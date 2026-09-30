@@ -1221,6 +1221,14 @@ def cache_file(run_dir: Path, *, tag: str, arrays: dict[str, np.ndarray], report
     partial.rename(marker)
 
 
+FILE_NOT_RECEIVED: Final[str] = ": file not received"
+"""Suffix of the problem line for a file CEDA did not serve.
+
+`PartialStreak` ignores these lines, because the newest-first archive meets them on every older run
+for which CEDA never published the file.
+"""
+
+
 def merge_run(run_dir: Path, *, init_time: datetime, files_expected: int) -> RunResult:
     """Combine a run's cached files into one `RunResult`.
 
@@ -1239,7 +1247,7 @@ def merge_run(run_dir: Path, *, init_time: datetime, files_expected: int) -> Run
     for tag in active_profile().file_tags:
         marker, array_path = _cache_paths(run_dir, tag)
         if not marker.exists():
-            problems.append(f"{tag}: file not received")
+            problems.append(f"{tag}{FILE_NOT_RECEIVED}")
             continue
         received += 1
         report = json.loads(marker.read_text())
@@ -1390,12 +1398,15 @@ def run_times(*, start: date, end: date, newest_first: bool = False) -> Iterator
 
 
 MAX_IDENTICAL_PARTIAL_RUNS: Final[int] = 5
-"""Consecutive runs that are partial with the same problems before the archive stops."""
+"""Consecutive runs that are partial with the same extract problems before the archive stops."""
 
 
 @dataclass
 class PartialStreak:
-    """Counts consecutive committed runs that are partial with an identical set of problems.
+    """Counts consecutive committed runs that are partial with an identical set of extract problems.
+
+    An extract problem is an absent field, missing leads, or a semantic fault. A file CEDA did not
+    serve is not one, so runs missing only files never build a streak.
 
     Attributes:
         problems: The problem set the current streak shares, or an empty set outside a streak.
@@ -1409,14 +1420,16 @@ class PartialStreak:
         """Count a committed run, and return whether the streak has reached the abort length.
 
         Args:
-            run: The run just committed. A complete run, or a partial run with different problems,
-                resets the streak.
+            run: The run just committed. A complete run, a run whose only problems are files not
+                received, or a partial run with different problems, resets the streak.
 
         Returns:
             `True` once `MAX_IDENTICAL_PARTIAL_RUNS` runs in a row were partial with the same
             problems.
         """
-        found = frozenset(run.problems)
+        found = frozenset(
+            problem for problem in run.problems if not problem.endswith(FILE_NOT_RECEIVED)
+        )
         if run.status != STATUS_PARTIAL or not found:
             self.problems, self.length = frozenset(), 0
         elif found == self.problems:
@@ -1635,7 +1648,7 @@ def _archive_locked(args: argparse.Namespace, *, token: str, product_dir: Path) 
             print(
                 f"stopping: {MAX_IDENTICAL_PARTIAL_RUNS} runs in a row were partial with the same "
                 f"problems, the first being {min(streak.problems)}. "
-                "Rerun later to resume."
+                "Rerun later to resume, with --retry-partial to fetch the partial runs again."
             )
             return 1
     write_documents(product_dir=product_dir, store=store, grid=grid)

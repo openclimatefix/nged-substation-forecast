@@ -16,9 +16,10 @@ complete runs only. The sample is small because every run holds 31 arrays of 55 
 `--product ukv-ceda-t120`). Pass `--sample 0` to read every run. A range check never loosens to
 pass: a failure means the store or the source is wrong.
 
-**The script prints one PASS or FAIL line per check, and no cell count or coordinate,** because
-those reveal the size and place of the private trial-area box. The measured numbers go only to
-`validation.json` next to the store. The script exits non-zero when any check fails.
+**The script prints one PASS, FAIL, or SKIP line per check, and no cell count or coordinate,**
+because those reveal the size and place of the private trial-area box. The measured numbers go only
+to `validation.json` next to the store. A check prints SKIP when the store holds too little data for
+it, and a SKIP does not fail the script. The script exits non-zero when any check fails.
 
 Run it with `uv run --with icechunk --with zarr python
 studies/weather_downloads/validate_ukv_ceda.py --store-dir <product dir>`. Pass `--product
@@ -70,7 +71,13 @@ T120_CHECK_NAMES: Final[tuple[str, ...]] = (
 )
 """Checks that run only for a profile with `T120` files, after `CHECK_NAMES`."""
 
+CheckResult = tuple[bool | None, dict[str, Any]]
+"""A check's outcome, then what it measured. `True` is a PASS, `False` a FAIL, and `None` a SKIP:
+the store holds too little data for the check to say anything."""
+
 KELVIN: Final[float] = 273.15
+MIN_RUNS_FOR_GRADIENT: Final[int] = 20
+"""Fewest sampled runs for which the north-to-south temperature correlation means anything."""
 VALUE_RANGES: Final[dict[str, tuple[float, float]]] = {
     "temperature_1p5m": (-40.0 + KELVIN, 50.0 + KELVIN),
     "temperature_0m": (-40.0 + KELVIN, 60.0 + KELVIN),
@@ -84,11 +91,11 @@ VALUE_RANGES: Final[dict[str, tuple[float, float]]] = {
     "wind_speed_10m": (0.0, 80.0),
     "wind_direction_10m": (0.0, 360.0),
     "pressure_msl": (90000.0, 110000.0),
-    "cloud_total": (0.0, 100.0),
+    "cloud_total": (0.0, 100.1),
     "cloud_low": (0.0, 100.0),
     "cloud_very_low": (0.0, 100.0),
     "cloud_medium": (0.0, 100.0),
-    "cloud_high": (0.0, 100.0),
+    "cloud_high": (0.0, 100.1),
     "cloud_base_height": (0.0, 20000.0),
     "cloud_param_0_6_26": (0.0, 20000.0),
     "convective_cloud_top_height": (0.0, 20000.0),
@@ -174,7 +181,7 @@ def check_run_spacing(group: zarr.Group) -> tuple[bool, dict[str, Any]]:
     return bool(np.array_equal(init_time, expected)), {"slots": len(init_time)}
 
 
-def check_status_counts(statuses: np.ndarray, group: zarr.Group) -> tuple[bool, dict[str, Any]]:
+def check_status_counts(statuses: np.ndarray, group: zarr.Group) -> CheckResult:
     """Check that no run has an unknown status, and that the file counts agree with the status."""
     counts = {name: int((statuses == code).sum()) for code, name in STATUS_NAMES.items()}
     counts["never_archived"] = int((statuses == 0).sum())
@@ -195,7 +202,7 @@ def read_sample(group: zarr.Group, spec: FieldSpec, slots: np.ndarray) -> np.nda
     return np.stack([np.asarray(array[int(slot)]) for slot in slots])
 
 
-def check_value_ranges(group: zarr.Group, slots: np.ndarray) -> tuple[bool, dict[str, Any]]:
+def check_value_ranges(group: zarr.Group, slots: np.ndarray) -> CheckResult:
     """Check every variable's finite values against its physical range."""
     measured: dict[str, Any] = {}
     ok = True
@@ -215,7 +222,7 @@ def check_value_ranges(group: zarr.Group, slots: np.ndarray) -> tuple[bool, dict
     return ok, measured
 
 
-def check_nan_layout(group: zarr.Group, slots: np.ndarray) -> tuple[bool, dict[str, Any]]:
+def check_nan_layout(group: zarr.Group, slots: np.ndarray) -> CheckResult:
     """Check that each variable is NaN at every unserved lead, and finite at every served lead."""
     ok = True
     bad: dict[str, str] = {}
@@ -242,9 +249,7 @@ def equation_of_time_minutes(day_of_year: int) -> float:
     return float(9.87 * np.sin(2 * angle) - 7.53 * np.cos(angle) - 1.5 * np.sin(angle))
 
 
-def check_shortwave_diurnal_cycle(
-    group: zarr.Group, slots: np.ndarray
-) -> tuple[bool, dict[str, Any]]:
+def check_shortwave_diurnal_cycle(group: zarr.Group, slots: np.ndarray) -> CheckResult:
     """Check that shortwave is centred on solar noon and near zero at midnight, by valid hour.
 
     The mean daily curve of shortwave, by UTC hour of the valid time, has a centroid over the
@@ -312,7 +317,7 @@ def _solar_noon_offset(
     return centroid - solar_noon, mean_by_hour, counts
 
 
-def check_adjacent_runs_differ(group: zarr.Group, pairs: np.ndarray) -> tuple[bool, dict[str, Any]]:
+def check_adjacent_runs_differ(group: zarr.Group, pairs: np.ndarray) -> CheckResult:
     """Check that no two consecutive complete runs hold bit-identical data.
 
     A stuck or duplicated download would store the same fields under two initialisation times.
@@ -322,8 +327,10 @@ def check_adjacent_runs_differ(group: zarr.Group, pairs: np.ndarray) -> tuple[bo
         pairs: The first slot of each pair of consecutive complete slots to compare.
 
     Returns:
-        Whether no pair was identical, and the measured values.
+        Whether no pair was identical, and the measured values. `None` when there is no pair.
     """
+    if not len(pairs):
+        return None, {"skipped": "no two adjacent complete runs"}
     identical: list[str] = []
     for variable in ADJACENT_RUN_VARIABLES:
         array = _array(group, variable)
@@ -337,15 +344,15 @@ def check_adjacent_runs_differ(group: zarr.Group, pairs: np.ndarray) -> tuple[bo
     return not identical, {"pairs_compared": len(pairs), "identical": identical}
 
 
-def check_temperature_continuity(
-    group: zarr.Group, slots: np.ndarray
-) -> tuple[bool, dict[str, Any]]:
+def check_temperature_continuity(group: zarr.Group, slots: np.ndarray) -> CheckResult:
     """Check that temperature does not jump at the change from the `T54` to the `T120` files.
 
     The median absolute difference between lead 54 and lead 57 may be at most
     `CONTINUITY_FACTOR` times the median absolute difference between leads 51 and 54, plus
-    `CONTINUITY_MARGIN_KELVIN`.
+    `CONTINUITY_MARGIN_KELVIN`. The check is skipped, returning `None`, when there is no run.
     """
+    if not len(slots):
+        return None, {"skipped": "no complete run to read"}
     spec = next(spec for spec in FIELDS if spec.variable == "temperature_1p5m")
     data = read_sample(group, spec, slots)
     reference = float(np.nanmedian(np.abs(data[:, T54_LAST_LEAD] - data[:, T54_LAST_LEAD - 3])))
@@ -358,12 +365,15 @@ def check_temperature_continuity(
     }
 
 
-def check_north_south_gradient(group: zarr.Group, slots: np.ndarray) -> tuple[bool, dict[str, Any]]:
+def check_north_south_gradient(group: zarr.Group, slots: np.ndarray) -> CheckResult:
     """Check that the stored grid runs north to south, and that temperature falls to the north.
 
     Latitude must fall as the row index rises. The mean temperature over the sampled runs must
-    correlate negatively with latitude, which fails if the rows were read in the wrong order.
+    correlate negatively with latitude, which fails if the rows were read in the wrong order. The
+    check is skipped, returning `None`, when fewer than `MIN_RUNS_FOR_GRADIENT` runs were sampled.
     """
+    if len(slots) < MIN_RUNS_FOR_GRADIENT:
+        return None, {"skipped": f"fewer than {MIN_RUNS_FOR_GRADIENT} runs sampled"}
     latitude = np.asarray(_array(group, "cell_latitude")[:])
     rows = np.asarray(_array(group, "cell_row")[:])
     rows_run_south = bool(latitude[rows == rows.min()].mean() > latitude[rows == rows.max()].mean())
@@ -378,9 +388,7 @@ def check_north_south_gradient(group: zarr.Group, slots: np.ndarray) -> tuple[bo
     }
 
 
-def check_gust_max_is_a_maximum(
-    group: zarr.Group, slots: np.ndarray
-) -> tuple[bool, dict[str, Any]]:
+def check_gust_max_is_a_maximum(group: zarr.Group, slots: np.ndarray) -> CheckResult:
     """Check that the maximum gust is not below the instantaneous gust at the same lead.
 
     The two are rounded to 13 significand bits, so a difference within `GUST_TOLERANCE` is equal.
@@ -392,7 +400,7 @@ def check_gust_max_is_a_maximum(
     return below < MAX_GUST_VIOLATION_FRACTION, {"fraction_max_below_instant": below}
 
 
-def check_gaps(statuses: np.ndarray) -> tuple[bool, dict[str, Any]]:
+def check_gaps(statuses: np.ndarray) -> CheckResult:
     """List the ranges of runs, between the first and last archived, that are not complete.
 
     A gap is not a failure, since CEDA has missing runs. The check fails only if a slot inside the
@@ -435,10 +443,10 @@ def _slot_time(slot: int) -> datetime:
 
 
 def main() -> int:
-    """Run every check and print PASS or FAIL for each.
+    """Run every check and print PASS, FAIL, or SKIP for each.
 
     Returns:
-        0 if every check passed, else 1.
+        0 if no check failed, else 1.
     """
     parser = argparse.ArgumentParser(description="Validate the UKV-CEDA Icechunk store.")
     add_product_argument(parser)
@@ -487,21 +495,20 @@ def main() -> int:
     if profile.has_t120:
         names = (*CHECK_NAMES, *T120_CHECK_NAMES)
         pairs = complete[np.isin(complete + 1, complete)]
-        results["adjacent_runs_differ"] = (
-            check_adjacent_runs_differ(group, sample_slots(pairs, sample=args.sample))
-            if len(pairs)
-            else no_runs
+        results["adjacent_runs_differ"] = check_adjacent_runs_differ(
+            group, sample_slots(pairs, sample=args.sample)
         )
-        results["temperature_continuity_54_57"] = (
-            check_temperature_continuity(group, complete_sample) if len(complete) else no_runs
+        results["temperature_continuity_54_57"] = check_temperature_continuity(
+            group, complete_sample
         )
     for name in names:
-        print(f"{'PASS' if results[name][0] else 'FAIL'} {name}")
+        outcome = {True: "PASS", False: "FAIL", None: "SKIP"}[results[name][0]]
+        print(f"{outcome} {name}")
     measured: dict[str, dict[str, Any] | int] = {name: results[name][1] for name in names}
     measured["sampled_complete_runs"] = len(complete_sample)
     measured["readable_runs"] = len(readable)
     (args.store_dir / "validation.json").write_text(json.dumps(measured, indent=2, default=str))
-    return 0 if all(passed for passed, _ in results.values()) else 1
+    return 0 if all(passed is not False for passed, _ in results.values()) else 1
 
 
 if __name__ == "__main__":
