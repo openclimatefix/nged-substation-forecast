@@ -10,11 +10,12 @@ metered output).
 
 A difference is the first product's error minus the second's, so a positive difference means the
 first product forecasts worse. Each bracketed pair is a 95% interval. A forecast's lead is the time
-from the start of the run that made it to the hour it forecasts. A matched lead means that ENS is
-scored at two leads, one shorter and one at least as long as the other product's lead, because the
-archive cannot give the two products the same lead. A product that beats ENS at the shorter lead
-wins although ENS had the shorter lead, and ENS beating a product at the longer lead is not
-explained by ENS having the shorter lead ([How the leads are matched](#how-the-leads-are-matched)).
+from the start of the run that made it to the hour it forecasts. A matched lead needs explaining,
+because the archive cannot give the two products the same lead. The study therefore scores ENS at
+two leads, one shorter and one at least as long as the other product's lead. If a product beats ENS
+at ENS's shorter lead, the product wins even though ENS had the advantage. If ENS beats a product at
+ENS's longer lead, ENS wins even though the product had the advantage ([How the leads are
+matched](#how-the-leads-are-matched)).
 
 The four individual products compared in most detail are the Met Office's UK variable-resolution
 weather model (UKV), ICON-EU from the German weather service's (DWD's) Icosahedral Nonhydrostatic
@@ -110,29 +111,23 @@ the result is not evidence that WeatherNext 3 loses skill.
 has a lower error than climatology, a forecast that uses no weather data (14.5%), but at day 14
 neither the ENS mean nor the GEFS mean does.** Each panel is one lead day, from day 0 at the top, on
 one shared x axis, and each row is one forecast product, sorted best first. Among the full-window
-products, the ENS mean and IFS 0.25° have the lowest day-1 errors. The three rows below the heading
-"Fewer months" are fitted on different, smaller row sets: WeatherNext 3 (7 months, February to
-September 2026, no May rows), AIFS Single (16 months), and AIFS ENS mean (11 months). The
-fewer-months rows' dots are hollow, the fewer-months rows are not ranked against the rows above, and
-each has a grey tick for the ENS mean on the same rows. WeatherNext 3's chart row uses every hour
-from February to September 2026, and Google has not documented which WeatherNext 3 weather-model
-version made that archive, so the February to June months may overlap WeatherNext 3's training data
-(Figure 19 splits the rows). At days 7 and 14 WeatherNext 3's solar error is not the lowest plotted:
-the ENS mean (13.7% at day 7) and GFS native (14.7% at day 14) are lower, on more months. Against
-the ENS mean on the same rows (14.7% and 16.0%) the difference is not resolved. Among the
-full-window rows, every product except IFS HRES 9 km is scored on exactly the same hours; IFS HRES 9
-km is scored without the target days its archive lacks. The fewer-months rows are scored on their
-own, smaller row sets. Leads are not equal: a Previous Runs product (read from Open-Meteo's archive
-of past forecasts) reads the freshest run at least a day old, a shorter lead than ENS's on most
-hours, which favours that product. A month counts whole in the resampling even where the row set
-holds part of it (September 2026 holds 10 days). Overlapping intervals can still hide a significant
-paired difference (Figure 5). Smart persistence, which uses no weather forecast, is drawn only at
-days 0 to 3, where it was scored. A lead day with no mark was not fitted, because it is beyond the
-product's forecast range or not in the archive we hold; nothing is filled in. Day 0 is a hindcast,
-not a day-ahead forecast a service could read, because each product reads a run that started before
-the hour it describes. Solar day 0 omits the hours ending 01:00 to 06:00 UTC for every product,
-because they precede the first 6-hourly step of the AIFS arms. The WeatherNext 3 row is the pooled
-rows (February to September 2026).
+products, the ENS mean and IFS 0.25° have the lowest day-1 errors. Every full-window product except
+IFS HRES 9 km is scored on exactly the same hours, and IFS HRES 9 km is scored without the target
+days its archive lacks. The three rows below the heading "Fewer months" are fitted on different,
+smaller row sets: WeatherNext 3 (7 months, February to September 2026, no May rows), AIFS Single (16
+months), and AIFS ENS mean (11 months). Their dots are hollow, they are not ranked against the rows
+above, and each has a grey tick for the ENS mean on the same rows. Google has not documented which
+WeatherNext 3 weather-model version made its archive, so the February to June months may overlap
+WeatherNext 3's training data (Figure 19 splits the rows). At days 7 and 14 WeatherNext 3's solar
+error is not the lowest plotted: the ENS mean (13.7% at day 7) and GFS native (14.7% at day 14) are
+lower, on more months. Against the ENS mean on the same rows (14.7% and 16.0%) the difference is not
+resolved. Leads are not equal, and the difference favours the Previous Runs products
+([Limitations](#what-figures-1-to-4-do-not-show)). Overlapping intervals can still hide a
+significant paired difference (Figure 5). Smart persistence, which uses no weather forecast, is
+drawn only at days 0 to 3, where it was scored. A lead day with no mark was not fitted, because it
+is beyond the product's forecast range or not in the archive we hold; nothing is filled in. Day 0 is
+a hindcast, not a day-ahead forecast a service could read. Solar day 0 omits the hours ending 01:00
+to 06:00 UTC for every product, because they precede the first 6-hourly step of the AIFS arms.
 
 ![Each wind forecast product's error at each fitted lead day, with 95% intervals](../assets/nwp_forecast_wind_leaderboard.svg)
 
@@ -185,43 +180,37 @@ solar day 1). By day 14, the GEFS mean, native GFS, and the ENS control member c
 from the ENS mean for either technology.
 <!-- report: Solar and Wind, intervals.parquet (21-month rows) -->
 
-**Among the 114 product-by-day dots across both technologies on the 21-month rows at days 1 to 14,
-one has a lower error than the ENS mean with an interval clear of zero: IFS 0.25° for wind at day 2,
-at -0.268 points [-0.451, -0.089].** Chance alone could produce one clear dot of 114, and IFS
-0.25°'s shorter lead favours it. At day 0, which a live service cannot use, ICON-D2 (the German
-weather service's regional ICON) and IFS 0.25° score a lower error for both technologies, and UKV
-and ICON-EU do for wind.
+**Among the 114 product-by-day dots on the 21-month rows at days 1 to 14, one has a lower error than
+the ENS mean with an interval clear of zero: IFS 0.25° for wind at day 2, at -0.268 points [-0.451,
+-0.089].** Chance alone could produce one clear dot of 114, and IFS 0.25°'s shorter lead favours it.
+At day 0, which a live service cannot use, ICON-D2 (the German weather service's regional ICON) and
+IFS 0.25° score a lower error for both technologies, and UKV and ICON-EU do for wind.
 
-**For WeatherNext 3, AIFS Single, and AIFS ENS mean, the result depends on which ENS mean forms the
-zero line.**
+**For WeatherNext 3 (Google's machine-learned weather model), AIFS Single, and AIFS ENS mean, the
+result depends on which ENS mean forms the zero line.** The table gives each product's difference
+from ENS's mean, in points, against an ENS mean refitted on the product's own months (the filled
+dot) and against the 21-month ENS mean on the same hours (the hollow mark).
 
-- **WeatherNext 3 (Google's machine-learned weather model; 7 months, dashed intervals)** scores a
-  lower error than an ENS mean refitted on the same 7 months at days 1 to 5 for solar and days 0 to
-  5 for wind (solar day 1: -0.243 points [-0.440, -0.069]). Against the 21-month ENS mean on the
-  same hours, WeatherNext 3 is not distinguishably lower at solar days 1 to 5 or wind days 0 to 5,
-  and scores higher at solar day 0 (+0.482 points [+0.141, +0.886]) and wind day 4 (+0.665 points
-  [+0.307, +1.004]). The refitted ENS mean scores a higher error than the 21-month ENS mean (solar
-  day 1: +0.539 points [+0.085, +1.194]), so the lower error may reflect the weaker zero line. The
-  weather-model version behind WeatherNext 3's archive is undocumented, so February to June may
-  overlap WeatherNext 3's training data. Only July to September postdate it, and that is 3 months,
-  so the pooled 7 months are not a fair comparison. - **AIFS Single (16 months)** scores a higher
-  error than a same-rows ENS mean at day 0 and, for solar, at day 1 (+0.391 points [+0.171,
-  +0.598]). At days 2 to 10 every filled-dot interval includes zero, except wind day 7 (+0.800
-  points [+0.015, +1.586]), and wind day 14 is also higher (+0.827 points [+0.212, +1.460]). Against
-  the 21-month ENS mean (hollow marks), wind is also higher at day 2 (+0.878 points [+0.269,
-  +1.700]) and day 5 (+0.642 points [+0.110, +1.173]).
-- **AIFS ENS mean (11 months)** is the most dependent on the zero line. Its filled dots are higher
-  at day 0 and at solar day 1 (+0.242 points [+0.018, +0.478]), and lower at solar day 3 (-0.932
-  points [-1.681, -0.312]), wind day 4 (-0.982 points [-1.826, -0.303]), and wind day 5 (-0.831
-  points [-1.535, -0.159]). Every hollow mark at those three days includes zero.
+| Product (months) | Against the refitted ENS mean | Against the 21-month ENS mean |
+|---|---|---|
+| WeatherNext 3 (7, dashed intervals) | Lower at solar days 1 to 5 (day 1: -0.243 [-0.440, -0.069]) and wind days 0 to 5 | Not distinguishably lower at those days. Higher at solar day 0 (+0.482 [+0.141, +0.886]) and wind day 4 (+0.665 [+0.307, +1.004]) |
+| AIFS Single (16) | Higher at day 0 and at solar day 1 (+0.391 [+0.171, +0.598]), and at wind day 7 (+0.800 [+0.015, +1.586]) and day 14 (+0.827 [+0.212, +1.460]). Every other interval at days 2 to 10 includes zero | Wind also higher at day 2 (+0.878 [+0.269, +1.700]) and day 5 (+0.642 [+0.110, +1.173]) |
+| AIFS ENS mean (11) | Higher at day 0 and at solar day 1 (+0.242 [+0.018, +0.478]). Lower at solar day 3 (-0.932 [-1.681, -0.312]), wind day 4 (-0.982 [-1.826, -0.303]), and wind day 5 (-0.831 [-1.535, -0.159]) | Every mark at solar day 3, wind day 4, and wind day 5 includes zero |
 
-**Figures 3 and 4 show each product's own error, which Figures 1 and 2 cannot, and error rises with
-lead.** The ENS mean's error for solar is 8.771% [8.096, 9.373] of capacity at day 1 and 14.876%
-[13.797, 15.870] at day 14, against 14.458% [13.205, 15.592] for climatology, a forecast that uses
-no weather data. For wind the ENS mean's errors are 8.350% [7.373, 9.364] and 18.867% [16.664,
-21.091], against 18.460% [16.341, 20.389]. At day 7 the ENS mean's error is lower than
-climatology's, though the solar gain lies near the 5% line with no second-setting check, and from
-day 10 the two cannot be told apart.
+The refitted ENS mean scores a higher error than the 21-month ENS mean (solar day 1: +0.539 points
+[+0.085, +1.194]), so a lower error than the refitted mean may reflect the weaker zero line. The
+weather-model version behind WeatherNext 3's archive is undocumented, so February to June may
+overlap its training data. Only July to September postdate that data, which is 3 months, so the
+pooled 7 months are not a fair comparison.
+
+**Error rises with lead, and from day 10 the ENS mean is no better than climatology (Figures 3 and
+4).** Climatology is a forecast that uses no weather data. At day 7 the ENS mean's error is lower
+than climatology's, though the solar gain lies near the 5% line with no second-setting check.
+
+| Mean absolute error, % of capacity | ENS mean, day 1 | ENS mean, day 14 | Climatology |
+|---|---|---|---|
+| Solar | 8.771% [8.096, 9.373] | 14.876% [13.797, 15.870] | 14.458% [13.205, 15.592] |
+| Wind | 8.350% [7.373, 9.364] | 18.867% [16.664, 21.091] | 18.460% [16.341, 20.389] |
 
 **Five limits apply to every dot in Figures 1 and 2.** They are the same-rows zero line, the fresher
 run that most products read (so a lower error than ENS's is not evidence of skill at equal lead),
@@ -231,15 +220,11 @@ the 5% level by chance ([Limitations](#what-figures-1-to-4-do-not-show)).
 
 **At day 1, at matched lead and at both XGBoost settings, ENS beat UKV, ICON-EU, and GEFS for solar,
 and UKV and GEFS for wind, while ICON-EU and IFS 0.25° cannot be separated from ENS for wind.** The
-Summary gives the numbers. A blend of ENS with ICON-EU and IFS 0.25° lowers the wind error at the
-conservative lead, and ICON-EU carries most of that gain (-0.169 points [-0.250, -0.090], post hoc).
-The day-2 blend is indistinguishable from ENS plus ICON-EU alone, and every solar blend control is
-itself worse than ENS alone
+Summary gives the numbers. Every solar blend control is itself worse than ENS alone, so the solar
+blend gain is not shown to come from the added weather
 ([blending](#a-blend-lowers-the-wind-error-at-both-leads-tested-and-the-solar-error-only-at-an-optimistic-lead)).
 Part of ENS's wind advantage may be timing noise that averaging removes
-([gaps](#part-of-enss-advantage-is-ensemble-averaging-and-timing)). The results sections also hold
-the planned AIFS contrast, the day-7 AIFS blend, and the lowest wind error of any forecast fitted,
-which reads a fresher run than ENS does.
+([gaps](#part-of-enss-advantage-is-ensemble-averaging-and-timing)).
 
 ## Introduction
 
@@ -384,10 +369,8 @@ headline claims: every contrast outside the planned list is exploratory, and so 
 paragraph quotes from an exploratory table. Analyses added after a result was seen, such as the two
 single-product wind blends, are exploratory and also post hoc. An exploratory interval with no real
 effect behind it has a nominal 5% chance of being statistically significant at the 5% level, and a
-higher chance if the intervals are too narrow. How many significant exploratory intervals are
-spurious is unknown, because how many have no real effect behind them is unknown. The intervals rest
-on overlapping months of weather and often share an arm, so spurious results tend to arrive
-together. No correction for multiple comparisons is applied to the exploratory intervals.
+higher chance if the intervals are too narrow ([Limitations](#what-the-numbers-depend-on) says how
+far the intervals can be trusted).
 <!-- report: header -->
 
 **The bracket assumes that ENS's own error does not fall as its lead lengthens, and the study tests
@@ -547,11 +530,8 @@ cancels that shared swing. The paired differences in Figures 5 and 6 are the tes
 statistically significant.
 
 **Figures 3 and 4 favour the Previous Runs products, because their day-1 leads are shorter than
-ENS's on most hours.** Only GEFS has ENS's exact lead on every row. UKV, ICON-EU, IFS 0.25°, and the
-other products from Open-Meteo's Previous Runs archive have a lead of 24 + (h mod n) hours, against
-ENS's 24 + h. IFS 0.25° day 1 can also come from a newer ECMWF run than ENS's 00 UTC run. The
-ordering of those products against ENS in Figures 3 and 4 is therefore not an ordering at equal
-lead.
+ENS's on most hours, so their ordering against ENS is not an ordering at equal lead.** Only GEFS has
+ENS's exact lead on every row ([How the leads are matched](#how-the-leads-are-matched)).
 
 ### Error rises with lead, and from day 10 the ENS mean is no better than climatology (exploratory)
 
