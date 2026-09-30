@@ -230,9 +230,7 @@ def _loaded(*, board_arms: list[str]) -> charts.Loaded:
     )
 
 
-def _figure(
-    monkeypatch: pytest.MonkeyPatch, *, number: int = 4, shifted_days: tuple[int, ...] = ()
-) -> dict[str, Any]:
+def _figure(monkeypatch: pytest.MonkeyPatch, *, number: int = 4) -> dict[str, Any]:
     board = _board()
     full = (
         board.filter(pl.col("window") == "full")
@@ -259,7 +257,6 @@ def _figure(
         title="A finding",
         number=number,
         row_set_marks=[charts.RowSetMarks(slug="wn3_mean", losses=pl.DataFrame())],
-        shifted_days=shifted_days,
     )
     return chart.to_dict()
 
@@ -444,51 +441,6 @@ def _touch(folder: Path, *names: str) -> None:
         pl.DataFrame({"arm": ["x"]}).write_parquet(folder / name)
 
 
-def test_no_optional_folder_means_no_optional_source(tmp_path: Path) -> None:
-    found = mod.optional_sources(data_dir=tmp_path, domain="solar")
-
-    assert (found.extra_dirs, found.blends_folders, found.wn3_folders) == ([], [], [])
-
-
-def test_the_day_4_folder_is_an_extra_lead_directory_and_the_day_5_folder_a_day_folder(
-    tmp_path: Path,
-) -> None:
-    _touch(tmp_path / mod.OPTIONAL_DAY4_SHARED, "solar_losses.parquet")
-    _touch(
-        tmp_path / mod.OPTIONAL_DAY5_AIFS_WN3,
-        "solar_single_day5_losses.parquet",
-        "solar_ens_day5_losses.parquet",
-        "solar_wn3_day5_losses.parquet",
-    )
-
-    found = mod.optional_sources(data_dir=tmp_path, domain="solar")
-
-    assert found.extra_dirs == [tmp_path / mod.OPTIONAL_DAY4_SHARED]
-    assert found.blends_folders == [
-        charts.DayFolder(folder=tmp_path / mod.OPTIONAL_DAY5_AIFS_WN3, days=(5,))
-    ]
-    assert found.wn3_folders == found.blends_folders
-
-
-def test_a_folder_missing_this_technologys_file_is_left_out(tmp_path: Path) -> None:
-    _touch(tmp_path / mod.OPTIONAL_DAY4_SHARED, "solar_losses.parquet")
-    _touch(tmp_path / mod.OPTIONAL_DAY5_AIFS_WN3, "solar_wn3_day5_losses.parquet")
-
-    wind = mod.optional_sources(data_dir=tmp_path, domain="wind")
-    solar = mod.optional_sources(data_dir=tmp_path, domain="solar")
-
-    assert wind.extra_dirs == []
-    assert wind.wn3_folders == []
-    assert solar.blends_folders == []
-    assert len(solar.wn3_folders) == 1
-
-
-def test_aifs_needs_both_its_row_sets_files_at_day_5(tmp_path: Path) -> None:
-    _touch(tmp_path / mod.OPTIONAL_DAY5_AIFS_WN3, "solar_single_day5_losses.parquet")
-
-    assert mod.optional_sources(data_dir=tmp_path, domain="solar").blends_folders == []
-
-
 def _per_day_losses(folder: Path, *, domain: str, row_set: str, day: int) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     pl.DataFrame({"arm": [f"{row_set}_day{day}"], "site": ["A"]}).write_parquet(
@@ -558,8 +510,8 @@ def test_every_grid_line_has_the_width_the_old_leaderboard_gave_its_minor_lines(
     widths = {
         layer["mark"]["strokeWidth"] for panel in spec["vconcat"] for layer in _grid_layers(panel)
     }
-    assert widths == {charts.MINOR_GRID_WIDTH_PX}
-    assert mod.GRID_WIDTH_PX == charts.MINOR_GRID_WIDTH_PX
+    assert widths == {1.5}
+    assert mod.GRID_WIDTH_PX == 1.5
 
 
 def test_each_panel_has_a_grid_line_at_every_whole_number_and_every_half_point_between(
@@ -591,74 +543,6 @@ def test_a_layer_that_turns_off_the_x_axis_would_hide_every_panels_tick_labels(
 
 def test_the_ticks_are_the_whole_numbers_of_the_range() -> None:
     assert mod.whole_ticks(x_domain=(4.0, 7.0)) == [4.0, 5.0, 6.0, 7.0]
-
-
-def _panels_for_axes() -> dict[int, pl.DataFrame]:
-    low = _full(rows=[("Product A", 0, 6.0), ("Product B", 0, 9.0)])
-    high = _full(rows=[("Product A", 10, 14.0), ("Product B", 10, 17.0)])
-    board = mod.board_rows(full=pl.concat([low, high]), short=None)
-    return {day: mod.day_rows(board=board, day=day) for day in (0, 10)}
-
-
-def test_with_no_shifted_day_every_panel_shares_one_range() -> None:
-    plan = mod.axis_plan(panels=_panels_for_axes(), baselines={0: [], 10: []})
-
-    assert plan.domains == {0: (5.0, 18.0), 10: (5.0, 18.0)}
-    assert plan.shift == 0.0
-
-
-def test_a_shifted_panel_has_the_same_span_as_the_others_and_sits_higher_by_a_whole_shift() -> None:
-    plan = mod.axis_plan(panels=_panels_for_axes(), baselines={0: [], 10: []}, shifted_days=[10])
-
-    (low_a, high_a), (low_b, high_b) = plan.domains[0], plan.domains[10]
-    assert (low_a, high_a) == (5.0, 10.0)
-    assert high_b - low_b == high_a - low_a
-    assert plan.shift == low_b - low_a == 8.0
-    assert plan.shift == int(plan.shift)
-
-
-def test_a_shifted_day_wider_than_the_other_panels_span_is_refused() -> None:
-    panels = _panels_for_axes()
-    wide = _full(rows=[("Product A", 10, 12.0), ("Product B", 10, 30.0)])
-    panels[10] = mod.day_rows(board=mod.board_rows(full=wide, short=None), day=10)
-
-    with pytest.raises(ValueError, match="more than the other panels"):
-        mod.axis_plan(panels=panels, baselines={0: [], 10: []}, shifted_days=[10])
-
-
-def test_the_shifted_panels_are_the_only_ones_titled_with_the_shift(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    spec = _figure(monkeypatch, shifted_days=(10,))
-
-    titles = _panel_titles(spec)
-    assert titles[:3] == ["Day 0 (hindcast)", "Day 1", "Day 7"]
-    assert titles[3].startswith("Day 10: x axis shifted up by ")
-    assert titles[3].endswith(" points")
-
-
-def test_the_shifted_panels_share_the_span_in_the_figure_and_keep_whole_number_ticks(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    spec = _figure(monkeypatch, shifted_days=(10,))
-
-    domains = {
-        panel["title"]["text"]: panel["layer"][0]["encoding"]["x"]["scale"]["domain"]
-        for panel in spec["vconcat"]
-    }
-    spans = {title: domain[1] - domain[0] for title, domain in domains.items()}
-    assert len(set(spans.values())) == 1
-    shifted = spec["vconcat"][-1]["layer"][0]["encoding"]["x"]["scale"]["domain"]
-    assert shifted[0] == int(shifted[0])
-
-
-def test_the_subtitle_says_which_days_use_the_shifted_axis() -> None:
-    text = " ".join(
-        mod.subtitle_lines(scope="Scope.", smart_days=[1], shift=8.0, shifted_days=[10, 14])
-    )
-
-    assert "days 10, 14 use an axis 8 points higher" in text
-    assert "All panels share one x axis" not in text
 
 
 def test_product_names_are_shortened_only_where_the_short_form_is_unambiguous() -> None:
@@ -707,3 +591,69 @@ def test_the_figure_gives_the_plot_more_width_than_the_old_fixed_label_column_di
     assert width > study_charts.PLOT_WIDTH_PX
     extent = _y_encoding(spec["vconcat"][0])["axis"]["minExtent"]
     assert extent + width + mod.RIGHT_MARGIN_PX == study_charts.CONTENT_WIDTH_PX
+
+
+# --- Default sources ----------------------------------------------------------------------------
+
+
+def _write_default_folders(data_dir: Path, *, domain: str, skip: str | None = None) -> None:
+    """Write every file `default_sources` expects, minimal, except the one named `skip`."""
+    names = [
+        f"{mod.PUBLISHED_FOLDER}/{domain}_losses.parquet",
+        f"{mod.PUBLISHED_FOLDER}/{domain}_predictions.parquet",
+        *(f"{folder}/{domain}_losses.parquet" for folder in mod.EXTRA_LEAD_FOLDERS),
+        *(
+            f"{folder}/{domain}_{row_set}_day{day}_losses.parquet"
+            for folder, days in (
+                (mod.AIFS_BLENDS_FOLDER, mod.BLEND_DAYS),
+                (mod.AIFS_EXTRA_FOLDER, mod.LEAN_DAYS),
+                (mod.DAY5_FOLDER, mod.DAY5),
+            )
+            for row_set in mod.ROW_SETS
+            for day in days
+        ),
+        *(
+            f"{folder}/{domain}_wn3_day{day}_losses.parquet"
+            for folder, days in (
+                (mod.WN3_FOLDER, mod.WN3_DAYS),
+                (mod.WN3_EXTRA_FOLDER, mod.WN3_EXTRA_DAYS),
+                (mod.DAY5_FOLDER, mod.DAY5),
+            )
+            for day in days
+        ),
+    ]
+    for name in names:
+        if name == skip:
+            continue
+        path = data_dir / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pl.DataFrame({"arm": ["x"]}).write_parquet(path)
+
+
+def test_the_day_4_and_day_5_folders_are_default_sources(tmp_path: Path) -> None:
+    _write_default_folders(tmp_path, domain="solar")
+
+    sources = mod.default_sources(data_dir=tmp_path, domain="solar")
+
+    assert tmp_path / "nwp_forecast_comparison_day4_shared" in sources.extra_dirs
+    assert sources.day5 == charts.DayFolder(
+        folder=tmp_path / "nwp_forecast_comparison_day5_aifs_wn3", days=(5,)
+    )
+    assert mod.DAY5 == (5,)
+
+
+@pytest.mark.parametrize(
+    "missing",
+    [
+        "nwp_forecast_comparison_day4_shared/wind_losses.parquet",
+        "nwp_forecast_comparison_day5_aifs_wn3/wind_single_day5_losses.parquet",
+        "nwp_forecast_comparison_day5_aifs_wn3/wind_ens_day5_losses.parquet",
+        "nwp_forecast_comparison_day5_aifs_wn3/wind_wn3_day5_losses.parquet",
+        "nwp_forecast_comparison_wn3_extra_days/wind_wn3_day10_losses.parquet",
+    ],
+)
+def test_a_missing_default_file_raises_naming_it(tmp_path: Path, missing: str) -> None:
+    _write_default_folders(tmp_path, domain="wind", skip=missing)
+
+    with pytest.raises(FileNotFoundError, match=Path(missing).name):
+        mod.default_sources(data_dir=tmp_path, domain="wind")

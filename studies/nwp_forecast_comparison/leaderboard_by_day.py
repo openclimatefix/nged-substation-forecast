@@ -20,21 +20,21 @@ compared by eye with a dot at day 0. Every dot has one colour. In each panel:
   panel, and Smart persistence, drawn only in the panels of lead days at which it was scored
   (the saved losses hold `smart_persistence_day<N>` for days 0 to 3).
 
-Optional sources: with `--optional-sources`, the script also reads whichever of the folders in
-`OPTIONAL_SOURCES` exist under the data directory (`optional_sources`). These hold the day-4 cells
-of the full-window products and the day-5 cells of AIFS and WeatherNext 3, fitted after the
-published leaderboards. A folder missing any file it needs is left out, with a log line.
+Sources: `default_sources` names every fit folder the leaderboard reads, under the data directory:
+the published fit, the extra-lead fits (including `nwp_forecast_comparison_day4_shared`, the day-4
+cells of the full-window products), the AIFS and WeatherNext 3 fits (including
+`nwp_forecast_comparison_day5_aifs_wn3`, their day-5 cells), and it raises if a folder or file is
+missing, so a missing day cannot silently leave a blank cell.
 
 Every limiting caveat the old leaderboard's caption carried is kept in `caveat_notes`, which the
 script prints after each figure's title so the page can reuse the list; the figure's own subtitle
 carries only what a reader needs to decode the chart.
 
-Run it with `uv run python studies/nwp_forecast_comparison/leaderboard_by_day.py --input-dir DIR
---extra-dir DIR ... --leaderboard-blends-dir DIR --wn3-dir DIR --leaderboard-blends-extra-dir DIR
---wn3-extra-dir DIR --first-figure-number 1`, the same folders `nwp_forecast_charts.py` takes. The
-script writes `marks.parquet`, `report.md` and each SVG once, and refuses to overwrite a file
-unless `--replace-svgs` is given for the SVGs. Generators appear nowhere: every error is pooled over
-the technology's generators, and the loading code refuses an unanonymised site label.
+Run it with `uv run python studies/nwp_forecast_comparison/leaderboard_by_day.py
+--first-figure-number 1`. The script writes `marks.parquet`, `report.md` and each SVG once, and
+refuses to overwrite a file unless `--replace-svgs` is given for the SVGs. Generators appear
+nowhere: every error is pooled over the technology's generators, and the loading code refuses an
+unanonymised site label.
 """
 
 import argparse
@@ -44,13 +44,14 @@ import math
 import os
 import subprocess
 import sys
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Final, NamedTuple
 
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
+from fit_aifs import BLEND_DAYS, LEAN_DAYS, ROW_SETS, WN3_DAYS, WN3_EXTRA_DAYS
 from nwp_forecast_charts import (
     CAPACITY_NOTE,
     DOMAINS,
@@ -138,66 +139,90 @@ LABEL_SHORTENINGS: Final[dict[str, str]] = {
 """Row labels shortened to widen the plot. Each short form names one product: there is one IFS HRES
 9 km row, one ENS control row, and one WeatherNext 3 row in a panel."""
 
-OPTIONAL_DAY4_SHARED: Final[str] = "nwp_forecast_comparison_day4_shared"
-OPTIONAL_DAY5_AIFS_WN3: Final[str] = "nwp_forecast_comparison_day5_aifs_wn3"
-OPTIONAL_DAY4_DAYS: Final[tuple[int, ...]] = (4,)
-OPTIONAL_DAY5_DAYS: Final[tuple[int, ...]] = (5,)
+PUBLISHED_FOLDER: Final[str] = "nwp_forecast_comparison"
+EXTRA_LEAD_FOLDERS: Final[tuple[str, ...]] = (
+    "nwp_forecast_comparison_leads_day10",
+    "nwp_forecast_comparison_leads_day10b",
+    "nwp_forecast_comparison_leads_day10c",
+    "nwp_forecast_comparison_leads_day10d",
+    "nwp_forecast_comparison_day4_shared",
+)
+"""The extra-lead fits (`<domain>_losses.parquet` each), read like `nwp_forecast_charts.py`'s
+`--extra-dir`. The last holds day 4 of the full-window products."""
+
+AIFS_BLENDS_FOLDER: Final[str] = "nwp_forecast_comparison_aifs_blends"
+AIFS_EXTRA_FOLDER: Final[str] = "nwp_forecast_comparison_aifs_extra_days"
+WN3_FOLDER: Final[str] = "nwp_forecast_comparison_wn3"
+WN3_EXTRA_FOLDER: Final[str] = "nwp_forecast_comparison_wn3_extra_days"
+DAY5_FOLDER: Final[str] = "nwp_forecast_comparison_day5_aifs_wn3"
+DAY5: Final[tuple[int, ...]] = (5,)
+"""The folders of AIFS Single, the AIFS ENS mean, and WeatherNext 3 (one losses file per row set
+and lead day, `<domain>_<row set>_day<N>_losses.parquet`), and the one lead day the last holds."""
 
 
-class OptionalSources(NamedTuple):
-    """The optional fit folders that exist, sorted into how the loading code reads each."""
+class Sources(NamedTuple):
+    """Every fit folder the leaderboard of one technology reads."""
 
+    published: Path
     extra_dirs: list[Path]
-    blends_folders: list[DayFolder]
-    wn3_folders: list[DayFolder]
+    blends: Path
+    blends_extra: Path
+    wn3: Path
+    wn3_extra: Path
+    day5: DayFolder
 
 
-OPTIONAL_SOURCES: Final[tuple[str, ...]] = (OPTIONAL_DAY4_SHARED, OPTIONAL_DAY5_AIFS_WN3)
-"""The optional folders, by name under the data directory, switched on by `--optional-sources`:
-`OPTIONAL_DAY4_SHARED` holds `<domain>_losses.parquet` (an extra-lead fit, read like
-`--extra-dir`), and `OPTIONAL_DAY5_AIFS_WN3` holds `<domain>_single_day5_losses.parquet`,
-`<domain>_ens_day5_losses.parquet` and `<domain>_wn3_day5_losses.parquet`."""
-
-
-def optional_sources(*, data_dir: Path, domain: DomainType) -> OptionalSources:
-    """Return whichever optional fit folders exist and hold every file this technology needs.
+def default_sources(*, data_dir: Path, domain: DomainType) -> Sources:
+    """Return the leaderboard's fit folders, after checking every file they must hold exists.
 
     Args:
         data_dir: The directory holding the study folders (`data/studies`).
         domain: `solar` or `wind`.
 
     Returns:
-        The day-4 folder as an extra-lead directory if it holds `<domain>_losses.parquet`; the
-        day-5 folder as an AIFS folder if it holds the `single` and `ens` files, and as a
-        WeatherNext 3 folder if it holds the `wn3` file. Each is left out, with a log line, if
-        the folder or a file is missing.
+        The folders.
+
+    Raises:
+        FileNotFoundError: If any expected file is missing.
     """
-    extra_dirs: list[Path] = []
-    blends: list[DayFolder] = []
-    wn3: list[DayFolder] = []
-    day4 = data_dir / OPTIONAL_DAY4_SHARED
-    if (day4 / f"{domain}_losses.parquet").exists():
-        extra_dirs.append(day4)
-    else:
-        _LOG.info("optional source %s has no %s losses; left out", day4, domain)
-    day5 = data_dir / OPTIONAL_DAY5_AIFS_WN3
-    aifs_files = [
-        day5 / f"{domain}_{name}_day{day}_losses.parquet"
-        for name in ("single", "ens")
-        for day in OPTIONAL_DAY5_DAYS
+    sources = Sources(
+        published=data_dir / PUBLISHED_FOLDER,
+        extra_dirs=[data_dir / name for name in EXTRA_LEAD_FOLDERS],
+        blends=data_dir / AIFS_BLENDS_FOLDER,
+        blends_extra=data_dir / AIFS_EXTRA_FOLDER,
+        wn3=data_dir / WN3_FOLDER,
+        wn3_extra=data_dir / WN3_EXTRA_FOLDER,
+        day5=DayFolder(folder=data_dir / DAY5_FOLDER, days=DAY5),
+    )
+    expected = [
+        sources.published / f"{domain}_losses.parquet",
+        sources.published / f"{domain}_predictions.parquet",
+        *(folder / f"{domain}_losses.parquet" for folder in sources.extra_dirs),
+        *(
+            folder / f"{domain}_{row_set}_day{day}_losses.parquet"
+            for folder, days in (
+                (sources.blends, BLEND_DAYS),
+                (sources.blends_extra, LEAN_DAYS),
+                (sources.day5.folder, DAY5),
+            )
+            for row_set in ROW_SETS
+            for day in days
+        ),
+        *(
+            folder / f"{domain}_wn3_day{day}_losses.parquet"
+            for folder, days in (
+                (sources.wn3, WN3_DAYS),
+                (sources.wn3_extra, WN3_EXTRA_DAYS),
+                (sources.day5.folder, DAY5),
+            )
+            for day in days
+        ),
     ]
-    wn3_files = [day5 / f"{domain}_wn3_day{day}_losses.parquet" for day in OPTIONAL_DAY5_DAYS]
-    if all(path.exists() for path in aifs_files):
-        blends.append(DayFolder(folder=day5, days=OPTIONAL_DAY5_DAYS))
-    else:
-        _LOG.info("optional source %s lacks the %s AIFS day-5 files; left out", day5, domain)
-    if all(path.exists() for path in wn3_files):
-        wn3.append(DayFolder(folder=day5, days=OPTIONAL_DAY5_DAYS))
-    else:
-        _LOG.info(
-            "optional source %s lacks the %s WeatherNext 3 day-5 file; left out", day5, domain
-        )
-    return OptionalSources(extra_dirs=extra_dirs, blends_folders=blends, wn3_folders=wn3)
+    missing = [str(path) for path in expected if not path.exists()]
+    if missing:
+        msg = f"{domain}: missing fit files: {missing}"
+        raise FileNotFoundError(msg)
+    return sources
 
 
 # --- The caveats the page can reuse -------------------------------------------------------------
@@ -437,56 +462,6 @@ def shared_x_domain(
     return float(math.floor(min(values))), float(math.ceil(max(values)))
 
 
-class AxisPlan(NamedTuple):
-    """Each panel's x range, and how far the shifted panels' range sits above the others'."""
-
-    domains: dict[int, tuple[float, float]]
-    shift: float
-
-
-def axis_plan(
-    *,
-    panels: Mapping[int, pl.DataFrame],
-    baselines: Mapping[int, Sequence[Baseline]],
-    shifted_days: Collection[int] = (),
-) -> AxisPlan:
-    """Choose every panel's x range.
-
-    With no `shifted_days`, every panel shares one range. Otherwise the panels of `shifted_days`
-    share a second range with the same span in points, so one point is the same number of pixels in
-    every panel, and it sits higher by `AxisPlan.shift` points, a whole number.
-
-    Args:
-        panels: Each lead day's `day_rows`.
-        baselines: Each lead day's baselines.
-        shifted_days: The lead days drawn on the shifted range.
-
-    Returns:
-        Each lead day's range, and the shift (0 if no day is shifted).
-
-    Raises:
-        ValueError: If a shifted day's values do not fit in a range of the other panels' span.
-    """
-    plain = [day for day in panels if day not in shifted_days]
-    moved = [day for day in panels if day in shifted_days]
-    base = shared_x_domain(
-        panels=[panels[day] for day in plain], baselines=[baselines[day] for day in plain]
-    )
-    domains = dict.fromkeys(plain, base)
-    if not moved:
-        return AxisPlan(domains=domains, shift=0.0)
-    low, high = shared_x_domain(
-        panels=[panels[day] for day in moved], baselines=[baselines[day] for day in moved]
-    )
-    span = base[1] - base[0]
-    if high - low > span:
-        msg = f"days {moved} span {high - low} points, more than the other panels' {span}"
-        raise ValueError(msg)
-    shifted = (low, low + span)
-    domains |= dict.fromkeys(moved, shifted)
-    return AxisPlan(domains=domains, shift=low - base[0])
-
-
 def whole_ticks(*, x_domain: tuple[float, float]) -> list[float]:
     """Return the labelled ticks: every whole number in the range.
 
@@ -538,18 +513,16 @@ def plot_width_px(*, label_px: int) -> int:
     return CONTENT_WIDTH_PX - label_px - RIGHT_MARGIN_PX
 
 
-def day_title(*, day: int, shift: float = 0.0) -> str:
+def day_title(*, day: int) -> str:
     """Return a panel's title.
 
     Args:
         day: The lead day.
-        shift: How many points the panel's x axis is shifted up from the first panel's, or 0.
 
     Returns:
-        `Day N`, with `(hindcast)` at day 0 and a note of the shift where there is one.
+        `Day N`, with `(hindcast)` at day 0.
     """
-    title = f"Day {day} (hindcast)" if day == 0 else f"Day {day}"
-    return f"{title}: x axis shifted up by {shift:g} points" if shift else title
+    return f"Day {day} (hindcast)" if day == 0 else f"Day {day}"
 
 
 def grid_layers(*, x_domain: tuple[float, float], x_encoding: alt.X) -> list[alt.Chart]:
@@ -584,7 +557,6 @@ def day_panel(
     x_domain: tuple[float, float],
     x_title: str | None,
     label_px: int,
-    shift: float = 0.0,
 ) -> alt.LayerChart:
     """Draw one lead day's panel.
 
@@ -595,7 +567,6 @@ def day_panel(
         x_domain: This panel's x range.
         x_title: The x axis's title, or None to leave it off (every panel but the bottom one).
         label_px: The row-label column's width, the same for every panel.
-        shift: How many points this panel's x axis is shifted up from the first panel's, or 0.
 
     Returns:
         The panel: the vertical grid; dashed baseline lines across every row, each named in a blank
@@ -732,7 +703,7 @@ def day_panel(
         width=plot_width_px(label_px=label_px),
         height=alt.Step(ROW_STEP_PX),
         title=alt.TitleParams(
-            day_title(day=day, shift=shift),
+            day_title(day=day),
             anchor="start",
             frame="group",
             fontSize=PANEL_TITLE_PX,
@@ -740,33 +711,21 @@ def day_panel(
     )
 
 
-def subtitle_lines(
-    *, scope: str, smart_days: Sequence[int], shift: float = 0.0, shifted_days: Sequence[int] = ()
-) -> list[str]:
+def subtitle_lines(*, scope: str, smart_days: Sequence[int]) -> list[str]:
     """Return the figure's subtitle: only what a reader needs to decode the chart.
 
     Args:
         scope: The sentence naming the technology and period, and the capacity definition.
         smart_days: The lead days whose panel draws Smart persistence.
-        shift: How many points the shifted panels' x axis sits above the others', or 0.
-        shifted_days: The lead days drawn on the shifted axis.
 
     Returns:
         The lines.
     """
     smart = ", ".join(str(day) for day in smart_days)
-    axis = (
-        "All panels share one x axis."
-        if not shifted_days
-        else (
-            "Panels share one x axis, except that days "
-            f"{', '.join(str(day) for day in shifted_days)} use an axis {shift:g} points higher "
-            "with the same width in points, so their tick labels differ from the other panels'."
-        )
-    )
     return [
         (
-            f"One panel per lead day, day 0 at the top. {axis} Each row is one forecast product. "
+            "One panel per lead day, day 0 at the top, all on the same x axis. Each row is one "
+            "forecast product. "
             "A dot is the mean absolute error of an XGBoost model given that product's forecast, "
             "as a percentage of capacity; smaller is better. The line is the 95% interval from "
             "resampling whole months and a fitting seed. Rows are sorted best first."
@@ -806,7 +765,6 @@ def by_day_figure(
     title: str,
     number: int,
     row_set_marks: Sequence[RowSetMarks] = (),
-    shifted_days: Sequence[int] = (),
 ) -> tuple[alt.VConcatChart, pl.DataFrame]:
     """Draw each product's mean absolute error as one panel per lead day.
 
@@ -816,8 +774,6 @@ def by_day_figure(
         title: The figure's title.
         number: The figure's number on its page.
         row_set_marks: Products fitted on fewer months than the published ones.
-        shifted_days: Lead days drawn on an x axis shifted up from the others' (see `axis_plan`);
-            none by default, so every panel shares one axis.
 
     Returns:
         The figure, and the marks it plots (`board_rows`'s frame).
@@ -838,7 +794,7 @@ def by_day_figure(
     days = panel_days(board=board)
     rows = {day: day_rows(board=board, day=day) for day in days}
     baselines = {day: baselines_at_day(losses=losses, day=day) for day in days}
-    plan = axis_plan(panels=rows, baselines=baselines, shifted_days=shifted_days)
+    x_domain = shared_x_domain(panels=list(rows.values()), baselines=list(baselines.values()))
     label_px = label_width_px(labels=[label for frame in rows.values() for label in frame["label"]])
     smart_days = [
         day
@@ -850,18 +806,15 @@ def by_day_figure(
             rows=rows[day],
             baselines=baselines[day],
             day=day,
-            x_domain=plan.domains[day],
+            x_domain=x_domain,
             x_title=MAE_TITLE if day == days[-1] else None,
             label_px=label_px,
-            shift=plan.shift if day in shifted_days else 0.0,
         )
         for day in days
     ]
     subtitle = subtitle_lines(
         scope=f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE}",
         smart_days=smart_days,
-        shift=plan.shift,
-        shifted_days=[day for day in days if day in shifted_days],
     )
     return (
         figure(
@@ -960,18 +913,6 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
     studies_dir = repo_data_dir() / "studies"
-    parser.add_argument("--input-dir", type=Path, required=True)
-    parser.add_argument("--extra-dir", type=Path, action="append", default=[])
-    parser.add_argument("--leaderboard-blends-dir", type=Path, default=None)
-    parser.add_argument("--wn3-dir", type=Path, default=None)
-    parser.add_argument("--leaderboard-blends-extra-dir", type=Path, default=None)
-    parser.add_argument("--wn3-extra-dir", type=Path, default=None)
-    parser.add_argument(
-        "--optional-sources",
-        action="store_true",
-        help=f"Also read the folders of OPTIONAL_SOURCES ({', '.join(OPTIONAL_SOURCES)}) under "
-        "--data-dir where they exist.",
-    )
     parser.add_argument("--data-dir", type=Path, default=studies_dir)
     parser.add_argument(
         "--output-dir",
@@ -994,14 +935,6 @@ def main() -> int:
         "--headline-figure-number", type=int, default=FIGURE_NUMBERS[("solar", "headline")]
     )
     parser.add_argument(
-        "--shifted-days",
-        type=int,
-        nargs="*",
-        default=[],
-        help="Lead days drawn on an x axis shifted up from the others' (same span), so that "
-        "the days of the largest errors do not stretch the shared axis.",
-    )
-    parser.add_argument(
         "--replace-svgs", action="store_true", help="Replace SVGs that already exist."
     )
     parser.add_argument("--no-svgo", action="store_true", help="Skip the svgo optimisation.")
@@ -1022,24 +955,16 @@ def main() -> int:
     boards: dict[DomainType, pl.DataFrame] = {}
     notes: dict[DomainType, list[str]] = {}
     for index, domain in enumerate(DOMAINS):
-        extras = (
-            optional_sources(data_dir=args.data_dir, domain=domain)
-            if args.optional_sources
-            else OptionalSources([], [], [])
-        )
-        loaded = load(
-            input_dir=args.input_dir,
-            domain=domain,
-            extra_dirs=[*args.extra_dir, *extras.extra_dirs],
-        )
+        sources = default_sources(data_dir=args.data_dir, domain=domain)
+        loaded = load(input_dir=sources.published, domain=domain, extra_dirs=sources.extra_dirs)
         marks = load_row_set_marks(
-            blends_dir=args.leaderboard_blends_dir,
-            wn3_dir=args.wn3_dir,
+            blends_dir=sources.blends,
+            wn3_dir=sources.wn3,
             domain=domain,
-            blends_extra_dir=args.leaderboard_blends_extra_dir,
-            wn3_extra_dir=args.wn3_extra_dir,
-            more_blends_folders=extras.blends_folders,
-            more_wn3_folders=extras.wn3_folders,
+            blends_extra_dir=sources.blends_extra,
+            wn3_extra_dir=sources.wn3_extra,
+            more_blends_folders=[sources.day5],
+            more_wn3_folders=[sources.day5],
         )
         charts[domain], boards[domain] = by_day_figure(
             loaded=loaded,
@@ -1047,7 +972,6 @@ def main() -> int:
             title=TITLES[(domain, "leaderboard")],
             number=args.first_figure_number + index,
             row_set_marks=marks,
-            shifted_days=args.shifted_days,
         )
         notes[domain] = caveat_notes(
             domain=domain,

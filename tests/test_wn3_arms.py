@@ -6,7 +6,6 @@ wrong number. The scripts are imported by path because `studies/` is not an impo
 """
 
 import importlib
-import math
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -777,23 +776,6 @@ def test_wn3_rows_passes_the_day_0_drop_to_aifs_rows(
         ("solar", 0),
         ("wind", 0),
     }
-
-
-def test_the_leaderboard_ticks_are_whole_numbers_up_to_the_highest_whole_number() -> None:
-    (low, high), ticks = charts.lead_board_x_domain(lowest=8.0, highest=12.0, longest_name=20)
-    assert ticks == [float(value) for value in range(int(ticks[0]), 13)]
-    assert ticks[-1] == 12.0
-    need = 20 * charts.LEAD_NAME_PX_PER_CHARACTER + charts.LEAD_NAME_GAP_PX
-    first_visible = low + need * (high - low) / charts.LEAD_PLOT_WIDTH_PX
-    assert ticks[0] == math.ceil(first_visible)
-    assert high == 12.5
-
-
-def test_the_leaderboard_ticks_fall_back_where_under_two_whole_numbers_fit() -> None:
-    (low, high), ticks = charts.lead_board_x_domain(lowest=6.0, highest=6.2, longest_name=20)
-    need = 20 * charts.LEAD_NAME_PX_PER_CHARACTER + charts.LEAD_NAME_GAP_PX
-    first_visible = low + need * (high - low) / charts.LEAD_PLOT_WIDTH_PX
-    assert ticks == charts.ticks(x_domain=(first_visible, high))
 
 
 def test_ens_members_fills_the_day_4_gap_with_the_supplement(
