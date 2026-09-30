@@ -4,7 +4,7 @@ description: >-
   The checklist for creating a GitHub issue or PR in openclimatefix/nged-substation-forecast —
   the fields `gh issue create` / `gh pr create` cannot set (labels, org issue Type, OCF project 33
   and its Status/Project/Area fields, sub-issue attachment and ordering, the JackKelly assignee) —
-  plus the never-hard-wrap rule for anything posted to GitHub, the never-squash-merge rule and
+  plus the fresh-sub-agent review of every body and comment before posting, the never-hard-wrap rule for anything posted to GitHub, the never-squash-merge rule and
   ship-time triage. Load before running `gh issue create`, `gh pr create`, `gh pr comment`,
   `gh issue comment` or `gh pr merge`, before writing any issue/PR body or comment, or when a PR
   completes a roadmap item.
@@ -94,7 +94,7 @@ word of the content. It is separate from the commit-message trailer (`Co-Authore
 <noreply@anthropic.com>`), which stays on commits only and keeps its usual placement at the end of
 the message. `plan-wave`'s epic-ledger comment already follows this.
 
-## Have a fresh sub-agent review every GitHub text you write
+## Have a fresh sub-agent review every issue body, PR body, and comment
 
 **Before you post an issue body, PR body or comment, and after any later edit, have a fresh
 sub-agent attack the draft.** A body written from memory carries claims nobody checked. An issue
@@ -111,7 +111,7 @@ sentence survives when nobody checks it against the data.
 - **Triage the findings against the source before applying them**, on the same terms as a diff
   review, and post the corrected text.
 - **A Sonnet reviewer is enough for a short body.** Use Opus for a long design description.
-- **State the review in your reply**, in one line, so the maintainer knows the text was checked.
+- **State the review in your message to the maintainer**, in one line, so the maintainer knows the text was checked.
 
 ## Never hard-wrap a GitHub body or comment
 

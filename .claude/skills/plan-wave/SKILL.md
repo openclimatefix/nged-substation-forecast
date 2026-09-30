@@ -307,7 +307,8 @@ time it finishes.
 ## 10. Record the wave on the epic
 
 Post one comment on the epic. It is the ledger step 1 reads next time, and the record of which
-issues belonged to which wave:
+issues belonged to which wave. Have a fresh sub-agent review the draft before posting it, as the
+`github-issue-pr-workflow` skill requires:
 
 ```bash
 gh issue comment <EPIC> --body-file <path>
