@@ -86,6 +86,7 @@ nav:
       - ML orchestration design: architecture/ml-orchestration.md
       - Production deployment design: architecture/production-deployment.md
       - AWS running costs: architecture/aws-costs.md
+      - The ensemble weather archive: architecture/ensemble-archive.md
       - "Why Dagster, not Airflow?": architecture/why-dagster-not-airflow.md
       - Code style: architecture/code-style.md
       - Testing: architecture/testing.md

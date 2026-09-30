@@ -410,10 +410,11 @@ and `cloud_cover`, and `wind_speed_100m` is all null. The spread is null for `di
 deterministic UKV has stitched history on Open-Meteo from about 2022 to 2023, and its
 `previous_day1` variables start only in about 2025.
 
-**The only per-run, per-member MOGREPS-UK history we found is the archive that a recorder would
-build, tracked in issue #926.** The 30-day window on AWS adds whatever runs still survive. A study
-that wants a MOGREPS-UK ensemble mean for the last 3 months can use Open-Meteo's stitched mean, but
-cannot recompute that mean from members.
+**The only per-run, per-member MOGREPS-UK history we found is the archive that a recorder builds,
+tracked in issue #926 and described in [the ensemble weather
+archive](../architecture/ensemble-archive.md).** The 30-day window on AWS adds whatever runs still
+survive. A study that wants a MOGREPS-UK ensemble mean for the last 3 months can use Open-Meteo's
+stitched mean, but cannot recompute that mean from members.
 
 **A MOGREPS-UK run holds 3 members, and the Met Office's 18-member MOGREPS-UK ensemble is six hourly
 runs lagged together.** [Porson et al. (2020)](https://doi.org/10.1002/qj.3844) describe it as "an
