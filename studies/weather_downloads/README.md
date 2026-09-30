@@ -71,7 +71,11 @@ way):
 - `fetch_ukv_ceda.py` and `validate_ukv_ceda.py` — the Met Office UKV 2 km archive held at CEDA
   (four runs a day from 2019-09-01), whole GRIB files cropped to the box and written to a local
   Icechunk store, one commit per run, needs `uv run --with icechunk --with zarr --with eccodes` and
-  the `CEDA_TOKEN` environment variable. The licence is CC BY-NC-SA 4.0.
+  the `CEDA_TOKEN` environment variable. The licence is CC BY-NC-SA 4.0. The flag `--product
+  ukv-ceda-t120` archives the 03 and 15 UTC runs (leads 0 to 120 hours) into its own store
+  `UKV-CEDA-T120`, and `--newest-first` works from the newest run back to `--start`. A crashed
+  download can leave a `.partial` file in the product's `_scratch/` directory, which is safe to
+  delete.
 - `fetch_weathernext3.py` and `validate_weathernext3.py` — WeatherNext 3 ensemble-mean runs (00,
   06, 12, and 18 UTC) from a Google Cloud Storage bucket that is not Requester Pays, cropped to a
   wide United Kingdom box (49.0 to 61.5 degrees north, 10.0 degrees west to 3.5 degrees east, which
