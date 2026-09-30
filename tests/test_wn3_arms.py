@@ -276,7 +276,7 @@ def test_row_set_rows_name_the_months_and_keep_the_same_rows_ens_mean_as_ticks(
     monkeypatch.setattr(charts, "lead_board_rows", lambda *, losses: canned)
     losses = pl.DataFrame({"arm": ["wn3_mean_day1", "ens_mean_day1", "unrelated_day1"]})
     rows = charts.row_set_board_rows(marks=[charts.RowSetMarks(slug="wn3_mean", losses=losses)])
-    assert set(rows["product"]) == {"WeatherNext 3 mean (7 months, out-of-sample)"}
+    assert set(rows["product"]) == {"WeatherNext 3 mean (7 months)"}
     marks = rows.filter(pl.col("kind") == "mark")
     ticks = rows.filter(pl.col("kind") == "ens_same_rows")
     assert marks.sort("day")["value"].to_list() == [8.0, 9.5]

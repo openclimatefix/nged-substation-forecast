@@ -85,7 +85,7 @@ from nwp_forecast_comparison import (
     predictions_path,
 )
 from studies.anonymise import SITE_LABELS, WIND_SITE_LABELS
-from studies.bootstrap import BootstrapInterval
+from studies.bootstrap import MIN_MONTHS_FOR_INTERVAL, BootstrapInterval
 from studies.charts import (
     CONTENT_WIDTH_PX,
     figure,
@@ -717,6 +717,24 @@ LEAD_ROW_PX: Final[int] = 60
 """The height of one product's row on the leaderboard, which holds one mark per fitted lead."""
 
 LEAD_TICK_HEIGHT_PX: Final[int] = 9
+
+WN3_LEADERBOARD_NOTES: Final[dict[DomainType, str]] = {
+    "solar": (
+        "At days 7 and 14 WeatherNext 3's solar error is not the lowest plotted: the ENS mean "
+        "(13.7%) and GFS native (14.7%) are lower, on more months."
+    ),
+    "wind": (
+        "At days 7 and 14 WeatherNext 3 has the lowest plotted wind error, on a different and "
+        "smaller row set; against the ENS mean on the same rows the gap is not resolved, and "
+        "the grey tick is the ENS mean of wind speed, not the mean-vector reference matched to "
+        "WeatherNext 3 (see the matched-reference table)."
+    ),
+}
+"""The sentence each leaderboard adds about WeatherNext 3's row at days 7 and 14."""
+
+MAJOR_GRID_COLOUR: Final[str] = "#C8C8C8"
+MINOR_GRID_COLOUR: Final[str] = "#DDDDDD"
+"""The leaderboard's vertical grid: the major lines are darker and thicker than the minor ones."""
 """The height of the grey tick that marks the ENS mean on a smaller row set's rows."""
 
 LEAD_DODGE_ROWS: Final[float] = 0.135
@@ -810,13 +828,13 @@ def load_row_set_marks(
     if blends_dir is not None:
         frames |= load_aifs_leads(blends_dir=blends_dir, domain=domain)
     if wn3_dir is not None:
-        # WN3's production weather model is trained until June 2026, so only the out-of-sample
-        # rows carry a claim and only they are drawn.
+        # The leaderboards draw every WN3 row (February to September 2026, 7 months); the split
+        # into in-sample and out-of-sample rows is drawn in the three-group figures.
         frames["wn3"] = pl.concat(
             [
                 wn3_split(
                     losses=pl.read_parquet(wn3_dir / f"{domain}_wn3_day{day}_losses.parquet"),
-                    split="out-of-sample",
+                    split="pooled",
                     domain=domain,
                     day=day,
                 )
@@ -881,8 +899,7 @@ def row_set_board_rows(*, marks: Sequence[RowSetMarks]) -> pl.DataFrame:
                 f"marks: {ens_span} against {mark_span}"
             )
             raise ValueError(msg)
-        scope = f"{months} months, out-of-sample" if mark.slug == "wn3_mean" else f"{months} months"
-        name = f"{PRODUCT_NAMES[mark.slug]} ({scope})"
+        name = f"{PRODUCT_NAMES[mark.slug]} ({months} months)"
         frames.append(
             rows.filter(pl.col("product").is_in([PRODUCT_NAMES[mark.slug], "ENS mean"]))
             .with_columns(
@@ -1038,7 +1055,7 @@ def leaderboard_figure(
     # baselines' names instead of running through them.
     grid = (
         alt.Chart(pl.DataFrame({"x": x_ticks, "y_start": -0.5, "y_end": len(products) - 0.5}))
-        .mark_rule(color=ocf.GRID, strokeWidth=1, aria=False)
+        .mark_rule(color=MAJOR_GRID_COLOUR, strokeWidth=1.5, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("x:Q", scale=x_scale, axis=x_axis, title=x_title),
             y=alt.Y("y_start:Q", scale=y_scale, axis=y_axis),
@@ -1048,7 +1065,7 @@ def leaderboard_figure(
     minor = minor_grid_values(x_ticks=x_ticks, x_domain=x_domain)
     minor_grid = (
         alt.Chart(pl.DataFrame({"x": minor, "y_start": -0.5, "y_end": len(products) - 0.5}))
-        .mark_rule(color=ocf.GRID, strokeWidth=0.5, opacity=0.6, aria=False)
+        .mark_rule(color=MINOR_GRID_COLOUR, strokeWidth=1, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("x:Q", scale=x_scale, axis=x_axis, title=x_title),
             y=alt.Y("y_start:Q", scale=y_scale, axis=y_axis),
@@ -1175,9 +1192,12 @@ def leaderboard_figure(
                 "below the full-window products were fitted on fewer months, shown in their "
                 "names; the full-window rows are ordered by day-1 error, the rows below them keep "
                 "a fixed order and are not ranked against each other, and a grey tick "
-                "beside a mark is the ENS mean fitted on the same rows. WeatherNext 3's marks "
-                "use only July to September 2026, the months after every training end its paper "
-                "lists. "
+                "beside a mark is the ENS mean fitted on the same rows. WeatherNext 3's row "
+                "holds every row from February to September 2026, and Google has not documented "
+                "which WeatherNext 3 model version made that archive, so the February to June "
+                "months may overlap its training data (Figure "
+                f"{FIGURE_NUMBERS[(domain, 'wn3_groups')]} splits the rows). "
+                f"{WN3_LEADERBOARD_NOTES[domain]} "
                 "A month counts whole "
                 "in the resampling even where the row set holds part of it (September 2026 holds "
                 "10 days). A lead day with no mark "
@@ -2576,6 +2596,9 @@ def aifs_leads(
 
 # --- Chart 7: WeatherNext 3 in three row groups ------------------------------------------------
 
+SENSITIVITY_SHIFT_DAYS: Final[float] = 0.03
+"""How far right of its primary mark a sensitivity-setting mark sits, in days."""
+
 WN3_GROUP_NAMES: Final[dict[str, str]] = {
     "in-sample": "Before July (may overlap WN3's training data)",
     "out-of-sample": "July to September (after every training end)",
@@ -2588,7 +2611,7 @@ WN3_GROUP_COLOURS: Final[dict[str, str]] = {
     "out-of-sample": ocf.BRAND_ORANGE,
     "pooled": ocf.DATA_BLUE,
 }
-"""Each WN3 row group's colour. The out-of-sample group, which carries every claim, is orange."""
+"""Each WN3 row group's colour; the out-of-sample group, the overlap check, is orange."""
 
 WN3_REFERENCE_ARMS: Final[dict[DomainType, str]] = {
     "solar": "ens_mean_day{day}",
@@ -2610,8 +2633,9 @@ def wn3_group_rows(*, wn3_dir: Path, domain: DomainType) -> pl.DataFrame:
         domain: `solar` or `wind`.
 
     Returns:
-        One row per (day, group, quantity), where quantity is `wn3`, `reference`, or `difference`,
-        with `value`, `lower_95`, `upper_95` (all in points of capacity), `n_rows` and `n_months`.
+        One row per (day, group, setting, quantity), where quantity is `wn3`, `reference`, or
+        `difference` and setting is `primary` or `sensitivity`, with `value`, `lower_95`, `upper_95`
+        (all in points of capacity), `n_rows` and `n_months`.
     """
     records: list[dict[str, object]] = []
     for day in WN3_DAYS:
@@ -2621,36 +2645,40 @@ def wn3_group_rows(*, wn3_dir: Path, domain: DomainType) -> pl.DataFrame:
         reference = WN3_REFERENCE_ARMS[domain].format(day=day)
         for group in WN3_SPLITS:
             rows = wn3_split(losses=losses, split=group, domain=domain, day=day)
-            primary = by_setting(losses=rows)["primary"]
-            errors = leaderboard(losses=primary, arms=[wn3, reference]).with_columns(
-                pl.col("arm").replace_strict({wn3: "wn3", reference: "reference"})
-            )
-            records.extend(
-                {
-                    "day": day,
-                    "group": group,
-                    "quantity": row["arm"],
-                    "value": row["value"] * PERCENTAGE_POINTS,
-                    "lower_95": row["lower_95"] * PERCENTAGE_POINTS,
-                    "upper_95": row["upper_95"] * PERCENTAGE_POINTS,
-                    "n_rows": row["n_rows"],
-                    "n_months": row["n_months"],
-                }
-                for row in errors.iter_rows(named=True)
-            )
-            gap = difference(losses=primary, treatment=wn3, reference=reference)
-            records.append(
-                {
-                    "day": day,
-                    "group": group,
-                    "quantity": "difference",
-                    "value": gap["difference"] * PERCENTAGE_POINTS,
-                    "lower_95": gap["lower_95"] * PERCENTAGE_POINTS,
-                    "upper_95": gap["upper_95"] * PERCENTAGE_POINTS,
-                    "n_rows": gap["n_rows"],
-                    "n_months": gap["n_months"],
-                }
-            )
+            for setting, setting_losses in by_setting(losses=rows).items():
+                if not arms_present(losses=setting_losses, arms=(wn3, reference)):
+                    continue
+                errors = leaderboard(losses=setting_losses, arms=[wn3, reference]).with_columns(
+                    pl.col("arm").replace_strict({wn3: "wn3", reference: "reference"})
+                )
+                records.extend(
+                    {
+                        "day": day,
+                        "group": group,
+                        "setting": setting,
+                        "quantity": row["arm"],
+                        "value": row["value"] * PERCENTAGE_POINTS,
+                        "lower_95": row["lower_95"] * PERCENTAGE_POINTS,
+                        "upper_95": row["upper_95"] * PERCENTAGE_POINTS,
+                        "n_rows": row["n_rows"],
+                        "n_months": row["n_months"],
+                    }
+                    for row in errors.iter_rows(named=True)
+                )
+                gap = difference(losses=setting_losses, treatment=wn3, reference=reference)
+                records.append(
+                    {
+                        "day": day,
+                        "group": group,
+                        "setting": setting,
+                        "quantity": "difference",
+                        "value": gap["difference"] * PERCENTAGE_POINTS,
+                        "lower_95": gap["lower_95"] * PERCENTAGE_POINTS,
+                        "upper_95": gap["upper_95"] * PERCENTAGE_POINTS,
+                        "n_rows": gap["n_rows"],
+                        "n_months": gap["n_months"],
+                    }
+                )
     return pl.DataFrame(records)
 
 
@@ -2676,9 +2704,12 @@ def wn3_group_panel(
     positions = {day: index for index, day in enumerate(WN3_DAYS)}
     drawn = rows.with_columns(
         x=pl.col("day").replace_strict(positions, return_dtype=pl.Float64)
-        + pl.col("group").replace_strict(offsets, return_dtype=pl.Float64),
+        + pl.col("group").replace_strict(offsets, return_dtype=pl.Float64)
+        + pl.when(pl.col("setting") == "sensitivity").then(SENSITIVITY_SHIFT_DAYS).otherwise(0.0),
         group_name=pl.col("group").replace_strict(WN3_GROUP_NAMES),
     )
+    primary_rows = drawn.filter(pl.col("setting") == "primary")
+    sensitivity_rows = drawn.filter(pl.col("setting") == "sensitivity")
     y_domain = padded_domain(
         low=float(drawn["lower_95"].min()),  # ty: ignore[invalid-argument-type]
         high=float(drawn["upper_95"].max()),  # ty: ignore[invalid-argument-type]
@@ -2707,12 +2738,24 @@ def wn3_group_panel(
         legend=None,
     )
     rules = (
-        alt.Chart(drawn)
+        alt.Chart(primary_rows)
         .mark_rule(strokeWidth=1.5, aria=False)
         .encode(x=x, y=alt.Y("lower_95:Q", scale=y_scale), y2="upper_95:Q", color=colour)  # ty: ignore[unresolved-attribute]
     )
+    sensitivity_rules = (
+        alt.Chart(sensitivity_rows)
+        .mark_rule(strokeWidth=1, strokeDash=[2, 2], color=ocf.BLACK_1, aria=False)
+        .encode(x=x, y=alt.Y("lower_95:Q", scale=y_scale), y2="upper_95:Q")  # ty: ignore[unresolved-attribute]
+    )
+    sensitivity_points = (
+        alt.Chart(sensitivity_rows)
+        .mark_point(
+            shape="square", size=30, filled=False, strokeWidth=1.5, color=ocf.BLACK_1, aria=False
+        )
+        .encode(x=x, y=y)  # ty: ignore[unresolved-attribute]
+    )
     points = (
-        alt.Chart(drawn)
+        alt.Chart(primary_rows)
         .mark_point(
             filled=not hollow,
             shape="diamond" if hollow else "circle",
@@ -2723,7 +2766,7 @@ def wn3_group_panel(
         )
         .encode(x=x, y=y, color=colour)  # ty: ignore[unresolved-attribute]
     )
-    layers: list[alt.Chart] = [rules, points]
+    layers: list[alt.Chart] = [rules, sensitivity_rules, points, sensitivity_points]
     if zero_label is not None:
         zero = pl.DataFrame({"value": [0.0], "text": [zero_label]})
         layers.insert(
@@ -2792,17 +2835,22 @@ def wn3_groups(*, wn3_dir: Path, domain: DomainType) -> tuple[alt.VConcatChart, 
                     "of capacity. Top panel: WeatherNext 3's error minus the reference's, on the "
                     "same rows. Lower panels: each product's own error. Dot: estimate. Line: "
                     "95% interval from resampling whole months. Filled dots are WeatherNext 3; "
-                    "hollow diamonds are the reference."
+                    "hollow diamonds are the reference. A hollow black square with a dashed line, "
+                    "just right of a dot, is the same quantity at the sensitivity XGBoost "
+                    "setting."
                 ),
                 (
                     "The three colours are three groups of the same out-of-fold rows: "
                     f"{WN3_SPLIT_MONTHS['in-sample']} (4 calendar months), "
                     f"{WN3_SPLIT_MONTHS['out-of-sample']} (3 months), and every row from "
                     "February to September 2026 (7 months). Only the second group is certain to "
-                    "lie after WeatherNext 3's training data, and the third mixes both, so it is "
-                    "not a fair comparison and not the headline until the archive's provenance "
-                    "is confirmed. Each calendar month occurs in one year only, so every "
-                    "contrast is descriptive."
+                    "lie after WeatherNext 3's training data, so it checks whether a change of "
+                    "model version at the start of July shows in the scores; "
+                    "the third group, which mixes both, is the leaderboards' WeatherNext 3 row. "
+                    "The second group's intervals resample only 3 months, fewer than the "
+                    f"{MIN_MONTHS_FOR_INTERVAL} that support an interval, so they show the "
+                    "range of the months and are indicative only. Each calendar month occurs "
+                    "in one year only, so every contrast is descriptive."
                 ),
                 f"{SHARED_ROWS_NOTE} {CAPACITY_NOTE}",
             ],
@@ -2930,12 +2978,12 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
     ("solar", "leaderboard"): (
         "For solar power, error rises with lead to day 10: at day 1 every weather forecast shown "
         "has a lower error than climatology (14.5%), but at day 14 neither the ENS mean nor the "
-        "GEFS mean does; the ENS mean and IFS 0.25° have the lowest day-1 errors"
+        "GEFS mean does"
     ),
     ("wind", "leaderboard"): (
         "For wind power, error rises with lead: at day 1 every weather forecast shown has a lower "
         "error than climatology (18.5%), but at day 14 neither the ENS mean nor the GEFS mean "
-        "does; the ENS mean and IFS 0.25° have the lowest day-1 errors"
+        "does"
     ),
     ("solar", "models_work"): (
         "Out-of-fold day-1 ENS-mean forecasts follow the measured output at all six solar farms"

@@ -130,7 +130,7 @@ def test_the_three_named_splits_are_the_only_ones():
     assert WN3_SPLITS == ("in-sample", "out-of-sample", "pooled")
 
 
-def test_the_chart_marks_use_only_out_of_sample_months(tmp_path: Path):
+def test_the_chart_marks_use_every_month(tmp_path: Path):
     for day in WN3_DAYS:
         pl.concat(
             [
@@ -142,11 +142,8 @@ def test_the_chart_marks_use_only_out_of_sample_months(tmp_path: Path):
     marks = load_row_set_marks(blends_dir=None, wn3_dir=tmp_path, domain="solar")
 
     assert len(marks) == 1
-    assert sorted(marks[0].losses["month"].unique().to_list()) == [
-        "2026-07",
-        "2026-08",
-        "2026-09",
-    ]
+    months = sorted(marks[0].losses["month"].unique().to_list())
+    assert months[0] < "2026-07" < months[-1]
 
 
 def _stage_losses(
