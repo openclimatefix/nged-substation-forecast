@@ -63,18 +63,24 @@ may run it at a time, because every worktree shares one data folder.
 """
 
 import argparse
+import inspect
 import logging
 import sys
 from pathlib import Path
-from typing import Final, NamedTuple
+from typing import Any, Final, NamedTuple
 
 import numpy as np
 import polars as pl
 from build_dataset import POWER_DELTA_URI, _wind_sites
-from ens_past_solar import _absolute_table_lines, _arm_columns_lines, _fingerprint
+from ens_past_solar import _arm_columns_lines, _fingerprint
 from run_experiment import Job, _add_time_features, run_all
 from sources import STUDIES_DATA_DIR, WEATHER_DATA_DIR
-from studies.bootstrap import bootstrap_absolute, bootstrap_difference, per_fold_differences
+from studies.bootstrap import (
+    bootstrap_absolute,
+    bootstrap_difference,
+    bootstrap_difference_at_level,
+    per_fold_differences,
+)
 from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
     SENSITIVITY_HYPER_PARAMETERS,
@@ -82,6 +88,7 @@ from studies.cross_validation import (
     assign_folds,
     booster_parameters,
     calendar_month_coverage,
+    out_of_fold_losses,
     raise_on_uncovered_months,
 )
 from studies.guards import check_no_missing, refuse_to_overwrite
@@ -159,10 +166,12 @@ POWER_HOUR_SHIFTS: Final[tuple[int, ...]] = (-1, 0, 1, 2, 3)
 ERA_GATE_Z: Final[float] = 5.0
 """The largest z-score of a step in a height's ratio to 100 m that `era_step_table` tolerates."""
 
+BONFERRONI_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / 4)
+"""The coverage in percent of the interval adjusted for the four planned contrasts: 98.75."""
+
 ERA_WINDOW_MONTHS: Final[int] = 12
 """The months either side of a candidate join that `era_step_table` averages."""
 
-SECONDS_LABEL: Final[str] = "primary"
 PRIMARY_SETTING: Final[str] = "primary"
 SENSITIVITY_SETTING: Final[str] = "sensitivity"
 POSITIVE_CONTROL_SETTING: Final[str] = "positive_control"
@@ -219,9 +228,12 @@ REAL_ARMS: Final[tuple[str, ...]] = (
     "levels_50_to_150",
     "levels_all",
 )
-"""The arms fitted on the real target and on the synthetic target."""
+"""The arms fitted on the real target."""
 
 NEGATIVE_CONTROL_ARM: Final[str] = "speed_100m_noise"
+
+POSITIVE_CONTROL_ARMS: Final[tuple[str, ...]] = ("speed_100m", "levels_50_to_150")
+"""The two arms the positive control compares, so the only ones fitted on the synthetic target."""
 
 
 def padding_columns(*, base: str, count: int) -> tuple[str, ...]:
@@ -309,23 +321,32 @@ def check_column_counts(*, arms: dict[str, tuple[str, ...]]) -> None:
         raise ValueError(msg)
 
 
-def check_settings(*, max_workers: int = MAX_WORKERS) -> None:
-    """Stop unless every fit is on the CPU, with no column subsampling, on at most `MAX_CORES`.
+def check_settings(*, job_list: list[Job], max_workers: int = MAX_WORKERS) -> None:
+    """Stop unless the fits will run on the CPU, with no column subsampling, on at most `MAX_CORES`.
+
+    `run_all` passes no device to `out_of_fold_losses`, so the fits use that function's default
+    device, which this reads. Each job's XGBoost parameters are built by `booster_parameters`, the
+    function `out_of_fold_losses` calls, from the job's own hyperparameters.
 
     Args:
+        job_list: Every fit the run will make.
         max_workers: How many fits run at once.
 
     Raises:
         ValueError: Naming the setting that breaks the study's rules.
     """
-    for settings in (PRIMARY_HYPER_PARAMETERS, SENSITIVITY_HYPER_PARAMETERS):
-        parameters = booster_parameters(hyper_parameters=settings, seed=0)
-        if parameters["device"] != "cpu":
-            msg = f"every fit must use device='cpu', got {parameters['device']!r}"
-            raise ValueError(msg)
+    device = inspect.signature(out_of_fold_losses).parameters["device"].default
+    if device != "cpu":
+        msg = f"every fit must use device='cpu', but out_of_fold_losses defaults to {device!r}"
+        raise ValueError(msg)
+    for arm, setting, _target, _features, hyper_parameters, _quantiles in job_list:
+        parameters = booster_parameters(hyper_parameters=hyper_parameters, seed=0, device=device)
         subsampling = [name for name in parameters if name.startswith("colsample")]
         if subsampling:
-            msg = f"column subsampling must stay off, but the fit sets {subsampling}"
+            msg = (
+                f"{arm} at {setting}: column subsampling must stay off, "
+                f"but the fit sets {subsampling}"
+            )
             raise ValueError(msg)
     if max_workers * THREADS_PER_FIT > MAX_CORES:
         msg = f"{max_workers} fits of {THREADS_PER_FIT} threads exceed {MAX_CORES} cores"
@@ -484,20 +505,53 @@ def read_wind(*, sites: pl.DataFrame) -> pl.DataFrame:
     return read_cerra_wind(directory=CERRA_DIR, cells=cells)
 
 
-def era_step_table(*, wind: pl.DataFrame) -> pl.DataFrame:
-    """Find the largest step, at any month, in each height's ratio to the 100 m speed.
+def _largest_step(*, values: np.ndarray, months: list[str]) -> tuple[float, float, str]:
+    """Find the month with the largest step in a deseasonalised monthly series.
 
-    A join of two production streams in CERRA's record would move a height's mean ratio to 100 m at
-    one month. Each month's pooled ratio has its calendar month's mean removed, and each candidate
-    month's step is the mean of the next `ERA_WINDOW_MONTHS` months minus the mean of the previous
-    `ERA_WINDOW_MONTHS`, divided by the standard error that independent months would give.
+    Each value has its calendar month's mean removed. A month's step is the mean of the next
+    `ERA_WINDOW_MONTHS` residuals minus the mean of the previous `ERA_WINDOW_MONTHS`, divided by
+    the standard error that independent months would give.
+
+    Args:
+        values: One value per month, in month order.
+        months: The `YYYY-MM` label of each value.
+
+    Returns:
+        The largest step, its z-score, and its month.
+    """
+    calendar = np.array([int(month[5:]) for month in months])
+    residual = values.copy()
+    for number in np.unique(calendar):
+        residual[calendar == number] -= values[calendar == number].mean()
+    standard_error = float(residual.std()) * np.sqrt(2.0 / ERA_WINDOW_MONTHS)
+    steps = {
+        months[index]: float(
+            residual[index : index + ERA_WINDOW_MONTHS].mean()
+            - residual[index - ERA_WINDOW_MONTHS : index].mean()
+        )
+        for index in range(ERA_WINDOW_MONTHS, len(residual) - ERA_WINDOW_MONTHS + 1)
+    }
+    month = max(steps, key=lambda key: abs(steps[key]))
+    return steps[month], steps[month] / standard_error, month
+
+
+def era_step_table(*, wind: pl.DataFrame) -> pl.DataFrame:
+    """Find the largest step, at any month, in each height's ratio to 100 m and in its own level.
+
+    A join of two production streams in CERRA's record would move a height's mean speed, or its
+    ratio to the 100 m speed, at one month. The ratio test removes weather common to every height,
+    so it is the sharper test. The level test uses each height's own monthly mean speed, and a
+    weather anomaly shows up as a step of the same sign at every height. Reading CERRA's
+    documentation for the date of a production-stream join is a manual step this function does not
+    do.
 
     Args:
         wind: `read_cerra_wind`'s frame.
 
     Returns:
-        One row per height other than 100 m, with `height`, `step_percent`, `z`, `month` (of the
-        largest |z|), and `n_months`.
+        One row per height and test, with `test` (`ratio` or `level`), `height`, `step_percent`
+        (of the series' mean), `z`, `month` (of the largest |z|), and `n_months`. The ratio test
+        has no row for 100 m.
     """
     monthly = (
         wind.with_columns(month=pl.col("time").dt.strftime("%Y-%m"))
@@ -505,87 +559,63 @@ def era_step_table(*, wind: pl.DataFrame) -> pl.DataFrame:
         .agg(pl.col(SPEED_COLUMNS).mean())
         .sort("month")
     )
+    months = monthly["month"].to_list()
     rows: list[dict[str, object]] = []
-    for column in SPEED_COLUMNS:
-        if column == SPEED_100M:
-            continue
-        ratio = monthly.select(
-            "month",
-            ratio=pl.col(column) / pl.col(SPEED_100M),
-            calendar_month=pl.col("month").str.slice(5).cast(pl.Int32),
-        ).with_columns(
-            residual=pl.col("ratio") - pl.col("ratio").mean().over("calendar_month"),
-        )
-        residual = ratio["residual"].to_numpy()
-        months = ratio["month"].to_list()
-        spread = float(residual.std())
-        standard_error = spread * np.sqrt(2.0 / ERA_WINDOW_MONTHS)
-        steps = {
-            months[index]: float(
-                residual[index : index + ERA_WINDOW_MONTHS].mean()
-                - residual[index - ERA_WINDOW_MONTHS : index].mean()
+    for test in ("ratio", "level"):
+        for column in SPEED_COLUMNS:
+            if test == "ratio" and column == SPEED_100M:
+                continue
+            series = monthly[column].to_numpy()
+            if test == "ratio":
+                series = series / monthly[SPEED_100M].to_numpy()
+            step, z, month = _largest_step(values=series, months=months)
+            rows.append(
+                {
+                    "test": test,
+                    "height": column.removeprefix("wind_speed_"),
+                    "step_percent": 100.0 * step / float(series.mean()),
+                    "z": z,
+                    "month": month,
+                    "n_months": len(months),
+                }
             )
-            for index in range(ERA_WINDOW_MONTHS, len(residual) - ERA_WINDOW_MONTHS + 1)
-        }
-        month = max(steps, key=lambda key: abs(steps[key]))
-        mean_ratio = float(ratio["ratio"].to_numpy().mean())
-        rows.append(
-            {
-                "height": column.removeprefix("wind_speed_"),
-                "step_percent": 100.0 * steps[month] / mean_ratio,
-                "z": steps[month] / standard_error,
-                "month": month,
-                "n_months": len(months),
-            }
-        )
     return pl.DataFrame(rows)
 
 
 def check_no_era(*, table: pl.DataFrame) -> None:
-    """Stop if any height's ratio to 100 m steps by more than `ERA_GATE_Z` standard errors.
+    """Stop if any height's ratio to 100 m or own level steps by more than `ERA_GATE_Z` errors.
 
     Args:
         table: `era_step_table`'s result.
 
     Raises:
-        ValueError: Naming the heights and months where a step was found. The folds then have to be
-            cut inside each era, and every arm given an era column, before any fit.
+        ValueError: Naming the tests, heights and months where a step was found. The folds then
+            have to be cut inside each era, and every arm given an era column, before any fit.
     """
     found = table.filter(pl.col("z").abs() > ERA_GATE_Z)
     if found.height:
         msg = (
-            f"a step in a height's ratio to 100 m exceeds {ERA_GATE_Z} standard errors: "
-            f"{found.select('height', 'month', 'z').to_dicts()}; cut the folds by era and add an "
-            "era column to every arm before fitting"
+            f"a step in a height's ratio to 100 m or level exceeds {ERA_GATE_Z} standard errors: "
+            f"{found.select('test', 'height', 'month', 'z').to_dicts()}; cut the folds by era and "
+            "add an era column to every arm before fitting"
         )
         raise ValueError(msg)
 
 
-def build_rows(
-    *,
-    wind: pl.DataFrame,
-    half_hourly: pl.DataFrame,
-    sites: pl.DataFrame,
-    shift: int = CENTRED_SHIFT,
+def _joined_rows(
+    *, wind: pl.DataFrame, half_hourly: pl.DataFrame, sites: pl.DataFrame, shift: int
 ) -> pl.DataFrame:
-    """Build the frame the fit loop reads, for one power-hour offset.
+    """Join wind to power at one power-hour offset and drop hours holding a zero half-hour.
 
     Args:
         wind: `read_wind`'s frame.
         half_hourly: `read_half_hourly_power`'s frame.
         sites: The wind roster, with `site` and `effective_capacity_mw`.
-        shift: The power hour's offset in half-hours; `CENTRED_SHIFT` for the main row set.
+        shift: The power hour's offset in half-hours.
 
     Returns:
-        One row per farm-hour with a wind value and a power hour, minus every hour holding an
-        exactly-zero half-hour, sorted by site then time. The frame carries the wind columns, every
-        arm's derived columns, `power_mw`, `effective_capacity_mw`, the calendar features, `month`,
-        `fold`, the synthetic target, and the `constrained` and `cap_mw` columns the fit loop reads.
-        NGED has confirmed that no wind farm in the trial area is under active network management.
-
-    Raises:
-        ValueError: If a column an arm reads holds a missing value, or a calendar month has no
-            training row in a fold.
+        One row per farm-hour with a wind value and a power hour, sorted by site then time, with the
+        calendar features and the `constrained` and `cap_mw` columns the fit loop reads.
     """
     if shift == CENTRED_SHIFT:
         joined = join_centred_power(wind=wind, half_hourly=half_hourly)
@@ -594,22 +624,64 @@ def build_rows(
             half_hourly=half_hourly.with_columns(pl.col("time").dt.offset_by(f"{-30 * shift}m"))
         )
         joined = wind.join(hourly, on=["site", "time"], how="inner").sort("site", "time")
-    frame = (
+    return (
         joined.join(sites.select("site", "effective_capacity_mw"), on="site")
         .filter(~pl.col("has_zero_half_hour"))
         .with_columns(constrained=pl.lit(value=False), cap_mw=pl.lit(None, dtype=pl.Float64))
         .pipe(lambda rows: _add_time_features(dataset=rows))
         .sort("site", "time")
     )
-    frame = with_synthetic_target(frame=with_shuffled_levels(frame=with_arm_columns(frame=frame)))
+
+
+def build_rows(
+    *,
+    wind: pl.DataFrame,
+    half_hourly: pl.DataFrame,
+    sites: pl.DataFrame,
+    shift: int = CENTRED_SHIFT,
+    shared_keys: pl.DataFrame | None = None,
+    with_controls: bool = True,
+) -> pl.DataFrame:
+    """Build the frame the fit loop reads, for one power-hour offset.
+
+    Args:
+        wind: `read_wind`'s frame.
+        half_hourly: `read_half_hourly_power`'s frame.
+        sites: The wind roster, with `site` and `effective_capacity_mw`.
+        shift: The power hour's offset in half-hours; `CENTRED_SHIFT` for the main row set.
+        shared_keys: If given, only the (site, time) rows it holds are kept, before folds are cut.
+        with_controls: Whether to add the two controls' columns, the shuffled levels and the
+            synthetic target. The power-hour scan needs neither.
+
+    Returns:
+        One row per farm-hour with a wind value and a power hour, minus every hour holding an
+        exactly-zero half-hour, sorted by site then time. The frame carries the wind columns, every
+        arm's derived columns, `power_mw`, `effective_capacity_mw`, the calendar features, `month`,
+        `fold`, the controls' columns if asked for, and the `constrained` and `cap_mw` columns the
+        fit loop reads. NGED has confirmed that no wind farm in the trial area is under active
+        network management.
+
+    Raises:
+        ValueError: If a column an arm reads holds a missing value, or a calendar month has no
+            training row in a fold.
+    """
+    frame = _joined_rows(wind=wind, half_hourly=half_hourly, sites=sites, shift=shift)
+    if shared_keys is not None:
+        frame = frame.join(shared_keys, on=["site", "time"], how="semi")
+    frame = with_arm_columns(frame=frame)
+    if with_controls:
+        frame = with_synthetic_target(frame=with_shuffled_levels(frame=frame))
     frame = assign_folds(dataset=frame)
+    arms = arm_columns()
+    if not with_controls:
+        arms.pop(NEGATIVE_CONTROL_ARM)
     check_no_missing(
         frame=frame,
         columns=(
             "power_mw",
-            SYNTHETIC_TARGET,
             "effective_capacity_mw",
-            *{name for columns in arm_columns().values() for name in columns},
+            *([SYNTHETIC_TARGET] if with_controls else []),
+            *{name for columns in arms.values() for name in columns},
         ),
     )
     raise_on_uncovered_months(coverage=calendar_month_coverage(frame=frame))
@@ -621,7 +693,8 @@ def jobs() -> list[Job]:
 
     Returns:
         The real-target arms and `NEGATIVE_CONTROL_ARM` at `PRIMARY_SETTING` and at
-        `SENSITIVITY_SETTING`, and `REAL_ARMS` on `SYNTHETIC_TARGET` at `POSITIVE_CONTROL_SETTING`.
+        `SENSITIVITY_SETTING`, and `POSITIVE_CONTROL_ARMS` on `SYNTHETIC_TARGET` at
+        `POSITIVE_CONTROL_SETTING`.
     """
     columns = arm_columns()
     arms = (*REAL_ARMS, NEGATIVE_CONTROL_ARM)
@@ -640,7 +713,7 @@ def jobs() -> list[Job]:
             PRIMARY_HYPER_PARAMETERS,
             False,
         )
-        for arm in REAL_ARMS
+        for arm in POSITIVE_CONTROL_ARMS
     ]
     return fits
 
@@ -648,7 +721,7 @@ def jobs() -> list[Job]:
 def power_hour_scan(
     *, wind: pl.DataFrame, half_hourly: pl.DataFrame, sites: pl.DataFrame
 ) -> pl.DataFrame:
-    """Fit the `speed_100m` arm at each power-hour offset and score it.
+    """Fit the `speed_100m` arm at each power-hour offset, scored on the rows all offsets share.
 
     Args:
         wind: `read_wind`'s frame.
@@ -656,24 +729,44 @@ def power_hour_scan(
         sites: The wind roster.
 
     Returns:
-        One row per offset with `shift`, `n_rows` and `mae_pp`, the mean absolute error as a
-        percentage of each farm's capacity. The rows differ between offsets, so only the error is
-        compared.
+        One row per offset with `shift`, `n_rows`, `mae_pp` (the mean absolute error as a
+        percentage of each farm's capacity) and `seed_spread_pp` (the largest minus the smallest of
+        the three seeds' errors). Every offset is fitted and scored on the same (site, time) rows,
+        with folds cut after the rows are chosen.
     """
+    keys = [
+        _joined_rows(wind=wind, half_hourly=half_hourly, sites=sites, shift=shift).select(
+            "site", "time"
+        )
+        for shift in POWER_HOUR_SHIFTS
+    ]
+    shared = keys[0]
+    for other in keys[1:]:
+        shared = shared.join(other, on=["site", "time"], how="inner")
     columns = arm_columns()["speed_100m"]
     rows: list[dict[str, float | int]] = []
     for shift in POWER_HOUR_SHIFTS:
-        frame = build_rows(wind=wind, half_hourly=half_hourly, sites=sites, shift=shift)
+        frame = build_rows(
+            wind=wind,
+            half_hourly=half_hourly,
+            sites=sites,
+            shift=shift,
+            shared_keys=shared,
+            with_controls=False,
+        )
         losses = run_all(
             dataset=frame,
             jobs=[("speed_100m", "scan", "power_mw", columns, PRIMARY_HYPER_PARAMETERS, False)],
             max_workers=MAX_WORKERS,
         )
+        per_seed = losses.group_by("seed").agg(pl.col(METRIC).mean())[METRIC]
         rows.append(
             {
                 "shift": shift,
                 "n_rows": frame.height,
                 "mae_pp": _mae(losses=losses, arm="speed_100m"),
+                "seed_spread_pp": float(per_seed.to_numpy().max() - per_seed.to_numpy().min())
+                * PERCENTAGE_POINTS,
             }
         )
         _LOG.info("power-hour offset %d half-hours: %s", shift, rows[-1])
@@ -681,17 +774,23 @@ def power_hour_scan(
 
 
 def check_centred_is_best(*, scan: pl.DataFrame) -> None:
-    """Stop unless the centred power hour has the lowest error in the scan.
+    """Stop if another power-hour offset beats the centred one by more than its seed spread.
 
     Args:
         scan: `power_hour_scan`'s result.
 
     Raises:
-        ValueError: Naming the offset that scored best, when it is not `CENTRED_SHIFT`.
+        ValueError: Naming the offsets that beat the centred offset by more than the centred
+            offset's `seed_spread_pp`.
     """
-    best = int(scan.sort("mae_pp")["shift"][0])
-    if best != CENTRED_SHIFT:
-        msg = f"the power-hour scan scores offset {best} best, not the centred {CENTRED_SHIFT}"
+    centred = scan.filter(pl.col("shift") == CENTRED_SHIFT).row(0, named=True)
+    better = scan.filter(pl.col("mae_pp") < centred["mae_pp"] - centred["seed_spread_pp"])
+    if better.height:
+        msg = (
+            f"the power-hour scan scores {better.select('shift', 'mae_pp').to_dicts()} better than "
+            f"the centred offset {CENTRED_SHIFT} ({centred['mae_pp']:.4f} pp) by more than "
+            f"its seed spread of {centred['seed_spread_pp']:.4f} pp"
+        )
         raise ValueError(msg)
 
 
@@ -738,6 +837,15 @@ def interval_record(
         losses=losses, treatment=contrast.treatment, reference=contrast.reference, metric=METRIC
     )
     same_sign = sum(np.sign(value) == np.sign(interval["difference"]) for value in folds)
+    wide: tuple[float, float] | tuple[None, None] = (None, None)
+    if contrast.planned:
+        wide = bootstrap_difference_at_level(
+            losses=losses,
+            treatment=contrast.treatment,
+            reference=contrast.reference,
+            metric=METRIC,
+            level=BONFERRONI_LEVEL,
+        )
     return {
         "setting": setting,
         "scope": scope,
@@ -750,6 +858,8 @@ def interval_record(
         "lower_95_pp": interval["lower_95"] * PERCENTAGE_POINTS,
         "upper_95_pp": interval["upper_95"] * PERCENTAGE_POINTS,
         "significant": interval["lower_95"] > 0.0 or interval["upper_95"] < 0.0,
+        "lower_bonferroni_pp": None if wide[0] is None else wide[0] * PERCENTAGE_POINTS,
+        "upper_bonferroni_pp": None if wide[1] is None else wide[1] * PERCENTAGE_POINTS,
         "folds_agreeing": int(same_sign),
         "n_folds": len(folds),
         "n_rows": interval["n_rows"],
@@ -822,7 +932,7 @@ def contrast_records(*, losses: pl.DataFrame, sites: list[str]) -> pl.DataFrame:
             scope="all",
         )
     )
-    return pl.DataFrame(records)
+    return pl.DataFrame(records, infer_schema_length=None)
 
 
 def absolute_records(*, losses: pl.DataFrame) -> pl.DataFrame:
@@ -862,11 +972,44 @@ def absolute_records(*, losses: pl.DataFrame) -> pl.DataFrame:
 
 CONTRAST_TABLE_HEADER: Final[tuple[str, str]] = (
     (
-        "| Scope | Contrast | Treatment error | Reference error | Difference (pp of capacity) "
-        "| 95% interval | Statistically significant at the 5% level? | Folds agreeing | Rows |"
+        "| Setting, scope | Contrast | Treatment error | Reference error "
+        "| Difference (pp of capacity) "
+        "| Unadjusted 95% interval | Statistically significant at the 5% level, unadjusted? "
+        f"| {BONFERRONI_LEVEL}% interval (Bonferroni, four planned contrasts) "
+        "| Excludes zero after Bonferroni? | Folds agreeing | Rows |"
     ),
-    "|---|---|---|---|---|---|---|---|---|",
+    "|---|---|---|---|---|---|---|---|---|---|---|",
 )
+
+
+def _bonferroni_text(*, row: dict[str, Any]) -> str:
+    """Render a contrast row's Bonferroni interval, or a dash for a row that has none.
+
+    Args:
+        row: A row of `contrast_records`.
+
+    Returns:
+        The interval as text.
+    """
+    lower, upper = row["lower_bonferroni_pp"], row["upper_bonferroni_pp"]
+    if lower is None or upper is None:
+        return "n/a"
+    return f"[{lower:+.3f}, {upper:+.3f}]"
+
+
+def _bonferroni_verdict(*, row: dict[str, Any]) -> str:
+    """Say whether a contrast row's Bonferroni interval excludes zero.
+
+    Args:
+        row: A row of `contrast_records`.
+
+    Returns:
+        `**yes**`, `no`, or `n/a` for a row with no Bonferroni interval.
+    """
+    lower, upper = row["lower_bonferroni_pp"], row["upper_bonferroni_pp"]
+    if lower is None or upper is None:
+        return "n/a"
+    return "**yes**" if lower > 0.0 or upper < 0.0 else "no"
 
 
 def _contrast_lines(*, records: pl.DataFrame) -> list[str]:
@@ -881,11 +1024,13 @@ def _contrast_lines(*, records: pl.DataFrame) -> list[str]:
     lines = [*CONTRAST_TABLE_HEADER]
     lines += [
         (
-            f"| {row['scope']} | {row['treatment']} − {row['reference']} "
+            f"| {row['setting']}, {row['scope']} | {row['treatment']} − {row['reference']} "
             f"| {row['treatment_mae_pp']:.3f} | {row['reference_mae_pp']:.3f} "
             f"| {row['difference_pp']:+.3f} "
             f"| [{row['lower_95_pp']:+.3f}, {row['upper_95_pp']:+.3f}] "
             f"| {'**yes**' if row['significant'] else 'no'} "
+            f"| {_bonferroni_text(row=row)} "
+            f"| {_bonferroni_verdict(row=row)} "
             f"| {row['folds_agreeing']} of {row['n_folds']} | {row['n_rows']:,} |"
         )
         for row in records.iter_rows(named=True)
@@ -917,10 +1062,54 @@ def _row_count_lines(*, frame: pl.DataFrame) -> list[str]:
     return lines
 
 
+ALL_ARMS: Final[tuple[str, ...]] = (*REAL_ARMS, NEGATIVE_CONTROL_ARM)
+"""Every arm fitted on the real target."""
+
+
+def _absolute_value(*, absolute: pl.DataFrame, setting: str, scope: str, arm: str) -> float:
+    """Read one arm's absolute error from `absolute_records`.
+
+    Args:
+        absolute: `absolute_records`' frame.
+        setting: The setting.
+        scope: `all` or a farm label.
+        arm: The arm.
+
+    Returns:
+        The error in percentage points of capacity.
+    """
+    return float(
+        absolute.filter(
+            (pl.col("setting") == setting) & (pl.col("scope") == scope) & (pl.col("arm") == arm)
+        )["mae_pp"].item()
+    )
+
+
+def _absolute_lines(*, absolute: pl.DataFrame, setting: str, arms: tuple[str, ...]) -> list[str]:
+    """Render each arm's pooled absolute error and 95% interval as a markdown table.
+
+    Args:
+        absolute: `absolute_records`' frame.
+        setting: The setting.
+        arms: The arms to list, in order.
+
+    Returns:
+        Markdown lines, header included.
+    """
+    pooled = absolute.filter((pl.col("setting") == setting) & (pl.col("scope") == "all"))
+    lines = ["| Arm | Error (pp of capacity) | 95% interval | Rows |", "|---|---|---|---|"]
+    for arm in arms:
+        row = pooled.filter(pl.col("arm") == arm).row(0, named=True)
+        lines.append(
+            f"| {arm} | {row['mae_pp']:.3f} | [{row['lower_95_pp']:.3f}, {row['upper_95_pp']:.3f}] "
+            f"| {row['n_rows']:,} |"
+        )
+    return lines
+
+
 def report_lines(
     *,
     frame: pl.DataFrame,
-    losses: pl.DataFrame,
     intervals: pl.DataFrame,
     absolute: pl.DataFrame,
     era: pl.DataFrame,
@@ -931,7 +1120,6 @@ def report_lines(
 
     Args:
         frame: The main row set.
-        losses: Every arm's losses.
         intervals: `contrast_records`' frame.
         absolute: `absolute_records`' frame.
         era: `era_step_table`'s frame.
@@ -965,15 +1153,20 @@ def report_lines(
         "#### Era check (gate before any fit)",
         "",
         (
-            f"The largest step, at any month, in each height's ratio to 100 m, as the mean of the "
-            f"next {ERA_WINDOW_MONTHS} months minus the mean of the previous {ERA_WINDOW_MONTHS} "
-            f"after removing each calendar month's mean. The gate is |z| above {ERA_GATE_Z}."
+            f"The largest step, at any month, in each height's ratio to 100 m (`ratio`) and in its "
+            f"own monthly mean speed (`level`), as the mean of the next {ERA_WINDOW_MONTHS} months "
+            f"minus the mean of the previous {ERA_WINDOW_MONTHS} after removing each calendar "
+            f"month's mean. The gate is |z| above {ERA_GATE_Z}. A weather anomaly moves every "
+            "height's level in the same direction, and a production-stream join would not. "
+            "Reading CERRA's documentation for the date of a production-stream join is a manual "
+            "step that this script does not do."
         ),
         "",
-        "| Height | Largest step (% of mean ratio) | z | Month |",
-        "|---|---|---|---|",
+        "| Test | Height | Largest step (% of mean) | z | Month |",
+        "|---|---|---|---|---|",
         *(
-            f"| {row['height']} | {row['step_percent']:+.2f} | {row['z']:+.2f} | {row['month']} |"
+            f"| {row['test']} | {row['height']} | {row['step_percent']:+.2f} | {row['z']:+.2f} "
+            f"| {row['month']} |"
             for row in era.iter_rows(named=True)
         ),
         "",
@@ -982,13 +1175,16 @@ def report_lines(
         (
             f"The `speed_100m` arm, fitted with the power hour built from the half-hours ending at "
             f"the label plus `shift` half-hours less 30 minutes and at the label plus `shift` "
-            f"half-hours. `shift` = {CENTRED_SHIFT} is the centred hour used everywhere else."
+            f"half-hours, on the rows every offset shares. `shift` = {CENTRED_SHIFT} is the "
+            "centred hour used everywhere else. The run stops if another offset beats the centred "
+            "one by more than the centred offset's seed spread."
         ),
         "",
-        "| Shift (half-hours) | Rows | Error (pp) |",
-        "|---|---|---|",
+        "| Shift (half-hours) | Rows | Error (pp) | Seed spread (pp) |",
+        "|---|---|---|---|",
         *(
-            f"| {row['shift']} | {row['n_rows']:,} | {row['mae_pp']:.3f} |"
+            f"| {row['shift']} | {row['n_rows']:,} | {row['mae_pp']:.4f} "
+            f"| {row['seed_spread_pp']:.4f} |"
             for row in scan.sort("shift").iter_rows(named=True)
         ),
         "",
@@ -996,21 +1192,20 @@ def report_lines(
         "",
         "#### Every arm's absolute error, primary setting",
         "",
-        *_absolute_table_lines(
-            pooled=losses.filter(pl.col("setting") == PRIMARY_SETTING),
-            arms=(*REAL_ARMS, NEGATIVE_CONTROL_ARM),
-        ),
+        *_absolute_lines(absolute=absolute, setting=PRIMARY_SETTING, arms=ALL_ARMS),
         "",
         "| Arm | " + " | ".join(sites) + " | Second setting |",
         "|---" * (len(sites) + 2) + "|",
     ]
-    for arm in (*REAL_ARMS, NEGATIVE_CONTROL_ARM):
-        in_primary = losses.filter(pl.col("setting") == PRIMARY_SETTING)
-        per_farm = " | ".join(
-            f"{_mae(losses=in_primary.filter(pl.col('site') == site), arm=arm):.3f}"
-            for site in sites
+    for arm in ALL_ARMS:
+
+        def _farm_value(*, site: str, arm: str = arm) -> float:
+            return _absolute_value(absolute=absolute, setting=PRIMARY_SETTING, scope=site, arm=arm)
+
+        per_farm = " | ".join(f"{_farm_value(site=site):.3f}" for site in sites)
+        second = _absolute_value(
+            absolute=absolute, setting=SENSITIVITY_SETTING, scope="all", arm=arm
         )
-        second = _mae(losses=losses.filter(pl.col("setting") == SENSITIVITY_SETTING), arm=arm)
         lines.append(f"| {arm} | {per_farm} | {second:.3f} |")
     lines += ["", "#### Planned contrasts (planned), primary setting", ""]
     lines += _contrast_lines(
@@ -1044,8 +1239,8 @@ def report_lines(
     lines += ["", "#### Negative control, both settings", ""]
     lines += _contrast_lines(records=intervals.filter(pl.col("treatment") == NEGATIVE_CONTROL_ARM))
     lines += ["", "#### Positive control (synthetic target)", ""]
-    lines += _absolute_table_lines(
-        pooled=losses.filter(pl.col("setting") == POSITIVE_CONTROL_SETTING), arms=REAL_ARMS
+    lines += _absolute_lines(
+        absolute=absolute, setting=POSITIVE_CONTROL_SETTING, arms=POSITIVE_CONTROL_ARMS
     )
     lines += [""]
     lines += _contrast_lines(
@@ -1087,9 +1282,9 @@ def main() -> int:
     )
     arguments = parser.parse_args()
 
-    check_settings()
-    arms = arm_columns()
-    check_column_counts(arms=arms)
+    job_list = jobs()
+    check_settings(job_list=job_list)
+    check_column_counts(arms=arm_columns())
     sites = _wind_sites()
     wind = read_wind(sites=sites)
     half_hourly = read_half_hourly_power(sites=sites)
@@ -1120,7 +1315,6 @@ def main() -> int:
         frame["time"].max(),
         frame.group_by("site").agg(pl.len(), pl.col("month").n_unique()).sort("site"),
     )
-    job_list = jobs()
     fingerprint = _fingerprint(frame=frame, job_list=job_list)
 
     if arguments.report_only:
@@ -1133,12 +1327,14 @@ def main() -> int:
             raise ValueError(msg)
         losses = pl.read_parquet(paths["losses.parquet"])
         scan = pl.read_parquet(paths["power_hour_scan.parquet"])
-        refuse_to_overwrite(paths=[paths["report.md"], paths["intervals.parquet"]])
+        refuse_to_overwrite(
+            paths=[paths["report.md"], paths["intervals.parquet"], paths["absolute.parquet"]]
+        )
     else:
         refuse_to_overwrite(paths=list(paths.values()))
         scan = power_hour_scan(wind=wind, half_hourly=half_hourly, sites=sites)
-        scan.write_parquet(paths["power_hour_scan.parquet"])
         check_centred_is_best(scan=scan)
+        scan.write_parquet(paths["power_hour_scan.parquet"])
         losses = run_all(dataset=frame, jobs=job_list, max_workers=MAX_WORKERS)
         check_same_rows(losses=losses)
         losses.write_parquet(paths["losses.parquet"])
@@ -1154,7 +1350,6 @@ def main() -> int:
     report = "\n".join(
         report_lines(
             frame=frame,
-            losses=losses,
             intervals=intervals,
             absolute=absolute,
             era=era,
