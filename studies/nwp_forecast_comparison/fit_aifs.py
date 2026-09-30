@@ -2556,10 +2556,13 @@ def run_blends(
 WN3_DAYS: Final[tuple[int, ...]] = (1, 2, 7, 14)
 """The lead days the WN3 fit scores, each on a frame of its own."""
 
-WN3_TRAINING_END_MONTH: Final[str] = "2026-06"
-"""The last month of WN3's production training window, in `%Y-%m` form. The WN3 paper states that
-the production weather model is trained until 30 June 2026, so scored months up to and including
-this one are in WN3's training window."""
+WN3_TRAINING_END: Final[date] = date(2026, 6, 30)
+"""The last day of WN3's production training window. The WN3 paper states that the production
+weather model is trained until 30 June 2026. The wording on the page about this date may change, so
+this constant is the only place the date is written in code."""
+
+WN3_TRAINING_END_MONTH: Final[str] = f"{WN3_TRAINING_END:%Y-%m}"
+"""The last month that starts inside the training window, in `%Y-%m` form."""
 
 WN3_SPLITS: Final[tuple[str, ...]] = ("in-sample", "out-of-sample")
 """The two month groups every WN3 result is reported in. Only the out-of-sample group carries a
@@ -2573,16 +2576,21 @@ WN3_SPLIT_MONTHS: Final[dict[str, str]] = {
 """Each split's months, in words, for the report."""
 
 
-def wn3_split(*, losses: pl.DataFrame, split: str) -> pl.DataFrame:
-    """Return the scored rows of one WN3 month group.
+def wn3_split(*, losses: pl.DataFrame, split: str, domain: DomainType, day: int) -> pl.DataFrame:
+    """Return the scored rows of one WN3 group, for one lead day's losses.
 
     The out-of-fold fit and its folds are unchanged; this only selects rows already scored. The
-    bootstrap then resamples the whole months that remain.
+    bootstrap then resamples the whole months that remain. A row is in-sample when its valid month
+    is `WN3_TRAINING_END_MONTH` or earlier. A row is out-of-sample only when its valid month is
+    later and the 00 UTC run it reads was issued after `WN3_TRAINING_END`, so a day-14 row that
+    verifies in July from a run issued in June belongs to neither group (`wn3_dropped_rows`).
 
     Args:
-        losses: Per-row losses carrying a `month` label in `%Y-%m` form.
-        split: `in-sample` (months up to `WN3_TRAINING_END_MONTH`) or `out-of-sample` (later
-            months).
+        losses: One lead day's per-row losses carrying `time` (UTC) and a `month` label in
+            `%Y-%m` form.
+        split: `in-sample` or `out-of-sample`.
+        domain: `solar` or `wind`, which sets how a row's valid time maps to its run's date.
+        day: The lead day of `losses`' arms.
 
     Returns:
         The rows of the group, every column kept.
@@ -2593,7 +2601,10 @@ def wn3_split(*, losses: pl.DataFrame, split: str) -> pl.DataFrame:
     if split == "in-sample":
         rows = losses.filter(pl.col("month") <= WN3_TRAINING_END_MONTH)
     elif split == "out-of-sample":
-        rows = losses.filter(pl.col("month") > WN3_TRAINING_END_MONTH)
+        rows = losses.filter(
+            (pl.col("month") > WN3_TRAINING_END_MONTH)
+            & (run_date(domain=domain, day=day) > WN3_TRAINING_END)
+        )
     else:
         msg = f"unknown WN3 split {split!r}: expected one of {WN3_SPLITS}"
         raise ValueError(msg)
@@ -2601,6 +2612,23 @@ def wn3_split(*, losses: pl.DataFrame, split: str) -> pl.DataFrame:
         msg = f"the WN3 {split} group holds no scored row"
         raise ValueError(msg)
     return rows
+
+
+def wn3_dropped_rows(*, losses: pl.DataFrame, domain: DomainType, day: int) -> int:
+    """Return how many (site, hour) rows fall in neither group.
+
+    Args:
+        losses: One lead day's per-row losses.
+        domain: `solar` or `wind`.
+        day: The lead day of `losses`' arms.
+
+    Returns:
+        The number of distinct (site, time) rows whose valid month is after
+        `WN3_TRAINING_END_MONTH` but whose run was issued on or before `WN3_TRAINING_END`.
+    """
+    late_month = pl.col("month") > WN3_TRAINING_END_MONTH
+    early_run = run_date(domain=domain, day=day) <= WN3_TRAINING_END
+    return losses.filter(late_month & early_run).select("site", "time").unique().height
 
 
 def wn3_arms(*, domain: DomainType, day: int) -> tuple[str, ...]:
@@ -2672,6 +2700,41 @@ def wn3_contrasts(*, domain: DomainType, day: int) -> list[Contrast]:
     return contrasts_
 
 
+def wn3_planned_arms(*, domain: DomainType, day: int) -> list[str]:
+    """Return the arms of the planned contrasts: WN3's mean and the ENS references."""
+    arms = [f"wn3_mean_day{day}", f"ens_mean_day{day}"]
+    if domain == "wind":
+        arms.append(f"ens_meanvec_day{day}")
+    return arms
+
+
+def wn3_near_line_contrasts(
+    *, losses: pl.DataFrame, domain: DomainType, day: int, split: str
+) -> list[Contrast]:
+    """Return the listed contrasts near the 5% line within one month group.
+
+    Args:
+        losses: The frame's primary-setting per-row losses, of every month.
+        domain: `solar` or `wind`.
+        day: A day of `WN3_DAYS`.
+        split: `in-sample` or `out-of-sample`.
+
+    Returns:
+        The contrasts of `wn3_contrasts` whose interval, on the group's rows only, is near the
+        line.
+    """
+    group = wn3_split(losses=losses, split=split, domain=domain, day=day)
+    return [
+        contrast
+        for contrast in wn3_contrasts(domain=domain, day=day)
+        if near_line(
+            interval=difference(
+                losses=group, treatment=contrast.treatment, reference=contrast.reference
+            )
+        )
+    ]
+
+
 def wn3_sensitivity_arms(*, losses: pl.DataFrame, domain: DomainType, day: int) -> list[str]:
     """Return every arm to refit at the sensitivity setting on one WN3 frame.
 
@@ -2681,21 +2744,13 @@ def wn3_sensitivity_arms(*, losses: pl.DataFrame, domain: DomainType, day: int) 
         day: A day of `WN3_DAYS`.
 
     Returns:
-        The planned contrast's two arms at every day (with the matched wind reference for wind),
-        then both arms of every listed contrast near the 5% line, without repeats.
+        The planned contrasts' arms at every day, then both arms of every listed contrast that is
+        near the 5% line in either month group, without repeats.
     """
-    arms = [f"wn3_mean_day{day}", f"ens_mean_day{day}"]
-    if domain == "wind":
-        arms.append(f"ens_meanvec_day{day}")
-    for contrast in wn3_contrasts(domain=domain, day=day):
-        for split in WN3_SPLITS:
-            interval = difference(
-                losses=wn3_split(losses=losses, split=split),
-                treatment=contrast.treatment,
-                reference=contrast.reference,
-            )
-            if near_line(interval=interval):
-                arms += [contrast.treatment, contrast.reference]
+    arms = wn3_planned_arms(domain=domain, day=day)
+    for split in WN3_SPLITS:
+        for contrast in wn3_near_line_contrasts(losses=losses, domain=domain, day=day, split=split):
+            arms += [contrast.treatment, contrast.reference]
     return list(dict.fromkeys(arms))
 
 
@@ -2720,8 +2775,6 @@ def fit_wn3_stage(
         workers=workers,
     )
     second_arms = wn3_sensitivity_arms(losses=primary, domain=domain, day=day)
-    if not second_arms:
-        return primary.with_columns(device=pl.lit(DEVICE))
     second = fit_jobs(
         frame=frame,
         domain=domain,
@@ -2791,10 +2844,18 @@ def wn3_stage_lines(
         *(f"- {arm}: {', '.join(arm_features(arm=arm, domain=domain))}" for arm in arms),
         "",
     ]
+    primary = losses.filter(pl.col("setting") == PRIMARY)
+    dropped = wn3_dropped_rows(losses=primary, domain=domain, day=day)
+    lines += [
+        (
+            f"{dropped} (site, hour) rows fall in neither group: their valid month is after "
+            f"{WN3_TRAINING_END_MONTH}, but the 00 UTC run they read was issued on or before "
+            f"{WN3_TRAINING_END:%Y-%m-%d}, inside WN3's training window."
+        ),
+        "",
+    ]
     for split in WN3_SPLITS:
-        lines += wn3_split_lines(
-            domain=domain, day=day, losses=wn3_split(losses=losses, split=split), split=split
-        )
+        lines += wn3_split_lines(domain=domain, day=day, losses=losses, split=split)
     return lines
 
 
@@ -2804,7 +2865,7 @@ def wn3_split_lines(*, domain: DomainType, day: int, losses: pl.DataFrame, split
     Args:
         domain: `solar` or `wind`.
         day: A day of `WN3_DAYS`.
-        losses: `wn3_split`'s rows of the stage's per-row losses.
+        losses: The stage's per-row losses, of every month.
         split: `in-sample` or `out-of-sample`.
 
     Returns:
@@ -2813,8 +2874,9 @@ def wn3_split_lines(*, domain: DomainType, day: int, losses: pl.DataFrame, split
         interval.
     """
     arms = wn3_arms(domain=domain, day=day)
-    primary = losses.filter(pl.col("setting") == PRIMARY)
-    second = losses.filter(pl.col("setting") == SENSITIVITY)
+    group = wn3_split(losses=losses, split=split, domain=domain, day=day)
+    primary = group.filter(pl.col("setting") == PRIMARY)
+    second = group.filter(pl.col("setting") == SENSITIVITY)
     claim = (
         "These months carry every claim about WN3."
         if split == "out-of-sample"
@@ -2845,14 +2907,24 @@ def wn3_split_lines(*, domain: DomainType, day: int, losses: pl.DataFrame, split
     lines += [contrast_row_with_errors(losses=primary, contrast=c) for c in contrast_list]
     lines += ["", *null_reading_lines(losses=primary, contrasts=contrast_list)]
     second_arms = set(second["arm"].unique().to_list())
+    planned = set(wn3_planned_arms(domain=domain, day=day))
+    near_here = {
+        (contrast.treatment, contrast.reference)
+        for contrast in wn3_near_line_contrasts(
+            losses=losses.filter(pl.col("setting") == PRIMARY), domain=domain, day=day, split=split
+        )
+    }
     lines += ["", "Pairs also fitted at the sensitivity setting", *ERROR_CONTRAST_HEADER]
     for contrast in contrast_list:
-        if not {contrast.treatment, contrast.reference} <= second_arms:
+        pair = (contrast.treatment, contrast.reference)
+        if not set(pair) <= second_arms:
             continue
-        interval = difference(
-            losses=primary, treatment=contrast.treatment, reference=contrast.reference
-        )
-        why = "near the 5% line" if near_line(interval=interval) else "planned contrast's arms"
+        if pair in near_here:
+            why = f"near the 5% line in the {split} months"
+        elif set(pair) <= planned:
+            why = "planned contrast's arms"
+        else:
+            continue
         lines.append(contrast_row_with_errors(losses=second, contrast=contrast, label=why))
     return [*lines, ""]
 

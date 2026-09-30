@@ -808,16 +808,20 @@ def load_row_set_marks(
     if blends_dir is not None:
         frames |= load_aifs_leads(blends_dir=blends_dir, domain=domain)
     if wn3_dir is not None:
+        # WN3's production weather model is trained until June 2026, so only the out-of-sample
+        # rows carry a claim and only they are drawn.
         frames["wn3"] = pl.concat(
             [
-                pl.read_parquet(wn3_dir / f"{domain}_wn3_day{day}_losses.parquet")
+                wn3_split(
+                    losses=pl.read_parquet(wn3_dir / f"{domain}_wn3_day{day}_losses.parquet"),
+                    split="out-of-sample",
+                    domain=domain,
+                    day=day,
+                )
                 for day in WN3_DAYS
             ],
             how="diagonal_relaxed",
         )
-        # WN3's production weather model is trained until June 2026, so only the out-of-sample
-        # months carry a claim and only they are drawn.
-        frames["wn3"] = wn3_split(losses=frames["wn3"], split="out-of-sample")
         check_anonymised(frame=frames["wn3"], domain=domain)
     for row_set, frame in frames.items():
         if "device" not in frame.columns:
@@ -875,7 +879,8 @@ def row_set_board_rows(*, marks: Sequence[RowSetMarks]) -> pl.DataFrame:
                 f"marks: {ens_span} against {mark_span}"
             )
             raise ValueError(msg)
-        name = f"{PRODUCT_NAMES[mark.slug]} ({months} months)"
+        scope = f"{months} months, out-of-sample" if mark.slug == "wn3_mean" else f"{months} months"
+        name = f"{PRODUCT_NAMES[mark.slug]} ({scope})"
         frames.append(
             rows.filter(pl.col("product").is_in([PRODUCT_NAMES[mark.slug], "ENS mean"]))
             .with_columns(

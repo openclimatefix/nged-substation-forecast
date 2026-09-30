@@ -591,8 +591,10 @@ def build_domain(
     output_dir: Path,
     weather_dir: Path,
     days: tuple[int, ...],
-) -> Path:
+) -> pl.DataFrame:
     """Build one technology's WN3 inputs on the published inputs' own `(site, time)` keys.
+
+    Nothing is written, so `main` can build both technologies before it writes either.
 
     Args:
         domain: `solar` or `wind`.
@@ -602,7 +604,7 @@ def build_domain(
         days: The bands to build.
 
     Returns:
-        The written file's path.
+        The built frame.
 
     Raises:
         ValueError: If `output_dir` is `published_dir`, `days` is empty or holds a day below 1, an
@@ -669,6 +671,25 @@ def build_domain(
     if empty:
         msg = f"{domain}: columns null on every row: {empty}"
         raise ValueError(msg)
+    return frame
+
+
+def write_domain(*, frame: pl.DataFrame, domain: DomainType, output_dir: Path) -> Path:
+    """Write one technology's built frame into the write-once `output_dir`.
+
+    Args:
+        frame: `build_domain`'s result.
+        domain: `solar` or `wind`.
+        output_dir: The new folder.
+
+    Returns:
+        The written file's path.
+
+    Raises:
+        FileExistsError: If the output file already exists.
+    """
+    output_path = output_dir / f"{domain}_wn3_inputs.parquet"
+    refuse_to_overwrite(paths=[output_path])
     output_dir.mkdir(parents=True, exist_ok=True)
     frame.write_parquet(output_path)
     _LOG.info("%s: wrote %d rows, %d columns to %s", domain, frame.height, frame.width, output_path)
@@ -707,14 +728,19 @@ def main() -> int:
         return 0
     if args.output_dir is None:
         parser.error("--build needs --output-dir")
-    for domain in ("solar", "wind"):
-        build_domain(
+    domains: tuple[DomainType, ...] = ("solar", "wind")
+    built = {
+        domain: build_domain(
             domain=domain,
             published_dir=args.published_dir,
             output_dir=args.output_dir,
             weather_dir=args.weather_dir,
             days=tuple(args.days),
         )
+        for domain in domains
+    }
+    for domain, frame in built.items():
+        write_domain(frame=frame, domain=domain, output_dir=args.output_dir)
     return 0
 
 
