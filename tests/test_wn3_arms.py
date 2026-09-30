@@ -50,6 +50,7 @@ fa = _load(name="fit_aifs")
 vw = _load(name="verify_wn3_steps")
 charts = _load(name="nwp_forecast_charts")
 bfi = _load(name="build_forecast_inputs")
+driver = _load(name="fit_day5_aifs_wn3")
 
 
 def _dataset(*, nan_cell: tuple[int, int] | None = None) -> xr.Dataset:
@@ -524,7 +525,7 @@ def test_solar_day_0_has_no_value_at_01_utc_and_reads_lead_2_at_02_utc() -> None
     assert frame["wn3_mean_day0_temp"][1] == pytest.approx(RUN_STRIDE + 1.5, rel=1e-5)
 
 
-def test_lean_inputs_reads_ens_at_day_4_from_its_native_steps_not_the_6_hourly_emulation(
+def test_lean_inputs_reads_ens_at_days_4_and_5_from_their_native_steps_not_the_6_hourly_emulation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     keys = {"site": ["A"], "time": [datetime(2026, 3, 5, 12, tzinfo=UTC)]}
@@ -532,13 +533,14 @@ def test_lean_inputs_reads_ens_at_day_4_from_its_native_steps_not_the_6_hourly_e
         {
             **keys,
             "ens_mean6_day4_ghi": [111.0],
+            "ens_mean6_day5_ghi": [112.0],
             "ens_mean6_day10_ghi": [10.0],
             "aifs_single_day4_ghi": [5.0],
         }
     ).write_parquet(tmp_path / "solar_aifs_inputs.parquet")
-    pl.DataFrame({**keys, "ens_mean_day10_ghi": [10.0]}).write_parquet(
-        tmp_path / "solar_extra_lead_inputs.parquet"
-    )
+    pl.DataFrame(
+        {**keys, "ens_mean_day5_ghi": [333.0], "ens_mean_day10_ghi": [10.0]}
+    ).write_parquet(tmp_path / "solar_extra_lead_inputs.parquet")
     seen: dict[str, object] = {}
 
     def native(
@@ -550,13 +552,14 @@ def test_lean_inputs_reads_ens_at_day_4_from_its_native_steps_not_the_6_hourly_e
         keep_init_time: bool = False,
     ) -> pl.DataFrame:
         seen.update(mean_days=mean_days, control_days=control_days, keep=keep_init_time)
-        return keys.with_columns(ens_mean_day4_ghi=pl.lit(222.0))
+        return keys.with_columns(ens_mean_day4_ghi=pl.lit(222.0), ens_mean_day5_ghi=pl.lit(333.0))
 
     monkeypatch.setattr(fa, "_ens_extra_frame", native)
     frame = fa.lean_inputs(aifs_dir=tmp_path, leads_day10_dir=tmp_path, domain="solar")
-    # The run stamp must be requested, or `check_runs` cannot see the native day-4 run's date.
-    assert seen == {"mean_days": (4,), "control_days": (), "keep": True}
+    # The run stamp must be requested, or `check_runs` cannot see the native run's date.
+    assert seen == {"mean_days": (4, 5), "control_days": (), "keep": True}
     assert frame["ens_mean_day4_ghi"][0] == 222.0
+    assert frame["ens_mean_day5_ghi"][0] == 333.0
     assert frame["ens_mean_day10_ghi"][0] == 10.0
 
 
@@ -575,6 +578,25 @@ def test_lean_inputs_stops_when_the_day_10_ens_read_differs_from_the_extra_lead_
         fa.lean_inputs(aifs_dir=tmp_path, leads_day10_dir=tmp_path, domain="solar")
 
 
+def test_lean_inputs_stops_when_the_day_5_ens_read_differs_from_the_extra_lead_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    keys = {"site": ["A"], "time": [datetime(2026, 3, 5, 12, tzinfo=UTC)]}
+    pl.DataFrame({**keys, "ens_mean6_day5_ghi": [9.0]}).write_parquet(
+        tmp_path / "solar_aifs_inputs.parquet"
+    )
+    pl.DataFrame({**keys, "ens_mean_day5_ghi": [11.0]}).write_parquet(
+        tmp_path / "solar_extra_lead_inputs.parquet"
+    )
+    monkeypatch.setattr(
+        fa,
+        "_ens_extra_frame",
+        lambda *, keys, **_: keys.with_columns(ens_mean_day5_ghi=pl.lit(12.0)),
+    )
+    with pytest.raises(ValueError, match="ens_mean_day5"):
+        fa.lean_inputs(aifs_dir=tmp_path, leads_day10_dir=tmp_path, domain="solar")
+
+
 def test_every_lean_day_has_exactly_one_source_of_its_ens_mean() -> None:
     for day in fa.LEAN_DAYS:
         sources = [
@@ -583,6 +605,18 @@ def test_every_lean_day_has_exactly_one_source_of_its_ens_mean() -> None:
             day in fa.LEAN_ENS_BUILT_DAYS,
         ]
         assert sum(sources) == 1, day
+
+
+def test_the_day_5_fit_days_have_exactly_one_source_of_their_ens_mean() -> None:
+    for day in driver.DAY5:
+        sources = [
+            day in bfi.ENS_DAYS,
+            day in fa.LEAN_ENS_NATIVE_DAYS,
+            day in fa.LEAN_ENS_BUILT_DAYS,
+        ]
+        assert sum(sources) == 1, day
+        assert day in w.ENS_EXTRA_DAYS
+        assert day not in bfi.ENS_DAYS
 
 
 def test_run_lean_fits_each_row_set_at_each_day_and_stamps_the_outputs(
@@ -614,10 +648,16 @@ def test_run_lean_fits_each_row_set_at_each_day_and_stamps_the_outputs(
     monkeypatch.setattr(fa, "lean_stage_lines", lambda **_: [])
     assert (
         fa.run_lean(
-            published_dir=tmp_path, output_dir=tmp_path, leads_day10_dir=tmp_path, workers=1
+            published_dir=tmp_path,
+            output_dir=tmp_path,
+            leads_day10_dir=tmp_path,
+            workers=1,
+            report_name="report_aifs.md",
         )
         == 0
     )
+    assert (tmp_path / "report_aifs.md").exists()
+    assert not (tmp_path / "report.md").exists()
     expected = {
         (domain, row_set, day, fa.lean_arms(row_set=row_set, day=day))
         for domain in fa.DOMAINS
@@ -835,3 +875,83 @@ def test_a_day_4_band_without_the_supplement_is_refused_and_with_it_accepted(
             ways=("mean",),
             six_hourly=six_hourly,
         )
+
+
+def test_day_5_reads_the_run_five_days_before_at_lead_120_plus_the_hour() -> None:
+    dataset = _dataset()
+    # A wind hour at 12:00 on 6 March reads the 00 UTC run of 1 March at lead 5 * 24 + 12 = 132,
+    # so a band one day off reads 108 or 156 instead.
+    frame = w.wn3_arm_frame(
+        cubes=_cubes(dataset=dataset),
+        runs=dataset[w.fetch.INIT_TIME].to_numpy().astype("datetime64[h]"),
+        sites=["A"],
+        keys=_keys(times=[datetime(2026, 3, 6, 12)]),
+        domain="wind",
+        day=5,
+    )
+    assert frame["wn3_mean_day5_init_time"][0] == datetime(2026, 3, 1, tzinfo=UTC)
+    # The synthetic wind is the same at every lead, so the lead shows only in a solar read.
+    solar = w.wn3_arm_frame(
+        cubes=_cubes(dataset=dataset),
+        runs=dataset[w.fetch.INIT_TIME].to_numpy().astype("datetime64[h]"),
+        sites=["A"],
+        keys=_keys(times=[datetime(2026, 3, 6, 12)]),
+        domain="solar",
+        day=5,
+    )
+    assert solar["wn3_mean_day5_ghi"][0] == pytest.approx(5 * 24 + 12, rel=1e-5)
+
+
+def _holey_frame(*, domain: str, day: int, nan_cell: tuple[int, int] | None) -> pl.DataFrame:
+    dataset = _dataset(nan_cell=nan_cell)
+    return w.wn3_arm_frame(
+        cubes=_cubes(dataset=dataset),
+        runs=dataset[w.fetch.INIT_TIME].to_numpy().astype("datetime64[h]"),
+        sites=["A"],
+        # 6 March reads the run of 1 March at day 5; 9 March reads 4 March, which the copy lacks.
+        keys=_keys(times=[datetime(2026, 3, 6, 12), datetime(2026, 3, 9, 12)]),
+        domain=domain,
+        day=day,
+    )
+
+
+@pytest.mark.parametrize("domain", ["solar", "wind"])
+def test_a_nan_inside_a_stored_run_stops_the_build_and_names_the_band(domain: str) -> None:
+    built = _holey_frame(domain=domain, day=5, nan_cell=(0, 0))
+
+    with pytest.raises(ValueError, match=r"wn3_mean_day5: 1 rows .*day-5 band"):
+        w.check_band_complete(built=built, domain=domain, day=5)
+
+
+@pytest.mark.parametrize("domain", ["solar", "wind"])
+def test_a_run_missing_from_the_copy_is_not_a_hole_inside_a_band(domain: str) -> None:
+    built = _holey_frame(domain=domain, day=5, nan_cell=None)
+
+    assert built["wn3_mean_day5_init_time"].null_count() == 1
+    w.check_band_complete(built=built, domain=domain, day=5)
+
+
+def test_the_day_5_fits_refuse_every_output_folder_but_their_own(tmp_path: Path) -> None:
+    published = tmp_path / "nwp_forecast_comparison"
+    for name in ("nwp_forecast_comparison_aifs_extra_days", "nwp_forecast_comparison_leads_day10"):
+        with pytest.raises(ValueError, match=driver.OUTPUT_DIR_NAME):
+            driver.check_output_dir(output_dir=tmp_path / name, published_dir=published)
+    driver.check_output_dir(output_dir=tmp_path / driver.OUTPUT_DIR_NAME, published_dir=published)
+
+
+def test_the_joined_report_keeps_both_fits_under_one_title_and_refuses_to_overwrite(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / driver.AIFS_REPORT_NAME).write_text("# AIFS\n\n## Solar\n\ntext a")
+    (tmp_path / driver.WN3_REPORT_NAME).write_text("# WN3\n\n## Wind\n\ntext b")
+
+    path = driver.write_joined_report(output_dir=tmp_path)
+
+    lines = path.read_text().splitlines()
+    assert lines[0].startswith("# ")
+    assert lines.count("## AIFS") == 1
+    assert lines.count("### Solar") == 1
+    assert lines.count("## WN3") == 1
+    assert lines.index("## AIFS") < lines.index("## WN3")
+    with pytest.raises(FileExistsError):
+        driver.write_joined_report(output_dir=tmp_path)

@@ -194,8 +194,8 @@ EXTRA_ENS_CONTROL_DAYS: Final[tuple[int, ...]] = (5, 7, 10, 14)
 published inputs."""
 
 
-ExtraBatchType = Literal["first", "second", "third", "fourth"]
-"""Which extra-lead build: the first, second, third, or fourth batch's columns."""
+ExtraBatchType = Literal["first", "second", "third", "fourth", "fifth"]
+"""Which extra-lead build: the first, second, third, fourth, or fifth batch's columns."""
 
 
 class ExtraLeadBuild(NamedTuple):
@@ -216,6 +216,21 @@ IFS_SINGLE_DAYS: Final[tuple[int, ...]] = (0, 1, 2, 3, 5, 7)
 """The lead days the fourth batch reads Open-Meteo's IFS HRES (9 km) archive at. Day 10 is absent
 because the archive's runs end at lead 240 hours, so day 10's leads (240 to 263 for wind, 241 to
 264 for solar) are almost all beyond them; `studies.ifs_single_runs.last_servable_day` is 9."""
+
+SHARED_DAY4: Final[tuple[int, ...]] = (4,)
+"""The one lead day the fifth batch builds, for every product the leaderboards draw at day 4 on the
+shared rows. Day 4 reads leads 96 to 119 hours for wind and 97 to 120 for solar, as days 3 and 5
+do at their own 24-hour offsets."""
+
+SHARED_DAY4_PRODUCT_DAY_OFFSETS: Final[dict[str, tuple[int, ...]]] = {
+    "ICON-EU": SHARED_DAY4,
+    "ICON global": SHARED_DAY4,
+    "IFS 0.25°": SHARED_DAY4,
+}
+"""The Previous Runs products the fifth batch reads at `previous_day4`: ICON-EU (whose archive ends
+at day 4), ICON global, and IFS 0.25 degree. On the published inputs' rows, `previous_day4` is null
+on at most 0.6% of rows for these three products, below `fit_extra_leads.MAX_MISSING_SHARE`.
+ICON-D2's archive holds only days 0 and 1, so it has no day 4."""
 
 EXTRA_LEAD_BUILDS: Final[dict[ExtraBatchType, ExtraLeadBuild]] = {
     "first": ExtraLeadBuild(
@@ -244,12 +259,23 @@ EXTRA_LEAD_BUILDS: Final[dict[ExtraBatchType, ExtraLeadBuild]] = {
         gefs_days=(),
         ifs_single_days=IFS_SINGLE_DAYS,
     ),
+    "fifth": ExtraLeadBuild(
+        product_day_offsets=SHARED_DAY4_PRODUCT_DAY_OFFSETS,
+        ens_mean_days=SHARED_DAY4,
+        ens_control_days=SHARED_DAY4,
+        gefs_days=SHARED_DAY4,
+        gfs_native_days=SHARED_DAY4,
+        ifs_single_days=SHARED_DAY4,
+    ),
 }
 """The first batch's columns (unchanged from its own build), the second batch's (ENS mean at day 7,
 ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7, with no Previous Runs column
 because the arms it refits take their columns from the published inputs), and the third batch's
-(the native GFS store at `GFS_NATIVE_DAYS`, and nothing else), and the fourth batch's (Open-Meteo's
-IFS HRES archive at `IFS_SINGLE_DAYS`, and nothing else)."""
+(the native GFS store at `GFS_NATIVE_DAYS`, and nothing else), the fourth batch's (Open-Meteo's
+IFS HRES archive at `IFS_SINGLE_DAYS`, and nothing else), and the fifth batch's (day 4 of every
+product the leaderboards draw there: ENS mean and control member, GEFS mean, the native GFS store,
+IFS HRES (9 km, Open-Meteo), and the Previous Runs ICON-EU, ICON global, and IFS 0.25 degree
+arms). ENS at day 4 needs `fetch_ens_day4_supplement.py`'s file, which `ens_members` adds."""
 
 AIFS_DAYS: Final[tuple[int, ...]] = (1, 2)
 """The bands the AIFS build reads unless `--aifs-days` names others: day 1 (the day-ahead product)
@@ -2145,7 +2171,8 @@ def main() -> int:
         help="With --extra-leads: which extra-lead build (the second adds ENS mean at day 7, the "
         "ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7; the third adds the "
         "native GFS store at days 0, 1, 2, 3, 5, 7, 10 and 14; the fourth adds Open-Meteo's IFS "
-        "Single Runs archive at days 0, 1, 2, 3, 5 and 7).",
+        "Single Runs archive at days 0, 1, 2, 3, 5 and 7; the fifth adds day 4 of ENS mean and "
+        "control, GEFS, native GFS, IFS HRES, ICON-EU, ICON global and IFS 0.25°).",
     )
     parser.add_argument(
         "--gfs-dir",

@@ -23,7 +23,7 @@ published inputs' own `(site, time)` keys:
   lead. Each site's value is the H3 resolution-5 overlap-weighted mean of the crop's 0.1 degree
   cells, taken on the eastward and northward components and turned into speed and direction after
   that.
-- `ens_mean_day<N>_*` at days 4, 7, 10 and 14, the same-rows ENS reference, built by
+- `ens_mean_day<N>_*` at days 4, 5, 7, 10 and 14, the same-rows ENS reference, built by
   `build_forecast_inputs._ens_extra_frame` as the published extra-lead inputs are.
 - Wind only, `ens_meanvec_day<N>_*` at every built day, the matched ENS reference whose speed is
   the length of the mean of the members' wind vectors, as WN3's is. The store holds only the
@@ -117,7 +117,7 @@ N_LEADS: Final[int] = 360
 WN3_DAYS: Final[tuple[int, ...]] = (1, 2, 7, 14)
 """The lead days built unless `--days` names others."""
 
-ENS_EXTRA_DAYS: Final[tuple[int, ...]] = (4, 7, 10, 14)
+ENS_EXTRA_DAYS: Final[tuple[int, ...]] = (4, 5, 7, 10, 14)
 """The days whose same-rows ENS mean `_ens_extra_frame` builds beside the WN3 arms. Days 0 to 3 are
 in the published inputs already."""
 
@@ -550,6 +550,40 @@ def check_physical_range(*, built: pl.DataFrame, domain: DomainType, day: int) -
     _LOG.info("%s: physical-range check passed", arm)
 
 
+def check_band_complete(*, built: pl.DataFrame, domain: DomainType, day: int) -> None:
+    """Raise if a row that reads a stored run and lead has a missing value in the band.
+
+    `wn3_arm_frame` leaves a value null where the run is absent from the copy or the lead is not
+    stored, and stamps the run only on the rows that have both. A stamped row with a null value
+    therefore reads a run whose band has a hole: a `NaN` in the store, which the weighted mean
+    carries through. The hole would otherwise drop the row from the fit without a word, as a run
+    missing from the copy does.
+
+    Args:
+        built: `wn3_arm_frame`'s result.
+        domain: `solar` or `wind`.
+        day: The band's day.
+
+    Raises:
+        ValueError: If a stamped row has a null in the arm's irradiance and temperature (solar) or
+            its two wind speeds (wind).
+    """
+    arm = f"wn3_mean_day{day}"
+    names = ("ghi", "temp") if domain == "solar" else ("speed_100m", "speed_10m")
+    holes = built.filter(
+        pl.col(f"{arm}_init_time").is_not_null(),
+        pl.any_horizontal(pl.col(f"{arm}_{name}").is_null() for name in names),
+    )
+    if holes.height:
+        first = holes["time"].min()
+        msg = (
+            f"{arm}: {holes.height} rows read a stored run and lead but hold no value, the first "
+            f"at {first}, so the store has a hole inside the day-{day} band"
+        )
+        raise ValueError(msg)
+    _LOG.info("%s: band-completeness check passed", arm)
+
+
 def ens_vector_mean_frame(*, extract: pl.DataFrame, day: int) -> pl.DataFrame:
     """Return ENS's wind arm whose speed is the length of the mean of the members' wind vectors.
 
@@ -665,6 +699,7 @@ def build_domain(
             cubes=cubes, runs=runs, sites=sites, keys=keys, domain=domain, day=day
         )
         check_physical_range(built=arm_frame, domain=domain, day=day)
+        check_band_complete(built=arm_frame, domain=domain, day=day)
         check_against_store(
             built=arm_frame, dataset=dataset, weights=weights, domain=domain, day=day
         )
