@@ -1,4 +1,4 @@
-r"""Download NORA3 hourly wind speed and direction at 50 m and 100 m, cut to the trial-area box.
+r"""Download NORA3 hourly wind speed and direction, cut to the trial-area box.
 
 One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>. MET Norway serves NORA3
@@ -12,7 +12,9 @@ line, error message, lineage note, or README carries them.
 
 The script fetches `wind_speed` and `wind_direction` at 50 m and 100 m (`height` indices 2 and 3 of
 the served `[10, 20, 50, 100, 250, 500, 750]`, checked against the served `height` array at run
-time). It requires `pydap`, which is not a workspace dependency, so run it as
+time) into `NORA3/`. With `--height-10m` it fetches the 10 m level (index 0) instead, into its own
+folder `NORA3_10m/`, so the two sets never share a month cache. It requires `pydap`, which is not a
+workspace dependency, so run it as
 
 ```bash
 uv run --with pydap python -u studies/weather_downloads/fetch_nora3.py \
@@ -45,7 +47,7 @@ import calendar
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final
+from typing import Final, NamedTuple
 
 import numpy as np
 import polars as pl
@@ -79,11 +81,20 @@ GRID_SPACING_M: Final[float] = 3000.0
 """The grid's first `x` and `y` coordinate and spacing, read once from the catalog's own `x` and
 `y` arrays. `_open_dataset` asserts the served axes still match them."""
 
-HEIGHT_INDICES: Final[tuple[int, int]] = (2, 3)
-"""Indices into the served `height` dimension for 50 m and 100 m."""
 
-HEIGHTS_M: Final[tuple[int, int]] = (50, 100)
-"""The heights, in metres, that `HEIGHT_INDICES` must select."""
+class HeightSet(NamedTuple):
+    """One contiguous run of the served `height` dimension, and where its output lands."""
+
+    indices: tuple[int, int]
+    """First and last index into the served `height` dimension, inclusive."""
+    heights_m: tuple[int, ...]
+    """The heights, in metres, that `indices` must select."""
+    product_dir_name: str
+    """The folder under `data/studies/weather/` holding this set's cache, file, and notes."""
+
+
+TURBINE_HEIGHTS: Final[HeightSet] = HeightSet((2, 3), (50, 100), "NORA3")
+NEAR_SURFACE_HEIGHT: Final[HeightSet] = HeightSet((0, 0), (10,), "NORA3_10m")
 
 EPOCH: Final[datetime] = datetime(1970, 1, 1, tzinfo=UTC)
 """`time`'s units are seconds since this epoch."""
@@ -103,11 +114,12 @@ OUTPUT_NAME: Final[str] = "NORA3_wind.parquet"
 files behind."""
 
 
-def _open_dataset(url: str) -> object:
+def _open_dataset(url: str, heights_set: HeightSet) -> object:
     """Open an OPeNDAP dataset and assert its grid axes and heights match this script's constants.
 
     Args:
         url: The aggregate's `CATALOG_URL`, or one monthly file's URL.
+        heights_set: The heights the dataset's `height` axis must serve at the given indices.
 
     Returns:
         The opened `pydap` dataset.
@@ -138,9 +150,12 @@ def _open_dataset(url: str) -> object:
                 f"{name}'s served scale_factor, add_offset, or _FillValue differs from the "
                 "constants in this script"
             )
-    heights = np.asarray(dataset["height"][:].data)[list(HEIGHT_INDICES)]
-    if not np.array_equal(heights, HEIGHTS_M):
-        raise RuntimeError(f"HEIGHT_INDICES select {heights.tolist()} m, expected {HEIGHTS_M}")
+    h0, h1 = heights_set.indices
+    heights = np.asarray(dataset["height"][:].data)[h0 : h1 + 1]
+    if not np.array_equal(heights, heights_set.heights_m):
+        raise RuntimeError(
+            f"the height indices select {heights.tolist()} m, expected {heights_set.heights_m}"
+        )
     return dataset
 
 
@@ -237,8 +252,9 @@ def fetch_month(
     month: int,
     index_range: tuple[int, int, int, int],
     in_monthly_file: bool,
+    heights_set: HeightSet,
 ) -> pl.DataFrame:
-    """Fetch wind speed and direction at 50 m and 100 m for one calendar month.
+    """Fetch wind speed and direction at the heights in `heights_set` for one calendar month.
 
     Args:
         dataset: The opened `pydap` dataset: the aggregate, or the month's own file.
@@ -247,6 +263,7 @@ def fetch_month(
         index_range: `(ix0, ix1, iy0, iy1)` from `_box_index_range`.
         in_monthly_file: Whether `dataset` is the month's own file, whose time axis starts at the
             month's first hour, rather than the aggregate, whose time axis starts at the epoch.
+        heights_set: Which heights to read.
 
     Returns:
         One row per (time, height_m, y_index, x_index). `y_index` and `x_index` are the grid's own
@@ -257,7 +274,7 @@ def fetch_month(
             OPeNDAP request fails. The message names no index or URL.
     """
     ix0, ix1, iy0, iy1 = index_range
-    h0, h1 = HEIGHT_INDICES
+    h0, h1 = heights_set.indices
     hours = _month_hours(year=year, month=month)
     t0 = 0 if in_monthly_file else int(hours[0] // 3600)
     t1 = t0 + len(hours)
@@ -284,7 +301,10 @@ def fetch_month(
 
     n_time, n_height, n_y, n_x = speed.shape
     height_grid, y_grid, x_grid = np.meshgrid(
-        np.array(HEIGHTS_M), np.arange(iy0, iy1 + 1), np.arange(ix0, ix1 + 1), indexing="ij"
+        np.array(heights_set.heights_m),
+        np.arange(iy0, iy1 + 1),
+        np.arange(ix0, ix1 + 1),
+        indexing="ij",
     )
     time_column = np.repeat(
         (hours * 1000).astype("int64").astype("datetime64[ms]"), n_height * n_y * n_x
@@ -331,6 +351,7 @@ def _fetch_months(
     dataset: object,
     last_served_hour: float,
     index_range: tuple[int, int, int, int],
+    heights_set: HeightSet,
 ) -> tuple[list[str], list[str]]:
     """Fetch and cache every requested month that is not cached yet.
 
@@ -340,6 +361,7 @@ def _fetch_months(
         dataset: The opened aggregated dataset.
         last_served_hour: The aggregate's last hour, in epoch seconds.
         index_range: `(ix0, ix1, iy0, iy1)` from `_box_index_range`.
+        heights_set: Which heights to read.
 
     Returns:
         The labels of the months read from monthly files, and the labels of the months skipped
@@ -361,7 +383,7 @@ def _fetch_months(
         if in_monthly_file:
             try:
                 month_dataset = _open_dataset(
-                    MONTHLY_FILE_URL_TEMPLATE.format(year=year, month=month)
+                    MONTHLY_FILE_URL_TEMPLATE.format(year=year, month=month), heights_set
                 )
             except requests.exceptions.HTTPError as error:
                 if not _is_not_found(error):
@@ -387,6 +409,7 @@ def _fetch_months(
             month=month,
             index_range=index_range,
             in_monthly_file=in_monthly_file,
+            heights_set=heights_set,
         )
         partial = month_path.with_suffix(".parquet.partial")
         frame.write_parquet(partial)
@@ -404,14 +427,22 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Download NORA3 wind over the trial-area box.")
     parser.add_argument("--start-month", required=True, help="First month, YYYY-MM.")
     parser.add_argument("--end-month", required=True, help="Last month, YYYY-MM.")
+    parser.add_argument(
+        "--height-10m",
+        action="store_true",
+        help="Fetch the 10 m level into NORA3_10m/ instead of 50 m and 100 m into NORA3/.",
+    )
     arguments = parser.parse_args()
+    heights_set = NEAR_SURFACE_HEIGHT if arguments.height_10m else TURBINE_HEIGHTS
+    heights_text = " and ".join(f"{height} m" for height in heights_set.heights_m)
+    height_options = " or ".join(str(height) for height in heights_set.heights_m)
 
-    output_dir = WEATHER_DOWNLOADS_DIR / "NORA3"
+    output_dir = WEATHER_DOWNLOADS_DIR / heights_set.product_dir_name
     month_cache_dir = output_dir / "_month_cache"
     month_cache_dir.mkdir(parents=True, exist_ok=True)
     months = _months(start_month=arguments.start_month, end_month=arguments.end_month)
 
-    dataset = _open_dataset(CATALOG_URL)
+    dataset = _open_dataset(CATALOG_URL, heights_set)
     n_time = dataset["time"].shape[0]  # ty: ignore[not-subscriptable]
     last_served_hour = float(np.asarray(dataset["time"][n_time - 1 : n_time].data)[0])  # ty: ignore[not-subscriptable]
     index_range = _box_index_range(
@@ -425,6 +456,7 @@ def main() -> int:
         dataset=dataset,
         last_served_hour=last_served_hour,
         index_range=index_range,
+        heights_set=heights_set,
     )
 
     labels = sorted(path.stem for path in month_cache_dir.glob("*.parquet"))
@@ -443,7 +475,7 @@ def main() -> int:
         product_dir=output_dir,
         source_address=CATALOG_URL,
         request_description=(
-            "NORA3 hourly wind_speed and wind_direction at 50 m and 100 m, OPeNDAP index-range "
+            f"NORA3 hourly wind_speed and wind_direction at {heights_text}, OPeNDAP index-range "
             "slice of the grid's own x/y axes to the trial-area box (one grid cell's margin "
             "around the NGED generator roster's own extent), whole calendar months"
         ),
@@ -454,7 +486,7 @@ def main() -> int:
             "months_fetched_from_monthly_files_this_run": from_monthly_files,
             "months_unavailable": unavailable,
             "last_served_hour_utc": datetime.fromtimestamp(last_served_hour, tz=UTC),
-            "heights_m": list(HEIGHTS_M),
+            "heights_m": list(heights_set.heights_m),
             "rows": combined.height,
             "size_mb": round(size_mb, 3),
         },
@@ -467,7 +499,7 @@ def main() -> int:
         lineage_filenames=["lineage.json"],
         columns={
             "time": "Timezone-naive (implicitly UTC) hourly timestamp of the instantaneous value.",
-            "height_m": "Height above ground, metres: 50 or 100.",
+            "height_m": f"Height above ground, metres: {height_options}.",
             "y_index": "Row index into NORA3's native 3 km Lambert-conformal grid, not a "
             "coordinate.",
             "x_index": "Column index into the same grid, not a coordinate.",
