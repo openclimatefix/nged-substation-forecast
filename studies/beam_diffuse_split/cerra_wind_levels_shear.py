@@ -22,7 +22,9 @@ for each height's ratio to 100 m and its own level.
 
 Run it with `uv run python studies/beam_diffuse_split/cerra_wind_levels_shear.py`, after
 `cerra_wind_levels.py`. It writes `report.md` and `intervals.parquet` to its own folder,
-`cerra_wind_levels_shear`, and stops while either exists.
+`cerra_wind_levels_shear`, and stops while either exists. `report.md` there holds
+`cerra_wind_levels.py`'s report followed by the post hoc sections, and `intervals.parquet` holds
+both scripts' intervals, so `check_page_numbers.py` can check the whole write-up against one report.
 """
 
 import logging
@@ -166,32 +168,34 @@ def main() -> int:
     farms = sorted(losses["site"].unique().to_list())
     records = _records(losses=losses, farms=farms)
     lines = [
-        "# CERRA wind levels: post hoc checks (exploratory)",
+        (SOURCE_DIR / "report.md").read_text().rstrip(),
+        "",
+        "## Post hoc checks (exploratory)",
         "",
         (
             "Every contrast here was chosen after the results were seen, so none carries a "
             "Bonferroni interval."
         ),
         "",
-        "### Contrasts against the two-height arm, all farms",
+        "#### Contrasts against the two-height arm, all farms",
         "",
         *_contrast_lines(records=records.filter(pl.col("scope") == "all")),
         "",
-        "### The same contrasts, per farm (primary setting)",
+        "#### The same contrasts, per farm (primary setting)",
         "",
         *_contrast_lines(records=records.filter(pl.col("scope") != "all")),
         "",
-        "### Share of the gain that a second height gives",
+        "#### Share of the gain that a second height gives",
         "",
         *_share_lines(losses=losses),
         "",
-        f"### Step statistic at {ERA_MONTH}",
+        f"#### Step statistic at {ERA_MONTH}",
         "",
         *_era_lines(),
         "",
     ]
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    records.write_parquet(paths[1])
+    pl.concat([pl.read_parquet(SOURCE_DIR / "intervals.parquet"), records]).write_parquet(paths[1])
     paths[0].write_text("\n".join(lines))
     _LOG.info("wrote %s", OUTPUT_DIR)
     return 0

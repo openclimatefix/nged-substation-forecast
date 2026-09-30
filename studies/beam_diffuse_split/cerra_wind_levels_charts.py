@@ -157,18 +157,18 @@ def _leaderboard(*, absolute: pl.DataFrame, report: str) -> alt.VConcatChart:
     )
 
 
-def _contrasts(*, intervals: pl.DataFrame, shear: pl.DataFrame, reports: str) -> alt.VConcatChart:
+def _contrasts(*, shear: pl.DataFrame, reports: str) -> alt.VConcatChart:
     """Draw the paired contrasts, planned, exploratory, and post hoc, at both settings.
 
     Args:
-        intervals: `cerra_wind_levels.py`'s `intervals.parquet`.
-        shear: `cerra_wind_levels_shear.py`'s `intervals.parquet`.
-        reports: The text of both reports, joined.
+        shear: `cerra_wind_levels_shear.py`'s `intervals.parquet`, which holds both scripts'
+            intervals.
+        reports: `cerra_wind_levels_shear.py`'s `report.md`, which holds both reports.
 
     Returns:
         Figure 2.
     """
-    both = pl.concat([intervals, shear], how="diagonal_relaxed").filter(
+    both = shear.filter(
         pl.col("scope") == "all", pl.col("setting").is_in([PRIMARY_SETTING, SENSITIVITY_SETTING])
     )
     rows = []
@@ -233,9 +233,7 @@ def main() -> int:
             absolute=pl.read_parquet(MAIN_DIR / "absolute.parquet"), report=main_report
         ),
         "cerra_wind_levels_contrasts": _contrasts(
-            intervals=pl.read_parquet(MAIN_DIR / "intervals.parquet"),
-            shear=pl.read_parquet(SHEAR_DIR / "intervals.parquet"),
-            reports=main_report + shear_report,
+            shear=pl.read_parquet(SHEAR_DIR / "intervals.parquet"), reports=shear_report
         ),
     }
     for name, chart in charts.items():
