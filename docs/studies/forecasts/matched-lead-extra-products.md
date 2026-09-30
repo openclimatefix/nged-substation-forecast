@@ -1,10 +1,16 @@
 # How the matched-lead study reads its extra products, and what they show at other lead days
 
-**This page holds the parts of the [matched-lead study](matched-lead.md) that concern its exploratory
-products: how each is read, and the two results sections that have no figure.** The main page
-carries the planned contrasts, the blends, Figures 1 to 20, the discussion, and the
-[limitations](matched-lead.md#limitations), which apply to every number here. Every result on this
-page is exploratory and fitted at the primary setting only.
+**This page holds the parts of the [matched-lead study](matched-lead.md) that concern its
+exploratory products: how the study reads each product, and the two results sections that have no
+figure.** The main page carries the planned contrasts, the blends, Figures 1 to 20, the discussion,
+and the [limitations](matched-lead.md#limitations), which apply to every number here. Every result
+on this page is exploratory and fitted at the primary setting only. The page is separate so that the
+main page's argument stays short. It assumes the main page's
+[Introduction](matched-lead.md#introduction) for the product names: ECMWF's ensemble (ENS) and its
+ensemble mean, NOAA's ensemble (GEFS), IFS 0.25°, and Open-Meteo's archive of past forecasts
+(Previous Runs). An arm is one XGBoost model given one product's forecast, and the primary setting
+is the first of the two hyperparameter settings that [the main
+page](matched-lead.md#the-xgboost-model-the-scored-hours-and-the-folds) defines.
 
 ## Data and methods
 
@@ -89,18 +95,18 @@ margin its upsampling reads beyond lead 144. Part of the rise in the error of th
 may come from the coarser steps and not only from an older run. `verify_extra_leads.py` checked,
 before the build, that GEFS's radiation beyond 240 hours is a 6-hour window mean.
 
-**Every mark in Figures 3 and 4 is a GPU fit, and a GPU fit is not bit-identical to a central
-processing unit (CPU) fit.** Every contrast among the extra arms therefore uses reference arms (the
-arms each contrast subtracts) refitted on the same device. The device noise floor is the difference
-between a GPU refit and the published CPU fit of the same arm. For solar it lies between -0.024 and
-+0.014 points, and every interval includes zero. For wind every point estimate is negative, between
--0.090 and -0.040 points, and one difference, ICON-EU at day 3 (-0.079 points [-0.167, -0.005]), is
-statistically significant at the 5% level. A wind mark from a GPU fit may therefore sit slightly
-below where a CPU fit would put it. A GPU fit repeats itself: the 23 solar arms and 23 wind arms
-that both an earlier GPU run and batch 1 fitted have identical per-row errors, to 0.0 on every row
-(a comparison of the two runs' saved losses that no committed script prints). The published headline
-contrasts, the blends, and the per-generator contrasts (Figures 5, 6, and 9 to 12) rest on the CPU
-fits of the published run.
+**Every mark in [Figures 3 and 4](matched-lead.md) is a GPU fit, and a GPU fit is not bit-identical
+to a central processing unit (CPU) fit.** Every contrast among the extra arms therefore uses
+reference arms (the arms each contrast subtracts) refitted on the same device. The device noise
+floor is the difference between a GPU refit and the published CPU fit of the same arm. For solar it
+lies between -0.024 and +0.014 points, and every interval includes zero. For wind every point
+estimate is negative, between -0.090 and -0.040 points, and one difference, ICON-EU at day 3 (-0.079
+points [-0.167, -0.005]), is statistically significant at the 5% level. A wind mark from a GPU fit
+may therefore sit slightly below where a CPU fit would put it. A GPU fit repeats itself: the 23
+solar arms and 23 wind arms that both an earlier GPU run and batch 1 fitted have identical per-row
+errors, to 0.0 on every row (a comparison of the two runs' saved losses that no committed script
+prints). The published headline contrasts, the blends, and the per-generator contrasts ([Figures 5,
+6, and 9 to 12](matched-lead.md)) rest on the CPU fits of the published run.
 
 **The ENS numbers at the extra leads are not comparable with the ENS horizons study.** Days 5, 7,
 10, and 14 of ENS, and ICON's day 0, use this study's rows, which start after the IFS Cycle 49r1
