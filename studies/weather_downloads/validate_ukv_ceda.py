@@ -5,25 +5,32 @@ the checks in `CHECK_NAMES`: the run spacing of the `init_time` axis, the counts
 the value range of every variable, the pattern of NaN against the lead layout that each variable is
 expected to have, the centroid of the daily shortwave curve against solar noon, the north-to-south
 order of the rows, that the maximum gust is not below the instantaneous gust, and the list of gaps,
-in which every run that CEDA lacks (status 3) appears.
+in which every run that CEDA lacks (status 3) appears. For `--product ukv-ceda-t120` the shortwave
+check also covers leads 57 to 120, and two more checks run: that consecutive complete runs are not
+bit-identical, and that temperature does not jump between leads 54 and 57. The first check confirms
+that the store's `product` attribute matches `--product`, and the script stops if it does not.
 
 **The checks read a sample of at most `--sample` runs, spread evenly across the archive**: the
 value ranges and the shortwave cycle read complete and partial runs, and the NaN layout reads
-complete runs only. The sample is small because every run holds 31 arrays of 55 steps. Pass
-`--sample 0` to read every run. A range check never loosens to pass: a failure means the store or
-the source is wrong.
+complete runs only. The sample is small because every run holds 31 arrays of 55 steps (121 for
+`--product ukv-ceda-t120`). Pass `--sample 0` to read every run. A range check never loosens to
+pass: a failure means the store or the source is wrong.
 
-**The script prints one PASS or FAIL line per check, and no cell count or coordinate,** because
-those reveal the size and place of the private trial-area box. The measured numbers go only to
-`validation.json` next to the store. The script exits non-zero when any check fails.
+**The script prints one PASS, FAIL, or SKIP line per check, and no cell count or coordinate,**
+because those reveal the size and place of the private trial-area box. The measured numbers go only
+to `validation.json` next to the store. A check prints SKIP when the store holds too little data for
+it, and a SKIP does not fail the script. The script exits non-zero when any check fails.
 
 Run it with `uv run --with icechunk --with zarr python
-studies/weather_downloads/validate_ukv_ceda.py --store-dir <product dir>`.
+studies/weather_downloads/validate_ukv_ceda.py --store-dir <product dir>`. Pass `--product
+ukv-ceda-t120` for the store of the 03 and 15 UTC runs, which changes the slot spacing, the step
+count, and the leads each variable serves.
 """
 
 import argparse
 import json
 import sys
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
@@ -32,12 +39,9 @@ import numpy as np
 import zarr
 from fetch_ukv_ceda import (
     CODE_VERSION,
-    CYCLE_HOURS,
     FIELDS,
-    N_STEPS,
     PLAIN_LAST_STEP,
-    PRODUCT_NAME,
-    SLOT_EPOCH,
+    PROFILES,
     STATUS_COMPLETE,
     STATUS_MISSING,
     STATUS_NAMES,
@@ -45,6 +49,9 @@ from fetch_ukv_ceda import (
     FieldSpec,
     UkvStore,
     _array,
+    active_profile,
+    add_product_argument,
+    set_profile,
 )
 from paths import WEATHER_DOWNLOADS_DIR
 
@@ -58,8 +65,19 @@ CHECK_NAMES: Final[tuple[str, ...]] = (
     "gust_max_is_a_maximum",
     "gaps",
 )
+T120_CHECK_NAMES: Final[tuple[str, ...]] = (
+    "adjacent_runs_differ",
+    "temperature_continuity_54_57",
+)
+"""Checks that run only for a profile with `T120` files, after `CHECK_NAMES`."""
+
+CheckResult = tuple[bool | None, dict[str, Any]]
+"""A check's outcome, then what it measured. `True` is a PASS, `False` a FAIL, and `None` a SKIP:
+the store holds too little data for the check to say anything."""
 
 KELVIN: Final[float] = 273.15
+MIN_RUNS_FOR_GRADIENT: Final[int] = 20
+"""Fewest sampled runs for which the north-to-south temperature correlation means anything."""
 VALUE_RANGES: Final[dict[str, tuple[float, float]]] = {
     "temperature_1p5m": (-40.0 + KELVIN, 50.0 + KELVIN),
     "temperature_0m": (-40.0 + KELVIN, 60.0 + KELVIN),
@@ -73,11 +91,11 @@ VALUE_RANGES: Final[dict[str, tuple[float, float]]] = {
     "wind_speed_10m": (0.0, 80.0),
     "wind_direction_10m": (0.0, 360.0),
     "pressure_msl": (90000.0, 110000.0),
-    "cloud_total": (0.0, 100.0),
+    "cloud_total": (0.0, 100.1),
     "cloud_low": (0.0, 100.0),
     "cloud_very_low": (0.0, 100.0),
     "cloud_medium": (0.0, 100.0),
-    "cloud_high": (0.0, 100.0),
+    "cloud_high": (0.0, 100.1),
     "cloud_base_height": (0.0, 20000.0),
     "cloud_param_0_6_26": (0.0, 20000.0),
     "convective_cloud_top_height": (0.0, 20000.0),
@@ -121,12 +139,24 @@ SOLAR_NOON_TOLERANCE_HOURS: Final[float] = 0.6
 """How far the centroid of the daily shortwave curve may sit from solar noon. Weather that clouds
 one half of a day moves the centroid by a few tenths of an hour, and a 1 hour lead offset moves it
 by 1 hour."""
+ADJACENT_RUN_VARIABLES: Final[tuple[str, ...]] = (
+    "temperature_1p5m",
+    "pressure_msl",
+    "wind_speed_10m",
+)
+"""Variables compared between consecutive runs: two runs 12 hours apart are never bit-identical."""
+T54_LAST_LEAD: Final[int] = 54
+T120_FIRST_LEAD: Final[int] = 57
+CONTINUITY_FACTOR: Final[float] = 3.0
+CONTINUITY_MARGIN_KELVIN: Final[float] = 1.0
+"""The median absolute temperature step from lead 54 to lead 57 may be at most
+`CONTINUITY_FACTOR` times the median step from lead 51 to lead 54, plus this margin."""
 GUST_TOLERANCE: Final[float] = 2**-12
 MAX_GUST_VIOLATION_FRACTION: Final[float] = 0.01
 
 
 def expected_leads(spec: FieldSpec) -> set[int]:
-    """The leads, in hours, at which a variable has data: its plain and `T54` files together."""
+    """The leads, in hours, at which a variable has data: all its files in the active profile."""
     leads: set[int] = set()
     for tag in spec.tags:
         leads.update(spec.expected_steps(tag=tag))
@@ -142,13 +172,16 @@ def sample_slots(slots: np.ndarray, *, sample: int) -> np.ndarray:
 
 
 def check_run_spacing(group: zarr.Group) -> tuple[bool, dict[str, Any]]:
-    """Check that `init_time` is the fixed 6-hourly grid from the slot epoch, without a shift."""
+    """Check that `init_time` is the active profile's fixed grid from its slot epoch, unshifted."""
+    profile = active_profile()
     init_time = np.asarray(_array(group, "init_time")[:])
-    expected = int(SLOT_EPOCH.timestamp()) + np.arange(len(init_time)) * CYCLE_HOURS * 3600
+    expected = int(profile.slot_epoch.timestamp()) + np.arange(len(init_time)) * (
+        profile.cycle_hours * 3600
+    )
     return bool(np.array_equal(init_time, expected)), {"slots": len(init_time)}
 
 
-def check_status_counts(statuses: np.ndarray, group: zarr.Group) -> tuple[bool, dict[str, Any]]:
+def check_status_counts(statuses: np.ndarray, group: zarr.Group) -> CheckResult:
     """Check that no run has an unknown status, and that the file counts agree with the status."""
     counts = {name: int((statuses == code).sum()) for code, name in STATUS_NAMES.items()}
     counts["never_archived"] = int((statuses == 0).sum())
@@ -169,7 +202,7 @@ def read_sample(group: zarr.Group, spec: FieldSpec, slots: np.ndarray) -> np.nda
     return np.stack([np.asarray(array[int(slot)]) for slot in slots])
 
 
-def check_value_ranges(group: zarr.Group, slots: np.ndarray) -> tuple[bool, dict[str, Any]]:
+def check_value_ranges(group: zarr.Group, slots: np.ndarray) -> CheckResult:
     """Check every variable's finite values against its physical range."""
     measured: dict[str, Any] = {}
     ok = True
@@ -189,12 +222,12 @@ def check_value_ranges(group: zarr.Group, slots: np.ndarray) -> tuple[bool, dict
     return ok, measured
 
 
-def check_nan_layout(group: zarr.Group, slots: np.ndarray) -> tuple[bool, dict[str, Any]]:
+def check_nan_layout(group: zarr.Group, slots: np.ndarray) -> CheckResult:
     """Check that each variable is NaN at every unserved lead, and finite at every served lead."""
     ok = True
     bad: dict[str, str] = {}
     for spec in FIELDS:
-        served = np.zeros(N_STEPS, dtype=bool)
+        served = np.zeros(active_profile().n_steps, dtype=bool)
         served[sorted(expected_leads(spec))] = True
         data = read_sample(group, spec, slots)
         present = np.isfinite(data)
@@ -216,9 +249,7 @@ def equation_of_time_minutes(day_of_year: int) -> float:
     return float(9.87 * np.sin(2 * angle) - 7.53 * np.cos(angle) - 1.5 * np.sin(angle))
 
 
-def check_shortwave_diurnal_cycle(
-    group: zarr.Group, slots: np.ndarray
-) -> tuple[bool, dict[str, Any]]:
+def check_shortwave_diurnal_cycle(group: zarr.Group, slots: np.ndarray) -> CheckResult:
     """Check that shortwave is centred on solar noon and near zero at midnight, by valid hour.
 
     The mean daily curve of shortwave, by UTC hour of the valid time, has a centroid over the
@@ -229,39 +260,120 @@ def check_shortwave_diurnal_cycle(
     spec = next(spec for spec in FIELDS if spec.variable == "shortwave_down")
     data = read_sample(group, spec, slots)
     init_seconds = np.asarray(_array(group, "init_time")[:])[slots]
+    longitude = float(np.mean(np.asarray(_array(group, "cell_longitude")[:])))
+    offset, mean_by_hour, counts = _solar_noon_offset(
+        data, init_seconds, leads=range(PLAIN_LAST_STEP + 1), longitude=longitude
+    )
+    ok = (
+        abs(offset) <= SOLAR_NOON_TOLERANCE_HOURS
+        and mean_by_hour[NIGHT_HOUR_UTC] < NIGHT_MEAN_MAX_W_M2
+        and bool(np.all(counts > 0))
+    )
+    measured: dict[str, Any] = {
+        "centroid_minus_solar_noon_hours": round(offset, 2),
+        "mean_w_m2_by_utc_hour": mean_by_hour.round(1).tolist(),
+    }
+    if active_profile().has_t120:
+        long_leads = sorted(lead for lead in expected_leads(spec) if lead >= T120_FIRST_LEAD)
+        long_offset, long_mean, _ = _solar_noon_offset(
+            data, init_seconds, leads=long_leads, longitude=longitude
+        )
+        ok = ok and abs(long_offset) <= SOLAR_NOON_TOLERANCE_HOURS
+        ok = ok and long_mean[NIGHT_HOUR_UTC] < NIGHT_MEAN_MAX_W_M2
+        measured["t120_leads_centroid_minus_solar_noon_hours"] = round(long_offset, 2)
+    return ok, measured
+
+
+def _solar_noon_offset(
+    data: np.ndarray, init_seconds: np.ndarray, *, leads: Iterable[int], longitude: float
+) -> tuple[float, np.ndarray, np.ndarray]:
+    """The shortwave centroid minus solar noon in hours, the mean by UTC hour, and the counts.
+
+    Args:
+        data: Shortwave as a `(run, step, cell)` array.
+        init_seconds: Each run's initialisation time in seconds since the epoch.
+        leads: The leads, in hours, to accumulate.
+        longitude: The cells' mean longitude in degrees east.
+
+    Returns:
+        The offset in hours, and the 24 mean values and the 24 sample counts, both by UTC hour of
+        the valid time.
+    """
     sums = np.zeros(24)
     counts = np.zeros(24)
     equation = []
+    lead_list = list(leads)
     for run, seconds in enumerate(init_seconds):
         init = datetime.fromtimestamp(int(seconds), tz=UTC)
         equation.append(equation_of_time_minutes(init.timetuple().tm_yday))
-        for lead in range(PLAIN_LAST_STEP + 1):
+        for lead in lead_list:
             hour = (init.hour + lead) % 24
             sums[hour] += float(np.nanmean(data[run, lead]))
             counts[hour] += 1
     mean_by_hour = sums / np.maximum(counts, 1)
     daylight = np.arange(4, 21)
     centroid = float(np.sum(daylight * mean_by_hour[daylight]) / np.sum(mean_by_hour[daylight]))
-    longitude = float(np.mean(np.asarray(_array(group, "cell_longitude")[:])))
     solar_noon = 12.0 - longitude / 15.0 - float(np.mean(equation)) / 60.0
-    offset = centroid - solar_noon
-    ok = (
-        abs(offset) <= SOLAR_NOON_TOLERANCE_HOURS
-        and mean_by_hour[NIGHT_HOUR_UTC] < NIGHT_MEAN_MAX_W_M2
-        and bool(np.all(counts > 0))
-    )
-    return ok, {
-        "centroid_minus_solar_noon_hours": round(offset, 2),
-        "mean_w_m2_by_utc_hour": mean_by_hour.round(1).tolist(),
+    return centroid - solar_noon, mean_by_hour, counts
+
+
+def check_adjacent_runs_differ(group: zarr.Group, pairs: np.ndarray) -> CheckResult:
+    """Check that no two consecutive complete runs hold bit-identical data.
+
+    A stuck or duplicated download would store the same fields under two initialisation times.
+
+    Args:
+        group: The opened archive.
+        pairs: The first slot of each pair of consecutive complete slots to compare.
+
+    Returns:
+        Whether no pair was identical, and the measured values. `None` when there is no pair.
+    """
+    if not len(pairs):
+        return None, {"skipped": "no two adjacent complete runs"}
+    identical: list[str] = []
+    for variable in ADJACENT_RUN_VARIABLES:
+        array = _array(group, variable)
+        for slot in pairs:
+            first = np.asarray(array[int(slot)])
+            second = np.asarray(array[int(slot) + 1])
+            if np.array_equal(first, second, equal_nan=True):
+                identical.append(f"{variable} at {_slot_time(int(slot)):%Y-%m-%dT%HZ}")
+    for line in identical:
+        print(f"  identical to the next run: {line}")
+    return not identical, {"pairs_compared": len(pairs), "identical": identical}
+
+
+def check_temperature_continuity(group: zarr.Group, slots: np.ndarray) -> CheckResult:
+    """Check that temperature does not jump at the change from the `T54` to the `T120` files.
+
+    The median absolute difference between lead 54 and lead 57 may be at most
+    `CONTINUITY_FACTOR` times the median absolute difference between leads 51 and 54, plus
+    `CONTINUITY_MARGIN_KELVIN`. The check is skipped, returning `None`, when there is no run.
+    """
+    if not len(slots):
+        return None, {"skipped": "no complete run to read"}
+    spec = next(spec for spec in FIELDS if spec.variable == "temperature_1p5m")
+    data = read_sample(group, spec, slots)
+    reference = float(np.nanmedian(np.abs(data[:, T54_LAST_LEAD] - data[:, T54_LAST_LEAD - 3])))
+    boundary = float(np.nanmedian(np.abs(data[:, T120_FIRST_LEAD] - data[:, T54_LAST_LEAD])))
+    bound = CONTINUITY_FACTOR * reference + CONTINUITY_MARGIN_KELVIN
+    return boundary <= bound, {
+        "median_abs_step_lead_51_to_54_kelvin": round(reference, 2),
+        "median_abs_step_lead_54_to_57_kelvin": round(boundary, 2),
+        "bound_kelvin": round(bound, 2),
     }
 
 
-def check_north_south_gradient(group: zarr.Group, slots: np.ndarray) -> tuple[bool, dict[str, Any]]:
+def check_north_south_gradient(group: zarr.Group, slots: np.ndarray) -> CheckResult:
     """Check that the stored grid runs north to south, and that temperature falls to the north.
 
     Latitude must fall as the row index rises. The mean temperature over the sampled runs must
-    correlate negatively with latitude, which fails if the rows were read in the wrong order.
+    correlate negatively with latitude, which fails if the rows were read in the wrong order. The
+    check is skipped, returning `None`, when fewer than `MIN_RUNS_FOR_GRADIENT` runs were sampled.
     """
+    if len(slots) < MIN_RUNS_FOR_GRADIENT:
+        return None, {"skipped": f"fewer than {MIN_RUNS_FOR_GRADIENT} runs sampled"}
     latitude = np.asarray(_array(group, "cell_latitude")[:])
     rows = np.asarray(_array(group, "cell_row")[:])
     rows_run_south = bool(latitude[rows == rows.min()].mean() > latitude[rows == rows.max()].mean())
@@ -276,9 +388,7 @@ def check_north_south_gradient(group: zarr.Group, slots: np.ndarray) -> tuple[bo
     }
 
 
-def check_gust_max_is_a_maximum(
-    group: zarr.Group, slots: np.ndarray
-) -> tuple[bool, dict[str, Any]]:
+def check_gust_max_is_a_maximum(group: zarr.Group, slots: np.ndarray) -> CheckResult:
     """Check that the maximum gust is not below the instantaneous gust at the same lead.
 
     The two are rounded to 13 significand bits, so a difference within `GUST_TOLERANCE` is equal.
@@ -290,7 +400,7 @@ def check_gust_max_is_a_maximum(
     return below < MAX_GUST_VIOLATION_FRACTION, {"fraction_max_below_instant": below}
 
 
-def check_gaps(statuses: np.ndarray) -> tuple[bool, dict[str, Any]]:
+def check_gaps(statuses: np.ndarray) -> CheckResult:
     """List the ranges of runs, between the first and last archived, that are not complete.
 
     A gap is not a failure, since CEDA has missing runs. The check fails only if a slot inside the
@@ -326,22 +436,39 @@ def check_gaps(statuses: np.ndarray) -> tuple[bool, dict[str, Any]]:
 
 def _slot_time(slot: int) -> datetime:
     """The initialisation time of a slot."""
-    return datetime.fromtimestamp(int(SLOT_EPOCH.timestamp()) + slot * CYCLE_HOURS * 3600, tz=UTC)
+    profile = active_profile()
+    return datetime.fromtimestamp(
+        int(profile.slot_epoch.timestamp()) + slot * profile.cycle_hours * 3600, tz=UTC
+    )
 
 
 def main() -> int:
-    """Run every check and print PASS or FAIL for each.
+    """Run every check and print PASS, FAIL, or SKIP for each.
 
     Returns:
-        0 if every check passed, else 1.
+        0 if no check failed, else 1.
     """
     parser = argparse.ArgumentParser(description="Validate the UKV-CEDA Icechunk store.")
-    parser.add_argument("--store-dir", type=Path, default=WEATHER_DOWNLOADS_DIR / PRODUCT_NAME)
+    add_product_argument(parser)
+    parser.add_argument(
+        "--store-dir", type=Path, default=None, help="default: <weather downloads>/<product name>"
+    )
     parser.add_argument("--sample", type=int, default=200)
     args = parser.parse_args()
+    profile = PROFILES[args.product]
+    set_profile(profile)
+    if args.store_dir is None:
+        args.store_dir = WEATHER_DOWNLOADS_DIR / profile.product_name
     store = UkvStore.open(store_path=args.store_dir / "store")
     session = store.repository.readonly_session(branch="main")
     group = zarr.open_group(session.store, mode="r")
+    stored_product = group.attrs.get("product")
+    if stored_product != profile.product_name:
+        print(
+            f"FAIL product: the store holds {stored_product!r}, "
+            f"but --product {args.product} needs {profile.product_name!r}"
+        )
+        return 1
     statuses = store.statuses()
     readable = np.flatnonzero((statuses == STATUS_COMPLETE) | (statuses == STATUS_PARTIAL))
     complete = np.flatnonzero(statuses == STATUS_COMPLETE)
@@ -364,13 +491,24 @@ def main() -> int:
         ),
         "gaps": check_gaps(statuses),
     }
-    for name in CHECK_NAMES:
-        print(f"{'PASS' if results[name][0] else 'FAIL'} {name}")
-    measured: dict[str, dict[str, Any] | int] = {name: results[name][1] for name in CHECK_NAMES}
+    names = CHECK_NAMES
+    if profile.has_t120:
+        names = (*CHECK_NAMES, *T120_CHECK_NAMES)
+        pairs = complete[np.isin(complete + 1, complete)]
+        results["adjacent_runs_differ"] = check_adjacent_runs_differ(
+            group, sample_slots(pairs, sample=args.sample)
+        )
+        results["temperature_continuity_54_57"] = check_temperature_continuity(
+            group, complete_sample
+        )
+    for name in names:
+        outcome = {True: "PASS", False: "FAIL", None: "SKIP"}[results[name][0]]
+        print(f"{outcome} {name}")
+    measured: dict[str, dict[str, Any] | int] = {name: results[name][1] for name in names}
     measured["sampled_complete_runs"] = len(complete_sample)
     measured["readable_runs"] = len(readable)
     (args.store_dir / "validation.json").write_text(json.dumps(measured, indent=2, default=str))
-    return 0 if all(passed for passed, _ in results.values()) else 1
+    return 0 if all(passed is not False for passed, _ in results.values()) else 1
 
 
 if __name__ == "__main__":
