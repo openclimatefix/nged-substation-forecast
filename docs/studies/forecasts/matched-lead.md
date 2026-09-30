@@ -1932,18 +1932,22 @@ continuous ranked probability scores that a single-valued arm does not have.
 
 ### WN3 and AIFS at days 0, 3, 4, and 10 (exploratory)
 
-**At days 3 and 4 for solar and wind, and at wind day 0, WN3's mean has a lower error than ENS's
-mean, with pooled intervals that exclude 0. At solar day 0 and solar day 10 no pooled difference is
-claimable, and at wind day 10 WN3's error is higher than ENS's, by an interval that only just
-excludes 0.** Day 0 is a hindcast: the row of an hour reads the 00 UTC run of the hour's own day, a
-forecast no service could read. Solar day 0 omits the hours ending 01:00 to 06:00 UTC for every arm,
-because those hours precede the first 6-hourly AIFS step, and the WN3 wind day 0 drops the hour
-ending 00:00 UTC, for which the WN3 store holds no lead. Every number in this section is exploratory
-and fitted at the primary setting only. Each WN3 error below is the mean absolute error of an
-XGBoost model given WN3's mean, as a percentage of capacity. Each difference is WN3's error minus
-ENS's error on the same rows, in points of capacity, so a negative difference means WN3 has the
-lower error. The wind reference is ENS's mean-vector speed, which matches how WN3's speed is built.
-<!-- report (WN3 extra days): pooled and July to September rows, ens_mean and ens_meanvec arms -->
+**In the pooled rows and in the February to June rows, WN3's mean has a lower error than ENS's mean
+at days 3 and 4 for solar and wind, with intervals that exclude 0, and in the July to September rows
+only solar days 3 and 4 and wind day 3 do the same.** In every group, the solar day-0 and day-10
+differences span 0. At wind day 0 the difference excludes 0 in the pooled and February to June rows
+and spans 0 in the July to September rows, and at wind day 4 it spans 0 in the July to September
+rows. At wind day 10, WN3's error is higher than ENS's, by an interval that excludes 0 in the pooled
+and February to June rows and spans 0 in the July to September rows. Day 0 is a hindcast: the row of
+an hour reads the 00 UTC run of the hour's own day, a forecast no service could read. Solar day 0
+omits the hours ending 01:00 to 06:00 UTC for every arm, because those hours precede the first
+6-hourly AIFS step, and the WN3 wind day 0 drops the hour ending 00:00 UTC, for which the WN3 store
+holds no lead. Every number in this section is exploratory and fitted at the primary setting only.
+Each WN3 error below is the mean absolute error of an XGBoost model given WN3's mean, as a
+percentage of capacity. Each difference is WN3's error minus ENS's error on the same rows, in points
+of capacity, so a negative difference means WN3 has the lower error. The wind reference is ENS's
+mean-vector speed, which matches how WN3's speed is built. <!-- report (WN3 extra days): all three
+row groups, ens_mean (solar) and ens_meanvec (wind) arms -->
 
 | Row group, technology, day | WN3 error (%) | ENS error (%) | WN3 minus ENS (points) |
 |---|---|---|---|
@@ -1955,6 +1959,14 @@ lower error. The wind reference is ENS's mean-vector speed, which matches how WN
 | Pooled, wind, day 3 | 10.107 | 11.787 | -1.680 [-2.672, -0.574] |
 | Pooled, wind, day 4 | 11.721 | 13.370 | -1.650 [-3.162, -0.261] |
 | Pooled, wind, day 10 | 19.003 | 17.352 | +1.652 [+0.014, +3.502] |
+| February to June, solar, day 0 | 8.956 | 8.970 | -0.014 [-0.134, +0.089] |
+| February to June, solar, day 3 | 11.523 | 13.204 | -1.681 [-2.562, -1.120] |
+| February to June, solar, day 4 | 12.633 | 14.145 | -1.513 [-3.077, -0.408] |
+| February to June, solar, day 10 | 16.783 | 17.216 | -0.433 [-1.279, +0.396] |
+| February to June, wind, day 0 | 7.037 | 7.490 | -0.454 [-0.993, -0.105] |
+| February to June, wind, day 3 | 11.700 | 14.153 | -2.453 [-3.225, -0.410] |
+| February to June, wind, day 4 | 13.338 | 16.419 | -3.081 [-4.376, -1.991] |
+| February to June, wind, day 10 | 24.268 | 21.652 | +2.616 [+0.625, +5.676] |
 | July to September, solar, day 0 | 8.592 | 8.761 | -0.169 [-0.328, +0.634] |
 | July to September, solar, day 3 | 9.957 | 11.066 | -1.109 [-1.878, -0.293] |
 | July to September, solar, day 4 | 11.188 | 11.652 | -0.464 [-0.684, -0.120] |
@@ -1964,11 +1976,12 @@ lower error. The wind reference is ENS's mean-vector speed, which matches how WN
 | July to September, wind, day 4 | 9.444 | 9.548 | -0.104 [-0.594, +0.483] |
 | July to September, wind, day 10 | 12.667 | 12.313 | +0.354 [-1.121, +2.686] |
 
-**The July to September rows rest on 3 calendar months, fewer than the study's minimum of 6, so
-their intervals are indicative only.** The pooled rows cover 7 months (February to April and June to
-September 2026). Google has not documented which WeatherNext 3 model version made the archive, so
-the pooled rows may include months that overlap WN3's training data. The sensitivity setting was
-also fitted for the contrasts whose interval lies near the 5% line, and the report gives it.
+**The February to June rows cover 4 calendar months and the July to September rows 3, both fewer
+than the study's minimum of 6, so their intervals are indicative only.** The pooled rows cover 7
+months (February to April and June to September 2026). Google has not documented which WeatherNext 3
+model version made the archive, so the pooled rows may include months that overlap WN3's training
+data. The sensitivity setting was also fitted for the contrasts whose interval lies near the 5%
+line, and the report gives it.
 
 **At wind day 10, WN3's mean is not detectably better than WN3's own weather shuffled within site,
 year-month, and hour of day.** The pooled WN3 error minus the first shuffled arm's is +0.202 points
@@ -1980,8 +1993,10 @@ second is -0.364 points [-0.952, +0.336].
 **AIFS Single and the AIFS ENS mean at these days are read as point differences, because the fits
 name no contrast and give no paired interval.** The absolute intervals overlap heavily wherever they
 are given, so no AIFS difference below is claimed. Each row is on the rows of its own row set (16
-months for AIFS Single, 11 for the AIFS ENS mean), against ENS's mean on the same rows. <!-- report
-(AIFS extra days): single and ens row sets -->
+months for AIFS Single, 11 for the AIFS ENS mean), against ENS's mean on the same rows. The AIFS
+minus ENS mean column is the AIFS error minus the ENS mean error, taken from the tabulated errors,
+because no report holds those differences. <!-- report (AIFS extra days): single and ens row sets
+-->
 
 | AIFS arm, technology, day | AIFS error (%) [95% interval] | ENS mean error (%) [95% interval] | AIFS minus ENS mean (points) |
 |---|---|---|---|

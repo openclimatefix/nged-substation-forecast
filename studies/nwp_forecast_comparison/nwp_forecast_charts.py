@@ -743,7 +743,14 @@ WN3_LEADERBOARD_NOTES: Final[dict[DomainType, str]] = {
 
 MAJOR_GRID_COLOUR: Final[str] = "#C8C8C8"
 MINOR_GRID_COLOUR: Final[str] = "#DDDDDD"
-"""The leaderboard's vertical grid: the major lines are darker and thicker than the minor ones."""
+"""The leaderboard's vertical grid: the major lines are darker, and the minor lines are thicker."""
+
+MAJOR_GRID_WIDTH_PX: Final[float] = 1.0
+MINOR_GRID_WIDTH_PX: Final[float] = 2.5
+"""The stroke widths of the major (integer) and minor (half-point) grid lines."""
+
+LEAD_BOTTOM_PAD_ROWS: Final[float] = 0.35
+"""The space below the last product's row, in rows, so the bottom axis does not cut its marks."""
 """The height of the grey tick that marks the ENS mean on a smaller row set's rows."""
 
 LEAD_DODGE_ROWS: Final[float] = 0.135
@@ -1048,7 +1055,8 @@ def leaderboard_figure(
     x_scale = alt.Scale(domain=list(x_domain), nice=False, zero=False)
     x_axis = alt.Axis(values=x_ticks, format=".2~f", grid=False)
     top_axis = alt.Axis(values=x_ticks, format=".2~f", grid=False, orient="top", title=None)
-    y_scale = alt.Scale(domain=[len(products) - 0.5, -LEAD_LABEL_ROWS], nice=False)
+    bottom = len(products) - 0.5 + LEAD_BOTTOM_PAD_ROWS
+    y_scale = alt.Scale(domain=[bottom, -LEAD_LABEL_ROWS], nice=False)
     y_axis = alt.Axis(labels=False, ticks=False, domain=False, grid=False, title=None)
     colour = alt.Color(
         "lead:N",
@@ -1075,8 +1083,8 @@ def leaderboard_figure(
     # The vertical grid is drawn as rules, not as the axis's grid, so that it starts below the
     # baselines' names instead of running through them.
     grid = (
-        alt.Chart(pl.DataFrame({"x": x_ticks, "y_start": -0.5, "y_end": len(products) - 0.5}))
-        .mark_rule(color=MAJOR_GRID_COLOUR, strokeWidth=1.5, aria=False)
+        alt.Chart(pl.DataFrame({"x": x_ticks, "y_start": -0.5, "y_end": bottom}))
+        .mark_rule(color=MAJOR_GRID_COLOUR, strokeWidth=MAJOR_GRID_WIDTH_PX, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("x:Q", scale=x_scale, axis=None),
             y=alt.Y("y_start:Q", scale=y_scale, axis=y_axis),
@@ -1085,8 +1093,8 @@ def leaderboard_figure(
     )
     minor = minor_grid_values(x_ticks=x_ticks, x_domain=x_domain)
     minor_grid = (
-        alt.Chart(pl.DataFrame({"x": minor, "y_start": -0.5, "y_end": len(products) - 0.5}))
-        .mark_rule(color=MINOR_GRID_COLOUR, strokeWidth=1, aria=False)
+        alt.Chart(pl.DataFrame({"x": minor, "y_start": -0.5, "y_end": bottom}))
+        .mark_rule(color=MINOR_GRID_COLOUR, strokeWidth=MINOR_GRID_WIDTH_PX, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("x:Q", scale=x_scale, axis=None),
             y=alt.Y("y_start:Q", scale=y_scale, axis=y_axis),
@@ -1200,7 +1208,7 @@ def leaderboard_figure(
             reference_text,
         ],
         width=LEAD_PLOT_WIDTH_PX,
-        height=LEAD_ROW_PX * (len(products) + LEAD_LABEL_ROWS - 0.5),
+        height=LEAD_ROW_PX * (len(products) + LEAD_LABEL_ROWS - 0.5 + LEAD_BOTTOM_PAD_ROWS),
     ).resolve_axis(x="independent")
     return figure(
         panels=[
@@ -1244,7 +1252,8 @@ def leaderboard_figure(
                     " Solar day 0 omits the hours ending 01:00 to 06:00 UTC for every product, "
                     "because they precede the first 6-hourly step of the AIFS arms."
                     if domain == "solar"
-                    else ""
+                    else " The WeatherNext 3 row drops the hour ending 00:00 UTC at day 0, "
+                    "for which the WN3 store holds no lead."
                 )
                 + " Leads are not equal: a "
                 "Previous Runs product reads the freshest run at least a day old, a shorter lead "
@@ -2889,8 +2898,8 @@ def wn3_groups(*, wn3_dir: Path, domain: DomainType) -> tuple[alt.VConcatChart, 
                     f"{WN3_SPLIT_MONTHS['out-of-sample']} (3 months), and every row from "
                     "February to September 2026 (7 months, no May rows). The second group is the "
                     "only group after every training end the WeatherNext 3 paper lists, "
-                    "so it checks whether a change of model version at the start of July shows in "
-                    "the scores; "
+                    "so it checks whether a change of weather model version at the start of July "
+                    "shows in the scores; "
                     "the third group, which mixes both, is the leaderboards' WeatherNext 3 row. "
                     "The second group's intervals resample only 3 months, fewer than the "
                     f"{MIN_MONTHS_FOR_INTERVAL} that support an interval, so they show the "
