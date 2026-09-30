@@ -230,21 +230,25 @@ has not been checked against DMI's own files.
 
 **The statistics bucket is not Requester Pays, and the raw ensemble bucket is.** [Google's
 guide](https://developers.google.com/weathernext/guides/gcs) marks `weathernext3_statistics_spatial`
-as Requester Pays "OFF", and `weathernext3_spatial`, which holds the 64 members, as Requester Pays
-"ON". Reading the statistics bucket therefore needs no billing project. The guide does not say
-whether the statistics bucket can be read without credentials, and an anonymous listing of it
-returned 401, so the fetch script authenticates with Google application default credentials. The
-guide also does not say who bears egress from the statistics bucket, and that is unverified. The
-study reads from a Compute Engine machine in the same region as the bucket regardless, because it
-needs the whole 2026-to-present archive at four runs a day, which is too much for a domestic
-internet connection, while a machine in the same region reads it far faster.
+as Requester Pays "OFF", and `weathernext3_spatial` as Requester Pays "ON". The 64 ensemble members
+are in `weathernext3_spatial`, a separate Requester Pays bucket that the fetch script never reads.
+Reading the statistics bucket needs no billing project. The bucket cannot be read anonymously,
+according to the maintainer: access must be requested from Google through its [access
+guide](https://developers.google.com/weathernext/guides/access-forecast), and reads then use a
+Google account's application default credentials. That is consistent with an anonymous listing of
+the bucket returning 401, observed once by a sub-agent on a bucket-level list rather than on a read
+of one run's Zarr store. The fetch script therefore authenticates with application default
+credentials. The guide names egress charges only for the raw ensemble bucket, so who bears egress
+from the statistics bucket is unverified. The study reads from a Compute Engine machine in the same
+region as the bucket regardless, because it needs the whole 2026-to-present archive at four runs a
+day, which is too much for a domestic internet connection, while a machine in the same region reads
+it far faster.
 
 **The bucket holds five percentiles that OCF has not fetched, and documents no standard deviation.**
 Google's guide lists the precomputed statistics `_mean`, `_p10`, `_p25`, `_p50`, `_p75`, and `_p90`
 for every 0.1° and 0.05° surface variable, with no pressure levels. The study fetched the mean only.
-The variable names and units of the percentile variables have not been checked against the bucket.
-The guide documents no standard deviation, minimum, or maximum. If the percentile variables are laid
-out like the mean, each extra variable per run would be about 7 GB (inferred, not measured).
+OCF has not checked the percentile variables' names and units against the bucket. The guide
+documents no standard deviation, minimum, or maximum.
 
 **The archive carries no back-fill before 2026-01-01.** The bucket's `zarr/` prefix holds only
 `2026_to_present`, with no earlier date-range prefix, confirmed by listing the bucket directly on

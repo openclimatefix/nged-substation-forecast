@@ -3,7 +3,7 @@
 One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/934>, the WeatherNext 3 arm of
 the matched-lead comparison. The source is the bucket
-`weathernext3_statistics_spatial` in region US-EAST1. The bucket is not Requester Pays. It holds one
+`weathernext3_statistics_spatial` in region US-EAST1. It holds one
 Zarr store per run, at 0.1 degrees over the globe, with precomputed statistics of each variable.
 This script reads only the ensemble mean, following Google's own guide at
 <https://developers.google.com/weathernext/guides/gcs>. The archive starts on 2026-01-01 and has a
@@ -16,27 +16,24 @@ transfers about 50 GB per run (360 lead times, 7 variables) and keeps about 15 M
 (`LAT_MIN` to `LAT_MAX` degrees north, `LON_MIN` to `LON_MAX` degrees east) is wide enough to reach
 offshore wind farms, and is not private.
 
-**Run the script on a Compute Engine machine in us-east1.** Google's guide says reads inside the
-same region avoid network transfer fees for the raw ensemble bucket, and says nothing about egress
-from the statistics bucket. The script assumes that reads from anywhere else would be billed as
-internet egress at $0.12 per GB, and that assumption is unverified for the statistics bucket. Which
-account bears the egress is also unverified. One run is about 50 GB of reads, which would be about
-£4.50 ($6) at that assumed price from outside Google Cloud. The four 360-hour runs of one day are
-about 200 GB, and the 267 days in the archive so far would be about 53 TB. The script detects
-whether it is on a Compute Engine machine in us-east1 through the metadata server. Outside us-east1
-it refuses to start when the estimated transfer exceeds `--max-external-gb` (default 5.0), which is
-less than one run. `--dry-run` prints the number of runs and the estimated transfer, and touches
-neither the network nor the store.
+**Run the script on a Compute Engine machine in us-east1.** Google's guide names egress charges only
+for the raw ensemble bucket, so the script assumes that reads of the statistics bucket from anywhere
+else are billed as internet egress at $0.12 per GB. That assumption and the payer are unverified.
+One run is about 50 GB of reads, which would be about £4.50 ($6) at that price from outside Google
+Cloud. The four 360-hour runs of one day are about 200 GB, and the 267 days in the archive so far
+would be about 53 TB. The script detects whether it is on a Compute Engine machine in us-east1
+through the metadata server. Outside us-east1 it refuses to start when the estimated transfer
+exceeds `--max-external-gb` (default 5.0), which is less than one run. `--dry-run` prints the number
+of runs and the estimated transfer, and touches neither the network nor the store.
 
-**No billing project is needed, and credentials come from the environment.** The statistics bucket
-is not Requester Pays, so the script names no project to bill. Google's guide does not say whether
-the statistics bucket can be read without credentials, and an anonymous listing of it returned 401.
-The script therefore authenticates with Google application default credentials:
+**No billing project is needed, but the bucket cannot be read anonymously.** Access to the
+statistics bucket must be requested from Google
+(<https://developers.google.com/weathernext/guides/access-forecast>), and the script then
+authenticates with the requesting Google account's application default credentials:
 `GOOGLE_APPLICATION_CREDENTIALS` on a workstation, or the machine's own service account on Compute
-Engine. The script never prints or writes the bucket name, the credentials, or an account name.
-The bucket also holds the 10th, 25th, 50th, 75th, and 90th percentiles of each variable, which
-this script does not fetch. Their variable names and units are unverified. The 64 ensemble members
-are in a separate Requester Pays bucket that this script never reads.
+Engine. The script never prints or writes the bucket name, the credentials, or an account name. The
+survey page describes the bucket, its access, and the statistics it holds beyond the mean:
+<https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/#what-we-learnt-about-weathernexts-precomputed-statistics-store>.
 
 **The output is one Icechunk repository with a `main` branch and a `staging` branch.** `--bucket`
 names a Cloud Storage bucket (in us-east1) that holds the repository under `STORE_PREFIX`, and
@@ -290,8 +287,8 @@ def _parse_run_name(*, name: str) -> tuple[date, int] | None:
 def _filesystem() -> gcsfs.GCSFileSystem:
     """Return a Cloud Storage filesystem for the statistics bucket, which is not Requester Pays.
 
-    The filesystem uses Google application default credentials. Google's guide does not say whether
-    the statistics bucket can be read anonymously, and an anonymous listing returned 401.
+    The filesystem uses Google application default credentials, because access to the bucket is
+    granted to a Google account on request.
 
     Returns:
         A filesystem authenticated with application default credentials.
