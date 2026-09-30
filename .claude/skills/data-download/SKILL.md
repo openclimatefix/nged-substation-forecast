@@ -6,13 +6,12 @@ description: >-
   one chunk, not the whole run: checkpoint every chunk to disk as soon as it is fetched, resume by
   skipping whatever is already cached, measure one chunk before committing to the rest, look up a
   provider's real parameter names before submitting a request, size each chunk to the provider's own
-  constraints, and get a fresh adversarial review before the script's first real run. Merge its PR
-  once the download has started and its first chunk is checked. Run the
-  `data-validation` skill's checklist once the fetch completes — a clean run is not evidence the
-  data is right — and write a generated README alongside the lineage note, for a human reader
-  picking up the directory cold. Load before writing or resuming any bulk-download script (e.g.
-  `studies/*/fetch_*.py`) that makes more than a handful of requests, and before running any such
-  script for the first time.
+  constraints, and get a fresh adversarial review before the script's first real run. Run the
+  `data-validation` skill's checklist on the first chunk and again once the fetch completes — a
+  clean run is not evidence the data is right — and write a generated README alongside the lineage
+  note, for a human reader picking up the directory cold. Load before writing or resuming any
+  bulk-download script (e.g. `studies/*/fetch_*.py`) that makes more than a handful of requests, and
+  before running any such script for the first time.
 ---
 
 # Writing a resumable bulk-download script
@@ -249,10 +248,10 @@ sections above already recommend, applied by a reader with no reason to assume t
 
 ## Merge a download PR once the download has started, and leave the issue open
 
-**Merge the PR when three conditions hold: a fresh reviewer has reviewed the script, the script has
-started running, and the first chunk of data has passed the `data-validation` checklist.** Do not
-hold the PR open for the days a bulk download takes. A bug found after more data has arrived is
-fixed in a follow-on PR.
+**Merge the download PR when three conditions hold: a fresh reviewer has reviewed the script, the
+script has started running, and the first chunk of data has passed the `data-validation`
+checklist.** Merging follows the `github-issue-pr-workflow` skill. Do not hold the PR open for the
+days a bulk download takes. A bug found after more data has arrived is fixed in a follow-on PR.
 
 **The issue that tracks the download stays open, with Status "In progress", until the whole
 download has finished and been validated.** Keep closing keywords out of the PR body, so the merge
