@@ -21,12 +21,12 @@ longitude axes are regular, ascending, rounded to 0.1 degrees, and span the box.
 Checks on each run with `run_written` set: `source_init_time` equals the `init_time` coordinate; no
 `NaN` or infinite value; each value inside a physical range (`RANGES`); radiation is near zero for
 night-time valid hours and positive at midday in April to September; direct radiation does not
-exceed total radiation by more than a small tolerance (`ranges` and `direct_le_total` fail above
-0.01% of a run's values, and print that percentage); and no (variable, lead time) slice is constant
-across the box, except dark radiation slices. Radiation may dip to -3600 J/m2, because an ensemble
-mean from a machine-learning weather model can be slightly negative at night. The night and midday
-checks catch only a gross shift such as 12 hours or a timezone error, and do not verify the exact
-hour convention.
+exceed total radiation by more than a small tolerance (`ranges` fails above 0.01% of a run's
+values and `direct_le_total` above 0.05%, and both print the percentage); and no (variable, lead
+time) slice is constant across the box, except dark radiation slices. Radiation may dip to -3600
+J/m2, because an ensemble mean from a machine-learning weather model can be slightly negative at
+night. The night and midday checks catch only a gross shift such as 12 hours or a timezone error,
+and do not verify the exact hour convention.
 
 Checks across runs: no two written runs have the same lead 1 of `temperature_2m_mean`; every slot
 without `run_written` is entirely `NaN`; and every such slot inside the scope (`--start-date`,
@@ -107,9 +107,16 @@ MIN_HOURLY_RADIATION_J_M2: Final[float] = -3600.0
 """An ensemble mean from a machine-learning weather model may dip slightly below zero at night, so
 the lower bound allows -3600 J/m2 (a mean of -1 W/m2 over the hour)."""
 OFFENDING_FRACTION_LIMIT: Final[float] = 1e-4
-"""`ranges` and `direct_le_total` fail only when more than 0.01% of a run's values offend, so that a
-few cells of a machine-learning weather model's noise do not fail a run, while a shifted or
-corrupted field, which offends in far more values, does."""
+"""`ranges` fails only when more than 0.01% of a run's values offend, so that a few cells of a
+machine-learning weather model's noise do not fail a run, while a shifted or corrupted field, which
+offends in far more values, does."""
+DIRECT_OFFENDING_FRACTION_LIMIT: Final[float] = 5e-4
+"""`direct_le_total` fails only when more than 0.05% of a run's values offend. Google's own
+WeatherNext 3 values put direct radiation above the allowance in up to 0.0262% of a run's values:
+28 of the 1081 runs in the stored range exceed 0.01%, and the stored values of every one match the
+source store. The largest excess over the allowance is 14,417 J/m2 (a mean of about 4 W/m2 over
+the hour). A limit of 0.05% is 1.9 times the largest measured fraction. A shifted or corrupted
+field offends in far more values."""
 
 RANGES: Final[dict[str, tuple[float, float]]] = {
     "temperature_2m_mean": (230.0, 320.0),
@@ -187,11 +194,11 @@ def _fail(*, results: Results, check: str, label: str) -> None:
 
 
 def _fail_if_many_values(
-    *, results: Results, check: str, label: str, offending: int, total: int
+    *, results: Results, check: str, label: str, offending: int, total: int, limit: float
 ) -> None:
-    """Record a failure of `check` if more than `OFFENDING_FRACTION_LIMIT` of values offend."""
+    """Record a failure of `check` if more than the fraction `limit` of values offend."""
     fraction = offending / total if total else 0.0
-    if fraction > OFFENDING_FRACTION_LIMIT:
+    if fraction > limit:
         _fail(results=results, check=check, label=f"{label} ({fraction:.3%} of values)")
 
 
@@ -305,6 +312,7 @@ def _check_values(*, values: np.ndarray, label: str, results: Results) -> None:
             label=label,
             offending=int(((array < low) | (array > high)).sum()),
             total=array.size,
+            limit=OFFENDING_FRACTION_LIMIT,
         )
 
 
@@ -337,6 +345,7 @@ def _check_radiation(
         label=label,
         offending=int((direct > allowed).sum()),
         total=direct.size,
+        limit=DIRECT_OFFENDING_FRACTION_LIMIT,
     )
 
 
