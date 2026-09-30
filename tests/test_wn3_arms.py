@@ -608,6 +608,7 @@ def test_every_lean_day_has_exactly_one_source_of_its_ens_mean() -> None:
 
 
 def test_the_day_5_fit_days_have_exactly_one_source_of_their_ens_mean() -> None:
+    assert driver.DAY5 == (5,)
     for day in driver.DAY5:
         sources = [
             day in bfi.ENS_DAYS,
@@ -955,3 +956,19 @@ def test_the_joined_report_keeps_both_fits_under_one_title_and_refuses_to_overwr
     assert lines.index("## AIFS") < lines.index("## WN3")
     with pytest.raises(FileExistsError):
         driver.write_joined_report(output_dir=tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("domain", "column"),
+    [("solar", "temp"), ("solar", "ghi"), ("wind", "speed_10m"), ("wind", "speed_100m")],
+)
+def test_a_hole_in_any_one_value_column_stops_the_build(domain: str, column: str) -> None:
+    built = _holey_frame(domain=domain, day=5, nan_cell=None).with_columns(
+        pl.when(pl.col("time").dt.day() == 6)
+        .then(None)
+        .otherwise(pl.col(f"wn3_mean_day5_{column}"))
+        .alias(f"wn3_mean_day5_{column}")
+    )
+
+    with pytest.raises(ValueError, match="day-5 band"):
+        w.check_band_complete(built=built, domain=domain, day=5)
