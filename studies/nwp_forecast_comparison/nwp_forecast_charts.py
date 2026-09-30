@@ -2603,27 +2603,28 @@ def per_generator(
 # --- Output -------------------------------------------------------------------------------------
 
 FIGURE_NUMBERS: Final[dict[tuple[DomainType, str], int]] = {
-    ("solar", "leaderboard"): 1,
-    ("wind", "leaderboard"): 2,
-    ("solar", "headline"): 3,
-    ("wind", "headline"): 4,
-    ("solar", "models_work"): 5,
-    ("wind", "models_work"): 6,
-    ("solar", "per_generator"): 7,
-    ("wind", "per_generator"): 8,
-    ("solar", "by_lead_day"): 11,
-    ("wind", "by_lead_day"): 12,
-    ("solar", "blends"): 9,
-    ("wind", "blends"): 10,
-    ("solar", "aifs"): 13,
-    ("wind", "aifs"): 14,
-    ("solar", "aifs_leads"): 15,
-    ("wind", "aifs_leads"): 16,
-    ("solar", "wn3_groups"): 17,
-    ("wind", "wn3_groups"): 18,
+    ("solar", "leaderboard"): 3,
+    ("wind", "leaderboard"): 4,
+    ("solar", "headline"): 5,
+    ("wind", "headline"): 6,
+    ("solar", "models_work"): 7,
+    ("wind", "models_work"): 8,
+    ("solar", "per_generator"): 9,
+    ("wind", "per_generator"): 10,
+    ("solar", "by_lead_day"): 13,
+    ("wind", "by_lead_day"): 14,
+    ("solar", "blends"): 11,
+    ("wind", "blends"): 12,
+    ("solar", "aifs"): 15,
+    ("wind", "aifs"): 16,
+    ("solar", "aifs_leads"): 17,
+    ("wind", "aifs_leads"): 18,
+    ("solar", "wn3_groups"): 19,
+    ("wind", "wn3_groups"): 20,
 }
-"""Each chart's figure number on the page, in the page's order: the leaderboard pair opens the page,
-then the planned contrasts."""
+"""Each chart's figure number on the page, in the page's order: the dot-and-interval pair
+(`dot_interval_vs_ens.py`, Figures 1 and 2) opens the page, then the leaderboard pair, then the
+planned contrasts."""
 
 TITLES: Final[dict[tuple[DomainType, str], str]] = {
     ("solar", "headline"): (

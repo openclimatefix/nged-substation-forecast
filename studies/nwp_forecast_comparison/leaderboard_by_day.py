@@ -31,7 +31,7 @@ captions on the page. The script prints the list and writes it to `report.md`; t
 subtitle carries only what a reader needs to decode the chart.
 
 Run it with `uv run python studies/nwp_forecast_comparison/leaderboard_by_day.py
---first-figure-number 1`. The script writes `marks.parquet`, `report.md` and each SVG once, and
+--first-figure-number 3`. The script writes `marks.parquet`, `report.md` and each SVG once, and
 refuses to overwrite a file unless `--replace-svgs` is given for the SVGs. Generators appear
 nowhere: every error is pooled over the technology's generators, and the loading code refuses an
 unanonymised site label.
