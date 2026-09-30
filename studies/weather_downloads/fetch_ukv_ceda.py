@@ -727,6 +727,7 @@ class RunResult:
         files_received: How many of them arrived and were cropped.
         blocks: For each variable found, an `(n_steps, n_cells)` `float32` array, where `n_steps` is
             the active profile's, NaN at the leads not served.
+        problems: The problem lines `merge_run` wrote to the ledger for this run. Not stored.
     """
 
     init_time: datetime
@@ -734,6 +735,7 @@ class RunResult:
     files_expected: int
     files_received: int
     blocks: dict[str, np.ndarray]
+    problems: tuple[str, ...] = ()
 
 
 class UkvStore:
@@ -769,9 +771,18 @@ class UkvStore:
         return np.asarray(_array(group, "status")[:], dtype=np.int8)
 
     def initialise(self, grid: CellGrid) -> None:
-        """Create the layout from the cell grid, unless the repository already has one."""
+        """Create the layout from the cell grid, unless the repository already has one.
+
+        Args:
+            grid: The cells to store.
+
+        Raises:
+            RuntimeError: If the existing layout belongs to a different product, slot spacing,
+                or lead count than the active profile, or has different cells.
+        """
         group = self._read_group()
         if group is not None and "status" in group:
+            _check_layout_matches_profile(group)
             stored = _array(group, "cell_latitude")[:]
             if not np.array_equal(stored, grid.latitude.astype(np.float64)):
                 message = "the store's cells differ from the trial-area box's cells"
@@ -810,6 +821,29 @@ class UkvStore:
             f"{run.files_received}/{run.files_expected} files"
         )
         return session.commit(message, allow_empty=True)
+
+
+def _check_layout_matches_profile(group: zarr.Group) -> None:
+    """Raise `RuntimeError` unless an existing layout was written by the active profile."""
+    profile = active_profile()
+    expected = {
+        "product": profile.product_name,
+        "slot_epoch": profile.slot_epoch.isoformat(),
+        "cycle_hours": profile.cycle_hours,
+        "step length": profile.n_steps,
+    }
+    stored = {
+        "product": group.attrs.get("product"),
+        "slot_epoch": group.attrs.get("slot_epoch"),
+        "cycle_hours": group.attrs.get("cycle_hours"),
+        "step length": _array(group, "step").shape[0],
+    }
+    for name, value in expected.items():
+        if stored[name] != value:
+            message = (
+                f"the store's {name} is {stored[name]!r} but the active product needs {value!r}"
+            )
+            raise RuntimeError(message)
 
 
 _ALONG_INIT_TIME: Final[tuple[str, ...]] = (
@@ -1223,6 +1257,7 @@ def merge_run(run_dir: Path, *, init_time: datetime, files_expected: int) -> Run
         files_expected=files_expected,
         files_received=received,
         blocks=blocks,
+        problems=tuple(problems),
     )
 
 
@@ -1352,6 +1387,43 @@ def run_times(*, start: date, end: date, newest_first: bool = False) -> Iterator
         for hour in run_hours
     ]
     yield from reversed(times) if newest_first else times
+
+
+MAX_IDENTICAL_PARTIAL_RUNS: Final[int] = 5
+"""Consecutive runs that are partial with the same problems before the archive stops."""
+
+
+@dataclass
+class PartialStreak:
+    """Counts consecutive committed runs that are partial with an identical set of problems.
+
+    Attributes:
+        problems: The problem set the current streak shares, or an empty set outside a streak.
+        length: How many consecutive runs have had exactly `problems`.
+    """
+
+    problems: frozenset[str] = frozenset()
+    length: int = 0
+
+    def record(self, run: RunResult) -> bool:
+        """Count a committed run, and return whether the streak has reached the abort length.
+
+        Args:
+            run: The run just committed. A complete run, or a partial run with different problems,
+                resets the streak.
+
+        Returns:
+            `True` once `MAX_IDENTICAL_PARTIAL_RUNS` runs in a row were partial with the same
+            problems.
+        """
+        found = frozenset(run.problems)
+        if run.status != STATUS_PARTIAL or not found:
+            self.problems, self.length = frozenset(), 0
+        elif found == self.problems:
+            self.length += 1
+        else:
+            self.problems, self.length = found, 1
+        return self.length >= MAX_IDENTICAL_PARTIAL_RUNS
 
 
 def archive(args: argparse.Namespace) -> int:
@@ -1496,6 +1568,7 @@ def _archive_locked(args: argparse.Namespace, *, token: str, product_dir: Path) 
     end = args.end or newest.date()
     listings: dict[date, dict[str, int] | None] = {}
     done = 0
+    streak = PartialStreak()
     for init_time in run_times(start=args.start, end=end, newest_first=args.newest_first):
         if init_time > newest:
             continue
@@ -1558,6 +1631,13 @@ def _archive_locked(args: argparse.Namespace, *, token: str, product_dir: Path) 
                 _directory_bytes(product_dir / "store") - before if args.measure else None
             ),
         )
+        if streak.record(run):
+            print(
+                f"stopping: {MAX_IDENTICAL_PARTIAL_RUNS} runs in a row were partial with the same "
+                f"problems, the first being {min(streak.problems)}. "
+                "Rerun later to resume."
+            )
+            return 1
     write_documents(product_dir=product_dir, store=store, grid=grid)
     return 0
 
@@ -1695,7 +1775,9 @@ def _reach_gotchas() -> tuple[str, str, str]:
             (
                 "Runs at 03 and 15 UTC reach 120 hours, because CEDA holds T120 files (3-hourly "
                 "leads 57 to 120 hours) for those runs only. The 00, 06, 12, and 18 UTC runs "
-                "reach 54 hours at most and are archived as the separate product UKV-CEDA."
+                "reach 54 hours at most and are archived as the separate product UKV-CEDA. "
+                "A crashed download can leave a .partial file in the product's _scratch/ "
+                "directory, which is safe to delete."
             ),
             (
                 "Leads are hourly to 48 hours and 3-hourly after that (51, 54, 57, and so on to "
