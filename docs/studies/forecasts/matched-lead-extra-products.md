@@ -4,13 +4,10 @@
 exploratory products: how the study reads each product, and the two results sections that have no
 figure.** The main page carries the planned contrasts, the blends, Figures 1 to 20, the discussion,
 and the [limitations](matched-lead.md#limitations), which apply to every number here. Every result
-on this page is exploratory and fitted at the primary setting only. The page is separate so that the
-main page's argument stays short. It assumes the main page's
-[Introduction](matched-lead.md#introduction) for the product names: ECMWF's ensemble (ENS) and its
-ensemble mean, NOAA's ensemble (GEFS), IFS 0.25°, and Open-Meteo's archive of past forecasts
-(Previous Runs). An arm is one XGBoost model given one product's forecast, and the primary setting
-is the first of the two hyperparameter settings that [the main
-page](matched-lead.md#the-xgboost-model-the-scored-hours-and-the-folds) defines.
+on this page is exploratory and fitted at the primary setting only. The main page's
+[Introduction](matched-lead.md#introduction) names the products. An arm is one XGBoost model given
+one product's forecast, and the primary setting is the first of the two hyperparameter settings that
+[the main page](matched-lead.md#the-xgboost-model-the-scored-hours-and-the-folds) defines.
 
 ## Data and methods
 
@@ -293,6 +290,64 @@ The `--lookahead-cleared` flag of `fit_aifs.py --wn3` stops the fit from startin
 it has read this section.
 
 ## Results
+
+### Day 0 is lower than day 1 for every product, and ICON-D2's day 0 is the lowest (exploratory)
+
+**ICON-D2's day-0 marks are the lowest wind error in Figure 4 and tie with IFS 0.25°'s day 0 for the
+lowest solar error in Figure 3, and each product's day-0 error is lower than the same product's
+day-1 error.** ICON's day 0 is read from the run that starts 0 to 3 hours before the hour it
+describes. That run is delivered about 1.5 hours (ICON-D2) or 3.5 hours (ICON-EU) after it starts,
+so day 0 is not a day-ahead forecast a service could read. The XGBoost model given ICON-D2's day-0
+value has an error of 7.776% of capacity [7.201, 8.305] for solar and 6.826% [5.901, 7.864] for
+wind. ICON-EU's day-0 errors are 8.487% [7.850, 9.071] and 7.224% [6.329, 8.221]. ICON-D2 minus ENS
+at day 0, both fitted on the GPU, is -0.349 points [-0.496, -0.189] for solar and -0.600 points
+[-0.771, -0.432] for wind (exploratory). ENS at day 0 minus ICON-EU at day 0 is -0.362 points
+[-0.538, -0.199] for solar and +0.201 points [+0.023, +0.401] for wind, so for solar ENS's day-0
+error is lower than ICON-EU's. ICON-D2 minus ICON-EU is -0.711 points [-0.871, -0.557] for solar and
+-0.398 points [-0.503, -0.290] for wind at day 0, against +0.302 points [+0.061, +0.665] and +0.046
+points [-0.079, +0.166] at day 1 (exploratory, both GPU refits).
+
+**Day 0 minus day 1 is negative and statistically significant for every product whose difference the
+batch reports print.** Those are 14 arms for solar and 12 for wind. The difference runs from -0.682
+[-0.892, -0.462] points (GEFS) to -2.101 [-2.598, -1.686] points (ICON-D2) for solar, and from
+-1.042 [-1.309, -0.784] points (the ENS control member) to -2.157 [-2.433, -1.927] points (UKV) for
+wind. IFS 0.25°'s solar day-0 error, 7.793%, is within 0.02 points of ICON-D2's.
+
+**At day 0, ICON-D2, IFS 0.25°, and for wind UKV and ICON-EU have a lower error than the ENS mean,
+and the day-0 leads of every one of these products but ICON-D2 and ICON-EU are estimated, not
+measured.** A Previous Runs product's day 0 reads the freshest run, a lead of a few hours. ENS's day
+0 reads the 00 UTC run of the day, a lead of 0 to 23 hours, so the comparison favours the Previous
+Runs products.
+
+| Exploratory: product at day 0 minus ENS mean at day 0 (points, primary) | Solar | Wind |
+|---|---|---|
+| GEFS mean | +1.233 [+0.940, +1.521] | +0.473 [+0.310, +0.620] |
+| ENS control member | +0.190 [+0.111, +0.267] | +0.201 [+0.126, +0.282] |
+| UKV | -0.017 [-0.266, +0.240] | -0.446 [-0.673, -0.218] |
+| IFS 0.25° | -0.332 [-0.524, -0.139] | -0.184 [-0.309, -0.059] |
+| GFS (Open-Meteo) | +1.969 [+1.671, +2.230] | +0.143 [-0.001, +0.276] |
+| ICON global | +0.513 [+0.362, +0.662] | +0.373 [+0.073, +0.727] |
+| ARPEGE Europe | +1.441 [+1.098, +1.796] | no wind arm |
+| AROME France | +0.716 [+0.441, +1.001] | no wind arm |
+| KNMI HARMONIE-AROME | +0.828 [+0.657, +1.002] | +0.415 [+0.179, +0.648] |
+| DMI HARMONIE-AROME | +0.838 [+0.632, +1.052] | +0.569 [-0.077, +1.723] |
+
+**For solar, ICON-D2's advantage over ICON-EU at day 0 shrinks as the served lead grows; for wind
+the intervals overlap.** For solar, ICON-D2 minus ICON-EU is -1.071 points [-1.241, -0.898] at a
+served lead of 1 hour, -0.599 points [-0.786, -0.428] at 2 hours, and -0.462 points [-0.670, -0.246]
+at 3 hours. For wind the advantage is the same at 0 and 1 hours (-0.454 points [-0.582, -0.317] and
+-0.454 points [-0.573, -0.336]) and smaller at 2 hours (-0.287 points [-0.413, -0.158]), but the
+intervals overlap. The subsets are different hours, so the study computed no paired test between
+served leads.
+
+**The day-0 served lead is checked for ICON-D2 and ICON-EU, radiation only, and estimated from the
+run cycle for every other product.** ICON-D2 runs every 3 hours, so the served lead of a radiation
+value at label hour h is ((h-1) mod 3) + 1 hours and of a wind value h mod 3 hours. The past-weather
+studies checked the radiation lead against ICON's own files at 9 hours on one day and at one place,
+and took the wind lead from where the hour-to-hour jumps of the served series fall and from the
+3-hourly run cycle.
+<!-- report (extra leads): ICON-D2 against ICON-EU, whole and by hour of day modulo 3; Long leads
+against climatology, and day 0 against ENS at day 0; Other products against ENS at the same day -->
 
 ### Neither native GFS nor IFS HRES 9 km has an error detectably lower than the ENS mean at any lead day (exploratory)
 
