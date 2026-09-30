@@ -1297,7 +1297,7 @@ def test_the_lead_chart_draws_from_synthetic_fits(monkeypatch: pytest.MonkeyPatc
 
     chart, title = charts.aifs_leads(losses_by_set=by_set, domain="solar")
 
-    assert " ".join(chart.to_dict()["title"]["text"]) == f"Figure 15: {title}"
+    assert " ".join(chart.to_dict()["title"]["text"]) == f"Figure 17: {title}"
     subtitle = " ".join(chart.to_dict()["title"]["subtitle"])
     assert "ENS control member series is 6-hourly" in subtitle
 

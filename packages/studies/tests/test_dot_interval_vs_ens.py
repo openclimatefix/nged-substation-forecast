@@ -12,6 +12,7 @@ sys.path.insert(0, str(_STUDY_DIR))
 sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
 
 from dot_interval_vs_ens import (  # noqa: E402
+    FIRST_FIGURE_NUMBER,
     SOURCES,
     Comparison,
     SourceType,
@@ -644,7 +645,8 @@ def test_the_figure_draws_with_its_number(tmp_path: Path) -> None:
     _full_fixture(tmp_path)
     rows = compute(data_dir=tmp_path, domain="solar")
 
-    assert "Figure 19:" in str(draw(rows=rows, domain="solar", number=19).to_dict())
+    assert FIRST_FIGURE_NUMBER == 1
+    assert "Figure 1:" in str(draw(rows=rows, domain="solar", number=FIRST_FIGURE_NUMBER).to_dict())
 
 
 def test_the_titles_name_the_quantity_and_count_no_rows(tmp_path: Path) -> None:
