@@ -143,12 +143,12 @@ comes back uncropped.
 **Where a provider publishes no queryable catalogue at all, its own docs page can still be scraped
 for the real values, and a sibling API from the same provider is not a safe substitute.** The
 Open-Meteo Previous Runs API publishes no `form.json` or `openapi.json` that we could find; its
-`models=` values came from `curl`-ing `https://open-meteo.com/en/docs/previous-runs-api` and reading
-the checkbox `id` attributes the page server-renders into the HTML, since the weather-model picker
-itself is otherwise built client-side by JavaScript a plain `curl` never runs. Open-Meteo's plain
-`/v1/forecast` endpoint publishes a real `openapi/forecast.yml` on GitHub, and reaching for that
-instead looks like the queryable catalogue this section otherwise recommends — but its weather-model
-list uses different identifiers for some of the same underlying weather models:
+`models=` values are read by `curl`-ing `https://open-meteo.com/en/docs/previous-runs-api` and
+reading the checkbox `id` attributes the page server-renders into the HTML, since the weather-model
+picker itself is otherwise built client-side by JavaScript a plain `curl` never runs. Open-Meteo's
+plain `/v1/forecast` endpoint publishes a real `openapi/forecast.yml` on GitHub, and reaching for
+that instead looks like the queryable catalogue this section otherwise recommends — but its
+weather-model list uses different identifiers for some of the same underlying weather models:
 `icon_d2`/`icon_eu`/`icon_global` there against `dwd_icon_d2`/`dwd_icon_eu`/`dwd_icon_global` on the
 Previous Runs API. Its ECMWF and GFS identifiers (`ecmwf_ifs`, `ncep_gfs_seamless`) happen to match,
 which is exactly the trap: nothing in either catalogue flags which weather-model families drift and
@@ -184,12 +184,13 @@ frame = frame.with_columns(
 )
 ```
 
-Two kinds of column must never go through this rounding. **A latitude or longitude column**: at 13
-significand bits a value near 55° carries up to roughly 700 m of rounding error, enough to move a
-point into the wrong grid cell. **A field accumulated or averaged since some earlier reference
-time** (ECMWF's `ssrd` in a forecast product, ICON's `ASWDIR_S`): rounding an accumulated series
-before it is de-accumulated into per-step values turns the differencing step's night-time zeros into
-rounding noise. De-accumulate first, round after.
+Three kinds of column must never go through this rounding. **An ID or a timestamp column**: only a
+physical measurement is rounded. **A latitude or longitude column**: at 13 significand bits a value
+near 55° carries up to roughly 700 m of rounding error, enough to move a point into the wrong grid
+cell. **A field accumulated or averaged since some earlier reference time** (ECMWF's `ssrd` in a
+forecast product, ICON's `ASWDIR_S`): rounding an accumulated series before it is de-accumulated
+into per-step values turns the differencing step's night-time zeros into rounding noise.
+De-accumulate first, round after.
 
 ## Run a long background download unbuffered, through `uv run`, so its log is actually readable
 
@@ -235,8 +236,8 @@ silently:
 None of these four faults shows up in `ruff check` or a syntax check. Finding them takes a
 comparison of the code with the provider's published constraints, of a measured field count with the
 expected one, of returned values with what is physically plausible, or a local repro of ambiguous
-library behaviour. Those are the techniques the "Measure one chunk" and "Look up the provider's real
-parameter names" sections above already recommend, applied by a reader with no reason to assume the
+library behaviour. The "Measure one chunk" and "Look up the provider's real parameter names"
+sections above already recommend those techniques, applied by a reader with no reason to assume the
 request is right.
 
 ## Merge a download PR once the download has started, and leave the issue open
