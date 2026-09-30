@@ -1,23 +1,26 @@
 """Draw each weather product's error minus the ECMWF ENS mean's, as dots with 95% intervals.
 
-One figure per technology (solar, wind), one panel per lead day (0, 3, 4, and 10), one row per
-weather product. A dot is the product's mean absolute error minus the ENS mean's at the same lead
-day, in percentage points of capacity, so a negative dot means the product forecasts better. The
-zero line is the ENS mean. The interval is the 95% interval from resampling whole calendar months
-and a fitting seed (`studies.bootstrap.bootstrap_difference`). A row that rests on fewer than
+One figure per technology (solar, wind), one panel per lead day (0, 1, 2, 3, 4, 5, 7, 10, and 14,
+the days of the page's leaderboards), one row per weather product the leaderboards carry. A dot is
+the product's mean absolute error minus the ENS mean's at the same lead day, in percentage points
+of capacity, so a negative dot means the product forecasts better. The zero line is the ENS mean.
+The interval is the 95% interval from resampling whole calendar months and a fitting seed
+(`studies.bootstrap.bootstrap_difference`). A row that rests on fewer than
 `MIN_MONTHS_FOR_INTERVAL` months gets a hollow dot and no interval.
 
 It reads the saved per-row losses of the fits under `data/studies/nwp_forecast_comparison_*` and
-fits nothing. **Each product is compared with an ENS-mean arm fitted beside it**, because a copy of
-the ENS mean in another folder is scored on other rows and trained on other folds:
+fits nothing. **Each row uses the arms the leaderboards draw**: an arm that a published CPU fit and
+a later GPU refit both hold is read from the GPU refit, as the leaderboards do, so a product and
+its reference were fitted on one device. The reference is the leaderboard's ENS-mean arm of the
+same lead day:
 
-- The products in `_leads_day10`, and the ENS mean arms at days 0, 3, and 10, share one folder.
-- The products in `_leads_day10b`, `_leads_day10c`, and `_leads_day10d` have no ENS mean of their
-  own at those days, so their reference is the `_leads_day10` ENS mean, as the page's own contrasts
-  use. The folders share one set of `(site, time, seed)` keys.
+- The products in `_leads_day10`, `_leads_day10b`, `_leads_day10c`, and `_leads_day10d` are
+  subtracted from the ENS mean of `LEADERBOARD_ENS_SOURCES`: `_leads_day10b` at days 2 and 7 and
+  `_leads_day10` at every other day. The folders hold the same `(site, time, seed)` keys, so the
+  pair joins across folders.
 - AIFS Single, the AIFS ENS mean, and WeatherNext 3 (WN3) each sit in a folder with an ENS mean
-  fitted on the same rows. For wind, WN3's reference is `ens_meanvec`, the ENS mean built from the
-  mean-vector speed, which matches how WN3's speed is built.
+  fitted on the same rows, which is the reference. For wind, WN3's reference is `ens_meanvec`, the
+  ENS mean built from the mean-vector speed, which matches how WN3's speed is built.
 
 WN3 appears only as the pooled row, which covers 7 months (February to April and June to September
 2026). The script writes `report.md`, `intervals.parquet`, and `README.md` to a new output folder,
@@ -56,8 +59,8 @@ PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 
 DOMAINS: Final[tuple[DomainType, DomainType]] = ("solar", "wind")
 
-DAYS: Final[tuple[int, ...]] = (0, 3, 4, 10)
-"""The lead days, one panel each."""
+DAYS: Final[tuple[int, ...]] = (0, 1, 2, 3, 4, 5, 7, 10, 14)
+"""The lead days of the page's leaderboards, one panel each."""
 
 PRIMARY_SETTING: Final[str] = "primary"
 """The hyperparameter setting every row is read at."""
@@ -69,7 +72,16 @@ KEY_COLUMNS: Final[tuple[str, ...]] = ("site", "time", "seed")
 """The columns that identify one row of one arm; a product and its reference pair on them."""
 
 SourceType = Literal[
-    "leads_day10", "leads_day10b", "leads_day10c", "leads_day10d", "aifs_ens", "aifs_single", "wn3"
+    "leads_day10",
+    "leads_day10b",
+    "leads_day10c",
+    "leads_day10d",
+    "aifs_single_blends",
+    "aifs_ens_blends",
+    "aifs_single_extra",
+    "aifs_ens_extra",
+    "wn3_blends",
+    "wn3_extra",
 ]
 """The folders a row's losses come from."""
 
@@ -81,21 +93,26 @@ class Source(NamedTuple):
     pattern: str
 
 
+_AIFS_BLENDS: Final[str] = "nwp_forecast_comparison_aifs_blends"
+_AIFS_EXTRA: Final[str] = "nwp_forecast_comparison_aifs_extra_days"
+_PER_DAY: Final[str] = "{{domain}}_{name}_day{{day}}_losses.parquet"
+
 SOURCES: Final[dict[SourceType, Source]] = {
     "leads_day10": Source("nwp_forecast_comparison_leads_day10", "{domain}_losses.parquet"),
     "leads_day10b": Source("nwp_forecast_comparison_leads_day10b", "{domain}_losses.parquet"),
     "leads_day10c": Source("nwp_forecast_comparison_leads_day10c", "{domain}_losses.parquet"),
     "leads_day10d": Source("nwp_forecast_comparison_leads_day10d", "{domain}_losses.parquet"),
-    "aifs_ens": Source(
-        "nwp_forecast_comparison_aifs_extra_days", "{domain}_ens_day{day}_losses.parquet"
-    ),
-    "aifs_single": Source(
-        "nwp_forecast_comparison_aifs_extra_days", "{domain}_single_day{day}_losses.parquet"
-    ),
-    "wn3": Source("nwp_forecast_comparison_wn3_extra_days", "{domain}_wn3_day{day}_losses.parquet"),
+    "aifs_single_blends": Source(_AIFS_BLENDS, _PER_DAY.format(name="single")),
+    "aifs_ens_blends": Source(_AIFS_BLENDS, _PER_DAY.format(name="ens")),
+    "aifs_single_extra": Source(_AIFS_EXTRA, _PER_DAY.format(name="single")),
+    "aifs_ens_extra": Source(_AIFS_EXTRA, _PER_DAY.format(name="ens")),
+    "wn3_blends": Source("nwp_forecast_comparison_wn3", _PER_DAY.format(name="wn3")),
+    "wn3_extra": Source("nwp_forecast_comparison_wn3_extra_days", _PER_DAY.format(name="wn3")),
 }
 """Each source's folder under `data/studies/`, and its losses file's name. A `{day}` in the name
-means one file per lead day."""
+means one file per lead day. The `_blends` folders hold days 1, 2, 7, and 14 and the `_extra`
+folders days 0, 3, 4, and 10. The superseded `nwp_forecast_comparison_leads` folder is not a
+source, because the leaderboards do not draw it."""
 
 REFERENCE_NAMES: Final[dict[str, str]] = {
     "ens_mean": "ENS mean",
@@ -107,43 +124,90 @@ WN3_LABEL: Final[str] = "WeatherNext 3 mean (7 months)"
 """WN3's row label; its rows cover February to April and June to September 2026 only."""
 
 
+def _sources(
+    days: tuple[int, ...], default: SourceType, overrides: Mapping[int, SourceType] | None = None
+) -> dict[int, SourceType]:
+    """Map each lead day to its source: `default`, except for the days in `overrides`."""
+    return {day: (overrides or {}).get(day, default) for day in days}
+
+
 class ProductRow(NamedTuple):
-    """One product's arm prefix at some lead days, from one source, and its reference."""
+    """One product's arm prefix, the source of each lead day it is fitted at, and its reference."""
 
     prefix: str
-    source: SourceType
-    days: tuple[int, ...]
-    reference_source: SourceType | None = None
+    sources: Mapping[int, SourceType]
+    reference_sources: Mapping[int, SourceType] | None = None
     domains: tuple[DomainType, ...] = DOMAINS
     wind_reference: str = "ens_mean"
     label: str | None = None
 
 
-PRODUCTS: Final[tuple[ProductRow, ...]] = (
-    ProductRow("ukv", "leads_day10", (0,)),
-    ProductRow("icon_d2", "leads_day10", (0,)),
-    ProductRow("icon_eu", "leads_day10", (0,)),
-    ProductRow("icon_eu", "leads_day10b", (3,), reference_source="leads_day10"),
-    ProductRow("icon_global", "leads_day10", (0, 3)),
-    ProductRow("gfs", "leads_day10", (0, 3)),
-    ProductRow("gfs_native", "leads_day10c", (0, 3, 10), reference_source="leads_day10"),
-    ProductRow("ifs025", "leads_day10", (0, 3)),
-    ProductRow("ifs_single", "leads_day10d", (0, 3), reference_source="leads_day10"),
-    ProductRow("arpege", "leads_day10", (0,), domains=("solar",)),
-    ProductRow("arpege", "leads_day10b", (3,), reference_source="leads_day10", domains=("solar",)),
-    ProductRow("arome", "leads_day10", (0,), domains=("solar",)),
-    ProductRow("dmi_harmonie", "leads_day10", (0,)),
-    ProductRow("knmi_harmonie", "leads_day10", (0,)),
-    ProductRow("gefs_mean", "leads_day10", (0, 3, 10)),
-    ProductRow("ens_control", "leads_day10", (0,)),
-    ProductRow("ens_control", "leads_day10b", (3, 10), reference_source="leads_day10"),
-    ProductRow("aifs_single", "aifs_single", DAYS),
-    ProductRow("aifs_ens_mean", "aifs_ens", DAYS),
-    ProductRow("wn3_mean", "wn3", DAYS, wind_reference="ens_meanvec", label=WN3_LABEL),
+LEADERBOARD_DAYS: Final[tuple[int, ...]] = (0, 1, 2, 3, 5, 7, 10, 14)
+"""The lead days of the products fitted in the `leads_day10*` folders (and ENS mean and GEFS)."""
+
+AIFS_DAYS: Final[tuple[int, ...]] = (0, 1, 2, 3, 4, 7, 10, 14)
+"""The lead days of AIFS Single, the AIFS ENS mean, and WN3: every day but 5."""
+
+LEADERBOARD_ENS_SOURCES: Final[dict[int, SourceType]] = _sources(
+    LEADERBOARD_DAYS, "leads_day10", {2: "leads_day10b", 7: "leads_day10b"}
 )
-"""Every row the figures draw. A product at a lead day no row names is not in the archive or not
-fitted. Day 4 holds only ENS, AIFS, and WN3, and day 10 only ENS, its control member, GEFS, native
-GFS, AIFS, and WN3."""
+"""The folder of the ENS-mean arm the leaderboards draw at each lead day. The published folder
+holds ENS-mean arms at days 0 to 3 too, but the leaderboards read the GPU refit that each of these
+folders holds, which `load`'s `prefer_extras` picks."""
+
+EXTRA_DAYS: Final[tuple[int, ...]] = (0, 3, 4, 10)
+"""The AIFS and WN3 lead days that sit in the `_extra` folders."""
+
+_B: Final[SourceType] = "leads_day10b"
+_LEADS_TO_3: Final[tuple[int, ...]] = (0, 1, 2, 3)
+_LEADS_TO_7: Final[tuple[int, ...]] = (0, 1, 2, 3, 5, 7)
+
+
+def _leaderboard_row(
+    prefix: str,
+    sources: Mapping[int, SourceType],
+    domains: tuple[DomainType, ...] = DOMAINS,
+) -> ProductRow:
+    """Return a product whose reference is the leaderboard's ENS mean at each of its days."""
+    return ProductRow(prefix, sources, reference_sources=LEADERBOARD_ENS_SOURCES, domains=domains)
+
+
+PRODUCTS: Final[tuple[ProductRow, ...]] = (
+    _leaderboard_row("ukv", _sources((0, 1), "leads_day10")),
+    _leaderboard_row("icon_d2", _sources((0, 1), "leads_day10")),
+    _leaderboard_row("icon_eu", _sources(_LEADS_TO_3, "leads_day10", {2: _B, 3: _B})),
+    _leaderboard_row("icon_global", _sources((0, 1, 2, 3, 5), "leads_day10", {2: _B})),
+    _leaderboard_row("gfs", _sources(_LEADS_TO_7, "leads_day10", {2: _B})),
+    _leaderboard_row("gfs_native", _sources(LEADERBOARD_DAYS, "leads_day10c")),
+    _leaderboard_row("ifs025", _sources(_LEADS_TO_7, "leads_day10", {2: _B})),
+    _leaderboard_row("ifs_single", _sources(_LEADS_TO_7, "leads_day10d")),
+    _leaderboard_row("arpege", _sources(_LEADS_TO_3, "leads_day10", {2: _B, 3: _B}), ("solar",)),
+    _leaderboard_row("arome", _sources((0, 1), "leads_day10"), ("solar",)),
+    _leaderboard_row("dmi_harmonie", _sources((0, 1), "leads_day10")),
+    _leaderboard_row("knmi_harmonie", _sources((0, 1), "leads_day10")),
+    _leaderboard_row("gefs_mean", _sources(LEADERBOARD_DAYS, "leads_day10", {2: _B, 7: _B})),
+    _leaderboard_row(
+        "ens_control",
+        _sources(LEADERBOARD_DAYS, _B, {0: "leads_day10", 1: "leads_day10"}),
+    ),
+    ProductRow(
+        "aifs_single",
+        _sources(AIFS_DAYS, "aifs_single_blends", dict.fromkeys(EXTRA_DAYS, "aifs_single_extra")),
+    ),
+    ProductRow(
+        "aifs_ens_mean",
+        _sources(AIFS_DAYS, "aifs_ens_blends", dict.fromkeys(EXTRA_DAYS, "aifs_ens_extra")),
+    ),
+    ProductRow(
+        "wn3_mean",
+        _sources(AIFS_DAYS, "wn3_blends", dict.fromkeys(EXTRA_DAYS, "wn3_extra")),
+        wind_reference="ens_meanvec",
+        label=WN3_LABEL,
+    ),
+)
+"""Every row the figures draw: each product the leaderboards carry, except the ENS mean, which is
+the reference. A product at a lead day no row names is not in the archive or not fitted. Day 4
+holds only AIFS and WN3, and day 5 holds neither."""
 
 
 class Comparison(NamedTuple):
@@ -173,18 +237,19 @@ def comparisons(*, domain: DomainType) -> list[Comparison]:
         if domain not in product.domains:
             continue
         reference_prefix = product.wind_reference if domain == "wind" else "ens_mean"
+        reference_sources = product.reference_sources or product.sources
         output.extend(
             Comparison(
                 domain=domain,
                 day=day,
                 label=product.label or PRODUCT_NAMES[product.prefix],
                 treatment=f"{product.prefix}_day{day}",
-                treatment_source=product.source,
+                treatment_source=source,
                 reference=f"{reference_prefix}_day{day}",
-                reference_source=product.reference_source or product.source,
+                reference_source=reference_sources[day],
                 reference_label=REFERENCE_NAMES[reference_prefix],
             )
-            for day in product.days
+            for day, source in product.sources.items()
         )
     return output
 
@@ -325,6 +390,9 @@ FAMILY: Final[str] = "weather model"
 INTERVAL_CONDITION: Final[str] = f"{MIN_MONTHS_FOR_INTERVAL} or more months: interval shown"
 NO_INTERVAL_CONDITION: Final[str] = f"Fewer than {MIN_MONTHS_FOR_INTERVAL} months: no interval"
 
+ROW_STEP_PX: Final[int] = 22
+"""The height of one row: 9 panels of up to 17 rows need them closer than the default."""
+
 X_TITLE: Final[str] = "Error minus the ENS mean's (points of capacity)"
 
 
@@ -445,6 +513,7 @@ def draw(*, rows: pl.DataFrame, domain: DomainType, number: int) -> alt.VConcatC
             condition_key=index == 0,
             figure_planning="exploratory",
             colour_by_family=True,
+            row_step_px=ROW_STEP_PX,
         )
         for index, day in enumerate(days)
     ]
@@ -514,13 +583,18 @@ def readme_text(*, rows: Mapping[DomainType, pl.DataFrame]) -> str:
     Returns:
         The README, in Markdown.
     """
-    references = sorted(
-        {
-            (row["label"], row["treatment_source"], row["reference"], row["reference_source"])
-            for frame in rows.values()
-            for row in frame.iter_rows(named=True)
-        }
-    )
+    groups: dict[tuple[str, str, str, str], tuple[set[str], set[int]]] = {}
+    for domain, frame in rows.items():
+        for row in frame.iter_rows(named=True):
+            key = (
+                row["label"],
+                row["treatment_source"],
+                re.sub(_DAY_SUFFIX, "", row["reference"]),
+                row["reference_source"],
+            )
+            domains, days = groups.setdefault(key, (set(), set()))
+            domains.add(domain)
+            days.add(row["day"])
     lines = [
         "# Each weather product minus the ECMWF ENS mean, dots and intervals",
         "",
@@ -540,19 +614,34 @@ def readme_text(*, rows: Mapping[DomainType, pl.DataFrame]) -> str:
         ),
         "",
         (
-            "Each product is compared with the ENS-mean arm of the same lead day from the same "
-            "folder where the folder holds one. A folder with no ENS mean at that day reads the "
-            "ENS mean from `nwp_forecast_comparison_leads_day10`. Wind WeatherNext 3 rows use "
-            "the `ens_meanvec` arm. The product, its folder, the reference prefix, and the "
-            "reference's folder:"
+            "Each row uses the arms the leaderboards draw: an arm held by both a published CPU "
+            "fit and a later GPU refit is read from the GPU refit. The reference is the "
+            "leaderboard's ENS-mean arm of the same lead day. The `leads_day10*` folders hold "
+            "the same `(site, time, seed)` keys, so a product in one folder pairs with the ENS "
+            "mean of another. AIFS Single, the AIFS ENS mean, and WeatherNext 3 use the ENS mean "
+            "fitted on their own rows, in their own file. Wind WeatherNext 3 rows use the "
+            "`ens_meanvec` arm. Each line below names a product's source folder and its "
+            "reference's, for the days listed:"
         ),
         "",
-        "| Product | Product source | Reference | Reference source |",
-        "|---|---|---|---|",
+        "| Product | Technologies | Days | Product source | Reference | Reference source |",
+        "|---|---|---|---|---|---|",
     ]
     lines += [
-        f"| {label} | {source} | {re.sub(_DAY_SUFFIX, '', reference)} | {reference_source} |"
-        for label, source, reference, reference_source in references
+        f"| {label} | {', '.join(sorted(domains))} | {', '.join(map(str, sorted(days)))} | "
+        f"{source} | {prefix} | {reference_source} |"
+        for (label, source, prefix, reference_source), (domains, days) in sorted(groups.items())
+    ]
+    lines += [
+        "",
+        (
+            "Not included, because each was not fitted on the comparison's rows and folds, so "
+            "its error is not comparable with these rows: the Open-Meteo ensemble means, "
+            "UKV from the CEDA archive, and NORA3. The climatology and persistence baselines "
+            "are not weather products, and the blends are not products, so neither has a row. "
+            "The superseded `nwp_forecast_comparison_leads` folder is not read, because the "
+            "leaderboards do not draw it."
+        ),
     ]
     return "\n".join([*lines, ""])
 
@@ -627,7 +716,9 @@ def main() -> int:
     studies_dir = repo_data_dir() / "studies"
     parser.add_argument("--data-dir", type=Path, default=studies_dir)
     parser.add_argument(
-        "--output-dir", type=Path, default=studies_dir / "nwp_forecast_comparison_vs_ens_dots"
+        "--output-dir",
+        type=Path,
+        default=studies_dir / "nwp_forecast_comparison_vs_ens_dots_all_days",
     )
     parser.add_argument(
         "--svg-dir", type=Path, default=PROJECT_ROOT / "docs" / "studies" / "assets"
@@ -642,7 +733,10 @@ def main() -> int:
     args = parser.parse_args()
     rows = {domain: compute(data_dir=args.data_dir, domain=domain) for domain in DOMAINS}
     files = ("report.md", "intervals.parquet", "README.md")
-    svgs = {domain: args.svg_dir / f"nwp_forecast_{domain}_dots_vs_ens.svg" for domain in DOMAINS}
+    svgs = {
+        domain: args.svg_dir / f"nwp_forecast_{domain}_dots_vs_ens_all_days.svg"
+        for domain in DOMAINS
+    }
     taken = [args.output_dir, *(args.output_dir / name for name in files), *svgs.values()]
     existing = [path for path in taken if path.exists()]
     if existing:

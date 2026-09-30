@@ -202,16 +202,18 @@ lead?](../../docs/studies/forecasts/matched-lead.md).
   every interval itself with the report's own functions and refuses any site label that is not an
   anonymised label. It has no default output directory: charts go to `docs/studies/assets/` only
   once a real report exists.
-- `dot_interval_vs_ens.py` fits nothing. It reads the saved losses of the extra-lead, AIFS, and
-  WeatherNext 3 folders and draws, for each technology, one panel per lead day (0, 3, 4, and 10) of
-  each weather product's error minus the ENS mean's, as a dot with a 95% interval from resampling
-  whole months and a fitting seed. A row with fewer than 6 months gets a hollow dot and no interval.
-  Each product is subtracted from the ENS-mean arm of the same lead day in its own folder, or, where
-  that folder holds no ENS mean at the day, from `_leads_day10`'s. WeatherNext 3's wind reference is
-  `ens_meanvec`. It writes `report.md`, `intervals.parquet`, and a `README.md` naming each row's
-  reference to a new `nwp_forecast_comparison_vs_ens_dots` folder, and two SVGs to
-  `docs/studies/assets/`. It checks that none of the five outputs exists before it writes any, and
-  it refuses to overwrite them.
+- `dot_interval_vs_ens.py` fits nothing. It reads the saved losses the leaderboards draw (the
+  `leads_day10*` folders, the AIFS and WeatherNext 3 folders for days 1, 2, 7, and 14, and their
+  `extra_days` folders for days 0, 3, 4, and 10) and draws, for each technology, one panel per
+  leaderboard lead day (0, 1, 2, 3, 4, 5, 7, 10, and 14) of each product's error minus the ENS
+  mean's, as a dot with a 95% interval from resampling whole months and a fitting seed. A row with
+  fewer than 6 months gets a hollow dot and no interval. Each product is subtracted from the
+  ENS-mean arm the leaderboard draws at the same day (`_leads_day10b` at days 2 and 7 and
+  `_leads_day10` elsewhere for the `leads_day10*` products, and the ENS mean in the product's own
+  file for AIFS and WeatherNext 3). WeatherNext 3's wind reference is `ens_meanvec`. It writes
+  `report.md`, `intervals.parquet`, and a `README.md` naming each row's reference to a new
+  `nwp_forecast_comparison_vs_ens_dots_all_days` folder, and two SVGs to `docs/studies/assets/`. It
+  checks that none of the five outputs exists before it writes any, and refuses to overwrite them.
 
 ## Outputs
 

@@ -548,6 +548,7 @@ def interval_panel(
     figure_planning: PlanningType = "mixed",
     value_labels: bool = False,
     colour_by_family: bool = False,
+    row_step_px: int = _ROW_STEP_PX,
 ) -> alt.LayerChart | alt.VConcatChart:
     """Draw one panel of dots and 95% interval lines beside a labelled zero rule.
 
@@ -609,6 +610,8 @@ def interval_panel(
             readable.
         colour_by_family: Whether a panel of one family colours its rows by family, as every
             other panel does, instead of by condition.
+        row_step_px: The height of one row in pixels, `_ROW_STEP_PX` unless a figure with many
+            rows needs them closer.
 
     Returns:
         The panel, under its keys where it has any.
@@ -759,7 +762,7 @@ def interval_panel(
     panel = alt.LayerChart(
         layer=[*reference, interval, *points],
         width=width,
-        height=alt.Step(_ROW_STEP_PX / offset_positions),
+        height=alt.Step(row_step_px / offset_positions),
         title=alt.TitleParams(panel_title, anchor="start", frame="group", fontSize=_PANEL_TITLE_PX),
     )
     keys = []

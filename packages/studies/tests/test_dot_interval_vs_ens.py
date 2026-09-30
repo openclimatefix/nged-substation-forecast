@@ -1,5 +1,6 @@
 import sys
 from collections.abc import Mapping, Sequence
+from functools import cache
 from pathlib import Path
 
 import polars as pl
@@ -10,7 +11,6 @@ sys.path.insert(0, str(_STUDY_DIR))
 sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
 
 from dot_interval_vs_ens import (  # noqa: E402
-    PRODUCTS,
     SOURCES,
     SourceType,
     chart_rows,
@@ -111,7 +111,7 @@ def _full_solar_fixture(data_dir: Path, *, short_months: Mapping[str, int] | Non
             if (source, arm) in written:
                 continue
             written.add((source, arm))
-            months = short_months.get(arm, 7 if source == "wn3" else 12)
+            months = short_months.get(arm, 7 if source.startswith("wn3") else 12)
             _write(
                 _arm(arm, error=error, months=months),
                 data_dir=data_dir,
@@ -141,47 +141,204 @@ def test_a_folder_without_an_ens_mean_reads_the_ens_mean_of_the_leads_day10_fold
     assert icon_eu_day3["value"].item() < 10.0
 
 
-def test_every_dot_is_subtracted_from_an_ens_mean_arm_of_the_same_day() -> None:
+D10: SourceType = "leads_day10"
+D10B: SourceType = "leads_day10b"
+
+EXPECTED_LEADERBOARD_ENS_SOURCE = {
+    0: D10,
+    1: D10,
+    2: D10B,
+    3: D10,
+    5: D10,
+    7: D10B,
+    10: D10,
+    14: D10,
+}
+"""The folder of the ENS-mean arm the leaderboards draw at each lead day, read off the saved
+folders: `ens_mean_day2` and `ens_mean_day7` are GPU refits in `_leads_day10b`, and every other
+day's GPU refit is in `_leads_day10`."""
+
+EXPECTED_SOLAR_LABELS_BY_DAY = {
+    0: {
+        "UKV",
+        "ICON-D2",
+        "ICON-EU",
+        "ICON global",
+        "GFS (Open-Meteo)",
+        "GFS (native)",
+        "IFS 0.25°",
+        "IFS HRES (9 km, Open-Meteo)",
+        "ARPEGE Europe",
+        "AROME France",
+        "DMI HARMONIE-AROME",
+        "KNMI HARMONIE-AROME",
+        "GEFS mean",
+        "ENS control member",
+        "AIFS Single",
+        "AIFS ENS mean",
+        "WeatherNext 3 mean (7 months)",
+    },
+    1: {
+        "UKV",
+        "ICON-D2",
+        "ICON-EU",
+        "ICON global",
+        "GFS (Open-Meteo)",
+        "GFS (native)",
+        "IFS 0.25°",
+        "IFS HRES (9 km, Open-Meteo)",
+        "ARPEGE Europe",
+        "AROME France",
+        "DMI HARMONIE-AROME",
+        "KNMI HARMONIE-AROME",
+        "GEFS mean",
+        "ENS control member",
+        "AIFS Single",
+        "AIFS ENS mean",
+        "WeatherNext 3 mean (7 months)",
+    },
+    2: {
+        "ICON-EU",
+        "ICON global",
+        "GFS (Open-Meteo)",
+        "GFS (native)",
+        "IFS 0.25°",
+        "IFS HRES (9 km, Open-Meteo)",
+        "ARPEGE Europe",
+        "GEFS mean",
+        "ENS control member",
+        "AIFS Single",
+        "AIFS ENS mean",
+        "WeatherNext 3 mean (7 months)",
+    },
+    3: {
+        "ICON-EU",
+        "ICON global",
+        "GFS (Open-Meteo)",
+        "GFS (native)",
+        "IFS 0.25°",
+        "IFS HRES (9 km, Open-Meteo)",
+        "ARPEGE Europe",
+        "GEFS mean",
+        "ENS control member",
+        "AIFS Single",
+        "AIFS ENS mean",
+        "WeatherNext 3 mean (7 months)",
+    },
+    4: {"AIFS Single", "AIFS ENS mean", "WeatherNext 3 mean (7 months)"},
+    5: {
+        "ICON global",
+        "GFS (Open-Meteo)",
+        "GFS (native)",
+        "IFS 0.25°",
+        "IFS HRES (9 km, Open-Meteo)",
+        "GEFS mean",
+        "ENS control member",
+    },
+    7: {
+        "GFS (Open-Meteo)",
+        "GFS (native)",
+        "IFS 0.25°",
+        "IFS HRES (9 km, Open-Meteo)",
+        "GEFS mean",
+        "ENS control member",
+        "AIFS Single",
+        "AIFS ENS mean",
+        "WeatherNext 3 mean (7 months)",
+    },
+    10: {
+        "GFS (native)",
+        "GEFS mean",
+        "ENS control member",
+        "AIFS Single",
+        "AIFS ENS mean",
+        "WeatherNext 3 mean (7 months)",
+    },
+    14: {
+        "GFS (native)",
+        "GEFS mean",
+        "ENS control member",
+        "AIFS Single",
+        "AIFS ENS mean",
+        "WeatherNext 3 mean (7 months)",
+    },
+}
+"""The products each lead day's panel holds for solar, read off the leaderboards' saved arms."""
+
+
+def test_each_panel_holds_exactly_the_products_the_leaderboards_carry_at_that_day() -> None:
+    plan = comparisons(domain="solar")
+
+    for day, labels in EXPECTED_SOLAR_LABELS_BY_DAY.items():
+        assert {c.label for c in plan if c.day == day} == labels
+    assert {c.day for c in plan} == set(EXPECTED_SOLAR_LABELS_BY_DAY)
+    assert len(plan) == sum(len(labels) for labels in EXPECTED_SOLAR_LABELS_BY_DAY.values())
+
+
+def test_wind_has_the_solar_rows_without_arpege_and_arome() -> None:
+    solar = {(c.label, c.day) for c in comparisons(domain="solar")}
+    wind = {(c.label, c.day) for c in comparisons(domain="wind")}
+
+    assert solar - wind == {
+        (label, day)
+        for label in ("ARPEGE Europe", "AROME France")
+        for day in (0, 1, 2, 3)
+        if (label, day) in solar
+    }
+    assert wind <= solar
+
+
+def test_every_leaderboard_product_is_subtracted_from_the_leaderboards_ens_mean_arm() -> None:
+    leaderboard_sources = {D10, D10B, "leads_day10c", "leads_day10d"}
     for domain in ("solar", "wind"):
-        for comparison in comparisons(domain=domain):
-            if comparison.treatment.startswith("wn3") and domain == "wind":
-                assert comparison.reference == f"ens_meanvec_day{comparison.day}"
-            else:
-                assert comparison.reference == f"ens_mean_day{comparison.day}"
-            assert comparison.treatment.endswith(f"_day{comparison.day}")
+        for c in comparisons(domain=domain):
+            if c.treatment_source in leaderboard_sources:
+                assert c.reference == f"ens_mean_day{c.day}"
+                assert c.reference_source == EXPECTED_LEADERBOARD_ENS_SOURCE[c.day]
+
+
+def test_every_product_fitted_in_the_leads_folders_has_a_source_for_each_of_its_days() -> None:
+    by_source = {(c.label, c.day): c.treatment_source for c in comparisons(domain="solar")}
+
+    assert by_source[("ICON-EU", 2)] == D10B
+    assert by_source[("ICON-EU", 3)] == D10B
+    assert by_source[("ICON-EU", 1)] == D10
+    assert by_source[("ENS control member", 0)] == D10
+    assert by_source[("ENS control member", 1)] == D10
+    assert by_source[("ENS control member", 5)] == D10B
+    assert by_source[("GEFS mean", 7)] == D10B
+    assert by_source[("GEFS mean", 5)] == D10
+    assert by_source[("GFS (native)", 14)] == "leads_day10c"
+    assert by_source[("IFS HRES (9 km, Open-Meteo)", 7)] == "leads_day10d"
+
+
+def test_aifs_and_wn3_read_their_own_ens_mean_from_their_own_file() -> None:
+    folders = {
+        "AIFS Single": "aifs_single",
+        "AIFS ENS mean": "aifs_ens",
+        "WeatherNext 3 mean (7 months)": "wn3",
+    }
+    for domain in ("solar", "wind"):
+        for c in comparisons(domain=domain):
+            if c.label in folders:
+                kind = "extra" if c.day in (0, 3, 4, 10) else "blends"
+                assert c.treatment_source == f"{folders[c.label]}_{kind}"
+                assert c.reference_source == c.treatment_source
 
 
 def test_wind_weathernext_3_uses_the_mean_vector_reference_and_solar_the_plain_mean() -> None:
     wind = [c for c in comparisons(domain="wind") if c.treatment.startswith("wn3")]
     solar = [c for c in comparisons(domain="solar") if c.treatment.startswith("wn3")]
+    days = (0, 1, 2, 3, 4, 7, 10, 14)
 
-    assert {c.reference for c in wind} == {f"ens_meanvec_day{d}" for d in (0, 3, 4, 10)}
-    assert {c.reference for c in solar} == {f"ens_mean_day{d}" for d in (0, 3, 4, 10)}
+    assert {c.reference for c in wind} == {f"ens_meanvec_day{d}" for d in days}
+    assert {c.reference for c in solar} == {f"ens_mean_day{d}" for d in days}
     assert {c.label for c in wind + solar} == {"WeatherNext 3 mean (7 months)"}
-
-
-def test_the_plan_holds_the_products_the_archive_has_at_days_4_and_10() -> None:
-    plan = comparisons(domain="solar")
-    at_day_4 = {c.label for c in plan if c.day == 4}
-    at_day_10 = {c.label for c in plan if c.day == 10}
-
-    assert at_day_4 == {"AIFS Single", "AIFS ENS mean", "WeatherNext 3 mean (7 months)"}
-    assert at_day_10 == {
-        "GEFS mean",
-        "ENS control member",
-        "GFS (native)",
-        "AIFS Single",
-        "AIFS ENS mean",
-        "WeatherNext 3 mean (7 months)",
-    }
-
-
-def test_arpege_and_arome_have_no_wind_row() -> None:
-    labels = {c.label for c in comparisons(domain="wind")}
-
-    assert "ARPEGE Europe" not in labels
-    assert "AROME France" not in labels
-    assert len(PRODUCTS) > 0
+    assert all(
+        c.reference.startswith("ens_mean_day")
+        for c in comparisons(domain="wind")
+        if not c.treatment.startswith("wn3")
+    )
 
 
 def test_the_sensitivity_setting_is_left_out(tmp_path: Path) -> None:
@@ -237,7 +394,7 @@ def test_a_row_with_fewer_than_six_months_has_a_dot_and_no_interval(tmp_path: Pa
     _full_solar_fixture(tmp_path, short_months={"ukv_day0": 5})
 
     rows = compute(data_dir=tmp_path, domain="solar")
-    short = rows.filter(pl.col("label") == "UKV")
+    short = rows.filter((pl.col("label") == "UKV") & (pl.col("day") == 0))
     shaped = chart_rows(rows=rows, day=0, with_conditions=True).filter(pl.col("label") == "UKV")
 
     assert short["n_months"].to_list() == [5]
@@ -255,8 +412,12 @@ def test_six_months_is_enough_for_an_interval_and_the_hollow_mark_is_in_the_char
 
     rows = compute(data_dir=tmp_path, domain="solar")
 
-    assert rows.filter(pl.col("label") == "UKV")["has_interval"].to_list() == [True]
-    assert rows.filter(pl.col("label") == "ICON-D2")["has_interval"].to_list() == [False]
+    assert rows.filter((pl.col("label") == "UKV") & (pl.col("day") == 0))[
+        "has_interval"
+    ].to_list() == [True]
+    assert rows.filter((pl.col("label") == "ICON-D2") & (pl.col("day") == 0))[
+        "has_interval"
+    ].to_list() == [False]
     spec = str(draw(rows=rows, domain="solar", number=19).to_dict())
     assert "'filled': False" in spec
     assert "Fewer than 6 months: no interval" in spec
@@ -320,6 +481,12 @@ def test_write_once_refuses_to_overwrite(tmp_path: Path) -> None:
 _PAGE_DATA = repo_data_dir() / "studies"
 
 
+@cache
+def _page_rows(domain: DomainType) -> pl.DataFrame:
+    """Bootstrap every dot of one technology once, for all the data-gated checks."""
+    return compute(data_dir=_PAGE_DATA, domain=domain)
+
+
 @pytest.mark.skipif(
     not (_PAGE_DATA / SOURCES["leads_day10"].folder).exists(),
     reason="the private study data is not in this checkout",
@@ -331,6 +498,18 @@ _PAGE_DATA = repo_data_dir() / "studies"
         ("wind", "UKV", 0, -0.446, -0.673, -0.218),
         ("solar", "IFS 0.25°", 0, -0.332, -0.524, -0.139),
         ("solar", "GFS (native)", 10, 0.410, 0.082, 0.727),
+        ("solar", "GEFS mean", 5, 1.118, 0.704, 1.569),
+        ("solar", "GEFS mean", 14, -0.002, -0.284, 0.256),
+        ("wind", "GEFS mean", 7, 0.290, -0.496, 1.119),
+        ("solar", "IFS 0.25°", 5, 0.088, -0.377, 0.575),
+        ("wind", "IFS 0.25°", 5, 0.507, 0.081, 0.937),
+        ("solar", "ENS control member", 2, 0.496, 0.303, 0.698),
+        ("wind", "ENS control member", 5, 1.487, 1.028, 1.891),
+        ("solar", "ENS control member", 14, -0.110, -0.329, 0.108),
+        ("solar", "WeatherNext 3 mean (7 months)", 1, -0.243, -0.440, -0.069),
+        ("solar", "WeatherNext 3 mean (7 months)", 14, -0.334, -0.996, 0.194),
+        ("wind", "WeatherNext 3 mean (7 months)", 2, -0.801, -1.206, -0.321),
+        ("wind", "WeatherNext 3 mean (7 months)", 7, -1.050, -2.870, 0.917),
         ("solar", "IFS HRES (9 km, Open-Meteo)", 3, 1.091, 0.775, 1.416),
         ("solar", "WeatherNext 3 mean (7 months)", 3, -1.478, -2.196, -0.831),
         ("wind", "WeatherNext 3 mean (7 months)", 10, 1.652, 0.014, 3.502),
@@ -339,7 +518,7 @@ _PAGE_DATA = repo_data_dir() / "studies"
 def test_the_dots_reproduce_the_contrasts_the_page_states(
     domain: DomainType, label: str, day: int, value: float, lower: float, upper: float
 ) -> None:
-    rows = compute(data_dir=_PAGE_DATA, domain=domain)
+    rows = _page_rows(domain)
 
     row = rows.filter((pl.col("label") == label) & (pl.col("day") == day)).row(0, named=True)
     assert (row["value"], row["lower"], row["upper"]) == pytest.approx(

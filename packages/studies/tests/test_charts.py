@@ -1605,3 +1605,10 @@ def test_stacked_contrasts_takes_its_own_second_setting_note_and_defaults_to_the
     assert SECOND_SETTING_NOTE in joined(default)
     assert "A custom note." in joined(custom)
     assert SECOND_SETTING_NOTE not in joined(custom)
+
+
+def test_row_step_sets_the_height_of_one_row() -> None:
+    rows = _rows(["weather model"])
+
+    assert _panel(rows)["height"] == {"step": 40}
+    assert _panel(rows, row_step_px=22)["height"] == {"step": 22}
