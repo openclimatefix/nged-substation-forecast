@@ -73,12 +73,17 @@ way):
   Icechunk store, one commit per run, needs `uv run --with icechunk --with zarr --with eccodes` and
   the `CEDA_TOKEN` environment variable. The licence is CC BY-NC-SA 4.0.
 - `fetch_weathernext3.py` and `validate_weathernext3.py` — WeatherNext 3 ensemble-mean runs (00,
-  06, 12, and 18 UTC) from a Requester Pays Google Cloud Storage bucket, cropped to a wide United
-  Kingdom box (49.0 to 61.5 degrees north, 10.0 degrees west to 3.5 degrees east, which is public
-  and unrelated to the private trial-area box) and written to an Icechunk store. The Zarr chunks
-  are whole-globe, so a run reads about 50 GB and keeps about 15 MB. Run the fetch only on a
-  Compute Engine machine in us-east1, with `GOOGLE_CLOUD_PROJECT` set, because reads from elsewhere
-  are billed as egress (`--dry-run` prints the estimate first).
+  06, 12, and 18 UTC) from a Google Cloud Storage bucket that is not Requester Pays, cropped to a
+  wide United Kingdom box (49.0 to 61.5 degrees north, 10.0 degrees west to 3.5 degrees east, which
+  is public and unrelated to the private trial-area box) and written to an Icechunk store. The Zarr
+  chunks are whole-globe, so a run reads about 50 GB and keeps about 15 MB. Run the fetch only on a
+  Compute Engine machine in us-east1, because reads from elsewhere may be billed as egress
+  (`--dry-run` prints the estimate first). No billing project is needed, but the bucket cannot be
+  read anonymously: access must be requested from Google (see its [access
+  guide](https://developers.google.com/weathernext/guides/access-forecast)), and the script then
+  reads with the Google account's application default credentials. The [survey
+  page](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/#what-we-learnt-about-weathernexts-precomputed-statistics-store)
+  describes the bucket and the statistics it holds beyond the mean.
     - **Arguments.** `--bucket` (a Cloud Storage bucket in us-east1) or `--local-store` (a
       directory, for tests) names the output; exactly one is required. `--start-date` and
       `--end-date` give the window, and `--end-date` is required when the repository is created,
