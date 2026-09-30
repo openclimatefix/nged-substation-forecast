@@ -8,7 +8,6 @@ page is exploratory and fitted at the primary setting only.
 
 ## Data and methods
 
-
 ### The extra lead days, day 0, and the products added later
 
 **The extra arms are fitted on a graphics processing unit (GPU), in four batches, and every one is

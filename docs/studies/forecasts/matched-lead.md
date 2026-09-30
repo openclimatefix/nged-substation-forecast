@@ -98,11 +98,11 @@ lead days 0 to 14, with 95% intervals, where most products lie to the right of z
 The marks are the same as in Figure 1, for the 3 wind farms. WeatherNext 3's filled dot is against
 the ENS mean-vector reference (ENS's mean whose wind speed is the length of the mean of its members'
 wind vectors, which matches how WeatherNext 3's speed is built; [How WeatherNext 3 is
-read](matched-lead-extra-products.md#how-weathernext-3-is-read)), and its hollow diamond is against the 21-month ENS mean of wind
-speed, so the gap between its two marks mixes the reference with the row set. WeatherNext 3's day-10
-dot is a hollow circle because its weather scored no better than shuffled weather in that fit
-(19.00% against 18.80% and 18.94%). The cause is not established, and the result is not evidence
-that WeatherNext 3 loses skill.
+read](matched-lead-extra-products.md#how-weathernext-3-is-read)), and its hollow diamond is against
+the 21-month ENS mean of wind speed, so the gap between its two marks mixes the reference with the
+row set. WeatherNext 3's day-10 dot is a hollow circle because its weather scored no better than
+shuffled weather in that fit (19.00% against 18.80% and 18.94%). The cause is not established, and
+the result is not evidence that WeatherNext 3 loses skill.
 
 ![Each solar forecast product's error at each fitted lead day, with 95% intervals](../assets/nwp_forecast_solar_leaderboard.svg)
 
@@ -172,9 +172,9 @@ lowers the error by 0.18 points even at a conservative lead.**
 
 ## Key findings
 
-**Every finding is about each product as this study reads it, at 6 solar farms and 3 wind farms,
-and is not a ranking of the weather models behind the products.** UKV, ICON-EU, and IFS 0.25° are
-single runs read at one grid point, and ENS and GEFS are ensemble means ([Introduction](#introduction)).
+**Every finding is about each product as this study reads it, at 6 solar farms and 3 wind farms, and
+is not a ranking of the weather models behind the products.** UKV, ICON-EU, and IFS 0.25° are single
+runs read at one grid point, and ENS and GEFS are ensemble means ([Introduction](#introduction)).
 
 **In Figures 1 and 2, six products score a higher error than the ENS mean at lead days 1 to 5, for
 both solar and wind, every interval excluding zero.** The six are IFS HRES 9 km, the GEFS mean, GFS
@@ -187,10 +187,10 @@ from the ENS mean for either technology.
 
 **Among the 114 product-by-day dots across both technologies on the 21-month rows at days 1 to 14,
 one has a lower error than the ENS mean with an interval clear of zero: IFS 0.25° for wind at day 2,
-at -0.268 points [-0.451, -0.089].** Chance alone could produce one clear dot of 114, and IFS 0.25°'s
-shorter lead favours it. At day 0, which a live service cannot use, ICON-D2 (the German weather
-service's regional ICON) and IFS 0.25° score a lower error for both technologies, and UKV and
-ICON-EU do for wind.
+at -0.268 points [-0.451, -0.089].** Chance alone could produce one clear dot of 114, and IFS
+0.25°'s shorter lead favours it. At day 0, which a live service cannot use, ICON-D2 (the German
+weather service's regional ICON) and IFS 0.25° score a lower error for both technologies, and UKV
+and ICON-EU do for wind.
 
 **For WeatherNext 3, AIFS Single, and AIFS ENS mean, the result depends on which ENS mean forms the
 zero line.**
@@ -204,12 +204,12 @@ zero line.**
   day 1: +0.539 points [+0.085, +1.194]), so the lower error may reflect the weaker zero line. The
   weather-model version behind WeatherNext 3's archive is undocumented, so February to June may
   overlap WeatherNext 3's training data. Only July to September postdate it, and that is 3 months,
-  so the pooled 7 months are not a fair comparison.
-- **AIFS Single (16 months)** scores a higher error than a same-rows ENS mean at day 0 and, for
-  solar, at day 1 (+0.391 points [+0.171, +0.598]). At days 2 to 10 every filled-dot interval
-  includes zero, except wind day 7 (+0.800 points [+0.015, +1.586]), and wind day 14 is also higher
-  (+0.827 points [+0.212, +1.460]). Against the 21-month ENS mean (hollow marks), wind is also higher
-  at day 2 (+0.878 points [+0.269, +1.700]) and day 5 (+0.642 points [+0.110, +1.173]).
+  so the pooled 7 months are not a fair comparison. - **AIFS Single (16 months)** scores a higher
+  error than a same-rows ENS mean at day 0 and, for solar, at day 1 (+0.391 points [+0.171,
+  +0.598]). At days 2 to 10 every filled-dot interval includes zero, except wind day 7 (+0.800
+  points [+0.015, +1.586]), and wind day 14 is also higher (+0.827 points [+0.212, +1.460]). Against
+  the 21-month ENS mean (hollow marks), wind is also higher at day 2 (+0.878 points [+0.269,
+  +1.700]) and day 5 (+0.642 points [+0.110, +1.173]).
 - **AIFS ENS mean (11 months)** is the most dependent on the zero line. Its filled dots are higher
   at day 0 and at solar day 1 (+0.242 points [+0.018, +0.478]), and lower at solar day 3 (-0.932
   points [-1.681, -0.312]), wind day 4 (-0.982 points [-1.826, -0.303]), and wind day 5 (-0.831
@@ -219,22 +219,23 @@ zero line.**
 lead.** The ENS mean's error for solar is 8.771% [8.096, 9.373] of capacity at day 1 and 14.876%
 [13.797, 15.870] at day 14, against 14.458% [13.205, 15.592] for climatology, a forecast that uses
 no weather data. For wind the ENS mean's errors are 8.350% [7.373, 9.364] and 18.867% [16.664,
-21.091], against 18.460% [16.341, 20.389]. At day 7 the ENS mean's error is lower than climatology's,
-though the solar gain lies near the 5% line with no second-setting check, and from day 10 the two
-cannot be told apart.
+21.091], against 18.460% [16.341, 20.389]. At day 7 the ENS mean's error is lower than
+climatology's, though the solar gain lies near the 5% line with no second-setting check, and from
+day 10 the two cannot be told apart.
 
 **Five limits apply to every dot in Figures 1 and 2.** They are the same-rows zero line, the fresher
 run that most products read (so a lower error than ENS's is not evidence of skill at equal lead),
-day 0 being a hindcast, dashed intervals that are too narrow, and rows that are not independent tests,
-among which about 1 in 20 comparisons with no true difference is statistically significant at the 5%
-level by chance ([Limitations](#what-figures-1-to-4-do-not-show)).
+day 0 being a hindcast, dashed intervals that are too narrow, and rows that are not independent
+tests, among which about 1 in 20 comparisons with no true difference is statistically significant at
+the 5% level by chance ([Limitations](#what-figures-1-to-4-do-not-show)).
 
 **At day 1, at matched lead and at both XGBoost settings, ENS beat UKV, ICON-EU, and GEFS for solar,
 and UKV and GEFS for wind, while ICON-EU and IFS 0.25° cannot be separated from ENS for wind.** The
 Summary gives the numbers. A blend of ENS with ICON-EU and IFS 0.25° lowers the wind error at the
 conservative lead, and ICON-EU carries most of that gain (-0.169 points [-0.250, -0.090], post hoc).
 The day-2 blend is indistinguishable from ENS plus ICON-EU alone, and every solar blend control is
-itself worse than ENS alone ([blending](#a-blend-lowers-the-wind-error-at-both-leads-tested-and-the-solar-error-only-at-an-optimistic-lead)).
+itself worse than ENS alone
+([blending](#a-blend-lowers-the-wind-error-at-both-leads-tested-and-the-solar-error-only-at-an-optimistic-lead)).
 Part of ENS's wind advantage may be timing noise that averaging removes
 ([gaps](#part-of-enss-advantage-is-ensemble-averaging-and-timing)). The results sections also hold
 the planned AIFS contrast, the day-7 AIFS blend, and the lowest wind error of any forecast fitted,
@@ -243,8 +244,8 @@ which reads a fresher run than ENS does.
 ## Introduction
 
 **The question is which weather forecast, or blend of forecasts, gives the most accurate day-ahead
-power forecast at the 6 solar farms and 3 wind farms.** Flexpectation's live service reads ENS
-at 09:00 UTC, so the answer decides whether a second weather source is worth ingesting. ENS is the
+power forecast at the 6 solar farms and 3 wind farms.** Flexpectation's live service reads ENS at
+09:00 UTC, so the answer decides whether a second weather source is worth ingesting. ENS is the
 incumbent. The table sets out each product a headline contrast uses, plus ICON-D2. The other
 products in the study are exploratory and appear in [Other
 products](#among-the-other-products-ifs-025-comes-closest-to-ens-exploratory), in [Error and
@@ -432,8 +433,9 @@ control separates the effect of the other products' weather from the effect of t
 arm is scored on the rows where the target, the no-weather baselines, and every planned product are
 present. IFS HRES 9 km loses the target days its archive lacks, and the AIFS arms have rows of their
 own ([the extra arms](#the-extra-lead-days-day-0-and-the-products-added-later) and [How AIFS is
-read](matched-lead-extra-products.md#how-aifs-is-read)). A row is one hour at one generator. Solar has 39,030 candidate rows from
-2024-12-01 and 35,263 shared rows. Wind has 42,144 candidate rows and 37,407 shared rows.
+read](matched-lead-extra-products.md#how-aifs-is-read)). A row is one hour at one generator. Solar
+has 39,030 candidate rows from 2024-12-01 and 35,263 shared rows. Wind has 42,144 candidate rows and
+37,407 shared rows.
 <!-- report: Solar and Wind, Rows -->
 Requiring a UKV day-1 value removes the most rows, so the shared rows hold little of spring 2026
 ([Limitations](#limitations) gives the counts).
@@ -497,7 +499,6 @@ target days its archive lacks, and the AIFS and WeatherNext 3 arms have rows of 
 - **[What is known about WN3's
   lookahead](matched-lead-extra-products.md#what-is-known-about-wn3s-lookahead):** why the
   WeatherNext 3 months before July may overlap its training data.
-
 
 ## Results
 
@@ -874,8 +875,8 @@ differences between generators.
 ![Paired differences at generators W1 to W3: UKV and ICON-EU minus ENS at day 1,
 and the P4b blend minus ENS](../assets/nwp_forecast_wind_per_generator.svg)
 
-Figure 10: At two of the three wind farms UKV has a higher error than ENS at day 1, and at two of the
-three wind farms the P4b blend has a lower error.
+Figure 10: At two of the three wind farms UKV has a higher error than ENS at day 1, and at two of
+the three wind farms the P4b blend has a lower error.
 
 ### A blend lowers the wind error at both leads tested, and the solar error only at an optimistic lead
 
@@ -992,8 +993,8 @@ per-generator contrasts.
 ![Two panels for solar: each forecast's own error, and paired differences of the blends minus ENS
 alone and minus their permutation controls](../assets/nwp_forecast_solar_blends.svg)
 
-Figure 11: For solar power a blend of ENS, ICON-EU, and IFS 0.25° lowers the error by 0.35 percentage
-points at an optimistic lead, but the blend's control is itself worse than ENS alone.
+Figure 11: For solar power a blend of ENS, ICON-EU, and IFS 0.25° lowers the error by 0.35
+percentage points at an optimistic lead, but the blend's control is itself worse than ENS alone.
 
 ![Two panels for wind: each forecast's own error, and paired differences of the blends minus ENS
 alone and minus their permutation controls](../assets/nwp_forecast_wind_blends.svg)
@@ -1046,8 +1047,8 @@ their guards are uninformative for the blend claim, and the verdict stays "may l
 The controls are worse than ENS alone by +0.088 to +0.147 points, and the same holds at the
 sensitivity setting. A blend that beats a control that is itself worse than ENS alone does not show
 that the added weather carries information. P4b minus ENS alone is -0.029 points [-0.097, +0.040],
-which includes zero, so the solar blend claim rests on P4a, whose added runs a live service may not be
-able to read. The refit removes neither limit.
+which includes zero, so the solar blend claim rests on P4a, whose added runs a live service may not
+be able to read. The refit removes neither limit.
 
 ### Part of ENS's advantage is ensemble averaging and timing
 
@@ -1228,7 +1229,6 @@ page](matched-lead-extra-products.md#neither-native-gfs-nor-ifs-hres-9-km-has-an
 holds the day-by-day tables, the comparison of native GFS with GFS (Open-Meteo), and the comparison
 of IFS HRES 9 km with IFS 0.25° and ICON-EU.
 
-
 ### AIFS Single has a lower wind error than ENS's control member at day 1, and no solar difference is claimable
 
 **On the 16 months of hours that AIFS Single covers, AIFS Single has a lower wind error than ENS's
@@ -1362,16 +1362,17 @@ AIFS ENS rows are descriptive only.
 **At day 7, giving an XGBoost model both ENS's mean and AIFS Single lowers the solar error, and the
 wind difference is not claimable. At day 14, neither technology has any skill to compare.** This
 section is exploratory, except the four deciding contrasts per technology (H7, H14, B7, and B14)
-that [How AIFS is read](matched-lead-extra-products.md#how-aifs-is-read) names. Those four were named before the fit but after the
-day-1 and day-2 AIFS results were known, so the page does not call them planned. Every number is at
-the primary setting unless a row says otherwise. The rows are the `single` row set, 6 solar farms
-and 3 wind farms, 16 months, and the AIFS Single versions those months hold. The survey page says
-that [AIFS has not been shown to improve faster than the physics-based
+that [How AIFS is read](matched-lead-extra-products.md#how-aifs-is-read) names. Those four were
+named before the fit but after the day-1 and day-2 AIFS results were known, so the page does not
+call them planned. Every number is at the primary setting unless a row says otherwise. The rows are
+the `single` row set, 6 solar farms and 3 wind farms, 16 months, and the AIFS Single versions those
+months hold. The survey page says that [AIFS has not been shown to improve faster than the
+physics-based
 IFS](../../background/weather-products-survey.md#aifs-has-not-been-shown-to-improve-faster-than-the-physics-based-ifs)
 and that [each AIFS version should be scored
-separately](../../background/weather-products-survey.md#score-each-aifs-version-separately), and this
-section treats AIFS Single as a forecast that has a lower or higher error, never as one that has
-improved.
+separately](../../background/weather-products-survey.md#score-each-aifs-version-separately), and
+this section treats AIFS Single as a forecast that has a lower or higher error, never as one that
+has improved.
 
 | Row set `single`: each arm's own error (% of capacity, primary) | Solar day 7 | Solar day 14 | Wind day 7 | Wind day 14 |
 |---|---|---|---|---|
@@ -1391,16 +1392,16 @@ The table's rows differ by day in the rows scored (28,208 solar and 28,419 wind 
 <!-- report (blends): Solar and Wind, `single`, day 7 and day 14, Absolute error of every arm -->
 
 **For solar power at day 7, the blend of ENS's mean and AIFS Single lowers the error against ENS's
-mean alone, and the shuffled control shows the gain comes from AIFS Single's weather (B7, deciding).**
-The blend's error is 13.901% against 14.297% for ENS's mean alone, a difference of -0.396 points
-[-0.578, -0.201]. The difference is -0.258 points [-0.432, -0.077] at the sensitivity setting, and
--0.396 points [-0.632, -0.118] at the 99.375% Bonferroni level. With each month dropped in turn the
-estimate runs from -0.454 to -0.359 points, so no month reverses the sign. The guard, the blend
-minus the blend given shuffled AIFS Single weather, is -0.437 points [-0.674, -0.169] at the primary
-setting and -0.342 points [-0.547, -0.128] at the sensitivity setting. The shuffled control is not
-significantly worse than ENS's mean alone (+0.041 points [-0.126, +0.198]), so the guard can
-discriminate. The verdict is that the blend lowers the error at day 7 for these six solar farms.
-The gain is 0.396 points of capacity, about 2.8% of ENS's mean's own error.
+mean alone, and the shuffled control shows the gain comes from AIFS Single's weather (B7,
+deciding).** The blend's error is 13.901% against 14.297% for ENS's mean alone, a difference of
+-0.396 points [-0.578, -0.201]. The difference is -0.258 points [-0.432, -0.077] at the sensitivity
+setting, and -0.396 points [-0.632, -0.118] at the 99.375% Bonferroni level. With each month dropped
+in turn the estimate runs from -0.454 to -0.359 points, so no month reverses the sign. The guard,
+the blend minus the blend given shuffled AIFS Single weather, is -0.437 points [-0.674, -0.169] at
+the primary setting and -0.342 points [-0.547, -0.128] at the sensitivity setting. The shuffled
+control is not significantly worse than ENS's mean alone (+0.041 points [-0.126, +0.198]), so the
+guard can discriminate. The verdict is that the blend lowers the error at day 7 for these six solar
+farms. The gain is 0.396 points of capacity, about 2.8% of ENS's mean's own error.
 <!-- report (blends): Deciding contrast B7, solar -->
 
 **For wind power at day 7, the blend's gain over ENS's mean is not claimable.** The difference is
@@ -1526,7 +1527,8 @@ intervals span 0 in every group. At day 14 the July to September interval is nar
 second-seed shuffled arm has the lower error. Hollow squares are the sensitivity setting.
 
 ![WN3's mean against ENS's mean-vector reference for wind power at days 1, 2, 7, and 14, in three
-groups of rows: each forecast's own error and the paired difference](../assets/nwp_forecast_wind_wn3_groups.svg)
+groups of rows: each forecast's own error and the paired
+difference](../assets/nwp_forecast_wind_wn3_groups.svg)
 
 Figure 20: For the three wind farms, WN3's mean has a lower error than ENS's mean-vector reference
 at day 1 in July to September (-0.358 points [-1.185, -0.002]): the upper bound is -0.002, and at
@@ -1645,7 +1647,6 @@ errors are higher.** At day 10 the AIFS sign changes with the row set and the te
 wind error is higher than ENS's in the pooled rows. The [companion
 page](matched-lead-extra-products.md#wn3-and-aifs-at-days-0-3-4-and-10-exploratory) holds the tables
 for the three row groups.
-
 
 ## Discussion: what to use
 
@@ -1817,9 +1818,9 @@ on the 21-month products, 28,570 and 28,873 for AIFS Single, 16,911 and 18,555 f
 and 11,479 and 10,260 for WeatherNext 3. Key findings gives the marks that differ between the two
 zero lines. For wind, WeatherNext 3's hollow diamond is against the 21-month ENS mean of wind speed,
 and its filled dot is against the mean-vector reference ([How WeatherNext 3 is
-read](matched-lead-extra-products.md#how-weathernext-3-is-read)). The two marks therefore differ in reference arm as well as in
-row set. WeatherNext 3's intervals cover 7 months, are dashed, and sit in the WeatherNext 3 results,
-which list the July to September rows separately.
+read](matched-lead-extra-products.md#how-weathernext-3-is-read)). The two marks therefore differ in
+reference arm as well as in row set. WeatherNext 3's intervals cover 7 months, are dashed, and sit
+in the WeatherNext 3 results, which list the July to September rows separately.
 
 **Most products in Figures 1 and 2 read a fresher run than ENS does, which favours those products.**
 At days 0 to 7, the Previous Runs products (read from Open-Meteo's archive of past forecasts) read
@@ -2026,8 +2027,8 @@ weight than a planned one.
   Bonferroni interval, the eight deciding contrasts of the AIFS blends and days 7 and 14 (four per
   technology, printed at a 99.375% Bonferroni interval beside the 95% one), and many exploratory
   contrasts, among them which product carries the wind blend gain, the 00-05 UTC subset, and the
-  result at wind generator W3. Apart from the Bonferroni intervals named above, no interval is adjusted
-  for the number of comparisons.
+  result at wind generator W3. Apart from the Bonferroni intervals named above, no interval is
+  adjusted for the number of comparisons.
 - **The sensitivity setting is not independent confirmation.** It changes the XGBoost
   hyperparameters and keeps the same rows, folds, and weather. Agreement between the two settings
   shows only that a verdict does not depend on the hyperparameters.
@@ -2094,11 +2095,11 @@ also fitted at the sensitivity setting, and the P4 refit is fitted at both setti
 
 **The outputs of the extra arms are in seven write-once folders.** Batches 1 to 4 write to
 `data/studies/nwp_forecast_comparison_leads_day10`, `..._day10b`, `..._day10c`, and `..._day10d`,
-the day-1 and day-2 AIFS arms write to `data/studies/nwp_forecast_comparison_aifs`, the AIFS
-blends and the day-7 and day-14 AIFS arms write to `data/studies/nwp_forecast_comparison_aifs_blends`,
-and the GPU refit of the P4 blends with two shuffle seeds writes to
-`data/studies/nwp_forecast_comparison_p4_seeds`. Each folder holds the extra
-inputs, the losses and predictions, `report.md`, and a `verification/` directory. The folder
+the day-1 and day-2 AIFS arms write to `data/studies/nwp_forecast_comparison_aifs`, the AIFS blends
+and the day-7 and day-14 AIFS arms write to `data/studies/nwp_forecast_comparison_aifs_blends`, and
+the GPU refit of the P4 blends with two shuffle seeds writes to
+`data/studies/nwp_forecast_comparison_p4_seeds`. Each folder holds the extra inputs, the losses and
+predictions, `report.md`, and a `verification/` directory. The folder
 `data/studies/nwp_forecast_comparison_leads` holds an earlier run of batch 1's arms, and the charts
 and tables do not read it.
 <!-- report: Design constants -->
