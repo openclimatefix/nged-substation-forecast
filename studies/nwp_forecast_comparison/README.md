@@ -137,14 +137,15 @@ lead?](../../docs/studies/forecasts/matched-lead.md).
   of each day at day 0 (00:00 UTC for wind, 01:00 UTC for solar), so the wind fit drops that hour
   and the solar drop above already covers it.
 
-  The two fits write into two separate new folders, because both write `single_day0_*` files and a
-  `report.md`, and each output is written once. Run from the repository root, one command at a
-  time:
+  The two fits write into two separate existing folders that hold only a `README.md`, because both
+  write `single_day0_*` files and a `report.md`, and each output is written once. The paths are
+  absolute because a worktree has no `data/` folder. Run one command at a time:
 
   ```bash
-  P=data/studies/nwp_forecast_comparison
-  LEAN=data/studies/nwp_forecast_comparison_aifs_extra_days
-  WN3=data/studies/nwp_forecast_comparison_wn3_extra_days
+  D=/home/jack/dev/nged-substation-forecast/data/studies
+  P=$D/nwp_forecast_comparison
+  LEAN=$D/nwp_forecast_comparison_aifs_extra_days
+  WN3=$D/nwp_forecast_comparison_wn3_extra_days
   uv run python studies/nwp_forecast_comparison/build_forecast_inputs.py --aifs \
     --aifs-days 0 3 4 10 --published-dir $P --output-dir $LEAN
   uv run python studies/nwp_forecast_comparison/fit_aifs.py --lean-leads --check \
