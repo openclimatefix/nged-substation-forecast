@@ -8,11 +8,12 @@
 > [#999](https://github.com/openclimatefix/nged-substation-forecast/issues/999).
 
 Our ECMWF ENS archive starts 2024-04-01; most trial-area power series go back to late 2019. An
-estimate of past weather covers the gap. [ERA5](data-sources.md#weather-data) is the estimate
-planned for ingest, and shares the ENS's IFS lineage, so the reanalysis-to-forecast domain shift is
-smaller than a different-model reanalysis would give. Which estimate of past weather to train on,
-per weather variable, is an [open question](#open-questions). Most of this page names ERA5 because
-ERA5 is the planned ingest.
+estimate of past weather ([defined
+below](#train-on-the-long-power-history-then-calibrate-per-weather-product)) covers the gap.
+[ERA5](data-sources.md#weather-data) is the estimate planned for ingest, and shares the ENS's IFS
+lineage, so the reanalysis-to-forecast domain shift is smaller than a different-model reanalysis
+would give. Which estimate of past weather to train on, per weather variable, is an [open
+question](#open-questions). Most of this page names ERA5 because ERA5 is the planned ingest.
 
 Almost all the cost is in the data layer. Once ERA5 and the paired residual statistics exist, moving
 between the variants below is mostly configuration — so they are leaderboard arms, not decisions to
@@ -99,13 +100,13 @@ weather age.
 
 > **Status: 🔬 Research.** Study:
 > [#999](https://github.com/openclimatefix/nged-substation-forecast/issues/999), under the
-> Studies epic [#896](https://github.com/openclimatefix/nged-substation-forecast/issues/896). A
-> design that wins the study is ported to production only if its results show promise.
+> Studies epic [#896](https://github.com/openclimatefix/nged-substation-forecast/issues/896).
 
 **A new weather product usually arrives with months of archive, while the power history runs from
 late 2019, so an XGBoost model trained only on the new product's archive discards years of power
-data.** ECMWF ENS's archive starts 2024-04-01, AIFS-ENS's 2025-07-02, WeatherNext 3's 2026-01-01,
-and Dynamical.org's ICON-EU's in early 2026 (dates from the [weather products
+data.** ECMWF ENS's archive starts 2024-04-01, the archive of AIFS-ENS (ECMWF's machine-learned
+ensemble) 2025-07-02, WeatherNext 3's 2026-01-01, and the archive of Dynamical.org's ICON-EU (the
+German weather service's European weather model) in early 2026 (dates from the [weather products
 survey](../background/weather-products-survey.md#forecast-models)). The traditional approach needs
 years of overlap between every product and the power data. The published comparisons of
 post-processing methods we have read also assume a fixed product with ample history.
@@ -113,13 +114,16 @@ post-processing methods we have read also assume a fixed product with ample hist
 **Most of this roadmap was written before autonomous forecasting experiments proved practical, which
 is why the older pages are cautious about adding weather products.** Claude Code runs whole
 forecasting experiments autonomously, including downloading new datasets. That research writes its
-code under `studies/` and `packages/studies/`, which no human reviews line by line, so it can test
-many ideas quickly. The autonomous sweep waits on the protected scorer
-([#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958)). Production code
-never imports from either directory, and production code is carefully reviewed. An idea here
-therefore moves in three steps: a broad autonomous sweep to narrow the search space, then supervised
-narrow sweeps if the results look promising, then a reviewed port of the study code to production if
-the results still look promising.
+code under `studies/` and `packages/studies/`, which no human reviews line by line, so the
+autonomous research can test many ideas quickly. Production code never imports from either
+directory, and production code is carefully reviewed.
+
+**An idea moves from an autonomous sweep to a reviewed production port in three steps.** A broad
+autonomous sweep narrows the search space; supervised narrow sweeps follow if the results look
+promising; and the study code is ported to production, through review, if the results still look
+promising. The broad autonomous sweep waits on
+[#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958), which protects the
+leaderboard scorer from edits by autonomous research.
 
 **The objective is to use as many weather forecasts as possible, on the belief that more forecasts
 make better wind and solar power forecasts.** Three criteria score a design against that objective:
@@ -140,7 +144,15 @@ capacity [0.087, 0.282] at the conservative lead, and gave no detectable solar g
 [−0.106, +0.033]). That study trained an XGBoost model on 21 months of every product, which is the
 traditional approach. A study of the learning curve has to allow a null result for solar.
 
-### A weather-response model and a product calibrator
+### Train on the long power history, then calibrate per weather product
+
+**"Estimates of past weather" is this page's umbrella term for every source describing weather that
+has already happened.** The sources are ERA5; CAMS, the Copernicus Atmosphere Monitoring Service's
+satellite-derived irradiance; the first time steps of numerical weather prediction (NWP) runs, such
+as the early leads of the Met Office UKV archive held by CEDA, the Centre for Environmental Data
+Analysis; weather-station observations; weather satellites; and weather inferred from the
+differentiable-physics (DP) models of wind and solar farms. Each source has errors of its own, so
+none of them is exact.
 
 **The design trains one weather-response model on the long power history, then fits a small product
 calibrator for each weather product on that product's short overlap with power.** The
@@ -148,46 +160,41 @@ weather-response model is a lag-free XGBoost model that maps weather, solar geom
 features to power. The weather-response model trains on power from late 2019 onwards, with an
 estimate of past weather as its input rather than any forecast. The product calibrator adapts the
 weather-response model's output to one weather product and that product's lead times. The
-weather-response model's output at the target time plays the role the draft plays in the
 [switching-events two-stage
-forecaster](switching-events.md#a-second-way-to-use-the-stage-1-baseline-correct-a-draft).
+forecaster](switching-events.md#a-second-way-to-use-the-stage-1-baseline-correct-a-draft) corrects
+a draft forecast, and the weather-response model's output at the target time plays the role of that
+draft.
 
-**"Estimates of past weather" is this page's umbrella term for every source describing weather that
-has already happened.** The sources are ERA5, CAMS, the first time steps of NWP runs (the early
-leads of CEDA's UKV archive, for example), weather-station observations, weather satellites, and
-weather inferred from the differentiable-physics (DP) models of wind and solar farms. Each source
-has errors of its own, so none of them is exact.
+**The design is the weather-forecasting literature's "perfect prognosis" approach**, whose
+trade-off against model output statistics (MOS) the [probabilistic-forecasting
+explainer](../techniques/probabilistic-forecasting.md#a-power-forecasting-model-trained-on-past-weather-does-not-hedge)
+sets out. The product calibrator is the MOS half of the design.
 
-**The split is the weather-forecasting literature's "perfect prognosis" approach, and Canada's
-Updateable MOS system was built for the new-model case.** Perfect prognosis fits a statistical
-model on observed or analysed weather and applies that model to forecast weather; model output
-statistics (MOS) fits on forecast weather directly. [Marzban, Sandgathe and Kalnay
-(2006)](https://doi.org/10.1175/MWR3088.1) show from a formal analysis that MOS should beat perfect
-prognosis on mean squared error, which is the case for fitting a calibrator on forecast weather
-rather than serving the weather-response model alone. [Wilson and Vallée
+**Canada's Updateable MOS weights new-model data up as it accumulates, which is the safe-entry
+criterion.** [Wilson and Vallée
 (2002)](https://doi.org/10.1175/1520-0434%282002%29017%3C0206%3ATCUMOS%3E2.0.CO%3B2) built
 Updateable MOS because each change of the Canadian weather model left too little archive for stable
-MOS equations. Updateable MOS develops its equations from a weighted blend of old-model and
-new-model data, weighted towards the new model while keeping enough old-model data for stable
-equations. That weighting is the safe-entry criterion above, applied to a weather model's upgrade
+MOS equations. Updateable MOS develops its equations from a weighted blend of data from the old and
+new weather models, weighted towards the new weather model while keeping enough data from the old
+weather model for stable equations. That weighting applies safe entry to a weather model's upgrade
 rather than to a new product.
 
-### The calibrator supplies the hedge that the weather-response model lacks
+### Correcting for forecast error
 
 **The weather-response model predicts power given the weather that happened, but a forecast needs
-power given the weather forecast, and the calibrator supplies the difference.** An XGBoost model
-trained on forecast weather learns to hedge, damping its sensitivity to weather where the forecast
-is often wrong ([why a model trained on past weather does not
-hedge](../techniques/probabilistic-forecasting.md#a-model-trained-on-past-weather-does-not-hedge)).
+power given the weather forecast, and the product calibrator supplies the difference.** An XGBoost
+model trained on forecast weather learns to hedge, damping its sensitivity to weather where the
+forecast is often wrong ([why a power-forecasting model trained on past weather does not
+hedge](../techniques/probabilistic-forecasting.md#a-power-forecasting-model-trained-on-past-weather-does-not-hedge)).
 The weather-response model never sees forecast error, so fed forecast weather it is over-sensitive,
 more so at long lead. Averaging the weather-response model's output over calibrated ensemble members
 approximates the hedge, and so does a recalibration fitted on the product's overlap with power.
 
-**The calibrator's parameter count is limited by the number of independent weather episodes in the
-overlap, not by the number of rows.** One weather system covers every site at once, so hundreds of
-sites during one storm give roughly one storm's worth of evidence. As a judgement rather than a
-measurement, one independent episode every two to three days gives about 150 to 230 episodes in 15
-months and 30 to 45 in a three-month winter. The calibrator therefore keeps few free parameters:
+**The product calibrator's parameter count is limited by the number of independent weather episodes
+in the overlap, not by the number of rows.** One weather system covers every site at once, so
+hundreds of sites during one storm give roughly one storm's worth of evidence. As a judgement rather
+than a measurement, one independent episode every 2 to 3 days gives about 150 to 230 episodes in 15
+months and 30 to 45 in a 3-month winter. The product calibrator therefore keeps few free parameters:
 
 - parameters that vary smoothly with lead time, rather than one set per lead;
 - per-series effects shrunk towards a pool per technology;
@@ -204,8 +211,8 @@ ensembles, to wind power ensembles, and to both. Phipps et al. found that post-p
 ensemble improved calibration and sharpness, while post-processing only the weather ensemble did not
 necessarily help. Phipps et al. is the one study we have found, and covers wind only. An affine map
 of power cannot reproduce the hedge where the power curve bends — wind near cut-in and rated speed,
-and PV at the export cap and the inverter clipping limit — which is the case for the weather-space
-arm below.
+and PV at the export cap and the inverter clipping limit. Those bends are the case for the
+weather-space calibrator below.
 
 **The power-space calibrator plugs into one modular component, the wrapper forecaster, shared by
 three consumers.** [Phase
@@ -216,35 +223,36 @@ heuristic](metrics-and-leaderboard.md#calibrating-the-manual-heuristic-aims-at-t
 ([#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)) and the
 degradation-conditional conformal calibration
 ([#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)) are planned to share
-that wrapper, and the product calibrator would be the third consumer. The wrapper would live in
+that wrapper. The product calibrator would be the wrapper's third consumer. The wrapper would live in
 `ml_core` as a `BaseForecaster` subclass that wraps another `BaseForecaster`, so the serving path
 stays "load a model, call `predict`".
 
-**The weather-space arm runs in two stages: a quick arm with XGBoost in the study, and an arm built
-on DP models after v2.**
+**The weather-space calibrator comes in two versions: a quick version with XGBoost in the study, and
+a version built on DP models after v2.**
 
 - **In the study:** fit a handful of weather-space parameters per variable — for example a wind
-  speed scale and offset, each smooth in lead time — directly on power error through the frozen
-  XGBoost weather-response model. A grid search or Nelder-Mead fits them without gradients, which
-  matters because an XGBoost model's output is piecewise constant in its inputs, so its gradient
-  is zero almost everywhere. A map with an offset, a scale on the ensemble mean, and a positive
-  scale on each member's departure from that mean keeps each member's rank and joint
-  structure across sites, lead times, and variables, so an ensemble product needs no copula step.
-  A deterministic product such as ICON-EU has no members, so its calibrator supplies the whole
-  weather-uncertainty term and borrows the spread's lead-time shape from ECMWF ENS.
+  speed offset, a scale on the ensemble-mean wind speed, and a positive scale on each member's
+  departure from that mean, each smooth in lead time — directly on power error through the frozen
+  XGBoost weather-response model. A grid search or Nelder-Mead fits the weather-space parameters
+  without gradients. The fit needs no gradients because an XGBoost model's output is piecewise
+  constant in its inputs, so the output's gradient is zero almost everywhere. A map of that form
+  keeps each member's rank and joint structure across sites, lead times, and variables, so an
+  ensemble product needs no copula step. A deterministic product such as ICON-EU has no members, so
+  its calibrator supplies the whole weather-uncertainty term and borrows the spread's lead-time
+  shape from ECMWF ENS.
 - **After v2:** repeat the weather-space experiments through the [DP
   models](../techniques/differentiable-physics.md) of wind and solar farms. The DP models are
-  differentiable, so the weather-space parameters can be fitted by gradient descent, and there can
-  be many more of them. The [weather encoder's multi-source
-  blending](../techniques/encoders.md#blending-several-nwp-sources) is the fullest form of this
-  arm.
+  differentiable, so gradient descent can fit many more weather-space parameters than the XGBoost
+  version can. The [weather encoder's multi-source
+  blending](../techniques/encoders.md#blending-several-nwp-sources) goes further than either
+  version.
 
 ### Which estimate of past weather to train on
 
-**Which estimate of past weather the weather-response model trains on is an open question, and the
-past-weather studies find ERA5 is not the best estimate for sunshine or for wind at the trial area's
-farms.** Given ERA5, an XGBoost model's error on past sunshine is 9.08% of capacity on the solar
-study's main row set, and given CAMS it is 5.09%
+**Which estimate of past weather the weather-response model trains on is an open question.** At the
+trial area's solar and wind farms, the past-weather studies find ERA5 is not the best estimate of
+either sunshine or wind. Given ERA5, an XGBoost model's error on past sunshine is 9.08% of capacity
+on the solar study's main row set, and given CAMS it is 5.09%
 ([solar](../studies/past-weather/solar.md#cams-describes-past-sunshine-best-of-the-eight-main-row-set-products-by-a-wide-margin)).
 At three wind farms, the error given UKV's T+0 wind as Open-Meteo serves it is 0.44 points [0.24,
 0.63] lower than given ERA5's wind
@@ -254,35 +262,37 @@ other variables, each tested against ERA5.
 
 **The best estimate of past weather may be a blend of several products rather than any one
 product.** In the [blending study](../studies/past-weather/blending.md), an XGBoost model given all
-six solar products beats an XGBoost model given CAMS, with CAMS's neighbouring hours and its
-beam/diffuse split, by 0.13 points [0.10, 0.17]; CAMS with ICON-EU gives most of that gain, 0.10
-points [0.07, 0.14]. On rows from January 2021, adding SARAH-3's satellite irradiance to CAMS's
+six solar products in that study beats an XGBoost model given CAMS, with CAMS's neighbouring hours
+and its beam/diffuse split, by 0.13 points [0.10, 0.17]; CAMS with ICON-EU gives most of that gain,
+0.10 points [0.07, 0.14]. On rows from January 2021, adding SARAH-3's satellite irradiance to CAMS's
 split beats the same CAMS model without SARAH-3 by 0.18 points [0.16, 0.21]. For wind, an XGBoost
-model given all five wind products beats an XGBoost model given UKV with its neighbouring hours by
-0.48 points [0.40, 0.56], and UKV with ICON-EU beats the same UKV model by 0.26 points [0.21, 0.31].
-A control that keeps the extra columns but shuffles their weather does no better than the single
-product, so the gain comes from the other products' hour-by-hour weather. Weather stations were not
-part of the blending study; in the [wind
+model given all five wind products in that study beats an XGBoost model given UKV with its
+neighbouring hours by 0.48 points [0.40, 0.56], and UKV with ICON-EU beats the same UKV model by
+0.26 points [0.21, 0.31]. The gain comes from the other products' hour-by-hour weather: a control
+that keeps the extra columns but shuffles their weather does no better than the single product.
+Weather stations were not part of the blending study. In the [wind
 study](../studies/past-weather/wind.md#one-nearby-10-m-weather-station-trails-era5s-10-m-wind-on-its-own-and-lowers-ukvs-error-when-added-to-it),
-one nearby 10 m station trails ERA5's 10 m wind on its own and lowers UKV's error when added to UKV.
-Three caveats limit what the blending results say about training the weather-response model:
+one nearby 10 m weather station trails ERA5's 10 m wind on its own and lowers UKV's error when added
+to UKV. Three caveats limit what the blending results say about training the weather-response model:
 
 - **The blends are learned in power space.** Each blend is an XGBoost model given several products'
   columns and predicting power, not a blended weather field. A blend can become the
-  weather-response model's input in two ways: feed every product's columns into the
+  weather-response model's input in two ways. The first way feeds every product's columns into the
   weather-response model, so every product the blend uses must be present at serve time or be
-  replaced by the product calibrator's output; or build a weather-space blend fitted against some
-  other estimate of past weather.
+  replaced by the product calibrator's output. The second way builds a weather-space blend fitted
+  against some other estimate of past weather.
 - **ICON-EU's history is too short for the whole power history.** The study's ICON-EU came from
   Open-Meteo and starts in November 2022, so a blend with ICON-EU cannot cover the power history
   back to late 2019. CAMS with SARAH-3, and CAMS with ERA5, can.
-- **All four headline comparisons are post hoc**, chosen after a first run's results, as the study
-  page says.
+- **The blending study's four headline comparisons are post hoc**, chosen after a first run's
+  results, as the study page says.
 
 **CEDA's UKV archive carries three caveats as a training input.**
 
-- CEDA's UKV is statistically different from the UKV the Met Office serves live. A calibrator can
-  absorb that difference only if the live service does not also serve UKV.
+- CEDA's UKV is statistically different from the UKV the Met Office serves live. If the live
+  service does not serve UKV, a weather-response model trained on CEDA's UKV never meets live UKV
+  and the difference does not matter. If the live service does serve UKV, live UKV's product
+  calibrator has to absorb the difference.
 - The Met Office's PS47 upgrade on 2026-01-21 changed UKV's microphysics and cloud scheme, so a
   UKV series spanning that date is not homogeneous.
 - The UKV fields fetched from CEDA so far hold 10 m wind and winds at 1000 hPa and 925 hPa, with
@@ -305,75 +315,77 @@ belongs to the effective-capacity work.** The weather-response model spans 2019 
 build-out and repowering, so an uncleaned target teaches both components to explain capacity changes
 as weather. The [effective-capacity estimation](capacity-estimation.md) work
 ([#141](https://github.com/openclimatefix/nged-substation-forecast/issues/141)) owns the estimate,
-and will ultimately estimate capacity inside the same DP models of wind and solar farms. This page
-does not design the cleaning.
+and will ultimately estimate capacity inside the same DP models of wind and solar farms.
+
+### How the study evaluates the design
+
+**The study measures a learning curve on stand-in products with long archives, against an XGBoost
+model trained natively on the same months of the same product, on identical rows.** At each month,
+the product calibrator is fitted on the N months before that month and scored on that month, for N
+in 1, 2, 3, 6, and 12. GEFS, the Global Ensemble Forecast System of the US National Oceanic and
+Atmospheric Administration, is the primary stand-in. The GEFS archive starts 2020-10-01 and GEFS
+comes from a different weather-model family from ERA5's, so the curve can be averaged over start
+months in every season. ECMWF ENS, from 2024-04-01, is the secondary and optimistic stand-in.
+AIFS-ENS, from 2025-07-02, is the real short-history case, entering as a blend with ECMWF ENS. The
+controls are the weather-response model fed raw forecast members with no product calibrator, an
+XGBoost model trained natively on the same N months, and the ENS champion trained on its full fold,
+which is a [confounded
+comparison](../ml_experimentation/cross-validation-folds.md#the-confounded-comparison-which-must-not-be-read-as-the-ablation)
+read only as the deployment reference.
+
+**The design may improve calibration more than headline skill, so the study sets its kill criterion
+before the first fit.** For one fixed product with ample history, a review of this design judged the
+likely gain to be calibration rather than headline skill. The study therefore compares against
+strong single-model baselines, scores every arm on identical rows by lead, and puts a paired
+month-block bootstrap interval on every planned contrast. The study's numbers are study-page numbers
+on the nine metered generators: nothing becomes a leaderboard row until the design is built into the
+pipeline.
 
 ### Traps the study has to avoid
 
-- **Stacking leakage.** The weather-response model's predictions on the calibrator's training rows
-  must be out-of-fold over month blocks, or the calibrator under-corrects.
-- **The calibrator absorbing the weather-response model's errors**, such as demand drift. Keep date
-  and calendar features out of the calibrator, and measure the weather-response model's own error
-  by fitting the same calibrator on estimate-of-past-weather inputs.
-- **An optimistic stand-in.** ECMWF ENS shares ERA5's IFS lineage, so a calibrator learns ENS from
-  an ERA5-trained weather-response model faster than it would learn a product from another
-  family.
-- **Season confounded with history length.** A calibrator fitted on the last three months before
-  July sees only spring and early summer. The learning curve must be averaged over several start months.
-- **A change of feed.** CEDA's UKV differs from live UKV, and Open-Meteo's ICON-EU may differ from
-  Dynamical.org's ICON-EU.
+- **Stacking leakage.** The weather-response model's predictions on the product calibrator's
+  training rows must be out-of-fold over month blocks, or the product calibrator under-corrects.
+- **The product calibrator absorbing the weather-response model's errors**, such as demand drift.
+  Keep date and calendar features out of the product calibrator, and measure the weather-response
+  model's own error by fitting the same calibrator on estimate-of-past-weather inputs.
+- **An optimistic stand-in.** ECMWF ENS shares ERA5's IFS lineage, so a calibrator mapping an
+  ERA5-trained weather-response model onto ENS needs fewer months than a calibrator mapping the
+  same weather-response model onto a product from another weather-model family.
+- **Season confounded with history length.** A calibrator fitted on the last 3 months before July
+  sees only spring and early summer. The learning curve must be averaged over several start months.
+- **A change of feed.** Open-Meteo's ICON-EU may differ from Dynamical.org's ICON-EU.
 
 ### Pre-training then fine-tuning becomes a comparison arm for wind and solar
 
 **For metered wind and solar generators, pre-training on estimates of past weather then fine-tuning
 on ECMWF ENS ([#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167)) answers
-the same question as the split, so the study runs #167's variants as comparison arms.** Warm start
-can only add trees, so an over-confident weather sensitivity learned in the first phase is hard to
-shrink. The split replaces that second phase with a calibrator small enough to fit on a few months.
-The [single-pool](#single-pool-vs-two-phase-warm-start), [lead-time-zero, and
+the same question as the weather-response model and product calibrator, so the study runs #167's
+variants as comparison arms.** Warm start can only add trees, so an over-confident weather
+sensitivity learned in the first phase is hard to shrink. The design replaces that second phase with
+a product calibrator small enough to fit on a few months. The
+[single-pool](#single-pool-vs-two-phase-warm-start), [lead-time-zero, and
 degraded-past-weather](#reconciling-era5-with-ens) arms are the fairer comparisons, because each
-trains one model on every row. For demand substations the split does not apply, because their
-forecasts lean on power lags, which the lag-free weather-response model does not use. So #167 still
-owns the longer training history for the champion model at demand substations.
+trains one XGBoost model on every row. For demand substations the design does not apply, because
+their forecasts lean on power lags, which the lag-free weather-response model does not use. So #167
+still owns the longer training history for the champion model at demand substations.
 
 ### The design moves a calibration step into the serving path
 
 **A calibrate-and-blend step at serve time trades against [principle 2, complexity
 offline](../design-philosophy/design-principles.md#2-complexity-belongs-offline-not-in-the-serving-path).**
-The calibrator's coefficients are computed offline, as the [inherent-stability
+The product calibrator's coefficients are computed offline, as the [inherent-stability
 rules](../design-philosophy/inherent-stability.md#where-complexity-should-live) accept for
 regime-conditional calibration. But production would also run the frozen weather-response model on
 every member of every product and blend the results, inside a `BaseForecaster` wrapper. A missing
 product gets weight zero, so every product-absent case has to be a scored failure scenario before
 the step is safe to ship.
 
-### How the study evaluates the design
-
-**The study measures a learning curve on stand-in products with long archives, against the same
-product trained natively on the same months, on identical rows.** At each month, the calibrator is
-fitted on the N months before that month and scored on that month, for N in 1, 2, 3, 6, and 12.
-GEFS, from 2020-10-01 and a different model family from ERA5, is the primary stand-in, so the curve
-can be averaged over start months in every season. ECMWF ENS, from 2024-04-01, is the secondary and
-optimistic stand-in. AIFS-ENS, from 2025-07-02, is the real short-history case, entering as a blend
-with ECMWF ENS. The controls are the weather-response model fed raw forecast members with no
-calibrator, an XGBoost model trained natively on the same N months, and the ENS champion trained on
-its full fold, which is a [confounded
-comparison](../ml_experimentation/cross-validation-folds.md#the-confounded-comparison-which-must-not-be-read-as-the-ablation)
-read only as the deployment reference.
-
-**The split may improve calibration more than headline skill, so the study sets its kill criterion
-before the first fit.** For one fixed product with ample history, a review of this design judged the
-likely gain to be calibration rather than headline skill. The study therefore compares against
-strong single-model baselines, scores every arm on identical rows by lead, and puts a paired
-month-block bootstrap interval on every planned contrast. The study's numbers are study-page numbers
-on the 9 metered generators: nothing becomes a leaderboard row until the design is built into the
-pipeline.
-
 ### Open questions
 
 - **One common set of weather variables.** Is one weather-response model on one common set of
   weather variables acceptable, given that products supply different variables? Dynamical.org's
-  ICON-EU carries wind at 10 m only, so a common set would leave a richer product's extra variables unused.
+  ICON-EU carries wind at 10 m only, so a common set would leave a richer product's extra variables
+  unused.
 - **The whole forecast, or a feature.** Is the calibrated forecast the whole forecast for wind and
   solar, beyond day 1 for example, or an input feature to the champion XGBoost model? A feature
   would need the champion retrained each time a product is added, which loses the "no retrain"
@@ -387,8 +399,8 @@ pipeline.
 - **Which estimate of past weather, per variable.** CAMS for irradiance and CEDA's UKV early time
   steps for the other variables is the working guess; ERA5, weather stations, weather satellites,
   and weather inferred from DP models are the alternatives. The best estimate may be a blend of
-  several products, which raises a further question: feed the weather-response model every
-  product's columns, or build a weather-space blend (see [the blending
+  several products. If it is, the weather-response model can either take every product's columns
+  or take a weather-space blend (see [the blending
   caveats](#which-estimate-of-past-weather-to-train-on)).
 
 ## Era covariates
@@ -581,7 +593,7 @@ history](#a-new-weather-product-with-a-few-months-of-history)
 ([#999](https://github.com/openclimatefix/nged-substation-forecast/issues/999)) runs separately,
 under `studies/`:
 
-1. Build the weather-response model at the 9 metered generators, lag-free and out-of-fold over
+1. Build the weather-response model at the nine metered generators, lag-free and out-of-fold over
    month blocks, once per estimate of past weather under test (ERA5, CAMS for irradiance, CEDA's
    UKV early time steps for the other variables).
 2. Fit the power-space calibrator per technology, smooth in lead time, in capacity-factor units,

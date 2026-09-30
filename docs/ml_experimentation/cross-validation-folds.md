@@ -96,16 +96,17 @@ all, so its evaluation lives entirely in the `metrics` asset's `evaluation_scope
 feeds the leaderboard.** The motivating case is adding ICON-EU NWP (from Dynamical.org), whose
 archive starts later than the leaderboard folds, leaving no overlapping history to score on.
 
-**For a new *weather* source, the ceiling sizes the prize.** [The perfect-weather
+**For a new *weather* source, the ceiling bounds the skill the source could add.** [The
+perfect-weather
 ceiling](../roadmap/metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates) measures
 how much forecast skill near-perfect weather would add. If a model trained and scored on reanalysis
 barely beats the ENS-scored champion, there is little forecast-error headroom for a further source
 to recover — unless the candidate's case rests on *resolution*, which that ceiling does not bound.
 
-Three patterns answer three different questions. A fourth question — how many months of a new
-source's history it takes before the source adds skill — is under research in [A new weather
-product with a few months of
-history](../roadmap/training-history.md#a-new-weather-product-with-a-few-months-of-history).
+Three patterns answer three different questions. A fourth question is under research in [A new
+weather product with a few months of
+history](../roadmap/training-history.md#a-new-weather-product-with-a-few-months-of-history): how
+many months of a new source's history it takes before the source adds skill.
 
 ### Controlled ablation — "does the source add skill?"
 

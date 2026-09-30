@@ -1430,9 +1430,9 @@ substation under the same weather system, so hundreds of substations during one 
 one storm's worth of evidence. A few years of history therefore hold few independent examples of
 each kind of weather.
 
-**A product whose history is too short for its own features could still enter the forecast through a
-small per-product calibrator**, under research in [A new weather product with a few months of
-history](training-history.md#a-new-weather-product-with-a-few-months-of-history).
+**A weather product whose history is too short to train an XGBoost model on could still enter the
+forecast through a small product calibrator**, under research in [A new weather product with a few
+months of history](training-history.md#a-new-weather-product-with-a-few-months-of-history).
 
 **A cheaper first signal needs only ECMWF ENS: check whether its calibration varies with the weather
 situation once lead time is accounted for.** For a single ensemble, [Allen et al.

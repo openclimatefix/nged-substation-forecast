@@ -184,8 +184,7 @@ v0.7) and the **pre-training experiments** it unlocks
 training history](training-history.md). Our power data reaches back to late 2019 while the ENS
 archive starts 2024-04-01, and Dynamical.org's ENS back-fill is not expected until ~November 2027,
 so an estimate of past weather is how the seasonal experiments on this page get more than one
-winter to learn from. The
-Tier-1 and Tier-2 config wins do not wait for it.
+winter to learn from. The Tier-1 and Tier-2 config wins do not wait for it.
 
 This milestone also carries the **quantile-ensemble pipeline** (per-member quantile forecasts pooled
 into delivered percentiles — Phase D of [Delivering the probabilistic
@@ -459,7 +458,7 @@ leaderboard experiment or controlled ad-hoc ablation, so we keep the result eith
   forecast-error headroom, but ICON-EU's ~6.5 km grid could still beat 31 km ERA5 on
   representativeness, which that ceiling does not bound. Because ICON-EU's history starts early 2026
   (shorter than the canonical CV folds) it is assessed via a controlled ad-hoc ablation, not the
-  leaderboard, until it has ~1–2 complete years of history. A [per-product
+  leaderboard, until it has ~1–2 complete years of history. A [product
   calibrator](training-history.md#a-new-weather-product-with-a-few-months-of-history), under
   research, could let ICON-EU into the forecast sooner. See [Evaluating a data source whose
   history is shorter than the
@@ -525,7 +524,7 @@ of the v2 live service)*
 **v2.1 is about a month of XGBoost work, once the v2 live service runs for all 2,500 time series.**
 v2.1 picks up whatever [XGBoost improvements](xgboost-improvements.md) v0.5 left undone, and adds
 [further NWP sources as features](xgboost-improvements.md#several-nwp-sources-as-features-v21), or
-through a [per-product
+through a [product
 calibrator](training-history.md#a-new-weather-product-with-a-few-months-of-history) if the study of
 that design shows promise.
 
