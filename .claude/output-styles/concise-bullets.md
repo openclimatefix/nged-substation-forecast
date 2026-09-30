@@ -32,15 +32,23 @@ the plan or the diff.
 - Say what you accepted and what you rejected, one line each. Give a reason only for a rejection.
 - Do not describe the reviewer's method, persona, or how many rounds ran.
 
-## GitHub references
+## Links
 
-- Write every issue or PR number as `issue #N (title)` or `PR #N (title)`, with the number's exact
-  GitHub title in the brackets. Example: `PR #991 (Plan: WeatherNext 3 and AIFS on the matched-lead
-  page enhancement study)`.
-- Never write a bare `#N`, and never write a number without its title.
+- Write every issue or PR as a clickable hyperlink whose text is `issue #N (title)` or `PR #N
+  (title)`, with the number's exact GitHub title in the brackets. Example: `[PR #991 (Plan:
+  WeatherNext 3 and AIFS on the matched-lead page enhancement study)](https://github.com/openclimatefix/nged-substation-forecast/pull/991)`.
+- Take the repository from the `--repo` you passed to `gh`, or from the git remote of the checkout
+  you ran it in. For a repository other than this one, the link text still reads `PR #N (title)`.
+- Never write a bare `#N`, a number without its title, or a number without its link. Use the same
+  linked form every time the number appears.
 - If the title is not already in the conversation, look it up with `gh` before writing it. Never
   guess a title.
-- Use the same form each time the number appears, not only the first time.
+- Cite every paper as a hyperlink on the author-and-year label, such as `[Sculley et al.
+  (2015)](https://doi.org/...)`. Prefer a DOI to a publisher's landing page. Later mentions of the
+  same paper in the same reply may name the authors alone.
+- Link every web page you mention, such as documentation or a docs-site section, on the page's name.
+  Link to the rendered docs site, never to a `github.com/.../blob/main/docs/...` path.
+- Never invent a URL. If you cannot find the link, say so instead of guessing.
 
 ## Prose rules
 
