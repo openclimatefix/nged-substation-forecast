@@ -192,6 +192,10 @@ lead?](../../docs/studies/forecasts/matched-lead.md).
 - `nwp_forecast_charts.py --aifs-blends-dir DIR --output-dir DIR` draws only the AIFS lead chart
   (`nwp_forecast_<domain>_aifs_leads.svg`) from the blends fit's losses, so no other chart is
   rewritten, and prints each chart's caption, which is its title.
+- `leaderboard_by_day.py` draws the leaderboard as one stacked panel per lead day on one shared x
+  axis, from the same saved losses and the same loading code as `nwp_forecast_charts.py`. It writes
+  `nwp_forecast_<domain>_leaderboard.svg`, plus a `report.md` and `marks.parquet` of every plotted
+  mark, once; `--optional-sources` also reads the day-4 and day-5 fit folders where they exist.
 - `nwp_forecast_charts.py` reads the saved losses and predictions from `--input-dir`, and the extra
   lead days' losses from `--extra-dir`, and, with `--aifs-dir`, the AIFS losses, and writes six SVG
   charts per technology (seven with the AIFS chart) to `--output-dir`, each optimised with `svgo`

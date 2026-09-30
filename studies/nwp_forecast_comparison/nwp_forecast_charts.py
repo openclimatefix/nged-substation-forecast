@@ -806,6 +806,13 @@ def lead_board_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+class DayFolder(NamedTuple):
+    """A folder of per-day, per-row-set losses files and the lead days it holds."""
+
+    folder: Path
+    days: tuple[int, ...]
+
+
 class RowSetMarks(NamedTuple):
     """One product fitted on a row set smaller than the published one, and that row set's losses."""
 
@@ -828,6 +835,8 @@ def load_row_set_marks(
     domain: DomainType,
     blends_extra_dir: Path | None = None,
     wn3_extra_dir: Path | None = None,
+    more_blends_folders: Sequence[DayFolder] = (),
+    more_wn3_folders: Sequence[DayFolder] = (),
 ) -> list[RowSetMarks]:
     """Read the losses of the products that are fitted on a smaller row set than the published one.
 
@@ -840,6 +849,9 @@ def load_row_set_marks(
             (`LEAN_DAYS`) join the blends fit's, or None.
         wn3_extra_dir: The directory `fit_aifs.py --wn3 --days ...` wrote to for `WN3_EXTRA_DAYS`,
             whose days join `wn3_dir`'s, or None.
+        more_blends_folders: Further AIFS folders, read as `load_aifs_leads`'s `more_folders`.
+        more_wn3_folders: Further WeatherNext 3 folders of
+            `<domain>_wn3_day<N>_losses.parquet` files, with the days to read.
 
     Returns:
         One `RowSetMarks` per product, in the order AIFS Single, AIFS ENS mean, WeatherNext 3
@@ -851,7 +863,12 @@ def load_row_set_marks(
     """
     frames: dict[str, pl.DataFrame] = {}
     if blends_dir is not None:
-        frames |= load_aifs_leads(blends_dir=blends_dir, domain=domain, extra_dir=blends_extra_dir)
+        frames |= load_aifs_leads(
+            blends_dir=blends_dir,
+            domain=domain,
+            extra_dir=blends_extra_dir,
+            more_folders=more_blends_folders,
+        )
     if wn3_dir is not None:
         # The leaderboards draw every WN3 row (February to September 2026, 7 months); the split
         # into in-sample and out-of-sample rows is drawn in the three-group figures.
@@ -863,7 +880,11 @@ def load_row_set_marks(
                     domain=domain,
                     day=day,
                 )
-                for folder, days in ((wn3_dir, WN3_DAYS), (wn3_extra_dir, WN3_EXTRA_DAYS))
+                for folder, days in (
+                    (wn3_dir, WN3_DAYS),
+                    (wn3_extra_dir, WN3_EXTRA_DAYS),
+                    *more_wn3_folders,
+                )
                 if folder is not None
                 for day in days
             ],
@@ -2247,7 +2268,11 @@ def aifs_lead_label(*, arm: str) -> str:
 
 
 def load_aifs_leads(
-    *, blends_dir: Path, domain: DomainType, extra_dir: Path | None = None
+    *,
+    blends_dir: Path,
+    domain: DomainType,
+    extra_dir: Path | None = None,
+    more_folders: Sequence[DayFolder] = (),
 ) -> dict[str, pl.DataFrame]:
     """Read one technology's blends-fit losses, every day of each row set stacked.
 
@@ -2256,6 +2281,8 @@ def load_aifs_leads(
         domain: `solar` or `wind`.
         extra_dir: The directory `fit_aifs.py --lean-leads` wrote to, whose days (`LEAN_DAYS`) are
             stacked after the blends fit's, or None.
+        more_folders: Further folders of `<domain>_<row set>_day<N>_losses.parquet` files, each
+            with the days to read, stacked after the others.
 
     Returns:
         Each row set's per-row losses, keyed by row set, after the anonymisation check. Arms carry
@@ -2265,7 +2292,11 @@ def load_aifs_leads(
         row_set: pl.concat(
             [
                 pl.read_parquet(folder / f"{domain}_{row_set}_day{day}_losses.parquet")
-                for folder, days in ((blends_dir, BLEND_DAYS), (extra_dir, LEAN_DAYS))
+                for folder, days in (
+                    (blends_dir, BLEND_DAYS),
+                    (extra_dir, LEAN_DAYS),
+                    *more_folders,
+                )
                 if folder is not None
                 for day in days
             ],
