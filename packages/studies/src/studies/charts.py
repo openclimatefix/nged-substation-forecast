@@ -16,7 +16,7 @@ import json
 import math
 import re
 import textwrap
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Final, Literal, NamedTuple
 
@@ -100,6 +100,11 @@ POST_HOC_PLANNING_NOTE: Final[str] = (
 
 CONDITION_SHAPES: Final[tuple[str, ...]] = ("circle", "diamond", "square")
 """The point shape of each condition, in the order the conditions are given."""
+
+DASH: Final[tuple[int, int]] = (4, 3)
+"""The dash pattern of an interval drawn from too few months to be trusted as a solid line."""
+
+_OTHER_OFFSET_PX: Final[int] = 5
 
 SECOND_SETTING_SHAPE: Final[str] = "triangle-up"
 """The hollow shape that marks a contrast at the second hyperparameter setting.
@@ -528,6 +533,242 @@ def wrapped(*, text: str, width: int = _TEXT_CHARACTERS) -> list[str]:
     return textwrap.wrap(text, width=width, break_long_words=False) or [text]
 
 
+class _XSpec(NamedTuple):
+    """The x scale, title, and axis every mark of a panel shares."""
+
+    scale: alt.Scale
+    title: list[str]
+    axis: alt.Axis
+
+
+def _flag(frame: pl.DataFrame, column: str, kind: Literal["true", "not_null"]) -> pl.Expr:
+    """Return an expression for a Boolean column's value, or false where the column is absent."""
+    if column not in frame.columns:
+        return pl.lit(value=False)
+    if kind == "not_null":
+        return pl.col(column).is_not_null()
+    return pl.col(column).fill_null(value=False)
+
+
+def paired_any(frame: pl.DataFrame) -> bool:
+    """Whether any row has an `other_difference`, so the panel draws a second mark per row."""
+    return "other_difference" in frame.columns and frame["other_difference"].is_not_null().any()
+
+
+def _rule_layers(
+    *,
+    frame: pl.DataFrame,
+    columns: tuple[str, str, str],
+    x_spec: _XSpec,
+    encodings: Mapping[str, object],
+    y_offset: int,
+) -> list[alt.Chart]:
+    """Draw interval lines: solid ones, then dashed ones where any row is flagged dashed.
+
+    Args:
+        frame: The rows to draw.
+        columns: The lower bound, upper bound, and Boolean dashed-flag columns.
+        x_spec: The shared x scale, title, and axis.
+        encodings: The y and colour encodings.
+        y_offset: Pixels to move the lines down from the row's centre.
+
+    Returns:
+        One layer of solid lines, and one of dashed lines where a row is dashed.
+    """
+    lower, upper, dashed_column = columns
+    dashed = _flag(frame, dashed_column, "true")
+    layers = []
+    for is_dashed in (False, True):
+        part = frame.filter(dashed == is_dashed)
+        if is_dashed and part.is_empty():
+            continue
+        layers.append(
+            alt.Chart(part)
+            .mark_rule(
+                strokeWidth=2,
+                clip=True,
+                aria=False,
+                yOffset=y_offset,
+                **({"strokeDash": list(DASH)} if is_dashed else {}),
+            )
+            .encode(  # ty: ignore[unresolved-attribute]
+                x=alt.X(f"{lower}:Q", scale=x_spec.scale, title=x_spec.title, axis=x_spec.axis),
+                x2=f"{upper}:Q",
+                **encodings,
+            )
+        )
+    return layers
+
+
+def _dot_layers(
+    *,
+    frame: pl.DataFrame,
+    filled: pl.Expr,
+    x_spec: _XSpec,
+    encodings: Mapping[str, object],
+    split: bool,
+    y_offset: int,
+) -> list[alt.Chart]:
+    """Draw a row's estimates: filled dots for `filled` rows and hollow dots for the rest.
+
+    Args:
+        frame: The rows to draw.
+        filled: Which rows are drawn filled.
+        x_spec: The shared x scale, title, and axis.
+        encodings: The y, colour, and (where `split`) shape encodings.
+        split: Whether to always draw a hollow layer, even an empty one.
+        y_offset: Pixels to move the dots down from the row's centre.
+
+    Returns:
+        The filled layer, then the hollow layer where `split` is set or any row is hollow.
+    """
+    tooltip = [
+        alt.Tooltip("label:N", title="Row"),
+        alt.Tooltip("difference:Q", title="Estimate"),
+        alt.Tooltip("lower_95:Q", title="Lower 95%"),
+        alt.Tooltip("upper_95:Q", title="Upper 95%"),
+    ]
+    x = alt.X("difference:Q", scale=x_spec.scale, title=x_spec.title, axis=x_spec.axis)
+    hollow_rows = frame.filter(~filled)
+    layers = [
+        alt.Chart(frame.filter(filled))
+        .mark_point(
+            filled=True, size=_POINT_SIZE, opacity=1, clip=True, aria=False, yOffset=y_offset
+        )
+        .encode(x=x, tooltip=tooltip, **encodings)  # ty: ignore[unresolved-attribute]
+    ]
+    if split or not hollow_rows.is_empty():
+        layers.append(
+            alt.Chart(hollow_rows)
+            .mark_point(
+                filled=False,
+                size=_POINT_SIZE,
+                strokeWidth=2,
+                opacity=1,
+                clip=True,
+                aria=False,
+                yOffset=y_offset,
+            )
+            .encode(x=x, tooltip=tooltip, **encodings)  # ty: ignore[unresolved-attribute]
+        )
+    return layers
+
+
+def _other_layers(
+    *,
+    other: pl.DataFrame,
+    x_spec: _XSpec,
+    encodings: Mapping[str, object],
+    shape: str,
+    y_offset: int,
+) -> tuple[list[alt.Chart], list[alt.Chart]]:
+    """Draw the second, hollow mark of each row that has one, with its own interval.
+
+    Args:
+        other: The rows with an `other_difference`.
+        x_spec: The shared x scale, title, and axis.
+        encodings: The y and colour encodings.
+        shape: The point shape.
+        y_offset: Pixels to move the marks down from the row's centre.
+
+    Returns:
+        The interval layers and the point layers.
+    """
+    rules = _rule_layers(
+        frame=other,
+        columns=("other_lower_95", "other_upper_95", "other_dashed"),
+        x_spec=x_spec,
+        encodings=encodings,
+        y_offset=y_offset,
+    )
+    point = (
+        alt.Chart(other)
+        .mark_point(
+            shape=shape,
+            filled=False,
+            size=_POINT_SIZE,
+            strokeWidth=2,
+            opacity=1,
+            clip=True,
+            aria=False,
+            yOffset=y_offset,
+        )
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("other_difference:Q", scale=x_spec.scale, title=x_spec.title, axis=x_spec.axis),
+            tooltip=[
+                alt.Tooltip("label:N", title="Row"),
+                alt.Tooltip("other_difference:Q", title="Other reference"),
+            ],
+            **encodings,
+        )
+    )
+    return rules, [point]
+
+
+def _data_layers(
+    *,
+    data: pl.DataFrame,
+    first: pl.Expr,
+    explicit_colours: bool,
+    encodings: Mapping[str, object],
+    x_spec: _XSpec,
+    other_shape: str,
+    other_offset_px: int,
+) -> tuple[list[alt.Chart], list[alt.Chart]]:
+    """Draw every row's interval line and estimate, and its second mark where it has one.
+
+    Args:
+        data: The panel's rows.
+        first: Which rows hold the first condition, drawn filled.
+        explicit_colours: Whether every row shares one marker shape, colour alone telling rows
+            apart.
+        encodings: The y, colour, and shape encodings.
+        x_spec: The shared x scale, title, and axis.
+        other_shape: The shape of the second mark.
+        other_offset_px: The vertical spacing of a row's two marks.
+
+    Returns:
+        The interval layers and the point layers.
+    """
+    no_shape = {key: value for key, value in encodings.items() if key != "shape"}
+    paired = _flag(data, "other_difference", "not_null")
+    has_other = paired_any(data)
+    groups = (
+        [(data.filter(~paired), 0), (data.filter(paired), -other_offset_px)]
+        if has_other
+        else [(data, 0)]
+    )
+    interval_layers: list[alt.Chart] = []
+    points: list[alt.Chart] = []
+    for frame, y_offset in groups:
+        interval_layers += _rule_layers(
+            frame=frame,
+            columns=("lower_95", "upper_95", "dashed"),
+            x_spec=x_spec,
+            encodings=no_shape,
+            y_offset=y_offset,
+        )
+        points += _dot_layers(
+            frame=frame,
+            filled=first & ~_flag(frame, "hollow", "true"),
+            x_spec=x_spec,
+            encodings=no_shape if explicit_colours else encodings,
+            split=not explicit_colours,
+            y_offset=y_offset,
+        )
+    if has_other:
+        other_rules, other_points = _other_layers(
+            other=data.filter(paired),
+            x_spec=x_spec,
+            encodings=no_shape,
+            shape=other_shape,
+            y_offset=other_offset_px,
+        )
+        interval_layers += other_rules
+        points += other_points
+    return interval_layers, points
+
+
 def interval_panel(
     *,
     rows: pl.DataFrame,
@@ -549,6 +790,8 @@ def interval_panel(
     value_labels: bool = False,
     colour_by_family: bool = False,
     row_step_px: int = _ROW_STEP_PX,
+    other_shape: str = "diamond",
+    other_offset_px: int = _OTHER_OFFSET_PX,
 ) -> alt.LayerChart | alt.VConcatChart:
     """Draw one panel of dots and 95% interval lines beside a labelled zero rule.
 
@@ -577,7 +820,12 @@ def interval_panel(
     Args:
         rows: One row per mark, with `label`, `family` (a `ProductFamily`), `difference`,
             `lower_95` and `upper_95`, `condition` if `conditions` is given, a Boolean
-            `planned` if any row is planned, and `second_difference` if any row has a second
+            `planned` if any row is planned, optionally a Boolean `hollow` (draws the row's dot
+            unfilled), a Boolean `dashed` (draws the row's interval dashed), and `other_difference`
+            with `other_lower_95`, `other_upper_95` and a Boolean `other_dashed` (a second, hollow
+            mark with its own interval on the same row, null for a row with none; used for the
+            same product against a second reference), and `second_difference` if any row has a
+            second
             hyperparameter setting (drawn as a hollow `SECOND_SETTING_SHAPE`, null for a row with
             none). Rows sharing a label share `planned`. Rows are drawn top to bottom in the
             order given.
@@ -612,6 +860,9 @@ def interval_panel(
             other panel does, instead of by condition.
         row_step_px: The height of one row in pixels, `_ROW_STEP_PX` unless a figure with many
             rows needs them closer.
+        other_shape: The point shape of the `other_difference` mark, always drawn hollow.
+        other_offset_px: How far above and below the row's centre, in pixels, a row with an
+            `other_difference` draws its two marks, so the two intervals do not overlap.
 
     Returns:
         The panel, under its keys where it has any.
@@ -642,7 +893,15 @@ def interval_panel(
         )
     rounded = [
         name
-        for name in ("difference", "lower_95", "upper_95", "second_difference")
+        for name in (
+            "difference",
+            "lower_95",
+            "upper_95",
+            "second_difference",
+            "other_difference",
+            "other_lower_95",
+            "other_upper_95",
+        )
         if name in rows.columns
     ]
     data = rows.with_columns(pl.col(rounded).round(3), shade=shade)
@@ -690,40 +949,14 @@ def interval_panel(
     )
     x_scale = alt.Scale(domain=list(x_domain), nice=False, zero=False)
     x_axis = alt.Axis(values=ticks(x_domain=x_domain), format=".2~f")
-    interval = (
-        alt.Chart(data)
-        .mark_rule(strokeWidth=2, clip=True, aria=False)
-        .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("lower_95:Q", scale=x_scale, title=x_title_lines, axis=x_axis),
-            x2="upper_95:Q",
-            **{key: value for key, value in encodings.items() if key != "shape"},
-        )
-    )
-    first = pl.col("condition") == conditions[0] if conditions else pl.lit(value=True)
-    x = alt.X("difference:Q", scale=x_scale, title=x_title_lines, axis=x_axis)
-    tooltip = [
-        alt.Tooltip("label:N", title="Row"),
-        alt.Tooltip("difference:Q", title="Estimate"),
-        alt.Tooltip("lower_95:Q", title="Lower 95%"),
-        alt.Tooltip("upper_95:Q", title="Upper 95%"),
-    ]
-    points = (
-        [
-            alt.Chart(data)
-            .mark_point(filled=True, size=_POINT_SIZE, opacity=1, clip=True, aria=False)
-            .encode(x=x, tooltip=tooltip, **encodings)  # ty: ignore[unresolved-attribute]
-        ]
-        if explicit_colours
-        else [
-            alt.Chart(data.filter(first))
-            .mark_point(filled=True, size=_POINT_SIZE, opacity=1, clip=True, aria=False)
-            .encode(x=x, tooltip=tooltip, **encodings),  # ty: ignore[unresolved-attribute]
-            alt.Chart(data.filter(~first))
-            .mark_point(
-                filled=False, size=_POINT_SIZE, strokeWidth=2, opacity=1, clip=True, aria=False
-            )
-            .encode(x=x, tooltip=tooltip, **encodings),  # ty: ignore[unresolved-attribute]
-        ]
+    interval_layers, points = _data_layers(
+        data=data,
+        first=pl.col("condition") == conditions[0] if conditions else pl.lit(value=True),
+        explicit_colours=explicit_colours,
+        encodings=encodings,
+        x_spec=_XSpec(scale=x_scale, title=x_title_lines, axis=x_axis),
+        other_shape=other_shape,
+        other_offset_px=other_offset_px,
     )
     if "second_difference" in data.columns and data["second_difference"].is_not_null().any():
         points.append(
@@ -760,7 +993,7 @@ def interval_panel(
         )
     offset_positions = len(conditions) if "yOffset" in encodings else 1
     panel = alt.LayerChart(
-        layer=[*reference, interval, *points],
+        layer=[*reference, *interval_layers, *points],
         width=width,
         height=alt.Step(row_step_px / offset_positions),
         title=alt.TitleParams(panel_title, anchor="start", frame="group", fontSize=_PANEL_TITLE_PX),

@@ -21,9 +21,11 @@ from dot_interval_vs_ens import (  # noqa: E402
     compute,
     contrast_rows,
     draw,
-    finding_title,
+    figure_title,
+    footnotes_for,
     load_arms,
     repo_data_dir,
+    subtitle_lines,
     write_once,
 )
 from nwp_forecast_comparison import DomainType  # noqa: E402
@@ -97,8 +99,16 @@ def test_a_product_is_subtracted_from_the_ens_mean_of_its_own_folder(tmp_path: P
     assert rows["reference_source"].to_list() == ["leads_day10"]
 
 
+OWN_FILE_ENS_ERROR = 0.07
+LEADERBOARD_ENS_ERROR = 0.05
+
+
 def _full_solar_fixture(data_dir: Path, *, short_months: Mapping[str, int] | None = None) -> None:
     """Write every arm the solar plan reads; each product gets a distinct constant error.
+
+    The ENS mean of an AIFS or WN3 file scores `OWN_FILE_ENS_ERROR`, and the leaderboard's ENS
+    mean `LEADERBOARD_ENS_ERROR`, so a second mark that read the wrong one would differ by 2
+    points. AIFS Single has 12 months, the AIFS ENS mean 11, and WN3 7.
 
     Args:
         data_dir: Where the fake `data/studies` goes.
@@ -107,16 +117,29 @@ def _full_solar_fixture(data_dir: Path, *, short_months: Mapping[str, int] | Non
     short_months = short_months or {}
     written: set[tuple[str, str]] = set()
     for index, comparison in enumerate(comparisons(domain="solar")):
-        for arm, source, error in (
+        arms = [
             (comparison.treatment, comparison.treatment_source, 0.10 + 0.001 * index),
-            (comparison.reference, comparison.reference_source, 0.05),
-        ):
+            (
+                comparison.reference,
+                comparison.reference_source,
+                OWN_FILE_ENS_ERROR if comparison.leaderboard_reference else LEADERBOARD_ENS_ERROR,
+            ),
+        ]
+        if comparison.leaderboard_reference and comparison.leaderboard_reference_source:
+            arms.append(
+                (
+                    comparison.leaderboard_reference,
+                    comparison.leaderboard_reference_source,
+                    LEADERBOARD_ENS_ERROR,
+                )
+            )
+        for arm, source, error in arms:
             if (source, arm) in written:
                 continue
             written.add((source, arm))
-            months = short_months.get(arm, 7 if source.startswith("wn3") else 12)
+            default = 7 if source.startswith("wn3") else 11 if source.startswith("aifs_ens") else 12
             _write(
-                _arm(arm, error=error, months=months),
+                _arm(arm, error=error, months=short_months.get(arm, default)),
                 data_dir=data_dir,
                 source=source,
                 domain="solar",
@@ -422,77 +445,186 @@ def test_a_site_label_that_is_not_anonymised_raises(tmp_path: Path) -> None:
 
 
 IFS = "IFS HRES (9 km, Open-Meteo)"
+AIFS_SINGLE = "AIFS Single"
+AIFS_ENS = "AIFS ENS mean"
+WN3 = "WeatherNext 3 mean (7 months)"
 
 
-def test_a_row_with_fewer_than_six_months_has_a_dot_and_no_interval(tmp_path: Path) -> None:
+def _row(rows: pl.DataFrame, label: str, day: int) -> dict:
+    return rows.filter((pl.col("label") == label) & (pl.col("day") == day)).row(0, named=True)
+
+
+def test_a_row_with_fewer_than_six_months_has_a_hollow_dot_and_no_interval(tmp_path: Path) -> None:
     # IFS HRES 9 km is the one product allowed to lack keys the ENS mean holds.
     _full_solar_fixture(tmp_path, short_months={"ifs_single_day0": 5})
 
     rows = compute(data_dir=tmp_path, domain="solar")
-    short = rows.filter((pl.col("label") == IFS) & (pl.col("day") == 0))
-    shaped = chart_rows(rows=rows, day=0, with_conditions=True).filter(pl.col("label") == IFS)
+    shaped = chart_rows(rows=rows, day=0, domain="solar").filter(pl.col("label") == IFS)
 
-    assert short["n_months"].to_list() == [5]
-    assert short["has_interval"].to_list() == [False]
+    assert _row(rows, IFS, 0)["n_months"] == 5
+    assert _row(rows, IFS, 0)["has_interval"] is False
     assert shaped["lower_95"].null_count() == 1
     assert shaped["upper_95"].null_count() == 1
     assert shaped["difference"].null_count() == 0
-    assert shaped["condition"].item().startswith("Fewer than 6 months")
+    assert shaped["hollow"].to_list() == [True]
 
 
-def test_six_months_is_enough_for_an_interval_and_the_hollow_mark_is_in_the_chart(
-    tmp_path: Path,
-) -> None:
+def test_six_months_is_enough_for_an_interval_and_five_is_not(tmp_path: Path) -> None:
     _full_solar_fixture(tmp_path, short_months={"ifs_single_day0": 6, "ifs_single_day1": 5})
 
     rows = compute(data_dir=tmp_path, domain="solar")
 
-    assert rows.filter((pl.col("label") == IFS) & (pl.col("day") == 0))[
-        "has_interval"
-    ].to_list() == [True]
-    assert rows.filter((pl.col("label") == IFS) & (pl.col("day") == 1))[
-        "has_interval"
-    ].to_list() == [False]
+    assert _row(rows, IFS, 0)["has_interval"] is True
+    assert _row(rows, IFS, 1)["has_interval"] is False
     spec = str(draw(rows=rows, domain="solar", number=19).to_dict())
     assert "'filled': False" in spec
-    assert "Fewer than 6 months: no interval" in spec
+    assert "Hollow circle: fewer than 6 months" in spec
+
+
+def test_the_three_fewer_month_products_have_a_second_mark_against_the_leaderboard_ens_mean(
+    tmp_path: Path,
+) -> None:
+    _full_solar_fixture(tmp_path)
+    rows = compute(data_dir=tmp_path, domain="solar")
+
+    for label in (AIFS_SINGLE, AIFS_ENS, WN3):
+        row = _row(rows, label, 3)
+        # Constant errors make each difference exact: the filled dot is against the own-file ENS
+        # mean and the second mark against the leaderboard's, 2 points apart.
+        assert row["second_value"] - row["value"] == pytest.approx(
+            (OWN_FILE_ENS_ERROR - LEADERBOARD_ENS_ERROR) * 100
+        )
+        assert row["second_reference_rows"] >= row["second_treatment_rows"]
+        assert None not in (row["second_lower"], row["second_upper"])
+    for label in ("UKV", "ICON-EU", "GEFS mean"):
+        assert _row(rows, label, 1)["second_value"] is None
+
+
+def test_the_second_mark_is_drawn_as_a_hollow_diamond_with_its_own_interval(
+    tmp_path: Path,
+) -> None:
+    _full_solar_fixture(tmp_path)
+    rows = compute(data_dir=tmp_path, domain="solar")
+
+    shaped = chart_rows(rows=rows, day=3, domain="solar")
+    paired = shaped.filter(pl.col("other_difference").is_not_null())
+    spec = draw(rows=rows, domain="solar", number=19).to_dict()
+
+    assert sorted(paired["label"].to_list()) == sorted([AIFS_SINGLE, AIFS_ENS, WN3])
+    assert paired.filter(pl.col("other_lower_95").is_null()).is_empty()
+    assert "'shape': 'diamond'" in str(spec)
+    assert "other_lower_95" in str(spec)
+
+
+def test_the_second_mark_allows_extra_leaderboard_keys_but_not_extra_product_keys() -> None:
+    comparison = _comparison("aifs_single", day=3)
+
+    _check_same_keys(
+        comparison=comparison,
+        treatment=_keyed("aifs_single_day3", months=11),
+        reference=_keyed("ens_mean_day3"),
+        reference_may_hold_more=True,
+    )
+    with pytest.raises(ValueError, match="only in aifs_single_day3"):
+        _check_same_keys(
+            comparison=comparison,
+            treatment=_keyed("aifs_single_day3"),
+            reference=_keyed("ens_mean_day3", months=11),
+            reference_may_hold_more=True,
+        )
+    with pytest.raises(ValueError, match="only in ens_mean_day3"):
+        _check_same_keys(
+            comparison=comparison,
+            treatment=_keyed("aifs_single_day3", months=11),
+            reference=_keyed("ens_mean_day3"),
+        )
+
+
+def test_the_second_mark_reads_the_leaderboards_ens_mean_arm_for_every_day() -> None:
+    for domain in ("solar", "wind"):
+        for c in comparisons(domain=domain):
+            if c.label in (AIFS_SINGLE, AIFS_ENS, WN3):
+                assert c.leaderboard_reference == f"ens_mean_day{c.day}"
+                assert c.leaderboard_reference_source == EXPECTED_LEADERBOARD_ENS_SOURCE[c.day]
+            else:
+                assert c.leaderboard_reference is None
+    wind_wn3 = [c for c in comparisons(domain="wind") if c.label == WN3]
+    assert {c.reference for c in wind_wn3} == {f"ens_meanvec_day{c.day}" for c in wind_wn3}
+
+
+def test_an_interval_from_fewer_than_twelve_months_is_dashed(tmp_path: Path) -> None:
+    _full_solar_fixture(tmp_path)
+    rows = compute(data_dir=tmp_path, domain="solar")
+
+    assert _row(rows, AIFS_SINGLE, 3)["dashed"] is False
+    assert _row(rows, AIFS_ENS, 3)["dashed"] is True
+    assert _row(rows, WN3, 3)["dashed"] is True
+    assert _row(rows, "UKV", 0)["dashed"] is False
+    assert _row(rows, WN3, 3)["second_dashed"] is True
+    assert "strokeDash" in str(draw(rows=rows, domain="solar", number=19).to_dict())
+
+
+def test_the_wind_wn3_day_10_row_is_footnoted_with_the_reports_numbers(tmp_path: Path) -> None:
+    _full_solar_fixture(tmp_path)
+    rows = compute(data_dir=tmp_path, domain="solar")  # labels and days only matter here
+
+    notes = footnotes_for(domain="wind", rows=rows)
+    wind_lines = subtitle_lines(domain="wind", rows=rows)
+    hollow = chart_rows(rows=rows, day=10, domain="wind").filter(pl.col("label") == WN3)
+
+    assert [(n.label, n.day) for n in notes] == [(WN3, 10)]
+    assert "19.00% against 18.80% and 18.94%" in " ".join(wind_lines)
+    assert "not evidence that WeatherNext 3 loses skill" in " ".join(wind_lines)
+    assert hollow["hollow"].to_list() == [True]
+    assert footnotes_for(domain="solar", rows=rows) == []
+    assert "19.00%" not in " ".join(subtitle_lines(domain="solar", rows=rows))
+    assert chart_rows(rows=rows, day=10, domain="solar")["hollow"].to_list() == [False] * 6
 
 
 def test_chart_rows_are_sorted_best_first_and_hold_one_day(tmp_path: Path) -> None:
     _full_solar_fixture(tmp_path)
     rows = compute(data_dir=tmp_path, domain="solar")
 
-    shaped = chart_rows(rows=rows, day=0, with_conditions=False)
+    shaped = chart_rows(rows=rows, day=0, domain="solar")
 
     assert shaped["difference"].to_list() == sorted(shaped["difference"].to_list())
     assert shaped.height == rows.filter(pl.col("day") == 0).height
 
 
-def test_the_figure_draws_with_its_number_and_a_title_counted_from_the_rows(tmp_path: Path) -> None:
+def test_the_figure_draws_with_its_number(tmp_path: Path) -> None:
     _full_solar_fixture(tmp_path)
     rows = compute(data_dir=tmp_path, domain="solar")
 
-    chart = draw(rows=rows, domain="solar", number=19)
-
-    assert "Figure 19:" in str(chart.to_dict())
+    assert "Figure 19:" in str(draw(rows=rows, domain="solar", number=19).to_dict())
 
 
-def _rows_for_title(*intervals: tuple[float, float, float, bool]) -> pl.DataFrame:
-    return pl.DataFrame(intervals, schema=["value", "lower", "upper", "has_interval"], orient="row")
-
-
-def test_the_title_counts_better_worse_spanning_and_short_rows() -> None:
-    rows = _rows_for_title(
-        (-1.0, -1.5, -0.5, True),
-        (1.0, 0.5, 1.5, True),
-        (0.1, -0.4, 0.6, True),
-        (3.0, 2.0, 4.0, False),
+def test_the_titles_name_the_quantity_and_count_no_rows(tmp_path: Path) -> None:
+    assert figure_title(domain="solar") == (
+        "For solar power, each weather product's error minus the ENS mean's error, by lead day"
     )
-
-    assert finding_title(rows=rows, domain="solar") == (
-        "For solar power, 1 of 4 product-and-lead rows have a higher error than the ENS mean, "
-        "1 have a lower error, and 1 cannot be told apart; 1 have too few months for an interval"
+    assert figure_title(domain="wind") == (
+        "For wind power, each weather product's error minus the ENS mean's error, by lead day"
     )
+    _full_solar_fixture(tmp_path)
+    rows = compute(data_dir=tmp_path, domain="solar")
+    text = str(draw(rows=rows, domain="solar", number=19).to_dict())
+    assert "product-and-lead rows" not in text
+    assert "told apart" not in text
+    assert "includes zero" in " ".join(subtitle_lines(domain="solar", rows=rows))
+
+
+def test_the_subtitle_says_which_products_read_a_shorter_lead_and_what_that_means(
+    tmp_path: Path,
+) -> None:
+    _full_solar_fixture(tmp_path)
+    rows = compute(data_dir=tmp_path, domain="solar")
+
+    text = " ".join(subtitle_lines(domain="solar", rows=rows))
+
+    assert "at days 0 to 7" in text
+    assert "UKV, ICON-D2, ICON-EU, ICON global, GFS (Open-Meteo), IFS 0.25°" in text
+    assert "a higher error than ENS is conservative for them" in text
+    assert "a lower error is not evidence of skill at equal lead" in text
 
 
 def test_the_figure_draws_no_accessibility_text_on_its_marks(tmp_path: Path) -> None:
