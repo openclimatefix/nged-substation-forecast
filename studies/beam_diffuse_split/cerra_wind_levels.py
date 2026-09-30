@@ -31,7 +31,9 @@ prints every arm's column list.
 - `levels_50_to_150`: the 50, 75, 100 and 150 m speeds.
 - `levels_all`: all five heights.
 - `speed_100m_noise`: the negative control, 100 m plus four columns each holding another month's
-  values of the 10, 50, 75 and 150 m speeds (`with_shuffled_levels`).
+  values of the 10, 50, 75 and 150 m speeds (`with_shuffled_levels`). Every arm has 7 columns (2
+  shared features plus 5 wind columns), so the control measures four shuffled columns replacing
+  inert padding.
 
 **Folds and intervals.** `studies.cross_validation.assign_folds` cuts each farm's span into 5
 contiguous blocks of whole months, and `raise_on_uncovered_months` checks that no calendar month is
@@ -210,7 +212,7 @@ EXPLORATORY_CONTRASTS: Final[tuple[Contrast, ...]] = (
 NEGATIVE_CONTROL: Final[Contrast] = Contrast(
     "speed_100m_noise",
     "speed_100m",
-    "information-free columns against equal-width padding: the size of change width alone makes",
+    "four shuffled columns against four inert padding columns, both arms with 7 columns",
     False,
 )
 POSITIVE_CONTROL: Final[Contrast] = Contrast(
@@ -976,7 +978,7 @@ CONTRAST_TABLE_HEADER: Final[tuple[str, str]] = (
         "| Difference (pp of capacity) "
         "| Unadjusted 95% interval | Statistically significant at the 5% level, unadjusted? "
         f"| {BONFERRONI_LEVEL}% interval (Bonferroni, four planned contrasts) "
-        "| Excludes zero after Bonferroni? | Folds agreeing | Rows |"
+        "| Statistically significant after Bonferroni? | Folds agreeing | Rows |"
     ),
     "|---|---|---|---|---|---|---|---|---|---|---|",
 )
@@ -998,7 +1000,7 @@ def _bonferroni_text(*, row: dict[str, Any]) -> str:
 
 
 def _bonferroni_verdict(*, row: dict[str, Any]) -> str:
-    """Say whether a contrast row's Bonferroni interval excludes zero.
+    """Say whether a row's Bonferroni interval is statistically significant at the 5% level.
 
     Args:
         row: A row of `contrast_records`.
@@ -1207,13 +1209,13 @@ def report_lines(
             absolute=absolute, setting=SENSITIVITY_SETTING, scope="all", arm=arm
         )
         lines.append(f"| {arm} | {per_farm} | {second:.3f} |")
-    lines += ["", "#### Planned contrasts (planned), primary setting", ""]
+    lines += ["", "#### Planned contrasts, primary setting", ""]
     lines += _contrast_lines(
         records=intervals.filter(
             (pl.col("setting") == PRIMARY_SETTING) & pl.col("planned") & (pl.col("scope") == "all")
         )
     )
-    lines += ["", "#### Planned contrasts (planned), second setting", ""]
+    lines += ["", "#### Planned contrasts, second setting", ""]
     lines += _contrast_lines(
         records=intervals.filter(
             (pl.col("setting") == SENSITIVITY_SETTING)
