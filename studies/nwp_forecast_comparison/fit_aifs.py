@@ -2556,6 +2556,52 @@ def run_blends(
 WN3_DAYS: Final[tuple[int, ...]] = (1, 2, 7, 14)
 """The lead days the WN3 fit scores, each on a frame of its own."""
 
+WN3_TRAINING_END_MONTH: Final[str] = "2026-06"
+"""The last month of WN3's production training window, in `%Y-%m` form. The WN3 paper states that
+the production weather model is trained until 30 June 2026, so scored months up to and including
+this one are in WN3's training window."""
+
+WN3_SPLITS: Final[tuple[str, ...]] = ("in-sample", "out-of-sample")
+"""The two month groups every WN3 result is reported in. Only the out-of-sample group carries a
+claim: the in-sample months lie inside WN3's training window, so WN3 against a product whose
+training data ends earlier is not a fair comparison there."""
+
+WN3_SPLIT_MONTHS: Final[dict[str, str]] = {
+    "in-sample": "February to June 2026",
+    "out-of-sample": "July to September 2026",
+}
+"""Each split's months, in words, for the report."""
+
+
+def wn3_split(*, losses: pl.DataFrame, split: str) -> pl.DataFrame:
+    """Return the scored rows of one WN3 month group.
+
+    The out-of-fold fit and its folds are unchanged; this only selects rows already scored. The
+    bootstrap then resamples the whole months that remain.
+
+    Args:
+        losses: Per-row losses carrying a `month` label in `%Y-%m` form.
+        split: `in-sample` (months up to `WN3_TRAINING_END_MONTH`) or `out-of-sample` (later
+            months).
+
+    Returns:
+        The rows of the group, every column kept.
+
+    Raises:
+        ValueError: If `split` is not one of `WN3_SPLITS`, or the group holds no row.
+    """
+    if split == "in-sample":
+        rows = losses.filter(pl.col("month") <= WN3_TRAINING_END_MONTH)
+    elif split == "out-of-sample":
+        rows = losses.filter(pl.col("month") > WN3_TRAINING_END_MONTH)
+    else:
+        msg = f"unknown WN3 split {split!r}: expected one of {WN3_SPLITS}"
+        raise ValueError(msg)
+    if rows.is_empty():
+        msg = f"the WN3 {split} group holds no scored row"
+        raise ValueError(msg)
+    return rows
+
 
 def wn3_arms(*, domain: DomainType, day: int) -> tuple[str, ...]:
     """Return every arm fitted on one WN3 day's frame.
@@ -2642,11 +2688,14 @@ def wn3_sensitivity_arms(*, losses: pl.DataFrame, domain: DomainType, day: int) 
     if domain == "wind":
         arms.append(f"ens_meanvec_day{day}")
     for contrast in wn3_contrasts(domain=domain, day=day):
-        interval = difference(
-            losses=losses, treatment=contrast.treatment, reference=contrast.reference
-        )
-        if near_line(interval=interval):
-            arms += [contrast.treatment, contrast.reference]
+        for split in WN3_SPLITS:
+            interval = difference(
+                losses=wn3_split(losses=losses, split=split),
+                treatment=contrast.treatment,
+                reference=contrast.reference,
+            )
+            if near_line(interval=interval):
+                arms += [contrast.treatment, contrast.reference]
     return list(dict.fromkeys(arms))
 
 
@@ -2710,7 +2759,7 @@ def wn3_rows(
 def wn3_stage_lines(
     *, domain: DomainType, day: int, frame: pl.DataFrame, losses: pl.DataFrame
 ) -> list[str]:
-    """Write one (technology, day) report section of the WN3 fit.
+    """Write one (technology, day) report section of the WN3 fit, in both month groups.
 
     Args:
         domain: `solar` or `wind`.
@@ -2720,12 +2769,11 @@ def wn3_stage_lines(
 
     Returns:
         The section's Markdown lines: the row counts and calendar-month coverage, the arms'
-        columns, every arm's absolute error, the listed contrasts at both settings, and the months
-        each contrast is scored in.
+        columns, then for the in-sample and the out-of-sample months in turn every arm's absolute
+        error, the listed contrasts at both settings, and the pairs also fitted at the
+        sensitivity setting.
     """
     arms = wn3_arms(domain=domain, day=day)
-    primary = losses.filter(pl.col("setting") == PRIMARY)
-    second = losses.filter(pl.col("setting") == SENSITIVITY)
     coverage = coverage_table(frame=frame)
     lines = [
         f"### {domain.capitalize()}, day {day}",
@@ -2742,7 +2790,46 @@ def wn3_stage_lines(
         "",
         *(f"- {arm}: {', '.join(arm_features(arm=arm, domain=domain))}" for arm in arms),
         "",
-        "#### Absolute error of every arm (GPU, primary setting)",
+    ]
+    for split in WN3_SPLITS:
+        lines += wn3_split_lines(
+            domain=domain, day=day, losses=wn3_split(losses=losses, split=split), split=split
+        )
+    return lines
+
+
+def wn3_split_lines(*, domain: DomainType, day: int, losses: pl.DataFrame, split: str) -> list[str]:
+    """Write one month group's tables of a (technology, day) WN3 section.
+
+    Args:
+        domain: `solar` or `wind`.
+        day: A day of `WN3_DAYS`.
+        losses: `wn3_split`'s rows of the stage's per-row losses.
+        split: `in-sample` or `out-of-sample`.
+
+    Returns:
+        The group's heading, every arm's absolute error, the listed contrasts at the primary
+        setting, and the pairs also fitted at the sensitivity setting, each with the group's own
+        interval.
+    """
+    arms = wn3_arms(domain=domain, day=day)
+    primary = losses.filter(pl.col("setting") == PRIMARY)
+    second = losses.filter(pl.col("setting") == SENSITIVITY)
+    claim = (
+        "These months carry every claim about WN3."
+        if split == "out-of-sample"
+        else "These months lie inside WN3's training window, so WN3 against a product trained on "
+        "earlier data is not a fair comparison here; read them as descriptive only."
+    )
+    lines = [
+        (
+            f"#### {split.capitalize()} months ({WN3_SPLIT_MONTHS[split]}, "
+            f"{primary['month'].n_unique()} months)"
+        ),
+        "",
+        claim,
+        "",
+        "Absolute error of every arm (GPU, primary setting)",
         "",
         "| Arm | Error (% of capacity) | 95% interval | Rows | Months |",
         "|---|---|---|---|---|",
@@ -2754,11 +2841,11 @@ def wn3_stage_lines(
             f"| {row['n_rows']} | {row['n_months']} |"
         )
     contrast_list = wn3_contrasts(domain=domain, day=day)
-    lines += ["", "#### Listed contrasts (primary setting)", *ERROR_CONTRAST_HEADER]
+    lines += ["", "Listed contrasts (primary setting)", *ERROR_CONTRAST_HEADER]
     lines += [contrast_row_with_errors(losses=primary, contrast=c) for c in contrast_list]
     lines += ["", *null_reading_lines(losses=primary, contrasts=contrast_list)]
     second_arms = set(second["arm"].unique().to_list())
-    lines += ["", "#### Pairs also fitted at the sensitivity setting", *ERROR_CONTRAST_HEADER]
+    lines += ["", "Pairs also fitted at the sensitivity setting", *ERROR_CONTRAST_HEADER]
     for contrast in contrast_list:
         if not {contrast.treatment, contrast.reference} <= second_arms:
             continue
@@ -2889,10 +2976,16 @@ def run_wn3(*, published_dir: Path, output_dir: Path, workers: int) -> int:
         "",
         (
             "Every fit is on the GPU. Differences are first arm minus second, in percentage points "
-            "of capacity, so a negative difference means the first arm has the lower error. Every "
-            "contrast is descriptive: the row set holds February to April and June to 10 September "
-            "2026, so each calendar month occurs in one year only and no scored cell has a "
-            "training row of its calendar month. No contrast is deciding. The planned contrast is "
+            "of capacity, so a negative difference means the first arm has the lower error. The "
+            "row set holds February to April and June to 10 September 2026, so each calendar "
+            "month occurs in one year only and no scored cell has a training row of its calendar "
+            "month, and every contrast is descriptive. No contrast is deciding. WN3's production "
+            "weather model is trained until 30 June 2026, so every result is reported in two "
+            "month groups: the in-sample months (February to June) lie inside WN3's training "
+            "window, and WN3 against a product trained on earlier data is not a fair comparison "
+            "there; the out-of-sample months (July to September) carry every claim, and rest on "
+            "3 calendar months, so their intervals are wide. The folds are unchanged: each group "
+            "selects rows already scored out of fold. The planned contrast is "
             "wn3_mean_day<N> − ens_mean_day<N> at days 1, 2, 7 and 14, with its negative control "
             "(WN3's weather shuffled within site, year-month and hour of day, under two seeds) "
             "and the sensitivity setting. Wind at every day also contrasts with "
@@ -3372,15 +3465,17 @@ def main_wn3(*, args: argparse.Namespace) -> int:
     Raises:
         ValueError: If `--lookahead-cleared` is absent: the maintainer records, after reading
             `build_wn3_inputs.py --read-store`'s run log and the page's lookahead section, that the
-            2026 runs were issued in real time and that WN3's training data ends before the scored
-            period. If either is false, the run stops and reports instead.
+            2026 runs were issued in real time and that WN3's training data ends on 30 June 2026,
+            inside the scored period (`WN3_TRAINING_END_MONTH`). If the runs were not real-time,
+            the run stops and reports instead.
     """
     if not args.lookahead_cleared:
         msg = (
             "refusing to fit WN3 without --lookahead-cleared: read the run log that "
             "`build_wn3_inputs.py --read-store` wrote and confirm that the runs were issued in "
-            "real time and that WN3's training data ends before the scored period. If either "
-            "fails, stop and report; do not fit."
+            "real time and that WN3's training data ends (30 June 2026) inside the scored "
+            "period, so every result is split into in-sample and out-of-sample months. If the "
+            "runs were not real-time, stop and report; do not fit."
         )
         raise ValueError(msg)
     studies_dir = args.published_dir.resolve().parent

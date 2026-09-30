@@ -645,25 +645,28 @@ mean keep the days they were fitted at (1, 2, 7, and 14), on their own row sets.
 
 ### What is known about WN3's lookahead
 
-**Google's documentation states neither WN3's training cut-off nor how long after 00 UTC a run is
-published, so the study cannot show from documentation that its 2026 runs are free of lookahead.**
-The [model guide](https://developers.google.com/weathernext/guides/models) gives the release as
-August 2026, and the [Cloud Storage guide](https://developers.google.com/weathernext/guides/gcs)
-says the archive starts on 2026-01-01 and holds "real-time operational data for 2026 to present".
-The [limitations page](https://developers.google.com/weathernext/guides/benefits-limitations) states
-neither a cut-off nor a latency. The archive therefore starts about 7 months before the release, and
-the documentation does not say whether the runs from January to August were issued in real time or
-produced afterwards with the released model. If they were produced afterwards, or if the training
-data overlaps the scored period, WN3's error is not comparable with the error of a forecast issued
-in real time.
+**WeatherNext 3's production weather model was trained until 30 June 2026, so the months from
+February to June 2026 lie inside its training window and only July to September 2026 are out of
+sample.** [Rasp et al. (2026)](https://arxiv.org/abs/2609.03582) state "For the production model, we
+train until June 30 2026". Every WN3 result on this page is therefore reported twice: for the
+in-sample months (February to June) and for the out-of-sample months (July to September). The
+out-of-sample months carry every claim about WN3. WN3 against AIFS or ENS on the in-sample months is
+not a fair comparison, because WN3's weights had seen those months and the other products' had not.
+The folds are unchanged, and each group selects rows that were already scored out of fold. The
+out-of-sample group holds 3 calendar months, so its intervals are wide.
 
-**The store's own run records are the evidence still to be read, and the run script stops on them.**
-Each run carries `run_written` and `source_init_time`. `build_wn3_inputs.py --read-store` logs both
-for every 00 UTC run (the function `log_run_provenance`) and stops if a run before the last written
-one is missing or a run's `source_init_time` differs from its `init_time`. The fit stops unless
-`--lookahead-cleared` is given, and the flag is given only after the log and this section have been
-read and the two conditions above are found to hold. If either fails, the study stops and reports,
-and does not fit. This section is updated with what the log shows before any WN3 number is reported.
+**The runs were issued in real time, on the evidence of Google's documentation and the archive's
+label, which the maintainer accepted as sufficient.** Google's
+[dissemination guide](https://developers.google.com/weathernext/guides/dissemination) gives a
+latency of 7 hours 45 minutes (Cloud Storage) to 8 hours 10 minutes (BigQuery) for the 6-hourly
+runs, and the [Cloud Storage guide](https://developers.google.com/weathernext/guides/gcs) labels the
+archive "real-time operational data for 2026 to present". The store's `run_written` and
+`source_init_time` records show that the 271 runs at 00 UTC from 2026-01-01 to 2026-09-28 are all
+present, with no gap and no run whose `source_init_time` differs from its `init_time`. Our own
+download wrote those records, so they show that the copy is complete and say nothing about when
+Google produced each run. `fit_aifs.py --wn3` runs only with `--lookahead-cleared`, which records
+the maintainer's acceptance. The maintainer is also asking a colleague at Open Climate Fix about
+hindcast cut-offs, and this page does not depend on the answer.
 
 ## Results
 

@@ -67,6 +67,7 @@ from fit_aifs import (
     leave_one_month_out,
     shuffled_prefix,
     smoothing_reading,
+    wn3_split,
 )
 from fit_aifs import contrasts as aifs_contrasts
 from nwp_forecast_comparison import (
@@ -814,6 +815,9 @@ def load_row_set_marks(
             ],
             how="diagonal_relaxed",
         )
+        # WN3's production weather model is trained until June 2026, so only the out-of-sample
+        # months carry a claim and only they are drawn.
+        frames["wn3"] = wn3_split(losses=frames["wn3"], split="out-of-sample")
         check_anonymised(frame=frames["wn3"], domain=domain)
     for row_set, frame in frames.items():
         if "device" not in frame.columns:
@@ -1164,7 +1168,9 @@ def leaderboard_figure(
                 "below the full-window products were fitted on fewer months, shown in their "
                 "names; the full-window rows are ordered by day-1 error, the rows below them keep "
                 "a fixed order and are not ranked against each other, and a grey tick "
-                "beside a mark is the ENS mean fitted on the same rows. A month counts whole "
+                "beside a mark is the ENS mean fitted on the same rows. WeatherNext 3's marks "
+                "use only July to September 2026, the months after its training window ended. "
+                "A month counts whole "
                 "in the resampling even where the row set holds part of it (September 2026 holds "
                 "10 days). A lead day with no mark "
                 "was not fitted, because it is beyond the product's forecast range or not in "
