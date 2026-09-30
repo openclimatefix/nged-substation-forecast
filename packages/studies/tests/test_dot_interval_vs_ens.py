@@ -596,14 +596,14 @@ def _keyed(arm: str, *, months: int = 12, skip_month: int | None = None) -> pl.D
     return frame if skip_month is None else frame.filter(pl.col("month") != skip_month)
 
 
-def _comparison(prefix: str) -> Comparison:
+def _comparison(prefix: str, *, day: int = 0, domain: DomainType = "solar") -> Comparison:
     return Comparison(
-        domain="solar",
-        day=0,
+        domain=domain,
+        day=day,
         label=prefix,
-        treatment=f"{prefix}_day0",
+        treatment=f"{prefix}_day{day}",
         treatment_source="leads_day10",
-        reference="ens_mean_day0",
+        reference=f"ens_mean_day{day}",
         reference_source="leads_day10",
         reference_label="ENS mean",
     )
@@ -632,6 +632,28 @@ def test_a_product_lacking_keys_the_reference_holds_raises_unless_it_is_ifs_sing
         treatment=_keyed("ifs_single_day0", skip_month=3),
         reference=_keyed("ens_mean_day0"),
     )
+
+
+def _lacks_a_month(prefix: str, *, day: int, domain: DomainType) -> None:
+    _check_same_keys(
+        comparison=_comparison(prefix, day=day, domain=domain),
+        treatment=_keyed(f"{prefix}_day{day}", skip_month=3),
+        reference=_keyed(f"ens_mean_day{day}"),
+    )
+
+
+def test_icon_global_may_lack_reference_keys_at_day_4_for_solar_only() -> None:
+    _lacks_a_month("icon_global", day=4, domain="solar")
+    with pytest.raises(ValueError, match="only in ens_mean_day4"):
+        _lacks_a_month("icon_global", day=4, domain="wind")
+    with pytest.raises(ValueError, match="only in ens_mean_day5"):
+        _lacks_a_month("icon_global", day=5, domain="solar")
+
+
+def test_ifs_single_may_lack_reference_keys_at_any_day_in_both_technologies() -> None:
+    for domain in ("solar", "wind"):
+        _lacks_a_month("ifs_single", day=3, domain=domain)
+        _lacks_a_month("ifs_single", day=7, domain=domain)
 
 
 def test_ifs_single_keys_the_treatment_lacks_still_raise_the_other_way() -> None:

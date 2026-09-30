@@ -21,7 +21,7 @@ same lead day:
   the target days where their own weather is missing, and their paired difference drops the ENS
   mean's rows on those days (`GAPPED_ARMS`): IFS HRES 9 km at every day (1,197 to 1,536 rows fewer
   at each day, in 2025-08 and 2026-06, where its archive has no run, and about 1.4% and 1.2% at day
-  4), and ICON global at day 4 for solar (96 rows fewer). `contrast_rows` raises for any other arm
+  4), and ICON global at day 4 for solar (288 rows fewer). `contrast_rows` raises for any other arm
   whose keys differ from its reference's.
 - AIFS Single, the AIFS ENS mean, and WeatherNext 3 (WN3) each sit in a folder with an ENS mean
   fitted on the same rows, which is the reference (at day 5, in the `_day5_aifs_wn3` folder). For
@@ -296,7 +296,9 @@ PRODUCTS: Final[tuple[ProductRow, ...]] = (
 )
 """Every row the figures draw: each product the leaderboards carry, except the ENS mean, which is
 the reference. A product at a lead day no row names is not in the archive or not fitted. Day 4
-holds only AIFS and WN3, and day 5 holds neither."""
+holds the products of the day-4 shared folder, AIFS, and WN3. Day 5 holds AIFS, WN3, and the ICON
+global, Open-Meteo GFS, IFS 0.25°, IFS HRES 9 km, ENS control, GEFS, and native GFS rows of the
+`leads_day10*` folders."""
 
 
 class Comparison(NamedTuple):
@@ -415,7 +417,10 @@ def load_arms(
     return output
 
 
-GAPPED_ARMS: Final[re.Pattern[str]] = re.compile(r"ifs_single_day\d+|icon_global_day4")
+GAPPED_ARMS: Final[dict[DomainType, re.Pattern[str]]] = {
+    "solar": re.compile(r"ifs_single_day\d+|icon_global_day4"),
+    "wind": re.compile(r"ifs_single_day\d+"),
+}
 """The arms scored without the target days where their own weather is missing, so the ENS mean holds
 rows they do not: IFS HRES 9 km at every day, and ICON global at day 4."""
 
@@ -442,7 +447,7 @@ def _check_same_keys(
     only_reference = reference.select(KEY_COLUMNS).join(
         treatment.select(KEY_COLUMNS), on=list(KEY_COLUMNS), how="anti"
     )
-    gapped = GAPPED_ARMS.fullmatch(comparison.treatment) is not None
+    gapped = GAPPED_ARMS[comparison.domain].fullmatch(comparison.treatment) is not None
     if only_treatment.height or (only_reference.height and not gapped):
         msg = (
             f"{comparison.domain} day {comparison.day} {comparison.label}: "
@@ -758,7 +763,7 @@ def readme_text(*, rows: Mapping[DomainType, pl.DataFrame]) -> str:
             "mean of another; day 4 uses the ENS mean of `nwp_forecast_comparison_day4_shared`. "
             "The exceptions are IFS HRES 9 km, which lacks 1,197 to 1,536 of the ENS mean's "
             "rows at each day (in 2025-08 and 2026-06, where its archive has no run, and about "
-            "1.4% and 1.2% at day 4), and ICON global at day 4 (96 rows fewer for solar); their "
+            "1.4% and 1.2% at day 4), and ICON global at day 4 (288 rows fewer for solar); their "
             "paired differences drop those rows, so compare `treatment_rows` with "
             "`reference_rows`. AIFS Single, the AIFS ENS mean, and WeatherNext 3 use the ENS mean "
             "fitted on their own rows, in their own file. Wind WeatherNext 3 rows use the "
