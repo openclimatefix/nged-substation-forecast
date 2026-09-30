@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Final
 
 import fit_aifs
+from build_forecast_inputs import DAY5_OUTPUT_DIR_NAME
 from studies.guards import refuse_to_overwrite
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
@@ -35,13 +36,20 @@ _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 DAY5: Final[tuple[int, ...]] = (5,)
 """The one lead day this script fits."""
 
-OUTPUT_DIR_NAME: Final[str] = "nwp_forecast_comparison_day5_aifs_wn3"
+OUTPUT_DIR_NAME: Final[str] = DAY5_OUTPUT_DIR_NAME
 """Under `data/studies/`, the only folder this script writes to."""
 
 AIFS_REPORT_NAME: Final[str] = "report_aifs.md"
+"""The AIFS fit's report, which `fit_aifs.run_lean` writes."""
+
 WN3_REPORT_NAME: Final[str] = "report_wn3.md"
+"""The WeatherNext 3 fit's report, which `fit_aifs.run_wn3` writes."""
+
 REPORT_NAME: Final[str] = "report.md"
+"""The two reports joined, written once after both fits."""
+
 README_NAME: Final[str] = "README.md"
+"""The folder's README, written if absent."""
 
 README_TEXT: Final[str] = """# AIFS and WeatherNext 3 at day 5 (write-once)
 

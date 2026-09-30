@@ -426,11 +426,11 @@ def test_the_row_set_diagnostic_is_none_without_the_gap_arm() -> None:
 
 
 DAY4_STEMS = ("ens_mean", "ens_control", "gefs_mean", "icon_eu", "icon_global", "ifs025")
-DAY4_STEMS += ("gfs_native", "ifs_single")
+DAY4_STEMS += ("gfs", "gfs_native", "ifs_single")
 
 
 @pytest.mark.parametrize("domain", ["solar", "wind"])
-def test_the_fifth_batch_fits_eight_products_at_day_4_and_nothing_else(domain: DomainType) -> None:
+def test_the_fifth_batch_fits_nine_products_at_day_4_and_nothing_else(domain: DomainType) -> None:
     arms = batch_prefixes(batch=BATCHES["fifth"], domain=domain)
 
     assert set(arms) == {f"{stem}_day4" for stem in DAY4_STEMS}
@@ -445,6 +445,7 @@ def test_the_fifth_build_reads_day_4_only_and_the_three_previous_runs_products_a
         "ICON-EU": (4,),
         "ICON global": (4,),
         "IFS 0.25°": (4,),
+        "GFS": (4,),
     }
     assert build.ens_mean_days == build.ens_control_days == build.gefs_days == (4,)
     assert build.gfs_native_days == build.ifs_single_days == (4,)
@@ -530,3 +531,18 @@ def test_the_row_set_diagnostic_names_the_fifth_batchs_own_arms():
     assert line.split("|")[1].strip() == "ens_mean_day4"
     # The default reference is the fourth batch's day-1 arm, which this frame lacks.
     assert row_set_diagnostic(losses=losses, gap_arm=batch.row_set_gap_arm) is None
+
+
+def test_the_fifth_build_refuses_any_output_folder_but_its_own(tmp_path: Path) -> None:
+    from build_forecast_inputs import DAY4_OUTPUT_DIR_NAME, build_extra_leads
+
+    assert FIFTH_OUTPUT_DIR_NAME == DAY4_OUTPUT_DIR_NAME
+    published = tmp_path / "nwp_forecast_comparison"
+    with pytest.raises(ValueError, match=DAY4_OUTPUT_DIR_NAME):
+        build_extra_leads(
+            domain="solar",
+            published_dir=published,
+            output_dir=tmp_path / "nwp_forecast_comparison_leads_day10",
+            gefs_window_dir=None,
+            batch="fifth",
+        )

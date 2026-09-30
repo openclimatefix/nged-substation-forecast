@@ -226,11 +226,13 @@ SHARED_DAY4_PRODUCT_DAY_OFFSETS: Final[dict[str, tuple[int, ...]]] = {
     "ICON-EU": SHARED_DAY4,
     "ICON global": SHARED_DAY4,
     "IFS 0.25°": SHARED_DAY4,
+    "GFS": SHARED_DAY4,
 }
 """The Previous Runs products the fifth batch reads at `previous_day4`: ICON-EU (whose archive ends
-at day 4), ICON global, and IFS 0.25 degree. On the published inputs' rows, `previous_day4` is null
-on at most 0.6% of rows for these three products, below `fit_extra_leads.MAX_MISSING_SHARE`.
-ICON-D2's archive holds only days 0 and 1, so it has no day 4."""
+at day 4), ICON global, IFS 0.25 degree, and Open-Meteo's GFS. On the published inputs' rows,
+`previous_day4` is null on at most 0.6% of rows for these products, below
+`fit_extra_leads.MAX_MISSING_SHARE`. ICON-D2's archive holds only days 0 and 1, so it has no day 4,
+and ARPEGE Europe's `previous_day4` is null on every row."""
 
 EXTRA_LEAD_BUILDS: Final[dict[ExtraBatchType, ExtraLeadBuild]] = {
     "first": ExtraLeadBuild(
@@ -274,7 +276,7 @@ because the arms it refits take their columns from the published inputs), and th
 (the native GFS store at `GFS_NATIVE_DAYS`, and nothing else), the fourth batch's (Open-Meteo's
 IFS HRES archive at `IFS_SINGLE_DAYS`, and nothing else), and the fifth batch's (day 4 of every
 product the leaderboards draw there: ENS mean and control member, GEFS mean, the native GFS store,
-IFS HRES (9 km, Open-Meteo), and the Previous Runs ICON-EU, ICON global, and IFS 0.25 degree
+IFS HRES (9 km, Open-Meteo), and the Previous Runs ICON-EU, ICON global, IFS 0.25 degree, and GFS
 arms). ENS at day 4 needs `fetch_ens_day4_supplement.py`'s file, which `ens_members` adds."""
 
 AIFS_DAYS: Final[tuple[int, ...]] = (1, 2)
@@ -326,6 +328,63 @@ SOLAR_ONLY_PRODUCTS: Final[frozenset[str]] = frozenset({"ARPEGE Europe", "AROME 
 SNAPSHOT_RADIATION_PRODUCTS: Final[frozenset[str]] = frozenset({"UKV"})
 """Products whose Previous Runs radiation is an instantaneous snapshot (V3), rebuilt through
 `hourly_from_snapshots` rather than used as served."""
+
+
+EQUAL_TOLERANCE: Final[float] = 1e-6
+"""The relative and absolute difference between a built frame's columns and another build's that
+Float32 storage allows."""
+
+DAY4_OUTPUT_DIR_NAME: Final[str] = "nwp_forecast_comparison_day4_shared"
+"""Under `data/studies/`, the only folder the fifth extra-lead batch builds into and fits in."""
+
+WN3_EXTRA_DAYS_DIR_NAME: Final[str] = "nwp_forecast_comparison_wn3_extra_days"
+"""Under `data/studies/`, the folder whose same-rows ENS mean at day 4 the fifth batch's must equal."""
+
+DAY5_OUTPUT_DIR_NAME: Final[str] = "nwp_forecast_comparison_day5_aifs_wn3"
+"""Under `data/studies/`, the only folder the day-5 AIFS and WeatherNext 3 inputs and fits go in."""
+
+
+def check_columns_equal(
+    *, built: pl.DataFrame, reference: pl.DataFrame, columns: Sequence[str], label: str
+) -> None:
+    """Raise unless `built` and `reference` hold the same values in `columns` on every row.
+
+    Args:
+        built: Rows keyed by `site` and `time`.
+        reference: Rows keyed the same way, from another build.
+        columns: The columns both frames hold.
+        label: What `reference` is, for the message.
+
+    Raises:
+        ValueError: If a key of `built` is absent from `reference`, or a column's values differ by
+            more than `EQUAL_TOLERANCE`, or are null in one frame and not in the other.
+    """
+    keys = ["site", "time"]
+    if built.select(keys).join(reference.select(keys), on=keys, how="anti").height:
+        msg = f"{label}: rows of the built frame are missing from it"
+        raise ValueError(msg)
+    joined = built.select(*keys, *columns).join(
+        reference.select(*keys, *columns), on=keys, how="left", suffix="_reference"
+    )
+    unequal = {}
+    for column in columns:
+        ours = pl.col(column).cast(pl.Float64)
+        theirs = pl.col(f"{column}_reference").cast(pl.Float64)
+        bad = joined.select(
+            (
+                (ours.is_null() != theirs.is_null())
+                | (
+                    ours.is_not_null()
+                    & theirs.is_not_null()
+                    & ((ours - theirs).abs() > EQUAL_TOLERANCE + EQUAL_TOLERANCE * theirs.abs())
+                )
+            ).sum()
+        ).item()
+        if bad:
+            unequal[column] = int(bad)
+    if unequal:
+        msg = f"{label}: columns differ from the reference's on some rows: {unequal}"
+        raise ValueError(msg)
 
 
 def _repo_data_dir() -> Path:
@@ -1758,11 +1817,16 @@ def build_extra_leads(
         The written file's path.
 
     Raises:
-        ValueError: If `output_dir` is `published_dir`.
+        ValueError: If `output_dir` is `published_dir`, or `batch` is `fifth` and `output_dir` is
+            not named `DAY4_OUTPUT_DIR_NAME`, or the fifth batch's ENS mean at day 4 differs from the
+            WeatherNext 3 folder's.
         FileExistsError: If the output file already exists.
     """
     if output_dir.resolve() == published_dir.resolve():
         msg = f"the extra-lead output must not be the published folder {published_dir}"
+        raise ValueError(msg)
+    if batch == "fifth" and output_dir.name != DAY4_OUTPUT_DIR_NAME:
+        msg = f"the fifth batch builds only into a folder named {DAY4_OUTPUT_DIR_NAME}, not {output_dir}"
         raise ValueError(msg)
     output_path = output_dir / f"{domain}_extra_lead_inputs.parquet"
     if output_path.exists():
@@ -1809,6 +1873,21 @@ def build_extra_leads(
             ifs_single_dir=ifs_single_dir,
         )
     output_dir.mkdir(parents=True, exist_ok=True)
+    if batch == "fifth":
+        check_columns_equal(
+            built=frame,
+            reference=pl.read_parquet(
+                published_dir.resolve().parent
+                / WN3_EXTRA_DAYS_DIR_NAME
+                / f"{domain}_wn3_inputs.parquet"
+            ),
+            columns=[
+                column
+                for column in frame.columns
+                if column.startswith("ens_mean_day4_") and not column.endswith("_init_time")
+            ],
+            label=f"{domain}/{WN3_EXTRA_DAYS_DIR_NAME} ens_mean_day4",
+        )
     frame.write_parquet(output_path)
     _LOG.info("%s: wrote %d rows, %d columns to %s", domain, frame.height, frame.width, output_path)
     return output_path
@@ -2172,7 +2251,7 @@ def main() -> int:
         "ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7; the third adds the "
         "native GFS store at days 0, 1, 2, 3, 5, 7, 10 and 14; the fourth adds Open-Meteo's IFS "
         "Single Runs archive at days 0, 1, 2, 3, 5 and 7; the fifth adds day 4 of ENS mean and "
-        "control, GEFS, native GFS, IFS HRES, ICON-EU, ICON global and IFS 0.25°).",
+        "control, GEFS, native GFS, IFS HRES, ICON-EU, ICON global, IFS 0.25° and Open-Meteo GFS).",
     )
     parser.add_argument(
         "--gfs-dir",

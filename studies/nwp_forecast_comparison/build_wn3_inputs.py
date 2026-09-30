@@ -53,10 +53,12 @@ import xarray as xr
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_forecast_inputs import (
+    DAY5_OUTPUT_DIR_NAME,
     DomainType,
     _ens_extra_frame,
     _repo_data_dir,
     aifs_site_weights,
+    check_columns_equal,
     ens_members,
 )
 
@@ -116,6 +118,10 @@ N_LEADS: Final[int] = 360
 
 WN3_DAYS: Final[tuple[int, ...]] = (1, 2, 7, 14)
 """The lead days built unless `--days` names others."""
+
+LEADS_DAY10_DIR_NAME: Final[str] = "nwp_forecast_comparison_leads_day10"
+"""Under `data/studies/`, the extra-lead folder whose ENS mean at day 5 the same-rows ENS mean at
+day 5 must equal."""
 
 ENS_EXTRA_DAYS: Final[tuple[int, ...]] = (4, 5, 7, 10, 14)
 """The days whose same-rows ENS mean `_ens_extra_frame` builds beside the WN3 arms. Days 0 to 3 are
@@ -660,12 +666,16 @@ def build_domain(
         The built frame.
 
     Raises:
-        ValueError: If `output_dir` is `published_dir`, `days` is empty or holds a day below 0, an
-            identity check fails, or a built column is null on every row.
+        ValueError: If `output_dir` is `published_dir`, `days` holds 5 and `output_dir` is not
+            named `DAY5_OUTPUT_DIR_NAME`, `days` is empty or holds a day below 0, an
+            identity check fails, the ENS mean at day 5 differs from the extra-lead folder's, or a built column is null on every row.
         FileExistsError: If the output file already exists.
     """
     if output_dir.resolve() == published_dir.resolve():
         msg = f"the WN3 output must not be the published folder {published_dir}"
+        raise ValueError(msg)
+    if 5 in days and output_dir.name != DAY5_OUTPUT_DIR_NAME:
+        msg = f"day 5 builds only into a folder named {DAY5_OUTPUT_DIR_NAME}, not {output_dir}"
         raise ValueError(msg)
     if not days or min(days) < 0:
         msg = f"days must be a non-empty tuple of days from 0, got {days}"
@@ -711,6 +721,21 @@ def build_domain(
         control_days=(),
     )
     frame = frame.join(extra, on=["site", "time"], how="left")
+    if 5 in days:
+        check_columns_equal(
+            built=frame,
+            reference=pl.read_parquet(
+                published_dir.resolve().parent
+                / LEADS_DAY10_DIR_NAME
+                / f"{domain}_extra_lead_inputs.parquet"
+            ),
+            columns=[
+                column
+                for column in frame.columns
+                if column.startswith("ens_mean_day5_") and not column.endswith("_init_time")
+            ],
+            label=f"{domain}/{LEADS_DAY10_DIR_NAME} ens_mean_day5",
+        )
     if domain == "wind":
         extract = ens_members(sites=sites)
         for day in days:

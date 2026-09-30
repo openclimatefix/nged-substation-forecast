@@ -69,7 +69,11 @@ from typing import Final, Literal, NamedTuple
 import numpy as np
 import polars as pl
 import xgboost
-from build_forecast_inputs import SOLAR_DAY0_FIRST_SCORED_LEAD, _ens_extra_frame
+from build_forecast_inputs import (
+    SOLAR_DAY0_FIRST_SCORED_LEAD,
+    _ens_extra_frame,
+    check_columns_equal,
+)
 from fit_extra_leads import error_text, interval_text
 from nwp_forecast_comparison import (
     BLEND_ARMS,
@@ -1350,10 +1354,6 @@ ENS_STAMPED: Final[frozenset[str]] = frozenset(
 )
 """The ENS prefixes that must carry a run stamp, so `check_runs` checks their run dates."""
 
-EQUAL_TOLERANCE: Final[float] = 1e-6
-"""The relative and absolute difference between the AIFS build's ENS columns and the extra-lead
-folders' that Float32 storage allows."""
-
 
 def ens_control_prefix(*, day: int) -> str:
     """Return the ENS control member's prefix at a day: 6-hourly at days 1 and 2, native beyond."""
@@ -1616,49 +1616,6 @@ def fit_blend_stage(
         workers=workers,
     )
     return pl.concat([primary, second]).with_columns(device=pl.lit(DEVICE))
-
-
-def check_columns_equal(
-    *, built: pl.DataFrame, reference: pl.DataFrame, columns: Sequence[str], label: str
-) -> None:
-    """Raise unless `built` and `reference` hold the same values in `columns` on every row.
-
-    Args:
-        built: Rows keyed by `site` and `time`.
-        reference: Rows keyed the same way, from another build.
-        columns: The columns both frames hold.
-        label: What `reference` is, for the message.
-
-    Raises:
-        ValueError: If a key of `built` is absent from `reference`, or a column's values differ by
-            more than `EQUAL_TOLERANCE`, or are null in one frame and not in the other.
-    """
-    keys = ["site", "time"]
-    if built.select(keys).join(reference.select(keys), on=keys, how="anti").height:
-        msg = f"{label}: rows of the AIFS build are missing from it"
-        raise ValueError(msg)
-    joined = built.select(*keys, *columns).join(
-        reference.select(*keys, *columns), on=keys, how="left", suffix="_reference"
-    )
-    unequal = {}
-    for column in columns:
-        ours = pl.col(column).cast(pl.Float64)
-        theirs = pl.col(f"{column}_reference").cast(pl.Float64)
-        bad = joined.select(
-            (
-                (ours.is_null() != theirs.is_null())
-                | (
-                    ours.is_not_null()
-                    & theirs.is_not_null()
-                    & ((ours - theirs).abs() > EQUAL_TOLERANCE + EQUAL_TOLERANCE * theirs.abs())
-                )
-            ).sum()
-        ).item()
-        if bad:
-            unequal[column] = int(bad)
-    if unequal:
-        msg = f"{label}: columns differ from the AIFS build's on some rows: {unequal}"
-        raise ValueError(msg)
 
 
 def check_equal_to_existing(*, built: pl.DataFrame, existing_dir: Path, domain: DomainType) -> None:
@@ -3234,8 +3191,8 @@ LEAN_ENS_BUILT_DAYS: Final[tuple[int, ...]] = (10,)
 
 LEAN_ENS_NATIVE_DAYS: Final[tuple[int, ...]] = (4, 5)
 """The lean days at which the published inputs hold no ENS mean and ENS still has 3-hourly steps
-(day 4 reads leads 96 to 120 hours, and day 5 reads leads 114 to 150 hours, which run on 3-hourly
-steps to lead 144 and on 6-hourly steps after it), so the AIFS build's 6-hourly emulation is not
+(day 4 scores leads 96 to 120 hours and day 5 scores leads 120 to 144 hours, and ENS steps 3-hourly
+to lead 144 and 6-hourly after it, so day 5's band reads a 6-hourly step beyond its last scored lead), so the AIFS build's 6-hourly emulation is not
 ENS's mean. The ENS mean is built from ENS's native steps, exactly as the WeatherNext 3 build
 builds it. Days 0 and 3 read the published columns."""
 

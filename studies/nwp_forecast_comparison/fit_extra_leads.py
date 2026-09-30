@@ -15,7 +15,7 @@ Five batches run into five folders (`--batch first` to `--batch fifth`). The sec
 batches take one `--context-dir` for each earlier batch's folder whose arms their contrast tables
 name.
 
-The fifth batch fits day 4 of eight products on the shared rows (`FIFTH_NEW_PREFIXES`) and refits no
+The fifth batch fits day 4 of nine products on the shared rows (`FIFTH_NEW_PREFIXES`) and refits no
 reference, into the one folder `FIFTH_OUTPUT_DIR_NAME`. Like the fourth batch, it scores each arm
 without the rows where the arm's own columns are null, and computes every contrast on the rows both
 arms score.
@@ -63,6 +63,7 @@ from typing import Final, NamedTuple
 
 import polars as pl
 from build_forecast_inputs import (
+    DAY4_OUTPUT_DIR_NAME,
     GFS_NATIVE_DAYS,
     IFS_SINGLE_DAYS,
     PRODUCT_SLUGS,
@@ -391,12 +392,13 @@ SHARED_DAY4_PRODUCT_SLUGS: Final[tuple[str, ...]] = (
     "icon_eu",
     "icon_global",
     "ifs025",
+    "gfs",
     "gfs_native",
     "ifs_single",
 )
 """The products the fifth batch fits at day 4 on the shared rows, by arm-name stem: ENS mean and
-control member, GEFS mean, ICON-EU, ICON global, IFS 0.25 degree, native GFS, and IFS HRES (9 km,
-Open-Meteo)."""
+control member, GEFS mean, ICON-EU, ICON global, IFS 0.25 degree, Open-Meteo's GFS, native GFS,
+and IFS HRES (9 km, Open-Meteo)."""
 
 FIFTH_NEW_PREFIXES: Final[tuple[str, ...]] = tuple(
     f"{stem}_day{day}" for day in SHARED_DAY4 for stem in SHARED_DAY4_PRODUCT_SLUGS
@@ -426,12 +428,12 @@ FIFTH_ENSEMBLE_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
 
 FIFTH_ENSEMBLE_TITLE: Final[str] = (
     "Other products against the ENS mean at day 4 (ENS, GEFS, native GFS, and IFS HRES read a 00 "
-    "UTC run's leads from 96 hours, the same lead; the ICON-EU, ICON global, and IFS 0.25 degree "
+    "UTC run's leads from 96 hours, the same lead; the ICON-EU, ICON global, IFS 0.25 degree, and GFS "
     "Previous Runs arms serve the freshest run at least 4 days old, a shorter lead)"
 )
 """The heading of the fifth batch's contrasts against ENS."""
 
-FIFTH_OUTPUT_DIR_NAME: Final[str] = "nwp_forecast_comparison_day4_shared"
+FIFTH_OUTPUT_DIR_NAME: Final[str] = DAY4_OUTPUT_DIR_NAME
 """Under `data/studies/`, the only folder the fifth batch writes to."""
 
 ENSEMBLE_TITLE: Final[str] = (
@@ -1380,7 +1382,7 @@ def main() -> int:
         "batch left on the CPU), the third (native GFS at days 0, 1, 2, 3, 5, 7, 10, and 14), or "
         "the fourth (IFS HRES (9 km, Open-Meteo) at days 0, 1, 2, 3, 5, and 7), or the fifth "
         "(day 4 of ENS mean and control, GEFS mean, ICON-EU, ICON global, IFS 0.25 degree, "
-        "native GFS, and IFS HRES (9 km, Open-Meteo)).",
+        "Open-Meteo GFS, native GFS, and IFS HRES (9 km, Open-Meteo)).",
     )
     parser.add_argument(
         "--context-dir",

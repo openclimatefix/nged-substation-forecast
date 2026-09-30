@@ -972,3 +972,89 @@ def test_a_hole_in_any_one_value_column_stops_the_build(domain: str, column: str
 
     with pytest.raises(ValueError, match="day-5 band"):
         w.check_band_complete(built=built, domain=domain, day=5)
+
+
+def test_the_day_5_wn3_build_refuses_any_output_folder_but_its_own(tmp_path: Path) -> None:
+    published = tmp_path / "nwp_forecast_comparison"
+    with pytest.raises(ValueError, match=bfi.DAY5_OUTPUT_DIR_NAME):
+        w.build_domain(
+            domain="solar",
+            published_dir=published,
+            output_dir=tmp_path / "nwp_forecast_comparison_wn3_extra_days",
+            weather_dir=tmp_path,
+            days=(3, 5),
+        )
+    assert driver.OUTPUT_DIR_NAME == bfi.DAY5_OUTPUT_DIR_NAME
+
+
+def _run_driver(
+    *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, existing: list[str]
+) -> list[str]:
+    """Run `driver.main` with both fits stubbed, and return which fits ran."""
+    out = tmp_path / driver.OUTPUT_DIR_NAME
+    out.mkdir(exist_ok=True)
+    for name in existing:
+        (out / name).write_text("# done\n\n## x")
+    ran: list[str] = []
+
+    def lean(*, report_name: str, output_dir: Path, **_: object) -> int:
+        ran.append("lean")
+        (output_dir / report_name).write_text("# AIFS\n")
+        return 0
+
+    def wn3(*, report_name: str, output_dir: Path, **_: object) -> int:
+        ran.append("wn3")
+        (output_dir / report_name).write_text("# WN3\n")
+        return 0
+
+    monkeypatch.setattr(driver.fit_aifs, "check_gpu_visible", lambda: None)
+    monkeypatch.setattr(driver.fit_aifs, "run_lean", lean)
+    monkeypatch.setattr(driver.fit_aifs, "run_wn3", wn3)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "x",
+            "--published-dir",
+            str(tmp_path / "nwp_forecast_comparison"),
+            "--output-dir",
+            str(out),
+            "--lookahead-cleared",
+        ],
+    )
+    driver.main()
+    return ran
+
+
+def test_the_driver_runs_both_fits_writes_the_readme_once_and_joins_the_reports(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ran = _run_driver(tmp_path=tmp_path, monkeypatch=monkeypatch, existing=[])
+
+    out = tmp_path / driver.OUTPUT_DIR_NAME
+    assert ran == ["lean", "wn3"]
+    assert (out / driver.README_NAME).read_text() == driver.README_TEXT
+    assert (out / driver.REPORT_NAME).exists()
+
+
+def test_the_driver_skips_a_fit_whose_report_exists_and_keeps_an_existing_readme(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = tmp_path / driver.OUTPUT_DIR_NAME
+    out.mkdir()
+    (out / driver.README_NAME).write_text("mine")
+
+    ran = _run_driver(
+        tmp_path=tmp_path, monkeypatch=monkeypatch, existing=[driver.AIFS_REPORT_NAME]
+    )
+
+    assert ran == ["wn3"]
+    assert (out / driver.README_NAME).read_text() == "mine"
+
+
+def test_the_driver_refuses_before_any_fit_when_report_md_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(FileExistsError):
+        _run_driver(tmp_path=tmp_path, monkeypatch=monkeypatch, existing=[driver.REPORT_NAME])
+    assert not (tmp_path / driver.OUTPUT_DIR_NAME / driver.AIFS_REPORT_NAME).exists()

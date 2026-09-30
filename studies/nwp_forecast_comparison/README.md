@@ -189,13 +189,13 @@ lead?](../../docs/studies/forecasts/matched-lead.md).
   blend's contrast with ENS and with both controls, the seed-to-seed gap between the controls, and
   both arms' absolute errors beside every contrast. If the two controls disagree on the guard's
   verdict, the blend claim is unresolved.
-- `build_forecast_inputs.py --extra-leads --batch fifth` writes day 4 of eight products onto the
+- `build_forecast_inputs.py --extra-leads --batch fifth` writes day 4 of nine products onto the
   published inputs' own `(site, time)` keys: ENS's mean and control member (reading the supplement
   `fetch_ens_day4_supplement.py` writes, so the band has no missing step), GEFS's mean, the native
-  GFS arm, IFS HRES (9 km, Open-Meteo), and the Previous Runs arms ICON-EU, ICON global, and IFS
-  0.25° at `previous_day4`. ICON-EU's archive ends at day 4. `previous_day4` is null on at most
-  0.6% of the published rows for those three products.
-- `fit_extra_leads.py --batch fifth` fits those eight arms on a GPU at the primary setting, on the
+  GFS arm, IFS HRES (9 km, Open-Meteo), and the Previous Runs arms ICON-EU, ICON global, IFS 0.25°,
+  and GFS at `previous_day4`. ICON-EU's archive ends at day 4. `previous_day4` is null on at most
+  0.6% of the published rows for those four products.
+- `fit_extra_leads.py --batch fifth` fits those nine arms on a GPU at the primary setting, on the
   shared rows and folds of the earlier extra-lead folders, with no negative control (no extra-lead
   batch has one). It writes only to a folder named `nwp_forecast_comparison_day4_shared`. Like the
   fourth batch, it scores each arm without the rows where the arm's own columns are null and
