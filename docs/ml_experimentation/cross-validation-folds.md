@@ -82,10 +82,10 @@ The fold design for a rolling-origin evaluation over whichever history lands —
 exactly how often production ends up retraining — is tracked separately in
 [#960](https://github.com/openclimatefix/nged-substation-forecast/issues/960).
 
-Because of that timescale, the plan is to **pre-train** on ERA5 reanalysis and fine-tune on ECMWF
-ENS, using the long power histories some assets have back to 2020. Pre-training is a training-time
-technique, distinct from the validation folds described here; the design is in [Extending the
-training history](../roadmap/training-history.md).
+Because of that timescale, the plan is to **pre-train** on an estimate of past weather (ERA5 is the
+planned ingest) and fine-tune on ECMWF ENS, using the long power histories some assets have back
+to 2020. Pre-training is a training-time technique, distinct from the validation folds described
+here; the design is in [Extending the training history](../roadmap/training-history.md).
 
 ---
 

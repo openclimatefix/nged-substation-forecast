@@ -1002,7 +1002,7 @@ not trade away [principle 8 ("*every experiment is scored
 identically*")](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically):
 the leaderboard measurement is unchanged and stays comparable, and the extrapolation check is an
 *additional* acceptance criterion rather than a substitute score. The feature becomes cleanly
-measurable only once [ERA5 pre-training](training-history.md) extends the training history from one
+measurable only once [pre-training](training-history.md) extends the training history from one
 summer to several.
 
 **Anchor it to init time, and source it from ERA5.** Compute the accumulator once at
@@ -1431,9 +1431,7 @@ one storm's worth of evidence. A few years of history therefore hold few indepen
 each kind of weather.
 
 **A product whose history is too short for its own features could still enter the forecast through a
-small per-product calibrator.** The design trains one weather-response model on the long power
-history and an estimate of past weather, then fits the calibrator on each product's few months of
-overlap with power. The design is under research in [A new weather product with a few months of
+small per-product calibrator**, under research in [A new weather product with a few months of
 history](training-history.md#a-new-weather-product-with-a-few-months-of-history).
 
 **A cheaper first signal needs only ECMWF ENS: check whether its calibration varies with the weather

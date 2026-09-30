@@ -1031,9 +1031,9 @@ today's ENS-scored skill, most of our error is not the weather forecast's fault 
 belongs in the modelling instead. The ceiling sizes the prize that ingesting another NWP source
 would chase. The ceiling does not gate trying a new source, because an autonomous study can test a
 new weather product quickly (see [A new weather product with a few months of
-history](training-history.md#a-new-weather-product-with-a-few-months-of-history)). Trained lag-free,
-the ceiling model is also that section's weather-response model, so the ceiling and the study share
-one model.
+history](training-history.md#a-new-weather-product-with-a-few-months-of-history)). A lag-free variant
+of the ceiling's XGBoost model is also that section's weather-response model, so the ceiling and the
+study can share one model. The ceiling proper uses the champion's own feature set, lags included.
 
 Two rungs, in increasing order of "cheating":
 
@@ -1062,7 +1062,7 @@ Three conditions on reading the result.
 
 - **It is a ceiling for the current model family and feature set.** A model that cannot exploit
   perfect weather shows a low ceiling for reasons that have nothing to do with weather availability.
-  That does not weaken the decision the ceiling gates — a model that cannot use perfect weather will
+  That does not weaken the decision the ceiling informs — a model that cannot use perfect weather will
   not be rescued by a better forecast of it — but it does mean the ceiling is re-measured after any
   large modelling change rather than treated as a standing fact.
 
@@ -1160,8 +1160,7 @@ implementation and one metric path — once we settle how a wrapper derives its 
 `MODEL_NAME` from the model it wraps. The per-product calibrator under research in [A new weather
 product with a few months of
 history](training-history.md#a-new-weather-product-with-a-few-months-of-history) would be the
-wrapper's third consumer. The wrapper would live in `ml_core` as a `BaseForecaster` subclass that
-wraps another `BaseForecaster`.
+wrapper's third consumer.
 
 Spread inflation widens the fan but cannot reshape it (the inflated ensemble is still 51 point
 forecasts, just pushed apart). It is the stopgap the full fix below must beat to earn the effort of

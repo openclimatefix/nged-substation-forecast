@@ -118,8 +118,10 @@ irradiance that drive substation load.
 damping that forecast error teaches, so fed forecast weather it is over-sensitive.** The damping
 above arises only because the training input is a forecast, wrong by a lead-time-dependent amount.
 An estimate of past weather — a reanalysis such as ERA5, a satellite retrieval such as CAMS, or the
-first time steps of a weather-model run — carries far smaller errors, so a model trained on one
-learns something close to the undamped response. Fed forecast weather, that model reacts fully to
+first time steps of a weather-model run — usually carries smaller errors than a forecast at long
+lead, though not always: at six solar farms, ECMWF ENS's day-1 ensemble mean describes past sunshine
+better than ERA5 does. The smaller the estimate's own error, the closer a model trained on that
+estimate comes to the undamped response. Fed forecast weather, that model reacts fully to
 every forecast swing, including the swings that are forecast error. The damping then has to come
 from elsewhere: from averaging the model's output over ensemble members whose spread honestly
 represents the forecast error, or from a recalibration fitted on forecast inputs.
