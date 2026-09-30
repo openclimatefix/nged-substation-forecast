@@ -290,6 +290,9 @@ def read_trial_area(*, bucket: str, weather_dir: Path) -> None:
 def open_local(*, weather_dir: Path) -> xr.Dataset:
     """Open the local copy, loaded into memory.
 
+    Args:
+        weather_dir: The directory holding the local copy of the store.
+
     Returns:
         The six variables, with dimensions `(init_time, lead_time, latitude, longitude)`.
     """

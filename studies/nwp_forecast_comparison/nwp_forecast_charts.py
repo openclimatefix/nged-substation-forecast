@@ -57,6 +57,8 @@ from fit_aifs import (
     NO_SKILL,
     ROW_SETS,
     WN3_DAYS,
+    WN3_SPLIT_MONTHS,
+    WN3_SPLITS,
     Contrast,
     blend_arm_name,
     blend_contrasts,
@@ -2572,6 +2574,244 @@ def aifs_leads(
     )
 
 
+# --- Chart 7: WeatherNext 3 in three row groups ------------------------------------------------
+
+WN3_GROUP_NAMES: Final[dict[str, str]] = {
+    "in-sample": "Before July (may overlap WN3's training data)",
+    "out-of-sample": "July to September (after every training end)",
+    "pooled": "All rows, February to September (mixes both)",
+}
+"""Each WN3 row group's name in the key."""
+
+WN3_GROUP_COLOURS: Final[dict[str, str]] = {
+    "in-sample": ocf.DATA_SKY,
+    "out-of-sample": ocf.BRAND_ORANGE,
+    "pooled": ocf.DATA_BLUE,
+}
+"""Each WN3 row group's colour. The out-of-sample group, which carries every claim, is orange."""
+
+WN3_REFERENCE_ARMS: Final[dict[DomainType, str]] = {
+    "solar": "ens_mean_day{day}",
+    "wind": "ens_meanvec_day{day}",
+}
+"""The ENS arm each technology's WN3 mean is contrasted with: for wind, the mean-vector speed."""
+
+WN3_REFERENCE_NAMES: Final[dict[DomainType, str]] = {
+    "solar": "ENS mean",
+    "wind": "ENS mean-vector reference",
+}
+
+
+def wn3_group_rows(*, wn3_dir: Path, domain: DomainType) -> pl.DataFrame:
+    """Return WN3's error, its reference's error, and their difference in each row group.
+
+    Args:
+        wn3_dir: The directory `fit_aifs.py --wn3` wrote to.
+        domain: `solar` or `wind`.
+
+    Returns:
+        One row per (day, group, quantity), where quantity is `wn3`, `reference`, or `difference`,
+        with `value`, `lower_95`, `upper_95` (all in points of capacity), `n_rows` and `n_months`.
+    """
+    records: list[dict[str, object]] = []
+    for day in WN3_DAYS:
+        losses = pl.read_parquet(wn3_dir / f"{domain}_wn3_day{day}_losses.parquet")
+        check_anonymised(frame=losses, domain=domain)
+        wn3 = f"wn3_mean_day{day}"
+        reference = WN3_REFERENCE_ARMS[domain].format(day=day)
+        for group in WN3_SPLITS:
+            rows = wn3_split(losses=losses, split=group, domain=domain, day=day)
+            primary = by_setting(losses=rows)["primary"]
+            errors = leaderboard(losses=primary, arms=[wn3, reference]).with_columns(
+                pl.col("arm").replace_strict({wn3: "wn3", reference: "reference"})
+            )
+            records.extend(
+                {
+                    "day": day,
+                    "group": group,
+                    "quantity": row["arm"],
+                    "value": row["value"] * PERCENTAGE_POINTS,
+                    "lower_95": row["lower_95"] * PERCENTAGE_POINTS,
+                    "upper_95": row["upper_95"] * PERCENTAGE_POINTS,
+                    "n_rows": row["n_rows"],
+                    "n_months": row["n_months"],
+                }
+                for row in errors.iter_rows(named=True)
+            )
+            gap = difference(losses=primary, treatment=wn3, reference=reference)
+            records.append(
+                {
+                    "day": day,
+                    "group": group,
+                    "quantity": "difference",
+                    "value": gap["difference"] * PERCENTAGE_POINTS,
+                    "lower_95": gap["lower_95"] * PERCENTAGE_POINTS,
+                    "upper_95": gap["upper_95"] * PERCENTAGE_POINTS,
+                    "n_rows": gap["n_rows"],
+                    "n_months": gap["n_months"],
+                }
+            )
+    return pl.DataFrame(records)
+
+
+def wn3_group_panel(
+    *, rows: pl.DataFrame, value_title: str, zero_label: str | None, hollow: bool = False
+) -> alt.LayerChart:
+    """Draw one quantity at the four lead days, three row groups dodged within each day.
+
+    Args:
+        rows: Rows of `wn3_group_rows` for one quantity, or with `hollow` True the reference's.
+        value_title: The y axis title, with `|` between its two lines, naming the unit and which
+            direction is better.
+        zero_label: The text of the rule at zero, or None to draw no rule.
+        hollow: Whether to draw hollow diamonds rather than filled dots.
+
+    Returns:
+        The panel.
+    """
+    groups = list(WN3_SPLITS)
+    offsets = {
+        group: (index - (len(groups) - 1) / 2) * DODGE_DAYS for index, group in enumerate(groups)
+    }
+    positions = {day: index for index, day in enumerate(WN3_DAYS)}
+    drawn = rows.with_columns(
+        x=pl.col("day").replace_strict(positions, return_dtype=pl.Float64)
+        + pl.col("group").replace_strict(offsets, return_dtype=pl.Float64),
+        group_name=pl.col("group").replace_strict(WN3_GROUP_NAMES),
+    )
+    y_domain = padded_domain(
+        low=float(drawn["lower_95"].min()),  # ty: ignore[invalid-argument-type]
+        high=float(drawn["upper_95"].max()),  # ty: ignore[invalid-argument-type]
+        include_zero=zero_label is not None,
+    )
+    x_scale = alt.Scale(domain=[-0.5, len(WN3_DAYS) - 0.5], nice=False)
+    labels = ", ".join(f"'Day {day}'" for day in WN3_DAYS)
+    x = alt.X(
+        "x:Q",
+        scale=x_scale,
+        axis=alt.Axis(
+            values=list(range(len(WN3_DAYS))),
+            labelExpr=f"[{labels}][datum.value]",
+            grid=False,
+            title="Lead day (the four fitted days are spaced evenly)",
+        ),
+    )
+    y_scale = alt.Scale(domain=list(y_domain), nice=False)
+    y = alt.Y("value:Q", scale=y_scale, axis=alt.Axis(title=value_title.split("|")))
+    colour = alt.Color(
+        "group_name:N",
+        scale=alt.Scale(
+            domain=[WN3_GROUP_NAMES[group] for group in groups],
+            range=[WN3_GROUP_COLOURS[group] for group in groups],
+        ),
+        legend=None,
+    )
+    rules = (
+        alt.Chart(drawn)
+        .mark_rule(strokeWidth=1.5, aria=False)
+        .encode(x=x, y=alt.Y("lower_95:Q", scale=y_scale), y2="upper_95:Q", color=colour)  # ty: ignore[unresolved-attribute]
+    )
+    points = (
+        alt.Chart(drawn)
+        .mark_point(
+            filled=not hollow,
+            shape="diamond" if hollow else "circle",
+            size=60,
+            strokeWidth=1.5,
+            opacity=1,
+            aria=False,
+        )
+        .encode(x=x, y=y, color=colour)  # ty: ignore[unresolved-attribute]
+    )
+    layers: list[alt.Chart] = [rules, points]
+    if zero_label is not None:
+        zero = pl.DataFrame({"value": [0.0], "text": [zero_label]})
+        layers.insert(
+            0,
+            alt.Chart(zero)
+            .mark_rule(color=ocf.BLACK_1, strokeDash=[4, 3], aria=False)
+            .encode(y=alt.Y("value:Q", scale=y_scale)),  # ty: ignore[unresolved-attribute]
+        )
+        layers.append(
+            alt.Chart(zero)
+            .mark_text(align="left", dx=4, dy=-6, color=ocf.BLACK_1, fontSize=10, aria=False)
+            .encode(x=alt.value(2), y=alt.Y("value:Q", scale=y_scale), text="text:N")  # ty: ignore[unresolved-attribute]
+        )
+    return alt.LayerChart(layer=layers, width=CONTENT_WIDTH_PX - 100, height=LEAD_PANEL_HEIGHT_PX)
+
+
+def wn3_groups(*, wn3_dir: Path, domain: DomainType) -> tuple[alt.VConcatChart, pl.DataFrame]:
+    """Draw WeatherNext 3's mean against ENS's in the three row groups, at the four lead days.
+
+    Args:
+        wn3_dir: The directory `fit_aifs.py --wn3` wrote to.
+        domain: `solar` or `wind`.
+
+    Returns:
+        The figure, and the rows it draws.
+    """
+    rows = wn3_group_rows(wn3_dir=wn3_dir, domain=domain)
+    reference = WN3_REFERENCE_NAMES[domain]
+    key = line_key(
+        labels=[WN3_GROUP_NAMES[group] for group in WN3_SPLITS],
+        colours=[WN3_GROUP_COLOURS[group] for group in WN3_SPLITS],
+        columns=1,
+    )
+    panels = [
+        key,
+        wn3_group_panel(
+            rows=rows.filter(pl.col("quantity") == "difference"),
+            value_title=f"WeatherNext 3 minus {reference}|(points; negative is better)",
+            zero_label=f"same error as {reference}",
+        ),
+        wn3_group_panel(
+            rows=rows.filter(pl.col("quantity") == "wn3"),
+            value_title="WeatherNext 3 mean absolute error|(% of capacity; smaller is better)",
+            zero_label=None,
+        ),
+        wn3_group_panel(
+            rows=rows.filter(pl.col("quantity") == "reference"),
+            value_title=f"{reference} mean absolute error|(% of capacity; smaller is better)",
+            zero_label=None,
+            hollow=True,
+        ),
+    ]
+    title = (
+        f"WeatherNext 3's error against {reference} for {TECHNOLOGY_NAMES[domain]}, in the "
+        "months before July, from July, and pooled"
+    )
+    return (
+        figure(
+            panels=panels,
+            number=FIGURE_NUMBERS[(domain, "wn3_groups")],
+            title=title,
+            subtitle=[
+                (
+                    "Each mark is an XGBoost model's error, given one forecast product, in "
+                    "percent of capacity, or the difference between two such models in points "
+                    "of capacity. Top panel: WeatherNext 3's error minus the reference's, on the "
+                    "same rows. Lower panels: each product's own error. Dot: estimate. Line: "
+                    "95% interval from resampling whole months. Filled dots are WeatherNext 3; "
+                    "hollow diamonds are the reference."
+                ),
+                (
+                    "The three colours are three groups of the same out-of-fold rows: "
+                    f"{WN3_SPLIT_MONTHS['in-sample']} (4 calendar months), "
+                    f"{WN3_SPLIT_MONTHS['out-of-sample']} (3 months), and every row from "
+                    "February to September 2026 (7 months). Only the second group is certain to "
+                    "lie after WeatherNext 3's training data, and the third mixes both, so it is "
+                    "not a fair comparison and not the headline until the archive's provenance "
+                    "is confirmed. Each calendar month occurs in one year only, so every "
+                    "contrast is descriptive."
+                ),
+                f"{SHARED_ROWS_NOTE} {CAPACITY_NOTE}",
+            ],
+            figure_planning=None,
+        ),
+        rows,
+    )
+
+
 # --- Chart 6: one generator at a time ---------------------------------------------------------
 
 GENERATOR_CONDITIONS: Final[dict[str, str]] = {
@@ -2671,6 +2911,8 @@ FIGURE_NUMBERS: Final[dict[tuple[DomainType, str], int]] = {
     ("wind", "aifs"): 14,
     ("solar", "aifs_leads"): 15,
     ("wind", "aifs_leads"): 16,
+    ("solar", "wn3_groups"): 17,
+    ("wind", "wn3_groups"): 18,
 }
 """Each chart's figure number on the page, in the page's order: the leaderboard pair opens the page,
 then the planned contrasts."""
@@ -2803,6 +3045,8 @@ def draw_domain(
         losses=losses, predictions=predictions, domain=domain, title=TITLES[(domain, "models_work")]
     )
     charts["models_work"] = work
+    if wn3_dir is not None:
+        charts["wn3_groups"] = wn3_groups(wn3_dir=wn3_dir, domain=domain)[0]
     if aifs_dir is not None:
         charts["aifs"] = aifs(
             losses_by_set=load_aifs(aifs_dir=aifs_dir, domain=domain),
