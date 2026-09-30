@@ -642,6 +642,7 @@ LEAD_COLOURS: Final[dict[int, str]] = {
     1: ocf.DATA_BLUE,
     2: ocf.DATA_SKY,
     3: ocf.DATA_DEEP_TEAL,
+    4: ocf.DATA_PURPLE,
     5: ocf.DATA_GREEN,
     7: ocf.ENSEMBLE_LINE,
     10: ocf.DATA_AMBER,
@@ -655,6 +656,7 @@ lightness band (L 0.81 against a ceiling of 0.77), and Data Sky, Data Green, and
 below 3:1 contrast against the background, so each lead's fixed slot within its row and the page's
 tables of every number carry the reading as well. Day 0 is black. Day 7 is a neutral grey, the
 brand palette's mid grey, and a diamond like day 0, because no chromatic colour is left for it.
+Day 4 is Data Purple, which was not run through that validator.
 Data Amber, Data Deep Teal, and Data Burnt Orange are internal-use colours, approved for the
 lead-day charts by the maintainer."""
 
@@ -1216,7 +1218,8 @@ def leaderboard_figure(
                 "Each row is one forecast product. Each mark is an XGBoost model's mean absolute "
                 "error, as a percentage of capacity, given that product's forecast at one lead "
                 "day. Smaller is better. Marks run from day 0 at the top to day 14 at the bottom; "
-                "day 7 is a grey diamond and day 0 is a black diamond. Products in the rows "
+                "day 7 is a grey diamond, day 0 is a black diamond, and day 4 (fitted for the AIFS "
+                "and WeatherNext 3 rows only) is purple. Products in the rows "
                 "below the full-window products were fitted on fewer months, shown in their "
                 "names; the full-window rows are ordered by day-1 error, the rows below them keep "
                 "a fixed order and are not ranked against each other, and a grey tick "
@@ -1235,8 +1238,15 @@ def leaderboard_figure(
                 f"paired difference (Figure {FIGURE_NUMBERS[(domain, 'headline')]})."
             ),
             (
-                "Day 0 is not a day-ahead forecast a service could read, because each product "
-                "reads a run that started before the hour it describes. Leads are not equal: a "
+                "Day 0 is a hindcast, not a day-ahead forecast a service could read, because each "
+                "product reads a run that started before the hour it describes."
+                + (
+                    " Solar day 0 omits the hours ending 01:00 to 06:00 UTC for every product, "
+                    "because they precede the first 6-hourly step of the AIFS arms."
+                    if domain == "solar"
+                    else ""
+                )
+                + " Leads are not equal: a "
                 "Previous Runs product reads the freshest run at least a day old, a shorter lead "
                 "than ENS's on most hours, which favours that product. IFS HRES (9 km, "
                 "Open-Meteo) is scored on slightly fewer hours: the shared hours minus the target "

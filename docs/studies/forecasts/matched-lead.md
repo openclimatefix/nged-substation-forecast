@@ -75,6 +75,10 @@ each with a grey tick for the ENS mean on the same rows. Google has not document
 training data (Figure 17 splits the rows). At days 7 and 14 WeatherNext 3's solar error is not the
 lowest plotted: the ENS mean (13.7% at day 7) and GFS native (14.7% at day 14) are lower, on more
 months. Against the ENS mean on the same rows (14.7% and 16.0%) the difference is not resolved.
+The AIFS Single, AIFS ENS mean, and WeatherNext 3 rows also carry days 0, 3, 4, and 10. Day 0 is a
+hindcast: each product reads a run that started before the hour it describes. At solar day 0 every
+arm omits the hours ending 01:00 to 06:00 UTC, which precede the first 6-hourly AIFS step. The
+WeatherNext 3 row is the pooled rows (February to September 2026).
 
 ![Each wind forecast product's error at each fitted lead day, with 95% intervals](../assets/nwp_forecast_wind_leaderboard.svg)
 
@@ -90,7 +94,10 @@ difference from WeatherNext 3 is resolved, and the plotted ranks compare differe
 14 WeatherNext 3's 17.9% is not detectably below the shuffled-weather arms (18.3% and 18.6%), so the
 chart does not show that WeatherNext 3 beats the 18.5% climatology. That grey tick is the ENS mean
 of wind speed, not the mean-vector reference matched to WeatherNext 3, which the WN3 results section
-compares.
+compares. The AIFS Single, AIFS ENS mean, and WeatherNext 3 rows also carry days 0, 3, 4, and 10.
+Day 0 is a hindcast: each product reads a run that started before the hour it describes, and the
+WeatherNext 3 row drops the hour ending 00:00 UTC, for which the WN3 store holds no lead. The
+WeatherNext 3 row is the pooled rows (February to September 2026).
 
 ![Paired differences in solar error with 95% intervals, both XGBoost settings](../assets/nwp_forecast_solar_headline.svg)
 
@@ -1922,6 +1929,83 @@ issued on or before 30 June: 75, 149, 542, and 1,015 rows for solar at days 1, 2
 the pooled rows. Across the 42 solar and 21 wind (farm, fold, calendar month) cells, none has a
 training row of its own calendar month. No loss in any saved file is NaN, and the only nulls are the
 continuous ranked probability scores that a single-valued arm does not have.
+
+### WN3 and AIFS at days 0, 3, 4, and 10 (exploratory)
+
+**At days 3 and 4 for solar and wind, and at wind day 0, WN3's mean has a lower error than ENS's
+mean, with pooled intervals that exclude 0. At solar day 0 and solar day 10 no pooled difference is
+claimable, and at wind day 10 WN3's error is higher than ENS's, by an interval that only just
+excludes 0.** Day 0 is a hindcast: the row of an hour reads the 00 UTC run of the hour's own
+day, a forecast no service could read. Solar day 0 omits the hours ending 01:00 to 06:00 UTC for every arm, because
+those hours precede the first 6-hourly AIFS step, and the WN3 wind day 0 drops the hour ending 00:00
+UTC, for which the WN3 store holds no lead. Every number in this section is exploratory and fitted
+at the primary setting only. Each WN3 error below is the mean absolute error of an XGBoost model
+given WN3's mean, as a percentage of capacity. Each difference is WN3's error minus ENS's error on
+the same rows, in points of capacity, so a negative difference means WN3 has the lower error. The
+wind reference is ENS's mean-vector speed, which matches how WN3's speed is built. <!-- report (WN3
+extra days): pooled and July to September rows, ens_mean and ens_meanvec arms -->
+
+| Row group, technology, day | WN3 error (%) | ENS error (%) | WN3 minus ENS (points) |
+|---|---|---|---|
+| Pooled, solar, day 0 | 8.796 | 8.878 | -0.082 [-0.226, +0.097] |
+| Pooled, solar, day 3 | 10.791 | 12.268 | -1.478 [-2.196, -0.831] |
+| Pooled, solar, day 4 | 12.035 | 13.120 | -1.086 [-2.059, -0.460] |
+| Pooled, solar, day 10 | 14.993 | 15.293 | -0.300 [-0.816, +0.157] |
+| Pooled, wind, day 0 | 6.416 | 6.720 | -0.305 [-0.663, -0.053] |
+| Pooled, wind, day 3 | 10.107 | 11.787 | -1.680 [-2.672, -0.574] |
+| Pooled, wind, day 4 | 11.721 | 13.370 | -1.650 [-3.162, -0.261] |
+| Pooled, wind, day 10 | 19.003 | 17.352 | +1.652 [+0.014, +3.502] |
+| July to September, solar, day 0 | 8.592 | 8.761 | -0.169 [-0.328, +0.634] |
+| July to September, solar, day 3 | 9.957 | 11.066 | -1.109 [-1.878, -0.293] |
+| July to September, solar, day 4 | 11.188 | 11.652 | -0.464 [-0.684, -0.120] |
+| July to September, solar, day 10 | 13.150 | 13.225 | -0.075 [-0.214, +0.253] |
+| July to September, wind, day 0 | 5.722 | 5.860 | -0.138 [-0.803, +0.066] |
+| July to September, wind, day 3 | 8.172 | 8.817 | -0.645 [-1.379, -0.280] |
+| July to September, wind, day 4 | 9.444 | 9.548 | -0.104 [-0.594, +0.483] |
+| July to September, wind, day 10 | 12.667 | 12.313 | +0.354 [-1.121, +2.686] |
+
+**The July to September rows rest on 3 calendar months, fewer than the study's minimum of 6, so
+their intervals are indicative only.** The pooled rows cover 7 months (February to April and June to
+September 2026). Google has not documented which WeatherNext 3 model version made the archive, so
+the pooled rows may include months that overlap WN3's training data. The sensitivity setting was
+also fitted for the contrasts whose interval lies near the 5% line, and the report gives it.
+
+**At wind day 10, WN3's mean is not detectably better than WN3's own weather shuffled within site,
+year-month, and hour of day.** The pooled WN3 error minus the first shuffled arm's is +0.202 points
+[-0.847, +1.278], so the interval spans 0 and the XGBoost model given WN3's day-10 wind has no
+detectable skill over the shuffled control. At solar day 10 the two shuffle seeds disagree in the
+pooled rows: WN3 minus the first shuffled arm is -1.169 points [-1.910, -0.463], and minus the
+second is -0.364 points [-0.952, +0.336].
+
+**AIFS Single and the AIFS ENS mean at these days are read as point differences, because the fits
+name no contrast and give no paired interval.** The absolute intervals overlap heavily wherever they
+are given, so no AIFS difference below is claimed. Each row is on the rows of its own row set (16
+months for AIFS Single, 11 for the AIFS ENS mean), against ENS's mean on the same rows. <!-- report
+(AIFS extra days): single and ens row sets -->
+
+| AIFS arm, technology, day | AIFS error (%) [95% interval] | ENS mean error (%) [95% interval] | AIFS minus ENS mean (points) |
+|---|---|---|---|
+| AIFS Single, solar, day 0 | 9.318 [8.595, 9.926] | 8.707 [8.027, 9.317] | +0.611 |
+| AIFS Single, solar, day 3 | 11.005 [10.100, 11.808] | 11.319 [10.429, 12.230] | -0.314 |
+| AIFS Single, solar, day 4 | 12.262 [11.241, 13.240] | 12.290 [11.355, 13.241] | -0.028 |
+| AIFS Single, solar, day 10 | 14.850 [13.796, 16.015] | 14.698 [13.654, 15.912] | +0.152 |
+| AIFS Single, wind, day 0 | 7.600 [6.926, 8.293] | 7.014 [6.308, 7.755] | +0.586 |
+| AIFS Single, wind, day 3 | 10.864 [9.616, 12.237] | 10.896 [9.552, 12.424] | -0.032 |
+| AIFS Single, wind, day 4 | 12.623 [11.088, 14.337] | 12.708 [11.157, 14.384] | -0.085 |
+| AIFS Single, wind, day 10 | 17.568 [15.264, 19.761] | 17.484 [15.151, 19.916] | +0.084 |
+| AIFS ENS mean, solar, day 0 | 9.073 [8.025, 9.882] | 8.584 [7.613, 9.286] | +0.489 |
+| AIFS ENS mean, solar, day 3 | 10.616 [9.321, 11.834] | 11.548 [9.990, 13.129] | -0.932 |
+| AIFS ENS mean, solar, day 4 | 12.100 [10.455, 13.731] | 12.393 [10.629, 14.333] | -0.293 |
+| AIFS ENS mean, solar, day 10 | 14.536 [12.728, 16.626] | 14.641 [12.976, 16.415] | -0.105 |
+| AIFS ENS mean, wind, day 0 | 8.162 [7.178, 9.069] | 7.391 [6.434, 8.277] | +0.771 |
+| AIFS ENS mean, wind, day 3 | 11.695 [10.138, 13.197] | 12.096 [10.300, 13.939] | -0.401 |
+| AIFS ENS mean, wind, day 4 | 12.814 [10.769, 14.738] | 13.796 [11.531, 15.884] | -0.982 |
+| AIFS ENS mean, wind, day 10 | 19.715 [15.857, 23.114] | 18.915 [15.330, 22.112] | +0.800 |
+
+**At day 0, AIFS has a higher point error than ENS's mean for both technologies, by 0.5 to 0.8
+points, and at day 3 and day 4 the AIFS point error is lower in every row.** At day 10 the sign
+changes with the row set and the technology. The day-4 ENS values come from a supplementary
+extraction of ENS's leads 105, 108, and 111 hours, which the study's main ENS extract lacks.
 
 ## Discussion: what to use
 
