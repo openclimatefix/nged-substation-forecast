@@ -19,6 +19,10 @@ history, historical features, and disaggregation, and each reads one weather pro
   also beats ERA5; and ICON global has the largest error of the
   five, about half of its gap to ICON-EU a pair of steps in the wind Open-Meteo's archive serves for
   it at one generator.
+- [Does blending CERRA's wind heights beat one height?](cerra-wind-levels.md) — at three wind
+  farms, an XGBoost model given CERRA's 10 m and 100 m wind speeds has lower error than one given
+  100 m alone, and the pair gives most of the gain of using four or five heights. CERRA is a
+  reanalysis, so the page says nothing about forecast skill.
 - [Does blending weather products beat the best single weather product?](blending.md) — at the six
   solar farms and three wind farms, an XGBoost model given several weather products at once beats an
   XGBoost model given the best single product with its neighbouring hours, by 0.13 points of

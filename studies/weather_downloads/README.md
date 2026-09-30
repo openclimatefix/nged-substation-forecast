@@ -47,8 +47,13 @@ way):
   The Historical Forecast and Previous Runs APIs serve the MOGREPS-UK mean as all null, and every
   Single Runs request for the mean models returned "run not available". The full fetch is about 504
   weighted calls (4 products x 7 windows x 9 sites x 2).
-- `fetch_cerra.py` — CERRA solar radiation and wind, from the Copernicus Climate Data Store, needs
-  `uv run --with cdsapi --with netCDF4`.
+- `fetch_cerra.py` — CERRA solar radiation and wind speed (10 m from the single-levels dataset, 50,
+  75, 100, and 150 m from the height-levels dataset), from the Copernicus Climate Data Store, needs
+  `uv run --with cdsapi --with netCDF4`. The flag `--wind-direction` fetches only wind direction at
+  the same five heights, into files named `wind_direction_<height>_m.parquet` and
+  `10m_wind_direction_surface.parquet`. `fetch_cerra_grid.py` writes the whole-domain latitude and
+  longitude of every grid cell, which is how the cropped files' `y_index` and `x_index` map to a
+  location.
 - `fetch_era5_wind.py` — native ERA5 10 m and 100 m wind from the Climate Data Store at a 3 x 3 block
   of cells around each of the three wind sites, needs `uv run --with cdsapi --with netCDF4`. The
   data on disk covers only 2024-01-01 to 2026-09-20 (the newest 6 chunks, about 2.7 years, fetched
@@ -61,18 +66,24 @@ way):
   deleted, needs `uv run --with cfgrib --with eccodes --with requests`.
 - `fetch_nora3.py` and `validate_nora3.py` — NORA3 hourly wind at 50 m and 100 m over OPeNDAP, cut
   server-side to the box, from the aggregated dataset and then MET Norway's monthly files, needs
-  `uv run --with pydap`.
+  `uv run --with pydap`. The flag `--height-10m` fetches the 10 m level instead, into its own folder
+  `NORA3_10m/`, so the two sets never share a month cache.
 - `fetch_ukv_ceda.py` and `validate_ukv_ceda.py` — the Met Office UKV 2 km archive held at CEDA
   (four runs a day from 2019-09-01), whole GRIB files cropped to the box and written to a local
   Icechunk store, one commit per run, needs `uv run --with icechunk --with zarr --with eccodes` and
   the `CEDA_TOKEN` environment variable. The licence is CC BY-NC-SA 4.0.
 - `fetch_weathernext3.py` and `validate_weathernext3.py` — WeatherNext 3 ensemble-mean runs (00,
-  06, 12, and 18 UTC) from a Requester Pays Google Cloud Storage bucket, cropped to a wide United
-  Kingdom box (49.0 to 61.5 degrees north, 10.0 degrees west to 3.5 degrees east, which is public
-  and unrelated to the private trial-area box) and written to an Icechunk store. The Zarr chunks
-  are whole-globe, so a run reads about 50 GB and keeps about 15 MB. Run the fetch only on a
-  Compute Engine machine in us-east1, with `GOOGLE_CLOUD_PROJECT` set, because reads from elsewhere
-  are billed as egress (`--dry-run` prints the estimate first).
+  06, 12, and 18 UTC) from a Google Cloud Storage bucket that is not Requester Pays, cropped to a
+  wide United Kingdom box (49.0 to 61.5 degrees north, 10.0 degrees west to 3.5 degrees east, which
+  is public and unrelated to the private trial-area box) and written to an Icechunk store. The Zarr
+  chunks are whole-globe, so a run reads about 50 GB and keeps about 15 MB. Run the fetch only on a
+  Compute Engine machine in us-east1, because reads from elsewhere may be billed as egress
+  (`--dry-run` prints the estimate first). No billing project is needed, but the bucket cannot be
+  read anonymously: access must be requested from Google (see its [access
+  guide](https://developers.google.com/weathernext/guides/access-forecast)), and the script then
+  reads with the Google account's application default credentials. The [survey
+  page](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/#what-we-learnt-about-weathernexts-precomputed-statistics-store)
+  describes the bucket and the statistics it holds beyond the mean.
     - **Arguments.** `--bucket` (a Cloud Storage bucket in us-east1) or `--local-store` (a
       directory, for tests) names the output; exactly one is required. `--start-date` and
       `--end-date` give the window, and `--end-date` is required when the repository is created,

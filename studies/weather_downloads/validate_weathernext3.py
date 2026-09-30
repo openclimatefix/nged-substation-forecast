@@ -36,8 +36,8 @@ skipped-run attributes.
 `--compare-source` reads the source store for the first written run, the last, and 5 random ones,
 and compares the whole stored slice at the first and last lead of every variable. It selects the
 source cells by value from the stored `latitude` and `longitude` (with `longitude % 360`),
-independently of the fetch's crop code. It needs `GOOGLE_CLOUD_PROJECT` and reads about 280 MB from
-the source per run.
+independently of the fetch's crop code. It authenticates with Google application default
+credentials and reads about 280 MB from the source per run.
 
 `--publish` validates the snapshot that `staging` pointed at when the script started, checks the
 tip of `main` is an ancestor of that snapshot, and then resets `main` to it, but only if `main` is
