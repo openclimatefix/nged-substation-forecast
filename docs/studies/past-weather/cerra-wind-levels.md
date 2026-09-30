@@ -81,8 +81,9 @@ farm's past power, and whether blending the heights beats reading 100 m alone.**
 Copernicus regional reanalysis for Europe, produced by a consortium led by the Swedish
 Meteorological and Hydrological Institute for the Copernicus Climate Change Service, which the
 European Centre for Medium-Range Weather Forecasts implements. A reanalysis re-runs a weather model
-over past years with the observations of each period, so every value is an analysis of a past hour and no
-value is a forecast. The Copernicus Climate Data Store serves CERRA's wind at 10 m from one dataset,
+over past years with the observations of each period, so every value is an analysis of a past hour
+and no value is a forecast. The Copernicus Climate Data Store serves CERRA's wind at 10 m from one
+dataset,
 [`reanalysis-cerra-single-levels`](https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels),
 and at 50, 75, 100, and 150 m from another,
 [`reanalysis-cerra-height-levels`](https://doi.org/10.24381/cds.38b394e6). The other studies under
