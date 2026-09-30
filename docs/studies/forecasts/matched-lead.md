@@ -1935,15 +1935,15 @@ continuous ranked probability scores that a single-valued arm does not have.
 **At days 3 and 4 for solar and wind, and at wind day 0, WN3's mean has a lower error than ENS's
 mean, with pooled intervals that exclude 0. At solar day 0 and solar day 10 no pooled difference is
 claimable, and at wind day 10 WN3's error is higher than ENS's, by an interval that only just
-excludes 0.** Day 0 is a hindcast: the row of an hour reads the 00 UTC run of the hour's own
-day, a forecast no service could read. Solar day 0 omits the hours ending 01:00 to 06:00 UTC
-for every arm, because those hours precede the first 6-hourly AIFS step, and the WN3 wind day 0 drops the hour ending 00:00
-UTC, for which the WN3 store holds no lead. Every number in this section is exploratory and fitted
-at the primary setting only. Each WN3 error below is the mean absolute error of an XGBoost model
-given WN3's mean, as a percentage of capacity. Each difference is WN3's error minus ENS's error on
-the same rows, in points of capacity, so a negative difference means WN3 has the lower error. The
-wind reference is ENS's mean-vector speed, which matches how WN3's speed is built. <!-- report (WN3
-extra days): pooled and July to September rows, ens_mean and ens_meanvec arms -->
+excludes 0.** Day 0 is a hindcast: the row of an hour reads the 00 UTC run of the hour's own day, a
+forecast no service could read. Solar day 0 omits the hours ending 01:00 to 06:00 UTC for every arm,
+because those hours precede the first 6-hourly AIFS step, and the WN3 wind day 0 drops the hour
+ending 00:00 UTC, for which the WN3 store holds no lead. Every number in this section is exploratory
+and fitted at the primary setting only. Each WN3 error below is the mean absolute error of an
+XGBoost model given WN3's mean, as a percentage of capacity. Each difference is WN3's error minus
+ENS's error on the same rows, in points of capacity, so a negative difference means WN3 has the
+lower error. The wind reference is ENS's mean-vector speed, which matches how WN3's speed is built.
+<!-- report (WN3 extra days): pooled and July to September rows, ens_mean and ens_meanvec arms -->
 
 | Row group, technology, day | WN3 error (%) | ENS error (%) | WN3 minus ENS (points) |
 |---|---|---|---|
