@@ -1680,12 +1680,18 @@ def build_extra_leads(
     return output_path
 
 
-def _h3_crop_weights(*, site_cells: Mapping[str, int], grid_cells: pl.DataFrame) -> pl.DataFrame:
-    """Return each site's H3 area weights over the AIFS crop's grid cells.
+def _h3_crop_weights(
+    *,
+    site_cells: Mapping[str, int],
+    grid_cells: pl.DataFrame,
+    grid_degrees: float = AIFS_CROP_DEGREES,
+) -> pl.DataFrame:
+    """Return each site's H3 area weights over a gridded product's crop.
 
     Args:
         site_cells: Each site to the H3 resolution-5 cell it sits in.
         grid_cells: The crop's `lat_index`, `lon_index`, `latitude` and `longitude`.
+        grid_degrees: The product's grid cell size, which `compute_h3_grid_weights` bins by.
 
     Returns:
         One row per (site, crop cell the site's H3 cell overlaps), with `site`, `lat_index`,
@@ -1696,7 +1702,7 @@ def _h3_crop_weights(*, site_cells: Mapping[str, int], grid_cells: pl.DataFrame)
             reaches beyond the crop.
     """
     h3_weights = compute_h3_grid_weights(
-        nwp_grid_size_degrees=AIFS_CROP_DEGREES, h3_index=sorted(set(site_cells.values()))
+        nwp_grid_size_degrees=grid_degrees, h3_index=sorted(set(site_cells.values()))
     )
     cells = grid_cells.select(
         "lat_index",
@@ -1722,15 +1728,20 @@ def _h3_crop_weights(*, site_cells: Mapping[str, int], grid_cells: pl.DataFrame)
         sums.filter((pl.col("total") - 1.0).abs() <= AIFS_WEIGHT_TOLERANCE)["site"].to_list()
     )
     if bad:
-        msg = f"H3 weights over the AIFS crop do not sum to 1 for {len(bad)} sites"
+        msg = f"H3 weights over the crop do not sum to 1 for {len(bad)} sites"
         raise ValueError(msg)
     return weights
 
 
 def aifs_site_weights(
-    *, path: Path, domain: DomainType, sites: list[str], spatial: SpatialReadType
+    *,
+    path: Path,
+    domain: DomainType,
+    sites: list[str],
+    spatial: SpatialReadType,
+    grid_degrees: float = AIFS_CROP_DEGREES,
 ) -> pl.DataFrame:
-    """Return each site's cell weights over one AIFS download's crop.
+    """Return each site's cell weights over one gridded download's crop.
 
     Args:
         path: The download's directory, holding `_grid_cells.parquet`.
@@ -1738,6 +1749,8 @@ def aifs_site_weights(
         sites: The sites to read.
         spatial: `h3` for the overlap-weighted mean of the cells under the site's H3 resolution-5
             cell (the read ENS's stored table has), or `nearest` for the one nearest cell.
+        grid_degrees: The download's grid cell size: AIFS's 0.25 degrees unless the caller reads
+            another product (WeatherNext 3's 0.1 degrees).
 
     Returns:
         `site`, `lat_index`, `lon_index` and `weight`. No coordinate or cell id is printed.
@@ -1764,7 +1777,7 @@ def aifs_site_weights(
         site: h3.latlng_to_cell(latitude, longitude, H3_RESOLUTION)
         for site, latitude, longitude in roster.iter_rows()
     }
-    return _h3_crop_weights(site_cells=site_cells, grid_cells=grid_cells)
+    return _h3_crop_weights(site_cells=site_cells, grid_cells=grid_cells, grid_degrees=grid_degrees)
 
 
 def aifs_members_frame(

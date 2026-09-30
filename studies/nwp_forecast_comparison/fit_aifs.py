@@ -32,6 +32,13 @@ control, which shuffles AIFS within site, year-month and hour of day). The day-1
 smoothing reading and the weather-spread table go in the report. Every stage (a row set at one
 day) writes its own losses, predictions and stamp, and a stage whose losses exist is not refitted.
 
+`--wn3` fits WeatherNext 3's ensemble mean at days 1, 2, 7 and 14, each day on a frame of its own,
+beside ENS's mean on the same rows, from the inputs `build_wn3_inputs.py --build` wrote to
+`--output-dir`. The row set `wn3` holds February to April and June to September 2026, so every
+contrast is descriptive. Each stage writes its own losses, predictions and stamp, a stage whose
+losses exist is not refitted, and the shuffled copies of WN3's columns are the negative control.
+Wind at day 1 also fits ENS's mean whose speed is the length of the mean wind vector.
+
 `--p4-controls` refits the published P4 blends, their first control and a second-seed control, and
 ENS's day-1 mean on the GPU, on the published run's own rows and folds, into a new `--output-dir`.
 If the two controls disagree on the guard's verdict, the blend claim is unresolved.
@@ -218,6 +225,29 @@ ROW_SETS: Final[dict[str, RowSet]] = {
 with IFS Cycle 50r1. The dates are from ECMWF's release pages as recorded in
 `docs/roadmap/data-sources.md`; the data does not verify them. Only 00 UTC runs are read, so a
 06 UTC boundary is a run date that the 00 UTC run of the day after starts."""
+
+WN3_ROW_SET: Final[str] = "wn3"
+"""The WeatherNext 3 row set's name."""
+
+ROW_SET_SPECS: Final[dict[str, RowSet]] = {
+    **ROW_SETS,
+    WN3_ROW_SET: RowSet(
+        first_month="2026-02",
+        era_start_months=("2026-06",),
+        fold_offsets={0: 0, 1: 0},
+        era_runs={
+            0: (date(2026, 1, 1), date(2026, 5, 11)),
+            1: (date(2026, 5, 13), RUNS_OPEN_END),
+        },
+        arms=("wn3_mean_day1", "ens_mean_day1"),
+        deciding=None,
+    ),
+}
+"""Every row set `aifs_rows` can cut: the two AIFS sets, and `wn3`. The WN3 store starts on
+2026-01-01, so `wn3` holds February to April and June to September 2026 (2026-01 is dropped for the
+UKV upgrade and 2026-05 for the version switch); each of its calendar months occurs in one year
+only, so it has no deciding contrast. The loops over the day-1 and day-2 fit and the blends fit
+read `ROW_SETS`, which leaves `wn3` out."""
 
 
 class Contrast(NamedTuple):
@@ -439,6 +469,10 @@ def add_shuffled_columns(
     return output
 
 
+STAMP_REQUIRED_PREFIXES: Final[tuple[str, ...]] = ("aifs_", "wn3_")
+"""A prefix starting with one of these must carry a `<prefix>_init_time` run stamp."""
+
+
 def run_date(*, domain: DomainType, day: int) -> pl.Expr:
     """Return the date of the 00 UTC run that day `day` reads, for each row's `time`.
 
@@ -464,29 +498,29 @@ def check_runs(
 ) -> None:
     """Raise unless every stamped arm's run on every row is the right 00 UTC run inside its era.
 
-    The prefixes checked come from `arms`: every non-shuffled prefix that starts `aifs_` must carry
-    a `<prefix>_init_time` column, and any other prefix (ENS's) is checked when its column is
-    present. Each prefix's day is read from its name.
+    The prefixes checked come from `arms`: every non-shuffled prefix that starts `aifs_` or `wn3_`
+    must carry a `<prefix>_init_time` column, and any other prefix (ENS's) is checked when its
+    column is present. Each prefix's day is read from its name.
 
     Args:
         frame: The set's rows, carrying `time`, `era_code` and each stamped arm's `_init_time`.
         domain: `solar` or `wind`.
-        row_set: `single` or `ens`.
+        row_set: A key of `ROW_SET_SPECS`.
         arms: The arms fitted on the frame.
 
     Raises:
-        ValueError: If an AIFS prefix has no run column or no `_day<N>` ending, or naming each arm
-            whose run is not a 00 UTC run, is not the run `day` days before the row's day, or
-            falls outside its era's run dates.
+        ValueError: If an AIFS or WN3 prefix has no run column or no `_day<N>` ending, or naming
+            each arm whose run is not a 00 UTC run, is not the run `day` days before the row's
+            day, or falls outside its era's run dates.
     """
-    first, last = era_run_bounds(spec=ROW_SETS[row_set], era_code=pl.col("era_code"))
+    first, last = era_run_bounds(spec=ROW_SET_SPECS[row_set], era_code=pl.col("era_code"))
     problems: dict[str, dict[str, int]] = {}
     prefixes = dict.fromkeys(
         prefix for arm in arms for prefix in arm_prefixes(arm=arm) if PERMUTED not in prefix
     )
     for prefix in prefixes:
         stamped = f"{prefix}_init_time" in frame.columns
-        if not stamped and prefix.startswith("aifs_"):
+        if not stamped and prefix.startswith(STAMP_REQUIRED_PREFIXES):
             msg = (
                 f"{domain}/{row_set}: {prefix}_init_time is missing, so its runs cannot be checked"
             )
@@ -527,7 +561,7 @@ def drop_runs_outside_era(
     Returns:
         The rows whose run date lies inside the era window of the hour's month.
     """
-    spec = ROW_SETS[row_set]
+    spec = ROW_SET_SPECS[row_set]
     era_code = pl.lit(0, dtype=pl.Int8) + sum(
         (pl.col("month") >= month).cast(pl.Int8) for month in spec.era_start_months
     )
@@ -569,7 +603,7 @@ def aifs_rows(
             has a null or a not-a-number on a kept row, the fold design is no longer among those
             covering every calendar month, or a row's run is wrong.
     """
-    spec = ROW_SETS[row_set]
+    spec = ROW_SET_SPECS[row_set]
     shared = rows(input_dir=published_dir, domain=domain).drop("era_code", "era", "fold")
     keys = ["site", "time"]
     if shared.select(keys).join(aifs.select(keys), on=keys, how="anti").height:
@@ -1125,22 +1159,24 @@ def build_stamp(
     domain: DomainType,
     arms: Sequence[str],
     extra_dirs: Mapping[str, Path] | None = None,
+    inputs_name: str = "aifs",
 ) -> dict[str, str]:
     """Return what a saved losses file must match.
 
     Args:
         published_dir: The folder holding the published `<domain>_forecast_inputs.parquet`.
-        aifs_dir: The folder holding `<domain>_aifs_inputs.parquet`.
+        aifs_dir: The folder holding `<domain>_<inputs_name>_inputs.parquet`.
         domain: `solar` or `wind`.
         arms: Every arm the saved losses may hold.
         extra_dirs: The extra-lead folders a blends fit reads, by name, or `None`.
+        inputs_name: `aifs` for the AIFS inputs, `wn3` for the WeatherNext 3 inputs.
 
     Returns:
         Every input file's SHA-256, the device, both hyper-parameter settings, the shuffle seeds
         (for a blends fit), and every arm's feature columns.
     """
     stamp = {
-        "inputs_sha256": sha256_of(path=aifs_dir / f"{domain}_aifs_inputs.parquet"),
+        "inputs_sha256": sha256_of(path=aifs_dir / f"{domain}_{inputs_name}_inputs.parquet"),
         "published_sha256": sha256_of(path=published_dir / f"{domain}_forecast_inputs.parquet"),
         "device": DEVICE,
         **environment_stamp(),
@@ -2475,6 +2511,330 @@ def run_blends(
     return 0
 
 
+# --- The WeatherNext 3 fit: WN3's ensemble mean at days 1, 2, 7 and 14 -------------------------
+
+WN3_DAYS: Final[tuple[int, ...]] = (1, 2, 7, 14)
+"""The lead days the WN3 fit scores, each on a frame of its own."""
+
+WN3_MEANVEC_DAY: Final[int] = 1
+"""The day at which wind also fits ENS's mean-vector reference."""
+
+
+def wn3_arms(*, domain: DomainType, day: int) -> tuple[str, ...]:
+    """Return every arm fitted on one WN3 day's frame.
+
+    Args:
+        domain: `solar` or `wind`.
+        day: A day of `WN3_DAYS`.
+
+    Returns:
+        WN3's ensemble mean, ENS's mean on the same rows, the two shuffled copies of WN3's columns
+        (the negative control and its second seed), and, for wind at `WN3_MEANVEC_DAY`, ENS's mean
+        with its speed taken as the length of the mean wind vector.
+    """
+    wn3 = f"wn3_mean_day{day}"
+    arms = [
+        wn3,
+        f"ens_mean_day{day}",
+        shuffled_prefix(source=wn3),
+        shuffled_prefix(source=wn3, variant="_b"),
+    ]
+    if domain == "wind" and day == WN3_MEANVEC_DAY:
+        arms.append(f"ens_meanvec_day{day}")
+    return tuple(arms)
+
+
+def wn3_shuffles(*, day: int) -> dict[str, tuple[str, ...]]:
+    """Return the prefix shuffled on one WN3 frame, with both seeds."""
+    return {f"wn3_mean_day{day}": ("", "_b")}
+
+
+def wn3_contrasts(*, domain: DomainType, day: int) -> list[Contrast]:
+    """Return every listed contrast of one WN3 frame, in report order.
+
+    Every contrast is descriptive: each calendar month of the row set occurs in one year only, so
+    no scored cell has a training row of its calendar month.
+
+    Args:
+        domain: `solar` or `wind`.
+        day: A day of `WN3_DAYS`.
+
+    Returns:
+        WN3's mean against ENS's mean (the planned contrast at day 1), against its own shuffled
+        copy (the negative control), the two shuffled copies against each other (the null), and for
+        wind at `WN3_MEANVEC_DAY` against ENS's mean-vector reference.
+    """
+    wn3 = f"wn3_mean_day{day}"
+    permuted = shuffled_prefix(source=wn3)
+    contrasts_ = [
+        Contrast(
+            wn3,
+            f"ens_mean_day{day}",
+            "descriptive, planned contrast" if day == 1 else "descriptive",
+        ),
+        Contrast(wn3, permuted, "descriptive (negative control: weather shuffled)"),
+        Contrast(wn3, shuffled_prefix(source=wn3, variant="_b"), "descriptive (second seed)"),
+        Contrast(
+            permuted, shuffled_prefix(source=wn3, variant="_b"), "descriptive (null: two shuffles)"
+        ),
+    ]
+    if domain == "wind" and day == WN3_MEANVEC_DAY:
+        contrasts_.append(
+            Contrast(
+                wn3,
+                f"ens_meanvec_day{day}",
+                "exploratory (both speeds are the length of a mean vector)",
+            )
+        )
+    return contrasts_
+
+
+def wn3_sensitivity_arms(*, losses: pl.DataFrame, domain: DomainType, day: int) -> list[str]:
+    """Return every arm to refit at the sensitivity setting on one WN3 frame.
+
+    Args:
+        losses: The frame's primary-setting per-row losses.
+        domain: `solar` or `wind`.
+        day: A day of `WN3_DAYS`.
+
+    Returns:
+        The planned contrast's two arms at day 1, then both arms of every listed contrast near the
+        5% line, without repeats.
+    """
+    arms = [f"wn3_mean_day{day}", f"ens_mean_day{day}"] if day == 1 else []
+    for contrast in wn3_contrasts(domain=domain, day=day):
+        interval = difference(
+            losses=losses, treatment=contrast.treatment, reference=contrast.reference
+        )
+        if near_line(interval=interval):
+            arms += [contrast.treatment, contrast.reference]
+    return list(dict.fromkeys(arms))
+
+
+def fit_wn3_stage(
+    *, frame: pl.DataFrame, domain: DomainType, day: int, workers: int
+) -> pl.DataFrame:
+    """Fit every arm of one WN3 frame, then the second-setting fits.
+
+    Args:
+        frame: The stage's rows from `wn3_rows`.
+        domain: `solar` or `wind`.
+        day: A day of `WN3_DAYS`.
+        workers: How many fits run at once.
+
+    Returns:
+        Every fit's per-row losses, stamped with the device.
+    """
+    primary = fit_jobs(
+        frame=frame,
+        domain=domain,
+        jobs=[(arm, PRIMARY) for arm in wn3_arms(domain=domain, day=day)],
+        workers=workers,
+    )
+    second_arms = wn3_sensitivity_arms(losses=primary, domain=domain, day=day)
+    if not second_arms:
+        return primary.with_columns(device=pl.lit(DEVICE))
+    second = fit_jobs(
+        frame=frame,
+        domain=domain,
+        jobs=[(arm, SENSITIVITY) for arm in second_arms],
+        workers=workers,
+    )
+    return pl.concat([primary, second]).with_columns(device=pl.lit(DEVICE))
+
+
+def wn3_rows(
+    *, published_dir: Path, inputs: pl.DataFrame, domain: DomainType, day: int
+) -> pl.DataFrame:
+    """Return one WN3 day's frame: the shared rows with each hour's day-`day` run inside its era.
+
+    Args:
+        published_dir: The folder holding the published inputs.
+        inputs: `<domain>_wn3_inputs.parquet`, keyed by `site` and `time`.
+        domain: `solar` or `wind`.
+        day: A day of `WN3_DAYS`.
+
+    Returns:
+        `aifs_rows`'s frame for the stage's arms.
+    """
+    return aifs_rows(
+        published_dir=published_dir,
+        aifs=inputs,
+        domain=domain,
+        row_set=WN3_ROW_SET,
+        arms=wn3_arms(domain=domain, day=day),
+        day=day,
+        shuffles=wn3_shuffles(day=day),
+    )
+
+
+def wn3_stage_lines(
+    *, domain: DomainType, day: int, frame: pl.DataFrame, losses: pl.DataFrame
+) -> list[str]:
+    """Write one (technology, day) report section of the WN3 fit.
+
+    Args:
+        domain: `solar` or `wind`.
+        day: A day of `WN3_DAYS`.
+        frame: The stage's rows.
+        losses: The stage's per-row losses.
+
+    Returns:
+        The section's Markdown lines: the row counts and calendar-month coverage, the arms'
+        columns, every arm's absolute error, the listed contrasts at both settings, and the months
+        each contrast is scored in.
+    """
+    arms = wn3_arms(domain=domain, day=day)
+    primary = losses.filter(pl.col("setting") == PRIMARY)
+    second = losses.filter(pl.col("setting") == SENSITIVITY)
+    coverage = coverage_table(frame=frame)
+    lines = [
+        f"### {domain.capitalize()}, day {day}",
+        "",
+        (
+            f"{frame.height} rows over {frame['month'].n_unique()} months "
+            f"({', '.join(sorted(frame['month'].unique().to_list()))}) at "
+            f"{frame['site'].n_unique()} sites. Calendar-month coverage: "
+            f"{coverage.filter(~pl.col('covered')).height} of {coverage.height} (site, fold, "
+            "calendar month) cells have no training row of their calendar month."
+        ),
+        "",
+        "#### Feature columns of every arm",
+        "",
+        *(f"- {arm}: {', '.join(arm_features(arm=arm, domain=domain))}" for arm in arms),
+        "",
+        "#### Absolute error of every arm (GPU, primary setting)",
+        "",
+        "| Arm | Error (% of capacity) | 95% interval | Rows | Months |",
+        "|---|---|---|---|---|",
+    ]
+    for row in leaderboard(losses=primary, arms=list(arms)).iter_rows(named=True):
+        text = error_text(value=row["value"], lower=row["lower_95"], upper=row["upper_95"])
+        lines.append(
+            f"| {row['arm']} | {text.split(' [')[0]} | [{text.split(' [')[1]} "
+            f"| {row['n_rows']} | {row['n_months']} |"
+        )
+    contrast_list = wn3_contrasts(domain=domain, day=day)
+    lines += ["", "#### Listed contrasts (primary setting)", *ERROR_CONTRAST_HEADER]
+    lines += [contrast_row_with_errors(losses=primary, contrast=c) for c in contrast_list]
+    second_arms = set(second["arm"].unique().to_list())
+    lines += ["", "#### Pairs also fitted at the sensitivity setting", *ERROR_CONTRAST_HEADER]
+    for contrast in contrast_list:
+        if not {contrast.treatment, contrast.reference} <= second_arms:
+            continue
+        interval = difference(
+            losses=primary, treatment=contrast.treatment, reference=contrast.reference
+        )
+        why = "near the 5% line" if near_line(interval=interval) else "planned contrast's arms"
+        lines.append(contrast_row_with_errors(losses=second, contrast=contrast, label=why))
+    return [*lines, ""]
+
+
+def check_wn3(*, published_dir: Path, wn3_dir: Path) -> bool:
+    """Fit `wn3_mean_day1` at one wind site twice on the GPU, and print a time estimate.
+
+    Args:
+        published_dir: The folder holding the published inputs.
+        wn3_dir: The folder holding `<domain>_wn3_inputs.parquet`.
+
+    Returns:
+        Whether the two fingerprints agree.
+    """
+    frame = wn3_rows(
+        published_dir=published_dir,
+        inputs=pl.read_parquet(wn3_dir / "wind_wn3_inputs.parquet"),
+        domain="wind",
+        day=1,
+    )
+    agree, seconds = time_two_fits(frame=frame, arm="wn3_mean_day1", domain="wind")
+    n_fits = (
+        sum(len(wn3_arms(domain=domain, day=day)) for domain in DOMAINS for day in WN3_DAYS)
+        * sum(N_SITES.values())
+        // len(DOMAINS)
+    )
+    sys.stdout.write(
+        f"one arm at one site: {seconds:.0f} s; about {n_fits} primary (arm, site) fits are about "
+        f"{n_fits * seconds / 3600:.1f} h on one worker (the sensitivity and near-line refits add "
+        "about a fifth)\n"
+    )
+    return agree
+
+
+def run_wn3(*, published_dir: Path, output_dir: Path, workers: int) -> int:
+    """Fit every stage of the WN3 fit and write its outputs once.
+
+    Args:
+        published_dir: The folder holding the published inputs.
+        output_dir: The new folder holding `<domain>_wn3_inputs.parquet` from `build_wn3_inputs.py
+            --build`, which receives every output.
+        workers: How many (arm, site) fits run at once.
+
+    Returns:
+        0.
+    """
+    report_path = output_dir / "report.md"
+    refuse_to_overwrite(paths=[report_path])
+    sections: list[str] = []
+    for domain in DOMAINS:
+        inputs = pl.read_parquet(output_dir / f"{domain}_wn3_inputs.parquet")
+        sections += [f"## {domain.capitalize()}, row set `{WN3_ROW_SET}`", ""]
+        for day in WN3_DAYS:
+            frame = wn3_rows(published_dir=published_dir, inputs=inputs, domain=domain, day=day)
+            stage = f"{WN3_ROW_SET}_day{day}"
+            losses_file = path_for(
+                output_dir=output_dir, domain=domain, row_set=stage, kind="losses"
+            )
+            predictions_file = path_for(
+                output_dir=output_dir, domain=domain, row_set=stage, kind="predictions"
+            )
+            stamp_file = losses_file.with_suffix(".json")
+            arms = list(wn3_arms(domain=domain, day=day))
+            stamp = build_stamp(
+                published_dir=published_dir,
+                aifs_dir=output_dir,
+                domain=domain,
+                arms=arms,
+                inputs_name="wn3",
+            )
+            if losses_file.exists():
+                losses = pl.read_parquet(losses_file)
+                check_saved_losses(
+                    losses=losses,
+                    frame=frame,
+                    stage=f"{domain}/{stage}",
+                    arms=arms,
+                    stamp_file=stamp_file,
+                    stamp=stamp,
+                )
+            else:
+                refuse_to_overwrite(paths=[predictions_file, stamp_file])
+                losses = fit_wn3_stage(frame=frame, domain=domain, day=day, workers=workers)
+                losses.write_parquet(losses_file)
+                stamp_file.write_text(json.dumps(stamp))
+            if not predictions_file.exists():
+                predictions_from_losses(losses=losses, frame=frame).write_parquet(predictions_file)
+            sections += wn3_stage_lines(domain=domain, day=day, frame=frame, losses=losses)
+    header = [
+        "# WeatherNext 3 at days 1, 2, 7 and 14, beside ENS's mean on the same rows: report",
+        "",
+        (
+            "Every fit is on the GPU. Differences are first arm minus second, in percentage points "
+            "of capacity, so a negative difference means the first arm has the lower error. Every "
+            "contrast is descriptive: the row set holds February to April and June to September "
+            "2026, so each calendar month occurs in one year only and no scored cell has a "
+            "training row of its calendar month. No contrast is deciding. The planned contrast is "
+            "wn3_mean_day1 − ens_mean_day1, with its negative control (WN3's weather shuffled "
+            "within site, year-month and hour of day, under two seeds). Wind at day 1 also "
+            "contrasts with ens_meanvec_day1, whose speed is the length of the mean of ENS's "
+            "member wind vectors, as WN3's is, because the WN3 store holds only the ensemble-mean "
+            "wind components."
+        ),
+        "",
+    ]
+    report_path.write_text("\n".join([*header, *sections]))
+    return 0
+
+
 # --- The P4 second-seed control refit -----------------------------------------------------------
 
 P4_SECOND_SEED: Final[int] = 1000
@@ -2926,31 +3286,43 @@ def run_p4(*, published_dir: Path, output_dir: Path, workers: int) -> int:
     return 0
 
 
-def main() -> int:
-    """Fit every arm on both row sets and both technologies, and write the outputs once."""
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--published-dir", type=Path, required=True)
-    parser.add_argument("--workers", type=int, default=1, help="(arm, site) fits run at once.")
-    parser.add_argument("--check", action="store_true", help="Compare two GPU runs of one arm.")
-    parser.add_argument(
-        "--blends",
-        action="store_true",
-        help="Fit AIFS at days 1, 2, 7 and 14 and the blends with ENS's mean, from the inputs "
-        "`build_forecast_inputs.py --aifs --aifs-days 1 2 7 14` wrote to --output-dir.",
+def main_wn3(*, args: argparse.Namespace) -> int:
+    """Run `--wn3`, or its `--check`, after refusing every folder the mode must not write to.
+
+    Args:
+        args: The parsed command line.
+
+    Returns:
+        The process exit code.
+    """
+    studies_dir = args.published_dir.resolve().parent
+    refuse_read_only_folders(
+        output_dir=args.output_dir,
+        read_only=[
+            args.published_dir,
+            studies_dir / EXISTING_AIFS_DIR_NAME,
+            studies_dir / BLENDS_DIR_NAME,
+            *(studies_dir / folder for folder in EXTRA_FOLDERS.values()),
+        ],
     )
-    parser.add_argument(
-        "--p4-controls",
-        action="store_true",
-        help="Refit the published P4 blends on the GPU with their first control and a "
-        "second-seed control, into a new --output-dir (no AIFS inputs are read).",
+    if args.check:
+        agree = check_wn3(published_dir=args.published_dir, wn3_dir=args.output_dir)
+        sys.stdout.write(f"two GPU runs agree: {agree}\n")
+        return 0 if agree else 1
+    return run_wn3(
+        published_dir=args.published_dir, output_dir=args.output_dir, workers=args.workers
     )
-    args = parser.parse_args()
-    check_gpu_visible()
-    if args.output_dir.resolve() == args.published_dir.resolve():
-        msg = "the output folder must not be the published folder"
-        raise ValueError(msg)
+
+
+def run_extra_mode(*, args: argparse.Namespace) -> int | None:
+    """Run the mode `args` selects, other than the default fit.
+
+    Args:
+        args: The parsed command line.
+
+    Returns:
+        The process exit code, or `None` when no other mode is selected.
+    """
     if args.p4_controls:
         studies_dir = args.published_dir.resolve().parent
         refuse_read_only_folders(
@@ -2969,6 +3341,8 @@ def main() -> int:
         return run_p4(
             published_dir=args.published_dir, output_dir=args.output_dir, workers=args.workers
         )
+    if args.wn3:
+        return main_wn3(args=args)
     if args.blends:
         studies_dir = args.published_dir.resolve().parent
         extra_dirs = {name: studies_dir / folder for name, folder in EXTRA_FOLDERS.items()}
@@ -2996,6 +3370,43 @@ def main() -> int:
             existing_dir=studies_dir / EXISTING_AIFS_DIR_NAME,
             workers=args.workers,
         )
+    return None
+
+
+def main() -> int:
+    """Fit every arm on both row sets and both technologies, and write the outputs once."""
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--published-dir", type=Path, required=True)
+    parser.add_argument("--workers", type=int, default=1, help="(arm, site) fits run at once.")
+    parser.add_argument("--check", action="store_true", help="Compare two GPU runs of one arm.")
+    parser.add_argument(
+        "--blends",
+        action="store_true",
+        help="Fit AIFS at days 1, 2, 7 and 14 and the blends with ENS's mean, from the inputs "
+        "`build_forecast_inputs.py --aifs --aifs-days 1 2 7 14` wrote to --output-dir.",
+    )
+    parser.add_argument(
+        "--wn3",
+        action="store_true",
+        help="Fit WeatherNext 3's ensemble mean at days 1, 2, 7 and 14 beside ENS's mean, from "
+        "the inputs `build_wn3_inputs.py --build` wrote to --output-dir.",
+    )
+    parser.add_argument(
+        "--p4-controls",
+        action="store_true",
+        help="Refit the published P4 blends on the GPU with their first control and a "
+        "second-seed control, into a new --output-dir (no AIFS inputs are read).",
+    )
+    args = parser.parse_args()
+    check_gpu_visible()
+    if args.output_dir.resolve() == args.published_dir.resolve():
+        msg = "the output folder must not be the published folder"
+        raise ValueError(msg)
+    extra = run_extra_mode(args=args)
+    if extra is not None:
+        return extra
     if args.check:
         agree = check_determinism(published_dir=args.published_dir, aifs_dir=args.output_dir)
         sys.stdout.write(f"two GPU runs agree: {agree}\n")

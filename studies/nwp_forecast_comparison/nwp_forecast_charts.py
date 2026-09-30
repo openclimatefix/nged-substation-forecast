@@ -56,6 +56,7 @@ from fit_aifs import (
     NO_DOY_SUFFIX,
     NO_SKILL,
     ROW_SETS,
+    WN3_DAYS,
     Contrast,
     blend_arm_name,
     blend_contrasts,
@@ -141,6 +142,9 @@ PRODUCT_NAMES: Final[dict[str, str]] = {
     "ens_mean": "ENS mean",
     "ens_control": "ENS control member",
     "gefs_mean": "GEFS mean",
+    "aifs_single": "AIFS Single",
+    "aifs_ens_mean": "AIFS ENS mean",
+    "wn3_mean": "WeatherNext 3 mean",
 }
 """Each column prefix's product name, up to its `_day<N>` suffix. Two rows are NOAA GFS: the one
 Open-Meteo serves (`gfs`, its GFS-SEAMLESS archive) and the one read from Dynamical.org's native
@@ -709,6 +713,9 @@ LEAD_POINT_SIZE: Final[int] = 45
 LEAD_ROW_PX: Final[int] = 60
 """The height of one product's row on the leaderboard, which holds one mark per fitted lead."""
 
+LEAD_TICK_HEIGHT_PX: Final[int] = 9
+"""The height of the grey tick that marks the ENS mean on a smaller row set's rows."""
+
 LEAD_DODGE_ROWS: Final[float] = 0.135
 """The vertical spacing between the marks of one product's lead days, in rows."""
 
@@ -739,8 +746,9 @@ def lead_board_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
 
     Returns:
         One row per fitted product and lead day, at the primary setting, with `product`, `day`,
-        `value`, `lower_95` and `upper_95` in percent of capacity. A lead day a product was not
-        fitted at has no row, so it is left blank rather than filled.
+        `value`, `lower_95` and `upper_95` in percent of capacity, and `n_months`, the number of
+        calendar months the arm's rows span. A lead day a product was not fitted at has no row, so
+        it is left blank rather than filled.
     """
     primary = by_setting(losses=losses)["primary"]
     parsed = parsed_lead_arms(losses=primary)
@@ -756,9 +764,121 @@ def lead_board_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
                 {arm: day for arm, (_, day) in parsed.items()}, return_dtype=pl.Int64
             ),
         )
-        .select("product", "day", "value", "lower_95", "upper_95")
+        .select("product", "day", "value", "lower_95", "upper_95", "n_months")
         .sort("product", "day")
     )
+
+
+class RowSetMarks(NamedTuple):
+    """One product fitted on a row set smaller than the published one, and that row set's losses."""
+
+    slug: str
+    losses: pl.DataFrame
+
+
+ROW_SET_PRODUCTS: Final[dict[str, str]] = {
+    "single": "aifs_single",
+    "ens": "aifs_ens_mean",
+    "wn3": "wn3_mean",
+}
+"""The product each smaller row set adds to the leaderboard, by row set."""
+
+
+def load_row_set_marks(
+    *, blends_dir: Path | None, wn3_dir: Path | None, domain: DomainType
+) -> list[RowSetMarks]:
+    """Read the losses of the products that are fitted on a smaller row set than the published one.
+
+    Args:
+        blends_dir: The directory `fit_aifs.py --blends` wrote to, or None to leave out AIFS Single
+            and the AIFS ENS mean.
+        wn3_dir: The directory `fit_aifs.py --wn3` wrote to, or None to leave out WeatherNext 3.
+        domain: `solar` or `wind`.
+
+    Returns:
+        One `RowSetMarks` per product, in the order AIFS Single, AIFS ENS mean, WeatherNext 3
+        mean, after the anonymisation check.
+
+    Raises:
+        ValueError: If a losses file was fitted on a device other than `EXTRA_DEVICE`.
+    """
+    frames: dict[str, pl.DataFrame] = {}
+    if blends_dir is not None:
+        frames |= load_aifs_leads(blends_dir=blends_dir, domain=domain)
+    if wn3_dir is not None:
+        frames["wn3"] = pl.concat(
+            [
+                pl.read_parquet(wn3_dir / f"{domain}_wn3_day{day}_losses.parquet")
+                for day in WN3_DAYS
+            ],
+            how="diagonal_relaxed",
+        )
+        check_anonymised(frame=frames["wn3"], domain=domain)
+    for row_set, frame in frames.items():
+        devices = set(frame["device"].unique().to_list()) if "device" in frame.columns else set()
+        if devices - {EXTRA_DEVICE}:
+            msg = f"row set {row_set}: fitted on {sorted(devices)}, not on {EXTRA_DEVICE}"
+            raise ValueError(msg)
+    return [
+        RowSetMarks(slug=slug, losses=frames[row_set])
+        for row_set, slug in ROW_SET_PRODUCTS.items()
+        if row_set in frames
+    ]
+
+
+def row_set_board_rows(*, marks: Sequence[RowSetMarks]) -> pl.DataFrame:
+    """Return each smaller-row-set product's marks, and its rows' ENS mean beside them.
+
+    Each product's name carries its number of months. The ENS mean rows are the same arms refitted
+    on the same rows, so a reader can tell the season's effect from the product's.
+
+    Args:
+        marks: `load_row_set_marks`'s result.
+
+    Returns:
+        `lead_board_rows`'s columns, plus `kind`: `mark` for the product, `ens_same_rows` for the
+        ENS mean on the product's rows.
+    """
+    frames = []
+    for mark in marks:
+        pattern = rf"^({mark.slug}|ens_mean)_day\d+$"
+        losses = mark.losses.filter(pl.col("arm").str.contains(pattern))
+        rows = lead_board_rows(losses=losses)
+        months = int(
+            rows.filter((pl.col("product") == PRODUCT_NAMES[mark.slug]) & (pl.col("day") == 1))[
+                "n_months"
+            ][0]
+        )
+        name = f"{PRODUCT_NAMES[mark.slug]} ({months} months)"
+        frames.append(
+            rows.filter(pl.col("product").is_in([PRODUCT_NAMES[mark.slug], "ENS mean"]))
+            .with_columns(
+                kind=pl.when(pl.col("product") == "ENS mean")
+                .then(pl.lit("ens_same_rows"))
+                .otherwise(pl.lit("mark")),
+                product=pl.lit(name),
+            )
+            .drop("n_months")
+        )
+    return pl.concat(frames)
+
+
+def minor_grid_values(*, x_ticks: Sequence[float], x_domain: tuple[float, float]) -> list[float]:
+    """Return the values of the 0.5-point minor grid lines: every half point that is not a tick.
+
+    Args:
+        x_ticks: The major ticks; the minor lines start at the first one, so none runs through
+            the product names.
+        x_domain: The x range.
+
+    Returns:
+        The half-point values from the first tick to the top of the range, without the ticks.
+    """
+    first = min(x_ticks)
+    count = math.floor((x_domain[1] - first) * 2 + 1e-9)
+    halves = [round(first + step * 0.5, 6) for step in range(count + 1)]
+    major = {round(tick, 6) for tick in x_ticks}
+    return [value for value in halves if value not in major]
 
 
 def lead_board_products(*, rows: pl.DataFrame) -> list[str]:
@@ -773,13 +893,22 @@ def lead_board_products(*, rows: pl.DataFrame) -> list[str]:
     return rows.filter(pl.col("day") == 1).sort("value")["product"].to_list()
 
 
-def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt.VConcatChart:
+def leaderboard_figure(
+    *,
+    loaded: Loaded,
+    domain: DomainType,
+    title: str,
+    row_set_marks: Sequence[RowSetMarks] = (),
+) -> alt.VConcatChart:
     """Draw each product's mean absolute error at each fitted lead day, one product per row.
 
     Args:
         loaded: `load`'s result; the marks come from `loaded.leaderboard_losses`.
         domain: `solar` or `wind`.
         title: The figure's title.
+        row_set_marks: Products fitted on a smaller row set than the published one. Each is drawn
+            in a row below the published products, named with its number of months, beside a grey
+            tick for the ENS mean fitted on the same rows.
 
     Returns:
         The figure.
@@ -793,8 +922,16 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
         extra_devices=loaded.extra_devices,
         published_arms=loaded.published_arms,
     )
-    rows = lead_board_rows(losses=losses)
-    products = lead_board_products(rows=rows)
+    published_rows = lead_board_rows(losses=losses).drop("n_months")
+    extra_rows = (
+        row_set_board_rows(marks=row_set_marks)
+        if row_set_marks
+        else published_rows.clear().with_columns(kind=pl.lit(""))
+    )
+    rows = pl.concat([published_rows.with_columns(kind=pl.lit("mark")), extra_rows])
+    marks_only = rows.filter(pl.col("kind") == "mark")
+    products = lead_board_products(rows=published_rows)
+    products += lead_board_products(rows=extra_rows.filter(pl.col("kind") == "mark"))
     baselines = leaderboard(
         losses=by_setting(losses=losses)["primary"], arms=["climatology", "smart_persistence_day1"]
     ).with_columns(
@@ -806,12 +943,20 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
     )
     days = sorted(set(rows["day"].to_list()))
     offsets = {day: (rank - (len(days) - 1) / 2) * LEAD_DODGE_ROWS for rank, day in enumerate(days)}
+    same_rows = rows.filter(pl.col("kind") == "ens_same_rows")
+    rows = marks_only
     data = rows.with_columns(
         y=pl.col("product").replace_strict(
             {name: float(index) for index, name in enumerate(products)}, return_dtype=pl.Float64
         )
         + pl.col("day").replace_strict(offsets, return_dtype=pl.Float64),
         lead=pl.format("Day {}", pl.col("day")),
+    )
+    same_rows_data = same_rows.with_columns(
+        y=pl.col("product").replace_strict(
+            {name: float(index) for index, name in enumerate(products)}, return_dtype=pl.Float64
+        )
+        + pl.col("day").replace_strict(offsets, return_dtype=pl.Float64)
     )
     lead_names = [f"Day {day}" for day in days]
     x_domain, x_ticks = lead_board_x_domain(
@@ -857,6 +1002,26 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
             x=alt.X("x:Q", scale=x_scale, axis=x_axis, title=x_title),
             y=alt.Y("y_start:Q", scale=y_scale, axis=y_axis),
             y2="y_end:Q",
+        )
+    )
+    minor = minor_grid_values(x_ticks=x_ticks, x_domain=x_domain)
+    minor_grid = (
+        alt.Chart(pl.DataFrame({"x": minor, "y_start": -0.5, "y_end": len(products) - 0.5}))
+        .mark_rule(color=ocf.GRID, strokeWidth=0.5, opacity=0.6, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("x:Q", scale=x_scale, axis=x_axis, title=x_title),
+            y=alt.Y("y_start:Q", scale=y_scale, axis=y_axis),
+            y2="y_end:Q",
+        )
+    )
+    same_rows_ticks = (
+        alt.Chart(same_rows_data)
+        .mark_tick(
+            color=ocf.BLACK_1, opacity=0.45, thickness=2, size=LEAD_TICK_HEIGHT_PX, aria=False
+        )
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("value:Q", scale=x_scale, axis=x_axis, title=x_title),
+            y=alt.Y("y:Q", scale=y_scale, axis=y_axis),
         )
     )
     names = (
@@ -935,7 +1100,17 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
         )
     )
     panel = alt.LayerChart(
-        layer=[grid, rules, reference_rules, intervals, points, names, reference_text],
+        layer=[
+            grid,
+            minor_grid,
+            rules,
+            reference_rules,
+            same_rows_ticks,
+            intervals,
+            points,
+            names,
+            reference_text,
+        ],
         width=LEAD_PLOT_WIDTH_PX,
         height=LEAD_ROW_PX * (len(products) + LEAD_LABEL_ROWS - 0.5),
     )
@@ -955,7 +1130,10 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
                 "Each row is one forecast product. Each mark is an XGBoost model's mean absolute "
                 "error, as a percentage of capacity, given that product's forecast at one lead "
                 "day. Smaller is better. Marks run from day 0 at the top to day 14 at the bottom; "
-                "day 7 is a grey diamond and day 0 is a black diamond. A lead day with no mark "
+                "day 7 is a grey diamond and day 0 is a black diamond. Products in the rows "
+                "below the full-window products were fitted on fewer months, shown in their "
+                "names; within each group, rows are ordered by day-1 error, and a grey tick "
+                "beside a mark is the ENS mean fitted on the same rows. A lead day with no mark "
                 "was not fitted, because it is beyond the product's forecast range or not in "
                 "the archive we hold; nothing is filled in. Dashed lines mark the no-weather "
                 f"baselines. {DOTS_NOTE} Overlapping intervals can still hide a significant "
@@ -2539,6 +2717,8 @@ def draw_domain(
     domain: DomainType,
     extra_dirs: Sequence[Path] = (),
     aifs_dir: Path | None = None,
+    blends_dir: Path | None = None,
+    wn3_dir: Path | None = None,
 ) -> tuple[dict[str, alt.VConcatChart], str | None]:
     """Draw every chart of one technology that its saved losses can support.
 
@@ -2547,6 +2727,10 @@ def draw_domain(
         domain: `solar` or `wind`.
         extra_dirs: The directories `fit_extra_leads.py` wrote to.
         aifs_dir: The directory `fit_aifs.py` wrote to, or None to leave the AIFS chart out.
+        blends_dir: The directory `fit_aifs.py --blends` wrote to, or None to leave AIFS Single and
+            the AIFS ENS mean off the leaderboard.
+        wn3_dir: The directory `fit_aifs.py --wn3` wrote to, or None to leave WeatherNext 3 off the
+            leaderboard.
 
     Returns:
         Each chart keyed by its name, and the chosen week's month and year.
@@ -2557,7 +2741,10 @@ def draw_domain(
     charts: dict[str, alt.VConcatChart | None] = {
         "headline": headline(losses=losses, domain=domain, title=TITLES[(domain, "headline")]),
         "leaderboard": leaderboard_figure(
-            loaded=loaded, domain=domain, title=TITLES[(domain, "leaderboard")]
+            loaded=loaded,
+            domain=domain,
+            title=TITLES[(domain, "leaderboard")],
+            row_set_marks=load_row_set_marks(blends_dir=blends_dir, wn3_dir=wn3_dir, domain=domain),
         ),
         "by_lead_day": by_lead_day(
             losses=losses, domain=domain, title=TITLES[(domain, "by_lead_day")]
@@ -2606,6 +2793,19 @@ def main() -> int:
         help="The directory `fit_aifs.py --blends` wrote to. Draws only the AIFS lead chart "
         "(`aifs_leads`), so no other SVG is rewritten, and needs no --input-dir.",
     )
+    parser.add_argument(
+        "--leaderboard-blends-dir",
+        type=Path,
+        default=None,
+        help="The directory `fit_aifs.py --blends` wrote to; adds AIFS Single and the AIFS ENS "
+        "mean to the leaderboards.",
+    )
+    parser.add_argument(
+        "--wn3-dir",
+        type=Path,
+        default=None,
+        help="The directory `fit_aifs.py --wn3` wrote to; adds WeatherNext 3 to the leaderboards.",
+    )
     parser.add_argument("--output-dir", type=Path, required=True, help="Where SVGs are written.")
     parser.add_argument("--no-svgo", action="store_true", help="Skip the svgo optimisation.")
     args = parser.parse_args()
@@ -2633,6 +2833,8 @@ def main() -> int:
             domain=domain,
             extra_dirs=args.extra_dir,
             aifs_dir=args.aifs_dir,
+            blends_dir=args.leaderboard_blends_dir,
+            wn3_dir=args.wn3_dir,
         )
         for name, chart in charts.items():
             path = args.output_dir / f"nwp_forecast_{domain}_{name}.svg"
