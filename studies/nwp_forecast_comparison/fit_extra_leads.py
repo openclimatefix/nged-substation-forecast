@@ -428,8 +428,8 @@ FIFTH_ENSEMBLE_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
 
 FIFTH_ENSEMBLE_TITLE: Final[str] = (
     "Other products against the ENS mean at day 4 (ENS, GEFS, native GFS, and IFS HRES read a 00 "
-    "UTC run's leads from 96 hours, the same lead; the ICON-EU, ICON global, IFS 0.25 degree, and GFS "
-    "Previous Runs arms serve the freshest run at least 4 days old, a shorter lead)"
+    "UTC run's leads from 96 hours, the same lead; the ICON-EU, ICON global, IFS 0.25 degree, and "
+    "GFS Previous Runs arms serve the freshest run at least 4 days old, a shorter lead)"
 )
 """The heading of the fifth batch's contrasts against ENS."""
 

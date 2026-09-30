@@ -534,11 +534,11 @@ def test_the_row_set_diagnostic_names_the_fifth_batchs_own_arms():
 
 
 def test_the_fifth_build_refuses_any_output_folder_but_its_own(tmp_path: Path) -> None:
-    from build_forecast_inputs import DAY4_OUTPUT_DIR_NAME, build_extra_leads
+    from build_forecast_inputs import build_extra_leads
 
-    assert FIFTH_OUTPUT_DIR_NAME == DAY4_OUTPUT_DIR_NAME
+    assert FIFTH_OUTPUT_DIR_NAME == "nwp_forecast_comparison_day4_shared"
     published = tmp_path / "nwp_forecast_comparison"
-    with pytest.raises(ValueError, match=DAY4_OUTPUT_DIR_NAME):
+    with pytest.raises(ValueError, match="nwp_forecast_comparison_day4_shared"):
         build_extra_leads(
             domain="solar",
             published_dir=published,
@@ -546,3 +546,64 @@ def test_the_fifth_build_refuses_any_output_folder_but_its_own(tmp_path: Path) -
             gefs_window_dir=None,
             batch="fifth",
         )
+
+
+def _patch_fifth_build(*, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ens: float) -> Path:
+    """Stub every column builder of the fifth batch but the ENS one, and write both references."""
+    import build_forecast_inputs as bfi
+
+    published = tmp_path / "nwp_forecast_comparison"
+    published.mkdir()
+    keys = pl.DataFrame({"site": ["A"], "time": [datetime(2026, 3, 6, 12, tzinfo=UTC)]})
+    keys.write_parquet(published / "solar_forecast_inputs.parquet")
+    wn3 = tmp_path / "nwp_forecast_comparison_wn3_extra_days"
+    wn3.mkdir()
+    keys.with_columns(ens_mean_day4_ghi=pl.lit(7.0)).write_parquet(wn3 / "solar_wn3_inputs.parquet")
+    monkeypatch.setattr(bfi, "_previous_runs_frame", lambda *, keys, **_: keys)
+    monkeypatch.setattr(bfi, "_gefs_frame", lambda *, keys, **_: keys)
+    monkeypatch.setattr(bfi, "_gfs_native_frame", lambda *, keys, **_: keys)
+    monkeypatch.setattr(bfi, "_ifs_single_frame", lambda *, keys, **_: keys)
+    monkeypatch.setattr(
+        bfi,
+        "_ens_extra_frame",
+        lambda *, keys, **_: keys.with_columns(ens_mean_day4_ghi=pl.lit(ens)),
+    )
+    return published
+
+
+def test_the_fifth_build_stops_when_its_ens_mean_differs_from_the_wn3_folders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from build_forecast_inputs import build_extra_leads
+
+    published = _patch_fifth_build(monkeypatch=monkeypatch, tmp_path=tmp_path, ens=8.0)
+    output = tmp_path / "nwp_forecast_comparison_day4_shared"
+
+    with pytest.raises(ValueError, match="ens_mean_day4"):
+        build_extra_leads(
+            domain="solar",
+            published_dir=published,
+            output_dir=output,
+            gefs_window_dir=None,
+            batch="fifth",
+        )
+    assert not (output / "solar_extra_lead_inputs.parquet").exists()
+
+
+def test_the_fifth_build_writes_its_inputs_when_its_ens_mean_equals_the_wn3_folders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from build_forecast_inputs import build_extra_leads
+
+    published = _patch_fifth_build(monkeypatch=monkeypatch, tmp_path=tmp_path, ens=7.0)
+    output = tmp_path / "nwp_forecast_comparison_day4_shared"
+
+    path = build_extra_leads(
+        domain="solar",
+        published_dir=published,
+        output_dir=output,
+        gefs_window_dir=None,
+        batch="fifth",
+    )
+
+    assert pl.read_parquet(path)["ens_mean_day4_ghi"][0] == 7.0

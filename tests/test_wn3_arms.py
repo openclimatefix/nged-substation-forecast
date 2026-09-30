@@ -976,7 +976,7 @@ def test_a_hole_in_any_one_value_column_stops_the_build(domain: str, column: str
 
 def test_the_day_5_wn3_build_refuses_any_output_folder_but_its_own(tmp_path: Path) -> None:
     published = tmp_path / "nwp_forecast_comparison"
-    with pytest.raises(ValueError, match=bfi.DAY5_OUTPUT_DIR_NAME):
+    with pytest.raises(ValueError, match="nwp_forecast_comparison_day5_aifs_wn3"):
         w.build_domain(
             domain="solar",
             published_dir=published,
@@ -984,7 +984,8 @@ def test_the_day_5_wn3_build_refuses_any_output_folder_but_its_own(tmp_path: Pat
             weather_dir=tmp_path,
             days=(3, 5),
         )
-    assert driver.OUTPUT_DIR_NAME == bfi.DAY5_OUTPUT_DIR_NAME
+    assert driver.OUTPUT_DIR_NAME == "nwp_forecast_comparison_day5_aifs_wn3"
+    assert bfi.DAY5_OUTPUT_DIR_NAME == "nwp_forecast_comparison_day5_aifs_wn3"
 
 
 def _run_driver(
@@ -1058,3 +1059,61 @@ def test_the_driver_refuses_before_any_fit_when_report_md_exists(
     with pytest.raises(FileExistsError):
         _run_driver(tmp_path=tmp_path, monkeypatch=monkeypatch, existing=[driver.REPORT_NAME])
     assert not (tmp_path / driver.OUTPUT_DIR_NAME / driver.AIFS_REPORT_NAME).exists()
+
+
+def _patch_day5_build(*, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ens: float) -> Path:
+    """Stub everything `build_domain` reads but the keys, the WN3 copy and the ENS reference."""
+    published = tmp_path / "nwp_forecast_comparison"
+    published.mkdir()
+    _keys(times=[datetime(2026, 3, 6, 12)]).write_parquet(
+        published / "wind_forecast_inputs.parquet"
+    )
+    reference = tmp_path / "nwp_forecast_comparison_leads_day10"
+    reference.mkdir()
+    _keys(times=[datetime(2026, 3, 6, 12)]).with_columns(
+        ens_mean_day5_speed_100m=pl.lit(7.0)
+    ).write_parquet(reference / "wind_extra_lead_inputs.parquet")
+    monkeypatch.setattr(w, "aifs_site_weights", lambda **_: _weights(cells=[("A", 0, 0, 1.0)]))
+    monkeypatch.setattr(w, "open_local", lambda **_: _dataset())
+    monkeypatch.setattr(w, "check_against_store", lambda **_: None)
+    monkeypatch.setattr(
+        w,
+        "_ens_extra_frame",
+        lambda *, keys, **_: keys.with_columns(ens_mean_day5_speed_100m=pl.lit(ens)),
+    )
+    monkeypatch.setattr(w, "ens_members", lambda **_: None)
+    monkeypatch.setattr(
+        w, "ens_vector_mean_frame", lambda *, extract, day: _keys(times=[datetime(2026, 3, 6, 12)])
+    )
+    return published
+
+
+def test_the_day_5_wn3_build_stops_when_its_ens_mean_differs_from_the_extra_lead_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    published = _patch_day5_build(monkeypatch=monkeypatch, tmp_path=tmp_path, ens=8.0)
+
+    with pytest.raises(ValueError, match="ens_mean_day5"):
+        w.build_domain(
+            domain="wind",
+            published_dir=published,
+            output_dir=tmp_path / "nwp_forecast_comparison_day5_aifs_wn3",
+            weather_dir=tmp_path,
+            days=(5,),
+        )
+
+
+def test_the_day_5_wn3_build_accepts_an_ens_mean_equal_to_the_extra_lead_folders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    published = _patch_day5_build(monkeypatch=monkeypatch, tmp_path=tmp_path, ens=7.0)
+
+    frame = w.build_domain(
+        domain="wind",
+        published_dir=published,
+        output_dir=tmp_path / "nwp_forecast_comparison_day5_aifs_wn3",
+        weather_dir=tmp_path,
+        days=(5,),
+    )
+
+    assert frame["ens_mean_day5_speed_100m"][0] == 7.0

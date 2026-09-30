@@ -3192,9 +3192,10 @@ LEAN_ENS_BUILT_DAYS: Final[tuple[int, ...]] = (10,)
 LEAN_ENS_NATIVE_DAYS: Final[tuple[int, ...]] = (4, 5)
 """The lean days at which the published inputs hold no ENS mean and ENS still has 3-hourly steps
 (day 4 scores leads 96 to 120 hours and day 5 scores leads 120 to 144 hours, and ENS steps 3-hourly
-to lead 144 and 6-hourly after it, so day 5's band reads a 6-hourly step beyond its last scored lead), so the AIFS build's 6-hourly emulation is not
-ENS's mean. The ENS mean is built from ENS's native steps, exactly as the WeatherNext 3 build
-builds it. Days 0 and 3 read the published columns."""
+to lead 144 and 6-hourly after it, so day 5's band reads a 6-hourly step beyond its last scored
+lead), so the AIFS build's 6-hourly emulation is not ENS's mean. The ENS mean is built from ENS's
+native steps, exactly as the WeatherNext 3 build builds it. Days 0 and 3 read the published
+columns."""
 
 LEAN_ENS_CHECKED_DAYS: Final[tuple[int, ...]] = (5, 10)
 """The lean days whose ENS mean the `leads_day10` extra-lead folder also holds, on the same rows,
