@@ -12,7 +12,7 @@ difference is in percentage points of capacity, written "points", and each brack
 interval. The rows are 53,107 farm-hours between 17 September 2019 and 30 June 2026, where a
 farm-hour is one wind farm's power in one hour. The comparison the study planned in advance, four
 heights (50, 75, 100, and 150 m) against 100 m alone, gives a difference in error of -0.394 points
-[-0.448, -0.344], which is 5% of the 100 m error, in every one of the five folds. CERRA is a
+[-0.448, -0.344], in every one of the five folds. CERRA is a
 reanalysis, so every number describes how well CERRA's wind explains power that has already been
 generated, and none describes forecast skill.
 
@@ -23,7 +23,7 @@ point estimates and has no interval. Four heights differ from the pair by -0.074
 -0.051], and five heights by -0.104 points [-0.121, -0.086], but both comparisons were chosen after
 the results were seen, so each is a lead to follow up rather than a finding. The 10 m and 100 m
 pair also differs from the 10 m speed alone by -0.370 points [-0.411, -0.332], another post hoc
-comparison. The planned comparison of the 10 m speed with the 100 m speed gives -0.050 points
+comparison. The planned comparison of the 100 m speed minus the 10 m speed gives -0.050 points
 [-0.123, +0.025], which is not statistically significant at the 5% level. Its Bonferroni-adjusted
 interval, [-0.145, +0.046], does not rule out the 100 m speed having an error up to 0.145 points
 lower than the 10 m speed. The page draws no conclusion about wind direction, because the study
@@ -225,7 +225,8 @@ second table.
 all 5 folds.** The synthetic target needs the speed at 120 m, which is a blend of the 100 m and 150
 m speeds, so the result shows that the XGBoost models can learn a blend of heights when the target
 needs one. The result says nothing about whether the real wind farms' power needs one. Figure 3
-shows the estimates of the four-height XGBoost model on the real target.
+shows the estimates of the four-height XGBoost model on the real target, for the first fitting seed
+only.
 
 ![Figure 3: The four-height XGBoost model's estimates follow measured power at each farm](../assets/cerra_wind_levels_predictions.svg)
 
@@ -293,13 +294,11 @@ product derives its speed, and the study has no way to separate that from the he
 
 **The planned mean of the 75, 100, and 150 m speeds changes the error by -0.050 points [-0.070,
 -0.032] against the 100 m speed, and the fifth height changes it by a further -0.029 points [-0.042,
--0.016].**
-Both are statistically significant at the 5% level after the Bonferroni correction, with 98.75%
-intervals of [-0.075, -0.029] and [-0.046, -0.013], and both have the same sign in all 5 folds. Both
-are small. The four heights as separate columns differ from the mean of three of them by -0.344 points
-[-0.393, -0.294], a post hoc comparison. The fifth height's gain is under 1% of the error of the
-four-height set. At the second setting the two differences are -0.052 points
-[-0.066, -0.038] and -0.020 points [-0.029, -0.011].
+-0.016].** Both are statistically significant at the 5% level after the Bonferroni correction, with
+98.75% intervals of [-0.075, -0.029] and [-0.046, -0.013], and both have the same sign in all 5
+folds. Both are small. The four heights as separate columns differ from the mean of three of them by
+-0.344 points [-0.393, -0.294], a post hoc comparison. At the second setting the two differences are
+-0.052 points [-0.066, -0.038] and -0.020 points [-0.029, -0.011].
 
 ### The negative and positive controls
 
