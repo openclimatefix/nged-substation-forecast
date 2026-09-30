@@ -69,7 +69,7 @@ from typing import Final, Literal, NamedTuple
 import numpy as np
 import polars as pl
 import xgboost
-from build_forecast_inputs import _ens_extra_frame
+from build_forecast_inputs import SOLAR_DAY0_FIRST_SCORED_LEAD, _ens_extra_frame
 from fit_extra_leads import error_text, interval_text
 from nwp_forecast_comparison import (
     BLEND_ARMS,
@@ -2565,17 +2565,39 @@ WN3_DAYS: Final[tuple[int, ...]] = (1, 2, 7, 14)
 WN3_EXTRA_DAYS: Final[tuple[int, ...]] = (0, 3, 4, 10)
 """The lead days the second WN3 fit adds, into a folder of its own, for the leaderboards."""
 
-WN3_NO_LEAD_HOUR: Final[dict[DomainType, int]] = {"solar": 1, "wind": 0}
-"""The hour of the UTC day at which a day-0 row has no stored lead. The store's leads start at 1
-hour. A wind row at 00:00 reads lead 0. A solar row at 01:00 (an hour labelled by its end) reads
-the accumulation from lead 0 to 1 and the mean of the temperatures at leads 0 and 1."""
+SOLAR_DAY0_DROPPED_HOURS: Final[tuple[int, ...]] = tuple(range(1, SOLAR_DAY0_FIRST_SCORED_LEAD))
+"""The hours of the UTC day, labelled by their end, that solar day 0 does not score for any arm.
+AIFS and ENS on 6-hourly steps have no step before lead 6 hours, so these hours (01:00 to 05:00 UTC)
+would be extrapolations. The hour ending 01:00 is also the one hour WeatherNext 3 stores no lead
+for."""
+
+WN3_WIND_NO_LEAD_HOUR: Final[int] = 0
+"""The hour of the UTC day at which a wind day-0 row has no WeatherNext 3 lead: the store's leads
+start at 1 hour, and a wind row at 00:00 reads lead 0."""
+
+
+def day0_drop(*, domain: DomainType, day: int, wn3: bool) -> pl.Expr | None:
+    """Return which rows a day-0 fit does not score, or `None` where every row is scored.
+
+    Args:
+        domain: `solar` or `wind`.
+        day: The lead day; only day 0 drops any row.
+        wn3: Whether the fit includes WeatherNext 3, which also has no wind row at 00:00 UTC.
+
+    Returns:
+        For solar day 0, the hours in `SOLAR_DAY0_DROPPED_HOURS`, for every arm so the rows stay
+        matched. For wind day 0, 00:00 UTC if `wn3`. Otherwise `None`.
+    """
+    if day != 0:
+        return None
+    if domain == "solar":
+        return pl.col("time").dt.hour().is_in(SOLAR_DAY0_DROPPED_HOURS)
+    return pl.col("time").dt.hour() == WN3_WIND_NO_LEAD_HOUR if wn3 else None
 
 
 def wn3_day0_drop(*, domain: DomainType, day: int) -> pl.Expr | None:
-    """Return which rows a WN3 day has no stored lead for, or `None` at every day but day 0."""
-    if day != 0:
-        return None
-    return pl.col("time").dt.hour() == WN3_NO_LEAD_HOUR[domain]
+    """Return which rows a WN3 day has no scored row for, or `None` at every day but day 0."""
+    return day0_drop(domain=domain, day=day, wn3=True)
 
 
 WN3_TRAINING_END: Final[date] = date(2026, 6, 30)
@@ -3177,6 +3199,7 @@ def lean_inputs(*, aifs_dir: Path, leads_day10_dir: Path, domain: DomainType) ->
         domain=domain,
         mean_days=LEAN_ENS_NATIVE_DAYS,
         control_days=(),
+        keep_init_time=True,
     )
     aifs = aifs.join(native, on=["site", "time"], how="left")
     aifs = aifs.rename(
@@ -3236,6 +3259,7 @@ def run_lean(
                     arms=arms,
                     day=day,
                     shuffles={},
+                    drop=day0_drop(domain=domain, day=day, wn3=False),
                 )
                 stage = f"{row_set}_day{day}"
                 losses_file = path_for(
@@ -3286,7 +3310,8 @@ def run_lean(
             "Every fit is on the GPU, at the primary setting only, and every result is "
             "descriptive: this fit names no contrast. Each stage fits AIFS's own arm and ENS's "
             "mean on the same rows, for the leaderboards. Day 0 reads the 00 UTC run of the row's "
-            "own day, a forecast no service could read."
+            "own day, a forecast no service could read, and at solar day 0 every arm omits the "
+            "hours ending 01:00 to 05:00 UTC, which precede the first 6-hourly step."
         ),
         "",
     ]

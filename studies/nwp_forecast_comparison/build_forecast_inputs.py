@@ -453,14 +453,21 @@ def _previous_runs_frame(
     return frame
 
 
+SOLAR_DAY0_FIRST_SCORED_LEAD: Final[int] = 6
+"""The lead of the first solar hour scored at day 0. AIFS and ENS on 6-hourly steps have no step
+before lead 6 hours, so the hours ending at leads 1 to 5 (01:00 to 05:00 UTC) are not scored, for
+any arm."""
+
+
 def check_first_step_reaches_targets(
     *, steps: efh.Steps, day: int, domain: DomainType, arm_prefix: str
 ) -> None:
-    """Refuse a solar band whose first scored hours lie before the first stored step.
+    """Refuse a solar band that scores an hour before its first stored step.
 
-    A solar hour's temperature is read at its midpoint, so a band that scores hour `24 N + 1` needs
-    a step at or before lead `24 N + 0.5`. Where the first step is later, the upsampling holds that
-    step's value flat across the earlier hours, which is an extrapolation and not an upsampling.
+    The hours a band scores are the end of every hour of its day, except that day 0 starts at
+    `SOLAR_DAY0_FIRST_SCORED_LEAD`. Where the first scored hour's lead is before the first step, the
+    upsampling would hold that step's value flat across the earlier hours, which is an extrapolation
+    and not an upsampling.
 
     Args:
         steps: The band's steps.
@@ -469,16 +476,18 @@ def check_first_step_reaches_targets(
         arm_prefix: The arm family's name, for the message.
 
     Raises:
-        ValueError: If a solar band's first target midpoint is before its first step.
+        ValueError: If a solar band's first scored hour is before its first step.
     """
     if domain != "solar":
         return
-    first_midpoint = float(efh.target_leads(day=day, domain=domain)[0]) - 0.5
-    if steps.leads[0] > first_midpoint:
+    first_scored = float(efh.target_leads(day=day, domain=domain)[0])
+    if day == 0:
+        first_scored = max(first_scored, float(SOLAR_DAY0_FIRST_SCORED_LEAD))
+    if steps.leads[0] > first_scored:
         msg = (
             f"{arm_prefix} day {day}: the first stored step is at lead {steps.leads[0]:g} h, after "
-            f"the first scored solar hour's midpoint at lead {first_midpoint:g} h, so that hour "
-            "would be an extrapolation"
+            f"the first scored solar hour at lead {first_scored:g} h, so that hour would be an "
+            "extrapolation"
         )
         raise ValueError(msg)
 
@@ -522,8 +531,7 @@ def ens_member_arms(
         One frame per (day, way) with `site`, `time` and that arm's own weather columns.
 
     Raises:
-        ValueError: If a solar band on 6-hourly steps scores an hour before its first step, as
-            day 0 does.
+        ValueError: If a solar band on 6-hourly steps scores an hour before its first step.
     """
     clear_sky = efh.clear_sky_table(domain=domain)
     frames: list[pl.DataFrame] = []
@@ -1582,6 +1590,7 @@ def _ens_extra_frame(
     domain: DomainType,
     mean_days: tuple[int, ...],
     control_days: tuple[int, ...],
+    keep_init_time: bool = False,
 ) -> pl.DataFrame:
     """Build ECMWF ENS's mean and control-member columns at the given days on `keys`.
 
@@ -1590,6 +1599,8 @@ def _ens_extra_frame(
         domain: `solar` or `wind`.
         mean_days: The days to build the ENS mean at.
         control_days: The days to build the ENS control member at.
+        keep_init_time: Whether each arm also carries the run that fed each hour, as
+            `<arm>_init_time`.
 
     Returns:
         `keys` with `ens_mean_day<N>_<field>` for every `N` in `mean_days` and
@@ -1610,6 +1621,7 @@ def _ens_extra_frame(
             ensemble_size=efh.ENSEMBLE_SIZE,
             arm_name=lambda way, band: efh.ens_arm(way=way, day=band),
             ways=extra_ens_ways(day=day, mean_days=mean_days, control_days=control_days),
+            keep_init_time=keep_init_time,
         )
     frame = keys
     for arm_frame in arms:

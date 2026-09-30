@@ -6,6 +6,7 @@ wrong number. The scripts are imported by path because `studies/` is not an impo
 """
 
 import importlib
+import math
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -546,13 +547,15 @@ def test_lean_inputs_reads_ens_at_day_4_from_its_native_steps_not_the_6_hourly_e
         domain: str,
         mean_days: tuple[int, ...],
         control_days: tuple[int, ...],
+        keep_init_time: bool = False,
     ) -> pl.DataFrame:
-        seen.update(mean_days=mean_days, control_days=control_days)
+        seen.update(mean_days=mean_days, control_days=control_days, keep=keep_init_time)
         return keys.with_columns(ens_mean_day4_ghi=pl.lit(222.0))
 
     monkeypatch.setattr(fa, "_ens_extra_frame", native)
     frame = fa.lean_inputs(aifs_dir=tmp_path, leads_day10_dir=tmp_path, domain="solar")
-    assert seen == {"mean_days": (4,), "control_days": ()}
+    # The run stamp must be requested, or `check_runs` cannot see the native day-4 run's date.
+    assert seen == {"mean_days": (4,), "control_days": (), "keep": True}
     assert frame["ens_mean_day4_ghi"][0] == 222.0
     assert frame["ens_mean_day10_ghi"][0] == 10.0
 
@@ -586,12 +589,20 @@ def test_run_lean_fits_each_row_set_at_each_day_and_stamps_the_outputs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     fitted: list[tuple[str, str, int, tuple[str, ...]]] = []
+    dropped: dict[tuple[str, int], bool] = {}
     monkeypatch.setattr(fa, "lean_inputs", lambda **_: pl.DataFrame({"site": ["A"]}))
 
     def rows(
-        *, domain: str, row_set: str, arms: tuple[str, ...], day: int, **_: object
+        *,
+        domain: str,
+        row_set: str,
+        arms: tuple[str, ...],
+        day: int,
+        drop: pl.Expr | None = None,
+        **_: object,
     ) -> pl.DataFrame:
         fitted.append((domain, row_set, day, arms))
+        dropped[domain, day] = drop is not None
         return pl.DataFrame({"site": ["A"], "month": ["2026-03"]})
 
     monkeypatch.setattr(fa, "aifs_rows", rows)
@@ -615,6 +626,8 @@ def test_run_lean_fits_each_row_set_at_each_day_and_stamps_the_outputs(
     }
     assert set(fitted) == expected
     assert len(fitted) == len(expected)
+    # Only solar day 0 drops rows (hours 1 to 5 UTC), so the arms are scored on the same rows.
+    assert {key for key, value in dropped.items() if value} == {("solar", 0)}
 
 
 def test_workers_argument_accepts_one_to_the_cap_and_refuses_the_rest() -> None:
@@ -627,35 +640,65 @@ def test_workers_argument_accepts_one_to_the_cap_and_refuses_the_rest() -> None:
             fa.workers_argument(bad)
 
 
-def test_a_solar_band_scoring_hours_before_its_first_step_is_refused() -> None:
-    def steps(*, first_lead: float) -> object:
-        return efh.Steps(
-            keys=pl.DataFrame(),
-            leads=np.array([first_lead, first_lead + 6.0]),
-            widths=np.array([6, 6]),
-            values={},
-            ensemble_size=1,
-        )
+def _steps(*, first_lead: float) -> object:
+    return efh.Steps(
+        keys=pl.DataFrame(),
+        leads=np.array([first_lead, first_lead + 6.0]),
+        widths=np.array([6, 6]),
+        values={},
+        ensemble_size=1,
+    )
 
+
+def test_a_solar_band_scoring_hours_before_its_first_step_is_refused() -> None:
+    # Day 0 scores from lead 6, so a first step at lead 12 leaves leads 6 to 11 unread.
     with pytest.raises(ValueError, match="extrapolation"):
         bfi.check_first_step_reaches_targets(
-            steps=steps(first_lead=6.0), day=0, domain="solar", arm_prefix="aifs_single"
+            steps=_steps(first_lead=12.0), day=0, domain="solar", arm_prefix="aifs_single"
         )
-    # Day 1's first hour ends at lead 25, well after a step at lead 6 or 24.
+    # A first step at lead 6 reaches the first scored day-0 hour, which ends at lead 6.
     bfi.check_first_step_reaches_targets(
-        steps=steps(first_lead=24.0), day=1, domain="solar", arm_prefix="aifs_single"
+        steps=_steps(first_lead=6.0), day=0, domain="solar", arm_prefix="aifs_single"
     )
-    # Wind reads at each hour's start, so a day-0 wind band is not checked here.
+    # Day 1's first hour ends at lead 25, after a step at lead 24.
     bfi.check_first_step_reaches_targets(
-        steps=steps(first_lead=6.0), day=0, domain="wind", arm_prefix="aifs_single"
+        steps=_steps(first_lead=24.0), day=1, domain="solar", arm_prefix="aifs_single"
     )
+    with pytest.raises(ValueError, match="extrapolation"):
+        bfi.check_first_step_reaches_targets(
+            steps=_steps(first_lead=30.0), day=1, domain="solar", arm_prefix="aifs_single"
+        )
+    # Wind reads at each hour's start, so a wind band is not checked here.
+    bfi.check_first_step_reaches_targets(
+        steps=_steps(first_lead=6.0), day=0, domain="wind", arm_prefix="aifs_single"
+    )
+
+
+def test_ens_member_arms_refuses_a_solar_day_0_band_whose_first_step_is_after_the_first_hour(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(bfi.efh, "clear_sky_table", lambda **_: pl.DataFrame())
+    monkeypatch.setattr(bfi.efh, "band_steps", lambda **_: _steps(first_lead=12.0))
+    with pytest.raises(ValueError, match="aifs_single day 0"):
+        bfi.ens_member_arms(
+            extract=pl.DataFrame(),
+            domain="solar",
+            days=(0,),
+            method="linear",
+            ensemble_size=1,
+            arm_name=lambda way, day: f"aifs_single_day{day}",
+            ways=("control",),
+            fine_step_last_lead=0,
+        )
 
 
 def test_the_leaderboard_ticks_are_whole_numbers_up_to_the_highest_whole_number() -> None:
     (low, high), ticks = charts.lead_board_x_domain(lowest=8.0, highest=12.0, longest_name=20)
     assert ticks == [float(value) for value in range(int(ticks[0]), 13)]
     assert ticks[-1] == 12.0
-    assert ticks[0] >= low
+    need = 20 * charts.LEAD_NAME_PX_PER_CHARACTER + charts.LEAD_NAME_GAP_PX
+    first_visible = low + need * (high - low) / charts.LEAD_PLOT_WIDTH_PX
+    assert ticks[0] == math.ceil(first_visible)
     assert high == 12.5
 
 

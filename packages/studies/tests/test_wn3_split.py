@@ -12,6 +12,7 @@ sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
 from fit_aifs import (  # noqa: E402
     WN3_DAYS,
     WN3_SPLITS,
+    day0_drop,
     lean_arms,
     shuffled_prefix,
     wn3_arms,
@@ -263,7 +264,7 @@ def test_day_0_drops_the_hour_with_no_stored_lead_and_no_other_day_does() -> Non
     assert wind is not None
     assert solar is not None
     assert hours.filter(wind)["time"].dt.hour().to_list() == [0]
-    assert hours.filter(solar)["time"].dt.hour().to_list() == [1]
+    assert hours.filter(solar)["time"].dt.hour().to_list() == [1, 2, 3, 4, 5]
     # The drop is the hour the build leaves null: solar 01:00 and wind 00:00, and no other hour.
     assert wn3_day0_drop(domain="wind", day=1) is None
     assert wn3_day0_drop(domain="solar", day=10) is None
@@ -277,3 +278,21 @@ def test_lean_arms_name_the_product_and_the_ens_mean_at_the_same_day() -> None:
 def test_lean_arms_at_days_3_and_4_read_the_ens_mean_of_that_day() -> None:
     assert lean_arms(row_set="single", day=3) == ("aifs_single_day3", "ens_mean_day3")
     assert lean_arms(row_set="ens", day=4) == ("aifs_ens_mean_day4", "ens_mean_day4")
+
+
+def test_lean_solar_day_0_drops_hours_1_to_5_and_no_other_lean_stage_drops_a_row() -> None:
+    hours = pl.DataFrame({"time": [datetime(2026, 7, 2, hour, tzinfo=UTC) for hour in range(24)]})
+    solar = day0_drop(domain="solar", day=0, wn3=False)
+    assert solar is not None
+    assert hours.filter(solar)["time"].dt.hour().to_list() == [1, 2, 3, 4, 5]
+    assert day0_drop(domain="wind", day=0, wn3=False) is None
+    assert day0_drop(domain="solar", day=3, wn3=False) is None
+    wind_wn3 = day0_drop(domain="wind", day=0, wn3=True)
+    assert wind_wn3 is not None
+    assert hours.filter(wind_wn3)["time"].dt.hour().to_list() == [0]
+
+
+def test_the_lean_days_are_the_four_the_leaderboards_add() -> None:
+    from fit_aifs import LEAN_DAYS
+
+    assert LEAN_DAYS == (0, 3, 4, 10)

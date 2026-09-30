@@ -130,11 +130,13 @@ lead?](../../docs/studies/forecasts/matched-lead.md).
 - `build_forecast_inputs.py --aifs --aifs-days 0 3 4 10` builds day 0 and days 3, 4, and 10 as well.
   Day 0 reads the 00 UTC run of the same day as the hour, so its weather is a hindcast that a
   service could not have read. AIFS and ENS on 6-hourly steps have no step before lead 6 hours
-  (radiation is null at lead 0), so the build raises for a solar day 0, whose first hours have no
-  step before them. `fit_aifs.py --lean-leads --days 0 3 4 10` fits only the AIFS Single arm and the
-  ENS mean arm at those days, at the primary setting, and `fit_aifs.py --wn3 --days 0 3 4 10` fits
-  the WeatherNext 3 arms at them. WeatherNext 3 stores no lead for one hour of each day at day 0
-  (00:00 UTC for wind, 01:00 UTC for solar), so the fit drops that hour.
+  (radiation is null at lead 0), so solar day 0 omits the hours ending 01:00 to 05:00 UTC for every
+  arm (AIFS Single, ENS, and WeatherNext 3), which keeps the rows matched. The build raises if any
+  other scored solar hour lies before the first step. Wind day 0 is unaffected. `fit_aifs.py
+  --lean-leads --days 0 3 4 10` fits only the AIFS Single arm and the ENS mean arm at those days, at
+  the primary setting, and `fit_aifs.py --wn3 --days 0 3 4 10` fits the WeatherNext 3 arms at them.
+  WeatherNext 3 stores no lead for one hour of each day at day 0 (00:00 UTC for wind, 01:00 UTC for
+  solar), so the wind fit drops that hour and the solar drop above already covers it.
 - `fit_aifs.py` fits every AIFS arm and reference on a GPU, on two nested row sets (`single`, and
   `ens` where AIFS ENS also exists), with folds cut inside the AIFS version eras. One contrast is
   deciding (AIFS Single against ENS's control member at day 1); AIFS ENS contrasts are
