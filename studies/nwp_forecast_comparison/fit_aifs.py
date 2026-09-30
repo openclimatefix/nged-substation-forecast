@@ -599,9 +599,15 @@ def check_wn3_runs_present(*, frame: pl.DataFrame, domain: DomainType, arms: Seq
         ValueError: Naming each WN3 arm and the dates of the runs its missing rows would have
             read, and how many rows each run leaves without a value.
     """
-    for arm in arms:
+    prefixes = dict.fromkeys(
+        prefix
+        for arm in arms
+        for prefix in arm_prefixes(arm=arm)
+        if prefix.startswith("wn3_") and PERMUTED not in prefix
+    )
+    for arm in prefixes:
         column = f"{arm}_init_time"
-        if not arm.startswith("wn3_") or column not in frame.columns:
+        if column not in frame.columns:
             continue
         day = int(arm.rpartition("_day")[2])
         missing = (

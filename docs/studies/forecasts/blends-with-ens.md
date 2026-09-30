@@ -20,7 +20,7 @@ machine-learned forecast).
 | Product | Days the blend is fitted at | Rows | What limits the comparison |
 |---|---|---|---|
 | AIFS Single | 1, 2, 7, 14 | `single`: 16 months | None beyond the shared limits below. |
-| ICON-EU | 1, 2 | `single` | Open-Meteo's archive holds ICON-EU's freshest run, at least 1 day old at day 1. |
+| ICON-EU | 1, 2 | `single` | Open-Meteo's archive holds ICON-EU's freshest run at least N days before the valid hour. |
 | UKV | 1 | `single` | Open-Meteo's archive fills only `previous_day1` for live UKV. |
 | WN3 | 1, 2, 7, 14 | `wn3`: 7 months | The months overlap WN3's training data, and its publication time is not established. |
 
@@ -44,8 +44,9 @@ unless every new arm holds the saved ENS mean's `(site, time, seed, fold)` keys.
 
 **ICON-EU is read at two leads, and UKV at one.** The optimistic ICON-EU blend reads the product's
 day-`N` value beside the ENS mean's day-`N` value. The conservative blend reads ICON-EU's day-`N+1`
-value, a run at least 48 hours old, as the published blend P4b does. The conservative blend therefore
-disadvantages ICON-EU against AIFS Single, which reads the same-day 00 UTC run. UKV live has only a
+value, from the freshest run at least 48 hours before the valid hour (at day 1), as the published
+blend P4b does. That run is older than the AIFS Single run, which is the 00 UTC run N days before the
+valid day, so the conservative blend disadvantages ICON-EU against AIFS Single. UKV live has only a
 day-1 value and no clear run cycle, so the UKV blend is an optimistic upper bound and is never ranked.
 
 **Five contrasts were planned before any fit.** Each is at both hyperparameter settings.
@@ -84,7 +85,7 @@ D=/home/jack/dev/nged-substation-forecast/data/studies
 P=$D/nwp_forecast_comparison
 OUT=$D/nwp_forecast_comparison_product_blends
 uv run python studies/nwp_forecast_comparison/fit_product_blends.py --lookahead-cleared \
-  --workers 4 --published-dir $P --output-dir $OUT
+  --workers 2 --published-dir $P --output-dir $OUT
 uv run python studies/nwp_forecast_comparison/dot_interval_vs_ens.py --blends \
   --output-dir $D/nwp_forecast_comparison_blends_vs_ens_dots
 ```

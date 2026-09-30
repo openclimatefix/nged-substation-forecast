@@ -206,6 +206,67 @@ def check_keys_match(
             raise ValueError(msg)
 
 
+def check_frame_matches_saved(*, frame: pl.DataFrame, saved: pl.DataFrame, stage: Stage) -> None:
+    """Raise unless the stage's rows are the `(site, time, fold)` rows of the saved ENS mean.
+
+    This runs before any fit, so `--dry-run` catches a row set that differs from the reused
+    folder's.
+
+    Args:
+        frame: The stage's rows.
+        saved: The reused folder's losses at the stage's day.
+        stage: The stage, for the message.
+
+    Raises:
+        ValueError: If the rows differ in any site, time, or fold.
+    """
+    keys = ["site", "time", "fold"]
+    want = (
+        saved.filter(pl.col("arm") == f"ens_mean_day{stage.day}", pl.col("setting") == PRIMARY)
+        .select(keys)
+        .unique()
+        .sort(keys)
+    )
+    if not frame.select(keys).unique().sort(keys).equals(want):
+        msg = f"{stage.domain}/single_day{stage.day}: the rows differ from the saved ENS mean's"
+        raise ValueError(msg)
+
+
+def check_reproduces_saved(
+    *, frame: pl.DataFrame, saved: pl.DataFrame, arm: str, domain: DomainType
+) -> bool:
+    """Refit one saved arm at its first site and return whether the rows equal the saved ones.
+
+    The comparison covers `(site, time, seed, fold, absolute_error_mw)`, so it tests the rows, the
+    folds, the shuffle, and the device together.
+
+    Args:
+        frame: A stage's rows, carrying the arm's columns.
+        saved: The reused folder's losses at the stage's day.
+        arm: The saved arm to refit at the primary setting.
+        domain: `solar` or `wind`.
+
+    Returns:
+        Whether the refit's rows equal the saved rows exactly.
+    """
+    site = min(frame["site"].unique().to_list())
+    losses = fit_aifs.fit_jobs(
+        frame=frame.filter(pl.col("site") == site), domain=domain, jobs=[(arm, PRIMARY)], workers=1
+    )
+    columns = [*ROW_KEYS, "absolute_error_mw"]
+    want = saved.filter(
+        pl.col("arm") == arm, pl.col("setting") == PRIMARY, pl.col("site") == site
+    ).select(columns)
+    return losses.select(columns).sort(ROW_KEYS).equals(want.sort(ROW_KEYS))
+
+
+def write_atomically(*, path: Path, frame: pl.DataFrame) -> None:
+    """Write a parquet file to a temporary name and rename it, so a crash leaves no partial file."""
+    temporary = path.with_name(path.name + ".tmp")
+    frame.write_parquet(temporary)
+    temporary.replace(path)
+
+
 def check_output_dir(*, output_dir: Path, read_only: list[Path]) -> None:
     """Raise unless `output_dir` is the one folder this script may write to.
 
@@ -510,8 +571,9 @@ def report_text(
             "of capacity, so a negative difference means the first arm has the lower error. "
             "C1 to C3 are each blend minus ENS's mean alone, C4 is each blend minus its own "
             "control, and C5 is the AIFS Single blend minus each ICON-EU blend. The conservative "
-            "ICON-EU blend reads a run at least 48 hours older than the AIFS Single blend's "
-            "same-day run, so C5 against it is biased towards AIFS Single; C5 is therefore read "
+            "ICON-EU blend reads the freshest run at least 48 hours before the valid hour, "
+            "which is older than the AIFS Single run, so C5 against it is biased towards AIFS "
+            "Single; C5 is therefore read "
             "against both ICON-EU blends. UKV is an optimistic upper bound and is never ranked. "
             f"The report prints {n_listed} intervals at each setting, so about {n_listed / 20:.1f} "
             "would reach statistical significance at the 5% level by chance, and every verdict "
@@ -616,6 +678,7 @@ def plan_stages(
                 shuffles=control_shuffles(arms=arms),
                 nullable=fit_aifs.NULLABLE_PREFIXES,
             )
+            check_frame_matches_saved(frame=frame, saved=saved, stage=stage)
             planned.append(PlannedStage(stage, frame, jobs, stamp, saved))
         wn3_inputs = pl.read_parquet(wn3_dir / f"{domain}_wn3_inputs.parquet")
         for day in WN3_DAYS:
@@ -674,7 +737,10 @@ def stage_losses(*, output_dir: Path, planned: PlannedStage, workers: int) -> pl
             stamp=planned.stamp,
         )
     else:
-        refuse_to_overwrite(paths=[predictions_file, stamp_file])
+        # A crash after the stamp and before the losses leaves a stamp a rerun rewrites; a crash
+        # mid-write leaves only a temporary file, so no losses file ever lacks its stamp.
+        refuse_to_overwrite(paths=[predictions_file])
+        stamp_file.write_text(json.dumps(planned.stamp))
         if planned.saved is not None:
             losses = fit_single_stage(
                 frame=planned.frame, stage=stage, saved=planned.saved, workers=workers
@@ -683,10 +749,12 @@ def stage_losses(*, output_dir: Path, planned: PlannedStage, workers: int) -> pl
             losses = fit_aifs.fit_jobs(
                 frame=planned.frame, domain=stage.domain, jobs=planned.jobs, workers=workers
             ).with_columns(device=pl.lit(fit_aifs.DEVICE))
-        losses.write_parquet(losses_file)
-        stamp_file.write_text(json.dumps(planned.stamp))
+        write_atomically(path=losses_file, frame=losses)
     if not predictions_file.exists():
-        predictions_from_losses(losses=losses, frame=planned.frame).write_parquet(predictions_file)
+        write_atomically(
+            path=predictions_file,
+            frame=predictions_from_losses(losses=losses, frame=planned.frame),
+        )
     return losses
 
 
@@ -747,6 +815,39 @@ def run_product_blends(
     return 0
 
 
+def run_check(*, planned: list[PlannedStage], reused_dir: Path) -> int:
+    """Time one arm twice, and refit a saved AIFS Single control to compare it with the saved rows.
+
+    Args:
+        planned: Every stage.
+        reused_dir: The AIFS blends folder whose saved losses the refit is compared with.
+
+    Returns:
+        0 if both checks pass, else 1, after printing `CHECK PASS` or `CHECK FAIL`.
+    """
+    first = next(item for item in planned if item.stage.domain == "wind")
+    agree, seconds = fit_aifs.time_two_fits(frame=first.frame, arm=first.jobs[0][0], domain="wind")
+    arm = blend_arm_name(product="aifs_single", day=1, role="_control")
+    stage = next(item for item in planned if item.stage == Stage("wind", "single", 1))
+    if stage.saved is None:
+        msg = "the wind day-1 `single` stage has no saved losses to compare with"
+        raise ValueError(msg)
+    reproduces = check_reproduces_saved(
+        frame=stage.frame, saved=stage.saved, arm=arm, domain="wind"
+    )
+    n_fits = sum(len(item.jobs) * item.frame["site"].n_unique() for item in planned)
+    passed = agree and reproduces
+    sys.stdout.write(
+        f"one arm at one site: {seconds:.0f} s; {n_fits} (arm, site) fits are about "
+        f"{n_fits * seconds / 3600:.1f} h on one worker\n"
+        f"two GPU runs agree: {agree}\n"
+        f"`{arm}` refitted at one wind site equals the saved rows in {reused_dir.name}: "
+        f"{reproduces}\n"
+        f"CHECK {'PASS' if passed else 'FAIL'}\n"
+    )
+    return 0 if passed else 1
+
+
 def main() -> int:
     """Fit the product blends, list the fits (`--dry-run`), or time one fit twice (`--check`)."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -791,17 +892,7 @@ def main() -> int:
         print_plan(planned=planned)
         return 0
     if args.check:
-        first = next(item for item in planned if item.stage.domain == "wind")
-        agree, seconds = fit_aifs.time_two_fits(
-            frame=first.frame, arm=first.jobs[0][0], domain="wind"
-        )
-        n_fits = sum(len(item.jobs) * item.frame["site"].n_unique() for item in planned)
-        sys.stdout.write(
-            f"one arm at one site: {seconds:.0f} s; {n_fits} (arm, site) fits are about "
-            f"{n_fits * seconds / 3600:.1f} h on one worker\n"
-            f"two GPU runs agree: {agree}\n"
-        )
-        return 0 if agree else 1
+        return run_check(planned=planned, reused_dir=reused_dir)
     return run_product_blends(
         planned=planned, output_dir=args.output_dir, reused_dir=reused_dir, workers=args.workers
     )

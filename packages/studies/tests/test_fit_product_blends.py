@@ -2,6 +2,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 import polars as pl
 import pytest
@@ -19,16 +20,21 @@ from fit_product_blends import (  # noqa: E402
     PlannedStage,
     Stage,
     blend_verdict_at_both_settings,
+    check_frame_matches_saved,
     check_keys_match,
     check_output_dir,
+    check_reproduces_saved,
     check_same_build,
     combine_losses,
     fit_single_stage,
     missing_jobs,
+    plan_stages,
     product_contrasts,
     ranking_verdict,
     report_text,
     reused_arms,
+    run_check,
+    run_product_blends,
     stage_jobs,
     stage_losses,
 )
@@ -235,7 +241,11 @@ def stub_fit(monkeypatch: pytest.MonkeyPatch) -> None:
         return (
             rows.select("site", "time", "month", "fold", "effective_capacity_mw")
             .join(pl.DataFrame({"seed": list(SEEDS)}), how="cross")
-            .with_columns(**{METRIC: pl.lit(0.1)}, signed_error_capped_mw=pl.lit(0.5))
+            .with_columns(
+                **{METRIC: pl.lit(0.1)},
+                signed_error_capped_mw=pl.lit(0.5),
+                absolute_error_mw=pl.lit(1.0),
+            )
         )
 
     monkeypatch.setattr(fit_aifs, "out_of_fold_losses", fake)
@@ -493,3 +503,339 @@ def test_the_report_prints_the_contrasts_at_both_settings_the_verdicts_and_the_r
     assert "`blend_icon_eu_conservative_day1_control` (9 columns)" in text
     assert "`blend_wn3_day14` minus `blend_wn3_day14_control`" in text
     assert "uncorrected for multiplicity" in text
+    assert "the freshest run at least 48 hours before the valid hour" in text
+
+
+# --- row check before fitting, crash safety, and the orchestration -------------------------------
+
+
+def test_the_frame_must_hold_the_saved_ens_means_site_time_fold_rows_before_any_fit():
+    stage, frame, saved = _stage_inputs(day=2)
+
+    check_frame_matches_saved(frame=frame, saved=saved, stage=stage)
+    with pytest.raises(ValueError, match="rows differ"):
+        check_frame_matches_saved(frame=frame.slice(1), saved=saved, stage=stage)
+    with pytest.raises(ValueError, match="rows differ"):
+        check_frame_matches_saved(
+            frame=frame.with_columns(fold=pl.col("fold") + 1), saved=saved, stage=stage
+        )
+    other_day = saved.with_columns(
+        arm=pl.when(pl.col("arm") == "ens_mean_day2")
+        .then(pl.lit("ens_mean_day1"))
+        .otherwise(pl.col("arm"))
+    )
+    with pytest.raises(ValueError, match="rows differ"):
+        check_frame_matches_saved(frame=frame.slice(1), saved=other_day, stage=stage)
+
+
+def _stub_rows(rows: pl.DataFrame) -> pl.DataFrame:
+    return (
+        rows.select("site", "time", "month", "fold", "effective_capacity_mw")
+        .join(pl.DataFrame({"seed": list(SEEDS)}), how="cross")
+        .with_columns(
+            **{METRIC: pl.lit(0.1)},
+            signed_error_capped_mw=pl.lit(0.5),
+            absolute_error_mw=pl.lit(1.0),
+        )
+    )
+
+
+def _saved_with_columns(
+    *, frame: pl.DataFrame, day: int, skip: tuple[str, str] | None = None, value: float = 1.0
+) -> pl.DataFrame:
+    pairs = [(a, st) for a in reused_arms(day=day) for st in (PRIMARY, SENSITIVITY)]
+    return pl.concat(
+        [
+            _stub_rows(frame).with_columns(
+                arm=pl.lit(arm),
+                setting=pl.lit(setting),
+                device=pl.lit("cuda"),
+                absolute_error_mw=pl.lit(value),
+            )
+            for arm, setting in pairs
+            if (arm, setting) != skip
+        ]
+    )
+
+
+def _world(tmp_path: Path, *, value: float = 1.0) -> tuple[Path, list[PlannedStage]]:
+    """A reused folder of saved losses and every stage planned against it, with no real data."""
+    reused = tmp_path / fit_aifs.BLENDS_DIR_NAME
+    reused.mkdir()
+    planned: list[PlannedStage] = []
+    for domain in ("solar", "wind"):
+        for day in (1, 2, 7):
+            arms = [*fpb.product_blend_arms(row_set="single", day=day), *reused_arms(day=day)]
+            frame = _frame(arms=arms, domain=domain, months=12)
+            skip = ("ens_mean_day1", SENSITIVITY) if day == 1 else None
+            saved = _saved_with_columns(frame=frame, day=day, skip=skip, value=value)
+            saved.write_parquet(reused / f"{domain}_single_day{day}_losses.parquet")
+            (reused / f"{domain}_single_day{day}_losses.json").write_text(json.dumps(_STAMP))
+            stage = Stage(domain, "single", day)
+            jobs = stage_jobs(stage=stage, saved=saved)
+            if jobs:
+                planned.append(PlannedStage(stage, frame, jobs, dict(_STAMP), saved))
+        for day in fpb.WN3_DAYS:
+            stage = Stage(domain, "wn3", day)
+            frame = _frame(
+                arms=list(fpb.product_blend_arms(row_set="wn3", day=day)), domain=domain, months=12
+            )
+            planned.append(
+                PlannedStage(stage, frame, stage_jobs(stage=stage, saved=None), {}, None)
+            )
+    return reused, planned
+
+
+def test_a_stage_that_crashes_writing_its_losses_leaves_no_losses_file_and_a_rerun_completes(
+    stub_fit: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    stage, frame, saved = _stage_inputs(day=2)
+    planned = PlannedStage(stage, frame, stage_jobs(stage=stage, saved=saved), {"a": "b"}, saved)
+    losses_file = tmp_path / "solar_single_day2_losses.parquet"
+
+    def boom(self: Path, target: Path) -> Path:
+        raise OSError("disk full")
+
+    with monkeypatch.context() as crash:
+        crash.setattr(Path, "replace", boom)
+        with pytest.raises(OSError, match="disk full"):
+            stage_losses(output_dir=tmp_path, planned=planned, workers=1)
+    assert not losses_file.exists()
+    assert json.loads(losses_file.with_suffix(".json").read_text()) == {"a": "b"}
+
+    losses = stage_losses(output_dir=tmp_path, planned=planned, workers=1)
+
+    assert losses_file.exists()
+    assert not list(tmp_path.glob("*.tmp"))
+    assert set(losses["arm"]) == {arm for arm, _ in planned.jobs}
+
+
+def test_a_rerun_after_losses_but_no_predictions_writes_the_predictions(
+    stub_fit: None, tmp_path: Path
+):
+    stage, frame, saved = _stage_inputs(day=2)
+    planned = PlannedStage(stage, frame, stage_jobs(stage=stage, saved=saved), {"a": "b"}, saved)
+    stage_losses(output_dir=tmp_path, planned=planned, workers=1)
+    predictions = tmp_path / "solar_single_day2_predictions.parquet"
+    predictions.unlink()
+
+    stage_losses(output_dir=tmp_path, planned=planned, workers=1)
+
+    assert predictions.exists()
+
+
+@pytest.fixture
+def few_resamples(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("studies.bootstrap.N_BOOTSTRAP_RESAMPLES", 50)
+
+
+def test_the_run_writes_every_stage_and_the_report_and_a_resume_fits_nothing(
+    stub_fit: None, few_resamples: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    reused, planned = _world(tmp_path)
+    output = tmp_path / OUTPUT_DIR_NAME
+
+    assert run_product_blends(planned=planned, output_dir=output, reused_dir=reused, workers=1) == 0
+    first = (output / "report.md").read_text()
+    assert len(list(output.glob("*_losses.parquet"))) == len(planned)
+    assert (output / "README.md").exists()
+    with pytest.raises(FileExistsError):
+        run_product_blends(planned=planned, output_dir=output, reused_dir=reused, workers=1)
+
+    (output / "report.md").unlink()
+
+    def no_fit(**kwargs: object) -> pl.DataFrame:
+        raise AssertionError("a resume must not fit")
+
+    monkeypatch.setattr(fit_aifs, "out_of_fold_losses", no_fit)
+    # The saved stamps of a resume must equal the planned ones, or the stage is refused.
+    for item in planned:
+        stamp_file = output / f"{item.stage.domain}_{fpb.stage_name(stage=item.stage)}_losses.json"
+        assert json.loads(stamp_file.read_text()) == item.stamp
+    run_product_blends(planned=planned, output_dir=output, reused_dir=reused, workers=1)
+
+    assert (output / "report.md").read_text() == first
+
+
+def test_a_resume_refuses_losses_whose_stamp_belongs_to_another_build(
+    stub_fit: None, few_resamples: None, tmp_path: Path
+):
+    reused, planned = _world(tmp_path)
+    output = tmp_path / OUTPUT_DIR_NAME
+    run_product_blends(planned=planned, output_dir=output, reused_dir=reused, workers=1)
+    (output / "report.md").unlink()
+    changed = [item._replace(stamp={**item.stamp, "gpu": "other"}) for item in planned]
+
+    with pytest.raises(ValueError, match="another build or device"):
+        run_product_blends(planned=changed, output_dir=output, reused_dir=reused, workers=1)
+
+
+def test_plan_stages_builds_each_stage_against_the_reused_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    reused, expected = _world(tmp_path)
+    wn3_dir = tmp_path / "wn3"
+    wn3_dir.mkdir()
+    for domain in ("solar", "wind"):
+        pl.DataFrame({"a": [1]}).write_parquet(wn3_dir / f"{domain}_wn3_inputs.parquet")
+    calls: list[dict[str, Any]] = []
+
+    def rows(**kwargs: Any) -> pl.DataFrame:
+        calls.append(kwargs)
+        return _frame(arms=list(kwargs["arms"]), domain=kwargs["domain"], months=12)
+
+    monkeypatch.setattr(fit_aifs, "blend_inputs", lambda **kwargs: pl.DataFrame())
+    monkeypatch.setattr(fit_aifs, "aifs_rows", rows)
+    monkeypatch.setattr(fit_aifs, "build_stamp", lambda **kwargs: dict(_STAMP))
+
+    planned = plan_stages(
+        published_dir=tmp_path,
+        reused_dir=reused,
+        wn3_dir=wn3_dir,
+        existing_dir=tmp_path,
+        extra_dirs={},
+    )
+
+    assert [(p.stage, p.jobs) for p in planned if p.stage.row_set == "single"] == [
+        (e.stage, e.jobs) for e in expected if e.stage.row_set == "single"
+    ]
+    assert len([p for p in planned if p.stage.row_set == "wn3"]) == 8
+    day2 = next(c for c in calls if c["day"] == 2 and c["row_set"] == "single")
+    assert set(day2["shuffles"]) == {"icon_eu_day2", "icon_eu_day3"}
+    assert {c["row_set"] for c in calls} == {"single", "wn3"}
+    # A reused stamp from another build stops the plan before any fit.
+    (reused / "solar_single_day1_losses.json").write_text(json.dumps({**_STAMP, "xgboost": "9"}))
+    with pytest.raises(ValueError, match="xgboost"):
+        plan_stages(
+            published_dir=tmp_path,
+            reused_dir=reused,
+            wn3_dir=wn3_dir,
+            existing_dir=tmp_path,
+            extra_dirs={},
+        )
+
+
+def test_plan_stages_refuses_rows_that_differ_from_the_saved_ens_mean_before_fitting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    reused, _ = _world(tmp_path)
+    wn3_dir = tmp_path / "wn3"
+    wn3_dir.mkdir()
+    for domain in ("solar", "wind"):
+        pl.DataFrame({"a": [1]}).write_parquet(wn3_dir / f"{domain}_wn3_inputs.parquet")
+    monkeypatch.setattr(fit_aifs, "blend_inputs", lambda **kwargs: pl.DataFrame())
+    monkeypatch.setattr(fit_aifs, "build_stamp", lambda **kwargs: dict(_STAMP))
+    monkeypatch.setattr(
+        fit_aifs,
+        "aifs_rows",
+        lambda **kwargs: _frame(arms=list(kwargs["arms"]), domain=kwargs["domain"], months=11),
+    )
+
+    with pytest.raises(ValueError, match="rows differ"):
+        plan_stages(
+            published_dir=tmp_path,
+            reused_dir=reused,
+            wn3_dir=wn3_dir,
+            existing_dir=tmp_path,
+            extra_dirs={},
+        )
+
+
+def test_the_check_passes_only_if_a_refit_control_equals_the_saved_rows(
+    stub_fit: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+):
+    monkeypatch.setattr(fit_aifs, "time_two_fits", lambda **kwargs: (True, 2.0))
+    reused, planned = _world(tmp_path)
+
+    assert run_check(planned=planned, reused_dir=reused) == 0
+    assert "CHECK PASS" in capsys.readouterr().out
+
+    (tmp_path / "other").mkdir()
+    _, differing = _world(tmp_path / "other", value=2.0)
+    assert run_check(planned=differing, reused_dir=reused) == 1
+    assert "CHECK FAIL" in capsys.readouterr().out
+    monkeypatch.setattr(fit_aifs, "time_two_fits", lambda **kwargs: (False, 2.0))
+    assert run_check(planned=planned, reused_dir=reused) == 1
+
+
+def test_a_refit_is_compared_on_its_site_time_seed_fold_and_error(stub_fit: None):
+    _, frame, _ = _stage_inputs(day=1)
+    arm = "blend_aifs_single_day1_control"
+    saved = _saved_with_columns(frame=frame, day=1)
+
+    assert check_reproduces_saved(frame=frame, saved=saved, arm=arm, domain="solar")
+    for mutated in (
+        saved.with_columns(
+            absolute_error_mw=pl.when(pl.col("arm") == arm)
+            .then(2.0)
+            .otherwise(pl.col("absolute_error_mw"))
+        ),
+        saved.with_columns(
+            fold=pl.when(pl.col("arm") == arm).then(pl.col("fold") + 1).otherwise(pl.col("fold"))
+        ),
+        saved.filter(~((pl.col("arm") == arm) & (pl.col("time") == 0))),
+    ):
+        assert not check_reproduces_saved(frame=frame, saved=mutated, arm=arm, domain="solar")
+
+
+def _run_main(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, planned: list[PlannedStage], *flags: str
+) -> int:
+    monkeypatch.setattr(fpb, "plan_stages", lambda **kwargs: planned)
+    monkeypatch.setattr(fit_aifs, "check_gpu_visible", lambda: None)
+    published = tmp_path / "nwp_forecast_comparison"
+    published.mkdir(exist_ok=True)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "fit_product_blends.py",
+            "--published-dir",
+            str(published),
+            "--output-dir",
+            str(tmp_path / OUTPUT_DIR_NAME),
+            "--lookahead-cleared",
+            *flags,
+        ],
+    )
+    return fpb.main()
+
+
+def test_main_dry_run_lists_the_fits_and_writes_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+):
+    _, planned = _world(tmp_path)
+
+    assert _run_main(monkeypatch, tmp_path, planned, "--dry-run") == 0
+
+    out = capsys.readouterr().out
+    assert "solar single_day1" in out
+    assert "blend_ukv_day1@sensitivity" in out
+    assert "(arm, site) fits in all" in out
+    assert not (tmp_path / OUTPUT_DIR_NAME).exists()
+
+
+def test_main_fits_and_writes_the_report(
+    stub_fit: None, few_resamples: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    _, planned = _world(tmp_path)
+
+    assert _run_main(monkeypatch, tmp_path, planned) == 0
+    assert (tmp_path / OUTPUT_DIR_NAME / "report.md").exists()
+
+
+def test_main_refuses_to_fit_without_the_lookahead_flag_or_into_another_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    _, planned = _world(tmp_path)
+    monkeypatch.setattr(fpb, "plan_stages", lambda **kwargs: planned)
+    argv = ["x", "--published-dir", str(tmp_path / "p"), "--dry-run"]
+
+    monkeypatch.setattr(sys, "argv", [*argv, "--output-dir", str(tmp_path / OUTPUT_DIR_NAME)])
+    with pytest.raises(ValueError, match="lookahead"):
+        fpb.main()
+    monkeypatch.setattr(
+        sys, "argv", [*argv, "--lookahead-cleared", "--output-dir", str(tmp_path / "elsewhere")]
+    )
+    with pytest.raises(ValueError, match="writes only"):
+        fpb.main()

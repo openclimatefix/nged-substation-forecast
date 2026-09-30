@@ -452,9 +452,10 @@ C5_DAYS: Final[tuple[int, ...]] = (1, 2)
 def blend_rankings(*, domain: DomainType) -> list[Comparison]:
     """List comparison C5: the AIFS Single blend minus each ICON-EU blend, at each day both exist.
 
-    The conservative ICON-EU blend reads a run at least 48 hours old where the AIFS Single blend
-    reads the same-day 00 UTC run, so the comparison is read against the optimistic ICON-EU blend
-    too. Both blends sit on the `single` rows, so `contrast_rows` raises if their keys differ.
+    The conservative ICON-EU blend reads the freshest run at least 48 hours before the valid
+    hour, which is older than the AIFS Single run, so the comparison is read against the
+    optimistic ICON-EU blend too. Both blends sit on the `single` rows, so `contrast_rows` raises
+    if their keys differ.
 
     Args:
         domain: `solar` or `wind`.
@@ -917,9 +918,10 @@ def blend_subtitle_lines(*, domain: DomainType) -> list[str]:
             "tends to draw too narrow."
         ),
         (
-            "Lead: ENS plus AIFS Single and ENS plus WeatherNext 3 read the same-day 00 UTC run. "
-            "ENS plus ICON-EU reads the freshest ICON-EU run at least 1 day old at the optimistic "
-            "lead, and 1 day older still at the conservative lead. ENS plus UKV reads UKV's "
+            "Lead: ENS plus AIFS Single and ENS plus WeatherNext 3 read the 00 UTC run N days "
+            "before the valid day. ENS plus ICON-EU reads the freshest ICON-EU run at least N days "
+            "before the valid hour at the optimistic lead, and at least N+1 days before at the "
+            "conservative lead. ENS plus UKV reads UKV's "
             "day-1 value, so it is an optimistic upper bound; no blend with UKV is ranked."
         ),
         (

@@ -41,6 +41,7 @@ from fit_aifs import (  # noqa: E402
     check_columns_equal,
     check_runs,
     check_saved_losses,
+    check_wn3_runs_present,
     contrast_losses,
     control_shuffles,
     day14_reading,
@@ -1722,3 +1723,19 @@ def test_a_control_shuffles_the_products_own_prefix_and_a_blend_shuffles_nothing
 
     assert control_shuffles(arms=arms) == {"icon_eu_day2": ("",), "icon_eu_day3": ("",)}
     assert control_shuffles(arms=("blend_icon_eu_day2", "ens_mean_day2")) == {}
+
+
+def test_a_missing_wn3_run_is_named_for_the_blend_and_not_for_its_control():
+    frame = pl.DataFrame(
+        {
+            "time": [datetime(2026, 3, 10, 12, tzinfo=UTC), datetime(2026, 3, 11, 12, tzinfo=UTC)],
+            "wn3_mean_day1_init_time": [datetime(2026, 3, 9, tzinfo=UTC), None],
+        }
+    )
+
+    with pytest.raises(ValueError, match="wn3_mean_day1: no WN3 run"):
+        check_wn3_runs_present(frame=frame, domain="wind", arms=("blend_wn3_day1",))
+    with pytest.raises(ValueError, match="2026-03-10"):
+        check_wn3_runs_present(frame=frame, domain="wind", arms=("wn3_mean_day1",))
+    # A control shows shuffled WN3 columns, so it needs no run of its own.
+    check_wn3_runs_present(frame=frame, domain="wind", arms=("blend_wn3_day1_control",))
