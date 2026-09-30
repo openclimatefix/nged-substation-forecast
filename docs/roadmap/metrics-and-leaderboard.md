@@ -1028,17 +1028,24 @@ Train *and* score on near-perfect weather, and the resulting skill bounds what w
 removing **forecast error** from the weather input — the channel that more ensemble members, better
 ensemble post-processing and sharper interpolation all work through. If that ceiling sits close to
 today's ENS-scored skill, most of our error is not the weather forecast's fault and the effort
-belongs in the modelling instead. So run this **before** ingesting another NWP source: it is the
-quick test that sizes the prize that ingesting another NWP source would chase.
+belongs in the modelling instead. The ceiling sizes the prize that ingesting another NWP source
+would chase. The ceiling does not gate trying a new source, because an autonomous study can test a
+new weather product quickly (see [A new weather product with a few months of
+history](training-history.md#a-new-weather-product-with-a-few-months-of-history)). Trained lag-free,
+the ceiling model is also that section's weather-response model, so the ceiling and the study share
+one model.
 
 Two rungs, in increasing order of "cheating":
 
-- **ERA5.** A reanalysis, so it assimilates observations, but still a 31 km model field — good, not
-  perfect. Needs no extra work once the [ingest](training-history.md) lands.
+- **Gridded estimates of past weather, compared with each other.** ERA5 is a reanalysis, so it
+  assimilates observations, but it is still a 31 km model field — good, not perfect. The early time
+  steps of the UKV archive held by CEDA, the Centre for Environmental Data Analysis, are the
+  alternative for every variable except irradiance. Which estimate of past weather to train on is
+  an [open question](training-history.md#open-questions), so this rung scores both.
 
-- **Observations.** Closer to truth at the site, and worth the second rung precisely because ERA5's
-  remaining error is not small. The UK Met Office's MIDAS Open (via CEDA, the Centre for
-  Environmental Data Analysis) supplies hourly land-surface temperature, wind, and pressure from GB
+- **Observations.** Measured at the site rather than averaged over a grid cell, and worth the
+  second rung precisely because ERA5's remaining error is not small. The UK Met Office's MIDAS Open
+  (via CEDA) supplies hourly land-surface temperature, wind, and pressure from GB
   stations — spatially sparse, so nearest-station matched. [CAMS](data-sources.md#weather-data)
   solar radiation is the equivalent rung for solar, and is already planned for v0.7.
 
@@ -1150,7 +1157,11 @@ heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile) and th
 [degradation-conditional conformal
 calibration](https://github.com/openclimatefix/nged-substation-forecast/issues/443) share one
 implementation and one metric path — once we settle how a wrapper derives its class-level
-`MODEL_NAME` from the model it wraps.
+`MODEL_NAME` from the model it wraps. The per-product calibrator under research in [A new weather
+product with a few months of
+history](training-history.md#a-new-weather-product-with-a-few-months-of-history) would be the
+wrapper's third consumer. The wrapper would live in `ml_core` as a `BaseForecaster` subclass that
+wraps another `BaseForecaster`.
 
 Spread inflation widens the fan but cannot reshape it (the inflated ensemble is still 51 point
 forecasts, just pushed apart). It is the stopgap the full fix below must beat to earn the effort of

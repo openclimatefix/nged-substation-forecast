@@ -112,6 +112,25 @@ the whole of Great Britain rather than a substation, and [Buizza and Leutbecher
 distribution 16 to 23 days out — on upper-air variables, not the near-surface temperature and
 irradiance that drive substation load.
 
+### A model trained on past weather does not hedge
+
+**A model trained on an estimate of past weather learns the weather-to-power response without the
+damping that forecast error teaches, so fed forecast weather it is over-sensitive.** The damping
+above arises only because the training input is a forecast, wrong by a lead-time-dependent amount.
+An estimate of past weather — a reanalysis such as ERA5, a satellite retrieval such as CAMS, or the
+first time steps of a weather-model run — carries far smaller errors, so a model trained on one
+learns something close to the undamped response. Fed forecast weather, that model reacts fully to
+every forecast swing, including the swings that are forecast error. The damping then has to come
+from elsewhere: from averaging the model's output over ensemble members whose spread honestly
+represents the forecast error, or from a recalibration fitted on forecast inputs.
+
+**Weather forecasters name the two training choices "perfect prognosis" and "model output
+statistics".** Perfect prognosis fits a statistical model on observed or analysed weather and applies
+that model to forecasts; model output statistics fits on the forecasts themselves. [Marzban,
+Sandgathe and Kalnay (2006)](https://doi.org/10.1175/MWR3088.1) show from a formal analysis that
+model output statistics should beat perfect prognosis on mean squared error, bias, and error
+variance.
+
 ## The fix, formally: a mixture of conditional distributions
 
 Ask the model for a full conditional distribution per member — "the distribution of power *given*

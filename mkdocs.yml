@@ -131,7 +131,7 @@ nav:
       - Metrics and leaderboard: roadmap/metrics-and-leaderboard.md
       - Net-demand disaggregation: roadmap/disaggregation.md
       - Switching events: roadmap/switching-events.md
-      - Extending training history with ERA5: roadmap/training-history.md
+      - Extending the training history: roadmap/training-history.md
       - XGBoost improvements: roadmap/xgboost-improvements.md
   - API reference:
       - Overview: api/index.md
