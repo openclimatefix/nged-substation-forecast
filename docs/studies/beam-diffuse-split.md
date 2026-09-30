@@ -379,8 +379,11 @@ was written into the study plan before any result existed: here, setup C against
 XGBoost settings. A contrast is statistically significant at the 5% level when its 95% interval does
 not contain zero. The month-resampled test covers the month-to-month weather and the fitting seed.
 The test does not cover differences between generators, because the same six sites appear in every
-resample. Among the many exploratory rows on this page, about 1 in 20 of those with no real effect
-behind them would reach significance at the 5% level by chance alone.
+resample. An exploratory interval with no real effect behind it has a nominal 5% chance of being
+statistically significant at the 5% level. How many significant exploratory intervals are spurious
+is unknown, because how many have no real effect behind them is unknown. The intervals rest on
+overlapping months of weather and often share an arm, so spurious results tend to arrive together.
+This page applies no correction for multiple comparisons to the exploratory rows.
 
 ## Results
 
