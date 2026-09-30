@@ -94,6 +94,25 @@ word of the content. It is separate from the commit-message trailer (`Co-Authore
 <noreply@anthropic.com>`), which stays on commits only and keeps its usual placement at the end of
 the message. `plan-wave`'s epic-ledger comment already follows this.
 
+## Have a fresh sub-agent review every GitHub text you write
+
+**Before you post an issue body, PR body or comment, and after any later edit, have a fresh
+sub-agent attack the draft.** A body written from memory carries claims nobody checked. An issue
+that said the CERRA download ran "from 1985" when the files start in 2019 shows how a plausible
+sentence survives when nobody checks it against the data.
+
+- **Give the reviewer the draft file or the issue number and no account of your reasoning.** It
+  must not be anchored by why you wrote the text.
+- **Ask it to check facts first.** Each claim about a date range, a count, a file name, a PR's
+  behaviour or a study's finding is checked against the repository, the data folder or the linked
+  PR. Then it checks the prose rules in `CLAUDE.md` and this skill's checklist: attribution line,
+  no hard wraps, no close, fix or resolve near an issue number, and no promise the project has not
+  agreed to.
+- **Triage the findings against the source before applying them**, on the same terms as a diff
+  review, and post the corrected text.
+- **A Sonnet reviewer is enough for a short body.** Use Opus for a long design description.
+- **State the review in your reply**, in one line, so the maintainer knows the text was checked.
+
 ## Never hard-wrap a GitHub body or comment
 
 **Write one line per paragraph. No hard wraps, at any width.** This applies to every issue body, PR
