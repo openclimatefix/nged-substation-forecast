@@ -243,3 +243,68 @@ def test_cerra_rows_keep_only_the_three_hourly_hours_with_a_full_centred_hour(tm
     # Hour 20 has wind but no power, and hours 2, 3, 5 and 6 have power but no wind.
     assert joined["time"].dt.hour().to_list() == [1, 4, 7]
     assert joined.columns[-2:] == ["power_mw", "has_zero_half_hour"]
+
+
+def test_a_cell_on_any_of_the_four_crop_edges_raises():
+    for edge_cell in [(12, 20), (12, 23), (10, 21), (14, 21)]:
+        cells = _cells(rows={"W1": (12, 21), "W2": edge_cell})
+
+        with pytest.raises(ValueError, match="only 1 of 2 sites"):
+            check_strictly_inside(cells=cells, crop=_crop())
+
+
+def test_a_cell_missing_from_the_crop_raises_even_between_the_edges():
+    crop = _crop().filter(~((pl.col("y_index") == 12) & (pl.col("x_index") == 22)))
+
+    with pytest.raises(ValueError, match="only 1 of 2 sites"):
+        check_strictly_inside(cells=_cells(rows={"W1": (12, 21), "W2": (12, 22)}), crop=crop)
+
+
+def test_nora3_nearest_cell_rounds_to_the_nearest_in_both_directions():
+    to_degrees = Transformer.from_crs(NORA3_LAMBERT_PROJ4, "EPSG:4326", always_xy=True)
+    rows = []
+    for site, (x_offset, y_offset) in {"W1": (-400.0, 300.0), "W2": (400.0, -300.0)}.items():
+        longitude, latitude = to_degrees.transform(
+            NORA3_GRID_X0_M + NORA3_GRID_SPACING_M * 620 + x_offset,
+            NORA3_GRID_Y0_M + NORA3_GRID_SPACING_M * 250 + y_offset,
+        )
+        rows.append({"site": site, "latitude": latitude, "longitude": longitude})
+
+    nearest = derive_nearest_nora3_cells(sites=pl.DataFrame(rows))
+
+    assert nearest["y_index"].to_list() == [250, 250]
+    assert nearest["x_index"].to_list() == [620, 620]
+
+
+def test_cerra_reading_keeps_an_hour_one_height_lacks_and_sorts_by_site_then_time(tmp_path: Path):
+    _write_cerra(directory=tmp_path, hours=[4, 1])
+    height_10 = tmp_path / CERRA_FILES[10]
+    pl.read_parquet(height_10).filter(
+        pl.col("valid_time") != DAY + timedelta(hours=4)
+    ).write_parquet(height_10)
+
+    wind = read_cerra_wind(directory=tmp_path, cells=_cells(rows={"W2": (12, 22), "W1": (11, 21)}))
+
+    assert wind["site"].to_list() == ["W1", "W1", "W2", "W2"]
+    assert wind["time"].dt.hour().to_list() == [1, 4, 1, 4]
+    assert wind["wind_speed_10m"].to_list() == [31.0, None, 32.0, None]
+    assert wind["wind_speed_150m"].null_count() == 0
+
+
+def test_join_pairs_each_site_with_its_own_power_and_sorts_by_site_then_time():
+    times = [datetime(2024, 1, 1, hour, tzinfo=UTC) for hour in (4, 1)]
+    wind = pl.DataFrame(
+        {"site": ["W2", "W2", "W1", "W1"], "time": times + times, "wind_speed_100m": [1.0] * 4}
+    )
+    half_hourly = pl.concat(
+        [
+            _half_hourly(site="W2", hours=6).with_columns(power_mw=pl.col("power_mw") + 100.0),
+            _half_hourly(site="W1", hours=6),
+        ]
+    )
+
+    joined = join_centred_power(wind=wind, half_hourly=half_hourly)
+
+    assert joined["site"].to_list() == ["W1", "W1", "W2", "W2"]
+    assert joined["time"].dt.hour().to_list() == [1, 4, 1, 4]
+    assert joined["power_mw"].to_list() == [1.5, 7.5, 101.5, 107.5]
