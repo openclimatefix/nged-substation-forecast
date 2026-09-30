@@ -25,12 +25,13 @@ published inputs' own `(site, time)` keys:
   that.
 - `ens_mean_day<N>_*` at days 7 and 14, the same-rows ENS reference, built by
   `build_forecast_inputs._ens_extra_frame` as the published extra-lead inputs are.
-- Wind only, `ens_meanvec_day1_*`, an exploratory ENS reference whose speed is the length of the
-  mean of the members' wind vectors, as WN3's is. The store holds only the ensemble-mean components,
-  so WN3's speed is the length of the mean vector, which is lower than the mean of the members'
-  speeds whenever the members disagree in direction. The ENS mean averages the members' speeds.
-- `<arm>_init_time` for each WN3 arm and for `ens_meanvec_day1`, which `fit_aifs.py --wn3` checks
-  against the run it should read.
+- Wind only, `ens_meanvec_day<N>_*` at every built day, the matched ENS reference whose speed is
+  the length of the mean of the members' wind vectors, as WN3's is. The store holds only the
+  ensemble-mean components, so WN3's speed is the length of the mean vector, which is lower than
+  the mean of the members' speeds whenever the members disagree in direction. The ENS mean
+  averages the members' speeds.
+- `<arm>_init_time` for each WN3 arm and for each `ens_meanvec_day<N>`, which `fit_aifs.py --wn3`
+  checks against the run it should read.
 
 Every output row carries only the anonymised `site` label; no generator name, id or coordinate is
 printed.
@@ -81,9 +82,9 @@ GRID_CELLS_NAME: Final[str] = "_grid_cells.parquet"
 GRID_DEGREES: Final[float] = 0.1
 """The WN3 grid's cell size, as `compute_h3_grid_weights` bins by."""
 
-PAD_DEGREES: Final[float] = 0.5
+PAD_DEGREES: Final[float] = 0.25
 """How far the copied box extends beyond the roster's extent. An H3 resolution-5 hexagon reaches
-about 0.13 degrees from its centre."""
+about 0.13 degrees from its centre, and the 0.1 degree grid adds up to a cell more."""
 
 FIRST_INIT: Final[np.datetime64] = np.datetime64("2026-01-01T00", "h")
 """The store's first run."""
@@ -118,8 +119,20 @@ WN3_DAYS: Final[tuple[int, ...]] = (1, 2, 7, 14)
 ENS_EXTRA_DAYS: Final[tuple[int, ...]] = (7, 14)
 """The days whose same-rows ENS mean `_ens_extra_frame` builds beside the WN3 arms."""
 
-MEANVEC_DAY: Final[int] = 1
-"""The one day the exploratory mean-vector ENS reference is built at."""
+PHYSICAL_RANGES: Final[dict[str, tuple[float, float]]] = {
+    "ghi": (0.0, 1400.0),
+    "temp": (-30.0, 45.0),
+    "speed_100m": (0.0, 70.0),
+    "speed_10m": (0.0, 70.0),
+}
+"""The physical range of each built column that every value must lie inside: hourly-mean global
+horizontal irradiance in W m-2 (the solar constant is 1,361), 2 m temperature in degrees C at a
+Great Britain site, and wind speed in m s-1. The identity check compares the transform with itself,
+so a wrong unit passes it, and this range does not."""
+
+MIN_PEAK_GHI: Final[float] = 300.0
+"""The lowest peak a WN3 arm's irradiance may have over a run of months: a smaller peak means the
+values are still in the wrong unit (kJ or MJ, say)."""
 
 CHECK_ROWS: Final[int] = 500
 """How many built rows `check_against_store` recomputes from the local copy, cell by cell."""
@@ -140,6 +153,63 @@ def _snapped_slice(*, axis: np.ndarray, low: float, high: float) -> slice:
         msg = "no stored cell lies inside the roster's box"
         raise ValueError(msg)
     return slice(int(inside[0]), int(inside[-1]) + 1)
+
+
+def log_run_provenance(
+    *, init_hours: np.ndarray, written: np.ndarray, source_hours: np.ndarray
+) -> None:
+    """Log each 00 UTC run's `run_written` flag beside its `init_time` and `source_init_time`.
+
+    LOOKAHEAD RECORD STEP. The page's lookahead section says the publication latency of a run is
+    not stated in Google's documentation. Once the store may be read, this output is the evidence
+    that the runs were written in real time: a run whose `source_init_time` differs from its
+    `init_time`, or that is not written, is not a plain real-time 00 UTC run. Read the log before
+    any fit, and copy what it shows into the page's lookahead section.
+
+    Args:
+        init_hours: The store's `init_time`, in integer hours since the epoch.
+        written: The store's `run_written` flags.
+        source_hours: The store's `source_init_time`, in the same unit.
+
+    Raises:
+        ValueError: After logging every run, if no run is written, a 00 UTC run before the last
+            written one is not written, or a written run has a `source_init_time` different from
+            its `init_time`.
+    """
+    init = init_hours.astype("datetime64[h]")
+    midnight = init.astype("datetime64[D]").astype("datetime64[h]") == init
+    positions = np.flatnonzero(midnight & (init >= FIRST_INIT))
+    is_written = written[positions].astype(bool)
+    if not is_written.any():
+        msg = "no 00 UTC run of 2026 is written in the store"
+        raise ValueError(msg)
+    last = int(np.flatnonzero(is_written).max())
+    for position in positions[: last + 1]:
+        _LOG.info(
+            "run %s: run_written=%s source_init_time=%s",
+            init[position],
+            bool(written[position]),
+            source_hours[position].astype("datetime64[h]"),
+        )
+    done = positions[is_written]
+    differs = int((source_hours[done] != init_hours[done]).sum())
+    # The store's init_time axis is allocated years ahead, so runs after the last written one are
+    # not gaps; an unwritten run before the last written one is.
+    gaps = int((~is_written[: last + 1]).sum())
+    _LOG.info(
+        "%d 00 UTC runs written, %d gaps before the last written run, %d with source_init_time "
+        "different from init_time",
+        len(done),
+        gaps,
+        differs,
+    )
+    if gaps or differs:
+        msg = (
+            f"{gaps} 00 UTC runs are unwritten before the last written run and {differs} have a "
+            "source_init_time different from their init_time: the runs may not be plain "
+            "real-time runs. Stop and report to the maintainer; do not fit."
+        )
+        raise ValueError(msg)
 
 
 def read_trial_area(*, bucket: str, weather_dir: Path) -> None:
@@ -175,6 +245,11 @@ def read_trial_area(*, bucket: str, weather_dir: Path) -> None:
     )
     init_hours = np.asarray(root.get_array(fetch.INIT_TIME)[:])
     written = np.asarray(root.get_array(fetch.RUN_WRITTEN)[:])
+    log_run_provenance(
+        init_hours=init_hours,
+        written=written,
+        source_hours=np.asarray(root.get_array(fetch.SOURCE_INIT_TIME)[:]),
+    )
     init = init_hours.astype("datetime64[h]")
     at_midnight = init.astype("datetime64[D]").astype("datetime64[h]") == init
     positions = np.flatnonzero(at_midnight & written & (init >= FIRST_INIT))
@@ -427,6 +502,35 @@ def check_against_store(
     _LOG.info("%s: identity check against the local copy passed (worst %.1e)", arm, worst)
 
 
+def check_physical_range(*, built: pl.DataFrame, domain: DomainType, day: int) -> None:
+    """Raise unless every value of a WN3 arm's columns lies in a physical range.
+
+    Args:
+        built: `wn3_arm_frame`'s result.
+        domain: `solar` or `wind`.
+        day: The band's day.
+
+    Raises:
+        ValueError: If a built value lies outside `PHYSICAL_RANGES`, or the peak irradiance is
+            below `MIN_PEAK_GHI`.
+    """
+    arm = f"wn3_mean_day{day}"
+    names = ("ghi", "temp") if domain == "solar" else ("speed_100m", "speed_10m")
+    for name in names:
+        low, high = PHYSICAL_RANGES[name]
+        values = built[f"{arm}_{name}"].drop_nulls()
+        if values.min() < low or values.max() > high:  # ty: ignore[unsupported-operator]
+            msg = (
+                f"{arm}_{name}: values run {values.min()} to {values.max()}, "
+                f"outside {low} to {high}"
+            )
+            raise ValueError(msg)
+    if domain == "solar" and built[f"{arm}_ghi"].max() < MIN_PEAK_GHI:  # ty: ignore[unsupported-operator]
+        msg = f"{arm}_ghi: the peak is {built[f'{arm}_ghi'].max()}, so the unit is probably wrong"
+        raise ValueError(msg)
+    _LOG.info("%s: physical-range check passed", arm)
+
+
 def ens_vector_mean_frame(*, extract: pl.DataFrame, day: int) -> pl.DataFrame:
     """Return ENS's wind arm whose speed is the length of the mean of the members' wind vectors.
 
@@ -462,7 +566,7 @@ def ens_vector_mean_frame(*, extract: pl.DataFrame, day: int) -> pl.DataFrame:
     }
     runs = steps.keys.filter(pl.col("ensemble_member") == 0).select("site", "init_time")
     arm = f"ens_meanvec_day{day}"
-    rows = runs.select(pl.all().repeat_by(len(targets)).explode()).with_columns(
+    rows = runs.select(pl.all().repeat_by(len(targets)).explode(empty_as_null=True)).with_columns(
         lead=pl.Series(np.tile(targets, runs.height)).cast(pl.Int64),
         **{name: pl.Series(values.reshape(-1)) for name, values in fields.items()},
     )
@@ -539,6 +643,7 @@ def build_domain(
         arm_frame = wn3_arm_frame(
             cubes=cubes, runs=runs, sites=sites, keys=keys, domain=domain, day=day
         )
+        check_physical_range(built=arm_frame, domain=domain, day=day)
         check_against_store(
             built=arm_frame, dataset=dataset, weights=weights, domain=domain, day=day
         )
@@ -550,12 +655,12 @@ def build_domain(
         control_days=(),
     )
     frame = frame.join(extra, on=["site", "time"], how="left")
-    if domain == "wind" and MEANVEC_DAY in days:
-        frame = frame.join(
-            ens_vector_mean_frame(extract=efh.members(sites=sites), day=MEANVEC_DAY),
-            on=["site", "time"],
-            how="left",
-        )
+    if domain == "wind":
+        extract = efh.members(sites=sites)
+        for day in days:
+            frame = frame.join(
+                ens_vector_mean_frame(extract=extract, day=day), on=["site", "time"], how="left"
+            )
     empty = [
         column
         for column in frame.columns[keys.width :]

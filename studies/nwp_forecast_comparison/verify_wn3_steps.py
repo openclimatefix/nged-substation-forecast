@@ -87,7 +87,15 @@ def best_is_zero(*, scores: dict[int | str, float], domain: DomainType) -> bool:
 
 
 def main() -> int:
-    """Run the checks, write the report, and return 1 if any check failed."""
+    """Run the checks and write the report.
+
+    Returns:
+        0.
+
+    Raises:
+        ValueError: After the report is written, if offset 0 is not the best of -1, 0 and +1 hours
+            at every technology and day, so that no fit follows a wrong hour convention.
+    """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--published-dir", type=Path, required=True)
@@ -127,8 +135,8 @@ def main() -> int:
     report_path.write_text("\n".join(lines))
     _LOG.info("wrote %s", report_path)
     if failures:
-        _LOG.error("failed: %s", failures)
-        return 1
+        msg = f"offset 0 is not the best hour offset for: {failures}; do not fit"
+        raise ValueError(msg)
     return 0
 
 

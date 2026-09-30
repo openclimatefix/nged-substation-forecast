@@ -624,18 +624,46 @@ hourly values on either side of it, as ENS's is.
 **WN3's wind speed is the length of the mean wind vector, which is biased low relative to ENS's.**
 The store holds the ensemble mean of the eastward and northward wind components and no member
 values, so WN3's speed is the length of the mean vector. ENS's speed is the mean of the members'
-speeds, which is larger when the members disagree in direction. The study therefore also fits an
-exploratory reference at day 1 for wind: ENS's mean whose speed is the length of the mean of its
-members' wind vectors.
+speeds, which is larger when the members disagree in direction. The study therefore also fits, for
+wind at every day, a matched ENS reference: ENS's mean whose speed is the length of the mean of its
+members' wind vectors. That reference, and not ENS's mean speed, is the one the wind contrasts
+against WN3 use as the like-for-like comparison. ENS's members' speed and direction at 100 m and
+10 m are on local disk for every day, so the reference needs no download. If a run lacked members,
+the build would drop that run and the fit would stop, naming the run.
 
 **The WN3 rows cover about 7 months, so every WN3 contrast is descriptive.** The row set holds
-February to April and June to September 2026. Each calendar month occurs in one year only, so no
-scored month has a training row of its own calendar month. The planned contrast is WN3's mean minus
-ENS's mean at day 1 on the same rows, for solar and wind, with a negative control that shuffles
-WN3's weather within farm, year-month, and hour of day, under two seeds. Every other number is
-exploratory. AIFS Single and the AIFS ENS mean keep the days they were fitted at (1, 2, 7, and 14),
-on their own row sets. Figures 1 and 2 name each row set's number of months and draw a grey tick for
-the ENS mean fitted on the same rows.
+February to April and June to 10 September 2026. September holds 10 days only, and counts as a whole
+month when the intervals resample months. Each calendar month occurs in one year only, so no scored
+month has a training row of its own calendar month. The contrast of interest is WN3's mean minus
+ENS's mean on the same rows, at days 1, 2, 7, and 14, for solar and wind, each with the sensitivity
+setting and each read as descriptive. Each is paired with a negative control that shuffles WN3's
+weather within farm, year-month, and hour of day, under two seeds. The day-14 gap minus the day-1
+gap is exploratory, and is read from the two intervals, not tested. A difference whose 95% interval
+spans 0 is reported with the interval's bounds, because a null at day 14 excludes only differences
+larger than the interval, and is never described as no difference. AIFS Single and the AIFS ENS
+mean keep the days they were fitted at (1, 2, 7, and 14), on their own row sets.
+
+### What is known about WN3's lookahead
+
+**Google's documentation states neither WN3's training cut-off nor how long after 00 UTC a run is
+published, so the study cannot show from documentation that its 2026 runs are free of lookahead.**
+The [model guide](https://developers.google.com/weathernext/guides/models) gives the release as
+August 2026, and the [Cloud Storage guide](https://developers.google.com/weathernext/guides/gcs)
+says the archive starts on 2026-01-01 and holds "real-time operational data for 2026 to present".
+The [limitations page](https://developers.google.com/weathernext/guides/benefits-limitations) states
+neither a cut-off nor a latency. The archive therefore starts about 7 months before the release, and
+the documentation does not say whether the runs from January to August were issued in real time or
+produced afterwards with the released model. If they were produced afterwards, or if the training
+data overlaps the scored period, WN3's error is not comparable with the error of a forecast issued
+in real time.
+
+**The store's own run records are the evidence still to be read, and the run script stops on them.**
+Each run carries `run_written` and `source_init_time`. `build_wn3_inputs.py --read-store` logs both
+for every 00 UTC run (the function `log_run_provenance`) and stops if a run before the last written
+one is missing or a run's `source_init_time` differs from its `init_time`. The fit stops unless
+`--lookahead-cleared` is given, and the flag is given only after the log and this section have been
+read and the two conditions above are found to hold. If either fails, the study stops and reports,
+and does not fit. This section is updated with what the log shows before any WN3 number is reported.
 
 ## Results
 
@@ -1700,24 +1728,6 @@ member and at day 14 there is no skill to compare. For a blend of ENS's mean and
 blend shows no detectable difference when both settings are read together. The day-14 reading rule
 finds no skill to compare at day 14.
 
-### WeatherNext 3's ensemble mean beside ENS's on the same rows (exploratory)
-
-**This section reports WN3's mean at days 1, 2, 7, and 14 beside ENS's mean fitted on the same rows,
-on the GPU, at the primary setting.** The numbers come from the `report.md` that
-`fit_aifs.py --wn3` writes. Every contrast is descriptive, for the reason in [How WeatherNext 3 is
-read](#how-weathernext-3-is-read).
-
-| Technology | Day | WN3 mean error (% of capacity) | ENS mean error, same rows | WN3 minus ENS (points) |
-|---|---|---|---|---|
-| Solar | 1 | not yet fitted | not yet fitted | not yet fitted |
-| Solar | 2 | not yet fitted | not yet fitted | not yet fitted |
-| Solar | 7 | not yet fitted | not yet fitted | not yet fitted |
-| Solar | 14 | not yet fitted | not yet fitted | not yet fitted |
-| Wind | 1 | not yet fitted | not yet fitted | not yet fitted |
-| Wind | 2 | not yet fitted | not yet fitted | not yet fitted |
-| Wind | 7 | not yet fitted | not yet fitted | not yet fitted |
-| Wind | 14 | not yet fitted | not yet fitted | not yet fitted |
-
 ## Discussion: what to use
 
 **Each recommendation below is about a product as this study reads it, and rests on an XGBoost model
@@ -1940,8 +1950,12 @@ while running the study -->
 
 **The WeatherNext 3 rows span about 7 months of 2026, each calendar month in one year only, so every
 WN3 result is descriptive: no scored month has a training row of its own calendar month.**
-The wind speed WN3 gives is also the length of a mean vector, which is lower than ENS's mean of
-member speeds, so a wind difference against ENS partly reflects that definition.
+September 2026 holds 10 days of rows and counts as a whole month in the month resampling. The wind
+speed WN3 gives is also the length of a mean vector, which is lower than ENS's mean of member
+speeds, so a wind difference against ENS's mean speed partly reflects that definition. The matched
+reference at every day removes that part. The WN3 rows take their capacities from the same
+`effective_capacity` table as every other row on this page (version 1, committed on 2026-09-22),
+which was committed after the last WN3 row of 10 September 2026.
 
 **The UKV day-1 requirement removes 47.8% and 50.5% of the solar rows of April and May 2026, and
 86.8% and 89.4% of the wind rows.** The shared rows require UKV's day-1 value, because UKV is a
@@ -2133,9 +2147,9 @@ and tables do not read it.
 **Every number on this page comes from one of nine `report.md` files or the `verification/` files
 beside them, or is derived from them, except the three the page marks in place (the GEFS store's
 missing long-lead wind, the day-by-day coverage shares in the lead-day table, and the repeat of the
-23 GPU arms), and the commands below rebuild the reports and the figures.** The eight files are the
+23 GPU arms), and the commands below rebuild the reports and the figures.** The nine files are the
 published run's, one for each of the four extra-lead batches, the day-1 and day-2 AIFS arms', the
-AIFS blends and long leads', and the P4 refit's. Run the commands
+AIFS blends and long leads', the P4 refit's, and the WN3 fit's. Run the commands
 from the repository root, in this order. The verification scripts write the `verification/`
 directories that the reports quote.
 
@@ -2204,8 +2218,8 @@ uv run python $R/fit_aifs.py --p4-controls --workers 1 --published-dir $P --outp
 uv run python $R/build_wn3_inputs.py --read-store --bucket BUCKET
 uv run python $R/build_wn3_inputs.py --build --published-dir $P --output-dir $W
 uv run python $R/verify_wn3_steps.py --published-dir $P --output-dir $W
-uv run python $R/fit_aifs.py --wn3 --check --published-dir $P --output-dir $W
-uv run python $R/fit_aifs.py --wn3 --workers 1 --published-dir $P --output-dir $W
+uv run python $R/fit_aifs.py --wn3 --check --lookahead-cleared --published-dir $P --output-dir $W
+uv run python $R/fit_aifs.py --wn3 --lookahead-cleared --workers 1 --published-dir $P --output-dir $W
 
 # Figures
 uv run python $R/nwp_forecast_charts.py --input-dir $P --extra-dir $D1 --extra-dir $D2 \

@@ -7,7 +7,7 @@ wrong number. The scripts are imported by path because `studies/` is not an impo
 
 import importlib
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType
 from typing import Final
@@ -42,6 +42,7 @@ def _load(*, name: str) -> ModuleType:
             sys.path.remove(path)
 
 
+efh = _load(name="ens_forecast_horizons")
 w = _load(name="build_wn3_inputs")
 fa = _load(name="fit_aifs")
 vw = _load(name="verify_wn3_steps")
@@ -224,10 +225,10 @@ def test_check_runs_requires_the_wn3_stamp() -> None:
         fa.check_runs(frame=frame, domain="wind", row_set="wn3", arms=("wn3_mean_day1",))
 
 
-def test_wn3_arms_add_the_mean_vector_reference_only_for_wind_at_day_one() -> None:
-    assert "ens_meanvec_day1" in fa.wn3_arms(domain="wind", day=1)
-    assert "ens_meanvec_day2" not in fa.wn3_arms(domain="wind", day=2)
-    assert not any("meanvec" in arm for arm in fa.wn3_arms(domain="solar", day=1))
+def test_wn3_arms_add_the_mean_vector_reference_for_wind_at_every_day_and_never_for_solar() -> None:
+    for day in fa.WN3_DAYS:
+        assert f"ens_meanvec_day{day}" in fa.wn3_arms(domain="wind", day=day)
+        assert not any("meanvec" in arm for arm in fa.wn3_arms(domain="solar", day=day))
 
 
 def test_the_wn3_fit_covers_days_one_two_seven_and_fourteen() -> None:
@@ -278,3 +279,138 @@ def test_row_set_rows_name_the_months_and_keep_the_same_rows_ens_mean_as_ticks(
     ticks = rows.filter(pl.col("kind") == "ens_same_rows")
     assert marks.sort("day")["value"].to_list() == [8.0, 9.5]
     assert ticks.sort("day")["value"].to_list() == [9.0, 10.0]
+
+
+def test_row_set_rows_refuse_ticks_from_other_days_than_the_marks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    canned = pl.DataFrame(
+        {
+            "product": ["ENS mean", "WeatherNext 3 mean", "WeatherNext 3 mean"],
+            "day": [1, 1, 2],
+            "value": [9.0, 8.0, 9.5],
+            "lower_95": [8.0, 7.0, 8.5],
+            "upper_95": [10.0, 9.0, 10.5],
+            "n_months": [7, 7, 7],
+        }
+    )
+    monkeypatch.setattr(charts, "lead_board_rows", lambda *, losses: canned)
+    losses = pl.DataFrame({"arm": ["wn3_mean_day1"]})
+    with pytest.raises(ValueError, match="other \\(lead day, months\\)"):
+        charts.row_set_board_rows(marks=[charts.RowSetMarks(slug="wn3_mean", losses=losses)])
+
+
+def test_row_set_marks_refuse_losses_with_no_device_column(tmp_path: Path) -> None:
+    pl.DataFrame({"arm": ["wn3_mean_day1"], "site": ["A"]}).write_parquet(
+        tmp_path / "solar_wn3_day1_losses.parquet"
+    )
+    for day in (2, 7, 14):
+        pl.DataFrame({"arm": [f"wn3_mean_day{day}"], "site": ["A"]}).write_parquet(
+            tmp_path / f"solar_wn3_day{day}_losses.parquet"
+        )
+    with pytest.raises(ValueError, match="no device column"):
+        charts.load_row_set_marks(blends_dir=None, wn3_dir=tmp_path, domain="solar")
+
+
+def _wind_extract() -> pl.DataFrame:
+    """Return a 51-member extract at two sites and two runs, 3-hourly to 72 h.
+
+    Site `A` has every member blowing at 90 degrees at the speed `lead / 10 + 1000 * run`, so the
+    mean vector's length identifies the lead and the run. Site `B` has 26 members at 0 degrees and
+    25 at 180 degrees, all at one speed, so the mean vector is one member's length over 51.
+    """
+    records = []
+    for run in range(2):
+        init = datetime(2026, 3, 1 + run)
+        for lead in range(0, 73, 3):
+            for member in range(efh.ENSEMBLE_SIZE):
+                a_speed = lead / 10 + 1000.0 * run
+                b_direction = 0.0 if member % 2 == 0 else 180.0
+                for site, speed, direction in (
+                    ("A", a_speed, 90.0),
+                    ("B", 51.0, b_direction),
+                ):
+                    records.append(
+                        {
+                            "site": site,
+                            "init_time": init,
+                            "ensemble_member": member,
+                            "lead_hours": lead,
+                            "speed_100m": speed,
+                            "direction_100m": direction,
+                            "speed_10m": speed,
+                            "direction_10m": direction,
+                        }
+                    )
+    return pl.DataFrame(records)
+
+
+def test_ens_mean_vector_frame_keeps_each_site_run_and_lead_together() -> None:
+    frame = w.ens_vector_mean_frame(extract=_wind_extract(), day=1)
+    speed = "ens_meanvec_day1_speed_100m"
+    stamp = "ens_meanvec_day1_init_time"
+    for run in range(2):
+        init = datetime(2026, 3, 1 + run, tzinfo=UTC)
+        for hour in (0, 7, 23):
+            time = init + timedelta(hours=24 + hour)
+            row = frame.filter((pl.col("site") == "A") & (pl.col("time") == time))
+            assert row[speed][0] == pytest.approx((24 + hour) / 10 + 1000.0 * run, rel=1e-6)
+            assert row[stamp][0] == init
+
+
+def test_ens_mean_vector_frame_speed_is_the_length_of_the_mean_of_member_vectors() -> None:
+    frame = w.ens_vector_mean_frame(extract=_wind_extract(), day=1)
+    site_b = frame.filter(pl.col("site") == "B")
+    assert site_b["ens_meanvec_day1_speed_100m"].to_list() == pytest.approx(
+        [1.0] * site_b.height, rel=1e-5
+    )
+
+
+def _store_axes(*, written: list[bool], source_shift: int = 0) -> tuple[np.ndarray, ...]:
+    first = int(np.datetime64("2026-01-01T00", "h").astype("int64"))
+    hours = first + 24 * np.arange(len(written))
+    source = hours.copy()
+    source[1] += source_shift
+    return hours, np.array(written), source
+
+
+def test_run_provenance_accepts_written_runs_followed_by_unwritten_future_slots() -> None:
+    hours, written, source = _store_axes(written=[True, True, True, False, False])
+    w.log_run_provenance(init_hours=hours, written=written, source_hours=source)
+
+
+def test_run_provenance_stops_on_a_gap_before_the_last_written_run() -> None:
+    hours, written, source = _store_axes(written=[True, False, True, False])
+    with pytest.raises(ValueError, match="1 00 UTC runs are unwritten"):
+        w.log_run_provenance(init_hours=hours, written=written, source_hours=source)
+
+
+def test_run_provenance_stops_when_a_source_init_time_differs_from_the_init_time() -> None:
+    hours, written, source = _store_axes(written=[True, True, True], source_shift=-6)
+    with pytest.raises(ValueError, match="1 have a source_init_time"):
+        w.log_run_provenance(init_hours=hours, written=written, source_hours=source)
+
+
+def test_physical_range_rejects_radiation_left_in_joules() -> None:
+    frame = pl.DataFrame(
+        {"wn3_mean_day1_ghi": [0.0, 900.0 * 3600], "wn3_mean_day1_temp": [10.0, 12.0]}
+    )
+    with pytest.raises(ValueError, match="outside"):
+        w.check_physical_range(built=frame, domain="solar", day=1)
+
+
+def test_physical_range_rejects_radiation_in_the_wrong_small_unit() -> None:
+    frame = pl.DataFrame({"wn3_mean_day1_ghi": [0.0, 0.25], "wn3_mean_day1_temp": [10.0, 12.0]})
+    with pytest.raises(ValueError, match="unit is probably wrong"):
+        w.check_physical_range(built=frame, domain="solar", day=1)
+
+
+def test_physical_range_rejects_temperature_left_in_kelvin() -> None:
+    frame = pl.DataFrame({"wn3_mean_day1_ghi": [0.0, 800.0], "wn3_mean_day1_temp": [283.0, 285.0]})
+    with pytest.raises(ValueError, match="outside"):
+        w.check_physical_range(built=frame, domain="solar", day=1)
+
+
+def test_physical_range_accepts_plausible_values() -> None:
+    frame = pl.DataFrame({"wn3_mean_day1_ghi": [0.0, 800.0], "wn3_mean_day1_temp": [3.0, 25.0]})
+    w.check_physical_range(built=frame, domain="solar", day=1)

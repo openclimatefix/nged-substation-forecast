@@ -34,10 +34,11 @@ day) writes its own losses, predictions and stamp, and a stage whose losses exis
 
 `--wn3` fits WeatherNext 3's ensemble mean at days 1, 2, 7 and 14, each day on a frame of its own,
 beside ENS's mean on the same rows, from the inputs `build_wn3_inputs.py --build` wrote to
-`--output-dir`. The row set `wn3` holds February to April and June to September 2026, so every
+`--output-dir`. The row set `wn3` holds February to April and June to 10 September 2026, so every
 contrast is descriptive. Each stage writes its own losses, predictions and stamp, a stage whose
 losses exist is not refitted, and the shuffled copies of WN3's columns are the negative control.
-Wind at day 1 also fits ENS's mean whose speed is the length of the mean wind vector.
+Wind at every day also fits ENS's mean whose speed is the length of the mean wind vector, the
+matched reference for the wind contrast.
 
 `--p4-controls` refits the published P4 blends, their first control and a second-seed control, and
 ENS's day-1 mean on the GPU, on the published run's own rows and folds, into a new `--output-dir`.
@@ -244,9 +245,9 @@ ROW_SET_SPECS: Final[dict[str, RowSet]] = {
     ),
 }
 """Every row set `aifs_rows` can cut: the two AIFS sets, and `wn3`. The WN3 store starts on
-2026-01-01, so `wn3` holds February to April and June to September 2026 (2026-01 is dropped for the
-UKV upgrade and 2026-05 for the version switch); each of its calendar months occurs in one year
-only, so it has no deciding contrast. The loops over the day-1 and day-2 fit and the blends fit
+2026-01-01, so `wn3` holds February to April and June to 10 September 2026 (2026-01 is dropped
+for the UKV upgrade and 2026-05 for the version switch); each of its calendar months occurs in one
+year only, so it has no deciding contrast. The loops over the day-1 and day-2 fit and the blends fit
 read `ROW_SETS`, which leaves `wn3` out."""
 
 
@@ -570,6 +571,44 @@ def drop_runs_outside_era(
     return frame.filter(run >= first, run <= last)
 
 
+def check_wn3_runs_present(*, frame: pl.DataFrame, domain: DomainType, arms: Sequence[str]) -> None:
+    """Raise, naming the missing 00 UTC runs, if a WN3 arm has rows with no run.
+
+    The read stage copies only the runs the store marks written, so a run absent from the copy
+    leaves nulls that `check_no_missing` would report only as a column count. R&D fails fast here
+    on purpose: a quietly degraded fit would poison every comparison built on it.
+
+    Args:
+        frame: The set's rows, carrying each WN3 arm's `_init_time` column.
+        domain: `solar` or `wind`.
+        arms: The arms to be fitted on the frame.
+
+    Raises:
+        ValueError: Naming each WN3 arm and the dates of the runs its missing rows would have
+            read, and how many rows each run leaves without a value.
+    """
+    for arm in arms:
+        column = f"{arm}_init_time"
+        if not arm.startswith("wn3_") or column not in frame.columns:
+            continue
+        day = int(arm.rpartition("_day")[2])
+        hour_start = pl.col("time") - pl.duration(hours=1 if domain == "solar" else 0)
+        missing = (
+            frame.filter(pl.col(column).is_null())
+            .select(run=(hour_start.dt.date() - pl.duration(days=day)))
+            .group_by("run")
+            .len()
+            .sort("run")
+        )
+        if missing.height:
+            listed = {str(run): count for run, count in missing.iter_rows()}
+            msg = (
+                f"{arm}: no WN3 run in the copy for these 00 UTC run dates (rows affected): "
+                f"{listed}"
+            )
+            raise ValueError(msg)
+
+
 def aifs_rows(
     *,
     published_dir: Path,
@@ -621,6 +660,7 @@ def aifs_rows(
         msg = f"{domain}/{row_set}: {spec.fold_offsets} no longer covers every calendar month"
         raise ValueError(msg)
     cut = cut_eras(frame=kept, first_months=spec.era_start_months, fold_offsets=spec.fold_offsets)
+    check_wn3_runs_present(frame=cut, domain=domain, arms=arms)
     check_no_missing(frame=cut, columns=source_columns(arms=arms, domain=domain, nullable=nullable))
     coverage_table(frame=cut)
     check_runs(frame=cut, domain=domain, row_set=row_set, arms=arms)
@@ -2516,9 +2556,6 @@ def run_blends(
 WN3_DAYS: Final[tuple[int, ...]] = (1, 2, 7, 14)
 """The lead days the WN3 fit scores, each on a frame of its own."""
 
-WN3_MEANVEC_DAY: Final[int] = 1
-"""The day at which wind also fits ENS's mean-vector reference."""
-
 
 def wn3_arms(*, domain: DomainType, day: int) -> tuple[str, ...]:
     """Return every arm fitted on one WN3 day's frame.
@@ -2529,7 +2566,7 @@ def wn3_arms(*, domain: DomainType, day: int) -> tuple[str, ...]:
 
     Returns:
         WN3's ensemble mean, ENS's mean on the same rows, the two shuffled copies of WN3's columns
-        (the negative control and its second seed), and, for wind at `WN3_MEANVEC_DAY`, ENS's mean
+        (the negative control and its second seed), and, for wind at every day, ENS's mean
         with its speed taken as the length of the mean wind vector.
     """
     wn3 = f"wn3_mean_day{day}"
@@ -2539,7 +2576,7 @@ def wn3_arms(*, domain: DomainType, day: int) -> tuple[str, ...]:
         shuffled_prefix(source=wn3),
         shuffled_prefix(source=wn3, variant="_b"),
     ]
-    if domain == "wind" and day == WN3_MEANVEC_DAY:
+    if domain == "wind":
         arms.append(f"ens_meanvec_day{day}")
     return tuple(arms)
 
@@ -2562,7 +2599,7 @@ def wn3_contrasts(*, domain: DomainType, day: int) -> list[Contrast]:
     Returns:
         WN3's mean against ENS's mean (the planned contrast at day 1), against its own shuffled
         copy (the negative control), the two shuffled copies against each other (the null), and for
-        wind at `WN3_MEANVEC_DAY` against ENS's mean-vector reference.
+        wind against ENS's mean-vector reference, the matched reference for the wind contrast.
     """
     wn3 = f"wn3_mean_day{day}"
     permuted = shuffled_prefix(source=wn3)
@@ -2570,7 +2607,7 @@ def wn3_contrasts(*, domain: DomainType, day: int) -> list[Contrast]:
         Contrast(
             wn3,
             f"ens_mean_day{day}",
-            "descriptive, planned contrast" if day == 1 else "descriptive",
+            "descriptive, planned contrast" if day == 1 else "descriptive, planned at every day",
         ),
         Contrast(wn3, permuted, "descriptive (negative control: weather shuffled)"),
         Contrast(wn3, shuffled_prefix(source=wn3, variant="_b"), "descriptive (second seed)"),
@@ -2578,12 +2615,12 @@ def wn3_contrasts(*, domain: DomainType, day: int) -> list[Contrast]:
             permuted, shuffled_prefix(source=wn3, variant="_b"), "descriptive (null: two shuffles)"
         ),
     ]
-    if domain == "wind" and day == WN3_MEANVEC_DAY:
+    if domain == "wind":
         contrasts_.append(
             Contrast(
                 wn3,
                 f"ens_meanvec_day{day}",
-                "exploratory (both speeds are the length of a mean vector)",
+                "descriptive, matched reference (both speeds are the length of a mean vector)",
             )
         )
     return contrasts_
@@ -2598,10 +2635,12 @@ def wn3_sensitivity_arms(*, losses: pl.DataFrame, domain: DomainType, day: int) 
         day: A day of `WN3_DAYS`.
 
     Returns:
-        The planned contrast's two arms at day 1, then both arms of every listed contrast near the
-        5% line, without repeats.
+        The planned contrast's two arms at every day (with the matched wind reference for wind),
+        then both arms of every listed contrast near the 5% line, without repeats.
     """
-    arms = [f"wn3_mean_day{day}", f"ens_mean_day{day}"] if day == 1 else []
+    arms = [f"wn3_mean_day{day}", f"ens_mean_day{day}"]
+    if domain == "wind":
+        arms.append(f"ens_meanvec_day{day}")
     for contrast in wn3_contrasts(domain=domain, day=day):
         interval = difference(
             losses=losses, treatment=contrast.treatment, reference=contrast.reference
@@ -2717,6 +2756,7 @@ def wn3_stage_lines(
     contrast_list = wn3_contrasts(domain=domain, day=day)
     lines += ["", "#### Listed contrasts (primary setting)", *ERROR_CONTRAST_HEADER]
     lines += [contrast_row_with_errors(losses=primary, contrast=c) for c in contrast_list]
+    lines += ["", *null_reading_lines(losses=primary, contrasts=contrast_list)]
     second_arms = set(second["arm"].unique().to_list())
     lines += ["", "#### Pairs also fitted at the sensitivity setting", *ERROR_CONTRAST_HEADER]
     for contrast in contrast_list:
@@ -2728,6 +2768,36 @@ def wn3_stage_lines(
         why = "near the 5% line" if near_line(interval=interval) else "planned contrast's arms"
         lines.append(contrast_row_with_errors(losses=second, contrast=contrast, label=why))
     return [*lines, ""]
+
+
+def null_reading_lines(*, losses: pl.DataFrame, contrasts: Sequence[Contrast]) -> list[str]:
+    """Return a sentence for each contrast whose 95% interval spans 0, stating the bounds.
+
+    A null is a statement about the interval, so the sentence gives both bounds, and the largest
+    difference the interval does not exclude.
+
+    Args:
+        losses: Per-row losses at the primary setting, holding every contrast's arms.
+        contrasts: The contrasts to read.
+
+    Returns:
+        One line per null contrast, empty if none spans 0.
+    """
+    lines = []
+    for contrast in contrasts:
+        result = difference(
+            losses=losses, treatment=contrast.treatment, reference=contrast.reference
+        )
+        if result["lower_95"] <= 0 <= result["upper_95"]:
+            text = interval_text(
+                point=result["difference"], lower=result["lower_95"], upper=result["upper_95"]
+            )
+            lines.append(
+                f"- {contrast.treatment} − {contrast.reference}: {text}. The interval spans 0, "
+                "so no difference is detected, and a difference as large as the interval's "
+                "farther bound is not excluded."
+            )
+    return lines
 
 
 def check_wn3(*, published_dir: Path, wn3_dir: Path) -> bool:
@@ -2820,14 +2890,18 @@ def run_wn3(*, published_dir: Path, output_dir: Path, workers: int) -> int:
         (
             "Every fit is on the GPU. Differences are first arm minus second, in percentage points "
             "of capacity, so a negative difference means the first arm has the lower error. Every "
-            "contrast is descriptive: the row set holds February to April and June to September "
+            "contrast is descriptive: the row set holds February to April and June to 10 September "
             "2026, so each calendar month occurs in one year only and no scored cell has a "
             "training row of its calendar month. No contrast is deciding. The planned contrast is "
-            "wn3_mean_day1 − ens_mean_day1, with its negative control (WN3's weather shuffled "
-            "within site, year-month and hour of day, under two seeds). Wind at day 1 also "
-            "contrasts with ens_meanvec_day1, whose speed is the length of the mean of ENS's "
-            "member wind vectors, as WN3's is, because the WN3 store holds only the ensemble-mean "
-            "wind components."
+            "wn3_mean_day<N> − ens_mean_day<N> at days 1, 2, 7 and 14, with its negative control "
+            "(WN3's weather shuffled within site, year-month and hour of day, under two seeds) "
+            "and the sensitivity setting. Wind at every day also contrasts with "
+            "ens_meanvec_day<N>, whose speed is the length of the mean of ENS's member wind "
+            "vectors, as WN3's is, because the WN3 store holds only the ensemble-mean wind "
+            "components; that contrast is the matched one for wind. The day-14 gap minus the "
+            "day-1 gap is exploratory and is read from the two intervals, not tested. A "
+            "difference whose interval spans 0 is reported with the interval's bounds, never as "
+            "no difference."
         ),
         "",
     ]
@@ -3294,7 +3368,21 @@ def main_wn3(*, args: argparse.Namespace) -> int:
 
     Returns:
         The process exit code.
+
+    Raises:
+        ValueError: If `--lookahead-cleared` is absent: the maintainer records, after reading
+            `build_wn3_inputs.py --read-store`'s run log and the page's lookahead section, that the
+            2026 runs were issued in real time and that WN3's training data ends before the scored
+            period. If either is false, the run stops and reports instead.
     """
+    if not args.lookahead_cleared:
+        msg = (
+            "refusing to fit WN3 without --lookahead-cleared: read the run log that "
+            "`build_wn3_inputs.py --read-store` wrote and confirm that the runs were issued in "
+            "real time and that WN3's training data ends before the scored period. If either "
+            "fails, stop and report; do not fit."
+        )
+        raise ValueError(msg)
     studies_dir = args.published_dir.resolve().parent
     refuse_read_only_folders(
         output_dir=args.output_dir,
@@ -3392,6 +3480,12 @@ def main() -> int:
         action="store_true",
         help="Fit WeatherNext 3's ensemble mean at days 1, 2, 7 and 14 beside ENS's mean, from "
         "the inputs `build_wn3_inputs.py --build` wrote to --output-dir.",
+    )
+    parser.add_argument(
+        "--lookahead-cleared",
+        action="store_true",
+        help="With --wn3: confirm that the WN3 runs were issued in real time and that WN3's "
+        "training data ends before the scored period.",
     )
     parser.add_argument(
         "--p4-controls",

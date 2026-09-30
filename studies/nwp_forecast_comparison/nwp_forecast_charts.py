@@ -800,7 +800,8 @@ def load_row_set_marks(
         mean, after the anonymisation check.
 
     Raises:
-        ValueError: If a losses file was fitted on a device other than `EXTRA_DEVICE`.
+        ValueError: If a losses file was fitted on a device other than `EXTRA_DEVICE`, or has no
+            `device` column.
     """
     frames: dict[str, pl.DataFrame] = {}
     if blends_dir is not None:
@@ -815,7 +816,10 @@ def load_row_set_marks(
         )
         check_anonymised(frame=frames["wn3"], domain=domain)
     for row_set, frame in frames.items():
-        devices = set(frame["device"].unique().to_list()) if "device" in frame.columns else set()
+        if "device" not in frame.columns:
+            msg = f"row set {row_set}: the losses have no device column, so the device is unknown"
+            raise ValueError(msg)
+        devices = set(frame["device"].unique().to_list())
         if devices - {EXTRA_DEVICE}:
             msg = f"row set {row_set}: fitted on {sorted(devices)}, not on {EXTRA_DEVICE}"
             raise ValueError(msg)
@@ -838,6 +842,10 @@ def row_set_board_rows(*, marks: Sequence[RowSetMarks]) -> pl.DataFrame:
     Returns:
         `lead_board_rows`'s columns, plus `kind`: `mark` for the product, `ens_same_rows` for the
         ENS mean on the product's rows.
+
+    Raises:
+        ValueError: If a product's ENS mean ticks do not cover the same lead days, each with the
+            same number of months, as the product's own marks.
     """
     frames = []
     for mark in marks:
@@ -849,6 +857,20 @@ def row_set_board_rows(*, marks: Sequence[RowSetMarks]) -> pl.DataFrame:
                 "n_months"
             ][0]
         )
+        ens_span = sorted(
+            rows.filter(pl.col("product") == "ENS mean").select("day", "n_months").iter_rows()
+        )
+        mark_span = sorted(
+            rows.filter(pl.col("product") == PRODUCT_NAMES[mark.slug])
+            .select("day", "n_months")
+            .iter_rows()
+        )
+        if ens_span != mark_span:
+            msg = (
+                f"{mark.slug}: the ENS mean ticks come from other (lead day, months) than the "
+                f"marks: {ens_span} against {mark_span}"
+            )
+            raise ValueError(msg)
         name = f"{PRODUCT_NAMES[mark.slug]} ({months} months)"
         frames.append(
             rows.filter(pl.col("product").is_in([PRODUCT_NAMES[mark.slug], "ENS mean"]))
@@ -931,7 +953,11 @@ def leaderboard_figure(
     rows = pl.concat([published_rows.with_columns(kind=pl.lit("mark")), extra_rows])
     marks_only = rows.filter(pl.col("kind") == "mark")
     products = lead_board_products(rows=published_rows)
-    products += lead_board_products(rows=extra_rows.filter(pl.col("kind") == "mark"))
+    # Products on a smaller row set keep a fixed order, because their errors are not comparable
+    # with the published products' or with one another's.
+    products += (
+        extra_rows.filter(pl.col("kind") == "mark")["product"].unique(maintain_order=True).to_list()
+    )
     baselines = leaderboard(
         losses=by_setting(losses=losses)["primary"], arms=["climatology", "smart_persistence_day1"]
     ).with_columns(
@@ -960,9 +986,13 @@ def leaderboard_figure(
     )
     lead_names = [f"Day {day}" for day in days]
     x_domain, x_ticks = lead_board_x_domain(
-        lowest=float(rows["lower_95"].min()),  # ty: ignore[invalid-argument-type]
+        lowest=min(
+            float(rows["lower_95"].min()),  # ty: ignore[invalid-argument-type]
+            float(same_rows["value"].min()) if same_rows.height else math.inf,  # ty: ignore[invalid-argument-type]
+        ),
         highest=max(
             float(rows["upper_95"].max()),  # ty: ignore[invalid-argument-type]
+            float(same_rows["value"].max()) if same_rows.height else -math.inf,  # ty: ignore[invalid-argument-type]
             float(baselines["value"].max()),  # ty: ignore[invalid-argument-type]
         ),
         longest_name=max(len(name) for name in products),
@@ -1132,8 +1162,11 @@ def leaderboard_figure(
                 "day. Smaller is better. Marks run from day 0 at the top to day 14 at the bottom; "
                 "day 7 is a grey diamond and day 0 is a black diamond. Products in the rows "
                 "below the full-window products were fitted on fewer months, shown in their "
-                "names; within each group, rows are ordered by day-1 error, and a grey tick "
-                "beside a mark is the ENS mean fitted on the same rows. A lead day with no mark "
+                "names; the full-window rows are ordered by day-1 error, the rows below them keep "
+                "a fixed order and are not ranked against each other, and a grey tick "
+                "beside a mark is the ENS mean fitted on the same rows. A month counts whole "
+                "in the resampling even where the row set holds part of it (September 2026 holds "
+                "10 days). A lead day with no mark "
                 "was not fitted, because it is beyond the product's forecast range or not in "
                 "the archive we hold; nothing is filled in. Dashed lines mark the no-weather "
                 f"baselines. {DOTS_NOTE} Overlapping intervals can still hide a significant "
