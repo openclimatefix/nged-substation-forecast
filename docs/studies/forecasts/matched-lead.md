@@ -1593,8 +1593,9 @@ possible even though no hourly gain was detected. The optimistic contrast, P4a (
 gain, but the P4a permutation guard is uninformative and P4a's IFS 0.25° value can come from a run
 newer than ENS's 00 UTC run. The study did not test how the live lead would move P4b, so the effect
 of the live lead on this verdict is unknown. What would change the recommendation: a test that
-separates a second weather model from a newer ECMWF run, such as a solar blend given ICON-EU alone,
-which the study fitted for wind only.
+separates a second weather model from a newer ECMWF run, such as a solar blend given ICON-EU alone.
+The [blends page](blends-with-ens.md) fits that blend: at the conservative lead it shows no
+detectable solar gain at day 1 or day 2.
 <!-- report: Solar, P4, the blend; Exploratory: each arm's own error over blocks of hours -->
 
 **For solar, the free GEFS ensemble is not a substitute for ENS.** At the same lead, an XGBoost

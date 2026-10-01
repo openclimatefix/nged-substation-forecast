@@ -81,7 +81,8 @@ a
   wind error but shows no detectable solar gain at a lead a 09:00 UTC service could use.
 - [Which single weather forecast should be added to ECMWF's ensemble mean
   first?](forecasts/blends-with-ens.md) — at the 6 solar farms and 3 wind farms, adding ICON-EU at the
-  optimistic lead lowers the wind error at day 1 by 0.58 points of capacity [0.48, 0.69]; AIFS Single
+  optimistic lead (exploratory; an upper bound on a live service's gain) lowers the wind error at
+  day 1 by 0.58 points of capacity [0.48, 0.69]; AIFS Single
   is the one product the page can name for solar, at day 2, by 0.33 [0.18, 0.48]. Elsewhere AIFS
   Single and ICON-EU are not separable.
 - [How do Open-Meteo's ensemble-mean products compare for solar and wind
