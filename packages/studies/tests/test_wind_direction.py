@@ -79,3 +79,10 @@ def test_shuffled_by_month_needs_two_months() -> None:
         shuffled_by_month(
             values=np.ones(3), months=np.array(["a"] * 3), generator=np.random.default_rng(0)
         )
+
+
+def test_shuffled_by_month_output_is_pinned_for_one_seed() -> None:
+    months = np.repeat(np.array(["a", "b", "c", "d"]), 2)
+    values = np.arange(8.0)
+    shuffled = shuffled_by_month(values=values, months=months, generator=np.random.default_rng(0))
+    assert list(shuffled) == [2.0, 3.0, 6.0, 7.0, 0.0, 1.0, 4.0, 5.0]

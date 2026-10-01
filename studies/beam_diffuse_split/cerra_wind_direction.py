@@ -216,7 +216,12 @@ REAL_ARMS: Final[tuple[str, ...]] = (*CORE_ARMS, *VEER_ARMS)
 """The arms fitted on the real target, at both settings."""
 
 SECTOR_CONTROL_ARMS: Final[tuple[str, ...]] = ("speed_100m", "speed_100m_dir")
-VEER_CONTROL_ARMS: Final[tuple[str, ...]] = ("veer_dir_100", "veer_dir_10_100", "veer_angle_10_100")
+VEER_CONTROL_ARMS: Final[tuple[str, ...]] = (
+    "veer_dir_100",
+    "veer_dir_10_100",
+    "veer_angle_10_100",
+    "veer_dir_all5",
+)
 
 PLANNED_CONTRASTS: Final[tuple[Contrast, ...]] = (
     Contrast("speed_100m_dir", "speed_100m", "what 100 m direction adds to 100 m speed", True),
@@ -266,14 +271,26 @@ POSITIVE_CONTROLS: Final[tuple[tuple[Contrast, str], ...]] = tuple(
                 "two raw directions where power has a veer cut",
                 False,
             ),
+            Contrast(
+                "veer_dir_all5",
+                "veer_dir_100",
+                "five raw directions where power has a veer cut",
+                False,
+            ),
         )
     )
 )
 """Every positive control's contrast on every injected target."""
 
-GATING_TARGETS: Final[tuple[str, ...]] = ("injected_sector_40", "injected_veer_40")
-"""The targets whose every contrast must have an upper 95% bound below zero. The 10% cuts are
-reported to show how small an effect the instrument sees, and do not gate the run."""
+GATING_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("speed_100m_dir", "injected_sector_40"),
+    ("veer_angle_10_100", "injected_veer_40"),
+    ("veer_dir_10_100", "injected_veer_40"),
+)
+"""The (treatment, target) pairs whose upper 95% bound must lie below zero. The 10% cuts, and
+`veer_dir_all5` against `veer_dir_100`, are reported and do not gate the run. If a gate fails, the
+run has already written every output, and the page reports the instrument's bound on the real
+target instead of reading a null."""
 
 
 def _sin(*, height_m: int) -> str:
@@ -894,7 +911,7 @@ def contrast_records(*, losses: pl.DataFrame, sites: list[str]) -> pl.DataFrame:
     Returns:
         One row per (setting, scope, contrast). The planned contrasts, the exploratory contrasts and
         the negative controls run on all rows at both real-target settings. The planned contrasts
-        also run per farm and per calendar year at the primary setting (exploratory splits).
+        also run per farm and per full calendar year at the primary setting (exploratory splits).
         Each positive control runs on its own injected target.
     """
     by_setting = {
@@ -911,7 +928,7 @@ def contrast_records(*, losses: pl.DataFrame, sites: list[str]) -> pl.DataFrame:
         ]
     primary = by_setting[PRIMARY_SETTING]
     splits = [(site, primary.filter(pl.col("site") == site)) for site in sites]
-    years = sorted(primary["time"].dt.year().unique().to_list())
+    years = full_years(times=primary["time"])
     splits += [(f"year {year}", _year(losses=primary, year=year)) for year in years]
     for contrast in PLANNED_CONTRASTS:
         records += [
@@ -998,13 +1015,17 @@ def prior_agreement(*, losses: pl.DataFrame, prior_path: Path = PRIOR_LOSSES_PAT
         ours = losses.filter((pl.col("setting") == PRIMARY_SETTING) & (pl.col("arm") == arm))
         theirs = prior.filter(pl.col("arm") == arm)
         joined = ours.join(theirs, on=["site", "time", "seed"], suffix="_prior")
-        gap = float(np.abs(joined[METRIC].to_numpy() - joined[f"{METRIC}_prior"].to_numpy()).max())
-        if joined.height != ours.height or joined.height != theirs.height or gap > PRIOR_TOLERANCE:
+        if not ours.height or joined.height != ours.height or joined.height != theirs.height:
             msg = (
                 f"{arm} does not reproduce the prerequisite study: {joined.height:,} rows joined "
-                f"of {ours.height:,} here and {theirs.height:,} there, "
-                f"largest difference {gap:.3g} "
-                f"against a tolerance of {PRIOR_TOLERANCE}"
+                f"of {ours.height:,} here and {theirs.height:,} there"
+            )
+            raise ValueError(msg)
+        gap = float(np.abs(joined[METRIC].to_numpy() - joined[f"{METRIC}_prior"].to_numpy()).max())
+        if not gap <= PRIOR_TOLERANCE:
+            msg = (
+                f"{arm} does not reproduce the prerequisite study: largest difference {gap:.3g} "
+                f"(NaN counts as a failure) against a tolerance of {PRIOR_TOLERANCE}"
             )
             raise ValueError(msg)
         lines.append(
@@ -1014,26 +1035,58 @@ def prior_agreement(*, losses: pl.DataFrame, prior_path: Path = PRIOR_LOSSES_PAT
     return lines
 
 
+ERA_MEAN_DEG: Final[float] = 30.0
+ERA_VEER_P95_DEG: Final[float] = 10.0
+"""A full year `differs from its neighbours` when its 100 m circular mean is more than
+`ERA_MEAN_DEG` degrees from the median of the other full years' circular means, or its veer 95th
+percentile is more than `ERA_VEER_P95_DEG` degrees from the median of theirs. The full years' own
+circular means span 23 degrees, so 30 degrees sits outside that spread."""
+
+
+def full_years(*, times: pl.Series) -> list[int]:
+    """List the calendar years with rows in all 12 months.
+
+    Args:
+        times: A datetime series.
+
+    Returns:
+        The years in which every month appears. A year with fewer months (the record starts in
+        September 2019 and ends in June 2026) is partial and is left out.
+    """
+    counts = (
+        times.to_frame("time")
+        .group_by(year=pl.col("time").dt.year())
+        .agg(months=pl.col("time").dt.month().n_unique())
+    )
+    return sorted(counts.filter(pl.col("months") == MONTHS_PER_YEAR)["year"].to_list())
+
+
+MONTHS_PER_YEAR: Final[int] = 12
+
+
 def direction_by_year(*, frame: pl.DataFrame) -> pl.DataFrame:
     """Summarise the 100 m direction and the veer for each calendar year.
 
     The prerequisite study's era check scans CERRA's speed for a step at any month and names no
-    production-stream boundary, so this script compares years. A change of production stream
-    inside the record would show as a year whose circular mean or veer distribution differs from
-    its neighbours.
+    production-stream boundary, so this script compares full years. A change of production stream
+    inside the record would show as a full year that `differs` from the other full years under the
+    rule at `ERA_MEAN_DEG`. A partial year is listed and never flagged, because its season mix
+    differs from a full year's.
 
     Args:
         frame: Rows carrying `time`, `wind_direction_100m` and `veer_deg_10_100m`.
 
     Returns:
-        One row per year with `rows`, `circular_mean_deg` of the 100 m direction, and the
-        `veer_median_deg`, `veer_p95_deg` and `veer_share_ge_threshold` of the signed veer.
+        One row per year with `rows`, `months`, `circular_mean_deg` of the 100 m direction, the
+        `veer_median_deg`, `veer_p95_deg` and `veer_share_ge_threshold` of the signed veer, and
+        `differs` (null for a partial year).
     """
     sin, cos = sine_cosine(direction_deg=pl.col("wind_direction_100m"))
-    return (
+    table = (
         frame.group_by(year=pl.col("time").dt.year())
         .agg(
             rows=pl.len(),
+            months=pl.col("time").dt.month().n_unique(),
             mean_sin=sin.mean(),
             mean_cos=cos.mean(),
             veer_median_deg=pl.col("veer_deg_10_100m").median(),
@@ -1043,15 +1096,37 @@ def direction_by_year(*, frame: pl.DataFrame) -> pl.DataFrame:
         .with_columns(
             circular_mean_deg=pl.arctan2(pl.col("mean_sin"), pl.col("mean_cos")).degrees() % 360.0
         )
-        .select(
-            "year",
-            "rows",
-            "circular_mean_deg",
-            "veer_median_deg",
-            "veer_p95_deg",
-            "veer_share_ge_threshold",
-        )
         .sort("year")
+    )
+    rows = table.to_dicts()
+    full = [row for row in rows if row["months"] == MONTHS_PER_YEAR]
+    for row in rows:
+        others = [other for other in full if other["year"] != row["year"]]
+        if row["months"] != MONTHS_PER_YEAR or not others:
+            row["differs"] = None
+            continue
+        mean_gap = abs(
+            (
+                row["circular_mean_deg"]
+                - float(np.median([other["circular_mean_deg"] for other in others]))
+                + 180.0
+            )
+            % 360.0
+            - 180.0
+        )
+        veer_gap = abs(
+            row["veer_p95_deg"] - float(np.median([other["veer_p95_deg"] for other in others]))
+        )
+        row["differs"] = mean_gap > ERA_MEAN_DEG or veer_gap > ERA_VEER_P95_DEG
+    return pl.DataFrame(rows).select(
+        "year",
+        "rows",
+        "months",
+        "circular_mean_deg",
+        "veer_median_deg",
+        "veer_p95_deg",
+        "veer_share_ge_threshold",
+        "differs",
     )
 
 
@@ -1176,14 +1251,24 @@ def report_lines(
         "#### Direction and veer by calendar year (era check)",
         "",
         (
-            "| Year | Rows | 100 m circular mean (degrees) | Veer median | Veer 95th percentile "
-            "| Share at or above threshold |"
+            "A year with fewer than 12 months is partial, is never flagged, and is left out of the "
+            f"per-year contrast splits. A full year differs when its 100 m circular mean is over "
+            f"{ERA_MEAN_DEG:.0f} degrees, or its veer 95th percentile over {ERA_VEER_P95_DEG:.0f} "
+            "degrees, from the median of the other full years."
         ),
-        "|---|---|---|---|---|---|",
+        "",
+        (
+            "| Year | Rows | Months | 100 m circular mean (degrees) | Veer median "
+            "| Veer 95th percentile | Share at or above threshold "
+            "| Differs from the other full years? |"
+        ),
+        "|---|---|---|---|---|---|---|---|",
         *(
-            f"| {row['year']} | {row['rows']:,} | {row['circular_mean_deg']:.1f} "
+            f"| {row['year']}{'' if row['differs'] is not None else ' (partial)'} "
+            f"| {row['rows']:,} | {row['months']} | {row['circular_mean_deg']:.1f} "
             f"| {row['veer_median_deg']:.2f} | {row['veer_p95_deg']:.2f} "
-            f"| {row['veer_share_ge_threshold']:.1%} |"
+            f"| {row['veer_share_ge_threshold']:.1%} "
+            f"| {'n/a' if row['differs'] is None else ('**yes**' if row['differs'] else 'no')} |"
             for row in direction_by_year(frame=frame).iter_rows(named=True)
         ),
         "",
@@ -1253,7 +1338,7 @@ def check_positive_controls(*, intervals: pl.DataFrame) -> None:
     """
     failed = []
     for contrast, setting in POSITIVE_CONTROLS:
-        if setting not in GATING_TARGETS:
+        if (contrast.treatment, setting) not in GATING_CONTRASTS:
             continue
         row = intervals.filter(
             (pl.col("setting") == setting)
@@ -1337,7 +1422,7 @@ def check() -> int:
             for target, (share, effect) in effects.items()
         ),
         *(
-            f"{row['year']}: {row['rows']:,} rows, 100 m circular mean "
+            f"{row['year']} ({row['months']} months): {row['rows']:,} rows, 100 m circular mean "
             f"{row['circular_mean_deg']:.0f} degrees, veer 95th percentile "
             f"{row['veer_p95_deg']:.1f} degrees"
             for row in direction_by_year(frame=frame).iter_rows(named=True)
