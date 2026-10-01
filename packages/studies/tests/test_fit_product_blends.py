@@ -444,6 +444,7 @@ def _error(*, arm: str) -> float:
 
 
 def _arm_rows(*, arm: str, setting: str, error: float) -> pl.DataFrame:
+    """Twelve months of rows; a blend's error varies by month so that no interval is degenerate."""
     return pl.DataFrame(
         [
             {"arm": arm, "site": site, "time": month * 100 + hour, "seed": seed, "month": month}
@@ -452,7 +453,13 @@ def _arm_rows(*, arm: str, setting: str, error: float) -> pl.DataFrame:
             for hour in range(2)
             for seed in SEEDS
         ]
-    ).with_columns(setting=pl.lit(setting), **{METRIC: pl.lit(error)})
+    ).with_columns(
+        setting=pl.lit(setting),
+        **{
+            METRIC: pl.lit(error)
+            + (0.003 * ((pl.col("month") * 5) % 4 - 1.5) if arm.startswith("blend_") else 0.0)
+        },
+    )
 
 
 def _combined(*, day: int) -> pl.DataFrame:
@@ -505,9 +512,15 @@ def test_the_report_prints_the_contrasts_at_both_settings_the_verdicts_and_the_r
     assert "uncorrected for multiplicity" in text
     # Every control (0.11) is worse than ENS's mean (0.10): 8 blends at 2 settings, per technology.
     assert text.count("16 (blend, setting) controls have a lower 95% bound above zero") == 2
-    assert "| `blend_aifs_single_day7` | 7 | -2.000 [-2.000, -2.000]" in text
-    assert "-2.000 | -2.000 | yes |" in text
-    assert "(the 95% level divided across 40 intervals)" in text
+    assert "covers 99.875% (the 95% level divided across 40 intervals)" in text
+    assert "only the blend-minus-ENS intervals are widened" in text
+    row = _multiplicity_row(text=text, blend="blend_aifs_single_day7")
+    interval = re.search(r"\[[^,]+, ([+-][0-9.]+)\]", row[2])
+    assert interval is not None
+    primary_upper = float(interval.group(1))
+    # The widened bound is above the 95% bound, and both are below zero here.
+    assert primary_upper < float(row[6]) < 0.0
+    assert row[-1] == "yes"
     assert "the freshest run at least 48 hours before the valid hour" in text
 
 
@@ -844,3 +857,23 @@ def test_main_refuses_to_fit_without_the_lookahead_flag_or_into_another_folder(
     )
     with pytest.raises(ValueError, match="writes only"):
         fpb.main()
+
+
+def _multiplicity_row(*, text: str, blend: str) -> list[str]:
+    line = next(line for line in text.splitlines() if line.startswith(f"| `{blend}` | "))
+    return [cell.strip() for cell in line.strip("|").split("|")]
+
+
+def test_a_blend_no_better_than_its_control_does_not_survive_even_with_a_widened_bound_below_zero(
+    stub_fit: None, few_resamples: None, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setitem(ERRORS, "blend_aifs_single", 0.09)
+    monkeypatch.setitem(ERRORS, "blend_aifs_single_control", 0.09)
+    combined = {day: _combined(day=day) for day in fpb.single_days()}
+
+    lines = fpb.multiplicity_lines(domain="solar", combined=combined, n_listed=40)
+
+    row = _multiplicity_row(text="\n".join(lines), blend="blend_aifs_single_day7")
+    assert float(row[6]) < 0.0
+    assert float(row[7]) < 0.0
+    assert row[-1] == "no"

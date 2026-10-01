@@ -1119,32 +1119,54 @@ def test_the_blend_rows_that_were_planned_are_marked_and_the_others_exploratory(
     assert "All rows are exploratory" not in spec
 
 
-def test_day_14_of_the_aifs_blend_is_exploratory_and_day_2_is_planned() -> None:
+def test_each_blend_row_is_planned_only_at_the_days_the_plan_names() -> None:
+    labels = {
+        "aifs": "ENS mean + AIFS Single",
+        "cons": "ENS mean + ICON-EU (conservative lead)",
+        "opt": "ENS mean + ICON-EU (optimistic lead)",
+        "ukv": "ENS mean + UKV (optimistic upper bound)",
+        "wn3": "ENS mean + WeatherNext 3 (7 months)",
+    }
+    expected = {
+        ("aifs", 1): True,
+        ("aifs", 2): True,
+        ("aifs", 7): True,
+        ("aifs", 14): False,
+        ("cons", 1): True,
+        ("cons", 2): True,
+        ("opt", 1): False,
+        ("opt", 2): False,
+        ("ukv", 1): True,
+        **{("wn3", day): False for day in (1, 2, 7, 14)},
+    }
+    pairs = list(expected)
     rows = pl.DataFrame(
         {
-            "label": ["ENS mean + AIFS Single"] * 2,
-            "day": [2, 14],
-            "value": [0.0, 0.0],
-            "has_interval": [True, True],
-            "lower": [0.0, 0.0],
-            "upper": [0.0, 0.0],
-            "dashed": [False, False],
-            "second_value": [None, None],
-            "second_has_interval": [None, None],
-            "second_lower": [None, None],
-            "second_upper": [None, None],
-            "second_dashed": [None, None],
+            "label": [labels[key] for key, _ in pairs],
+            "day": [day for _, day in pairs],
+            "value": [0.0] * len(pairs),
+            "has_interval": [True] * len(pairs),
+            "lower": [0.0] * len(pairs),
+            "upper": [0.0] * len(pairs),
+            "dashed": [False] * len(pairs),
+            "second_value": [None] * len(pairs),
+            "second_has_interval": [None] * len(pairs),
+            "second_lower": [None] * len(pairs),
+            "second_upper": [None] * len(pairs),
+            "second_dashed": [None] * len(pairs),
         },
         schema_overrides=dict.fromkeys(("second_value", "second_lower", "second_upper"), pl.Float64)
         | {"second_has_interval": pl.Boolean, "second_dashed": pl.Boolean},
     )
 
-    planned = {
-        day: chart_rows(rows=rows, day=day, domain="solar", blends=True)["planned"].to_list()
-        for day in (2, 14)
-    }
+    found = {}
+    for key, day in pairs:
+        shaped = chart_rows(rows=rows, day=day, domain="solar", blends=True)
+        found[(key, day)] = shaped.filter(pl.col("label") == labels[key])["planned"].to_list() == [
+            True
+        ]
 
-    assert planned == {2: [True], 14: [False]}
+    assert found == expected
 
 
 def test_days_7_and_14_get_their_own_axis_and_say_so_in_the_panel_header(tmp_path: Path) -> None:
@@ -1164,7 +1186,24 @@ def test_days_7_and_14_get_their_own_axis_and_say_so_in_the_panel_header(tmp_pat
             domain="solar",
             day=7,
         )
-    plan = [c for c in comparisons(domain="solar", products=BLEND_PRODUCTS) if c.day in (1, 7)]
+    day2_files: list[tuple[str, float, SourceType, int]] = [
+        ("ens_mean_day2", 0.10, "aifs_single_blends", 12),
+        ("blend_aifs_single_day2", 0.09, "aifs_single_blends", 12),
+        ("blend_icon_eu_day2", 0.095, "product_blends_single", 12),
+        ("blend_icon_eu_conservative_day2", 0.098, "product_blends_single", 12),
+        ("ens_mean_day2", 0.10, "product_blends_wn3", 7),
+        ("blend_wn3_day2", 0.09, "product_blends_wn3", 7),
+        ("ens_mean_day2", 0.12, "leads_day10b", 12),
+    ]
+    for arm, error, source, months in day2_files:
+        _write(
+            _arm(arm, error=error, months=months),
+            data_dir=tmp_path,
+            source=source,
+            domain="solar",
+            day=2,
+        )
+    plan = [c for c in comparisons(domain="solar", products=BLEND_PRODUCTS) if c.day in (1, 2, 7)]
     rows = compute_plan(data_dir=tmp_path, domain="solar", plan=plan)
 
     spec = str(draw(rows=rows, domain="solar", number=1, blends=True).to_dict())
@@ -1172,3 +1211,5 @@ def test_days_7_and_14_get_their_own_axis_and_say_so_in_the_panel_header(tmp_pat
     assert spec.count("wider axis than days 1 and 2") == 1
     assert "Lead day 7 (wider axis than days 1 and 2)" in spec
     assert "'Lead day 1'" in spec
+    # Day 2 shares days 1's axis, so its header carries no note.
+    assert "'Lead day 2'" in spec

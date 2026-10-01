@@ -508,8 +508,11 @@ def multiplicity_lines(
         "",
         (
             "`Control minus ENS` is the blend's control minus ENS's mean alone. The widened "
-            f"interval covers {level:.3f}% (the 95% level divided across {n_listed} intervals); "
-            "`Survives` means its upper bound is below zero at both settings."
+            f"interval covers {level:.3f}% (the 95% level divided across {n_listed} intervals). "
+            f"The family is all {n_listed} intervals, but only the blend-minus-ENS intervals are "
+            "widened, so the correction is conservative. `Survives` follows the `lead_verdict` "
+            "rule: the widened upper bound of blend minus ENS and the 95% upper bound of blend "
+            "minus its own control are both below zero at both settings."
         ),
         "",
         (
@@ -532,13 +535,14 @@ def multiplicity_lines(
             scope = combined[day].filter(pl.col("setting") == setting)
             versus_ens = difference(losses=scope, treatment=blend, reference=mean)
             control = difference(losses=scope, treatment=f"{blend}_control", reference=mean)
+            versus_control = difference(losses=scope, treatment=blend, reference=f"{blend}_control")
             _, upper = bootstrap_difference_at_level(
                 losses=scope, treatment=blend, reference=mean, metric=METRIC, level=level
             )
             cells["blend"].append(interval_cell(interval=versus_ens))
             cells["control"].append(interval_cell(interval=control))
             cells["upper"].append(f"{upper * PERCENTAGE_POINTS:+.3f}")
-            survives = survives and upper < 0.0
+            survives = survives and upper < 0.0 and versus_control["upper_95"] < 0.0
             worse_controls += control["lower_95"] > 0.0
         lines.append(
             f"| `{blend}` | {day} | {' | '.join(cells['blend'])} | {' | '.join(cells['control'])} "
