@@ -1375,15 +1375,6 @@ arrived; [masking whole
 sources](../techniques/encoders.md#handling-missing-inputs-remove-the-token-dont-zero-fill) sets out
 what that precedent does and does not cover.
 
-**The [blends
-page](../studies/forecasts/blends-with-ens.md) names AIFS Single as the product to add to ENS only for
-solar at day 2, a result that is fragile, and finds AIFS Single and ICON-EU not separable at the
-other leads and technologies tested.** The wind day-1 gain from ICON-EU is an upper bound, because
-it was measured at the optimistic lead. The roadmap's current plan is to defer further blend studies
-until they can use probabilistic XGBoost power forecasts and the shared metrics suite (exceedance,
-the continuous ranked probability score, and the other metrics NGED uses), rather than the
-point-forecast error in percent of capacity that the blends page used.
-
 **A second weather product helped a past-weather solar measurement, but the day-ahead study finds
 no detectable solar gain at a conservative lead, and it puts a size on the wind gain.** A
 [comment on issue #810](https://github.com/openclimatefix/nged-substation-forecast/issues/810#issuecomment-5785179619)
@@ -1403,6 +1394,16 @@ gain may include newer ECMWF runs. For solar, P4b is -0.033 points [-0.106, +0.0
 solar is -0.347 points [-0.482, -0.219], but its guard is uninformative because the permuted control
 is itself worse than ENS alone. The study scores point forecasts, so it does not test whether a
 second source improves the probabilistic forecast or the CRPS the experiment steps above use.
+
+**The [blends page](../studies/forecasts/blends-with-ens.md) names AIFS Single as the product to add
+to ENS only for solar at day 2, a fragile result. At solar day 1 and wind days 1 and 2, the page's
+ranking rule ranks neither AIFS Single nor ICON-EU above the other.** The wind day-1 gain from
+ICON-EU is exploratory and an upper bound, because it reads an ICON-EU run fresher than a live
+service would. The roadmap's current plan is to defer further blend studies until they can use
+probabilistic XGBoost power forecasts and the [metrics NGED cares
+about](../techniques/evaluation-metrics.md), such as exceedance and the continuous ranked
+probability score, rather than the mean absolute error in percentage points of capacity that the
+blends page used.
 
 **Each step of the experiment has to beat the step before on out-of-sample CRPS per horizon slice,
 with a block-bootstrap confidence interval that excludes zero:**
