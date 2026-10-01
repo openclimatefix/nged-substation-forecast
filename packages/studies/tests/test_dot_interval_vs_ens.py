@@ -739,7 +739,8 @@ def test_write_once_refuses_to_overwrite(tmp_path: Path) -> None:
 
 
 def _tiny_chart() -> alt.VConcatChart:
-    return alt.vconcat(alt.Chart(pl.DataFrame({"x": [1.0]})).mark_text(text="x"))
+    text = alt.Chart(pl.DataFrame({"x": [1.0]})).mark_text(text="x")
+    return alt.vconcat(text)  # ty: ignore[invalid-argument-type]
 
 
 def test_write_svg_replaces_an_existing_svg_and_leaves_no_draft(tmp_path: Path) -> None:
