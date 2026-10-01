@@ -289,6 +289,24 @@ Google produced each run. If Google produced the runs after the fact, WN3's erro
 The `--lookahead-cleared` flag of `fit_aifs.py --wn3` stops the fit from starting until whoever runs
 it has read this section.
 
+### Why the WN3 paper's gains over ENS are not directly comparable with this study
+
+**The WN3 paper's gains over ENS and this study's results answer different questions, so they do not
+conflict.** [Rasp et al. (2026)](https://arxiv.org/abs/2609.03582) compare WN3 against 48 ENS
+members, scored with the fair continuous ranked probability score (CRPS). For single-level
+variables, the ENS members are regridded to 0.1° from the TIGGE (THORPEX Interactive Grand Global
+Ensemble) and MARS (Meteorological Archival and Retrieval System) archives. Rasp et al. note that
+TIGGE's reduced storage resolution adds roughly 0.02 K to ENS's 2 m temperature CRPS at 6-hour
+multiples in the paper's analysis evaluations. We found no mention of statistical post-processing
+applied to ENS. For short lead times, the WN3 station head lowers station 2 m temperature CRPS by up
+to 40% against ENS, and Figure 3 shows the gain narrowing with lead time. Rasp et al. describe the
+station head as building station calibration into the model, so that WN3 needs no separate
+calibration stage. A comparison with post-processed ENS would therefore be a natural extension of
+their work. This study trains one XGBoost model per weather product on the ensemble mean, which can
+absorb each product's systematic bias but not differences in spread, because the XGBoost model sees
+only the mean. The study scores the error of the generators' power forecast in percent of capacity.
+This study does not test the paper's claim.
+
 ## Results
 
 ### Day 0 is lower than day 1 for every product, and ICON-D2's day 0 is the lowest (exploratory)
