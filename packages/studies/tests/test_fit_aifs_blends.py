@@ -26,6 +26,7 @@ from fit_aifs import (  # noqa: E402
     LONG_DAYS,
     NO_DOY_SUFFIX,
     NO_SKILL,
+    PRODUCT_BLEND_DAYS,
     ROW_SETS,
     SKILL,
     Contrast,
@@ -40,16 +41,20 @@ from fit_aifs import (  # noqa: E402
     check_columns_equal,
     check_runs,
     check_saved_losses,
+    check_wn3_runs_present,
     contrast_losses,
+    control_shuffles,
     day14_reading,
     drop_runs_outside_era,
     ens_control_prefix,
     expected_column_count,
     fit_jobs,
     lead_verdict,
+    product_blend_arms,
     refuse_read_only_folders,
     shuffled_prefix,
     smoothing_reading,
+    stage_arms_fitted,
     stage_deciding_arms,
     summed_arm,
     weather_spread,
@@ -1297,7 +1302,7 @@ def test_the_lead_chart_draws_from_synthetic_fits(monkeypatch: pytest.MonkeyPatc
 
     chart, title = charts.aifs_leads(losses_by_set=by_set, domain="solar")
 
-    assert " ".join(chart.to_dict()["title"]["text"]) == f"Figure 15: {title}"
+    assert " ".join(chart.to_dict()["title"]["text"]) == f"Figure 17: {title}"
     subtitle = " ".join(chart.to_dict()["title"]["subtitle"])
     assert "ENS control member series is 6-hourly" in subtitle
 
@@ -1598,3 +1603,139 @@ def test_the_environment_stamp_names_the_gpu_without_its_serial_and_the_library_
 def test_the_printed_interval_count_is_the_plans_contrast_lists_count():
     # 38 listed contrasts per technology across both row sets and four days.
     assert fit_aifs.count_listed_intervals() == 2 * 38
+
+
+# --- The product blends --------------------------------------------------------------------------
+
+
+def test_the_published_blend_arm_lists_are_unchanged_by_the_product_blends():
+    # `check_saved_losses` refuses a saved folder whose arms differ, so these lists are pinned.
+    assert blend_arms(row_set="single", day=1) == (
+        "aifs_single_day1",
+        "ens_mean_day1",
+        "ens_control6_day1",
+        "blend_aifs_single_day1",
+        "blend_aifs_single_day1_control",
+        "blend_aifs_single_day1_mirror",
+    )
+    assert stage_arms_fitted(row_set="single", day=7) == [
+        "aifs_single_day7",
+        "ens_mean_day7",
+        "ens_control_day7",
+        "blend_aifs_single_day7",
+        "blend_aifs_single_day7_control",
+        "blend_aifs_single_day7_mirror",
+        "aifs_single_day7_permuted",
+        "aifs_single_day7_permuted_b",
+        "ifs025_day7",
+        "ifs_single_day7",
+        "aifs_single_day7_no_doy",
+        "ens_control_day7_no_doy",
+    ]
+    assert blend_arms(row_set="ens", day=2) == (
+        "aifs_ens_mean_day2",
+        "ens_mean_day2",
+        "blend_aifs_ens_day2",
+        "blend_aifs_ens_day2_control",
+    )
+
+
+@pytest.mark.parametrize(
+    ("arm", "prefixes"),
+    [
+        ("blend_icon_eu_day2", ("ens_mean_day2", "icon_eu_day2")),
+        ("blend_icon_eu_day2_control", ("ens_mean_day2", "icon_eu_day2_permuted")),
+        # The conservative lead reads the ICON-EU run one day older than ENS's day.
+        ("blend_icon_eu_conservative_day2", ("ens_mean_day2", "icon_eu_day3")),
+        ("blend_icon_eu_conservative_day2_control", ("ens_mean_day2", "icon_eu_day3_permuted")),
+        ("blend_icon_eu_conservative_day1", ("ens_mean_day1", "icon_eu_day2")),
+        ("blend_ukv_day1", ("ens_mean_day1", "ukv_day1")),
+        ("blend_ukv_day1_control", ("ens_mean_day1", "ukv_day1_permuted")),
+        ("blend_wn3_day7", ("ens_mean_day7", "wn3_mean_day7")),
+        ("blend_wn3_day7_control", ("ens_mean_day7", "wn3_mean_day7_permuted")),
+    ],
+)
+def test_a_product_blend_shows_ens_mean_and_the_products_columns_at_its_lead(
+    arm: str, prefixes: tuple[str, ...]
+):
+    assert arm_prefixes(arm=arm) == prefixes
+
+
+@pytest.mark.parametrize("domain", ["solar", "wind"])
+def test_the_conservative_blend_reads_the_day_after_the_optimistic_blends_columns(
+    domain: DomainType,
+):
+    optimistic = arm_features(arm="blend_icon_eu_day1", domain=domain)
+    conservative = arm_features(arm="blend_icon_eu_conservative_day1", domain=domain)
+
+    assert {c for c in optimistic if c.startswith("icon_eu_day1_")}
+    assert not {c for c in conservative if c.startswith("icon_eu_day1_")}
+    assert {c for c in conservative if c.startswith("icon_eu_day2_")}
+    assert [c for c in optimistic if not c.startswith("icon_eu_")] == [
+        c for c in conservative if not c.startswith("icon_eu_")
+    ]
+
+
+@pytest.mark.parametrize("domain", ["solar", "wind"])
+def test_every_product_blend_and_its_control_hold_the_same_column_count(domain: DomainType):
+    arms = [
+        arm
+        for row_set in ("single", "wn3")
+        for day in BLEND_DAYS
+        for arm in product_blend_arms(row_set=row_set, day=day)
+        if arm.startswith("blend_")
+    ]
+
+    for arm in arms:
+        assert len(arm_features(arm=arm, domain=domain)) == expected_column_count(
+            arm=arm, domain=domain
+        )
+    counts = {len(arm_features(arm=arm, domain=domain)) for arm in arms}
+    assert counts == {9 if domain == "solar" else 11}
+
+
+def test_the_product_blend_arms_follow_the_days_each_product_reaches():
+    assert PRODUCT_BLEND_DAYS == {"icon_eu": (1, 2), "icon_eu_conservative": (1, 2), "ukv": (1,)}
+    assert product_blend_arms(row_set="single", day=1) == (
+        "blend_icon_eu_day1",
+        "blend_icon_eu_day1_control",
+        "blend_icon_eu_conservative_day1",
+        "blend_icon_eu_conservative_day1_control",
+        "blend_ukv_day1",
+        "blend_ukv_day1_control",
+    )
+    assert product_blend_arms(row_set="single", day=2) == (
+        "blend_icon_eu_day2",
+        "blend_icon_eu_day2_control",
+        "blend_icon_eu_conservative_day2",
+        "blend_icon_eu_conservative_day2_control",
+    )
+    assert product_blend_arms(row_set="single", day=7) == ()
+    assert product_blend_arms(row_set="wn3", day=14) == (
+        "ens_mean_day14",
+        "blend_wn3_day14",
+        "blend_wn3_day14_control",
+    )
+
+
+def test_a_control_shuffles_the_products_own_prefix_and_a_blend_shuffles_nothing():
+    arms = product_blend_arms(row_set="single", day=2)
+
+    assert control_shuffles(arms=arms) == {"icon_eu_day2": ("",), "icon_eu_day3": ("",)}
+    assert control_shuffles(arms=("blend_icon_eu_day2", "ens_mean_day2")) == {}
+
+
+def test_a_missing_wn3_run_is_named_for_the_blend_and_not_for_its_control():
+    frame = pl.DataFrame(
+        {
+            "time": [datetime(2026, 3, 10, 12, tzinfo=UTC), datetime(2026, 3, 11, 12, tzinfo=UTC)],
+            "wn3_mean_day1_init_time": [datetime(2026, 3, 9, tzinfo=UTC), None],
+        }
+    )
+
+    with pytest.raises(ValueError, match="wn3_mean_day1: no WN3 run"):
+        check_wn3_runs_present(frame=frame, domain="wind", arms=("blend_wn3_day1",))
+    with pytest.raises(ValueError, match="2026-03-10"):
+        check_wn3_runs_present(frame=frame, domain="wind", arms=("wn3_mean_day1",))
+    # A control shows shuffled WN3 columns, so it needs no run of its own.
+    check_wn3_runs_present(frame=frame, domain="wind", arms=("blend_wn3_day1_control",))

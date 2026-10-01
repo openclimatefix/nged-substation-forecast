@@ -2,9 +2,10 @@
 
 One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/934>, the WeatherNext 3 arm of
-the matched-lead comparison. The source is the Requester Pays bucket
-`weathernext3_statistics_spatial` in region US-EAST1, which holds one Zarr store per run, at 0.1
-degrees over the globe, with the ensemble mean of each variable, following Google's own guide at
+the matched-lead comparison. The source is the bucket
+`weathernext3_statistics_spatial` in region US-EAST1. It holds one
+Zarr store per run, at 0.1 degrees over the globe, with precomputed statistics of each variable.
+This script reads only the ensemble mean, following Google's own guide at
 <https://developers.google.com/weathernext/guides/gcs>. The archive starts on 2026-01-01 and has a
 run every hour. The runs at 00, 06, 12, and 18 UTC have 360 hourly lead times, and the other hours
 only 48. This script fetches only the runs at 00, 06, 12, and 18 UTC.
@@ -15,20 +16,24 @@ transfers about 50 GB per run (360 lead times, 7 variables) and keeps about 15 M
 (`LAT_MIN` to `LAT_MAX` degrees north, `LON_MIN` to `LON_MAX` degrees east) is wide enough to reach
 offshore wind farms, and is not private.
 
-**The script must run on a Compute Engine machine in us-east1.** Reads inside the same region cost
-nothing, while reads from anywhere else are billed as internet egress at $0.12 per GB. One run is
-about 50 GB of reads, which costs about £4.50 ($6) from outside Google Cloud. The four 360-hour runs
-of one day are about 200 GB, and the 267 days in the archive so far would be about 53 TB. The script
-detects whether it is on a Compute Engine machine in us-east1 through the metadata server. Outside
-us-east1 it refuses to start when the estimated transfer exceeds `--max-external-gb` (default 5.0),
-which is less than one run. `--dry-run` prints the number of runs and the estimated transfer, and
-touches neither the network nor the store.
+**Run the script on a Compute Engine machine in us-east1.** Google's guide names egress charges only
+for the raw ensemble bucket, so the script assumes that reads of the statistics bucket from anywhere
+else are billed as internet egress at $0.12 per GB. That assumption and the payer are unverified.
+One run is about 50 GB of reads, which would be about £4.50 ($6) at that price from outside Google
+Cloud. The four 360-hour runs of one day are about 200 GB, and the 267 days in the archive so far
+would be about 53 TB. The script detects whether it is on a Compute Engine machine in us-east1
+through the metadata server. Outside us-east1 it refuses to start when the estimated transfer
+exceeds `--max-external-gb` (default 5.0), which is less than one run. `--dry-run` prints the number
+of runs and the estimated transfer, and touches neither the network nor the store.
 
-**Credentials and the billing project come from the environment.** `GOOGLE_CLOUD_PROJECT` names the
-project that pays for the reads, and the script exits with a message if that variable is unset.
-Authentication uses Google application default credentials: `GOOGLE_APPLICATION_CREDENTIALS` on a
-workstation, or the machine's own service account on Compute Engine. The script never prints or
-writes the project name, the bucket name, the credentials, or an account name.
+**No billing project is needed, but the bucket cannot be read anonymously.** Access to the
+statistics bucket must be requested from Google
+(<https://developers.google.com/weathernext/guides/access-forecast>), and the script then
+authenticates with the requesting Google account's application default credentials:
+`GOOGLE_APPLICATION_CREDENTIALS` on a workstation, or the machine's own service account on Compute
+Engine. The script never prints or writes the bucket name, the credentials, or an account name. The
+survey page describes the bucket, its access, and the statistics it holds beyond the mean:
+<https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/#what-we-learnt-about-weathernexts-precomputed-statistics-store>.
 
 **The output is one Icechunk repository with a `main` branch and a `staging` branch.** `--bucket`
 names a Cloud Storage bucket (in us-east1) that holds the repository under `STORE_PREFIX`, and
@@ -53,10 +58,9 @@ entirely NaN is treated as a failed read. A run whose `success` marker object is
 wanted run the bucket does not list, are skipped and recorded in the group attributes rather than
 raised. The script records a failed run's label, continues with the other runs, prints the failed
 labels at the end, and exits non-zero. An uncaught exception prints only the run label and the
-exception's type name, because an exception message can carry an account name, the billing project,
-or the bucket name.
+exception's type name, because an exception message can carry an account name or the bucket name.
 
-Run it on the machine with `GOOGLE_CLOUD_PROJECT=<project> uv run python
+Run it on the machine with `uv run python
 studies/weather_downloads/fetch_weathernext3.py --bucket <bucket> --start-date 2026-01-01
 --end-date 2026-09-24`. Then check the output with `validate_weathernext3.py`.
 """
@@ -237,8 +241,8 @@ def _describe(*, error: BaseException) -> str:
     """Return what may be printed about `error`: its type name, plus the message of an assertion.
 
     The message of an `AssertionError` is a fixed string written in this module, with no data
-    value, coordinate, or count. The message of any other exception can carry an account name, the
-    billing project, or the bucket name.
+    value, coordinate, or count. The message of any other exception can carry an account name or
+    the bucket name.
     """
     if isinstance(error, AssertionError):
         return f"AssertionError: {error}"
@@ -281,20 +285,15 @@ def _parse_run_name(*, name: str) -> tuple[date, int] | None:
 
 
 def _filesystem() -> gcsfs.GCSFileSystem:
-    """Return a Requester Pays Cloud Storage filesystem, billed to `GOOGLE_CLOUD_PROJECT`.
+    """Return a Cloud Storage filesystem for the statistics bucket, which is not Requester Pays.
+
+    The filesystem uses Google application default credentials, because access to the bucket is
+    granted to a Google account on request.
 
     Returns:
-        A filesystem whose reads are billed to the project named by `GOOGLE_CLOUD_PROJECT`.
-
-    Raises:
-        SystemExit: If `GOOGLE_CLOUD_PROJECT` is unset.
+        A filesystem authenticated with application default credentials.
     """
-    billing_project = os.environ.get("GOOGLE_CLOUD_PROJECT")
-    if not billing_project:
-        sys.exit("GOOGLE_CLOUD_PROJECT is not set: it names the project billed for the reads.")
-    return gcsfs.GCSFileSystem(
-        token="google_default", requester_pays=billing_project, project=billing_project
-    )
+    return gcsfs.GCSFileSystem(token="google_default")
 
 
 def _with_retries[T](*, action: Callable[[], T], label: str, what: str) -> T:
@@ -304,7 +303,7 @@ def _with_retries[T](*, action: Callable[[], T], label: str, what: str) -> T:
     in `NON_RETRYABLE_ERRORS` is deterministic, so it is raised at once. The first sleep is 10 s and
     each later one doubles. Each retry prints the run label, what was being done, the attempt
     number, and the exception's type name only, because an exception message can carry a request
-    URL, an account name, or the billing project.
+    URL or an account name.
 
     Args:
         action: The call to make.
@@ -328,7 +327,7 @@ def _with_retries[T](*, action: Callable[[], T], label: str, what: str) -> T:
                 raise
             error_name = type(error).__name__
         # The backoff sleeps outside the `except` block, so a Ctrl-C during the sleep does not
-        # chain the original error, whose message can carry the billing project or an account.
+        # chain the original error, whose message can carry an account name.
         print(f"{label}: {what} attempt {attempt} failed ({error_name}); retrying", flush=True)
         time.sleep(BACKOFF_SECONDS * 2**attempt)
     message = "unreachable: the loop returns or raises"
@@ -362,7 +361,7 @@ def _open_cropped(*, fs: gcsfs.GCSFileSystem, run_name: str) -> xr.Dataset:
     metadata.
 
     Args:
-        fs: A Requester Pays filesystem.
+        fs: A filesystem for the source bucket.
         run_name: The run's store directory name.
 
     Returns:
@@ -715,7 +714,7 @@ def _fetch_run(
     next commit.
 
     Args:
-        fs: A Requester Pays filesystem for the source bucket.
+        fs: A filesystem for the source bucket.
         repo: The output repository.
         day: The run's init day.
         hour: The run's init hour, UTC.
@@ -877,8 +876,9 @@ def _run(*, arguments: argparse.Namespace) -> int:
     print(f"{len(to_fetch)} runs to fetch, about {estimate:.0f} GB to read")
     if to_fetch and not _in_us_east1() and estimate > arguments.max_external_gb:
         print(
-            f"Refusing to read about {estimate:.0f} GB from outside us-east1: it would be billed "
-            f"as egress at ${EGRESS_USD_PER_GB}/GB, about ${estimate * EGRESS_USD_PER_GB:.0f}. "
+            f"Refusing to read about {estimate:.0f} GB from outside us-east1: at the "
+            f"assumed egress price of ${EGRESS_USD_PER_GB}/GB that is about "
+            f"${estimate * EGRESS_USD_PER_GB:.0f}. "
             "Run this script on a Compute Engine machine in us-east1, or raise "
             "--max-external-gb.",
             file=sys.stderr,
@@ -912,8 +912,8 @@ def _run(*, arguments: argparse.Namespace) -> int:
 def main() -> int:
     """Fetch WeatherNext 3 ensemble-mean runs into an Icechunk repository, one commit per run.
 
-    Any uncaught exception prints only its type name, because a message can carry an account name,
-    the billing project, or the bucket name. The message of an `AssertionError` is printed too,
+    Any uncaught exception prints only its type name, because a message can carry an account name or
+    the bucket name. The message of an `AssertionError` is printed too,
     because every assertion in this module has a fixed message. Ctrl-C prints only `interrupted`.
     """
     parser = argparse.ArgumentParser(description=__doc__)

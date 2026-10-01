@@ -98,6 +98,7 @@ from verify_previous_runs_leads import PRODUCT_DIRS
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
 import ens_forecast_horizons as efh
+from fetch_ens_day4_supplement import SUPPLEMENT_PATH as ENS_DAY4_SUPPLEMENT_PATH
 from fetch_ens_forecast_horizons import H3_RESOLUTION
 from studies.gfs_native import (
     HOURLY_SERVED_LAST_DAY,
@@ -193,8 +194,8 @@ EXTRA_ENS_CONTROL_DAYS: Final[tuple[int, ...]] = (5, 7, 10, 14)
 published inputs."""
 
 
-ExtraBatchType = Literal["first", "second", "third", "fourth"]
-"""Which extra-lead build: the first, second, third, or fourth batch's columns."""
+ExtraBatchType = Literal["first", "second", "third", "fourth", "fifth"]
+"""Which extra-lead build: the first, second, third, fourth, or fifth batch's columns."""
 
 
 class ExtraLeadBuild(NamedTuple):
@@ -215,6 +216,23 @@ IFS_SINGLE_DAYS: Final[tuple[int, ...]] = (0, 1, 2, 3, 5, 7)
 """The lead days the fourth batch reads Open-Meteo's IFS HRES (9 km) archive at. Day 10 is absent
 because the archive's runs end at lead 240 hours, so day 10's leads (240 to 263 for wind, 241 to
 264 for solar) are almost all beyond them; `studies.ifs_single_runs.last_servable_day` is 9."""
+
+SHARED_DAY4: Final[tuple[int, ...]] = (4,)
+"""The one lead day the fifth batch builds, for every product the leaderboards draw at day 4 on the
+shared rows. Day 4 reads leads 96 to 119 hours for wind and 97 to 120 for solar, as days 3 and 5
+do at their own 24-hour offsets."""
+
+SHARED_DAY4_PRODUCT_DAY_OFFSETS: Final[dict[str, tuple[int, ...]]] = {
+    "ICON-EU": SHARED_DAY4,
+    "ICON global": SHARED_DAY4,
+    "IFS 0.25°": SHARED_DAY4,
+    "GFS": SHARED_DAY4,
+}
+"""The Previous Runs products the fifth batch reads at `previous_day4`: ICON-EU (whose archive ends
+at day 4), ICON global, IFS 0.25 degree, and Open-Meteo's GFS. On the published inputs' rows,
+`previous_day4` is null on at most 0.6% of rows for these products, below
+`fit_extra_leads.MAX_MISSING_SHARE`. ICON-D2's archive holds only days 0 and 1, so it has no day 4,
+and ARPEGE Europe's `previous_day4` is null on every row."""
 
 EXTRA_LEAD_BUILDS: Final[dict[ExtraBatchType, ExtraLeadBuild]] = {
     "first": ExtraLeadBuild(
@@ -243,12 +261,23 @@ EXTRA_LEAD_BUILDS: Final[dict[ExtraBatchType, ExtraLeadBuild]] = {
         gefs_days=(),
         ifs_single_days=IFS_SINGLE_DAYS,
     ),
+    "fifth": ExtraLeadBuild(
+        product_day_offsets=SHARED_DAY4_PRODUCT_DAY_OFFSETS,
+        ens_mean_days=SHARED_DAY4,
+        ens_control_days=SHARED_DAY4,
+        gefs_days=SHARED_DAY4,
+        gfs_native_days=SHARED_DAY4,
+        ifs_single_days=SHARED_DAY4,
+    ),
 }
 """The first batch's columns (unchanged from its own build), the second batch's (ENS mean at day 7,
 ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7, with no Previous Runs column
 because the arms it refits take their columns from the published inputs), and the third batch's
-(the native GFS store at `GFS_NATIVE_DAYS`, and nothing else), and the fourth batch's (Open-Meteo's
-IFS HRES archive at `IFS_SINGLE_DAYS`, and nothing else)."""
+(the native GFS store at `GFS_NATIVE_DAYS`, and nothing else), the fourth batch's (Open-Meteo's
+IFS HRES archive at `IFS_SINGLE_DAYS`, and nothing else), and the fifth batch's (day 4 of every
+product the leaderboards draw there: ENS mean and control member, GEFS mean, the native GFS store,
+IFS HRES (9 km, Open-Meteo), and the Previous Runs ICON-EU, ICON global, IFS 0.25 degree, and GFS
+arms). ENS at day 4 needs `fetch_ens_day4_supplement.py`'s file, which `ens_members` adds."""
 
 AIFS_DAYS: Final[tuple[int, ...]] = (1, 2)
 """The bands the AIFS build reads unless `--aifs-days` names others: day 1 (the day-ahead product)
@@ -299,6 +328,64 @@ SOLAR_ONLY_PRODUCTS: Final[frozenset[str]] = frozenset({"ARPEGE Europe", "AROME 
 SNAPSHOT_RADIATION_PRODUCTS: Final[frozenset[str]] = frozenset({"UKV"})
 """Products whose Previous Runs radiation is an instantaneous snapshot (V3), rebuilt through
 `hourly_from_snapshots` rather than used as served."""
+
+
+EQUAL_TOLERANCE: Final[float] = 1e-6
+"""The relative and absolute difference between a built frame's columns and another build's that
+Float32 storage allows."""
+
+DAY4_OUTPUT_DIR_NAME: Final[str] = "nwp_forecast_comparison_day4_shared"
+"""Under `data/studies/`, the only folder the fifth extra-lead batch builds into and fits in."""
+
+WN3_EXTRA_DAYS_DIR_NAME: Final[str] = "nwp_forecast_comparison_wn3_extra_days"
+"""Under `data/studies/`, the folder whose same-rows ENS mean at day 4 the fifth batch's ENS mean
+must equal."""
+
+DAY5_OUTPUT_DIR_NAME: Final[str] = "nwp_forecast_comparison_day5_aifs_wn3"
+"""Under `data/studies/`, the only folder the day-5 AIFS and WeatherNext 3 inputs and fits go in."""
+
+
+def check_columns_equal(
+    *, built: pl.DataFrame, reference: pl.DataFrame, columns: Sequence[str], label: str
+) -> None:
+    """Raise unless `built` and `reference` hold the same values in `columns` on every row.
+
+    Args:
+        built: Rows keyed by `site` and `time`.
+        reference: Rows keyed the same way, from another build.
+        columns: The columns both frames hold.
+        label: What `reference` is, for the message.
+
+    Raises:
+        ValueError: If a key of `built` is absent from `reference`, or a column's values differ by
+            more than `EQUAL_TOLERANCE`, or are null in one frame and not in the other.
+    """
+    keys = ["site", "time"]
+    if built.select(keys).join(reference.select(keys), on=keys, how="anti").height:
+        msg = f"{label}: rows of the built frame are missing from it"
+        raise ValueError(msg)
+    joined = built.select(*keys, *columns).join(
+        reference.select(*keys, *columns), on=keys, how="left", suffix="_reference"
+    )
+    unequal = {}
+    for column in columns:
+        ours = pl.col(column).cast(pl.Float64)
+        theirs = pl.col(f"{column}_reference").cast(pl.Float64)
+        bad = joined.select(
+            (
+                (ours.is_null() != theirs.is_null())
+                | (
+                    ours.is_not_null()
+                    & theirs.is_not_null()
+                    & ((ours - theirs).abs() > EQUAL_TOLERANCE + EQUAL_TOLERANCE * theirs.abs())
+                )
+            ).sum()
+        ).item()
+        if bad:
+            unequal[column] = int(bad)
+    if unequal:
+        msg = f"{label}: columns differ from the reference's on some rows: {unequal}"
+        raise ValueError(msg)
 
 
 def _repo_data_dir() -> Path:
@@ -453,6 +540,95 @@ def _previous_runs_frame(
     return frame
 
 
+SOLAR_DAY0_FIRST_SCORED_LEAD: Final[int] = 7
+"""The lead of the first solar hour scored at day 0. AIFS and ENS on 6-hourly steps have no step
+before lead 6 hours, and a solar temperature is read at each hour's midpoint, so the hour ending at
+lead 6 (midpoint 5.5) would still be a half-hour extrapolation. The hours ending at leads 1 to 6
+(01:00 to 06:00 UTC) are therefore not scored, for any arm."""
+
+
+def check_first_step_reaches_targets(
+    *, steps: efh.Steps, day: int, domain: DomainType, arm_prefix: str
+) -> None:
+    """Refuse a solar band that scores an hour before its first stored step.
+
+    The hours a band scores are the end of every hour of its day, except that day 0 starts at
+    `SOLAR_DAY0_FIRST_SCORED_LEAD`. A solar temperature is read at each hour's midpoint, half an
+    hour before its end. Where the first scored hour's midpoint is before the first step, the
+    upsampling would hold that step's value flat across the earlier hours, which is an extrapolation
+    and not an upsampling.
+
+    Args:
+        steps: The band's steps.
+        day: The band's day.
+        domain: `solar` or `wind`; wind reads at each hour's start and is not checked here.
+        arm_prefix: The arm family's name, for the message.
+
+    Raises:
+        ValueError: If a solar band's first scored hour is before its first step.
+    """
+    if domain != "solar":
+        return
+    first_scored = float(efh.target_leads(day=day, domain=domain)[0])
+    if day == 0:
+        first_scored = max(first_scored, float(SOLAR_DAY0_FIRST_SCORED_LEAD))
+    if steps.leads[0] > first_scored - 0.5:
+        msg = (
+            f"{arm_prefix} day {day}: the first stored step is at lead {steps.leads[0]:g} h, after "
+            f"the midpoint of the first scored solar hour at lead {first_scored - 0.5:g} h, so "
+            "that hour would be an extrapolation"
+        )
+        raise ValueError(msg)
+
+
+def ens_members(*, sites: list[str]) -> pl.DataFrame:
+    """Read ENS's per-member extract for some generators, with the day-4 supplement added.
+
+    The extract holds a lead band for each of days 0, 1, 2, 3, 5, 7, 10, and 14, so it lacks the
+    leads 105, 108, and 111 that a day-4 band needs. `fetch_ens_day4_supplement.py` writes those
+    leads to a separate file. Where that file does not exist, the extract is returned alone, and
+    `check_no_step_gap` then raises for a day-4 band.
+
+    Args:
+        sites: The generator labels.
+
+    Returns:
+        One row per generator, run, valid time, and member, with the supplement's rows appended.
+    """
+    extract = efh.members(sites=sites)
+    if not ENS_DAY4_SUPPLEMENT_PATH.exists():
+        return extract
+    return pl.concat(
+        [extract, efh.members(sites=sites, source=ENS_DAY4_SUPPLEMENT_PATH)], how="vertical"
+    )
+
+
+def check_no_step_gap(*, steps: efh.Steps, day: int, arm_prefix: str) -> None:
+    """Raise if any step of a band is missing between its first and last step.
+
+    `band_steps` keeps whichever leads the extract holds, so a lead missing from the middle of a
+    band leaves two steps further apart than the width of the later one. The upsampling would then
+    interpolate across the hole, or fail with no explanation.
+
+    Args:
+        steps: The band's steps.
+        day: The band's day.
+        arm_prefix: The arm's name without its day, for the message.
+
+    Raises:
+        ValueError: If a step lies more than its own width after the step before it.
+    """
+    gaps = np.flatnonzero(np.diff(steps.leads) > steps.widths[1:])
+    if gaps.size:
+        first = int(gaps[0])
+        msg = (
+            f"{arm_prefix} day {day}: no step between leads {steps.leads[first]:g} h and "
+            f"{steps.leads[first + 1]:g} h, so the extract lacks a lead there. For ENS at day 4, "
+            "write the supplement with fetch_ens_day4_supplement.py first"
+        )
+        raise ValueError(msg)
+
+
 def ens_member_arms(
     *,
     extract: pl.DataFrame,
@@ -490,6 +666,10 @@ def ens_member_arms(
 
     Returns:
         One frame per (day, way) with `site`, `time` and that arm's own weather columns.
+
+    Raises:
+        ValueError: If a band lacks a step between its first and last, or a solar band on 6-hourly
+            steps scores an hour before its first step.
     """
     clear_sky = efh.clear_sky_table(domain=domain)
     frames: list[pl.DataFrame] = []
@@ -502,6 +682,16 @@ def ens_member_arms(
             fine_step_last_lead=fine_step_last_lead,
             six_hourly=six_hourly,
         )
+        check_no_step_gap(
+            steps=steps, day=day, arm_prefix=arm_name("mean", day).rsplit("_day", 1)[0]
+        )
+        if six_hourly or fine_step_last_lead == 0:
+            check_first_step_reaches_targets(
+                steps=steps,
+                day=day,
+                domain=domain,
+                arm_prefix=arm_name("mean", day).rsplit("_day", 1)[0],
+            )
         upsampled = efh.upsampled_fields(steps=steps, day=day, domain=domain, clear_sky=clear_sky)
         combined = efh.combine(
             steps=steps, upsampled=upsampled, day=day, domain=domain, method=method
@@ -544,7 +734,7 @@ def _ens_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
     """
     baselined = efh.with_baselines(frame=efh.base_frame(domain=domain), domain=domain)
     sites = sorted(baselined["site"].unique().to_list())
-    extract = efh.members(sites=sites)
+    extract = ens_members(sites=sites)
     arms = ens_member_arms(
         extract=extract,
         domain=domain,
@@ -1541,6 +1731,7 @@ def _ens_extra_frame(
     domain: DomainType,
     mean_days: tuple[int, ...],
     control_days: tuple[int, ...],
+    keep_init_time: bool = False,
 ) -> pl.DataFrame:
     """Build ECMWF ENS's mean and control-member columns at the given days on `keys`.
 
@@ -1549,6 +1740,8 @@ def _ens_extra_frame(
         domain: `solar` or `wind`.
         mean_days: The days to build the ENS mean at.
         control_days: The days to build the ENS control member at.
+        keep_init_time: Whether each arm also carries the run that fed each hour, as
+            `<arm>_init_time`.
 
     Returns:
         `keys` with `ens_mean_day<N>_<field>` for every `N` in `mean_days` and
@@ -1558,7 +1751,7 @@ def _ens_extra_frame(
     if not (mean_days or control_days):
         return keys
     sites = sorted(keys["site"].unique().to_list())
-    extract = efh.members(sites=sites)
+    extract = ens_members(sites=sites)
     arms: list[pl.DataFrame] = []
     for day in sorted({*mean_days, *control_days}):
         arms += ens_member_arms(
@@ -1569,6 +1762,7 @@ def _ens_extra_frame(
             ensemble_size=efh.ENSEMBLE_SIZE,
             arm_name=lambda way, band: efh.ens_arm(way=way, day=band),
             ways=extra_ens_ways(day=day, mean_days=mean_days, control_days=control_days),
+            keep_init_time=keep_init_time,
         )
     frame = keys
     for arm_frame in arms:
@@ -1624,11 +1818,19 @@ def build_extra_leads(
         The written file's path.
 
     Raises:
-        ValueError: If `output_dir` is `published_dir`.
+        ValueError: If `output_dir` is `published_dir`, or `batch` is `fifth` and `output_dir` is
+            not named `DAY4_OUTPUT_DIR_NAME`, or the fifth batch's ENS mean at day 4 differs from
+            the WeatherNext 3 folder's.
         FileExistsError: If the output file already exists.
     """
     if output_dir.resolve() == published_dir.resolve():
         msg = f"the extra-lead output must not be the published folder {published_dir}"
+        raise ValueError(msg)
+    if batch == "fifth" and output_dir.name != DAY4_OUTPUT_DIR_NAME:
+        msg = (
+            f"the fifth batch builds only into a folder named {DAY4_OUTPUT_DIR_NAME}, "
+            f"not {output_dir}"
+        )
         raise ValueError(msg)
     output_path = output_dir / f"{domain}_extra_lead_inputs.parquet"
     if output_path.exists():
@@ -1675,17 +1877,38 @@ def build_extra_leads(
             ifs_single_dir=ifs_single_dir,
         )
     output_dir.mkdir(parents=True, exist_ok=True)
+    if batch == "fifth":
+        check_columns_equal(
+            built=frame,
+            reference=pl.read_parquet(
+                published_dir.resolve().parent
+                / WN3_EXTRA_DAYS_DIR_NAME
+                / f"{domain}_wn3_inputs.parquet"
+            ),
+            columns=[
+                column
+                for column in frame.columns
+                if column.startswith("ens_mean_day4_") and not column.endswith("_init_time")
+            ],
+            label=f"{domain}/{WN3_EXTRA_DAYS_DIR_NAME} ens_mean_day4",
+        )
     frame.write_parquet(output_path)
     _LOG.info("%s: wrote %d rows, %d columns to %s", domain, frame.height, frame.width, output_path)
     return output_path
 
 
-def _h3_crop_weights(*, site_cells: Mapping[str, int], grid_cells: pl.DataFrame) -> pl.DataFrame:
-    """Return each site's H3 area weights over the AIFS crop's grid cells.
+def _h3_crop_weights(
+    *,
+    site_cells: Mapping[str, int],
+    grid_cells: pl.DataFrame,
+    grid_degrees: float = AIFS_CROP_DEGREES,
+) -> pl.DataFrame:
+    """Return each site's H3 area weights over a gridded product's crop.
 
     Args:
         site_cells: Each site to the H3 resolution-5 cell it sits in.
         grid_cells: The crop's `lat_index`, `lon_index`, `latitude` and `longitude`.
+        grid_degrees: The product's grid cell size, which `compute_h3_grid_weights` bins by.
 
     Returns:
         One row per (site, crop cell the site's H3 cell overlaps), with `site`, `lat_index`,
@@ -1696,19 +1919,21 @@ def _h3_crop_weights(*, site_cells: Mapping[str, int], grid_cells: pl.DataFrame)
             reaches beyond the crop.
     """
     h3_weights = compute_h3_grid_weights(
-        nwp_grid_size_degrees=AIFS_CROP_DEGREES, h3_index=sorted(set(site_cells.values()))
+        nwp_grid_size_degrees=grid_degrees, h3_index=sorted(set(site_cells.values()))
     )
+    # Cast to Float64 first: a Float32 0.1 degree coordinate and its Float64 twin differ after
+    # rounding, so the join would silently miss cells.
     cells = grid_cells.select(
         "lat_index",
         "lon_index",
-        nwp_lat=pl.col("latitude").round(4),
-        nwp_lon=pl.col("longitude").round(4),
+        nwp_lat=pl.col("latitude").cast(pl.Float64).round(4),
+        nwp_lon=pl.col("longitude").cast(pl.Float64).round(4),
     )
     by_cell = h3_weights.select(
         "h3_index",
         "proportion",
-        nwp_lat=pl.col("nwp_lat").round(4),
-        nwp_lon=pl.col("nwp_lon").round(4),
+        nwp_lat=pl.col("nwp_lat").cast(pl.Float64).round(4),
+        nwp_lon=pl.col("nwp_lon").cast(pl.Float64).round(4),
     ).join(cells, on=["nwp_lat", "nwp_lon"])
     sites = pl.DataFrame(
         {"site": list(site_cells), "h3_index": list(site_cells.values())},
@@ -1722,15 +1947,20 @@ def _h3_crop_weights(*, site_cells: Mapping[str, int], grid_cells: pl.DataFrame)
         sums.filter((pl.col("total") - 1.0).abs() <= AIFS_WEIGHT_TOLERANCE)["site"].to_list()
     )
     if bad:
-        msg = f"H3 weights over the AIFS crop do not sum to 1 for {len(bad)} sites"
+        msg = f"H3 weights over the crop do not sum to 1 for {len(bad)} sites"
         raise ValueError(msg)
     return weights
 
 
 def aifs_site_weights(
-    *, path: Path, domain: DomainType, sites: list[str], spatial: SpatialReadType
+    *,
+    path: Path,
+    domain: DomainType,
+    sites: list[str],
+    spatial: SpatialReadType,
+    grid_degrees: float = AIFS_CROP_DEGREES,
 ) -> pl.DataFrame:
-    """Return each site's cell weights over one AIFS download's crop.
+    """Return each site's cell weights over one gridded download's crop.
 
     Args:
         path: The download's directory, holding `_grid_cells.parquet`.
@@ -1738,6 +1968,8 @@ def aifs_site_weights(
         sites: The sites to read.
         spatial: `h3` for the overlap-weighted mean of the cells under the site's H3 resolution-5
             cell (the read ENS's stored table has), or `nearest` for the one nearest cell.
+        grid_degrees: The download's grid cell size: AIFS's 0.25 degrees unless the caller reads
+            another product (WeatherNext 3's 0.1 degrees).
 
     Returns:
         `site`, `lat_index`, `lon_index` and `weight`. No coordinate or cell id is printed.
@@ -1764,7 +1996,7 @@ def aifs_site_weights(
         site: h3.latlng_to_cell(latitude, longitude, H3_RESOLUTION)
         for site, latitude, longitude in roster.iter_rows()
     }
-    return _h3_crop_weights(site_cells=site_cells, grid_cells=grid_cells)
+    return _h3_crop_weights(site_cells=site_cells, grid_cells=grid_cells, grid_degrees=grid_degrees)
 
 
 def aifs_members_frame(
@@ -1929,7 +2161,7 @@ def _aifs_frame(
         keep_init_time=True,
     )
     arm_frames += ens_member_arms(
-        extract=efh.members(sites=sites),
+        extract=ens_members(sites=sites),
         domain=domain,
         days=days,
         method=method,
@@ -1974,7 +2206,7 @@ def build_aifs(
 
     Raises:
         ValueError: If `output_dir` is `published_dir` or the folder of the day-1 and day-2 AIFS
-            fit, or `days` is empty or holds a day below 1.
+            fit, or `days` is empty or holds a day below 0.
         FileExistsError: If the output file already exists.
     """
     if output_dir.resolve() == published_dir.resolve():
@@ -1983,8 +2215,8 @@ def build_aifs(
     if output_dir.resolve() == published_dir.resolve().parent / EXISTING_AIFS_DIR_NAME:
         msg = f"the AIFS output must not be the existing AIFS folder {output_dir}"
         raise ValueError(msg)
-    if not days or min(days) < 1:
-        msg = f"days must be a non-empty tuple of days from 1, got {days}"
+    if not days or min(days) < 0:
+        msg = f"days must be a non-empty tuple of days from 0, got {days}"
         raise ValueError(msg)
     output_path = output_dir / f"{domain}_aifs_inputs.parquet"
     refuse_to_overwrite(paths=[output_path])
@@ -2022,7 +2254,8 @@ def main() -> int:
         help="With --extra-leads: which extra-lead build (the second adds ENS mean at day 7, the "
         "ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7; the third adds the "
         "native GFS store at days 0, 1, 2, 3, 5, 7, 10 and 14; the fourth adds Open-Meteo's IFS "
-        "Single Runs archive at days 0, 1, 2, 3, 5 and 7).",
+        "Single Runs archive at days 0, 1, 2, 3, 5 and 7; the fifth adds day 4 of ENS mean and "
+        "control, GEFS, native GFS, IFS HRES, ICON-EU, ICON global, IFS 0.25° and Open-Meteo GFS).",
     )
     parser.add_argument(
         "--gfs-dir",

@@ -103,6 +103,8 @@ nav:
       - Forecasts:
           - "How accurate is a power forecast driven by ECMWF ENS at each horizon?": studies/forecasts/ens-horizons.md
           - "Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?": studies/forecasts/matched-lead.md
+          - "Extra weather products in the day-ahead lead comparison: how they are read, and their results": studies/forecasts/matched-lead-extra-products.md
+          - "Which single weather forecast should be added to ECMWF's ensemble mean first?": studies/forecasts/blends-with-ens.md
           - "How do Open-Meteo's ensemble-mean products compare for solar and wind power?": studies/forecasts/ensemble-means.md
   - ML experimentation:
       - Overview: ml_experimentation/index.md

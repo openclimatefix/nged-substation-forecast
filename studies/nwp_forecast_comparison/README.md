@@ -4,7 +4,9 @@ Study for [issue #810](https://github.com/openclimatefix/nged-substation-forecas
 question is which forecast product, or which blend of products, gives the most accurate power
 forecast at the day-ahead lead the live service delivers, and at the two days after it. The design
 and the results are on the published page, [Which weather forecast is best at day-ahead
-lead?](../../docs/studies/forecasts/matched-lead.md).
+lead?](../../docs/studies/forecasts/matched-lead.md). How the extra products (AIFS, WeatherNext 3,
+the extra lead days, and day 0) are read, and their figureless results, are on its [companion
+page](../../docs/studies/forecasts/matched-lead-extra-products.md).
 
 ## Scripts
 
@@ -127,6 +129,43 @@ lead?](../../docs/studies/forecasts/matched-lead.md).
   overlap-weighted mean of the crop's cells, as ENS's stored table does; AIFS Single also has a
   nearest-cell arm at day 1. `--aifs-weather-dir` names the folder holding the two downloads. The
   build refuses the published folder and the day-1 and day-2 AIFS folder as its output.
+- `build_forecast_inputs.py --aifs --aifs-days 0 3 4 10` builds day 0 and days 3, 4, and 10 as
+  well. Day 0 reads the 00 UTC run of the same day as the hour, so its weather is a hindcast that
+  a service could not have read. AIFS and ENS on 6-hourly steps have no step before lead 6 hours
+  (radiation is null at lead 0), and a solar temperature is read at each hour's midpoint, so solar
+  day 0 omits the hours ending 01:00 to 06:00 UTC for every arm (AIFS Single, ENS, and WeatherNext
+  3), which keeps the rows matched. The build raises if any other scored solar hour's midpoint
+  lies before the first step. Wind day 0 is unaffected. WeatherNext 3 stores no lead for one hour
+  of each day at day 0 (00:00 UTC for wind, 01:00 UTC for solar), so the wind fit drops that hour
+  and the solar drop above already covers it.
+
+  The two fits write into two separate existing folders that hold only a `README.md`, because both
+  write `single_day0_*` files and a `report.md`, and each output is written once. The paths are
+  absolute because a worktree has no `data/` folder. Run one command at a time:
+
+  ```bash
+  D=/home/jack/dev/nged-substation-forecast/data/studies
+  P=$D/nwp_forecast_comparison
+  LEAN=$D/nwp_forecast_comparison_aifs_extra_days
+  WN3=$D/nwp_forecast_comparison_wn3_extra_days
+  uv run python studies/nwp_forecast_comparison/build_forecast_inputs.py --aifs \
+    --aifs-days 0 3 4 10 --published-dir $P --output-dir $LEAN
+  uv run python studies/nwp_forecast_comparison/fit_aifs.py --lean-leads --check \
+    --days 0 3 4 10 --published-dir $P --output-dir $LEAN
+  uv run python studies/nwp_forecast_comparison/fit_aifs.py --lean-leads \
+    --days 0 3 4 10 --workers 8 --published-dir $P --output-dir $LEAN
+  uv run python studies/nwp_forecast_comparison/build_wn3_inputs.py --build \
+    --days 0 3 4 10 --published-dir $P --output-dir $WN3
+  uv run python studies/nwp_forecast_comparison/fit_aifs.py --wn3 --check --lookahead-cleared \
+    --days 0 3 4 10 --published-dir $P --output-dir $WN3
+  uv run python studies/nwp_forecast_comparison/fit_aifs.py --wn3 --lookahead-cleared \
+    --days 0 3 4 10 --workers 8 --published-dir $P --output-dir $WN3
+  ```
+
+  `--lean-leads` fits only the AIFS Single arm and the ENS mean arm at those days, at the primary
+  setting, which is 144 (arm, site) fits. `--wn3` fits the WeatherNext 3 arms at them, which is 156
+  primary fits and the sensitivity refits on top. Each `--check` fits one arm twice, prints the
+  time and the estimated total, and fits nothing else.
 - `fit_aifs.py` fits every AIFS arm and reference on a GPU, on two nested row sets (`single`, and
   `ens` where AIFS ENS also exists), with folds cut inside the AIFS version eras. One contrast is
   deciding (AIFS Single against ENS's control member at day 1); AIFS ENS contrasts are
@@ -152,19 +191,78 @@ lead?](../../docs/studies/forecasts/matched-lead.md).
   blend's contrast with ENS and with both controls, the seed-to-seed gap between the controls, and
   both arms' absolute errors beside every contrast. If the two controls disagree on the guard's
   verdict, the blend claim is unresolved.
+- `build_forecast_inputs.py --extra-leads --batch fifth` writes day 4 of nine products onto the
+  published inputs' own `(site, time)` keys: ENS's mean and control member (reading the supplement
+  `fetch_ens_day4_supplement.py` writes, so the band has no missing step), GEFS's mean, the native
+  GFS arm, IFS HRES (9 km, Open-Meteo), and the Previous Runs arms ICON-EU, ICON global, IFS 0.25°,
+  and GFS at `previous_day4`. ICON-EU's archive ends at day 4. `previous_day4` is null on at most
+  0.6% of the published rows for those four products.
+- `fit_extra_leads.py --batch fifth` fits those nine arms on a GPU at the primary setting, on the
+  shared rows and folds of the earlier extra-lead folders, with no negative control (no extra-lead
+  batch has one). It writes only to a folder named `nwp_forecast_comparison_day4_shared`. Like the
+  fourth batch, it scores each arm without the rows where the arm's own columns are null and
+  computes each contrast on the rows both arms score. Its contrasts are each arm against the ENS
+  mean at day 4, and against the same product at day 3, read from all four earlier batches through
+  four `--context-dir` folders.
+- `fit_day5_aifs_wn3.py` fits day 5 of AIFS Single, the AIFS ENS mean, and WeatherNext 3, each
+  beside ENS's mean, by calling `fit_aifs.run_lean` and `fit_aifs.run_wn3` at day 5, with the
+  settings of the days already fitted. It writes only to a folder named
+  `nwp_forecast_comparison_day5_aifs_wn3`: the two fits' reports as `report_aifs.md` and
+  `report_wn3.md`, and `report.md` joining them. `build_wn3_inputs.py --build` raises if a stored
+  WeatherNext 3 run that a band reads holds a `NaN`, and `build_forecast_inputs.py` raises on any
+  missing step inside an AIFS or ENS band.
 - `nwp_forecast_charts.py --aifs-blends-dir DIR --output-dir DIR` draws only the AIFS lead chart
   (`nwp_forecast_<domain>_aifs_leads.svg`) from the blends fit's losses, so no other chart is
   rewritten, and prints each chart's caption, which is its title.
+- `leaderboard_by_day.py` draws the MAE leaderboard of every product at every fitted lead day as
+  one stacked panel per day on one shared x axis, reading the published fit, the extra-lead fits
+  (including the day-4 folder), the AIFS and WeatherNext 3 fits (including the day-5 folder) from
+  `data/studies/`, and raising if any expected file is missing. It writes
+  `nwp_forecast_<domain>_leaderboard.svg`, plus a `report.md` and `marks.parquet` of every plotted
+  mark, once.
 - `nwp_forecast_charts.py` reads the saved losses and predictions from `--input-dir`, and the extra
-  lead days' losses from `--extra-dir`, and, with `--aifs-dir`, the AIFS losses, and writes six SVG
-  charts per technology (seven with the AIFS chart) to `--output-dir`, each optimised with `svgo`
-  (skip with `--no-svgo`): the leaderboard of every product's absolute error at every fitted lead
-  day, the planned contrasts P1a to P4b at both settings, one chosen week of out-of-fold forecasts
-  against measured output, the contrasts at each generator alone, the blends against ENS alone and
-  their controls, and error by lead day with ENS's day-0 and day-1 intervals shaded. It computes
-  every interval itself with the report's own functions and refuses any site label that is not an
-  anonymised label. It has no default output directory: charts go to `docs/studies/assets/` only
-  once a real report exists.
+  lead days' losses from `--extra-dir`, and, with `--aifs-dir`, the AIFS losses, and writes five SVG
+  charts per technology (six with the AIFS chart) to `--output-dir`, each optimised with `svgo`
+  (skip with `--no-svgo`): the planned contrasts P1a to P4b at both settings, one chosen week of
+  out-of-fold forecasts against measured output, the contrasts at each generator alone, the blends
+  against ENS alone and their controls, and error by lead day with ENS's day-0 and day-1 intervals
+  shaded. It computes every interval itself with the report's own functions and refuses any site
+  label that is not an anonymised label. It has no default output directory: charts go to
+  `docs/studies/assets/` only once a real report exists.
+- `dot_interval_vs_ens.py` fits nothing. It reads the saved losses the leaderboards draw (the
+  `leads_day10*` folders, the AIFS and WeatherNext 3 folders for days 1, 2, 7, and 14, their
+  `extra_days` folders for days 0, 3, 4, and 10, `day4_shared` for day 4, and `day5_aifs_wn3` for
+  day 5) and draws, for each technology, one panel per leaderboard lead day (0, 1, 2, 3, 4, 5, 7,
+  10, and 14) of each product's error minus the ENS mean's, as a dot with a 95% interval from
+  resampling whole months and a fitting seed. A row with fewer than 6 months gets a hollow dot and
+  no interval. Each product is subtracted from the ENS-mean arm the leaderboard draws at the same
+  day: `_leads_day10b` at days 2 and 7, `_day4_shared` at day 4, and `_leads_day10` elsewhere for
+  the `leads_day10*` products, and the ENS mean in the product's own file for AIFS and WeatherNext
+  3. WeatherNext 3's wind reference is `ens_meanvec`. Because those three are fitted on 16, 11,
+  and 7 months, each of their rows also has a hollow diamond against the leaderboard's 21-month
+  ENS mean on the keys the two share, and an interval from fewer than 12 months is dashed. IFS
+  HRES 9 km lacks 1,197 to 1,536 of the ENS mean's rows at each day, and ICON global at day 4
+  lacks 288 for solar, so their paired differences drop those rows; any other arm whose rows
+  differ from its reference's makes the script raise. It writes `report.md`, `intervals.parquet`,
+  and a `README.md` naming each row's reference to a new
+  `nwp_forecast_comparison_vs_ens_dots_final` folder, and two SVGs to `docs/studies/assets/`. It
+  checks that none of the five outputs exists before it writes any, and refuses to overwrite them.
+  With `--blends` (and its own `--output-dir`) it draws, in place of the single products, each
+  blend of ENS's mean with one product at days 1, 2, 7, and 14 where the blend exists, minus the
+  ENS mean alone, at the primary setting, and adds `rankings.parquet` and a report section for
+  comparison C5, the AIFS Single blend minus each ICON-EU blend. The AIFS Single blends are read
+  from `nwp_forecast_comparison_aifs_blends`, and the ICON-EU, UKV, and WeatherNext 3 blends from
+  `nwp_forecast_comparison_product_blends`.
+- `fit_product_blends.py` fits ENS plus one product for ICON-EU (optimistic and conservative lead,
+  days 1 and 2), UKV (day 1), and WeatherNext 3 (days 1, 2, 7, and 14 on the 7 WeatherNext 3
+  months), each with a control that shuffles the product's columns. It reuses the AIFS Single
+  blends of `nwp_forecast_comparison_aifs_blends`, refits only the (arm, setting) pairs that folder
+  lacks, and raises unless its build stamp equals that folder's and every new arm holds the saved
+  ENS mean's `(site, time, seed, fold)` keys. It calls `fit_aifs.product_blend_arms`, which leaves
+  `blend_arms`, `stage_arms_fitted`, and `wn3_arms` unchanged, and writes only to a folder named
+  `nwp_forecast_comparison_product_blends`. `--dry-run` lists the fits without fitting, and
+  `--check` fits one arm twice on the GPU. Its `report.md` holds every arm's columns and the
+  contrasts C1 to C5 at both settings.
 
 ## Outputs
 
@@ -237,6 +335,61 @@ day-1 and day-2 AIFS folder, and the three extra-lead folders (`nwp_forecast_com
 `_day10b`, and `_day10d`), and check it after the last fit. Check CPU load with `uptime` before each
 `--check`, and run only one fit at a time. Each `--check` fits one arm at one wind site twice on
 the GPU, stops unless the two fingerprints agree, and prints the fit's runtime estimate.
+
+## Running the day-4 and day-5 fits
+
+Run these in order, one job at a time, from the repository root, after `uptime` shows the CPU is
+idle. `D` is the shared data folder.
+
+```bash
+D=/home/jack/dev/nged-substation-forecast/data/studies
+P=$D/nwp_forecast_comparison
+DAY4=$D/nwp_forecast_comparison_day4_shared
+DAY5=$D/nwp_forecast_comparison_day5_aifs_wn3
+uv run python studies/nwp_forecast_comparison/build_forecast_inputs.py --extra-leads \
+  --batch fifth --published-dir $P --output-dir $DAY4
+CONTEXT="--context-dir $D/nwp_forecast_comparison_leads_day10 \
+  --context-dir $D/nwp_forecast_comparison_leads_day10b \
+  --context-dir $D/nwp_forecast_comparison_leads_day10c \
+  --context-dir $D/nwp_forecast_comparison_leads_day10d"
+uv run python studies/nwp_forecast_comparison/fit_extra_leads.py --batch fifth --check \
+  --published-dir $P --output-dir $DAY4 $CONTEXT
+uv run python studies/nwp_forecast_comparison/fit_extra_leads.py --batch fifth --workers 2 \
+  --published-dir $P --output-dir $DAY4 $CONTEXT
+uv run python studies/nwp_forecast_comparison/build_forecast_inputs.py --aifs --aifs-days 5 \
+  --published-dir $P --output-dir $DAY5
+uv run python studies/nwp_forecast_comparison/build_wn3_inputs.py --build --days 5 \
+  --published-dir $P --output-dir $DAY5
+uv run python studies/nwp_forecast_comparison/fit_day5_aifs_wn3.py --check --lookahead-cleared \
+  --published-dir $P --output-dir $DAY5
+uv run python studies/nwp_forecast_comparison/fit_day5_aifs_wn3.py --lookahead-cleared \
+  --workers 8 --published-dir $P --output-dir $DAY5
+```
+
+Before the first command, record a SHA-256 baseline of every file in the published folder and in
+each earlier extra-lead, AIFS, and WeatherNext 3 folder, and check it after the last fit.
+
+## Running the product blends fit
+
+Run it after `uptime` shows the CPU is idle and `nvidia-smi` shows the GPU is free. The saved
+AIFS blend fits took about 8 to 10 s each, so the 315 (arm, site) fits take about 1 hour with 2
+workers. `--dry-run`
+builds every frame, checks the build stamp against `nwp_forecast_comparison_aifs_blends`, and lists
+the fits without fitting.
+
+```bash
+D=/home/jack/dev/nged-substation-forecast/data/studies
+P=$D/nwp_forecast_comparison
+OUT=$D/nwp_forecast_comparison_product_blends
+uv run python studies/nwp_forecast_comparison/fit_product_blends.py --dry-run --lookahead-cleared \
+  --published-dir $P --output-dir $OUT
+uv run python studies/nwp_forecast_comparison/fit_product_blends.py --check --lookahead-cleared \
+  --published-dir $P --output-dir $OUT
+uv run python studies/nwp_forecast_comparison/fit_product_blends.py --lookahead-cleared \
+  --workers 2 --published-dir $P --output-dir $OUT
+uv run python studies/nwp_forecast_comparison/dot_interval_vs_ens.py --blends \
+  --output-dir $D/nwp_forecast_comparison_blends_vs_ens_dots
+```
 
 ## Folds
 

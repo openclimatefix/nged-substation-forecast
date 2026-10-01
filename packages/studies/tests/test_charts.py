@@ -1605,3 +1605,70 @@ def test_stacked_contrasts_takes_its_own_second_setting_note_and_defaults_to_the
     assert SECOND_SETTING_NOTE in joined(default)
     assert "A custom note." in joined(custom)
     assert SECOND_SETTING_NOTE not in joined(custom)
+
+
+def test_row_step_sets_the_height_of_one_row() -> None:
+    rows = _rows(["weather model"])
+
+    assert _panel(rows)["height"] == {"step": 40}
+    assert _panel(rows, row_step_px=22)["height"] == {"step": 22}
+
+
+def _mark_dicts(spec: dict, mark: str) -> list[dict]:
+    layers = spec["layer"] if "layer" in spec else spec["vconcat"][-1]["layer"]
+    return [layer["mark"] for layer in layers if layer["mark"]["type"] == mark]
+
+
+def test_no_dash_or_offset_is_drawn_unless_a_row_asks_for_one() -> None:
+    spec = _panel(_rows(["weather model", "weather model"]))
+
+    assert not [m for m in _mark_dicts(spec, "rule") if "strokeDash" in m]
+    assert {m.get("yOffset", 0) for m in _mark_dicts(spec, "point")} == {0}
+
+
+def test_a_dashed_row_draws_its_interval_dashed_and_the_others_solid() -> None:
+    rows = _rows(["weather model", "weather model"]).with_columns(dashed=pl.Series([True, False]))
+
+    rules = [m for m in _mark_dicts(_panel(rows), "rule") if m.get("strokeWidth") == 2]
+
+    assert sorted("strokeDash" in m for m in rules) == [False, True]
+
+
+def test_a_hollow_row_draws_an_unfilled_dot_and_keeps_its_interval() -> None:
+    rows = _rows(["weather model", "weather model"]).with_columns(hollow=pl.Series([True, False]))
+
+    points = _mark_dicts(_panel(rows), "point")
+
+    assert sorted(m["filled"] for m in points) == [False, True]
+
+
+def test_a_second_mark_is_a_hollow_diamond_with_its_own_interval_above_the_first() -> None:
+    rows = _rows(["weather model", "weather model"]).with_columns(
+        other_difference=pl.Series([0.5, None]),
+        other_lower_95=pl.Series([0.25, None]),
+        other_upper_95=pl.Series([0.75, None]),
+        other_dashed=pl.Series([True, None]),
+    )
+
+    spec = _panel(rows)
+    points = _mark_dicts(spec, "point")
+    rules = _mark_dicts(spec, "rule")
+
+    diamonds = [m for m in points if m.get("shape") == "diamond"]
+    assert len(diamonds) == 1
+    assert diamonds[0]["filled"] is False
+    assert diamonds[0]["yOffset"] > 0
+    assert any(m.get("yOffset", 0) < 0 for m in points)
+    assert [m for m in rules if m.get("yOffset", 0) > 0 and "strokeDash" in m]
+
+
+def test_every_point_is_filled_when_condition_colours_are_given() -> None:
+    rows = _rows(["weather model", "weather model"]).with_columns(condition=pl.Series(["a", "b"]))
+
+    spec = _panel(
+        rows, conditions=("a", "b"), condition_colours=("#FF4901", "#306BFF"), condition_key=False
+    )
+
+    points = _mark_dicts(spec, "point")
+    assert points
+    assert all(m["filled"] is True for m in points)
