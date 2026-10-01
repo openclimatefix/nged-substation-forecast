@@ -39,6 +39,14 @@ WN3 appears only as the pooled row, which covers 7 months (February to April and
 2026). The script writes `report.md`, `intervals.parquet`, and `README.md` to a new output folder,
 and one SVG per technology. It refuses to overwrite any of them.
 
+**`--blends` draws ENS plus one product instead.** Each row is an XGBoost model given the ENS
+mean's columns plus one product's columns (AIFS Single, ICON-EU at the optimistic and at the
+conservative lead, UKV, and WeatherNext 3), and its dot is the blend's error minus the ENS mean's
+alone on the same rows, at days 1, 2, 7, and 14 where the blend exists. The blends are read from
+`nwp_forecast_comparison_aifs_blends` and `nwp_forecast_comparison_product_blends`. The report adds
+the comparison C5, the AIFS Single blend minus each ICON-EU blend, which reuses the keys check. The
+dots are at the primary setting only; `fit_product_blends.py`'s `report.md` holds both settings.
+
 Run it with `uv run python studies/nwp_forecast_comparison/dot_interval_vs_ens.py`.
 """
 
@@ -64,7 +72,7 @@ from nwp_forecast_charts import (
 )
 from nwp_forecast_comparison import METRIC, PERCENTAGE_POINTS, DomainType
 from studies.bootstrap import MIN_MONTHS_FOR_INTERVAL, bootstrap_difference
-from studies.charts import figure, interval_panel
+from studies.charts import figure, interval_panel, planning
 
 _LOG: Final[logging.Logger] = logging.getLogger("dot_interval_vs_ens")
 
@@ -102,6 +110,8 @@ SourceType = Literal[
     "aifs_single_day5",
     "aifs_ens_day5",
     "wn3_day5",
+    "product_blends_single",
+    "product_blends_wn3",
 ]
 """The folders a row's losses come from."""
 
@@ -116,6 +126,7 @@ class Source(NamedTuple):
 _AIFS_BLENDS: Final[str] = "nwp_forecast_comparison_aifs_blends"
 _AIFS_EXTRA: Final[str] = "nwp_forecast_comparison_aifs_extra_days"
 _DAY5: Final[str] = "nwp_forecast_comparison_day5_aifs_wn3"
+_PRODUCT_BLENDS: Final[str] = "nwp_forecast_comparison_product_blends"
 _PER_DAY: Final[str] = "{{domain}}_{name}_day{{day}}_losses.parquet"
 
 SOURCES: Final[dict[SourceType, Source]] = {
@@ -145,11 +156,14 @@ SOURCES: Final[dict[SourceType, Source]] = {
     "aifs_single_day5": Source(folder=_DAY5, pattern=_PER_DAY.format(name="single")),
     "aifs_ens_day5": Source(folder=_DAY5, pattern=_PER_DAY.format(name="ens")),
     "wn3_day5": Source(folder=_DAY5, pattern=_PER_DAY.format(name="wn3")),
+    "product_blends_single": Source(folder=_PRODUCT_BLENDS, pattern=_PER_DAY.format(name="single")),
+    "product_blends_wn3": Source(folder=_PRODUCT_BLENDS, pattern=_PER_DAY.format(name="wn3")),
 }
 """Each source's folder under `data/studies/`, and its losses file's name. A `{day}` in the name
 means one file per lead day. The `_blends` folders hold days 1, 2, 7, and 14 and the `_extra`
-folders days 0, 3, 4, and 10. The superseded `nwp_forecast_comparison_leads` folder is not a
-source, because the leaderboards do not draw it."""
+folders days 0, 3, 4, and 10. The `_product_blends` folder holds the ICON-EU and UKV blends on the
+`single` rows, and the WeatherNext 3 blend on the `wn3` rows. The superseded
+`nwp_forecast_comparison_leads` folder is not a source, because the leaderboards do not draw it."""
 
 REFERENCE_NAMES: Final[dict[str, str]] = {
     "ens_mean": "ENS mean",
@@ -320,6 +334,73 @@ global, Open-Meteo GFS, IFS 0.25°, IFS HRES 9 km, ENS control, GEFS, and native
 `leads_day10*` folders."""
 
 
+BLEND_DAYS: Final[tuple[int, ...]] = (1, 2, 7, 14)
+"""The lead days of the blend figures: each blend's panels."""
+
+_AIFS_SINGLE_BLENDS: Final[SourceType] = "aifs_single_blends"
+_PRODUCT_SINGLE: Final[SourceType] = "product_blends_single"
+_SINGLE_ENS: Final[dict[int, SourceType]] = _sources(days=BLEND_DAYS, default=_AIFS_SINGLE_BLENDS)
+_WN3_OWN: Final[dict[int, SourceType]] = _sources(days=BLEND_DAYS, default="product_blends_wn3")
+
+AIFS_BLEND_LABEL: Final[str] = "ENS mean + AIFS Single"
+ICON_EU_OPTIMISTIC_LABEL: Final[str] = "ENS mean + ICON-EU (optimistic lead)"
+ICON_EU_CONSERVATIVE_LABEL: Final[str] = "ENS mean + ICON-EU (conservative lead)"
+UKV_LABEL: Final[str] = "ENS mean + UKV (optimistic upper bound)"
+WN3_BLEND_LABEL: Final[str] = "ENS mean + WeatherNext 3 (7 months)"
+
+BLEND_PLANNED_DAYS: Final[dict[str, tuple[int, ...]]] = {
+    AIFS_BLEND_LABEL: (1, 2, 7),
+    ICON_EU_CONSERVATIVE_LABEL: (1, 2),
+    UKV_LABEL: (1,),
+}
+"""The blend rows written into the study plan before any fit, by label, and the days at which each
+is planned (contrasts C1 to C3). Every other row is exploratory: the optimistic ICON-EU blend, the
+WeatherNext 3 blend, and AIFS Single at day 14."""
+
+BLEND_AXIS_GROUPS: Final[tuple[tuple[int, ...], ...]] = ((1, 2), (7, 14))
+"""The lead days that share an x axis in the blend figures. Days 7 and 14 hold wide intervals, so
+they get an axis of their own and days 1 and 2 stay readable."""
+
+BLEND_PRODUCTS: Final[tuple[ProductRow, ...]] = (
+    ProductRow(
+        prefix="blend_aifs_single",
+        sources=_sources(days=BLEND_DAYS, default=_AIFS_SINGLE_BLENDS),
+        reference_sources=_SINGLE_ENS,
+        label=AIFS_BLEND_LABEL,
+    ),
+    ProductRow(
+        prefix="blend_icon_eu",
+        sources=_sources(days=(1, 2), default=_PRODUCT_SINGLE),
+        reference_sources=_SINGLE_ENS,
+        label=ICON_EU_OPTIMISTIC_LABEL,
+    ),
+    ProductRow(
+        prefix="blend_icon_eu_conservative",
+        sources=_sources(days=(1, 2), default=_PRODUCT_SINGLE),
+        reference_sources=_SINGLE_ENS,
+        label=ICON_EU_CONSERVATIVE_LABEL,
+    ),
+    ProductRow(
+        prefix="blend_ukv",
+        sources=_sources(days=(1,), default=_PRODUCT_SINGLE),
+        reference_sources=_SINGLE_ENS,
+        label=UKV_LABEL,
+    ),
+    ProductRow(
+        prefix="blend_wn3",
+        sources=_sources(days=BLEND_DAYS, default="product_blends_wn3"),
+        reference_sources=_WN3_OWN,
+        label=WN3_BLEND_LABEL,
+        on_fewer_months=True,
+    ),
+)
+"""The rows of the `--blends` figures. Each blend is read at the primary setting and subtracted
+from the ENS mean that sits beside it in the file that holds its reference: AIFS Single's file
+for the four blends on the `single` rows, and the WeatherNext 3 file for WeatherNext 3's blend,
+whose 7 months also get a second mark against the leaderboard's 21-month ENS mean. ICON-EU reaches
+days 1 and 2 in the published inputs, and UKV live day 1."""
+
+
 class Comparison(NamedTuple):
     """One dot: a product's arm at a lead day, and the ENS-mean arm it is subtracted from.
 
@@ -339,17 +420,20 @@ class Comparison(NamedTuple):
     leaderboard_reference_source: SourceType | None = None
 
 
-def comparisons(*, domain: DomainType) -> list[Comparison]:
+def comparisons(
+    *, domain: DomainType, products: Sequence[ProductRow] = PRODUCTS
+) -> list[Comparison]:
     """List every dot of one technology's figure.
 
     Args:
         domain: `solar` or `wind`.
+        products: The rows to draw: `PRODUCTS`, or `BLEND_PRODUCTS` for the blend figures.
 
     Returns:
-        One comparison per product and lead day, in `PRODUCTS` order.
+        One comparison per product and lead day, in the order of `products`.
     """
     output = []
-    for product in PRODUCTS:
+    for product in products:
         if domain not in product.domains:
             continue
         reference_prefix = product.wind_reference if domain == "wind" else "ens_mean"
@@ -372,6 +456,43 @@ def comparisons(*, domain: DomainType) -> list[Comparison]:
             for day, source in product.sources.items()
         )
     return output
+
+
+C5_DAYS: Final[tuple[int, ...]] = (1, 2)
+"""The days at which ICON-EU has a blend, so the AIFS Single blend has one to be compared with."""
+
+
+def blend_rankings(*, domain: DomainType) -> list[Comparison]:
+    """List comparison C5: the AIFS Single blend minus each ICON-EU blend, at each day both exist.
+
+    The conservative ICON-EU blend reads the freshest run at least 48 hours before the valid
+    hour, which is older than the AIFS Single run, so the comparison is read against the
+    optimistic ICON-EU blend too. Both blends sit on the `single` rows, so `contrast_rows` raises
+    if their keys differ.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        One comparison per (day, ICON-EU lead), with the AIFS Single blend as the treatment.
+    """
+    return [
+        Comparison(
+            domain=domain,
+            day=day,
+            label=f"{AIFS_BLEND_LABEL} minus {reference_label}",
+            treatment=f"blend_aifs_single_day{day}",
+            treatment_source=_AIFS_SINGLE_BLENDS,
+            reference=f"{prefix}_day{day}",
+            reference_source=_PRODUCT_SINGLE,
+            reference_label=reference_label,
+        )
+        for day in C5_DAYS
+        for prefix, reference_label in (
+            ("blend_icon_eu_conservative", ICON_EU_CONSERVATIVE_LABEL),
+            ("blend_icon_eu", ICON_EU_OPTIMISTIC_LABEL),
+        )
+    ]
 
 
 _DAY_SUFFIX: Final[re.Pattern[str]] = re.compile(r"_day(?P<day>\d+)$")
@@ -642,17 +763,17 @@ def contrast_rows(
     return pl.DataFrame(records, infer_schema_length=None)
 
 
-def compute(*, data_dir: Path, domain: DomainType) -> pl.DataFrame:
-    """Read the saved losses and bootstrap every dot of one technology.
+def compute_plan(*, data_dir: Path, domain: DomainType, plan: Sequence[Comparison]) -> pl.DataFrame:
+    """Read the saved losses the plan names and bootstrap each comparison.
 
     Args:
         data_dir: The `data/studies` directory.
         domain: `solar` or `wind`.
+        plan: The comparisons.
 
     Returns:
         `contrast_rows`'s result.
     """
-    plan = comparisons(domain=domain)
     wanted = (
         {(c.treatment_source, c.treatment) for c in plan}
         | {(c.reference_source, c.reference) for c in plan}
@@ -663,6 +784,22 @@ def compute(*, data_dir: Path, domain: DomainType) -> pl.DataFrame:
         }
     )
     return contrast_rows(arms=load_arms(data_dir=data_dir, domain=domain, wanted=wanted), plan=plan)
+
+
+def compute(*, data_dir: Path, domain: DomainType, blends: bool = False) -> pl.DataFrame:
+    """Read the saved losses and bootstrap every dot of one technology.
+
+    Args:
+        data_dir: The `data/studies` directory.
+        domain: `solar` or `wind`.
+        blends: Whether to draw the ENS-plus-one-product blends instead of the single products.
+
+    Returns:
+        `contrast_rows`'s result.
+    """
+    products = BLEND_PRODUCTS if blends else PRODUCTS
+    plan = comparisons(domain=domain, products=products)
+    return compute_plan(data_dir=data_dir, domain=domain, plan=plan)
 
 
 # --- Chart --------------------------------------------------------------------------------------
@@ -718,13 +855,17 @@ def footnotes_for(*, domain: DomainType, rows: pl.DataFrame) -> list[Footnote]:
     ]
 
 
-def chart_rows(*, rows: pl.DataFrame, day: int, domain: DomainType) -> pl.DataFrame:
+def chart_rows(
+    *, rows: pl.DataFrame, day: int, domain: DomainType, blends: bool = False
+) -> pl.DataFrame:
     """Shape one lead day's rows for `interval_panel`, best product first.
 
     Args:
         rows: `contrast_rows`'s result for one technology.
         day: The lead day.
         domain: `solar` or `wind`, which selects the footnoted rows.
+        blends: Whether the rows are blends, which adds the Boolean `planned` column
+            (`BLEND_PLANNED_DAYS`).
 
     Returns:
         Rows sorted by ascending difference, carrying `label`, `family`, `difference`, `lower_95`
@@ -736,11 +877,17 @@ def chart_rows(*, rows: pl.DataFrame, day: int, domain: DomainType) -> pl.DataFr
     is_noted = pl.struct("label", "day").is_in(
         [{"label": label, "day": note_day} for label, note_day in noted]
     )
+    planned = (
+        [pl.col("label").is_in([k for k, days in BLEND_PLANNED_DAYS.items() if day in days])]
+        if blends
+        else []
+    )
     return (
         rows.filter(pl.col("day") == day)
         .sort("value")
         .select(
             "label",
+            *[expr.alias("planned") for expr in planned],
             family=pl.lit(FAMILY),
             difference=pl.col("value"),
             lower_95=pl.when(pl.col("has_interval")).then(pl.col("lower")),
@@ -755,7 +902,7 @@ def chart_rows(*, rows: pl.DataFrame, day: int, domain: DomainType) -> pl.DataFr
     )
 
 
-def figure_title(*, domain: DomainType) -> str:
+def figure_title(*, domain: DomainType, blends: bool = False) -> str:
     """Name what a figure shows, without counting rows.
 
     Rows are not independent tests, and the ENS control member is not a competing product, so a
@@ -763,25 +910,70 @@ def figure_title(*, domain: DomainType) -> str:
 
     Args:
         domain: `solar` or `wind`.
+        blends: Whether the figure draws ENS plus one product instead of single products.
 
     Returns:
         The figure's title.
     """
+    if blends:
+        return (
+            f"For {domain} power, the error of the ENS mean plus one weather product, minus the "
+            "ENS mean alone's error, by lead day"
+        )
     return (
         f"For {domain} power, each weather product's error minus the ENS mean's error, by lead day"
     )
 
 
-def subtitle_lines(*, domain: DomainType, rows: pl.DataFrame) -> list[str]:
+def blend_subtitle_lines(*, domain: DomainType) -> list[str]:
+    """Write the blend figure's subtitle lines, which say what each row, mark, and zero mean."""
+    return [
+        (
+            "Each row is an XGBoost model given the ENS mean's weather plus one product's weather "
+            f"for {TECHNOLOGY_NAMES[domain]}. Dot: its error minus that of an XGBoost model given "
+            "the ENS mean's weather alone, on the same hours, in percentage points of capacity; "
+            "negative means adding the product helps. Zero is the ENS mean alone. Where a 95% "
+            "interval includes zero, adding the product is not distinguished from not adding it."
+        ),
+        DOTS_NOTE,
+        (
+            "Dashed line: an interval from fewer than 12 months, which a month-block bootstrap "
+            "tends to draw too narrow."
+        ),
+        (
+            "Lead: ENS mean plus AIFS Single and ENS mean plus WeatherNext 3 read the 00 UTC "
+            "run N days before the valid day. ENS mean plus ICON-EU reads the freshest ICON-EU "
+            "run at least N days before the valid hour at the optimistic lead, and at least N+1 "
+            "days before at the conservative lead. ENS mean plus UKV reads UKV's day-1 value, so "
+            "it is an optimistic upper bound; no blend with UKV is ranked."
+        ),
+        (
+            "Rows: ENS mean plus AIFS Single, ICON-EU, or UKV shares 16 months. ENS mean plus "
+            "WeatherNext 3 rests on 7 months, against an ENS mean refitted on those months "
+            "(filled dot) and against the 21-month ENS mean (hollow diamond)."
+        ),
+        CAPACITY_NOTE,
+    ]
+
+
+def subtitle_lines(*, domain: DomainType, rows: pl.DataFrame, blends: bool = False) -> list[str]:
     """Write the figure's subtitle lines, which say what each mark, line, and zero mean.
 
     Args:
         domain: `solar` or `wind`.
         rows: `contrast_rows`'s result for the technology.
+        blends: Whether the figure draws ENS plus one product instead of single products.
 
     Returns:
         The lines, before wrapping.
     """
+    if blends:
+        lines = blend_subtitle_lines(domain=domain)
+        if not rows["has_interval"].all():
+            lines.append(
+                f"Hollow circle: fewer than {MIN_MONTHS_FOR_INTERVAL} months, so no interval."
+            )
+        return lines
     lines = [
         (
             "Each row is an XGBoost model given one product's weather for "
@@ -820,17 +1012,63 @@ def subtitle_lines(*, domain: DomainType, rows: pl.DataFrame) -> list[str]:
     return lines
 
 
-def draw(*, rows: pl.DataFrame, domain: DomainType, number: int) -> alt.VConcatChart:
+def draw(
+    *, rows: pl.DataFrame, domain: DomainType, number: int, blends: bool = False
+) -> alt.VConcatChart:
     """Draw one technology's figure: one panel per lead day.
 
     Args:
         rows: `contrast_rows`'s result for one technology.
         domain: `solar` or `wind`.
         number: The figure's number on the page.
+        blends: Whether the figure draws ENS plus one product instead of single products.
 
     Returns:
         The figure.
     """
+    present = set(rows["day"].to_list())
+    days = [day for day in (BLEND_DAYS if blends else DAYS) if day in present]
+    groups = (
+        [tuple(d for d in group if d in days) for group in BLEND_AXIS_GROUPS]
+        if blends
+        else [tuple(days)]
+    )
+    domains = {
+        day: _x_domain(rows=rows.filter(pl.col("day").is_in(group)))
+        for group in groups
+        if group
+        for day in group
+    }
+    panel_rows = {day: chart_rows(rows=rows, day=day, domain=domain, blends=blends) for day in days}
+    figure_planning = planning(rows=list(panel_rows.values()))
+    last_of_group = {group[-1] for group in groups if group}
+    panels = [
+        interval_panel(
+            rows=panel_rows[day],
+            x_domain=domains[day],
+            x_title=X_TITLE if day in last_of_group else "",
+            zero_label="same as the ENS mean",
+            better_label="better than the ENS mean",
+            panel_title=_panel_title(day=day, blends=blends, domains=domains),
+            reference_labels=index == 0,
+            family_key=False,
+            figure_planning=figure_planning,
+            colour_by_family=True,
+            row_step_px=ROW_STEP_PX,
+        )
+        for index, day in enumerate(days)
+    ]
+    return figure(
+        panels=panels,
+        number=number,
+        title=figure_title(domain=domain, blends=blends),
+        subtitle=subtitle_lines(domain=domain, rows=rows, blends=blends),
+        figure_planning=figure_planning,
+    )
+
+
+def _x_domain(*, rows: pl.DataFrame) -> tuple[float, float]:
+    """Return the padded x range, including zero, that holds every mark and interval of `rows`."""
     shown = pl.concat(
         [
             rows.select("value", "lower", "upper"),
@@ -843,31 +1081,36 @@ def draw(*, rows: pl.DataFrame, domain: DomainType, number: int) -> alt.VConcatC
     )
     low = min(shown["value"].to_list() + shown["lower"].drop_nulls().to_list())
     high = max(shown["value"].to_list() + shown["upper"].drop_nulls().to_list())
-    x_domain = padded_domain(low=low, high=high, include_zero=True)
-    days = [day for day in DAYS if day in set(rows["day"].to_list())]
-    panels = [
-        interval_panel(
-            rows=chart_rows(rows=rows, day=day, domain=domain),
-            x_domain=x_domain,
-            x_title=X_TITLE if index == len(days) - 1 else "",
-            zero_label="same as the ENS mean",
-            better_label="better than the ENS mean",
-            panel_title=f"Lead day {day}",
-            reference_labels=index == 0,
-            family_key=False,
-            figure_planning="exploratory",
-            colour_by_family=True,
-            row_step_px=ROW_STEP_PX,
-        )
-        for index, day in enumerate(days)
-    ]
-    return figure(
-        panels=panels,
-        number=number,
-        title=figure_title(domain=domain),
-        subtitle=subtitle_lines(domain=domain, rows=rows),
-        figure_planning="exploratory",
-    )
+    return padded_domain(low=low, high=high, include_zero=True)
+
+
+def _panel_title(*, day: int, blends: bool, domains: Mapping[int, tuple[float, float]]) -> str:
+    """Name a panel's lead day, and say where its axis is wider than the first group's."""
+    title = f"Lead day {day}"
+    if blends and domains[day] != domains[min(domains)]:
+        title += " (wider axis than days 1 and 2)"
+    return title
+
+
+BLENDS_README_TEXT: Final[
+    str
+] = """# ENS plus one weather product minus the ENS mean alone, dots and intervals
+
+Written once by `studies/nwp_forecast_comparison/dot_interval_vs_ens.py --blends` from the saved
+per-row losses of `nwp_forecast_comparison_aifs_blends` (the AIFS Single blend and ENS's mean) and
+`nwp_forecast_comparison_product_blends` (the ICON-EU, UKV, and WeatherNext 3 blends). It fits
+nothing, and it is never overwritten.
+
+- `report.md` prints every dot at the primary setting, and comparison C5, the AIFS Single blend
+  minus each ICON-EU blend.
+- `intervals.parquet` holds one row per dot, with the columns of the single-product figures'
+  `intervals.parquet`. The WeatherNext 3 blend also carries the second mark against the
+  leaderboard's 21-month ENS mean.
+- `rankings.parquet` holds one row per C5 comparison, with the same statistics.
+
+Both hyperparameter settings, and the verdicts, are in `report.md` of
+`nwp_forecast_comparison_product_blends`.
+"""
 
 
 # --- Report and README ---------------------------------------------------------------------------
@@ -892,17 +1135,52 @@ def _cell(*, row: Mapping[str, object], prefix: str = "") -> str:
     return f"{value} [{row[f'{prefix}lower']:+.3f}, {row[f'{prefix}upper']:+.3f}]{dashed}"
 
 
-def report_text(*, rows: Mapping[DomainType, pl.DataFrame]) -> str:
+def ranking_lines(*, rankings: Mapping[DomainType, pl.DataFrame]) -> list[str]:
+    """Print comparison C5 (AIFS Single blend minus each ICON-EU blend) at the primary setting."""
+    lines = [
+        "## C5: the AIFS Single blend minus each ICON-EU blend",
+        "",
+        (
+            "AIFS Single ranks above ICON-EU only if the difference against the optimistic "
+            "ICON-EU blend has an upper bound below zero; ICON-EU ranks above AIFS Single only "
+            "if the difference against the conservative ICON-EU blend has a lower bound above "
+            "zero. `fit_product_blends.py`'s `report.md` applies the rule at both settings."
+        ),
+        "",
+        "| Technology | Day | Comparison | Difference (points) | Months | Rows |",
+        "|---|---|---|---|---|---|",
+    ]
+    for domain, frame in rankings.items():
+        lines += [
+            f"| {domain} | {row['day']} | {row['label']} | {_cell(row=row)} | {row['n_months']} | "
+            f"{row['n_rows']} |"
+            for row in frame.sort("day", "label").iter_rows(named=True)
+        ]
+    lines.append("")
+    return lines
+
+
+def report_text(
+    *,
+    rows: Mapping[DomainType, pl.DataFrame],
+    rankings: Mapping[DomainType, pl.DataFrame] | None = None,
+) -> str:
     """Print every dot's estimate and interval, so the page and the charts quote the report.
 
     Args:
         rows: Each technology's `contrast_rows` result.
+        rankings: Each technology's comparison C5, for the blend figures, or `None` for the single
+            products.
 
     Returns:
         The report, in Markdown.
     """
     lines = [
-        "# Each weather product minus the ENS mean, by lead day",
+        (
+            "# Each weather product minus the ENS mean, by lead day"
+            if rankings is None
+            else "# ENS plus one weather product, minus the ENS mean alone, by lead day"
+        ),
         "",
         (
             "Product minus reference, in points of capacity at the primary XGBoost setting. "
@@ -943,6 +1221,8 @@ def report_text(*, rows: Mapping[DomainType, pl.DataFrame]) -> str:
             for note in footnotes_for(domain=domain, rows=frame)
         ]
         lines.append("")
+    if rankings is not None:
+        lines += ranking_lines(rankings=rankings)
     return "\n".join(lines)
 
 
@@ -1119,11 +1399,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     studies_dir = repo_data_dir() / "studies"
     parser.add_argument("--data-dir", type=Path, default=studies_dir)
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=studies_dir / "nwp_forecast_comparison_vs_ens_dots_final",
-    )
+    default_output_dir = studies_dir / "nwp_forecast_comparison_vs_ens_dots_final"
+    parser.add_argument("--output-dir", type=Path, default=default_output_dir)
     parser.add_argument(
         "--svg-dir", type=Path, default=PROJECT_ROOT / "docs" / "studies" / "assets"
     )
@@ -1134,29 +1411,61 @@ def main() -> int:
         help="The solar figure's number on the page; the wind figure follows it.",
     )
     parser.add_argument("--no-svgo", action="store_true", help="Skip the svgo optimisation.")
+    parser.add_argument(
+        "--blends",
+        action="store_true",
+        help="Draw ENS plus one product instead of the single products. Needs --output-dir.",
+    )
     args = parser.parse_args()
-    rows = {domain: compute(data_dir=args.data_dir, domain=domain) for domain in DOMAINS}
-    files = ("report.md", "intervals.parquet", "README.md")
-    svgs = {domain: args.svg_dir / f"nwp_forecast_{domain}_dots_vs_ens.svg" for domain in DOMAINS}
+    if args.blends and args.output_dir == default_output_dir:
+        parser.error("--blends needs its own --output-dir, because the default folder is taken")
+    rows = {
+        domain: compute(data_dir=args.data_dir, domain=domain, blends=args.blends)
+        for domain in DOMAINS
+    }
+    rankings = (
+        {
+            domain: compute_plan(
+                data_dir=args.data_dir, domain=domain, plan=blend_rankings(domain=domain)
+            )
+            for domain in DOMAINS
+        }
+        if args.blends
+        else None
+    )
+    files = ("report.md", "intervals.parquet", "README.md", *(("rankings.parquet",) * args.blends))
+    stem = "blends_vs_ens" if args.blends else "dots_vs_ens"
+    svgs = {domain: args.svg_dir / f"nwp_forecast_{domain}_{stem}.svg" for domain in DOMAINS}
     taken = [args.output_dir, *(args.output_dir / name for name in files), *svgs.values()]
     existing = [path for path in taken if path.exists()]
     if existing:
         msg = f"{existing} exist; this script writes each output once"
         raise FileExistsError(msg)
     charts = {
-        domain: draw(rows=rows[domain], domain=domain, number=args.first_figure_number + index)
+        domain: draw(
+            rows=rows[domain],
+            domain=domain,
+            number=args.first_figure_number + index,
+            blends=args.blends,
+        )
         for index, domain in enumerate(DOMAINS)
     }
     args.output_dir.mkdir(parents=True, exist_ok=False)
-    write_once(path=args.output_dir / "report.md", write=report_text(rows=rows))
+    write_once(path=args.output_dir / "report.md", write=report_text(rows=rows, rankings=rankings))
     write_once(path=args.output_dir / "intervals.parquet", write=pl.concat(rows.values()))
-    write_once(path=args.output_dir / "README.md", write=readme_text(rows=rows))
+    readme = BLENDS_README_TEXT if args.blends else readme_text(rows=rows)
+    write_once(path=args.output_dir / "README.md", write=readme)
+    if rankings is not None:
+        write_once(
+            path=args.output_dir / "rankings.parquet",
+            write=pl.concat(rankings.values(), how="vertical_relaxed"),
+        )
     for domain, path in svgs.items():
         write_once(path=path, write=charts[domain])
         if not args.no_svgo:
             optimise(path=path)
         _LOG.info("wrote %s", path)
-        sys.stdout.write(f"{domain} caption: {figure_title(domain=domain)}\n")
+        sys.stdout.write(f"{domain} caption: {figure_title(domain=domain, blends=args.blends)}\n")
     return 0
 
 
