@@ -25,6 +25,7 @@ def test_sine_cosine_treats_zero_and_360_alike_and_east_is_sine_one() -> None:
     encoded = _encode(degrees=[0.0, 360.0, 90.0])
     assert encoded["sin"][0] == pytest.approx(encoded["sin"][1], abs=1e-9)
     assert encoded["cos"][0] == pytest.approx(encoded["cos"][1], abs=1e-9)
+    assert (encoded["sin"][0], encoded["cos"][0]) == pytest.approx((0.0, 1.0), abs=1e-9)
     assert (encoded["sin"][2], encoded["cos"][2]) == pytest.approx((1.0, 0.0), abs=1e-9)
 
 
@@ -39,16 +40,30 @@ def test_veer_degrees_wraps_across_north(upper: float, lower: float, expected: f
     assert frame["v"][0] == pytest.approx(expected)
 
 
-def test_shuffled_by_month_gives_each_month_one_other_months_values() -> None:
-    months = np.repeat(np.array(["m0", "m1", "m2", "m3"]), 5)
-    values = np.repeat(np.arange(4.0), 5) * 100.0 + np.tile(np.arange(5.0), 4)
-    shuffled = shuffled_by_month(values=values, months=months, generator=np.random.default_rng(1))
-    for month_number, month in enumerate(["m0", "m1", "m2", "m3"]):
+def _donor_map(*, seed: int, month_count: int = 6) -> dict[int, int]:
+    months = np.repeat(np.arange(month_count), 3)
+    values = months * 100.0 + np.tile(np.arange(3.0), month_count)
+    shuffled = shuffled_by_month(
+        values=values, months=months, generator=np.random.default_rng(seed)
+    )
+    donors = {}
+    for month in range(month_count):
         rows = shuffled[months == month]
-        donors = {int(value // 100) for value in rows}
-        assert len(donors) == 1
-        assert donors != {month_number}
-        assert shuffled.shape == values.shape
+        assert len({int(value // 100) for value in rows}) == 1
+        donors[month] = int(rows[0] // 100)
+    return donors
+
+
+def test_shuffled_by_month_gives_each_month_one_other_months_values() -> None:
+    donors = _donor_map(seed=1)
+    assert all(donor != month for month, donor in donors.items())
+    assert sorted(donors.values()) == list(range(6))
+
+
+def test_shuffled_by_month_donor_map_depends_on_the_random_source() -> None:
+    maps = [_donor_map(seed=seed) for seed in range(8)]
+    assert len({tuple(sorted(donors.items())) for donors in maps}) > 1
+    assert any(donor != (month + 1) % 6 for donors in maps for month, donor in donors.items())
 
 
 def test_shuffled_by_month_repeats_a_short_donor_to_fill_a_long_month() -> None:

@@ -8,7 +8,7 @@ seeds, bootstrap and gates, and adds the direction columns it lacked.
 **Data.** `data/studies/weather/CERRA/`: CERRA's wind speed and wind direction at 10, 50, 75, 100,
 and 150 m, at the 190 grid cells around the trial area, every 3 hours from 2019-09-01 to 2026-06-30.
 Direction is in degrees clockwise from north, the direction the wind blows from. The files' circular
-mean at 100 m is about 228 degrees, the south-westerly of the UK's prevailing wind, which confirms
+mean at 100 m is about 227 degrees, the south-westerly of the UK's prevailing wind, which confirms
 that convention. An arm gets a direction as its sine and cosine, which is the same under either
 convention. `studies.wind_direction` holds the encoding, the veer and the month shuffle.
 
@@ -43,11 +43,14 @@ Every other contrast is exploratory, and the veer family's contrasts are explora
 
 **Controls.** Two negative controls shuffle direction by month: `speed_100m_dir_noise` against
 `speed_100m` (width-matched noise against padding) and `veer_dir_100_noise` against `veer_dir_100`.
-Two positive controls use synthetic targets, a fixed power curve of the 100 m speed cut by 40% in
-a direction sector (`direction_sector`) or at a veer of 10 degrees or more (`veer`), with noise. The
-run writes every output first and then raises unless `speed_100m_dir` beats `speed_100m` on the
-sector target and `veer_angle_10_100` beats `veer_dir_100` on the veer target, each by an interval
-that excludes zero.
+Four positive controls inject a cut into the real power, `power_mw` times one minus the loss on a
+rule's rows: a direction sector (`sector`, within 30 degrees of 255 degrees) or a signed veer of
+at least 10 degrees, clockwise with height from 10 m to 100 m (`veer`), each at 40% and at 10%. The
+report prints each rule's share of rows and mean injected effect in percentage points of capacity.
+The run writes every output and then raises unless, on the 40% targets, `speed_100m_dir` beats
+`speed_100m` on the sector target, and `veer_angle_10_100` and `veer_dir_10_100` each beat
+`veer_dir_100` on the veer target, each by an interval below zero. The 10% targets are reported
+only.
 
 **Checks that need no fit.** `--dry-run` prints the arms, the number of fits, the output files and
 which direction files are missing, reads no data and exits 0. `--check` reads the direction files
@@ -57,8 +60,10 @@ The full run stops while any direction file is missing.
 
 Run it with `uv run python studies/beam_diffuse_split/cerra_wind_direction.py`. `--report-only`
 rebuilds `report.md` and the interval tables from the saved losses, still checking the saved
-fingerprint. A re-run stops while any output exists, until it is moved to a `superseded/`
-subfolder. Only one agent may run it at a time, because every worktree shares one data folder.
+fingerprint, and refuses only if one of those three files exists. A full run stops before any fit
+while any output exists, until it is moved to a
+`superseded/` subfolder. Only one agent may run it at a time, because every worktree shares one
+data folder.
 """
 
 import argparse
@@ -66,23 +71,20 @@ import logging
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import Final
+from typing import Final, NamedTuple
 
 import numpy as np
 import polars as pl
 from build_dataset import _wind_sites
 from cerra_wind_levels import (
     CERRA_DIR,
-    CUT_IN_M_S,
     GRID_PATH,
     MAX_CORES,
     MAX_WORKERS,
     NOISE_SEED,
     PRIMARY_SETTING,
-    RATED_M_S,
     SENSITIVITY_SETTING,
     SHARED_FEATURES,
-    SYNTHETIC_NOISE_FRACTION,
     Contrast,
     check_column_counts,
     check_same_rows,
@@ -163,20 +165,33 @@ column."""
 SECTOR_CENTRE_DEG: Final[float] = 255.0
 SECTOR_HALF_WIDTH_DEG: Final[float] = 30.0
 VEER_THRESHOLD_DEG: Final[float] = 10.0
-SYNTHETIC_LOSS: Final[float] = 0.4
-"""The share of power the synthetic targets remove inside the direction sector, or at a veer of
-`VEER_THRESHOLD_DEG` or more from 10 m to 100 m."""
+"""A veer is `veer_degrees` of the 100 m direction over the 10 m direction, positive when the wind
+turns clockwise with height (veering). The veer rule cuts only a signed veer of at least
+`VEER_THRESHOLD_DEG`, not a backing (anticlockwise) turn of the same size."""
 
 SYNTHETIC_SHARE_RANGE: Final[tuple[float, float]] = (0.10, 0.50)
-"""The share of rows a synthetic target's rule may affect. Outside it the control is vacuous or the
-whole target."""
+"""The share of rows an injected rule may affect. Outside it the control is vacuous or the whole
+target."""
 
-SECTOR_TARGET: Final[str] = "synthetic_sector_mw"
-VEER_TARGET: Final[str] = "synthetic_veer_mw"
 
-SECTOR_SETTING: Final[str] = "positive_control_sector"
-VEER_SETTING: Final[str] = "positive_control_veer"
-CONTROL_SETTINGS: Final[tuple[str, ...]] = (SECTOR_SETTING, VEER_SETTING)
+class Injection(NamedTuple):
+    """One positive control: a rule, and the share of real power it removes on the rule's rows."""
+
+    target: str
+    rule: str
+    loss: float
+
+
+INJECTIONS: Final[tuple[Injection, ...]] = (
+    Injection("injected_sector_40", "sector", 0.40),
+    Injection("injected_sector_10", "sector", 0.10),
+    Injection("injected_veer_40", "veer", 0.40),
+    Injection("injected_veer_10", "veer", 0.10),
+)
+"""Each target is the real `power_mw` times `1 - loss` on the rule's rows and unchanged elsewhere,
+so every real feature of the target stays. Each target name is also its setting name."""
+
+CONTROL_SETTINGS: Final[tuple[str, ...]] = tuple(i.target for i in INJECTIONS)
 
 PLANNED_COUNT: Final[int] = 3
 BONFERRONI_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / PLANNED_COUNT)
@@ -232,26 +247,33 @@ NEGATIVE_CONTROLS: Final[tuple[Contrast, ...]] = (
     Contrast("speed_100m_dir_noise", "speed_100m", "shuffled direction against padding", False),
     Contrast("veer_dir_100_noise", "veer_dir_100", "a shuffled 10 m direction against none", False),
 )
-POSITIVE_CONTROLS: Final[tuple[tuple[Contrast, str], ...]] = (
-    (
-        Contrast("speed_100m_dir", "speed_100m", "direction where the target has a sector", False),
-        SECTOR_SETTING,
-    ),
-    (
-        Contrast(
-            "veer_angle_10_100", "veer_dir_100", "the veer angle where the target has veer", False
-        ),
-        VEER_SETTING,
-    ),
-    (
-        Contrast(
-            "veer_dir_10_100", "veer_dir_100", "raw directions where the target has veer", False
-        ),
-        VEER_SETTING,
-    ),
+POSITIVE_CONTROLS: Final[tuple[tuple[Contrast, str], ...]] = tuple(
+    (contrast, injection.target)
+    for injection in INJECTIONS
+    for contrast in (
+        (Contrast("speed_100m_dir", "speed_100m", "direction where power has a sector cut", False),)
+        if injection.rule == "sector"
+        else (
+            Contrast(
+                "veer_angle_10_100",
+                "veer_dir_100",
+                "the veer angle where power has a veer cut",
+                False,
+            ),
+            Contrast(
+                "veer_dir_10_100",
+                "veer_dir_100",
+                "two raw directions where power has a veer cut",
+                False,
+            ),
+        )
+    )
 )
-"""The first two gate the run. The third reports whether two raw directions can recover a veer rule,
-which bounds what a null `veer_dir_10_100` against `veer_dir_100` can be read as."""
+"""Every positive control's contrast on every injected target."""
+
+GATING_TARGETS: Final[tuple[str, ...]] = ("injected_sector_40", "injected_veer_40")
+"""The targets whose every contrast must have an upper 95% bound below zero. The 10% cuts are
+reported to show how small an effect the instrument sees, and do not gate the run."""
 
 
 def _sin(*, height_m: int) -> str:
@@ -472,7 +494,7 @@ def with_shuffled_direction(*, frame: pl.DataFrame, heights: tuple[int, ...]) ->
         The frame with `_noise_pair` columns for each of 10 m and 100 m that is in `heights`, each
         shuffled separately within each farm.
     """
-    columns: list[pl.Series] = []
+    columns: list[pl.Expr] = []
     for height in (10, 100):
         if height not in heights:
             continue
@@ -486,95 +508,97 @@ def with_shuffled_direction(*, frame: pl.DataFrame, heights: tuple[int, ...]) ->
             shuffled[rows] = shuffled_by_month(
                 values=values[rows], months=months[rows], generator=generator
             )
-        radians = np.radians(shuffled.astype(np.float64))
+        degrees = pl.Series(f"shuffled_{height}m", shuffled)
+        sin, cos = sine_cosine(direction_deg=pl.lit(degrees))
         sin_name, cos_name = _noise_pair(height_m=height)
-        columns += [pl.Series(sin_name, np.sin(radians)), pl.Series(cos_name, np.cos(radians))]
+        columns += [sin.alias(sin_name), cos.alias(cos_name)]
     return frame.with_columns(columns)
 
 
-def _power_curve_fraction(*, speed: pl.Expr) -> pl.Expr:
-    """Return a fixed power curve as a fraction of capacity: cut-in, a cubic, then rated power.
-
-    Args:
-        speed: The wind speed expression in metres per second.
-
-    Returns:
-        The fraction in [0, 1].
-    """
-    return ((speed - CUT_IN_M_S) / (RATED_M_S - CUT_IN_M_S)).clip(0.0, 1.0).pow(3)
-
-
-def synthetic_rule_masks(*, frame: pl.DataFrame) -> dict[str, pl.Series]:
-    """Return which rows each synthetic target cuts.
+def rule_masks(*, frame: pl.DataFrame) -> dict[str, pl.Series]:
+    """Return which rows each injection rule cuts.
 
     Args:
         frame: Rows carrying `wind_direction_100m` and `veer_deg_10_100m`.
 
     Returns:
-        `SECTOR_TARGET` to the rows whose 100 m direction lies within `SECTOR_HALF_WIDTH_DEG` of
-        `SECTOR_CENTRE_DEG`, and `VEER_TARGET` to the rows whose veer from 10 m to 100 m is at least
-        `VEER_THRESHOLD_DEG`.
+        `sector` to the rows whose 100 m direction lies within `SECTOR_HALF_WIDTH_DEG` of
+        `SECTOR_CENTRE_DEG`, and `veer` to the rows whose signed veer from 10 m to 100 m is at least
+        `VEER_THRESHOLD_DEG` (clockwise with height).
     """
     distance = ((pl.col("wind_direction_100m") - SECTOR_CENTRE_DEG + 180.0) % 360.0 - 180.0).abs()
     masks = frame.select(
         sector=distance < SECTOR_HALF_WIDTH_DEG,
         veer=pl.col("veer_deg_10_100m") >= VEER_THRESHOLD_DEG,
     )
-    return {SECTOR_TARGET: masks["sector"], VEER_TARGET: masks["veer"]}
+    return {"sector": masks["sector"], "veer": masks["veer"]}
 
 
-def with_synthetic_targets(*, frame: pl.DataFrame) -> pl.DataFrame:
-    """Add the two positive controls' targets.
-
-    Each target is the fixed power curve of the 100 m speed, multiplied by `1 - SYNTHETIC_LOSS`
-    inside its rule's rows, plus Gaussian noise, in megawatts. Only an arm that can read the rule's
-    direction columns can reproduce the cut.
+def with_injected_targets(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Add the positive controls' targets, each the real power cut on a rule's rows.
 
     Args:
-        frame: Rows carrying the 100 m speed, `wind_direction_100m`, `veer_deg_10_100m` and
-            `effective_capacity_mw`.
+        frame: Rows carrying `power_mw`, `wind_direction_100m` and `veer_deg_10_100m`.
 
     Returns:
-        The frame with `SECTOR_TARGET` and `VEER_TARGET`.
+        The frame with one column per `INJECTIONS` target: `power_mw * (1 - loss)` on the rule's
+        rows and `power_mw` elsewhere. Only an arm that can read the rule's direction columns can
+        reproduce the cut.
     """
-    masks = synthetic_rule_masks(frame=frame)
-    fraction = _power_curve_fraction(speed=pl.col(_speed(height_m=100)))
-    additions = []
-    for index, target in enumerate((SECTOR_TARGET, VEER_TARGET)):
-        noise = np.random.default_rng((NOISE_SEED, index)).normal(
-            0.0, SYNTHETIC_NOISE_FRACTION, frame.height
-        )
-        cut = pl.when(masks[target]).then(1.0 - SYNTHETIC_LOSS).otherwise(1.0)
-        additions.append(
-            (
-                (fraction * cut + pl.Series(noise)).clip(0.0, 1.0) * pl.col("effective_capacity_mw")
-            ).alias(target)
-        )
-    return frame.with_columns(additions)
+    masks = rule_masks(frame=frame)
+    return frame.with_columns(
+        pl.when(masks[injection.rule])
+        .then(pl.col("power_mw") * (1.0 - injection.loss))
+        .otherwise(pl.col("power_mw"))
+        .alias(injection.target)
+        for injection in INJECTIONS
+    )
 
 
-def check_synthetic_shares(*, frame: pl.DataFrame) -> dict[str, float]:
-    """Stop unless each synthetic rule cuts a share of rows inside `SYNTHETIC_SHARE_RANGE`.
+def injected_effects(*, frame: pl.DataFrame) -> dict[str, tuple[float, float]]:
+    """Measure each injection's size.
 
     Args:
-        frame: Rows carrying the columns `synthetic_rule_masks` reads.
+        frame: Rows carrying `power_mw`, `effective_capacity_mw` and the `INJECTIONS` targets.
 
     Returns:
-        Each target's share of affected rows.
+        Each target to the share of rows its rule cuts and the mean injected effect in percentage
+        points of capacity, the mean over all rows of (power minus target) over capacity times 100.
+    """
+    masks = rule_masks(frame=frame)
+    return {
+        injection.target: (
+            float(masks[injection.rule].to_numpy().mean()),
+            float(
+                ((frame["power_mw"] - frame[injection.target]) / frame["effective_capacity_mw"])
+                .to_numpy()
+                .mean()
+            )
+            * PERCENTAGE_POINTS,
+        )
+        for injection in INJECTIONS
+    }
+
+
+def check_synthetic_shares(*, frame: pl.DataFrame) -> dict[str, tuple[float, float]]:
+    """Stop unless each injection rule cuts a share of rows inside `SYNTHETIC_SHARE_RANGE`.
+
+    Args:
+        frame: Rows carrying the columns `injected_effects` reads.
+
+    Returns:
+        `injected_effects`' result.
 
     Raises:
         ValueError: Naming each target whose share is outside the range.
     """
-    shares = {
-        target: float(mask.to_numpy().mean())
-        for target, mask in synthetic_rule_masks(frame=frame).items()
-    }
+    effects = injected_effects(frame=frame)
     low, high = SYNTHETIC_SHARE_RANGE
-    bad = {target: share for target, share in shares.items() if not low <= share <= high}
+    bad = {target: share for target, (share, _) in effects.items() if not low <= share <= high}
     if bad:
-        msg = f"a synthetic rule affects a share of rows outside [{low}, {high}]: {bad}"
+        msg = f"an injection rule affects a share of rows outside [{low}, {high}]: {bad}"
         raise ValueError(msg)
-    return shares
+    return effects
 
 
 def build_rows(
@@ -622,7 +646,7 @@ def build_rows(
     frame = with_shuffled_direction(
         frame=with_direction_columns(frame=joined, heights=heights), heights=heights
     )
-    frame = with_synthetic_targets(frame=frame)
+    frame = with_injected_targets(frame=frame)
     frame = assign_folds(dataset=frame)
     arms = arm_columns()
     present = {
@@ -641,12 +665,12 @@ def build_rows(
 
 
 def jobs() -> list[Job]:
-    """Return every fit: the arms at both settings, and the two positive controls.
+    """Return every fit: the arms at both settings, and the four positive controls.
 
     Returns:
-        `REAL_ARMS` at `PRIMARY_SETTING` and at `SENSITIVITY_SETTING`, `SECTOR_CONTROL_ARMS` on
-        `SECTOR_TARGET` at `SECTOR_SETTING`, and `VEER_CONTROL_ARMS` on `VEER_TARGET` at
-        `VEER_SETTING`, all at the primary hyperparameters.
+        `REAL_ARMS` at `PRIMARY_SETTING` and at `SENSITIVITY_SETTING`, and for each injection its
+        control arms (`SECTOR_CONTROL_ARMS` or `VEER_CONTROL_ARMS`) on its target, at the primary
+        hyperparameters, with the injection's target name as the setting.
     """
     columns = arm_columns()
     fits: list[Job] = []
@@ -657,12 +681,18 @@ def jobs() -> list[Job]:
         fits += [
             (arm, setting, "power_mw", columns[arm], hyper_parameters, False) for arm in REAL_ARMS
         ]
-    for setting, target, arms in (
-        (SECTOR_SETTING, SECTOR_TARGET, SECTOR_CONTROL_ARMS),
-        (VEER_SETTING, VEER_TARGET, VEER_CONTROL_ARMS),
-    ):
+    for injection in INJECTIONS:
+        arms = SECTOR_CONTROL_ARMS if injection.rule == "sector" else VEER_CONTROL_ARMS
         fits += [
-            (arm, setting, target, columns[arm], PRIMARY_HYPER_PARAMETERS, False) for arm in arms
+            (
+                arm,
+                injection.target,
+                injection.target,
+                columns[arm],
+                PRIMARY_HYPER_PARAMETERS,
+                False,
+            )
+            for arm in arms
         ]
     return fits
 
@@ -797,7 +827,7 @@ def interval_record(
         losses: One setting's per-row losses for both arms, restricted to the scope.
         contrast: The pairing.
         setting: The setting the losses came from.
-        scope: A label for the rows: `all`, a farm label, or a half of the year.
+        scope: A label for the rows: `all`, a farm label, or a calendar year.
 
     Returns:
         A record with the differences in percentage points of capacity, the 95% interval, the
@@ -841,20 +871,17 @@ def interval_record(
     }
 
 
-def _half_of_year(*, losses: pl.DataFrame, half: str) -> pl.DataFrame:
-    """Restrict losses to October to March (`winter`) or April to September (`summer`).
+def _year(*, losses: pl.DataFrame, year: int) -> pl.DataFrame:
+    """Restrict losses to one calendar year.
 
     Args:
         losses: Per-row losses carrying `time`.
-        half: `winter` or `summer`.
+        year: The calendar year.
 
     Returns:
-        The rows in that half.
+        The rows in that year.
     """
-    month = pl.col("time").dt.month()
-    return losses.filter(
-        (month >= 10) | (month <= 3) if half == "winter" else month.is_between(4, 9)
-    )
+    return losses.filter(pl.col("time").dt.year() == year)
 
 
 def contrast_records(*, losses: pl.DataFrame, sites: list[str]) -> pl.DataFrame:
@@ -867,8 +894,8 @@ def contrast_records(*, losses: pl.DataFrame, sites: list[str]) -> pl.DataFrame:
     Returns:
         One row per (setting, scope, contrast). The planned contrasts, the exploratory contrasts and
         the negative controls run on all rows at both real-target settings. The planned contrasts
-        also run per farm and per half of the year at the primary setting (exploratory splits).
-        Each positive control runs on its own synthetic target.
+        also run per farm and per calendar year at the primary setting (exploratory splits).
+        Each positive control runs on its own injected target.
     """
     by_setting = {
         setting: losses.filter(pl.col("setting") == setting)
@@ -884,7 +911,8 @@ def contrast_records(*, losses: pl.DataFrame, sites: list[str]) -> pl.DataFrame:
         ]
     primary = by_setting[PRIMARY_SETTING]
     splits = [(site, primary.filter(pl.col("site") == site)) for site in sites]
-    splits += [(half, _half_of_year(losses=primary, half=half)) for half in ("winter", "summer")]
+    years = sorted(primary["time"].dt.year().unique().to_list())
+    splits += [(f"year {year}", _year(losses=primary, year=year)) for year in years]
     for contrast in PLANNED_CONTRASTS:
         records += [
             interval_record(
@@ -937,8 +965,13 @@ def absolute_records(*, losses: pl.DataFrame) -> pl.DataFrame:
     return pl.DataFrame(records)
 
 
+PRIOR_TOLERANCE: Final[float] = 1e-6
+"""The largest absolute difference in a per-row loss, as a fraction of capacity, that
+`prior_agreement` accepts between this run's speed-only arms and the prerequisite study's."""
+
+
 def prior_agreement(*, losses: pl.DataFrame, prior_path: Path = PRIOR_LOSSES_PATH) -> list[str]:
-    """Compare the two speed-only arms' per-row losses with the prerequisite study's.
+    """Stop unless the two speed-only arms reproduce the prerequisite study's per-row losses.
 
     The two arms have the same columns, rows, folds, seeds and settings as in the prerequisite
     study, so the losses should be identical on the same device.
@@ -949,10 +982,16 @@ def prior_agreement(*, losses: pl.DataFrame, prior_path: Path = PRIOR_LOSSES_PAT
 
     Returns:
         One report line per arm with the largest absolute difference and the number of rows
-        compared, or a line saying the prior file is absent.
+        compared.
+
+    Raises:
+        FileNotFoundError: If the prerequisite study's losses are absent.
+        ValueError: If an arm's rows do not all match, or the largest difference exceeds
+            `PRIOR_TOLERANCE`.
     """
     if not prior_path.exists():
-        return [f"{prior_path.name} is absent, so no comparison was made."]
+        msg = f"{prior_path} is absent, so the speed-only arms cannot be checked against it"
+        raise FileNotFoundError(msg)
     prior = pl.read_parquet(prior_path).filter(pl.col("setting") == PRIMARY_SETTING)
     lines = []
     for arm in ("speed_10m", "speed_100m"):
@@ -960,12 +999,60 @@ def prior_agreement(*, losses: pl.DataFrame, prior_path: Path = PRIOR_LOSSES_PAT
         theirs = prior.filter(pl.col("arm") == arm)
         joined = ours.join(theirs, on=["site", "time", "seed"], suffix="_prior")
         gap = float(np.abs(joined[METRIC].to_numpy() - joined[f"{METRIC}_prior"].to_numpy()).max())
+        if joined.height != ours.height or joined.height != theirs.height or gap > PRIOR_TOLERANCE:
+            msg = (
+                f"{arm} does not reproduce the prerequisite study: {joined.height:,} rows joined "
+                f"of {ours.height:,} here and {theirs.height:,} there, "
+                f"largest difference {gap:.3g} "
+                f"against a tolerance of {PRIOR_TOLERANCE}"
+            )
+            raise ValueError(msg)
         lines.append(
             f"- `{arm}`: largest absolute difference from the prerequisite study's per-row loss "
-            f"{gap:.3g} over {joined.height:,} rows "
-            f"({ours.height:,} here, {theirs.height:,} there)."
+            f"{gap:.3g} over {joined.height:,} rows."
         )
     return lines
+
+
+def direction_by_year(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Summarise the 100 m direction and the veer for each calendar year.
+
+    The prerequisite study's era check scans CERRA's speed for a step at any month and names no
+    production-stream boundary, so this script compares years. A change of production stream
+    inside the record would show as a year whose circular mean or veer distribution differs from
+    its neighbours.
+
+    Args:
+        frame: Rows carrying `time`, `wind_direction_100m` and `veer_deg_10_100m`.
+
+    Returns:
+        One row per year with `rows`, `circular_mean_deg` of the 100 m direction, and the
+        `veer_median_deg`, `veer_p95_deg` and `veer_share_ge_threshold` of the signed veer.
+    """
+    sin, cos = sine_cosine(direction_deg=pl.col("wind_direction_100m"))
+    return (
+        frame.group_by(year=pl.col("time").dt.year())
+        .agg(
+            rows=pl.len(),
+            mean_sin=sin.mean(),
+            mean_cos=cos.mean(),
+            veer_median_deg=pl.col("veer_deg_10_100m").median(),
+            veer_p95_deg=pl.col("veer_deg_10_100m").quantile(0.95),
+            veer_share_ge_threshold=(pl.col("veer_deg_10_100m") >= VEER_THRESHOLD_DEG).mean(),
+        )
+        .with_columns(
+            circular_mean_deg=pl.arctan2(pl.col("mean_sin"), pl.col("mean_cos")).degrees() % 360.0
+        )
+        .select(
+            "year",
+            "rows",
+            "circular_mean_deg",
+            "veer_median_deg",
+            "veer_p95_deg",
+            "veer_share_ge_threshold",
+        )
+        .sort("year")
+    )
 
 
 CONTRAST_HEADER: Final[tuple[str, str]] = (
@@ -1035,7 +1122,7 @@ def report_lines(
     job_list: list[Job],
     file_lines: list[str],
     prior_lines: list[str],
-    shares: dict[str, float],
+    effects: dict[str, tuple[float, float]],
 ) -> list[str]:
     """Assemble the report the page quotes.
 
@@ -1046,7 +1133,7 @@ def report_lines(
         job_list: Every fit.
         file_lines: `check_direction_files`' lines.
         prior_lines: `prior_agreement`'s lines.
-        shares: `check_synthetic_shares`' result.
+        effects: `check_synthetic_shares`' result.
 
     Returns:
         Markdown lines.
@@ -1072,9 +1159,33 @@ def report_lines(
         "",
         *prior_lines,
         "",
-        "#### Synthetic targets",
+        "#### Injected targets (positive controls)",
         "",
-        *(f"- `{target}`: the rule cuts {share:.1%} of rows." for target, share in shares.items()),
+        (
+            "Each target is the real power times one minus the loss on the rule's rows. The "
+            "veer rule cuts a signed veer of at least "
+            f"{VEER_THRESHOLD_DEG:.0f} degrees, clockwise with height."
+        ),
+        "",
+        *(
+            f"- `{target}`: the rule cuts {share:.1%} of rows, a mean injected effect of "
+            f"{effect:.3f} pp of capacity over all rows."
+            for target, (share, effect) in effects.items()
+        ),
+        "",
+        "#### Direction and veer by calendar year (era check)",
+        "",
+        (
+            "| Year | Rows | 100 m circular mean (degrees) | Veer median | Veer 95th percentile "
+            "| Share at or above threshold |"
+        ),
+        "|---|---|---|---|---|---|",
+        *(
+            f"| {row['year']} | {row['rows']:,} | {row['circular_mean_deg']:.1f} "
+            f"| {row['veer_median_deg']:.2f} | {row['veer_p95_deg']:.2f} "
+            f"| {row['veer_share_ge_threshold']:.1%} |"
+            for row in direction_by_year(frame=frame).iter_rows(named=True)
+        ),
         "",
         *_arm_columns_lines(job_list=job_list),
         "",
@@ -1106,7 +1217,7 @@ def report_lines(
             ),
         ),
         (
-            "Planned contrasts by farm and half of the year (exploratory splits)",
+            "Planned contrasts by farm and calendar year (exploratory splits)",
             intervals.filter(pl.col("scope") != "all"),
         ),
         (
@@ -1114,14 +1225,16 @@ def report_lines(
             pooled.filter(pl.col("treatment").is_in([c.treatment for c in NEGATIVE_CONTROLS])),
         ),
         (
-            "Positive controls (synthetic targets)",
+            "Positive controls (injected targets)",
             pooled.filter(pl.col("setting").is_in(CONTROL_SETTINGS)),
         ),
     ):
         lines += [f"#### {title}", "", *_contrast_lines(records=selection), ""]
-    for setting, arms in ((SECTOR_SETTING, SECTOR_CONTROL_ARMS), (VEER_SETTING, VEER_CONTROL_ARMS)):
+    for injection in INJECTIONS:
+        setting = injection.target
+        arms = SECTOR_CONTROL_ARMS if injection.rule == "sector" else VEER_CONTROL_ARMS
         lines += [
-            f"#### Absolute error on the synthetic target, `{setting}`",
+            f"#### Absolute error on the injected target, `{setting}`",
             "",
             *_absolute_lines(absolute=absolute, setting=setting, arms=arms),
             "",
@@ -1130,7 +1243,7 @@ def report_lines(
 
 
 def check_positive_controls(*, intervals: pl.DataFrame) -> None:
-    """Stop unless the two gating positive controls recover their synthetic effects.
+    """Stop unless the gating positive controls recover their injected effects.
 
     Args:
         intervals: `contrast_records`' frame.
@@ -1139,7 +1252,9 @@ def check_positive_controls(*, intervals: pl.DataFrame) -> None:
         ValueError: Naming each gating control whose upper 95% bound is not below zero.
     """
     failed = []
-    for contrast, setting in POSITIVE_CONTROLS[:2]:
+    for contrast, setting in POSITIVE_CONTROLS:
+        if setting not in GATING_TARGETS:
+            continue
         row = intervals.filter(
             (pl.col("setting") == setting)
             & (pl.col("treatment") == contrast.treatment)
@@ -1208,13 +1323,25 @@ def check() -> int:
         wind=wind, direction=direction, half_hourly=half_hourly, sites=sites, heights=present
     )
     shared = check_same_rows_as_prior(frame=frame)
-    shares = check_synthetic_shares(frame=frame)
+    effects = check_synthetic_shares(frame=frame)
+    if not PRIOR_LOSSES_PATH.exists():
+        msg = f"{PRIOR_LOSSES_PATH} is absent, so the run's agreement check could not pass"
+        raise FileNotFoundError(msg)
     refuse_to_overwrite(paths=[OUTPUT_DIR / name for name in OUTPUT_NAMES])
     out = [
         "arm and setting checks passed",
         *lines,
         f"row set: {frame.height:,} rows, {shared:,} keys equal to the prerequisite study's",
-        f"synthetic rule shares: {shares}",
+        *(
+            f"{target}: rule cuts {share:.1%} of rows, mean injected effect {effect:.3f} pp"
+            for target, (share, effect) in effects.items()
+        ),
+        *(
+            f"{row['year']}: {row['rows']:,} rows, 100 m circular mean "
+            f"{row['circular_mean_deg']:.0f} degrees, veer 95th percentile "
+            f"{row['veer_p95_deg']:.1f} degrees"
+            for row in direction_by_year(frame=frame).iter_rows(named=True)
+        ),
         f"heights present: {present}; missing files: {missing_direction_files() or 'none'}",
         "outputs: none exist",
     ]
@@ -1255,7 +1382,7 @@ def main() -> int:
         wind=wind, direction=direction, half_hourly=half_hourly, sites=sites, heights=HEIGHTS_M
     )
     check_same_rows_as_prior(frame=frame)
-    shares = check_synthetic_shares(frame=frame)
+    effects = check_synthetic_shares(frame=frame)
     fingerprint = _fingerprint(frame=frame, job_list=job_list)
     paths = {name: OUTPUT_DIR / name for name in OUTPUT_NAMES}
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -1267,23 +1394,22 @@ def main() -> int:
                 "seed set, or hyperparameter setting than this code now produces"
             )
             raise ValueError(msg)
-        losses = pl.read_parquet(paths["losses.parquet"])
         refuse_to_overwrite(
             paths=[paths["report.md"], paths["intervals.parquet"], paths["absolute.parquet"]]
         )
+        losses = pl.read_parquet(paths["losses.parquet"])
     else:
         refuse_to_overwrite(paths=list(paths.values()))
         losses = run_all(dataset=frame, jobs=job_list, max_workers=MAX_WORKERS)
-        check_same_rows(losses=losses)
         losses.write_parquet(paths["losses.parquet"])
-        paths["losses.fingerprint"].write_text(fingerprint)
         frame.write_parquet(paths["rows.parquet"])
+        check_same_rows(losses=losses)
+        paths["losses.fingerprint"].write_text(fingerprint)
 
     farms = sorted(frame["site"].unique().to_list())
+    prior_lines = prior_agreement(losses=losses)
     intervals = contrast_records(losses=losses, sites=farms)
     absolute = absolute_records(losses=losses)
-    intervals.write_parquet(paths["intervals.parquet"])
-    absolute.write_parquet(paths["absolute.parquet"])
     report = "\n".join(
         report_lines(
             frame=frame,
@@ -1291,10 +1417,12 @@ def main() -> int:
             absolute=absolute,
             job_list=job_list,
             file_lines=file_lines,
-            prior_lines=prior_agreement(losses=losses),
-            shares=shares,
+            prior_lines=prior_lines,
+            effects=effects,
         )
     )
+    intervals.write_parquet(paths["intervals.parquet"])
+    absolute.write_parquet(paths["absolute.parquet"])
     paths["report.md"].write_text(report)
     sys.stdout.write(report)
     check_positive_controls(intervals=intervals)

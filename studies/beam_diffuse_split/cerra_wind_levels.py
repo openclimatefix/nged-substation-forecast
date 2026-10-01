@@ -100,6 +100,7 @@ from studies.reanalysis_wind import (
     join_centred_power,
     read_cerra_wind,
 )
+from studies.wind_direction import shuffled_by_month
 from weather_products import METRIC, PERCENTAGE_POINTS, _mae
 
 _LOG: Final[logging.Logger] = logging.getLogger("cerra_wind_levels")
@@ -355,43 +356,6 @@ def check_settings(*, job_list: list[Job], max_workers: int = MAX_WORKERS) -> No
         raise ValueError(msg)
 
 
-def _shuffled_by_month(
-    *, values: np.ndarray, months: np.ndarray, generator: np.random.Generator
-) -> np.ndarray:
-    """Fill each month's rows with the values of a different month, so no row keeps its own.
-
-    The months are put in a random cyclic order and each takes its successor's values, repeated or
-    cut to its own row count. Every column keeps a realistic distribution and diurnal spacing, and
-    carries no information about the hour it sits on.
-
-    Args:
-        values: One column of one farm's values in time order.
-        months: Each row's month label.
-        generator: The random source.
-
-    Returns:
-        An array shaped like `values`.
-
-    Raises:
-        ValueError: If the rows hold fewer than two months.
-    """
-    unique = np.unique(months)
-    if len(unique) < 2:
-        msg = "shuffling by month needs at least two months"
-        raise ValueError(msg)
-    order = generator.permutation(len(unique))
-    donor = {
-        unique[order[position]]: unique[order[(position + 1) % len(unique)]]
-        for position in range(len(unique))
-    }
-    shuffled = np.empty_like(values)
-    for month in unique:
-        rows = np.flatnonzero(months == month)
-        donor_values = values[months == donor[month]]
-        shuffled[rows] = donor_values[np.arange(len(rows)) % len(donor_values)]
-    return shuffled
-
-
 def with_shuffled_levels(*, frame: pl.DataFrame) -> pl.DataFrame:
     """Add `speed_100m_noise`'s four information-free columns.
 
@@ -411,7 +375,7 @@ def with_shuffled_levels(*, frame: pl.DataFrame) -> pl.DataFrame:
         for site_index, site in enumerate(sorted(set(sites))):
             rows = sites == site
             generator = np.random.default_rng((NOISE_SEED, height, site_index))
-            shuffled[rows] = _shuffled_by_month(
+            shuffled[rows] = shuffled_by_month(
                 values=values[rows], months=months[rows], generator=generator
             )
         columns[shuffled_column(height_m=height)] = shuffled
