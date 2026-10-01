@@ -1672,3 +1672,59 @@ def test_every_point_is_filled_when_condition_colours_are_given() -> None:
     points = _mark_dicts(spec, "point")
     assert points
     assert all(m["filled"] is True for m in points)
+
+
+def _four_rows() -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "label": [f"row {index}" for index in range(4)],
+            "family": ["weather model"] * 4,
+            "difference": [-1.5, 0.25, -0.5, 0.0],
+            "lower_95": [-2.0, 0.125, -1.0, -0.25],
+            "upper_95": [-1.0, 0.5, 0.0, 0.25],
+        }
+    )
+
+
+def test_row_bands_cover_every_second_row_in_the_given_order():
+    spec = _panel(_four_rows(), row_bands=True)
+    (band,) = _layer(spec, "bar")
+
+    assert [row["label"] for row in _values(spec, band)] == ["row 1", "row 3"]
+    assert band["encoding"]["y"]["sort"] == ["row 0", "row 1", "row 2", "row 3"]
+    assert band["mark"]["color"] == ocf.GREY_3
+    assert band["mark"]["opacity"] == 0.35
+    assert band["encoding"]["y"]["scale"] == {"paddingInner": 0}
+    assert band["mark"]["height"] == {"band": 1}
+    assert band["encoding"]["x"] == {"value": 0}
+    assert band["encoding"]["x2"] == {"value": PLOT_WIDTH_PX}
+
+
+def test_row_bands_draw_beneath_every_other_layer():
+    spec = _panel(_four_rows(), row_bands=True)
+
+    assert spec["layer"][0]["mark"]["type"] == "bar"
+    assert [layer["mark"]["type"] for layer in spec["layer"]].count("bar") == 1
+
+
+def test_a_row_with_two_marks_is_banded_as_one_row():
+    rows = _four_rows().with_columns(
+        other_difference=pl.Series([None, -0.25, None, None], dtype=pl.Float64),
+        other_lower_95=pl.Series([None, -0.5, None, None], dtype=pl.Float64),
+        other_upper_95=pl.Series([None, 0.0, None, None], dtype=pl.Float64),
+    )
+    spec = _panel(rows, row_bands=True)
+    (band,) = _layer(spec, "bar")
+
+    assert [row["label"] for row in _values(spec, band)] == ["row 1", "row 3"]
+
+
+def test_a_single_row_has_no_band():
+    assert _layer(_panel(_rows(["satellite"]), row_bands=True), "bar") == []
+
+
+def test_the_default_draws_no_bands_and_matches_row_bands_false():
+    default = _panel(_four_rows())
+
+    assert _layer(default, "bar") == []
+    assert default == _panel(_four_rows(), row_bands=False)
