@@ -1038,8 +1038,8 @@ def prior_agreement(*, losses: pl.DataFrame, prior_path: Path = PRIOR_LOSSES_PAT
 ERA_MEAN_DEG: Final[float] = 30.0
 ERA_VEER_P95_DEG: Final[float] = 10.0
 """A full year `differs from its neighbours` when its 100 m circular mean is more than
-`ERA_MEAN_DEG` degrees from the median of the other full years' circular means, or its veer 95th
-percentile is more than `ERA_VEER_P95_DEG` degrees from the median of theirs. The full years' own
+`ERA_MEAN_DEG` degrees from the circular mean of the other full years' circular means, or its
+veer 95th percentile is more than `ERA_VEER_P95_DEG` degrees from the median of theirs. The full years' own
 circular means span 23 degrees, so 30 degrees sits outside that spread."""
 
 
@@ -1105,20 +1105,16 @@ def direction_by_year(*, frame: pl.DataFrame) -> pl.DataFrame:
         if row["months"] != MONTHS_PER_YEAR or not others:
             row["differs"] = None
             continue
-        mean_gap = abs(
-            (
-                row["circular_mean_deg"]
-                - float(np.median([other["circular_mean_deg"] for other in others]))
-                + 180.0
-            )
-            % 360.0
-            - 180.0
+        others_radians = np.radians([other["circular_mean_deg"] for other in others])
+        others_mean_deg = float(
+            np.degrees(np.arctan2(np.sin(others_radians).mean(), np.cos(others_radians).mean()))
         )
+        mean_gap = abs((row["circular_mean_deg"] - others_mean_deg + 180.0) % 360.0 - 180.0)
         veer_gap = abs(
             row["veer_p95_deg"] - float(np.median([other["veer_p95_deg"] for other in others]))
         )
         row["differs"] = mean_gap > ERA_MEAN_DEG or veer_gap > ERA_VEER_P95_DEG
-    return pl.DataFrame(rows).select(
+    return pl.DataFrame(rows, schema_overrides={"differs": pl.Boolean}).select(
         "year",
         "rows",
         "months",
@@ -1254,7 +1250,7 @@ def report_lines(
             "A year with fewer than 12 months is partial, is never flagged, and is left out of the "
             f"per-year contrast splits. A full year differs when its 100 m circular mean is over "
             f"{ERA_MEAN_DEG:.0f} degrees, or its veer 95th percentile over {ERA_VEER_P95_DEG:.0f} "
-            "degrees, from the median of the other full years."
+            "degrees, from the other full years (circular mean for direction, median for veer)."
         ),
         "",
         (
@@ -1334,12 +1330,15 @@ def check_positive_controls(*, intervals: pl.DataFrame) -> None:
         intervals: `contrast_records`' frame.
 
     Raises:
-        ValueError: Naming each gating control whose upper 95% bound is not below zero.
+        ValueError: If the pairs checked differ from `GATING_CONTRASTS`, or naming each gating
+            control whose upper 95% bound is not below zero.
     """
     failed = []
+    checked: set[tuple[str, str]] = set()
     for contrast, setting in POSITIVE_CONTROLS:
         if (contrast.treatment, setting) not in GATING_CONTRASTS:
             continue
+        checked.add((contrast.treatment, setting))
         row = intervals.filter(
             (pl.col("setting") == setting)
             & (pl.col("treatment") == contrast.treatment)
@@ -1351,6 +1350,9 @@ def check_positive_controls(*, intervals: pl.DataFrame) -> None:
                 f"{row['difference_pp']:+.3f} pp "
                 f"[{row['lower_95_pp']:+.3f}, {row['upper_95_pp']:+.3f}]"
             )
+    if checked != set(GATING_CONTRASTS):
+        msg = f"the gate checked {sorted(checked)} but must check {sorted(GATING_CONTRASTS)}"
+        raise ValueError(msg)
     if failed:
         msg = (
             f"a positive control failed, so a null on the real target is not 'no effect': {failed}"
