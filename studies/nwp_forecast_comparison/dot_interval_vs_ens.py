@@ -1391,14 +1391,21 @@ def write_svg(*, path: Path, chart: alt.VConcatChart, replace: bool, svgo: bool)
             beside it, and swapped in last, so a failure leaves the old SVG in place.
         svgo: Whether to optimise the SVG.
     """
-    target = path.with_name(f"{path.stem}.draft.svg") if replace else path
-    if replace:
-        target.unlink(missing_ok=True)
-    write_once(path=target, write=chart)
-    if svgo:
-        optimise(path=target)
-    if replace:
-        target.replace(path)
+    if not replace:
+        write_once(path=path, write=chart)
+        if svgo:
+            optimise(path=path)
+        return
+    draft = path.with_name(f"{path.stem}.draft.svg")
+    draft.unlink(missing_ok=True)
+    try:
+        write_once(path=draft, write=chart)
+        if svgo:
+            optimise(path=draft)
+    except BaseException:
+        draft.unlink(missing_ok=True)
+        raise
+    draft.replace(path)
 
 
 def repo_data_dir() -> Path:
@@ -1446,7 +1453,7 @@ def main() -> int:
         action="store_true",
         help=(
             "Redraw only the SVGs, replacing any that exist, and write nothing to --output-dir, "
-            "which must already hold the first run's files."
+            "which must already exist."
         ),
     )
     parser.add_argument(

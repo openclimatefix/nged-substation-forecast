@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 from functools import cache
 from pathlib import Path
 
+import altair as alt
 import polars as pl
 import pytest
 
@@ -11,6 +12,7 @@ _STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "nwp_forecast_com
 sys.path.insert(0, str(_STUDY_DIR))
 sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
 
+import dot_interval_vs_ens as module  # noqa: E402
 from dot_interval_vs_ens import (  # noqa: E402
     BLEND_PRODUCTS,
     FIRST_FIGURE_NUMBER,
@@ -34,6 +36,7 @@ from dot_interval_vs_ens import (  # noqa: E402
     report_text,
     subtitle_lines,
     write_once,
+    write_svg,
 )
 from nwp_forecast_comparison import DomainType  # noqa: E402
 
@@ -733,6 +736,70 @@ def test_write_once_refuses_to_overwrite(tmp_path: Path) -> None:
     with pytest.raises(FileExistsError):
         write_once(path=path, write="second")
     assert path.read_text() == "first"
+
+
+def _tiny_chart() -> alt.VConcatChart:
+    return alt.vconcat(alt.Chart(pl.DataFrame({"x": [1.0]})).mark_text(text="x"))
+
+
+def test_write_svg_replaces_an_existing_svg_and_leaves_no_draft(tmp_path: Path) -> None:
+    path = tmp_path / "figure.svg"
+    path.write_text("old")
+
+    write_svg(path=path, chart=_tiny_chart(), replace=True, svgo=False)
+
+    assert path.read_text().startswith("<svg")
+    assert [p.name for p in tmp_path.iterdir()] == ["figure.svg"]
+
+
+def test_write_svg_without_replace_refuses_an_existing_svg(tmp_path: Path) -> None:
+    path = tmp_path / "figure.svg"
+    path.write_text("old")
+
+    with pytest.raises(FileExistsError):
+        write_svg(path=path, chart=_tiny_chart(), replace=False, svgo=False)
+    assert path.read_text() == "old"
+
+
+def test_write_svg_keeps_the_old_svg_until_the_new_one_is_optimised(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "figure.svg"
+    path.write_text("old")
+    seen: list[str] = []
+
+    def fake_optimise(*, path: Path) -> None:
+        seen.append((path.parent / "figure.svg").read_text())
+        assert path.name == "figure.draft.svg"
+        assert path.read_text().startswith("<svg")
+
+    monkeypatch.setattr(module, "optimise", fake_optimise)
+
+    write_svg(path=path, chart=_tiny_chart(), replace=True, svgo=True)
+
+    assert seen == ["old"]
+    assert path.read_text().startswith("<svg")
+
+
+@pytest.mark.parametrize("failing", ["write_once", "optimise"])
+def test_a_failure_while_replacing_leaves_the_old_svg_and_no_draft(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failing: str
+) -> None:
+    path = tmp_path / "figure.svg"
+    path.write_text("old")
+
+    def fail(**_: object) -> None:
+        (tmp_path / "figure.draft.svg").write_text("partial")
+        msg = "boom"
+        raise RuntimeError(msg)
+
+    monkeypatch.setattr(module, failing, fail)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        write_svg(path=path, chart=_tiny_chart(), replace=True, svgo=True)
+
+    assert path.read_text() == "old"
+    assert [p.name for p in tmp_path.iterdir()] == ["figure.svg"]
 
 
 _PAGE_DATA = repo_data_dir() / "studies"
