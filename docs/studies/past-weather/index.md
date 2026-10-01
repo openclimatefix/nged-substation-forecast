@@ -20,9 +20,10 @@ history, historical features, and disaggregation, and each reads one weather pro
   five, about half of its gap to ICON-EU a pair of steps in the wind Open-Meteo's archive serves for
   it at one generator.
 - [CERRA's and NORA3's wind against ERA5's](reanalysis-wind.md) — at the three wind farms, an
-  XGBoost model given CERRA's 100 m wind has a higher error than one given ERA5's, mostly at one
-  farm, and one given NORA3's 100 m wind does not differ clearly from ERA5's. The page does not rank
-  CERRA against NORA3, and ICON-D2 has the lowest error in both blocks.
+  XGBoost model given CERRA's 100 m wind has a higher error than an XGBoost model given ERA5's,
+  mostly at one farm, and an XGBoost model given NORA3's 100 m wind does not differ clearly from
+  ERA5's. The page does not rank CERRA against NORA3, and ICON-D2 has the lowest estimated error in
+  both blocks.
 - [Does blending CERRA's wind heights beat one height?](cerra-wind-levels.md) — at three wind
   farms, an XGBoost model given CERRA's 10 m and 100 m wind speeds has lower error than one given
   100 m alone, and the pair gives most of the gain of using four or five heights. CERRA is a

@@ -4,12 +4,16 @@ Reads the two write-once folders `reanalysis_past_wind.py` wrote, `wind_cerra` a
 under `past_weather_v2/`. Every drawn number is recomputed from `losses.parquet` with the same
 month-and-seed resampling the fit script used, and **the script stops before drawing unless each
 recomputed number rounds to the number the folder's `report.md` prints.** Nothing is refitted and
-nothing is written under `data/`.
+nothing is written under `data/` except each `per_site.md`.
 
 Each product is one block, scored on its own rows, so the two blocks are not comparable with each
-other: CERRA's rows are 1 hour in 3, and the two blocks' ERA5 rows differ. The script also prints,
-to its log, each product's contrast with ERA5 at each farm, which the page quotes. Generators
-appear only as `W1` to `W3`, and no chart carries a calendar date.
+other: CERRA's rows are 1 hour in 3, and the two blocks' ERA5 rows differ. The script also writes
+a new `per_site.md` beside each report, holding the contrasts the page quotes per farm, each with
+its 95% interval from resampling months within that farm, and the three drawn contrasts the fit
+report does not print (UKV, ICON-EU, and ICON global minus ERA5). `_check_contrasts` skips those
+three, because the report prints only the contrasts it names, so `per_site.md` is where a committed
+script prints them. It never touches `losses.parquet`, `losses.fingerprint`, or `report.md`.
+Generators appear only as `W1` to `W3`, and no chart carries a calendar date.
 
 Run it with `uv run python studies/beam_diffuse_split/reanalysis_past_wind_charts.py`. Optimise
 each SVG with `npx svgo@4 --multipass --precision=1 --final-newline` before committing it.
@@ -24,6 +28,7 @@ from typing import Final, NamedTuple
 
 import polars as pl
 from sources import UPDATE_OUTPUT_DIR
+from studies.bootstrap import BootstrapInterval, bootstrap_difference
 from studies.charts import (
     PERCENTAGE_POINTS,
     BlockArm,
@@ -47,6 +52,9 @@ ASSETS_DIR: Final[Path] = Path(__file__).resolve().parents[2] / "docs" / "studie
 
 METRIC: Final[str] = "absolute_error_capped_fraction_of_capacity"
 """The loss column the fit script averages."""
+
+PER_SITE_FILE: Final[str] = "per_site.md"
+"""The new file written beside each fit report."""
 
 PRIMARY: Final[str] = "pooled"
 SECOND: Final[str] = "sensitivity"
@@ -107,23 +115,21 @@ PRODUCTS: Final[tuple[Product, ...]] = (
 
 REFERENCE_ARM: Final[str] = "era5_wind"
 D2_ARM: Final[str] = "icon_d2_wind"
+UNPRINTED_ARMS: Final[tuple[tuple[str, str], ...]] = (
+    ("ukv_wind", "UKV"),
+    ("icon_eu_wind", "ICON-EU"),
+    ("icon_global_wind", "ICON global"),
+)
+"""The arms whose contrast with ERA5 Figure 2 draws and the fit report does not print."""
 
 BLOCKS_NOT_COMPARABLE: Final[str] = (
-    "Compare arms only within a block: the blocks differ in rows, hours of the day, period, and "
-    "fitted XGBoost models, and even their ERA5 rows differ, so no CERRA row is comparable with "
-    "any NORA3 row."
+    "The two blocks are scored on different rows, so compare arms only within a block."
 )
 DOTS: Final[str] = (
-    "Dot: estimate. Line: 95% interval from resampling whole calendar months, each with all three "
-    "farms' rows, and a fitting seed. The interval does not cover variation between the three "
-    "farms."
+    "Dot: estimate. Line: 95% interval from resampling calendar months and a fitting seed."
 )
 CAPACITY: Final[str] = (
-    "Errors are a fraction of each generator's 99th-percentile output, not its nameplate capacity."
-)
-SCOPE: Final[str] = "Three wind farms in Lincolnshire. CERRA and NORA3 are read at 100 m."
-HEIGHTS: Final[str] = (
-    "Wind heights: ERA5, CERRA, and NORA3 at 100 m, the ICON products at 80 m, UKV at 100 m."
+    "Errors are a percentage of each farm's 99th-percentile output, not its nameplate capacity."
 )
 PLANNING_NOTE: Final[str] = (
     "Planned: written into the study plan before the block's first fit, which is the new "
@@ -133,10 +139,7 @@ REFERENCE_NOTE: Final[str] = "The lighter, hollow row is ERA5, scored on that bl
 CONTRAST_REFERENCE_NOTE: Final[str] = (
     "Every contrast in a top panel is against ERA5, scored on that block's own rows."
 )
-CHANCE_NOTE: Final[str] = (
-    "No correction is made for the number of exploratory contrasts, and the contrasts are "
-    "correlated."
-)
+CHANCE_NOTE: Final[str] = "No correction is made for the number of exploratory contrasts."
 
 
 def _read_rows(*, report: str) -> int:
@@ -146,19 +149,6 @@ def _read_rows(*, report: str) -> int:
         msg = "the report has no 'Rows scored here' line"
         raise ValueError(msg)
     return int(match.group(1).replace(",", ""))
-
-
-def _read_shares(*, report: str) -> tuple[float, float]:
-    """Read the avoidable and one-year-only uncovered-month shares from a report."""
-    match = re.search(
-        r"\(avoidable\): ([\d.]+)%; the share in a calendar month seen in one year only, which "
-        r"no fold design can cover: ([\d.]+)%",
-        report,
-    )
-    if match is None:
-        msg = "the report has no uncovered-month line"
-        raise ValueError(msg)
-    return float(match.group(1)), float(match.group(2))
 
 
 def _check_contrasts(
@@ -183,31 +173,105 @@ def _check_contrasts(
         )
 
 
-def per_site_differences(
-    *, losses: pl.DataFrame, treatment: str, reference: str
-) -> dict[str, float]:
-    """Return each site's mean of treatment minus reference error, in points of capacity.
+def per_site_interval(
+    *, losses: pl.DataFrame, site: str, treatment: str, reference: str
+) -> BootstrapInterval:
+    """Return one site's treatment-minus-reference difference and its 95% interval.
+
+    The interval resamples whole calendar months and a fitting seed within the one site, at the
+    primary setting.
 
     Args:
         losses: A `losses.parquet`.
+        site: The anonymised site label, such as `W1`.
         treatment: The arm whose error is the minuend.
         reference: The arm whose error is subtracted.
 
     Returns:
-        Site label to difference, at the primary setting, averaged over seeds.
+        The bootstrap result, with `difference`, `lower_95` and `upper_95` in points of capacity.
     """
-    pivot = (
-        losses.filter(pl.col("setting") == PRIMARY, pl.col("arm").is_in([treatment, reference]))
-        .pivot(on="arm", index=["site", "time", "seed"], values=METRIC)
-        .with_columns(difference=pl.col(treatment) - pl.col(reference))
-        .group_by("site")
-        .agg(pl.col("difference").mean() * PERCENTAGE_POINTS)
-        .sort("site")
+    at_site = losses.filter(pl.col("setting") == PRIMARY, pl.col("site") == site)
+    interval = bootstrap_difference(
+        losses=at_site, treatment=treatment, reference=reference, metric=METRIC
     )
-    return dict(pivot.iter_rows())
+    return {
+        **interval,
+        "difference": interval["difference"] * PERCENTAGE_POINTS,
+        "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
+        "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
+    }
 
 
-def _build(*, product: Product) -> tuple[RowSetBlock, RowSetBlock, tuple[float, float]]:
+def _signed(*, value: float) -> str:
+    """Format a value to three decimals with an explicit sign, as the fit reports do."""
+    return f"{value:+.3f}"
+
+
+def per_site_report(*, product: Product, losses: pl.DataFrame) -> str:
+    """Return the text of one block's `per_site.md`.
+
+    Args:
+        product: The block.
+        losses: The block's `losses.parquet`.
+
+    Returns:
+        Markdown holding each quoted per-farm contrast with its interval, then the drawn contrasts
+        against ERA5 that the fit report does not print.
+    """
+    sites = sorted(losses["site"].unique().to_list())
+    contrasts = [
+        (product.new_arm, REFERENCE_ARM, product.new_label, "ERA5"),
+        *(
+            [(product.new_arm, "icon_global_wind", product.new_label, "ICON global")]
+            if product.key == "nora3"
+            else []
+        ),
+    ]
+    lines = [
+        f"## {product.label}: contrasts by farm",
+        "",
+        (
+            "Points of capacity at the primary setting. Each interval is a 95% bound from "
+            "resampling whole calendar months and a fitting seed within the one farm, so it does "
+            "not cover differences between farms."
+        ),
+        "",
+        "| Contrast | Farm | Difference | 95% interval |",
+        "|---|---|---|---|",
+    ]
+    for treatment, reference, treatment_label, reference_label in contrasts:
+        for site in sites:
+            hit = per_site_interval(
+                losses=losses, site=site, treatment=treatment, reference=reference
+            )
+            lines.append(
+                f"| {treatment_label} minus {reference_label} | {site} | "
+                f"{_signed(value=hit['difference'])} | "
+                f"[{_signed(value=hit['lower_95'])}, {_signed(value=hit['upper_95'])}] |"
+            )
+    lines += [
+        "",
+        f"## {product.label}: drawn contrasts the fit report does not print",
+        "",
+        "All farms, at the primary setting, in points of capacity.",
+        "",
+        "| Contrast | Difference | 95% interval | Rows |",
+        "|---|---|---|---|",
+    ]
+    at_primary = losses.filter(pl.col("setting") == PRIMARY)
+    for arm, label in UNPRINTED_ARMS:
+        hit = bootstrap_difference(
+            losses=at_primary, treatment=arm, reference=REFERENCE_ARM, metric=METRIC
+        )
+        lines.append(
+            f"| {label} minus ERA5 | {_signed(value=hit['difference'] * PERCENTAGE_POINTS)} | "
+            f"[{_signed(value=hit['lower_95'] * PERCENTAGE_POINTS)}, "
+            f"{_signed(value=hit['upper_95'] * PERCENTAGE_POINTS)}] | {hit['n_rows']:,} |"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _build(*, product: Product) -> tuple[RowSetBlock, RowSetBlock]:
     """Build one product's leaderboard block and contrast block, checked against its report."""
     report_path = product.folder / "report.md"
     report = report_path.read_text()
@@ -247,7 +311,7 @@ def _build(*, product: Product) -> tuple[RowSetBlock, RowSetBlock, tuple[float, 
         rows=primary, reference=REFERENCE_ARM, report_path=report_path, setting=PRIMARY
     )
     _check_contrasts(rows=second, reference=REFERENCE_ARM, report_path=report_path, setting=SECOND)
-    contrasts = primary.with_columns(second_difference=second["difference"])
+    contrasts = primary.with_columns(second_difference=second["difference"]).sort("difference")
     pairs = (
         PlannedContrast(by_arm[product.new_arm], by_arm[REFERENCE_ARM]),
         PlannedContrast(by_arm[product.new_arm], by_arm[D2_ARM]),
@@ -265,20 +329,7 @@ def _build(*, product: Product) -> tuple[RowSetBlock, RowSetBlock, tuple[float, 
         rows=planned_second, reference=REFERENCE_ARM, report_path=report_path, setting=SECOND
     )
     planned = planned_primary.with_columns(second_difference=planned_second["difference"])
-    sites = per_site_differences(losses=losses, treatment=product.new_arm, reference=REFERENCE_ARM)
-    _LOG.info(
-        "%s minus ERA5 by site, points of capacity: %s",
-        product.label,
-        {site: round(value, 2) for site, value in sites.items()},
-    )
-    if product.key == "nora3":
-        against_global = per_site_differences(
-            losses=losses, treatment=product.new_arm, reference="icon_global_wind"
-        )
-        _LOG.info(
-            "NORA3 minus ICON global by site, points of capacity: %s",
-            {site: round(value, 2) for site, value in against_global.items()},
-        )
+    (product.folder / PER_SITE_FILE).write_text(per_site_report(product=product, losses=losses))
     dates = "Aug 2024 to Jun 2026" if product.key == "cerra" else "Aug 2024 to Aug 2026"
     return (
         RowSetBlock(
@@ -296,23 +347,12 @@ def _build(*, product: Product) -> tuple[RowSetBlock, RowSetBlock, tuple[float, 
             planned_rows=planned,
             hours_unit="farm-hours",
         ),
-        _read_shares(report=report),
     )
 
 
 def _narrow(*, lines: list[str]) -> list[str]:
     """Wrap each caption line, which keeps it inside the figure's edge."""
     return [piece for line in lines for piece in wrapped(text=line, width=CAPTION_CHARACTERS)]
-
-
-def _share_lines(*, shares: dict[str, tuple[float, float]]) -> list[str]:
-    """State each block's uncovered-month shares, as the Methods page defines them."""
-    return [
-        f"{label}: {avoidable:.1f}% of scored rows are in a calendar month, seen in two or more "
-        f"years, with no training row in their fold, and {one_year:.1f}% are in a calendar month "
-        "seen in one year only, which no fold design can cover."
-        for label, (avoidable, one_year) in shares.items()
-    ]
 
 
 def main() -> int:
@@ -322,26 +362,20 @@ def main() -> int:
     built = [_build(product=product) for product in PRODUCTS]
     leaderboard_blocks = [pair[0] for pair in built]
     contrast_blocks = [pair[1] for pair in built]
-    shares = {product.label: pair[2] for product, pair in zip(PRODUCTS, built, strict=True)}
     leaderboard = stacked_leaderboard(
         blocks=leaderboard_blocks,
         reference_note=REFERENCE_NOTE,
         number=1,
-        title="At three wind farms, ICON-D2's wind has the lowest error in both blocks",
+        title="At three wind farms, ICON-D2's wind has the lowest estimated error in both blocks",
         subtitle=_narrow(
             lines=[
-                "Each arm's own mean absolute error, sorted best first within its block.",
+                "Each arm's mean absolute error, sorted best first within its block. " + CAPACITY,
                 BLOCKS_NOT_COMPARABLE,
                 (
-                    "Overlapping intervals do not show that two arms are equal: every arm's error "
-                    "swings together from month to month, a swing that Figure 2's paired "
-                    "contrasts cancel."
+                    "Overlapping intervals do not show that two arms are equal: Figure 2's paired "
+                    "contrasts cancel the swing the arms share from month to month."
                 ),
-                *_share_lines(shares=shares),
-                HEIGHTS,
                 DOTS,
-                CAPACITY,
-                SCOPE,
             ]
         ),
     )
@@ -355,18 +389,12 @@ def main() -> int:
         subtitle=_narrow(
             lines=[
                 (
-                    "Top panel of each block: each arm's mean absolute error minus ERA5's. Lower "
-                    "panel: that block's two planned contrasts, the first arm's error minus the "
-                    "second's."
+                    "Top panel of each block: each arm's error minus ERA5's, sorted. Lower panel: "
+                    "the block's two planned contrasts, the first arm minus the second."
                 ),
-                "Each arm's own error is in Figure 1.",
                 BLOCKS_NOT_COMPARABLE,
                 CHANCE_NOTE,
-                *_share_lines(shares=shares),
-                HEIGHTS,
                 DOTS,
-                CAPACITY,
-                SCOPE,
             ]
         ),
         planning_note=PLANNING_NOTE,
