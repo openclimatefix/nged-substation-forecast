@@ -333,7 +333,7 @@ overdispersive for a range of upper-air variables".
 stations from July to November 2025. They score raw and post-processed versions of both ensembles.
 Raw AIFS scores worse than raw IFS at every lead time, with a CRPS skill score near -4% and a mean
 absolute error skill score near -3%. Post-processing shrinks the gap, which stays significant only
-at short lead times and at days 14 and 15. Both raw ensembles are strongly under-dispersive.
+at short lead times and in some cases at days 14 and 15. Both raw ensembles are strongly under-dispersive.
 
 **These papers rank weather forecasts against weather observations, which is a different question
 from the one this page answers.** This study fits an XGBoost model for each generator and each arm,
