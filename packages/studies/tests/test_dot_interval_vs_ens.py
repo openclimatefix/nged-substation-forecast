@@ -654,6 +654,40 @@ def test_the_figure_draws_with_its_number(tmp_path: Path) -> None:
     assert "Figure 1:" in str(draw(rows=rows, domain="solar", number=FIRST_FIGURE_NUMBER).to_dict())
 
 
+def _bar_layers_per_panel(spec: dict) -> list[int]:
+    """Count each panel's `bar` layers, a panel being a `layer` chart anywhere in the figure."""
+    if "layer" in spec:
+        return [sum(layer["mark"]["type"] == "bar" for layer in spec["layer"])]
+    return [count for child in spec.get("vconcat", []) for count in _bar_layers_per_panel(child)]
+
+
+def test_row_bands_draw_one_band_layer_in_every_panel(tmp_path: Path) -> None:
+    _full_fixture(tmp_path)
+    rows = compute(data_dir=tmp_path, domain="solar")
+    days = set(rows["day"].to_list())
+
+    banded = _bar_layers_per_panel(
+        draw(rows=rows, domain="solar", number=1, row_bands=True).to_dict()
+    )
+
+    assert banded.count(1) == len(days)
+    assert set(banded) == {1}
+
+
+def test_the_default_figure_and_a_blends_figure_draw_no_bands(tmp_path: Path) -> None:
+    _full_fixture(tmp_path)
+    rows = compute(data_dir=tmp_path, domain="solar")
+
+    default = _bar_layers_per_panel(draw(rows=rows, domain="solar", number=1).to_dict())
+    blends = _bar_layers_per_panel(
+        draw(rows=rows, domain="solar", number=1, blends=True, row_bands=False).to_dict()
+    )
+
+    assert default
+    assert not any(default)
+    assert not any(blends)
+
+
 def test_the_titles_name_the_quantity_and_count_no_rows(tmp_path: Path) -> None:
     assert figure_title(domain="solar") == (
         "For solar power, each weather product's error minus the ENS mean's error, by lead day"

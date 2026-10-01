@@ -176,6 +176,10 @@ multiplying by the panel's longest label inflated every row to the tallest one's
 Where a label carries more than one condition, offset side by side, Vega-Lite's step size is the
 height of one (label, condition) position, not one label, so `interval_panel` divides this by the
 number of conditions sharing a label, and the conditions' bands add back up to this height."""
+
+_ROW_BAND_OPACITY: Final[float] = 0.35
+"""The opacity of `GREY_3` bands: about as light as `GREY_2` on the page background, and
+translucent so the axis gridlines show through."""
 _POINT_SIZE: Final[int] = 70
 _PANEL_TITLE_PX: Final[int] = ocf.font_size(style="Body Large", body_px=11)
 _KEY_TITLE_PX: Final[int] = ocf.font_size(style="Body", body_px=11)
@@ -866,10 +870,12 @@ def interval_panel(
         other_shape: The point shape of the `other_difference` mark, always drawn hollow.
         other_offset_px: How far above and below the row's centre, in pixels, a row with an
             `other_difference` draws its two marks, so the two intervals do not overlap.
-        row_bands: Whether to draw a band of `ocf.GREY_2` behind every second product row, the
-            second, fourth, and so on, so a reader can tell which marks belong to which row label.
-            Each band is as tall as its row, including both marks of a row that has two, and spans
-            the plot's width. The bands are the first layer, so every other mark draws over them.
+        row_bands: Whether to draw a band of `ocf.GREY_3`, at `_ROW_BAND_OPACITY`, behind every
+            second product row, the second, fourth, and so on, so a reader can tell which marks
+            belong to which row label. Each band is as tall as its row, including both marks of a
+            row that has two, with no gap between adjacent rows, and spans the plot's width. The
+            bands are the first layer, and are translucent so the axis gridlines show through
+            them.
 
     Returns:
         The panel, under its keys where it has any.
@@ -1061,7 +1067,8 @@ def _row_band_layers(*, labels: Sequence[str], width: int) -> list[alt.Chart]:
     return [
         alt.Chart(pl.DataFrame({"label": banded}))
         .mark_bar(
-            color=ocf.GREY_2,
+            color=ocf.GREY_3,
+            opacity=_ROW_BAND_OPACITY,
             height={"band": 1},
             stroke=None,
             clip=True,
@@ -1069,7 +1076,12 @@ def _row_band_layers(*, labels: Sequence[str], width: int) -> list[alt.Chart]:
             tooltip=None,
         )
         .encode(  # ty: ignore[unresolved-attribute]
-            y=alt.Y("label:N", sort=list(labels), title=None),
+            y=alt.Y(
+                "label:N",
+                sort=list(labels),
+                title=None,
+                scale=alt.Scale(paddingInner=0),
+            ),
             x=alt.value(0),
             x2=alt.value(width),
         )

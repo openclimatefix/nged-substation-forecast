@@ -7,6 +7,7 @@ import plotting.ocf_theme as ocf
 import polars as pl
 import pytest
 from studies.charts import (
+    _ROW_BAND_OPACITY,
     CONDITION_COLOURS,
     CONTENT_WIDTH_PX,
     CONTRAST_COLUMNS_WITH_MONTHS,
@@ -1692,7 +1693,9 @@ def test_row_bands_cover_every_second_row_in_the_given_order():
 
     assert [row["label"] for row in _values(spec, band)] == ["row 1", "row 3"]
     assert band["encoding"]["y"]["sort"] == ["row 0", "row 1", "row 2", "row 3"]
-    assert band["mark"]["color"] == ocf.GREY_2
+    assert band["mark"]["color"] == ocf.GREY_3
+    assert band["mark"]["opacity"] == _ROW_BAND_OPACITY
+    assert band["encoding"]["y"]["scale"] == {"paddingInner": 0}
     assert band["mark"]["height"] == {"band": 1}
     assert band["encoding"]["x"] == {"value": 0}
     assert band["encoding"]["x2"] == {"value": PLOT_WIDTH_PX}

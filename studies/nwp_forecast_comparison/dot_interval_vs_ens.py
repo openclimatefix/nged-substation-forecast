@@ -39,7 +39,8 @@ WN3 appears only as the pooled row, which covers 7 months (February to April and
 2026). The script writes `report.md`, `intervals.parquet`, and `README.md` to a new output folder,
 and one SVG per technology. It refuses to overwrite any of them, except that `--replace-svgs`
 redraws only the SVGs, with a light grey band behind every second product row, and leaves the
-output folder untouched. The `--blends` figures draw no bands.
+output folder untouched. Each replacement is drawn and optimised beside the old SVG, which is
+swapped out only once the new one is ready.
 
 **`--blends` draws ENS plus one product instead.** Each row is an XGBoost model given the ENS
 mean's columns plus one product's columns (AIFS Single, ICON-EU at the optimistic and at the
@@ -1380,6 +1381,26 @@ def optimise(*, path: Path) -> None:
     )
 
 
+def write_svg(*, path: Path, chart: alt.VConcatChart, replace: bool, svgo: bool) -> None:
+    """Write one figure's SVG, optimised, replacing an existing SVG only once the new one is ready.
+
+    Args:
+        path: The SVG's path.
+        chart: The figure.
+        replace: Whether `path` may already exist. The new SVG is then drawn and optimised
+            beside it, and swapped in last, so a failure leaves the old SVG in place.
+        svgo: Whether to optimise the SVG.
+    """
+    target = path.with_name(f"{path.stem}.draft.svg") if replace else path
+    if replace:
+        target.unlink(missing_ok=True)
+    write_once(path=target, write=chart)
+    if svgo:
+        optimise(path=target)
+    if replace:
+        target.replace(path)
+
+
 def repo_data_dir() -> Path:
     """Return the shared `data/` directory, resolving a linked worktree to the main checkout.
 
@@ -1469,7 +1490,7 @@ def main() -> int:
             domain=domain,
             number=args.first_figure_number + index,
             blends=args.blends,
-            row_bands=not args.blends,
+            row_bands=True,
         )
         for index, domain in enumerate(DOMAINS)
     }
@@ -1487,10 +1508,7 @@ def main() -> int:
                 write=pl.concat(rankings.values(), how="vertical_relaxed"),
             )
     for domain, path in svgs.items():
-        path.unlink(missing_ok=True)
-        write_once(path=path, write=charts[domain])
-        if not args.no_svgo:
-            optimise(path=path)
+        write_svg(path=path, chart=charts[domain], replace=args.replace_svgs, svgo=not args.no_svgo)
         _LOG.info("wrote %s", path)
         sys.stdout.write(f"{domain} caption: {figure_title(domain=domain, blends=args.blends)}\n")
     return 0
