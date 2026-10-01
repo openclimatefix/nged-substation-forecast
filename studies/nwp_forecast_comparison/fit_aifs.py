@@ -3909,7 +3909,8 @@ def require_lookahead_cleared(*, cleared: bool) -> None:
 
     Args:
         cleared: Whether the flag was given. The flag confirms that the run log of
-            `build_wn3_inputs.py --read-store` and the page's lookahead section have been read.
+            `build_wn3_inputs.py --read-store` and the lookahead section of the companion page
+            have been read.
 
     Raises:
         ValueError: If `cleared` is false.
@@ -3917,7 +3918,8 @@ def require_lookahead_cleared(*, cleared: bool) -> None:
     if not cleared:
         msg = (
             "refusing to fit WN3 without --lookahead-cleared: read the run log that "
-            "`build_wn3_inputs.py --read-store` wrote and the lookahead section of the page. "
+            "`build_wn3_inputs.py --read-store` wrote and the lookahead section of the companion "
+            "page. "
             "Every result is reported for in-sample, out-of-sample, and pooled rows."
         )
         raise ValueError(msg)
@@ -3934,7 +3936,8 @@ def main_wn3(*, args: argparse.Namespace) -> int:
 
     Raises:
         ValueError: If `--lookahead-cleared` is absent. The flag confirms that the run log of
-            `build_wn3_inputs.py --read-store` and the page's lookahead section have been read.
+            `build_wn3_inputs.py --read-store` and the lookahead section of the companion page
+            have been read.
     """
     require_lookahead_cleared(cleared=args.lookahead_cleared)
     studies_dir = args.published_dir.resolve().parent
@@ -4118,7 +4121,7 @@ def main() -> int:
         "--lookahead-cleared",
         action="store_true",
         help="With --wn3: confirm that the run log of `build_wn3_inputs.py --read-store` and the "
-        "page's lookahead section have been read.",
+        "lookahead section of the companion page have been read.",
     )
     parser.add_argument(
         "--p4-controls",
