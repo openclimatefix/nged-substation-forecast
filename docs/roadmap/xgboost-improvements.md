@@ -880,12 +880,12 @@ cell. CERRA is the tempting alternative — higher-resolution, and since its 202
 extension no longer stuck at 2021 but running to within a few months of present. But CERRA is a
 *different* model (a HARMONIE-based regional system), so z-scoring ECMWF forecasts against a CERRA
 climatology folds a model-pair bias into every anomaly. (This same model-consistency argument,
-together with ERA5T's near-real-time latency, is why the project now [standardises on
-ERA5](data-sources.md#weather-data) as its single reanalysis for every use — pre-training, capacity
-estimation, and this climatology alike; CERRA stays documented as a higher-resolution option but is
-deprioritised.) The most self-consistent source imaginable would be a climatology from our own
-archived ENS, but a robust day-of-year climatology wants 10+ years and the archive is nowhere near
-that yet, so ERA5 wins in practice.
+together with ERA5T's near-real-time latency, is why [ERA5](data-sources.md#weather-data) is the
+reanalysis planned for capacity estimation and this climatology; CERRA stays documented as a
+higher-resolution option but is deprioritised. Which estimate of past weather to pre-train on is a
+separate [open question](training-history.md#open-questions).) The most self-consistent source
+imaginable would be a climatology from our own archived ENS, but a robust day-of-year climatology
+wants 10+ years and the archive is nowhere near that yet, so ERA5 wins in practice.
 
 **Storage and ingestion — settle the design when the experiment earns it.** The climatology wants
 storing the way the rest of the project stores gridded weather: an **H3-indexed Delta table** keyed
@@ -1002,7 +1002,7 @@ not trade away [principle 8 ("*every experiment is scored
 identically*")](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically):
 the leaderboard measurement is unchanged and stays comparable, and the extrapolation check is an
 *additional* acceptance criterion rather than a substitute score. The feature becomes cleanly
-measurable only once [ERA5 pre-training](training-history.md) extends the training history from one
+measurable only once [pre-training](training-history.md) extends the training history from one
 summer to several.
 
 **Anchor it to init time, and source it from ERA5.** Compute the accumulator once at
@@ -1150,7 +1150,9 @@ roughly 5.5 years, which is what makes the seasonal items on this page cleanly m
 secondarily the holiday, monotone-constraint and global-model items, whose value all turns on
 seasonal or regime coverage the current window does not have. The design, the era-confounding hazard
 that dictates the ingest's scope, and the COVID covariate are on [Extending the training
-history](training-history.md).
+history](training-history.md). For metered wind and solar generators, the pre-training variants are
+also comparison arms in the study of [a new weather product with a few months of
+history](training-history.md#pre-training-then-fine-tuning-becomes-a-comparison-arm-for-wind-and-solar).
 
 **The largest meta-analysis of solar forecasting we have found puts the peak almost exactly where
 5.5 years lands.** [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) pool 4,687 skill
@@ -1428,6 +1430,10 @@ substation under the same weather system, so hundreds of substations during one 
 one storm's worth of evidence. A few years of history therefore hold few independent examples of
 each kind of weather.
 
+**A weather product whose history is too short to train an XGBoost model on could still enter the
+forecast through a small product calibrator**, under research in [A new weather product with a few
+months of history](training-history.md#a-new-weather-product-with-a-few-months-of-history).
+
 **A cheaper first signal needs only ECMWF ENS: check whether its calibration varies with the weather
 situation once lead time is accounted for.** For a single ensemble, [Allen et al.
 (2020)](https://doi.org/10.1002/qj.3806) found that making ensemble model output statistics (EMOS)
@@ -1473,19 +1479,6 @@ exact zeros at night.)
 
 ## Explicitly deferred (not quick, or not skill)
 
-- **A two-stage weather-to-power model (Stage A frozen, Stage B calibrates) is the classical "perfect
-  prog" method, and a reviewer's conclusion is that it likely gains calibration rather than skill.**
-  The idea: Stage A learns weather to power from best-estimate weather
-  only (CAMS, ERA5, analyses), then freezes; Stage B takes Stage A's output on forecast weather, plus
-  raw forecast weather, lead time and lagged power, and learns to calibrate uncertainty and correct
-  with lags. A model trained only on best-estimate weather learns the power response smoothed by
-  forecast error, so a frozen Stage A is expected to be over-confident at long lead — and because
-  Stage B needs the raw forecast weather too (not just Stage A's output), it becomes ordinary
-  stacking rather than a clean two-stage split. The plausible gain is calibration and diagnosis, not
-  headline skill. If tried, test it in a short study against strong single-stage baselines (the lead-
-  time feature, ensemble statistics, training on members, warm start on ENS), scored on identical
-  rows by lead, with a kill criterion set before the study runs — see [out-of-sample
-  requirements](switching-events.md) for the shared methodology.
 - **[#176](https://github.com/openclimatefix/nged-substation-forecast/issues/176) local-time power
   lags** — a DST edge case affecting a handful of half-hours per year; the issue itself says it may
   not be worth worrying about yet. Revisit if the metrics slices ever show a DST-transition

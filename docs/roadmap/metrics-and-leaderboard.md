@@ -1028,19 +1028,29 @@ Train *and* score on near-perfect weather, and the resulting skill bounds what w
 removing **forecast error** from the weather input — the channel that more ensemble members, better
 ensemble post-processing and sharper interpolation all work through. If that ceiling sits close to
 today's ENS-scored skill, most of our error is not the weather forecast's fault and the effort
-belongs in the modelling instead. So run this **before** ingesting another NWP source: it is the
-quick test that sizes the prize that ingesting another NWP source would chase.
+belongs in the modelling instead. The ceiling bounds the skill that ingesting another NWP source
+could add. A low ceiling need not stop anyone trying a new source, because an autonomous study can
+test a new weather product quickly (see [A new weather product with a few months of
+history](training-history.md#a-new-weather-product-with-a-few-months-of-history)). That study trains
+a lag-free XGBoost model on estimates of past weather, which the study calls the weather-response
+model. A lag-free variant of the ceiling's XGBoost model can serve as both, so the ceiling and the
+study can share one XGBoost model. The ceiling proper uses the champion's own feature set, lags
+included.
 
 Two rungs, in increasing order of "cheating":
 
-- **ERA5.** A reanalysis, so it assimilates observations, but still a 31 km model field — good, not
-  perfect. Needs no extra work once the [ingest](training-history.md) lands.
+- **Gridded estimates of past weather, compared with each other.** ERA5 is a reanalysis, so it
+  assimilates observations, but it is still a 31 km model field — good, not perfect. The early time
+  steps of the UKV archive held by CEDA, the Centre for Environmental Data Analysis, are the
+  alternative for every variable except irradiance. Which estimate of past weather to train on is
+  an [open question](training-history.md#open-questions), so this rung scores both.
 
-- **Observations.** Closer to truth at the site, and worth the second rung precisely because ERA5's
-  remaining error is not small. The UK Met Office's MIDAS Open (via CEDA, the Centre for
-  Environmental Data Analysis) supplies hourly land-surface temperature, wind, and pressure from GB
-  stations — spatially sparse, so nearest-station matched. [CAMS](data-sources.md#weather-data)
-  solar radiation is the equivalent rung for solar, and is already planned for v0.7.
+- **Observations.** Observations are measured at the site rather than averaged over a grid cell.
+  Observations earn the second rung precisely because a gridded estimate's remaining error is not
+  small. The UK Met Office's MIDAS Open (via CEDA) supplies hourly land-surface temperature, wind,
+  and pressure from GB stations — spatially sparse, so nearest-station matched.
+  [CAMS](data-sources.md#weather-data) solar radiation is the equivalent rung for solar, and is
+  already planned for v0.7.
 
 Three conditions on reading the result.
 
@@ -1055,7 +1065,7 @@ Three conditions on reading the result.
 
 - **It is a ceiling for the current model family and feature set.** A model that cannot exploit
   perfect weather shows a low ceiling for reasons that have nothing to do with weather availability.
-  That does not weaken the decision the ceiling gates — a model that cannot use perfect weather will
+  That does not weaken the decision the ceiling informs — a model that cannot use perfect weather will
   not be rescued by a better forecast of it — but it does mean the ceiling is re-measured after any
   large modelling change rather than treated as a standing fact.
 
@@ -1150,7 +1160,10 @@ heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile) and th
 [degradation-conditional conformal
 calibration](https://github.com/openclimatefix/nged-substation-forecast/issues/443) share one
 implementation and one metric path — once we settle how a wrapper derives its class-level
-`MODEL_NAME` from the model it wraps.
+`MODEL_NAME` from the model it wraps. The product calibrator under research in [A new weather
+product with a few months of
+history](training-history.md#a-new-weather-product-with-a-few-months-of-history) would be the
+wrapper's third consumer.
 
 Spread inflation widens the fan but cannot reshape it (the inflated ensemble is still 51 point
 forecasts, just pushed apart). It is the stopgap the full fix below must beat to earn the effort of

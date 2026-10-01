@@ -38,10 +38,11 @@ best-estimate, not a guarantee.
   infra-as-code, confirming NGED's cloud and security standards, and game days).
 - [XGBoost improvements](xgboost-improvements.md) — the v0.5 experiment backlog: four effort tiers,
   ordered best bang-for-the-buck within each tier, targeting the 3–10 day user band.
-- [Extending the training history](training-history.md) — using ERA5 to train on the power data that
-  predates the ECMWF ENS archive: the era-confounding hazard that dictates the ingest's scope, the
-  reconciliation and pooling variants, the COVID covariate, and why ERA5 scoring is a diagnostic
-  rather than a promotion criterion.
+- [Extending the training history](training-history.md) — using estimates of past weather such as
+  ERA5 to train on the power data that predates the ECMWF ENS archive: the era-confounding hazard
+  that dictates the ingest's scope, the reconciliation and pooling variants, how a weather product
+  with a few months of history could enter the forecast, the COVID covariate, and why ERA5 scoring
+  is a diagnostic rather than a promotion criterion.
 - [Engineering health](engineering-health.md) — scientific-rigor tests and cleanup.
 - [Capacity estimation](capacity-estimation.md) — the v0.7 head-to-head between candidate estimators
   of the time-varying effective capacity of metered generators: a [convex
@@ -182,8 +183,8 @@ v0.7) and the **pre-training experiments** it unlocks
 ([#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167)) — see [Extending the
 training history](training-history.md). Our power data reaches back to late 2019 while the ENS
 archive starts 2024-04-01, and Dynamical.org's ENS back-fill is not expected until ~November 2027,
-so ERA5 is how the seasonal experiments on this page get more than one winter to learn from. The
-Tier-1 and Tier-2 config wins do not wait for it.
+so an estimate of past weather is how the seasonal experiments on this page get more than one
+winter to learn from. The Tier-1 and Tier-2 config wins do not wait for it.
 
 This milestone also carries the **quantile-ensemble pipeline** (per-member quantile forecasts pooled
 into delivered percentiles — Phase D of [Delivering the probabilistic
@@ -452,14 +453,15 @@ leaderboard experiment or controlled ad-hoc ablation, so we keep the result eith
   ([#363](https://github.com/openclimatefix/nged-substation-forecast/issues/363)): explore whether
   adding ICON-EU from Dynamical.org improves forecast skill over ECMWF ENS alone — the v1
   nice-to-have version of the broader [v2.1 multi-source
-  item](#v21-xgboost-improvements-at-full-scale). **Sized by the v0.5 [perfect-weather
-  ceiling](metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates)**: a low ceiling
-  means there is little forecast-error headroom to chase and this drops down the list — though not
-  off it, because ICON-EU's ~6.5 km grid could still beat 31 km ERA5 on representativeness, which
-  that ceiling does not bound. Because ICON-EU's history starts early 2026 (shorter than the
-  canonical CV folds) it is assessed via a controlled ad-hoc ablation, not the leaderboard, until it
-  has ~1–2 complete years of history. See [Evaluating a data source whose history is shorter than
-  the
+  item](#v21-xgboost-improvements-at-full-scale). The v0.5 [perfect-weather
+  ceiling](metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates) sizes the
+  forecast-error headroom, but ICON-EU's ~6.5 km grid could still beat 31 km ERA5 on
+  representativeness, which that ceiling does not bound. Because ICON-EU's history starts early 2026
+  (shorter than the canonical CV folds) it is assessed via a controlled ad-hoc ablation, not the
+  leaderboard, until it has ~1–2 complete years of history. A [product
+  calibrator](training-history.md#a-new-weather-product-with-a-few-months-of-history), under
+  research, could let ICON-EU into the forecast sooner. See [Evaluating a data source whose
+  history is shorter than the
   folds](../ml_experimentation/cross-validation-folds.md#evaluating-a-data-source-whose-history-is-shorter-than-the-folds).
 - **Handle NWP model upgrades**
   ([#851](https://github.com/openclimatefix/nged-substation-forecast/issues/851)): an upgraded
@@ -521,7 +523,10 @@ of the v2 live service)*
 
 **v2.1 is about a month of XGBoost work, once the v2 live service runs for all 2,500 time series.**
 v2.1 picks up whatever [XGBoost improvements](xgboost-improvements.md) v0.5 left undone, and adds
-[further NWP sources as features](xgboost-improvements.md#several-nwp-sources-as-features-v21).
+[further NWP sources as features](xgboost-improvements.md#several-nwp-sources-as-features-v21), or
+through a [product
+calibrator](training-history.md#a-new-weather-product-with-a-few-months-of-history) if the study of
+that design shows promise.
 
 ---
 
@@ -549,7 +554,9 @@ differentiable-physics modules, so the encoder comes after the physics and disag
 - **[Differentiable physics](../techniques/differentiable-physics.md) for power forecasting** (not
   just capacity estimation): use DP models to directly forecast power, handling MVA metering
   natively (see [the graph-structured engine](disaggregation.md#the-graph-structured-engine) and
-  [MVA metering](disaggregation.md#apparent-power-mva-metering))
+  [MVA metering](disaggregation.md#apparent-power-mva-metering)), and to calibrate each weather
+  product in weather space by gradient descent (see [the weather-space
+  arm](training-history.md#the-calibrator-can-act-on-power-or-on-weather))
 - **Graph-structured disaggregation**: Model substations, metered generators, and unmetered
   generator fleets as nodes in an electrical/spatial graph, with edges representing physical
   connections. The graph is a **data structure** — a structural prior on who can exchange load and

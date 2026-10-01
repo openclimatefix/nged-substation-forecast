@@ -82,10 +82,10 @@ The fold design for a rolling-origin evaluation over whichever history lands —
 exactly how often production ends up retraining — is tracked separately in
 [#960](https://github.com/openclimatefix/nged-substation-forecast/issues/960).
 
-Because of that timescale, the plan is to **pre-train** on ERA5 reanalysis and fine-tune on ECMWF
-ENS, using the long power histories some assets have back to 2020. Pre-training is a training-time
-technique, distinct from the validation folds described here; the design is in [Extending the
-training history](../roadmap/training-history.md).
+Because of that timescale, the plan is to **pre-train** on an estimate of past weather (ERA5 is the
+planned ingest) and fine-tune on ECMWF ENS, using the long power histories some assets have back
+to 2020. Pre-training is a training-time technique, distinct from the validation folds described
+here; the design is in [Extending the training history](../roadmap/training-history.md).
 
 ---
 
@@ -96,14 +96,17 @@ all, so its evaluation lives entirely in the `metrics` asset's `evaluation_scope
 feeds the leaderboard.** The motivating case is adding ICON-EU NWP (from Dynamical.org), whose
 archive starts later than the leaderboard folds, leaving no overlapping history to score on.
 
-**For a new *weather* source, check the ceiling first.** Before ingesting one at all, measure how
-much forecast skill near-perfect weather would add — see [the perfect-weather
-ceiling](../roadmap/metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates). If a
-model trained and scored on reanalysis barely beats the ENS-scored champion, there is little
-forecast-error headroom for a further source to recover, and the patterns below are not yet worth
-running — unless the candidate's case rests on *resolution*, which that ceiling does not bound.
+**For a new *weather* source, the ceiling bounds the skill the source could add.** [The
+perfect-weather
+ceiling](../roadmap/metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates) measures
+how much forecast skill near-perfect weather would add. If a model trained and scored on reanalysis
+barely beats the ENS-scored champion, there is little forecast-error headroom for a further source
+to recover — unless the candidate's case rests on *resolution*, which that ceiling does not bound.
 
-Three patterns answer three different questions.
+Three patterns answer three different questions. A fourth question is under research in [A new
+weather product with a few months of
+history](../roadmap/training-history.md#a-new-weather-product-with-a-few-months-of-history): how
+many months of a new source's history it takes before the source adds skill.
 
 ### Controlled ablation — "does the source add skill?"
 
