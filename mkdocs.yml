@@ -98,6 +98,7 @@ nav:
           - Methods shared by the past-weather studies: studies/past-weather/methods.md
           - "Which weather product best describes past sunshine?": studies/past-weather/solar.md
           - "Which weather product best describes past wind?": studies/past-weather/wind.md
+          - "Do CERRA and NORA3 describe past wind better than ERA5?": studies/past-weather/reanalysis-wind.md
           - "Does blending CERRA's wind heights beat one height?": studies/past-weather/cerra-wind-levels.md
           - "Does blending weather products beat the best single weather product?": studies/past-weather/blending.md
       - Forecasts:
