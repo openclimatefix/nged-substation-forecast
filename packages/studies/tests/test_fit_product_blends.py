@@ -503,6 +503,11 @@ def test_the_report_prints_the_contrasts_at_both_settings_the_verdicts_and_the_r
     assert "`blend_icon_eu_conservative_day1_control` (9 columns)" in text
     assert "`blend_wn3_day14` minus `blend_wn3_day14_control`" in text
     assert "uncorrected for multiplicity" in text
+    # Every control (0.11) is worse than ENS's mean (0.10): 8 blends at 2 settings, per technology.
+    assert text.count("16 (blend, setting) controls have a lower 95% bound above zero") == 2
+    assert "| `blend_aifs_single_day7` | 7 | -2.000 [-2.000, -2.000]" in text
+    assert "-2.000 | -2.000 | yes |" in text
+    assert "(the 95% level divided across 40 intervals)" in text
     assert "the freshest run at least 48 hours before the valid hour" in text
 
 

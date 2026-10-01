@@ -72,7 +72,7 @@ from nwp_forecast_charts import (
 )
 from nwp_forecast_comparison import METRIC, PERCENTAGE_POINTS, DomainType
 from studies.bootstrap import MIN_MONTHS_FOR_INTERVAL, bootstrap_difference
-from studies.charts import figure, interval_panel
+from studies.charts import figure, interval_panel, planning
 
 _LOG: Final[logging.Logger] = logging.getLogger("dot_interval_vs_ens")
 
@@ -342,11 +342,24 @@ _PRODUCT_SINGLE: Final[SourceType] = "product_blends_single"
 _SINGLE_ENS: Final[dict[int, SourceType]] = _sources(days=BLEND_DAYS, default=_AIFS_SINGLE_BLENDS)
 _WN3_OWN: Final[dict[int, SourceType]] = _sources(days=BLEND_DAYS, default="product_blends_wn3")
 
-AIFS_BLEND_LABEL: Final[str] = "ENS + AIFS Single"
-ICON_EU_OPTIMISTIC_LABEL: Final[str] = "ENS + ICON-EU (optimistic lead)"
-ICON_EU_CONSERVATIVE_LABEL: Final[str] = "ENS + ICON-EU (conservative lead)"
-UKV_LABEL: Final[str] = "ENS + UKV (optimistic upper bound)"
-WN3_BLEND_LABEL: Final[str] = "ENS + WeatherNext 3 (7 months)"
+AIFS_BLEND_LABEL: Final[str] = "ENS mean + AIFS Single"
+ICON_EU_OPTIMISTIC_LABEL: Final[str] = "ENS mean + ICON-EU (optimistic lead)"
+ICON_EU_CONSERVATIVE_LABEL: Final[str] = "ENS mean + ICON-EU (conservative lead)"
+UKV_LABEL: Final[str] = "ENS mean + UKV (optimistic upper bound)"
+WN3_BLEND_LABEL: Final[str] = "ENS mean + WeatherNext 3 (7 months)"
+
+BLEND_PLANNED_DAYS: Final[dict[str, tuple[int, ...]]] = {
+    AIFS_BLEND_LABEL: (1, 2, 7),
+    ICON_EU_CONSERVATIVE_LABEL: (1, 2),
+    UKV_LABEL: (1,),
+}
+"""The blend rows written into the study plan before any fit, by label, and the days at which each
+is planned (contrasts C1 to C3). Every other row is exploratory: the optimistic ICON-EU blend, the
+WeatherNext 3 blend, and AIFS Single at day 14."""
+
+BLEND_AXIS_GROUPS: Final[tuple[tuple[int, ...], ...]] = ((1, 2), (7, 14))
+"""The lead days that share an x axis in the blend figures. Days 7 and 14 hold wide intervals, so
+they get an axis of their own and days 1 and 2 stay readable."""
 
 BLEND_PRODUCTS: Final[tuple[ProductRow, ...]] = (
     ProductRow(
@@ -842,13 +855,17 @@ def footnotes_for(*, domain: DomainType, rows: pl.DataFrame) -> list[Footnote]:
     ]
 
 
-def chart_rows(*, rows: pl.DataFrame, day: int, domain: DomainType) -> pl.DataFrame:
+def chart_rows(
+    *, rows: pl.DataFrame, day: int, domain: DomainType, blends: bool = False
+) -> pl.DataFrame:
     """Shape one lead day's rows for `interval_panel`, best product first.
 
     Args:
         rows: `contrast_rows`'s result for one technology.
         day: The lead day.
         domain: `solar` or `wind`, which selects the footnoted rows.
+        blends: Whether the rows are blends, which adds the Boolean `planned` column
+            (`BLEND_PLANNED_DAYS`).
 
     Returns:
         Rows sorted by ascending difference, carrying `label`, `family`, `difference`, `lower_95`
@@ -860,11 +877,17 @@ def chart_rows(*, rows: pl.DataFrame, day: int, domain: DomainType) -> pl.DataFr
     is_noted = pl.struct("label", "day").is_in(
         [{"label": label, "day": note_day} for label, note_day in noted]
     )
+    planned = (
+        [pl.col("label").is_in([k for k, days in BLEND_PLANNED_DAYS.items() if day in days])]
+        if blends
+        else []
+    )
     return (
         rows.filter(pl.col("day") == day)
         .sort("value")
         .select(
             "label",
+            *[expr.alias("planned") for expr in planned],
             family=pl.lit(FAMILY),
             difference=pl.col("value"),
             lower_95=pl.when(pl.col("has_interval")).then(pl.col("lower")),
@@ -918,16 +941,16 @@ def blend_subtitle_lines(*, domain: DomainType) -> list[str]:
             "tends to draw too narrow."
         ),
         (
-            "Lead: ENS plus AIFS Single and ENS plus WeatherNext 3 read the 00 UTC run N days "
-            "before the valid day. ENS plus ICON-EU reads the freshest ICON-EU run at least N days "
-            "before the valid hour at the optimistic lead, and at least N+1 days before at the "
-            "conservative lead. ENS plus UKV reads UKV's "
-            "day-1 value, so it is an optimistic upper bound; no blend with UKV is ranked."
+            "Lead: ENS mean plus AIFS Single and ENS mean plus WeatherNext 3 read the 00 UTC "
+            "run N days before the valid day. ENS mean plus ICON-EU reads the freshest ICON-EU "
+            "run at least N days before the valid hour at the optimistic lead, and at least N+1 "
+            "days before at the conservative lead. ENS mean plus UKV reads UKV's day-1 value, so "
+            "it is an optimistic upper bound; no blend with UKV is ranked."
         ),
         (
-            "Rows: ENS plus AIFS Single, ICON-EU, and UKV share 16 months. ENS plus WeatherNext 3 "
-            "rests on 7 months, against an ENS mean refitted on those months (filled dot) and "
-            "against the 21-month ENS mean (hollow diamond)."
+            "Rows: ENS mean plus AIFS Single, ICON-EU, or UKV shares 16 months. ENS mean plus "
+            "WeatherNext 3 rests on 7 months, against an ENS mean refitted on those months "
+            "(filled dot) and against the 21-month ENS mean (hollow diamond)."
         ),
         CAPACITY_NOTE,
     ]
@@ -1003,6 +1026,49 @@ def draw(
     Returns:
         The figure.
     """
+    present = set(rows["day"].to_list())
+    days = [day for day in (BLEND_DAYS if blends else DAYS) if day in present]
+    groups = (
+        [tuple(d for d in group if d in days) for group in BLEND_AXIS_GROUPS]
+        if blends
+        else [tuple(days)]
+    )
+    domains = {
+        day: _x_domain(rows=rows.filter(pl.col("day").is_in(group)))
+        for group in groups
+        if group
+        for day in group
+    }
+    panel_rows = {day: chart_rows(rows=rows, day=day, domain=domain, blends=blends) for day in days}
+    figure_planning = planning(rows=list(panel_rows.values()))
+    last_of_group = {group[-1] for group in groups if group}
+    panels = [
+        interval_panel(
+            rows=panel_rows[day],
+            x_domain=domains[day],
+            x_title=X_TITLE if day in last_of_group else "",
+            zero_label="same as the ENS mean",
+            better_label="better than the ENS mean",
+            panel_title=_panel_title(day=day, blends=blends, domains=domains),
+            reference_labels=index == 0,
+            family_key=False,
+            figure_planning=figure_planning,
+            colour_by_family=True,
+            row_step_px=ROW_STEP_PX,
+        )
+        for index, day in enumerate(days)
+    ]
+    return figure(
+        panels=panels,
+        number=number,
+        title=figure_title(domain=domain, blends=blends),
+        subtitle=subtitle_lines(domain=domain, rows=rows, blends=blends),
+        figure_planning=figure_planning,
+    )
+
+
+def _x_domain(*, rows: pl.DataFrame) -> tuple[float, float]:
+    """Return the padded x range, including zero, that holds every mark and interval of `rows`."""
     shown = pl.concat(
         [
             rows.select("value", "lower", "upper"),
@@ -1015,32 +1081,15 @@ def draw(
     )
     low = min(shown["value"].to_list() + shown["lower"].drop_nulls().to_list())
     high = max(shown["value"].to_list() + shown["upper"].drop_nulls().to_list())
-    x_domain = padded_domain(low=low, high=high, include_zero=True)
-    present = set(rows["day"].to_list())
-    days = [day for day in (BLEND_DAYS if blends else DAYS) if day in present]
-    panels = [
-        interval_panel(
-            rows=chart_rows(rows=rows, day=day, domain=domain),
-            x_domain=x_domain,
-            x_title=X_TITLE if index == len(days) - 1 else "",
-            zero_label="same as the ENS mean",
-            better_label="better than the ENS mean",
-            panel_title=f"Lead day {day}",
-            reference_labels=index == 0,
-            family_key=False,
-            figure_planning="exploratory",
-            colour_by_family=True,
-            row_step_px=ROW_STEP_PX,
-        )
-        for index, day in enumerate(days)
-    ]
-    return figure(
-        panels=panels,
-        number=number,
-        title=figure_title(domain=domain, blends=blends),
-        subtitle=subtitle_lines(domain=domain, rows=rows, blends=blends),
-        figure_planning="exploratory",
-    )
+    return padded_domain(low=low, high=high, include_zero=True)
+
+
+def _panel_title(*, day: int, blends: bool, domains: Mapping[int, tuple[float, float]]) -> str:
+    """Name a panel's lead day, and say where its axis is wider than the first group's."""
+    title = f"Lead day {day}"
+    if blends and domains[day] != domains[min(domains)]:
+        title += " (wider axis than days 1 and 2)"
+    return title
 
 
 BLENDS_README_TEXT: Final[
@@ -1385,7 +1434,7 @@ def main() -> int:
         else None
     )
     files = ("report.md", "intervals.parquet", "README.md", *(("rankings.parquet",) * args.blends))
-    stem = "blend_dots_vs_ens" if args.blends else "dots_vs_ens"
+    stem = "blends_vs_ens" if args.blends else "dots_vs_ens"
     svgs = {domain: args.svg_dir / f"nwp_forecast_{domain}_{stem}.svg" for domain in DOMAINS}
     taken = [args.output_dir, *(args.output_dir / name for name in files), *svgs.values()]
     existing = [path for path in taken if path.exists()]

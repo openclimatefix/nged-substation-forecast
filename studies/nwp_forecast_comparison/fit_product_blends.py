@@ -52,6 +52,8 @@ from fit_aifs import (
 )
 from fit_extra_leads import interval_text
 from nwp_forecast_comparison import (
+    METRIC,
+    PERCENTAGE_POINTS,
     DomainType,
     difference,
     predictions_from_losses,
@@ -59,6 +61,7 @@ from nwp_forecast_comparison import (
 from studies.bootstrap import (
     NO_DETECTABLE_DIFFERENCE,
     BootstrapInterval,
+    bootstrap_difference_at_level,
     combine_setting_verdicts,
 )
 from studies.guards import refuse_to_overwrite
@@ -481,6 +484,77 @@ def columns_lines(*, arms: list[str]) -> list[str]:
     return lines
 
 
+def multiplicity_lines(
+    *, domain: DomainType, combined: dict[int, pl.DataFrame], n_listed: int
+) -> list[str]:
+    """Print each blend's control minus ENS's mean and each blend minus ENS's mean, widened.
+
+    A control that is itself worse than ENS's mean alone makes the control guard (C4) weak, so each
+    control's difference from ENS's mean is printed at both settings. The blend-minus-ENS contrasts
+    (C1 to C3) are also printed with a Bonferroni-widened interval, at a coverage that corrects the
+    95% level across every interval the report lists.
+
+    Args:
+        domain: `solar` or `wind`.
+        combined: The saved and new losses at each day.
+        n_listed: How many intervals the report lists at each setting.
+
+    Returns:
+        The two tables and a count of controls that are significantly worse than ENS's mean.
+    """
+    level = 100.0 - 5.0 / n_listed
+    lines = [
+        f"### {domain}: controls, and Bonferroni-widened blend-minus-ENS intervals",
+        "",
+        (
+            "`Control minus ENS` is the blend's control minus ENS's mean alone. The widened "
+            f"interval covers {level:.3f}% (the 95% level divided across {n_listed} intervals); "
+            "`Survives` means its upper bound is below zero at both settings."
+        ),
+        "",
+        (
+            "| Blend | Day | Blend minus ENS, primary | Blend minus ENS, sensitivity | "
+            "Control minus ENS, primary | Control minus ENS, sensitivity | "
+            "Widened upper bound, primary | Widened upper bound, sensitivity | Survives |"
+        ),
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    worse_controls = 0
+    blends = [("aifs_single", day) for day in REUSED_DAYS] + [
+        (product, day) for product, days in fit_aifs.PRODUCT_BLEND_DAYS.items() for day in days
+    ]
+    for product, day in blends:
+        blend = blend_arm_name(product=product, day=day)
+        mean = f"ens_mean_day{day}"
+        cells: dict[str, list[str]] = {"blend": [], "control": [], "upper": []}
+        survives = True
+        for setting in SETTINGS:
+            scope = combined[day].filter(pl.col("setting") == setting)
+            versus_ens = difference(losses=scope, treatment=blend, reference=mean)
+            control = difference(losses=scope, treatment=f"{blend}_control", reference=mean)
+            _, upper = bootstrap_difference_at_level(
+                losses=scope, treatment=blend, reference=mean, metric=METRIC, level=level
+            )
+            cells["blend"].append(interval_cell(interval=versus_ens))
+            cells["control"].append(interval_cell(interval=control))
+            cells["upper"].append(f"{upper * PERCENTAGE_POINTS:+.3f}")
+            survives = survives and upper < 0.0
+            worse_controls += control["lower_95"] > 0.0
+        lines.append(
+            f"| `{blend}` | {day} | {' | '.join(cells['blend'])} | {' | '.join(cells['control'])} "
+            f"| {' | '.join(cells['upper'])} | {'yes' if survives else 'no'} |"
+        )
+    lines += [
+        "",
+        (
+            f"{worse_controls} (blend, setting) controls have a lower 95% bound above zero "
+            "against ENS's mean alone, so they are significantly worse than ENS's mean."
+        ),
+        "",
+    ]
+    return lines
+
+
 def single_lines(*, domain: DomainType, combined: dict[int, pl.DataFrame]) -> list[str]:
     """Print C1 to C5 at both settings and the verdicts, for one technology."""
     lines = [f"## {domain}: ENS plus one product, `single` rows", ""]
@@ -555,6 +629,11 @@ def wn3_lines(*, domain: DomainType, losses: dict[int, pl.DataFrame]) -> list[st
     return lines
 
 
+def n_intervals(*, n_domains: int) -> int:
+    """Return how many intervals the report lists at each setting."""
+    return len(product_contrasts()) * n_domains
+
+
 def report_text(
     *,
     singles: dict[DomainType, dict[int, pl.DataFrame]],
@@ -562,7 +641,7 @@ def report_text(
     refits: list[str],
 ) -> str:
     """Return `report.md`: the header, the refitted pairs, the columns, and every contrast."""
-    n_listed = len(product_contrasts()) * len(singles)
+    n_listed = n_intervals(n_domains=len(singles))
     lines = [
         "# ENS plus one weather product: report",
         "",
@@ -598,6 +677,7 @@ def report_text(
     ]
     for domain in fit_aifs.DOMAINS:
         lines += single_lines(domain=domain, combined=singles[domain])
+        lines += multiplicity_lines(domain=domain, combined=singles[domain], n_listed=n_listed)
         lines += wn3_lines(domain=domain, losses=wn3[domain])
     return "\n".join(lines)
 
