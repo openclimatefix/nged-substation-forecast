@@ -111,8 +111,8 @@ publishes a fourth kind:
   pages score this archive.
 - **The Previous Runs archive serves each variable at a fixed offset of 1 to 7 days**
   ([Previous Runs API](https://open-meteo.com/en/docs/previous-runs-api)). The archive starts on
-  2024-01-19 at the earliest, and serves day 1 only for UKV, ICON-D2, the Met Office global 10 km
-  model, and the HARMONIE-AROME and AROME models (table below).
+  2024-01-19 at the earliest. The survey found day 1 as the only offset served for UKV, ICON-D2, the
+  Met Office global 10 km model, and the HARMONIE-AROME and AROME models (table below).
 - **The Single Runs archive keeps whole runs** ([Single Runs
   API](https://open-meteo.com/en/docs/single-runs-api)), but only from the 2026-04-02 00 UTC run:
   `ecmwf_ifs025` and `ncep_gfs013` both reject `run=2026-04-01T00:00`. ECMWF IFS HRES 9 km is the
@@ -134,11 +134,15 @@ from 2024-08-10. Runs from 2026-05-12 06 UTC use IFS Cycle 50r1 ([what that upgr
 to a supported access pattern.** Every Dynamical.org catalogue page carries the notice
 "data.dynamical.org access ends September 30, 2026".
 
-**Which offsets the Previous Runs archive serves is set by the archive, not by the model's
-horizon.** UKV's runs in the Single Runs archive hold 55 hourly steps, to T+54 h, and ICON global's
-runs reach 180 h, yet the Previous Runs archive serves UKV at day 1 only and ICON global to day 6
-only. Any lead-matched comparison is therefore capped at day 1 where one arm is UKV, ICON-D2, the
-Met Office global 10 km model, or a HARMONIE-AROME or AROME model.
+**Open-Meteo documents that the Previous Runs archive populates only the offsets within a model's
+forecast horizon.** Its [Previous Runs API](https://open-meteo.com/en/docs/previous-runs-api) page
+says "For local models with shorter forecast horizons (2–5 days), only offsets within that horizon
+are populated", and its [UK Met Office page](https://open-meteo.com/en/docs/ukmo-api) lists UKV's
+forecast length as 2 days. UKV's runs in the Single Runs archive hold 55 hourly steps, to T+54 h.
+The survey found day 1 as the only offset served for UKV, and ICON global's runs reach 180 h with
+offsets served to day 6. The documentation does not say why UKV's offsets stop at day 1. Any
+lead-matched comparison is therefore capped at day 1 where one arm is UKV, ICON-D2, the Met Office
+global 10 km model, or a HARMONIE-AROME or AROME model.
 
 | Model on Open-Meteo | First day-1 global irradiance at Lincoln | Offsets served |
 |---|---|---|
@@ -549,7 +553,8 @@ fixed height.
 
 **Several whole-run archives reach back further than Open-Meteo's Previous Runs archive, but
 Previous Runs is the only free route surveyed that puts ICON-D2, AROME, the HARMONIE-AROME models,
-and UKV as Open-Meteo serves it at a fixed lead, and for those models at day 1 only.** CEDA's UKV
+and UKV as Open-Meteo serves it at a fixed lead, and for those models the survey found only day 1
+served.** CEDA's UKV
 archive keeps whole runs from 2016, but access is by application, and CEDA's UKV is statistically
 different from the live UKV. Issue #810 proposes ECMWF ENS via Dynamical.org, the product in
 production, as the incumbent each other model is compared against. A place in this list is not a
