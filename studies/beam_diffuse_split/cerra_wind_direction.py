@@ -1039,8 +1039,8 @@ ERA_MEAN_DEG: Final[float] = 30.0
 ERA_VEER_P95_DEG: Final[float] = 10.0
 """A full year `differs from its neighbours` when its 100 m circular mean is more than
 `ERA_MEAN_DEG` degrees from the circular mean of the other full years' circular means, or its
-veer 95th percentile is more than `ERA_VEER_P95_DEG` degrees from the median of theirs. The full years' own
-circular means span 23 degrees, so 30 degrees sits outside that spread."""
+veer 95th percentile is more than `ERA_VEER_P95_DEG` degrees from the median of theirs. The full
+years' own circular means span 23 degrees, so 30 degrees sits outside that spread."""
 
 
 def full_years(*, times: pl.Series) -> list[int]:
