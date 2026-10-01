@@ -289,6 +289,22 @@ Google produced each run. If Google produced the runs after the fact, WN3's erro
 The `--lookahead-cleared` flag of `fit_aifs.py --wn3` stops the fit from starting until whoever runs
 it has read this section.
 
+### Why the WN3 paper's gains over ENS are not directly comparable with this study
+
+**The WN3 paper's CRPS gains over ENS and this study's matched-lead results answer different
+questions, so they are not in conflict.** [Rasp et al. (2026)](https://arxiv.org/abs/2609.03582)
+state their ENS baseline clearly, apply the same lapse-rate adjustment to every forecast, and score
+ENS with the fair CRPS. They note that TIGGE's reduced resolution at 6-hour multiples slightly
+penalises ENS. Their ENS reference is the raw 48-member ENS, regridded to 0.1° from TIGGE and MARS,
+with no EMOS, bias correction, or spread rescaling. Their gains are largest at short leads, for
+example up to 40% lower station 2 m temperature CRPS, and shrink with lead time. CRPS rewards
+well-calibrated spread, so the short-lead gains may in part reflect under-dispersion or bias in raw
+ENS, which the paper notes for precipitation at 6 hours. The paper does not compare against a
+post-processed ENS, so it cannot say how much of the gap reflects dispersion or bias rather than
+forecast information. Our design differs: each product gets its own XGBoost model trained on the
+generators' power, which absorbs bias and spread differences, and we compare the mean's error in
+percent of capacity. Our study does not test the paper's claim.
+
 ## Results
 
 ### Day 0 is lower than day 1 for every product, and ICON-D2's day 0 is the lowest (exploratory)
