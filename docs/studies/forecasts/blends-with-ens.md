@@ -8,11 +8,12 @@ tree model) the ENS mean's weather plus one product's weather, and scores the po
 mean absolute error in percentage points of the generator's capacity. A negative difference means
 the added product helps. Differences are the blend's error minus that of an XGBoost model given the
 ENS mean alone, with 95% intervals from resampling whole months and a fitting seed. Every result is
-on the `single` rows (the 16 months from March 2025 in which the 00 UTC run of AIFS Single, ECMWF's
-machine-learned forecast, lies inside one version era), at the primary hyperparameter setting with
-the sensitivity setting in brackets, and is uncorrected for multiplicity unless the text says
-otherwise. The exception is WeatherNext 3 (WN3, Google DeepMind's machine-learned forecast), which has
-7 months and is fitted at the primary setting only.
+on the `single` rows (the 16 months from March 2025 in which the 00 UTC run of AIFS (Artificial
+Intelligence Forecasting System) Single, ECMWF's machine-learned forecast, lies inside one version
+era), at the primary hyperparameter setting with the sensitivity setting in brackets, and is
+uncorrected for multiplicity unless the text says otherwise. The exception is WeatherNext 3 (WN3,
+Google DeepMind's machine-learned forecast), which has 7 months and is fitted at the primary setting
+only.
 
 ![Figure 1: For solar power, the error of the ENS mean plus one weather
 product, minus the ENS mean alone's error, by lead day (primary
@@ -29,11 +30,11 @@ setting)](../assets/nwp_forecast_wind_blends_vs_ens.svg)
 
 ## Key findings
 
-- **At wind day 1, adding ICON-EU at the optimistic lead (exploratory; an upper bound on a live
-  service's gain) lowers the error by 0.58 points [0.48, 0.69] (0.55 at sensitivity), from the ENS
-  mean's 8.20%.** The result survives a Bonferroni correction. At the conservative lead the gain is
-  0.165 [0.063, 0.264] (0.158), which does not survive the Bonferroni correction
-  ([wind results](#wind-results)).
+- **At wind day 1, adding ICON-EU (the German weather service's regional ICON model for Europe) at
+  the optimistic lead (exploratory; an upper bound on a live service's gain) lowers the error by
+  0.58 points [0.48, 0.69] (0.55 at sensitivity), from the ENS mean's 8.20%.** The result survives a
+  Bonferroni correction. At the conservative lead the gain is 0.165 [0.063, 0.264] (0.158), which
+  does not survive the Bonferroni correction ([wind results](#wind-results)).
 - **At solar day 2, adding AIFS Single lowers the error by 0.33 points [0.18, 0.48] (0.27) from
   10.13%, survives the Bonferroni correction, and beats the optimistic ICON-EU blend by 0.20 [0.03,
   0.37].** At sensitivity that difference's upper bound is -0.000, on the line
@@ -46,8 +47,9 @@ setting)](../assets/nwp_forecast_wind_blends_vs_ens.svg)
   is worse than the optimistic ICON-EU blend at day 2 (+0.39 [+0.25, +0.59], +0.29 at sensitivity).
   The optimistic blend is an upper bound for ICON-EU, so the rule does not rank ICON-EU above AIFS
   Single.
-- **UKV at day 1, an optimistic upper bound, lowers the wind error by 0.64 points [0.41, 1.01]
-  (0.46).** The solar gain, 0.16 [0.03, 0.27], fails the Bonferroni correction.
+- **UKV (the Met Office's UK variable-resolution weather model) at day 1, an optimistic upper bound,
+  lowers the wind error by 0.64 points [0.41, 1.01] (0.46).** The solar gain, 0.16 [0.03, 0.27],
+  fails the Bonferroni correction.
 
 ## Introduction
 
@@ -80,8 +82,8 @@ column count.** The control shuffles the product's columns among hours that shar
 year-month, and an hour of day. The rows, folds, settings, seeds, and GPU device are those of the
 saved AIFS Single blends in `nwp_forecast_comparison_aifs_blends`, which this study reuses. The
 fitting script fits the ICON-EU, UKV, and WN3 arms, and refits the five AIFS Single (arm, setting)
-pairs that folder lacked. It raises unless its build stamp and every new arm's `(site, time, seed,
-fold)` keys equal the saved ones.
+pairs that folder lacked. The fitting script raises unless its build stamp and every new arm's
+`(site, time, seed, fold)` keys equal the saved ones.
 
 **Five contrasts were planned before any fit.** C1 is the conservative ICON-EU blend minus ENS at
 days 1 and 2. C2 is the AIFS Single blend minus ENS at days 1, 2, and 7. C3 is the UKV blend minus
@@ -117,15 +119,16 @@ two products are not separable.
 
 ### Wind results
 
-**Adding ICON-EU at the optimistic lead lowers the wind error at both days.** The differences are
--0.576 [-0.689, -0.483] at day 1 and -0.605 [-0.779, -0.444] at day 2 (-0.547 and -0.486 at
-sensitivity), and both survive the Bonferroni correction. At the conservative lead they are -0.165
-[-0.264, -0.063] and -0.251 [-0.440, -0.080] (-0.158 and -0.144), and neither survives it.
+**Adding ICON-EU at the optimistic lead (exploratory; an upper bound on a live service's gain)
+lowers the wind error at both days.** The differences are -0.576 [-0.689, -0.483] at day 1 and
+-0.605 [-0.779, -0.444] at day 2 (-0.547 and -0.486 at sensitivity), and both survive the Bonferroni
+correction. At the conservative lead they are -0.165 [-0.264, -0.063] and -0.251 [-0.440, -0.080]
+(-0.158 and -0.144), and neither survives it.
 
 **Adding AIFS Single lowers the wind error at day 1 and survives the Bonferroni correction.** The
 differences are -0.305 [-0.603, -0.099] (-0.167 [-0.278, -0.073]) at day 1 and -0.211 [-0.383,
--0.049] at day 2 (-0.200), which fails the correction. At day 7 the differences are -0.274 [-0.586,
-+0.064] and -0.361 [-0.529, -0.183].
+-0.049] at day 2 (-0.200), which fails the correction. At day 7 the primary difference is -0.274
+[-0.586, +0.064] and the sensitivity difference -0.361 [-0.529, -0.183].
 
 **AIFS Single and ICON-EU are not separable at wind day 1 or day 2, except that AIFS Single is worse
 than the optimistic ICON-EU blend at day 2.** C5 against the optimistic blend is +0.270 [-0.050,
@@ -140,7 +143,7 @@ bound for ICON-EU, so the rule does not rank ICON-EU above AIFS Single.
 primary difference, +0.302 [+0.015, +0.644], lies above zero, and the blend is worse than its own
 control by +0.379 [+0.065, +0.739]. The sensitivity interval, +0.115 [-0.075, +0.336], spans zero.
 AIFS Single alone is worse than its shuffled copy by +0.569 [+0.071, +1.080], so the AIFS Single
-input at day 14 carries no skill and the model overfits it.
+input at day 14 appears to add noise rather than skill.
 
 ### WeatherNext 3 on 7 months
 
