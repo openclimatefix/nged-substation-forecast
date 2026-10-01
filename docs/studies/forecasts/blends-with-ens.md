@@ -65,8 +65,9 @@ so their day-1 leads run from about 24 to 47 hours. The optimistic blend reads a
 ENS's for most hours, and the conservative blend reads a run older than ENS's for every hour. The
 two blends therefore bracket the live value: the optimistic blend is an upper bound on ICON-EU's gain
 and the conservative blend a lower bound. A live 09:00 UTC issue would read roughly the 00 or 03 UTC
-ICON-EU run, about as old as ENS's. The data this page reads hold only a day-1 value for UKV, so its
-blend is an optimistic upper bound and is never ranked.
+ICON-EU run, about as old as ENS's. This page fits UKV at day 1 only, and UKV's day-1 value probably
+reads a run fresher than a 09:00 UTC service would, so its blend is an optimistic upper bound and is
+never ranked.
 
 | Product | Days fitted | Rows |
 |---|---|---|

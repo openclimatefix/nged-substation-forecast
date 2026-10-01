@@ -134,17 +134,18 @@ from 2024-08-10. Runs from 2026-05-12 06 UTC use IFS Cycle 50r1 ([what that upgr
 to a supported access pattern.** Every Dynamical.org catalogue page carries the notice
 "data.dynamical.org access ends September 30, 2026".
 
-**Open-Meteo documents that the Previous Runs archive populates only the offsets within a model's
-forecast horizon.** Its [Previous Runs API](https://open-meteo.com/en/docs/previous-runs-api) page
-says "For local models with shorter forecast horizons (2–5 days), only offsets within that horizon
-are populated", and its [UK Met Office page](https://open-meteo.com/en/docs/ukmo-api) lists UKV's
-forecast length as 2 days. UKV's runs in the Single Runs archive hold 55 hourly steps, to T+54 h.
-The survey found day 1 as the only offset served for UKV, and ICON global's runs reach 180 h with
-offsets served to day 6. The documentation does not say why UKV's offsets stop at day 1. Any
-lead-matched comparison is therefore capped at day 1 where one arm is UKV, ICON-D2, the Met Office
-global 10 km model, or a HARMONIE-AROME or AROME model.
+**Open-Meteo documents that, for local models with 2-to-5-day horizons, the Previous Runs archive
+populates only the offsets within that horizon.** Its [Previous Runs
+API](https://open-meteo.com/en/docs/previous-runs-api) page says "For local models with shorter
+forecast horizons (2–5 days), only offsets within that horizon are populated", and its [UK Met
+Office page](https://open-meteo.com/en/docs/ukmo-api) lists UKV's forecast length as 2 days. UKV's
+runs in the Single Runs archive hold 55 hourly steps, to T+54 h. At Lincoln the survey found only
+day 1 served for UKV. ICON global's runs reach 180 h, and the survey found its offsets served to day
+6. Neither page explains why UKV stops at day 1, nor why the Met Office global 10 km model, listed at
+7 days, does too. Any lead-matched comparison is therefore capped at day 1 where one arm is UKV,
+ICON-D2, the Met Office global 10 km model, or a HARMONIE-AROME or AROME model.
 
-| Model on Open-Meteo | First day-1 global irradiance at Lincoln | Offsets served |
+| Model on Open-Meteo | First day-1 global irradiance at Lincoln | Offsets found served |
 |---|---|---|
 | ICON-D2 | 2024-01-19 | Day 1 |
 | Météo-France AROME France | 2024-01-19 | Day 1 |
