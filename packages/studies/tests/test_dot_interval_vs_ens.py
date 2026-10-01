@@ -12,19 +12,24 @@ sys.path.insert(0, str(_STUDY_DIR))
 sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
 
 from dot_interval_vs_ens import (  # noqa: E402
+    BLEND_PRODUCTS,
     FIRST_FIGURE_NUMBER,
+    PRODUCTS,
     SOURCES,
     Comparison,
     SourceType,
     _check_same_keys,
+    blend_rankings,
     chart_rows,
     comparisons,
     compute,
+    compute_plan,
     contrast_rows,
     draw,
     figure_title,
     footnotes_for,
     load_arms,
+    ranking_lines,
     repo_data_dir,
     report_text,
     subtitle_lines,
@@ -923,3 +928,288 @@ def test_the_arms_that_drop_their_own_null_days_hold_fewer_rows_than_their_refer
     assert held("ICON global", 4)[0] < held("ICON global", 4)[1]
     assert held("IFS HRES (9 km, Open-Meteo)", 4)[0] < held("IFS HRES (9 km, Open-Meteo)", 4)[1]
     assert held("ICON-EU", 4)[0] == held("ICON-EU", 4)[1]
+
+
+# --- The blend figures ---------------------------------------------------------------------------
+
+
+def _blend_plan(*, day: int = 1) -> list[Comparison]:
+    """Every blend dot at one day."""
+    return [c for c in comparisons(domain="solar", products=BLEND_PRODUCTS) if c.day == day]
+
+
+def test_each_blend_is_subtracted_from_the_ens_mean_beside_it_at_the_days_it_exists() -> None:
+    plan = {(c.label, c.day): c for c in comparisons(domain="solar", products=BLEND_PRODUCTS)}
+
+    conservative = plan[("ENS mean + ICON-EU (conservative lead)", 2)]
+    assert conservative.treatment == "blend_icon_eu_conservative_day2"
+    assert conservative.treatment_source == "product_blends_single"
+    assert (conservative.reference, conservative.reference_source) == (
+        "ens_mean_day2",
+        "aifs_single_blends",
+    )
+    aifs = plan[("ENS mean + AIFS Single", 14)]
+    assert (aifs.treatment, aifs.treatment_source) == (
+        "blend_aifs_single_day14",
+        "aifs_single_blends",
+    )
+    assert {day for (label, day) in plan if "ICON-EU" in label} == {1, 2}
+    assert {day for (label, day) in plan if "UKV" in label} == {1}
+    assert {day for (label, day) in plan if "AIFS" in label} == {1, 2, 7, 14}
+
+
+def test_the_weathernext_3_blend_reads_its_own_ens_mean_and_has_a_second_mark_in_both_domains() -> (
+    None
+):
+    for domain in ("solar", "wind"):
+        plan = {
+            c.day: c
+            for c in comparisons(domain=domain, products=BLEND_PRODUCTS)
+            if c.treatment.startswith("blend_wn3")
+        }
+
+        assert sorted(plan) == [1, 2, 7, 14]
+        for day, comparison in plan.items():
+            assert comparison.treatment_source == "product_blends_wn3"
+            # Wind too: the blend is column-matched with `ens_mean`, not `ens_meanvec`.
+            assert (comparison.reference, comparison.reference_source) == (
+                f"ens_mean_day{day}",
+                "product_blends_wn3",
+            )
+            assert comparison.leaderboard_reference == f"ens_mean_day{day}"
+            assert (
+                comparison.leaderboard_reference_source
+                == {
+                    1: "leads_day10",
+                    2: "leads_day10b",
+                    7: "leads_day10b",
+                    14: "leads_day10",
+                }[day]
+            )
+
+
+def test_the_single_product_plan_is_unchanged_by_the_blend_rows() -> None:
+    assert comparisons(domain="solar") == comparisons(domain="solar", products=PRODUCTS)
+    assert not [c for c in comparisons(domain="solar") if c.treatment.startswith("blend_")]
+
+
+def _write_blend_fixture(tmp_path: Path) -> None:
+    files: list[tuple[str, float, SourceType, int]] = [
+        ("ens_mean_day1", 0.10, "aifs_single_blends", 12),
+        ("blend_aifs_single_day1", 0.08, "aifs_single_blends", 12),
+        ("blend_icon_eu_day1", 0.085, "product_blends_single", 12),
+        ("blend_icon_eu_conservative_day1", 0.095, "product_blends_single", 12),
+        ("blend_ukv_day1", 0.09, "product_blends_single", 12),
+        # WeatherNext 3 holds 7 months, its own ENS mean, and a second mark against the
+        # leaderboards' ENS mean, which here is the decoy.
+        ("ens_mean_day1", 0.10, "product_blends_wn3", 7),
+        ("blend_wn3_day1", 0.09, "product_blends_wn3", 7),
+        ("ens_mean_day1", 0.12, "leads_day10", 12),
+    ]
+    for arm, error, source, months in files:
+        _write(
+            _arm(arm, error=error, months=months),
+            data_dir=tmp_path,
+            source=source,
+            domain="solar",
+            day=1,
+        )
+
+
+def test_a_blend_dot_is_the_blends_error_minus_the_ens_mean_beside_it(tmp_path: Path) -> None:
+    _write_blend_fixture(tmp_path)
+
+    rows = compute_plan(data_dir=tmp_path, domain="solar", plan=_blend_plan())
+
+    assert dict(zip(rows["label"], rows["value"], strict=True)) == pytest.approx(
+        {
+            "ENS mean + AIFS Single": -2.0,
+            "ENS mean + ICON-EU (optimistic lead)": -1.5,
+            "ENS mean + ICON-EU (conservative lead)": -0.5,
+            "ENS mean + UKV (optimistic upper bound)": -1.0,
+            "ENS mean + WeatherNext 3 (7 months)": -1.0,
+        }
+    )
+    wn3 = rows.filter(pl.col("label").str.contains("WeatherNext")).row(0, named=True)
+    # The second mark is against the leaderboards' ENS mean, not the file's own.
+    assert wn3["second_value"] == pytest.approx((0.09 - 0.12) * 100)
+    assert wn3["n_months"] == 7
+
+
+def test_c5_is_the_aifs_single_blend_minus_each_icon_eu_blend_at_days_1_and_2() -> None:
+    plan = blend_rankings(domain="wind")
+
+    assert [(c.day, c.treatment, c.reference) for c in plan] == [
+        (1, "blend_aifs_single_day1", "blend_icon_eu_conservative_day1"),
+        (1, "blend_aifs_single_day1", "blend_icon_eu_day1"),
+        (2, "blend_aifs_single_day2", "blend_icon_eu_conservative_day2"),
+        (2, "blend_aifs_single_day2", "blend_icon_eu_day2"),
+    ]
+    assert {(c.treatment_source, c.reference_source) for c in plan} == {
+        ("aifs_single_blends", "product_blends_single")
+    }
+
+
+def test_c5_subtracts_the_right_icon_eu_blend_and_raises_for_blends_on_different_rows(
+    tmp_path: Path,
+) -> None:
+    _write_blend_fixture(tmp_path)
+    plan = [c for c in blend_rankings(domain="solar") if c.day == 1]
+
+    rows = compute_plan(data_dir=tmp_path, domain="solar", plan=plan)
+
+    by_reference = dict(zip(rows["reference"], rows["value"], strict=True))
+    assert by_reference == pytest.approx(
+        {"blend_icon_eu_conservative_day1": -1.5, "blend_icon_eu_day1": -0.5}
+    )
+    # An ICON-EU blend that lacks a month the AIFS Single blend holds is refused.
+    other = tmp_path / "other"
+    _write_blend_fixture(other)
+    path = other / "nwp_forecast_comparison_product_blends" / "solar_single_day1_losses.parquet"
+    frame = pl.read_parquet(path)
+    frame.filter(~((pl.col("arm") == "blend_icon_eu_day1") & (pl.col("month") == 3))).write_parquet(
+        path
+    )
+    with pytest.raises(ValueError, match="only in blend_aifs_single_day1"):
+        compute_plan(data_dir=other, domain="solar", plan=plan)
+
+
+def test_the_blend_figure_and_report_say_what_each_dot_and_each_row_is(tmp_path: Path) -> None:
+    _write_blend_fixture(tmp_path)
+    rows = compute_plan(data_dir=tmp_path, domain="solar", plan=_blend_plan())
+    rankings = compute_plan(
+        data_dir=tmp_path,
+        domain="solar",
+        plan=[c for c in blend_rankings(domain="solar") if c.day == 1],
+    )
+
+    spec = str(draw(rows=rows, domain="solar", number=3, blends=True).to_dict())
+    text = report_text(rows={"solar": rows}, rankings={"solar": rankings})
+    subtitle = " ".join(subtitle_lines(domain="solar", rows=rows, blends=True))
+
+    assert "Figure 3:" in spec
+    assert figure_title(domain="solar", blends=True) == (
+        "For solar power, the error of the ENS mean plus one weather product, minus the "
+        "ENS mean alone's error, by lead day"
+    )
+    assert "Lead day 1" in spec
+    assert "no blend with UKV is ranked" in subtitle
+    assert "## C5: the AIFS Single blend minus each ICON-EU blend" in text
+    assert "ENS mean + AIFS Single minus ENS mean + ICON-EU (conservative lead)" in text
+    assert ranking_lines(rankings={"solar": rankings})[0].startswith("## C5")
+
+
+def test_the_blend_rows_that_were_planned_are_marked_and_the_others_exploratory(
+    tmp_path: Path,
+) -> None:
+    _write_blend_fixture(tmp_path)
+    rows = compute_plan(data_dir=tmp_path, domain="solar", plan=_blend_plan())
+
+    shaped = chart_rows(rows=rows, day=1, domain="solar", blends=True)
+
+    assert dict(zip(shaped["label"], shaped["planned"], strict=True)) == {
+        "ENS mean + AIFS Single": True,
+        "ENS mean + ICON-EU (conservative lead)": True,
+        "ENS mean + UKV (optimistic upper bound)": True,
+        "ENS mean + ICON-EU (optimistic lead)": False,
+        "ENS mean + WeatherNext 3 (7 months)": False,
+    }
+    spec = str(draw(rows=rows, domain="solar", number=1, blends=True).to_dict())
+    assert "(planned)" in spec
+    assert "All rows are exploratory" not in spec
+
+
+def test_each_blend_row_is_planned_only_at_the_days_the_plan_names() -> None:
+    labels = {
+        "aifs": "ENS mean + AIFS Single",
+        "cons": "ENS mean + ICON-EU (conservative lead)",
+        "opt": "ENS mean + ICON-EU (optimistic lead)",
+        "ukv": "ENS mean + UKV (optimistic upper bound)",
+        "wn3": "ENS mean + WeatherNext 3 (7 months)",
+    }
+    expected = {
+        ("aifs", 1): True,
+        ("aifs", 2): True,
+        ("aifs", 7): True,
+        ("aifs", 14): False,
+        ("cons", 1): True,
+        ("cons", 2): True,
+        ("opt", 1): False,
+        ("opt", 2): False,
+        ("ukv", 1): True,
+        **{("wn3", day): False for day in (1, 2, 7, 14)},
+    }
+    pairs = list(expected)
+    rows = pl.DataFrame(
+        {
+            "label": [labels[key] for key, _ in pairs],
+            "day": [day for _, day in pairs],
+            "value": [0.0] * len(pairs),
+            "has_interval": [True] * len(pairs),
+            "lower": [0.0] * len(pairs),
+            "upper": [0.0] * len(pairs),
+            "dashed": [False] * len(pairs),
+            "second_value": [None] * len(pairs),
+            "second_has_interval": [None] * len(pairs),
+            "second_lower": [None] * len(pairs),
+            "second_upper": [None] * len(pairs),
+            "second_dashed": [None] * len(pairs),
+        },
+        schema_overrides=dict.fromkeys(("second_value", "second_lower", "second_upper"), pl.Float64)
+        | {"second_has_interval": pl.Boolean, "second_dashed": pl.Boolean},
+    )
+
+    found = {}
+    for key, day in pairs:
+        shaped = chart_rows(rows=rows, day=day, domain="solar", blends=True)
+        found[(key, day)] = shaped.filter(pl.col("label") == labels[key])["planned"].to_list() == [
+            True
+        ]
+
+    assert found == expected
+
+
+def test_days_7_and_14_get_their_own_axis_and_say_so_in_the_panel_header(tmp_path: Path) -> None:
+    _write_blend_fixture(tmp_path)
+    files: list[tuple[str, float, SourceType, int]] = [
+        ("ens_mean_day7", 0.10, "aifs_single_blends", 12),
+        ("blend_aifs_single_day7", 0.08, "aifs_single_blends", 12),
+        ("ens_mean_day7", 0.10, "product_blends_wn3", 7),
+        ("blend_wn3_day7", 0.0, "product_blends_wn3", 7),
+        ("ens_mean_day7", 0.12, "leads_day10b", 12),
+    ]
+    for arm, error, source, months in files:
+        _write(
+            _arm(arm, error=error, months=months),
+            data_dir=tmp_path,
+            source=source,
+            domain="solar",
+            day=7,
+        )
+    day2_files: list[tuple[str, float, SourceType, int]] = [
+        ("ens_mean_day2", 0.10, "aifs_single_blends", 12),
+        ("blend_aifs_single_day2", 0.09, "aifs_single_blends", 12),
+        ("blend_icon_eu_day2", 0.095, "product_blends_single", 12),
+        ("blend_icon_eu_conservative_day2", 0.098, "product_blends_single", 12),
+        ("ens_mean_day2", 0.10, "product_blends_wn3", 7),
+        ("blend_wn3_day2", 0.09, "product_blends_wn3", 7),
+        ("ens_mean_day2", 0.12, "leads_day10b", 12),
+    ]
+    for arm, error, source, months in day2_files:
+        _write(
+            _arm(arm, error=error, months=months),
+            data_dir=tmp_path,
+            source=source,
+            domain="solar",
+            day=2,
+        )
+    plan = [c for c in comparisons(domain="solar", products=BLEND_PRODUCTS) if c.day in (1, 2, 7)]
+    rows = compute_plan(data_dir=tmp_path, domain="solar", plan=plan)
+
+    spec = str(draw(rows=rows, domain="solar", number=1, blends=True).to_dict())
+
+    assert spec.count("wider axis than days 1 and 2") == 1
+    assert "Lead day 7 (wider axis than days 1 and 2)" in spec
+    assert "'Lead day 1'" in spec
+    # Day 2 shares days 1's axis, so its header carries no note.
+    assert "'Lead day 2'" in spec
