@@ -312,37 +312,36 @@ paper's claim.
 
 ### How the AIFS papers and an independent study compare AIFS with ENS
 
-**The ECMWF papers on AIFS (Artificial Intelligence Forecasting System) compare ensembles with
-probabilistic scores, and an independent study of raw 10 m wind finds the opposite ranking from the
-ECMWF scorecards.** [Lang et al. (2026)](https://doi.org/10.1038/s44387-026-00073-7) train AIFS-CRPS
-on the almost fair CRPS (afCRPS) and compare it with the 9 km, 50-member IFS ensemble. We found no
-mention of post-processing of the IFS ensemble in the medium range. The paper reports CRPS,
-ensemble-mean root mean squared error, anomaly correlation, and spread, and describes the
-improvements as "in the range of 5-20%" without a separate figure for each metric. It discusses
-AIFS-CRPS's over-dispersion, and we found no discussion of under-dispersion in the IFS ensemble.
+**The ECMWF papers on AIFS (Artificial Intelligence Forecasting System) score raw ensembles with
+probabilistic scores, and find AIFS ahead of the IFS ensemble for most upper-air variables.** [Lang
+et al. (2026)](https://doi.org/10.1038/s44387-026-00073-7) train AIFS-CRPS on the almost fair CRPS
+(afCRPS) and compare it with the 9 km, 50-member IFS ensemble. We found no mention of
+post-processing of the IFS ensemble in the medium range. For most upper-air variables the paper
+reports lower CRPS and ensemble-mean root mean squared error and higher anomaly correlation, with
+improvements "in the range of 5–20%". Lang et al. discuss AIFS-CRPS's over-dispersion, and we found
+no discussion of under-dispersion in the IFS ensemble.
 
-**The ECMWF Newsletter on the operational AIFS ensemble reports a similar comparison.** [Lang et al.
-(2025)](https://www.ecmwf.int/en/newsletter/185/earth-system-science/aifs-ens-becomes-operational)
-compare AIFS ENS with IFS ENS on the same four scores, and we found no mention of post-processing.
-The authors write that improvements "reach up to 25%", and that for 10 m wind speed verified against
-surface synoptic observation (SYNOP) stations "IFS ENS is more skilful". They describe AIFS ENS as
-"currently overdispersive for a range of upper-air variables". The papers on the deterministic AIFS
-Single train on mean squared error, and we found no verification of an ensemble in them.
+**The ECMWF Newsletter on the operational AIFS ensemble reports a similar comparison.** [Lang and
+Magnusson (2025)](https://doi.org/10.21957/hg1z-pe65) compare AIFS ENS with IFS ENS on the same four
+scores, and we found no mention of post-processing. The authors write that improvements "reach up to
+25%" for upper-air variables, and that for 10 m wind speed verified against surface synoptic
+observation (SYNOP) stations "IFS ENS is more skilful". They describe AIFS ENS as "currently
+overdispersive for a range of upper-air variables".
 
 **An independent study finds raw AIFS ENS less skilful than raw IFS ENS for 10 m wind speed.**
 [Kocsis and Baran (2026)](https://arxiv.org/abs/2606.02508) verify 10 m wind speed at 9,246 SYNOP
 stations from July to November 2025. They score raw and post-processed versions of both ensembles.
 Raw AIFS scores worse than raw IFS at every lead time, with a CRPS skill score near -4% and a mean
 absolute error skill score near -3%. Post-processing shrinks the gap, which stays significant only
-at short lead times. Both raw ensembles are strongly under-dispersive.
+at short lead times and at days 14 and 15. Both raw ensembles are strongly under-dispersive.
 
-**What this means for the comparison on this page.** This study trains one XGBoost model per weather
-product on the generators' power, using that product's ensemble mean as input, so each XGBoost model
-can absorb the systematic bias of its product before the error is scored in percent of capacity.
-That setup is closer to how a forecasting service would use a weather product than a comparison of
-raw ensembles, and it answers how much information a weather-to-power model can extract from each
-product. Differences in spread do not reach a comparison built on the ensemble mean. The studies so
-far score the mean alone, and this page makes no comparison of calibrated probabilistic forecasts.
+**These papers rank weather forecasts against weather observations, which is a different question
+from the one this page answers.** This study fits an XGBoost model for each generator and each arm,
+from one product's forecast and calendar columns, and scores the power forecast in percent of
+capacity. The question is how much information an XGBoost model fitted to power can extract from
+each product. An arm reads ENS's mean, ENS's control member, AIFS Single, or AIFS ENS's mean. The
+XGBoost model can therefore learn a product's stable bias at each generator, but it never sees a
+product's spread. This page makes no comparison of calibrated probabilistic forecasts.
 
 ## Results
 
