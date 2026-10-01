@@ -842,16 +842,6 @@ def stage_losses(*, output_dir: Path, planned: PlannedStage, workers: int) -> pl
     return losses
 
 
-def refit_lines(*, planned: list[PlannedStage]) -> list[str]:
-    """List the AIFS Single (arm, setting) pairs that this run refits."""
-    return [
-        f"- {item.stage.domain} day {item.stage.day}: `{arm}` at {setting}"
-        for item in planned
-        if item.saved is not None
-        for arm, setting in missing_jobs(saved=item.saved, arms=reused_arms(day=item.stage.day))
-    ]
-
-
 def print_plan(*, planned: list[PlannedStage]) -> None:
     """Print every stage's fits, and the number of (arm, site) fits, without fitting."""
     total = 0
@@ -876,27 +866,50 @@ def run_product_blends(
     readme = output_dir / README_NAME
     if not readme.exists():
         readme.write_text(README_TEXT)
-    new = {
-        (item.stage.domain, item.stage.row_set, item.stage.day): stage_losses(
-            output_dir=output_dir, planned=item, workers=workers
-        )
-        for item in planned
-    }
+    for item in planned:
+        stage_losses(output_dir=output_dir, planned=item, workers=workers)
+    (output_dir / REPORT_NAME).write_text(
+        report_from_saved(output_dir=output_dir, reused_dir=reused_dir)
+    )
+    return 0
+
+
+def report_from_saved(*, output_dir: Path, reused_dir: Path) -> str:
+    """Return the report built from the saved losses alone, fitting nothing.
+
+    Args:
+        output_dir: The folder holding this script's saved losses, which is only read.
+        reused_dir: The AIFS blends folder whose saved losses the contrasts also read.
+
+    Returns:
+        `report_text`'s result, with the refitted AIFS Single pairs read from the saved losses.
+    """
     singles: dict[DomainType, dict[int, pl.DataFrame]] = {}
     wn3: dict[DomainType, dict[int, pl.DataFrame]] = {}
+    refits: list[str] = []
     for domain in fit_aifs.DOMAINS:
         singles[domain] = {}
         for day in single_days():
             saved = pl.read_parquet(reused_dir / f"{domain}_single_day{day}_losses.parquet")
-            fitted = new.get((domain, "single", day))
+            file = output_dir / f"{domain}_single_day{day}_losses.parquet"
+            fitted = pl.read_parquet(file) if file.exists() else None
             singles[domain][day] = combine_losses(
                 saved=saved, new=fitted, arms=reused_arms(day=day)
             )
-        wn3[domain] = {day: new[(domain, fit_aifs.WN3_ROW_SET, day)] for day in WN3_DAYS}
-    (output_dir / REPORT_NAME).write_text(
-        report_text(singles=singles, wn3=wn3, refits=refit_lines(planned=planned))
-    )
-    return 0
+            if fitted is not None:
+                refits += [
+                    f"- {domain} day {day}: `{arm}` at {setting}"
+                    for arm, setting in fitted.select("arm", "setting")
+                    .unique()
+                    .sort("arm", "setting")
+                    .iter_rows()
+                    if arm in reused_arms(day=day)
+                ]
+        wn3[domain] = {
+            day: pl.read_parquet(output_dir / f"{domain}_wn3_day{day}_losses.parquet")
+            for day in WN3_DAYS
+        }
+    return report_text(singles=singles, wn3=wn3, refits=refits)
 
 
 def run_check(*, planned: list[PlannedStage], reused_dir: Path) -> int:
@@ -947,6 +960,12 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="List the fits; fit nothing.")
     parser.add_argument("--check", action="store_true", help="Compare two GPU runs of one arm.")
     parser.add_argument(
+        "--report-dir",
+        type=Path,
+        help="Write only `report.md`, built from the saved losses in --output-dir, into this new "
+        "folder, and fit nothing.",
+    )
+    parser.add_argument(
         "--lookahead-cleared",
         action="store_true",
         help="Confirm that the run log of `build_wn3_inputs.py --read-store` and the page's "
@@ -962,6 +981,13 @@ def main() -> int:
         output_dir=args.output_dir,
         read_only=[args.published_dir, reused_dir, wn3_dir, existing_dir, *extra_dirs.values()],
     )
+    if args.report_dir is not None:
+        refuse_to_overwrite(paths=[args.report_dir / REPORT_NAME])
+        args.report_dir.mkdir(exist_ok=True)
+        (args.report_dir / REPORT_NAME).write_text(
+            report_from_saved(output_dir=args.output_dir, reused_dir=reused_dir)
+        )
+        return 0
     fit_aifs.require_lookahead_cleared(cleared=args.lookahead_cleared)
     if not args.dry_run:
         fit_aifs.check_gpu_visible()

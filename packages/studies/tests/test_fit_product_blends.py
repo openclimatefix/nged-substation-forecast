@@ -877,3 +877,38 @@ def test_a_blend_no_better_than_its_control_does_not_survive_even_with_a_widened
     assert float(row[6]) < 0.0
     assert float(row[7]) < 0.0
     assert row[-1] == "no"
+
+
+def test_a_report_can_be_built_from_the_saved_losses_into_a_new_folder_without_fitting(
+    stub_fit: None, few_resamples: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    reused, planned = _world(tmp_path)
+    output = tmp_path / OUTPUT_DIR_NAME
+    run_product_blends(planned=planned, output_dir=output, reused_dir=reused, workers=1)
+    original = (output / "report.md").read_text()
+    saved_files = sorted(p.name for p in output.iterdir())
+
+    def no_fit(**kwargs: object) -> pl.DataFrame:
+        raise AssertionError("a report must not fit")
+
+    monkeypatch.setattr(fit_aifs, "out_of_fold_losses", no_fit)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "fit_product_blends.py",
+            "--published-dir",
+            str(tmp_path / "nwp_forecast_comparison"),
+            "--output-dir",
+            str(output),
+            "--report-dir",
+            str(tmp_path / "report_copy"),
+        ],
+    )
+
+    assert fpb.main() == 0
+
+    assert (tmp_path / "report_copy" / "report.md").read_text() == original
+    assert sorted(p.name for p in output.iterdir()) == saved_files
+    with pytest.raises(FileExistsError):
+        fpb.main()
