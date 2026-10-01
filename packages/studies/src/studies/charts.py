@@ -794,6 +794,7 @@ def interval_panel(
     row_step_px: int = _ROW_STEP_PX,
     other_shape: str = "diamond",
     other_offset_px: int = _OTHER_OFFSET_PX,
+    row_bands: bool = False,
 ) -> alt.LayerChart | alt.VConcatChart:
     """Draw one panel of dots and 95% interval lines beside a labelled zero rule.
 
@@ -865,6 +866,10 @@ def interval_panel(
         other_shape: The point shape of the `other_difference` mark, always drawn hollow.
         other_offset_px: How far above and below the row's centre, in pixels, a row with an
             `other_difference` draws its two marks, so the two intervals do not overlap.
+        row_bands: Whether to draw a band of `ocf.GREY_2` behind every second product row, the
+            second, fourth, and so on, so a reader can tell which marks belong to which row label.
+            Each band is as tall as its row, including both marks of a row that has two, and spans
+            the plot's width. The bands are the first layer, so every other mark draws over them.
 
     Returns:
         The panel, under its keys where it has any.
@@ -994,8 +999,9 @@ def interval_panel(
             _value_label_layers(data=data, x_domain=x_domain, x_scale=x_scale, width=width)
         )
     offset_positions = len(conditions) if "yOffset" in encodings else 1
+    bands = _row_band_layers(labels=labels, width=width) if row_bands else []
     panel = alt.LayerChart(
-        layer=[*reference, *interval_layers, *points],
+        layer=[*bands, *reference, *interval_layers, *points],
         width=width,
         height=alt.Step(row_step_px / offset_positions),
         title=alt.TitleParams(panel_title, anchor="start", frame="group", fontSize=_PANEL_TITLE_PX),
@@ -1037,6 +1043,37 @@ def interval_panel(
             )
         )
     return alt.vconcat(*keys, panel, spacing=8) if keys else panel
+
+
+def _row_band_layers(*, labels: Sequence[str], width: int) -> list[alt.Chart]:
+    """Return the layer drawing a light band behind every second row, or none for a single row.
+
+    Args:
+        labels: The panel's row labels, top to bottom.
+        width: The plot's width in pixels.
+
+    Returns:
+        A list of one bar layer, or an empty list where no row is banded.
+    """
+    banded = list(labels)[1::2]
+    if not banded:
+        return []
+    return [
+        alt.Chart(pl.DataFrame({"label": banded}))
+        .mark_bar(
+            color=ocf.GREY_2,
+            height={"band": 1},
+            stroke=None,
+            clip=True,
+            aria=False,
+            tooltip=None,
+        )
+        .encode(  # ty: ignore[unresolved-attribute]
+            y=alt.Y("label:N", sort=list(labels), title=None),
+            x=alt.value(0),
+            x2=alt.value(width),
+        )
+    ]
 
 
 def _value_label_layers(

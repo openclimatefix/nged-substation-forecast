@@ -37,7 +37,9 @@ share, each mark with its own interval. An interval from fewer than 12 months is
 
 WN3 appears only as the pooled row, which covers 7 months (February to April and June to September
 2026). The script writes `report.md`, `intervals.parquet`, and `README.md` to a new output folder,
-and one SVG per technology. It refuses to overwrite any of them.
+and one SVG per technology. It refuses to overwrite any of them, except that `--replace-svgs`
+redraws only the SVGs, with a light grey band behind every second product row, and leaves the
+output folder untouched. The `--blends` figures draw no bands.
 
 **`--blends` draws ENS plus one product instead.** Each row is an XGBoost model given the ENS
 mean's columns plus one product's columns (AIFS Single, ICON-EU at the optimistic and at the
@@ -1013,7 +1015,12 @@ def subtitle_lines(*, domain: DomainType, rows: pl.DataFrame, blends: bool = Fal
 
 
 def draw(
-    *, rows: pl.DataFrame, domain: DomainType, number: int, blends: bool = False
+    *,
+    rows: pl.DataFrame,
+    domain: DomainType,
+    number: int,
+    blends: bool = False,
+    row_bands: bool = False,
 ) -> alt.VConcatChart:
     """Draw one technology's figure: one panel per lead day.
 
@@ -1022,6 +1029,7 @@ def draw(
         domain: `solar` or `wind`.
         number: The figure's number on the page.
         blends: Whether the figure draws ENS plus one product instead of single products.
+        row_bands: Whether every second product row gets a light grey band behind it.
 
     Returns:
         The figure.
@@ -1055,6 +1063,7 @@ def draw(
             figure_planning=figure_planning,
             colour_by_family=True,
             row_step_px=ROW_STEP_PX,
+            row_bands=row_bands,
         )
         for index, day in enumerate(days)
     ]
@@ -1412,6 +1421,14 @@ def main() -> int:
     )
     parser.add_argument("--no-svgo", action="store_true", help="Skip the svgo optimisation.")
     parser.add_argument(
+        "--replace-svgs",
+        action="store_true",
+        help=(
+            "Redraw only the SVGs, replacing any that exist, and write nothing to --output-dir, "
+            "which must already hold the first run's files."
+        ),
+    )
+    parser.add_argument(
         "--blends",
         action="store_true",
         help="Draw ENS plus one product instead of the single products. Needs --output-dir.",
@@ -1436,31 +1453,41 @@ def main() -> int:
     files = ("report.md", "intervals.parquet", "README.md", *(("rankings.parquet",) * args.blends))
     stem = "blends_vs_ens" if args.blends else "dots_vs_ens"
     svgs = {domain: args.svg_dir / f"nwp_forecast_{domain}_{stem}.svg" for domain in DOMAINS}
-    taken = [args.output_dir, *(args.output_dir / name for name in files), *svgs.values()]
-    existing = [path for path in taken if path.exists()]
-    if existing:
-        msg = f"{existing} exist; this script writes each output once"
-        raise FileExistsError(msg)
+    if args.replace_svgs:
+        if not args.output_dir.is_dir():
+            msg = f"{args.output_dir} is missing; --replace-svgs redraws the SVGs of a finished run"
+            raise FileNotFoundError(msg)
+    else:
+        taken = [args.output_dir, *(args.output_dir / name for name in files), *svgs.values()]
+        existing = [path for path in taken if path.exists()]
+        if existing:
+            msg = f"{existing} exist; this script writes each output once"
+            raise FileExistsError(msg)
     charts = {
         domain: draw(
             rows=rows[domain],
             domain=domain,
             number=args.first_figure_number + index,
             blends=args.blends,
+            row_bands=not args.blends,
         )
         for index, domain in enumerate(DOMAINS)
     }
-    args.output_dir.mkdir(parents=True, exist_ok=False)
-    write_once(path=args.output_dir / "report.md", write=report_text(rows=rows, rankings=rankings))
-    write_once(path=args.output_dir / "intervals.parquet", write=pl.concat(rows.values()))
-    readme = BLENDS_README_TEXT if args.blends else readme_text(rows=rows)
-    write_once(path=args.output_dir / "README.md", write=readme)
-    if rankings is not None:
+    if not args.replace_svgs:
+        args.output_dir.mkdir(parents=True, exist_ok=False)
         write_once(
-            path=args.output_dir / "rankings.parquet",
-            write=pl.concat(rankings.values(), how="vertical_relaxed"),
+            path=args.output_dir / "report.md", write=report_text(rows=rows, rankings=rankings)
         )
+        write_once(path=args.output_dir / "intervals.parquet", write=pl.concat(rows.values()))
+        readme = BLENDS_README_TEXT if args.blends else readme_text(rows=rows)
+        write_once(path=args.output_dir / "README.md", write=readme)
+        if rankings is not None:
+            write_once(
+                path=args.output_dir / "rankings.parquet",
+                write=pl.concat(rankings.values(), how="vertical_relaxed"),
+            )
     for domain, path in svgs.items():
+        path.unlink(missing_ok=True)
         write_once(path=path, write=charts[domain])
         if not args.no_svgo:
             optimise(path=path)
