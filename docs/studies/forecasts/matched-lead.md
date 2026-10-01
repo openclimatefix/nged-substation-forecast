@@ -803,7 +803,8 @@ the three wind farms the P4b blend has a lower error.
 ### A blend lowers the wind error at both leads tested, and the solar error only at an optimistic lead
 
 **A blend of ENS, ICON-EU, and IFS 0.25° lowers the wind error at both leads tested, and lowers the
-solar error only at the optimistic lead.**
+solar error only at the optimistic lead.** [Which single weather forecast should be added to
+ECMWF's ensemble mean first?](blends-with-ens.md) compares blends of ENS with one product at a time.
 
 **Blend P4a adds ICON-EU and IFS 0.25° at their day 1 and blend P4b at their day 2, and P4b decides
 the verdict because a live service could have read every value it adds.** Each blend gives one

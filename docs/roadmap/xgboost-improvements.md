@@ -1375,6 +1375,11 @@ arrived; [masking whole
 sources](../techniques/encoders.md#handling-missing-inputs-remove-the-token-dont-zero-fill) sets out
 what that precedent does and does not cover.
 
+**The [blends
+page](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/blends-with-ens/)
+names AIFS Single as the first product to add to ENS only for solar at day 2, and finds AIFS Single
+and ICON-EU not separable elsewhere.**
+
 **A second weather product helped a past-weather solar measurement, but the day-ahead study finds
 no detectable solar gain at a conservative lead, and it puts a size on the wind gain.** A
 [comment on issue #810](https://github.com/openclimatefix/nged-substation-forecast/issues/810#issuecomment-5785179619)
