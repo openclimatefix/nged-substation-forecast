@@ -1,8 +1,8 @@
 # Past-weather studies
 
-**Three studies score how well each weather product describes weather that has already happened, at
-the metered generators in Flexpectation's trial area in Lincolnshire.** Each study fits one XGBoost
-model per generator and scores it by mean absolute error as a percentage of the generator's
+**The studies below score how well each weather product describes weather that has already happened,
+at the metered generators in Flexpectation's trial area in Lincolnshire.** Each study fits one
+XGBoost model per generator and scores it by mean absolute error as a percentage of the generator's
 capacity. The parts of this project that read past weather are capacity estimation, training
 history, historical features, and disaggregation, and each reads one weather product.
 
@@ -19,6 +19,11 @@ history, historical features, and disaggregation, and each reads one weather pro
   also beats ERA5; and ICON global has the largest error of the
   five, about half of its gap to ICON-EU a pair of steps in the wind Open-Meteo's archive serves for
   it at one generator.
+- [CERRA's and NORA3's wind against ERA5's](reanalysis-wind.md) — at the three wind farms, an
+  XGBoost model given CERRA's 100 m wind has a higher error than an XGBoost model given ERA5's,
+  mostly at one farm, and an XGBoost model given NORA3's 100 m wind does not differ clearly from
+  ERA5's. The page does not rank CERRA against NORA3, and ICON-D2 has the lowest estimated error in
+  both blocks.
 - [Does blending CERRA's wind heights beat one height?](cerra-wind-levels.md) — at three wind
   farms, an XGBoost model given CERRA's 10 m and 100 m wind speeds has lower error than one given
   100 m alone, and the pair gives most of the gain of using four or five heights. CERRA is a
@@ -33,7 +38,7 @@ history, historical features, and disaggregation, and each reads one weather pro
   compared, beats CAMS's split with its neighbouring hours by 0.18 points and plain CAMS's split by
   0.20 points, on a longer row set from January 2021.
 
-**The [Methods page](methods.md) states what the three studies share.** The Methods page holds the
+**The [Methods page](methods.md) states what the studies share.** The Methods page holds the
 row sets and their site-hours, the capacity normalisation, the month-block folds, the bootstrap
 intervals, the rule for planned and exploratory comparisons with the list of planned contrasts, the
 second hyperparameter setting, and the limits every study shares.
