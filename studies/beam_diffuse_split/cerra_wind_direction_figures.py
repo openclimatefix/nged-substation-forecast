@@ -13,8 +13,8 @@ Wind farms appear only as `W1` to `W3`, and no figure carries a calendar date. E
 with `aria=False`.
 
 **The script refuses to overwrite a figure that exists.** Move an old figure out of the way
-first. `--dry-run` reads and checks everything, builds the three figures in memory, and writes
-nothing.
+first. `--dry-run` reads and checks everything, builds the figures in memory, and writes nothing.
+`--only-missing` leaves every figure that exists untouched and draws only the others.
 
 Run it with
 `uv run python studies/beam_diffuse_split/cerra_wind_direction_figures.py`, then optimise each
@@ -519,17 +519,23 @@ def main() -> int:
         action="store_true",
         help="Read and check everything and build the figures in memory, but write nothing.",
     )
+    parser.add_argument(
+        "--only-missing",
+        action="store_true",
+        help="Skip every figure whose SVG already exists, without overwriting or deleting it, "
+        "and draw only the missing ones.",
+    )
     arguments = parser.parse_args()
     paths = {number: ASSETS_DIR / name for number, name in FIGURE_FILES.items()}
+    skipped = [number for number, path in paths.items() if arguments.only_missing and path.exists()]
+    wanted = [number for number in paths if number not in skipped]
     if not arguments.dry_run:
-        refuse_to_overwrite(paths=paths.values())
+        refuse_to_overwrite(paths=[paths[number] for number in wanted])
     intervals = pl.read_parquet(OUTPUT_DIR / "intervals.parquet")
     report = (OUTPUT_DIR / "report.md").read_text()
-    figures = {
-        1: planned_figure(intervals=intervals, report=report),
-        2: veer_figure(intervals=intervals, report=report),
-        3: farms_figure(intervals=intervals, report=report),
-    }
+    builders = {1: planned_figure, 2: veer_figure, 3: farms_figure}
+    figures = {number: builders[number](intervals=intervals, report=report) for number in wanted}
+    _LOG.info("skipped (SVG exists): %s; drawing: %s", skipped or "none", wanted or "none")
     for number, chart in figures.items():
         if arguments.dry_run:
             _LOG.info("dry run: figure %d built and checked, would write %s", number, paths[number])
