@@ -174,11 +174,26 @@ def _solar_weather_fields(*, prefix: str) -> tuple[str, str]:
     return (f"{prefix}_ghi", f"{prefix}_temp")
 
 
+UKV_CEDA_PREFIX: Final[str] = "ukv_ceda"
+"""The start of every UKV-CEDA weather-column prefix, such as `ukv_ceda_day2` and its shuffled
+copies. UKV-CEDA serves its own 10 m and 925 hPa winds, not the 100 m wind of the other products."""
+
+
 def _wind_weather_fields(*, prefix: str) -> tuple[str, str, str, str]:
     """Return one product's four wind weather columns.
 
-    Hub-height speed, direction sine and cosine, then 10 m speed.
+    Hub-height speed, direction sine and cosine, then 10 m speed. A UKV-CEDA prefix has no 100 m
+    wind, so its four columns are the 10 m speed, the 10 m direction sine and cosine, and the
+    925 hPa speed, in that order: `fit_aifs.add_shuffled_columns` shuffles the second and third
+    columns together as one direction.
     """
+    if prefix.startswith(UKV_CEDA_PREFIX):
+        return (
+            f"{prefix}_speed_10m",
+            f"{prefix}_sin_10m",
+            f"{prefix}_cos_10m",
+            f"{prefix}_speed_925hpa",
+        )
     return (
         f"{prefix}_speed_100m",
         f"{prefix}_sin_100m",

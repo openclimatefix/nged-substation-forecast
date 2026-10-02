@@ -308,20 +308,25 @@ BLEND_AIFS_PREFIXES: Final[dict[str, str]] = {
     "icon_eu": "icon_eu_day{day}",
     "icon_eu_conservative": "icon_eu_day{next_day}",
     "ukv": "ukv_day{day}",
+    "ukv_ceda": "ukv_ceda_day{day}",
     "wn3": "wn3_mean_day{day}",
 }
 """Each blend's second product, to the weather-column prefix of that product at one day. The
 conservative ICON-EU blend reads the product one day older than ENS's mean (published blend P4b)."""
 
-BlendRoleType = Literal["", "_control", "_mirror"]
-"""A blend arm's role: the blend itself, its control (AIFS shuffled), or its mirror control (ENS
-shuffled)."""
+BlendRoleType = Literal["", "_control", "_control_b", "_mirror", "_pad"]
+"""A blend arm's role: the blend itself, its control (the second product shuffled), the control under
+the second shuffle seed, its mirror control (ENS shuffled), or ENS's mean padded to the blend's
+column count with exact copies of its own columns."""
+
+COPY_SUFFIX: Final[str] = "_copy"
+"""Appended to ENS's mean prefix to name the exact copies of its columns that pad `_pad` arms."""
 
 _P4_ARM: Final[re.Pattern[str]] = re.compile(r"blend_(p4a|p4b)(_control|_control_b)?")
 """The published P4 blends and their two controls: the first shuffle and the second seed's."""
 
 _BLEND_ARM: Final[re.Pattern[str]] = re.compile(
-    rf"{BLEND_PREFIX}({'|'.join(BLEND_AIFS_PREFIXES)})_day(\d+)(_control|_mirror)?"
+    rf"{BLEND_PREFIX}({'|'.join(BLEND_AIFS_PREFIXES)})_day(\d+)(_control|_control_b|_mirror|_pad)?"
 )
 _DAY_OF_PREFIX: Final[re.Pattern[str]] = re.compile(r".*_day(\d+)")
 
@@ -337,12 +342,14 @@ def arm_prefixes(*, arm: str) -> tuple[str, ...]:
     Args:
         arm: An arm's name; `NO_DOY_SUFFIX` marks the refit without `day_of_year`. A blend arm is
             `blend_<product>_day<N>`, where the product is a key of `BLEND_AIFS_PREFIXES`, with an
-            optional `_control` or `_mirror`.
-            Any other arm is its own prefix.
+            optional role: `_control`, `_control_b`, `_mirror`, or `_pad`. Any other arm is its
+            own prefix.
 
     Returns:
-        A single product's prefix, or, for a blend, ENS's mean first and then the AIFS product's,
-        with the shuffled side carrying `PERMUTED` in its prefix for a control or mirror control.
+        A single product's prefix, or, for a blend, ENS's mean first and then the second product's.
+        The shuffled side carries `PERMUTED` in its prefix for a control (`_control_b` adds the
+        second seed's variant) or mirror control. A `_pad` arm shows ENS's mean and then the
+        prefix of its exact copy (`COPY_SUFFIX`).
     """
     name = arm.removesuffix(NO_DOY_SUFFIX)
     published = _P4_ARM.fullmatch(name)
@@ -360,8 +367,12 @@ def arm_prefixes(*, arm: str) -> tuple[str, ...]:
     ens = f"ens_mean_day{day}"
     if role == "_control":
         aifs = shuffled_prefix(source=aifs)
+    elif role == "_control_b":
+        aifs = shuffled_prefix(source=aifs, variant="_b")
     elif role == "_mirror":
         ens = shuffled_prefix(source=ens)
+    elif role == "_pad":
+        aifs = f"{ens}{COPY_SUFFIX}"
     return (ens, aifs)
 
 
@@ -1507,12 +1518,27 @@ def product_blend_arms(*, row_set: str, day: int) -> tuple[str, ...]:
 
 
 def control_shuffles(*, arms: Sequence[str]) -> dict[str, tuple[str, ...]]:
-    """Return the prefixes to shuffle, under the first seed, for every control arm in `arms`."""
-    return {
-        arm_prefixes(arm=arm)[1].removesuffix(PERMUTED): ("",)
-        for arm in arms
-        if arm.endswith("_control")
-    }
+    """Return the prefixes to shuffle for every control arm in `arms`, with their seed variants.
+
+    Args:
+        arms: The arms to be fitted.
+
+    Returns:
+        Each shuffled product's prefix to the variants of `SHUFFLE_SEEDS` to build for it: the
+        first seed (`""`) for a `_control` arm and the second (`"_b"`) for a `_control_b` arm of a
+        blend.
+    """
+    variants: dict[str, list[str]] = {}
+    for arm in arms:
+        if arm.endswith("_control"):
+            variant = ""
+        elif arm.endswith("_control_b") and _BLEND_ARM.fullmatch(arm):
+            variant = "_b"
+        else:
+            continue
+        source = arm_prefixes(arm=arm)[1].removesuffix(f"{PERMUTED}{variant}")
+        variants.setdefault(source, []).append(variant)
+    return {source: tuple(found) for source, found in variants.items()}
 
 
 def blend_contrasts(*, row_set: str, day: int) -> list[Contrast]:

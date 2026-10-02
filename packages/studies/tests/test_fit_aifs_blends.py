@@ -15,6 +15,7 @@ sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
 
 import fit_aifs  # noqa: E402
 import nwp_forecast_charts as charts  # noqa: E402
+import nwp_forecast_comparison  # noqa: E402
 from build_forecast_inputs import (  # noqa: E402
     AIFS_VALUE_COLUMNS,
     aifs_members_frame,
@@ -1739,3 +1740,174 @@ def test_a_missing_wn3_run_is_named_for_the_blend_and_not_for_its_control():
         check_wn3_runs_present(frame=frame, domain="wind", arms=("wn3_mean_day1",))
     # A control shows shuffled WN3 columns, so it needs no run of its own.
     check_wn3_runs_present(frame=frame, domain="wind", arms=("blend_wn3_day1_control",))
+
+
+# --- the UKV-CEDA blend ---------------------------------------------------------------------------
+
+_SOLAR_CALENDAR = (
+    "hour_of_day",
+    "day_of_year",
+    "era_code",
+    "solar_elevation_deg",
+    "solar_azimuth_deg",
+)
+_WIND_CALENDAR = ("hour_of_day", "day_of_year", "era_code")
+_ENS_WIND = (
+    "ens_mean_day2_speed_100m",
+    "ens_mean_day2_sin_100m",
+    "ens_mean_day2_cos_100m",
+    "ens_mean_day2_speed_10m",
+)
+
+
+def _ukv_ceda_wind(*, prefix: str) -> tuple[str, ...]:
+    return tuple(
+        f"{prefix}_{field}" for field in ("speed_10m", "sin_10m", "cos_10m", "speed_925hpa")
+    )
+
+
+@pytest.mark.parametrize(
+    ("role", "solar_weather", "wind_weather"),
+    [
+        (
+            "",
+            ("ens_mean_day2_ghi", "ens_mean_day2_temp", "ukv_ceda_day2_ghi", "ukv_ceda_day2_temp"),
+            (*_ENS_WIND, *_ukv_ceda_wind(prefix="ukv_ceda_day2")),
+        ),
+        (
+            "_control",
+            (
+                "ens_mean_day2_ghi",
+                "ens_mean_day2_temp",
+                "ukv_ceda_day2_permuted_ghi",
+                "ukv_ceda_day2_permuted_temp",
+            ),
+            (*_ENS_WIND, *_ukv_ceda_wind(prefix="ukv_ceda_day2_permuted")),
+        ),
+        (
+            "_control_b",
+            (
+                "ens_mean_day2_ghi",
+                "ens_mean_day2_temp",
+                "ukv_ceda_day2_permuted_b_ghi",
+                "ukv_ceda_day2_permuted_b_temp",
+            ),
+            (*_ENS_WIND, *_ukv_ceda_wind(prefix="ukv_ceda_day2_permuted_b")),
+        ),
+        (
+            "_pad",
+            (
+                "ens_mean_day2_ghi",
+                "ens_mean_day2_temp",
+                "ens_mean_day2_copy_ghi",
+                "ens_mean_day2_copy_temp",
+            ),
+            (
+                *_ENS_WIND,
+                "ens_mean_day2_copy_speed_100m",
+                "ens_mean_day2_copy_sin_100m",
+                "ens_mean_day2_copy_cos_100m",
+                "ens_mean_day2_copy_speed_10m",
+            ),
+        ),
+    ],
+    ids=["blend", "control", "second-control", "pad"],
+)
+def test_a_ukv_ceda_arm_lists_the_columns_of_its_role_in_order(
+    role: str, solar_weather: tuple[str, ...], wind_weather: tuple[str, ...]
+):
+    arm = blend_arm_name(product="ukv_ceda", day=2, role=role)
+
+    assert arm_features(arm=arm, domain="solar") == (*_SOLAR_CALENDAR, *solar_weather)
+    assert arm_features(arm=arm, domain="wind") == (*_WIND_CALENDAR, *wind_weather)
+
+
+@pytest.mark.parametrize("role", ["", "_control", "_control_b", "_pad"])
+@pytest.mark.parametrize(("domain", "count"), [("solar", 9), ("wind", 11)])
+def test_every_ukv_ceda_arm_holds_the_blends_column_count(
+    role: str, domain: DomainType, count: int
+):
+    arm = blend_arm_name(product="ukv_ceda", day=3, role=role)
+
+    assert expected_column_count(arm=arm, domain=domain) == count
+    assert len(arm_features(arm=arm, domain=domain)) == count
+
+
+def test_the_ukv_blend_name_does_not_swallow_the_ukv_ceda_blend_name():
+    assert arm_prefixes(arm="blend_ukv_day1") == ("ens_mean_day1", "ukv_day1")
+    assert arm_prefixes(arm="blend_ukv_ceda_day1") == ("ens_mean_day1", "ukv_ceda_day1")
+
+
+def test_the_ukv_ceda_wind_columns_sit_in_the_order_the_shuffle_groups_them():
+    # `add_shuffled_columns` groups wind fields by position: (speed), (sin, cos), (speed 925 hPa).
+    fields = nwp_forecast_comparison._wind_weather_fields(prefix="ukv_ceda_day1")
+
+    assert fields[1:3] == ("ukv_ceda_day1_sin_10m", "ukv_ceda_day1_cos_10m")
+    assert fields[0].endswith("speed_10m")
+    assert fields[3].endswith("speed_925hpa")
+
+
+@pytest.mark.parametrize(
+    "prefix", [*nwp_forecast_comparison.PLANNED_PREFIXES, "ukv_day1", "ukv_day1_permuted"]
+)
+def test_every_other_products_wind_columns_are_unchanged(prefix: str):
+    assert nwp_forecast_comparison.arm_columns(domain="wind", prefixes=(prefix,)) == (
+        *_WIND_CALENDAR,
+        f"{prefix}_speed_100m",
+        f"{prefix}_sin_100m",
+        f"{prefix}_cos_100m",
+        f"{prefix}_speed_10m",
+    )
+
+
+def test_a_ukv_ceda_wind_shuffle_moves_the_direction_columns_together_and_the_speeds_apart():
+    source = "ukv_ceda_day2"
+    frame = _shuffle_frame(domain="wind").with_columns(angle=pl.col("value") * 0.37)
+    frame = frame.with_columns(
+        **{
+            f"{source}_speed_10m": pl.col("value"),
+            f"{source}_sin_10m": pl.col("angle").sin(),
+            f"{source}_cos_10m": pl.col("angle").cos(),
+            f"{source}_speed_925hpa": pl.col("value") + 1000.0,
+        }
+    )
+
+    shuffled = add_shuffled_columns(frame=frame, domain="wind", shuffles={source: ("",)})
+
+    permuted = f"{source}_permuted"
+    norm = shuffled[f"{permuted}_sin_10m"] ** 2 + shuffled[f"{permuted}_cos_10m"] ** 2
+    assert np.allclose(norm.to_numpy(), 1.0)
+    # The two speeds are shuffled under different seeds, so they no longer move in step.
+    moved_10m = shuffled[f"{permuted}_speed_10m"].to_numpy()
+    moved_925 = shuffled[f"{permuted}_speed_925hpa"].to_numpy() - 1000.0
+    assert not np.array_equal(moved_10m, moved_925)
+
+
+def test_a_second_seed_control_asks_for_the_second_variant_and_both_controls_ask_for_both():
+    first = blend_arm_name(product="ukv_ceda", day=1, role="_control")
+    second = blend_arm_name(product="ukv_ceda", day=1, role="_control_b")
+
+    assert control_shuffles(arms=(second,)) == {"ukv_ceda_day1": ("_b",)}
+    assert control_shuffles(arms=(first, second)) == {"ukv_ceda_day1": ("", "_b")}
+    assert control_shuffles(arms=(blend_arm_name(product="ukv_ceda", day=1, role="_pad"),)) == {}
+
+
+def test_the_published_p4_second_control_is_still_left_to_its_own_guard():
+    assert control_shuffles(arms=("blend_p4a_control_b", "blend_p4a")) == {}
+
+
+@pytest.mark.parametrize("domain", ["solar", "wind"])
+def test_fit_jobs_accepts_every_ukv_ceda_arm_at_the_blends_column_count(
+    stub_fit: None, domain: DomainType
+):
+    arms = [
+        blend_arm_name(product="ukv_ceda", day=2, role=role)
+        for role in ("", "_control", "_control_b", "_pad")
+    ]
+    frame = _frame_with(arms=arms, domain=domain)
+
+    losses = fit_jobs(
+        frame=frame, domain=domain, jobs=[(arm, "primary") for arm in arms], workers=1
+    )
+
+    assert set(losses["arm"]) == set(arms)
