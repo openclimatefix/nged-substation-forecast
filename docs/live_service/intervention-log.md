@@ -89,6 +89,7 @@ counting the good weeks of an excluded window while discounting the bad weeks.
 | 2026-08-13 19:56 | Sentry alarm — but from the pre-v0.2 code on a laptop, not from AWS | `upstream-outage` | <5 | yes | Dynamical.org first published the 2026-08-09 00Z ECMWF run with a variable wholly missing, and v0.1 treated that as fatal, so the partition was re-materialised by hand. Four forecast slots ran on the previous day's run in the meantime. [#493](https://github.com/openclimatefix/nged-substation-forecast/pull/493) added the retry that covers it |
 | 2026-09-23 19:00 | Building the v0.2.1 image failed | `our-bug` | 20 | no | `data/` on the workstation is a symlink to another disk, and the build script's `COPY data/production_model/` sent the symlink itself rather than its target, so the build failed with "not found". Worked around with a worktree holding a real copy of the model, then fixed properly in [#864](https://github.com/openclimatefix/nged-substation-forecast/pull/864), which passes the model to the build as a named build context resolved with `realpath` |
 | 2026-09-23 19:10 | `apt full-upgrade` on the control-plane box lost its SSH session mid-run | `infrastructure` | 15 | no | Upgrading Tailscale restarted `tailscaled`, which carried the SSH session away and left `apt` waiting on a `needrestart` prompt with nobody to answer it. Killed the stuck `needrestart` process, then finished with `dpkg --configure -a` and a `NEEDRESTART_MODE=a apt full-upgrade` inside `tmux`, so a dropped connection can no longer strand the prompt |
+| 2026-10-02 15:15 | Failed scheduled `ecmwf_ens` runs on 2026-10-01 and 2026-10-02 | `upstream-outage` | 10 | no | Both 08:30 UTC runs failed on missing values in Dynamical.org's store (the cause on 2026-10-01 is not established) and `ecmwf_ens` does not retry that failure ([#1020](https://github.com/openclimatefix/nged-substation-forecast/issues/1020)), so `ecmwf_ens_schedule`'s cron was hot-patched in the code-server container on the control-plane box until [#1022](https://github.com/openclimatefix/nged-substation-forecast/pull/1022) moves it to 10:30 UTC |
 
 ## Periods covered
 
@@ -99,7 +100,7 @@ with no stated period is indistinguishable from a log nobody kept.
 |---|---|---|---|---|
 | 2026-07-15 18:00 UTC → 2026-08-14 00:00 UTC | v0.1 | 28 time series, 6-hourly `live_forecasts` on AWS | 1 | No — pre-v1.0 |
 | 2026-08-14 00:00 UTC → 2026-09-23 18:00 UTC | v0.2 | 31 time series, 6-hourly `live_forecasts` on AWS, with `live_forecasts_are_healthy` reporting on each slot | 0 | No — pre-v1.0 |
-| 2026-09-23 18:00 UTC → ongoing | v0.2.1 | 31 time series, 6-hourly `live_forecasts` on AWS, under a champion retrained on corrected NGED timestamps | 2 | No — pre-v1.0 |
+| 2026-09-23 18:00 UTC → ongoing | v0.2.1 | 31 time series, 6-hourly `live_forecasts` on AWS, under a champion retrained on corrected NGED timestamps | 3 | No — pre-v1.0 |
 
 Figures for the v0.2 period below are stated as of **08:00 UTC on 28 August 2026**, after that day's
 06:00 UTC slot. Every count in this section moves within the day, so the as-of instant is part of

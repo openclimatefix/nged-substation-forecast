@@ -61,19 +61,21 @@ ecmwf_ens_job = define_asset_job(
     hooks={sentry_capture_failure},
     description=(
         "Download the day's ECMWF ENS NWP run and write it to the nwp Delta table, replacing"
-        " that (nwp_model_id, init_time) partition. Runs daily at 08:30 UTC; see"
+        " that (nwp_model_id, init_time) partition. Runs daily at 10:30 UTC; see"
         " ecmwf_ens_schedule for the retry behaviour when the run is not yet published."
     ),
 )
 
 
-@schedule(job=ecmwf_ens_job, cron_schedule="30 8 * * *", execution_timezone="UTC")
+@schedule(job=ecmwf_ens_job, cron_schedule="30 10 * * *", execution_timezone="UTC")
 def ecmwf_ens_schedule(context: ScheduleEvaluationContext) -> RunRequest:
-    """Materialise today's ``ecmwf_ens`` partition daily at 08:30 UTC.
+    """Materialise today's ``ecmwf_ens`` partition daily at 10:30 UTC.
 
-    08:30 UTC is a safety margin past the 00Z run's expected publication time (roughly 08:00 UTC
-    / 9am BST); ``ecmwf_ens_partitions``' ``end_offset=1`` means today's partition key already
-    exists by this point. If the run isn't usable yet — absent from the catalog, or present with
+    10:30 UTC is a safety margin past the 00Z run's usual arrival on ECMWF's bucket and
+    Dynamical.org's publication (08:05 to 08:20 UTC on a normal day), and 90 minutes before the
+    12:00 UTC ``live_forecasts`` slot.
+    ``ecmwf_ens_partitions``' ``end_offset=1`` means today's partition key already exists by this
+    point. If the run isn't usable yet — absent from the catalog, or present with
     a weather variable still wholesale empty — ``ecmwf_ens`` retries every 30 minutes, up to 8
     times (``NwpRunNotYetAvailable`` / ``NwpVariableWhollyMissing`` → ``RetryRequested`` in
     ``defs/assets.py``) rather than failing outright; any other error still fails immediately.

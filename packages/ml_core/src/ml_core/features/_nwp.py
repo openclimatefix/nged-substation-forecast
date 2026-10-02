@@ -21,10 +21,15 @@ from contracts.weather_schemas import Nwp
 NWP_PUBLICATION_DELAY_HOURS: Final[int] = 9
 """Hours after an NWP run's ``init_time`` before we treat that run as usable.
 
-The delay models when a run reaches *our* disk, not when Dynamical publish that run. Dynamical
-publish each 00Z run between 08:05 and 08:20 UTC, and ``ecmwf_ens_schedule`` downloads it at 08:30
-UTC. A 00Z run is therefore ours from roughly 08:30, which is 8.5 hours after that run's
-``init_time``. Nine is the nearest whole hour at or after 8.5.
+The delay stands in for when a run reaches *our* disk, not when Dynamical publish that run.
+Dynamical publish each 00Z run between 08:05 and 08:20 UTC, and ``ecmwf_ens_schedule`` downloads it
+at 10:30 UTC. A 00Z run is therefore ours from roughly 10:30, which is 10.5 hours after that run's
+``init_time``, or about 14:40 UTC at worst once the download's retries are counted. The constant is
+9 hours. In replay, ``select_nwp_init_time`` picks the same run at each of the four 6-hourly slots
+for any delay above 6 hours and up to 12 hours, so 9 hours gives each slot the run that a healthy
+ingest has landed by that slot. The same constant derives ``power_fcst_init_time`` in bulk-mode
+training, so changing it changes the training features. A run that retries past 12:00 UTC misses the
+12:00 slot in live mode, which replay does not model.
 
 The feature pipeline uses the delay to derive ``power_fcst_init_time`` from ``nwp_init_time`` in
 bulk mode, and to derive ``nwp_init_time`` when a single-run caller omits ``nwp_init_time``.

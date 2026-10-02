@@ -268,7 +268,7 @@ its 00Z run has actually landed, matching Dynamical's publication lag; shared wi
 ``ecmwf_ens_job``/``ecmwf_ens_schedule`` in ``defs/schedules.py``."""
 
 _ECMWF_ENS_MAX_RETRIES: Final[int] = 8
-"""Retries × ``_ECMWF_ENS_RETRY_DELAY_SECONDS`` ≥ 4h of coverage past the 08:30 UTC schedule
+"""Retries × ``_ECMWF_ENS_RETRY_DELAY_SECONDS`` ≥ 4h of coverage past the 10:30 UTC schedule
 (``ecmwf_ens_schedule``), comfortably past Dynamical's typical publication time — and past the
 3h25m a measured republication took. Applies to ``NwpRunNotYetAvailable`` and
 ``NwpVariableWhollyMissing``, the two ways an upstream run says "not ready yet"; a genuine bug
@@ -442,7 +442,7 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     warn rather than block, so a degraded run is still written and still forecast from.
 
     A run Dynamical.org has not published yet is retried up to 8 times, 30 minutes apart,
-    covering more than 4 hours past the 08:30 UTC schedule. A materialisation that runs for hours
+    covering more than 4 hours past the 10:30 UTC schedule. A materialisation that runs for hours
     and then fails is therefore this asset waiting for an upstream run that never arrived, not a
     bug.
     """

@@ -187,10 +187,10 @@ The count is a subtraction — how many daily runs separate the freshest run on 
 that ought to exist by now — and all the care goes into that second term. It is derived from a
 deadline — how long after a run's `init_time` a healthy ingest should have landed it — rather than
 from the publication time, because what matters is when the run reaches *our* disk. The deadline
-therefore has to clear `ecmwf_ens_schedule`'s 08:30 UTC start plus that asset's retry ladder — 8
+therefore has to clear `ecmwf_ens_schedule`'s 10:30 UTC start plus that asset's retry ladder — 8
 retries at 30 minutes, plus a download on each attempt, for the failure mode that is only detectable
-after downloading — so it sits at 14 hours. The retry delays alone put the last healthy landing at
-about 12:30 UTC, and paying a download and convert on every attempt moves that to about 12:40 UTC,
+after downloading — so it sits at 16 hours. The retry delays alone put the last healthy landing at
+about 14:30 UTC, and paying a download and convert on every attempt moves that to about 14:40 UTC,
 which leaves 81 minutes of margin spread over 9 attempts. The deadline is therefore breached only if
 download-and-convert *averages* about 10 minutes across all 9 attempts, not if one attempt is slow:
 a single 645-second download costs only about 10 of those 81 minutes. The consequence is a one-run
