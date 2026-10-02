@@ -13,20 +13,21 @@ metered output), each difference is in percentage points of capacity, written "p
 bracketed pair is a 95% interval unless the text says otherwise. The rows are 53,107 farm-hours
 between 17 September 2019 and 30 June 2026, where a farm-hour is one wind farm's power in one hour.
 With direction given at both heights, the 100 m and 10 m columns did equally well: the planned
-difference is +0.021 points, with a 98.33% interval of [-0.055, +0.101]. CERRA is a reanalysis, so every
-number describes how well CERRA's wind explains power that has already been generated, and none
-describes forecast skill.
+difference is +0.021 points, with a 98.33% interval of [-0.055, +0.101]. CERRA is a reanalysis, so
+every number describes how well CERRA's wind explains power that has already been generated, and
+none describes forecast skill.
 
-**Direction at all five heights did not lower the error by more than about 0.005 points beyond
-direction at 100 m, and the study could detect a veer effect only when the effect was large.**
-Direction at all five CERRA heights, against direction at 100 m alone, differs by +0.010 points
-[-0.005, +0.025], so a gain larger than about 0.005 points is excluded at the 95% level. The check
-that a veer effect would show up is weak. Of a veer effect injected into the real power to cut it by
-0.690 points over all rows, two raw directions recovered 0.015 points, and of an injected effect of
-0.172 points they recovered none. A veer effect of that smaller size, or of another form, is
-therefore not ruled out. The study's negative controls show that columns carrying no information
-change the error by 0.040 to 0.060 points, so any veer-family difference below about 0.05 points is
-below the noise the pipeline produces without any signal.
+**Against direction at 100 m alone, direction at all five heights excluded a gain larger than about
+0.005 points at the 95% level (exploratory, primary setting; the second setting's +0.011 [+0.003,
++0.020] excludes any gain), and the study could detect a veer effect only when the effect was
+large.** Direction at all five CERRA heights, against direction at 100 m alone, differs by +0.010
+points [-0.005, +0.025], so a gain larger than about 0.005 points is excluded at the 95% level. The
+check that a veer effect would show up is weak. Of a veer effect injected into the real power to cut
+it by 0.690 points over all rows, two raw directions recovered 0.015 points, and of an injected
+effect of 0.172 points they recovered none. A veer effect of that smaller size, or of another form,
+is therefore not ruled out. Swapping 2 inert padding columns for 2 uninformative columns raised the
+error by 0.040 to 0.060 points in the negative controls, so part of what a set of extra real columns
+adds can be cancelled by the cost of fitting them.
 
 ![Figure 1: CERRA's wind direction cut the error at 100 m and at 10 m, and the two did equally
 well](../assets/cerra_wind_direction_planned.svg)
@@ -41,12 +42,12 @@ well](../assets/cerra_wind_direction_planned.svg)
   at the 95% level for this study's XGBoost models, and the study's check of its own sensitivity to
   veer was weak.
 - **Do not read the page as a statement about forecasting or about wakes.** CERRA is an analysis of
-  the past, and no column set holds anything about turbines.
+  the past, and no column set holds a turbine layout, hub height or land-cover column.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
 > AI model. This page and its study scripts were written by Claude Sonnet 5.5, reusing shared study
-> code written by Claude Opus 5.5, Claude Sonnet 5, and Claude Sonnet 5.5. An independent review by
+> code written by Claude Opus 5.5, Claude Sonnet 5, and Claude Sonnet 5.5. Two independent reviews by
 > Claude Opus checked the method and the results adversarially.
 
 ## Key findings
@@ -57,9 +58,9 @@ well](../assets/cerra_wind_direction_planned.svg)
 - **The 100 m and 10 m heights do equally well when each has its direction, a null result with a
   difference of up to 0.101 points not ruled out.** See [With direction, 100 m and 10 m do equally
   well](#with-direction-100-m-and-10-m-do-equally-well).
-- **Direction at several heights gains no more than about 0.005 points over direction at 100 m, an
-  exploratory result.** See [Direction at several heights adds no more than a small
-  gain](#direction-at-several-heights-adds-no-more-than-a-small-gain).
+- **Direction at several heights gains no more than about 0.005 points over direction at 100 m, at
+  the 95% level, an exploratory result.** See [Direction at several heights adds no more than a
+  small gain](#direction-at-several-heights-adds-no-more-than-a-small-gain).
 - **The study's check that it could see a veer effect passed only for large effects.** See [The
   controls](#the-controls).
 - **The gain from direction has the same sign at every wind farm and in every full calendar year,
@@ -70,19 +71,20 @@ well](../assets/cerra_wind_direction_planned.svg)
 
 **The question is whether an XGBoost model given CERRA's wind direction describes a wind farm's past
 power better than one given CERRA's wind speed alone, and whether direction at several heights adds
-anything beyond direction at one height.** CERRA is the Copernicus regional reanalysis for Europe,
-produced by a consortium led by the Swedish Meteorological and Hydrological Institute for the
-Copernicus Climate Change Service. A reanalysis re-runs a weather model over past years with the
+lowers the error beyond direction at one height.** CERRA is the Copernicus regional reanalysis for
+Europe, produced by a consortium led by the Swedish Meteorological and Hydrological Institute for
+the Copernicus Climate Change Service. A reanalysis re-runs a weather model over past years with the
 observations of each period, so every value is an analysis of a past hour and no value is a
-forecast. The [previous study of CERRA's wind heights](cerra-wind-levels.md) gave an XGBoost model
-CERRA's wind speed at one to five heights and no direction. That study could therefore not say what
-direction adds, and its errors are not comparable in level with the errors on the [wind
-page](wind.md), whose XGBoost models carry direction as a sine and a cosine.
+forecast. CERRA is one estimate of past weather, and the results describe that estimate only. The
+[previous study of CERRA's wind heights](cerra-wind-levels.md) gave an XGBoost model CERRA's wind
+speed at one to five heights and no direction. That study could therefore not say what direction
+adds, and its errors are not comparable in level with the errors on the [wind page](wind.md), whose
+XGBoost models carry direction as a sine and a cosine.
 
 **Several mechanisms could make direction matter for a wind farm's power, and the study does not
 separate them.** Turbines in a farm could shade each other differently in different wind directions,
 the land around a farm could change the wind's speed and turbulence with direction, and the wind
-turns with height, called veer where the wind turns clockwise as height increases. A decision about
+turns with height, called veer when the wind turns clockwise as height increases. A decision about
 which CERRA columns to ingest for past weather can cite the result.
 
 | Property | CERRA's wind direction |
@@ -104,7 +106,7 @@ three farms has at least 15,950 of them. A farm-hour's power is the mean of the 
 readings in the hour centred on the CERRA time, and any hour holding a half-hour of exactly zero is
 dropped, from the target alone, so that every column set is scored on the same rows. The wind farms
 appear only as W1 to W3. Each farm reads CERRA at its nearest grid cell. Each farm's capacity is the
-`effective_capacity_mw` column of the roster metadata used by the previous study. Each XGBoost model
+`effective_capacity_mw` column of the roster table used by the previous study. Each XGBoost model
 is trained on some blocks of whole months and scored on the others, in 5 folds per farm. The 2,000
 resamples of whole calendar months, each with one of three fitting seeds, give the 95% intervals.
 Every fit ran on the CPU, with no column subsampling and no early stopping, and the study made
@@ -116,10 +118,10 @@ within a family has the same number of feature columns.** The sine and cosine ma
 degree close together, which the raw angle does not. Every column set carries `hour_of_day` and
 `day_of_year`. The core family has 7 feature columns, of which 5 are wind columns. The veer family
 has 14 feature columns, of which 12 are wind columns, and holds the 10 m and 100 m speeds in every
-column set. A column set with fewer real wind columns is padded with monotone transforms of a
-speed, such as its square and its square root, which a tree cannot use to learn anything new. A
-comparison never crosses families, so the width never decides a comparison. The wind columns of each
-column set are:
+column set. A column set with fewer real wind columns is padded with monotone transforms of a speed,
+such as its square and its square root, which a tree cannot split on in a way the speed itself does
+not allow. A comparison never crosses families, so the width never decides a comparison. The wind
+columns of each column set are:
 
 | Family | Column set | Real wind columns | Padding |
 |---|---|---|---|
@@ -180,13 +182,13 @@ of rows, and cuts power by 40% (0.690 points) or by 10% (0.172 points). The full
 three gates passed on the 40% targets: direction beat speed alone on the sector target, and both
 `veer_angle_10_100` and `veer_dir_10_100` beat `veer_dir_100` on the veer target.
 
-**One check runs before the fits.** Direction files for all five heights were checked for missing
-values and for keys unmatched to the speed files, and the 100 m circular mean direction is 227
-degrees, south-westerly, as the UK's prevailing wind is. A calendar-year table of the 100 m circular
-mean and the veer found no full year differing from the others by more than 30 degrees in circular
-mean or 10 degrees in the 95th percentile of veer. The study did not search the record for a step,
-and the CERRA documentation does not give the dates where production streams join, so a join is not
-ruled out.
+**The direction files had no missing values, and no full calendar year differed from the others.**
+Direction files for all five heights were checked for missing values and for keys unmatched to the
+speed files, and the 100 m circular mean direction is 227 degrees, south-westerly, as the UK's
+prevailing wind is. A calendar-year table of the 100 m circular mean and the veer found no full year
+differing from the others by more than 30 degrees in circular mean or 10 degrees in the 95th
+percentile of veer. The study did not search the record for a step, and the CERRA documentation does
+not give the dates where production streams join, so a join is not ruled out.
 
 ## Results
 
@@ -232,11 +234,11 @@ every column set. No figure draws these three rows, and their numbers are in the
 
 **The planned comparison of `speed_100m_dir` against `speed_10m_dir` gives +0.021 points [-0.042,
 +0.086], which is not statistically significant at the 5% level, and its 98.33% interval is [-0.055,
-+0.101].** The interval does not rule out an XGBoost model given the 100 m speed and direction having
-an error up to 0.055 points lower than one given the 10 m speed and direction, and does not rule
-out an error up to 0.101 points higher. At the second setting the difference is +0.048 points,
-with a 98.33% interval of [-0.026, +0.125]. Three of the five folds have the positive sign at the primary
-setting.
++0.101].** The interval does not rule out an XGBoost model given the 100 m speed and direction
+having an error up to 0.055 points lower than one given the 10 m speed and direction, and does not
+rule out an error up to 0.101 points higher. At the second setting the difference is +0.048 points,
+with a 98.33% interval of [-0.026, +0.125]. Three of the five folds have the positive sign at the
+primary setting.
 
 **The 10 m and 100 m columns come from two CERRA products, so the comparison mixes a surface
 diagnostic with a value interpolated to a fixed height as well as two heights.** CERRA assimilates
@@ -255,19 +257,20 @@ m gives +0.004 points [-0.006, +0.015], and direction at all five heights agains
 gives +0.005 points [-0.004, +0.016]. An explicit veer added to the 100 m direction gives -0.011
 points [-0.027, +0.003], and -0.011 points [-0.020, -0.002] at the second setting.
 
-**Three rows are statistically significant at the second setting only, and none is a finding.**
-They are the explicit veer against `veer_dir_100`, -0.011 points; the five-height column set against
-`veer_dir_100`, +0.011 points; and the five-height column set against `veer_dir_10_100`, +0.007
-points. Each lies near the 5% line at the primary setting, and each is smaller than the noise the
-negative controls produce, about 0.05 points. The five-height rows are positive, which means the
+**Three rows are statistically significant at the second setting only, and none is a finding.** The
+three rows are the explicit veer against `veer_dir_100`, -0.011 points; the five-height column set
+against `veer_dir_100`, +0.011 points; and the five-height column set against `veer_dir_10_100`,
++0.007 points. Each lies near the 5% line at the primary setting, and each is smaller than the 0.040
+points that two uninformative columns cost. The five-height rows are positive, which means the
 column set with more direction columns had the higher error.
 
 **The result bounds a gain and does not show that veer is absent.** The bound applies to this
 study's XGBoost models, to CERRA's direction, and to a veer effect that two raw directions, or the
 other column sets, could use. The next section says how large a veer effect the study could see.
 
-![Figure 2: Direction at several heights changed the error by less than the pipeline's noise
-floor](../assets/cerra_wind_direction_veer.svg)
+![Figure 2: Beyond direction at 100 m, more heights or an explicit veer changed the error by 0.011
+points or less, and raw directions caught only the 40% veer
+injection](../assets/cerra_wind_direction_veer.svg)
 
 ### The controls
 
@@ -287,14 +290,17 @@ gave -0.021 points [-0.036, -0.006]. A null on the real target for the raw-direc
 therefore rules out only a veer effect of about the size and form of the 40% injection, and a veer
 effect of 0.172 points is not excluded.
 
-**Columns that carry no information raise the error by 0.040 to 0.060 points, and the page treats
-about 0.05 points as the pipeline's noise floor for adding usable columns.** The four
+**Two uninformative columns raised the error by 0.040 to 0.060 points.** The four
 negative-control rows are +0.043 points [+0.014, +0.077] and +0.060 points [+0.036, +0.092] for
 `speed_100m_dir_noise` against `speed_100m`, at the two settings, and +0.053 points [+0.036, +0.072]
 and +0.040 points [+0.028, +0.053] for `veer_dir_100_noise` against `veer_dir_100`. Every one is
-statistically significant at the 5% level, and every one is worse. Every veer-family difference on
-this page is smaller than the floor. The five-height column set swaps 8 padding columns for real
-direction columns, so a gain up to about 0.05 points could be hidden by that cost. The row
+statistically significant at the 5% level, and every one is worse. Every difference among the
+direction column sets of the veer family is smaller than that cost. The 0.005-point bound is on the
+net error. The five-height column set swaps 8 padding columns for real direction columns, and the
+study did not measure what fitting 8 extra columns costs. Information worth more than 0.005 points
+could therefore be cancelled by that cost. As a sign that the cost is real, `veer_dir_10_100` beats
+`veer_dir_100_noise` by 0.048 points while sitting 0.004 points above `veer_dir_100`, and
+`veer_angle_10_100` has an error of 7.701 points against 7.765 for `veer_dir_100_noise`. The row
 `veer_dir_10_100` minus `veer_dir_100_noise`, -0.048 points [-0.067, -0.031], measures the 10 m
 direction against that cost of unusable columns and is not a gain over `veer_dir_100`.
 
@@ -306,9 +312,9 @@ the 100 m speed changes the error by -0.122 points [-0.164, -0.077] at W1, -0.53
 -0.418] at W2, and -0.511 points [-0.620, -0.404] at W3. Direction added to the 10 m speed changes
 it by -0.152 points [-0.197, -0.108], -0.658 points [-0.792, -0.528], and -0.572 points [-0.689,
 -0.449]. No single farm therefore dominates the pooled result. The comparison is also negative in
-every full calendar year from 2020 to 2025, with one or two folds per year, and each year holds
-12 months, so no interval is dashed. A year with only one or two folds gives an interval from fewer
-weather episodes, so the years are not independent checks.
+every full calendar year from 2020 to 2025, with one or two folds per year. In 2023 one of the two
+folds had the opposite sign for direction at 100 m. A year with only one or two folds gives an
+interval from fewer weather episodes, so the years are not independent checks.
 
 **The comparison of 100 m with 10 m changes sign by farm and by year, which is noise and not a
 finding.** At W2 it is +0.156 points [+0.065, +0.242], at W1 -0.033 points [-0.107, +0.044], and at
@@ -323,18 +329,17 @@ sign](../assets/cerra_wind_direction_farms.svg)
 **To describe past wind at these three farms from CERRA, an XGBoost model should be given the
 direction as well as the speed.** The planned gain is about 5% of the speed-only error at either
 height, and the study did not test a height other than 10 m and 100 m for the planned comparisons.
-What would change the recommendation is a result at a farm whose direction CERRA represents poorly,
-or a more flexible XGBoost model that extracts the direction's information from the speed.
+What would change the recommendation is a result at a farm whose direction CERRA represents poorly.
 
 **The 100 m or the 10 m columns can be read, and the study does not say which is better with
 direction.** The planned difference is +0.021 points with a 98.33% interval of [-0.055, +0.101]. A
 choice between the two heights can rest on other grounds, such as which CERRA product a pipeline
 already reads.
 
-**These results give no reason to read direction at a second height, and the study cannot rule out
-a small veer effect.** The five-height bound of about 0.005 points applies to the XGBoost models and
-columns tested. A study that wants to find a veer effect smaller than the 0.172-point injection, or
-a veer effect in another form, needs a more sensitive instrument first.
+**The five-height and 10 m-and-100 m rows give no reason to read direction at a second height, and
+the study cannot rule out a small veer effect.** The five-height bound of about 0.005 points applies
+to the XGBoost models and columns tested. A study that wants to find a veer effect smaller than the
+0.172-point injection, or a veer effect in another form, needs a more sensitive instrument first.
 
 **The page recommends nothing about forecasting or about wakes.** CERRA is an analysis of past
 hours, so a result about how well it explains past power does not carry to a forecast at any lead,
@@ -348,20 +353,21 @@ only.** The farms share their weather, so the intervals resample months and seed
 - **The veer instrument is weak.** Two raw directions recovered 0.015 points of a 0.690-point
   injected effect and nothing of a 0.172-point one, so a null veer result is a statement about large
   effects only.
-- **The negative controls move the error by 0.040 to 0.060 points.** Any difference below about 0.05
-  points between column sets of different widths of real columns is within that noise.
+- **Two uninformative columns cost 0.040 to 0.060 points.** A comparison that swaps padding for real
+  columns measures the information net of that cost.
 - **The 10 m and 100 m columns mix height and product.** The 10 m direction comes from a surface
   diagnostic and the other four directions from another CERRA product. CERRA assimilates surface
   observations, which may constrain the 10 m direction better than the 100 m direction.
-- **The year splits have one or two folds each,** and the first and last calendar years of the record
-  are partial and are left out.
-- **43 exploratory rows and 4 negative-control rows are uncorrected for multiple comparisons.** About
-  2 false positives are expected at the 5% level if no row has a real effect, and they cluster.
+- **The year splits have one or two folds each,** and the first and last calendar years of the
+  record are partial and are left out.
+- **43 exploratory rows and 4 negative-control rows are uncorrected for multiple comparisons.**
+  About 2 false positives are expected at the 5% level if no row has a real effect, and they
+  cluster.
 - **The record may contain a join of production streams.** The documentation does not give the
   dates, and the study compared calendar years instead of searching for a step.
 - **The 3-hourly rows hold 8 values of `hour_of_day`,** so the XGBoost models see fewer rows than an
   hourly study would give them.
-- **Each farm's capacity is one value from the roster metadata** used by the previous study,
+- **Each farm's capacity is one value from the roster table** used by the previous study,
   computed over the farm's whole history, including the months a fold holds out.
 - **The fits ran on the CPU.** Another device would give slightly different numbers.
 
@@ -371,7 +377,8 @@ only.** The farms share their weather, so the intervals resample months and seed
 other than the five CERRA serves.**
 
 - **Forecasting is not covered.** CERRA is a reanalysis.
-- **Wakes and terrain are not covered.** No column set holds anything about turbines or land.
+- **Wakes and terrain are not covered.** No column set holds a turbine layout, hub height or
+  land-cover column.
 - **Other weather products are not covered.** The [wind page](wind.md) compares products.
 - **Offshore wind and other regions are not covered.**
 - **Speed at five heights with direction is not covered.** The veer family holds the 10 m and 100 m

@@ -33,7 +33,7 @@ import plotting.ocf_theme as ocf
 import polars as pl
 from cerra_wind_levels import PRIMARY_SETTING, SENSITIVITY_SETTING
 from sources import STUDIES_DATA_DIR
-from studies.charts import figure, interval_panel
+from studies.charts import PLOT_WIDTH_PX, axis_title_with_direction, figure, interval_panel, wrapped
 from studies.guards import refuse_to_overwrite
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
@@ -58,9 +58,17 @@ FARMS: Final[tuple[str, ...]] = ("W1", "W2", "W3")
 FARM_COLOURS: Final[tuple[str, ...]] = (ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_PURPLE)
 """One main data colour per wind farm, so the three farms stay distinct in Figure 3."""
 
-NOISE_FLOOR_PP: Final[float] = 0.05
-"""Half the width of the shaded band in Figure 2: the size of change that four to eight unusable
-columns produced in the negative controls (0.040 to 0.060 points)."""
+UNINFORMATIVE_COST_PP: Final[float] = 0.05
+"""Where Figure 2 draws its reference line: about the rise in error that swapping 2 inert padding
+columns for 2 uninformative columns produced in the negative controls (0.040 to 0.060 points)."""
+
+UNINFORMATIVE_LABEL: Final[str] = "two uninformative columns"
+"""The reference line's label."""
+
+VALUE_LABEL_PX: Final[int] = 150
+"""The room a value label such as `+0.043 [+0.014, +0.077]` needs beside its interval, in pixels."""
+
+VALUE_LABEL_FONT_PX: Final[int] = 11
 
 DOMAIN_STEP: Final[float] = 0.05
 """Axis limits are rounded outward to a multiple of this many points."""
@@ -102,12 +110,8 @@ VEER_LABELS: Final[dict[tuple[str, str], str]] = {
 """Figure 2's exploratory rows, top to bottom."""
 
 NEGATIVE_LABELS: Final[dict[tuple[str, str], str]] = {
-    ("speed_100m_dir_noise", "speed_100m"): (
-        "Negative control: shuffled 100 m direction added to the 100 m speed"
-    ),
-    ("veer_dir_100_noise", "veer_dir_100"): (
-        "Negative control: shuffled 10 m direction added to the 100 m direction"
-    ),
+    ("speed_100m_dir_noise", "speed_100m"): "Negative control: shuffled 100 m direction",
+    ("veer_dir_100_noise", "veer_dir_100"): "Negative control: shuffled 10 m direction",
 }
 """Figure 2's negative controls, below the exploratory rows."""
 
@@ -207,6 +211,96 @@ def _domain(*, lows: list[float], highs: list[float]) -> tuple[float, float]:
     return round(low, 2), round(high, 2)
 
 
+def _domain_with_label_room(*, frame: pl.DataFrame) -> tuple[float, float]:
+    """Widen the axis until every row's value label fits beside its interval.
+
+    A row's label sits beyond the interval's end that lies farthest from zero, so it never crosses
+    the zero rule: left of the lower bound for a negative estimate and right of the upper bound
+    for any other.
+
+    Args:
+        frame: The panel rows, with `difference`, `lower_95`, `upper_95`, and optionally
+            `second_difference`.
+
+    Returns:
+        The axis limits, multiples of `DOMAIN_STEP`.
+    """
+    seconds = frame["second_difference"].drop_nulls().to_list()
+    low, high = _domain(
+        lows=[*frame["lower_95"].to_list(), *seconds],
+        highs=[*frame["upper_95"].to_list(), *seconds],
+    )
+    for _ in range(100):
+        pixels_per_point = PLOT_WIDTH_PX / (high - low)
+        left_short = any(
+            (row["lower_95"] - low) * pixels_per_point < VALUE_LABEL_PX
+            for row in frame.filter(pl.col("difference") < 0).iter_rows(named=True)
+        )
+        right_short = any(
+            (high - row["upper_95"]) * pixels_per_point < VALUE_LABEL_PX
+            for row in frame.filter(pl.col("difference") >= 0).iter_rows(named=True)
+        )
+        if not (left_short or right_short):
+            return low, high
+        low = round(low - DOMAIN_STEP, 2) if left_short else low
+        high = round(high + DOMAIN_STEP, 2) if right_short else high
+    msg = "the axis did not settle"
+    raise ValueError(msg)
+
+
+def _value_labels(*, frame: pl.DataFrame, x_domain: tuple[float, float], x_title: str) -> list:
+    """Draw each row's estimate and interval to three decimals, beyond its far interval end.
+
+    Args:
+        frame: The panel rows.
+        x_domain: The panel's x range.
+        x_title: The x axis title the panel passes to `interval_panel`, repeated so the layers'
+            titles agree and merge.
+
+    Returns:
+        One text layer for the rows labelled left of their interval and one for the rest.
+    """
+    title = wrapped(
+        text=axis_title_with_direction(
+            x_title=x_title, better_label="first set better", better_direction="negative"
+        ),
+        width=78,
+    )
+    scale = alt.Scale(domain=list(x_domain), nice=False, zero=False)
+    labels = list(dict.fromkeys(frame["label"].to_list()))
+    text = frame.with_columns(
+        text=pl.format(
+            "{} [{}, {}]",
+            *(
+                pl.col(name).map_elements(lambda value: f"{value:+.3f}", return_dtype=pl.String)
+                for name in ("difference", "lower_95", "upper_95")
+            ),
+        ),
+    )
+    layers = []
+    for on_left in (False, True):
+        side = text.filter((pl.col("difference") < 0) if on_left else (pl.col("difference") >= 0))
+        if side.is_empty():
+            continue
+        layers.append(
+            alt.Chart(side)
+            .mark_text(
+                align="right" if on_left else "left",
+                dx=-7 if on_left else 7,
+                baseline="middle",
+                fontSize=VALUE_LABEL_FONT_PX,
+                aria=False,
+            )
+            .encode(  # ty: ignore[unresolved-attribute]
+                x=alt.X("lower_95:Q" if on_left else "upper_95:Q", scale=scale, title=title),
+                y=alt.Y("label:N", sort=labels, title=None),
+                text="text:N",
+                color=alt.value(ocf.BLACK_1),
+            )
+        )
+    return layers
+
+
 def _panel_rows(*, rows: list[dict]) -> pl.DataFrame:
     """Build an `interval_panel` frame from the rows' prepared fields.
 
@@ -264,37 +358,58 @@ def _contrast_marks(
     return marks
 
 
-def _noise_band(*, x_domain: tuple[float, float]) -> alt.Chart:
-    """Draw the shaded band of plus and minus `NOISE_FLOOR_PP` points, full height.
+def _cost_line(*, x_domain: tuple[float, float]) -> list[alt.Chart]:
+    """Draw the dashed reference line at `UNINFORMATIVE_COST_PP` and its label inside the plot.
 
     Args:
-        x_domain: The panel's x range, which the band's scale must repeat.
+        x_domain: The panel's x range, which the layers' scale must repeat.
 
     Returns:
-        The band layer.
+        The rule, then its label.
     """
-    return (
-        alt.Chart(pl.DataFrame({"low": [-NOISE_FLOOR_PP], "high": [NOISE_FLOOR_PP]}))
-        .mark_rect(color=ocf.DATA_BLUE_LIGHT, opacity=0.3, aria=False, tooltip=None)
+    scale = alt.Scale(domain=list(x_domain), nice=False, zero=False)
+    anchor = pl.DataFrame({"x": [UNINFORMATIVE_COST_PP]})
+    rule = (
+        alt.Chart(anchor)
+        .mark_rule(color=ocf.BRAND_ORANGE, strokeWidth=1.5, strokeDash=[4, 3], aria=False)
+        .encode(x=alt.X("x:Q", scale=scale))  # ty: ignore[unresolved-attribute]
+    )
+    text = (
+        alt.Chart(anchor)
+        .mark_text(
+            align="left",
+            dx=4,
+            dy=3,
+            baseline="top",
+            color=ocf.BLACK_1,
+            fontSize=VALUE_LABEL_FONT_PX,
+            aria=False,
+        )
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("low:Q", scale=alt.Scale(domain=list(x_domain), nice=False, zero=False)),
-            x2="high:Q",
+            x=alt.X("x:Q", scale=scale), y=alt.value(0), text=alt.value(UNINFORMATIVE_LABEL)
         )
     )
+    return [rule, text]
 
 
-def _with_band(*, panel: alt.LayerChart, x_domain: tuple[float, float]) -> alt.LayerChart:
-    """Put the noise-floor band behind a panel's layers.
+def _with_layers(
+    *,
+    panel: alt.LayerChart,
+    behind: list,
+    in_front: list,
+) -> alt.LayerChart:
+    """Add layers behind and in front of a keyless `interval_panel` result.
 
     Args:
         panel: An `interval_panel` result that has no keys, so is a single layered chart.
-        x_domain: The panel's x range.
+        behind: Layers drawn before the panel's own.
+        in_front: Layers drawn after the panel's own.
 
     Returns:
-        The panel with the band as its first layer.
+        The panel with the extra layers.
     """
     return alt.LayerChart(
-        layer=[_noise_band(x_domain=x_domain), *panel.layer],
+        layer=[*behind, *panel.layer, *in_front],
         width=panel.width,
         height=panel.height,
         title=panel.title,
@@ -323,10 +438,7 @@ def planned_figure(*, intervals: pl.DataFrame, report: str) -> alt.VConcatChart:
         mark["lower_95"] = row["lower_bonferroni_pp"]
         mark["upper_95"] = row["upper_bonferroni_pp"]
     frame = _panel_rows(rows=marks).with_columns(planned=pl.lit(value=True))
-    x_domain = _domain(
-        lows=[*frame["lower_95"].to_list(), *frame["second_difference"].to_list()],
-        highs=[*frame["upper_95"].to_list(), *frame["second_difference"].to_list()],
-    )
+    x_domain = _domain_with_label_room(frame=frame)
     panel = interval_panel(
         rows=frame,
         x_domain=x_domain,
@@ -334,9 +446,13 @@ def planned_figure(*, intervals: pl.DataFrame, report: str) -> alt.VConcatChart:
         zero_label="no difference",
         better_label="first set better",
         figure_planning="planned",
-        value_labels=True,
         row_step_px=ROW_STEP_PX,
         row_bands=True,
+    )
+    panel = _with_layers(
+        panel=panel,  # ty: ignore[invalid-argument-type]
+        behind=[],
+        in_front=_value_labels(frame=frame, x_domain=x_domain, x_title=X_TITLE),
     )
     return figure(
         panels=[panel],
@@ -395,18 +511,7 @@ def veer_figure(*, intervals: pl.DataFrame, report: str) -> alt.VConcatChart:
         )
     top = _panel_rows(rows=[*exploratory, *negative])
     bottom = _panel_rows(rows=positive)
-    x_domain = _domain(
-        lows=[
-            *top["lower_95"].to_list(),
-            *top["second_difference"].drop_nulls().to_list(),
-            *bottom["lower_95"].to_list(),
-        ],
-        highs=[
-            *top["upper_95"].to_list(),
-            *top["second_difference"].drop_nulls().to_list(),
-            *bottom["upper_95"].to_list(),
-        ],
-    )
+    x_domain = _domain_with_label_room(frame=pl.concat([top, bottom]))
     panels = []
     for index, (frame, title) in enumerate(
         (
@@ -414,33 +519,40 @@ def veer_figure(*, intervals: pl.DataFrame, report: str) -> alt.VConcatChart:
             (bottom, "Positive controls: a veer effect injected into the real target"),
         )
     ):
+        x_title = X_TITLE if index == 1 else ""
         panel = interval_panel(
             rows=frame,
             x_domain=x_domain,
-            x_title=X_TITLE if index == 1 else "",
+            x_title=x_title,
             zero_label="no difference",
             better_label="first set better",
             panel_title=title,
             reference_labels=index == 0,
             figure_planning="exploratory",
-            value_labels=True,
             row_step_px=ROW_STEP_PX,
             row_bands=True,
         )
-        panels.append(_with_band(panel=panel, x_domain=x_domain))  # ty: ignore[invalid-argument-type]
+        panels.append(
+            _with_layers(
+                panel=panel,  # ty: ignore[invalid-argument-type]
+                behind=_cost_line(x_domain=x_domain) if index == 0 else [],
+                in_front=_value_labels(frame=frame, x_domain=x_domain, x_title=x_title),
+            )
+        )
     return figure(
         panels=panels,
         number=2,
         figure_planning="exploratory",
         title=(
-            "Direction at several heights changed the error by less than the pipeline's noise floor"
+            "Beyond direction at 100 m, more heights or an explicit veer changed the error by "
+            "0.011 points or less, and raw directions caught only the 40% veer injection"
         ),
         subtitle=[
             "Each row: the first set of columns minus the second set, on the same rows.",
             f"{DOTS} {HOLLOW} {CAPACITY}",
             (
-                "Shaded band: plus and minus 0.05 points, the change the negative controls "
-                "produced from columns that carry no information."
+                "Dashed line at +0.05: about the rise in error from swapping 2 inert padding "
+                "columns for 2 uninformative columns (+0.040 to +0.060 in the negative controls)."
             ),
             (
                 "The injected veer effect cuts power by 40% (0.69 points over all rows) or by 10% "
