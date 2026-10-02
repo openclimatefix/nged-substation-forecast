@@ -289,6 +289,60 @@ Google produced each run. If Google produced the runs after the fact, WN3's erro
 The `--lookahead-cleared` flag of `fit_aifs.py --wn3` stops the fit from starting until whoever runs
 it has read this section.
 
+### Why the WN3 paper's gains over ENS are not directly comparable with this study
+
+**The WN3 paper's gains over ENS and this study's results answer different questions, so they do not
+conflict.** [Rasp et al. (2026)](https://arxiv.org/abs/2609.03582) compare WN3 against 48 ENS
+members, scored with the fair continuous ranked probability score (CRPS). For single-level
+variables, the ENS members are regridded to 0.1° from the TIGGE (THORPEX Interactive Grand Global
+Ensemble) and MARS (Meteorological Archival and Retrieval System) archives. Rasp et al. note that
+TIGGE's reduced storage resolution adds roughly 0.02 K to ENS's 2 m temperature CRPS at 6-hour
+multiples in the paper's analysis evaluations. We found no mention of statistical post-processing
+applied to ENS. The paper reports no ensemble-mean error for ENS, so its results cannot separate the
+accuracy of the ENS mean from the calibration of its spread. The ensemble-mean errors we found in
+the paper are cyclone track, intensity, and extent errors for WN3 and its predecessor. For short
+lead times, the WN3 station head lowers station 2 m temperature CRPS by up to 40% against ENS, and
+Figure 3 shows the gain narrowing with lead time. Rasp et al. describe the station head as building
+station calibration into the model, so that WN3 needs no separate calibration stage. A comparison
+with post-processed ENS would therefore be a natural extension of their work. This study trains one
+XGBoost model per weather product on the ensemble mean, which can absorb each product's systematic
+bias but not differences in spread, because the XGBoost model sees only the mean. The study scores
+the error of the generators' power forecast in percent of capacity. This study does not test the
+paper's claim.
+
+### How the AIFS papers and an independent study compare AIFS with ENS
+
+**The ECMWF papers on AIFS (Artificial Intelligence Forecasting System) score raw ensembles with
+probabilistic scores, and find AIFS ahead of the IFS ensemble for most upper-air variables.** [Lang
+et al. (2026)](https://doi.org/10.1038/s44387-026-00073-7) train AIFS-CRPS on the almost fair CRPS
+(afCRPS) and compare it with the 9 km, 50-member IFS ensemble. We found no mention of
+post-processing of the IFS ensemble in the medium range. For most upper-air variables the paper
+reports lower CRPS and ensemble-mean root mean squared error and higher anomaly correlation, with
+improvements "in the range of 5–20%". Lang et al. discuss AIFS-CRPS's over-dispersion, and we found
+no discussion of under-dispersion in the IFS ensemble.
+
+**The ECMWF Newsletter on the operational AIFS ensemble reports a similar comparison.** [Lang and
+Magnusson (2025)](https://doi.org/10.21957/hg1z-pe65) compare AIFS ENS with IFS ENS on the same four
+scores, and we found no mention of post-processing. The authors write that improvements "reach up to
+25%" for upper-air variables, and that for 10 m wind speed verified against surface synoptic
+observation (SYNOP) stations "IFS ENS is more skilful". They describe AIFS ENS as "currently
+overdispersive for a range of upper-air variables".
+
+**An independent study finds raw AIFS ENS less skilful than raw IFS ENS for 10 m wind speed.**
+[Kocsis and Baran (2026)](https://arxiv.org/abs/2606.02508) verify 10 m wind speed at 9,246 SYNOP
+stations from July to November 2025. They score raw and post-processed versions of both ensembles.
+Raw AIFS scores worse than raw IFS at every lead time, with a CRPS skill score near -4% and a mean
+absolute error skill score near -3%. Post-processing shrinks the gap, which stays significant only
+at short lead times and in some cases at days 14 and 15. Both raw ensembles are strongly under-dispersive.
+
+**These papers rank weather forecasts against weather observations, which is a different question
+from the one this page answers.** This study fits an XGBoost model for each generator and each arm,
+from one product's forecast and calendar columns, and scores the power forecast in percent of
+capacity. The question is how much information an XGBoost model fitted to power can extract from
+each product. An arm reads ENS's mean, ENS's control member, AIFS Single, or AIFS ENS's mean. The
+XGBoost model can therefore learn a product's stable bias at each generator, but it never sees a
+product's spread. This page makes no comparison of calibrated probabilistic forecasts.
+
 ## Results
 
 ### Day 0 is lower than day 1 for every product, and ICON-D2's day 0 is the lowest (exploratory)
