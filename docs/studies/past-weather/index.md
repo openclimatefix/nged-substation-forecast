@@ -28,6 +28,12 @@ history, historical features, and disaggregation, and each reads one weather pro
   farms, an XGBoost model given CERRA's 10 m and 100 m wind speeds has lower error than one given
   100 m alone, and the pair gives most of the gain of using four or five heights. CERRA is a
   reanalysis, so the page says nothing about forecast skill.
+- [Does CERRA's wind direction add to its wind speed?](cerra-wind-direction.md) — at three wind
+  farms, an XGBoost model given CERRA's wind direction as well as its speed has about 5% lower error
+  than one given the speed alone, at 100 m and at 10 m, and the two heights do equally well. Direction
+  at all five heights adds no more than about 0.005 points beyond direction at 100 m, but the study's
+  check of its own sensitivity to veer was weak. CERRA is a reanalysis, so the page says nothing about
+  forecast skill.
 - [Does blending weather products beat the best single weather product?](blending.md) — at the six
   solar farms and three wind farms, an XGBoost model given several weather products at once beats an
   XGBoost model given the best single product with its neighbouring hours, by 0.13 points of

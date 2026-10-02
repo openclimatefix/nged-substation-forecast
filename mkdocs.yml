@@ -100,6 +100,7 @@ nav:
           - "Which weather product best describes past wind?": studies/past-weather/wind.md
           - "Do CERRA and NORA3 describe past wind better than ERA5?": studies/past-weather/reanalysis-wind.md
           - "Does blending CERRA's wind heights beat one height?": studies/past-weather/cerra-wind-levels.md
+          - "Does CERRA's wind direction add to its wind speed?": studies/past-weather/cerra-wind-direction.md
           - "Does blending weather products beat the best single weather product?": studies/past-weather/blending.md
       - Forecasts:
           - "How accurate is a power forecast driven by ECMWF ENS at each horizon?": studies/forecasts/ens-horizons.md
