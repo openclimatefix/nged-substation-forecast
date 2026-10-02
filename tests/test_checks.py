@@ -781,8 +781,8 @@ def test_power_data_is_fresh_re_raises_a_cancelled_run(
 _TODAY = datetime(2026, 7, 20, tzinfo=UTC)
 """Midnight of the arbitrary "today" the slot arithmetic tests are anchored on."""
 
-_NWP_DOWNLOAD_HOUR = 9
-"""The hour by which a healthy ``ecmwf_ens_schedule`` run (08:30 UTC) has landed the day's 00Z
+_NWP_DOWNLOAD_HOUR = 11
+"""The hour by which a healthy ``ecmwf_ens_schedule`` run (10:30 UTC) has landed the day's 00Z
 run, used only to build the *on-disk* state each slot test starts from."""
 
 
@@ -794,7 +794,7 @@ def _daily_runs(latest: datetime, n: int = 6) -> list[datetime]:
 def _healthy_runs_at(slot: datetime) -> list[datetime]:
     """The NWP runs a *healthy* ingest has on disk at ``slot``.
 
-    Today's 00Z run lands at 08:30 UTC, so the 00:00 and 06:00 slots still see only yesterday's
+    Today's 00Z run lands at 10:30 UTC, so the 00:00 and 06:00 slots still see only yesterday's
     run while the 12:00 and 18:00 slots see today's. That is the whole reason healthy NWP age
     spans 12–30 hours.
     """
@@ -830,8 +830,8 @@ def test_no_missed_runs_at_any_healthy_slot(slot_hour: int, healthy_age_hours: f
         (0, 1, 1),
         (6, 1, 1),
         # The 12:00 slot is deliberately lenient by one run. The day's run is due on disk at
-        # 08:30, but the deadline has to survive `ecmwf_ens`'s 4-hour retry window, so it only
-        # demands the run by 14:00 — a download that failed today is therefore first reported at
+        # 10:30, but the deadline has to survive `ecmwf_ens`'s 4-hour retry window, so it only
+        # demands the run by 16:00 — a download that failed today is therefore first reported at
         # the 18:00 slot rather than raising a false alarm on every slow-but-healthy morning.
         (12, 1, 0),
         (18, 1, 1),

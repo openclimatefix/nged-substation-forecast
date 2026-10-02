@@ -71,9 +71,9 @@ ecmwf_ens_job = define_asset_job(
 def ecmwf_ens_schedule(context: ScheduleEvaluationContext) -> RunRequest:
     """Materialise today's ``ecmwf_ens`` partition daily at 10:30 UTC.
 
-    10:30 UTC is a safety margin past the 00Z run's usual arrival on ECMWF's bucket (about 07:50 UTC
-    at the median and about 09:00 UTC at the 99th percentile) and Dynamical.org's publication (08:05
-    to 08:20 UTC on a normal day), and 90 minutes before the 12:00 UTC ``live_forecasts`` slot.
+    10:30 UTC is a safety margin past the 00Z run's usual arrival on ECMWF's bucket and
+    Dynamical.org's publication (08:05 to 08:20 UTC on a normal day), and 90 minutes before the
+    12:00 UTC ``live_forecasts`` slot.
     ``ecmwf_ens_partitions``' ``end_offset=1`` means today's partition key already exists by this
     point. If the run isn't usable yet — absent from the catalog, or present with
     a weather variable still wholesale empty — ``ecmwf_ens`` retries every 30 minutes, up to 8

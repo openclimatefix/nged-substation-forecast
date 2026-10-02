@@ -191,9 +191,9 @@ therefore has to clear `ecmwf_ens_schedule`'s 10:30 UTC start plus that asset's 
 retries at 30 minutes, plus a download on each attempt, for the failure mode that is only detectable
 after downloading — so it sits at 16 hours. The retry delays alone put the last healthy landing at
 about 14:30 UTC, and paying a download and convert on every attempt moves that to about 14:40 UTC,
-which leaves 80 minutes of margin spread over 9 attempts. The deadline is therefore breached only if
+which leaves 81 minutes of margin spread over 9 attempts. The deadline is therefore breached only if
 download-and-convert *averages* about 10 minutes across all 9 attempts, not if one attempt is slow:
-a single 645-second download costs only about 10 of those 80 minutes. The consequence is a one-run
+a single 645-second download costs only about 10 of those 81 minutes. The consequence is a one-run
 leniency at the 12:00 slot, where today's run has landed but is not yet *demanded*: a download that
 fails today is reported from the 18:00 slot onwards rather than six hours earlier. That one-run
 leniency is the right way round to be wrong. A tighter deadline would recover those six hours but
