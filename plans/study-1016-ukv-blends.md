@@ -189,13 +189,18 @@ The build calls the tested primitives in `studies.resample` directly:
   snapshots.
 - **Wind is instantaneous at the label.** The target's wind power is the shared target, centred on
   the label, so no UKV-specific shift is applied.
-- **Pre-fit alignment check:** the radiation peak-offset check (`studies.timestamp_checks`) on the
-  rebuilt column is a gate at day 1: `timestamp_checks.check_hour_ending` must find an offset within
-  15 minutes
-  of -30 (the matched-lead page found about -43 minutes for the UKV rebuild, `matched-lead.md`).
-  Days 2 to 4 are printed, and the page says the check cannot test the lead there, because the
-  clear-sky multiplication sets the diurnal shape whatever run the anchor came from. A wind
-  power-hour offset scan is printed. Neither changes the shared target.
+- **Pre-fit alignment check:** the radiation peak-offset check (`studies.timestamp_checks`) gates
+  day 1 on the median over the six solar generators, with two conditions. (a) The raw native day-1
+  snapshots, which are instants, peak within 15 minutes of 0, which catches any lead or slot error.
+  (b) The rebuilt day-1 column peaks 30 plus or minus 10 minutes before (a)'s median, which confirms
+  that the build averages the snapshots at `L - 1` and `L`. The snapshots are not reweighted. On
+  the 262 complete 03 UTC runs in the store, the raw snapshots peak about 10 minutes after their
+  stamp and the rebuilt column about 20 minutes before its label, so the page states as a
+  limitation that UKV-CEDA's hourly radiation is centred about 20 minutes later than the power hour
+  and that this handicaps the blend. Days 2 to 4 are printed, and the page says the check cannot
+  test the lead there, because the clear-sky multiplication sets the diurnal shape whatever run
+  the anchor came from. A wind power-hour offset scan is printed. Neither changes the shared
+  target.
 
 ## Data and the row set
 
@@ -305,8 +310,8 @@ agent writes each published script, and a fresh Opus reviewer reads it before it
 | Script | What it does |
 |---|---|
 | `build_ukv_ceda_inputs.py` | Writes `<domain>_ukv_ceda_inputs.parquet` on the published `(site, time)` keys: every UKV-CEDA column at every day and the run's `init_time`. Reads each site's nearest 2 km cell (private roster, labels only in output). Refuses to build unless the fetcher has passed the window (the oldest archived slot is at or before 2024-11-27 03Z) and every status-0 slot inside the window ("not yet attempted") has been retried once, by re-running the fetch with `--start` and `--end` over those days. A slot still unlisted after the retry (CEDA lists no runs for 2026-06-26 to 2026-07-02) counts as missing under its own cause, "run not listed by CEDA", and does not block the build. Writes the Icechunk snapshot ID it read into the stamp and the README, so the inputs can be rebuilt exactly. Prints the rows-lost-by-cause table and the day-5 share into its log and the folder's README. `--dry-run` times one month and prints the same table on the slots that exist. |
-| `verify_ukv_ceda_inputs.py` | Reads only. Recomputes a sample of built values from the store in plain Python, stratified to hit leads up to 48, the step from 48 to 51, leads of 57 and above, and wind hours 0 to 2. Runs the alignment checks and gates each day's skill: the correlation of `ukv_ceda_dayN_ghi` with `ghi_cams`, and of `_speed_10m` with ERA5's 10 m speed, printed beside Open-Meteo UKV day 1's. Day 1 must come close to Open-Meteo UKV's own correlation, and the correlation must fall as the day rises, or the check fails. Also a monthly step check (each month's mean UKV-CEDA ghi and 10 m speed divided by ENS's, flagging a month-to-month change of 15% or more, as `check_input_steps.py` does). Exits non-zero on a failed check. |
-| `fit_ukv_ceda_blends.py` | The fit and the report. Imports `fit_aifs` (`fit_jobs`, `add_shuffled_columns`, `control_shuffles`, `build_stamp`, `time_two_fits`, `blend_arm_name`), `nwp_forecast_comparison` (`difference`, `coverage_table`), `studies.cross_validation`, `studies.bootstrap` (`combine_setting_verdicts`, as `fit_product_blends.py` does), and `studies.guards`. |
+| `verify_ukv_ceda_inputs.py` | Reads the store and the inputs, and writes only `verify.json` (the result and each inputs file's SHA-256) into the build's folder. Recomputes a sample of built values from the store in plain Python, stratified to hit leads up to 48, the step from 48 to 51, leads of 57 and above, and wind hours 0 to 2. Runs the alignment checks and gates each day's skill: the correlation of `ukv_ceda_dayN_ghi` with `ghi_cams`, and of `_speed_10m` with ERA5's 10 m speed, printed beside Open-Meteo UKV day 1's. Day 1 must come close to Open-Meteo UKV's own correlation, and the correlation, taken on the rows all four lead days hold, must not rise as the day rises, or the check fails. Also a monthly step check (each month's mean UKV-CEDA ghi and 10 m speed divided by ENS's, flagging a month-to-month change of 15% or more, as `check_input_steps.py` does). Exits non-zero on a failed check. |
+| `fit_ukv_ceda_blends.py` | The fit and the report. Refuses to fit unless `verify.json` passed on the inputs `build.json` recorded. Imports `fit_aifs` (`fit_jobs`, `add_shuffled_columns`, `control_shuffles`, `build_stamp`, `time_two_fits`, `blend_arm_name`), `nwp_forecast_comparison` (`difference`, `coverage_table`), `studies.cross_validation`, `studies.bootstrap` (`combine_setting_verdicts`, as `fit_product_blends.py` does), and `studies.guards`. |
 | `ukv_ceda_blends_charts.py` | Draws every figure from saved losses and predictions, with no refit. |
 
 **Changes in shared code.** One parameter on `studies.ifs_single_runs` (`run_hour`; its module

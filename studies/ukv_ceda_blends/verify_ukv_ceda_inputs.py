@@ -1,9 +1,10 @@
 """Verify the UKV-CEDA inputs `build_ukv_ceda_inputs.py` wrote, before any fit reads them.
 
 One-off throwaway script for
-<https://github.com/openclimatefix/nged-substation-forecast/issues/1016>. It only reads: the built
-`<domain>_ukv_ceda_inputs.parquet`, the published inputs, and the `UKV-CEDA-T120` store. It exits
-non-zero if a check fails, and `fit_ukv_ceda_blends.py` runs only after it has exited 0.
+<https://github.com/openclimatefix/nged-substation-forecast/issues/1016>. It reads the built
+`<domain>_ukv_ceda_inputs.parquet`, the published inputs, and the `UKV-CEDA-T120` store, and writes
+only `verify.json` into the build's folder. It exits non-zero if a check fails, and
+`fit_ukv_ceda_blends.py` runs only after a passing run, which it confirms from `verify.json`.
 
 **Values are recomputed in plain Python.** A stratified sample of built values is recomputed from
 the store with `math` and no array code, so a slip in the build's array arithmetic does not repeat
@@ -12,27 +13,39 @@ rebuilt leads), and leads of 57 hours and above, and wind hours 0 to 2 UTC, wher
 previous day's. A rebuilt radiation value is recomputed only where both 3-hourly anchors either side
 are in daylight, because the hold-flat rule for night anchors is not worth reimplementing.
 
-**Alignment.** At day 1 the radiation column must track the sun best near -30 minutes
-(`studies.timestamp_checks.check_hour_ending`, within 15 minutes), which is the signature of a mean
-over the hour ending at the label. Days 2 to 4 are printed only, because the clear-sky
-multiplication sets the diurnal shape whatever run the anchor came from, so the check cannot test
-the lead there. A scan of the correlation between UKV-CEDA's day-1 10 m wind speed and the wind
-power, with the speed shifted by -3 to +3 hours, is printed.
+**Alignment.** The gate is the median over the solar generators, and has two parts. (a) The raw
+native day-1 snapshots, which are instants, must track the sun best within
+`RAW_PEAK_TOLERANCE_MINUTES` of 0, which catches any lead or slot error. (b) The rebuilt day-1
+column, a mean of two snapshots an hour apart, must peak `MEAN_OF_TWO_OFFSET_MINUTES` plus or minus
+`MEAN_PEAK_TOLERANCE_MINUTES` from (a)'s median, which confirms that the build averages the
+snapshots at `L - 1` and `L`. The snapshots are not reweighted to land on -30 minutes. UKV-CEDA's
+radiation behaves like the sun about 10 minutes after its stamp, a property of the archive that no
+construction choice can remove, so the rebuilt column is centred about 20 minutes before the label,
+not 30. Days 2 to 4 are printed only, because the clear-sky multiplication sets the diurnal shape
+whatever run the anchor came from, so the check cannot test the lead there. A scan of the
+correlation between UKV-CEDA's day-1 10 m wind speed and the wind power, with the speed shifted by
+-3 to +3 hours, is printed.
 
 **Skill.** The correlation of `ukv_ceda_day<N>_ghi` with CAMS's irradiance, and of `_speed_10m` with
-ERA5's 10 m speed, is printed beside Open-Meteo UKV day 1's on the same rows. The check fails
-unless day 1 is within `DAY1_TOLERANCE` of Open-Meteo UKV's correlation and the correlation never
-rises from one lead day to the next.
+ERA5's 10 m speed, taken at each lead day on the rows all four lead days hold, is printed beside
+Open-Meteo UKV day 1's on the same rows. The check fails unless day 1 is within `DAY1_TOLERANCE` of
+Open-Meteo UKV's correlation and the correlation never rises from one lead day to the next.
 
 **Steps.** Each month's mean UKV-CEDA irradiance and 10 m wind speed over ENS's, per generator, is
 printed where a month differs from the one before by 15% or more. This is a screen, and it does not
 fail the run.
+
+**The verify stamp.** The script writes `verify.json` into the build's folder, holding whether
+every gating check passed and the SHA-256 of each inputs file it read. `fit_ukv_ceda_blends.py`
+refuses to fit unless that stamp passed and its hashes are the inputs' current ones. A later run
+replaces the stamp, because it describes the latest verification and not an output of the study.
 
 Run it with `uv run python studies/ukv_ceda_blends/verify_ukv_ceda_inputs.py`.
 """
 
 import argparse
 import itertools
+import json
 import math
 import random
 import sys
@@ -57,7 +70,7 @@ from paths import REPO_DATA_DIR  # noqa: E402
 from studies.grid_sampling import nearest_cells  # noqa: E402
 from studies.ifs_single_runs import served_lead_hours  # noqa: E402
 from studies.solar import zenith  # noqa: E402
-from studies.timestamp_checks import check_hour_ending, correlation_by_offset  # noqa: E402
+from studies.timestamp_checks import best_offset_minutes, correlation_by_offset  # noqa: E402
 
 SAMPLE_PER_STRATUM: Final[int] = 6
 """How many rows are recomputed per technology, lead day, and stratum."""
@@ -70,6 +83,18 @@ ABSOLUTE_TOLERANCE: Final[float] = 1e-6
 
 DAY1_TOLERANCE: Final[float] = 0.05
 """How far below Open-Meteo UKV's day-1 correlation UKV-CEDA's day-1 correlation may sit."""
+
+RAW_PEAK_TOLERANCE_MINUTES: Final[int] = 15
+"""How far the median raw day-1 snapshot peak may sit from 0 minutes, where an instant peaks."""
+
+MEAN_OF_TWO_OFFSET_MINUTES: Final[int] = -30
+"""Where a mean of two snapshots an hour apart peaks, relative to the snapshots' own peak."""
+
+MEAN_PEAK_TOLERANCE_MINUTES: Final[int] = 10
+"""How far the rebuilt column's median peak may sit from `MEAN_OF_TWO_OFFSET_MINUTES` after (a)."""
+
+DAY1_SNAPSHOT_LEADS: Final[range] = range(21, 46)
+"""The native leads whose snapshots the day-1 rows average, in hours."""
 
 STEP_RATIO_THRESHOLD: Final[float] = 1.15
 """A month-to-month change in a generator's UKV-CEDA to ENS ratio beyond this factor is flagged."""
@@ -475,23 +500,85 @@ def skill_gate(
     return reasons
 
 
+def alignment_gate(*, raw_peaks: Sequence[int], rebuilt_peaks: Sequence[int]) -> list[str]:
+    """Return why the day-1 radiation timing fails, if it does, from the median over generators.
+
+    Args:
+        raw_peaks: Each generator's peak offset of the raw day-1 snapshots, in minutes.
+        rebuilt_peaks: Each generator's peak offset of the rebuilt day-1 column, in minutes.
+
+    Returns:
+        The reasons, empty if both parts of the gate pass.
+    """
+    raw = float(np.median(raw_peaks))
+    rebuilt = float(np.median(rebuilt_peaks))
+    reasons = []
+    if abs(raw) > RAW_PEAK_TOLERANCE_MINUTES:
+        reasons.append(
+            f"the raw day-1 snapshots peak at {raw:+.0f} minutes, more than "
+            f"{RAW_PEAK_TOLERANCE_MINUTES} from 0, so a lead or slot is misread"
+        )
+    if abs(rebuilt - raw - MEAN_OF_TWO_OFFSET_MINUTES) > MEAN_PEAK_TOLERANCE_MINUTES:
+        reasons.append(
+            f"the rebuilt day-1 column peaks {rebuilt - raw:+.0f} minutes from the raw snapshots, "
+            f"not {MEAN_OF_TWO_OFFSET_MINUTES} plus or minus {MEAN_PEAK_TOLERANCE_MINUTES}, so the "
+            "build is not averaging the snapshots at L - 1 and L"
+        )
+    return reasons
+
+
+def raw_day1_peak(*, store: build.StoreRead, cell: SiteCell, init_times: Sequence[datetime]) -> int:
+    """Return where a site's raw day-1 radiation snapshots track the sun best, in minutes.
+
+    Args:
+        store: The opened store.
+        cell: The site's cell.
+        init_times: The runs the site's day-1 rows read.
+
+    Returns:
+        The offset of the correlation's peak.
+    """
+    times: list[datetime] = []
+    values: list[float] = []
+    for init in init_times:
+        slot = int((init - build.T120_PROFILE.slot_epoch) / timedelta(hours=build.SLOT_HOURS))
+        series = read_run(store=store, variable="shortwave_down", slot=slot, cell=cell.cell)
+        for lead in DAY1_SNAPSHOT_LEADS:
+            if math.isfinite(series[lead]):
+                times.append(init + timedelta(hours=lead))
+                values.append(series[lead])
+    correlations = correlation_by_offset(
+        times=pl.Series(times, dtype=pl.Datetime("us", "UTC")),
+        ghi=np.array(values),
+        latitude=cell.latitude,
+        longitude=cell.longitude,
+    )
+    return best_offset_minutes(correlations=correlations)
+
+
 def alignment_lines(
-    *, domain: DomainType, joined: pl.DataFrame, cells: dict[str, SiteCell]
+    *,
+    domain: DomainType,
+    joined: pl.DataFrame,
+    cells: dict[str, SiteCell],
+    store: build.StoreRead,
 ) -> tuple[list[str], bool]:
-    """Run the radiation peak-offset check at every lead day, gating day 1.
+    """Run the radiation peak-offset check at every lead day, gating day 1 on the median.
 
     Args:
         domain: `solar` or `wind`; only solar is checked.
         joined: Built inputs with `site` and `time`.
         cells: Each site's coordinates.
+        store: The opened store, read for the raw day-1 snapshots.
 
     Returns:
-        The printed lines, and whether day 1 passed at every site.
+        The printed lines, and whether the day-1 gate passed.
     """
     if domain != "solar":
         return [], True
     lines: list[str] = []
-    passed = True
+    raw_peaks: list[int] = []
+    rebuilt_peaks: list[int] = []
     for day in build.LEAD_DAYS:
         for site, cell in sorted(cells.items()):
             frame = joined.filter(
@@ -503,17 +590,26 @@ def alignment_lines(
                 latitude=cell.latitude,
                 longitude=cell.longitude,
             )
-            best = max(correlations, key=lambda offset: correlations[offset])
+            best = best_offset_minutes(correlations=correlations)
             lines.append(
                 f"solar day {day} site {site}: radiation tracks the sun best at {best:+d} minutes"
             )
             if day == 1:
-                try:
-                    check_hour_ending(correlations=correlations, name=f"UKV-CEDA day 1 at {site}")
-                except ValueError as error:
-                    lines.append(f"FAIL {error}")
-                    passed = False
-    return lines, passed
+                rebuilt_peaks.append(best)
+                raw = raw_day1_peak(
+                    store=store,
+                    cell=cell,
+                    init_times=frame["ukv_ceda_day1_init_time"].unique().to_list(),
+                )
+                raw_peaks.append(raw)
+                lines.append(f"solar day 1 site {site}: raw snapshots peak at {raw:+d} minutes")
+    reasons = alignment_gate(raw_peaks=raw_peaks, rebuilt_peaks=rebuilt_peaks)
+    lines.append(
+        f"solar day 1 median over {len(raw_peaks)} sites: raw snapshots "
+        f"{np.median(raw_peaks):+.0f} minutes, rebuilt column {np.median(rebuilt_peaks):+.0f}"
+    )
+    lines.extend(f"FAIL {reason}" for reason in reasons)
+    return lines, not reasons
 
 
 def wind_offset_lines(*, joined: pl.DataFrame) -> list[str]:
@@ -579,10 +675,9 @@ def skill_lines(*, domain: DomainType, joined: pl.DataFrame) -> tuple[list[str],
         if domain == "solar"
         else ("speed_10m_era5", "ukv_day1_speed_10m", "speed_10m")
     )
-    per_day = [
-        correlation(first=joined[f"ukv_ceda_day{day}_{field}"], second=joined[truth])
-        for day in build.LEAD_DAYS
-    ]
+    day_columns = [f"ukv_ceda_day{day}_{field}" for day in build.LEAD_DAYS]
+    shared = joined.drop_nulls([truth, *day_columns]).drop_nans([truth, *day_columns])
+    per_day = [correlation(first=shared[column], second=shared[truth]) for column in day_columns]
     both = joined.drop_nulls([open_meteo, "ukv_ceda_day1_" + field, truth])
     open_meteo_day1 = correlation(first=both[open_meteo], second=both[truth])
     same_rows = correlation(first=both["ukv_ceda_day1_" + field], second=both[truth])
@@ -591,13 +686,31 @@ def skill_lines(*, domain: DomainType, joined: pl.DataFrame) -> tuple[list[str],
     )
     lines = [
         (
-            f"{domain}: correlation of UKV-CEDA {field} with {truth} by lead day "
+            f"{domain}: correlation of UKV-CEDA {field} with {truth} by lead day, on the "
+            f"{shared.height} rows all four days hold, "
             f"{[round(v, 3) for v in per_day]}; on the rows Open-Meteo UKV day 1 also holds, "
             f"UKV-CEDA {same_rows:.3f} and Open-Meteo UKV {open_meteo_day1:.3f}"
         ),
         *(f"FAIL {domain}: {reason}" for reason in reasons),
     ]
     return lines, not reasons
+
+
+def write_verify_stamp(*, output_dir: Path, passed: bool) -> None:
+    """Record whether verification passed and which inputs it read, replacing any earlier stamp.
+
+    Args:
+        output_dir: The build's folder, holding the inputs files.
+        passed: Whether every gating check passed.
+    """
+    stamp = {
+        "passed": passed,
+        "inputs_sha256": {
+            domain: build.sha256_of(path=output_dir / f"{domain}_ukv_ceda_inputs.parquet")
+            for domain in build.DOMAINS
+        },
+    }
+    (output_dir / build.VERIFY_STAMP_NAME).write_text(json.dumps(stamp, indent=2) + "\n")
 
 
 def verify(*, published_dir: Path, day4_dir: Path, store_dir: Path, output_dir: Path) -> bool:
@@ -628,12 +741,15 @@ def verify(*, published_dir: Path, day4_dir: Path, store_dir: Path, output_dir: 
         lines, skill_ok = skill_lines(domain=domain, joined=joined)
         sys.stdout.write("\n".join(lines) + "\n")
         cells = site_cells(store=store, domain=domain, sites=built["site"].unique().to_list())
-        aligned_lines, aligned = alignment_lines(domain=domain, joined=joined, cells=cells)
+        aligned_lines, aligned = alignment_lines(
+            domain=domain, joined=joined, cells=cells, store=store
+        )
         sys.stdout.write("\n".join(aligned_lines) + ("\n" if aligned_lines else ""))
         if domain == "wind":
             sys.stdout.write("\n".join(wind_offset_lines(joined=joined)) + "\n")
         sys.stdout.write("\n".join(step_lines(joined=joined, domain=domain)) + "\n")
         ok = ok and skill_ok and aligned
+    write_verify_stamp(output_dir=output_dir, passed=ok)
     sys.stdout.write(f"VERIFY {'PASS' if ok else 'FAIL'}\n")
     return ok
 

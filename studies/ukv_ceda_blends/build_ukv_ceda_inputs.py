@@ -176,6 +176,9 @@ SNAPSHOT_OFFSETS_MINUTES: Final[tuple[int, int]] = (-60, 0)
 README_NAME: Final[str] = "README.md"
 STAMP_NAME: Final[str] = "build.json"
 
+VERIFY_STAMP_NAME: Final[str] = "verify.json"
+"""The stamp `verify_ukv_ceda_inputs.py` writes into the build's folder."""
+
 SLOT_HOURS: Final[int] = T120_PROFILE.cycle_hours
 
 
@@ -603,7 +606,7 @@ def attribute_causes(
 
     Args:
         frame: Rows from `with_run`, holding `slot`, `lead_hours`, and `columns`, where the columns
-            are null if the run did not supply them.
+            are null or NaN if the run did not supply them.
         statuses: The store's status of every slot.
         columns: The UKV-CEDA columns to test for presence.
 
@@ -615,7 +618,8 @@ def attribute_causes(
     slots = frame["slot"].to_numpy()
     inside = (slots >= 0) & (slots < len(statuses))
     status = np.where(inside, statuses[np.clip(slots, 0, max(len(statuses) - 1, 0))], 0)
-    absent = pl.any_horizontal(pl.col(column).is_null() for column in columns)
+    # The wind arrays mark a missing slot with NaN, not null, so both count as absent.
+    absent = pl.any_horizontal(pl.col(column).fill_nan(None).is_null() for column in columns)
     return frame.with_columns(status=pl.Series(status, dtype=pl.Int64)).with_columns(
         cause=pl.when(~absent)
         .then(None)
@@ -648,7 +652,7 @@ def day_columns(*, joined: pl.DataFrame, day: int, domain: DomainType) -> pl.Dat
         "site",
         "time",
         *(
-            pl.col(field).cast(pl.Float64).alias(f"{prefix}_{field}")
+            pl.col(field).cast(pl.Float64).fill_nan(None).alias(f"{prefix}_{field}")
             for field in WEATHER_FIELDS[domain]
         ),
         pl.col("init_time").alias(f"{prefix}_init_time"),

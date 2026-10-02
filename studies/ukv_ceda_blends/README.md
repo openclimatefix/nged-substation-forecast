@@ -48,8 +48,11 @@ before the build and before every fit, and start only below a load average of ab
    run slot the store marks as never archived has been fetched again once. Name the days CEDA still
    does not list in `--unlisted-days`.
 4. `uv run python studies/ukv_ceda_blends/verify_ukv_ceda_inputs.py` recomputes a stratified sample of
-   built values in plain Python, checks the radiation timestamp at day 1, compares each lead day's
-   correlation with CAMS and ERA5 against Open-Meteo UKV day 1, and screens for month-to-month steps.
+   built values in plain Python, gates the radiation timestamp at day 1 (see "The radiation
+   timestamp" below), compares each lead day's correlation with CAMS and ERA5 against Open-Meteo UKV
+   day 1 on the rows all four lead days hold, and screens for month-to-month steps. It writes
+   `verify.json`, holding whether every gating check passed and the SHA-256 of each inputs file, into
+   the build's folder.
 5. `uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --dry-run` builds every frame,
    checks every arm's columns, and lists the fits.
 6. `uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --check` fits one arm at one wind
@@ -77,7 +80,9 @@ before the build and before every fit, and start only below a load average of ab
   not refitted, and every output is written once.
 - `ukv_ceda_blends_charts.py` draws the headline figure and the per-generator figure from the saved
   losses.
-- `check_arm_columns_unchanged.py` is described in step 1.
+- `check_arm_columns_unchanged.py` is described in step 1. It cannot cover the main matched-lead
+  fit, which wrote no stamp. No arm prefix there starts with `ukv_ceda`, so the new branch of
+  `_wind_weather_fields` is never reached by that fit.
 
 ## Changes to shared code
 
@@ -88,7 +93,22 @@ before the build and before every fit, and start only below a load average of ab
 - `nwp_forecast_comparison._wind_weather_fields` returns the 10 m and 925 hPa column names for a
   prefix that starts with `ukv_ceda`.
 
+## The radiation timestamp
+
+The day-1 gate in `verify_ukv_ceda_inputs.py` is the median over the solar generators of two peak
+offsets, each the offset at which the radiation correlates best with the cosine of the solar zenith
+angle. (a) The raw native day-1 snapshots, which are instants, must peak within 15 minutes of 0. (b)
+The rebuilt column, a mean of the snapshots at `L - 1` and `L`, must peak 30 plus or minus 10
+minutes before (a). The snapshots are not reweighted to land on -30 minutes.
+
 ## Reading the results
+
+- UKV-CEDA's radiation is centred about 20 minutes later than the power hour. On the 262 complete
+  03 UTC runs of 2026-01-02 to 2026-09-28, the raw snapshots peaked about 10 minutes after their
+  stamp (15 minutes at one generator), so the mean of two snapshots peaks about 20 minutes before
+  its label instead of 30. Open-Meteo's UKV peaked 13 minutes before its stamp. The offset is a
+  property of the archive that no construction choice can remove. It handicaps the blend and does
+  not favour it, because every UKV-CEDA value comes from a run issued at least 21 hours ahead.
 
 - UKV-CEDA is the archive of the Met Office's UKV, which is statistically different from the live
   UKV feed. A model trained on UKV-CEDA must not be run on live UKV.

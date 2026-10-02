@@ -17,6 +17,8 @@ sys.path.insert(0, str(_STUDIES_DIR / "beam_diffuse_split"))
 sys.path.insert(0, str(_STUDIES_DIR / "weather_downloads"))
 
 import build_ukv_ceda_inputs as build  # noqa: E402
+from studies.baselines import haurwitz_w_m2  # noqa: E402
+from studies.solar import zenith  # noqa: E402
 
 NAN = float("nan")
 
@@ -102,6 +104,43 @@ def test_a_fixed_share_of_the_clear_sky_is_rebuilt_as_that_share_of_each_leads_c
     filled = build.fill_radiation(snapshots=snapshots, clear_sky=clear)
 
     assert np.allclose(filled, 0.5 * clear)
+
+
+def test_a_rising_clear_sky_index_is_rebuilt_at_each_leads_own_instant():
+    # A constant index would hide an anchor position shifted by 1.5 hours (ENS's mistake, where a
+    # value is the mean of the step ending at its label); a rising index would not.
+    clear = _clear_sky(daylight_utc_hours=range(24))
+    index = 0.2 + 0.005 * (np.arange(build.N_LEADS) - 48)
+    snapshots = np.where(np.isin(np.arange(121), build.NATIVE_LEADS), index * 600.0, NAN)[None, :]
+
+    filled = build.fill_radiation(snapshots=snapshots, clear_sky=clear)
+
+    assert filled[0, build.FILLED_LEADS] == pytest.approx(index[build.FILLED_LEADS] * 600.0)
+
+
+def test_the_clear_sky_is_evaluated_at_each_leads_own_instant():
+    init = datetime(2026, 6, 21, 3, tzinfo=UTC)
+    latitude, longitude = 52.0, -1.0
+    leads = [6, 9, 30, 57, 105]
+
+    clear = build.clear_sky_by_lead(init_times=[init], latitude=latitude, longitude=longitude)
+
+    expected = [
+        float(
+            haurwitz_w_m2(
+                apparent_zenith_deg=zenith(
+                    stamps=pl.Series(
+                        [init + timedelta(hours=lead)], dtype=pl.Datetime("us", "UTC")
+                    ),
+                    latitude=latitude,
+                    longitude=longitude,
+                )
+            )[0]
+        )
+        for lead in leads
+    ]
+    assert expected[0] > 100.0
+    assert clear[0, leads] == pytest.approx(expected)
 
 
 def test_native_radiation_leads_pass_through_unchanged_even_below_the_daylight_floor():
@@ -252,6 +291,34 @@ def test_each_missing_value_is_labelled_by_its_runs_status():
         None,
         "run not listed by CEDA",
     ]
+
+
+def test_a_nan_wind_value_is_labelled_by_its_runs_status_and_stored_as_null():
+    slots, _ = _slots_and_init(n=1)
+    shape = (1, build.N_LEADS, 1)
+    series = {
+        name: np.full(shape, np.nan)
+        for name in (
+            "wind_speed_10m",
+            "wind_direction_10m",
+            "wind_speed_925hpa",
+            "wind_direction_925hpa",
+        )
+    }
+    hourly = build.wind_instants(slots=slots, series=series, sites=["W1"])
+    init = build.slot_init_time(slot=slots[0])
+    keys = _keys((init + timedelta(hours=30)).replace(tzinfo=None), site="W1")
+
+    built = build.build_day(
+        keys=keys,
+        day=1,
+        domain="wind",
+        hourly=hourly,
+        statuses=np.array([build.STATUS_MISSING] * 4, dtype=np.int8),
+    )
+
+    assert built["ukv_ceda_day1_cause"].to_list() == ["run missing"]
+    assert built["ukv_ceda_day1_speed_10m"].is_null().all()
 
 
 def test_a_lead_beyond_the_store_is_its_own_cause_before_the_status_is_read():

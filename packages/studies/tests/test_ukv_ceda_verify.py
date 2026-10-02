@@ -192,6 +192,61 @@ def test_the_skill_check_fails_when_day_1_is_far_below_open_meteo_or_the_correla
     assert "rises with the lead day" in rising[0]
 
 
+def test_each_lead_days_correlation_is_taken_on_the_rows_all_four_days_hold():
+    truth = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    # Day 1 alone also holds a last row that is perfectly aligned; the shared rows are noisy, and
+    # the same for every day.
+    noisy = [1.0, 3.0, 2.0, 5.0, 4.0, None]
+    joined = pl.DataFrame(
+        {
+            "ghi_cams": truth,
+            "ukv_day1_ghi": truth,
+            "ukv_ceda_day1_ghi": [*noisy[:5], 6.0],
+            "ukv_ceda_day2_ghi": noisy,
+            "ukv_ceda_day3_ghi": noisy,
+            "ukv_ceda_day4_ghi": noisy,
+        }
+    )
+
+    lines, _ = verify.skill_lines(domain="solar", joined=joined)
+
+    shared_correlation = verify.correlation(first=pl.Series(noisy[:5]), second=pl.Series(truth[:5]))
+    assert f"[{round(shared_correlation, 3)}, {round(shared_correlation, 3)}" in lines[0]
+
+
+def test_the_radiation_alignment_gate_is_the_median_over_generators_in_two_parts():
+    assert verify.alignment_gate(raw_peaks=[10, 10, 15, 10, 10, 10], rebuilt_peaks=[-20] * 6) == []
+    # One generator off does not fail a median.
+    assert verify.alignment_gate(raw_peaks=[10, 10, 40, 10, 10, 10], rebuilt_peaks=[-20] * 6) == []
+    # The raw snapshots are an instant: a median 20 minutes from 0 is a lead or slot error.
+    raw = verify.alignment_gate(raw_peaks=[20] * 6, rebuilt_peaks=[-10] * 6)
+    assert len(raw) == 1
+    assert "raw day-1 snapshots" in raw[0]
+    # A rebuilt column that peaks with the snapshots is not averaging L - 1 and L.
+    mean = verify.alignment_gate(raw_peaks=[10] * 6, rebuilt_peaks=[10] * 6)
+    assert len(mean) == 1
+    assert "not averaging" in mean[0]
+    # The rebuilt column 41 minutes before the raw snapshots is outside 30 plus or minus 10.
+    assert len(verify.alignment_gate(raw_peaks=[10] * 6, rebuilt_peaks=[-31] * 6)) == 1
+    assert verify.alignment_gate(raw_peaks=[10] * 6, rebuilt_peaks=[-30] * 6) == []
+
+
+def test_the_verify_stamp_records_the_result_and_the_hash_of_every_inputs_file(tmp_path: Path):
+    for domain in ("solar", "wind"):
+        pl.DataFrame({"a": [1, 2]}).write_parquet(tmp_path / f"{domain}_ukv_ceda_inputs.parquet")
+
+    verify.write_verify_stamp(output_dir=tmp_path, passed=True)
+
+    stamp = json.loads((tmp_path / "verify.json").read_text())
+    assert stamp["passed"] is True
+    assert stamp["inputs_sha256"] == {
+        domain: build.sha256_of(path=tmp_path / f"{domain}_ukv_ceda_inputs.parquet")
+        for domain in ("solar", "wind")
+    }
+    verify.write_verify_stamp(output_dir=tmp_path, passed=False)
+    assert json.loads((tmp_path / "verify.json").read_text())["passed"] is False
+
+
 def test_a_correlation_that_stays_level_does_not_count_as_rising():
     assert verify.non_increasing(values=[0.9, 0.9, 0.8])
     assert not verify.non_increasing(values=[0.9, 0.91])

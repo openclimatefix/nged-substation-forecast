@@ -735,16 +735,48 @@ def test_the_report_text_states_the_reading_rule_and_the_lead_gap():
     assert "CPU line." in text
 
 
-def test_check_init_times_accepts_the_03_utc_run_for_solar_and_wind():
-    for domain in ("solar", "wind"):
-        frame = _candidates(domain=domain).head(20)
-        stamped = frame.select("site", "time").with_columns(
-            ukv_ceda_day2_init_time=served_init_time(
-                time=pl.col("time"), day=2, domain=domain, run_hour=3
-            )
-        )
+def test_check_init_times_reads_the_03_utc_run_of_the_rows_own_day_minus_the_lead_day():
+    # A wind label is an instant: 14:00 on 10 March reads the run of 8 March at lead day 2.
+    wind = pl.DataFrame(
+        {
+            "time": [datetime(2026, 3, 10, 14, tzinfo=UTC)],
+            "ukv_ceda_day2_init_time": [datetime(2026, 3, 8, 3, tzinfo=UTC)],
+        }
+    )
+    fit.check_init_times(frame=wind, domain="wind", day=2)
+    # A solar label names the hour ending at it, so 00:00 on 10 March belongs to 9 March.
+    solar = pl.DataFrame(
+        {
+            "time": [datetime(2026, 3, 10, 0, tzinfo=UTC)],
+            "ukv_ceda_day1_init_time": [datetime(2026, 3, 8, 3, tzinfo=UTC)],
+        }
+    )
+    fit.check_init_times(frame=solar, domain="solar", day=1)
 
-        fit.check_init_times(frame=stamped, domain=domain, day=2)
+    for domain, frame, day in (("wind", wind, 2), ("solar", solar, 1)):
+        shifted = frame.with_columns(pl.col(f"ukv_ceda_day{day}_init_time") + pl.duration(days=1))
+        with pytest.raises(ValueError, match="read a run other than"):
+            fit.check_init_times(frame=shifted, domain=domain, day=day)
+
+
+def test_a_fit_needs_a_passing_verify_stamp_for_the_inputs_the_build_recorded(tmp_path: Path):
+    stamp = _build_folder(folder=tmp_path)
+    hashes = stamp["inputs_sha256"]
+    with pytest.raises(ValueError, match="absent"):
+        fit.check_verified(output_dir=tmp_path, stamp=stamp)
+
+    (tmp_path / "verify.json").write_text(json.dumps({"passed": False, "inputs_sha256": hashes}))
+    with pytest.raises(ValueError, match="did not pass"):
+        fit.check_verified(output_dir=tmp_path, stamp=stamp)
+
+    (tmp_path / "verify.json").write_text(
+        json.dumps({"passed": True, "inputs_sha256": {"solar": "x", "wind": "y"}})
+    )
+    with pytest.raises(ValueError, match="other inputs"):
+        fit.check_verified(output_dir=tmp_path, stamp=stamp)
+
+    (tmp_path / "verify.json").write_text(json.dumps({"passed": True, "inputs_sha256": hashes}))
+    fit.check_verified(output_dir=tmp_path, stamp=stamp)
 
 
 def test_the_report_is_built_from_saved_losses_alone_and_its_intervals_are_saved(

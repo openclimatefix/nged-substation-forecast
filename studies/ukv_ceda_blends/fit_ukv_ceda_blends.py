@@ -93,7 +93,6 @@ from studies.cross_validation import (  # noqa: E402
     uncovered_months,
 )
 from studies.guards import check_no_missing, refuse_to_overwrite  # noqa: E402
-from studies.ifs_single_runs import served_init_time  # noqa: E402
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -250,17 +249,20 @@ def ukv_columns(*, domain: DomainType, day: int) -> list[str]:
 def check_init_times(*, frame: pl.DataFrame, domain: DomainType, day: int) -> None:
     """Raise unless every row's stamped run is the 03 UTC run `day` days before its own day.
 
+    The expected run is recomputed here from the plan's rule and not from the function the build
+    stamps with. A solar label names the hour ending at it, so its day is the day of the label minus
+    one hour. A wind label is an instant, so its day is its own.
+
     Args:
         frame: Rows carrying `time` and `ukv_ceda_day<N>_init_time`.
         domain: `solar` or `wind`.
         day: The lead day.
 
     Raises:
-        ValueError: Naming how many rows read another run than `served_init_time` with `run_hour=3`.
+        ValueError: Naming how many rows read another run than the 03 UTC run of day D-`day`.
     """
-    expected = served_init_time(
-        time=pl.col("time"), day=day, domain=domain, run_hour=build.RUN_HOUR
-    )
+    instant = pl.col("time") - pl.duration(hours=1) if domain == "solar" else pl.col("time")
+    expected = instant.dt.truncate("1d") - pl.duration(days=day) + pl.duration(hours=build.RUN_HOUR)
     wrong = frame.filter(pl.col(f"{PRODUCT}_day{day}_init_time") != expected).height
     if wrong:
         msg = (
@@ -408,6 +410,29 @@ def read_build_stamp(*, output_dir: Path) -> dict[str, object]:
             msg = f"{domain}: the inputs file is not the one build.json recorded"
             raise ValueError(msg)
     return stamp
+
+
+def check_verified(*, output_dir: Path, stamp: Mapping[str, object]) -> None:
+    """Raise unless `verify_ukv_ceda_inputs.py` passed on the inputs the build recorded.
+
+    Args:
+        output_dir: The folder holding the build's outputs and `verify.json`.
+        stamp: The build's stamp, from `read_build_stamp`.
+
+    Raises:
+        ValueError: If `verify.json` is absent, did not pass, or names other inputs than the build.
+    """
+    path = output_dir / build.VERIFY_STAMP_NAME
+    if not path.exists():
+        msg = f"{path.name} is absent: run verify_ukv_ceda_inputs.py first"
+        raise ValueError(msg)
+    verified = json.loads(path.read_text())
+    if verified.get("passed") is not True:
+        msg = "verify_ukv_ceda_inputs.py did not pass, so no stage may run"
+        raise ValueError(msg)
+    if verified.get("inputs_sha256") != stamp["inputs_sha256"]:
+        msg = "verify_ukv_ceda_inputs.py passed on other inputs than the build recorded"
+        raise ValueError(msg)
 
 
 def stage_stamp(
@@ -1327,11 +1352,6 @@ def main() -> int:
     parser.add_argument(
         "--report-name", default="report", help="The report's name, `report` or new."
     )
-    parser.add_argument(
-        "--verified",
-        action="store_true",
-        help="Confirm verify_ukv_ceda_inputs.py exited 0 on this build.",
-    )
     args = parser.parse_args()
     check_output_dir(output_dir=args.output_dir, read_only=[args.published_dir, args.day4_dir])
     planned = plan_stages(
@@ -1352,9 +1372,7 @@ def main() -> int:
     fit_aifs.check_gpu_visible()
     if args.check:
         return run_check(planned=planned, output_dir=args.output_dir)
-    if not args.verified:
-        sys.stdout.write("pass --verified once verify_ukv_ceda_inputs.py has exited 0\n")
-        return 1
+    check_verified(output_dir=args.output_dir, stamp=read_build_stamp(output_dir=args.output_dir))
     return run_fits(
         planned=planned,
         output_dir=args.output_dir,
