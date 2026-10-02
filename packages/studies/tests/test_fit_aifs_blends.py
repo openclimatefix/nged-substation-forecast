@@ -30,6 +30,7 @@ from fit_aifs import (  # noqa: E402
     PRODUCT_BLEND_DAYS,
     ROW_SETS,
     SKILL,
+    BlendRoleType,
     Contrast,
     add_shuffled_columns,
     arm_features,
@@ -1814,7 +1815,7 @@ def _ukv_ceda_wind(*, prefix: str) -> tuple[str, ...]:
     ids=["blend", "control", "second-control", "pad"],
 )
 def test_a_ukv_ceda_arm_lists_the_columns_of_its_role_in_order(
-    role: str, solar_weather: tuple[str, ...], wind_weather: tuple[str, ...]
+    role: BlendRoleType, solar_weather: tuple[str, ...], wind_weather: tuple[str, ...]
 ):
     arm = blend_arm_name(product="ukv_ceda", day=2, role=role)
 
@@ -1825,7 +1826,7 @@ def test_a_ukv_ceda_arm_lists_the_columns_of_its_role_in_order(
 @pytest.mark.parametrize("role", ["", "_control", "_control_b", "_pad"])
 @pytest.mark.parametrize(("domain", "count"), [("solar", 9), ("wind", 11)])
 def test_every_ukv_ceda_arm_holds_the_blends_column_count(
-    role: str, domain: DomainType, count: int
+    role: BlendRoleType, domain: DomainType, count: int
 ):
     arm = blend_arm_name(product="ukv_ceda", day=3, role=role)
 

@@ -315,9 +315,9 @@ BLEND_AIFS_PREFIXES: Final[dict[str, str]] = {
 conservative ICON-EU blend reads the product one day older than ENS's mean (published blend P4b)."""
 
 BlendRoleType = Literal["", "_control", "_control_b", "_mirror", "_pad"]
-"""A blend arm's role: the blend itself, its control (the second product shuffled), the control under
-the second shuffle seed, its mirror control (ENS shuffled), or ENS's mean padded to the blend's
-column count with exact copies of its own columns."""
+"""A blend arm's role: the blend itself, its control (the second product shuffled), the control
+under the second shuffle seed, its mirror control (ENS shuffled), or ENS's mean padded to the
+blend's column count with exact copies of its own columns."""
 
 COPY_SUFFIX: Final[str] = "_copy"
 """Appended to ENS's mean prefix to name the exact copies of its columns that pad `_pad` arms."""

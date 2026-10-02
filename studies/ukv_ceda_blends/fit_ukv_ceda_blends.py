@@ -867,6 +867,8 @@ def scoped_line(
     Returns:
         `| label | difference [interval] | rows | months |`.
     """
+    if losses.is_empty():
+        return f"| {label} | no rows | 0 | 0 |"
     differences, months = paired_differences(
         losses=losses, treatment=treatment, reference=reference, metric=METRIC
     )
@@ -882,6 +884,36 @@ def scoped_line(
             f"{float(differences.mean()) * PERCENTAGE_POINTS:+.3f} (no interval: {n_months} months)"
         )
     return f"| {label} | {text} | {differences.shape[1]} | {n_months} |"
+
+
+def generator_error_lines(*, losses: pl.DataFrame, arms: Sequence[str]) -> list[str]:
+    """Format each arm's mean absolute error at each generator alone, with no interval.
+
+    Args:
+        losses: Per-row losses at one setting, holding every arm of `arms`.
+        arms: The arms to show, as columns.
+
+    Returns:
+        A Markdown table of percent of capacity, one row per generator in label order.
+    """
+    means = (
+        losses.filter(pl.col("arm").is_in(list(arms)))
+        .group_by("site", "arm")
+        .agg(error=pl.col(METRIC).mean() * PERCENTAGE_POINTS)
+        .pivot(on="arm", index="site", values="error")
+        .sort("site")
+    )
+    lines = [
+        "Mean absolute error at each generator alone (primary setting, % of capacity):",
+        "",
+        "| Generator | " + " | ".join(f"`{arm}`" for arm in arms) + " |",
+        "|---|" + "---|" * len(arms),
+    ]
+    lines += [
+        f"| {row['site']} | " + " | ".join(f"{row[arm]:.3f}" for arm in arms) + " |"
+        for row in means.iter_rows(named=True)
+    ]
+    return lines
 
 
 def stage_lines(
@@ -988,6 +1020,10 @@ def stage_lines(
                 f"| `{row['arm']}` | {setting} | {value} | [{interval_part} | {row['n_rows']} "
                 f"| {row['n_months']} |"
             )
+    lines += [
+        "",
+        *generator_error_lines(losses=per_setting[PRIMARY], arms=stage_arms(day=stage.day)),
+    ]
     lines += [
         "",
         (

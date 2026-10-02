@@ -42,9 +42,7 @@ def _instant(*, time: pl.Expr, domain: DomainType) -> pl.Expr:
     return time - pl.duration(hours=1) if domain == "solar" else time
 
 
-def served_init_time(
-    *, time: pl.Expr, day: int, domain: DomainType, run_hour: int = 0
-) -> pl.Expr:
+def served_init_time(*, time: pl.Expr, day: int, domain: DomainType, run_hour: int = 0) -> pl.Expr:
     """Return the start of the run that serves a target hour at a lead day.
 
     Args:
