@@ -74,8 +74,8 @@ def test_replay_reconstructs_the_run_that_had_genuinely_landed(
 ) -> None:
     """Replay must pick the run that was really on disk, at every one of the four slots.
 
-    Ground truth: we ingest one 00Z run a day and ``ecmwf_ens_schedule`` downloads it at 08:30
-    UTC, so day D's run is ours from 08:30. The 00:00 and 06:00 slots therefore still see D-1's
+    Ground truth: we ingest one 00Z run a day and ``ecmwf_ens_schedule`` downloads it at 10:30
+    UTC, so day D's run is ours from 10:30. The 00:00 and 06:00 slots therefore still see D-1's
     run; the 12:00 and 18:00 slots see D's. The 06:00 case is the one a too-small delay gets
     wrong, by handing the slot a run that had not landed yet.
     """

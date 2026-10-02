@@ -383,7 +383,7 @@ which is why `power_forecast_warnings` carries a `warning_source` field ([Delive
 tables](../roadmap/delivery-tables.md#table-2-power_forecast_warnings)).
 
 The provider channel must also count the right signal. We ingest **one ECMWF run per day** — the 00Z
-run, downloaded at 08:30 UTC — and we forecast at 00:00, 06:00, 12:00 and 18:00, so healthy NWP age
+run, downloaded at 10:30 UTC — and we forecast at 00:00, 06:00, 12:00 and 18:00, so healthy NWP age
 at forecast time ranges from 12 hours at the 12:00 slot to **30 hours at the 06:00 slot**, just
 before the day's download lands. Raw age is therefore not a health signal: 18-hour-old NWP is
 exactly what the 18:00 slot is supposed to use. An absolute age threshold would have to sit in the

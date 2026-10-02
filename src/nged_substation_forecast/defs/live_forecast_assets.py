@@ -132,7 +132,7 @@ class LiveForecastsConfig(Config):
             # back 16 * 6h = 4 days, not 16 days. This is a lineage-only safety margin (it decides
             # what the Dagster UI graph and a `--with upstream` materialisation consider a parent,
             # not what live_forecasts actually reads): comfortably more than the ~30h a healthy
-            # NWP run is ever stale — the 00Z run lands around 08:30 UTC (see
+            # NWP run is ever stale — the 00Z run lands around 10:30 UTC (see
             # schedules.ecmwf_ens_schedule), so the 06:00 slot still uses the previous day's run, a
             # worst case of 30h — so it still covers several consecutive missed daily runs before
             # live_forecasts_are_healthy's missed-run check would already have alarmed.

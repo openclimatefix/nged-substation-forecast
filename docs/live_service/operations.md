@@ -379,7 +379,7 @@ check only reports on slots where the asset *succeeded*; a slot that raised fail
 and Sentry reports that — see *When `live_forecasts` fails outright* below.
 
 **When a daily NWP run is missing.** We ingest one ECMWF run per day (the 00Z run, downloaded at
-08:30 UTC), so healthy NWP is between 12 and 30 hours old depending on which 6-hourly slot is
+10:30 UTC), so healthy NWP is between 12 and 30 hours old depending on which 6-hourly slot is
 forecasting. Raw age is not a fault signal; a missed *run* is, and `live_forecasts_are_healthy`'s
 `n_missed_nwp_runs` is that count. It measures how far *behind* the feed is — how many daily runs
 separate the freshest run on disk from the freshest that ought to exist — so it is **zero in every
@@ -398,7 +398,7 @@ as follows.
 - **absent from the metadata** — the NWP table holds no run at or before this slot, so the count has
   no finite answer; the description says so. Expect `live_forecasts` itself to be failing too.
 
-One count deserves a caveat: the check demands the day's run by 14:00 UTC, so a download that fails
+One count deserves a caveat: the check demands the day's run by 16:00 UTC, so a download that fails
 today first shows up at the 18:00 slot rather than the 12:00 one — deliberately, for the reasoning
 in [Production Deployment — Design: the missed daily NWP run
 count](../architecture/production-deployment.md#read-the-live-forecast-back-off-disk-with-a-second-asset-check).

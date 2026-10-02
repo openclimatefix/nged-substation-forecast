@@ -483,20 +483,20 @@ whole CV half of ``power_forecasts`` before any data is read."""
 _NWP_RUN_INTERVAL: Final[timedelta] = timedelta(days=1)
 """How often a new NWP run lands: one ECMWF ENS 00Z run per day (``ecmwf_ens_partitions``)."""
 
-_NWP_RUN_EXPECTED_ON_DISK_BY: Final[timedelta] = timedelta(hours=14)
+_NWP_RUN_EXPECTED_ON_DISK_BY: Final[timedelta] = timedelta(hours=16)
 """How long after its ``init_time`` a daily NWP run must be on disk before it counts as missed.
 
-Derived from ``ecmwf_ens_schedule``'s 08:30 UTC start plus its retry ladder, with the worst-case
-retry paying a download and convert of its own — about 12:40 UTC, at the ~1 min/run measured in
+Derived from ``ecmwf_ens_schedule``'s 10:30 UTC start plus its retry ladder, with the worst-case
+retry paying a download and convert of its own — about 14:40 UTC, at the ~1 min/run measured in
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/>. That leaves
-81 minutes of margin to 14:00 UTC, spread over 9 attempts: the deadline is breached only if
+80 minutes of margin to 16:00 UTC, spread over 9 attempts: the deadline is breached only if
 download-and-convert *averages* about 10 minutes across all of them, not if one attempt is slow.
 The deadline is deliberately generous, because the two errors cost very different amounts: too
 tight and the check cries wolf on every morning the download merely ran slowly, too loose and a
 genuinely missed run is reported one 6-hourly slot later than it might have been. Fuller reasoning:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#read-the-live-forecast-back-off-disk-with-a-second-asset-check>
 
-At 14 hours the 00:00, 06:00 and 12:00 slots expect yesterday's run and the 18:00 slot expects
+At 16 hours the 00:00, 06:00 and 12:00 slots expect yesterday's run and the 18:00 slot expects
 today's, so every healthy slot reports zero missed runs and a failed download is reported from the
 18:00 slot onwards."""
 
@@ -673,7 +673,7 @@ def count_missed_nwp_runs(
     if latest is None:
         return MissedNwpRuns(None, expected_latest, None)
     # Clamped at zero: NWP fresher than the deadline requires is not a fault. That is exactly the
-    # healthy 12:00 slot, where the day's run has already landed (08:30) but a deadline generous
+    # healthy 12:00 slot, where the day's run has already landed (10:30) but a deadline generous
     # enough to survive the ingest retry window still only asks for yesterday's.
     n_missed = max(0, (expected_latest - latest) // run_interval)
     return MissedNwpRuns(latest, expected_latest, n_missed)
