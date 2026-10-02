@@ -338,6 +338,31 @@ def status_at(*, statuses: np.ndarray, slot: int) -> int:
     return int(statuses[slot]) if 0 <= slot < len(statuses) else 0
 
 
+def check_slot_times(*, store: StoreRead, slots: Sequence[int]) -> None:
+    """Raise unless the store's own `init_time` of each slot is the run time the build assumes.
+
+    The build maps a run to its slot by arithmetic on the 12-hourly grid, so this compares that
+    arithmetic with the store's `init_time` coordinate. A slot beyond the coordinate's length was
+    never archived and is not compared.
+
+    Args:
+        store: The opened store.
+        slots: The slots to be read.
+
+    Raises:
+        ValueError: Naming the slots whose stored time is not the slot grid's.
+    """
+    stored = np.asarray(zarr_array(group=store.group, name="init_time")[:], dtype=np.int64)
+    wrong = [
+        slot
+        for slot in slots
+        if slot < len(stored) and int(stored[slot]) != int(slot_init_time(slot=slot).timestamp())
+    ]
+    if wrong:
+        msg = f"the store's init_time is not the slot grid's for slots {wrong[:5]}"
+        raise ValueError(msg)
+
+
 def read_cells(
     *, store: StoreRead, slots: Sequence[int], variables: Sequence[str], cells: np.ndarray
 ) -> dict[str, np.ndarray]:
@@ -948,6 +973,7 @@ def build_domain(*, store: StoreRead, domain: DomainType, candidates: pl.DataFra
             for slot in with_run(frame=keys, day=day, domain=domain)["slot"].unique().to_list()
         }
     )
+    check_slot_times(store=store, slots=slots)
     started = time.monotonic()
     series = read_cells(
         store=store,

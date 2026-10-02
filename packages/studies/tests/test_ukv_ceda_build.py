@@ -8,6 +8,7 @@ import numpy as np
 import polars as pl
 import pytest
 import zarr
+import zarr.storage
 
 _STUDIES_DIR = Path(__file__).resolve().parents[3] / "studies"
 sys.path.insert(0, str(_STUDIES_DIR / "ukv_ceda_blends"))
@@ -497,3 +498,23 @@ def test_the_build_writes_only_to_a_folder_named_for_the_study(tmp_path: Path):
         build.check_output_dir(output_dir=tmp_path / "elsewhere", read_only=reads)
     with pytest.raises(ValueError, match="writes only to a folder named"):
         build.check_output_dir(output_dir=reads[0], read_only=reads)
+
+
+def _store_with_init_times(*, seconds: list[int]) -> build.StoreRead:
+    group = zarr.open_group(zarr.storage.MemoryStore(), mode="w")
+    array = group.create_array("init_time", shape=(len(seconds),), dtype="int64")
+    array[:] = np.array(seconds, dtype=np.int64)
+    return build.StoreRead(group=group, snapshot_id="X", statuses=np.zeros(len(seconds), np.int8))
+
+
+def test_the_slot_arithmetic_must_match_the_stores_own_init_time_coordinate():
+    epoch = int(build.T120_PROFILE.slot_epoch.timestamp())
+    good = _store_with_init_times(seconds=[epoch + 12 * 3600 * slot for slot in range(4)])
+
+    build.check_slot_times(store=good, slots=[0, 1, 3, 9])
+
+    shifted = _store_with_init_times(
+        seconds=[epoch + 12 * 3600 * slot + (3600 if slot == 2 else 0) for slot in range(4)]
+    )
+    with pytest.raises(ValueError, match=r"slots \[2\]"):
+        build.check_slot_times(store=shifted, slots=[0, 1, 2])

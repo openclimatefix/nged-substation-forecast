@@ -97,8 +97,8 @@ def test_every_lead_day_panel_shares_one_axis_that_includes_zero():
 
     assert low < -0.4
     assert high > 0.0
-    assert low <= float(min(r["lower_95"].min() for r in rows))
-    assert high >= float(max(r["upper_95"].max() for r in rows))
+    assert low <= min(float(np.min(r["lower_95"].to_numpy())) for r in rows)
+    assert high >= max(float(np.max(r["upper_95"].to_numpy())) for r in rows)
 
 
 def test_the_generator_rows_carry_only_anonymised_labels_in_label_order():
