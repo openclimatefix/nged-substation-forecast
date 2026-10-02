@@ -269,7 +269,7 @@ study's XGBoost models, to CERRA's direction, and to a veer effect that two raw 
 other column sets, could use. The next section says how large a veer effect the study could see.
 
 ![Figure 2: Beyond direction at 100 m, more heights or an explicit veer changed the error by 0.011
-points or less, and raw directions caught only the 40% veer
+points or less at the primary setting, and raw directions caught only the 40% veer
 injection](../assets/cerra_wind_direction_veer.svg)
 
 ### The controls

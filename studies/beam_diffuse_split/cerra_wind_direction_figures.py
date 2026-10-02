@@ -70,6 +70,10 @@ VALUE_LABEL_PX: Final[int] = 150
 
 VALUE_LABEL_FONT_PX: Final[int] = 11
 
+RIGHT_LABEL_FLOOR_PP: Final[float] = 0.06
+"""In Figure 2's top panel, the least x at which a right-placed value label starts, so no label
+sits across the dashed line at `UNINFORMATIVE_COST_PP`."""
+
 DOMAIN_STEP: Final[float] = 0.05
 """Axis limits are rounded outward to a multiple of this many points."""
 
@@ -211,7 +215,9 @@ def _domain(*, lows: list[float], highs: list[float]) -> tuple[float, float]:
     return round(low, 2), round(high, 2)
 
 
-def _domain_with_label_room(*, frame: pl.DataFrame) -> tuple[float, float]:
+def _domain_with_label_room(
+    *, frame: pl.DataFrame, right_floor: float | None = None
+) -> tuple[float, float]:
     """Widen the axis until every row's value label fits beside its interval.
 
     A row's label sits beyond the interval's end that lies farthest from zero, so it never crosses
@@ -221,6 +227,8 @@ def _domain_with_label_room(*, frame: pl.DataFrame) -> tuple[float, float]:
     Args:
         frame: The panel rows, with `difference`, `lower_95`, `upper_95`, and optionally
             `second_difference`.
+        right_floor: The least x at which a right-placed label starts, or `None` for the
+            interval's upper bound.
 
     Returns:
         The axis limits, multiples of `DOMAIN_STEP`.
@@ -237,7 +245,8 @@ def _domain_with_label_room(*, frame: pl.DataFrame) -> tuple[float, float]:
             for row in frame.filter(pl.col("difference") < 0).iter_rows(named=True)
         )
         right_short = any(
-            (high - row["upper_95"]) * pixels_per_point < VALUE_LABEL_PX
+            (high - max(row["upper_95"], right_floor or row["upper_95"])) * pixels_per_point
+            < VALUE_LABEL_PX
             for row in frame.filter(pl.col("difference") >= 0).iter_rows(named=True)
         )
         if not (left_short or right_short):
@@ -248,7 +257,13 @@ def _domain_with_label_room(*, frame: pl.DataFrame) -> tuple[float, float]:
     raise ValueError(msg)
 
 
-def _value_labels(*, frame: pl.DataFrame, x_domain: tuple[float, float], x_title: str) -> list:
+def _value_labels(
+    *,
+    frame: pl.DataFrame,
+    x_domain: tuple[float, float],
+    x_title: str,
+    right_floor: float | None = None,
+) -> list:
     """Draw each row's estimate and interval to three decimals, beyond its far interval end.
 
     Args:
@@ -256,6 +271,8 @@ def _value_labels(*, frame: pl.DataFrame, x_domain: tuple[float, float], x_title
         x_domain: The panel's x range.
         x_title: The x axis title the panel passes to `interval_panel`, repeated so the layers'
             titles agree and merge.
+        right_floor: The least x at which a right-placed label starts, or `None` for the
+            interval's upper bound.
 
     Returns:
         One text layer for the rows labelled left of their interval and one for the rest.
@@ -269,6 +286,7 @@ def _value_labels(*, frame: pl.DataFrame, x_domain: tuple[float, float], x_title
     scale = alt.Scale(domain=list(x_domain), nice=False, zero=False)
     labels = list(dict.fromkeys(frame["label"].to_list()))
     text = frame.with_columns(
+        label_x=pl.col("upper_95").clip(lower_bound=right_floor),
         text=pl.format(
             "{} [{}, {}]",
             *(
@@ -292,7 +310,7 @@ def _value_labels(*, frame: pl.DataFrame, x_domain: tuple[float, float], x_title
                 aria=False,
             )
             .encode(  # ty: ignore[unresolved-attribute]
-                x=alt.X("lower_95:Q" if on_left else "upper_95:Q", scale=scale, title=title),
+                x=alt.X("lower_95:Q" if on_left else "label_x:Q", scale=scale, title=title),
                 y=alt.Y("label:N", sort=labels, title=None),
                 text="text:N",
                 color=alt.value(ocf.BLACK_1),
@@ -511,7 +529,9 @@ def veer_figure(*, intervals: pl.DataFrame, report: str) -> alt.VConcatChart:
         )
     top = _panel_rows(rows=[*exploratory, *negative])
     bottom = _panel_rows(rows=positive)
-    x_domain = _domain_with_label_room(frame=pl.concat([top, bottom]))
+    x_domain = _domain_with_label_room(
+        frame=pl.concat([top, bottom]), right_floor=RIGHT_LABEL_FLOOR_PP
+    )
     panels = []
     for index, (frame, title) in enumerate(
         (
@@ -536,7 +556,12 @@ def veer_figure(*, intervals: pl.DataFrame, report: str) -> alt.VConcatChart:
             _with_layers(
                 panel=panel,  # ty: ignore[invalid-argument-type]
                 behind=_cost_line(x_domain=x_domain) if index == 0 else [],
-                in_front=_value_labels(frame=frame, x_domain=x_domain, x_title=x_title),
+                in_front=_value_labels(
+                    frame=frame,
+                    x_domain=x_domain,
+                    x_title=x_title,
+                    right_floor=RIGHT_LABEL_FLOOR_PP if index == 0 else None,
+                ),
             )
         )
     return figure(
@@ -545,7 +570,8 @@ def veer_figure(*, intervals: pl.DataFrame, report: str) -> alt.VConcatChart:
         figure_planning="exploratory",
         title=(
             "Beyond direction at 100 m, more heights or an explicit veer changed the error by "
-            "0.011 points or less, and raw directions caught only the 40% veer injection"
+            "0.011 points or less at the primary setting, and raw directions caught only the 40% "
+            "veer injection"
         ),
         subtitle=[
             "Each row: the first set of columns minus the second set, on the same rows.",
