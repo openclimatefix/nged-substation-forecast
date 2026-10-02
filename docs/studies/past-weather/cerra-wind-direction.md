@@ -197,8 +197,8 @@ direction added to the 10 m speed by -0.458 points [-0.532, -0.382], both planne
 intervals are [-0.472, -0.309] and [-0.551, -0.364], so both comparisons are statistically
 significant at the 5% level after adjustment, and both have the same sign in all 5 folds. At the
 second setting the differences are -0.336 points and -0.422 points, with 98.33% intervals of
-[-0.405, -0.267] and [-0.508, -0.336], so the verdict holds at both settings. Figure 1 shows the three planned
-comparisons. Each error is in the table below.
+[-0.405, -0.267] and [-0.508, -0.336], so the verdict holds at both settings. Figure 1 shows the
+three planned comparisons. Each error is in the table below.
 
 | Column set | Error (points of capacity) | 95% interval |
 |---|---|---|
@@ -225,7 +225,8 @@ direction taken from another month, in place of the real direction, gives an err
 differs from the shuffled direction by -0.429 points [-0.495, -0.366] (exploratory). In the veer
 family, direction at 100 m differs from no direction by -0.342 points [-0.399, -0.286] and direction
 at 10 m and 100 m by -0.338 points [-0.397, -0.283], both exploratory, with both speeds held in
-every column set.
+every column set. No figure draws these three rows, and their numbers are in the study's saved
+`report.md`.
 
 ### With direction, 100 m and 10 m do equally well
 

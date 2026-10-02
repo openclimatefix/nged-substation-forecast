@@ -489,7 +489,7 @@ def farms_figure(*, intervals: pl.DataFrame, report: str) -> alt.VConcatChart:
         condition_title="Wind farm",
         figure_planning="exploratory",
         row_step_px=FARM_ROW_STEP_PX,
-        row_bands=True,
+        row_bands=False,
     )
     return figure(
         panels=[panel],
