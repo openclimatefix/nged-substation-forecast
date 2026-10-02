@@ -1,0 +1,4123 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../cerra-wind-levels/">
+      
+      
+        <link rel="next" href="../blending/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Does CERRA's wind direction add to its wind speed? - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#at-three-wind-farms-adding-cerras-wind-direction-to-its-wind-speed-cut-the-error-by-about-5" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Does CERRA's wind direction add to its wind speed?
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/weather-products-survey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products surveyed for the weather-product studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/manual-heuristic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The manual heuristic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ensemble-archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The ensemble weather archive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reanalysis-wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CERRA and NORA3 describe past wind better than ERA5?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cerra-wind-levels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending CERRA's wind heights beat one height?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CERRA's wind direction add to its wind speed?
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CERRA's wind direction add to its wind speed?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#direction-lowers-the-error-at-both-heights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Direction lowers the error at both heights
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#with-direction-100-m-and-10-m-do-equally-well" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With direction, 100 m and 10 m do equally well
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#direction-at-several-heights-adds-no-more-than-a-small-gain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Direction at several heights adds no more than a small gain
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gain-from-direction-is-smaller-at-one-farm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The gain from direction is smaller at one farm
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discussion-what-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discussion: what to use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_4" id="__nav_8_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/ens-horizons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/matched-lead-extra-products/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extra weather products in the day-ahead lead comparison: how they are read, and their results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/blends-with-ens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which single weather forecast should be added to ECMWF's ensemble mean first?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/ensemble-means/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an ML experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/data-cleaning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning the trial-area telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending training history with ERA5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#direction-lowers-the-error-at-both-heights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Direction lowers the error at both heights
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#with-direction-100-m-and-10-m-do-equally-well" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With direction, 100 m and 10 m do equally well
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#direction-at-several-heights-adds-no-more-than-a-small-gain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Direction at several heights adds no more than a small gain
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gain-from-direction-is-smaller-at-one-farm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The gain from direction is smaller at one farm
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discussion-what-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discussion: what to use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="at-three-wind-farms-adding-cerras-wind-direction-to-its-wind-speed-cut-the-error-by-about-5">At three wind farms, adding CERRA's wind direction to its wind speed cut the error by about 5%</h1>
+<h2 id="summary">Summary</h2>
+<p><strong>At three wind farms in Lincolnshire, adding the Copernicus regional reanalysis for Europe's
+(CERRA's) wind direction to CERRA's wind speed cut the error of an XGBoost model's estimate of power
+by 0.386 points of capacity at 100 m and by 0.458 points at 10 m, about 5% of the speed-only
+error.</strong> Both differences are planned comparisons, statistically significant at the 5% level after
+adjusting for the three planned comparisons, and keep their sign and size at a second XGBoost
+setting. The study fits one XGBoost model per wind farm to predict the farm's hourly power from
+CERRA's 3-hourly analysis. Each error is a percentage of the farm's capacity (its 99th percentile of
+metered output), each difference is in percentage points of capacity, written "points", and each
+bracketed pair is a 95% interval unless the text says otherwise. The rows are 53,107 farm-hours
+between 17 September 2019 and 30 June 2026, where a farm-hour is one wind farm's power in one hour.
+With direction given at both heights, the 100 m and 10 m columns did equally well: the planned
+difference is +0.021 points, with a 98.33% interval of [-0.055, +0.101]. CERRA is a reanalysis, so
+every number describes how well CERRA's wind explains power that has already been generated, and
+none describes forecast skill.</p>
+<p><strong>Against direction at 100 m alone, direction at all five heights excluded a gain larger than about
+0.005 points at the 95% level (exploratory, primary setting; the second setting's +0.011 [+0.003,
++0.020] excludes any gain), and the study could detect a veer effect only when the effect was
+large.</strong> Direction at all five CERRA heights, against direction at 100 m alone, differs by +0.010
+points [-0.005, +0.025], so a gain larger than about 0.005 points is excluded at the 95% level. The
+check that a veer effect would show up is weak. Of a veer effect injected into the real power to cut
+it by 0.690 points over all rows, two raw directions recovered 0.015 points, and of an injected
+effect of 0.172 points they recovered none. A veer effect of that smaller size, or of another form,
+is therefore not ruled out. Swapping 2 inert padding columns for 2 uninformative columns raised the
+error by 0.040 to 0.060 points in the negative controls, so part of what a set of extra real columns
+adds can be cancelled by the cost of fitting them.</p>
+<p><img alt="Figure 1: CERRA's wind direction cut the error at 100 m and at 10 m, and the two did equally
+well" src="../../assets/cerra_wind_direction_planned.svg" /></p>
+<p><strong>Three scoped recommendations follow from the evidence below.</strong></p>
+<ul>
+<li><strong>To describe past wind at these three farms from CERRA, give the XGBoost model the wind direction
+  as well as the wind speed.</strong> The gain is about 5% of the speed-only error, at 100 m and at 10 m,
+  with a smaller gain at one farm than at the other two (exploratory).</li>
+<li><strong>Do not read the page as showing that direction at several heights, or an explicit veer, adds
+  nothing.</strong> The page bounds an added gain from direction at all five heights at about 0.005 points
+  at the 95% level for this study's XGBoost models, and the study's check of its own sensitivity to
+  veer was weak.</li>
+<li><strong>Do not read the page as a statement about forecasting or about wakes.</strong> CERRA is an analysis of
+  the past, and no column set holds a turbine layout, hub height or land-cover column.</li>
+</ul>
+<blockquote>
+<p><strong>How this page was made.</strong> The research question came from a human. Everything else — the code
+behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
+AI model. This page and its study scripts were written by Claude Sonnet 5.5, reusing shared study
+code written by Claude Opus 5.5, Claude Sonnet 5, and Claude Sonnet 5.5. Two independent reviews by
+Claude Opus checked the method and the results adversarially.</p>
+</blockquote>
+<h2 id="key-findings">Key findings</h2>
+<ul>
+<li><strong>Direction added to 100 m speed changes the error by -0.386 points, and direction added to 10 m
+  speed by -0.458 points, both planned comparisons.</strong> See <a href="#direction-lowers-the-error-at-both-heights">Direction lowers the error at both
+  heights</a>.</li>
+<li><strong>The 100 m and 10 m heights do equally well when each has its direction, a null result with a
+  difference of up to 0.101 points not ruled out.</strong> See <a href="#with-direction-100-m-and-10-m-do-equally-well">With direction, 100 m and 10 m do equally
+  well</a>.</li>
+<li><strong>Direction at several heights gains no more than about 0.005 points over direction at 100 m, at
+  the 95% level, an exploratory result.</strong> See <a href="#direction-at-several-heights-adds-no-more-than-a-small-gain">Direction at several heights adds no more than a
+  small gain</a>.</li>
+<li><strong>The study's check that it could see a veer effect passed only for large effects.</strong> See <a href="#the-controls">The
+  controls</a>.</li>
+<li><strong>The gain from direction has the same sign at every wind farm and in every full calendar year,
+  and its size differs between farms, an exploratory result.</strong> See <a href="#the-gain-from-direction-is-smaller-at-one-farm">The gain from direction is
+  smaller at one farm</a>.</li>
+</ul>
+<h2 id="introduction">Introduction</h2>
+<p><strong>The question is whether an XGBoost model given CERRA's wind direction describes a wind farm's past
+power better than one given CERRA's wind speed alone, and whether direction at several heights adds
+lowers the error beyond direction at one height.</strong> CERRA is the Copernicus regional reanalysis for
+Europe, produced by a consortium led by the Swedish Meteorological and Hydrological Institute for
+the Copernicus Climate Change Service. A reanalysis re-runs a weather model over past years with the
+observations of each period, so every value is an analysis of a past hour and no value is a
+forecast. CERRA is one estimate of past weather, and the results describe that estimate only. The
+<a href="../cerra-wind-levels/">previous study of CERRA's wind heights</a> gave an XGBoost model CERRA's wind
+speed at one to five heights and no direction. That study could therefore not say what direction
+adds, and its errors are not comparable in level with the errors on the <a href="../wind/">wind page</a>, whose
+XGBoost models carry direction as a sine and a cosine.</p>
+<p><strong>Several mechanisms could make direction matter for a wind farm's power, and the study does not
+separate them.</strong> Turbines in a farm could shade each other differently in different wind directions,
+the land around a farm could change the wind's speed and turbulence with direction, and the wind
+turns with height, called veer when the wind turns clockwise as height increases. A decision about
+which CERRA columns to ingest for past weather can cite the result.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>CERRA's wind direction</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Heights</td>
+<td>10, 50, 75, 100, and 150 m</td>
+</tr>
+<tr>
+<td>Quantity</td>
+<td>Direction the wind blows from, in degrees clockwise from north</td>
+</tr>
+<tr>
+<td>Time step</td>
+<td>Every 3 hours (00, 03, ..., 21 UTC), an analysis</td>
+</tr>
+<tr>
+<td>Grid</td>
+<td>5,500 m, read at each farm's nearest cell</td>
+</tr>
+<tr>
+<td>History used</td>
+<td>1 September 2019 to 30 June 2026</td>
+</tr>
+<tr>
+<td>Source of the 10 m direction</td>
+<td><code>reanalysis-cerra-single-levels</code>, a surface diagnostic</td>
+</tr>
+<tr>
+<td>Source of the other four directions</td>
+<td><code>reanalysis-cerra-height-levels</code>, values interpolated to fixed heights above ground</td>
+</tr>
+</tbody>
+</table>
+<h2 id="data-and-methods">Data and methods</h2>
+<p><strong>The rows, the folds, the intervals, and the two XGBoost settings are those of the <a href="../cerra-wind-levels/#data-and-methods">previous
+study</a>, so the speed-only column sets reproduce its errors
+exactly.</strong> There are 53,107 farm-hours between 17 September 2019 and 30 June 2026, and each of the
+three farms has at least 15,950 of them. A farm-hour's power is the mean of the half-hourly
+readings in the hour centred on the CERRA time, and any hour holding a half-hour of exactly zero is
+dropped, from the target alone, so that every column set is scored on the same rows. The wind farms
+appear only as W1 to W3. Each farm reads CERRA at its nearest grid cell. Each farm's capacity is the
+<code>effective_capacity_mw</code> column of the roster table used by the previous study. Each XGBoost model
+is trained on some blocks of whole months and scored on the others, in 5 folds per farm. The 2,000
+resamples of whole calendar months, each with one of three fitting seeds, give the 95% intervals.
+Every fit ran on the CPU, with no column subsampling and no early stopping, and the study made
+1,530 XGBoost fits in all. The primary setting is <code>max_depth</code> 6, and the second setting is a
+shallower, more heavily regularised one.</p>
+<p><strong>A direction enters an XGBoost model as its sine and its cosine, two columns, and every column set
+within a family has the same number of feature columns.</strong> The sine and cosine make 359 degrees and 1
+degree close together, which the raw angle does not. Every column set carries <code>hour_of_day</code> and
+<code>day_of_year</code>. The core family has 7 feature columns, of which 5 are wind columns. The veer family
+has 14 feature columns, of which 12 are wind columns, and holds the 10 m and 100 m speeds in every
+column set. A column set with fewer real wind columns is padded with monotone transforms of a speed,
+such as its square and its square root, which a tree cannot split on in a way the speed itself does
+not allow. A comparison never crosses families, so the width never decides a comparison. The wind
+columns of each column set are:</p>
+<table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Column set</th>
+<th>Real wind columns</th>
+<th>Padding</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>core</td>
+<td><code>speed_10m</code></td>
+<td>10 m speed</td>
+<td>4 transforms of 10 m speed</td>
+</tr>
+<tr>
+<td>core</td>
+<td><code>speed_100m</code></td>
+<td>100 m speed</td>
+<td>4 transforms of 100 m speed</td>
+</tr>
+<tr>
+<td>core</td>
+<td><code>speed_10m_dir</code></td>
+<td>10 m speed, sine and cosine of 10 m direction</td>
+<td>2 transforms of 10 m speed</td>
+</tr>
+<tr>
+<td>core</td>
+<td><code>speed_100m_dir</code></td>
+<td>100 m speed, sine and cosine of 100 m direction</td>
+<td>2 transforms of 100 m speed</td>
+</tr>
+<tr>
+<td>core</td>
+<td><code>speed_100m_dir_noise</code> (negative control)</td>
+<td>100 m speed, sine and cosine of another month's 100 m direction</td>
+<td>2 transforms of 100 m speed</td>
+</tr>
+<tr>
+<td>veer</td>
+<td><code>veer_speed_10_100</code></td>
+<td>10 m and 100 m speeds</td>
+<td>10 transforms of 100 m speed</td>
+</tr>
+<tr>
+<td>veer</td>
+<td><code>veer_dir_100</code></td>
+<td>speeds, sine and cosine at 100 m</td>
+<td>8</td>
+</tr>
+<tr>
+<td>veer</td>
+<td><code>veer_dir_10_100</code></td>
+<td>speeds, sine and cosine at 10 m and 100 m</td>
+<td>6</td>
+</tr>
+<tr>
+<td>veer</td>
+<td><code>veer_angle_10_100</code></td>
+<td>speeds, sine and cosine at 100 m, and of the veer from 10 m to 100 m</td>
+<td>6</td>
+</tr>
+<tr>
+<td>veer</td>
+<td><code>veer_dir_all5</code></td>
+<td>speeds, sine and cosine at 10, 50, 75, 100, and 150 m</td>
+<td>0</td>
+</tr>
+<tr>
+<td>veer</td>
+<td><code>veer_dir_100_noise</code> (negative control)</td>
+<td>speeds, sine and cosine at 100 m, and of another month's 10 m direction</td>
+<td>6</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The veer from 10 m to 100 m is the 100 m direction minus the 10 m direction, wrapped to the range
+-180 to 180 degrees, and is positive when the wind turns clockwise with height.</strong> The columns
+<code>veer_dir_10_100</code> and <code>veer_angle_10_100</code> hold the same information in two forms. A tree can build a
+veer from two raw directions only with many splits, so the difference between them says whether an
+explicit veer helps the XGBoost model.</p>
+<p><strong>"Planned" and "exploratory" have one meaning each on this page.</strong> A comparison is planned when it
+was written into the study plan before any fit, and every other comparison is exploratory. Each
+difference is the error of the first column set minus the error of the second, so a negative
+difference means the first column set has the lower error. The three planned comparisons are:</p>
+<ol>
+<li><code>speed_100m_dir</code> minus <code>speed_100m</code>: what direction adds at 100 m;</li>
+<li><code>speed_10m_dir</code> minus <code>speed_10m</code>: what direction adds at 10 m;</li>
+<li><code>speed_100m_dir</code> minus <code>speed_10m_dir</code>: 100 m against 10 m, each with its direction.</li>
+</ol>
+<p>Each planned comparison was also fitted at the second setting. The veer comparisons, the splits by
+wind farm and by year, and the controls are exploratory. The plan is in the repository's git history
+(the file <code>plans/study-994-cerra-wind-direction.md</code> on the study branch).</p>
+<p><strong>The test covers the month-to-month weather and the fitting seed, and not differences between wind
+farms.</strong> A difference is called statistically significant at the 5% level when its 95% interval lies
+wholly on one side of zero. The three farms share their weather, so the intervals describe these
+three farms. The page corrects for multiple comparisons in one place: each planned comparison also
+has a 98.33% interval, a Bonferroni correction for the three planned comparisons, and counts as a
+finding only if that interval lies wholly on one side of zero and the second setting agrees. The
+page has 43 exploratory rows, 16 contrasts and 27 splits, and 4 negative-control rows. An
+exploratory row with no real effect behind it has a nominal 5% chance of reaching statistical
+significance at the 5% level, so about 2 such rows would be expected if no row had a real effect.
+The true number of spurious rows is unknown, because the number of rows with no real effect is
+unknown. The rows share their months and the farms share their weather, so spurious results cluster.
+No exploratory row is corrected, and none is stated as a finding.</p>
+<p><strong>Two kinds of control check the setup.</strong> A negative control replaces real columns with the same
+columns taken from another month of the same farm, so that they look like wind and say nothing about
+the hour. The negative controls are <code>speed_100m_dir_noise</code>, in place of two inert padding columns,
+and <code>veer_dir_100_noise</code>, in place of two more. A positive control is a target with an effect
+injected on purpose, so the effect must exist. Each injected target is the real power times one
+minus a loss, applied on the rows a rule selects and unchanged elsewhere, so every real feature of
+the target stays. The sector rule selects hours when the 100 m direction is within 30 degrees of 255
+degrees, 26.3% of rows, and cuts power by 40% (a mean effect of 3.275 points over all rows) or by
+10% (0.819 points). The veer rule selects hours when the veer is 10 degrees or more clockwise, 18.2%
+of rows, and cuts power by 40% (0.690 points) or by 10% (0.172 points). The full run stopped unless
+three gates passed on the 40% targets: direction beat speed alone on the sector target, and both
+<code>veer_angle_10_100</code> and <code>veer_dir_10_100</code> beat <code>veer_dir_100</code> on the veer target.</p>
+<p><strong>The direction files had no missing values, and no full calendar year differed from the others.</strong>
+Direction files for all five heights were checked for missing values and for keys unmatched to the
+speed files, and the 100 m circular mean direction is 227 degrees, south-westerly, as the UK's
+prevailing wind is. A calendar-year table of the 100 m circular mean and the veer found no full year
+differing from the others by more than 30 degrees in circular mean or 10 degrees in the 95th
+percentile of veer. The study did not search the record for a step, and the CERRA documentation does
+not give the dates where production streams join, so a join is not ruled out.</p>
+<h2 id="results">Results</h2>
+<h3 id="direction-lowers-the-error-at-both-heights">Direction lowers the error at both heights</h3>
+<p><strong>Direction added to the 100 m speed changes the error by -0.386 points [-0.457, -0.320], and
+direction added to the 10 m speed by -0.458 points [-0.532, -0.382], both planned.</strong> The 98.33%
+intervals are [-0.472, -0.309] and [-0.551, -0.364], so both comparisons are statistically
+significant at the 5% level after adjustment, and both have the same sign in all 5 folds. At the
+second setting the differences are -0.336 points and -0.422 points, with 98.33% intervals of
+[-0.405, -0.267] and [-0.508, -0.336], so the verdict holds at both settings. Figure 1 shows the
+three planned comparisons. Each error is in the table below.</p>
+<table>
+<thead>
+<tr>
+<th>Column set</th>
+<th>Error (points of capacity)</th>
+<th>95% interval</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>speed_10m</code></td>
+<td>8.424</td>
+<td>[8.078, 8.752]</td>
+</tr>
+<tr>
+<td><code>speed_100m</code></td>
+<td>8.373</td>
+<td>[8.044, 8.699]</td>
+</tr>
+<tr>
+<td><code>speed_10m_dir</code></td>
+<td>7.966</td>
+<td>[7.591, 8.321]</td>
+</tr>
+<tr>
+<td><code>speed_100m_dir</code></td>
+<td>7.987</td>
+<td>[7.623, 8.346]</td>
+</tr>
+<tr>
+<td><code>speed_100m_dir_noise</code></td>
+<td>8.416</td>
+<td>[8.080, 8.743]</td>
+</tr>
+<tr>
+<td><code>veer_speed_10_100</code></td>
+<td>8.054</td>
+<td>[7.718, 8.376]</td>
+</tr>
+<tr>
+<td><code>veer_dir_100</code></td>
+<td>7.712</td>
+<td>[7.350, 8.054]</td>
+</tr>
+<tr>
+<td><code>veer_dir_10_100</code></td>
+<td>7.716</td>
+<td>[7.357, 8.057]</td>
+</tr>
+<tr>
+<td><code>veer_angle_10_100</code></td>
+<td>7.701</td>
+<td>[7.335, 8.042]</td>
+</tr>
+<tr>
+<td><code>veer_dir_all5</code></td>
+<td>7.721</td>
+<td>[7.364, 8.061]</td>
+</tr>
+<tr>
+<td><code>veer_dir_100_noise</code></td>
+<td>7.765</td>
+<td>[7.399, 8.106]</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The intervals of the errors overlap, and only the paired differences are evidence.</strong> The overlap
+comes from the months of weather that all column sets share. A comparison of two column sets on the
+same months removes that shared swing, so a difference can be statistically significant when the two
+errors' intervals overlap.</p>
+<p><strong>A control supports the reading that the gain is from the direction's information.</strong> The 100 m
+direction taken from another month, in place of the real direction, gives an error of 8.416 points
+[8.080, 8.743], which is 0.043 points [+0.014, +0.077] above <code>speed_100m</code>, and the real direction
+differs from the shuffled direction by -0.429 points [-0.495, -0.366] (exploratory). In the veer
+family, direction at 100 m differs from no direction by -0.342 points [-0.399, -0.286] and direction
+at 10 m and 100 m by -0.338 points [-0.397, -0.283], both exploratory, with both speeds held in
+every column set. No figure draws these three rows, and their numbers are in the study's saved
+<code>report.md</code>.</p>
+<h3 id="with-direction-100-m-and-10-m-do-equally-well">With direction, 100 m and 10 m do equally well</h3>
+<p><strong>The planned comparison of <code>speed_100m_dir</code> against <code>speed_10m_dir</code> gives +0.021 points [-0.042,
++0.086], which is not statistically significant at the 5% level, and its 98.33% interval is [-0.055,
++0.101].</strong> The interval does not rule out an XGBoost model given the 100 m speed and direction
+having an error up to 0.055 points lower than one given the 10 m speed and direction, and does not
+rule out an error up to 0.101 points higher. At the second setting the difference is +0.048 points,
+with a 98.33% interval of [-0.026, +0.125]. Three of the five folds have the positive sign at the
+primary setting.</p>
+<p><strong>The 10 m and 100 m columns come from two CERRA products, so the comparison mixes a surface
+diagnostic with a value interpolated to a fixed height as well as two heights.</strong> CERRA assimilates
+surface observations, which may constrain the 10 m direction better than the 100 m direction. A
+tie could therefore hide a 10 m advantage that CERRA's design explains and not the wind.</p>
+<h3 id="direction-at-several-heights-adds-no-more-than-a-small-gain">Direction at several heights adds no more than a small gain</h3>
+<p><strong>Direction at all five heights, against direction at 100 m alone, gives +0.010 points [-0.005,
++0.025], an exploratory result, so a gain larger than about 0.005 points is excluded at the 95%
+level.</strong> The lower bound of the interval is the bound that limits a gain, because a negative
+difference is a gain. The five-height column set swaps 8 padding columns for real direction columns
+and has an error of 7.721 points, against 7.712 for <code>veer_dir_100</code>. At the second setting the
+difference is +0.011 points [+0.003, +0.020]. Direction at 10 m and 100 m against direction at 100
+m gives +0.004 points [-0.006, +0.015], and direction at all five heights against 10 m and 100 m
+gives +0.005 points [-0.004, +0.016]. An explicit veer added to the 100 m direction gives -0.011
+points [-0.027, +0.003], and -0.011 points [-0.020, -0.002] at the second setting.</p>
+<p><strong>Three rows are statistically significant at the second setting only, and none is a finding.</strong> The
+three rows are the explicit veer against <code>veer_dir_100</code>, -0.011 points; the five-height column set
+against <code>veer_dir_100</code>, +0.011 points; and the five-height column set against <code>veer_dir_10_100</code>,
++0.007 points. Each lies near the 5% line at the primary setting, and each is smaller than the 0.040
+points that two uninformative columns cost. The five-height rows are positive, which means the
+column set with more direction columns had the higher error.</p>
+<p><strong>The result bounds a gain and does not show that veer is absent.</strong> The bound applies to this
+study's XGBoost models, to CERRA's direction, and to a veer effect that two raw directions, or the
+other column sets, could use. The next section says how large a veer effect the study could see.</p>
+<p><img alt="Figure 2: Beyond direction at 100 m, more heights or an explicit veer changed the error by 0.011
+points or less at the primary setting, and raw directions caught only the 40% veer
+injection" src="../../assets/cerra_wind_direction_veer.svg" /></p>
+<h3 id="the-controls">The controls</h3>
+<p><strong>All three gates passed on the 40% injected targets, but the gate on direction at one height is
+uninformative and the veer instrument is weak.</strong> On the sector target, <code>speed_100m_dir</code> against
+<code>speed_100m</code> differs by -1.730 points [-2.009, -1.455]. The real target already gives -0.386 points
+for the same comparison, so much of the gate's difference is not a response to the injection. On the
+veer target, <code>veer_angle_10_100</code> against <code>veer_dir_100</code> differs by -0.132 points [-0.154, -0.111],
+and <code>veer_dir_10_100</code> against <code>veer_dir_100</code> by -0.015 points [-0.025, -0.005], from an injected
+effect of 0.690 points over all rows. Two raw directions therefore recovered a small part of the
+injected effect, and the explicit veer recovered more of it.</p>
+<p><strong>At the 10% injection the two raw directions recovered nothing.</strong> The injected effect is 0.172
+points over all rows. <code>veer_dir_10_100</code> against <code>veer_dir_100</code> gives +0.002 points [-0.007, +0.011],
+and <code>veer_dir_all5</code> against <code>veer_dir_100</code> gives +0.009 points [-0.003, +0.021]. The explicit veer
+gave -0.021 points [-0.036, -0.006]. A null on the real target for the raw-direction column sets
+therefore rules out only a veer effect of about the size and form of the 40% injection, and a veer
+effect of 0.172 points is not excluded.</p>
+<p><strong>Two uninformative columns raised the error by 0.040 to 0.060 points.</strong> The four
+negative-control rows are +0.043 points [+0.014, +0.077] and +0.060 points [+0.036, +0.092] for
+<code>speed_100m_dir_noise</code> against <code>speed_100m</code>, at the two settings, and +0.053 points [+0.036, +0.072]
+and +0.040 points [+0.028, +0.053] for <code>veer_dir_100_noise</code> against <code>veer_dir_100</code>. Every one is
+statistically significant at the 5% level, and every one is worse. Every difference among the
+direction column sets of the veer family is smaller than that cost. The 0.005-point bound is on the
+net error. The five-height column set swaps 8 padding columns for real direction columns, and the
+study did not measure what fitting 8 extra columns costs. Information worth more than 0.005 points
+could therefore be cancelled by that cost. As a sign that the cost is real, <code>veer_dir_10_100</code> beats
+<code>veer_dir_100_noise</code> by 0.048 points while sitting 0.004 points above <code>veer_dir_100</code>, and
+<code>veer_angle_10_100</code> has an error of 7.701 points against 7.765 for <code>veer_dir_100_noise</code>. The row
+<code>veer_dir_10_100</code> minus <code>veer_dir_100_noise</code>, -0.048 points [-0.067, -0.031], measures the 10 m
+direction against that cost of unusable columns and is not a gain over <code>veer_dir_100</code>.</p>
+<h3 id="the-gain-from-direction-is-smaller-at-one-farm">The gain from direction is smaller at one farm</h3>
+<p><strong>The planned comparisons have a negative sign at every wind farm for direction at either height,
+and the gain at W1 is about a quarter of the gain at W2 and W3 (exploratory).</strong> Direction added to
+the 100 m speed changes the error by -0.122 points [-0.164, -0.077] at W1, -0.537 points [-0.665,
+-0.418] at W2, and -0.511 points [-0.620, -0.404] at W3. Direction added to the 10 m speed changes
+it by -0.152 points [-0.197, -0.108], -0.658 points [-0.792, -0.528], and -0.572 points [-0.689,
+-0.449]. No single farm therefore dominates the pooled result. The comparison is also negative in
+every full calendar year from 2020 to 2025, with one or two folds per year. In 2023 one of the two
+folds had the opposite sign for direction at 100 m. A year with only one or two folds gives an
+interval from fewer weather episodes, so the years are not independent checks.</p>
+<p><strong>The comparison of 100 m with 10 m changes sign by farm and by year, which is noise and not a
+finding.</strong> At W2 it is +0.156 points [+0.065, +0.242], at W1 -0.033 points [-0.107, +0.044], and at
+W3 -0.077 points [-0.200, +0.042]. Among the years it is statistically significant in 2023 (+0.115
+points) and 2024 (-0.166 points) with opposite signs.</p>
+<p><img alt="Figure 3: Direction cut the error at every wind farm, and 100 m against 10 m changed
+sign" src="../../assets/cerra_wind_direction_farms.svg" /></p>
+<h2 id="discussion-what-to-use">Discussion: what to use</h2>
+<p><strong>To describe past wind at these three farms from CERRA, an XGBoost model should be given the
+direction as well as the speed.</strong> The planned gain is about 5% of the speed-only error at either
+height, and the study did not test a height other than 10 m and 100 m for the planned comparisons.
+What would change the recommendation is a result at a farm whose direction CERRA represents poorly.</p>
+<p><strong>The 100 m or the 10 m columns can be read, and the study does not say which is better with
+direction.</strong> The planned difference is +0.021 points with a 98.33% interval of [-0.055, +0.101]. A
+choice between the two heights can rest on other grounds, such as which CERRA product a pipeline
+already reads.</p>
+<p><strong>The five-height and 10 m-and-100 m rows give no reason to read direction at a second height, and
+the study cannot rule out a small veer effect.</strong> The five-height bound of about 0.005 points applies
+to the XGBoost models and columns tested. A study that wants to find a veer effect smaller than the
+0.172-point injection, or a veer effect in another form, needs a more sensitive instrument first.</p>
+<p><strong>The page recommends nothing about forecasting or about wakes.</strong> CERRA is an analysis of past
+hours, so a result about how well it explains past power does not carry to a forecast at any lead,
+and a gain from direction is not by itself a wake or a terrain effect.</p>
+<h2 id="limitations">Limitations</h2>
+<p><strong>The results describe three wind farms in Lincolnshire, and the intervals describe those farms
+only.</strong> The farms share their weather, so the intervals resample months and seeds, not farms.</p>
+<ul>
+<li><strong>The veer instrument is weak.</strong> Two raw directions recovered 0.015 points of a 0.690-point
+  injected effect and nothing of a 0.172-point one, so a null veer result is a statement about large
+  effects only.</li>
+<li><strong>Two uninformative columns cost 0.040 to 0.060 points.</strong> A comparison that swaps padding for real
+  columns measures the information net of that cost.</li>
+<li><strong>The 10 m and 100 m columns mix height and product.</strong> The 10 m direction comes from a surface
+  diagnostic and the other four directions from another CERRA product. CERRA assimilates surface
+  observations, which may constrain the 10 m direction better than the 100 m direction.</li>
+<li><strong>The year splits have one or two folds each,</strong> and the first and last calendar years of the
+  record are partial and are left out.</li>
+<li><strong>43 exploratory rows and 4 negative-control rows are uncorrected for multiple comparisons.</strong>
+  About 2 false positives are expected at the 5% level if no row has a real effect, and they
+  cluster.</li>
+<li><strong>The record may contain a join of production streams.</strong> The documentation does not give the
+  dates, and the study compared calendar years instead of searching for a step.</li>
+<li><strong>The 3-hourly rows hold 8 values of <code>hour_of_day</code>,</strong> so the XGBoost models see fewer rows than an
+  hourly study would give them.</li>
+<li><strong>Each farm's capacity is one value from the roster table</strong> used by the previous study,
+  computed over the farm's whole history, including the months a fold holds out.</li>
+<li><strong>The fits ran on the CPU.</strong> Another device would give slightly different numbers.</li>
+</ul>
+<h2 id="scope">Scope</h2>
+<p><strong>The page says nothing about forecast skill, wakes, other reanalyses, other regions, or heights
+other than the five CERRA serves.</strong></p>
+<ul>
+<li><strong>Forecasting is not covered.</strong> CERRA is a reanalysis.</li>
+<li><strong>Wakes and terrain are not covered.</strong> No column set holds a turbine layout, hub height or
+  land-cover column.</li>
+<li><strong>Other weather products are not covered.</strong> The <a href="../wind/">wind page</a> compares products.</li>
+<li><strong>Offshore wind and other regions are not covered.</strong></li>
+<li><strong>Speed at five heights with direction is not covered.</strong> The veer family holds the 10 m and 100 m
+  speeds only.</li>
+</ul>
+<h2 id="data-and-code-availability">Data and code availability</h2>
+<p><strong>Every input except the wind farms' metered output, coordinates, and capacity table is public, and
+the code is in the repository at the commit that merged this page.</strong> The code is in
+<code>studies/beam_diffuse_split/</code> (<code>cerra_wind_direction.py</code> and <code>cerra_wind_direction_figures.py</code>) and
+in <code>packages/studies/</code> (<code>wind_direction.py</code>). The fits used XGBoost 3.4.1 on the CPU, at the
+settings of the previous study.</p>
+<ul>
+<li><strong>Public inputs:</strong> CERRA's wind direction from the Copernicus Climate Data Store, at 10 m from
+  <a href="https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels"><code>reanalysis-cerra-single-levels</code></a>
+  and at 50, 75, 100, and 150 m from
+  <a href="https://doi.org/10.24381/cds.38b394e6"><code>reanalysis-cerra-height-levels</code></a>, and CERRA's wind speed
+  from the same two datasets.</li>
+<li><strong>Private inputs:</strong> the three farms' metered output and coordinates, and the capacity table. The
+  farms appear only as W1 to W3.</li>
+<li><strong>Planned comparisons:</strong> recorded in the study plan, in the repository's git history.</li>
+</ul>
+<h2 id="reproducing-the-figures">Reproducing the figures</h2>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/beam_diffuse_split/cerra_wind_direction.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/beam_diffuse_split/cerra_wind_direction_figures.py
+npx<span class="w"> </span>svgo@4<span class="w"> </span>--multipass<span class="w"> </span>--precision<span class="o">=</span><span class="m">1</span><span class="w"> </span>--final-newline<span class="w"> </span>docs/studies/assets/cerra_wind_direction_*.svg
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
