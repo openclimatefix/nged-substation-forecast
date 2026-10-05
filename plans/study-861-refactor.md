@@ -79,8 +79,8 @@ the folder branch 1016 gives it.
 | `tools/` (2) | `check_page_numbers` (the command line over `studies.page_numbers`), `stamp_alignment` |
 | the package, no script left | `figure_numbers` |
 
-A single asterisk marks a module that moves wholesale to the package in layer 1 and is deleted from `studies/`. A double asterisk
-marks a script from which named helpers move to the package in layer 2 (the script stays, shorter).
+A single asterisk marks a module that moves wholesale to the package in layer 1 and is deleted from
+`studies/`. A double asterisk marks a script from which named helpers move to the package in layer 2 (the script stays, shorter).
 The `weather_downloads/fetch_era5_wind.py` script keeps its folder and loses its
 `sys.path.insert` into `beam_diffuse_split/`, because the helpers it reads come from layer 1.
 
@@ -164,8 +164,8 @@ with `ty` `extra-paths` to match.
   under `studies/` is named `test_*.py`.
 - **Imports resolve through one fixture.** `packages/studies/tests/conftest.py` gains
   `study_script(study, module)`, which puts `studies/<study>/` on `sys.path`, imports the module
-  under a unique name, and removes both afterwards. It replaces the two loader styles now in use. Because a script then imports only its folder and `studies.*`, one folder on the path
-  is always enough. `ty` `extra-paths` keeps one entry per folder that a test still imports
+  under a unique name, and removes both afterwards. It replaces the two loader styles now in use. Because a script then imports only its
+  folder and `studies.*`, one folder on the path is always enough. `ty` `extra-paths` keeps one entry per folder that a test still imports
   statically; entries for folders no test imports are deleted.
 - **The study skill's per-script review rule is unchanged.** It covers `studies/**`, which now holds
   scripts only. Tests sit under `packages/studies`, so they get the package's treatment: the diff
@@ -248,9 +248,9 @@ rule. A `git mv` commit changes no content beyond path strings, so `git diff -M`
 7. **Verification and reviews** (below).
 
 **Which parts a Sonnet implementer does mechanically:** steps 0, 1, 4, 5 and 6, and the moves in
-steps 2 and 3. Judgement stays with the maintainer or Opus in two places: the public names chosen when an
-underscore-private symbol becomes a package API, and the layer-2 grouping into modules, which this
-plan proposes but the scan on the merged `main` may change.
+steps 2 and 3. Judgement stays with the maintainer or Opus in two places: the public names chosen
+when an underscore-private symbol becomes a package API, and the layer-2 grouping into modules,
+which this plan proposes but the scan on the merged `main` may change.
 
 ## Reproduction
 
