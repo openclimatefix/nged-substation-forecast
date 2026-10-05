@@ -18,6 +18,8 @@ from typing import Any, Final
 import numpy as np
 import pytest
 
+from studies import ukv_ceda_profiles
+
 pytest.importorskip("icechunk")
 pytest.importorskip("zarr")
 pytest.importorskip("pyproj")
@@ -166,8 +168,8 @@ def test_merge_run_expects_ten_files_under_the_t120_profile(tmp_path: Path) -> N
 
 
 def test_step_constants() -> None:
-    assert (*range(37, 49), 51, 54) == fetch.T54_STEPS
-    assert tuple(range(57, 121, 3)) == fetch.T120_STEPS
+    assert (*range(37, 49), 51, 54) == ukv_ceda_profiles.T54_STEPS
+    assert tuple(range(57, 121, 3)) == ukv_ceda_profiles.T120_STEPS
 
 
 @pytest.mark.parametrize(

@@ -74,15 +74,6 @@ sys.path.insert(0, str(_STUDIES_DIR / "beam_diffuse_split"))
 sys.path.insert(0, str(_STUDIES_DIR / "weather_downloads"))
 
 import ens_forecast_horizons as efh  # noqa: E402
-from fetch_ukv_ceda import (  # noqa: E402
-    PLAIN_LAST_STEP,
-    STATUS_COMPLETE,
-    STATUS_MISSING,
-    STATUS_PARTIAL,
-    T54_STEPS,
-    T120_PROFILE,
-    T120_STEPS,
-)
 from nwp_forecast_comparison import (  # noqa: E402
     DomainType,
     candidate_rows,
@@ -101,6 +92,15 @@ from studies.resample import (  # noqa: E402
     wind_polar,
 )
 from studies.solar import zenith  # noqa: E402
+from studies.ukv_ceda_profiles import (  # noqa: E402
+    PLAIN_LAST_STEP,
+    STATUS_COMPLETE,
+    STATUS_MISSING,
+    STATUS_PARTIAL,
+    T54_STEPS,
+    T120_PROFILE,
+    T120_STEPS,
+)
 from studies.wind_direction import sine_cosine  # noqa: E402
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)

@@ -40,12 +40,8 @@ import zarr
 from fetch_ukv_ceda import (
     CODE_VERSION,
     FIELDS,
-    PLAIN_LAST_STEP,
     PROFILES,
-    STATUS_COMPLETE,
-    STATUS_MISSING,
     STATUS_NAMES,
-    STATUS_PARTIAL,
     FieldSpec,
     UkvStore,
     _array,
@@ -54,6 +50,12 @@ from fetch_ukv_ceda import (
     set_profile,
 )
 from paths import WEATHER_DOWNLOADS_DIR
+from studies.ukv_ceda_profiles import (
+    PLAIN_LAST_STEP,
+    STATUS_COMPLETE,
+    STATUS_MISSING,
+    STATUS_PARTIAL,
+)
 
 CHECK_NAMES: Final[tuple[str, ...]] = (
     "run_spacing",

@@ -58,11 +58,11 @@ from fetch_ukv_ceda import (
     GRID_SPACING_M,
     N_STEPS,
     SLOT_EPOCH,
-    STATUS_COMPLETE,
     _array,
     _repository_config,
 )
 from paths import WEATHER_DOWNLOADS_DIR
+from studies.ukv_ceda_profiles import STATUS_COMPLETE
 from validate_ukv_ceda import NAN_ALLOWED, VALUE_RANGES, check_run_spacing, expected_leads
 
 CheckKindType = Literal["recent", "era5"]
