@@ -384,11 +384,13 @@ exclude = '\.git|\.venv|packages/(notebooks|dashboard)/[^/]+\.py'
 extra-paths = [
     "tests",
     "studies/beam_diffuse_split",
+    "studies/ens_backfill_pilot",
     "studies/nwp_forecast_comparison",
+    "studies/open_meteo_ensemble_means",
     "studies/past_weather",
+    "studies/weather_downloads",
     "packages/studies/tests/nwp_forecast_comparison",
     "packages/studies/tests/past_weather",
-    "studies/weather_downloads",
 ]
 
 [tool.ty.src]
@@ -430,7 +432,9 @@ python_files = ["test_*.py", "*_test.py", "packages/notebooks/plot_missing_NWP_d
 pythonpath = [
     "tests",
     "studies/beam_diffuse_split",
+    "studies/ens_backfill_pilot",
     "studies/nwp_forecast_comparison",
+    "studies/open_meteo_ensemble_means",
     "studies/past_weather",
     "studies/weather_downloads",
     "packages/studies/tests/nwp_forecast_comparison",

@@ -62,46 +62,45 @@ ENS, and the UKV-from-CEDA blends. Tests of these scripts are in
 - `fetch_ens_day4_supplement.py` extracts the ENS leads that the day-4 band needs and
   `ens_members.parquet` lacks.
 - `verify_previous_runs_leads.py` runs three checks and writes one markdown table each under
-  `--output-dir`. V1 (a gate) compares Open-Meteo's GFS `previous_dayN` values with the Dynamical.org
-  GFS runs, for candidate run offsets `k` from 0 to 12 hours, and passes only if the mean absolute
-  difference is lowest at `k = 0` for `N = 1` and `N = 2`. Each site scores every grid cell of the
-  Dynamical.org extract and keeps the best, so no site coordinate is read. V1 fails if nothing is
-  scored. V1b gives, per product, field and day, each UTC hour's mean absolute second difference of
-  the `previous_dayN` series divided by its mean over all hours, and reads a 3- or 6-hourly run
-  cycle where the switch hours stand out by a ratio of 1.3 or more. V3 measures each product's
-  radiation timestamp convention from the offset at which its `previous_day1` series tracks the
-  sun best, and tests each candidate rebuild of UKV's hourly value from its snapshots; `--v3-only`
-  runs V3 alone, and the study's `report.md` quotes `v3_conventions.md` from a `verification/`
-  directory beside it. Outputs: `v1_wind.md`, `v1_radiation.md`,
+  `--output-dir`. V1 (a gate) compares Open-Meteo's GFS `previous_dayN` values with the
+  Dynamical.org GFS runs, for candidate run offsets `k` from 0 to 12 hours, and passes only if the
+  mean absolute difference is lowest at `k = 0` for `N = 1` and `N = 2`. Each site scores every grid
+  cell of the Dynamical.org extract and keeps the best, so no site coordinate is read. V1 fails if
+  nothing is scored. V1b gives, per product, field and day, each UTC hour's mean absolute second
+  difference of the `previous_dayN` series divided by its mean over all hours, and reads a 3- or
+  6-hourly run cycle where the switch hours stand out by a ratio of 1.3 or more. V3 measures each
+  product's radiation timestamp convention from the offset at which its `previous_day1` series
+  tracks the sun best, and tests each candidate rebuild of UKV's hourly value from its snapshots;
+  `--v3-only` runs V3 alone, and the study's `report.md` quotes `v3_conventions.md` from a
+  `verification/` directory beside it. Outputs: `v1_wind.md`, `v1_radiation.md`,
   `v1b_run_switches.md`, `v3_conventions.md`.
 - `check_input_steps.py` (V1c) divides each month's mean day-1 radiation and 100 m wind speed of UKV
   and IFS 0.25° by ICON-EU's at the same site, and flags a month-to-month change of 15% or more.
   Output: `v1c_steps.md`.
 - `build_forecast_inputs.py` writes `solar_forecast_inputs.parquet` and
-  `wind_forecast_inputs.parquet` under `--output-dir` (default `data/studies/nwp_forecast_comparison/`).
-  Each file has one row per generator-hour with the target, the capacity, the calendar and
-  sun-position columns, every Previous Runs product's weather columns at its planned day offsets
-  (wind speeds in m/s), ECMWF ENS's mean at days 0 to 3 and control member at days 0 to 3, the
-  no-weather baselines' inputs, and, where GEFS is built, the GEFS mean at days 1 to 3. ENS and GEFS
-  are built directly at the chosen upsampling combination (`clear_sky` for solar, `speed_components`
-  for wind) through the public functions of `studies/nwp_forecast_comparison/ens_forecast_horizons.py`.
-  GEFS reads each site's nearest 0.25° cell, converts its alternating 3- and 6-hour radiation
-  windows to 3-hour step means (`studies.resample.gefs_step_means`) on whole runs before any band is
-  sliced, and averages the 31 members. It runs only when
-  `data/studies/weather/GEFS_window_2024-11-01_None/_month_cache/` covers 2024-11 to the month the
-  rows end on (the last month may be a `.partial.parquet`), or when `--gefs-window-dir` names a
-  `GEFS_window_*` extract. The build raises if any 00 UTC run the rows need is missing or
-  incomplete.
-- `nwp_forecast_comparison.py` reads those files and takes the rows where the target, the
-  baselines' inputs, and every planned arm's columns are present. It cuts folds with
-  `studies.cross_validation.cut_eras`, fits every arm out of fold, scores the no-weather
-  baselines, and writes `report.md`, `<domain>_losses.parquet` and `<domain>_predictions.parquet`
-  under `--output-dir`. Every contrast is computed within one hyperparameter setting, and a
-  planned verdict stands only if both settings give it. `--dry-run` stops after printing the
-  coverage table and the job list. `--report-only` writes the report from the saved losses.
-  `--fit-missing` fits only the (arm, setting) pairs the saved losses lack. `--synthetic-losses`
-  fabricates losses instead of fitting, to exercise the report, and refuses to write under
-  `data/studies/`.
+  `wind_forecast_inputs.parquet` under `--output-dir` (default
+  `data/studies/nwp_forecast_comparison/`). Each file has one row per generator-hour with the
+  target, the capacity, the calendar and sun-position columns, every Previous Runs product's weather
+  columns at its planned day offsets (wind speeds in m/s), ECMWF ENS's mean at days 0 to 3 and
+  control member at days 0 to 3, the no-weather baselines' inputs, and, where GEFS is built, the
+  GEFS mean at days 1 to 3. ENS and GEFS are built directly at the chosen upsampling combination
+  (`clear_sky` for solar, `speed_components` for wind) through the public functions of
+  `studies/nwp_forecast_comparison/ens_forecast_horizons.py`. GEFS reads each site's nearest 0.25°
+  cell, converts its alternating 3- and 6-hour radiation windows to 3-hour step means
+  (`studies.resample.gefs_step_means`) on whole runs before any band is sliced, and averages the 31
+  members. It runs only when `data/studies/weather/GEFS_window_2024-11-01_None/_month_cache/` covers
+  2024-11 to the month the rows end on (the last month may be a `.partial.parquet`), or when
+  `--gefs-window-dir` names a `GEFS_window_*` extract. The build raises if any 00 UTC run the rows
+  need is missing or incomplete.
+- `nwp_forecast_comparison.py` reads those files and takes the rows where the target, the baselines'
+  inputs, and every planned arm's columns are present. It cuts folds with
+  `studies.cross_validation.cut_eras`, fits every arm out of fold, scores the no-weather baselines,
+  and writes `report.md`, `<domain>_losses.parquet` and `<domain>_predictions.parquet` under
+  `--output-dir`. Every contrast is computed within one hyperparameter setting, and a planned
+  verdict stands only if both settings give it. `--dry-run` stops after printing the coverage table
+  and the job list. `--report-only` writes the report from the saved losses. `--fit-missing` fits
+  only the (arm, setting) pairs the saved losses lack. `--synthetic-losses` fabricates losses
+  instead of fitting, to exercise the report, and refuses to write under `data/studies/`.
 - `verify_extra_leads.py` reads only, and writes two Markdown files under
   `<output-dir>/verification/`: `gefs_radiation_window.md` checks that GEFS's radiation beyond 240 h
   is a 6-hour window mean, and `day0_matches_past_series.md` checks that Open-Meteo's unsuffixed
@@ -109,8 +108,8 @@ ENS, and the UKV-from-CEDA blends. Tests of these scripts are in
   the series the past-weather studies read.
 - `build_forecast_inputs.py --extra-leads --published-dir PUBLISHED --output-dir DIR` writes the
   extra lead days' input columns (ENS at days 5 and 14, GEFS at days 5, 10, and 14, IFS 0.25°, GFS,
-  and ICON global at day 5, and ICON-D2 and ICON-EU at day 0) onto the published inputs' own
-  `(site, time)` keys, to a new folder.
+  and ICON global at day 5, and ICON-D2 and ICON-EU at day 0) onto the published inputs' own `(site,
+  time)` keys, to a new folder.
 - `fit_extra_leads.py` fits those arms on a GPU at the primary setting only, together with the
   published arms they are compared with, refitted on the same device. `--check` fits one arm at one
   generator twice and stops unless the two runs agree. `--report-only` writes the report from the
@@ -127,8 +126,8 @@ ENS, and the UKV-from-CEDA blends. Tests of these scripts are in
 - `verify_gfs_native.py` reads only, and writes `gfs_radiation_window.md` (whether the store's
   radiation follows the reset rule, at every window length including the windows shorter than 6
   hours and lead 0), `gfs_served_runs.md` (the run and lead each target hour reads), and, with
-  `--built-dir`, `gfs_built_columns.md` (a sample of built values recomputed from the store in
-  plain Python) under `<output-dir>/verification/`. It exits non-zero if any check fails.
+  `--built-dir`, `gfs_built_columns.md` (a sample of built values recomputed from the store in plain
+  Python) under `<output-dir>/verification/`. It exits non-zero if any check fails.
 - `fit_extra_leads.py --batch third` fits the eight native GFS arms per technology on a GPU and
   refits nothing: its contrasts against the ENS mean and against Open-Meteo's GFS read the earlier
   batches' GPU fits, through one `--context-dir` for each earlier batch's folder.
@@ -166,11 +165,11 @@ ENS, and the UKV-from-CEDA blends. Tests of these scripts are in
   The other arm's fold training sets contained the gap days.
 - `verify_aifs_steps.py --published-dir PUBLISHED --output-dir DIR` reads only. It checks, at each
   of days 1, 2, 7, and 14, that AIFS Single's radiation is a 6-hour mean ending at the lead and its
-  wind is instantaneous (both against ERA5), and it checks the units and the crop's grid
-  orientation (against GEFS), and writes `verification/aifs_steps.md`. With `--wiring`, after the
-  build, it checks that the default ENS path is unchanged, the 6-hourly ENS columns are wired, and
-  each built AIFS Single 100 m speed equals the raw store's weighted mean at the run and lead its
-  day names, and writes `verification/aifs_wiring.md`. It exits non-zero on a failed check.
+  wind is instantaneous (both against ERA5), and it checks the units and the crop's grid orientation
+  (against GEFS), and writes `verification/aifs_steps.md`. With `--wiring`, after the build, it
+  checks that the default ENS path is unchanged, the 6-hourly ENS columns are wired, and each built
+  AIFS Single 100 m speed equals the raw store's weighted mean at the run and lead its day names,
+  and writes `verification/aifs_wiring.md`. It exits non-zero on a failed check.
 - `build_forecast_inputs.py --aifs --published-dir PUBLISHED --output-dir DIR` writes the AIFS
   Single and AIFS ENS columns at days 1 and 2 (the 00 UTC run of the day before, as ENS is read),
   ENS's mean and control member on 6-hourly steps, and each AIFS arm's and ENS arm's run time, onto
@@ -180,15 +179,15 @@ ENS, and the UKV-from-CEDA blends. Tests of these scripts are in
   overlap-weighted mean of the crop's cells, as ENS's stored table does; AIFS Single also has a
   nearest-cell arm at day 1. `--aifs-weather-dir` names the folder holding the two downloads. The
   build refuses the published folder and the day-1 and day-2 AIFS folder as its output.
-- `build_forecast_inputs.py --aifs --aifs-days 0 3 4 10` builds day 0 and days 3, 4, and 10 as
-  well. Day 0 reads the 00 UTC run of the same day as the hour, so its weather is a hindcast that
-  a service could not have read. AIFS and ENS on 6-hourly steps have no step before lead 6 hours
+- `build_forecast_inputs.py --aifs --aifs-days 0 3 4 10` builds day 0 and days 3, 4, and 10 as well.
+  Day 0 reads the 00 UTC run of the same day as the hour, so its weather is a hindcast that a
+  service could not have read. AIFS and ENS on 6-hourly steps have no step before lead 6 hours
   (radiation is null at lead 0), and a solar temperature is read at each hour's midpoint, so solar
   day 0 omits the hours ending 01:00 to 06:00 UTC for every arm (AIFS Single, ENS, and WeatherNext
-  3), which keeps the rows matched. The build raises if any other scored solar hour's midpoint
-  lies before the first step. Wind day 0 is unaffected. WeatherNext 3 stores no lead for one hour
-  of each day at day 0 (00:00 UTC for wind, 01:00 UTC for solar), so the wind fit drops that hour
-  and the solar drop above already covers it.
+  3), which keeps the rows matched. The build raises if any other scored solar hour's midpoint lies
+  before the first step. Wind day 0 is unaffected. WeatherNext 3 stores no lead for one hour of each
+  day at day 0 (00:00 UTC for wind, 01:00 UTC for solar), so the wind fit drops that hour and the
+  solar drop above already covers it.
 
   The two fits write into two separate existing folders that hold only a `README.md`, because both
   write `single_day0_*` files and a `report.md`, and each output is written once. The paths are
@@ -215,14 +214,14 @@ ENS, and the UKV-from-CEDA blends. Tests of these scripts are in
 
   `--lean-leads` fits only the AIFS Single arm and the ENS mean arm at those days, at the primary
   setting, which is 144 (arm, site) fits. `--wn3` fits the WeatherNext 3 arms at them, which is 156
-  primary fits and the sensitivity refits on top. Each `--check` fits one arm twice, prints the
-  time and the estimated total, and fits nothing else.
+  primary fits and the sensitivity refits on top. Each `--check` fits one arm twice, prints the time
+  and the estimated total, and fits nothing else.
 - `fit_aifs.py` fits every AIFS arm and reference on a GPU, on two nested row sets (`single`, and
   `ens` where AIFS ENS also exists), with folds cut inside the AIFS version eras. One contrast is
-  deciding (AIFS Single against ENS's control member at day 1); AIFS ENS contrasts are
-  descriptive; all others are exploratory. `--check` fits one arm twice and prints a time
-  estimate. A row set whose losses file exists is not refitted, so a rerun after a crash resumes
-  where it stopped; `report.md` is always written once.
+  deciding (AIFS Single against ENS's control member at day 1); AIFS ENS contrasts are descriptive;
+  all others are exploratory. `--check` fits one arm twice and prints a time estimate. A row set
+  whose losses file exists is not refitted, so a rerun after a crash resumes where it stopped;
+  `report.md` is always written once.
 - `fit_aifs.py --blends` fits AIFS at days 1, 2, 7, and 14 and the blends of ENS's mean with AIFS
   Single (`single` row set) and with the AIFS ENS mean (`ens` row set), each blend with a control
   that shuffles AIFS within site, year-month, and hour of day (seed 0, and seed 1000 for the
@@ -265,8 +264,8 @@ ENS, and the UKV-from-CEDA blends. Tests of these scripts are in
 - `nwp_forecast_charts.py --aifs-blends-dir DIR --output-dir DIR` draws only the AIFS lead chart
   (`nwp_forecast_<domain>_aifs_leads.svg`) from the blends fit's losses, so no other chart is
   rewritten, and prints each chart's caption, which is its title.
-- `leaderboard_by_day.py` draws the MAE leaderboard of every product at every fitted lead day as
-  one stacked panel per day on one shared x axis, reading the published fit, the extra-lead fits
+- `leaderboard_by_day.py` draws the MAE leaderboard of every product at every fitted lead day as one
+  stacked panel per day on one shared x axis, reading the published fit, the extra-lead fits
   (including the day-4 folder), the AIFS and WeatherNext 3 fits (including the day-5 folder) from
   `data/studies/`, and raising if any expected file is missing. It writes
   `nwp_forecast_<domain>_leaderboard.svg`, plus a `report.md` and `marks.parquet` of every plotted
@@ -289,27 +288,27 @@ ENS, and the UKV-from-CEDA blends. Tests of these scripts are in
   no interval. Each product is subtracted from the ENS-mean arm the leaderboard draws at the same
   day: `_leads_day10b` at days 2 and 7, `_day4_shared` at day 4, and `_leads_day10` elsewhere for
   the `leads_day10*` products, and the ENS mean in the product's own file for AIFS and WeatherNext
-  3. WeatherNext 3's wind reference is `ens_meanvec`. Because those three are fitted on 16, 11,
-  and 7 months, each of their rows also has a hollow diamond against the leaderboard's 21-month
-  ENS mean on the keys the two share, and an interval from fewer than 12 months is dashed. IFS
-  HRES 9 km lacks 1,197 to 1,536 of the ENS mean's rows at each day, and ICON global at day 4
-  lacks 288 for solar, so their paired differences drop those rows; any other arm whose rows
-  differ from its reference's makes the script raise. It writes `report.md`, `intervals.parquet`,
-  and a `README.md` naming each row's reference to a new
-  `nwp_forecast_comparison_vs_ens_dots_final` folder, and two SVGs to `docs/studies/assets/`. It
-  checks that none of the five outputs exists before it writes any, and refuses to overwrite them.
-  With `--blends` (and its own `--output-dir`) it draws, in place of the single products, each
-  blend of ENS's mean with one product at days 1, 2, 7, and 14 where the blend exists, minus the
-  ENS mean alone, at the primary setting, and adds `rankings.parquet` and a report section for
-  comparison C5, the AIFS Single blend minus each ICON-EU blend. The AIFS Single blends are read
-  from `nwp_forecast_comparison_aifs_blends`, and the ICON-EU, UKV, and WeatherNext 3 blends from
-  `nwp_forecast_comparison_product_blends`.
+  3. WeatherNext 3's wind reference is `ens_meanvec`. Because those three are fitted on 16, 11, and
+     7 months, each of their rows also has a hollow diamond against the leaderboard's 21-month ENS
+     mean on the keys the two share, and an interval from fewer than 12 months is dashed. IFS HRES 9
+     km lacks 1,197 to 1,536 of the ENS mean's rows at each day, and ICON global at day 4 lacks 288
+     for solar, so their paired differences drop those rows; any other arm whose rows differ from
+     its reference's makes the script raise. It writes `report.md`, `intervals.parquet`, and a
+     `README.md` naming each row's reference to a new `nwp_forecast_comparison_vs_ens_dots_final`
+     folder, and two SVGs to `docs/studies/assets/`. It checks that none of the five outputs exists
+     before it writes any, and refuses to overwrite them. With `--blends` (and its own
+     `--output-dir`) it draws, in place of the single products, each blend of ENS's mean with one
+     product at days 1, 2, 7, and 14 where the blend exists, minus the ENS mean alone, at the
+     primary setting, and adds `rankings.parquet` and a report section for comparison C5, the AIFS
+     Single blend minus each ICON-EU blend. The AIFS Single blends are read from
+     `nwp_forecast_comparison_aifs_blends`, and the ICON-EU, UKV, and WeatherNext 3 blends from
+     `nwp_forecast_comparison_product_blends`.
 - `fit_product_blends.py` fits ENS plus one product for ICON-EU (optimistic and conservative lead,
   days 1 and 2), UKV (day 1), and WeatherNext 3 (days 1, 2, 7, and 14 on the 7 WeatherNext 3
-  months), each with a control that shuffles the product's columns. It reuses the AIFS Single
-  blends of `nwp_forecast_comparison_aifs_blends`, refits only the (arm, setting) pairs that folder
-  lacks, and raises unless its build stamp equals that folder's and every new arm holds the saved
-  ENS mean's `(site, time, seed, fold)` keys. It calls `fit_aifs.product_blend_arms`, which leaves
+  months), each with a control that shuffles the product's columns. It reuses the AIFS Single blends
+  of `nwp_forecast_comparison_aifs_blends`, refits only the (arm, setting) pairs that folder lacks,
+  and raises unless its build stamp equals that folder's and every new arm holds the saved ENS
+  mean's `(site, time, seed, fold)` keys. It calls `fit_aifs.product_blend_arms`, which leaves
   `blend_arms`, `stage_arms_fitted`, and `wn3_arms` unchanged, and writes only to a folder named
   `nwp_forecast_comparison_product_blends`. `--dry-run` lists the fits without fitting, and
   `--check` fits one arm twice on the GPU. Its `report.md` holds every arm's columns and the
@@ -320,17 +319,17 @@ ENS, and the UKV-from-CEDA blends. Tests of these scripts are in
 - `report.md` holds, per technology: every arm's column list; the rows each planned product drops;
   the UKV straddle share; both settings' leaderboards; the planned contrasts P1a to P4b with their
   verdicts and the ENS monotonicity table by 3-hour band; the blend verdict; and the exploratory
-  brackets at every day, UKV's bracket by era, the exact-lead wind re-read, the ENS control
-  member, and the ENS day-1 reconciliation with the horizons page. Every contrast row is labelled
-  planned or exploratory.
-- `<domain>_losses.parquet` holds one row per (arm, setting, site, time, seed) with the capped
-  error in megawatts and as a fraction of capacity. `<domain>_predictions.parquet` holds the
-  capped prediction for the same keys.
+  brackets at every day, UKV's bracket by era, the exact-lead wind re-read, the ENS control member,
+  and the ENS day-1 reconciliation with the horizons page. Every contrast row is labelled planned or
+  exploratory.
+- `<domain>_losses.parquet` holds one row per (arm, setting, site, time, seed) with the capped error
+  in megawatts and as a fraction of capacity. `<domain>_predictions.parquet` holds the capped
+  prediction for the same keys.
 - `data/studies/nwp_forecast_comparison_leads/` holds the extra lead days and is write-once.
   `<domain>_extra_lead_inputs.parquet` holds the extra columns, `<domain>_losses.parquet` and
-  `<domain>_predictions.parquet` the GPU fits in the same layout as the published files,
-  `report.md` the absolute errors, contrasts, and device noise floor, and `verification/` the two
-  checks of `verify_extra_leads.py`.
+  `<domain>_predictions.parquet` the GPU fits in the same layout as the published files, `report.md`
+  the absolute errors, contrasts, and device noise floor, and `verification/` the two checks of
+  `verify_extra_leads.py`.
 - `data/studies/nwp_forecast_comparison_aifs/` holds the AIFS arms and is write-once.
   `<domain>_aifs_inputs.parquet` holds the AIFS columns, `<domain>_<row_set>_losses.parquet` and
   `<domain>_<row_set>_predictions.parquet` the GPU fits in the published layout (`row_set` is
@@ -381,11 +380,11 @@ sha256sum -c $B/sha-before-aifs-blends.txt
 sha256sum -c /tmp/claude-1000/pub-sha-before.txt
 ```
 
-Before the first command, record a SHA-256 baseline of every file in the published folder, the
-day-1 and day-2 AIFS folder, and the three extra-lead folders (`nwp_forecast_comparison_leads_day10`,
+Before the first command, record a SHA-256 baseline of every file in the published folder, the day-1
+and day-2 AIFS folder, and the three extra-lead folders (`nwp_forecast_comparison_leads_day10`,
 `_day10b`, and `_day10d`), and check it after the last fit. Check CPU load with `uptime` before each
-`--check`, and run only one fit at a time. Each `--check` fits one arm at one wind site twice on
-the GPU, stops unless the two fingerprints agree, and prints the fit's runtime estimate.
+`--check`, and run only one fit at a time. Each `--check` fits one arm at one wind site twice on the
+GPU, stops unless the two fingerprints agree, and prints the fit's runtime estimate.
 
 ## Running the day-4 and day-5 fits
 
@@ -422,11 +421,10 @@ each earlier extra-lead, AIFS, and WeatherNext 3 folder, and check it after the 
 
 ## Running the product blends fit
 
-Run it after `uptime` shows the CPU is idle and `nvidia-smi` shows the GPU is free. The saved
-AIFS blend fits took about 8 to 10 s each, so the 315 (arm, site) fits take about 1 hour with 2
-workers. `--dry-run`
-builds every frame, checks the build stamp against `nwp_forecast_comparison_aifs_blends`, and lists
-the fits without fitting.
+Run it after `uptime` shows the CPU is idle and `nvidia-smi` shows the GPU is free. The saved AIFS
+blend fits took about 8 to 10 s each, so the 315 (arm, site) fits take about 1 hour with 2 workers.
+`--dry-run` builds every frame, checks the build stamp against
+`nwp_forecast_comparison_aifs_blends`, and lists the fits without fitting.
 
 ```bash
 D=/home/jack/dev/nged-substation-forecast/data/studies
@@ -445,9 +443,9 @@ uv run python studies/nwp_forecast_comparison/dot_interval_vs_ens.py --blends \
 ## Folds
 
 `assign_folds_with_eras()` and `coverage_table()` use `cut_eras`, `calendar_month_coverage` and
-`raise_on_uncovered_months` from `studies.cross_validation`. This study rotates the third
-era's folds by 3 (`NWP_ERA_FOLD_OFFSETS`), because a rotation of 2 leaves two solar (site, fold,
-calendar month) cells uncovered on these rows.
+`raise_on_uncovered_months` from `studies.cross_validation`. This study rotates the third era's
+folds by 3 (`NWP_ERA_FOLD_OFFSETS`), because a rotation of 2 leaves two solar (site, fold, calendar
+month) cells uncovered on these rows.
 
 ## Does UKV-CEDA lower the error of the ECMWF ENS mean at lead days 1 to 4?
 
@@ -493,57 +491,60 @@ before the build and before every fit, and start only below a load average of ab
    `*_losses.json` stamp under `data/studies/nwp_forecast_comparison_*` and exits 0 if each arm's
    recorded columns still equal `fit_aifs.arm_features`. The check proves that the one branch added
    to `nwp_forecast_comparison._wind_weather_fields` leaves every earlier arm alone.
-2. `uv run python studies/nwp_forecast_comparison/build_ukv_ceda_inputs.py --dry-run` builds one month
-   (`--dry-run-month`, default 2026-03), prints the rows lost to each cause, and writes nothing.
+2. `uv run python studies/nwp_forecast_comparison/build_ukv_ceda_inputs.py --dry-run` builds one
+   month (`--dry-run-month`, default 2026-03), prints the rows lost to each cause, and writes
+   nothing.
 3. `uv run python studies/nwp_forecast_comparison/build_ukv_ceda_inputs.py` writes
    `<domain>_ukv_ceda_inputs.parquet`, `build.json`, and `README.md` into the write-once folder
    `data/studies/ukv_ceda_blends/`. The build refuses to run until the download covers the window
    and every run slot the store marks as never archived has been fetched again once. Name the days
    CEDA still does not list in `--unlisted-days`.
-4. `uv run python studies/nwp_forecast_comparison/verify_ukv_ceda_inputs.py` recomputes a stratified sample
-   of built values in plain Python, gates the radiation timestamp at day 1 (see "The radiation
-   timestamp" below), compares each lead day's correlation with the Copernicus Atmosphere Monitoring
-   Service (CAMS) and ECMWF's fifth reanalysis (ERA5) against Open-Meteo UKV day 1 on the rows all
-   four lead days hold, and screens for month-to-month steps. The script writes `verify.json`,
-   holding whether every gating check passed and the SHA-256 of each inputs file, into the build's
-   folder.
-5. `uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --dry-run` builds every frame,
-   checks every arm's columns, and lists the fits.
-6. `uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --check` fits one arm at one wind
-   site twice on the graphics processing unit (GPU), stops unless the two fingerprints agree, prints
-   a time estimate, and compares ENS's mean alone with its padded copy on the wind day-1 rows.
-7. `uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --verified` fits every stage,
-   writes the losses once, refits the wind day-1 blend at one site on the central processing unit
-   (CPU), and writes `report.md` and `intervals.parquet`. Add `--only-missing` to fit the pairs no
-   saved file holds into a new `_added_<k>` file, and `--report-only --report-name NAME` to write
+4. `uv run python studies/nwp_forecast_comparison/verify_ukv_ceda_inputs.py` recomputes a stratified
+   sample of built values in plain Python, gates the radiation timestamp at day 1 (see "The
+   radiation timestamp" below), compares each lead day's correlation with the Copernicus Atmosphere
+   Monitoring Service (CAMS) and ECMWF's fifth reanalysis (ERA5) against Open-Meteo UKV day 1 on the
+   rows all four lead days hold, and screens for month-to-month steps. The script writes
+   `verify.json`, holding whether every gating check passed and the SHA-256 of each inputs file,
+   into the build's folder.
+5. `uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --dry-run` builds every
+   frame, checks every arm's columns, and lists the fits.
+6. `uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --check` fits one arm at
+   one wind site twice on the graphics processing unit (GPU), stops unless the two fingerprints
+   agree, prints a time estimate, and compares ENS's mean alone with its padded copy on the wind
+   day-1 rows.
+7. `uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --verified` fits every
+   stage, writes the losses once, refits the wind day-1 blend at one site on the central processing
+   unit (CPU), and writes `report.md` and `intervals.parquet`. Add `--only-missing` to fit the pairs
+   no saved file holds into a new `_added_<k>` file, and `--report-only --report-name NAME` to write
    the report again from the saved losses into new files.
-8. `uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --post-hoc-stale --dry-run` lists
-   the post hoc stale-blend fits (see "Post hoc stale blend" below) and the rows each stage loses to
-   the blend's extra columns.
-9. `uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --post-hoc-stale --report-name
-   report_2` fits the stale blend into new `_added_<k>` files, never touching the planned fits, and
-   writes `report_2.md` and `report_2_intervals.parquet`.
+8. `uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --post-hoc-stale --dry-run`
+   lists the post hoc stale-blend fits (see "Post hoc stale blend" below) and the rows each stage
+   loses to the blend's extra columns.
+9. `uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --post-hoc-stale
+   --report-name report_2` fits the stale blend into new `_added_<k>` files, never touching the
+   planned fits, and writes `report_2.md` and `report_2_intervals.parquet`.
 10. `uv run python studies/nwp_forecast_comparison/ukv_ceda_blends_charts.py --figures-dir DIR
     --intervals-name report_2_intervals.parquet` draws every figure from the saved intervals and
     losses without fitting.
 
-11. `uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --post-hoc-permutation --dry-run`
-    lists the post hoc permutation test's fits (see "Post hoc permutation test" below), and the same
-    command with `--report-name report_3` instead of `--dry-run` fits the controls into new
-    `_added_<k>` files and writes `report_3.md` and `report_3_intervals.parquet`.
-12. `uv run python studies/nwp_forecast_comparison/build_ukv_ceda_inputs.py --older-run --dry-run`, then
-    without `--dry-run` and with the same `--unlisted-days`, builds the older-run inputs into the
-    write-once folder `data/studies/ukv_ceda_blends_run15/`. `verify_ukv_ceda_inputs.py --older-run`
-    verifies them. `fit_ukv_ceda_blends.py --post-hoc-older-run --report-name report_4` fits the
-    older-run blend and writes `report_4.md` (see "Post hoc older run" below).
-13. `uv run python studies/nwp_forecast_comparison/ukv_ceda_blends_charts.py --post-hoc-only --figures-dir
-    DIR --intervals-name report_4_intervals.parquet` draws the permutation and older-run figures.
-14. `uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --report-only --post-hoc-older-run
-    --report-name report_5` writes `report_5.md` and `report_5_intervals.parquet` from the saved
-    losses, fitting nothing. The report adds the day-1 older-run split at lead 48 hours, the share
-    of the planned gain each post hoc blend keeps, and each arm's error at each generator.
-    `ukv_ceda_blends_charts.py --figures-dir DIR --intervals-name report_5_intervals.parquet` then
-    draws every figure of the page.
+11. `uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --post-hoc-permutation
+    --dry-run` lists the post hoc permutation test's fits (see "Post hoc permutation test" below),
+    and the same command with `--report-name report_3` instead of `--dry-run` fits the controls into
+    new `_added_<k>` files and writes `report_3.md` and `report_3_intervals.parquet`.
+12. `uv run python studies/nwp_forecast_comparison/build_ukv_ceda_inputs.py --older-run --dry-run`,
+    then without `--dry-run` and with the same `--unlisted-days`, builds the older-run inputs into
+    the write-once folder `data/studies/ukv_ceda_blends_run15/`. `verify_ukv_ceda_inputs.py
+    --older-run` verifies them. `fit_ukv_ceda_blends.py --post-hoc-older-run --report-name report_4`
+    fits the older-run blend and writes `report_4.md` (see "Post hoc older run" below).
+13. `uv run python studies/nwp_forecast_comparison/ukv_ceda_blends_charts.py --post-hoc-only
+    --figures-dir DIR --intervals-name report_4_intervals.parquet` draws the permutation and
+    older-run figures.
+14. `uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --report-only
+    --post-hoc-older-run --report-name report_5` writes `report_5.md` and
+    `report_5_intervals.parquet` from the saved losses, fitting nothing. The report adds the day-1
+    older-run split at lead 48 hours, the share of the planned gain each post hoc blend keeps, and
+    each arm's error at each generator. `ukv_ceda_blends_charts.py --figures-dir DIR
+    --intervals-name report_5_intervals.parquet` then draws every figure of the page.
 
 ### Outputs the report adds after the first science review
 

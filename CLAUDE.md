@@ -557,9 +557,19 @@ in
 | `weather_utils` | Shared NWP query helpers used by both the dashboard and the feature pipeline (the analysis-proxy selection) |
 | `xgboost_forecaster` | Concrete `BaseForecaster` implementation using XGBoost |
 | `plotting` | The OCF-brand Altair theme and shared plotting helpers |
-| `studies` | The tested machinery the one-off studies under `studies/` call: solar geometry, served-column checks, power aggregation, anonymisation, the Fractions Skill Score |
+| `studies` | The tested machinery the one-off studies under `studies/` call: solar geometry, served-column checks, power aggregation, anonymisation, the Fractions Skill Score, the data paths, and the common rows the past-weather studies share. Study scripts import only their own folder, `studies.*`, and the other reviewed packages, and nothing in `src/` or any other package imports `studies` (see "Import rules for studies") |
 | `dashboard` | Marimo web apps for visualisation (`view_forecasts.py`, `map_and_timeseries.py`) plus their shared helpers in `src/dashboard/` |
 | `notebooks` | Marimo exploration notebooks |
+
+### Import rules for studies
+
+**A study script under `studies/` may import from its own folder, from `studies.*`
+(`packages/studies`), and from the other reviewed packages in `packages/*`.** `src/` and every
+package under `packages/` except `packages/studies` must never import `studies` or a study script,
+because humans review that code and the study code is fast-moving and agent-written. Code that two
+study folders need moves into `packages/studies/src/studies/` with its tests.
+`packages/studies/tests/test_study_boundaries.py` enforces both halves, and the `study` skill's
+"Where a study's pieces live" section says how to apply them.
 
 ### Dagster Assets (`src/nged_substation_forecast/defs/assets.py`)
 
