@@ -1637,7 +1637,7 @@ weather-station feed, the spread of ENS members, or products it does not score.*
 
 **Every input except the generators' metered output, the generators' coordinates, the capacity
 table, and the station-to-farm mapping is public, and the code is in the repository at the commit
-that merged this page.** The code that produced every figure is in `studies/beam_diffuse_split/` and
+that merged this page.** The code that produced every figure is in `studies/past_weather/` and
 in `packages/studies/`.
 
 - **Public inputs:** ERA5 wind from Open-Meteo's copy of the Copernicus archive, the UKV and ICON

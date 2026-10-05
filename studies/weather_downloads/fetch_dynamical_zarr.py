@@ -1,13 +1,13 @@
 """Download whole GFS, GEFS, and ECMWF AIFS runs from Dynamical.org, cropped to the trial-area box.
 
 One-off throwaway script for
-<https://github.com/openclimatefix/nged-substation-forecast/issues/841>, covering the "GFS and GEFS
-whole runs" row and the ECMWF AIFS Single and AIFS ENS rows: the forecast study (#810) needs every
-lead time of every run, from 2021-05 for GFS, 2020-10 for GEFS, 2024-04 for AIFS Single, and
-2025-07 for AIFS ENS. Every dataset is opened lazily through `dynamical_catalog.open`, the same
-entry point `dynamical_data.ecmwf_ens.download` uses for production ECMWF ENS, then cropped by a
-`.sel()` on `latitude`/`longitude` before any array chunk is requested. The box appears only in the
-arguments to that one `.sel()` call in this process.
+<https://github.com/openclimatefix/nged-substation-forecast/issues/841>, covering the "GFS and
+GEFS whole runs" row and the ECMWF AIFS Single and AIFS ENS rows: the forecast study (#810) needs
+every lead time of every run, from 2021-05 for GFS, 2020-10 for GEFS, 2024-04 for AIFS Single,
+and 2025-07 for AIFS ENS. Every dataset is opened lazily through `dynamical_catalog.open`, the
+same entry point `dynamical_data.ecmwf_ens.download` uses for production ECMWF ENS, then cropped
+by a `.sel()` on `latitude`/`longitude` before any array chunk is requested. The box appears only
+in the arguments to that one `.sel()` call in this process.
 
 **No lead-time or ensemble-member subsetting is applied.** The output is every `init_time`, every
 ensemble member (GEFS and ECMWF AIFS ENS only), every lead time, and the eight variables in
@@ -15,35 +15,35 @@ ensemble member (GEFS and ECMWF AIFS ENS only), every lead time, and the eight v
 
 **The script fetches and checkpoints one calendar month of `init_time` at a time.** Each month is
 written to `_month_cache/` as soon as it lands, and a re-run skips every month already cached as
-complete. A month counts as complete only if its last day is earlier than the newest `init_time` in
-the store minus `PUBLICATION_LAG_DAYS`; any other month is written as `<month>.partial.parquet` and
-re-fetched on the next run. The final file is built from this run's months with `scan_parquet` and
-`sink_parquet`, so its peak memory does not depend on the length of the archive. One month of GEFS
-(30 runs, 31 members, 181 lead times) held in memory needs a few GB of RAM, so the up to
-`--workers` (default 3) months in flight at once need up to three times that, well within this
-workstation's 61 GB, where a year would need tens of GB. Every month file records a hash of the
-crop's grid cells in its parquet metadata, and the combine step refuses to mix months whose hash
-differs.
+complete. A month counts as complete only if its last day is earlier than the newest `init_time`
+in the store minus `PUBLICATION_LAG_DAYS`; any other month is written as
+`<month>.partial.parquet` and re-fetched on the next run. The final file is built from this run's
+months with `scan_parquet` and `sink_parquet`, so its peak memory does not depend on the length
+of the archive. One month of GEFS (30 runs, 31 members, 181 lead times) held in memory needs a
+few GB of RAM, so the up to `--workers` (default 3) months in flight at once need up to three
+times that, well within this workstation's 61 GB, where a year would need tens of GB. Every month
+file records a hash of the crop's grid cells in its parquet metadata, and the combine step
+refuses to mix months whose hash differs.
 
 **The Zarr stores are chunked far larger than the box, so the bytes transferred exceed the bytes
-kept.** GFS stores 105 lead times by 121 by 121 grid cells per chunk, and GEFS stores 64 lead times
-by 17 by 16 grid cells (all 31 members in one chunk). AIFS Single stores all 61 lead times by 241
-by 240 grid cells per chunk, and AIFS ENS stores all 61 lead times and 51 members by 32 by 32 grid
-cells per chunk. Every chunk the box touches is transferred
-whole.
+kept.** GFS stores 105 lead times by 121 by 121 grid cells per chunk, and GEFS stores 64 lead
+times by 17 by 16 grid cells (all 31 members in one chunk). AIFS Single stores all 61 lead times
+by 241 by 240 grid cells per chunk, and AIFS ENS stores all 61 lead times and 51 members by 32 by
+32 grid cells per chunk. Every chunk the box touches is transferred whole.
 
-**Row counts, cell counts, and the crop's hash go only to the private lineage note and the parquet
-metadata, never to stdout,** because they reveal the size of the trial-area box.
+**Row counts, cell counts, and the crop's hash go only to the private lineage note and the
+parquet metadata, never to stdout,** because they reveal the size of the trial-area box.
 
 Run it with `uv run python studies/weather_downloads/fetch_dynamical_zarr.py --dataset
-noaa-gfs-forecast`, `--dataset noaa-gefs-forecast-35-day`, `--dataset ecmwf-aifs-single-forecast`,
-or `--dataset ecmwf-aifs-ens-forecast` (the last two land in `ECMWF-AIFS/` and `ECMWF-AIFS-ENS/`).
-`--workers` sets how many months are fetched concurrently. `--extra-east-columns N` widens the crop
-by `N` grid columns on the east side and `--output-suffix=-WIDE` appends a suffix to the product
-directory name, so a wider crop lands beside the default one; `check_aifs_crop_covers_sites.py`
-checks that a crop covers every study site's H3 cell. Passing `--start-date` and `--end-date`
-(both `YYYY-MM-DD`, inclusive) fetches only that window, into its own directory, for a trial run.
-Then check the output with `validate_dynamical_zarr.py`.
+noaa-gfs-forecast`, `--dataset noaa-gefs-forecast-35-day`, `--dataset
+ecmwf-aifs-single-forecast`, or `--dataset ecmwf-aifs-ens-forecast` (the last two land in
+`ECMWF-AIFS/` and `ECMWF-AIFS-ENS/`). `--workers` sets how many months are fetched concurrently.
+`--extra-east-columns N` widens the crop by `N` grid columns on the east side and
+`--output-suffix=-WIDE` appends a suffix to the product directory name, so a wider crop lands
+beside the default one; `check_aifs_crop_covers_sites.py` checks that a crop covers every study
+site's H3 cell. Passing `--start-date` and `--end-date` (both `YYYY-MM-DD`, inclusive) fetches
+only that window, into its own directory, for a trial run. Then check the output with
+`validate_dynamical_zarr.py`.
 """
 
 import argparse
@@ -75,7 +75,7 @@ VARIABLES: Final[tuple[str, ...]] = (
     "pressure_surface",
 )
 """The solar and wind fields both candidate studies need, plus surface pressure and 2 m temperature
-for the physical checks every arm in `studies/beam_diffuse_split` runs."""
+for the physical checks every arm in `studies/past_weather` runs."""
 
 DATASETS: Final[dict[str, str]] = {
     "noaa-gfs-forecast": "GFS",

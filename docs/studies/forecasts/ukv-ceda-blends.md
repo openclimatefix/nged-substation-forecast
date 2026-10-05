@@ -558,9 +558,8 @@ only, the 15 UTC run of the day before.
 
 **The inputs and fitted losses are in the private data store, and every output carries only the
 anonymised `site` label.** The generators are labelled A to F for solar and W1 to W3 for wind. The
-code is `studies/ukv_ceda_blends/`, with `fit_aifs.py` and `nwp_forecast_comparison.py` from
-`studies/nwp_forecast_comparison/` and `packages/studies/`. The reports were written by the code at
-commit `4d12892c`.
+code is in `studies/nwp_forecast_comparison/` and `packages/studies/`. The reports were written by the
+code at commit `4d12892c`.
 
 **XGBoost 3.4.1 fitted every XGBoost model on one RTX A6000 GPU, at two hyperparameter settings.**
 The primary setting is a learning rate of 0.05, a maximum tree depth of 6, a minimum child weight of

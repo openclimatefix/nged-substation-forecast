@@ -5,10 +5,10 @@ One-off throwaway script for
 from its THREDDS server over OPeNDAP, on its own 3 km Lambert-conformal grid
 (`nora3_subset_atmos/wind_hourly_v2_agg/nora3_wind_hourly.ncml`). The cut to the trial-area box
 happens server-side: each request slices the grid's own `x` and `y` index ranges, so no
-whole-domain file is downloaded. `paths.TrialAreaBox`'s latitude and longitude bounds are converted
-once, locally, to a grid index range (`_box_index_range`). The bounds, and the index range derived
-from them, are as private as the box itself: they go to the OPeNDAP call and nowhere else. No log
-line, error message, lineage note, or README carries them.
+whole-domain file is downloaded. `studies.trial_area.TrialAreaBox`'s latitude and longitude bounds
+are converted once, locally, to a grid index range (`_box_index_range`). The bounds, and the index
+range derived from them, are as private as the box itself: they go to the OPeNDAP call and nowhere
+else. No log line, error message, lineage note, or README carries them.
 
 The script fetches `wind_speed` and `wind_direction` at 50 m and 100 m (`height` indices 2 and 3 of
 the served `[10, 20, 50, 100, 250, 500, 750]`, checked against the served `height` array at run

@@ -8,8 +8,59 @@ lead?](../../docs/studies/forecasts/matched-lead.md). How the extra products (AI
 the extra lead days, and day 0) are read, and their figureless results, are on its [companion
 page](../../docs/studies/forecasts/matched-lead-extra-products.md).
 
+## The scripts and the pages they feed
+
+**Five pages draw on the scripts in this folder, so find a page's scripts in this table.** The
+folder holds the matched-lead study, its extra products, the ENS-horizons study, the blends with
+ENS, and the UKV-from-CEDA blends. Tests of these scripts are in
+`packages/studies/tests/nwp_forecast_comparison/`. A script imports only from this folder, from
+`studies.*` (`packages/studies/`), and from the other reviewed packages.
+
+| Script | Published page |
+|---|---|
+| `nwp_forecast_comparison.py` | [Matched lead](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead/) |
+| `build_forecast_inputs.py` | [Matched lead](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead/) |
+| `verify_previous_runs_leads.py` | [Matched lead](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead/) |
+| `check_input_steps.py` | [Matched lead](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead/) |
+| `nwp_forecast_charts.py` | [Matched lead](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead/) |
+| `leaderboard_by_day.py` | [Matched lead](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead/) |
+| `fit_extra_leads.py` | [Matched lead](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead/) |
+| `verify_extra_leads.py` | [Matched-lead extra products](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead-extra-products/) |
+| `fit_aifs.py` | [Matched-lead extra products](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead-extra-products/) |
+| `verify_aifs_steps.py` | [Matched-lead extra products](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead-extra-products/) |
+| `verify_gfs_native.py` | [Matched lead](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead/) |
+| `verify_ifs_single.py` | [Matched lead](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead/) |
+| `build_wn3_inputs.py` | [Matched-lead extra products](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead-extra-products/) |
+| `verify_wn3_steps.py` | [Matched-lead extra products](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead-extra-products/) |
+| `fit_day5_aifs_wn3.py` | [Matched-lead extra products](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead-extra-products/) |
+| `fit_product_blends.py` | [Blends with ENS](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/blends-with-ens/) |
+| `dot_interval_vs_ens.py` | [Blends with ENS](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/blends-with-ens/) |
+| `fetch_ens_forecast_horizons.py` | [ENS horizons](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/ens-horizons/) |
+| `fetch_ens_day4_supplement.py` | [ENS horizons](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/ens-horizons/) |
+| `ens_forecast_horizons.py` | [ENS horizons](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/ens-horizons/) |
+| `ens_forecast_charts.py` | [ENS horizons](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/ens-horizons/) |
+| `build_ukv_ceda_inputs.py` | [UKV from CEDA](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/ukv-ceda-blends/) |
+| `verify_ukv_ceda_inputs.py` | [UKV from CEDA](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/ukv-ceda-blends/) |
+| `fit_ukv_ceda_blends.py` | [UKV from CEDA](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/ukv-ceda-blends/) |
+| `check_arm_columns_unchanged.py` | [UKV from CEDA](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/ukv-ceda-blends/) |
+| `ukv_ceda_blends_charts.py` | [UKV from CEDA](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/ukv-ceda-blends/) |
+
 ## Scripts
 
+- `fetch_ens_forecast_horizons.py` extracts every ECMWF ENS member's radiation, temperature, and 10
+  m and 100 m wind at each metered generator's H3 cell, at the leads the horizon study scores, from
+  the production NWP Delta table, into `data/studies/ens_forecast_horizons/ens_members.parquet`.
+- `ens_forecast_horizons.py` scores ENS-driven power forecasts at eight horizons, for solar and
+  wind, at hourly resolution on the past-weather studies' own rows: first how to upsample ENS's 3-
+  and 6-hourly steps to hourly, then three ways of using the 51 members (the control member, the
+  ensemble mean, and each member through the power model), four baselines that read no weather
+  forecast, and two past-weather references that are not forecasts. Writes its losses, predictions,
+  member-forecast summaries, intervals, leaderboard, and `report.md` to
+  `data/studies/ens_forecast_horizons/`.
+- `ens_forecast_charts.py` draws the ENS horizon page's anonymised charts from
+  `ens_forecast_horizons.py`'s outputs, checking each number against the report.
+- `fetch_ens_day4_supplement.py` extracts the ENS leads that the day-4 band needs and
+  `ens_members.parquet` lacks.
 - `verify_previous_runs_leads.py` runs three checks and writes one markdown table each under
   `--output-dir`. V1 (a gate) compares Open-Meteo's GFS `previous_dayN` values with the Dynamical.org
   GFS runs, for candidate run offsets `k` from 0 to 12 hours, and passes only if the mean absolute

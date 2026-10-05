@@ -388,7 +388,7 @@ other than the five CERRA serves.**
 
 **Every input except the wind farms' metered output, coordinates, and capacity table is public, and
 the code is in the repository at the commit that merged this page.** The code is in
-`studies/beam_diffuse_split/` (`cerra_wind_direction.py` and `cerra_wind_direction_figures.py`) and
+`studies/past_weather/` (`cerra_wind_direction.py` and `cerra_wind_direction_figures.py`) and
 in `packages/studies/` (`wind_direction.py`). The fits used XGBoost 3.4.1 on the CPU, at the
 settings of the previous study.
 

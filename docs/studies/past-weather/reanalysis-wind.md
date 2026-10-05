@@ -212,7 +212,7 @@ describes. The nearest cell of each grid to each farm is 0.8 to 2.5 km away for 
 km for NORA3, pooled across the three farms. The XGBoost settings are those of the main wind page,
 with no column subsampling, and the XGBoost version is 3.4.1, the version in `uv.lock` (the saved
 losses do not record the version that fitted them). Every fit ran on the CPU. The code is in
-`studies/beam_diffuse_split/` and `packages/studies/`, and the commit that merged this page holds
+`studies/past_weather/` and `packages/studies/`, and the commit that merged this page holds
 the version that produced the figures.
 
 ## Reproducing the figures

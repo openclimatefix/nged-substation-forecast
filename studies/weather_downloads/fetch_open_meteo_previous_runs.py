@@ -2,20 +2,20 @@
 
 One-off throwaway script for the forecast study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/810>. The Historical Forecast
-archives `fetch_open_meteo_grid.py` and `studies/past_weather/fetch_open_meteo_point.py`
-already downloaded only hold each model's most-recent-run value at each hour (lead 0-3h), so they
-cannot score a forecast at a genuine lead time. The Previous Runs API
+archives `fetch_open_meteo_grid.py` and `studies/past_weather/fetch_open_meteo_point.py` already
+downloaded only hold each model's most-recent-run value at each hour (lead 0-3h), so they cannot
+score a forecast at a genuine lead time. The Previous Runs API
 (<https://open-meteo.com/en/docs/previous-runs-api>) serves the same hour from several different
 model runs side by side: `<variable>` is the freshest run covering that hour (lead 0), and
 `<variable>_previous_dayN` for `N` in 1-7 is the run made `N` x 24 hours earlier — so
-`shortwave_radiation_previous_day3` at a given `time` is what a forecast issued three days earlier
-predicted for that same hour. That is exactly the lead-time axis the forecast study needs and the
-Historical Forecast archives do not carry.
+`shortwave_radiation_previous_day3` at a given `time` is what a forecast issued three days
+earlier predicted for that same hour. That is exactly the lead-time axis the forecast study needs
+and the Historical Forecast archives do not carry.
 
-**Sites, not the trial-area grid.** This script builds the same anonymised meter roster
-`studies/beam_diffuse_split/studies.pv_dataset.pv_sites`/`_wind_sites` does (`_roster` below is a
-deliberate duplicate — see its own docstring for why) and follows the same request/response shape
-as `studies/past_weather/fetch_open_meteo_point.py`, rather than the trial-area grid
+**Sites, not the trial-area grid.** This script builds the same anonymised meter roster as
+`studies.pv_dataset.pv_sites` and `wind_sites` (`_roster` below is a deliberate duplicate — see
+its own docstring for why) and follows the same request/response shape as
+`studies/past_weather/fetch_open_meteo_point.py`, rather than the trial-area grid
 `fetch_open_meteo_grid.py` uses: a forecast study scores a specific generator's forecast, not a
 grid cell's. No coordinate or `time_series_id` reaches the written frame or any log line — rows
 are keyed by the anonymised `site` label the roster assigns, exactly as the sibling per-site
@@ -25,21 +25,23 @@ scripts do.
 itself** (the checkbox `id` attributes server-rendered into
 <https://open-meteo.com/en/docs/previous-runs-api>), not guessed and not carried over from
 `sources.OPEN_METEO_MODELS`, because the Previous Runs API's own identifiers differ from the
-Historical Forecast API's for the same model: ICON is `dwd_icon_d2`/`dwd_icon_eu`/`dwd_icon_global`
-here, not the bare `icon_d2`/`icon_eu`/`icon_global` `fetch_open_meteo_point.py` requests; GFS is
+Historical Forecast API's for the same model: ICON is
+`dwd_icon_d2`/`dwd_icon_eu`/`dwd_icon_global` here, not the bare
+`icon_d2`/`icon_eu`/`icon_global` `fetch_open_meteo_point.py` requests; GFS is
 `ncep_gfs_seamless`, not `gfs_seamless`; ECMWF's 9 km HRES is `ecmwf_ifs`, not `ecmwf_ifs04`. See
 `MODELS` below for the full registry and which candidates from the issue were skipped and why.
 
 **Checkpointed per (model, year)**, following the `data-download` skill: each model's own request
-is split into whole calendar years (the coarsest chunk that still lets a crash mid-run lose at most
-one year of one model), written atomically to `_year_cache/<year>.parquet` under each product's
-`previous_runs/` directory as soon as it is fetched, and combined by reading back whatever is
-cached — so re-running the same command after a crash or a daily-quota refusal resumes rather than
-re-fetching. `_first_year_with_data` measures each model's own archive start with a one-month probe
-before committing to the multi-year backfill, per the skill's "measure one chunk first" rule.
+is split into whole calendar years (the coarsest chunk that still lets a crash mid-run lose at
+most one year of one model), written atomically to `_year_cache/<year>.parquet` under each
+product's `previous_runs/` directory as soon as it is fetched, and combined by reading back
+whatever is cached — so re-running the same command after a crash or a daily-quota refusal
+resumes rather than re-fetching. `_first_year_with_data` measures each model's own archive start
+with a one-month probe before committing to the multi-year backfill, per the skill's "measure one
+chunk first" rule.
 
-Run it with `uv run python studies/weather_downloads/fetch_open_meteo_previous_runs.py --model ukv`,
-or with no `--model` to fetch every registered model in turn.
+Run it with `uv run python studies/weather_downloads/fetch_open_meteo_previous_runs.py --model
+ukv`, or with no `--model` to fetch every registered model in turn.
 """
 
 import argparse
@@ -295,9 +297,9 @@ def _get_json(*, url: str) -> Any:
     """Fetch one URL, retrying a transport failure but never an API refusal.
 
     Copied from `studies/past_weather/fetch_open_meteo_point.py`'s `_get_json`: see that
-    function's docstring for why a rate-limit refusal must not be retried, and why the refusal body
-    is read only for its `reason` and never echoed whole (it can quote a request parameter back,
-    and the coordinates in this request are meter locations).
+    function's docstring for why a rate-limit refusal must not be retried, and why the refusal
+    body is read only for its `reason` and never echoed whole (it can quote a request parameter
+    back, and the coordinates in this request are meter locations).
     """
     for attempt in range(MAX_ATTEMPTS):
         try:
@@ -398,8 +400,8 @@ class NoCoverageError(RuntimeError):
     Raised only for that specific condition, distinct from the plain `RuntimeError` `_get_json`
     raises for a transport failure, a quota refusal, or a malformed response —
     `_first_year_with_data` catches only this subclass, so a quota refusal on the cheap one-month
-    probe propagates as a real failure instead of being treated as "no data yet" and triggering the
-    heavier whole-year probe.
+    probe propagates as a real failure instead of being treated as "no data yet" and triggering
+    the heavier whole-year probe.
     """
 
 
@@ -704,9 +706,10 @@ def _write_docs_for_model(
 ) -> None:
     """Write `lineage.json` and `README.md` for one already-fetched model, from measured data only.
 
-    Every number quoted in the README comes from `frame` itself — the lead-differencing fractions,
-    the timestamp-convention correlations, and the native-step fractions are all computed here,
-    never hand-typed, so a later re-run cannot leave the docs describing a stale fetch.
+    Every number quoted in the README comes from `frame` itself — the lead-differencing
+    fractions, the timestamp-convention correlations, and the native-step fractions are all
+    computed here, never hand-typed, so a later re-run cannot leave the docs describing a stale
+    fetch.
     """
     lead_diff = _check_lead_differs(frame=frame)
     timestamp = _check_timestamp_convention(frame=frame, sites=sites)
