@@ -580,6 +580,10 @@ def per_study_relative(*, folder: Path) -> Path:
     return folder.relative_to(PER_STUDY_DIR)
 
 
+# One folder per batch of the NWP forecast comparison, each holding that batch's inputs and
+# fits. The `NFC_` prefix abbreviates `nwp_forecast_comparison`, and a batch's name is the folder's
+# name without that prefix. Some batches have no reader of their own: `NFC_BATCH_DIRS` lists them
+# all, for the data moves that rename every batch folder.
 NFC_AIFS_DIR: Final[Path] = nfc_batch_dir_for(batch="aifs")
 NFC_AIFS_BLENDS_DIR: Final[Path] = nfc_batch_dir_for(batch="aifs_blends")
 NFC_AIFS_EXTRA_DAYS_DIR: Final[Path] = nfc_batch_dir_for(batch="aifs_extra_days")
@@ -602,11 +606,6 @@ NFC_VS_ENS_DOTS_BLENDS_FINAL_DIR: Final[Path] = nfc_batch_dir_for(batch="vs_ens_
 NFC_VS_ENS_DOTS_FINAL_DIR: Final[Path] = nfc_batch_dir_for(batch="vs_ens_dots_final")
 NFC_WN3_DIR: Final[Path] = nfc_batch_dir_for(batch="wn3")
 NFC_WN3_EXTRA_DAYS_DIR: Final[Path] = nfc_batch_dir_for(batch="wn3_extra_days")
-"""One folder per batch of the NWP forecast comparison, each holding that batch's inputs and fits.
-
-The `NFC_` prefix abbreviates `nwp_forecast_comparison`. A batch's name is the folder's name without
-that prefix.
-"""
 
 NFC_BATCH_DIRS: Final[tuple[Path, ...]] = (
     NFC_AIFS_DIR,

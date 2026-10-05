@@ -1,8 +1,10 @@
-"""Pin where every study folder lives, and that no script spells a folder's name itself.
+"""Pin where every study folder lives, and that scripts do not join a folder's name themselves.
 
 Every folder under `data/studies/` is named once, in `studies.sources`, so that moving a folder
 changes one constant. These tests hold the constants to the paths the scripts used before they
-existed, and fail on any script that joins a folder name onto a path by hand.
+existed, and fail on any script that joins one of those folder names onto a path with `/` and a
+string literal. The scan does not see an f-string, `joinpath`, `os.path.join`, `Path(a, b)`, or a
+name held in a variable.
 """
 
 import ast
@@ -205,7 +207,7 @@ def _joined_folder_names(*, path: Path) -> list[tuple[int, str]]:
     return found
 
 
-def test_no_script_joins_a_data_folder_name_onto_a_path_by_hand():
+def test_no_script_joins_a_data_folder_name_onto_a_path_with_a_slash_and_a_literal():
     offenders = [
         f"{path.relative_to(REPO_ROOT)}:{line}: / {name!r}"
         for root in SCANNED_FOLDERS
