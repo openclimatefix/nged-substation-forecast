@@ -62,27 +62,27 @@ def test_request_body_lists_only_the_chunks_months() -> None:
 
 
 def test_box_cells_enclose_an_edge_that_is_off_the_grid() -> None:
-    cells = box_cells(lat_min=52.9, lat_max=53.1, lon_min=-0.1, lon_max=0.1)
-    assert {lat for lat, _ in cells} == {211, 212, 213}
-    assert {lon for _, lon in cells} == {-1, 0, 1}
+    cells = box_cells(lat_min=9.9, lat_max=10.1, lon_min=19.9, lon_max=20.1)
+    assert {lat for lat, _ in cells} == {39, 40, 41}
+    assert {lon for _, lon in cells} == {79, 80, 81}
 
 
 def test_box_cells_add_no_row_for_an_edge_on_a_grid_line() -> None:
-    cells = box_cells(lat_min=53.0, lat_max=53.25, lon_min=0.0, lon_max=0.25)
-    assert sorted(cells) == [(212, 0), (212, 1), (213, 0), (213, 1)]
+    cells = box_cells(lat_min=10.0, lat_max=10.25, lon_min=20.0, lon_max=20.25)
+    assert sorted(cells) == [(40, 80), (40, 81), (41, 80), (41, 81)]
 
 
 def test_block_cells_offsets_match_the_cells() -> None:
-    block = block_cells(centre=(200, -4))
+    block = block_cells(centre=(40, 80))
     assert len(block) == 9
-    assert all(cell == (200 + dy, -4 + dx) for dy, dx, cell in block)
+    assert all(cell == (40 + dy, 80 + dx) for dy, dx, cell in block)
     assert {dy for dy, _, _ in block} == {-1, 0, 1}
 
 
 def test_quarter_degree_index_rounds_to_the_nearest_grid_line() -> None:
-    assert quarter_degree_index(degrees=53.1) == 212
-    assert quarter_degree_index(degrees=53.2) == 213
-    assert quarter_degree_index(degrees=-0.1) == 0
+    assert quarter_degree_index(degrees=10.1) == 40
+    assert quarter_degree_index(degrees=10.2) == 41
+    assert quarter_degree_index(degrees=19.9) == 80
 
 
 def test_cluster_cells_joins_a_chain_and_splits_a_distant_cell() -> None:
@@ -159,20 +159,126 @@ def test_overlap_check_fails_on_a_one_bit_difference() -> None:
     assert not validator._check_overlap(overlap=bumped, old=old)[0]
 
 
-def test_orientation_check_fails_when_an_offset_disagrees_with_its_cell() -> None:
+def test_cell_plan_offsets_check_fails_when_an_offset_disagrees_with_its_cell() -> None:
     good = pl.DataFrame(
         {
             "kind": ["wind", "wind"],
             "label": ["W1", "W1"],
             "dy": [0, 1],
             "dx": [0, 0],
-            "lat_q": [200, 201],
+            "lat_q": [40, 41],
             "lon_q": [0, 0],
         }
     )
-    flipped = good.with_columns(lat_q=pl.Series([200, 199]))
-    assert validator._check_orientation(groups=good)[0]
-    assert not validator._check_orientation(groups=flipped)[0]
+    flipped = good.with_columns(lat_q=pl.Series([40, 39]))
+    assert validator._check_cell_plan_offsets(groups=good)[0]
+    assert not validator._check_cell_plan_offsets(groups=flipped)[0]
+
+
+def _old_file(*, path: Path, labels: tuple[str, ...]) -> pl.DataFrame:
+    """Write a one-month old-style wind file whose series all hold the same values per hour."""
+    hours = pl.datetime_range(
+        datetime(2024, 1, 1), datetime(2024, 1, 31, 23), interval="1h", eager=True
+    )
+    rng = np.random.default_rng(2)
+    values = {
+        n: rng.normal(3.0, 1.0, hours.len()).astype(np.float32) for n in validator.VALUE_COLUMNS
+    }
+    frames = [
+        pl.DataFrame({"site": [label] * hours.len(), "dy": 0, "dx": 0, "time": hours}).with_columns(
+            pl.Series(n, v) for n, v in values.items()
+        )
+        for label in labels
+    ]
+    old = pl.concat(frames)
+    old.write_parquet(path)
+    return old
+
+
+def _groups_sharing_a_cell() -> pl.DataFrame:
+    """Two wind-farm labels whose centre cells are the same cell."""
+    return pl.DataFrame(
+        {
+            "kind": ["wind", "wind"],
+            "label": ["W1", "W2"],
+            "dy": [0, 0],
+            "dx": [0, 0],
+            "cell_id": [7, 7],
+        },
+        schema_overrides={"cell_id": pl.Int32},
+    )
+
+
+def test_old_series_collapses_blocks_that_share_a_cell(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
+    monkeypatch.setattr(validator, "OLD_WIND_PATH", tmp_path / "old.parquet")
+    raw = _old_file(path=tmp_path / "old.parquet", labels=("W1", "W2"))
+    old = validator._old_series(groups=_groups_sharing_a_cell())
+    assert old.height == raw.height // 2
+    assert old.select("cell_id", "time").is_duplicated().sum() == 0
+    # An exact re-fetch holds each cell once, and must pass the bit-equality check.
+    assert validator._check_overlap(overlap=old, old=old)[0]
+
+
+def test_old_series_raises_when_blocks_sharing_a_cell_disagree(
+    tmp_path: Path,
+    monkeypatch,  # noqa: ANN001
+) -> None:
+    monkeypatch.setattr(validator, "OLD_WIND_PATH", tmp_path / "old.parquet")
+    raw = _old_file(path=tmp_path / "old.parquet", labels=("W1", "W2"))
+    raw.with_columns(
+        pl.when(pl.col("site") == "W2")
+        .then(pl.col("u10") + 1)
+        .otherwise(pl.col("u10"))
+        .alias("u10")
+    ).write_parquet(tmp_path / "old.parquet")
+    with pytest.raises(ValueError, match="different values"):
+        validator._old_series(groups=_groups_sharing_a_cell())
+
+
+def test_overlap_check_fails_on_a_duplicated_old_key() -> None:
+    """Without de-duplication the old frame has twice the rows of a perfect re-fetch."""
+    january = _frame(cell_ids=(7,)).filter(pl.col("time") < datetime(2020, 1, 1, tzinfo=UTC))
+    doubled = pl.concat([january, january])
+    assert not validator._check_overlap(overlap=january, old=doubled)[0]
+
+
+def _station_inputs(
+    *, lag: int, shuffle_cells: bool
+) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+    frame = _frame(cell_ids=(0, 1, 2))
+    groups = pl.DataFrame(
+        {
+            "kind": ["station"] * 3,
+            "label": ["S0", "S1", "S2"],
+            "dy": [0, 0, 0],
+            "dx": [0, 0, 0],
+            "cell_id": pl.Series([0, 1, 2], dtype=pl.Int32),
+        }
+    )
+    truth = frame.select(
+        "cell_id", "time", validator._speed(frame=frame, height="10").alias("wind_speed_m_s")
+    )
+    mapping = {0: "S1", 1: "S2", 2: "S0"} if shuffle_cells else {0: "S0", 1: "S1", 2: "S2"}
+    observations = truth.with_columns(
+        pl.col("cell_id").replace_strict(mapping, return_dtype=pl.String).alias("src_id"),
+        pl.col("time") - pl.duration(hours=lag),
+    ).select("src_id", "time", "wind_speed_m_s")
+    return frame, groups, observations
+
+
+def test_station_correlation_passes_on_matching_series_and_fails_on_a_shift_or_a_swap() -> None:
+    frame, groups, observations = _station_inputs(lag=0, shuffle_cells=False)
+    assert validator._check_station_correlation(
+        frame=frame, groups=groups, observations=observations
+    )[0]
+    frame, groups, shifted = _station_inputs(lag=1, shuffle_cells=False)
+    assert not validator._check_station_correlation(
+        frame=frame, groups=groups, observations=shifted
+    )[0]
+    frame, groups, swapped = _station_inputs(lag=0, shuffle_cells=True)
+    assert not validator._check_station_correlation(
+        frame=frame, groups=groups, observations=swapped
+    )[0]
 
 
 # --------------------------------------------------------------------------------------------------
@@ -199,8 +305,8 @@ def _write_zip(*, path: Path, chunk: Chunk) -> xr.Dataset:
         },
         coords={
             "valid_time": times,
-            "latitude": [53.5, 53.25, 53.0],
-            "longitude": [-0.5, -0.25, 0.0, 0.25],
+            "latitude": [10.5, 10.25, 10.0],
+            "longitude": [19.5, 19.75, 20.0, 20.25],
         },
     )
     netcdf = path.parent / "a.nc"
@@ -219,14 +325,14 @@ def test_read_zip_keeps_the_right_cell_and_value(tmp_path: Path, monkeypatch) ->
     chunk = Chunk(year=2020, first_month=2, last_month=2)
     ds = _write_zip(path=tmp_path / "x.zip", chunk=chunk)
     cells = pl.DataFrame(
-        {"cell_id": [0, 1], "lat_q": [214, 212], "lon_q": [-1, 1]},
+        {"cell_id": [0, 1], "lat_q": [42, 40], "lon_q": [79, 81]},
         schema={"cell_id": pl.Int32, "lat_q": pl.Int16, "lon_q": pl.Int16},
     )
     kept = fetch._read_zip(zip_path=tmp_path / "x.zip", cells=cells, chunk=chunk)
     assert kept.height == 2 * chunk.n_hours
     first = kept.filter(pl.col("cell_id") == 0).row(0, named=True)
     assert first["time"] == datetime(2020, 2, 1, tzinfo=UTC)
-    # Cell 0 is latitude 53.5 (first row), longitude -0.25 (second column).
+    # Cell 0 is latitude 10.5 (first row), longitude 19.75 (second column).
     assert first["u10"] == ds["u10"].isel(valid_time=0, latitude=0, longitude=1).item()
 
 
