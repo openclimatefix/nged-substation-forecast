@@ -70,8 +70,9 @@ reads a table that is stale rather than silently uncleaned.
 about 11 bytes per row. At V2 (about 2,500 series), 4 years is about 175M rows, 1 to 2 GB on disk;
 the cleaned copy roughly doubles that.
 
-**What it costs** is a full rewrite of the cleaned table on every run — trivial at V1, where
-rewriting the 36 MB table took 0.08 s, and a few GB per run at V2, to be re-measured before V2 —
+**What it costs** is a full rewrite of the cleaned table whenever NGED delivers new data, about
+four times a day — trivial at V1, where rewriting the 36 MB table took 0.08 s, and a few GB per
+rewrite at V2, to be re-measured before V2 —
 and one more hop between NGED's data and `live_forecasts`. Appending only new rows instead of
 rewriting is deferred to its own issue under the v0.9 epic, because appending needs a key
 comparison, a context window, a re-cleaned recent tail, and a version-triggered rebuild.
@@ -99,6 +100,11 @@ comparison, a context window, a re-cleaned recent tail, and a version-triggered 
   else. The docstring states the contract a rule must keep: return every input
   row exactly once, never change `time_series_id` or `time`, flag rather than delete, and when two
   rules match one row, record the first in the function's order.
+- `CLEANING_CODE_HASH: Final[str]` — the SHA-256 of this module's own source file, computed at
+  import. The skip compares it, so any edit to a cleaning rule forces a rebuild on the next run,
+  whether or not the edit is committed, and whether the code runs from a git checkout or from the
+  container. The docstring says the rules must live in this module, or the hash must cover every
+  file they live in.
 - No `first_times` argument. Because `power` is the whole table, a rule computes each series' first
   reading itself (`pl.col("time").min().over("time_series_id")`). The append design will see only a
   window, so it will need the first readings passed in; that issue adds the argument.
@@ -117,21 +123,32 @@ comparison, a context window, a re-cleaned recent tail, and a version-triggered 
 ### `packages/delta_store/src/delta_store/cleaned_power_time_series.py` (new)
 
 - `write_cleaned_power_time_series(df: pt.DataFrame[CleanedPowerTimeSeries], table_uri, *,
-  raw_version: int, code_sha: str, storage_options, retention_hours: int = 2)` —
+  provenance: CleaningProvenance, storage_options, retention_hours: int = 2)` —
   `write_deltalake(mode="overwrite", partition_by=["time_series_id"])`, one atomic Delta commit
   (principle 10), then `vacuum(retention_hours=retention_hours, dry_run=False,
   enforce_retention_duration=False)`. Both flags matter: `dry_run` defaults to `True`, which lists
   files and deletes none, and delta-rs refuses a retention under 168 hours without
-  `enforce_retention_duration=False`. Without the vacuum every hourly overwrite leaves the previous
-  copy on disk forever. The retention bounds how long the longest reader scan may take: a scan
-  resolves its file list when it starts, and only files tombstoned more than 2 hours ago are
-  deleted, so at steady state about three copies sit on disk (about 110 MB at V1).
-- The write commit's `custom_metadata` records `raw_version`, the raw table's Delta version the
-  cleaning run read, and `code_sha`, the git SHA of the code that did the cleaning. `raw_version`
-  serves provenance, the keeping-up check, and the skip below; `code_sha` serves the skip. The
-  vacuum adds two commits of its own (`VACUUM START` and `VACUUM END`) after the write, so a reader
-  of `raw_version` walks `DeltaTable.history()` back to the newest `WRITE` commit rather than taking
-  the latest commit.
+  `enforce_retention_duration=False`. Without the vacuum every overwrite leaves the previous copy on
+  disk forever. The retention bounds how long the longest reader scan may take: a scan resolves its
+  file list when it starts, and only files tombstoned more than 2 hours ago are deleted. Rewrites
+  are about 6 hours apart, so at steady state about two copies sit on disk (about 70 MB at V1). The
+  list `vacuum` returns repeats already-deleted paths on later calls, so its length is never
+  reported as a count of files deleted.
+- The write commit's `custom_metadata` records a `CleaningProvenance` (a small frozen dataclass in
+  `nged_data.cleaning`, with a reader beside it):
+    - `raw_table_id` and `raw_version` — the raw table's Delta table id and the version the cleaning
+      read. The id guards against a deleted and rebuilt raw table, whose versions restart at 0.
+    - `code_hash` — `CLEANING_CODE_HASH` (below), which the skip compares.
+    - `git_sha` — the git SHA of the code that did the cleaning, for provenance only: from
+      `ml_core.repro.get_git_info`, or, when that returns `UNKNOWN` as it does in the container,
+      from a non-empty `GIT_SHA` environment variable (set by `build_and_verify_image.sh`), else
+      `UNKNOWN`. The fallback lives in the cleaning code, not in `get_git_info`, so the MLflow
+      provenance tags of the other stages do not change.
+- Every vacuum adds two commits (`VACUUM START` and `VACUUM END`) after the write, even when it
+  deletes nothing, so the reader walks `DeltaTable.history(limit=10)` back to the newest `WRITE`
+  commit. A missing table, no `WRITE` commit in that window, or a missing key reads as "no
+  provenance", which always means rebuild. The very first `write_deltalake` is recorded as a
+  `WRITE` (the reviewer checked).
 - `write_deltalake` does not keep row order within a partition (the reviewer found 13 of 33
   partitions out of `time` order after one write), so the table on disk is not sorted. That does
   not matter at V1; at V2 it weakens row-group pruning on `time`.
@@ -150,32 +167,36 @@ The asset gets its own module rather than joining `defs/assets.py`, which holds 
 - `clean_nged_power_data` — `deps=["power_time_series_and_metadata"]`, production-layer tags. A
   minimal wrapper:
     - **Skip when nothing has changed.** NGED publishes new power data about every 6 hours, but
-      the ingest job runs hourly as a cheap retry, and the ingest only commits a new raw version
-      when new rows arrive. At the start of each run the asset reads the raw table's current
-      version and the code's git SHA, and compares them with the `raw_version` and `code_sha` in
-      the cleaned table's newest `WRITE` commit. When both match, and the run's config does not
-      set `force`, it returns at once with `skipped: True` metadata, which costs reading two Delta
-      logs. Otherwise it rebuilds. That gives about four rewrites a day instead of 24.
+      the ingest job runs hourly as a cheap retry. The ingest only commits a new raw version when
+      new rows arrive: on the real V1 table all 50 commits are writes, and the ingest never runs
+      optimize or vacuum. At the start of each run the asset reads the raw table's id and current
+      version and compares them, and `CLEANING_CODE_HASH`, with the provenance in the cleaned
+      table's newest `WRITE` commit. When all three match, and the run's config does not set
+      `force`, it returns at once with `skipped: True` metadata, which costs reading two Delta logs.
+      Otherwise, including when there is no provenance, it rebuilds. That gives about four rewrites
+      a day instead of 24.
     - **The skip is also the retry.** A failed rebuild leaves the old `raw_version` in place, so
       the next hourly run sees a mismatch and rebuilds, every hour until one succeeds. No Dagster
       `RetryPolicy` is needed, and the keeping-up check below warns if the rebuilds keep failing.
-    - **The git SHA catches a change to the cleaning rules**, which leaves the raw version
-      unchanged. The SHA comes from `ml_core.repro.get_git_info`, falling back to the `GIT_SHA`
-      environment variable the production Docker image sets, because the container has no git
-      repository. When the SHA is `UNKNOWN`, or the working tree is dirty, the asset never skips:
-      rebuilding when unsure is always correct, only slower.
+    - **The code hash catches a change to the cleaning rules**, which leaves the raw version
+      unchanged. A hash of the module's source rather than the git SHA, because the git route
+      fails both ways: `get_git_info` counts untracked files as dirty, so the workstation (which
+      always has untracked files) would never skip, and the container has no git repository at
+      all.
     - **`force`**: a `CleanNgedPowerDataConfig(force: bool = False)` run config makes a manual run
-      rebuild regardless, for example on a laptop with uncommitted rule changes (where the dirty
-      check already forces a rebuild) or after a hand-edited roster, which neither the raw version
-      nor the SHA records.
+      rebuild regardless, for example after a hand-edited roster, which the skip test does not
+      cover (see Risks). A schedule with no `run_config` runs it with the default (the reviewer
+      checked).
     - If the raw table does not exist yet, log and return with `n_rows: 0` metadata rather than
       raising, because an absent input degrades (inherent-stability).
-    - Scan the raw table, read the whole roster (with `allow_superfluous_columns=True`, as
+    - Scan the raw table at the version just read (`pl.scan_delta(path, version=raw_version)`), so
+      an ingest that commits mid-run cannot make the recorded version disagree with the rows
+      cleaned. Read the whole roster (with `allow_superfluous_columns=True`, as
       `metrics` does, because the parquet carries extra geo columns), call `flag_nged_power`,
       collect with the streaming engine, sort by `(time_series_id, time)` —
       `PowerTimeSeries.validate` rejects unsorted rows, and Delta file order is not sorted, which
       the reviewer confirmed fails on the real V1 data — then `CleanedPowerTimeSeries.validate`,
-      then write, passing the raw table's version read at the start of the run.
+      then write with the `CleaningProvenance`.
     - Metadata: `n_rows`, `n_rows_kept`, `n_time_series`, and per drop reason
       `drop_reason/<reason>/n_rows`, `.../n_time_series`, `.../min_power`, and `.../max_power`,
       computed from the collected frame with one `group_by("drop_reason")`.
@@ -194,7 +215,8 @@ The asset gets its own module rather than joining `defs/assets.py`, which holds 
 - `cleaned_power_keeps_up_with_raw` — a `WARN`, `blocking=False` asset check on
   `power_time_series_and_metadata`, beside `power_data_is_fresh`. It compares the raw table's
   current Delta version with the `raw_version` recorded in the cleaned table's newest `WRITE`
-  commit, and warns when the cleaned table is 3 or more raw commits behind, when the cleaned table
+  commit, and warns when the cleaned table is 2 or more raw commits behind (about 6 to 12 hours of
+  NGED deliveries), when the raw table id differs, when the cleaned table
   is absent, or when the key is missing. Counting raw commits rather than hours of reading time
   counts missed runs, which is the unit inherent-stability asks for. A lag of 0 or 1 commits is
   healthy: the check runs in parallel with `clean_nged_power_data` in the same job, so it may see
@@ -209,10 +231,11 @@ The asset gets its own module rather than joining `defs/assets.py`, which holds 
 ### `src/nged_substation_forecast/defs/schedules.py`
 
 - Add `"clean_nged_power_data"` to `power_time_series_and_metadata_job`'s selection, so the asset
-  runs hourly, straight after ingest and five minutes before each 6-hourly `live_forecasts` slot.
-  That is well over the four runs a day the maintainer requires. The job's `description` string
-  and the comment above the job, which both say the job only ingests, are updated to name the
-  cleaning step too. #1020 also edits this file (the
+  runs hourly, straight after ingest and five minutes before each 6-hourly `live_forecasts` slot,
+  and rebuilds whenever NGED has delivered, which meets the maintainer's four-times-a-day
+  requirement. Five passages describe the job as ingest only and are updated to name the cleaning
+  step: the comment above the job, the job's `description`, the schedule's `description`, the
+  schedule's docstring, and the `live_forecasts_schedule` docstring. #1020 also edits this file (the
   `ecmwf_ens` schedule), but the maintainer will merge this PR before work on #1020 starts, and a
   comment on #1020 says so.
 
@@ -230,18 +253,22 @@ The asset gets its own module rather than joining `defs/assets.py`, which holds 
   population.
 - The two dashboard notebooks (`packages/dashboard/view_forecasts.py:332` and
   `map_and_timeseries.py:122`) read `scan_cleaned_power`, following the `marimo-notebooks` skill.
+  `packages/dashboard/pyproject.toml` gains the `nged_data` dependency, which it lacks today, and
+  `uv.lock` is regenerated.
 - The `deps` of `eligible_time_series`, `effective_capacity`, `trained_cv_model`, `metrics`, and
   `live_forecasts` change from `power_time_series_and_metadata` to `clean_nged_power_data`.
 - Provenance: `trained_cv_model`, `cv_power_forecasts`, and `metrics` stamp the
   `power_time_series` Delta version in MLflow so a run can be replayed with
   `scan_delta(version=N)`. The cleaned table's own versions are vacuumed after 2 hours, so they are
-  not replayable. The three assets instead stamp a new key, `cleaned_power_time_series_source`: the
-  `raw_version` from the cleaned table's newest `WRITE` commit, read at the start of the asset, or
-  `ABSENT` when the table or the key is missing. Replaying means re-running the cleaning over that
-  raw version at the run's git SHA. `ml_core/repro.py` gains the `TableNameType` value and a small
-  lookup function beside `get_delta_versions`, which only reads `DeltaTable.version()`. The stamp
-  is approximate in one way: `cv_power_forecasts` re-scans power for every `init_time` chunk, so one
-  long run can span several hourly cleaned tables.
+  not replayable. The three assets instead stamp the cleaned table's `CleaningProvenance`, read at
+  the start of the asset: `raw_version` and the cleaning's own `git_sha` under a new key,
+  `cleaned_power_time_series_source`, or `ABSENT` when there is no provenance. Replaying means
+  re-running the cleaning over that raw version at the cleaning's git SHA, which can differ from
+  the training run's own SHA, because the skip means the stored table may have been built by older
+  code. `ml_core/repro.py` gains the `TableNameType` value and its docstring says so; the lookup
+  itself is `nged_data.cleaning`'s provenance reader. The stamp is approximate in one way:
+  `cv_power_forecasts` re-scans power for every `init_time` chunk, so one long run can span several
+  cleaned tables.
 - `tests/test_asset_layer_tags.py` pins the production-layer assets; `clean_nged_power_data` is
   added there, and that test requires `docs/architecture/overview.md` to change with it.
 - Still reading raw power: the ingest itself and its `power_data_is_fresh` check, which measure
@@ -299,19 +326,27 @@ Nothing in this issue builds that table; the mapping is a decision for the issue
     - an absent raw table yields `n_rows: 0` and no exception;
     - every assertion reads the written table back through `pl.scan_delta`.
     - a vacuum that raises still leaves the run successful, with `vacuum_failed: True`;
-    - a second run with the same raw version and SHA is skipped (`skipped: True`, and the cleaned
-      table's version does not change);
+    - a second run with the same raw version and code hash is skipped (`skipped: True`, and the
+      cleaned table's version does not change);
     - a run after a new raw commit rebuilds;
-    - a run under a different SHA (with `get_git_info` monkeypatched) rebuilds, and an `UNKNOWN`
-      or dirty SHA always rebuilds;
+    - a run under a different code hash rebuilds (monkeypatching `CLEANING_CODE_HASH` on
+      `nged_substation_forecast.defs.cleaning_assets` if that module imports it by name, or on
+      `nged_data.cleaning` if the asset reads it through the module);
+    - a cleaned table whose newest `WRITE` commit carries no provenance rebuilds;
     - `force=True` rebuilds when nothing changed;
-    - after a rebuild that raises (with `flag_nged_power` monkeypatched to raise), the next run
-      with the same raw version rebuilds rather than skipping.
+    - after a rebuild that raises (with `flag_nged_power` monkeypatched to raise, on the module the
+      asset looks it up from), the next run with the same raw version rebuilds rather than
+      skipping;
+    - the recorded `git_sha` falls back to a set `GIT_SHA` environment variable when
+      `get_git_info` returns `UNKNOWN`, and is `UNKNOWN` when the variable is empty or unset
+      (`monkeypatch.setenv` and `delenv`).
 - `tests/test_checks.py`: `cleaned_power_keeps_up_with_raw` passes at a lag of 0 and 1 raw commits,
-  warns at 3, warns when the cleaned table or its `raw_version` key is absent, and degrades rather
+  warns at 2 (which pins the threshold), warns when the raw table id differs, warns when the
+  cleaned table or its provenance is absent, and degrades rather
   than raising when a table is unreadable.
-- `ml_core` tests: the new provenance lookup returns the newest `WRITE` commit's `raw_version`, and
-  `ABSENT` for a missing table or key.
+- `packages/nged_data/tests/test_cleaning.py` also covers the provenance reader: it returns the
+  newest `WRITE` commit's provenance after a vacuum's two commits, and "no provenance" for a missing
+  table or key.
 - Readers: one test per read path proves flagged rows are excluded — `effective_capacity`,
   `eligible_time_series` (flagging series 1, the only series eligible for the fixture's `FOLD_ID`),
   `metrics` (a flagged actual is not scored), and `live_forecasts` (a spy on
@@ -350,7 +385,9 @@ V1 data to check the run time and the on-disk size after vacuum.
 
 ## Risks and open questions
 
-1. **V2 rewrite cost.** A few GB per rebuild, about four rebuilds a day once the skip is in.
+1. **V2 rewrite cost.** A few GB per rebuild, about four rebuilds a day once the skip is in. A
+   rebuild falls in the 5 minutes before a `live_forecasts` slot; at V2 one that has not finished
+   leaves the slot reading the previous cleaned table, which is safe but up to 6 hours staler.
    Recommendation: measure before V2; the append issue is the answer if the rewrite is too slow.
 2. **The roster is not part of the skip test.** A roster change with no new power data leaves the
    cleaned table as it was until the next NGED delivery, at most about 6 hours later. No rule reads
@@ -416,6 +453,29 @@ Accepted, all ten findings:
 ### Skip when unchanged (maintainer request)
 
 NGED publishes new power data about every 6 hours, and the ingest runs hourly only as a cheap retry.
-The asset therefore skips the rewrite when the raw version and the code's git SHA both match the
-cleaned table's newest write commit, which keeps the hourly retry and cuts the rewrites to about
+The asset therefore skips the rewrite when the raw version and the cleaning code both match the
+cleaned table's newest write commit (first by git SHA, then, after the review below, by a hash of
+the cleaning module's source), which keeps the hourly retry and cuts the rewrites to about
 four a day. A `force` run config covers manual runs.
+
+### Review of the skip logic (fresh Opus sub-agent, with experiments)
+
+Accepted:
+
+- The skip compares a hash of the cleaning module's source, not the git SHA: `get_git_info` counts
+  untracked files as dirty, so the workstation would never skip and tests would fail on any
+  worktree with edits, and the container has no git repository. The git SHA stays, for provenance
+  only, with an explicit `GIT_SHA` fallback that treats an empty value as `UNKNOWN`.
+- Provenance stamps the cleaning's own git SHA, because the skip means a training run can read a
+  table built by older code.
+- The raw table's id is recorded beside its version; the scan is pinned to the version recorded;
+  a missing provenance means rebuild; `history(limit=10)`; the `vacuum` return list is never
+  reported as a deletion count.
+- The keeping-up check warns at 2 raw commits behind rather than 3.
+- The dashboards need `nged_data` as a dependency.
+- Stale text about hourly rewrites and the copies on disk, and three more `schedules.py` passages
+  that describe the job as ingest only.
+- Named monkeypatch targets and three more skip tests.
+
+Confirmed by the reviewer: the raw table commits only when new rows arrive; the first write is a
+`WRITE` commit; `force` with a default runs from a schedule with no `run_config`.
