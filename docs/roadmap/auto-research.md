@@ -204,8 +204,10 @@ experiment around the method it was asked to test. The protected paths are:
 - `metrics.py` under `packages/ml_core/src/ml_core/`, which computes the scores;
 - `cv_helpers.py` under the same directory, which turns fold dates into training and validation
   windows and decides which series are eligible;
-- `features/_lags.py` under the same directory, which nulls any power lag the forecast could not
-  have known at its initialisation time.
+- `features/_lags.py` under the same directory, which builds the lag features and holds the
+  function that nulls any power lag the forecast could not have known at its initialisation time.
+  The call to that function sits in feature code the worker may edit, so only the leakage test below
+  catches the call's removal.
 
 The diff check catches an edit to a protected path however the worker made the edit, including
 through a shell command.
