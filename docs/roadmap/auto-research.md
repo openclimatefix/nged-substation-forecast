@@ -212,6 +212,38 @@ separation addresses that risk.
 
 ## Proposed design
 
+### From idea to score, step by step
+
+**One idea passes through ten steps on its way from the research lead's choice to a score on the
+leaderboard.** The sections below describe each step in detail.
+
+1. The research lead, an LLM session that decides what to try next, chooses an idea and the existing
+   implementation to build on, and writes the idea down.
+2. The research lead launches a worker, a separate Claude Code session, in the worker's own git
+   worktree. The worker implements the idea on a branch of a private research repository, and may
+   train and score freely on the training window while doing so.
+3. The worker pushes the implementation, and the research lead submits the implementation's commit
+   to the trusted submit command. The submit command is a small Python command in this repository,
+   and runs as the maintainer's Unix user.
+4. The submit command rejects the implementation if the diff touches any of the protected paths,
+   which hold the evaluation code.
+5. The submit command launches a fresh reviewer agent, which reads the written idea and the diff.
+   The reviewer's findings go back to the worker for a capped number of rounds. An implementation
+   the reviewer still rejects is recorded as failed review and never trained.
+6. The submit command builds the scored checkout: the implementation's commit, with every protected
+   path restored from the commit the session started from, in a directory the worker cannot write.
+7. The submit command trains the implementation on data truncated at the fold's training end, and
+   runs inference over the validation window. The implementation's code runs as the restricted
+   research user, never as the maintainer.
+8. The submit command runs the leakage test. The test re-runs the implementation on data perturbed
+   after sampled cut-off times, and rejects the implementation if any forecast initialised at or
+   before a cut-off changes.
+9. The scorer, run from `main` as the maintainer, scores the forecasts and refuses a forecast that
+   leaves out any series. The submit command logs the score to MLflow with the implementation's
+   commit hash.
+10. The submit command records the score and the review verdict in the hypothesis store. The
+    research lead reads the result and returns to step 1.
+
 ### Two modes of work
 
 **The design has two modes: a search over small ideas, and one long agent session per large idea.**
@@ -416,9 +448,11 @@ same fields in every file:
 - the idea's status: worth deepening, or abandoned;
 - the reason for abandoning the idea, where the idea was abandoned.
 
-Within a session, the research lead updates the store on the session's branch in the research
-repository. At the end of the session, the submit command opens one pull request carrying the
-updated store into this repository, and the maintainer merges the pull request. A new session starts
+Within a session, the submit command writes each implementation's commit, MLflow run, score, and
+review verdict into the store, and the research lead writes the hypothesis, the status, and the
+reason for abandoning an idea. Both write to the session's branch in the research repository. At the
+end of the session, the submit command opens one pull request carrying the updated store into this
+repository, and the maintainer merges the pull request. A new session starts
 only after the previous session's pull request has merged, so every session reads every earlier
 finding. No worker, reviewer, or research-lead agent holds write access to `main`. The store carries
 aggregate scores only, because a per-series score could identify a metered generator. A person
@@ -428,6 +462,44 @@ curates the findings worth publishing into `docs/`, the way studies are written 
 The person writing the pull request adds the research repository as a git remote, reads the winning
 node's diff against the commit the session started from, writes the idea up as a specification, and
 re-implements the idea in a reviewed pull request, as #958 requires of every autonomous study.
+
+### What stops the research lead cheating
+
+**The research lead never handles a score, the evaluation code, or `main`, so every route to a
+better-looking result runs into one of the submit command's checks.** The research lead runs as the
+same restricted research user as the workers, and holds a token for the research repository only.
+Each route meets one check:
+
+- **Reporting a score the implementation did not earn.** No agent computes or reports a score: the
+  submit command trains the implementation, the scorer computes the score, and MLflow records the
+  score. When the submit command opens the session's hypothesis-store pull request, the submit
+  command rewrites every score and review verdict in the store from MLflow, so an edit to those
+  fields on the session's branch never reaches `main`.
+- **Skipping or steering the review.** The submit command, not the research lead, launches the
+  reviewer, and the reviewer's instructions live in this repository. The research lead supplies
+  only the written idea.
+- **Editing the evaluation code, the submit command, or the scorer.** The submit command and the
+  scorer run from this repository as the maintainer's user. The scored checkout restores every
+  protected path, and the submit command rejects a diff that touches a protected path.
+- **Training on the validation window, or looking ahead in time.** The submit command truncates the
+  training data at the fold's training end. The leakage test rejects an implementation whose
+  forecasts change when data from after the forecast's initialisation time is perturbed.
+- **Dropping the hard series.** The scorer's row-set refusal rejects a forecast that leaves out any
+  series.
+- **Hiding failed attempts.** The submit command records every submission, including rejected
+  submissions, in MLflow and in the hypothesis store, so the record of what was tried does not
+  depend on the research lead.
+- **Promoting a winner straight into production.** No agent can write to `main`, and a winning idea
+  reaches production only as a reviewed re-implementation.
+
+**Three risks remain, and none of the three is cheating in the sense the checks above catch.** A
+search that tries hundreds of ideas on one fold will overfit that fold however honestly the search
+runs. The defence is the separate certifying evaluation in [Ranking and
+steering](#ranking-and-steering). If issue #958 accepts that a research session sees power observed
+inside the validation window, the research lead could steer workers towards ideas that suit what the
+research lead has seen, which the certifying window and live monitoring are meant to catch. And the
+LLM may know what happened during the evaluation period from its own training data, which the [open
+questions](#open-questions) below raise.
 
 ## Open questions
 
