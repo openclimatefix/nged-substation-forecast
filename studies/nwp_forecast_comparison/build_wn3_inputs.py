@@ -6,7 +6,7 @@ One-off throwaway script for the WN3 arms of
 `--read-store` opens the WN3 Icechunk repository (`--bucket`, branch `main`) read-only and copies
 the 00 UTC runs' six variables that the arms use (2 m temperature, total solar radiation, and the
 eastward and northward wind at 10 m and 100 m) over a box around the private generator roster to
-`--weather-dir/WeatherNext3_trial_area/`: `trial_area.zarr` and `_grid_cells.parquet`. The box is
+`--weather-dir/WeatherNext3/`: `trial_area.zarr` and `_grid_cells.parquet`. The box is
 the roster's extent plus `PAD_DEGREES` on every side, so every site's H3 resolution-5 hexagon lies
 inside it. It is computed at run time, is never printed, and is never written into a committed
 file. A missing chunk reads as `NaN`, so the read fails if any copied variable is all `NaN`, and it
@@ -232,7 +232,7 @@ def read_trial_area(*, bucket: str, weather_dir: Path) -> None:
 
     Args:
         bucket: The Cloud Storage bucket holding the Icechunk repository.
-        weather_dir: The folder whose `WeatherNext3_trial_area` subfolder receives the copy.
+        weather_dir: The folder whose `WeatherNext3` subfolder receives the copy.
 
     Raises:
         FileExistsError: If the copy already exists.
@@ -793,7 +793,7 @@ def main() -> int:
         "--weather-dir",
         type=Path,
         default=WEATHERNEXT3_PRODUCT_DIR.parent,
-        help="The folder holding (or receiving) the WeatherNext3_trial_area copy.",
+        help="The folder holding (or receiving) the WeatherNext3 copy.",
     )
     parser.add_argument(
         "--published-dir",

@@ -31,8 +31,8 @@ validated. A check that finds no qualifying rows in a month is skipped for that 
 prints SKIP if that held for every month, and `PASS (n months skipped)` otherwise.
 
 Run it with `uv run python studies/weather_downloads/validate_dynamical_zarr.py --directory
-<directory under data/studies/weather>`, for example `--directory GEFS` or `--directory
-ECMWF-AIFS-ENS`. A level shift at a model-version change is not tested.
+<product or window name under data/studies/downloads/NWP>`, for example `--directory GEFS` or
+`--directory ECMWF-AIFS-ENS`. A level shift at a model-version change is not tested.
 """
 
 import argparse

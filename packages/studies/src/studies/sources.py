@@ -353,25 +353,37 @@ STUDIES_DATA_DIR: Final[Path] = REPO_DATA_DIR / "studies"
 
 Under `data/studies/` rather than beside the pipeline's own tables, so that a weather product a
 study alone fetches cannot be mistaken for one the Dagster asset graph ingests. `data/NWP/` holds
-what production ingests; `data/studies/weather/ICON-D2/` holds what a study fetched to answer one
+what production ingests; `data/studies/downloads/NWP/` holds what a study fetched to answer one
 question. `data/NGED/` stays outside it: the pipeline's own power and metadata tables, which a study
 reads and does not own.
 """
 
-DOWNLOADS_DIR: Final[Path] = STUDIES_DATA_DIR
+DOWNLOADS_DIR: Final[Path] = STUDIES_DATA_DIR / "downloads"
 """The layer of `data/studies/` that holds shared downloads, one folder per kind of data.
 
-Equal to `STUDIES_DATA_DIR` until the data moves. No script reads this constant yet.
+Data that several studies use, or plausibly could, is filed here by what it is. A folder is never
+named after the study that first fetched it.
 """
+
+NWP_DOWNLOADS_DIR: Final[Path] = DOWNLOADS_DIR / "NWP"
+"""Forecasts: model runs, Previous Runs archives, and the extracts made from them."""
+
+REANALYSIS_DOWNLOADS_DIR: Final[Path] = DOWNLOADS_DIR / "reanalysis"
+"""Estimates of past weather from a weather model run over the past: ERA5, CERRA, NORA3, and the
+others, with the CAMS satellite retrieval."""
+
+OBSERVATIONS_DOWNLOADS_DIR: Final[Path] = DOWNLOADS_DIR / "observations"
+"""Measurements: weather stations, the SARAH-3 satellite retrieval, and NGED's own exports."""
 
 PER_STUDY_DIR: Final[Path] = STUDIES_DATA_DIR
 """The layer of `data/studies/` that holds one folder per study.
 
-Equal to `STUDIES_DATA_DIR` until the data moves. Every study's folder below is built from this
-constant.
+Equal to `STUDIES_DATA_DIR` until the study folders move. Every study folder below is built from
+this constant, except the CERRA wind studies, whose folders already sit in
+`STUDIES_DATA_DIR / "per_study"`.
 """
 
-SCRATCH_DIR: Final[Path] = REPO_DATA_DIR / "_scratch"
+SCRATCH_DIR: Final[Path] = STUDIES_DATA_DIR / "_scratch"
 """Where a whole-domain download or an archive extraction lands transiently, and is then deleted.
 
 Under `data/`, not `/tmp`: `/tmp` on this machine is tmpfs, and a multi-gigabyte file there
@@ -379,12 +391,10 @@ consumes memory rather than disk. The CERRA fetches and the ERA5 archive reader 
 """
 
 WEATHER_DATA_DIR: Final[Path] = STUDIES_DATA_DIR / "weather"
-"""Where downloaded weather lands, one subdirectory per product (`ERA5`, `CAMS`, `ENS`, `UKV`,
-`ICON-D2`, `ICON-EU`, `ICON-GLOBAL`, `SARAH-3`, `ICON-DREAM-EU`, `ECMWF-IFS-HRES`, `ARPEGE-EUROPE`,
-`DMI-HARMONIE-AROME`, `KNMI-HARMONIE-AROME`).
+"""The folder that held every downloaded weather product, one subdirectory per product.
 
-Kept apart from any one study's outputs because a download is an input a later study can reuse, and
-some take most of a night to fetch again.
+Only the UKV-on-CEDA stores and the trial-area box still live here. Every other product has moved
+under `DOWNLOADS_DIR`: `product_dir_for` gives the current folder of a product, given its name.
 """
 
 TRIAL_AREA_BOX_PATH: Final[Path] = WEATHER_DATA_DIR / "_trial_area_box.json"
@@ -396,26 +406,111 @@ derived from the private generator roster (`packages/contracts` `TimeSeriesMetad
 generator locations must never appear in anything published — see CLAUDE.md.
 """
 
-ANM_DATA_DIR: Final[Path] = STUDIES_DATA_DIR / "anm"
+PREVIOUS_RUNS_DIR: Final[Path] = NWP_DOWNLOADS_DIR / "OPEN-METEO-PREVIOUS-RUNS"
+"""Open-Meteo's Previous Runs and historical-forecast archives, one folder per model."""
+
+PREVIOUS_RUNS_PRODUCTS: Final[tuple[str, ...]] = (
+    "AROME-FRANCE",
+    "ARPEGE-EUROPE",
+    "DMI-HARMONIE-AROME",
+    "ECMWF-IFS-025",
+    "ECMWF-IFS-HRES",
+    "GFS-SEAMLESS",
+    "ICON-D2",
+    "ICON-EU",
+    "ICON-GLOBAL",
+    "KNMI-HARMONIE-AROME",
+    "UKV",
+)
+"""The folder name of each Open-Meteo model under `PREVIOUS_RUNS_DIR`.
+
+A model's `previous_runs/` download and its README sit at the top of its folder, and the per-site
+frames fetched for it sit in `site_points/`.
+"""
+
+NWP_WINDOWS_DIR: Final[Path] = NWP_DOWNLOADS_DIR / "windows"
+"""Downloads of a model over a bounded window of dates, one folder per window."""
+
+NWP_PRODUCT_NAMES: Final[tuple[str, ...]] = (
+    "ECMWF-AIFS",
+    "ECMWF-AIFS-ENS",
+    "ECMWF-IFS-SINGLE-RUNS",
+    "GEFS",
+    "GFS",
+    "OPEN-METEO-ENSEMBLE-MEANS",
+)
+"""The forecast products whose folder under `NWP_DOWNLOADS_DIR` has the product's own name."""
+
+REANALYSIS_PRODUCT_NAMES: Final[tuple[str, ...]] = (
+    "CAMS",
+    "CERRA",
+    "ERA5",
+    "ERA5-WIND-2019-2023",
+    "ICON-DREAM-EU",
+    "NORA3",
+    "NORA3_10m",
+)
+"""The products whose folder under `REANALYSIS_DOWNLOADS_DIR` has the product's own name."""
+
+OBSERVATION_PRODUCT_NAMES: Final[tuple[str, ...]] = ("MIDAS-OPEN", "SARAH-3")
+"""The products whose folder under `OBSERVATIONS_DOWNLOADS_DIR` has the product's own name."""
+
+SITE_POINTS_FOLDER_NAME: Final[str] = "site_points"
+"""The subfolder of a product that holds the frames fetched or cut at each site's coordinates."""
+
+_PRODUCT_DIRS: Final[dict[str, Path]] = {
+    **{name: PREVIOUS_RUNS_DIR / name for name in PREVIOUS_RUNS_PRODUCTS},
+    **{name: NWP_DOWNLOADS_DIR / name for name in NWP_PRODUCT_NAMES},
+    **{name: REANALYSIS_DOWNLOADS_DIR / name for name in REANALYSIS_PRODUCT_NAMES},
+    **{name: OBSERVATIONS_DOWNLOADS_DIR / name for name in OBSERVATION_PRODUCT_NAMES},
+    "ENS": NWP_DOWNLOADS_DIR / "ENS_SITE_EXTRACT",
+    "WeatherNext3_trial_area": NWP_DOWNLOADS_DIR / "WeatherNext3",
+    # The UKV-on-CEDA stores have not moved yet.
+    "UKV-CEDA": WEATHER_DATA_DIR / "UKV-CEDA",
+    "UKV-CEDA-part2": WEATHER_DATA_DIR / "UKV-CEDA-part2",
+    "UKV-CEDA-part3": WEATHER_DATA_DIR / "UKV-CEDA-part3",
+    "UKV-CEDA-T120": WEATHER_DATA_DIR / "UKV-CEDA-T120",
+}
+"""Each product's folder, keyed by the name scripts and registries give the product.
+
+The key is the name the product had when every product sat in one folder. Two keys differ from the
+folder's own name: `ENS`, whose folder `ENS_SITE_EXTRACT` holds the per-site extract of the
+ensemble, and `WeatherNext3_trial_area`, whose folder is `WeatherNext3`.
+"""
+
+ANM_DATA_DIR: Final[Path] = OBSERVATIONS_DOWNLOADS_DIR / "NGED-ANM"
 """Where NGED's active network management setpoint exports are filed, one CSV per `time_series_id`,
 beside the export-cap parquet `anm_setpoints.py` derives from each.
 """
 
 
 def product_dir_for(*, product: str) -> Path:
-    """Return the folder of a weather product whose name is only known at run time.
+    """Return the folder of a downloaded product, given the name the scripts know it by.
 
     A script that names one product writes a constant below. A script that loops over products, or
     takes the product's name from a registry or the command line, calls this function, so the
-    layout of the weather folders is spelled out in this module alone.
+    layout of the download folders is spelled out in this module alone.
 
     Args:
-        product: The product's folder name, such as `ICON-D2` or `ECMWF-IFS-025`.
+        product: The product's name, such as `ICON-D2`, `ECMWF-IFS-025`, or `ERA5`, or the name of
+            a window of dates, such as `GFS_window_2025-07-01_2025-07-02`.
 
     Returns:
         The product's folder.
+
+    Raises:
+        ValueError: If no product has that name, so a misspelt name fails here rather than creating
+            a stray folder. A name holding `_window_` is a window of dates and always has a folder
+            under `NWP_WINDOWS_DIR`.
     """
-    return WEATHER_DATA_DIR / product
+    if "_window_" in product:
+        return NWP_WINDOWS_DIR / product
+    try:
+        return _PRODUCT_DIRS[product]
+    except KeyError:
+        raise ValueError(
+            f"unknown product {product!r}; known products are {sorted(_PRODUCT_DIRS)}"
+        ) from None
 
 
 def previous_runs_product_dir_for(*, product: str) -> Path:
@@ -426,12 +521,35 @@ def previous_runs_product_dir_for(*, product: str) -> Path:
 
     Returns:
         The product's folder, which holds its `previous_runs/` download.
+
+    Raises:
+        ValueError: If the product is not one of `PREVIOUS_RUNS_PRODUCTS`.
     """
+    if product not in PREVIOUS_RUNS_PRODUCTS:
+        raise ValueError(
+            f"{product!r} is not an Open-Meteo Previous Runs product; "
+            f"known products are {list(PREVIOUS_RUNS_PRODUCTS)}"
+        )
     return product_dir_for(product=product)
+
+
+def site_points_dir_for(*, product: str) -> Path:
+    """Return the folder of a product's frames cut or fetched at each site's coordinates.
+
+    Args:
+        product: The product's name, as `product_dir_for` takes it.
+
+    Returns:
+        The `site_points/` folder inside the product's folder.
+    """
+    return product_dir_for(product=product) / SITE_POINTS_FOLDER_NAME
 
 
 ERA5_PRODUCT_DIR: Final[Path] = product_dir_for(product="ERA5")
 """ERA5, fetched from Open-Meteo's mirror and from the Copernicus Climate Data Store."""
+
+ERA5_SITE_POINTS_DIR: Final[Path] = site_points_dir_for(product="ERA5")
+"""ERA5's per-site frames: the irradiance and the wind at each site's coordinates."""
 
 ERA5_WIND_2019_2023_PRODUCT_DIR: Final[Path] = product_dir_for(product="ERA5-WIND-2019-2023")
 """ERA5 native-level wind for 2019 to 2023."""
@@ -439,8 +557,14 @@ ERA5_WIND_2019_2023_PRODUCT_DIR: Final[Path] = product_dir_for(product="ERA5-WIN
 CAMS_PRODUCT_DIR: Final[Path] = product_dir_for(product="CAMS")
 """The CAMS radiation service's satellite retrieval."""
 
+CAMS_SITE_POINTS_DIR: Final[Path] = site_points_dir_for(product="CAMS")
+"""The CAMS irradiance at each site's coordinates."""
+
 ENS_PRODUCT_DIR: Final[Path] = product_dir_for(product="ENS")
 """The per-site extract of ECMWF's ensemble."""
+
+ENS_SITE_POINTS_DIR: Final[Path] = site_points_dir_for(product="ENS")
+"""The ensemble's irradiance and wind at each site's coordinates, built from `data/NWP`."""
 
 CERRA_PRODUCT_DIR: Final[Path] = product_dir_for(product="CERRA")
 """The CERRA regional reanalysis."""
@@ -531,16 +655,23 @@ ERA5_WIND_COMPARE_DIR: Final[Path] = study_dir_for(study="era5_wind_compare")
 ENS_BACKFILL_PILOT_DIR: Final[Path] = study_dir_for(study="ens_backfill_pilot")
 """The ENS backfill pilot's checkpoint files."""
 
-CERRA_WIND_LEVELS_DIR: Final[Path] = study_dir_for(study="cerra_wind_levels")
+CERRA_WIND_STUDIES_DIR: Final[Path] = STUDIES_DATA_DIR / "per_study" / "cerra_wind"
+"""The folder of the CERRA wind studies, one subfolder per study.
+
+The first folder under the `per_study/` layer. The other study folders stay directly under
+`PER_STUDY_DIR` until they move.
+"""
+
+CERRA_WIND_LEVELS_DIR: Final[Path] = CERRA_WIND_STUDIES_DIR / "levels"
 """The CERRA wind-levels study."""
 
-CERRA_WIND_LEVELS_POST_HOC_DIR: Final[Path] = study_dir_for(study="cerra_wind_levels_post_hoc")
+CERRA_WIND_LEVELS_POST_HOC_DIR: Final[Path] = CERRA_WIND_STUDIES_DIR / "levels_post_hoc"
 """The CERRA wind-levels study's post-hoc shear analysis."""
 
-CERRA_WIND_LEVELS_SHEAR_DIR: Final[Path] = study_dir_for(study="cerra_wind_levels_shear")
+CERRA_WIND_LEVELS_SHEAR_DIR: Final[Path] = CERRA_WIND_STUDIES_DIR / "shear"
 """An earlier output of the CERRA wind-shear analysis."""
 
-CERRA_WIND_DIRECTION_DIR: Final[Path] = study_dir_for(study="cerra_wind_direction")
+CERRA_WIND_DIRECTION_DIR: Final[Path] = CERRA_WIND_STUDIES_DIR / "direction"
 """The CERRA wind-direction study."""
 
 UKV_CEDA_BLENDS_DIR: Final[Path] = study_dir_for(study="ukv_ceda_blends")
@@ -684,7 +815,7 @@ def point_output_path_for(*, source: SourceType) -> Path:
     Returns:
         The parquet path holding that source's per-site fluxes.
     """
-    return product_dir_for(product=source.upper()) / f"beam_diffuse_{source}.parquet"
+    return site_points_dir_for(product=source.upper()) / f"beam_diffuse_{source}.parquet"
 
 
 def temperature_site_b_path_for(*, source: SourceType) -> Path:
@@ -701,7 +832,7 @@ def temperature_site_b_path_for(*, source: SourceType) -> Path:
     Returns:
         The parquet path holding that model's single-site hourly temperature.
     """
-    return product_dir_for(product=source.upper()) / "temperature_2m_site_b.parquet"
+    return site_points_dir_for(product=source.upper()) / "temperature_2m_site_b.parquet"
 
 
 IFS_OPEN_DATA_CUTOVER: Final[datetime] = datetime(2025, 10, 1, tzinfo=UTC)

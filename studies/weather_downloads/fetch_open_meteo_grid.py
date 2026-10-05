@@ -294,7 +294,8 @@ def _write_docs_for_model(
             .n_unique()` when regenerating docs for an already-downloaded file, not a fresh
             `box.grid_points(...).height` call, which reflects the trial-area box's *current*
             extent and can differ from what the file was fetched with if the box changed since.
-        output_dir: The product's own directory under `data/studies/weather/`.
+        output_dir: The product's own directory under
+            `data/studies/downloads/NWP/OPEN-METEO-PREVIOUS-RUNS/`.
         start_date: First date actually fetched, `YYYY-MM-DD`.
         end_date: Last date actually fetched, `YYYY-MM-DD`.
     """

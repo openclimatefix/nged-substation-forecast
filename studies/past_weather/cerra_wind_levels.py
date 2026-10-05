@@ -1,12 +1,13 @@
 """Does blending CERRA's wind levels beat CERRA's 100 m wind alone at predicting wind power?
 
-One-off throwaway script for <https://github.com/openclimatefix/nged-substation-forecast/issues/957>.
-The plan is `plans/study-957-cerra-wind-blend.md` and was committed before the first fit.
+One-off throwaway script for
+<https://github.com/openclimatefix/nged-substation-forecast/issues/957>. The plan is
+`plans/study-957-cerra-wind-blend.md` and was committed before the first fit.
 
-**Data.** `data/studies/weather/CERRA/`: CERRA's wind speed at 10, 50, 75, 100 and 150 m, at the
-190 grid cells around the trial area, every 3 hours (00, 03, ..., 21 UTC) from 2019-09-01 to
-2026-06-30. The files hold speed only, with no direction. `studies.reanalysis_wind` reads each wind
-farm's nearest cell and builds the power hour, centred on the label. The 10 m speed comes from
+**Data.** `data/studies/downloads/reanalysis/CERRA/`: CERRA's wind speed at 10, 50, 75, 100 and 150
+m, at the 190 grid cells around the trial area, every 3 hours (00, 03, ..., 21 UTC) from 2019-09-01
+to 2026-06-30. The files hold speed only, with no direction. `studies.reanalysis_wind` reads each
+wind farm's nearest cell and builds the power hour, centred on the label. The 10 m speed comes from
 CERRA's single-levels product and the other four from its height-levels product.
 
 **Row set.** Every 3-hourly wind-farm hour that has a centred power hour, minus every hour holding

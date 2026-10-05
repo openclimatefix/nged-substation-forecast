@@ -2109,9 +2109,9 @@ svgo@4 --multipass --precision=1 --final-newline` on every SVG it writes and rea
 dot command runs last, and its script runs the same `svgo` command.
 
 **The inputs are on disk and cannot all be downloaded again.** The build reads the finished GEFS
-download in `data/studies/weather/GEFS_window_2024-11-01_None/`, each Previous Runs product's
+download in `data/studies/downloads/NWP/windows/GEFS_window_2024-11-01_None/`, each Previous Runs product's
 `combined.parquet`, and the native GFS, IFS HRES 9 km, and AIFS downloads under
-`data/studies/weather/`. Dynamical.org's access ends on 2026-09-30. Every worktree writes to the
+`data/studies/downloads/NWP/`. Dynamical.org's access ends on 2026-09-30. Every worktree writes to the
 main checkout's `data/studies/`, so move the saved outputs to `superseded/` before re-running
 the fourth command.
 <!-- plan: Process and constraints -->

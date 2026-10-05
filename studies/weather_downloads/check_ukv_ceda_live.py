@@ -53,7 +53,7 @@ import polars as pl
 import zarr
 from fetch_open_meteo_previous_runs import _pv_sites, _wind_sites
 from fetch_ukv_ceda import GRID_SPACING_M, N_STEPS, _array, _repository_config
-from studies.sources import ERA5_PRODUCT_DIR, product_dir_for
+from studies.sources import ERA5_PRODUCT_DIR, ERA5_SITE_POINTS_DIR, product_dir_for
 from studies.ukv_ceda_profiles import CYCLE_HOURS, FIELDS, SLOT_EPOCH, STATUS_COMPLETE
 from validate_ukv_ceda import NAN_ALLOWED, VALUE_RANGES, check_run_spacing, expected_leads
 
@@ -324,7 +324,7 @@ class Era5Data:
     def read(cls) -> Era5Data:
         """Read `temp_c` on the 0.25 degree grid, and the native 10 m wind speed by site."""
         temperature = pl.read_parquet(
-            ERA5_DIR / "beam_diffuse_open_meteo.parquet",
+            ERA5_SITE_POINTS_DIR / "beam_diffuse_open_meteo.parquet",
             columns=["time", "latitude", "longitude", "temp_c"],
         ).with_columns(pl.col("time").dt.replace_time_zone(None).dt.cast_time_unit("us"))
         wind = (

@@ -41,12 +41,12 @@ from studies.era5_grid import (
     first_date_of,
     suffixed,
 )
-from studies.sources import ERA5_PRODUCT_DIR
+from studies.sources import ERA5_SITE_POINTS_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_era5_open_meteo")
 
-OUTPUT_PATH: Final[Path] = suffixed(ERA5_PRODUCT_DIR / "beam_diffuse_open_meteo.parquet")
+OUTPUT_PATH: Final[Path] = suffixed(ERA5_SITE_POINTS_DIR / "beam_diffuse_open_meteo.parquet")
 
 ARCHIVE_URL: Final[str] = "https://archive-api.open-meteo.com/v1/archive"
 REQUEST_TIMEOUT_SECONDS: Final[float] = 300.0

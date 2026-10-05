@@ -91,7 +91,8 @@ class HeightSet(NamedTuple):
     heights_m: tuple[int, ...]
     """The heights, in metres, that `indices` must select."""
     product_dir_name: str
-    """The folder under `data/studies/weather/` holding this set's cache, file, and notes."""
+    """The folder under `data/studies/downloads/reanalysis/` holding this set's cache, file,
+    and notes."""
 
 
 TURBINE_HEIGHTS: Final[HeightSet] = HeightSet((2, 3), (50, 100), "NORA3")

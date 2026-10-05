@@ -5,8 +5,8 @@ in the repo imports it, it adds no package and it changes no data contract. It d
 products the fact-checked survey (`docs/background/weather-products-survey.md`) ranks for the two
 past-weather studies (#809) and the forecast study (#810), recorded in [issue
 841](https://github.com/openclimatefix/nged-substation-forecast/issues/841). This directory covers
-the downloads only; #809 and #810 read what lands under `data/studies/weather/<PRODUCT>/` and are
-out of scope here.
+the downloads only; #809 and #810 read what lands under `data/studies/downloads/<kind>/<PRODUCT>/`
+(the kinds are `NWP`, `reanalysis`, and `observations`) and are out of scope here.
 
 ## The trial-area box
 
@@ -23,10 +23,11 @@ index (`point_id`, `cell_id`, `y_index`/`x_index`) rather than a coordinate.
 ## Lineage notes
 
 `lineage.write_lineage_note` writes a lineage JSON file into each product directory
-(`data/studies/weather/<PRODUCT>/lineage.json`, or `lineage_<variable>.json` where a script fetches
-several variables into one directory, as `fetch_cerra.py` and `fetch_icon_dream.py` do). Each note
-records the source address, what was requested, the variables kept, and the retrieval time — the one
-format every fetch script here reuses, per the convention in `packages/studies/src/studies/sources.py`.
+(`data/studies/downloads/<kind>/<PRODUCT>/lineage.json`, or `lineage_<variable>.json` where a script
+fetches several variables into one directory, as `fetch_cerra.py` and `fetch_icon_dream.py` do).
+Each note records the source address, what was requested, the variables kept, and the retrieval time
+— the one format every fetch script here reuses, per the convention in
+`packages/studies/src/studies/sources.py`.
 
 ## Running a fetch script
 

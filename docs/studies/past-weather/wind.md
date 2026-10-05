@@ -1689,7 +1689,7 @@ uv run python studies/beam_diffuse_split/check_page_numbers.py \
 ```
 
 `wind_icon_dream.py` needs ICON-DREAM-EU's own gridded download already on disk in
-`data/studies/weather/ICON-DREAM-EU/`. No committed script reproduces that download in this
+`data/studies/downloads/reanalysis/ICON-DREAM-EU/`. No committed script reproduces that download in this
 repository: it was a one-off backfill for
 [issue #841](https://github.com/openclimatefix/nged-substation-forecast/issues/841), documented in that
 directory's own `README_*.md` files and their `lineage_*.json` siblings, which give the exact
@@ -1762,10 +1762,10 @@ report lands separately, in
 rebuilds it from a saved `losses.parquet` alone, fitting nothing.
 
 `station_wind_arms.py` needs the page's own row set, so the first code block above comes first. It
-also needs the MIDAS Open download in `data/studies/weather/MIDAS-OPEN/`. The download script needs
-a `CEDA_TOKEN` in the main checkout's `.env`. The download script fetches `dataset-version-202607`
-of two datasets, `uk-hourly-weather-obs` and `uk-radiation-obs`, at quality-control version 1. The
-station arms read `uk-hourly-weather-obs` only. The report lands in
+also needs the MIDAS Open download in `data/studies/downloads/observations/MIDAS-OPEN/`. The
+download script needs a `CEDA_TOKEN` in the main checkout's `.env`. The download script fetches
+`dataset-version-202607` of two datasets, `uk-hourly-weather-obs` and `uk-radiation-obs`, at
+quality-control version 1. The station arms read `uk-hourly-weather-obs` only. The report lands in
 `data/studies/beam_diffuse_split/past_weather_v2/station_wind_arms/report.md`. A run that fits
 refuses to overwrite an output that exists, so move earlier outputs aside first.
 

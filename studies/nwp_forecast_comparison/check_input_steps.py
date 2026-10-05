@@ -54,7 +54,8 @@ def _monthly_mean(*, product_dir: str, field_column: str) -> pl.DataFrame:
     """Return one product's monthly mean of one field, per site.
 
     Args:
-        product_dir: The product's directory name under `data/studies/weather/`.
+        product_dir: The product's directory name under
+            `data/studies/downloads/NWP/OPEN-METEO-PREVIOUS-RUNS/`.
         field_column: The Previous Runs column to average.
 
     Returns:

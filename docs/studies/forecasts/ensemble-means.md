@@ -344,11 +344,11 @@ statistically significant at the 5% level.
 ## Data and code availability
 
 **The four Open-Meteo ensemble means, CAMS, and ERA5 are public downloads, and the metered power is
-private.** The Open-Meteo means are in `data/studies/weather/OPEN-METEO-ENSEMBLE-MEANS/`. The local
-ECMWF ENS series is built from `data/studies/weather/ENS/`, which reads this project's own ENS Delta
-table. NGED's power readings are private. Every output carries only the anonymised labels `A` to `F`
-and `W1` to `W3`. The code is in `studies/open_meteo_ensemble_means/` and
-`packages/studies/`, at the commit that adds this page.
+private.** The Open-Meteo means are in `data/studies/downloads/NWP/OPEN-METEO-ENSEMBLE-MEANS/`. The
+local ECMWF ENS series is built from `data/studies/downloads/NWP/ENS_SITE_EXTRACT/`, which reads
+this project's own ENS Delta table. NGED's power readings are private. Every output carries only the
+anonymised labels `A` to `F` and `W1` to `W3`. The code is in `studies/open_meteo_ensemble_means/`
+and `packages/studies/`, at the commit that adds this page.
 
 ## Reproducing the figures
 

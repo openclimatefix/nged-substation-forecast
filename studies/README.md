@@ -57,15 +57,45 @@ branch. The directory is not an attic.
   page it feeds.** A script runs with only its own folder on `sys.path`: it never reaches into
   another folder, and code that two folders share is in `packages/studies/src/studies/`.
 - **Paths may have rotted.** Every study's data lives under `data/studies/`, in the directory
-  `DATA_PATH_INTERNAL` names — the same variable `contracts.Settings` reads. Downloaded weather sits
-  in `weather/<product>/` and NGED's active network management exports in `anm/`, so a later study
-  can reuse them; what one study builds from them sits in `<name>/`. None of it is in version
-  control, and a data directory that has been cleaned out will not refill itself. `data/NGED/` and
-  `data/NWP/` are the pipeline's own, and a study reads them rather than writing to them.
+  `DATA_PATH_INTERNAL` names — the same variable `contracts.Settings` reads. Downloads sit in
+  `downloads/`, filed by what the data is, so that a later study can reuse them; what one study
+  builds from them sits in `<name>/`. [Where data lives](#where-data-lives) lists the folders. None
+  of it is in version control, and a data directory that has been cleaned out will not refill
+  itself. `data/NGED/` and `data/NWP/` are the pipeline's own, and a study reads them rather than
+  writing to them.
 - **A run command in a module docstring is the checked way to run that script.** Each one runs
   against the workspace environment, and names with `--with` only what the lockfile does not carry.
 - **Read the study's own README first.** Each directory has one, covering what the study measured,
   what the arms are, and which readings the result does not support.
+
+## Where data lives
+
+**Every download is filed under `data/studies/downloads/` by what it is, never by the study that
+first fetched it.** Each product has one folder. A product's frames cut or fetched at each site's
+coordinates sit in a `site_points/` subfolder of that folder, beside the gridded download. The names
+of the folders are constants in `packages/studies/src/studies/sources.py`, and scripts never spell a
+folder name themselves.
+
+| Folder under `data/studies/downloads/` | What it holds | Written by |
+|---|---|---|
+| `NWP/OPEN-METEO-PREVIOUS-RUNS/<model>/` | Open-Meteo's Previous Runs and historical-forecast downloads, one folder for each of 11 models; `site_points/` holds the frames at each site | `weather_downloads/fetch_open_meteo_previous_runs.py`, `weather_downloads/fetch_open_meteo_grid.py`, `past_weather/fetch_open_meteo_point.py`, `past_weather/fetch_wind_point.py` |
+| `NWP/ECMWF-AIFS/`, `NWP/ECMWF-AIFS-ENS/`, `NWP/GEFS/`, `NWP/GFS/` | Dynamical.org's copies of ECMWF AIFS, ECMWF AIFS ensemble, GEFS, and GFS over the trial area | `weather_downloads/fetch_dynamical_zarr.py` |
+| `NWP/windows/<name>/` | A download of one model over a bounded window of dates | `weather_downloads/fetch_dynamical_zarr.py`, `weather_downloads/fetch_open_meteo_previous_runs.py` |
+| `NWP/ECMWF-IFS-SINGLE-RUNS/` | Open-Meteo's Single Runs archive of ECMWF's high-resolution forecast | `weather_downloads/fetch_open_meteo_single_runs.py` |
+| `NWP/OPEN-METEO-ENSEMBLE-MEANS/` | Open-Meteo's ensemble-mean products | `weather_downloads/fetch_open_meteo_ensemble_means.py` |
+| `NWP/WeatherNext3/` | The local copy of WeatherNext 3 over the trial area | `nwp_forecast_comparison/build_wn3_inputs.py` |
+| `NWP/ENS_SITE_EXTRACT/` | The per-site extract of ECMWF ENS, built from `data/NWP`; the frames at each site are in `site_points/` | `beam_diffuse_split/fetch_ens_point.py`, `beam_diffuse_split/fetch_ens_point_wind.py` |
+| `reanalysis/ERA5/`, `reanalysis/ERA5-WIND-2019-2023/` | ERA5 irradiance and wind from Open-Meteo's mirror and from the Copernicus Climate Data Store; `ERA5/site_points/` holds the frames at each site | `beam_diffuse_split/fetch_era5.py`, `beam_diffuse_split/fetch_era5_open_meteo.py`, `weather_downloads/fetch_era5_wind.py`, `weather_downloads/fetch_era5_wind_2019_2023.py` |
+| `reanalysis/CAMS/` | The CAMS radiation service's satellite retrieval at each site, and its yearly CSV downloads | `beam_diffuse_split/fetch_cams.py` |
+| `reanalysis/CERRA/` | The CERRA regional reanalysis | `weather_downloads/fetch_cerra.py`, `weather_downloads/fetch_cerra_grid.py` |
+| `reanalysis/NORA3/`, `reanalysis/NORA3_10m/` | The NORA3 reanalysis wind | `weather_downloads/fetch_nora3.py` |
+| `reanalysis/ICON-DREAM-EU/` | The ICON-DREAM-EU reanalysis; `site_points/` holds the frame at each site | `weather_downloads/fetch_icon_dream.py`, `past_weather/extract_site_series.py` |
+| `observations/MIDAS-OPEN/` | The Met Office's MIDAS Open station observations | `weather_downloads/fetch_midas_open.py` |
+| `observations/SARAH-3/` | The SARAH-3 satellite retrieval, ordered by hand from CM SAF; `site_points/` holds the frame at each site | `past_weather/extract_site_series.py` |
+| `observations/NGED-ANM/` | NGED's active network management setpoint exports, and the export-cap parquet derived from each | `beam_diffuse_split/anm_setpoints.py` (the exports come from NGED) |
+
+Every other folder directly under `data/studies/` is one study's own inputs and results. The
+`UKV-CEDA*` stores and the trial-area box are in `data/studies/weather/`.
 
 ## The studies
 

@@ -30,7 +30,11 @@ from pathlib import Path
 from typing import Final
 
 import polars as pl
-from studies.sources import GEFS_WINDOW_DIR, previous_runs_product_dir_for
+from studies.sources import (
+    GEFS_WINDOW_DIR,
+    SITE_POINTS_FOLDER_NAME,
+    previous_runs_product_dir_for,
+)
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -51,7 +55,8 @@ MAX_RATIO_ERROR: Final[float] = 0.10
 """How far beyond-240-h mean radiation may sit from the 6-hour reading's, as a share of it."""
 
 PRODUCTS: Final[dict[str, str]] = {"ICON-D2": "icon-d2", "ICON-EU": "icon-eu"}
-"""Each product's directory under `data/studies/weather/`, and the slug in its file names."""
+"""Each product's directory under `data/studies/downloads/NWP/OPEN-METEO-PREVIOUS-RUNS/`, and
+the slug in its file names."""
 
 
 def gefs_window_table(*, files: list[Path]) -> pl.DataFrame:
@@ -213,7 +218,8 @@ def day0_comparison(*, product_dir: Path, slug: str) -> list[dict[str, str | flo
     """Compare a product's unsuffixed Previous Runs columns with the past studies' series.
 
     Args:
-        product_dir: The product's folder, which holds its `previous_runs/` download.
+        product_dir: The product's folder, which holds its `previous_runs/` download and its
+            `site_points/` folder.
         slug: The product's slug in its file names.
 
     Returns:
@@ -225,7 +231,9 @@ def day0_comparison(*, product_dir: Path, slug: str) -> list[dict[str, str | flo
     records: list[dict[str, str | float | int]] = []
     for column, file_pattern, past_column in DAY0_COLUMNS:
         past = pl.read_parquet(
-            product_dir / file_pattern.format(slug=slug, underscored=slug.replace("-", "_"))
+            product_dir
+            / SITE_POINTS_FOLDER_NAME
+            / file_pattern.format(slug=slug, underscored=slug.replace("-", "_"))
         ).select("site", "time", past=past_column)
         shared = (
             combined.select("site", "time", column)
