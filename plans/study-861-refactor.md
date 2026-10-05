@@ -132,7 +132,7 @@ Second, `logging.getLogger("<old script name>")` calls in moved code are updated
 
 | New module | Comes from | What it holds |
 |---|---|---|
-| `studies.sources` | `sources.py`, wholesale | `SourceType`, `SOURCE_CHOICES`, `PER_SITE_SOURCES`, `OpenMeteoModel` and its registry, `point_output_path_for`, and the path constants (`REPO_DATA_DIR`, `STUDIES_DATA_DIR`, `WEATHER_DATA_DIR`, `ANM_DATA_DIR`). `weather_downloads/paths.py` imports `REPO_DATA_DIR` from here instead of defining it a second time. |
+| `studies.sources` | `sources.py`, wholesale | `SourceType`, `SOURCE_CHOICES`, `PER_SITE_SOURCES`, `OpenMeteoModel` and its registry, `point_output_path_for`, and the path constants (`REPO_DATA_DIR`, `STUDIES_DATA_DIR`, `DOWNLOADS_DIR`, `PER_STUDY_DIR`, `WEATHER_DATA_DIR`, `ANM_DATA_DIR`). `DOWNLOADS_DIR` and `PER_STUDY_DIR` are the two layers under `STUDIES_DATA_DIR`, and every kind folder and study folder is built from one of them. `weather_downloads/paths.py` imports `REPO_DATA_DIR` from here instead of defining it a second time. |
 | `studies.pv_dataset` | `build_dataset.py` | The site rosters (`pv_sites`, `wind_sites`), `solar_hourly_power` (from `build_dataset._hourly_power`, which builds a period-ending hour), `read_era5`, `nearest_era5_cell`, `read_cams`, the outage and false-zero filters, the separation-model columns. The build's command line stays in `beam_diffuse_split/build_dataset.py`. `wind_products._hourly_power` is a different function (it shifts every stamp by 30 minutes), becomes `wind_hourly_power` in the layer-2 commit, and a test asserts that the two give different timestamps for the same input, so a swapped import is caught. `ensemble_means_mae` and `ens_forecast_horizons` import both under aliases. |
 | `studies.arm_runner` | `run_experiment.py` | `Job`, `run_all`, `MAX_CONCURRENT_FITS`, `SHARED_FEATURES`, `add_time_features`, `dataset_path_for`. |
 | `studies.commissioning`, `studies.export_cap`, `studies.physics_model`, `studies.era5_grid`, `studies.figure_numbers` | the scripts of the same name | Whole modules. |
@@ -254,54 +254,63 @@ with `ty` `extra-paths` to match.
 
 **Every file a study downloads or builds moves under `data/studies/`, in folders named for what the
 data is, and each study keeps one folder of its own outputs.** The maintainer decided the rules and
-the placement. The code that names the folders is changed first, in a code-only change that leaves
-the data where it is (step D1 below), and the files then move in waves, one pull request per wave.
+the placement. The maintainer proposed `data/studies/studies/` as the name of the per-study layer
+and invited a better name, so the plan uses `per_study`, which avoids `studies/studies/`. Renaming
+it later is a one-token change. The code that names the folders is changed first, in a code-only
+change that leaves the data where it is (step D1 below), and the files then move in waves, one pull
+request per wave.
 
 **Decisions taken by the maintainer, and what each settles:**
 
 1. All study downloads live in `data/studies/`, apart from Dagster-managed data (`data/NGED`,
    `data/NWP` and the other pipeline tables), which no study writes.
-2. Data used, or plausibly usable, by several studies is filed by what it is: `NWP/`,
-   `reanalysis/` and `observations/`. A folder is never named after the study that first wrote it.
-   This covers per-site download files too: they stay with their product.
-3. Each study has one folder with `inputs/` (cached intermediate frames), `results/` (losses,
-   predictions, stamps, intervals), `reports/` and `superseded/`. The 22 `nwp_forecast_comparison_*`
-   folders and the flat `nwp_forecast_comparison/` become one folder with one subfolder per batch,
-   and the three-way split applies only where "Where the three-way split applies" says so.
+2. Data used, or plausibly usable, by several studies is filed by what it is, under `downloads/`: `downloads/NWP/`,
+   `downloads/reanalysis/` and `downloads/observations/`. A folder is never named after the study
+   that first wrote it. This covers per-site download files too: they stay with their product.
+3. Each study has one folder under `per_study/` with `inputs/` (cached intermediate frames),
+   `results/` (losses, predictions, stamps, intervals), `reports/` and `superseded/`. The 22
+   `nwp_forecast_comparison_*` folders and the flat `nwp_forecast_comparison/` become one folder
+   with one subfolder per batch, and the three-way split applies only where "Where the three-way
+   split applies" says so.
 4. The nwp-archivist store (`/mnt/data/nwp-archive*`) is not a study and not Dagster-managed. It
    stays where it is, as do its caches and the MOGREPS copy on `/mnt/wd_18tb`, and no study script
    reads them.
 5. The ECMWF ENS backfill ultimately belongs in the `data/NWP` Delta table, ingested by Dagster.
    That ingest is not part of this refactor. Issue #959 ("Extend ECMWF ENS training history") carries
    the fetch, and the ingest needs an issue of its own once #959 settles the fetch scope. Until
-   then, fetched files are staged in `data/studies/NWP/ENS_BACKFILL_STAGING/`.
-6. The three `UKV-CEDA` stores are not merged. They become three sibling folders under `NWP/`.
+   then, fetched files are staged in `data/studies/downloads/NWP/ENS_BACKFILL_STAGING/`.
+6. The three `UKV-CEDA` stores are not merged. They become three sibling folders under `downloads/NWP/`.
 7. `data.old` is deleted only on the maintainer's explicit go-ahead, after the gate in step G.
 8. The three `era_fold_design` Python scripts and its nine shell scripts use `~/` paths (above).
 
-**The target layout.**
+**The target layout.** `data/studies/` has two layers of its own: `downloads/` holds the shared data
+kinds and `per_study/` holds one folder per study. `_scratch/` and `_private/` stay at the top
+level, because they belong to neither layer: `_scratch/` is transient, and `_private/` holds a file
+that is never published or committed. No other top-level item remains once `weather/` is a
+tombstone.
 
 ```text
 data/studies/
-  NWP/                       forecasts: runs, previous runs, and the extracts made from them
-    ECMWF-AIFS/  ECMWF-AIFS-ENS/  ECMWF-IFS-SINGLE-RUNS/  GEFS/  GFS/
-    WeatherNext3/            from WeatherNext3_trial_area
-    UKV-CEDA/  UKV-CEDA-part2/  UKV-CEDA-part3/  UKV-CEDA-T120/
-    OPEN-METEO-ENSEMBLE-MEANS/
-    OPEN-METEO-PREVIOUS-RUNS/<model>/   the eleven Previous Runs products, each with site_points/
-    ENS_SITE_EXTRACT/        ens_members, solar and wind inputs, member summaries (shared)
-      site_points/           per-site frames built from data/NWP
-    ENS_BACKFILL_STAGING/    the #959 fetch, until Dagster ingests it
-    windows/                 the eight window or trial copies
-    superseded/
-  reanalysis/                ERA5  CERRA  NORA3  NORA3_10m  ICON-DREAM-EU  CAMS
-  observations/              MIDAS-OPEN  SARAH-3  NGED-ANM
-  _scratch/                  transient downloads (today data/_scratch)
-  _private/                  trial_area_box.json (never published or committed)
-  <study>/                   one folder per study
+  downloads/                 shared data, filed by what it is
+    NWP/                     forecasts: runs, previous runs, and the extracts made from them
+      ECMWF-AIFS/  ECMWF-AIFS-ENS/  ECMWF-IFS-SINGLE-RUNS/  GEFS/  GFS/
+      WeatherNext3/          from WeatherNext3_trial_area
+      UKV-CEDA/  UKV-CEDA-part2/  UKV-CEDA-part3/  UKV-CEDA-T120/
+      OPEN-METEO-ENSEMBLE-MEANS/
+      OPEN-METEO-PREVIOUS-RUNS/<model>/   the eleven Previous Runs products, each with site_points/
+      ENS_SITE_EXTRACT/      ens_members, solar and wind inputs, member summaries (shared)
+        site_points/         per-site frames built from data/NWP
+      ENS_BACKFILL_STAGING/  the #959 fetch, until Dagster ingests it
+      windows/               the eight window or trial copies
+      superseded/
+    reanalysis/              ERA5  CERRA  NORA3  NORA3_10m  ICON-DREAM-EU  CAMS
+    observations/            MIDAS-OPEN  SARAH-3  NGED-ANM
+  per_study/                 one folder per study
     beam_diffuse_split  ens_forecast_horizons  nwp_forecast_comparison
     ukv_ceda_blends  cerra_wind  open_meteo_ensemble_means  open_meteo_ens_gap
     icon_eu_compare  era5_wind_compare  ens_backfill_pilot
+  _scratch/                  transient downloads (today data/_scratch)
+  _private/                  trial_area_box.json (never published or committed)
 ```
 
 **Where the three-way split applies.** A study folder gets `inputs/`, `results/`, `reports/` and
@@ -313,42 +322,43 @@ in the wave log, and `verification/` and `superseded/` folders move whole. Split
 `nwp_forecast_comparison/` would rewrite about 120 `output_dir /` uses across its scripts, so it
 keeps one folder per batch with every file unchanged.
 
-**Old path to new path, for every entry of `data/studies` and `data/studies/weather`.** Paths are
-relative to `data/studies/`. The wave column names the step in "Data migration" that moves the row.
+**Old path to new path, for every entry of `data/studies` and `data/studies/weather`.** Old and new
+paths are both relative to `data/studies/`. The wave column names the step in "Data migration" that
+moves the row.
 
 | Old path | New path | Wave |
 |---|---|---|
 | `data/_scratch` (outside `data/studies`) | `_scratch/` | D2 |
-| `superseded/ECMWF-AIFS-3x3`, `superseded/ECMWF-AIFS-ENS-3x3`, `superseded/beam_diffuse_ens_2026-09-26.parquet`, `superseded/beam_diffuse_ens_wind_2026-09-26.parquet` | `NWP/superseded/`, same names (deletion is proposed under "Tidy-up while moving") | D2 |
+| `superseded/ECMWF-AIFS-3x3`, `superseded/ECMWF-AIFS-ENS-3x3`, `superseded/beam_diffuse_ens_2026-09-26.parquet`, `superseded/beam_diffuse_ens_wind_2026-09-26.parquet` | `downloads/NWP/superseded/`, same names (deletion is proposed under "Tidy-up while moving") | D2 |
 | `weather/WeatherNext3_icechunk_test` | `_scratch/WeatherNext3_icechunk_test` | D2 |
-| `cerra_wind_direction`, `cerra_wind_levels`, `cerra_wind_levels_post_hoc`, `cerra_wind_levels_shear` | `cerra_wind/{direction,levels,levels_post_hoc,shear}`, files and their `superseded*` folders unchanged | D2 |
-| `weather/{AROME-FRANCE,ARPEGE-EUROPE,DMI-HARMONIE-AROME,ECMWF-IFS-025,ECMWF-IFS-HRES,GFS-SEAMLESS,ICON-D2,ICON-EU,ICON-GLOBAL,KNMI-HARMONIE-AROME,UKV}` (the eleven Previous Runs products) | `NWP/OPEN-METEO-PREVIOUS-RUNS/<model>/`. The product's `beam_diffuse_<model>.parquet`, `wind_<model>.parquet` and `temperature_2m_site_b.parquet` go to `<model>/site_points/`, so the four `temperature_2m_site_b.parquet` files no longer collide. The download parquet, `previous_runs/`, `README.md` and `lineage.json` stay at the top of `<model>/` | D3 |
-| `weather/ECMWF-AIFS-ENS_window_2025-08-01_2025-08-31`, `ECMWF-AIFS_window_2025-02-20_2025-03-05`, `GEFS_window_2024-11-01_None`, `GEFS_window_2025-07-01_2025-07-03`, `GEFS_window_2026-09-22_2026-09-24`, `GFS_window_2025-07-01_2025-07-02`, `WeatherNext3_window_2026-09-20_2026-09-20` | `NWP/windows/<same name>/` | D3 |
-| `weather/CERRA` (the wind-level, direction, surface and grid files are all downloads) | `reanalysis/CERRA/`, files unchanged | D4 |
-| `weather/CAMS` | `reanalysis/CAMS/`. `beam_diffuse_cams*.parquet` go to `site_points/`; the `cams_site_*.csv` downloads stay | D4 |
-| `weather/ERA5` | `reanalysis/ERA5/`. `beam_diffuse_open_meteo*.parquet` and `wind_era5*.parquet` go to `site_points/`; the `beam_diffuse/*.zip` downloads, `wind_native_cds.parquet`, `wind_native_chunks` and `_cds_smoke_test.nc` stay | D4 |
-| `weather/ICON-DREAM-EU` | `reanalysis/ICON-DREAM-EU/`. `beam_diffuse_icon-dream-eu.parquet` goes to `site_points/` | D4 |
-| `weather/NORA3`, `weather/NORA3_10m` | `reanalysis/NORA3/`, `reanalysis/NORA3_10m/`, files unchanged | D4 |
-| `weather/MIDAS-OPEN` | `observations/MIDAS-OPEN/`, files unchanged | D4 |
-| `weather/SARAH-3` | `observations/SARAH-3/`. `beam_diffuse_sarah-3.parquet` goes to `site_points/` | D4 |
-| `anm/` (the CSV export, `export_cap_23.parquet`, `README.md`, `superseded/`) | `observations/NGED-ANM/`, with the export-cap parquet beside the CSV | D4 |
-| `weather/ECMWF-AIFS`, `ECMWF-AIFS-ENS`, `ECMWF-IFS-SINGLE-RUNS`, `GEFS`, `GFS` | `NWP/<same name>/`, files unchanged | D5 |
-| `weather/WeatherNext3_trial_area` | `NWP/WeatherNext3/` (`trial_area.zarr`, `_grid_cells.parquet`) | D5 |
-| `weather/OPEN-METEO-ENSEMBLE-MEANS` | `NWP/OPEN-METEO-ENSEMBLE-MEANS/`, files unchanged | D5 |
-| `weather/ENS` (`beam_diffuse_ens.parquet`, `beam_diffuse_ens_wind.parquet`, `README.md`) | `NWP/ENS_SITE_EXTRACT/site_points/` for the two parquet files, `NWP/ENS_SITE_EXTRACT/README.md` for the README | D5 |
-| the 22 folders `nwp_forecast_comparison_{aifs,aifs_blends,aifs_extra_days,day4_shared,day5_aifs_wn3,leaderboard_by_day,leaderboard_by_day_fig3,leads,leads_day10,leads_day10b,leads_day10c,leads_day10d,p4_seeds,product_blends,product_blends_report,vs_ens_dots,vs_ens_dots_all_days,vs_ens_dots_blends,vs_ens_dots_blends_final,vs_ens_dots_final,wn3,wn3_extra_days}` | `nwp_forecast_comparison/<batch>/`, the suffix being the batch name, with every file, `verification/` and `superseded/` unchanged | D6 |
-| the flat files of `nwp_forecast_comparison/` (`report.md`, `solar_*`, `wind_*`, `verification/`) | `nwp_forecast_comparison/original/`, files unchanged | D6 |
-| `ens_forecast_horizons/{ens_members,solar_inputs,wind_inputs,solar_member_summary,wind_member_summary}.parquet` (top level only) | `NWP/ENS_SITE_EXTRACT/` | D7 |
-| `ens_forecast_horizons_day4/` (`ens_members_day4.parquet`, `README.md`) | `NWP/ENS_SITE_EXTRACT/` | D7 |
-| `ens_forecast_horizons/era_covered/` (its own `solar_inputs`, `wind_inputs` and member summaries differ from the top-level files) | `ens_forecast_horizons/era_covered/`, unchanged, so nothing collides | D7 |
-| the rest of `ens_forecast_horizons/` (losses, predictions, rows, weights, `intervals`, `leaderboard`, `report.md`, `superseded/`) | `ens_forecast_horizons/`, in place | D7 |
-| `beam_diffuse_split/beam_diffuse_dataset_*.parquet` (13 frames, written through `dataset_path_for`) | `beam_diffuse_split/inputs/` | D7 |
-| `beam_diffuse_split/{beam_diffuse_ens_horizons,beam_diffuse_figures,beam_diffuse_multi_nwp,beam_diffuse_weather_products,beam_diffuse_wind_products,blend_products,past_weather_v2,satellite_blend,superseded}` and `era5_source_agreement.json` | `beam_diffuse_split/`, in place | D7 |
-| `open_meteo_ensemble_means`, `open_meteo_ens_gap`, `icon_eu_compare`, `era5_wind_compare`, `ens_backfill_pilot` | same names, files unchanged. `frame_*.parquet` moves to `inputs/` only where one path constant writes it | D7 |
-| `weather/UKV-CEDA`, `UKV-CEDA-part2`, `UKV-CEDA-part3` | `NWP/UKV-CEDA/`, `NWP/UKV-CEDA-part2/`, `NWP/UKV-CEDA-part3/`, three stores, never merged | D8 |
-| `weather/UKV-CEDA-T120` | `NWP/UKV-CEDA-T120/` | D8 |
-| `weather/_t120_trial` | `NWP/windows/UKV-CEDA-T120_trial/` | D8 |
-| `ukv_ceda_blends`, `ukv_ceda_blends_run15` | `ukv_ceda_blends/` and `ukv_ceda_blends/run15/` | D8 |
+| `cerra_wind_direction`, `cerra_wind_levels`, `cerra_wind_levels_post_hoc`, `cerra_wind_levels_shear` | `per_study/cerra_wind/{direction,levels,levels_post_hoc,shear}`, files and their `superseded*` folders unchanged | D2 |
+| `weather/{AROME-FRANCE,ARPEGE-EUROPE,DMI-HARMONIE-AROME,ECMWF-IFS-025,ECMWF-IFS-HRES,GFS-SEAMLESS,ICON-D2,ICON-EU,ICON-GLOBAL,KNMI-HARMONIE-AROME,UKV}` (the eleven Previous Runs products) | `downloads/NWP/OPEN-METEO-PREVIOUS-RUNS/<model>/`. The product's `beam_diffuse_<model>.parquet`, `wind_<model>.parquet` and `temperature_2m_site_b.parquet` go to `<model>/site_points/`, so the four `temperature_2m_site_b.parquet` files no longer collide. The download parquet, `previous_runs/`, `README.md` and `lineage.json` stay at the top of `<model>/` | D3 |
+| `weather/ECMWF-AIFS-ENS_window_2025-08-01_2025-08-31`, `ECMWF-AIFS_window_2025-02-20_2025-03-05`, `GEFS_window_2024-11-01_None`, `GEFS_window_2025-07-01_2025-07-03`, `GEFS_window_2026-09-22_2026-09-24`, `GFS_window_2025-07-01_2025-07-02`, `WeatherNext3_window_2026-09-20_2026-09-20` | `downloads/NWP/windows/<same name>/` | D3 |
+| `weather/CERRA` (the wind-level, direction, surface and grid files are all downloads) | `downloads/reanalysis/CERRA/`, files unchanged | D4 |
+| `weather/CAMS` | `downloads/reanalysis/CAMS/`. `beam_diffuse_cams*.parquet` go to `site_points/`; the `cams_site_*.csv` downloads stay | D4 |
+| `weather/ERA5` | `downloads/reanalysis/ERA5/`. `beam_diffuse_open_meteo*.parquet` and `wind_era5*.parquet` go to `site_points/`; the `beam_diffuse/*.zip` downloads, `wind_native_cds.parquet`, `wind_native_chunks` and `_cds_smoke_test.nc` stay | D4 |
+| `weather/ICON-DREAM-EU` | `downloads/reanalysis/ICON-DREAM-EU/`. `beam_diffuse_icon-dream-eu.parquet` goes to `site_points/` | D4 |
+| `weather/NORA3`, `weather/NORA3_10m` | `downloads/reanalysis/NORA3/`, `downloads/reanalysis/NORA3_10m/`, files unchanged | D4 |
+| `weather/MIDAS-OPEN` | `downloads/observations/MIDAS-OPEN/`, files unchanged | D4 |
+| `weather/SARAH-3` | `downloads/observations/SARAH-3/`. `beam_diffuse_sarah-3.parquet` goes to `site_points/` | D4 |
+| `anm/` (the CSV export, `export_cap_23.parquet`, `README.md`, `superseded/`) | `downloads/observations/NGED-ANM/`, with the export-cap parquet beside the CSV | D4 |
+| `weather/ECMWF-AIFS`, `ECMWF-AIFS-ENS`, `ECMWF-IFS-SINGLE-RUNS`, `GEFS`, `GFS` | `downloads/NWP/<same name>/`, files unchanged | D5 |
+| `weather/WeatherNext3_trial_area` | `downloads/NWP/WeatherNext3/` (`trial_area.zarr`, `_grid_cells.parquet`) | D5 |
+| `weather/OPEN-METEO-ENSEMBLE-MEANS` | `downloads/NWP/OPEN-METEO-ENSEMBLE-MEANS/`, files unchanged | D5 |
+| `weather/ENS` (`beam_diffuse_ens.parquet`, `beam_diffuse_ens_wind.parquet`, `README.md`) | `downloads/NWP/ENS_SITE_EXTRACT/site_points/` for the two parquet files, `downloads/NWP/ENS_SITE_EXTRACT/README.md` for the README | D5 |
+| the 22 folders `nwp_forecast_comparison_{aifs,aifs_blends,aifs_extra_days,day4_shared,day5_aifs_wn3,leaderboard_by_day,leaderboard_by_day_fig3,leads,leads_day10,leads_day10b,leads_day10c,leads_day10d,p4_seeds,product_blends,product_blends_report,vs_ens_dots,vs_ens_dots_all_days,vs_ens_dots_blends,vs_ens_dots_blends_final,vs_ens_dots_final,wn3,wn3_extra_days}` | `per_study/nwp_forecast_comparison/<batch>/`, the suffix being the batch name, with every file, `verification/` and `superseded/` unchanged | D6 |
+| the flat files of `nwp_forecast_comparison/` (`report.md`, `solar_*`, `wind_*`, `verification/`) | `per_study/nwp_forecast_comparison/original/`, files unchanged | D6 |
+| `ens_forecast_horizons/{ens_members,solar_inputs,wind_inputs,solar_member_summary,wind_member_summary}.parquet` (top level only) | `downloads/NWP/ENS_SITE_EXTRACT/` | D7 |
+| `ens_forecast_horizons_day4/` (`ens_members_day4.parquet`, `README.md`) | `downloads/NWP/ENS_SITE_EXTRACT/` | D7 |
+| `ens_forecast_horizons/era_covered/` (its own `solar_inputs`, `wind_inputs` and member summaries differ from the top-level files) | `per_study/ens_forecast_horizons/era_covered/`, unchanged, so nothing collides | D7 |
+| the rest of `ens_forecast_horizons/` (losses, predictions, rows, weights, `intervals`, `leaderboard`, `report.md`, `superseded/`) | `per_study/ens_forecast_horizons/`, files unchanged | D7 |
+| `beam_diffuse_split/beam_diffuse_dataset_*.parquet` (13 frames, written through `dataset_path_for`) | `per_study/beam_diffuse_split/inputs/` | D7 |
+| `beam_diffuse_split/{beam_diffuse_ens_horizons,beam_diffuse_figures,beam_diffuse_multi_nwp,beam_diffuse_weather_products,beam_diffuse_wind_products,blend_products,past_weather_v2,satellite_blend,superseded}` and `era5_source_agreement.json` | `per_study/beam_diffuse_split/`, files unchanged | D7 |
+| `open_meteo_ensemble_means`, `open_meteo_ens_gap`, `icon_eu_compare`, `era5_wind_compare`, `ens_backfill_pilot` | `per_study/<same name>/`, files unchanged. `frame_*.parquet` moves to `inputs/` only where one path constant writes it | D7 |
+| `weather/UKV-CEDA`, `UKV-CEDA-part2`, `UKV-CEDA-part3` | `downloads/NWP/UKV-CEDA/`, `downloads/NWP/UKV-CEDA-part2/`, `downloads/NWP/UKV-CEDA-part3/`, three stores, never merged | D8 |
+| `weather/UKV-CEDA-T120` | `downloads/NWP/UKV-CEDA-T120/` | D8 |
+| `weather/_t120_trial` | `downloads/NWP/windows/UKV-CEDA-T120_trial/` | D8 |
+| `ukv_ceda_blends`, `ukv_ceda_blends_run15` | `per_study/ukv_ceda_blends/` and `per_study/ukv_ceda_blends/run15/` | D8 |
 | `weather/_trial_area_box.json` | `_private/trial_area_box.json` | D8, last |
 | `weather/` itself | a read-only tombstone (below) | after D8 |
 
@@ -389,14 +399,16 @@ a silent failure into a loud one.
   one constants module (`studies.sources`, plus the existing `weather_downloads/paths.py` constant
   that now imports from it), the eight `_repo_data_dir()` copies are replaced by that module, and
   `STAMP_GLOB` and the ~25 folder names in `nwp_forecast_comparison/` become constants. **The
-  constants keep their old values**, so data stays where it is and the tests and the reproduction
-  check cover a change of structure only. The temporary directory in `build_dataset.py:315` and the
-  scratch constants in `fetch_cerra.py` and `fetch_cerra_grid.py` become one `SCRATCH_DIR` constant.
-  D1 also gives `check_arm_columns_unchanged.py` a required `--expected-stamps` argument, passed as 72
-  (today's `ls nwp_forecast_comparison_*/*_losses.json | wc -l`). The script exits non-zero when the
-  number of stamps it finds differs from the argument, and the argument has no default, so a glob
-  that matches too few stamps cannot pass.
-- **Step D2, folders no process reads:** `data/_scratch`, the top-level `superseded/`,
+  constants keep their old values** (`DOWNLOADS_DIR` and `PER_STUDY_DIR` both equal
+  `STUDIES_DATA_DIR` until their folders move), so data stays where it is and the tests and the
+  reproduction check cover a change of structure only. The temporary directory in
+  `build_dataset.py:315` and the scratch constants in `fetch_cerra.py` and `fetch_cerra_grid.py`
+  become one `SCRATCH_DIR` constant. D1 also gives `check_arm_columns_unchanged.py` a required
+  `--expected-stamps` argument, passed as 72 (today's `ls nwp_forecast_comparison_*/*_losses.json |
+  wc -l`). The script exits non-zero when the number of stamps it finds differs from the argument,
+  and the argument has no default, so a glob that matches too few stamps cannot pass.
+- **Step D2, folders no process reads** (the four `cerra_wind_*` folders land in
+  `per_study/cerra_wind/`)**:** `data/_scratch`, the top-level `superseded/`,
   `WeatherNext3_icechunk_test`, and the four `cerra_wind_*` folders. `fetch_cerra*.py` writes
   `_scratch`, so no CERRA fetch may be running.
 - **Step D3, the Previous Runs products and the window copies** (all but `_t120_trial`), with the
@@ -404,27 +416,27 @@ a silent failure into a loud one.
 - **Step D4, reanalysis, observations and `anm/`.** No fetch is running on these folders.
 - **Step D5, raw forecast products and the ENS per-site extract.**
 - **Step D6, `nwp_forecast_comparison` consolidation.** The ~25 constants, the guards and
-  `STAMP_GLOB` change in one PR, and the glob becomes `nwp_forecast_comparison/*/*_losses.json`.
+  `STAMP_GLOB` change in one PR, and the glob becomes `per_study/nwp_forecast_comparison/*/*_losses.json`.
   The glob skips `superseded/` folders and `ukv_ceda_blends/`, which are outside the 72, and the check
   still passes `--expected-stamps 72`. The wave does not start while any `fit_*` run is writing to a
   batch folder.
-- **Step D7, the shared ENS extract and the remaining study folders** (`ens_forecast_horizons`,
-  `ens_forecast_horizons_day4`, the `beam_diffuse_split` dataset frames, and the five small
-  studies). `fetch_ens_day4_supplement.py` and `build_forecast_inputs.ens_members` take the new
-  constant, the day-4 README's "never edit `ens_forecast_horizons/`" sentence is corrected, and
-  `two_shares.py`'s `FILES` entries follow.
+- **Step D7, the shared ENS extract and the remaining study folders**, each moving under
+  `per_study/` (`ens_forecast_horizons`, `ens_forecast_horizons_day4`, the `beam_diffuse_split`
+  dataset frames, and the five small studies). `fetch_ens_day4_supplement.py` and
+  `build_forecast_inputs.ens_members` take the new constant, the day-4 README's "never edit
+  `ens_forecast_horizons/`" sentence is corrected, and `two_shares.py`'s `FILES` entries follow.
 - **Step D8, work in flight, last.** `UKV-CEDA-T120`, `_t120_trial`, `ukv_ceda_blends` and
   `ukv_ceda_blends_run15` move only when no process writes to them. The `ukv-t120` unit is a
   transient `systemd-run` unit that has back-filled newest-first towards 2019-09 since 2026-10-02. It
   is stopped (`systemctl --user stop ukv-t120`), the store is moved, and the unit is restarted from a
-  checkout on the new code with `--store-dir` pointing at `NWP/UKV-CEDA-T120`, resuming from the
-  store's own state. If the back-fill still has weeks to run, only this wave waits: D2 to D7 do not
-  touch the T120 store, so the old `weather/` keeps the T120 store, `_t120_trial` and
+  checkout on the new code with `--store-dir` pointing at `downloads/NWP/UKV-CEDA-T120`, resuming
+  from the store's own state. If the back-fill still has weeks to run, only this wave waits: D2 to
+  D7 do not touch the T120 store, so the old `weather/` keeps the T120 store, `_t120_trial` and
   `_trial_area_box.json` until D8. `_trial_area_box.json` then moves last, and its old path keeps a
-  symlink until the restarted unit runs, because `fetch_ukv_ceda.py` in the `ukv-ceda` worktree reads
-  that path. `UKV-CEDA`, `-part2` and `-part3` move as three separate stores, only while no fetch is
-  running on them. **Never moved:** the MOGREPS copy on `/mnt/wd_18tb`, and the `nwp-archive*` stores
-  and caches.
+  symlink until the restarted unit runs, because `fetch_ukv_ceda.py` in the `ukv-ceda` worktree
+  reads that path. `UKV-CEDA`, `-part2` and `-part3` move as three separate stores, only while no
+  fetch is running on them. **Never moved:** the MOGREPS copy on `/mnt/wd_18tb`, and the
+  `nwp-archive*` stores and caches.
 
 **A symlink is left at each old path while a wave runs, and the `STAMP_GLOB` double match is handled
 explicitly.** A symlink to a directory is followed by `pathlib`, `pl.scan_parquet`, `pl.scan_delta`
@@ -444,17 +456,21 @@ refusals still fire. Four cases need care:
 - **A symlink cannot replace a folder a writer holds open**, which is why step D8 waits.
 
 **A symlink is removed only when no referrer remains anywhere, and the old `weather/` then becomes a
-tombstone.** A writer running stale code calls `mkdir(parents=True, exist_ok=True)`, which silently
-recreates a removed path and writes a fresh copy there, and the write-once refusals do not fire
-because the path no longer exists. Before removing a symlink, `grep` for its old path in every
-checkout listed by `git worktree list`, in `~/.config/systemd/user`, in the transient units shown by
-`systemctl --user list-units`, and in `/mnt/data/*.sh`. When `weather/` is empty, replace it with a
-read-only tombstone (an empty directory with mode 555, or a regular file), so a stale writer fails
-loudly. The tombstone stays until no worktree holds code that names the old paths.
+tombstone.** Study folders that keep their name (`beam_diffuse_split`, `ens_forecast_horizons` and
+the others) also leave a symlink at `data/studies/<study>` pointing into `per_study/`, and the same
+removal rule applies to it. A writer running stale code calls `mkdir(parents=True, exist_ok=True)`,
+which silently recreates a removed path and writes a fresh copy there, and the write-once refusals
+do not fire because the path no longer exists. Before removing a symlink, `grep` for its old path in
+every checkout listed by `git worktree list`, in `~/.config/systemd/user`, in the transient units
+shown by `systemctl --user list-units`, and in `/mnt/data/*.sh`. When `weather/` is empty, replace
+it with a read-only tombstone (an empty directory with mode 555, or a regular file), so a stale
+writer fails loudly. The tombstone stays until no worktree holds code that names the old paths.
 
 **The `era_fold_design` files follow the data.** `two_shares.py`, `saved_cov.py` and `common.py` name
-`data/studies/beam_diffuse_split` and `data/studies`. Each wave that moves a folder one of them names
-updates the literal in the same PR, so the two scripts that still run keep resolving their inputs.
+`data/studies/beam_diffuse_split` and `data/studies`, which become
+`data/studies/per_study/beam_diffuse_split` and the matching `downloads/` or `per_study/` path. Each
+wave that moves a folder one of them names updates the literal in the same PR, so the two scripts
+that still run keep resolving their inputs.
 
 **Step G, deleting `data.old` (separate and gated, not part of any move).** `data.old` (143 GB, on
 the root device) holds a stale copy of the Dagster tables (`NGED`, `NWP`, `power_forecasts`,
@@ -486,7 +502,8 @@ gains one row per script folder.
 explicit go-ahead in chat.** The verdicts come from a read-only check on 2026-10-05 of what reads
 each folder (a grep of `studies/`, `packages/`, `docs/`, `plans/`, `scripts/` and the skills on
 `main`, and a hash of every file above 1 MB that shares its size with another file). Other branches
-were not read.
+were not read. Paths in this section are old paths from the table above, and each lands under
+`downloads/` or `per_study/` in its wave.
 
 - **WeatherNext 3 test folders:** delete `WeatherNext3_icechunk_test` (67 MB, the output of the fetch
   script's own test mode, read by nothing) and `WeatherNext3_window_2026-09-20_2026-09-20` (0.9 MB, the
@@ -520,12 +537,13 @@ were not read.
       `_piecewise`. The grep checks names, not each quoted number, so a reviewer confirms that the
       page's figures come from the `_piecewise` entries before the deletion.
 - **Stale READMEs under `data/` (73 `README*.md` files):** one `sed` pass after the last wave rewrites
-  `data/studies/weather/<dir>` to the new path, and manual fixes cover the rest. Two READMEs name
-  `ECMWF-AIFS-WIDE` and `ECMWF-AIFS-ENS-WIDE`, which no longer exist, and the `ERA5` and `CAMS`
-  READMEs omit the `_2026-08-20_2026-09-21` extension files. READMEs are not regenerated, because
-  regeneration needs the network and rewrites `lineage.json` with a new `retrieved_at_utc`. Stamps do
-  not hash READMEs (a grep of every `*.json`, `*.fingerprint` and `*.txt` under `data/studies` found
-  no mention), so editing them changes no hash the manifest comparison checks.
+  `data/studies/weather/<dir>` to its path under `data/studies/downloads/`, and manual fixes cover
+  the rest. Two READMEs name `ECMWF-AIFS-WIDE` and `ECMWF-AIFS-ENS-WIDE`, which no longer exist, and
+  the `ERA5` and `CAMS` READMEs omit the `_2026-08-20_2026-09-21` extension files. READMEs are not
+  regenerated, because regeneration needs the network and rewrites `lineage.json` with a new
+  `retrieved_at_utc`. Stamps do not hash READMEs (a grep of every `*.json`, `*.fingerprint` and
+  `*.txt` under `data/studies` found no mention), so editing them changes no hash the manifest
+  comparison checks.
 
 ## Order of mechanical steps
 
@@ -621,8 +639,10 @@ implementer adds a per-row bit-for-bit check: write the row frame the script bui
   input would land in the shared `data/`, which this plan promises never to touch, so the
   reproduction fails loudly: it runs the scripts as a user without write permission on the shared
   `data/` if the machine allows that, and otherwise takes a `find data -newer <marker>` listing
-  before and after, and any file the listing shows is a failure. The implementer measures with `du`
-  first (`ens_forecast_horizons/` alone is 4.8 GB).
+  before and after, and any file the listing shows is a failure. The scratch root mirrors the layout
+  in force. Reproduction runs before any data moves, so it mirrors the old layout, and a later
+  re-check mirrors `downloads/` (symlinks) and `per_study/` (real copies of the folders written).
+  The implementer measures with `du` first (`ens_forecast_horizons/` alone is 4.8 GB).
 - **Compare outputs.** Run the scripts on the branch into the scratch root and compare each
   `report.md`, `intervals.parquet` and leaderboard output against the file already on disk in the
   shared `data/studies/`, using `cmp` for reports and a Polars `frame_equal` for parquet files.
@@ -655,14 +675,17 @@ implementer adds a per-row bit-for-bit check: write the row frame the script bui
   manifest is compared with the D0 baseline through the old-to-new map: every hash reappears
   exactly once, and the file count per folder matches. Active folders are skipped and re-baselined
   after they finish. Stamps are re-checked by recomputing `inputs_sha256` and `published_sha256`
-  against the files at their new paths. At the end, this grep returns nothing:
+  against the files at their new paths. At the end, these two greps return nothing. The second
+  catches every kind folder and study folder named without its `downloads/` or `per_study/` layer:
 
   ```bash
   grep -rnE "studies/weather|nwp_forecast_comparison_[a-z]|data/_scratch|data/studies/anm" \
     studies packages docs .claude CLAUDE.md
+  grep -rnE "data/studies/(NWP|reanalysis|observations|beam_diffuse_split|ens_forecast_horizons|nwp_forecast_comparison|ukv_ceda_blends|cerra_wind|open_meteo_ens|icon_eu_compare|era5_wind_compare|ens_backfill_pilot)" \
+    studies packages docs .claude CLAUDE.md
   ```
 
-  The same grep runs in every checkout listed by `git worktree list` before a symlink is removed.
+  The same greps run in every checkout listed by `git worktree list` before a symlink is removed.
   `check_arm_columns_unchanged.py` must report the baseline stamp count, and its
   `--expected-stamps 72` argument fails the run if it finds fewer.
 - **`era_fold_design` reproduction check.** The audit and this plan found that
@@ -697,7 +720,8 @@ implementer adds a per-row bit-for-bit check: write the row frame the script bui
 - **Outside `docs/`:** a `grep` finds 177 lines in scripts and READMEs under `studies/` and
   `packages/` that name a script path, plus the skills that name a path, `pyproject.toml` comments,
   `studies/README.md`, and `packages/studies/README.md`.
-- **Data paths:** the files that name `data/studies/weather`, `anm/`, `ens_forecast_horizons/`
+- **Data paths:** the files that name `data/studies/weather`, `anm/`,
+  a kind folder or study folder without its `downloads/` or `per_study/` layer, `ens_forecast_horizons/`
   parquet names or `nwp_forecast_comparison_<batch>` are updated in the wave that moves them. The
   audit counts hits in `docs/studies/forecasts/matched-lead.md` (19), `docs/studies/past-weather/wind.md`
   (11), `solar.md` (6), `ensemble-means.md` (4), `cerra-wind-levels.md` (3), `beam-diffuse-split.md`
