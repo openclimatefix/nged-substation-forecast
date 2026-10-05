@@ -12,14 +12,18 @@ wrote, and writes SVG files into a new `--figures-dir`, each written once.
   `fit_ukv_ceda_blends.reading` gives from the saved intervals.
 - `<domain>_generators.svg`: P1 at the primary setting, for each generator alone, one panel per
   lead day. This figure is exploratory.
-- `<domain>_errors.svg`: each XGBoost model's own mean absolute error with its 95% interval, one
-  panel per lead day, at both settings, read from the `error` rows of `intervals.parquet`.
+- `<domain>_errors.svg`: each XGBoost model's own mean absolute error at the primary setting, one
+  row per lead day and one mark per model, with no interval, from the `error` rows of
+  `intervals.parquet`.
+- `<domain>_generator_errors.svg`: the padded ENS model's and the blend's mean absolute error at
+  each generator alone, one panel per lead day, from the `generator_error` rows.
 - `<domain>_week<k>.svg`: measured output and the day-1 blend's out-of-fold forecast for each
   generator over one week of era `k - 1`. The week is chosen by `nwp_forecast_charts.choose_week`
   from measured output alone, and the axis counts days 1 to 7, so no figure carries a calendar date.
   The months and years of the weeks are printed for the page's text.
 
-Two post hoc figures read the rows a later report adds (`--post-hoc-only` draws only these):
+Three post hoc figures read the rows a later report adds. They are drawn whenever the intervals
+hold older-run rows, and `--post-hoc-only` draws only these:
 
 - `solar_permutation.svg`: for each solar lead day, the 17 shuffled controls' differences from
   padded ENS as grey ticks and the planned blend's P1 as a marker, with its rank and permutation
@@ -83,7 +87,6 @@ from studies.charts import (  # noqa: E402
     CONTENT_WIDTH_PX,
     figure,
     interval_panel,
-    leaderboard_panel,
 )
 from studies.guards import refuse_to_overwrite  # noqa: E402
 
@@ -92,14 +95,20 @@ DOMAINS: Final[tuple[DomainType, DomainType]] = ("solar", "wind")
 FIGURE_NUMBERS: Final[dict[tuple[DomainType, str], int]] = {
     ("solar", "headline"): 1,
     ("wind", "headline"): 2,
-    ("solar", "generators"): 3,
-    ("wind", "generators"): 4,
+    ("solar", "weeks"): 3,
+    ("wind", "weeks"): 4,
     ("solar", "errors"): 5,
     ("wind", "errors"): 6,
-    ("solar", "weeks"): 7,
-    ("wind", "weeks"): 8,
+    ("solar", "generator_errors"): 7,
+    ("wind", "generator_errors"): 8,
+    ("wind", "generators"): 9,
+    ("solar", "generators"): 10,
+    ("solar", "permutation"): 11,
+    ("solar", "older"): 12,
+    ("wind", "older"): 13,
 }
-"""The figure's number on the page. A week figure is captioned with its number and a letter."""
+"""The figure's number on the page, in the order the figures appear. A week figure is captioned with
+its number and a letter."""
 
 PRIMARY_LABEL: Final[str] = "Primary setting"
 SENSITIVITY_LABEL: Final[str] = "Sensitivity setting"
@@ -111,8 +120,8 @@ SETTING_LABELS: Final[dict[str, str]] = {
 
 READING_LABELS: Final[dict[str, str]] = {
     "lowers": "planned rule met",
-    fit.UNRESOLVED_LOWER: "unresolved (lower than padded ENS, control test not passed)",
-    fit.NO_DETECTABLE_DIFFERENCE: "inconclusive (a gain is not excluded)",
+    fit.UNRESOLVED_LOWER: "unresolved, control test not passed",
+    fit.NO_DETECTABLE_DIFFERENCE: "inconclusive",
     "raises": "blend raises the error",
 }
 """A reading's panel-title label, where the key `lowers` or `raises` stands for the verdict
@@ -121,11 +130,14 @@ READING_LABELS: Final[dict[str, str]] = {
 TITLES: Final[dict[DomainType, str]] = {
     "solar": (
         "For six solar farms, adding UKV-CEDA lowered the ENS mean's error by about 0.1 points of "
-        "capacity at lead days 1 to 3, and day 4 is inconclusive"
+        "capacity at lead days 1 to 3. The planned rule is met at day 3 only, and day 4 is "
+        "inconclusive"
     ),
     "wind": (
         "For three wind farms, adding UKV-CEDA's winds lowered the ENS mean's error at lead days 1 "
-        "and 2 under every check, day 3 rests on February 2026, and day 4 is inconclusive"
+        "and 2 at both hyperparameter settings, against both shuffled controls, after the "
+        "Bonferroni correction, and with any one month dropped. Day 3 rests on February 2026, and "
+        "day 4 is inconclusive"
     ),
 }
 """Each headline figure's title, written by hand after reading the intervals, the Bonferroni
@@ -134,12 +146,12 @@ rule alone would state a verdict per lead day that those checks do not support. 
 a title are machine-printed in the subtitle."""
 
 ARM_LABELS: Final[dict[fit_aifs.BlendRoleType, str]] = {
-    "_pad": "ENS mean, padded to the same column count",
+    "_pad": "Padded ENS mean",
     "": "ENS mean + UKV-CEDA",
-    "_control": "ENS mean + shuffled UKV-CEDA, seed 0",
-    "_control_b": "ENS mean + shuffled UKV-CEDA, seed 1000",
+    "_control": "Shuffled, seed 0",
+    "_control_b": "Shuffled, seed 1000",
 }
-"""The error figure's row label of each arm, by its role."""
+"""The error figures' name of each arm, by its role, in the order the figures draw them."""
 
 P1_LABEL: Final[str] = "Blend minus padded ENS"
 P2_LABEL: Final[str] = "Blend minus shuffled UKV-CEDA"
@@ -154,19 +166,15 @@ CONTRAST_LABELS: Final[dict[str, str]] = {
 
 AXIS_TITLE: Final[str] = "Error minus padded ENS's (points of capacity; more negative is better)"
 
-POST_HOC_FIGURE_NUMBERS: Final[dict[tuple[DomainType, str], int]] = {
-    ("solar", "permutation"): 9,
-    ("solar", "older"): 10,
-    ("wind", "older"): 11,
-}
-"""The post hoc figures' numbers, after the eight of `FIGURE_NUMBERS`."""
-
 OLDER_LABELS: Final[dict[str, str]] = {
     "fresh_p1_same_rows": "Planned blend minus padded ENS, same rows",
     "older_p1": "Older-run blend minus its padded ENS",
     "older_p2": "Older-run blend minus its shuffled control",
+    "older_vs_fresh": "Older-run blend minus planned blend",
 }
-"""The older-run figure's row labels, by contrast code in `intervals.parquet`."""
+"""The older-run figure's row labels, by contrast code in `intervals.parquet`. The last row is the
+contrast that decides whether the older-run blend differs from the planned blend: two rows that
+are each compared with padded ENS cannot show it."""
 
 FAMILY: Final[str] = "weather model"
 """Every row is the same kind of comparison, so every row takes the one family's colour."""
@@ -461,8 +469,30 @@ def headline(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatChart
     )
 
 
+ARM_COLOURS: Final[dict[fit_aifs.BlendRoleType, str]] = {
+    "_pad": ocf.ENSEMBLE_LINE,
+    "": ocf.DATA_BLUE,
+    "_control": ocf.BRAND_ORANGE,
+    "_control_b": ocf.DATA_GREEN,
+}
+"""Each arm's colour in the absolute-error figures, by its role."""
+
+ARM_SHAPES: Final[dict[fit_aifs.BlendRoleType, str]] = {
+    "_pad": "circle",
+    "": "diamond",
+    "_control": "square",
+    "_control_b": "triangle-up",
+}
+"""Each arm's mark shape, a backup to its colour."""
+
+ERROR_ROW_HEIGHT_PX: Final[int] = 24
+"""The height of one row of an absolute-error panel, before the marks are spread within it."""
+GENERATOR_ARM_ROLES: Final[tuple[fit_aifs.BlendRoleType, ...]] = ("_pad", "")
+"""The two arms the per-generator error figure draws; the shuffled controls are in the report."""
+
+
 def arm_error_rows(*, intervals: pl.DataFrame, domain: DomainType, day: int) -> pl.DataFrame:
-    """Shape one lead day's arms, each with its own absolute error, for `leaderboard_panel`.
+    """Shape one lead day's arms, each with its own absolute error, in a fixed arm order.
 
     Args:
         intervals: `intervals.parquet`'s rows.
@@ -470,67 +500,129 @@ def arm_error_rows(*, intervals: pl.DataFrame, domain: DomainType, day: int) -> 
         day: The lead day.
 
     Returns:
-        One row per arm and setting, in points of capacity, best primary-setting error first. A
-        sensitivity-setting row is a `reference` row, which the panel draws as a lighter hollow
-        mark.
+        One row per arm at the primary setting, in points of capacity, in the order of
+        `ARM_LABELS`, with the arm's label and role.
     """
-    arms = {fit.arm_name(day=day, role=role): label for role, label in ARM_LABELS.items()}
+    names = {fit.arm_name(day=day, role=role): role for role in ARM_LABELS}
     errors = scale_of(
         frame=intervals.filter(
             pl.col("domain") == domain,
             pl.col("day") == day,
             pl.col("contrast") == "error",
-            pl.col("scope").is_in(list(arms)),
+            pl.col("setting") == fit.PRIMARY,
+            pl.col("scope").is_in(list(names)),
         )
     )
-    best_first = (
-        errors.filter(pl.col("setting") == fit.PRIMARY).sort("difference")["scope"].to_list()
-    )
-    rank = {arm: index for index, arm in enumerate(best_first)}
-    setting_order = {setting: index for index, setting in enumerate(SETTING_LABELS)}
+    order = {role: index for index, role in enumerate(ARM_LABELS)}
     return (
         errors.with_columns(
-            rank=pl.col("scope").replace_strict(rank, return_dtype=pl.Int8),
-            setting_order=pl.col("setting").replace_strict(setting_order, return_dtype=pl.Int8),
+            role=pl.col("scope").replace_strict(names, return_dtype=pl.String),
         )
-        .sort("rank", "setting_order")
+        .with_columns(order=pl.col("role").replace_strict(order, return_dtype=pl.Int8))
+        .sort("order")
         .select(
-            label=pl.concat_str(
-                pl.col("scope").replace_strict(arms, return_dtype=pl.String),
-                pl.col("setting").replace_strict(
-                    {fit.PRIMARY: ", primary setting", fit.SENSITIVITY: ", sensitivity setting"},
-                    return_dtype=pl.String,
-                ),
-            ),
-            family=pl.lit(FAMILY),
-            reference=pl.col("setting") == fit.SENSITIVITY,
+            "role",
+            label=pl.col("role").replace_strict(ARM_LABELS, return_dtype=pl.String),
             value=pl.col("difference"),
-            lower_95=pl.col("lower"),
-            upper_95=pl.col("upper"),
         )
     )
 
 
 def errors_title(*, intervals: pl.DataFrame, domain: DomainType) -> str:
-    """State the padded ENS model's error at lead day 1 and lead day 4, from the saved intervals."""
-    padded = {
-        day: float(
-            arm_error_rows(intervals=intervals, domain=domain, day=day).filter(
-                pl.col("label") == f"{ARM_LABELS['_pad']}, primary setting"
-            )["value"][0]
-        )
-        for day in (build.LEAD_DAYS[0], build.LEAD_DAYS[-1])
+    """State the padded ENS model's error at lead days 1 and 4 and how far the arms differ.
+
+    Args:
+        intervals: `intervals.parquet`'s rows.
+        domain: `solar` or `wind`.
+
+    Returns:
+        The title: the padded ENS model's error at the first and last lead day, and the largest
+        gap between the highest and the lowest of the four arms at any lead day, all at the primary
+        setting.
+    """
+    by_day = {
+        day: arm_error_rows(intervals=intervals, domain=domain, day=day) for day in build.LEAD_DAYS
     }
+    first, last = build.LEAD_DAYS[0], build.LEAD_DAYS[-1]
+    padded = {
+        day: float(rows.filter(pl.col("role") == "_pad")["value"].to_numpy()[0])
+        for day, rows in by_day.items()
+    }
+    spread = max(float(np.ptp(rows["value"].to_numpy())) for rows in by_day.values())
     return (
         f"For {TECHNOLOGY_NAMES[domain]}, an XGBoost model given ENS's mean alone has a mean "
-        f"absolute error of {padded[build.LEAD_DAYS[0]]:.1f}% of capacity at lead day "
-        f"{build.LEAD_DAYS[0]} and {padded[build.LEAD_DAYS[-1]]:.1f}% at lead day "
-        f"{build.LEAD_DAYS[-1]}"
+        f"absolute error of {padded[first]:.1f}% of capacity at lead day {first} and "
+        f"{padded[last]:.1f}% at lead day {last}, and the four models differ by at most "
+        f"{spread:.2f} points at any lead day"
+    )
+
+
+def arm_dot_panel(
+    *,
+    frame: pl.DataFrame,
+    row_order: Sequence[str],
+    x_domain: tuple[float, float],
+    x_title: str,
+    panel_title: str,
+    roles: Sequence[fit_aifs.BlendRoleType],
+    row_height: int = ERROR_ROW_HEIGHT_PX,
+) -> alt.LayerChart:
+    """Draw one mark per (row, arm): a row of the panel is a lead day or a generator.
+
+    Args:
+        frame: Columns `row` (the row's label), `role` (the arm's role), and `value` (the error).
+        row_order: The rows from top to bottom.
+        x_domain: The shared x range.
+        x_title: The x axis title, or an empty string for no title.
+        panel_title: The panel's title.
+        roles: The arm roles drawn, whose labels, colours, and shapes form the key.
+        row_height: The height of one row. The arms' marks are spread evenly down the row, so
+            marks of nearly equal value do not hide one another.
+
+    Returns:
+        The panel.
+    """
+    labels = [ARM_LABELS[role] for role in roles]
+    step = row_height / (len(roles) + 1)
+    offsets = [step * (index - (len(roles) - 1) / 2) for index in range(len(roles))]
+    drawn = frame.with_columns(
+        arm=pl.col("role").replace_strict(ARM_LABELS, return_dtype=pl.String)
+    )
+    marks = (
+        alt.Chart(drawn)
+        .mark_point(filled=True, size=70, opacity=0.9, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X(
+                "value:Q",
+                scale=alt.Scale(domain=list(x_domain), nice=False),
+                title=x_title or None,
+            ),
+            y=alt.Y("row:N", sort=list(row_order), title=None),
+            color=alt.Color(
+                "arm:N",
+                scale=alt.Scale(domain=labels, range=[ARM_COLOURS[role] for role in roles]),
+                legend=alt.Legend(title=None, columns=2, symbolOpacity=1),
+            ),
+            shape=alt.Shape(
+                "arm:N",
+                scale=alt.Scale(domain=labels, range=[ARM_SHAPES[role] for role in roles]),
+            ),
+            yOffset=alt.YOffset("arm:N", scale=alt.Scale(domain=labels, range=offsets)),
+        )
+    )
+    return alt.layer(marks).properties(  # ty: ignore[invalid-return-type]
+        width=CONTENT_WIDTH_PX - 160,
+        height=row_height * len(row_order),
+        title=alt.TitleParams(panel_title, anchor="start", frame="group"),
     )
 
 
 def errors(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatChart:
-    """Draw every arm's own absolute error at every lead day: one panel per lead day.
+    """Draw every arm's own absolute error: one row per lead day, the four arms in a fixed order.
+
+    The figure draws the primary setting and no intervals. The arms' errors differ by far less than
+    the intervals on any one arm's level, which swing with the weather every arm shares, so the
+    intervals would hide the differences the figure exists to show.
 
     Args:
         intervals: `intervals.parquet`'s rows.
@@ -539,32 +631,147 @@ def errors(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatChart:
     Returns:
         The figure.
     """
-    rows = {
-        day: arm_error_rows(intervals=intervals, domain=domain, day=day) for day in build.LEAD_DAYS
-    }
-    shared = x_domain_of(rows=list(rows.values()))
-    panels = [
-        leaderboard_panel(
-            rows=day_rows,
-            x_domain=(0.0, shared[1]),
-            x_title=ABSOLUTE_ERROR_X_TITLE if day == build.LEAD_DAYS[-1] else "",
-            panel_title=f"Lead day {day}",
-            keys=False,
+    rows = pl.concat(
+        arm_error_rows(intervals=intervals, domain=domain, day=day).with_columns(
+            row=pl.lit(f"Lead day {day}")
         )
-        for index, (day, day_rows) in enumerate(rows.items())
-    ]
+        for day in build.LEAD_DAYS
+    )
+    low, high = padded_domain(
+        low=float(rows["value"].to_numpy().min()),
+        high=float(rows["value"].to_numpy().max()),
+        include_zero=False,
+    )
+    panel = arm_dot_panel(
+        frame=rows,
+        row_order=[f"Lead day {day}" for day in build.LEAD_DAYS],
+        x_domain=(low, high),
+        x_title=ABSOLUTE_ERROR_X_TITLE,
+        panel_title="Primary setting",
+        roles=list(ARM_LABELS),
+        row_height=ERROR_ROW_HEIGHT_PX * 2,
+    )
     return figure(
-        panels=panels,
+        panels=[panel],
         number=FIGURE_NUMBERS[(domain, "errors")],
         title=errors_title(intervals=intervals, domain=domain),
         subtitle=[
             (
-                "Mean absolute error of each XGBoost model, in percent of capacity, with its 95% "
-                "interval from resampling whole months and a fitting seed. The arms share their "
-                "rows, so these intervals are wider than the paired differences in the headline "
-                "figure, which cancel the month-to-month swing every arm shares. Each arm has two "
-                "rows: the primary setting, and the sensitivity setting as a lighter hollow row. "
-                "Arms are sorted best first at the primary setting."
+                "Mean absolute error of each XGBoost model at the primary setting, in percent of "
+                "capacity, one row per lead day and one mark per model. Shuffled is the ENS mean "
+                "plus UKV-CEDA's columns shuffled within generator, year-month, and hour of day, "
+                "under the seed named. The tables on this page "
+                "give both settings. The marks carry no interval: every model's error rises and "
+                "falls together from month to month, which makes an interval on one model's level "
+                "far wider than the gaps between models. The paired intervals on those gaps are in "
+                "the headline figure."
+            ),
+            f"{scope_note(intervals=intervals, domain=domain)} {CAPACITY_NOTE}",
+        ],
+        figure_planning=None,
+    )
+
+
+def generator_error_rows(*, intervals: pl.DataFrame, domain: DomainType, day: int) -> pl.DataFrame:
+    """Shape one lead day's per-generator absolute errors of the padded ENS model and the blend.
+
+    Args:
+        intervals: `intervals.parquet`'s rows.
+        domain: `solar` or `wind`.
+        day: The lead day.
+
+    Returns:
+        One row per generator and arm, in points of capacity, with the generator's label in `row`.
+    """
+    names = {fit.arm_name(day=day, role=role): role for role in GENERATOR_ARM_ROLES}
+    prefix = f"{fit.GENERATOR_ERROR_SCOPE} "
+    rows = intervals.filter(
+        pl.col("domain") == domain,
+        pl.col("day") == day,
+        pl.col("contrast") == "generator_error",
+        pl.col("scope").str.starts_with(prefix),
+    ).with_columns(
+        site=pl.col("scope").str.replace(prefix, "", literal=True).str.split(": ").list.get(0),
+        arm=pl.col("scope").str.split(": ").list.get(1),
+    )
+    check_anonymised(frame=rows.select("site"), domain=domain)
+    return (
+        rows.filter(pl.col("arm").is_in(list(names)))
+        .sort("site")
+        .select(
+            row="Generator " + pl.col("site"),
+            role=pl.col("arm").replace_strict(names, return_dtype=pl.String),
+            value=pl.col("difference") * PERCENTAGE_POINTS,
+        )
+    )
+
+
+def generator_errors_title(*, intervals: pl.DataFrame, domain: DomainType) -> str:
+    """State the range of the blend's per-generator error at the first and last lead day.
+
+    Args:
+        intervals: `intervals.parquet`'s rows.
+        domain: `solar` or `wind`.
+
+    Returns:
+        The title, from the saved errors.
+    """
+    first, last = build.LEAD_DAYS[0], build.LEAD_DAYS[-1]
+    ranges = {}
+    for day in (first, last):
+        rows = generator_error_rows(intervals=intervals, domain=domain, day=day).filter(
+            pl.col("role") == ""
+        )
+        values = rows["value"].to_numpy()
+        ranges[day] = (float(values.min()), float(values.max()))
+    return (
+        f"At {TECHNOLOGY_NAMES[domain]}, the blend's mean absolute error runs from "
+        f"{ranges[first][0]:.1f}% to {ranges[first][1]:.1f}% of capacity at lead day {first}, and "
+        f"from {ranges[last][0]:.1f}% to {ranges[last][1]:.1f}% at lead day {last}"
+    )
+
+
+def generator_errors(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatChart:
+    """Draw the absolute error at each generator alone: one panel per lead day.
+
+    Args:
+        intervals: `intervals.parquet`'s rows.
+        domain: `solar` or `wind`.
+
+    Returns:
+        The figure, with the padded ENS model and the blend at the primary setting.
+    """
+    rows = {
+        day: generator_error_rows(intervals=intervals, domain=domain, day=day)
+        for day in build.LEAD_DAYS
+    }
+    everything = pl.concat(rows.values())
+    low, high = padded_domain(
+        low=float(everything["value"].to_numpy().min()),
+        high=float(everything["value"].to_numpy().max()),
+        include_zero=False,
+    )
+    order = sorted(set(everything["row"].to_list()))
+    panels = [
+        arm_dot_panel(
+            frame=day_rows,
+            row_order=order,
+            x_domain=(low, high),
+            x_title=ABSOLUTE_ERROR_X_TITLE if day == build.LEAD_DAYS[-1] else "",
+            panel_title=f"Lead day {day}",
+            roles=GENERATOR_ARM_ROLES,
+        )
+        for day, day_rows in rows.items()
+    ]
+    return figure(
+        panels=panels,
+        number=FIGURE_NUMBERS[(domain, "generator_errors")],
+        title=generator_errors_title(intervals=intervals, domain=domain),
+        subtitle=[
+            (
+                "Mean absolute error of the padded ENS model and of the blend at each generator "
+                "alone, at the primary setting, in percent of capacity. The report prints the "
+                "same errors for the two shuffled controls."
             ),
             f"{scope_note(intervals=intervals, domain=domain)} {CAPACITY_NOTE}",
         ],
@@ -603,6 +810,34 @@ def generator_rows(*, intervals: pl.DataFrame, domain: DomainType, day: int) -> 
     )
 
 
+def generators_title(*, intervals: pl.DataFrame, domain: DomainType) -> str:
+    """State at which lead days every generator's point estimate is below zero, and how far.
+
+    Args:
+        intervals: `intervals.parquet`'s rows.
+        domain: `solar` or `wind`.
+
+    Returns:
+        A finding if every generator's P1 point estimate is below zero at lead day 1 and at every
+        lead day up to some day, giving the range of those estimates, else a plain description.
+    """
+    below: list[int] = []
+    estimates: list[float] = []
+    for day in build.LEAD_DAYS:
+        values = generator_rows(intervals=intervals, domain=domain, day=day)["difference"]
+        if float(values.to_numpy().max()) >= 0.0:
+            break
+        below.append(day)
+        estimates += values.to_list()
+    name = TECHNOLOGY_NAMES[domain]
+    if not below:
+        return f"At each of {name}, adding UKV-CEDA to the ENS mean changes the error differently"
+    return (
+        f"At each of {name}, the blend's point estimate is below padded ENS's at "
+        f"{days_text(days=below)}, by {-max(estimates):.2f} to {-min(estimates):.2f} points"
+    )
+
+
 def generators(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatChart:
     """Draw P1 at each generator alone, one panel per lead day, on one shared axis.
 
@@ -635,10 +870,7 @@ def generators(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatCha
     return figure(
         panels=panels,
         number=FIGURE_NUMBERS[(domain, "generators")],
-        title=(
-            f"At each of {TECHNOLOGY_NAMES[domain]}, adding UKV-CEDA to the ENS mean "
-            "changes the error by a different amount"
-        ),
+        title=generators_title(intervals=intervals, domain=domain),
         subtitle=[
             (
                 "Difference in mean absolute error between the blend and ENS's mean padded to the "
@@ -741,7 +973,7 @@ def permutation_figure(*, intervals: pl.DataFrame) -> alt.VConcatChart:
             .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
         )
         panel = (ticks + marker + zero).properties(
-            width=CONTENT_WIDTH_PX - 120,
+            width=CONTENT_WIDTH_PX - 40,
             height=44,
             title=alt.TitleParams(title, anchor="start", frame="group"),
         )
@@ -756,7 +988,7 @@ def permutation_figure(*, intervals: pl.DataFrame) -> alt.VConcatChart:
             ),
             *panels,
         ],
-        number=POST_HOC_FIGURE_NUMBERS[("solar", "permutation")],
+        number=FIGURE_NUMBERS[("solar", "permutation")],
         title=(
             "For six solar farms, the planned blend's gain over padded ENS is larger than all "
             f"17 shuffled controls' at {where}"
@@ -886,7 +1118,7 @@ def older_figure(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatC
     ]
     return figure(
         panels=panels,
-        number=POST_HOC_FIGURE_NUMBERS[(domain, "older")],
+        number=FIGURE_NUMBERS[(domain, "older")],
         title=older_title(intervals=intervals, domain=domain),
         subtitle=[
             (
@@ -894,9 +1126,10 @@ def older_figure(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatC
                 "arm minus second, in points of capacity; negative means the first forecasts "
                 "better. All rows are the rows where the older run is present. The older run "
                 "leads 12 hours longer than the planned run, so the figure cannot separate the "
-                "longer lead from the earlier start. Filled dot: primary setting. Lighter hollow "
-                "mark: sensitivity setting. Line: 95% interval from resampling whole months and a "
-                "fitting seed."
+                "longer lead from the earlier start. At lead days 1 and 2 the older run also has "
+                "more hours rebuilt from 3-hourly steps, which the figure cannot separate "
+                "either. Filled dot: primary setting. Lighter hollow mark: sensitivity setting. "
+                "Line: 95% interval from resampling whole months and a fitting seed."
             ),
             f"{scope_note(intervals=intervals, domain=domain)} {CAPACITY_NOTE}",
         ],
@@ -1043,13 +1276,14 @@ def weeks(
         domain: `solar` or `wind`.
 
     Returns:
-        Each era code to its figure and the week's month and year, for the page's text.
+        Each era code to its figure and the week's month and year, for the page's text. The
+        figures are lettered in order from `a`, so an era with no week leaves no gap.
     """
     check_anonymised(frame=losses, domain=domain)
     series = measured_and_forecast(losses=losses, predictions=predictions, arm=BLEND_ARM_DAY1)
     figures: dict[int, tuple[alt.VConcatChart, str]] = {}
-    for era, week in era_weeks(series=series, domain=domain).items():
-        letter = f"{FIGURE_NUMBERS[(domain, 'weeks')]}{'abc'[era]}"
+    for index, (era, week) in enumerate(era_weeks(series=series, domain=domain).items()):
+        letter = f"{FIGURE_NUMBERS[(domain, 'weeks')]}{'abc'[index]}"
         figures[era] = (
             week_figure(series=series, week=week, domain=domain, letter=letter),
             f"{week:%B %Y}",
@@ -1114,7 +1348,8 @@ def main() -> int:
     )
     args = parser.parse_args()
     intervals = pl.read_parquet(args.results_dir / args.intervals_name)
-    if args.post_hoc_only:
+    has_post_hoc = not intervals.filter(pl.col("scope") == fit.OLDER_SCOPE).is_empty()
+    if has_post_hoc:
         post_hoc = {
             "solar_permutation.svg": permutation_figure(intervals=intervals),
             **{
@@ -1124,12 +1359,14 @@ def main() -> int:
         }
         for name, chart in post_hoc.items():
             write_figure(chart=chart, path=args.figures_dir / name, svgo=not args.no_svgo)
+    if args.post_hoc_only:
         return 0
     for domain in DOMAINS:
         figures = {
             f"{domain}_headline.svg": headline(intervals=intervals, domain=domain),
             f"{domain}_generators.svg": generators(intervals=intervals, domain=domain),
             f"{domain}_errors.svg": errors(intervals=intervals, domain=domain),
+            f"{domain}_generator_errors.svg": generator_errors(intervals=intervals, domain=domain),
         }
         stage = fit.Stage(domain=domain, day=1)
         losses = fit.saved_losses(output_dir=args.results_dir, stage=stage)

@@ -193,6 +193,24 @@ OLDER_ROLES: Final[tuple[fit_aifs.BlendRoleType, ...]] = ("_pad", "", "_control"
 OLDER_SCOPE: Final[str] = "post hoc older run"
 """The `scope` of every older-run interval in `intervals.parquet`."""
 
+HOURLY_LEAD_LIMIT_HOURS: Final[int] = 48
+"""The store holds UKV-CEDA hourly to this lead and every 3 hours after it, so a row read beyond
+this lead holds values rebuilt from 3-hourly steps."""
+
+OLDER_SPLIT_SCOPES: Final[dict[bool, str]] = {
+    True: f"{OLDER_SCOPE}, lead 48 hours or less",
+    False: f"{OLDER_SCOPE}, lead beyond 48 hours",
+}
+"""The scope of a day-1 older-run contrast on the rows at or before the hourly limit (`True`) and
+beyond it (`False`). Neither equals `OLDER_SCOPE`, so no chart reads these rows as the whole."""
+
+TIME_RESOLUTION_CAVEAT: Final[str] = (
+    "The store holds UKV-CEDA hourly only to lead 48 hours, so at lead days 1 and 2 more of this "
+    "run's hours are rebuilt from 3-hourly steps than the planned run's. The contrast therefore "
+    "also changes the time resolution of the UKV-CEDA columns."
+)
+"""The sentence the post hoc stale and older-run sections carry on the confound they share."""
+
 PADDING_CHECK_NAME: Final[str] = "padding_check.json"
 """Where `--check` writes whether ENS's mean alone and its padded copy score identically."""
 
@@ -1377,12 +1395,25 @@ def scoped_line(
     return f"| {label} | {text} | {differences.shape[1]} | {n_months} |"
 
 
-def generator_error_lines(*, losses: pl.DataFrame, arms: Sequence[str]) -> list[str]:
+GENERATOR_ERROR_SCOPE: Final[str] = "generator error"
+"""The scope prefix of a per-generator absolute error in `intervals.parquet`, followed by
+`<site>: <arm>`. The row carries the mean error, with no interval."""
+
+
+def generator_error_lines(
+    *,
+    losses: pl.DataFrame,
+    arms: Sequence[str],
+    stage: Stage,
+    records: list[IntervalRecord],
+) -> list[str]:
     """Format each arm's mean absolute error at each generator alone, with no interval.
 
     Args:
         losses: Per-row losses at one setting, holding every arm of `arms`.
         arms: The arms to show, as columns.
+        stage: The stage, whose technology and lead day label each record.
+        records: Where each mean error is appended for `intervals.parquet`, at the primary setting.
 
     Returns:
         A Markdown table of percent of capacity, one row per generator in label order.
@@ -1390,10 +1421,29 @@ def generator_error_lines(*, losses: pl.DataFrame, arms: Sequence[str]) -> list[
     means = (
         losses.filter(pl.col("arm").is_in(list(arms)))
         .group_by("site", "arm")
-        .agg(error=pl.col(METRIC).mean() * PERCENTAGE_POINTS)
-        .pivot(on="arm", index="site", values="error")
-        .sort("site")
+        .agg(
+            error=pl.col(METRIC).mean() * PERCENTAGE_POINTS,
+            n_rows=pl.col("time").n_unique(),
+            n_months=pl.col("time").dt.strftime("%Y-%m").n_unique(),
+        )
     )
+    records.extend(
+        {
+            "domain": stage.domain,
+            "day": stage.day,
+            "setting": PRIMARY,
+            "contrast": "generator_error",
+            "scope": f"{GENERATOR_ERROR_SCOPE} {row['site']}: {row['arm']}",
+            "level": float("nan"),
+            "difference": row["error"] / PERCENTAGE_POINTS,
+            "lower": float("nan"),
+            "upper": float("nan"),
+            "n_rows": row["n_rows"],
+            "n_months": row["n_months"],
+        }
+        for row in means.sort("site", "arm").iter_rows(named=True)
+    )
+    table = means.pivot(on="arm", index="site", values="error").sort("site")
     lines = [
         "Mean absolute error at each generator alone (primary setting, % of capacity):",
         "",
@@ -1402,7 +1452,7 @@ def generator_error_lines(*, losses: pl.DataFrame, arms: Sequence[str]) -> list[
     ]
     lines += [
         f"| {row['site']} | " + " | ".join(f"{row[arm]:.3f}" for arm in arms) + " |"
-        for row in means.iter_rows(named=True)
+        for row in table.iter_rows(named=True)
     ]
     return lines
 
@@ -1718,7 +1768,12 @@ def stage_lines(
             )
     lines += [
         "",
-        *generator_error_lines(losses=per_setting[PRIMARY], arms=stage_arms(day=stage.day)),
+        *generator_error_lines(
+            losses=per_setting[PRIMARY],
+            arms=stage_arms(day=stage.day),
+            stage=stage,
+            records=records,
+        ),
         "",
         *control_gap_lines(
             per_setting=per_setting,
@@ -1873,7 +1928,7 @@ def stale_lines(
             f"planned padded ENS reference were fitted on all {planned.frame.height} rows, and "
             f"every contrast below scores the same {rows.height} rows. The last contrast is the "
             f"measured effect of the planned reference's extra training rows, and bounds the tilt "
-            f"in the stale-versus-planned contrast."
+            f"in the stale-versus-planned contrast. {TIME_RESOLUTION_CAVEAT}"
         ),
         "",
         "| Contrast (points) | Primary | Sensitivity |",
@@ -2130,6 +2185,99 @@ class OlderReading(NamedTuple):
     p1: dict[str, BootstrapInterval]
     p2: dict[str, BootstrapInterval]
     fresh_p1: dict[str, BootstrapInterval]
+    vs_fresh: dict[str, BootstrapInterval]
+
+
+def older_lead_hours(*, day: int) -> pl.Expr:
+    """Return the lead, in hours, at which the older run is read for each row of a stage.
+
+    The lead is `24 * (day + extra_days) - run_hour + h`, where `h` is the hour of the row's `time`
+    label: the build's rule, which for a solar label (the hour ending at it) is the instant's hour
+    plus 1.
+
+    Args:
+        day: The ENS lead day.
+
+    Returns:
+        An expression over `time`.
+    """
+    spec = build.OLDER_RUN
+    return pl.col("time").dt.hour() + (24 * (day + spec.extra_days) - spec.run_hour)
+
+
+def older_split_lines(
+    *,
+    planned: PlannedStage,
+    on_rows: Mapping[str, pl.DataFrame],
+    records: list[IntervalRecord],
+) -> list[str]:
+    """Split a day-1 older-run stage at the store's hourly limit, from the saved losses.
+
+    The older run is read at a lead of up to 56 hours at day 1, past the store's 48 hours of hourly
+    steps, where the planned run is hourly throughout. Scoring the rows at or before lead 48 hours
+    keeps both runs hourly. The rows beyond it are the late hours of the day, so the split also
+    separates hours of the day.
+
+    Args:
+        planned: The stage and its rows, whose `older_frame` is set.
+        on_rows: The stage's losses at each setting, on the older-run rows.
+        records: Where every printed interval is appended for `intervals.parquet`.
+
+    Returns:
+        The section's Markdown lines, or an empty list at a lead day other than 1.
+    """
+    stage, rows = planned.stage, planned.older_frame
+    if rows is None or stage.day != 1:
+        return []
+    pad, fresh, _, _ = stage_arms(day=stage.day)
+    older_pad, older, _ = older_arms(day=stage.day)
+    pairs = {
+        "older_p1": (older, older_pad),
+        "fresh_p1_same_rows": (fresh, pad),
+        "older_vs_fresh": (older, fresh),
+    }
+    hourly = rows.select(
+        "site", "time", hourly=older_lead_hours(day=stage.day) <= HOURLY_LEAD_LIMIT_HOURS
+    )
+    lines = [
+        (
+            f"Post hoc split of day {stage.day} at the store's hourly limit, scored from the "
+            f"saved losses: the older run is read at lead {HOURLY_LEAD_LIMIT_HOURS} hours or less "
+            "(hourly steps) or beyond (3-hourly steps rebuilt hourly). The planned run is hourly "
+            "throughout. The rows beyond the limit are the late hours of the day."
+        ),
+        "",
+        "| Rows | Share of rows | Contrast (points) | Primary | Sensitivity |",
+        "|---|---|---|---|---|",
+    ]
+    for is_hourly, scope in OLDER_SPLIT_SCOPES.items():
+        keys = hourly.filter(pl.col("hourly") == is_hourly).select("site", "time")
+        share = keys.height / rows.height
+        label = (
+            f"lead {HOURLY_LEAD_LIMIT_HOURS} hours or less"
+            if is_hourly
+            else f"lead beyond {HOURLY_LEAD_LIMIT_HOURS} hours"
+        )
+        for code, (treatment, reference) in pairs.items():
+            by_setting = {
+                setting: difference(
+                    losses=on_rows[setting].join(keys, on=["site", "time"]),
+                    treatment=treatment,
+                    reference=reference,
+                )
+                for setting in SETTINGS
+            }
+            records.extend(
+                record(stage=stage, setting=setting, contrast=code, scope=scope, interval=interval)
+                for setting, interval in by_setting.items()
+            )
+            lines.append(
+                f"| {label} ({keys.height} rows) | {share:.1%} | {OLDER_CONTRASTS[code]} "
+                f"| {interval_cell(interval=by_setting[PRIMARY])} "
+                f"| {interval_cell(interval=by_setting[SENSITIVITY])} |"
+            )
+    lines.append("")
+    return lines
 
 
 def older_lines(
@@ -2200,7 +2348,8 @@ def older_lines(
             "control, and its padded ENS reference were fitted on those rows. The planned blend "
             f"and the planned padded ENS reference were fitted on all {planned.frame.height} "
             f"rows, and every contrast below scores the same {rows.height} rows. The last "
-            "contrast is the measured effect of the planned reference's extra training rows."
+            "contrast is the measured effect of the planned reference's extra training rows. "
+            f"{TIME_RESOLUTION_CAVEAT}"
         ),
         "",
         "| Contrast (points) | Primary | Sensitivity |",
@@ -2247,12 +2396,19 @@ def older_lines(
                 f"| {row['n_months']} |"
             )
     lines.append("")
+    lines += older_split_lines(planned=planned, on_rows=on_rows, records=records)
     return lines, OlderReading(
         reading=verdict,
         p1=intervals["older_p1"],
         p2=intervals["older_p2"],
         fresh_p1=intervals["fresh_p1_same_rows"],
+        vs_fresh=intervals["older_vs_fresh"],
     )
+
+
+OLDER_READING_COLUMN: Final[str] = "Post hoc reading (one control seed, no Bonferroni correction)"
+"""The older-run readings column's heading: it rests on P1 and one control at the unadjusted 95%
+level, where a planned reading rests on both controls and the corrected intervals."""
 
 
 def older_summary_lines(*, readings: Mapping[tuple[str, int], OlderReading]) -> list[str]:
@@ -2262,11 +2418,13 @@ def older_summary_lines(*, readings: Mapping[tuple[str, int], OlderReading]) -> 
     scale = PERCENTAGE_POINTS
     lines = [
         (
-            "| Technology | Lead day | Reading | Planned P1, same rows, primary / sensitivity "
+            f"| Technology | Lead day | {OLDER_READING_COLUMN} "
+            "| Planned P1, same rows, primary / sensitivity "
             "| Older-run P1, primary / sensitivity "
-            "| Older-run P2 (control), primary / sensitivity |"
+            "| Older-run P2 (control), primary / sensitivity "
+            "| Older-run blend minus planned blend, primary / sensitivity |"
         ),
-        "|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|",
     ]
     for (domain, day), item in readings.items():
         cells = [
@@ -2276,10 +2434,55 @@ def older_summary_lines(*, readings: Mapping[tuple[str, int], OlderReading]) -> 
                 f"{interval[setting]['upper_95'] * scale:+.3f}]"
                 for setting in SETTINGS
             )
-            for interval in (item.fresh_p1, item.p1, item.p2)
+            for interval in (item.fresh_p1, item.p1, item.p2, item.vs_fresh)
         ]
         lines.append(f"| {domain} | {day} | {item.reading} | " + " | ".join(cells) + " |")
     return lines
+
+
+def kept_gain_lines(*, records: Sequence[IntervalRecord]) -> list[str]:
+    """Format the share of the planned gain that each post hoc blend keeps, empty if none is saved.
+
+    The share is the post hoc blend's P1 point estimate over the planned blend's P1 on the same
+    rows. It is a ratio of two estimates, so it carries no interval, and it is read only where both
+    estimates are well below zero.
+
+    Args:
+        records: Every printed interval.
+
+    Returns:
+        A Markdown table with one row per technology, lead day, and post hoc blend.
+    """
+    point = {
+        (r["domain"], r["day"], r["setting"], r["contrast"], r["scope"]): r["difference"]
+        for r in records
+    }
+    lines: list[str] = []
+    for blend, scope, contrast in (
+        ("stale", STALE_SCOPE, "stale_p1"),
+        ("older run", OLDER_SCOPE, "older_p1"),
+    ):
+        for domain in fit_aifs.DOMAINS:
+            for day in DAYS:
+                shares = []
+                for setting in SETTINGS:
+                    planned = point.get((domain, day, setting, "fresh_p1_same_rows", scope))
+                    post_hoc = point.get((domain, day, setting, contrast, scope))
+                    if planned is None or post_hoc is None:
+                        break
+                    shares.append(f"{post_hoc / planned:.0%}")
+                else:
+                    lines.append(f"| {blend} | {domain} | {day} | {' / '.join(shares)} |")
+    if not lines:
+        return []
+    return [
+        (
+            "| Post hoc blend | Technology | Lead day | Share of the planned gain kept, "
+            "primary / sensitivity |"
+        ),
+        "|---|---|---|---|",
+        *lines,
+    ]
 
 
 def columns_lines() -> list[str]:
@@ -2305,6 +2508,7 @@ def report_text(
     padding_line: str,
     permutation_summary: Sequence[str] = (),
     older_summary: Sequence[str] = (),
+    kept_summary: Sequence[str] = (),
 ) -> str:
     """Return `report.md`: the design, the readings, the columns, and every stage.
 
@@ -2316,6 +2520,7 @@ def report_text(
         padding_line: The sentence on whether padded and unpadded ENS score identically.
         permutation_summary: The post hoc permutation test's table, empty if none is saved.
         older_summary: The post hoc older-run readings table, empty if none is saved.
+        kept_summary: The share of the planned gain each post hoc blend keeps, empty if none.
 
     Returns:
         The report.
@@ -2338,9 +2543,10 @@ def report_text(
             "UKV-CEDA's lead is 3 hours fresher than ENS's at every hour, which favours the "
             "blend, so the planned contrasts cannot separate UKV-CEDA's weather from its later "
             "run; the post hoc stale blend, where UKV-CEDA's run is 21 hours staler than ENS's, "
-            "tests that. UKV-CEDA's wind columns are native 10 m and 925 hPa winds, not 100 m "
-            "winds, so a wind gain may come from a second vertical level. Rows lost to each cause "
-            "are in the folder's `README.md`."
+            "tests that, and it also changes UKV-CEDA's lead and, at days 1 and 2, its time "
+            "resolution. UKV-CEDA's wind columns are its native 10 m and 925 hPa winds, where "
+            "ENS's are 10 m and 100 m, so part of a wind gain may come from the 925 hPa level. "
+            "Rows lost to each cause are in the folder's `README.md`."
         ),
         "",
         "## Readings",
@@ -2388,13 +2594,29 @@ def report_text(
                     "starts 9 hours before ENS's 00 UTC run, where the planned blend's run starts "
                     "3 hours after it, and the lead is 12 hours longer. It cannot separate the "
                     "effect of the longer lead from the effect of the earlier start, because "
-                    "the two change together. The planned P1 on the same rows is the reference."
+                    "the two change together, and at days 1 and 2 more of its hours are "
+                    "rebuilt from 3-hourly steps. The planned P1 on the same rows is the "
+                    "reference."
                 ),
                 "",
                 *older_summary,
                 "",
             ]
             if older_summary
+            else []
+        ),
+        *(
+            [
+                (
+                    "Post hoc: the share of the planned gain that each post hoc blend keeps, the "
+                    "post hoc blend's P1 over the planned blend's P1 on the same rows (point "
+                    "estimates, no interval)."
+                ),
+                "",
+                *kept_summary,
+                "",
+            ]
+            if kept_summary
             else []
         ),
         cpu_line,
@@ -2512,6 +2734,7 @@ def build_report(*, planned: Sequence[PlannedStage], output_dir: Path) -> tuple[
             padding_line=padding_check_line(output_dir=output_dir),
             permutation_summary=permutation_summary_lines(summaries=permutations),
             older_summary=older_summary_lines(readings=older_readings),
+            kept_summary=kept_gain_lines(records=records),
         ),
         pl.DataFrame(records),
     )

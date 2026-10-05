@@ -855,7 +855,11 @@ def test_each_arms_error_is_listed_per_generator_in_percent_of_capacity():
     _, losses = _report_stage()
     primary = losses.filter(pl.col("setting") == PRIMARY)
 
-    lines = fit.generator_error_lines(losses=primary, arms=fit.stage_arms(day=2))
+    records: list[fit.IntervalRecord] = []
+
+    lines = fit.generator_error_lines(
+        losses=primary, arms=fit.stage_arms(day=2), stage=Stage("wind", 2), records=records
+    )
 
     assert lines[2].startswith("| Generator | `blend_ukv_ceda_day2_pad` | `blend_ukv_ceda_day2` |")
     rows = [line for line in lines if line.startswith(("| W1", "| W2"))]
@@ -864,6 +868,13 @@ def test_each_arms_error_is_listed_per_generator_in_percent_of_capacity():
     assert pad_error == pytest.approx(10.0, abs=0.5)
     blend_error = float(rows[0].split("|")[3])
     assert blend_error < pad_error
+    by_scope = {r["scope"]: r for r in records}
+    assert len(records) == 8
+    saved = by_scope["generator error W1: blend_ukv_ceda_day2_pad"]
+    assert saved["contrast"] == "generator_error"
+    assert saved["setting"] == PRIMARY
+    assert saved["difference"] * 100 == pytest.approx(pad_error, abs=1e-3)
+    assert saved["n_rows"] == 60
 
 
 def test_a_predictions_file_left_without_its_losses_is_never_overwritten(
@@ -1392,6 +1403,8 @@ def test_the_stale_section_scores_every_contrast_on_the_stale_rows_and_reads_bot
     text = "\n".join(lines)
     assert "Post hoc: ENS day 2 plus UKV-CEDA day 3, wind" in text
     assert "21 hours staler than ENS's" in text
+    assert "hourly only to lead 48 hours" in text
+    assert "also changes the time resolution" in text
     assert stale_reading == "lowers the error at day 2"
     stale_rows = stage.stale_frame
     assert stale_rows is not None
@@ -2075,6 +2088,8 @@ def test_the_older_section_scores_every_contrast_on_the_older_rows_against_its_o
     assert "Post hoc: ENS day 2 plus UKV-CEDA's older run, wind" in text
     assert "starts 9 hours before ENS's 00 UTC run" in text
     assert "its lead is 12 hours longer" in text
+    assert "hourly only to lead 48 hours" in text
+    assert "also changes the time resolution" in text
     assert (
         "cannot separate the effect of the longer lead from the effect of the earlier start" in text
     )
@@ -2146,17 +2161,142 @@ def test_the_older_readings_table_gives_both_settings_of_each_contrast():
         PRIMARY: _interval(difference=-0.01, lower=-0.012, upper=-0.008),
         SENSITIVITY: _interval(difference=-0.009, lower=-0.011, upper=-0.007),
     }
+    versus = {
+        PRIMARY: _interval(difference=0.008, lower=0.001, upper=0.012),
+        SENSITIVITY: _interval(difference=0.007, lower=-0.001, upper=0.011),
+    }
 
     lines = fit.older_summary_lines(
-        readings={("wind", 1): fit.OlderReading(reading="x", p1=p1, p2=p2, fresh_p1=fresh)}
+        readings={
+            ("wind", 1): fit.OlderReading(
+                reading="x", p1=p1, p2=p2, fresh_p1=fresh, vs_fresh=versus
+            )
+        }
     )
 
+    assert "one control seed, no Bonferroni correction" in lines[0]
+    assert "Older-run blend minus planned blend" in lines[0]
     assert lines[2] == (
         "| wind | 1 | x | -1.000 [-1.200, -0.800] / -0.900 [-1.100, -0.700] "
         "| -0.200 [-0.300, -0.100] / -0.100 [-0.200, +0.050] "
-        "| -0.400 [-0.500, -0.300] / -0.300 [-0.400, -0.200] |"
+        "| -0.400 [-0.500, -0.300] / -0.300 [-0.400, -0.200] "
+        "| +0.800 [+0.100, +1.200] / +0.700 [-0.100, +1.100] |"
     )
     assert fit.older_summary_lines(readings={}) == []
+
+
+def _record_of(
+    *, day: int, setting: str, contrast: str, scope: str, difference: float
+) -> fit.IntervalRecord:
+    return {
+        "domain": "wind",
+        "day": day,
+        "setting": setting,
+        "contrast": contrast,
+        "scope": scope,
+        "level": 95.0,
+        "difference": difference,
+        "lower": difference - 0.001,
+        "upper": difference + 0.001,
+        "n_rows": 10,
+        "n_months": 10,
+    }
+
+
+def test_the_kept_gain_table_divides_each_post_hoc_gain_by_the_planned_gain_on_the_same_rows():
+    records = [
+        _record_of(day=2, setting=s, contrast=c, scope=scope, difference=d)
+        for s, planned, stale, older in (
+            (PRIMARY, -0.2, -0.13, -0.1),
+            (SENSITIVITY, -0.1, -0.1, -0.1),
+        )
+        for c, scope, d in (
+            ("fresh_p1_same_rows", fit.STALE_SCOPE, planned),
+            ("stale_p1", fit.STALE_SCOPE, stale),
+            ("fresh_p1_same_rows", fit.OLDER_SCOPE, planned * 2),
+            ("older_p1", fit.OLDER_SCOPE, older),
+        )
+    ]
+
+    lines = fit.kept_gain_lines(records=records)
+
+    assert "| stale | wind | 2 | 65% / 100% |" in lines
+    assert "| older run | wind | 2 | 25% / 50% |" in lines
+    assert fit.kept_gain_lines(records=[]) == []
+
+
+def test_the_older_run_lead_is_the_build_rule_and_the_split_sits_at_the_hourly_limit():
+    times = [datetime(2025, 3, 5, hour, tzinfo=UTC) for hour in (0, 15, 16, 23)]
+
+    leads = pl.DataFrame({"time": times}).select(
+        day1=fit.older_lead_hours(day=1), day2=fit.older_lead_hours(day=2)
+    )
+
+    # 24 * (day + 1) - 15 + hour.
+    assert leads["day1"].to_list() == [33, 48, 49, 56]
+    assert leads["day2"].to_list() == [57, 72, 73, 80]
+    assert fit.HOURLY_LEAD_LIMIT_HOURS == 48
+
+
+def test_the_day_one_older_split_scores_rows_at_and_beyond_the_hourly_limit_apart(
+    few_resamples: None,
+):
+    base, _ = _report_stage()
+    early = base.frame.with_columns(time=pl.col("time").dt.replace(hour=15))
+    late = base.frame.with_columns(time=pl.col("time").dt.replace(hour=16))
+    frame = pl.concat([early, late])
+    stage = base._replace(stage=Stage("wind", 1), frame=frame, older_frame=frame)
+    arms = {
+        "blend_ukv_ceda_day1_pad": 0.10,
+        "blend_ukv_ceda_day1": 0.09,
+        "blend_ukv_ceda_run15_day1_pad": 0.10,
+        "blend_ukv_ceda_run15_day1": 0.095,
+    }
+    losses = pl.concat(
+        frame.with_columns(
+            arm=pl.lit(arm),
+            setting=pl.lit(setting),
+            seed=pl.lit(seed),
+            signed_error_capped_mw=pl.lit(0.0),
+            **{
+                METRIC: pl.when(pl.col("time").dt.hour() == 15)
+                .then(level)
+                .otherwise(level + (0.02 if arm.endswith("run15_day1") else 0.0))
+            },
+        )
+        for arm, level in arms.items()
+        for setting in (PRIMARY, SENSITIVITY)
+        for seed in range(3)
+    )
+    on_rows = {
+        setting: losses.filter(pl.col("setting") == setting).drop("setting")
+        for setting in (PRIMARY, SENSITIVITY)
+    }
+    records: list[fit.IntervalRecord] = []
+
+    lines = fit.older_split_lines(planned=stage, on_rows=on_rows, records=records)
+
+    by_scope = {
+        (r["scope"], r["contrast"]): r["difference"] for r in records if r["setting"] == PRIMARY
+    }
+    assert by_scope[(fit.OLDER_SPLIT_SCOPES[True], "older_vs_fresh")] == pytest.approx(0.005)
+    assert by_scope[(fit.OLDER_SPLIT_SCOPES[False], "older_vs_fresh")] == pytest.approx(0.025)
+    assert by_scope[(fit.OLDER_SPLIT_SCOPES[False], "fresh_p1_same_rows")] == pytest.approx(-0.01)
+    assert fit.OLDER_SPLIT_SCOPES[True].endswith("lead 48 hours or less")
+    assert fit.OLDER_SPLIT_SCOPES[False].endswith("lead beyond 48 hours")
+    assert fit.OLDER_SCOPE not in {scope for scope, _ in by_scope}
+    assert any("lead 48 hours or less (" in line and "50.0%" in line for line in lines)
+    assert any("lead beyond 48 hours (" in line and "50.0%" in line for line in lines)
+
+
+def test_the_older_split_is_empty_at_other_lead_days_and_without_older_rows():
+    base, losses = _report_stage()
+    with_rows = base._replace(older_frame=base.frame)
+
+    assert fit.older_split_lines(planned=with_rows, on_rows={}, records=[]) == []
+    day1 = base._replace(stage=Stage("wind", 1))
+    assert fit.older_split_lines(planned=day1, on_rows={}, records=[]) == []
+    assert not losses.is_empty()
 
 
 def test_the_report_adds_the_permutation_and_older_tables_only_when_they_are_given():

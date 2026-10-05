@@ -84,6 +84,12 @@ before the build and before every fit, and start only below a load average of ab
     older-run blend and writes `report_4.md` (see "Post hoc older run" below).
 13. `uv run python studies/ukv_ceda_blends/ukv_ceda_blends_charts.py --post-hoc-only --figures-dir DIR
     --intervals-name report_4_intervals.parquet` draws the permutation and older-run figures.
+14. `uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --report-only --post-hoc-older-run
+    --report-name report_5` writes `report_5.md` and `report_5_intervals.parquet` from the saved
+    losses, fitting nothing. The report adds the day-1 older-run split at lead 48 hours, the share of
+    the planned gain each post hoc blend keeps, and each arm's error at each generator.
+    `ukv_ceda_blends_charts.py --figures-dir DIR --intervals-name report_5_intervals.parquet` then
+    draws every figure of the page.
 
 ## Outputs the report adds after the first science review
 
@@ -105,7 +111,8 @@ before the build and before every fit, and start only below a load average of ab
   day 1, and writes `padding_check.json` once. The report prints the result.
 - **`intervals.parquet` rows.** Beside the planned and exploratory rows, `scope` can be
   `Bonferroni` (P1 at `level` 99.375), `control gap` (`contrast` `control_gap`),
-  `E6 most influential month dropped`, `post hoc stale` (contrasts `stale_p1`, `stale_p2`,
+  `E6 most influential month dropped`, `generator error <site>: <arm>` (contrast `generator_error`,
+  the arm's mean absolute error at one generator, with no interval), `post hoc stale` (contrasts `stale_p1`, `stale_p2`,
   `stale_p2b`, `stale_vs_fresh`, `fresh_p1_same_rows`, and `training_rows`), and the `error`
   contrast, whose `difference` is an arm's own mean absolute error and whose `scope` is the arm.
   The charts read every figure number from these rows.
@@ -146,7 +153,10 @@ instant, plus 1 for a solar label). That run starts 9 hours before ENS's 00 UTC 
 where the planned blend's run starts 3 hours after it, and leads 12 hours longer than the planned
 run. Day 4 cannot be built: its lead reaches 129 hours, beyond the store's 120, for every hour after
 14:00 UTC. The two changes, a longer lead and an earlier start against ENS, move together, so the
-arm cannot separate the effect of the lead from the effect of the timing. The arm has its own padded
+arm cannot separate the effect of the lead from the effect of the timing. The store is hourly only
+to lead 48 hours, so the older run also has more hours rebuilt from 3-hourly steps than the planned
+run has at days 1 and 2. At day 1 the older run is read at a lead of 33 to 56 hours, and the report
+splits the day-1 rows at lead 48 hours, where both runs are hourly. The arm has its own padded
 ENS reference refitted on its rows, one shuffled control (seed 0), and equal column counts (9 for
 solar, 11 for wind), at both settings, for both technologies. The report prints the older-run blend
 minus its padded ENS (P1), minus its control (P2), minus the planned blend, and the planned P1 on
@@ -167,8 +177,9 @@ guard, stamp checks, and init-time assertions as the main build, into
   `studies/nwp_forecast_comparison/` directory and changes neither. A stage whose losses exist is
   not refitted, and every output is written once.
 - `ukv_ceda_blends_charts.py` draws the headline figure (both settings' intervals, a title and panel
-  titles that state the reading), the per-generator figure, the per-arm absolute-error figure for
-  every lead day, and the week figures from the saved intervals, losses, and predictions.
+  titles that state the reading), the per-generator figure, the per-arm absolute-error figure with
+  no intervals, the per-generator absolute-error figure, the permutation and older-run figures, and
+  the week figures from the saved intervals, losses, and predictions.
 - `check_arm_columns_unchanged.py` is described in step 1. It cannot cover the main matched-lead
   fit, which wrote no stamp. No arm prefix there starts with `ukv_ceda`, so the new branch of
   `_wind_weather_fields` is never reached by that fit.
@@ -196,8 +207,8 @@ minutes before (a). The snapshots are not reweighted to land on -30 minutes.
   03 UTC runs of 2026-01-02 to 2026-09-28, the raw snapshots peaked about 10 minutes after their
   stamp (15 minutes at one generator), so the mean of two snapshots peaks about 20 minutes before
   its label instead of 30. Open-Meteo's UKV peaked 13 minutes before its stamp. The offset is a
-  property of the archive that no construction choice can remove. It handicaps the blend and does
-  not favour it, because every UKV-CEDA value comes from a run issued at least 21 hours ahead.
+  property of the archive that no construction choice can remove. The study does not measure how the
+  offset changes the error.
 
 - UKV-CEDA is the archive of the Met Office's UKV, which is statistically different from the live
   UKV feed. A model trained on UKV-CEDA must not be run on live UKV.

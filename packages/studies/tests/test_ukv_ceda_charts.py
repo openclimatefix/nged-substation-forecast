@@ -109,6 +109,20 @@ def _intervals(*, domain: DomainType) -> pl.DataFrame:
                 domain=domain,
                 day=day,
                 setting="primary",
+                contrast="generator_error",
+                scope=f"generator error {site}: blend_ukv_ceda_day{day}{role}",
+                difference=0.08 + 0.01 * index + (0.0 if role == "" else 0.002) + 0.01 * (day - 1),
+                lower=float("nan"),
+                upper=float("nan"),
+            )
+            for index, site in enumerate(SITES[domain])
+            for role in ("_pad", "", "_control")
+        )
+        records.extend(
+            _record(
+                domain=domain,
+                day=day,
+                setting="primary",
                 contrast="p1",
                 scope=f"E5 generator {site}",
                 difference=-0.001,
@@ -175,8 +189,8 @@ def test_the_headline_draws_one_panel_per_lead_day_under_a_title_that_states_the
     assert "Largest gain P1's interval does not exclude" in caption
     assert "day 4: primary " in caption
     assert "Lead day 1: planned rule met" in text
-    assert "Lead day 2: unresolved (lower than padded ENS, control test not passed)" in text
-    assert "Lead day 4: inconclusive (a gain is not excluded)" in text
+    assert "Lead day 2: unresolved, control test not passed" in text
+    assert "Lead day 4: inconclusive" in text
     assert "Negative means the blend forecasts better" in caption
     assert "3 hours fresher than ENS's at every hour" in caption
     assert "Filled dot: primary setting. Lighter hollow mark: sensitivity setting." in caption
@@ -204,36 +218,83 @@ def test_a_title_says_no_lead_day_survives_when_the_bonferroni_interval_reaches_
     assert "at no lead day" in charts.bonferroni_note(intervals=intervals, domain="wind")
 
 
-def test_the_error_rows_hold_each_arms_own_error_best_first_at_both_settings():
+def test_the_error_rows_hold_each_arms_own_primary_error_in_a_fixed_arm_order():
     rows = charts.arm_error_rows(intervals=_intervals(domain="wind"), domain="wind", day=2)
 
-    assert rows["label"].to_list()[::2] == [
-        "ENS mean + UKV-CEDA, primary setting",
-        "ENS mean + shuffled UKV-CEDA, seed 1000, primary setting",
-        "ENS mean, padded to the same column count, primary setting",
-        "ENS mean + shuffled UKV-CEDA, seed 0, primary setting",
-    ]
-    first, second = rows.row(0, named=True), rows.row(1, named=True)
-    assert first["value"] == pytest.approx(8.7)
-    assert first["lower_95"] == pytest.approx(8.2)
-    assert second["label"] == "ENS mean + UKV-CEDA, sensitivity setting"
-    assert second["value"] == pytest.approx(8.8)
-    assert rows["reference"].to_list() == [False, True] * 4
+    assert rows["role"].to_list() == ["_pad", "", "_control", "_control_b"]
+    assert rows["label"].to_list() == list(charts.ARM_LABELS.values())
+    assert rows["value"].to_list() == pytest.approx([9.0, 8.7, 9.1, 8.9])
 
 
-def test_the_error_figure_has_a_panel_per_lead_day_and_a_title_naming_the_errors():
+def test_the_error_figure_is_one_panel_of_lead_day_rows_under_a_title_naming_the_errors():
     chart = charts.errors(intervals=_intervals(domain="wind"), domain="wind")
 
     spec = chart.to_dict()
     title = " ".join(spec["title"]["text"])
-    assert len(spec["vconcat"]) == 4
     assert "Figure 6:" in title
     assert "ENS's mean alone has a mean absolute error of 8.0% of capacity at lead day 1" in title
-    assert "and 11.0% at lead day 4" in title
+    assert "11.0% at lead day 4" in title
+    assert "differ by at most 0.40 points at any lead day" in title
     text = json.dumps(spec)
     for day in (1, 2, 3, 4):
         assert f"Lead day {day}" in text
     assert "smaller is better" in text
+    assert "lowerBound" not in text.lower()
+    assert '"sort": ["Lead day 1", "Lead day 2", "Lead day 3", "Lead day 4"]' in text
+
+
+def test_the_generator_error_rows_hold_the_padded_arm_and_the_blend_at_each_generator():
+    rows = charts.generator_error_rows(intervals=_intervals(domain="wind"), domain="wind", day=2)
+
+    assert (
+        rows["row"].to_list() == ["Generator W1"] * 2 + ["Generator W2"] * 2 + ["Generator W3"] * 2
+    )
+    assert rows["role"].to_list() == ["_pad", ""] * 3
+    assert rows["value"].to_list()[:2] == pytest.approx([9.2, 9.0])
+
+
+def test_the_generator_error_figure_states_the_range_of_the_blends_error_in_its_title():
+    chart = charts.generator_errors(intervals=_intervals(domain="wind"), domain="wind")
+
+    spec = chart.to_dict()
+    title = " ".join(spec["title"]["text"])
+    assert len(spec["vconcat"]) == 4
+    assert "Figure 8:" in title
+    assert "runs from 8.0% to 10.0% of capacity at lead day 1" in title
+    assert "from 11.0% to 13.0% at lead day 4" in title
+    assert "Generator W3" in json.dumps(spec)
+
+
+def test_a_generator_error_row_with_a_label_that_is_not_anonymised_is_refused():
+    intervals = _intervals(domain="wind").with_columns(
+        scope=pl.col("scope").str.replace("error W1", "error Real name", literal=True)
+    )
+
+    with pytest.raises(ValueError, match="not anonymised labels"):
+        charts.generator_error_rows(intervals=intervals, domain="wind", day=1)
+
+
+def test_the_generator_title_names_the_days_every_estimate_is_below_zero_and_their_range():
+    intervals = _intervals(domain="solar")
+    assert "below padded ENS's at days 1, 2, 3, and 4, by 0.10 to 0.10 points" in (
+        charts.generators_title(intervals=intervals, domain="solar")
+    )
+    mixed = intervals.with_columns(
+        difference=pl.when((pl.col("day") == 3) & (pl.col("scope") == "E5 generator A"))
+        .then(0.002)
+        .otherwise(pl.col("difference"))
+    )
+
+    title = charts.generators_title(intervals=mixed, domain="solar")
+
+    assert "at days 1 and 2," in title
+    assert "day 3" not in title
+    zero = intervals.with_columns(
+        difference=pl.when((pl.col("day") == 2) & (pl.col("scope") == "E5 generator A"))
+        .then(0.0)
+        .otherwise(pl.col("difference"))
+    )
+    assert "at day 1," in charts.generators_title(intervals=zero, domain="solar")
 
 
 def test_the_generator_rows_carry_only_anonymised_labels_in_label_order():
@@ -258,6 +319,9 @@ def test_the_generator_figure_says_once_that_it_is_exploratory_and_its_interval_
     spec = chart.to_dict()
     caption = " ".join(spec["title"]["subtitle"])
 
+    assert "Figure 10: At each of the six solar farms, the blend's point estimate" in " ".join(
+        spec["title"]["text"]
+    )
     assert caption.count("All rows are exploratory.") == 1
     assert "does not cover differences between generators" in caption
     text = json.dumps(spec)
@@ -329,7 +393,7 @@ def test_the_week_figures_name_each_weeks_month_and_year_for_the_pages_text(
 
     assert set(figures) == {0, 1, 2}
     captions = [" ".join(chart.to_dict()["title"]["text"]) for chart, _ in figures.values()]
-    assert [c.split(":")[0] for c in captions] == ["Figure 8a", "Figure 8b", "Figure 8c"]
+    assert [c.split(":")[0] for c in captions] == ["Figure 4a", "Figure 4b", "Figure 4c"]
     months = [month for _, month in figures.values()]
     assert all(len(month.split()) == 2 and month.split()[1].isdigit() for month in months)
 
@@ -385,11 +449,19 @@ def test_the_open_gain_note_gives_the_machine_printed_bound_of_each_inconclusive
     assert charts.open_gain_note(intervals=clear, domain="wind") == ""
 
 
-def test_the_hand_written_titles_name_no_planned_verdict_and_call_day_four_inconclusive():
+def test_the_hand_written_titles_scope_their_claims_and_call_day_four_inconclusive():
     for title in charts.TITLES.values():
-        assert "planned rule" not in title
+        assert "every check" not in title
         assert "no detectable difference" not in title
         assert "day 4 is inconclusive" in title
+    assert "planned rule is met at day 3 only" in charts.TITLES["solar"]
+    for check in (
+        "both hyperparameter settings",
+        "both shuffled controls",
+        "Bonferroni correction",
+        "any one month dropped",
+    ):
+        assert check in charts.TITLES["wind"]
 
 
 def test_each_headline_carries_its_own_technologys_title():
@@ -449,6 +521,7 @@ def _post_hoc_intervals() -> pl.DataFrame:
                     ("fresh_p1_same_rows", -0.003),
                     ("older_p1", -0.001),
                     ("older_p2", -0.002),
+                    ("older_vs_fresh", 0.002),
                 ):
                     records.append(
                         _record(
@@ -461,6 +534,26 @@ def _post_hoc_intervals() -> pl.DataFrame:
                             lower=centre - 0.001,
                             upper=centre + 0.001,
                         )
+                    )
+                # The stale and the day-1 split sections hold rows under the same codes, which no
+                # older-run figure may read as the older run's own.
+                for scope in (
+                    "post hoc stale",
+                    "post hoc older run, lead 48 hours or less",
+                    "post hoc older run, lead beyond 48 hours",
+                ):
+                    records.extend(
+                        _record(
+                            domain=domain,
+                            day=day,
+                            setting=setting,
+                            contrast=code,
+                            scope=scope,
+                            difference=0.5,
+                            lower=0.4,
+                            upper=0.6,
+                        )
+                        for code in ("fresh_p1_same_rows", "older_p1", "older_vs_fresh")
                     )
     return pl.DataFrame(records)
 
@@ -484,20 +577,23 @@ def test_the_permutation_figure_titles_each_panel_with_its_rank_and_the_figure_w
     assert "rank 4 of 18, p-value 0.222" in text
     assert "larger than all 17 shuffled controls' at day 1" in text
     assert "cannot go below 0.056" in text
-    assert "Figure 9:" in text
+    assert f'"width": {charts.CONTENT_WIDTH_PX - 40}' in text
+    assert "Figure 11:" in text
 
 
-def test_the_older_rows_hold_three_contrasts_at_both_settings_in_points():
+def test_the_older_rows_hold_four_contrasts_at_both_settings_in_points_from_the_whole_older_scope():
     rows = charts.older_rows(intervals=_post_hoc_intervals(), domain="wind", day=2)
 
-    assert rows["label"].to_list()[:2] == [
-        "Planned blend minus padded ENS, same rows",
-        "Planned blend minus padded ENS, same rows",
+    assert rows["label"].to_list() == [
+        label for label in charts.OLDER_LABELS.values() for _ in range(2)
     ]
-    assert rows.height == 6
+    assert rows["label"].to_list()[-1] == "Older-run blend minus planned blend"
+    assert rows.height == 8
     assert set(rows["condition"]) == {"Primary setting", "Sensitivity setting"}
     assert rows["difference"].to_list()[:2] == [pytest.approx(-0.3)] * 2
     assert rows["lower_95"][0] == pytest.approx(-0.4)
+    # Rows of the stale section and of the day-1 split carry the same codes under other scopes.
+    assert max(abs(value) for value in rows["difference"].to_list()) < 0.5
 
 
 def test_the_older_figure_has_a_panel_per_lead_day_and_says_what_it_cannot_separate():
@@ -506,7 +602,7 @@ def test_the_older_figure_has_a_panel_per_lead_day_and_says_what_it_cannot_separ
     text = json.dumps(chart.to_dict()).replace('", "', " ")
     assert text.count("Lead day ") >= 3
     assert "cannot separate the longer lead from the earlier start" in text
-    assert "Figure 10:" in text
+    assert "Figure 12:" in text
     assert "Post hoc." in text
 
 
@@ -526,3 +622,19 @@ def test_the_older_title_states_a_finding_only_when_every_point_estimate_support
     )
     assert "against the planned blend" in charts.older_title(intervals=flipped, domain="wind")
     assert "gains less" not in charts.older_title(intervals=flipped, domain="wind")
+
+
+def test_the_week_figures_are_lettered_in_order_even_when_an_era_has_no_week(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    series = _series(domain="solar").filter(pl.col("time") < datetime(2025, 11, 1, tzinfo=UTC))
+    later = _series(domain="solar").filter(pl.col("time") >= datetime(2026, 1, 1, tzinfo=UTC))
+    series = pl.concat([series, later])
+    monkeypatch.setattr(charts, "measured_and_forecast", lambda **_: series)
+    losses = series.select("site").with_columns(x=pl.lit(1))
+
+    figures = charts.weeks(losses=losses, predictions=losses, domain="solar")
+
+    assert set(figures) == {0, 2}
+    captions = [" ".join(chart.to_dict()["title"]["text"]) for chart, _ in figures.values()]
+    assert [c.split(":")[0] for c in captions] == ["Figure 3a", "Figure 3b"]
