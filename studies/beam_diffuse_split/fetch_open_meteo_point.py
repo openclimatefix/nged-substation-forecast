@@ -35,7 +35,7 @@ from typing import Any, Final
 import numpy as np
 import polars as pl
 from build_dataset import _pv_sites
-from era5_grid import LAST_DATE, LAST_YEAR
+from studies.era5_grid import LAST_DATE, LAST_YEAR
 from studies.served_column_checks import (
     check_direct_is_not_a_separation_model,
     check_hourly_value_is_a_backward_mean,

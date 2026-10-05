@@ -37,7 +37,6 @@ import numpy as np
 import polars as pl
 import pvlib
 import xarray as xr
-from era5_grid import PUBLISHED_LAST_DATE
 from studies.anonymise import (
     LABEL_PERMUTATION_SEED,
     SITE_LABELS,
@@ -45,6 +44,7 @@ from studies.anonymise import (
     WIND_SITE_LABELS,
     site_labels_for,
 )
+from studies.era5_grid import PUBLISHED_LAST_DATE
 from studies.power import hourly_from_half_hourly
 from studies.solar import azimuth, extraterrestrial_horizontal, zenith
 from studies.sources import (

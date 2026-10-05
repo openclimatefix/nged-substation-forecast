@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Final
 
 import polars as pl
-from era5_grid import (
+from studies.era5_grid import (
     FIRST_YEAR,
     GRID_LATITUDES,
     GRID_LONGITUDES,

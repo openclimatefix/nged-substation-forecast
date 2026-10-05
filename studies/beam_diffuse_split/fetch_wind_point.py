@@ -31,8 +31,8 @@ from typing import Final
 
 import polars as pl
 from build_dataset import _wind_sites
-from era5_grid import FIRST_DATE_OVERRIDE, LAST_DATE, LAST_YEAR, suffixed
 from fetch_open_meteo_point import fetch_point_frame
+from studies.era5_grid import FIRST_DATE_OVERRIDE, LAST_DATE, LAST_YEAR, suffixed
 from studies.sources import HISTORICAL_FORECAST_URL, WEATHER_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

@@ -48,9 +48,9 @@ from typing import Final
 import numpy as np
 import polars as pl
 import xgboost as xgb
-from commissioning import drop_commissioning_ramp
 from export_cap import with_export_cap
 from studies.bootstrap import bootstrap_difference, per_fold_differences
+from studies.commissioning import drop_commissioning_ramp
 from studies.cross_validation import (
     N_FOLDS,
     PRIMARY_HYPER_PARAMETERS,

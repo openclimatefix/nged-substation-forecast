@@ -37,7 +37,7 @@ from typing import Final
 
 import polars as pl
 
-_LOG: Final[logging.Logger] = logging.getLogger("commissioning")
+_LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
 SETTLED_OUTPUT_FROM: Final[dict[str, datetime]] = {
     "E": datetime(2024, 10, 6, tzinfo=UTC),

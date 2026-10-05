@@ -75,15 +75,7 @@ from typing import Final, Literal, NamedTuple
 import numpy as np
 import polars as pl
 from build_dataset import CAMS_PATH, _hourly_power, _pv_sites, nearest_era5_cell, read_era5
-from commissioning import drop_commissioning_ramp
 from export_cap import with_export_cap
-from physics_model import (
-    CELL_TEMPERATURE_RISE_K,
-    MIN_COS_ZENITH,
-    REFERENCE_CELL_TEMPERATURE_C,
-    Geometry,
-    plane_of_array,
-)
 from run_experiment import (
     MAX_CONCURRENT_FITS,
     SHARED_FEATURES,
@@ -103,6 +95,7 @@ from studies.bootstrap import (
     bootstrap_year_change,
     per_fold_differences,
 )
+from studies.commissioning import drop_commissioning_ramp
 from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
     SEEDS,
@@ -114,6 +107,13 @@ from studies.cross_validation import (
 )
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.neighbouring_hours import with_neighbouring_hours
+from studies.physics_model import (
+    CELL_TEMPERATURE_RISE_K,
+    MIN_COS_ZENITH,
+    REFERENCE_CELL_TEMPERATURE_C,
+    Geometry,
+    plane_of_array,
+)
 from studies.raw_comparison import (
     mean_per_site_correlation,
     raw_column_comparison,

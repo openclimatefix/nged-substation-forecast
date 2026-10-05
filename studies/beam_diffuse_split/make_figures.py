@@ -36,8 +36,8 @@ import altair as alt
 # Importing the theme module registers and enables the OCF Altair theme as a side effect.
 import plotting.ocf_theme as ocf
 import polars as pl
-from commissioning import drop_commissioning_ramp
 from run_experiment import dataset_path_for, results_dir_for
+from studies.commissioning import drop_commissioning_ramp
 from studies.sources import STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
