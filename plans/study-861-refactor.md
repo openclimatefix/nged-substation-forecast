@@ -80,9 +80,10 @@ the folder branch 1016 gives it.
 | the package, no script left | `figure_numbers` |
 
 A single asterisk marks a module that moves wholesale to the package in layer 1 and is deleted from
-`studies/`. A double asterisk marks a script from which named helpers move to the package in layer 2 (the script stays, shorter).
-The `weather_downloads/fetch_era5_wind.py` script keeps its folder and loses its
-`sys.path.insert` into `beam_diffuse_split/`, because the helpers it reads come from layer 1.
+`studies/`. A double asterisk marks a script from which named helpers move to the package in layer 2
+(the script stays, shorter). The `weather_downloads/fetch_era5_wind.py` script keeps its folder and
+loses its `sys.path.insert` into `beam_diffuse_split/`, because the helpers it reads come from layer
+1.
 
 **Alternative considered: fewer folders.** One `past_weather/` folder for solar, wind, `cerra_wind/`,
 blending and ENS horizons would need no layer 2, because the 60-odd layer-2 symbols are all
@@ -164,9 +165,10 @@ with `ty` `extra-paths` to match.
   under `studies/` is named `test_*.py`.
 - **Imports resolve through one fixture.** `packages/studies/tests/conftest.py` gains
   `study_script(study, module)`, which puts `studies/<study>/` on `sys.path`, imports the module
-  under a unique name, and removes both afterwards. It replaces the two loader styles now in use. Because a script then imports only its
-  folder and `studies.*`, one folder on the path is always enough. `ty` `extra-paths` keeps one entry per folder that a test still imports
-  statically; entries for folders no test imports are deleted.
+  under a unique name, and removes both afterwards. It replaces the two loader styles now in use.
+  Because a script then imports only its folder and `studies.*`, one folder on the path is always
+  enough. `ty` `extra-paths` keeps one entry per folder that a test still imports statically;
+  entries for folders no test imports are deleted.
 - **The study skill's per-script review rule is unchanged.** It covers `studies/**`, which now holds
   scripts only. Tests sit under `packages/studies`, so they get the package's treatment: the diff
   review and the mutation pass.
