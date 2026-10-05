@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /home/jack/dev/nged-substation-forecast/.claude/worktrees/era-fold-design
+cd ~/dev/nged-substation-forecast/.claude/worktrees/era-fold-design
 O=../scratch/era-fold/out; S=../scratch/era-fold/scripts; L=$O/runQ2.log
 until grep -q I2DONE $O/runQ.log 2>/dev/null; do sleep 30; done
 fit() { echo "=== $* $(uptime | sed 's/.*load/load/')" >> $L

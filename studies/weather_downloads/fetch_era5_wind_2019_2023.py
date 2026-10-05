@@ -61,10 +61,9 @@ from era5_cells import (
 )
 from fetch_midas_open import _FILENAME_VERSION_TAG, STATION_METADATA_DIR, _badc_table
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR, load_trial_area_box
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "beam_diffuse_split"))
-from build_dataset import _wind_sites
+from paths import WEATHER_DOWNLOADS_DIR
+from studies.pv_dataset import wind_sites
+from studies.trial_area import load_trial_area_box
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_era5_wind_2019_2023")
@@ -176,7 +175,7 @@ def build_group_table() -> pl.DataFrame:
     centres: list[tuple[Literal["station", "wind"], str, Cell]] = [
         ("station", src_id, centre) for src_id, centre in _station_centres()
     ]
-    wind = _wind_sites().select("site", "latitude", "longitude").sort("site")
+    wind = wind_sites().select("site", "latitude", "longitude").sort("site")
     centres.extend(
         (
             "wind",

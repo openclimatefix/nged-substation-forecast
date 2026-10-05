@@ -1,7 +1,7 @@
 """Coverage of the folds saved with every published study's per-row losses (review 2). Read-only."""
 from pathlib import Path
 import polars as pl
-ROOT = Path("/home/jack/dev/nged-substation-forecast/data/studies")
+ROOT = Path("~/dev/nged-substation-forecast/data/studies").expanduser()
 for p in sorted(ROOT.rglob("*.parquet")):
     if "superseded" in p.parts or p.stat().st_size > 2_000_000_000:
         continue

@@ -24,8 +24,8 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from sources import SOURCE_CHOICES, STUDY_DATA_DIR
 from studies.fractions_skill_score import fss_from, monthly_components, on_a_complete_hourly_grid
+from studies.sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 WINDOW_HOURS: Final[tuple[int, ...]] = (1, 3, 5, 7, 9)
 """The temporal tolerances the score is reported at, in hours, widest last.

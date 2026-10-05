@@ -43,15 +43,20 @@ Run it with `uv run python studies/nwp_forecast_comparison/build_wn3_inputs.py -
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Final
 
+# The Rust core of Icechunk reads this variable when it is imported, so it must be set first.
+os.environ.setdefault("ICECHUNK_LOG", "error")
+
+import ens_forecast_horizons as efh
+import icechunk
 import numpy as np
 import polars as pl
 import xarray as xr
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+import zarr
 from build_forecast_inputs import (
     DAY5_OUTPUT_DIR_NAME,
     DomainType,
@@ -61,17 +66,11 @@ from build_forecast_inputs import (
     check_columns_equal,
     ens_members,
 )
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "weather_downloads"))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-import ens_forecast_horizons as efh
-
-# `fetch_weathernext3` sets `ICECHUNK_LOG` before `icechunk` is imported below it.
-import fetch_weathernext3 as fetch
-import icechunk
-import zarr
 from studies.guards import refuse_to_overwrite
 from studies.resample import interpolate_linear, wind_components
+
+from studies import ens_members as ens_member_columns
+from studies import wn3_fetch as fetch
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -453,7 +452,7 @@ def wn3_arm_frame(
         **{field: _masked(values=values, present=present) for field, values in fields.items()}
     )
     stamp = pl.Series(np.where(present, run, np.datetime64("NaT", "h")).astype("datetime64[us]"))
-    return efh.prefixed(frame=reduced, arm=arm, domain=domain).with_columns(
+    return ens_member_columns.prefixed(frame=reduced, arm=arm, domain=domain).with_columns(
         stamp.dt.replace_time_zone("UTC").alias(f"{arm}_init_time")
     )
 
@@ -638,7 +637,7 @@ def ens_vector_mean_frame(*, extract: pl.DataFrame, day: int) -> pl.DataFrame:
         time=init_time + pl.duration(hours=pl.col("lead")),
         init_time=init_time,
     )
-    return efh.prefixed(frame=rows, arm=arm, domain="wind").join(
+    return ens_member_columns.prefixed(frame=rows, arm=arm, domain="wind").join(
         rows.select("site", "time", **{f"{arm}_init_time": "init_time"}),
         on=["site", "time"],
         how="left",

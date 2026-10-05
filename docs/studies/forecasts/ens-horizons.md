@@ -535,9 +535,9 @@ ENS alone.**
 ## Reproducing the figures
 
 ```bash
-uv run python studies/beam_diffuse_split/fetch_ens_forecast_horizons.py
-uv run python studies/beam_diffuse_split/ens_forecast_horizons.py --refit both
-uv run python studies/beam_diffuse_split/ens_forecast_charts.py --results-dir data/studies/ens_forecast_horizons/era_covered
+uv run python studies/nwp_forecast_comparison/fetch_ens_forecast_horizons.py
+uv run python studies/nwp_forecast_comparison/ens_forecast_horizons.py --refit both
+uv run python studies/nwp_forecast_comparison/ens_forecast_charts.py --results-dir data/studies/ens_forecast_horizons/era_covered
 ```
 
 The report lands in `data/studies/ens_forecast_horizons/era_covered/report.md`, beside the saved

@@ -29,9 +29,9 @@ import numpy as np
 # Importing the theme module registers and enables the OCF Altair theme as a side effect.
 import plotting.ocf_theme as ocf
 import polars as pl
-from build_dataset import _pv_sites
-from export_cap import CAP_FILE_PREFIX
-from sources import ANM_DATA_DIR, REPO_DATA_DIR, STUDY_DATA_DIR
+from studies.export_cap import CAP_FILE_PREFIX
+from studies.pv_dataset import pv_sites
+from studies.sources import ANM_DATA_DIR, REPO_DATA_DIR, STUDY_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("site_e_commissioning")
 
@@ -104,7 +104,7 @@ def _subject_export_cap() -> pl.DataFrame:
     Returns:
         The subject's export cap, sorted by time.
     """
-    time_series_id = _pv_sites().filter(pl.col("site") == SUBJECT)["time_series_id"].item()
+    time_series_id = pv_sites().filter(pl.col("site") == SUBJECT)["time_series_id"].item()
     return pl.read_parquet(ANM_DATA_DIR / f"{CAP_FILE_PREFIX}{time_series_id}.parquet").sort("time")
 
 
@@ -134,9 +134,9 @@ def _half_hourly_gain() -> pl.DataFrame:
         .agg(pl.col("effective_capacity_mw").last())
         .collect()
     )
-    # `_pv_sites` is the one roster query, so this figure cannot label a generator differently from
+    # `pv_sites` is the one roster query, so this figure cannot label a generator differently from
     # the frames the arms are scored on.
-    sites = _pv_sites().select("time_series_id", "site")
+    sites = pv_sites().select("time_series_id", "site")
     power = (
         pl.scan_delta(str(REPO_DATA_DIR / "NGED" / "power_time_series.delta"))
         .filter(pl.col("time_series_id").is_in(sites["time_series_id"].to_list()))

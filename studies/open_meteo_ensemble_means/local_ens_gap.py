@@ -67,9 +67,9 @@ from studies.stitched_ensemble import (
     newest_run_member_means,
 )
 
-from build_dataset import _add_solar_geometry, _pv_sites  # isort: skip
-from run_experiment import Job, run_all  # isort: skip
-from sources import STUDIES_DATA_DIR, WEATHER_DATA_DIR  # isort: skip
+from studies.pv_dataset import add_solar_geometry, pv_sites  # isort: skip
+from studies.arm_runner import Job, run_all  # isort: skip
+from studies.sources import STUDIES_DATA_DIR, WEATHER_DATA_DIR  # isort: skip
 
 _LOG: Final[logging.Logger] = logging.getLogger("local_ens_gap")
 
@@ -241,12 +241,12 @@ def _hourly_extraterrestrial(*, first: datetime, last: datetime) -> pl.DataFrame
         One row per (site, hour label) with `extraterrestrial_horizontal_w_m2`. The site
         coordinates are used inside this function and never returned.
     """
-    sites = _pv_sites().select("site", "latitude", "longitude")
+    sites = pv_sites().select("site", "latitude", "longitude")
     hours = pl.DataFrame(
         {"time": pl.datetime_range(first, last, "1h", time_zone="UTC", eager=True)}
     )
     grid = sites.join(hours, how="cross")
-    return _add_solar_geometry(joined=grid).select(
+    return add_solar_geometry(joined=grid).select(
         "site", "time", "extraterrestrial_horizontal_w_m2"
     )
 

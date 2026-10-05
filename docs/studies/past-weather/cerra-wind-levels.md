@@ -387,7 +387,7 @@ the five CERRA serves, or regions other than Lincolnshire.**
 
 **Every input except the wind farms' metered output, coordinates, and capacity table is public, and
 the code is in the repository at the commit that merged this page.** The code is in
-`studies/beam_diffuse_split/` (`cerra_wind_levels.py`, `cerra_wind_levels_shear.py`, and
+`studies/past_weather/` (`cerra_wind_levels.py`, `cerra_wind_levels_shear.py`, and
 `cerra_wind_levels_charts.py`) and in `packages/studies/`.
 
 - **Public inputs:** CERRA's wind speed from the Copernicus Climate Data Store, at 10 m from
@@ -416,9 +416,9 @@ results section and the Key findings. The Summary was checked the same way, on a
 without its disclaimer, because the disclaimer's model version numbers are not in the report.
 
 ```bash
-uv run python studies/beam_diffuse_split/cerra_wind_levels.py
-uv run python studies/beam_diffuse_split/cerra_wind_levels_shear.py
-uv run python studies/beam_diffuse_split/cerra_wind_levels_charts.py
+uv run python studies/past_weather/cerra_wind_levels.py
+uv run python studies/past_weather/cerra_wind_levels_shear.py
+uv run python studies/past_weather/cerra_wind_levels_charts.py
 npx svgo@4 --multipass --precision=1 --final-newline docs/studies/assets/cerra_wind_levels_*.svg
 uv run python studies/beam_diffuse_split/check_page_numbers.py \
     docs/studies/past-weather/cerra-wind-levels.md \

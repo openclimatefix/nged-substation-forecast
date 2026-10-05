@@ -61,7 +61,8 @@ import requests
 import xarray as xr
 from delta_store.precision import round_to_significand_bits
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR, load_trial_area_box
+from paths import WEATHER_DOWNLOADS_DIR
+from studies.trial_area import load_trial_area_box
 
 BASE_URL: Final[str] = "https://opendata.dwd.de/climate_environment/REA/ICON-DREAM-EU"
 GRID_URL: Final[str] = f"{BASE_URL}/invariant/ICON-DREAM-EU_grid.nc"

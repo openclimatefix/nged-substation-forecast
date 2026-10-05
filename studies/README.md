@@ -11,12 +11,19 @@ by `experiment_name`, so in this repository an experiment is one MLflow-tracked 
 production pipeline. A study of whether a weather product's published field carries information is a
 different kind of thing.
 
+**A script under `studies/` may import from its own folder, from `studies.*` (`packages/studies`),
+and from the other reviewed packages in `packages/*`.** `src/` and every package under `packages/`
+except `packages/studies` must never import `studies` or a study script, because humans review that
+code and the study code is fast-moving and agent-written. Code that two study folders need lives in
+`packages/studies/src/studies/`. `packages/studies/tests/test_study_boundaries.py` enforces both
+halves.
+
 ## What this tier promises, and what it does not
 
 | | `packages/` and `src/` | `studies/` |
 |---|---|---|
 | Runs in production | yes | never |
-| Has tests | yes | the machinery does, the study does not |
+| Has tests | yes | the machinery does, and `packages/studies/tests/<folder>/` tests some scripts; the study as a whole does not |
 | Maintained as the repository changes | yes | no |
 | Backwards compatibility | within reason | none |
 | Linted by CI | yes | yes |
@@ -46,6 +53,9 @@ branch. The directory is not an attic.
 - **Nothing here is imported by production code.** No study touches a Patito contract or enters the
   Dagster asset graph, and nothing in `src/` or `packages/` imports one. A study that needs to do
   any of that has stopped being a study.
+- **Each folder holds the scripts of one family of pages, and its README maps every script to the
+  page it feeds.** A script runs with only its own folder on `sys.path`: it never reaches into
+  another folder, and code that two folders share is in `packages/studies/src/studies/`.
 - **Paths may have rotted.** Every study's data lives under `data/studies/`, in the directory
   `DATA_PATH_INTERNAL` names — the same variable `contracts.Settings` reads. Downloaded weather sits
   in `weather/<product>/` and NGED's active network management exports in `anm/`, so a later study
@@ -62,6 +72,9 @@ branch. The directory is not an attic.
 | Directory | Question it answered | Where the answer lives |
 |---|---|---|
 | `beam_diffuse_split/` | Does a weather product's own beam/diffuse split carry information a PV forecast can use, beyond the global horizontal irradiance alone? | [Does a weather product's beam/diffuse split help a PV forecast?](https://openclimatefix.github.io/nged-substation-forecast/studies/beam-diffuse-split/) |
-| `nwp_forecast_comparison/` | At the day-ahead lead the live service delivers, and the two days after it, which forecast product, or which blend of products, gives the most accurate power forecast? | In progress — no fit has run yet; see `studies/nwp_forecast_comparison/README.md` |
-| `ukv_ceda_blends/` | Does adding the Met Office's UKV, read from the CEDA archive, to the ECMWF ENS mean lower the power-forecast error at lead days 1 to 4? | [Does adding UKV from CEDA to ECMWF's ensemble mean lower the error?](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/ukv-ceda-blends/) |
+| `past_weather/` | Which weather product best describes past sunshine and past wind, and does blending products beat the best single product? | The pages under [Past weather](https://openclimatefix.github.io/nged-substation-forecast/studies/past-weather/); the folder README maps each script to its page |
+| `nwp_forecast_comparison/` | Which forecast product, or which blend of products, gives the most accurate power forecast at the day-ahead lead the live service delivers, and at the days around it? How accurate is an ECMWF ENS-driven forecast at each horizon? Does adding the Met Office's UKV, read from the CEDA archive, to the ECMWF ENS mean lower the error? | The Forecasts pages listed on the [studies index](https://openclimatefix.github.io/nged-substation-forecast/studies/); the folder README maps each script to its page |
 | `open_meteo_ensemble_means/` | How well do Open-Meteo's ensemble-mean products for MOGREPS-UK, ICON-D2-EPS, ICON-EU-EPS, and ECMWF IFS ENS predict solar and wind power, beside CAMS and ERA5? | [How do Open-Meteo's ensemble-mean products compare for solar and wind power?](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/ensemble-means/) |
+| `weather_downloads/` | Which weather products can the studies download, and what does each download hold? | No page: the downloads feed the pages above, and the folder README describes each fetch script |
+| `ens_backfill_pilot/` | Can ECMWF's control-member forecasts for 2021-03-21 to 2024-03-31 be rebuilt from the GRIB files that Dynamical.org stages on Source Cooperative? | No page: `studies/ens_backfill_pilot/report.md` holds the pilot's result |
+| `era_fold_design/` | How many scored hours have a calendar month held out of every training row under the era folds, and how do planned contrasts move when the folds cover every month? | No page: `studies/era_fold_design/report.md` holds the measurement behind the plan in PR #906 |

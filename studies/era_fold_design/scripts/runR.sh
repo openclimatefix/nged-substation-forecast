@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /home/jack/dev/nged-substation-forecast/.claude/worktrees/era-fold-design
+cd ~/dev/nged-substation-forecast/.claude/worktrees/era-fold-design
 O=../scratch/era-fold/out; S=../scratch/era-fold/scripts; L=$O/runR.log
 fit() { echo "=== [${DEVICE:-cpu}] $* $(uptime | sed 's/.*load/load/')" >> $L
   uv run python $S/$1 "${@:2}" 2>&1 | grep --line-buffered "^done\|rror\|Trace\|^rows\|^offsets\|^device\|^arms\|^{\|Uncovered\|cells" | cut -c1-500 >> $L; }

@@ -31,10 +31,11 @@ import sys
 from typing import Final
 
 import polars as pl
-from run_experiment import _add_time_features, dataset_path_for, results_dir_for
-from sources import SOURCE_CHOICES
+from run_experiment import results_dir_for
+from studies.arm_runner import add_time_features, dataset_path_for
 from studies.bootstrap import bootstrap_difference
 from studies.cross_validation import assign_folds
+from studies.sources import SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("sky_conditions")
@@ -111,7 +112,7 @@ def main() -> int:
         (pl.col("setting") == "primary") & (pl.col("target") == "power_mw")
     )
     dataset = assign_folds(
-        dataset=_add_time_features(dataset=pl.read_parquet(dataset_path_for(source=source)))
+        dataset=add_time_features(dataset=pl.read_parquet(dataset_path_for(source=source)))
     )
     binned = _binned(dataset=dataset)
     _LOG.info(

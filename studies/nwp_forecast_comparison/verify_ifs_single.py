@@ -41,10 +41,6 @@ from pathlib import Path
 from typing import Final, NamedTuple
 
 import polars as pl
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-import ens_forecast_horizons as efh
 from build_forecast_inputs import (
     IFS_SINGLE_DAYS,
     IFS_SINGLE_DIR_NAME,
@@ -60,6 +56,8 @@ from studies.ifs_single_runs import (
     served_init_time,
     served_lead_hours,
 )
+
+from studies import ens_members
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -409,7 +407,7 @@ def gap_table(*, built_dir: Path, archive_path: Path) -> pl.DataFrame:
         run_type = built.schema["time"]
         present = runs.cast(run_type)
         for day in IFS_SINGLE_DAYS:
-            columns = efh.ens_columns(arm=ifs_single_arm(day=day), domain=domain)
+            columns = ens_members.ens_columns(arm=ifs_single_arm(day=day), domain=domain)
             frame = built.select(
                 "time",
                 null=pl.any_horizontal(pl.col(c).is_null() for c in columns),
@@ -480,7 +478,7 @@ def _sample_rows(*, built_dir: Path) -> list[Sample]:
         built = pl.read_parquet(built_dir / f"{domain}_extra_lead_inputs.parquet")
         picked = built.sort("site", "time").gather_every(max(1, built.height // SAMPLE_ROWS))
         for day in IFS_SINGLE_DAYS:
-            for column in efh.ens_columns(arm=ifs_single_arm(day=day), domain=domain):
+            for column in ens_members.ens_columns(arm=ifs_single_arm(day=day), domain=domain):
                 field = column.removeprefix(f"{ifs_single_arm(day=day)}_")
                 for site, time, value in picked.select("site", "time", column).iter_rows():
                     init, lead = expected_served(time=time, day=day, solar=domain == "solar")

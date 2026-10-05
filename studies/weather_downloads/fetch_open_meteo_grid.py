@@ -11,7 +11,7 @@ validated for it.
 
 The trial-area box is never printed, logged, or written into the output: only the grid points'
 `point_id` (a running index) travels into filenames and frames, exactly as
-`studies/beam_diffuse_split/fetch_open_meteo_point.py` keys its per-site output on an anonymised
+`studies/past_weather/fetch_open_meteo_point.py` keys its per-site output on an anonymised
 label rather than a coordinate.
 
 Run it with `uv run python studies/weather_downloads/fetch_open_meteo_grid.py --model ecmwf-ifs-hres
@@ -30,7 +30,8 @@ from typing import Any, Final
 
 import polars as pl
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR, load_trial_area_box, open_meteo_api_key
+from paths import WEATHER_DOWNLOADS_DIR, open_meteo_api_key
+from studies.trial_area import load_trial_area_box
 
 HISTORICAL_FORECAST_URL: Final[str] = (
     "https://customer-historical-forecast-api.open-meteo.com/v1/forecast"
@@ -160,7 +161,7 @@ Open-Meteo's docs, which do not list machine-readable identifiers."""
 def _get_json(*, url: str) -> Any:
     """Fetch one URL, retrying a transport failure but never an API refusal.
 
-    Copied from `studies/beam_diffuse_split/fetch_open_meteo_point.py`'s `_get_json`: see that
+    Copied from `studies/past_weather/fetch_open_meteo_point.py`'s `_get_json`: see that
     function's docstring for why a rate-limit refusal must not be retried.
     """
     for attempt in range(MAX_ATTEMPTS):

@@ -1,13 +1,16 @@
 """Shared frame builders and fold designs for the era-fold measurement (scratch)."""
 
+import os
 import sys
 from pathlib import Path
 
-WORKTREE = Path("/home/jack/dev/nged-substation-forecast/.claude/worktrees/era-fold-design")
+WORKTREE = Path("~/dev/nged-substation-forecast/.claude/worktrees/era-fold-design").expanduser()
 sys.path.insert(0, str(WORKTREE / "studies" / "beam_diffuse_split"))
 # pin the ENS script to the commit the D0 numbers came from (the worktree branch has since changed it)
-sys.path.insert(0, "/home/jack/dev/nged-substation-forecast/.claude/worktrees/scratch/era-fold/code")
-OUT = Path("/home/jack/dev/nged-substation-forecast/.claude/worktrees/scratch/era-fold/out")
+sys.path.insert(
+    0, os.path.expanduser("~/dev/nged-substation-forecast/.claude/worktrees/scratch/era-fold/code")
+)
+OUT = Path("~/dev/nged-substation-forecast/.claude/worktrees/scratch/era-fold/out").expanduser()
 
 import polars as pl  # noqa: E402
 from build_dataset import _wind_sites  # noqa: E402
@@ -23,7 +26,7 @@ from weather_products import common_rows as solar_common_rows  # noqa: E402
 from wind_products import common_rows as wind_common_rows  # noqa: E402
 from wind_products import joined as wind_joined  # noqa: E402
 
-DATA = Path("/home/jack/dev/nged-substation-forecast/data/studies/beam_diffuse_split")
+DATA = Path("~/dev/nged-substation-forecast/data/studies/beam_diffuse_split").expanduser()
 
 
 def wind_pre_fold() -> pl.DataFrame:

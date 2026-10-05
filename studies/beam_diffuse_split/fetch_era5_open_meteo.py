@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Final
 
 import polars as pl
-from era5_grid import (
+from studies.era5_grid import (
     FIRST_YEAR,
     GRID_LATITUDES,
     GRID_LONGITUDES,
@@ -41,7 +41,7 @@ from era5_grid import (
     first_date_of,
     suffixed,
 )
-from sources import WEATHER_DATA_DIR
+from studies.sources import WEATHER_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_era5_open_meteo")

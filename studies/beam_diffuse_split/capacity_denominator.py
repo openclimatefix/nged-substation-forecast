@@ -19,10 +19,10 @@ import sys
 from typing import Final
 
 import polars as pl
-from commissioning import drop_commissioning_ramp
-from run_experiment import _add_time_features, dataset_path_for
-from sources import SOURCE_CHOICES, STUDY_DATA_DIR
+from studies.arm_runner import add_time_features, dataset_path_for
 from studies.bootstrap import bootstrap_difference
+from studies.commissioning import drop_commissioning_ramp
+from studies.sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 CLEAREST_WEEK: Final[str] = "2026-04-20"
 """The week the clearest-week panels draw, as `make_figures._chosen_weeks` picks it."""
@@ -134,7 +134,7 @@ def main() -> int:
         ("The 99.9th percentile of the daylight rows", "p999"),
         ("The highest reading", "highest"),
     ):
-        rescaled = _add_time_features(
+        rescaled = add_time_features(
             dataset=losses.join(scales.select("site", column), on="site", how="inner")
         ).with_columns(metric=pl.col("absolute_error_capped_mw") / pl.col(column))
         result = bootstrap_difference(

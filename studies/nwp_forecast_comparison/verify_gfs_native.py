@@ -41,10 +41,6 @@ from typing import Final, NamedTuple
 
 import numpy as np
 import polars as pl
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-import ens_forecast_horizons as efh
 from build_forecast_inputs import (
     GFS_NATIVE_DAYS,
     GFS_NATIVE_DIR_NAME,
@@ -61,6 +57,8 @@ from studies.gfs_native import (
     step_means,
     window_hours,
 )
+
+from studies import ens_members
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -456,7 +454,7 @@ def _sample_rows(*, built_dir: Path, gfs_dir: Path) -> list[Sample]:
         for day in GFS_NATIVE_DAYS:
             if domain == "solar" and day > HOURLY_SERVED_LAST_DAY:
                 continue
-            for column in efh.ens_columns(arm=gfs_native_arm(day=day), domain=domain):
+            for column in ens_members.ens_columns(arm=gfs_native_arm(day=day), domain=domain):
                 field = column.removeprefix(f"{gfs_native_arm(day=day)}_")
                 for site, time, value in picked.select("site", "time", column).iter_rows():
                     init, lead = expected_served(time=time, day=day, solar=domain == "solar")

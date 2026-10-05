@@ -74,7 +74,8 @@ import xarray as xr
 from delta_store.nwp import NWP_SIGNIFICAND_BITS
 from delta_store.precision import round_to_significand_bits
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR, load_trial_area_box
+from paths import WEATHER_DOWNLOADS_DIR
+from studies.trial_area import load_trial_area_box
 
 SINGLE_LEVELS_DATASET: Final[str] = "reanalysis-cerra-single-levels"
 HEIGHT_LEVELS_DATASET: Final[str] = "reanalysis-cerra-height-levels"

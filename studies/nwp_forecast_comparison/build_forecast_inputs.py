@@ -81,25 +81,14 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Final, Literal, NamedTuple
 
+import ens_forecast_horizons as efh
 import h3.api.basic_int as h3
 import numpy as np
 import polars as pl
 from contracts.settings import PROJECT_ROOT
-from geo.h3 import compute_h3_grid_weights
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from verify_extra_leads import (
-    gefs_boundary_table,
-    gefs_boundary_verdict,
-    gefs_window_table,
-    gefs_window_verdict,
-)
-from verify_previous_runs_leads import PRODUCT_DIRS
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-import ens_forecast_horizons as efh
 from fetch_ens_day4_supplement import SUPPLEMENT_PATH as ENS_DAY4_SUPPLEMENT_PATH
 from fetch_ens_forecast_horizons import H3_RESOLUTION
+from geo.h3 import compute_h3_grid_weights
 from studies.gfs_native import (
     HOURLY_SERVED_LAST_DAY,
     LAST_LEAD_HOURS,
@@ -116,6 +105,15 @@ from studies.ifs_single_runs import clip_radiation, last_servable_day
 from studies.ifs_single_runs import served_init_time as ifs_single_init_time
 from studies.ifs_single_runs import served_lead_hours as ifs_single_lead_hours
 from studies.resample import gefs_step_means
+from verify_extra_leads import (
+    gefs_boundary_table,
+    gefs_boundary_verdict,
+    gefs_window_table,
+    gefs_window_verdict,
+)
+from verify_previous_runs_leads import PRODUCT_DIRS
+
+from studies import ens_members as ens_member_columns
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -548,7 +546,7 @@ lead 6 (midpoint 5.5) would still be a half-hour extrapolation. The hours ending
 
 
 def check_first_step_reaches_targets(
-    *, steps: efh.Steps, day: int, domain: DomainType, arm_prefix: str
+    *, steps: ens_member_columns.Steps, day: int, domain: DomainType, arm_prefix: str
 ) -> None:
     """Refuse a solar band that scores an hour before its first stored step.
 
@@ -603,7 +601,7 @@ def ens_members(*, sites: list[str]) -> pl.DataFrame:
     )
 
 
-def check_no_step_gap(*, steps: efh.Steps, day: int, arm_prefix: str) -> None:
+def check_no_step_gap(*, steps: ens_member_columns.Steps, day: int, arm_prefix: str) -> None:
     """Raise if any step of a band is missing between its first and last step.
 
     `band_steps` keeps whichever leads the extract holds, so a lead missing from the middle of a
@@ -697,11 +695,11 @@ def ens_member_arms(
             steps=steps, upsampled=upsampled, day=day, domain=domain, method=method
         )
         for way in ways:
-            reduced = efh.reduce_members(
+            reduced = ens_member_columns.reduce_members(
                 hourly=combined, domain=domain, way=way, ensemble_size=ensemble_size
             )
             arm = arm_name(way, day)
-            arm_frame = efh.prefixed(frame=reduced, arm=arm, domain=domain)
+            arm_frame = ens_member_columns.prefixed(frame=reduced, arm=arm, domain=domain)
             if keep_init_time:
                 runs = combined.select("site", "time", **{f"{arm}_init_time": "init_time"}).unique(
                     subset=["site", "time"]
@@ -778,7 +776,9 @@ def compare_ens_rebuild(*, domain: DomainType) -> float:
         column
         for day in ENS_DAYS
         for way in ("mean", "control")
-        for column in efh.ens_columns(arm=efh.ens_arm(way=way, day=day), domain=domain)
+        for column in ens_member_columns.ens_columns(
+            arm=efh.ens_arm(way=way, day=day), domain=domain
+        )
     ]
     keys = old.select("site", "time")
     new = _ens_frame(keys=keys, domain=domain)
@@ -1332,7 +1332,7 @@ def _gfs_native_direct_arm(
         init_time=served_init_time(time=pl.col("time"), day=day, domain=domain),
         lead_hours=served_lead_hours(time=pl.col("time"), day=day, domain=domain),
     )
-    columns = efh.ens_columns(arm=gfs_native_arm(day=day), domain=domain)
+    columns = ens_member_columns.ens_columns(arm=gfs_native_arm(day=day), domain=domain)
     join_keys = ["site", "init_time", "lead_hours"]
     if domain == "solar":
         earlier = extract.select(
@@ -1487,7 +1487,7 @@ def _gfs_native_frame(
             frame = frame.join(arm_frame, on=["site", "time"], how="left")
     too_many = {}
     for day in days:
-        columns = efh.ens_columns(arm=gfs_native_arm(day=day), domain=domain)
+        columns = ens_member_columns.ens_columns(arm=gfs_native_arm(day=day), domain=domain)
         in_span = frame.filter(
             served_init_time(time=pl.col("time"), day=day, domain=domain) >= first_init
         )
@@ -1598,8 +1598,8 @@ def _ifs_single_arm_columns(
         init_time=ifs_single_init_time(time=pl.col("time"), day=day, domain=domain),
         lead_hours=ifs_single_lead_hours(time=pl.col("time"), day=day, domain=domain),
     )
-    columns = efh.ens_columns(arm=ifs_single_arm(day=day), domain=domain)
-    fields = efh.fields(domain=domain)
+    columns = ens_member_columns.ens_columns(arm=ifs_single_arm(day=day), domain=domain)
+    fields = ens_member_columns.fields(domain=domain)
     joined = targets.join(extract, on=["site", "init_time", "lead_hours"], how="left")
     return joined.select(
         "site",
@@ -1670,7 +1670,7 @@ def _ifs_single_frame(
     for day in days:
         arm = _ifs_single_arm_columns(keys=keys, extract=extract, domain=domain, day=day)
         frame = frame.join(arm, on=["site", "time"], how="left")
-        columns = efh.ens_columns(arm=ifs_single_arm(day=day), domain=domain)
+        columns = ens_member_columns.ens_columns(arm=ifs_single_arm(day=day), domain=domain)
         share = float(
             frame.select(pl.any_horizontal(pl.col(c).is_null() for c in columns).mean()).item()
         )

@@ -3,6 +3,12 @@
 **The machinery a one-off study calls, held to the repository's normal standard while the studies
 themselves are not.** `studies/README.md` says which code moves here, and why.
 
+**A study script under `studies/` may import from its own folder, from `studies.*` (this package),
+and from the other reviewed packages in `packages/*`.** `src/` and every package under `packages/`
+except this one must never import `studies` or a study script, because humans review that code and
+the study code is fast-moving and agent-written. `tests/test_study_boundaries.py` enforces both
+halves, and no module here imports a script by its bare name.
+
 ## What this package owns, and what it does not
 
 It owns the pieces that more than one study needs and that fail silently when wrong: the
@@ -79,3 +85,24 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 - `deaccumulation` — turning accumulated precipitation or radiation totals into per-second rates.
 - `charts` — the dot-and-interval chart panel, the figure caption, the colour of each product
   family, and the parser that reads a study report's contrast tables.
+- `sources` — the names of the irradiance sources, the registry of Open-Meteo models the downloads
+  can fetch, and the paths under `data/studies/` that every study builds from.
+- `pv_dataset` — the readers, rosters, outage and false-zero filters, solar-geometry columns, and
+  separation-model columns that join NGED PV power to a weather source. The command that builds and
+  writes one frame is `studies/beam_diffuse_split/build_dataset.py`.
+- `arm_runner` — fitting every (arm, site) job concurrently and concatenating the per-row losses,
+  with the features every beam/diffuse arm shares.
+- `era5_grid`, `commissioning`, `physics_model`, `export_cap` — the ERA5 grid and date range, the
+  rows dropped while a generator was being built, the fitted plane-of-array PV model, and the
+  active-network-management export cap joined onto a modelling frame.
+- `solar_product_frames`, `wind_product_frames`, `product_frames` — the common rows of the solar and
+  wind past-weather studies, and the domain descriptions, blend columns, and contrast rows that the
+  blending study and the ENS studies reuse.
+- `ens_members` — the weather fields and columns of each ECMWF ENS arm, and the reduction of a run's
+  members to the arm's statistic.
+- `trial_area` — the private latitude and longitude box around the NGED trial area, held in memory
+  only.
+- `wn3_fetch` and `ukv_ceda_profiles` — the store names of the WeatherNext 3 Icechunk store, and the
+  product profiles and field table of the CEDA UKV archive, which a fetch script and an input
+  builder both read.
+- `figure_numbers` — the figure number of every chart on the past-weather solar and wind pages.

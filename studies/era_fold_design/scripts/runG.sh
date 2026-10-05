@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /home/jack/dev/nged-substation-forecast/.claude/worktrees/era-fold-design
+cd ~/dev/nged-substation-forecast/.claude/worktrees/era-fold-design
 O=../scratch/era-fold/out; S=../scratch/era-fold/scripts; L=$O/runG.log
 while pgrep -f "fit_B_rot.py" >/dev/null; do sleep 30; done
 for d in D0 D0trim I II; do

@@ -12,7 +12,7 @@ that one retrieval, which is the same three-field structure the arms already con
 
 Requests are made at each meter's own coordinates, read at run time from the private roster. **No
 coordinate and no identifier reaches the written frame**: rows are keyed by the anonymised site
-label `build_dataset._pv_sites` assigns, and the downloaded CSVs stay in the git-ignored data
+label `studies.pv_dataset.pv_sites` assigns, and the downloaded CSVs stay in the git-ignored data
 directory.
 
 The service publishes irradiation in Wh m⁻² summed over each step, so at a 1-hour step the number is
@@ -30,9 +30,16 @@ from typing import Final, NamedTuple
 
 import cdsapi  # ty: ignore[unresolved-import]
 import polars as pl
-from build_dataset import _pv_sites
-from era5_grid import FIRST_YEAR, LAST_DATE, LAST_YEAR, OUTPUT_SUFFIX, first_date_of, suffixed
-from sources import WEATHER_DATA_DIR
+from studies.era5_grid import (
+    FIRST_YEAR,
+    LAST_DATE,
+    LAST_YEAR,
+    OUTPUT_SUFFIX,
+    first_date_of,
+    suffixed,
+)
+from studies.pv_dataset import pv_sites
+from studies.sources import WEATHER_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_cams")
@@ -206,7 +213,7 @@ def _read_one(*, path: Path, site: str) -> pl.DataFrame:
 def main() -> int:
     """Download every site-year and write the one long frame `build_dataset` reads."""
     CAMS_DIR.mkdir(parents=True, exist_ok=True)
-    sites = _pv_sites()
+    sites = pv_sites()
     jobs = [
         SiteYear(
             site=str(row["site"]),

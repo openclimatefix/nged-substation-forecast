@@ -24,8 +24,8 @@ from pathlib import Path
 from typing import Final
 
 import polars as pl
-from build_dataset import read_era5
-from sources import STUDY_DATA_DIR
+from studies.pv_dataset import read_era5
+from studies.sources import STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("verify_era5_sources")

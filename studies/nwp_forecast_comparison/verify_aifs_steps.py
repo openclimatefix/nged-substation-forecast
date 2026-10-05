@@ -52,6 +52,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Final, cast
 
+import ens_forecast_horizons as efh
 import polars as pl
 from build_forecast_inputs import (
     AIFS_DAYS,
@@ -65,12 +66,9 @@ from build_forecast_inputs import (
     aifs_site_weights,
     ens_member_arms,
 )
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-import ens_forecast_horizons as efh
-from build_dataset import _pv_sites, nearest_era5_cell, read_era5
-from sources import WEATHER_DATA_DIR
 from studies.guards import refuse_to_overwrite
+from studies.pv_dataset import nearest_era5_cell, pv_sites, read_era5
+from studies.sources import WEATHER_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -130,7 +128,7 @@ def era5_column(*, domain: DomainType, sites: list[str]) -> pl.DataFrame:
             .drop_nulls()
         )
     gridded = read_era5(source="open-meteo")
-    cells = nearest_era5_cell(sites=_pv_sites().filter(pl.col("site").is_in(sites)), era5=gridded)
+    cells = nearest_era5_cell(sites=pv_sites().filter(pl.col("site").is_in(sites)), era5=gridded)
     return (
         cells.join(
             gridded,
