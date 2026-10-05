@@ -581,7 +581,7 @@ def test_the_permutation_figure_titles_each_panel_with_its_rank_and_the_figure_w
     assert "rank 4 of 18, p-value 0.222" in text
     assert "larger than all 17 shuffled controls' at day 1" in text
     assert "cannot go below 0.056" in text
-    assert f'"width": {charts.CONTENT_WIDTH_PX - 40}' in text
+    assert f'"width": {charts.CONTENT_WIDTH_PX - 12}' in text
     assert "Figure 11:" in text
 
 

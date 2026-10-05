@@ -1,17 +1,17 @@
 # At three Lincolnshire wind farms, adding archived UKV forecasts to ECMWF's ensemble mean lowered the wind power error at lead days 1 and 2, and the solar gain of about 0.1 points is unresolved
 
 **At 3 wind farms in Lincolnshire, an XGBoost model (a gradient-boosted tree model) given the Met
-Office's UKV weather forecast from the CEDA archive as well as the mean of the European Centre for Medium-Range Weather
-Forecasts (ECMWF) ensemble forecast (ENS) had a lower power-forecast error than one given the ENS
-mean alone at lead days 1 and 2.** The result holds at both hyperparameter settings, against both
-shuffled controls, after the Bonferroni correction, and with any one calendar month dropped. The gain
-is 0.24 to 0.27 points of capacity at day 1 and 0.19 to 0.21 points at day 2, across the two
-settings. At wind day 3 the gain rests heavily on February 2026. At 6 solar farms the gain is about
-0.1 points of capacity at days 1 to 3, and the planned rule is met at day 3 only. At day 4 the study
-is inconclusive for both technologies. Two post hoc tests that move UKV's run earlier cannot say how
-much of any gain comes from UKV's weather and how much from UKV's run starting 3 hours after ENS's
-run. The UKV data comes from the archive at the Centre for Environmental Data Analysis (CEDA), which
-this page calls UKV-CEDA.
+Office's UKV weather forecast from the CEDA archive as well as the mean of the European Centre for
+Medium-Range Weather Forecasts (ECMWF) ensemble forecast (ENS) had a lower power-forecast error than
+one given the ENS mean alone at lead days 1 and 2.** The result holds at both hyperparameter
+settings, against both shuffled controls, after the Bonferroni correction, and with any one calendar
+month dropped. The gain is 0.24 to 0.27 points of capacity at day 1 and 0.19 to 0.21 points at day
+2, across the two settings. At wind day 3 the gain rests heavily on February 2026. At 6 solar farms
+the gain is about 0.1 points of capacity at days 1 to 3, and the planned rule is met at day 3 only.
+At day 4 the study is inconclusive for both technologies. Two post hoc tests that move UKV's run
+earlier cannot say how much of any gain comes from UKV's weather and how much from UKV's run
+starting 3 hours after ENS's run. The UKV data comes from the archive at the Centre for
+Environmental Data Analysis (CEDA), which this page calls UKV-CEDA.
 
 **The error is a mean absolute error in percentage points of the generator's capacity, and every
 difference is the first model's error minus the second's.** A negative difference means the model
@@ -40,8 +40,8 @@ inconclusive](../assets/ukv_ceda_blends_v4/wind_headline.svg)
 ## Key findings
 
 **Take-home for a day-ahead wind forecast.** At the 3 wind farms, adding UKV-CEDA's winds to the ENS
-mean lowers the error at lead days 1 and 2 by about 0.2 to 0.3 points of capacity. A UKV-CEDA run that is
-12 hours older than the run tested keeps about half the day-1 gain.
+mean lowers the error at lead days 1 and 2 by about 0.2 to 0.3 points of capacity. A UKV-CEDA run
+that is 12 hours older than the run tested keeps about half the day-1 gain.
 
 **Take-home for solar.** At the 6 solar farms, adding UKV-CEDA lowers the error by about 0.1 points
 at days 1 to 3, and the planned rule is met at day 3 only. A post hoc permutation test ranks the
@@ -114,10 +114,10 @@ monthly distribution of UKV-CEDA at each hour of day, so a shuffled control carr
 information from UKV-CEDA. The study fits two shuffled controls, with shuffle seeds 0 and 1000.
 Equal column counts matter because an XGBoost model with more columns can win without carrying more
 information. A check at wind day 1 and solar day 1 found the padded ENS model's per-row losses
-identical to those of the unpadded ENS model (`padding_check.json`, which `fit_ukv_ceda_blends.py --check` writes once and `report_2.md`
-prints). The padded ENS model
-carries no extra information, so P1 measures what UKV-CEDA adds to the ENS columns given, and not
-what it adds beyond every field ENS publishes.
+identical to those of the unpadded ENS model (`padding_check.json`, which `fit_ukv_ceda_blends.py
+--check` writes once and `report_2.md` prints). The padded ENS model carries no extra information,
+so P1 measures what UKV-CEDA adds to the ENS columns given, and not what it adds beyond every field
+ENS publishes.
 
 **The solar models are given ENS's mean global irradiance and temperature, and UKV-CEDA's
 global irradiance and temperature.** The wind models are given ENS's 100 m wind speed, the sine and
