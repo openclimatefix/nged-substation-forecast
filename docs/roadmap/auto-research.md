@@ -79,6 +79,16 @@ perform.
 
 ## Published evidence on research agents
 
+**Treat the older results below with caution, because LLMs have improved very quickly and the LLMs
+available in 2026 are far more capable than the LLMs these papers tested.** [Du et al.
+(2023)](https://arxiv.org/abs/2305.14325) and [Lu et al. (2024)](https://arxiv.org/abs/2408.06292)
+measured LLMs that are now several generations old. A gain from debate or from an automated reviewer
+on a 2023 LLM may be smaller, or absent, on a 2026 LLM that already gets most of those answers
+right. [Aygün et al. (2025)](https://arxiv.org/abs/2509.06503) saw the same effect in their own
+results: on one task, GPT-5's single attempt was already good enough that the tree search made
+little difference, and Aygün et al. expect more tasks to saturate as LLMs improve. The papers'
+methods and failure modes carry over more reliably than their numbers do.
+
 ### Agents that generate, rank and critique ideas
 
 **The AI Scientist's automated reviewer agreed with the average human reviewer more closely than
