@@ -3,13 +3,14 @@
 > **Status: 🚧 Planned.** The infrastructure — the trusted submit command, the review step, the
 > leakage test, the research repository, the hypothesis store, and the leaderboard query — is
 > planned for v0.3, alongside the leaderboard. The experiments themselves run in v0.5, alongside the
-> rest of the [XGBoost improvements](xgboost-improvements.md). Gated on [Protect the leaderboard
-> scorer for autonomous
-> research](https://github.com/openclimatefix/nged-substation-forecast/issues/958). The
-> infrastructure is tracked in
-> [issue #1031](https://github.com/openclimatefix/nged-substation-forecast/issues/1031), and the
-> experiments in
-> [issue #1038](https://github.com/openclimatefix/nged-substation-forecast/issues/1038). Neither the
+> rest of the [XGBoost improvements](xgboost-improvements.md). Gated on [issue #958 (Protect the
+> leaderboard scorer for autonomous
+> research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958). The
+> infrastructure is tracked in [issue #1031 (Tracking: infrastructure for safe experiments run by an
+> LLM agent
+> (auto-research))](https://github.com/openclimatefix/nged-substation-forecast/issues/1031), and the
+> experiments in [issue #1038 (Run ideas through the LLM agent, and decide which ideas go to the
+> agent)](https://github.com/openclimatefix/nged-substation-forecast/issues/1038). Neither the
 > infrastructure nor the search is built yet.
 
 **We plan to have a large language model (LLM) agent run some or all of the
@@ -30,13 +31,17 @@ the leaderboard with no human in the loop.
   the deeper look.
 
 The design below works for all three options. Under the third option, a person makes the research
-lead's choice of which ideas to deepen.
+lead's choice of which ideas to deepen. [Issue #1038 (Run ideas through the LLM agent, and decide
+which ideas go to the
+agent)](https://github.com/openclimatefix/nged-substation-forecast/issues/1038) tracks that decision
+and the experiments.
 
 **An agent session is judged on whether a finding moves the leaderboard, not on whether the finding
 is publishable.** A result reaching production has to beat the champion on the honest scorer planned
-in [issue #958](https://github.com/openclimatefix/nged-substation-forecast/issues/958). The honest
-scorer runs from the reviewed `main` branch as the maintainer's Unix user. Issue #958 also plans for
-agent sessions to run as a separate Unix user barred from the validation data the scorer holds back.
+in [issue #958 (Protect the leaderboard scorer for autonomous
+research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958). The honest scorer
+runs from the reviewed `main` branch as the maintainer's Unix user. Issue #958 also plans for agent
+sessions to run as a separate Unix user barred from the validation data the scorer holds back.
 
 ## Why energy forecasting suits automated research
 
@@ -53,14 +58,15 @@ live monitoring. Issue #958 plans to stop a session reading the held-back valida
 is still undecided.
 
 **Data is comparatively plentiful and each experiment is cheap.** Once the training-history
-extension ([#959](https://github.com/openclimatefix/nged-substation-forecast/issues/959)) lands,
-each series will have several full years of half-hourly data. Each small experiment is an XGBoost
-training run scored against a fixed fold. That run is cheap and fast compared with a wet-lab
-experiment or a large pretraining run for a neural network. That combination is why an autonomous
-research session is worth building here, even though the wider literature finds genuine recursive
-self-improvement still blocked in most domains
-([Duan et al., 2026](https://arxiv.org/abs/2609.11873), surveying the obstacles across scientific
-discovery, embodied artificial intelligence (AI), and software engineering).
+extension ([issue #959 (Extend ECMWF ENS training
+history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959)) lands, each series
+will have several full years of half-hourly data. Each small experiment is an XGBoost training run
+scored against a fixed fold. That run is cheap and fast compared with a wet-lab experiment or a
+large pretraining run for a neural network. That combination is why an autonomous research session
+is worth building here, even though the wider literature finds genuine recursive self-improvement
+still blocked in most domains ([Duan et al., 2026](https://arxiv.org/abs/2609.11873), surveying the
+obstacles across scientific discovery, embodied artificial intelligence (AI), and software
+engineering).
 
 ## What the experiment platform provides, and the leaderboard query it lacks
 
@@ -72,10 +78,13 @@ prunes experiments nobody needs any more.
 **The one piece the platform lacks for an agent to read results is a machine-readable leaderboard
 query.** That query is a thin, typed Python surface answering "fetch the aggregate leaderboard
 metrics for experiment X" and "rank every experiment by metric Y", so the agent reads results
-without scraping a UI. The visual leaderboard
-([#4](https://github.com/openclimatefix/nged-substation-forecast/issues/4)) needs the same query
+without scraping a UI. The visual leaderboard ([issue #4 (Create "visual leaderboard" script using
+Altair & display it in
+MLFlow)](https://github.com/openclimatefix/nged-substation-forecast/issues/4)) needs the same query
 underneath it. Writing the query as a reusable function, rather than burying the query in the chart
-script, leaves the agent's surface at a few lines of code once the agent is built.
+script, leaves the agent's surface at a few lines of code once the agent is built. [Issue #1032 (Add
+a typed Python query for leaderboard metrics: fetch one experiment, rank all by a
+metric)](https://github.com/openclimatefix/nged-substation-forecast/issues/1032) tracks the query.
 
 **MLflow's own Model Context Protocol (MCP) server, the standard interface through which an AI agent
 calls a tool, does not serve this need.** The server's tools are generated by capturing the stdout
@@ -215,7 +224,10 @@ separation addresses that risk.
 ### From idea to score, step by step
 
 **One idea passes through ten steps on its way from the research lead's choice to a score on the
-leaderboard.** The sections below describe each step in detail.
+leaderboard.** The sections below describe each step in detail, and [issue #1031 (Tracking:
+infrastructure for safe experiments run by an LLM agent
+(auto-research))](https://github.com/openclimatefix/nged-substation-forecast/issues/1031) tracks the
+work to build them.
 
 1. The research lead, an LLM session that decides what to try next, chooses an idea and the existing
    implementation to build on, and writes the idea down.
@@ -266,11 +278,13 @@ protections, the review, and the record described below.
 
 **A worker may change any part of the pipeline except a short list of protected paths, and every
 worker must end with the same output.** That output is a parquet file of `PowerForecast` rows for
-the fold, scored through the study route planned in #958: `scripts/score_study.py`, run from the
-`main` checkout as the maintainer's Unix user, scores the file the research session hands over. An
-extension point narrower than the whole pipeline could not express the large ideas above. Each
-implementation must also run end to end from the raw power, weather, and metadata tables, so that
-the leakage test below can re-run the implementation on perturbed copies of those tables.
+the fold, scored through the study route planned in [issue #958 (Protect the leaderboard scorer for
+autonomous research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958):
+`scripts/score_study.py`, run from the `main` checkout as the maintainer's Unix user, scores the
+file the research session hands over. An extension point narrower than the whole pipeline could not
+express the large ideas above. Each implementation must also run end to end from the raw power,
+weather, and metadata tables, so that the leakage test below can re-run the implementation on
+perturbed copies of those tables.
 
 ### An LLM research lead decides what to try next
 
@@ -295,19 +309,26 @@ choices.
 **The design splits into an agent loop, which reuses Claude Code, and a small trusted submit
 command, which no agent can touch.** The agent loop is the research lead choosing ideas, launching
 workers, and reading results. The agent loop is a standard harness, so the design does not build
-one: the research lead is itself a Claude Code session, run interactively or through the
-[Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk), which packages Claude Code as a
-Python library. For each node the research lead chooses, the research lead launches a worker in the
-worker's own git worktree to implement one idea on top of the parent node's code.
+one: the research lead is itself a Claude Code session, run interactively or through the [Claude
+Agent SDK](https://code.claude.com/docs/en/agent-sdk), which packages Claude Code as a Python
+library. For each node the research lead chooses, the research lead launches a worker in the
+worker's own git worktree to implement one idea on top of the parent node's code. [Issue #1036 (Set
+up the auto-research research lead session and review
+step)](https://github.com/openclimatefix/nged-substation-forecast/issues/1036) tracks the
+research-lead session.
 
 **The trusted submit command runs as the maintainer's Unix user in a process no agent can reach, and
 is the only process that trains and runs inference for a scored node.** The research lead submits a
 node by calling one narrow command, such as `submit_node <commit>`, through a `sudo` rule, the same
-pattern #958 plans for `scripts/score_study.py`. The submit command is plain Python in this
-repository, tested with the rest of the code, and does every step the agents must not control:
-launching the review, building the scored checkout, training the node and running inference, running
-the leakage test, handing the predictions to the scorer, logging to MLflow, pushing node branches,
-and opening the hypothesis-store pull request.
+pattern [issue #958 (Protect the leaderboard scorer for autonomous
+research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958) plans for
+`scripts/score_study.py`. The submit command is plain Python in this repository, tested with the
+rest of the code, and does every step the agents must not control: launching the review, building
+the scored checkout, training the node and running inference, running the leakage test, handing the
+predictions to the scorer, logging to MLflow, pushing node branches, and opening the
+hypothesis-store pull request. [Issue #1037 (Build the trusted submit command for
+auto-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1037) tracks the
+submit command.
 
 **No agent trains or predicts for a scored run, and the worker's code never runs as the maintainer's
 user.** The submit command executes the worker's code as a subprocess running as the restricted
@@ -328,15 +349,15 @@ interactive research-lead session. That pane is optional and can wait until the 
 submit command, not the research lead, launches the reviewer, so no agent can skip the review. The
 reviewer is given the written idea and the worker's diff, but not the worker's reasoning, so the
 worker's rationale cannot anchor the review. The reviewer checks three properties: that the diff
-implements the idea the worker was given, against the
-[silent changes Si et al. found](#coding-agents-change-experiments-without-saying-so); that no
-feature uses data from after the forecast was made; and that the code has no plain bug. The
-reviewer's findings go back to the worker for a capped number of rounds. An implementation the
-reviewer still rejects after the last round is recorded in the hypothesis store as failed review,
-and is not trained. A review does not guarantee a correct implementation. A review does make it less
-likely that a good idea is discarded because one implementation was broken, which is one source of
-the variance between implementations that
-[Ning et al.](#one-implementation-is-weak-evidence-about-an-idea) measured.
+implements the idea the worker was given, against the [silent changes Si et al.
+found](#coding-agents-change-experiments-without-saying-so); that no feature uses data from after
+the forecast was made; and that the code has no plain bug. The reviewer's findings go back to the
+worker for a capped number of rounds. An implementation the reviewer still rejects after the last
+round is recorded in the hypothesis store as failed review, and is not trained. A review does not
+guarantee a correct implementation. A review does make it less likely that a good idea is discarded
+because one implementation was broken, which is one source of the variance between implementations
+that [Ning et al.](#one-implementation-is-weak-evidence-about-an-idea) measured. Issue #1036 also
+tracks the review step.
 
 ### Protecting the evaluation code
 
@@ -344,7 +365,9 @@ the variance between implementations that
 a protected file change nothing in the scored run.** The submit command checks out the node's
 commit, restores every protected path from the commit the session started from, removing any file
 the node added under a protected path, and places the checkout in a directory the worker's Unix user
-cannot write. The protected paths are:
+cannot write. [Issue #1035 (Build the scored checkout and leakage test for
+auto-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1035) tracks the
+scored checkout and the leakage test. The protected paths are:
 
 - `conf/cv/`, which defines the cross-validation folds;
 - `packages/contracts/`, which defines the data schemas;
@@ -363,8 +386,9 @@ calls the protected code.** A worker may stop calling `cv_helpers.py` and write 
 filter, write a new lag module that nulls nothing, or point the workspace in `pyproject.toml` at a
 modified copy of `ml_core`. The worker's code also runs in the same Python process as the protected
 code, so the worker's code could replace the lag-nullification function in memory. Two checks cover
-behaviour instead. The row-set refusal planned in #958 stops a worker dropping hard series from the
-forecast. The leakage test stops lookahead.
+behaviour instead. The row-set refusal planned in [issue #958 (Protect the leaderboard scorer for
+autonomous research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958) stops a
+worker dropping hard series from the forecast. The leakage test stops lookahead.
 
 **The submit command, not the worker's code, truncates the training data at the fold's `train_end`,
 and the leakage test re-runs the pipeline on perturbed data.** For a sample of cut-off times, the
@@ -374,9 +398,9 @@ upstream data product the worker added, and rejects the node if any forecast ini
 before the cut-off changes. The test also checks that the pipeline's unperturbed output equals the
 rows handed to the scorer, so the tested code and the scored code are the same code.
 
-**A worker's prediction code needs power observed inside the validation window, and #958 plans to
-bar the research sessions' Unix user from reading that window.** Forecasting a validation row needs
-power observed before that row's initialisation time, and those observations lie inside the
+**A worker's prediction code needs power observed inside the validation window, and issue #958 plans
+to bar the research sessions' Unix user from reading that window.** Forecasting a validation row
+needs power observed before that row's initialisation time, and those observations lie inside the
 validation window. Two options remain open. A harness running as the maintainer's user could stage,
 for each initialisation time, only the power observed before that time, and run the worker's code as
 the research user against the staged copy. Or the design could accept that a session sees in-window
@@ -399,22 +423,26 @@ Ranking on the mean is the policy [Ning et al.](#one-implementation-is-weak-evid
 propose for crediting an idea rather than one implementation of the idea. Ning et al. did not test
 that policy inside a search like this one.
 
-**The search steers on the leaderboard's headline score, normalised mean absolute error (NMAE)
-([How each win is evaluated](xgboost-improvements.md#how-each-win-is-evaluated)), over forecast lead
-times of 3 to 10 days.** The scorer does not yet report that band, so the search can steer on the
-band only once the scorer does. Using the leaderboard's own score means the search and the
-leaderboard cannot disagree about which experiment is best. It is open whether tail skill, scored by
-[threshold-weighted continuous ranked probability score](metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
+**The search steers on the leaderboard's headline score, normalised mean absolute error (NMAE) ([How
+each win is evaluated](xgboost-improvements.md#how-each-win-is-evaluated)), over forecast lead times
+of 3 to 10 days.** The scorer does not yet report that band, which [issue #1033 (Report NMAE over
+3–10 day lead times as a leaderboard horizon
+slice)](https://github.com/openclimatefix/nged-substation-forecast/issues/1033) adds, so the search
+can steer on the band only once the scorer does. Using the leaderboard's own score means the search
+and the leaderboard cannot disagree about which experiment is best. It is open whether tail skill,
+scored by [threshold-weighted continuous ranked probability
+score](metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
 (CRPS), should steer the search instead. Steering on the headline score is the goal-oriented
 optimisation He et al. criticise. The protection this design relies on is therefore the separate
 certifying evaluation, not the steering signal.
 
-**Issue [#960](https://github.com/openclimatefix/nged-substation-forecast/issues/960)'s
-recommendation already separates steering from certifying.** The recommendation is a "discovery
-lane" that ranks ideas cheaply by cross-validation over whole-month blocks, and a rolling-origin
-evaluation that confirms the winners. Issue #960 says both can be designed and built against the
-current single fold, `mid_2025_to_mid_2026`, without waiting for more history. Until that design
-lands, the search would steer on the same fold on which promotion is decided. The planned [Ladder
+**The recommendation in [issue #960 (Design rolling-origin CV folds, assuming at least monthly
+retraining)](https://github.com/openclimatefix/nged-substation-forecast/issues/960) already
+separates steering from certifying.** The recommendation is a "discovery lane" that ranks ideas
+cheaply by cross-validation over whole-month blocks, and a rolling-origin evaluation that confirms
+the winners. Issue #960 says both can be designed and built against the current single fold,
+`mid_2025_to_mid_2026`, without waiting for more history. Until that design lands, the search would
+steer on the same fold on which promotion is decided. The planned [Ladder
 guard](metrics-and-leaderboard.md#fold-hygiene-selection-bias-and-a-final-test-window), which
 publishes a new best only when the new best beats the standing best by a declared margin, would then
 be the only protection against selection bias. The scale of search this page proposes is a reason to
@@ -429,7 +457,10 @@ and the champion's configuration. Each node is a branch created from its parent 
 child node inherits every change its parent made. A worker pushes to the research repository only.
 The node's MLflow run records the commit hash, so every score links to the exact code behind the
 score. Old branches stay pinned to the commit they started from and are never updated after a
-refactor, which is the rule `studies/` already follows.
+refactor, which is the rule `studies/` already follows. [Issue #1034 (Set up the auto-research
+repository and hypothesis
+store)](https://github.com/openclimatefix/nged-substation-forecast/issues/1034) tracks the research
+repository and the hypothesis store.
 
 **A separate repository keeps the workers' credentials away from this repository without any rules
 per branch.** Workers, reviewers, and the research lead hold a token for the research repository
@@ -461,7 +492,9 @@ curates the findings worth publishing into `docs/`, the way studies are written 
 **A winning idea reaches production as a reviewed re-implementation, never as merged agent code.**
 The person writing the pull request adds the research repository as a git remote, reads the winning
 node's diff against the commit the session started from, writes the idea up as a specification, and
-re-implements the idea in a reviewed pull request, as #958 requires of every autonomous study.
+re-implements the idea in a reviewed pull request, as [issue #958 (Protect the leaderboard scorer
+for autonomous research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958)
+requires of every autonomous study.
 
 ### What stops the research lead cheating
 
@@ -495,11 +528,12 @@ Each route meets one check:
 **Three risks remain, and none of the three is cheating in the sense the checks above catch.** A
 search that tries hundreds of ideas on one fold will overfit that fold however honestly the search
 runs. The defence is the separate certifying evaluation in [Ranking and
-steering](#ranking-and-steering). If issue #958 accepts that a research session sees power observed
-inside the validation window, the research lead could steer workers towards ideas that suit what the
-research lead has seen, which the certifying window and live monitoring are meant to catch. And the
-LLM may know what happened during the evaluation period from its own training data, which the [open
-questions](#open-questions) below raise.
+steering](#ranking-and-steering). If [issue #958 (Protect the leaderboard scorer for autonomous
+research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958) accepts that a
+research session sees power observed inside the validation window, the research lead could steer
+workers towards ideas that suit what the research lead has seen, which the certifying window and
+live monitoring are meant to catch. And the LLM may know what happened during the evaluation period
+from its own training data, which the [open questions](#open-questions) below raise.
 
 ## Open questions
 
