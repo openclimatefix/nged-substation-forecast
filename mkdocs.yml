@@ -130,6 +130,7 @@ nav:
       - Data sources: roadmap/data-sources.md
       - Delivery tables: roadmap/delivery-tables.md
       - Engineering health: roadmap/engineering-health.md
+      - Experiments run by an LLM agent: roadmap/auto-research.md
       - How NGED assembles forecasts: roadmap/forecast-building-blocks.md
       - Handover to NGED: roadmap/handover.md
       - "Live service: what's left to build": roadmap/live-service.md

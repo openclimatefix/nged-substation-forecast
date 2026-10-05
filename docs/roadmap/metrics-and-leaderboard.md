@@ -525,13 +525,14 @@ The original issue and its design-update comment are retained in
 
 **The single leaderboard fold (`mid_2025_to_mid_2026` in `conf/cv/default.yaml`) serves as both the
 model-selection set and the reported skill number, which the review already names as a source of
-optimistic bias** — see [Leaderboards of machine learning
-results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results) for
-[Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)'s M3/M4 warning and [Pinheiro et
-al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493)'s one-year minimum, both of which our
-own fold already meets in length but not in independence. With hundreds of planned experiments (the
-roadmap mentions auto-experimentation driven by a large language model (LLM) in v0.5), the winner's
-reported skill will grow more optimistically biased over time. Our own fold is small in effective
+optimistic bias** — see
+[Leaderboards of machine learning results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results)
+for [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)'s M3/M4 warning and
+[Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493)'s one-year minimum, both of
+which our own fold already meets in length but not in independence. The winner's reported skill will
+grow more optimistically biased over time, because hundreds of experiments are planned, including a
+search run by a large language model (LLM) agent that
+[Experiments run by an LLM agent](auto-research.md) describes. Our own fold is small in effective
 sample size rather than in row count, because consecutive half-hours are strongly correlated. The
 epoch mechanism handles *data* changes but not *adaptive selection* on a fixed fold.
 
