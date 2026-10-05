@@ -1,20 +1,22 @@
 # Experiments run by an LLM agent ("auto-research")
 
-> **Status: 🚧 Planned.** The infrastructure — the orchestrator, the leaderboard query, the diff
-> check, and the leakage test — is planned for v0.3, alongside the leaderboard. The experiments
+> **Status: 🚧 Planned.** The infrastructure — the orchestrator, the review step, the leakage test,
+> the research repository, the hypothesis store, and the leaderboard query — is planned for v0.3,
+> alongside the leaderboard. The experiments
 > themselves run in v0.5, alongside the rest of the [XGBoost improvements](xgboost-improvements.md).
 > Gated on [Protect the leaderboard scorer for autonomous
 > research](https://github.com/openclimatefix/nged-substation-forecast/issues/958). Neither the
 > infrastructure nor the search is built yet.
 
-**We plan to have a large language model (LLM) agent run some or all of the [XGBoost
-improvements](xgboost-improvements.md) backlog as a search: implement each idea, score it, and
-combine the ideas that help.** Each idea becomes an experiment: a variant of Flexpectation's XGBoost
-forecasting model, trained and scored the same way as every other variant. The leaderboard is the
-table that ranks those experiments, and the champion is the experiment currently promoted to
-production. The agent works in the style of [Karpathy's
-autoresearch](https://github.com/karpathy/autoresearch), registering and running experiments and
-reading the leaderboard with no human in the loop.
+**We plan to have a large language model (LLM) agent run some or all of the
+[XGBoost improvements](xgboost-improvements.md) backlog as a search: implement each idea, score it,
+and combine the ideas that help.** Larger ideas from other roadmap pages, such as a new estimator of
+generator capacity, may also go to the agent. Each idea becomes an experiment: a variant of
+Flexpectation's XGBoost forecasting model, trained and scored the same way as every other variant.
+The leaderboard is the table that ranks those experiments, and the champion is the experiment
+currently promoted to production. The agent works in the style of
+[Karpathy's autoresearch](https://github.com/karpathy/autoresearch), registering and running
+experiments and reading the leaderboard with no human in the loop.
 
 **Which of the XGBoost ideas go to the agent is not yet decided.** The options are:
 
@@ -23,13 +25,13 @@ reading the leaderboard with no human in the loop.
 - a broad-but-shallow screen of every idea by the agent, followed by a deeper, curated look at the
   ideas the screen picks out.
 
-The design below works for all three options, because each option starts from the same screen.
+The design below works for all three options, because each option starts from a broad screen.
 
 **An agent session is judged on whether a finding moves the leaderboard, not on whether the finding
 is publishable.** A result reaching production has to beat the champion on the honest scorer planned
 in [#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958). The honest scorer
-runs from the reviewed `main` branch as the maintainer's Unix user. Agent sessions run as a separate
-Unix user that cannot read the validation data the scorer holds back.
+runs from the reviewed `main` branch as the maintainer's Unix user. #958 also plans for agent
+sessions to run as a separate Unix user barred from the validation data the scorer holds back.
 
 ## Why energy forecasting suits automated research
 
@@ -41,8 +43,8 @@ The system being judged had a hand in constructing that check. A promoted foreca
 instead checked against power measured at the substation after the forecast was made, both in a
 held-back historical window and in [live monitoring](live-service.md#production-monitoring). A
 session that has read the held-back validation data could game the historical-window check but not
-live monitoring. The separate Unix user in #958 is what stops the session reading the held-back
-validation data.
+live monitoring. #958 plans to stop a session reading the held-back validation data, and the
+[proposed design](#protecting-the-evaluation-code) sets out the part of that plan still undecided.
 
 **Data is comparatively plentiful and each experiment is cheap.** Once the training-history
 extension ([#959](https://github.com/openclimatefix/nged-substation-forecast/issues/959)) lands,
@@ -121,15 +123,15 @@ paper review: the leaderboard's honest scorer.
 **Debate between agents bears directly on how agents here could critique each other's work.**
 Arithmetic and word-problem accuracy resemble the reasoning a session does when checking its own
 feature-engineering logic or reading a metrics table, so the gains Du et al. measured are evidence
-about agents here, not just an analogy. Whether the proposed design should add that critique is an
-[open question](#open-questions).
+about agents here, not just an analogy. The proposed design adds that critique as a
+[review before training](#the-orchestrator-and-the-workers).
 
 **Co-Scientist's tournament is one concrete answer to the breadth-versus-depth question, and the
 proposed design answers the question differently.** In Co-Scientist, breadth comes from generating
 many hypotheses up front, depth comes from repeated tournament rounds against the current top of the
 ranking, and the balance between breadth and depth emerges from running more rounds. The
-[proposed design](#proposed-design) below sets the balance with a screen of the ideas followed by a
-tree search.
+[proposed design](#an-llm-research-lead-decides-what-to-try-next) below sets the balance with an LLM
+research lead that screens broadly and then goes deeper.
 
 ### Google's ERA: a tree search over code variants
 
@@ -203,22 +205,68 @@ separation addresses that risk.
 
 ## Proposed design
 
-**A Python orchestrator holds the search tree, launches Claude Code workers, and scores their code
-itself.** Claude Code is Anthropic's coding agent. The orchestrator picks the next node to extend,
-and launches a headless `claude -p` worker in its own git worktree to implement one idea on top of
-that node's code. The orchestrator then trains and predicts with the worker's code as the restricted
-research user planned in #958, so worker code cannot read the held-back data. Workers never report
-their own scores.
+### Two modes of work
 
-**Every node is logged as an MLflow run under a `study/`-prefixed experiment name, so the search
-tree is visible on the leaderboard but outside every promotion path.** #958 plans the same prefix
-for every autonomous study.
+**The design has two modes: a search over small ideas, and one long agent session per large idea.**
+A small idea is a Tier 1 or Tier 2 entry in the XGBoost backlog, such as a calendar feature or a
+model setting, which a worker can implement and score within an hour. A large idea is a research
+project lasting days: a new estimator of the effective capacity of metered generators, a detector of
+switching events, a full differentiable-physics forecaster, or a method for disaggregating unmetered
+generation. A large idea usually adds a new upstream data product or a new forecaster, so a tree
+search over many quick variants does not suit the large idea. Both modes share the protections, the
+review, and the record described below.
 
-**The orchestrator rejects, and logs, any diff that touches the evaluation code.** The honest scorer
-planned in #958 runs from `main`, so once #958 lands a worker cannot change how forecasts are
-scored. But a worker's own code produces the forecasts. The [Si et al.
-finding](#coding-agents-change-experiments-without-saying-so) is that an agent can change the
-experiment around the method it was asked to test. The protected paths are:
+### Workers change the pipeline; the output is fixed
+
+**A worker may change any part of the pipeline except a short list of protected paths, and every
+worker must end with the same output.** That output is a set of `PowerForecast` rows for the fold,
+scored by the honest scorer through the study route planned in #958, in which
+`scripts/score_study.py` scores a predictions file from `main`. An extension point narrower than the
+whole pipeline could not express the large ideas above. Each implementation also exposes one entry
+point: given every input up to an initialisation time, return the forecasts made at that time. The
+leakage test below calls that entry point.
+
+### An LLM research lead decides what to try next
+
+**An LLM research lead prioritises the ideas, screens them broadly and shallowly, and then goes
+deeper on the promising ones, in repeated rounds.** Each round runs four steps:
+
+1. Prioritise the ideas, starting from the order `xgboost-improvements.md` already gives them.
+2. Implement each idea once or a few times, and score every implementation.
+3. Read the scores and the hypothesis store, and choose which ideas or combinations to explore
+   further.
+4. Repeat from step 2 on the chosen subset.
+
+This order is the maintainer's current best guess at sequencing, not a settled decision. ERA's
+upper-confidence-bound rule is one tool the research lead can use to choose which node to extend,
+and also a baseline against which to measure the research lead's choices.
+
+### The orchestrator and the workers
+
+**A Python orchestrator launches Claude Code workers, and trains and scores their code itself.**
+Claude Code is Anthropic's coding agent. For each node the research lead chooses, the orchestrator
+launches a headless `claude -p` worker in its own git worktree to implement one idea on top of that
+node's code. Workers never report their own scores. Every node is logged as an MLflow run under a
+`study/`-prefixed experiment name, so the search tree is visible on the leaderboard but outside every
+promotion path. #958 plans the same prefix for every autonomous study.
+
+**A fresh reviewer agent reads every implementation before the implementation trains a model.** The
+reviewer is given the written idea and the worker's diff, but not the worker's reasoning, so the
+worker's rationale cannot anchor the review. The reviewer checks three properties: that the diff
+implements the idea it was given, against the [silent changes Si et al.
+found](#coding-agents-change-experiments-without-saying-so); that no feature uses data from after
+the forecast was made; and that the code has no plain bug. The reviewer's findings go back to the
+worker for a capped number of rounds. A review does not guarantee a correct implementation, but a
+review makes it less likely that a good idea is discarded because one implementation was broken,
+which is the risk [Ning et al.](#one-implementation-is-weak-evidence-about-an-idea) measured.
+
+### Protecting the evaluation code
+
+**The worker cannot change the evaluation code that the scored run uses, because the orchestrator
+builds the scored run's checkout itself.** The orchestrator checks out the node's commit, restores
+every protected path from `main`, and places the checkout in a directory the worker's Unix user
+cannot write. A worker that clones the repository, copies files, or edits its own copy of a
+protected file therefore changes nothing the scored run executes. The protected paths are:
 
 - `conf/cv/`, which defines the cross-validation folds;
 - `packages/contracts/`, which defines the data schemas;
@@ -227,43 +275,41 @@ experiment around the method it was asked to test. The protected paths are:
   windows and decides which series are eligible;
 - `features/_lags.py` under the same directory, which builds the lag features and holds the
   function that nulls any power lag the forecast could not have known at its initialisation time.
-  The call to that function sits in feature code the worker may edit, so only the leakage test below
-  catches the call's removal.
 
-The diff check catches an edit to a protected path however the worker made the edit, including
-through a shell command.
+The orchestrator also rejects, and logs, any diff that touches a protected path, so that an
+implementation is never scored on evaluation code its author did not expect.
 
-**A diff check cannot catch lookahead written into new feature code, so the orchestrator also runs
-a leakage test on every node.** Lookahead is a feature using data from after the forecast was made.
-A worker can add a centred rolling window, join on the wrong time column, or remove the call to the
-lag nullification, all inside feature code the worker is allowed to edit. The leakage test perturbs
-every power observation after each forecast's initialisation time, predicts again, and rejects the
+**File permissions protect files, not behaviour, so the orchestrator also runs a leakage test on
+every node.** The worker's code runs in the same Python process as the protected code, so the
+worker's code could replace the lag-nullification function, or change the fold windows in memory,
+without touching a protected file. A worker can also add a centred rolling window or join on the
+wrong time column inside code the worker is allowed to edit. The leakage test perturbs every power
+observation after each forecast's initialisation time, calls the entry point again, and rejects the
 node if any forecast changes.
 
-**The guard against editing the evaluation code lives in the orchestrator and the Unix user, not
-inside the worker's Claude Code session.** A guard inside the session only saves a worker from
-wasting a run on an edit the orchestrator would reject. The guard could be a deny rule in
-`.claude/settings.json`, a `PreToolUse` hook, or a Claude Code mod handling tool-call events. #958
-already notes that a shell command can bypass a deny rule. A worker can also edit the
-`.claude/settings.json` in its own worktree to remove any hook or deny rule. A deny rule, which #958
-already lists as optional, is enough for that limited purpose. A mod would add JavaScript or
-TypeScript code that runs with the user's permissions, without adding any protection the diff check
-does not already give.
+**A worker's prediction code needs power observed inside the validation window, which conflicts with
+the plan in #958 that the research user cannot read the validation data.** Forecasting a validation
+row needs power observed before that row's initialisation time, and those observations lie inside
+the validation window. Two ways out are on the table. A harness running as the maintainer's user
+could feed the worker's code only the power observed before each initialisation time. Or the design
+could accept that a session sees in-window power, and rely on a separate certifying window and on
+live monitoring to catch any gaming. #958 is where that decision belongs.
 
-**The search first screens each idea it is given once on top of the champion, then runs ERA's
-upper-confidence-bound tree search, seeded with pairs of the ideas that passed.** Seeding the tree
-search with every pair of ideas that passed the screen follows ERA's
-[single-cell recombination study](#googles-era-a-tree-search-over-code-variants). Under the
-broad-but-shallow option, the screen is the agent's whole job, and the curated deeper look replaces
-the tree search.
+**A guard inside the worker's Claude Code session adds no protection beyond the orchestrator's
+checks.** A worker can bypass a deny rule in `.claude/settings.json` with a shell command, and can
+edit the `.claude/settings.json` in its own worktree to remove a deny rule or a `PreToolUse` hook. A
+Claude Code mod handling tool-call events would add JavaScript or TypeScript code that runs with the
+user's permissions, without adding any protection the orchestrator does not already give. A deny
+rule is still worth having to save a worker from wasting a run on an edit the orchestrator would
+reject.
+
+### Ranking and steering
 
 **Ideas are ranked on the mean score across their implementations, and an idea is implemented a
 second and third time only when its score is close to a competitor's or the idea is a finalist.**
 Ranking on the mean is the policy [Ning et al.](#one-implementation-is-weak-evidence-about-an-idea)
 propose for crediting an idea rather than one implementation of the idea. Ning et al. did not test
-that policy inside a tree search. The best single implementation of a winning idea is the
-implementation handed to a reviewer. The reviewer re-implements the idea for promotion, as #958
-requires of every autonomous study.
+that policy inside a tree search.
 
 **The search steers on the leaderboard's headline score, normalised mean absolute error (NMAE)
 ([How each win is evaluated](xgboost-improvements.md#how-each-win-is-evaluated)), over forecast lead
@@ -286,26 +332,53 @@ publishes a new best only when the new best beats the standing best by a declare
 be the only protection against selection bias. The scale of search this page proposes is a reason to
 build #960's design before the search runs.
 
+### Recording what was learned
+
+**Every implementation is kept as a branch in a separate research repository, which starts as a
+private mirror of this repository.** Before each session, the orchestrator copies the latest `main`
+into the research repository, so every session starts from the champion's current code. Each node is
+a branch created from its parent node's commit, so a child node inherits every change its parent
+made. A worker pushes to the research repository only, and the node's MLflow run records the
+commit hash, so every score links to the exact code behind it. Old branches stay pinned to the
+commit they started from and are never updated after a refactor, which is the rule `studies/`
+already follows.
+
+**The research repository is separate so that a worker's credentials cannot reach this
+repository.** A fine-grained GitHub token cannot be limited to a namespace of branches, so a worker
+able to push node branches here could also push to any unprotected branch. Hundreds of node branches
+would also bury the branches people actually work on.
+
+**A structured hypothesis store records what each idea taught the project, in a form a person can
+read.** The store holds one markdown file per idea under `studies/auto_research/` on `main`, with the
+same fields in every file:
+
+- the hypothesis;
+- each implementation, with its commit in the research repository and its MLflow run;
+- each implementation's score, and the spread between implementations;
+- the reviewer's verdict on each implementation;
+- the idea's status: promising, worth deepening, or abandoned;
+- the reason for abandoning the idea, where the idea was abandoned.
+
+The research lead reads and updates the store between rounds. The orchestrator opens one batched
+pull request per session, and the maintainer merges the pull request, so the agent never holds write
+access to `main`. The store carries aggregate scores only, because a per-series score could identify
+a metered generator. A person curates the findings worth publishing into `docs/`, the way studies are
+written up today.
+
+**A winning idea reaches production through a reviewed pull request on this repository.** The
+reviewer adds the research repository as a git remote, reads the winning node's diff against the
+commit the session started from, and re-implements or cherry-picks the idea, as #958 requires of
+every autonomous study.
+
 ## Open questions
 
-**Nothing in the design chooses which idea to try next so as to learn the most.** ERA's
-upper-confidence-bound rule chooses which node to extend, and Co-Scientist's tournament ranks
-hypotheses that already exist. He et al. propose one answer, an intermediate signal of progress that
-chooses the next experiment, but test the proposal only in a simulated physics environment. An idea
-raised in internal discussion, drawn from self-driving-lab practice in materials science rather than
-from a paper this project has reviewed directly, is that this choice is the crucial component of an
-autonomous research loop. That idea is worth checking against the self-driving-lab literature before
-the design relies on the idea.
-
-**It is undecided whether agents should critique each other's code before the scorer runs.** The
-debate results above suggest a second worker reviewing each diff could catch a mistake the leakage
-test cannot, such as an implementation that quietly drops part of the idea it was asked to test.
-
-**It is still undecided how a session should record its own experience over time.** One option is a
-dedicated hypothesis store: a structured record of what was tried, what was found, and why a branch
-was abandoned, richer than an MLflow run. The other option is to carry the same information in the
-tags and descriptions of MLflow's existing experiments and runs. Nobody has yet compared the
-hypothesis store with the MLflow option.
+**How well an LLM research lead chooses what to try next is untested.** ERA's upper-confidence-bound
+rule chooses which node to extend, and Co-Scientist's tournament ranks hypotheses that already
+exist. He et al. propose an intermediate signal of progress that chooses the next experiment, but
+test the proposal only in a simulated physics environment. An idea raised in internal discussion,
+drawn from self-driving-lab practice in materials science rather than from a paper this project has
+reviewed directly, is that this choice is the crucial component of an autonomous research loop. That
+idea is worth checking against the self-driving-lab literature before the design relies on the idea.
 
 **The LLM may already know what happened during the evaluation period.** An LLM trained on text
 written after the start of a validation window may know about events inside the window, such as a
