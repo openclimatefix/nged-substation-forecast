@@ -72,8 +72,8 @@ A single asterisk marks a module that moves wholesale to the package in layer 1 
 `studies/` (the starred scripts that remain in `beam_diffuse_split/` are listed there only until
 their commit). A double asterisk marks a script from which named helpers move to the package in
 layer 2 (the script stays, shorter). `weather_downloads/fetch_era5_wind.py` keeps its folder and
-loses its `sys.path.insert` into `beam_diffuse_split/`, because the helpers it reads come from layer
-1. The scripts of `past_weather/` that today read each other, such as the 13 symbols
+loses its `sys.path.insert` into `beam_diffuse_split/`, because the helpers it reads come from
+layer 1. The scripts of `past_weather/` that today read each other, such as the 13 symbols
 `cerra_wind_direction` takes from `cerra_wind_levels`, become same-folder imports and need no move.
 
 **The four orphans stay in `beam_diffuse_split/` for now.** They feed the data-sources page, the
