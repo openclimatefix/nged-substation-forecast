@@ -45,9 +45,9 @@ best-estimate, not a guarantee.
   pooling variants, how a weather product with a few months of history could enter the forecast,
   the COVID covariate, and why scoring against estimates of past weather is a diagnostic rather than
   a promotion criterion.
-- [Experiments run by an LLM agent](auto-research.md) — an LLM agent running the XGBoost backlog as a
-  tree search: what published research agents found, and a proposed design that scores each
-  worker's code from outside the worker's session.
+- [Experiments run by an LLM agent](auto-research.md) — a large language model (LLM) agent running
+  the XGBoost backlog as a tree search: what published research agents found, and a proposed design
+  that scores each worker's code from outside the worker's session.
 - [Engineering health](engineering-health.md) — scientific-rigor tests and cleanup.
 - [Capacity estimation](capacity-estimation.md) — the v0.7 head-to-head between candidate estimators
   of the time-varying effective capacity of metered generators: a [convex
@@ -217,12 +217,13 @@ quantile pipeline:
   gated on the two items above, since degrading earlier would emit output no scenario has tested
 
 **Automated experimentation ("auto-research")**: once the leaderboard (v0.3) is stable, we plan to
-have an LLM agent run the XGBoost backlog as a search. This may have to wait until v2, and is gated
-on [#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958) landing first,
-because an autonomous session is only trustworthy once it cannot edit or bypass the scorer it is
-judged against. The published evidence, and a proposed design in which an idea is implemented again
-whenever the idea's score is close to a competitor's and every experiment is scored from outside the
-agent's session, are in [Experiments run by an LLM agent](auto-research.md).
+have an LLM agent run the XGBoost backlog as a search. Automated experimentation may have to wait
+until v2. The work is gated on
+[#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958) landing first, because
+an autonomous session is only trustworthy once the session cannot edit or bypass the scorer the
+session is judged against. [Experiments run by an LLM agent](auto-research.md) gives the published
+evidence, and a proposed design in which an idea is implemented again whenever the idea's score is
+close to a competitor's and every experiment is scored from outside the agent's session.
 
 ---
 

@@ -529,12 +529,12 @@ optimistic bias** — see
 [Leaderboards of machine learning results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results)
 for [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)'s M3/M4 warning and
 [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493)'s one-year minimum, both of
-which our own fold already meets in length but not in independence. With hundreds of planned
-experiments (including a tree search run by a large language model (LLM) agent, described in
-[Experiments run by an LLM agent](auto-research.md)), the winner's reported skill will grow more
-optimistically biased over time. Our own fold is small in effective sample size rather than in row
-count, because consecutive half-hours are strongly correlated. The epoch mechanism handles *data*
-changes but not *adaptive selection* on a fixed fold.
+which our own fold already meets in length but not in independence. The winner's reported skill will
+grow more optimistically biased over time, because hundreds of experiments are planned, including a
+tree search run by a large language model (LLM) agent that
+[Experiments run by an LLM agent](auto-research.md) describes. Our own fold is small in effective
+sample size rather than in row count, because consecutive half-hours are strongly correlated. The
+epoch mechanism handles *data* changes but not *adaptive selection* on a fixed fold.
 
 **Whether to reserve a genuinely untouched final-test year remains a design decision in #960.**
 Jack has questioned whether to reserve that year rather than train on more history and report
