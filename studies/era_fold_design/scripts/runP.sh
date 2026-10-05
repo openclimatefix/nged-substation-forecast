@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /home/jack/dev/nged-substation-forecast/.claude/worktrees/era-fold-design
+cd ~/dev/nged-substation-forecast/.claude/worktrees/era-fold-design
 O=../scratch/era-fold/out; S=../scratch/era-fold/scripts; L=$O/runP.log
 while pgrep -f "partC_fit.py wind IIr 1 --sens" >/dev/null; do sleep 15; done
 fit() { echo "=== [${DEVICE:-cpu}] $* $(uptime | sed 's/.*load/load/')" >> $L

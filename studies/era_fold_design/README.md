@@ -45,3 +45,5 @@ Absolute mean absolute error (percent of capacity), primary setting, CPU: DMI 8.
 ## Wind `wind_icon_dream` panel: D1 minus D0 (primary setting, CPU)
 
 ICON-DREAM-EU minus ERA5: +0.001 [-0.119, +0.131] under D0, +0.010 [-0.096, +0.125] under D1 (change +0.009). ICON-DREAM-EU minus ICON-EU: +0.340 [+0.266, +0.405] under D0, +0.312 [+0.245, +0.371] under D1 (change -0.028). Neither contrast changes sign or significance. D0 reproduces the published per-row losses bit for bit (450,369 rows).
+
+`common.py`, the `part*` scripts, and the `run*.sh` scripts cannot be re-run, because the worktree and the frozen copy of the ENS script that they load no longer exist. `two_shares.py` and `saved_cov.py` read only the saved files under `data/studies/` and still run.
