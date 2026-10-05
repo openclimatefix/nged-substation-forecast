@@ -442,8 +442,9 @@ the finding it catches is prose the branch has no business touching.
 
 ## Which model to give the review to
 
-**Use Opus 5 for anything an outside reader will see, Sonnet 5 for routine internal sweeps, and
-never Haiku 4.5.** All three were given a byte-identical brief over an identical 433-line range.
+**Use the latest version of Opus for anything an outside reader will see, Sonnet for routine
+internal sweeps, and never Haiku.** All three were given a byte-identical brief over an identical
+433-line range.
 
 | | Haiku 4.5 | Sonnet 5 | Opus 5 |
 |---|---|---|---|
