@@ -1,20 +1,17 @@
 # Does UKV-CEDA lower the error of the ECMWF ENS mean at lead days 1 to 4?
 
 Study for [issue #1016](https://github.com/openclimatefix/nged-substation-forecast/issues/1016).
-The question is whether adding the Met Office's UKV (a 2 km UK weather model), read from the CEDA
-archive (the Centre for Environmental Data Analysis), to the ECMWF ENS mean lowers the power-forecast
-error at lead days 1 to 4, for solar and for wind separately. The rows, eras, folds, hyperparameter
-settings, seeds, metric, and paired month-resampled intervals are those of
+The question is whether adding the Met Office's UKV (its 2 km UK variable-resolution weather model), read from the CEDA archive (the Centre for Environmental Data Analysis), to the mean of the European Centre for Medium-Range Weather Forecasts (ECMWF) ensemble forecast (ENS) lowers the power-forecast
+error at lead days 1 to 4, for solar and for wind separately. The rows, eras, folds, hyperparameter settings, seeds, metric, and paired month-resampled intervals follow
 [Which weather forecast is best at day-ahead lead?](../../docs/studies/forecasts/matched-lead.md).
-The shuffled control and the reading rule are those of
+The shuffled control and the reading rule follow
 [ENS plus one weather product](../../docs/studies/forecasts/blends-with-ens.md).
 
-**The 03 UTC run is the only UKV-CEDA lead.** An hour on day `D` at lead day `N` reads the 03 UTC
+**The planned blend reads UKV-CEDA's 03 UTC run (UTC is Coordinated Universal Time).** An hour on day `D` at lead day `N` reads the 03 UTC
 run of day `D - N` from the `UKV-CEDA-T120` store, at lead `24 * N + h - 3` hours, where `h` is the
 hour of day. A service running at 09:00 UTC could read that run. The lead is 21 to 117 hours over
 days 1 to 4, inside the store's 120 hours. Day 5 cannot be built, because its lead exceeds 120 hours
-for every hour after 03:00 UTC. The 3 hours are shorter than ENS's lead at every hour, which favours
-the blend.
+for every hour after 03:00 UTC. The UKV-CEDA lead is 3 hours shorter than ENS's lead at every hour, which favours the blend.
 
 **Four arms are fitted per technology and lead day, each at both hyperparameter settings.** An arm is
 one XGBoost model per generator, and the arms hold equal column counts (9 for solar, 11 for wind).
@@ -27,7 +24,7 @@ one XGBoost model per generator, and the arms hold equal column counts (9 for so
 | `blend_ukv_ceda_dayN_control_b` | the same shuffle under seed 1000 |
 
 UKV-CEDA's wind columns are its native 10 m speed, the sine and cosine of its 10 m direction, and its
-925 hPa speed. They are not the 100 m wind that ENS carries. Two contrasts are planned before any
+925 hPa speed. None of these columns is the 100 m wind that ENS carries. Two contrasts are planned before any
 fit. P1 is the blend minus the padded ENS arm. P2 is the blend minus each control. The blend lowers
 the error only if the upper 95% bound of P1 and of both P2 contrasts is below zero at both settings.
 
@@ -38,28 +35,26 @@ before the build and before every fit, and start only below a load average of ab
 
 1. `uv run python studies/ukv_ceda_blends/check_arm_columns_unchanged.py` reads every
    `*_losses.json` stamp under `data/studies/nwp_forecast_comparison_*` and exits 0 if each arm's
-   recorded columns still equal `fit_aifs.arm_features`. It proves that the one branch added to
+   recorded columns still equal `fit_aifs.arm_features`. The check proves that the one branch added to
    `nwp_forecast_comparison._wind_weather_fields` leaves every earlier arm alone.
 2. `uv run python studies/ukv_ceda_blends/build_ukv_ceda_inputs.py --dry-run` builds one month
    (`--dry-run-month`, default 2026-03), prints the rows lost to each cause, and writes nothing.
 3. `uv run python studies/ukv_ceda_blends/build_ukv_ceda_inputs.py` writes
    `<domain>_ukv_ceda_inputs.parquet`, `build.json`, and `README.md` into the write-once folder
-   `data/studies/ukv_ceda_blends/`. It refuses to run until the download covers the window and every
+   `data/studies/ukv_ceda_blends/`. The build refuses to run until the download covers the window and every
    run slot the store marks as never archived has been fetched again once. Name the days CEDA still
    does not list in `--unlisted-days`.
 4. `uv run python studies/ukv_ceda_blends/verify_ukv_ceda_inputs.py` recomputes a stratified sample of
    built values in plain Python, gates the radiation timestamp at day 1 (see "The radiation
-   timestamp" below), compares each lead day's correlation with CAMS and ERA5 against Open-Meteo UKV
-   day 1 on the rows all four lead days hold, and screens for month-to-month steps. It writes
-   `verify.json`, holding whether every gating check passed and the SHA-256 of each inputs file, into
+   timestamp" below), compares each lead day's correlation with the Copernicus Atmosphere Monitoring Service (CAMS) and ECMWF's fifth reanalysis (ERA5) against Open-Meteo UKV
+   day 1 on the rows all four lead days hold, and screens for month-to-month steps. The script writes `verify.json`, holding whether every gating check passed and the SHA-256 of each inputs file, into
    the build's folder.
 5. `uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --dry-run` builds every frame,
    checks every arm's columns, and lists the fits.
-6. `uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --check` fits one arm at one wind
-   site twice on the GPU, stops unless the two fingerprints agree, prints a time estimate, and
+6. `uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --check` fits one arm at one wind site twice on the graphics processing unit (GPU), stops unless the two fingerprints agree, prints a time estimate, and
    compares ENS's mean alone with its padded copy on the wind day-1 rows.
 7. `uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --verified` fits every stage, writes
-   the losses once, refits the wind day-1 blend at one site on the CPU, and writes `report.md` and
+   the losses once, refits the wind day-1 blend at one site on the central processing unit (CPU), and writes `report.md` and
    `intervals.parquet`. Add `--only-missing` to fit the pairs no saved file holds into a new
    `_added_<k>` file, and `--report-only --report-name NAME` to write the report again from the saved
    losses into new files.
@@ -75,7 +70,7 @@ before the build and before every fit, and start only below a load average of ab
 
 11. `uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --post-hoc-permutation --dry-run`
     lists the post hoc permutation test's fits (see "Post hoc permutation test" below), and the same
-    command with `--report-name report_3` instead of `--dry-run` fits them into new `_added_<k>`
+    command with `--report-name report_3` instead of `--dry-run` fits the controls into new `_added_<k>`
     files and writes `report_3.md` and `report_3_intervals.parquet`.
 12. `uv run python studies/ukv_ceda_blends/build_ukv_ceda_inputs.py --older-run --dry-run`, then
     without `--dry-run` and with the same `--unlisted-days`, builds the older-run inputs into the
@@ -137,12 +132,11 @@ hoc, exploratory analysis added after the first science review.
 
 **The permutation test asks whether the solar blend's gain is larger than shuffled controls give by
 chance.** For each solar lead day, `--post-hoc-permutation` fits 15 further shuffled controls
-(`blend_ukv_ceda_dayN_control_s<seed>`, seeds 2010 to 2150 in steps of 10) at the primary setting
-only. Each shuffles UKV-CEDA's columns within generator, year-month, and hour of day, with the same
+(`blend_ukv_ceda_dayN_control_s<seed>`, seeds 2010 to 2150 in steps of 10) at the primary setting only. Each further control shuffles UKV-CEDA's columns within generator, year-month, and hour of day, with the same
 groups as the planned control. The report prints the planned blend's P1 against the 17 values of
-(shuffled control minus padded ENS) from the planned two controls and the 15 extra ones, the rank of
+(shuffled control minus padded ENS) from the planned two controls and the 15 extra controls, the rank of
 P1 among the 18 values, and the one-sided permutation p-value `(1 + controls at or below P1) / 18`,
-whose smallest possible value is 0.056. The test is exploratory and post hoc. It fits
+whose smallest possible value is 0.056. The test is exploratory and post hoc. The test fits
 6 generators x 4 lead days x 15 seeds, 360 fits.
 
 ## Post hoc older run
@@ -152,17 +146,16 @@ whose smallest possible value is 0.056. The test is exploratory and post hoc. It
 day before ENS's run, for `N` of 1 to 3. For an hour on day `D` at lead day `N`, the run starts at
 15:00 UTC on day `D - N - 1` and the lead is `24 * N + h + 9` hours (`h` the hour of the hour's
 instant, plus 1 for a solar label). That run starts 9 hours before ENS's 00 UTC run of day `D - N`,
-where the planned blend's run starts 3 hours after it, and leads 12 hours longer than the planned
+where the planned blend's run starts 3 hours after ENS's run, and leads 12 hours longer than the planned
 run. Day 4 cannot be built: its lead reaches 129 hours, beyond the store's 120, for every hour after
 14:00 UTC. The two changes, a longer lead and an earlier start against ENS, move together, so the
 arm cannot separate the effect of the lead from the effect of the timing. The store is hourly only
 to lead 48 hours, so the older run also has more hours rebuilt from 3-hourly steps than the planned
-run has at days 1 and 2. At day 1 the older run is read at a lead of 33 to 56 hours, and the report
-splits the day-1 rows at lead 48 hours, where both runs are hourly. The arm has its own padded
+run has at days 1 and 2. At day 1 the older run is read at a lead of 33 to 56 hours. The report splits the day-1 rows at lead 48 hours, because both runs are hourly on the rows at or before that lead. The arm has its own padded
 ENS reference refitted on its rows, one shuffled control (seed 0), and equal column counts (9 for
 solar, 11 for wind), at both settings, for both technologies. The report prints the older-run blend
 minus its padded ENS (P1), minus its control (P2), minus the planned blend, and the planned P1 on
-the same rows. Its inputs are built by `build_ukv_ceda_inputs.py --older-run` with the same coverage
+the same rows. The older-run inputs are built by `build_ukv_ceda_inputs.py --older-run` with the same coverage
 guard, stamp checks, and init-time assertions as the main build, into
 `data/studies/ukv_ceda_blends_run15/`.
 
@@ -182,7 +175,7 @@ guard, stamp checks, and init-time assertions as the main build, into
   titles that state the reading), the per-generator figure, the per-arm absolute-error figure with
   no intervals, the per-generator absolute-error figure, the permutation and older-run figures, and
   the week figures from the saved intervals, losses, and predictions.
-- `check_arm_columns_unchanged.py` is described in step 1. It cannot cover the main matched-lead
+- `check_arm_columns_unchanged.py` is described in step 1. The check cannot cover the main matched-lead
   fit, which wrote no stamp. No arm prefix there starts with `ukv_ceda`, so the new branch of
   `_wind_weather_fields` is never reached by that fit.
 
@@ -213,6 +206,6 @@ minutes before (a). The snapshots are not reweighted to land on -30 minutes.
   offset changes the error.
 
 - UKV-CEDA is the archive of the Met Office's UKV, which is statistically different from the live
-  UKV feed. A model trained on UKV-CEDA must not be run on live UKV.
+  UKV feed. An XGBoost model trained on UKV-CEDA must not be run on live UKV.
 - The 09:00 UTC delivery time of the 03 UTC run is an assumption that has not been measured for CEDA.
 - The page that reports the results is `docs/studies/forecasts/ukv-ceda-blends.md`.

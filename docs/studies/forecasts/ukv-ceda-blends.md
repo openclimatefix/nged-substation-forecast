@@ -1,21 +1,13 @@
 # At three Lincolnshire wind farms, adding archived UKV forecasts to ECMWF's ensemble mean lowered the wind power error at lead days 1 and 2, and the solar gain of about 0.1 points is unresolved
 
-**At 3 wind farms in Lincolnshire, an XGBoost model (a gradient-boosted tree model) given the Met
-Office's UKV weather forecast from the CEDA archive as well as the mean of the European Centre for
-Medium-Range Weather Forecasts (ECMWF) ensemble forecast (ENS) had a lower power-forecast error than
-one given the ENS mean alone at lead days 1 and 2.** The result holds at both hyperparameter
+**At three wind farms in Lincolnshire, the power-forecast error at lead days 1 and 2 was lower for an XGBoost model (a gradient-boosted tree model) given the Met Office's UK variable-resolution (UKV) weather forecast from the archive of the Centre for Environmental Data Analysis (CEDA) as well as the mean of the European Centre for Medium-Range Weather Forecasts (ECMWF) ensemble forecast (ENS) than for an XGBoost model given the ENS mean alone.** The result holds at both hyperparameter
 settings, against both shuffled controls, after the Bonferroni correction, and with any one calendar
 month dropped. The gain is 0.24 to 0.27 points of capacity at day 1 and 0.19 to 0.21 points at day
-2, across the two settings. At wind day 3 the gain rests heavily on February 2026. At 6 solar farms
-the gain is about 0.1 points of capacity at days 1 to 3, and the planned rule is met at day 3 only.
-At day 4 the study is inconclusive for both technologies. Two post hoc tests that move UKV's run
-earlier cannot say how much of any gain comes from UKV's weather and how much from UKV's run
-starting 3 hours after ENS's run. The UKV data comes from the archive at the Centre for
-Environmental Data Analysis (CEDA), which this page calls UKV-CEDA.
+2, across the two settings. At wind day 3 the gain rests heavily on February 2026. At six solar farms the gain is about 0.1 points of capacity at days 1 to 3, and the planned rule is met at day 3 only.
+At day 4 the study is inconclusive for both technologies. UKV's run starts 3 hours after ENS's run. Two post hoc tests that move UKV's run earlier cannot say how much of any gain comes from UKV's weather and how much from the later start. This page calls the UKV data from the CEDA archive UKV-CEDA.
 
 **The error is a mean absolute error in percentage points of the generator's capacity, and every
-difference is the first model's error minus the second's.** A negative difference means the model
-with UKV-CEDA forecasts better. Each bracketed pair is a 95% interval from resampling whole calendar
+difference is the first XGBoost model's error minus the second XGBoost model's error.** A negative difference means the XGBoost model given UKV-CEDA forecasts better. Each bracketed pair is a 95% interval from resampling whole calendar
 months and a fitting seed. Every number comes from one of the study's five reports: `report.md`, and
 the post hoc `report_2.md`, `report_3.md`, `report_4.md`, and `report_5.md`. The page names the
 report wherever the number is not in `report.md` or `report_2.md`. The two hyperparameter settings
@@ -40,11 +32,10 @@ inconclusive](../assets/ukv_ceda_blends_v5/wind_headline.svg)
 ## Key findings
 
 **For a day-ahead wind forecast, adding UKV-CEDA's winds to the ENS mean lowers the error at lead
-days 1 and 2 by about 0.2 to 0.3 points of capacity at the 3 wind farms.** A UKV-CEDA run that is
+days 1 and 2 by about 0.2 to 0.3 points of capacity at the three wind farms.** A UKV-CEDA run that is
 12 hours older than the run tested keeps about half the day-1 gain.
 
-**For solar, adding UKV-CEDA lowers the error by about 0.1 points at days 1 to 3 at the 6 solar
-farms, and the planned rule is met at day 3 only.** A post hoc permutation test ranks the gain
+**For solar, adding UKV-CEDA lowers the error by about 0.1 points at days 1 to 3 at the six solar farms, and the planned rule is met at day 3 only.** A post hoc permutation test ranks the gain
 first of 18 at days 1 to 3, and licenses no claim of statistical significance at the 5% level.
 
 **At wind day 3 the gain rests on February 2026, and at day 4 the study cannot say whether UKV-CEDA
@@ -64,7 +55,7 @@ helps.**
   ([solar results](#solar-about-01-points-of-capacity-at-days-1-to-3)).** The differences run from
   -0.082 to -0.163 across days and settings. The planned rule is met at day 3 only. A post hoc
   permutation test, added after the two planned controls had been seen, ranks the planned blend's
-  gain first of 18 at days 1 to 3 (p = 0.056, the smallest that 17 draws allow), and the planned
+  gain first of 18 at days 1 to 3 (p = 0.056, the smallest p-value that 17 shuffled controls allow), and the planned
   readings at days 1 and 2 stay "unresolved".
 - **At day 4, the study is inconclusive ([day 4](#day-4-is-inconclusive)).** The intervals do not
   exclude a gain of 0.172 points for solar or 0.295 points for wind, as large as the gains at days 1
@@ -86,7 +77,7 @@ used by the [matched-lead page](matched-lead.md). The [weather products
 survey](../../background/weather-products-survey.md) describes both products.
 
 **The ENS mean and UKV-CEDA read different runs, and UKV-CEDA's run starts later.** For a valid hour
-on day D at lead day N, ENS reads the 00 UTC run of day D−N, at a lead of 24N plus the hour of the
+on day D at lead day N, ENS reads the 00 UTC run of day D−N (UTC is Coordinated Universal Time), at a lead of 24N plus the hour of the
 day. UKV-CEDA reads the 03 UTC run of the same day, which a service running at 09:00 UTC could read.
 UKV-CEDA's lead is therefore 3 hours shorter at every hour.
 
@@ -105,8 +96,7 @@ UKV-CEDA's lead is therefore 3 hours shorter at every hour.
 
 ## Data and methods
 
-**A blend is an XGBoost model given ENS's mean weather and UKV-CEDA's weather, and the page compares
-it with two other XGBoost models.** The padded ENS model is given ENS's mean weather and exact
+**A blend is an XGBoost model given ENS's mean weather and UKV-CEDA's weather, and the page compares the blend with two other XGBoost models.** The padded ENS model is given ENS's mean weather and exact
 copies of the same columns, so that it has the blend's column count (9 for solar, 11 for wind). The
 shuffled-control model has the blend's columns, but its UKV-CEDA columns are shuffled among hours
 that share a generator, a year-month, and an hour of day. The shuffle keeps each generator's
@@ -115,7 +105,7 @@ information from UKV-CEDA. The study fits two shuffled controls, with shuffle se
 
 **Equal column counts matter because an XGBoost model with more columns can win without carrying
 more information.** A check at wind day 1 and solar day 1 found the padded ENS model's per-row losses
-identical to those of the unpadded ENS model (`padding_check.json`, which `fit_ukv_ceda_blends.py
+identical to the unpadded ENS model's (`padding_check.json`, which `fit_ukv_ceda_blends.py
 --check` writes once and `report_2.md` prints). The padded ENS model carries no extra information,
 so the blend minus the padded ENS model measures what UKV-CEDA adds to the ENS columns given, and not what it adds beyond every field
 ENS publishes.
@@ -123,19 +113,17 @@ ENS publishes.
 **The solar models are given ENS's mean global irradiance and temperature, and UKV-CEDA's
 global irradiance and temperature.** The wind models are given ENS's 100 m wind speed, the sine and
 cosine of its 100 m direction, and its 10 m wind speed. UKV-CEDA's wind columns are its native 10 m
-wind speed, the sine and cosine of its 10 m direction, and its 925 hPa wind speed. They are not 100
-m winds. Every model also has the hour of day, the day of the year, and an era code, and the solar
-models have the sun's elevation and azimuth. Each model is one XGBoost model per generator.
+wind speed, the sine and cosine of its 10 m direction, and its 925 hPa wind speed. None of UKV-CEDA's wind columns is a 100 m wind. Every XGBoost model also has the hour of day, the day of the year, and an era code, and the solar
+models have the sun's elevation and azimuth. Each model named above is fitted separately at each generator, as one XGBoost model per generator.
 
 **The rows, folds, and intervals follow the matched-lead page.** The study scores 21 months of valid
 hours, from December 2024 to September 2026, with January 2026 dropped because the Met Office
 upgraded UKV on 21 January 2026. The eras are: era 0 before October 2025 (10 months), era 1 from
 October to December 2025 (3 months, too few for an interval), and era 2 from February 2026 (8
-months). Folds are blocks of whole months within each era. Each row is scored only if ENS and
-UKV-CEDA both have values for it, so every model of a lead day is trained and scored on the same
+months). Folds are blocks of whole months within each era. Each row, one generator at one valid hour, is scored only if ENS and UKV-CEDA both have values for the row, so every XGBoost model of a lead day is trained and scored on the same
 rows: 38,253 to 38,287 solar rows and 41,526 to 41,541 wind rows per lead day. Each row's error is
 divided by its own generator's capacity before any mean or difference. The intervals resample whole
-calendar months and one of three fitting seeds, paired across models. They cover month-to-month
+calendar months and one of three fitting seeds, paired across XGBoost models. The intervals cover month-to-month
 weather and fitting-seed variation, and not differences between generators.
 
 **Two contrasts are planned.** A planned contrast was written into the study plan before any result
@@ -143,7 +131,7 @@ existed. P1 is the blend minus the padded ENS model. P2 is the blend minus each 
 with one contrast per shuffle seed. The reading rule is: the blend "lowers the error" at a
 technology and lead day only if the upper 95% bound of P1 and of both P2 contrasts is below zero at
 both settings. The study reports P1's Bonferroni-adjusted 99.375% interval, which corrects across
-the 8 P1 intervals per setting, and it does not adjust P2. Where P1 is below zero at both settings
+the 8 P1 intervals per setting. The study does not adjust P2. Where P1 is below zero at both settings
 and a P2 bound is not, the reading is "unresolved: lower than padded ENS, control test not passed".
 
 **Every other number is exploratory, and the page does not correct the exploratory rows for
@@ -152,8 +140,7 @@ review as post hoc. Each exploratory row has a nominal 5% chance of reaching sta
 significance at the 5% level with no real effect behind it. The number of spurious rows is unknown,
 and the rows' shared months make spurious results cluster. Where the reports flag a contrast as near the 5% line, the page says so.
 
-**Every fit is on one graphics processing unit.** The page reports a CPU refit of one model as a
-noise floor ([Limitations](#limitations)).
+**Every fit is on one graphics processing unit (GPU).** The page reports a refit of one XGBoost model on a central processing unit (CPU) as a noise floor ([Limitations](#limitations)).
 
 ## Results
 
@@ -163,7 +150,7 @@ noise floor ([Limitations](#limitations)).
 rule.** Figures 3 and 4 plot the day-1 blend's out-of-fold forecast against measured output, with
 each generator's output as a percentage of its own capacity, over one week per era chosen from
 measured output alone. A week is left out for an era in which no week has every generator covered
-on all seven days. Solar has no such week in era 1 (October to December 2025), so Figures 3a and 3b
+on all 7 days. Solar has no fully covered week in era 1 (October to December 2025), so Figures 3a and 3b
 show the weeks of February 2025 and March 2026. Figures 4a, 4b, and 4c show the wind weeks of
 September 2025, December 2025, and February 2026.
 
@@ -182,12 +169,10 @@ one week](../assets/ukv_ceda_blends_v5/wind_week2.svg)
 ![Figure 4c: Measured output of the three wind farms and the XGBoost model's out-of-fold forecast over
 one week](../assets/ukv_ceda_blends_v5/wind_week3.svg)
 
-**The mean absolute error of every model rises with the lead day, and the padded ENS model's error
+**The mean absolute error of every XGBoost model rises with the lead day, and the padded ENS model's error
 is the reference level.** For solar, the padded ENS model's error is 8.820% of capacity at day 1 and
-11.692% at day 4. For wind it is 8.236% at day 1 and 12.328% at day 4. The tables give every model's
-own error, at both settings, from `report_2.md`. The errors carry no intervals, because every
-model's error rises and falls together from month to month, and pairing cancels that shared swing.
-Figures 5 and 6 draw the primary-setting errors, and Figures 7 and 8 draw them at each generator.
+11.692% at day 4. For wind, the padded ENS model's error is 8.236% at day 1 and 12.328% at day 4. The tables give every XGBoost model's own error, at both settings, from `report_2.md`. The errors carry no intervals, because every XGBoost model's error rises and falls together from month to month, and pairing cancels that shared swing.
+Figures 5 and 6 draw the primary-setting errors, and Figures 7 and 8 draw the errors at each generator.
 
 | Solar lead day | Setting | Padded ENS | ENS + UKV-CEDA | ENS + shuffled, seed 0 | ENS + shuffled, seed 1000 |
 |---|---|---|---|---|---|
@@ -212,12 +197,11 @@ Figures 5 and 6 draw the primary-setting errors, and Figures 7 and 8 draw them a
 | 4 | sensitivity | 12.168 | 12.034 | 12.194 | 12.252 |
 
 ![Figure 5: For the six solar farms, an XGBoost model given ENS's mean alone has a mean absolute error
-of 8.8% of capacity at lead day 1 and 11.7% at lead day 4, and the four models differ by at most 0.19
+of 8.8% of capacity at lead day 1 and 11.7% at lead day 4, and the four XGBoost models differ by at most 0.19
 points at any lead day](../assets/ukv_ceda_blends_v5/solar_errors.svg)
 
 ![Figure 6: For the three wind farms, an XGBoost model given ENS's mean alone has a mean absolute
-error of 8.2% of capacity at lead day 1 and 12.3% at lead day 4, and the four models differ by at
-most 0.28 points at any lead day](../assets/ukv_ceda_blends_v5/wind_errors.svg)
+error of 8.2% of capacity at lead day 1 and 12.3% at lead day 4, and the four XGBoost models differ by at most 0.28 points at any lead day](../assets/ukv_ceda_blends_v5/wind_errors.svg)
 
 ![Figure 7: At the six solar farms, the blend's mean absolute error runs from 8.0% to 10.4% of
 capacity at lead day 1, and from 11.0% to 13.2% at lead day 4](../assets/ukv_ceda_blends_v5/solar_generator_errors.svg)
@@ -235,12 +219,11 @@ against the seed-0 control is -0.226 [-0.307, -0.145] (-0.270) and against the s
 -0.103]), P2 is -0.181 [-0.296, -0.069] (-0.236) against seed 0 and -0.190 [-0.285, -0.097]
 (-0.218) against seed 1000.
 
-**The Bonferroni intervals stay below zero at both settings.** At day 1 they are [-0.342, -0.144]
+**The Bonferroni intervals stay below zero at both settings.** At day 1 the Bonferroni intervals are [-0.342, -0.144]
 and [-0.379, -0.173], and at day 2 [-0.338, -0.071] and [-0.298, -0.061].
 
 **Dropping any one month leaves the wind upper bounds at days 1 and 2 below zero.** In the
-exploratory, post hoc leave-one-month-out check (nothing refitted), the highest upper bound over the drops is
--0.151 at day 1 (dropping January 2025) and -0.083 at day 2. The sensitivity setting gives -0.178 and
+exploratory, post hoc leave-one-month-out check (nothing refitted), the highest upper bound over the 21 single-month drops is -0.151 at day 1 (dropping January 2025) and -0.083 at day 2. The sensitivity setting gives -0.178 and
 -0.088.
 
 **The gain is similar in era 0 and era 2, and clear at two of the three generators.** In the
@@ -252,8 +235,7 @@ day-2 differences are -0.147 [-0.257, -0.037], -0.231 [-0.361, -0.105], and -0.2
 Figure 9 draws the generators.
 
 **The shuffled controls differ from each other by no more than 0.058 points at any wind lead day.**
-The largest gap is at day 4 and the sensitivity setting (-0.058 [-0.201, +0.056]), and no wind gap
-is statistically significant at the 5% level. At wind days 1 and 2 the gap between the controls is
+The largest gap is at day 4 and the sensitivity setting (-0.058 [-0.201, +0.056]). No wind gap is statistically significant at the 5% level. At wind days 1 and 2 the gap between the controls is
 therefore far smaller than P1.
 
 ![Figure 9: At each of the three wind farms, the blend's point estimate is below padded ENS's at days
@@ -273,8 +255,7 @@ day 3 are near the 5% line at both settings (`report_5.md`).
 
 **By generator, wind day 3 is clear at W2 only.** The differences are -0.101 [-0.315, +0.076] at W1,
 -0.452 [-0.765, -0.213] at W2, and -0.271 [-0.613, +0.052] at W3. The page therefore reports wind
-day 3 as met by the planned rule and as dependent on one month, and does not place it beside days 1
-and 2.
+day 3 as met by the planned rule and as dependent on one month, and does not place wind day 3 beside days 1 and 2.
 
 ### Solar: about 0.1 points of capacity at days 1 to 3
 
@@ -296,7 +277,7 @@ correction the P1 interval reaches zero at the primary setting at both days ([-0
 +0.020]). Solar day 3 survives the correction at both settings ([-0.284, -0.052] and [-0.215,
 -0.016]).
 
-**Several solar contrasts are near the 5% line.** The reports flag these (`report_5.md`): at day 1, P1
+**Several solar contrasts are near the 5% line.** The reports flag these contrasts (`report_5.md`): at day 1, P1
 at both settings, the seed-0 P2 at the primary setting, and the seed-1000 P2 at both settings; at
 day 2, P1 and both P2 contrasts at both settings; at day 3, the seed-0 P2 at both settings; and at
 day 4, the seed-1000 P2 at the sensitivity setting.
@@ -306,18 +287,16 @@ much as the solar gain, and two draws are too few to say how far a shuffled cont
 by chance.** At day 1 the seed-0 control minus the seed-1000 control is +0.079 [+0.025, +0.133] at
 the primary setting and +0.062 [+0.018, +0.103] at the sensitivity setting, and at day 4 the
 sensitivity gap is -0.067 [-0.131, -0.006]. The intervals resample months and fitting seeds, not
-shuffle seeds, so they understate how far a solar model's error moves for reasons unrelated to its
+shuffle seeds, so the intervals understate how far a solar XGBoost model's error moves for reasons unrelated to its
 inputs. The wind gaps are at most 0.058 points. The page therefore describes solar as one pattern,
 not as four separate verdicts. The next subsection adds 15 further shuffled controls.
 
 **Solar is also fragile to the loss of one month.** In the post hoc leave-one-month-out check, the
 highest upper bound over the drops is -0.001 at day 1 (dropping May 2026, primary setting), -0.004
-at day 2 (June 2026), and +0.008 at day 2 at the sensitivity setting. At day 3 it is -0.063 at the
-primary setting (May 2026) and -0.033 at the sensitivity setting.
+at day 2 (June 2026), and +0.008 at day 2 at the sensitivity setting. At day 3 the highest upper bound is -0.063 at the primary setting (May 2026) and -0.033 at the sensitivity setting.
 
 **By generator, every solar generator's point estimate is below zero at days 1 to 3.** At day 1 the
-differences run from -0.045 [-0.197, +0.084] at A to -0.196 [-0.356, -0.030] at E. Figure 10 draws
-them. By era, solar day 3 gives -0.154 [-0.254, -0.059] in era 0 and -0.159 [-0.312, +0.009] in era
+differences run from -0.045 [-0.197, +0.084] at A to -0.196 [-0.356, -0.030] at E. Figure 10 draws every solar generator's difference. By era, solar day 3 gives -0.154 [-0.254, -0.059] in era 0 and -0.159 [-0.312, +0.009] in era
 2, and days 1 and 2 give similar point estimates with intervals that include zero.
 
 ![Figure 10: At each of the six solar farms, the blend's point estimate is below padded ENS's at days
@@ -325,11 +304,9 @@ them. By era, solar day 3 gives -0.154 [-0.254, -0.059] in era 0 and -0.159 [-0.
 
 ### The solar gain beats all 17 shuffled controls in a post hoc permutation test
 
-**At solar days 1 to 3, the planned blend's gain over padded ENS is larger than that of every one
-of 17 shuffled controls.** The test was added after the two planned controls had been seen, so it is
-exploratory. It fits 15 further shuffled controls per solar lead day at the primary setting, with
+**At solar days 1 to 3, the planned blend's gain over padded ENS is larger than the gain of every one of 17 shuffled controls.** The test was added after the two planned controls had been seen, so the test is exploratory. The test fits 15 further shuffled controls per solar lead day at the primary setting, with
 shuffle seeds 2010 to 2150 in steps of 10, and places the planned blend's P1 among the 17 values of
-(shuffled control minus padded ENS) that the planned two controls and the 15 further ones give. The
+(shuffled control minus padded ENS) that the planned two controls and the 15 further controls give. The
 numbers are in `report_3.md` and again in `report_5.md`. At days 1 to 3, P1 (-0.105, -0.086, and
 -0.163) is lower than every control: the lowest control is -0.041, -0.025, and -0.067. P1 ranks 1 of
 18, and the one-sided permutation p-value is 0.056, the smallest that 17 controls allow. At day 4,
@@ -338,25 +315,22 @@ P1 (-0.054) ranks 6 of 18 (p = 0.333).
 **One shuffled control can move far by chance.** At day 4 the lowest of the 17 controls is -0.141, larger in size than
 the planned blend's P1 at days 1 and 2.
 
-**The test licenses a ranking and no more.** It licenses no claim of statistical significance at the
-5% level, because the smallest p-value it can give is 0.056. It changes none of the planned
-readings, which stay "unresolved" at days 1 and 2. It gives no combined p-value across days 1 to 3,
-because the days share months and shuffle seeds. It makes no claim about other months, because it
-does not resample months, and so answers a different question from the bootstrap intervals.
+**The test licenses a ranking and no more.** The permutation test licenses no claim of statistical significance at the
+5% level, because the smallest p-value it can give is 0.056. The test changes none of the planned readings, which stay "unresolved" at days 1 and 2. The test gives no combined p-value across days 1 to 3,
+because the days share months and shuffle seeds. The test makes no claim about other months, because the test does not resample months. The test therefore answers a different question from the month-resampled intervals.
 
 ![Figure 11: For six solar farms, the planned blend's gain over padded ENS is larger than all 17
 shuffled controls' at days 1, 2, and 3](../assets/ukv_ceda_blends_v5/solar_permutation.svg)
 
 ### Day 4 is inconclusive
 
-**At day 4 the intervals do not exclude gains as large as those at days 1 to 3, so the study cannot
+**At day 4 the intervals do not exclude gains as large as the gains at days 1 to 3, so the study cannot
 say whether the gain fades.** For solar, P1 is -0.054 [-0.172, +0.053] (-0.036 [-0.108, +0.034]),
 and a gain of 0.172 points is not excluded at the primary setting and 0.108 at the sensitivity
 setting. For wind, P1 is -0.105 [-0.268, +0.058] (-0.133 [-0.295, +0.031]), and a gain of 0.268
 points is not excluded at the primary setting and 0.295 at the sensitivity setting. A gain larger
 than those bounds is excluded. The wind day-4 P2 contrasts are below zero at the sensitivity setting
-for both seeds (-0.160 [-0.315, -0.025] and -0.218 [-0.396, -0.056]), and wind day 4 is near the 5%
-line for P1 and both P2 contrasts at both settings (`report_5.md`).
+for both seeds (-0.160 [-0.315, -0.025] and -0.218 [-0.396, -0.056]). Wind day 4 is near the 5% line for P1 and both P2 contrasts at both settings (`report_5.md`).
 
 ### How the gain changes when UKV-CEDA's run is older
 
@@ -368,9 +342,7 @@ hours. The older-run blend (`report_4.md`) reads UKV-CEDA's 15 UTC run of the da
 That run starts 9 hours before ENS's 00 UTC run and leads 12 hours longer than the planned run. Both
 blends were run after a scientific-validity review had seen the planned results, so both are post
 hoc and exploratory. Neither can separate the effect of a longer lead from the effect of an
-earlier start. A UKV-CEDA run that starts at the same moment as ENS's 00 UTC run would sit between
-the planned blend (3 hours after) and the older-run blend (9 hours before), and the study did not fit
-such a run.
+earlier start. The study did not fit a UKV-CEDA run that starts at the same moment as ENS's 00 UTC run. That run would sit between the planned blend's run (3 hours after) and the older-run blend's run (9 hours before).
 
 **Both blends also change the time resolution of UKV-CEDA's columns, a third confound.** The store
 holds UKV-CEDA hourly only to lead 48 hours, and every hour after lead 48 hours is rebuilt from
@@ -380,8 +352,7 @@ hourly. The older run at day 1 is read at a lead of 33 to 56 hours, and 25.5% of
 blend therefore have more rebuilt hours than the planned blend at days 1 and 2.
 
 **The stale blend loses most of the wind day-1 gain, and keeps about half of the wind gain at days
-2 and 3.** The stale blend is compared with a padded ENS model trained on the same rows, because it
-loses 0.3% to 0.4% of rows that have no UKV-CEDA day N + 1. The padded ENS model trained on all
+2 and 3.** The stale blend is compared with a padded ENS model trained on the same rows, because the stale blend loses 0.3% to 0.4% of rows that have no UKV-CEDA day N + 1. The padded ENS model trained on all
 rows differs from the padded ENS model trained on the stale rows by at most 0.022 points (wind day
 1, primary setting), so the difference in training rows does not drive the contrasts. The table gives the stale blend minus
 its padded ENS model (P1, stale) and the stale blend minus the planned blend, at the primary setting
@@ -399,15 +370,12 @@ and the sensitivity setting (`report_2.md`).
 **At wind day 1 and solar day 3 the stale blend is clearly worse than the planned blend, and the
 other rows are mostly not separable.** At wind day 1 the stale blend loses 0.188 [0.120, 0.249] of
 the planned blend's 0.239 points. Most of the day-1 gain therefore needs UKV-CEDA's lead to be 21 to
-44 hours rather than 45 to 68 hours, and the stale blend cannot say how much of the gain the 3-hour
-timing advantage carries. The stale blend's gain at wind day 1 is not statistically significant, and
-an effect of 0.167 points at the primary setting is not excluded. At wind days 2 and 3 the stale
+44 hours rather than 45 to 68 hours. The stale blend cannot say how much of the gain the 3-hour
+timing advantage carries. The stale blend's gain at wind day 1 is not statistically significant. A stale-blend gain of 0.167 points at the primary setting is not excluded. At wind days 2 and 3 the stale
 blend keeps 65% and 49% of the planned gain at the primary setting (38% and 53% at the sensitivity
 setting, `report_5.md`), and its gain is below zero at the primary setting (-0.137 and -0.135). The
-stale-minus-planned contrast at wind days 2 and 3 is not statistically significant at the primary
-setting, and at the sensitivity setting it is significant at wind day 2 (+0.114 [+0.012, +0.208]).
-The post hoc reading at wind days 2 and 3 stays "no detectable difference". For solar, the effect
-of 0.071, 0.135, and 0.057 points at days 1, 2, and 3 is not excluded at the primary setting.
+stale-minus-planned contrast at wind days 2 and 3 is not statistically significant at the primary setting. At the sensitivity setting the contrast is significant at wind day 2 (+0.114 [+0.012, +0.208]).
+The post hoc reading at wind days 2 and 3 stays "no detectable difference". For solar, a stale-blend gain of 0.071, 0.135, and 0.057 points at days 1, 2, and 3 is not excluded at the primary setting.
 
 **A stale UKV-CEDA run still carries some information that the shuffled copy lacks.** The stale
 blend is lower than its shuffled controls at wind day 1 at both settings and both seeds.
@@ -417,10 +385,8 @@ wind day 1 is statistically significant at both settings.** The older-run blend'
 [-0.208, -0.061] at wind day 1 against the planned blend's -0.239 on the same rows, and -0.147
 [-0.234, -0.077] against -0.210 at wind day 2 (`report_4.md`). The older-run blend minus the planned
 blend at wind day 1 is +0.102 [+0.034, +0.168] at the primary setting and +0.156 [+0.090, +0.219] at
-the sensitivity setting. At solar the older-run P1 interval includes zero at the primary setting at
-all three days, and the older-run minus planned contrast is statistically significant only at day 2
-at the sensitivity setting (+0.062 [+0.008, +0.114]). The reading column of the older-run table
-rests on one control seed and no Bonferroni correction, so it is weaker than a planned reading.
+the sensitivity setting. At solar, the older-run P1 interval includes zero at the primary setting at all three days. The older-run minus planned contrast at solar is statistically significant only at day 2
+at the sensitivity setting (+0.062 [+0.008, +0.114]). The older-run readings in `report_4.md` rest on one control seed and no Bonferroni correction, so an older-run reading is weaker than a planned reading.
 
 | Technology and lead day | Planned P1 (primary) | Older-run P1 (primary) | Older-run minus planned blend (primary) | Older-run minus planned blend (sensitivity) |
 |---|---|---|---|---|
@@ -437,9 +403,8 @@ limit (`report_5.md`). At wind day 1 the older-run minus planned contrast on tho
 rows) is +0.115 [+0.048, +0.186] at the primary setting and +0.166 [+0.109, +0.226] at the
 sensitivity setting, so the time resolution does not explain the wind loss. At solar day 1 the
 contrast is +0.034 [-0.047, +0.108] on the rows at or before the limit (74.5% of the rows), and
-+0.148 [+0.041, +0.241] beyond it. The rows beyond the limit are the late hours of the day, so the
-split cannot separate time resolution from hour of day, and the solar loss is not attributable to
-either one.
++0.148 [+0.041, +0.241] beyond the limit. The rows beyond the limit are the late hours of the day, so the
+split cannot separate time resolution from hour of day. The solar loss is not attributable to either cause.
 
 ![Figure 12: For the six solar farms, the blend with UKV-CEDA's older run, which starts 9 hours before
 ENS's run, gains less over padded ENS than the planned blend, in the point estimates at every lead
@@ -458,8 +423,7 @@ significant: +0.114 [+0.012, +0.208]). At the primary setting the stale-minus-pl
 losing most of the gain (0.210 and 0.276 points), and the day-3 interval does not exclude losing
 all of it. The study therefore cannot say how much of the wind gain at days 2 and 3 the 3-hour
 timing advantage carries. The older-run blend keeps about half of the planned gain, which measures
-a 12-hour longer lead and a 12-hour earlier start together, and its wind day-1 loss holds on hourly
-rows. The study did not fit the run that would separate the two causes.
+a 12-hour longer lead and a 12-hour earlier start together. The older-run blend's wind day-1 loss holds on hourly rows. The study did not fit the run that would separate the two causes.
 
 ### What the gain could come from
 
@@ -467,7 +431,7 @@ rows. The study did not fit the run that would separate the two causes.
 
 - **Time resolution at day 1.** UKV-CEDA is hourly to lead 48 hours, while ENS is 3-hourly and
   upsampled, so some of the day-1 gain may come from the finer time steps. At days 3 and 4 both
-  products are 3-hourly, so this cannot explain the day-3 gains. The older-run split above shows
+  products are 3-hourly, so the time resolution cannot explain the day-3 gains. The older-run split above shows
   that the wind day-1 loss from an older run holds on hourly rows.
 - **Wind heights.** The wind blend adds UKV-CEDA's 10 m wind and its 925 hPa wind, a level that no
   ENS column in this study carries. Part of the gain may come from the 925 hPa level, rather than
@@ -483,16 +447,11 @@ rows. The study did not fit the run that would separate the two causes.
 
 **For wind at days 1 and 2, the result supports testing live UKV as an addition to the ENS mean.**
 This page cannot say how a blend with live UKV would do, and the licence of the UKV-CEDA data does
-not settle whether the data may be used in production. A service whose UKV run is 12 hours older
-than the run tested here should expect about half of the day-1 wind gain (the older-run blend keeps
-57% at the primary setting and 42% at the sensitivity setting), and a run 24 hours older should
-expect less (30% and 24%, `report_5.md`). What would change this: a blend that reads a hexagon mean
+not settle whether the data may be used in production. If a service's UKV run is 12 hours older than the run tested here, the service should expect about half of the day-1 wind gain (the older-run blend keeps 57% at the primary setting and 42% at the sensitivity setting). A run 24 hours older should give less (30% and 24%, `report_5.md`). What would change this recommendation: a blend that reads a hexagon mean
 of UKV-CEDA, the same blend fitted on live UKV, and more months of data.
 
 **For solar and for wind at day 3, the page does not recommend adding UKV-CEDA.** The solar gain of
-about 0.1 points is unresolved under the planned rule. A post hoc permutation test ranks it first of
-18 at days 1 to 3, which licenses no claim of statistical significance at the 5% level, and the wind
-day-3 gain rests on one month. At day 4 the study is inconclusive, and the page does not say that
+about 0.1 points is unresolved under the planned rule. A post hoc permutation test ranks the solar gain first of 18 at days 1 to 3, which licenses no claim of statistical significance at the 5% level. The wind day-3 gain rests on one month. At day 4 the study is inconclusive, and the page does not say that
 UKV-CEDA does not help there.
 
 ## Limitations
@@ -518,8 +477,7 @@ rebuilt table would move every number.
   so the effective sample is the 21 months and the intervals do not cover differences between
   generators.
 - **The radiation timestamp may handicap the blend.** UKV-CEDA's hourly radiation is a mean of two
-  snapshots and is centred slightly later than the power hour. The study does not measure how this
-  changes the error.
+  snapshots and is centred slightly later than the power hour. The study does not measure how the later centring changes the error.
 - **The licence of the UKV-CEDA data is not settled on this page.** The fetch script records the
   licence as Creative Commons Attribution-NonCommercial-ShareAlike 4.0 (non-commercial use only).
   The [weather products survey](../../background/weather-products-survey.md) lists it only as the "Met
@@ -532,7 +490,7 @@ rebuilt table would move every number.
 
 **The study does not cover day 5, live UKV, a UKV run that starts at the same moment as ENS's run,
 a hexagon-mean read of UKV-CEDA, probabilistic scores, other regions, or any product other than
-UKV-CEDA.** It tests the blend of the ENS mean and UKV-CEDA only, and not UKV-CEDA alone. The study
+UKV-CEDA.** The study tests the blend of the ENS mean and UKV-CEDA only, and not UKV-CEDA alone. The study
 tests two UKV-CEDA runs: the 03 UTC run of ENS's own day, and, post hoc and at days 1 to 3 only, the
 15 UTC run of the day before.
 
@@ -542,9 +500,9 @@ tests two UKV-CEDA runs: the 03 UTC run of ENS's own day, and, post hoc and at d
 anonymised `site` label.** The generators are labelled A to F for solar and W1 to W3 for wind. The
 code is `studies/ukv_ceda_blends/`, with `fit_aifs.py` and `nwp_forecast_comparison.py` from
 `studies/nwp_forecast_comparison/` and `packages/studies/`. The reports were written by the code at
-commit `4d12892c`. UKV-CEDA is the Met Office's UKV from the CEDA archive.
+commit `4d12892c`.
 
-**XGBoost 3.4.1 fitted every model on one RTX A6000 GPU, at two hyperparameter settings.** The
+**XGBoost 3.4.1 fitted every XGBoost model on one RTX A6000 GPU, at two hyperparameter settings.** The
 primary setting is a learning rate of 0.05, a maximum tree depth of
 6, a minimum child weight of 20, 500 boosting rounds, an L2 penalty of 1.0, and a row subsample of
 0.8. The sensitivity setting is a learning rate of 0.03, a maximum depth of 4, a minimum child weight
