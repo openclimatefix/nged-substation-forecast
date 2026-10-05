@@ -191,9 +191,11 @@ Target](../ml_experimentation/cross-validation-folds.md#target-multiple-yearly-f
 validation.
 
 Rejecting ERA5-backed folds excludes reanalysis only as a *promotion criterion*, not as a
-measurement. Scoring against ERA5 is legitimate as a **diagnostic** — it decomposes total error into
-the weather-to-power response and the implicit hedging against forecast error — and lands as its own
-`evaluation_scope`, leaving the leaderboard folds ENS-only. See [Extending the training
+measurement. Scoring against an estimate of past weather is legitimate as a **diagnostic** — it
+decomposes total error into the weather-to-power response and the implicit hedging against forecast
+error — and lands as its own `evaluation_scope`, leaving the leaderboard folds ENS-only. The planned
+estimates of past weather are CAMS for irradiance and CEDA UKV for other variables, with ERA5 kept
+for gap filling and as a comparison arm. See [Extending the training
 history](../roadmap/training-history.md#evaluation).
 
 ## Two metric stores, one division of labour
