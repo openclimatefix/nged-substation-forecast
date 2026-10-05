@@ -121,6 +121,7 @@ nav:
       - Operating the live service: live_service/operations.md
       - Intervention log: live_service/intervention-log.md
       - Setting up Sentry telemetry: live_service/sentry.md
+      - Backing up the workstation: live_service/backup.md
       - Configuration reference: live_service/setup.md
   - Roadmap:
       - Overview: roadmap/index.md
