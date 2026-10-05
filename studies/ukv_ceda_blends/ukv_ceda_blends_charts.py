@@ -103,19 +103,26 @@ SETTING_LABELS: Final[dict[str, str]] = {
 READING_LABELS: Final[dict[str, str]] = {
     "lowers": "planned rule met",
     fit.UNRESOLVED_LOWER: "unresolved (lower than padded ENS, control test not passed)",
-    fit.NO_DETECTABLE_DIFFERENCE: "no detectable difference",
+    fit.NO_DETECTABLE_DIFFERENCE: "inconclusive (a gain is not excluded)",
     "raises": "blend raises the error",
 }
 """A reading's panel-title label, where the key `lowers` or `raises` stands for the verdict
 `lowers the error at day N` or `raises the error at day N`."""
 
-READING_PHRASES: Final[dict[str, str]] = {
-    "lowers": "lowered the error (planned rule met)",
-    fit.UNRESOLVED_LOWER: "lowered the error below padded ENS's but did not pass the control test",
-    fit.NO_DETECTABLE_DIFFERENCE: "made no detectable difference",
-    "raises": "raised the error",
+TITLES: Final[dict[DomainType, str]] = {
+    "solar": (
+        "For six solar farms, adding UKV-CEDA lowered the ENS mean's error by about 0.1 points of "
+        "capacity at lead days 1 to 3, and day 4 is inconclusive"
+    ),
+    "wind": (
+        "For three wind farms, adding UKV-CEDA's winds lowered the ENS mean's error at lead days 1 "
+        "and 2 under every check, day 3 rests on February 2026, and day 4 is inconclusive"
+    ),
 }
-"""A reading's phrase in a figure title."""
+"""Each headline figure's title, written by hand after reading the intervals, the Bonferroni
+correction, the leave-one-month-out table, and the control gap. A title generated from the planned
+rule alone would state a verdict per lead day that those checks do not support. The numbers behind
+a title are machine-printed in the subtitle."""
 
 ARM_LABELS: Final[dict[fit_aifs.BlendRoleType, str]] = {
     "_pad": "ENS mean, padded to the same column count",
@@ -249,24 +256,34 @@ def days_text(*, days: Sequence[int]) -> str:
     return f"days {joined}"
 
 
-def finding_title(*, intervals: pl.DataFrame, domain: DomainType) -> str:
-    """State what adding UKV-CEDA to the ENS mean did at each lead day, from the saved intervals.
+def open_gain_note(*, intervals: pl.DataFrame, domain: DomainType) -> str:
+    """State the gain P1 leaves open at each lead day whose reading is inconclusive.
 
     Args:
         intervals: `intervals.parquet`'s rows.
         domain: `solar` or `wind`.
 
     Returns:
-        A title that groups the lead days by their reading and is scoped to the generators tested.
+        A sentence giving, per such day and setting, the largest gain P1's interval does not
+        exclude, in points of capacity, or an empty string if no day is inconclusive.
     """
-    by_kind: dict[str, list[int]] = {}
+    parts = []
     for day in build.LEAD_DAYS:
-        kind = reading_kind(reading=day_reading(intervals=intervals, domain=domain, day=day))
-        by_kind.setdefault(kind, []).append(day)
-    clauses = [
-        f"{READING_PHRASES[kind]} at {days_text(days=days)}" for kind, days in by_kind.items()
-    ]
-    return f"For {TECHNOLOGY_NAMES[domain]}, adding UKV-CEDA to the ENS mean " + "; ".join(clauses)
+        if day_reading(intervals=intervals, domain=domain, day=day) != fit.NO_DETECTABLE_DIFFERENCE:
+            continue
+        p1 = {
+            setting: contrast_interval(
+                intervals=intervals, domain=domain, day=day, setting=setting, contrast="p1"
+            )
+            for setting in (fit.PRIMARY, fit.SENSITIVITY)
+        }
+        parts.append(f"day {day}: {fit.left_open_text(p1=p1)}")
+    if not parts:
+        return ""
+    return (
+        "Largest gain P1's interval does not exclude where the reading is inconclusive, in points "
+        "of capacity: " + "; ".join(parts) + "."
+    )
 
 
 def bonferroni_note(*, intervals: pl.DataFrame, domain: DomainType) -> str:
@@ -401,7 +418,7 @@ def headline(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatChart
     return figure(
         panels=panels,
         number=FIGURE_NUMBERS[(domain, "headline")],
-        title=finding_title(intervals=intervals, domain=domain),
+        title=TITLES[domain],
         subtitle=[
             (
                 "Difference in mean absolute error between two XGBoost models, first arm minus "
@@ -412,6 +429,7 @@ def headline(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatChart
                 "months and a fitting seed, at each setting."
             ),
             bonferroni_note(intervals=intervals, domain=domain),
+            *filter(None, [open_gain_note(intervals=intervals, domain=domain)]),
             f"{scope_note(intervals=intervals, domain=domain)} {CAPACITY_NOTE} {SCALE_NOTE}",
         ],
         figure_planning="planned",

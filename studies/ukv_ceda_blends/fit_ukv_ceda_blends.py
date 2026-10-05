@@ -43,11 +43,12 @@ start only below a load average of about 24.
 **Post hoc stale blend.** After the first science review, `--post-hoc-stale` adds, for lead days 1
 to 3, the arm `blend_ukv_ceda_stale_dayN`: ENS day `N` plus UKV-CEDA day `N + 1`, the 03 UTC run one
 day before ENS's run, which is 21 hours staler than ENS's where the planned blend's is 3 hours
-fresher. It has the planned arms' column counts, and its control is the first-seed shuffle of those
-columns (the second seed is not fitted: the stale blend is exploratory, and a second seed can be
-added with the same flag if the stale gain survives). Its padded ENS reference is the planned
-stage's own, reused. Every contrast scores the rows where UKV-CEDA's day `N + 1` is present. These
-arms are exploratory and post hoc.
+fresher. It has the planned arms' column counts, and its controls are the shuffles of those
+columns under both shuffle seeds. Its padded ENS reference is refitted on
+the stale rows (`blend_ukv_ceda_stale_dayN_pad`), so the blend and the reference train on the same
+rows, and the report prints the planned reference minus the stale-rows reference as the measured
+tilt from the planned reference's extra training rows. Every contrast scores the rows where
+UKV-CEDA's day `N + 1` is present. These arms are exploratory and post hoc.
 
 Run it with `uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --dry-run`.
 """
@@ -58,6 +59,7 @@ import logging
 import re
 import sys
 from collections.abc import Mapping, Sequence
+from itertools import combinations
 from pathlib import Path
 from typing import Final, NamedTuple, TypedDict
 
@@ -140,9 +142,9 @@ lead day older than ENS's, which makes the UKV-CEDA run 21 hours staler than ENS
 STALE_DAYS: Final[tuple[int, ...]] = tuple(day for day in DAYS if day + 1 in DAYS)
 """The ENS lead days of the stale blend: UKV-CEDA's day `N + 1` must be built."""
 
-STALE_ROLES: Final[tuple[fit_aifs.BlendRoleType, ...]] = ("", "_control")
-"""The roles fitted for the stale blend: the blend and the control of the first shuffle seed. The
-padded reference is the planned stage's own, reused."""
+STALE_ROLES: Final[tuple[fit_aifs.BlendRoleType, ...]] = ("_pad", "", "_control", "_control_b")
+"""The roles fitted for the stale blend: the padded ENS reference, the blend, and the controls of
+both shuffle seeds, all trained on the stale rows."""
 
 STALE_SCOPE: Final[str] = "post hoc stale"
 """The `scope` of every stale-blend interval in `intervals.parquet`."""
@@ -210,7 +212,7 @@ def stale_arm_name(*, day: int, role: fit_aifs.BlendRoleType) -> str:
 
 
 def stale_arms(*, day: int) -> tuple[str, ...]:
-    """Return the post hoc stale blend's arms at ENS lead day `day`: the blend and one control."""
+    """Return the stale arms of lead day `day`: padded reference, blend, and both controls."""
     return tuple(stale_arm_name(day=day, role=role) for role in STALE_ROLES)
 
 
@@ -420,7 +422,7 @@ def stale_stage_frame(*, stage: Stage, frame: pl.DataFrame, inputs: pl.DataFrame
 
     The stale blend reads UKV-CEDA's day `N + 1`, the 03 UTC run one day before ENS's run, so it
     needs those columns on top of everything the planned arms need. The folds are the stage's, so
-    the planned padded reference, which is reused, scores the same folds.
+    the planned arms score the same folds.
 
     Args:
         stage: The technology and ENS lead day `N`, which must be in `STALE_DAYS`.
@@ -428,8 +430,8 @@ def stale_stage_frame(*, stage: Stage, frame: pl.DataFrame, inputs: pl.DataFrame
         inputs: The technology's `<domain>_ukv_ceda_inputs.parquet`.
 
     Returns:
-        The rows of `frame` where UKV-CEDA's day `N + 1` columns are present, with the first-seed
-        shuffle of those columns.
+        The rows of `frame` where UKV-CEDA's day `N + 1` columns are present, with the shuffles of
+        those columns under both seeds.
 
     Raises:
         ValueError: If a row reads the wrong run, an arm's column holds a missing value, or no row
@@ -881,10 +883,23 @@ def noise_floor_line(*, cpu: pl.DataFrame, gpu: pl.DataFrame) -> str:
     gap = np.abs(joined["gap"].to_numpy()) * PERCENTAGE_POINTS
     cpu_error = joined[METRIC].to_numpy().mean() * PERCENTAGE_POINTS
     gpu_error = joined[f"{METRIC}_gpu"].to_numpy().mean() * PERCENTAGE_POINTS
+    by_seed = reference.pivot(on="seed", index=["site", "time"], values=METRIC).drop("site", "time")
+    seeds = by_seed.to_numpy() * PERCENTAGE_POINTS
+    seed_gaps = np.concatenate(
+        [
+            np.abs(seeds[:, first] - seeds[:, second])
+            for first, second in combinations(range(seeds.shape[1]), 2)
+        ]
+    )
+    seed_means = seeds.mean(axis=0)
     return (
         f"The CPU refit of `{arm}` at wind site {CPU_SITE} (primary setting) differs from the GPU "
         f"fit by {gap.mean():.4f} points of capacity per row on average and {gap.max():.4f} at "
-        f"most; the two fits' mean errors are {cpu_error:.4f} (CPU) and {gpu_error:.4f} (GPU)."
+        f"most; the two fits' mean errors are {cpu_error:.4f} (CPU) and {gpu_error:.4f} (GPU). "
+        f"For comparison, two fitting seeds of the same GPU blend at that site differ by "
+        f"{seed_gaps.mean():.4f} points of capacity per row on average and {seed_gaps.max():.4f} "
+        f"at most, and the {seeds.shape[1]} seeds' mean errors span "
+        f"{np.ptp(seed_means):.4f} points ({seed_means.min():.4f} to {seed_means.max():.4f})."
     )
 
 
@@ -1507,10 +1522,14 @@ def stage_lines(
 
 
 STALE_CONTRASTS: Final[dict[str, str]] = {
-    "stale_p1": "Stale blend minus padded ENS (P1, stale)",
-    "stale_p2": "Stale blend minus its shuffled control (P2, stale; first seed only)",
+    "stale_p1": "Stale blend minus padded ENS trained on the stale rows (P1, stale)",
+    "stale_p2": "Stale blend minus its shuffled control (P2, stale; first seed)",
+    "stale_p2b": "Stale blend minus its second-seed shuffled control (P2b, stale)",
     "stale_vs_fresh": "Stale blend minus the planned blend (UKV-CEDA run 21 hours staler)",
     "fresh_p1_same_rows": "Planned blend minus padded ENS, on the stale blend's rows",
+    "training_rows": (
+        "Tilt: padded ENS trained on all rows minus padded ENS trained on the stale rows"
+    ),
 }
 """The post hoc stale section's contrasts, by their code in `intervals.parquet`."""
 
@@ -1538,7 +1557,7 @@ def stale_lines(
     if rows is None or not set(stale_jobs(day=stage.day)) <= saved:
         return [], None
     pad, fresh, _, _ = stage_arms(day=stage.day)
-    stale, stale_control = stale_arms(day=stage.day)
+    stale_pad, stale, stale_control, stale_control_b = stale_arms(day=stage.day)
     on_rows = {
         setting: at_setting(losses=losses, setting=setting).join(
             rows.select("site", "time"), on=["site", "time"]
@@ -1546,10 +1565,12 @@ def stale_lines(
         for setting in SETTINGS
     }
     pairs = {
-        "stale_p1": (stale, pad),
+        "stale_p1": (stale, stale_pad),
         "stale_p2": (stale, stale_control),
+        "stale_p2b": (stale, stale_control_b),
         "stale_vs_fresh": (stale, fresh),
         "fresh_p1_same_rows": (fresh, pad),
+        "training_rows": (pad, stale_pad),
     }
     intervals = {
         code: {
@@ -1568,7 +1589,10 @@ def stale_lines(
     verdict = reading(
         day=stage.day,
         p1=intervals["stale_p1"],
-        p2={setting: [intervals["stale_p2"][setting]] for setting in SETTINGS},
+        p2={
+            setting: [intervals["stale_p2"][setting], intervals["stale_p2b"][setting]]
+            for setting in SETTINGS
+        },
     )
     lines = [
         f"#### Post hoc: ENS day {stage.day} plus UKV-CEDA day {stage.day + 1}, {stage.domain}",
@@ -1577,9 +1601,12 @@ def stale_lines(
             f"Post hoc and exploratory, added after the first science review. UKV-CEDA's run is "
             f"21 hours staler than ENS's, so the 3-hour advantage of the planned blend is "
             f"reversed. {rows.height} of the stage's {planned.frame.height} rows hold UKV-CEDA's "
-            f"day {stage.day + 1}. The padded ENS reference and the planned blend were fitted on "
-            f"all {planned.frame.height} rows, and every contrast below scores the same "
-            f"{rows.height} rows."
+            f"day {stage.day + 1}. The stale blend, its controls, and the stale-rows padded ENS "
+            f"reference were fitted on those {rows.height} rows. The planned blend and the "
+            f"planned padded ENS reference were fitted on all {planned.frame.height} rows, and "
+            f"every contrast below scores the same {rows.height} rows. The last contrast is the "
+            f"measured effect of the planned reference's extra training rows, and bounds the tilt "
+            f"in the stale-versus-planned contrast."
         ),
         "",
         "| Contrast (points) | Primary | Sensitivity |",
@@ -1591,7 +1618,7 @@ def stale_lines(
         ),
         "",
         (
-            f"Reading with one control seed: {verdict}. P1 (stale) at the primary setting: "
+            f"Post hoc reading, both control seeds: {verdict}. P1 (stale) at the primary setting: "
             f"{null_reading(interval=intervals['stale_p1'][PRIMARY])}. At the sensitivity "
             f"setting: {null_reading(interval=intervals['stale_p1'][SENSITIVITY])}."
         ),
@@ -1600,7 +1627,10 @@ def stale_lines(
         "|---|---|---|---|---|---|",
     ]
     for setting in SETTINGS:
-        board = leaderboard(losses=on_rows[setting], arms=[pad, fresh, stale, stale_control])
+        board = leaderboard(
+            losses=on_rows[setting],
+            arms=[pad, fresh, stale_pad, stale, stale_control, stale_control_b],
+        )
         for row in board.iter_rows(named=True):
             records.append(
                 {
@@ -1698,7 +1728,7 @@ def report_text(
             [
                 (
                     "Post hoc: ENS day N plus UKV-CEDA day N + 1 (UKV-CEDA 21 hours staler than "
-                    "ENS), read with one control seed."
+                    "ENS), a post hoc reading with both control seeds."
                 ),
                 "",
                 *stale_summary,

@@ -94,9 +94,9 @@ before the build and before every fit, and start only below a load average of ab
 - **`intervals.parquet` rows.** Beside the planned and exploratory rows, `scope` can be
   `Bonferroni` (P1 at `level` 99.375), `control gap` (`contrast` `control_gap`),
   `E6 most influential month dropped`, `post hoc stale` (contrasts `stale_p1`, `stale_p2`,
-  `stale_vs_fresh`, and `fresh_p1_same_rows`), and the `error` contrast, whose `difference` is an
-  arm's own mean absolute error and whose `scope` is the arm. The charts read every figure number
-  from these rows.
+  `stale_p2b`, `stale_vs_fresh`, `fresh_p1_same_rows`, and `training_rows`), and the `error`
+  contrast, whose `difference` is an arm's own mean absolute error and whose `scope` is the arm.
+  The charts read every figure number from these rows.
 
 ## Post hoc stale blend
 
@@ -104,13 +104,13 @@ before the build and before every fit, and start only below a load average of ab
 `blend_ukv_ceda_stale_dayN` is ENS day `N` plus UKV-CEDA day `N + 1` for `N` of 1 to 3, with the
 same column counts as the planned arms. UKV-CEDA's run is the 03 UTC run one day before ENS's run,
 21 hours staler than ENS's run, where the planned blend's run is 3 hours fresher. The arm is fitted
-for both technologies at both settings with one control, the first-seed shuffle of its UKV-CEDA
-columns. The second control seed is not fitted because the arm is exploratory; running
-`--post-hoc-stale` again with a second control is possible if the stale gain survives. The planned
-stage's padded ENS arm is the reference and is not refitted. The fits score the stage's rows where
-UKV-CEDA's day `N + 1` is present, about 0.4% fewer rows, so the reference's training set is slightly
-larger than the stale blend's, and every contrast scores the same rows. The fit count is 108 (arm,
-site) fits.
+for both technologies at both settings with its own padded ENS reference
+(`blend_ukv_ceda_stale_dayN_pad`) and both shuffled controls, all trained on the stage's rows where
+UKV-CEDA's day `N + 1` is present, about 0.4% fewer rows than the planned arms. Every contrast
+scores those rows. The report prints the planned padded reference minus the stale-rows padded
+reference as the measured tilt from the planned reference's extra training rows. The fit count is
+216 (arm, site) fits: 3 lead days, 2 settings, 4 arms, and 9 generators. The stale blend is a post
+hoc, exploratory analysis added after the first science review.
 
 ## Scripts
 

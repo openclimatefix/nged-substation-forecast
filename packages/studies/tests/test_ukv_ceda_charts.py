@@ -169,21 +169,19 @@ def test_the_headline_draws_one_panel_per_lead_day_under_a_title_that_states_the
     text = json.dumps(spec)
     caption = " ".join([*spec["title"]["text"], *spec["title"]["subtitle"]])
     assert len(spec["vconcat"]) == 4
-    assert (
-        "Figure 1: For the six solar farms, adding UKV-CEDA to the ENS mean lowered the error"
-        in (" ".join(spec["title"]["text"]))
-    )
-    assert "(planned rule met) at days 1 and 3" in caption
-    assert "did not pass the control test at day 2" in caption
-    assert "made no detectable difference at day 4" in caption
+    assert "Figure 1: " + charts.TITLES["solar"] in " ".join(spec["title"]["text"])
+    assert "planned rule met" not in " ".join(spec["title"]["text"])
+    assert "no detectable difference" not in caption
+    assert "Largest gain P1's interval does not exclude" in caption
+    assert "day 4: primary " in caption
     assert "Lead day 1: planned rule met" in text
     assert "Lead day 2: unresolved (lower than padded ENS, control test not passed)" in text
-    assert "Lead day 4: no detectable difference" in text
+    assert "Lead day 4: inconclusive (a gain is not excluded)" in text
     assert "Negative means the blend forecasts better" in caption
     assert "3 hours fresher than ENS's at every hour" in caption
     assert "Filled dot: primary setting. Lighter hollow mark: sensitivity setting." in caption
     assert "P1 stays below zero at both settings at days 1 and 2." in caption
-    assert "the six solar farms" in caption
+    assert "The six solar farms, up to " in caption
 
 
 def test_every_lead_day_panel_shares_one_axis_that_includes_zero():
@@ -364,3 +362,38 @@ def test_a_figure_is_written_once_as_svg(tmp_path: Path):
     charts.check_no_dates(path=path)
     with pytest.raises(FileExistsError):
         charts.write_figure(chart=chart, path=path, svgo=False)
+
+
+def test_the_open_gain_note_gives_the_machine_printed_bound_of_each_inconclusive_day():
+    intervals = _intervals(domain="wind")
+    p1 = {
+        setting: charts.contrast_interval(
+            intervals=intervals, domain="wind", day=4, setting=setting, contrast="p1"
+        )
+        for setting in ("primary", "sensitivity")
+    }
+
+    note = charts.open_gain_note(intervals=intervals, domain="wind")
+
+    assert note.endswith(f"day 4: {charts.fit.left_open_text(p1=p1)}.")
+    assert note.count("day ") == 1
+    clear = intervals.with_columns(
+        upper=pl.when((pl.col("day") == 4) & (pl.col("contrast") == "p1"))
+        .then(-0.001)
+        .otherwise(pl.col("upper"))
+    )
+    assert charts.open_gain_note(intervals=clear, domain="wind") == ""
+
+
+def test_the_hand_written_titles_name_no_planned_verdict_and_call_day_four_inconclusive():
+    for title in charts.TITLES.values():
+        assert "planned rule" not in title
+        assert "no detectable difference" not in title
+        assert "day 4 is inconclusive" in title
+
+
+def test_each_headline_carries_its_own_technologys_title():
+    for domain in ("solar", "wind"):
+        chart = charts.headline(intervals=_intervals(domain=domain), domain=domain)
+
+        assert charts.TITLES[domain] in " ".join(chart.to_dict()["title"]["text"])

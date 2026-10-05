@@ -480,6 +480,20 @@ def test_the_noise_floor_sentence_names_the_gap_between_the_cpu_and_gpu_rows(
     assert "0.1000 at most" in line
 
 
+def test_the_noise_floor_sentence_gives_the_gap_between_two_gpu_fitting_seeds(
+    tiny_stage: fit.PlannedStage,
+):
+    gpu = _losses(arms=["blend_ukv_ceda_day1"], settings=[PRIMARY], frame=tiny_stage.frame)
+    gpu = gpu.with_columns(**{METRIC: pl.col(METRIC) + 0.01 * pl.col("seed")})
+    cpu = gpu.with_columns(device=pl.lit("cpu")).filter(pl.col("site") == fit.CPU_SITE)
+
+    line = fit.noise_floor_line(cpu=cpu, gpu=gpu)
+
+    # Seeds score 5, 6, and 7 points: the pair gaps are 1, 2, and 1.
+    assert "differ by 1.3333 points of capacity per row on average and 2.0000 at most" in line
+    assert "span 2.0000 points (5.0000 to 7.0000)" in line
+
+
 def test_padded_and_unpadded_ens_are_called_identical_only_when_every_row_matches(
     tiny_stage: fit.PlannedStage, monkeypatch: pytest.MonkeyPatch
 ):
@@ -985,6 +999,23 @@ def test_the_leave_one_month_out_table_names_the_month_and_saves_the_influential
     rows = [line for line in lines if line.startswith(("| primary", "| sensitivity"))]
     assert len(rows) == 2
     assert all("| 2025-03 |" in row for row in rows)
+    for row, setting in zip(rows, (PRIMARY, SENSITIVITY), strict=True):
+        dropped = {
+            drop.month: drop.interval
+            for drop in fit.month_drops(
+                losses=per_setting[setting],
+                treatment="blend_ukv_ceda_day2",
+                reference="blend_ukv_ceda_day2_pad",
+            )
+        }
+        loosest = max(dropped, key=lambda month: dropped[month]["upper_95"])
+        tightest = min(dropped, key=lambda month: dropped[month]["upper_95"])
+        assert loosest != tightest
+        highest_upper = f"{dropped[loosest]['upper_95'] * fit.PERCENTAGE_POINTS:+.3f} ({loosest})"
+        assert row.endswith(f"| {highest_upper} |")
+        saved = next(r for r in records if r["setting"] == setting)
+        assert saved["difference"] == dropped["2025-03"]["difference"]
+        assert saved["upper"] == dropped["2025-03"]["upper_95"]
     assert {(r["setting"], r["scope"]) for r in records} == {
         (PRIMARY, "E6 most influential month dropped"),
         (SENSITIVITY, "E6 most influential month dropped"),
@@ -1089,9 +1120,14 @@ def test_the_report_prints_the_saved_padding_check_or_says_none_is_saved(tmp_pat
 
 
 def test_the_stale_blend_reads_ukv_ceda_one_day_older_and_keeps_the_planned_column_count():
-    blend, control = fit.stale_arms(day=2)
+    pad, blend, control, control_b = fit.stale_arms(day=2)
 
-    assert (blend, control) == ("blend_ukv_ceda_stale_day2", "blend_ukv_ceda_stale_day2_control")
+    assert (pad, blend, control, control_b) == (
+        "blend_ukv_ceda_stale_day2_pad",
+        "blend_ukv_ceda_stale_day2",
+        "blend_ukv_ceda_stale_day2_control",
+        "blend_ukv_ceda_stale_day2_control_b",
+    )
     wind = fit_aifs.arm_features(arm=blend, domain="wind")
     assert wind[-4:] == (
         "ukv_ceda_day3_speed_10m",
@@ -1152,7 +1188,7 @@ def test_the_stale_frame_keeps_the_stage_folds_and_drops_rows_without_the_next_d
     for field in build.WEATHER_FIELDS["wind"]:
         assert f"ukv_ceda_day2_{field}" in stale.columns
         assert f"ukv_ceda_day2_permuted_{field}" in stale.columns
-        assert f"ukv_ceda_day2_permuted_b_{field}" not in stale.columns
+        assert f"ukv_ceda_day2_permuted_b_{field}" in stale.columns
     for arm in fit.stale_arms(day=1):
         assert set(fit_aifs.arm_features(arm=arm, domain="wind")) <= set(stale.columns)
 
@@ -1184,7 +1220,16 @@ def stale_stage(
     wind_data: tuple[pl.DataFrame, pl.DataFrame], tiny_stage: fit.PlannedStage
 ) -> fit.PlannedStage:
     _, inputs = wind_data
-    stale = fit.stale_stage_frame(stage=tiny_stage.stage, frame=tiny_stage.frame, inputs=inputs)
+    lacking = tiny_stage.frame.sort("site", "time").row(0, named=True)
+    holed = inputs.with_columns(
+        ukv_ceda_day2_speed_10m=pl.when(
+            (pl.col("site") == lacking["site"]) & (pl.col("time") == lacking["time"])
+        )
+        .then(None)
+        .otherwise(pl.col("ukv_ceda_day2_speed_10m"))
+    )
+    stale = fit.stale_stage_frame(stage=tiny_stage.stage, frame=tiny_stage.frame, inputs=holed)
+    assert stale.height == tiny_stage.frame.height - 1
     return tiny_stage._replace(stale_frame=stale)
 
 
@@ -1206,7 +1251,7 @@ def _save_planned(*, folder: Path, stage: fit.PlannedStage) -> None:
     )
 
 
-def test_the_stale_fits_wait_for_every_planned_pair_and_then_list_the_four_stale_pairs(
+def test_the_stale_fits_wait_for_every_planned_pair_and_then_list_the_eight_stale_pairs(
     tmp_path: Path, stale_stage: fit.PlannedStage
 ):
     stage = stale_stage.stage
@@ -1249,7 +1294,7 @@ def test_a_post_hoc_fit_scores_the_stale_rows_into_a_new_file_and_never_refits(
         planned=stale_stage, output_dir=tmp_path, workers=1, only_missing=False, post_hoc=True
     )
 
-    assert calls == [(fit.stale_jobs(day=1), 6)]
+    assert calls == [(fit.stale_jobs(day=1), stale_stage.frame.height - 1)]
     assert planned_file.read_bytes() == before
     assert (tmp_path / "wind_day1_added_1_losses.parquet").exists()
     assert (tmp_path / "wind_day1_added_1_predictions.parquet").exists()
@@ -1274,7 +1319,7 @@ def test_a_saved_stale_arm_that_scores_other_rows_than_the_stale_rows_is_refused
         planned=stale_stage, output_dir=tmp_path, workers=1, only_missing=False, post_hoc=True
     )
     assert stale_stage.stale_frame is not None
-    narrower = stale_stage._replace(stale_frame=stale_stage.stale_frame.head(5))
+    narrower = stale_stage._replace(stale_frame=stale_stage.stale_frame.head(3))
 
     with pytest.raises(ValueError, match="other rows or folds than its rows"):
         fit.verified_losses(planned=narrower, output_dir=tmp_path)
@@ -1321,7 +1366,7 @@ def _stale_losses(
     return stage._replace(stale_frame=stale_rows), losses
 
 
-def test_the_stale_section_scores_every_contrast_on_the_stale_rows_and_reads_one_control(
+def test_the_stale_section_scores_every_contrast_on_the_stale_rows_and_reads_both_controls(
     few_resamples: None,
 ):
     base, _ = _report_stage()
@@ -1332,8 +1377,10 @@ def test_the_stale_section_scores_every_contrast_on_the_stale_rows_and_reads_one
             "blend_ukv_ceda_day2": 0.09,
             "blend_ukv_ceda_day2_control": 0.11,
             "blend_ukv_ceda_day2_control_b": 0.11,
+            "blend_ukv_ceda_stale_day2_pad": 0.105,
             "blend_ukv_ceda_stale_day2": 0.095,
             "blend_ukv_ceda_stale_day2_control": 0.11,
+            "blend_ukv_ceda_stale_day2_control_b": 0.11,
         },
     )
     records: list[fit.IntervalRecord] = []
@@ -1352,9 +1399,38 @@ def test_the_stale_section_scores_every_contrast_on_the_stale_rows_and_reads_one
         (code, setting) for code in fit.STALE_CONTRASTS for setting in (PRIMARY, SENSITIVITY)
     }
     assert all(r["n_rows"] == stale_rows.height for r in by_code.values())
-    assert by_code[("stale_p1", PRIMARY)]["difference"] == pytest.approx(-0.005, abs=0.002)
+    # P1 is read against the padded reference trained on the stale rows, not the planned one.
+    assert by_code[("stale_p1", PRIMARY)]["difference"] == pytest.approx(-0.01, abs=0.001)
+    assert by_code[("training_rows", PRIMARY)]["difference"] == pytest.approx(-0.005, abs=0.001)
     assert by_code[("stale_vs_fresh", PRIMARY)]["difference"] == pytest.approx(0.005, abs=0.002)
     assert by_code[("fresh_p1_same_rows", PRIMARY)]["difference"] == pytest.approx(-0.01, abs=0.002)
+
+
+def test_a_second_stale_control_that_matches_the_stale_blend_blocks_the_stale_reading(
+    few_resamples: None,
+):
+    base, _ = _report_stage()
+    stage, losses = _stale_losses(
+        stage=base,
+        levels={
+            "blend_ukv_ceda_day2_pad": 0.10,
+            "blend_ukv_ceda_day2": 0.09,
+            "blend_ukv_ceda_day2_control": 0.11,
+            "blend_ukv_ceda_day2_control_b": 0.11,
+            "blend_ukv_ceda_stale_day2_pad": 0.10,
+            "blend_ukv_ceda_stale_day2": 0.09,
+            "blend_ukv_ceda_stale_day2_control": 0.11,
+            "blend_ukv_ceda_stale_day2_control_b": 0.09,
+        },
+    )
+    records: list[fit.IntervalRecord] = []
+
+    _, stale_reading = fit.stale_lines(planned=stage, losses=losses, records=records)
+
+    assert stale_reading != "lowers the error at day 2"
+    by_code = {(r["contrast"], r["setting"]): r for r in records if r["scope"] == fit.STALE_SCOPE}
+    assert by_code[("stale_p2b", PRIMARY)]["difference"] == pytest.approx(0.0, abs=0.002)
+    assert by_code[("stale_p2", PRIMARY)]["difference"] == pytest.approx(-0.02, abs=0.002)
 
 
 def test_the_stale_section_is_absent_until_every_stale_pair_is_saved(few_resamples: None):
@@ -1376,8 +1452,10 @@ def test_a_stale_blend_that_does_not_lower_the_error_is_read_as_no_detectable_di
             "blend_ukv_ceda_day2": 0.09,
             "blend_ukv_ceda_day2_control": 0.11,
             "blend_ukv_ceda_day2_control_b": 0.11,
+            "blend_ukv_ceda_stale_day2_pad": 0.10,
             "blend_ukv_ceda_stale_day2": 0.10,
             "blend_ukv_ceda_stale_day2_control": 0.10,
+            "blend_ukv_ceda_stale_day2_control_b": 0.10,
         },
     )
 
@@ -1410,6 +1488,6 @@ def test_the_dry_run_lists_the_stale_fits_and_the_rows_that_lack_the_next_day(
     fit.print_plan(planned=[stale_stage], output_dir=tmp_path, only_missing=False, post_hoc=True)
 
     out = capsys.readouterr().out
-    assert "wind day 1: 6 rows (0 stage rows lack the next day)" in out
-    assert "4 (arm, setting) fits" in out
-    assert "4 (arm, site) fits in all" in out
+    assert "wind day 1: 5 rows (1 stage rows lack the next day)" in out
+    assert "8 (arm, setting) fits" in out
+    assert "8 (arm, site) fits in all" in out
