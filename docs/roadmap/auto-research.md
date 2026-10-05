@@ -266,7 +266,8 @@ work to build the infrastructure behind those steps.
    before a cut-off changes.
 9. The scorer, run from `main` as the maintainer, scores the forecasts and refuses a forecast that
    leaves out any row of an eligible series. The submit command logs the score and the review
-   verdict to MLflow with the implementation's commit hash.
+   verdict to MLflow, with the idea the implementation implements and the implementation's commit
+   hash.
 10. The submit command records the score and the review verdict in the hypothesis store. The
     research lead reads the result and returns to step 1.
 
@@ -520,11 +521,11 @@ auto-research repository and hypothesis
 store)](https://github.com/openclimatefix/nged-substation-forecast/issues/1034) tracks the research
 repository and the hypothesis store.
 
-**A separate repository keeps the workers' credentials away from this repository without any rules
-per branch.** Workers, reviewers, and the research lead hold a token for the research repository
-only. The submit command runs as the maintainer's user and is the only automated process holding a
-token for this repository. A separate repository also keeps hundreds of node branches out of the
-branch list people work from.
+**A separate repository keeps the workers' credentials away from this repository without per-branch
+rules on this repository.** Workers, reviewers, and the research lead hold a token for the research
+repository only. The submit command runs as the maintainer's user and is the only automated process
+holding a token for this repository. A separate repository also keeps hundreds of node branches out
+of the branch list people work from.
 
 **A structured hypothesis store records what each idea taught the project, in a form a person can
 read.** The store holds one Markdown file per idea under `studies/auto_research/` on `main`, with
