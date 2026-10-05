@@ -31,7 +31,7 @@ from typing import Any, Final
 import polars as pl
 from lineage import write_lineage_note, write_readme
 from paths import open_meteo_api_key
-from studies.sources import product_dir_for
+from studies.sources import previous_runs_product_dir_for
 from studies.trial_area import load_trial_area_box
 
 HISTORICAL_FORECAST_URL: Final[str] = (
@@ -395,7 +395,7 @@ def main() -> int:
         end_date=arguments.end_date,
     )
 
-    output_dir = product_dir_for(product=model.output_dir)
+    output_dir = previous_runs_product_dir_for(product=model.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     filename = f"{model.output_dir}_{arguments.start_date}_{arguments.end_date}.parquet"
     output_path = output_dir / filename

@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Final
 
 import polars as pl
-from studies.sources import GEFS_WINDOW_DIR, WEATHER_DATA_DIR
+from studies.sources import GEFS_WINDOW_DIR, previous_runs_product_dir_for
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -209,14 +209,11 @@ DAY0_TOLERANCE: Final[float] = 0.01
 """How close the two series must be on an hour to count as equal, in each column's own unit."""
 
 
-def day0_comparison(
-    *, weather_dir: Path, product: str, slug: str
-) -> list[dict[str, str | float | int]]:
+def day0_comparison(*, product_dir: Path, slug: str) -> list[dict[str, str | float | int]]:
     """Compare a product's unsuffixed Previous Runs columns with the past studies' series.
 
     Args:
-        weather_dir: `data/studies/weather/`.
-        product: The product's directory name.
+        product_dir: The product's folder, which holds its `previous_runs/` download.
         slug: The product's slug in its file names.
 
     Returns:
@@ -224,13 +221,11 @@ def day0_comparison(
         (site, time) hours, the largest absolute difference, and the share of those hours within
         `DAY0_TOLERANCE`.
     """
-    combined = pl.read_parquet(weather_dir / product / "previous_runs" / "combined.parquet")
+    combined = pl.read_parquet(product_dir / "previous_runs" / "combined.parquet")
     records: list[dict[str, str | float | int]] = []
     for column, file_pattern, past_column in DAY0_COLUMNS:
         past = pl.read_parquet(
-            weather_dir
-            / product
-            / file_pattern.format(slug=slug, underscored=slug.replace("-", "_"))
+            product_dir / file_pattern.format(slug=slug, underscored=slug.replace("-", "_"))
         ).select("site", "time", past=past_column)
         shared = (
             combined.select("site", "time", column)
@@ -319,7 +314,9 @@ def main() -> int:
         day0.extend(
             f"| {product} | {record['column']} | {record['hours']} "
             f"| {record['max_abs_difference']:.4f} | {record['share_within_tolerance']:.4f} |"
-            for record in day0_comparison(weather_dir=WEATHER_DATA_DIR, product=product, slug=slug)
+            for record in day0_comparison(
+                product_dir=previous_runs_product_dir_for(product=product), slug=slug
+            )
         )
     (verification / "day0_matches_past_series.md").write_text("\n".join(day0) + "\n")
     _LOG.info("wrote %s", verification)

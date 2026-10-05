@@ -67,7 +67,7 @@ from studies.anonymise import (
     site_labels_for,
 )
 from studies.solar import cos_zenith_hour_mean, extraterrestrial_horizontal, zenith
-from studies.sources import REPO_DATA_DIR, product_dir_for
+from studies.sources import REPO_DATA_DIR, previous_runs_product_dir_for
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_open_meteo_previous_runs")
@@ -827,7 +827,7 @@ def main() -> int:
     _LOG.info("fetching %d models for %d sites", len(models), sites.height)
 
     for model in models:
-        output_dir = product_dir_for(product=model.output_dir) / "previous_runs"
+        output_dir = previous_runs_product_dir_for(product=model.output_dir) / "previous_runs"
         output_dir.mkdir(parents=True, exist_ok=True)
         frame = _fetch_model_checkpointed(model=model, sites=sites, output_dir=output_dir)
         combined_path = output_dir / "combined.parquet"
