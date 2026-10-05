@@ -71,6 +71,10 @@ directory. The archive itself is on a local disk.
 
 **The archive is not yet published.** No copy exists outside the workstation.
 
+The steps for running the recorder are in the [`nwp-archivist`
+README](https://github.com/openclimatefix/nwp-archivist#readme). They cover installing the three
+units, reading the logs, the fault ledger, and rolling back a cutover.
+
 ## How the data is stored
 
 **Each product is one Icechunk repository, and each variable is one Zarr array.** A study opens a
