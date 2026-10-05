@@ -79,19 +79,12 @@ from itertools import combinations
 from pathlib import Path
 from typing import Final, Literal, NamedTuple, TypedDict
 
+import build_ukv_ceda_inputs as build
+import fit_aifs
 import numpy as np
 import polars as pl
-
-_STUDIES_DIR: Final[Path] = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_STUDIES_DIR / "ukv_ceda_blends"))
-sys.path.insert(0, str(_STUDIES_DIR / "nwp_forecast_comparison"))
-sys.path.insert(0, str(_STUDIES_DIR / "beam_diffuse_split"))
-sys.path.insert(0, str(_STUDIES_DIR / "weather_downloads"))
-
-import build_ukv_ceda_inputs as build  # noqa: E402
-import fit_aifs  # noqa: E402
-from fit_extra_leads import error_text, interval_text  # noqa: E402
-from nwp_forecast_comparison import (  # noqa: E402
+from fit_extra_leads import error_text, interval_text
+from nwp_forecast_comparison import (
     METRIC,
     NWP_ERA_FOLD_OFFSETS,
     NWP_ERA_START_MONTHS,
@@ -105,7 +98,7 @@ from nwp_forecast_comparison import (  # noqa: E402
     leaderboard,
     predictions_from_losses,
 )
-from studies.bootstrap import (  # noqa: E402
+from studies.bootstrap import (
     MIN_MONTHS_FOR_INTERVAL,
     NO_DETECTABLE_DIFFERENCE,
     BootstrapInterval,
@@ -113,15 +106,15 @@ from studies.bootstrap import (  # noqa: E402
     combine_setting_verdicts,
     paired_differences,
 )
-from studies.cross_validation import (  # noqa: E402
+from studies.cross_validation import (
     calendar_month_coverage,
     cut_eras,
     out_of_fold_losses,
     search_fold_offsets,
     uncovered_months,
 )
-from studies.guards import check_no_missing, refuse_to_overwrite  # noqa: E402
-from studies.sources import REPO_DATA_DIR  # noqa: E402
+from studies.guards import check_no_missing, refuse_to_overwrite
+from studies.sources import REPO_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 

@@ -1678,10 +1678,10 @@ draws Figures 4a, 5a, 6, 7a, 8, 9, and 10; `ens_hres_past_wind_charts.py` draws 
 `weather_product_domains.py`.
 
 ```bash
-uv run python studies/beam_diffuse_split/fetch_wind_point.py
-uv run python studies/beam_diffuse_split/wind_products.py
-uv run python studies/beam_diffuse_split/wind_products.py --era5-by-year
-uv run python studies/beam_diffuse_split/wind_product_charts.py
+uv run python studies/past_weather/fetch_wind_point.py
+uv run python studies/past_weather/wind_products.py
+uv run python studies/past_weather/wind_products.py --era5-by-year
+uv run python studies/past_weather/wind_product_charts.py
 uv run python studies/beam_diffuse_split/check_page_numbers.py \
     docs/studies/past-weather/wind.md \
     data/studies/beam_diffuse_split/beam_diffuse_wind_products/report.md \
@@ -1696,8 +1696,8 @@ directory's own `README_*.md` files and their `lineage_*.json` siblings, which g
 request and any licence prerequisite. With the download in place:
 
 ```bash
-uv run python studies/beam_diffuse_split/wind_icon_dream.py
-uv run python studies/beam_diffuse_split/wind_icon_dream_charts.py
+uv run python studies/past_weather/wind_icon_dream.py
+uv run python studies/past_weather/wind_icon_dream_charts.py
 ```
 
 The ECMWF section has its own scripts. They need the ENS forecast horizons page's saved inputs and
@@ -1718,10 +1718,10 @@ uv run python studies/weather_downloads/fetch_open_meteo_grid.py --model ecmwf-i
 With those files in place:
 
 ```bash
-uv run python studies/beam_diffuse_split/ens_hres_past_wind.py
-uv run python studies/beam_diffuse_split/ens_hres_past_wind.py --extra-fits
-uv run python studies/beam_diffuse_split/ens_hres_past_wind.py --report-only
-uv run python studies/beam_diffuse_split/ens_hres_past_wind_charts.py
+uv run python studies/past_weather/ens_hres_past_wind.py
+uv run python studies/past_weather/ens_hres_past_wind.py --extra-fits
+uv run python studies/past_weather/ens_hres_past_wind.py --report-only
+uv run python studies/past_weather/ens_hres_past_wind_charts.py
 uv run python studies/beam_diffuse_split/check_page_numbers.py \
     docs/studies/past-weather/wind.md \
     data/studies/beam_diffuse_split/past_weather_v2/ens_hres_past_wind/report.md \
@@ -1751,7 +1751,7 @@ The wind-products report lands in
 --fit-missing` keeps the losses already saved and fits only the XGBoost models they lack. That
 report also prints the check with the solar study's power hour, the run that keeps the zero hours,
 the step ratios, and the distances between the farms and to ICON-D2's edge. `uv run python
-studies/beam_diffuse_split/check_served_wind.py` writes `served_wind_checks.md` beside it: the
+studies/past_weather/check_served_wind.py` writes `served_wind_checks.md` beside it: the
 grid-cell check, the 100 m rescaling, and when the ICON 80 m wind starts. The hour-to-hour jump
 diagnostics behind the served leads were one-off checks during review, and are in neither
 `report.md` nor `served_wind_checks.md`. `wind_products.py --era5-by-year` reads the saved losses,
@@ -1771,9 +1771,9 @@ refuses to overwrite an output that exists, so move earlier outputs aside first.
 
 ```bash
 uv run python studies/weather_downloads/fetch_midas_open.py
-uv run python studies/beam_diffuse_split/station_wind_arms.py
-uv run python studies/beam_diffuse_split/station_wind_arms.py --report-only
-uv run python studies/beam_diffuse_split/station_wind_arms_charts.py
+uv run python studies/past_weather/station_wind_arms.py
+uv run python studies/past_weather/station_wind_arms.py --report-only
+uv run python studies/past_weather/station_wind_arms_charts.py
 uv run python studies/beam_diffuse_split/check_page_numbers.py \
     docs/studies/past-weather/wind.md \
     data/studies/beam_diffuse_split/past_weather_v2/station_wind_arms/report.md \
@@ -1801,8 +1801,8 @@ from to `data/studies/beam_diffuse_split/past_weather_v2/wind_leaderboard_2/repo
 with `intervals.parquet`. The script refuses to overwrite either file. With the losses in place:
 
 ```bash
-uv run python studies/beam_diffuse_split/past_wind_leaderboard.py
-uv run python studies/beam_diffuse_split/past_wind_leaderboard_charts.py
+uv run python studies/past_weather/past_wind_leaderboard.py
+uv run python studies/past_weather/past_wind_leaderboard_charts.py
 ```
 
 [ecmwf-results]: #ukv-beats-hres-and-ens-day-0-and-hress-lead-over-era5-depends-on-the-training-design

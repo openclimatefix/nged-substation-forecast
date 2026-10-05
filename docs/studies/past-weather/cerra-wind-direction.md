@@ -404,7 +404,7 @@ settings of the previous study.
 ## Reproducing the figures
 
 ```bash
-uv run python studies/beam_diffuse_split/cerra_wind_direction.py
-uv run python studies/beam_diffuse_split/cerra_wind_direction_figures.py
+uv run python studies/past_weather/cerra_wind_direction.py
+uv run python studies/past_weather/cerra_wind_direction_figures.py
 npx svgo@4 --multipass --precision=1 --final-newline docs/studies/assets/cerra_wind_direction_*.svg
 ```

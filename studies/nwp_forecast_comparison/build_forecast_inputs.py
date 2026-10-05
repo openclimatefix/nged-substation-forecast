@@ -81,25 +81,14 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Final, Literal, NamedTuple
 
+import ens_forecast_horizons as efh
 import h3.api.basic_int as h3
 import numpy as np
 import polars as pl
 from contracts.settings import PROJECT_ROOT
-from geo.h3 import compute_h3_grid_weights
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from verify_extra_leads import (
-    gefs_boundary_table,
-    gefs_boundary_verdict,
-    gefs_window_table,
-    gefs_window_verdict,
-)
-from verify_previous_runs_leads import PRODUCT_DIRS
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-import ens_forecast_horizons as efh
 from fetch_ens_day4_supplement import SUPPLEMENT_PATH as ENS_DAY4_SUPPLEMENT_PATH
 from fetch_ens_forecast_horizons import H3_RESOLUTION
+from geo.h3 import compute_h3_grid_weights
 from studies.gfs_native import (
     HOURLY_SERVED_LAST_DAY,
     LAST_LEAD_HOURS,
@@ -116,6 +105,13 @@ from studies.ifs_single_runs import clip_radiation, last_servable_day
 from studies.ifs_single_runs import served_init_time as ifs_single_init_time
 from studies.ifs_single_runs import served_lead_hours as ifs_single_lead_hours
 from studies.resample import gefs_step_means
+from verify_extra_leads import (
+    gefs_boundary_table,
+    gefs_boundary_verdict,
+    gefs_window_table,
+    gefs_window_verdict,
+)
+from verify_previous_runs_leads import PRODUCT_DIRS
 
 from studies import ens_members as ens_member_columns
 

@@ -49,20 +49,13 @@ from pathlib import Path
 from typing import Final
 
 import altair as alt
+import build_ukv_ceda_inputs as build
+import fit_aifs
+import fit_ukv_ceda_blends as fit
 import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
-
-_STUDIES_DIR: Final[Path] = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_STUDIES_DIR / "ukv_ceda_blends"))
-sys.path.insert(0, str(_STUDIES_DIR / "nwp_forecast_comparison"))
-sys.path.insert(0, str(_STUDIES_DIR / "beam_diffuse_split"))
-sys.path.insert(0, str(_STUDIES_DIR / "weather_downloads"))
-
-import build_ukv_ceda_inputs as build  # noqa: E402
-import fit_aifs  # noqa: E402
-import fit_ukv_ceda_blends as fit  # noqa: E402
-from nwp_forecast_charts import (  # noqa: E402
+from nwp_forecast_charts import (
     CAPACITY_NOTE,
     DIFFERENCE_TITLE,
     FORECAST_COLOUR,
@@ -76,20 +69,20 @@ from nwp_forecast_charts import (  # noqa: E402
     measured_and_forecast,
     padded_domain,
 )
-from nwp_forecast_comparison import (  # noqa: E402
+from nwp_forecast_comparison import (
     NWP_ERA_START_MONTHS,
     PERCENTAGE_POINTS,
     DomainType,
 )
-from studies.bootstrap import BootstrapInterval  # noqa: E402
-from studies.charts import (  # noqa: E402
+from studies.bootstrap import BootstrapInterval
+from studies.charts import (
     ABSOLUTE_ERROR_X_TITLE,
     CONTENT_WIDTH_PX,
     figure,
     interval_panel,
 )
-from studies.guards import refuse_to_overwrite  # noqa: E402
-from studies.sources import REPO_DATA_DIR  # noqa: E402
+from studies.guards import refuse_to_overwrite
+from studies.sources import REPO_DATA_DIR
 
 DOMAINS: Final[tuple[DomainType, DomainType]] = ("solar", "wind")
 

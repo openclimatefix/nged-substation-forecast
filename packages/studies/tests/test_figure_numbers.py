@@ -154,7 +154,7 @@ BLOCK_TITLE: Final[re.Pattern[str]] = re.compile(
 
 def _written_stems() -> dict[str, list[str]]:
     """Return, for each wind chart script, the SVG stems its `charts` dict writes."""
-    scripts_dir = REPO_ROOT / "studies" / "beam_diffuse_split"
+    scripts_dir = REPO_ROOT / "studies" / "past_weather"
     return {
         script: WRITTEN_STEM.findall((scripts_dir / script).read_text())
         for script in WIND_CHART_SCRIPTS

@@ -3,7 +3,7 @@
 One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>. The forecast study reads
 each generator as an area-weighted mean over the generator's H3 resolution-5 cell
-(`geo.h3.compute_h3_grid_weights`, as `studies/beam_diffuse_split/ens_past_solar.py` does). That
+(`geo.h3.compute_h3_grid_weights`, as `studies/past_weather/ens_past_solar.py` does). That
 read needs every 0.25-degree grid column and row the cell touches to be inside the crop.
 
 For each of the nine anonymised study sites (PV `A` to `F`, wind `W1` to `W3`) the script finds the

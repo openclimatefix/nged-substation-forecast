@@ -416,9 +416,9 @@ results section and the Key findings. The Summary was checked the same way, on a
 without its disclaimer, because the disclaimer's model version numbers are not in the report.
 
 ```bash
-uv run python studies/beam_diffuse_split/cerra_wind_levels.py
-uv run python studies/beam_diffuse_split/cerra_wind_levels_shear.py
-uv run python studies/beam_diffuse_split/cerra_wind_levels_charts.py
+uv run python studies/past_weather/cerra_wind_levels.py
+uv run python studies/past_weather/cerra_wind_levels_shear.py
+uv run python studies/past_weather/cerra_wind_levels_charts.py
 npx svgo@4 --multipass --precision=1 --final-newline docs/studies/assets/cerra_wind_levels_*.svg
 uv run python studies/beam_diffuse_split/check_page_numbers.py \
     docs/studies/past-weather/cerra-wind-levels.md \

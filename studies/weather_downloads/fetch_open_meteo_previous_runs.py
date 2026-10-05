@@ -2,7 +2,7 @@
 
 One-off throwaway script for the forecast study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/810>. The Historical Forecast
-archives `fetch_open_meteo_grid.py` and `studies/beam_diffuse_split/fetch_open_meteo_point.py`
+archives `fetch_open_meteo_grid.py` and `studies/past_weather/fetch_open_meteo_point.py`
 already downloaded only hold each model's most-recent-run value at each hour (lead 0-3h), so they
 cannot score a forecast at a genuine lead time. The Previous Runs API
 (<https://open-meteo.com/en/docs/previous-runs-api>) serves the same hour from several different
@@ -15,7 +15,7 @@ Historical Forecast archives do not carry.
 **Sites, not the trial-area grid.** This script builds the same anonymised meter roster
 `studies/beam_diffuse_split/studies.pv_dataset.pv_sites`/`_wind_sites` does (`_roster` below is a
 deliberate duplicate — see its own docstring for why) and follows the same request/response shape
-as `studies/beam_diffuse_split/fetch_open_meteo_point.py`, rather than the trial-area grid
+as `studies/past_weather/fetch_open_meteo_point.py`, rather than the trial-area grid
 `fetch_open_meteo_grid.py` uses: a forecast study scores a specific generator's forecast, not a
 grid cell's. No coordinate or `time_series_id` reaches the written frame or any log line — rows
 are keyed by the anonymised `site` label the roster assigns, exactly as the sibling per-site
@@ -103,7 +103,7 @@ BASE_VARIABLES: Final[tuple[str, ...]] = (
     "wind_direction_100m",
 )
 """Open-Meteo's normalised variable names, before the `_previous_dayN` suffix. `direct_radiation`
-rather than `diffuse_radiation`, matching `studies/beam_diffuse_split/fetch_open_meteo_point.py`'s
+rather than `diffuse_radiation`, matching `studies/past_weather/fetch_open_meteo_point.py`'s
 choice, so a later join onto that study's arms uses the same flux. `wind_speed_100m` /
 `wind_direction_100m` are Open-Meteo's own rescaling to 100 m for a model whose native upper level
 sits elsewhere (120 m for the ICON family — see `fetch_wind_point.py`'s docstring for the measured
@@ -294,7 +294,7 @@ def _requested_variables() -> tuple[str, ...]:
 def _get_json(*, url: str) -> Any:
     """Fetch one URL, retrying a transport failure but never an API refusal.
 
-    Copied from `studies/beam_diffuse_split/fetch_open_meteo_point.py`'s `_get_json`: see that
+    Copied from `studies/past_weather/fetch_open_meteo_point.py`'s `_get_json`: see that
     function's docstring for why a rate-limit refusal must not be retried, and why the refusal body
     is read only for its `reason` and never echoed whole (it can quote a request parameter back,
     and the coordinates in this request are meter locations).
@@ -802,7 +802,7 @@ def _write_docs_for_model(
             (
                 "wind_speed_100m/wind_direction_100m is Open-Meteo's own rescaling for a model "
                 "whose native upper level is not 100 m (120 m for the ICON family, scaled by "
-                "0.98 per `studies/beam_diffuse_split/fetch_wind_point.py`'s measurement) — not "
+                "0.98 per `studies/past_weather/fetch_wind_point.py`'s measurement) — not "
                 "independently re-measured here."
             ),
         ],

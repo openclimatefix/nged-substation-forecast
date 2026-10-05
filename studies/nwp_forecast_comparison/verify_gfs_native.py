@@ -41,9 +41,6 @@ from typing import Final, NamedTuple
 
 import numpy as np
 import polars as pl
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
 from build_forecast_inputs import (
     GFS_NATIVE_DAYS,
     GFS_NATIVE_DIR_NAME,

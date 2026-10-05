@@ -62,16 +62,14 @@ import numpy as np
 import polars as pl
 from contracts.settings import PROJECT_ROOT
 from studies.hourly_means import hourly_from_snapshots
+from studies.pv_dataset import (
+    pv_sites,  # the private solar roster, for coordinates read at run time
+)
 from studies.timestamp_checks import (
     CANDIDATE_OFFSETS_MINUTES,
     HOUR_ENDING_OFFSET_MINUTES,
     best_offset_minutes,
     correlation_by_offset,
-)
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-from studies.pv_dataset import (
-    pv_sites,  # the private solar roster, for coordinates read at run time
 )
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)

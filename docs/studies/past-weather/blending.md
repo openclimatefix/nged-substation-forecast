@@ -669,10 +669,10 @@ over less than 4 years for solar and 2 years for wind.**
 ## Reproducing the figures
 
 ```bash
-uv run python studies/beam_diffuse_split/weather_products.py
-uv run python studies/beam_diffuse_split/wind_products.py
-uv run python studies/beam_diffuse_split/blend_products.py
-uv run python studies/beam_diffuse_split/blend_product_charts.py
+uv run python studies/past_weather/weather_products.py
+uv run python studies/past_weather/wind_products.py
+uv run python studies/past_weather/blend_products.py
+uv run python studies/past_weather/blend_product_charts.py
 ```
 
 The report lands in `data/studies/beam_diffuse_split/blend_products/report.md`, beside
@@ -685,9 +685,9 @@ blending study above run first too, because its report reads `blend_products/los
 the reconciliation against that study's own gain, then:
 
 ```bash
-uv run python studies/beam_diffuse_split/weather_products.py --panel record
-uv run python studies/beam_diffuse_split/blend_satellites.py
-uv run python studies/beam_diffuse_split/blend_satellites_charts.py
+uv run python studies/past_weather/weather_products.py --panel record
+uv run python studies/past_weather/blend_satellites.py
+uv run python studies/past_weather/blend_satellites_charts.py
 ```
 
 The report lands in `data/studies/beam_diffuse_split/satellite_blend/report.md`, beside

@@ -47,11 +47,12 @@ import sys
 from pathlib import Path
 from typing import Final
 
+import ens_forecast_horizons as efh
+import icechunk
 import numpy as np
 import polars as pl
 import xarray as xr
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+import zarr
 from build_forecast_inputs import (
     DAY5_OUTPUT_DIR_NAME,
     DomainType,
@@ -61,12 +62,6 @@ from build_forecast_inputs import (
     check_columns_equal,
     ens_members,
 )
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "weather_downloads"))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-import ens_forecast_horizons as efh
-import icechunk
-import zarr
 from studies.guards import refuse_to_overwrite
 from studies.resample import interpolate_linear, wind_components
 

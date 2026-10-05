@@ -82,23 +82,17 @@ from pathlib import Path
 from typing import Final, Literal
 
 import polars as pl
+
+# The underscore-named helpers below are the roster, power and geometry code the earlier studies
+# use, and reusing them keeps every convention identical. Importing private names is a one-off here.
+from studies.arm_runner import Job, run_all
 from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
     SENSITIVITY_HYPER_PARAMETERS,
     assign_week_folds,
 )
-from studies.guards import check_no_missing, refuse_to_overwrite
-from studies.stitched_ensemble import (
-    hold_backward_mean_hourly,
-    interpolate_instants_hourly,
-    newest_run_member_means,
-)
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-# The underscore-named helpers below are the roster, power and geometry code the earlier studies
-# use, and reusing them keeps every convention identical. Importing private names is a one-off here.
-from studies.arm_runner import Job, run_all
 from studies.export_cap import with_export_cap
+from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.pv_dataset import (
     add_solar_geometry,
     drop_false_zeros,
@@ -109,6 +103,11 @@ from studies.pv_dataset import (
 )
 from studies.pv_dataset import solar_hourly_power as _solar_hourly_power
 from studies.sources import STUDIES_DATA_DIR, WEATHER_DATA_DIR
+from studies.stitched_ensemble import (
+    hold_backward_mean_hourly,
+    interpolate_instants_hourly,
+    newest_run_member_means,
+)
 from studies.wind_product_frames import wind_hourly_power as _wind_hourly_power
 
 _LOG: Final[logging.Logger] = logging.getLogger("ensemble_means_mae")

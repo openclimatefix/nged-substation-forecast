@@ -1743,25 +1743,25 @@ default `--sources`, all six products the second round adds. The extra models' o
 have to run first, or the check fails on a missing file rather than silently dropping those four
 models' checks.
 
-```bash uv run --with netcdf4 python studies/beam_diffuse_split/extract_site_series.py --product
-sarah-3 uv run python studies/beam_diffuse_split/extract_site_series.py --product icon-dream-eu uv
-run python studies/beam_diffuse_split/fetch_open_meteo_point.py --model ecmwf-ifs-hres  # and
+```bash uv run --with netcdf4 python studies/past_weather/extract_site_series.py --product
+sarah-3 uv run python studies/past_weather/extract_site_series.py --product icon-dream-eu uv
+run python studies/past_weather/fetch_open_meteo_point.py --model ecmwf-ifs-hres  # and
 arpege-europe, dmi-harmonie-arome, knmi-harmonie-arome for source in ecmwf-ifs-hres arpege-europe
 dmi-harmonie-arome knmi-harmonie-arome; do uv run python studies/beam_diffuse_split/build_dataset.py
---source $source done uv run python studies/beam_diffuse_split/check_new_products.py for source in
+--source $source done uv run python studies/past_weather/check_new_products.py for source in
 open-meteo ukv icon-d2 icon-eu icon-global cams sarah-3 icon-dream-eu; do uv run python
 studies/beam_diffuse_split/build_dataset.py --source $source done uv run python
 studies/beam_diffuse_split/build_dataset.py --source cams \ --min-cams-reliability 0 --suffix
-_allhours uv run python studies/beam_diffuse_split/weather_products.py --panel long record uv run
-python studies/beam_diffuse_split/weather_products.py --panel all uv run python
-studies/beam_diffuse_split/weather_product_charts.py uv run python
-studies/beam_diffuse_split/ens_past_solar.py uv run python
-studies/beam_diffuse_split/ens_past_solar_charts.py uv run python
-studies/beam_diffuse_split/station_past_solar.py uv run python
-studies/beam_diffuse_split/station_past_solar_charts.py uv run python
-studies/beam_diffuse_split/cerra_past_solar.py uv run python
-studies/beam_diffuse_split/past_solar_leaderboard.py uv run python
-studies/beam_diffuse_split/past_solar_leaderboard_charts.py ```
+_allhours uv run python studies/past_weather/weather_products.py --panel long record uv run
+python studies/past_weather/weather_products.py --panel all uv run python
+studies/past_weather/weather_product_charts.py uv run python
+studies/past_weather/ens_past_solar.py uv run python
+studies/past_weather/ens_past_solar_charts.py uv run python
+studies/past_weather/station_past_solar.py uv run python
+studies/past_weather/station_past_solar_charts.py uv run python
+studies/past_weather/cerra_past_solar.py uv run python
+studies/past_weather/past_solar_leaderboard.py uv run python
+studies/past_weather/past_solar_leaderboard_charts.py ```
 
 The eight-product report lands in
 `data/studies/beam_diffuse_split/past_weather_v2/solar_long/report.md`, and the longer record's in
@@ -1770,11 +1770,11 @@ The eight-product report lands in
 neither mode overwrites an existing file. `--concurrent-fits` lowers how many XGBoost models are
 fitted at once. The report also prints the distances between the generators and to ICON-D2's edge,
 the ERA5 cells they fall in, and every number the charts share with it. The charts come from `uv run
-python studies/beam_diffuse_split/weather_product_charts.py`, which computes the numbers the report
+python studies/past_weather/weather_product_charts.py`, which computes the numbers the report
 does not print, the leaderboard's intervals and Figures 4 and 5, from the saved losses without
 refitting any XGBoost model. `check_new_products.py` writes the timing and direct-beam checks on all
 six products the second round adds to `past_weather_v2/product_checks.md`. The served-lead check
-runs with `uv run --with cfgrib python studies/beam_diffuse_split/verify_icon_lineage.py --model
+runs with `uv run --with cfgrib python studies/past_weather/verify_icon_lineage.py --model
 icon-eu`, against the runs the German weather service still publishes, which cover about one day.
 
 `check_new_products.py` also reads a single-site hourly 2 m temperature fetch for each of the four

@@ -35,17 +35,12 @@ Run it with `uv run python studies/beam_diffuse_split/stamp_alignment.py`.
 """
 
 import logging
-import sys
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Final
 
 import numpy as np
 import polars as pl
 import pvlib
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
 from contracts.power_schemas import POWER_TIMESTAMPS_CORRECTED_BEFORE
 from studies.pv_dataset import CAMS_PATH, REPO_DATA_DIR, pv_sites
 

@@ -62,23 +62,16 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Final, NamedTuple
 
+import build_ukv_ceda_inputs as build
+import ens_forecast_horizons as efh
 import numpy as np
 import polars as pl
-
-_STUDIES_DIR: Final[Path] = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_STUDIES_DIR / "ukv_ceda_blends"))
-sys.path.insert(0, str(_STUDIES_DIR / "nwp_forecast_comparison"))
-sys.path.insert(0, str(_STUDIES_DIR / "beam_diffuse_split"))
-sys.path.insert(0, str(_STUDIES_DIR / "weather_downloads"))
-
-import build_ukv_ceda_inputs as build  # noqa: E402
-import ens_forecast_horizons as efh  # noqa: E402
-from nwp_forecast_comparison import DomainType  # noqa: E402
-from studies.grid_sampling import nearest_cells  # noqa: E402
-from studies.ifs_single_runs import served_lead_hours  # noqa: E402
-from studies.solar import zenith  # noqa: E402
-from studies.sources import REPO_DATA_DIR  # noqa: E402
-from studies.timestamp_checks import best_offset_minutes, correlation_by_offset  # noqa: E402
+from nwp_forecast_comparison import DomainType
+from studies.grid_sampling import nearest_cells
+from studies.ifs_single_runs import served_lead_hours
+from studies.solar import zenith
+from studies.sources import REPO_DATA_DIR
+from studies.timestamp_checks import best_offset_minutes, correlation_by_offset
 
 SAMPLE_PER_STRATUM: Final[int] = 6
 """How many rows are recomputed per technology, lead day, and stratum."""

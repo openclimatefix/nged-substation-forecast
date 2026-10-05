@@ -41,9 +41,6 @@ from pathlib import Path
 from typing import Final, NamedTuple
 
 import polars as pl
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
 from build_forecast_inputs import (
     IFS_SINGLE_DAYS,
     IFS_SINGLE_DIR_NAME,

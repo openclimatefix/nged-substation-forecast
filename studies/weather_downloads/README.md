@@ -26,7 +26,7 @@ rather than a coordinate.
 (`data/studies/weather/<PRODUCT>/lineage.json`, or `lineage_<variable>.json` where a script fetches
 several variables into one directory, as `fetch_cerra.py` and `fetch_icon_dream.py` do). Each note
 records the source address, what was requested, the variables kept, and the retrieval time — the one
-format every fetch script here reuses, per `studies/beam_diffuse_split/sources.py`'s convention.
+format every fetch script here reuses, per `packages/studies/src/studies/sources.py`'s convention.
 
 ## Running a fetch script
 

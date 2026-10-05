@@ -371,23 +371,22 @@ allow-init-docstring = true
 exclude = '\.git|\.venv|packages/(notebooks|dashboard)/[^/]+\.py'
 
 [tool.ty.environment]
-# Mirror `pythonpath = ["tests"]` in `[tool.pytest.ini_options]` below, so `ty` resolves a bare
+# Mirror `pythonpath` in `[tool.pytest.ini_options]` below, so `ty` resolves a bare
 # `_nwp_test_data` import the same way pytest does. Without this setting, the import resolves only
 # from a module sitting beside `_nwp_test_data` in `tests/`, and the same import from a package's
 # own test suite — `packages/ml_core/tests`, say — is an `unresolved-import` error even though
 # pytest runs it fine.
 #
-# `studies/beam_diffuse_split` is here too: `studies/nwp_forecast_comparison/build_forecast_inputs.py`
-# reuses that study's public functions (`ens_forecast_horizons.base_frame` and others) by inserting
-# that directory onto `sys.path` at runtime, exactly as the `tests` entry above does for pytest.
-# Without this, the same import that runs fine is an `unresolved-import` error under `ty` alone.
-# `studies/nwp_forecast_comparison` is here for `packages/studies/tests/test_fit_extra_leads.py`.
-# `studies/weather_downloads` is here for `packages/studies/tests/test_validate_weathernext3.py`.
-# `studies/ukv_ceda_blends` is here for the `packages/studies/tests/test_ukv_ceda_*.py` modules.
+# Each folder under `studies/` that holds a script a test imports by bare name is listed here and in
+# `pythonpath` under `[tool.pytest.ini_options]`, so `ty` resolves `import wind_products` the same
+# way pytest does. A script imports only its own folder, `studies.*`, and the other reviewed
+# packages, which `packages/studies/tests/test_study_boundaries.py` enforces.
 extra-paths = [
     "tests",
     "studies/beam_diffuse_split",
     "studies/nwp_forecast_comparison",
+    "studies/past_weather",
+    "packages/studies/tests/past_weather",
     "studies/ukv_ceda_blends",
     "studies/weather_downloads",
 ]
@@ -422,7 +421,18 @@ python_files = ["test_*.py", "*_test.py", "packages/notebooks/plot_missing_NWP_d
 # own directory to sys.path the way prepend mode does. This is also load-bearing for the `-p
 # _pytest_autoinject` entry in `addopts` above: `-p` resolves a bare module name against sys.path,
 # and `tests/_pytest_autoinject.py` is only importable as `_pytest_autoinject` because of this line.
-pythonpath = ["tests"]
+#
+# Each folder under `studies/` that holds a script a test imports by bare name is listed too, and in
+# `extra-paths` under `[tool.ty.environment]` above. Importing a script from another folder would
+# pass under this setting and fail under `uv run python studies/<folder>/<script>.py`, which is why
+# `packages/studies/tests/test_study_boundaries.py` forbids it. A test directory is listed when its
+# tests import helpers from a sibling test module by bare name.
+pythonpath = [
+    "tests",
+    "studies/beam_diffuse_split",
+    "studies/past_weather",
+    "packages/studies/tests/past_weather",
+]
 # `error` first: any warning not explicitly excepted below fails the test that raised it, so a
 # deprecation in our own code is caught by the PR that introduces it instead of accumulating in the
 # summary. Later entries win, so every exception below is applied on top of `error`.

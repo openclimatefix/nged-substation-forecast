@@ -40,8 +40,6 @@ import polars as pl
 import xarray as xr
 from lineage import write_lineage_note, write_readme
 from paths import WEATHER_DOWNLOADS_DIR
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "beam_diffuse_split"))
 from studies.pv_dataset import wind_sites
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

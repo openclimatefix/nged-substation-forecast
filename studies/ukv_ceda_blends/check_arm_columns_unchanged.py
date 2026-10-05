@@ -21,12 +21,8 @@ import sys
 from pathlib import Path
 from typing import Final
 
-_STUDY_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(_STUDY_DIR.parent / "nwp_forecast_comparison"))
-sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
-
-import fit_aifs  # noqa: E402
-from nwp_forecast_comparison import DomainType, _repo_data_dir  # noqa: E402
+import fit_aifs
+from nwp_forecast_comparison import DomainType, _repo_data_dir
 
 STAMP_GLOB: Final[str] = "nwp_forecast_comparison_*/*_losses.json"
 """Under `data/studies/`, every earlier study's stamps."""

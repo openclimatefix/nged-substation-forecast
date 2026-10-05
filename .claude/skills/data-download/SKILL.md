@@ -323,5 +323,5 @@ correct request with "Daily API request limit exceeded". A quota refusal midway 
 therefore not evidence the request itself is wrong, and is not a licence to guess at an alternative
 parameter to work around it — check for another session's fetch against the same provider first, and
 otherwise treat the refusal the same way `_get_json` in
-`studies/beam_diffuse_split/fetch_open_meteo_point.py` already does: stop and resume later, never
+`studies/past_weather/fetch_open_meteo_point.py` already does: stop and resume later, never
 retry it in a loop.

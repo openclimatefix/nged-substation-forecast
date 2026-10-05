@@ -24,8 +24,6 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from studies.charts import CONTENT_WIDTH_PX, LABEL_WIDTH_PX, wrapped
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
 from studies.sources import STUDIES_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("ensemble_means_chart")

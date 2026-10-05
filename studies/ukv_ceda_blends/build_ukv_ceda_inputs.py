@@ -63,36 +63,30 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Final, NamedTuple
 
+import ens_forecast_horizons as efh
 import icechunk
 import numpy as np
 import polars as pl
 import zarr
-
-_STUDIES_DIR: Final[Path] = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_STUDIES_DIR / "nwp_forecast_comparison"))
-sys.path.insert(0, str(_STUDIES_DIR / "beam_diffuse_split"))
-sys.path.insert(0, str(_STUDIES_DIR / "weather_downloads"))
-
-import ens_forecast_horizons as efh  # noqa: E402
-from nwp_forecast_comparison import (  # noqa: E402
+from nwp_forecast_comparison import (
     DomainType,
     candidate_rows,
     rows,
 )
-from studies.baselines import haurwitz_w_m2  # noqa: E402
-from studies.grid_sampling import nearest_cells  # noqa: E402
-from studies.guards import refuse_to_overwrite  # noqa: E402
-from studies.hourly_means import hourly_from_snapshots  # noqa: E402
-from studies.ifs_single_runs import served_init_time, served_lead_hours  # noqa: E402
-from studies.resample import (  # noqa: E402
+from studies.baselines import haurwitz_w_m2
+from studies.grid_sampling import nearest_cells
+from studies.guards import refuse_to_overwrite
+from studies.hourly_means import hourly_from_snapshots
+from studies.ifs_single_runs import served_init_time, served_lead_hours
+from studies.resample import (
     clear_sky_index_resample,
     interpolate_linear,
     wind_components,
     wind_polar,
 )
-from studies.solar import zenith  # noqa: E402
-from studies.sources import REPO_DATA_DIR  # noqa: E402
-from studies.ukv_ceda_profiles import (  # noqa: E402
+from studies.solar import zenith
+from studies.sources import REPO_DATA_DIR
+from studies.ukv_ceda_profiles import (
     PLAIN_LAST_STEP,
     STATUS_COMPLETE,
     STATUS_MISSING,
@@ -101,7 +95,7 @@ from studies.ukv_ceda_profiles import (  # noqa: E402
     T120_PROFILE,
     T120_STEPS,
 )
-from studies.wind_direction import sine_cosine  # noqa: E402
+from studies.wind_direction import sine_cosine
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
