@@ -12,11 +12,13 @@ from studies.ifs_single_runs import (
 )
 
 
-def _served(*, time: datetime, day: int, domain: DomainType) -> tuple[datetime, int]:
+def _served(
+    *, time: datetime, day: int, domain: DomainType, run_hour: int = 0
+) -> tuple[datetime, int]:
     frame = pl.DataFrame({"time": [time]}).with_columns(pl.col("time").dt.replace_time_zone("UTC"))
     return frame.select(
-        init=served_init_time(time=pl.col("time"), day=day, domain=domain),
-        lead=served_lead_hours(time=pl.col("time"), day=day, domain=domain),
+        init=served_init_time(time=pl.col("time"), day=day, domain=domain, run_hour=run_hour),
+        lead=served_lead_hours(time=pl.col("time"), day=day, domain=domain, run_hour=run_hour),
     ).row(0)
 
 
@@ -84,3 +86,56 @@ def test_radiation_is_clipped_at_zero_and_left_alone_above_it():
     clipped = frame.select(clip_radiation(radiation=pl.col("r")))["r"].to_list()
 
     assert clipped == [0.0, 0.0, 5.5, None]
+
+
+RUN_03 = datetime(2025, 3, 8, 3, tzinfo=UTC)
+"""The 03 UTC run two days before 2025-03-10."""
+
+
+@pytest.mark.parametrize(
+    ("hour", "lead"), [(0, 45), (2, 47), (3, 48), (23, 68)], ids=["h0", "h2", "h3", "h23"]
+)
+def test_a_wind_hour_reads_the_03_utc_run_two_days_back_at_a_lead_three_hours_shorter(
+    hour: int, lead: int
+):
+    init, got_lead = _served(time=datetime(2025, 3, 10, hour), day=2, domain="wind", run_hour=3)
+
+    assert init == RUN_03
+    assert got_lead == lead
+
+
+@pytest.mark.parametrize(
+    ("label", "lead"),
+    [
+        (datetime(2025, 3, 10, 2), 47),
+        (datetime(2025, 3, 10, 3), 48),
+        (datetime(2025, 3, 10, 23), 68),
+        (datetime(2025, 3, 11, 0), 69),
+    ],
+    ids=["h2", "h3", "h23", "label-midnight"],
+)
+def test_a_solar_hour_reads_the_03_utc_run_of_the_day_its_start_instant_falls_on(
+    label: datetime, lead: int
+):
+    init, got_lead = _served(time=label, day=2, domain="solar", run_hour=3)
+
+    assert init == RUN_03
+    assert got_lead == lead
+
+
+def test_run_hour_zero_is_the_default_and_changes_nothing():
+    label = datetime(2025, 3, 10, 14)
+
+    assert _served(time=label, day=2, domain="solar") == _served(
+        time=label, day=2, domain="solar", run_hour=0
+    )
+
+
+def test_the_03_utc_run_reaches_day_4_inside_its_120_hour_store_but_not_day_5():
+    last_wind_day_4 = _served(time=datetime(2025, 3, 10, 23), day=4, domain="wind", run_hour=3)[1]
+    last_solar_day_4 = _served(time=datetime(2025, 3, 11, 0), day=4, domain="solar", run_hour=3)[1]
+    last_wind_day_5 = _served(time=datetime(2025, 3, 10, 23), day=5, domain="wind", run_hour=3)[1]
+
+    assert last_wind_day_4 == 116
+    assert last_solar_day_4 == 117
+    assert last_wind_day_5 == 140
