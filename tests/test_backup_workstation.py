@@ -7,6 +7,7 @@ every file twice, copying a SQLite database as a torn file, and missing a source
 """
 
 import importlib.util
+import os
 import sqlite3
 import subprocess
 import sys
@@ -249,6 +250,16 @@ def test_entries_changed_since_reports_created_and_deleted_files(tmp_path: Path)
     changed = backup_workstation.entries_changed_since(sources=sources, snapshot=snapshot)
     assert any(line.startswith("literature: ") and line.endswith("new.pdf") for line in changed)
     assert any(line.startswith("data: *deleting") for line in changed)
+
+
+def test_entries_changed_since_ignores_a_directory_timestamp(tmp_path: Path) -> None:
+    sources = _make_sources(tmp_path)
+    snapshot = _backup(tmp_path, sources, _FIRST_RUN)
+
+    # A timestamp well away from the backup's, because rsync compares times to the second.
+    os.utime(tmp_path / "literature", times=(0, 0))
+
+    assert backup_workstation.entries_changed_since(sources=sources, snapshot=snapshot) == []
 
 
 def test_collect_sources_drops_nested_and_duplicate_roots(tmp_path: Path) -> None:

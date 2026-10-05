@@ -490,8 +490,8 @@ def entries_changed_since(sources: Sequence[BackupSource], snapshot: Path) -> li
 
     Run straight after a backup, the list holds only the entries created, changed, or deleted
     while the backup ran. An empty list means the snapshot matches the workstation exactly,
-    compared on size and modification time. SQLite databases are left out, because their copies
-    never match the live file's modification time.
+    compared on each file's size and modification time. SQLite databases are left out, because
+    their copies never match the live file's modification time.
 
     Args:
         sources: The directories that were copied.
@@ -505,6 +505,9 @@ def entries_changed_since(sources: Sequence[BackupSource], snapshot: Path) -> li
         process = _rsync(
             [
                 "-aHn",
+                # A directory's modification time changes whenever a file inside it does, so
+                # comparing it only repeats what the file lines already say.
+                "--omit-dir-times",
                 "--delete",
                 "--itemize-changes",
                 *_excludes(source),
