@@ -85,7 +85,13 @@ from studies.resample import (
     wind_polar,
 )
 from studies.solar import zenith
-from studies.sources import REPO_DATA_DIR
+from studies.sources import (
+    NFC_DAY4_SHARED_DIR,
+    NFC_DIR,
+    UKV_CEDA_BLENDS_DIR,
+    UKV_CEDA_BLENDS_RUN15_DIR,
+    UKV_CEDA_T120_PRODUCT_DIR,
+)
 from studies.ukv_ceda_profiles import (
     PLAIN_LAST_STEP,
     STATUS_COMPLETE,
@@ -101,12 +107,12 @@ _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
 DOMAINS: Final[tuple[DomainType, DomainType]] = ("solar", "wind")
 
-STORE_DIR_NAME: Final[str] = T120_PROFILE.product_name
-"""Under `data/studies/weather/`, the store this script reads."""
+STORE_DIR: Final[Path] = UKV_CEDA_T120_PRODUCT_DIR
+"""The store this script reads."""
 
-PUBLISHED_DIR_NAME: Final[str] = "nwp_forecast_comparison"
-DAY4_DIR_NAME: Final[str] = "nwp_forecast_comparison_day4_shared"
-"""Under `data/studies/`, the folders holding ENS's mean at days 1 to 3 and at day 4."""
+PUBLISHED_DIR: Final[Path] = NFC_DIR
+DAY4_DIR: Final[Path] = NFC_DAY4_SHARED_DIR
+"""The folders holding ENS's mean at days 1 to 3 and at day 4."""
 
 
 class RunSpec(NamedTuple):
@@ -121,7 +127,7 @@ class RunSpec(NamedTuple):
     extra_days: int
     column_prefix: str
     lead_days: tuple[int, ...]
-    output_dir_name: str
+    output_dir: Path
     description: str
 
 
@@ -130,7 +136,7 @@ PLANNED_RUN: Final[RunSpec] = RunSpec(
     extra_days=0,
     column_prefix="ukv_ceda",
     lead_days=(1, 2, 3, 4),
-    output_dir_name="ukv_ceda_blends",
+    output_dir=UKV_CEDA_BLENDS_DIR,
     description="the 03 UTC run of the ENS run's own day, which a 09:00 UTC service could read",
 )
 """The planned run: 03 UTC of day `D - N`, at lead `24 * N + h - 3` hours, 3 hours after ENS's 00
@@ -141,15 +147,15 @@ OLDER_RUN: Final[RunSpec] = RunSpec(
     extra_days=1,
     column_prefix="ukv_ceda_run15",
     lead_days=(1, 2, 3),
-    output_dir_name="ukv_ceda_blends_run15",
+    output_dir=UKV_CEDA_BLENDS_RUN15_DIR,
     description="the 15 UTC run of the day before the ENS run's own day, 9 hours before ENS's run",
 )
 """The post hoc older run: 15 UTC of day `D - N - 1`, at lead `24 * N + h + 9` hours, which starts 9
 hours before ENS's 00 UTC run of day `D - N` and leads 12 hours longer than the planned run's. Day 4
 would need leads up to 129 hours, beyond the store's 120, for every hour after 14:00 UTC."""
 
-OUTPUT_DIR_NAME: Final[str] = PLANNED_RUN.output_dir_name
-"""Under `data/studies/`, the folder the planned run writes to."""
+OUTPUT_DIR: Final[Path] = PLANNED_RUN.output_dir
+"""The folder the planned run writes to."""
 
 RUN_HOUR: Final[int] = PLANNED_RUN.run_hour
 """The UTC hour of the run every lead day reads: 03 UTC, readable before 09:00 UTC."""
@@ -1254,16 +1260,15 @@ def check_output_dir(
     Args:
         output_dir: Where the build would write.
         read_only: The folders the script reads.
-        spec: Which run is read, whose `output_dir_name` the folder must carry.
+        spec: Which run is read, whose `output_dir` is the only folder the run may write to.
 
     Raises:
-        ValueError: If `output_dir` is a folder the script reads, or is not named
-            `spec.output_dir_name`.
+        ValueError: If `output_dir` is a folder the script reads, or is not `spec.output_dir`.
     """
     if output_dir.resolve() in {folder.resolve() for folder in read_only} or (
-        output_dir.name != spec.output_dir_name
+        output_dir.resolve() != spec.output_dir.resolve()
     ):
-        msg = f"this run writes only to a folder named {spec.output_dir_name}, not {output_dir}"
+        msg = f"this run writes only to {spec.output_dir}, not {output_dir}"
         raise ValueError(msg)
 
 
@@ -1275,11 +1280,10 @@ def parse_days(*, text: str) -> date:
 def main() -> int:
     """Build the UKV-CEDA inputs, or time one month without writing (`--dry-run`)."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    studies_dir = REPO_DATA_DIR / "studies"
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--published-dir", type=Path, default=studies_dir / PUBLISHED_DIR_NAME)
-    parser.add_argument("--day4-dir", type=Path, default=studies_dir / DAY4_DIR_NAME)
-    parser.add_argument("--store-dir", type=Path, default=studies_dir / "weather" / STORE_DIR_NAME)
+    parser.add_argument("--published-dir", type=Path, default=PUBLISHED_DIR)
+    parser.add_argument("--day4-dir", type=Path, default=DAY4_DIR)
+    parser.add_argument("--store-dir", type=Path, default=STORE_DIR)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument(
         "--older-run",
@@ -1297,7 +1301,7 @@ def main() -> int:
     parser.add_argument("--dry-run-month", default="2026-03", help="The month `--dry-run` builds.")
     args = parser.parse_args()
     spec = OLDER_RUN if args.older_run else PLANNED_RUN
-    output_dir = args.output_dir or studies_dir / spec.output_dir_name
+    output_dir = args.output_dir or spec.output_dir
     check_output_dir(
         output_dir=output_dir,
         read_only=[args.published_dir, args.day4_dir, args.store_dir],

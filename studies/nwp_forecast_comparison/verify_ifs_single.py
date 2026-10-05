@@ -43,10 +43,8 @@ from typing import Final, NamedTuple
 import polars as pl
 from build_forecast_inputs import (
     IFS_SINGLE_DAYS,
-    IFS_SINGLE_DIR_NAME,
     IFS_SINGLE_FILE_NAME,
     KMH_TO_MS,
-    _repo_data_dir,
     ifs_single_arm,
 )
 from studies.ifs_single_runs import (
@@ -56,6 +54,7 @@ from studies.ifs_single_runs import (
     served_init_time,
     served_lead_hours,
 )
+from studies.sources import ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR
 
 from studies import ens_members
 
@@ -598,9 +597,7 @@ def main() -> int:
     parser.add_argument("--built-dir", type=Path, default=None)
     parser.add_argument("--ifs-single-dir", type=Path, default=None)
     args = parser.parse_args()
-    directory = (
-        args.ifs_single_dir or _repo_data_dir() / "studies" / "weather" / IFS_SINGLE_DIR_NAME
-    )
+    directory = args.ifs_single_dir or ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR
     archive_path = directory / IFS_SINGLE_FILE_NAME
     verification = args.output_dir / "verification"
     verification.mkdir(parents=True, exist_ok=True)

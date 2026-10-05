@@ -61,7 +61,7 @@ import pyarrow.parquet as pq
 import xarray as xr
 from delta_store.precision import round_to_significand_bits
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR
+from studies.sources import product_dir_for
 from studies.trial_area import load_trial_area_box
 
 VARIABLES: Final[tuple[str, ...]] = (
@@ -558,7 +558,7 @@ def main() -> int:
         if is_window
         else product_name
     )
-    output_dir = WEATHER_DOWNLOADS_DIR / directory_name
+    output_dir = product_dir_for(product=directory_name)
     month_cache_dir = output_dir / "_month_cache"
     month_cache_dir.mkdir(parents=True, exist_ok=True)
     _write_grid_cells(dataset=cropped, path=output_dir / "_grid_cells.parquet")

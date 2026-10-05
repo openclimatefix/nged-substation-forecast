@@ -26,7 +26,6 @@ from pilot_common import (
     STEPS_HOURS,
     VARIABLE_MESSAGE,
     RequestStats,
-    data_dir,
     fetch_idx,
     file_url,
     get_bytes,
@@ -41,6 +40,7 @@ from studies.deaccumulation import (
 )
 from studies.ens_grib_source import IdxEntry, find_gaps, prefix_range_header
 from studies.grib1_simple import decode_values, parse_header, unpack_rows
+from studies.sources import ENS_BACKFILL_PILOT_DIR, REPO_DATA_DIR
 
 try:
     # Not a workspace dependency: run with `uv run --with eccodes`.
@@ -87,7 +87,7 @@ def load_dates() -> dict[date, dict[str, np.ndarray]]:
         "longitudes_degrees_east",
     ]
     loaded = {}
-    for path in sorted((data_dir() / "control").glob("*.npz")):
+    for path in sorted((ENS_BACKFILL_PILOT_DIR / "control").glob("*.npz")):
         with np.load(path) as archive:
             loaded[date.fromisoformat(path.stem)] = {key: archive[key] for key in keys}
     return loaded
@@ -400,7 +400,7 @@ def section_grid(*, dates: dict[date, dict[str, np.ndarray]]) -> None:
     """Section (f): compare the fetched rows and columns with the pipeline's grid cells."""
     emit("## (f) Grid registration")
     emit()
-    weights = pl.read_parquet(data_dir().parents[1] / "h3_grid_weights.parquet")
+    weights = pl.read_parquet(REPO_DATA_DIR / "h3_grid_weights.parquet")
     latitudes = weights["nwp_lat"].unique().to_numpy().astype(np.float64)
     longitudes_east = np.mod(weights["nwp_lon"].unique().to_numpy().astype(np.float64), 360)
     fetched_latitudes = next(iter(dates.values()))["latitudes"]
@@ -483,7 +483,7 @@ def main() -> int:
     section_validation(dates=dates)
     emit("## (h) Totals")
     emit()
-    files = sorted((data_dir() / "control").glob("*.npz"))
+    files = sorted((ENS_BACKFILL_PILOT_DIR / "control").glob("*.npz"))
     emit(
         f"Checkpoint files: {len(files)}, "
         f"{sum(f.stat().st_size for f in files) / 1e6:.1f} MB on disk."

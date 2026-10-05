@@ -39,12 +39,12 @@ from studies.era5_grid import (
     suffixed,
 )
 from studies.pv_dataset import pv_sites
-from studies.sources import WEATHER_DATA_DIR
+from studies.sources import CAMS_PRODUCT_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_cams")
 
-CAMS_DIR: Final[Path] = WEATHER_DATA_DIR / "CAMS"
+CAMS_DIR: Final[Path] = CAMS_PRODUCT_DIR
 OUTPUT_PATH: Final[Path] = suffixed(CAMS_DIR / "beam_diffuse_cams.parquet")
 
 ADS_URL: Final[str] = "https://ads.atmosphere.copernicus.eu/api"

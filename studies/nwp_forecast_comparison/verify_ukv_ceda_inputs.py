@@ -70,7 +70,6 @@ from nwp_forecast_comparison import DomainType
 from studies.grid_sampling import nearest_cells
 from studies.ifs_single_runs import served_lead_hours
 from studies.solar import zenith
-from studies.sources import REPO_DATA_DIR
 from studies.timestamp_checks import best_offset_minutes, correlation_by_offset
 
 SAMPLE_PER_STRATUM: Final[int] = 6
@@ -891,15 +890,10 @@ def verify(
 
 def main() -> int:
     """Verify the built inputs and return 0 if every gating check passes."""
-    studies_dir = REPO_DATA_DIR / "studies"
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--published-dir", type=Path, default=studies_dir / build.PUBLISHED_DIR_NAME
-    )
-    parser.add_argument("--day4-dir", type=Path, default=studies_dir / build.DAY4_DIR_NAME)
-    parser.add_argument(
-        "--store-dir", type=Path, default=studies_dir / "weather" / build.STORE_DIR_NAME
-    )
+    parser.add_argument("--published-dir", type=Path, default=build.PUBLISHED_DIR)
+    parser.add_argument("--day4-dir", type=Path, default=build.DAY4_DIR)
+    parser.add_argument("--store-dir", type=Path, default=build.STORE_DIR)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument(
         "--older-run",
@@ -912,9 +906,9 @@ def main() -> int:
         published_dir=args.published_dir,
         day4_dir=args.day4_dir,
         store_dir=args.store_dir,
-        output_dir=args.output_dir or studies_dir / spec.output_dir_name,
+        output_dir=args.output_dir or spec.output_dir,
         spec=spec,
-        planned_dir=studies_dir / build.PLANNED_RUN.output_dir_name,
+        planned_dir=build.PLANNED_RUN.output_dir,
     )
     return 0 if ok else 1
 

@@ -22,11 +22,11 @@ import polars as pl
 import xarray as xr
 from fetch_cerra import HEIGHT_LEVELS_DATASET, _build_request, download_one_chunk
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR
+from studies.sources import CERRA_PRODUCT_DIR, SCRATCH_DIR
 
-OUTPUT_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR / "CERRA"
+OUTPUT_DIR: Final[Path] = CERRA_PRODUCT_DIR
 OUTPUT_PATH: Final[Path] = OUTPUT_DIR / "cerra_grid.parquet"
-SCRATCH_PATH: Final[Path] = WEATHER_DOWNLOADS_DIR.parent.parent / "_scratch" / "cerra" / "grid.nc"
+SCRATCH_PATH: Final[Path] = SCRATCH_DIR / "cerra" / "grid.nc"
 GRID_DATE: Final[str] = "2020-01-01"
 """Any served date works, because the grid is fixed; one day at 00:00 is the smallest request."""
 

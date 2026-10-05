@@ -367,7 +367,15 @@ Equal to `STUDIES_DATA_DIR` until the data moves. No script reads this constant 
 PER_STUDY_DIR: Final[Path] = STUDIES_DATA_DIR
 """The layer of `data/studies/` that holds one folder per study.
 
-Equal to `STUDIES_DATA_DIR` until the data moves. No script reads this constant yet.
+Equal to `STUDIES_DATA_DIR` until the data moves. Every study's folder below is built from this
+constant.
+"""
+
+SCRATCH_DIR: Final[Path] = REPO_DATA_DIR / "_scratch"
+"""Where a whole-domain download or an archive extraction lands transiently, and is then deleted.
+
+Under `data/`, not `/tmp`: `/tmp` on this machine is tmpfs, and a multi-gigabyte file there
+consumes memory rather than disk. The CERRA fetches and the ERA5 archive reader use this folder.
 """
 
 WEATHER_DATA_DIR: Final[Path] = STUDIES_DATA_DIR / "weather"
@@ -379,14 +387,256 @@ Kept apart from any one study's outputs because a download is an input a later s
 some take most of a night to fetch again.
 """
 
+TRIAL_AREA_BOX_PATH: Final[Path] = WEATHER_DATA_DIR / "_trial_area_box.json"
+"""Where the trial-area box's bounds are kept.
+
+**This file is never read by anything outside this process's private working state, and its
+contents must never be logged, printed, committed, or quoted back in a report.** The bounds are
+derived from the private generator roster (`packages/contracts` `TimeSeriesMetadata`), and NGED's
+generator locations must never appear in anything published — see CLAUDE.md.
+"""
+
 ANM_DATA_DIR: Final[Path] = STUDIES_DATA_DIR / "anm"
 """Where NGED's active network management setpoint exports are filed, one CSV per `time_series_id`,
 beside the export-cap parquet `anm_setpoints.py` derives from each.
 """
 
-STUDY_DATA_DIR: Final[Path] = STUDIES_DATA_DIR / "beam_diffuse_split"
+
+def product_dir_for(*, product: str) -> Path:
+    """Return the folder of a weather product whose name is only known at run time.
+
+    A script that names one product writes a constant below. A script that loops over products, or
+    takes the product's name from a registry or the command line, calls this function, so the
+    layout of the weather folders is spelled out in this module alone.
+
+    Args:
+        product: The product's folder name, such as `ICON-D2` or `ECMWF-IFS-025`.
+
+    Returns:
+        The product's folder.
+    """
+    return WEATHER_DATA_DIR / product
+
+
+def previous_runs_product_dir_for(*, product: str) -> Path:
+    """Return the folder of an Open-Meteo Previous Runs product, given the product's folder name.
+
+    Args:
+        product: The product's folder name, such as `ICON-D2` or `ECMWF-IFS-025`.
+
+    Returns:
+        The product's folder, which holds its `previous_runs/` download.
+    """
+    return product_dir_for(product=product)
+
+
+ERA5_PRODUCT_DIR: Final[Path] = product_dir_for(product="ERA5")
+"""ERA5, fetched from Open-Meteo's mirror and from the Copernicus Climate Data Store."""
+
+ERA5_WIND_2019_2023_PRODUCT_DIR: Final[Path] = product_dir_for(product="ERA5-WIND-2019-2023")
+"""ERA5 native-level wind for 2019 to 2023."""
+
+CAMS_PRODUCT_DIR: Final[Path] = product_dir_for(product="CAMS")
+"""The CAMS radiation service's satellite retrieval."""
+
+ENS_PRODUCT_DIR: Final[Path] = product_dir_for(product="ENS")
+"""The per-site extract of ECMWF's ensemble."""
+
+CERRA_PRODUCT_DIR: Final[Path] = product_dir_for(product="CERRA")
+"""The CERRA regional reanalysis."""
+
+NORA3_PRODUCT_DIR: Final[Path] = product_dir_for(product="NORA3")
+"""The NORA3 reanalysis, wind at several heights."""
+
+NORA3_10M_PRODUCT_DIR: Final[Path] = product_dir_for(product="NORA3_10m")
+"""The NORA3 reanalysis, 10 m wind."""
+
+ICON_DREAM_EU_PRODUCT_DIR: Final[Path] = product_dir_for(product="ICON-DREAM-EU")
+"""The ICON-DREAM-EU reanalysis."""
+
+MIDAS_OPEN_PRODUCT_DIR: Final[Path] = product_dir_for(product="MIDAS-OPEN")
+"""The Met Office's MIDAS Open station observations."""
+
+SARAH_3_PRODUCT_DIR: Final[Path] = product_dir_for(product="SARAH-3")
+"""The SARAH-3 satellite retrieval."""
+
+ECMWF_IFS_HRES_PRODUCT_DIR: Final[Path] = product_dir_for(product="ECMWF-IFS-HRES")
+"""Open-Meteo's historical-forecast archive of ECMWF's high-resolution forecast."""
+
+ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR: Final[Path] = product_dir_for(product="ECMWF-IFS-SINGLE-RUNS")
+"""Open-Meteo's Single Runs archive of ECMWF's high-resolution forecast."""
+
+ECMWF_AIFS_PRODUCT_DIR: Final[Path] = product_dir_for(product="ECMWF-AIFS")
+"""ECMWF's AIFS Single forecast."""
+
+ECMWF_AIFS_ENS_PRODUCT_DIR: Final[Path] = product_dir_for(product="ECMWF-AIFS-ENS")
+"""ECMWF's AIFS ensemble forecast."""
+
+GEFS_WINDOW_DIR: Final[Path] = product_dir_for(product="GEFS_window_2024-11-01_None")
+"""The finished GEFS download, with its `_month_cache/`."""
+
+GFS_PRODUCT_DIR: Final[Path] = product_dir_for(product="GFS")
+"""The native GFS store from Dynamical.org."""
+
+GFS_WINDOW_DIR: Final[Path] = product_dir_for(product="GFS_window_2025-07-01_2025-07-02")
+"""Open-Meteo's GFS Previous Runs archive over a two-day window."""
+
+WEATHERNEXT3_PRODUCT_DIR: Final[Path] = product_dir_for(product="WeatherNext3_trial_area")
+"""The local copy of WeatherNext 3 over the trial area."""
+
+UKV_CEDA_T120_PRODUCT_DIR: Final[Path] = product_dir_for(product="UKV-CEDA-T120")
+"""The Met Office's UKV archive on CEDA, run-time 120 forecasts."""
+
+OPEN_METEO_ENSEMBLE_MEANS_PRODUCT_DIR: Final[Path] = product_dir_for(
+    product="OPEN-METEO-ENSEMBLE-MEANS"
+)
+"""Open-Meteo's ensemble-mean downloads."""
+
+
+def study_dir_for(*, study: str) -> Path:
+    """Return a study's folder, given the study's name.
+
+    Args:
+        study: The study's folder name, such as `ens_forecast_horizons`.
+
+    Returns:
+        The study's folder.
+    """
+    return PER_STUDY_DIR / study
+
+
+STUDY_DATA_DIR: Final[Path] = study_dir_for(study="beam_diffuse_split")
 """Where everything this study builds from its inputs lives: the joined datasets, each arm's
 results, and the figures.
+"""
+
+ENS_FORECAST_HORIZONS_DIR: Final[Path] = study_dir_for(study="ens_forecast_horizons")
+"""The ENS forecast-horizons study's inputs and results."""
+
+ENS_FORECAST_HORIZONS_DAY4_DIR: Final[Path] = study_dir_for(study="ens_forecast_horizons_day4")
+"""The day-4 supplement to the ENS member extract."""
+
+OPEN_METEO_ENSEMBLE_MEANS_DIR: Final[Path] = study_dir_for(study="open_meteo_ensemble_means")
+"""The Open-Meteo ensemble-means study."""
+
+OPEN_METEO_ENS_GAP_DIR: Final[Path] = study_dir_for(study="open_meteo_ens_gap")
+"""The study of the gap between a local ensemble and ENS."""
+
+ICON_EU_COMPARE_DIR: Final[Path] = study_dir_for(study="icon_eu_compare")
+"""The ICON-EU comparison between Dynamical.org and Open-Meteo."""
+
+ERA5_WIND_COMPARE_DIR: Final[Path] = study_dir_for(study="era5_wind_compare")
+"""The ERA5 wind comparison between Open-Meteo and the Climate Data Store."""
+
+ENS_BACKFILL_PILOT_DIR: Final[Path] = study_dir_for(study="ens_backfill_pilot")
+"""The ENS backfill pilot's checkpoint files."""
+
+CERRA_WIND_LEVELS_DIR: Final[Path] = study_dir_for(study="cerra_wind_levels")
+"""The CERRA wind-levels study."""
+
+CERRA_WIND_LEVELS_POST_HOC_DIR: Final[Path] = study_dir_for(study="cerra_wind_levels_post_hoc")
+"""The CERRA wind-levels study's post-hoc shear analysis."""
+
+CERRA_WIND_LEVELS_SHEAR_DIR: Final[Path] = study_dir_for(study="cerra_wind_levels_shear")
+"""An earlier output of the CERRA wind-shear analysis."""
+
+CERRA_WIND_DIRECTION_DIR: Final[Path] = study_dir_for(study="cerra_wind_direction")
+"""The CERRA wind-direction study."""
+
+UKV_CEDA_BLENDS_DIR: Final[Path] = study_dir_for(study="ukv_ceda_blends")
+"""The planned run of the UKV-on-CEDA blends study."""
+
+UKV_CEDA_BLENDS_RUN15_DIR: Final[Path] = study_dir_for(study="ukv_ceda_blends_run15")
+"""The UKV-on-CEDA blends study's run on the 15 UTC cycle."""
+
+NFC_DIR: Final[Path] = study_dir_for(study="nwp_forecast_comparison")
+"""The NWP forecast comparison's original batch, which holds the published fit."""
+
+
+def nfc_batch_dir_for(*, batch: str) -> Path:
+    """Return the folder of one batch of the NWP forecast comparison.
+
+    Args:
+        batch: The batch's name without its study prefix, such as `aifs_blends`.
+
+    Returns:
+        The batch's folder.
+    """
+    return study_dir_for(study=f"nwp_forecast_comparison_{batch}")
+
+
+def per_study_relative(*, folder: Path) -> Path:
+    """Return a study folder's path relative to `PER_STUDY_DIR`.
+
+    A script that takes the per-study folder as a command-line argument joins this path onto the
+    argument, so the script's tests can point the argument at a temporary directory.
+
+    Args:
+        folder: A folder under `PER_STUDY_DIR`, such as `NFC_AIFS_BLENDS_DIR`.
+
+    Returns:
+        The folder's path below `PER_STUDY_DIR`.
+    """
+    return folder.relative_to(PER_STUDY_DIR)
+
+
+# One folder per batch of the NWP forecast comparison, each holding that batch's inputs and
+# fits. The `NFC_` prefix abbreviates `nwp_forecast_comparison`, and a batch's name is the folder's
+# name without that prefix. Some batches have no reader of their own: `NFC_BATCH_DIRS` lists them
+# all, for the data moves that rename every batch folder.
+NFC_AIFS_DIR: Final[Path] = nfc_batch_dir_for(batch="aifs")
+NFC_AIFS_BLENDS_DIR: Final[Path] = nfc_batch_dir_for(batch="aifs_blends")
+NFC_AIFS_EXTRA_DAYS_DIR: Final[Path] = nfc_batch_dir_for(batch="aifs_extra_days")
+NFC_DAY4_SHARED_DIR: Final[Path] = nfc_batch_dir_for(batch="day4_shared")
+NFC_DAY5_AIFS_WN3_DIR: Final[Path] = nfc_batch_dir_for(batch="day5_aifs_wn3")
+NFC_LEADERBOARD_BY_DAY_DIR: Final[Path] = nfc_batch_dir_for(batch="leaderboard_by_day")
+NFC_LEADERBOARD_BY_DAY_FIG3_DIR: Final[Path] = nfc_batch_dir_for(batch="leaderboard_by_day_fig3")
+NFC_LEADS_DIR: Final[Path] = nfc_batch_dir_for(batch="leads")
+NFC_LEADS_DAY10_DIR: Final[Path] = nfc_batch_dir_for(batch="leads_day10")
+NFC_LEADS_DAY10B_DIR: Final[Path] = nfc_batch_dir_for(batch="leads_day10b")
+NFC_LEADS_DAY10C_DIR: Final[Path] = nfc_batch_dir_for(batch="leads_day10c")
+NFC_LEADS_DAY10D_DIR: Final[Path] = nfc_batch_dir_for(batch="leads_day10d")
+NFC_P4_SEEDS_DIR: Final[Path] = nfc_batch_dir_for(batch="p4_seeds")
+NFC_PRODUCT_BLENDS_DIR: Final[Path] = nfc_batch_dir_for(batch="product_blends")
+NFC_PRODUCT_BLENDS_REPORT_DIR: Final[Path] = nfc_batch_dir_for(batch="product_blends_report")
+NFC_VS_ENS_DOTS_DIR: Final[Path] = nfc_batch_dir_for(batch="vs_ens_dots")
+NFC_VS_ENS_DOTS_ALL_DAYS_DIR: Final[Path] = nfc_batch_dir_for(batch="vs_ens_dots_all_days")
+NFC_VS_ENS_DOTS_BLENDS_DIR: Final[Path] = nfc_batch_dir_for(batch="vs_ens_dots_blends")
+NFC_VS_ENS_DOTS_BLENDS_FINAL_DIR: Final[Path] = nfc_batch_dir_for(batch="vs_ens_dots_blends_final")
+NFC_VS_ENS_DOTS_FINAL_DIR: Final[Path] = nfc_batch_dir_for(batch="vs_ens_dots_final")
+NFC_WN3_DIR: Final[Path] = nfc_batch_dir_for(batch="wn3")
+NFC_WN3_EXTRA_DAYS_DIR: Final[Path] = nfc_batch_dir_for(batch="wn3_extra_days")
+
+NFC_BATCH_DIRS: Final[tuple[Path, ...]] = (
+    NFC_AIFS_DIR,
+    NFC_AIFS_BLENDS_DIR,
+    NFC_AIFS_EXTRA_DAYS_DIR,
+    NFC_DAY4_SHARED_DIR,
+    NFC_DAY5_AIFS_WN3_DIR,
+    NFC_LEADERBOARD_BY_DAY_DIR,
+    NFC_LEADERBOARD_BY_DAY_FIG3_DIR,
+    NFC_LEADS_DIR,
+    NFC_LEADS_DAY10_DIR,
+    NFC_LEADS_DAY10B_DIR,
+    NFC_LEADS_DAY10C_DIR,
+    NFC_LEADS_DAY10D_DIR,
+    NFC_P4_SEEDS_DIR,
+    NFC_PRODUCT_BLENDS_DIR,
+    NFC_PRODUCT_BLENDS_REPORT_DIR,
+    NFC_VS_ENS_DOTS_DIR,
+    NFC_VS_ENS_DOTS_ALL_DAYS_DIR,
+    NFC_VS_ENS_DOTS_BLENDS_DIR,
+    NFC_VS_ENS_DOTS_BLENDS_FINAL_DIR,
+    NFC_VS_ENS_DOTS_FINAL_DIR,
+    NFC_WN3_DIR,
+    NFC_WN3_EXTRA_DAYS_DIR,
+)
+"""Every batch folder of the NWP forecast comparison, apart from the original batch `NFC_DIR`."""
+
+NFC_STAMP_GLOB: Final[str] = "nwp_forecast_comparison_*/*_losses.json"
+"""Matches every earlier batch's `*_losses.json` stamp, relative to `PER_STUDY_DIR`.
+
+The stamps record the columns each fit used, which `check_arm_columns_unchanged.py` compares.
 """
 
 
@@ -434,7 +684,7 @@ def point_output_path_for(*, source: SourceType) -> Path:
     Returns:
         The parquet path holding that source's per-site fluxes.
     """
-    return WEATHER_DATA_DIR / source.upper() / f"beam_diffuse_{source}.parquet"
+    return product_dir_for(product=source.upper()) / f"beam_diffuse_{source}.parquet"
 
 
 def temperature_site_b_path_for(*, source: SourceType) -> Path:
@@ -451,7 +701,7 @@ def temperature_site_b_path_for(*, source: SourceType) -> Path:
     Returns:
         The parquet path holding that model's single-site hourly temperature.
     """
-    return WEATHER_DATA_DIR / source.upper() / "temperature_2m_site_b.parquet"
+    return product_dir_for(product=source.upper()) / "temperature_2m_site_b.parquet"
 
 
 IFS_OPEN_DATA_CUTOVER: Final[datetime] = datetime(2025, 10, 1, tzinfo=UTC)

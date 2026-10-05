@@ -58,24 +58,28 @@ import polars as pl
 import xarray as xr
 import zarr
 from build_forecast_inputs import (
-    DAY5_OUTPUT_DIR_NAME,
     DomainType,
     _ens_extra_frame,
-    _repo_data_dir,
     aifs_site_weights,
     check_columns_equal,
     ens_members,
 )
 from studies.guards import refuse_to_overwrite
 from studies.resample import interpolate_linear, wind_components
+from studies.sources import (
+    NFC_DAY5_AIFS_WN3_DIR,
+    NFC_DIR,
+    NFC_LEADS_DAY10_DIR,
+    WEATHERNEXT3_PRODUCT_DIR,
+)
 
 from studies import ens_members as ens_member_columns
 from studies import wn3_fetch as fetch
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
-WN3_DIR_NAME: Final[str] = "WeatherNext3_trial_area"
-"""Under `data/studies/weather/`, the folder of the local copy."""
+WN3_DIR_NAME: Final[str] = WEATHERNEXT3_PRODUCT_DIR.name
+"""The name of the local copy's folder."""
 
 ZARR_NAME: Final[str] = "trial_area.zarr"
 
@@ -118,8 +122,8 @@ N_LEADS: Final[int] = 360
 WN3_DAYS: Final[tuple[int, ...]] = (1, 2, 7, 14)
 """The lead days built unless `--days` names others."""
 
-LEADS_DAY10_DIR_NAME: Final[str] = "nwp_forecast_comparison_leads_day10"
-"""Under `data/studies/`, the extra-lead folder whose ENS mean at day 5 the same-rows ENS mean at
+LEADS_DAY10_DIR_NAME: Final[str] = NFC_LEADS_DAY10_DIR.name
+"""The name of the extra-lead folder whose ENS mean at day 5 the same-rows ENS mean at
 day 5 must equal."""
 
 ENS_EXTRA_DAYS: Final[tuple[int, ...]] = (4, 5, 7, 10, 14)
@@ -668,7 +672,7 @@ def build_domain(
 
     Raises:
         ValueError: If `output_dir` is `published_dir`, `days` holds 5 and `output_dir` is not
-            named `DAY5_OUTPUT_DIR_NAME`, `days` is empty or holds a day below 0, an
+            `NFC_DAY5_AIFS_WN3_DIR`, `days` is empty or holds a day below 0, an
             identity check fails, the ENS mean at day 5 differs from the extra-lead folder's, or a
             built column is null on every row.
         FileExistsError: If the output file already exists.
@@ -676,8 +680,8 @@ def build_domain(
     if output_dir.resolve() == published_dir.resolve():
         msg = f"the WN3 output must not be the published folder {published_dir}"
         raise ValueError(msg)
-    if 5 in days and output_dir.name != DAY5_OUTPUT_DIR_NAME:
-        msg = f"day 5 builds only into a folder named {DAY5_OUTPUT_DIR_NAME}, not {output_dir}"
+    if 5 in days and output_dir.resolve() != NFC_DAY5_AIFS_WN3_DIR.resolve():
+        msg = f"day 5 builds only into {NFC_DAY5_AIFS_WN3_DIR}, not {output_dir}"
         raise ValueError(msg)
     if not days or min(days) < 0:
         msg = f"days must be a non-empty tuple of days from 0, got {days}"
@@ -788,13 +792,13 @@ def main() -> int:
     parser.add_argument(
         "--weather-dir",
         type=Path,
-        default=_repo_data_dir() / "studies" / "weather",
+        default=WEATHERNEXT3_PRODUCT_DIR.parent,
         help="The folder holding (or receiving) the WeatherNext3_trial_area copy.",
     )
     parser.add_argument(
         "--published-dir",
         type=Path,
-        default=_repo_data_dir() / "studies" / "nwp_forecast_comparison",
+        default=NFC_DIR,
         help="With --build: the folder holding the published arm-input parquets.",
     )
     parser.add_argument("--output-dir", type=Path, help="With --build: the new folder to write.")

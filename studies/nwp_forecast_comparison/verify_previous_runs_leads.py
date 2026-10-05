@@ -50,7 +50,6 @@ Run it with `uv run python studies/nwp_forecast_comparison/verify_previous_runs_
 import argparse
 import json
 import logging
-import os
 import re
 import sys
 from collections.abc import Sequence
@@ -60,11 +59,11 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from contracts.settings import PROJECT_ROOT
 from studies.hourly_means import hourly_from_snapshots
 from studies.pv_dataset import (
     pv_sites,  # the private solar roster, for coordinates read at run time
 )
+from studies.sources import GFS_WINDOW_DIR, previous_runs_product_dir_for
 from studies.timestamp_checks import (
     CANDIDATE_OFFSETS_MINUTES,
     HOUR_ENDING_OFFSET_MINUTES,
@@ -88,40 +87,11 @@ PRODUCT_DIRS: Final[dict[str, str]] = {
 }
 """Every Previous Runs product this study reads, to its `data/studies/weather/<dir>/` directory."""
 
-GFS_WINDOW_DIR_NAME: Final[str] = "GFS_window_2025-07-01_2025-07-02"
-"""The raw Dynamical.org GFS whole-run extract V1 checks Open-Meteo's GFS against."""
-
 V1_OFFSETS_K: Final[tuple[int, ...]] = tuple(range(13))
 """Candidate offsets, in hours, tried on top of `24N` hours before the target hour."""
 
 V1_DAYS_N: Final[tuple[int, ...]] = (1, 2)
 """The `previous_dayN` offsets V1's gate is checked on."""
-
-
-def _repo_data_dir() -> Path:
-    """Return the shared `data/` directory, resolving a linked worktree to the main checkout.
-
-    Every worktree's `data/` would otherwise be empty: the downloads under it run to tens of
-    gigabytes and are shared by every branch. A linked worktree marks itself by making `.git` a
-    file holding `gitdir: <main>/.git/worktrees/<name>`, which names the main checkout two levels
-    up; a plain checkout has no such file and resolves to itself.
-
-    Returns:
-        The directory holding `studies/`, `NGED/` and the rest of the shared downloads.
-    """
-    root = PROJECT_ROOT
-    marker = root / ".git"
-    if marker.is_file():
-        pointer = marker.read_text().removeprefix("gitdir:").strip()
-        git_dir = Path(pointer)
-        if git_dir.parent.name == "worktrees":
-            root = git_dir.parent.parent.parent
-    return Path(os.environ.get("DATA_PATH_INTERNAL") or root / "data")
-
-
-def _weather_dir() -> Path:
-    """Return `data/studies/weather/`, where every downloaded weather product lives."""
-    return _repo_data_dir() / "studies" / "weather"
 
 
 def _floor6(moment: datetime) -> datetime:
@@ -172,7 +142,7 @@ def _dynamical_gfs_by_run() -> GridCellByRun:
         Each run's initialisation time to each grid cell id (`lat_index * 10 + lon_index`, never a
         real coordinate) to `{"wind_speed_100m_kmh": {lead: value}, "ghi_raw": {lead: value}}`.
     """
-    path = _weather_dir() / GFS_WINDOW_DIR_NAME / "GFS.parquet"
+    path = GFS_WINDOW_DIR / "GFS.parquet"
     frame = (
         pl.read_parquet(path)
         .with_columns(
@@ -315,7 +285,9 @@ def run_v1(*, output_dir: Path) -> bool:
         extract must fail the gate, not pass it vacuously).
     """
     by_run = _dynamical_gfs_by_run()
-    served = pl.read_parquet(_weather_dir() / "GFS-SEAMLESS" / "previous_runs" / "combined.parquet")
+    served = pl.read_parquet(
+        previous_runs_product_dir_for(product="GFS-SEAMLESS") / "previous_runs" / "combined.parquet"
+    )
     cells = sorted({cell for cell_map in by_run.values() for cell in cell_map})
     cell_rank = {cell: rank for rank, cell in enumerate(cells)}
 
@@ -474,7 +446,9 @@ def run_v1b(*, output_dir: Path) -> None:
         "|---|---|---|" + "---|" * len(hour_headers) + "---|---|",
     ]
     for name, dir_name in PRODUCT_DIRS.items():
-        path = _weather_dir() / dir_name / "previous_runs" / "combined.parquet"
+        path = (
+            previous_runs_product_dir_for(product=dir_name) / "previous_runs" / "combined.parquet"
+        )
         if not path.exists():
             continue
         for field, template in V1B_COLUMN_TEMPLATES.items():
@@ -622,7 +596,7 @@ def run_v3(*, output_dir: Path) -> None:
     ukv_lines: list[str] = []
     chosen: tuple[int, ...] | None = None
     for name, dir_name in PRODUCT_DIRS.items():
-        path = _weather_dir() / dir_name / "previous_runs"
+        path = previous_runs_product_dir_for(product=dir_name) / "previous_runs"
         combined_path = path / "combined.parquet"
         if not combined_path.exists():
             lines.append(f"| {name} | n/a | not measured (no combined.parquet) | n/a |")

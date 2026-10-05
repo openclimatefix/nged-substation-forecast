@@ -113,12 +113,12 @@ from studies.product_frames import SOLAR, solar_frame
 from studies.pv_dataset import add_separation_models, pv_sites
 from studies.reanalysis_wind import derive_nearest_cells
 from studies.resample import DEFAULT_DAYLIGHT_FLOOR_W_M2, clear_sky_index_resample
-from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
+from studies.sources import CERRA_PRODUCT_DIR, STUDY_DATA_DIR
 from weather_products import CONTRAST_HEADER, _contrast_line, geometry_lines
 
 _LOG: Final[logging.Logger] = logging.getLogger("cerra_past_solar")
 
-CERRA_DIR: Final[Path] = WEATHER_DATA_DIR / "CERRA"
+CERRA_DIR: Final[Path] = CERRA_PRODUCT_DIR
 GHI_PATH: Final[Path] = CERRA_DIR / "surface_solar_radiation_downwards_surface.parquet"
 BHI_PATH: Final[Path] = CERRA_DIR / (
     "time_integrated_surface_direct_short_wave_radiation_flux_surface.parquet"

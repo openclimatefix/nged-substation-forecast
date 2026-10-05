@@ -55,9 +55,9 @@ import requests
 from delta_store.nwp import NWP_SIGNIFICAND_BITS
 from delta_store.precision import round_to_significand_bits
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR
 from pydap.client import open_url  # ty: ignore[unresolved-import]
 from pyproj import Transformer
+from studies.sources import product_dir_for
 from studies.trial_area import load_trial_area_box
 
 CATALOG_URL: Final[str] = (
@@ -438,7 +438,7 @@ def main() -> int:
     heights_text = " and ".join(f"{height} m" for height in heights_set.heights_m)
     height_options = " or ".join(str(height) for height in heights_set.heights_m)
 
-    output_dir = WEATHER_DOWNLOADS_DIR / heights_set.product_dir_name
+    output_dir = product_dir_for(product=heights_set.product_dir_name)
     month_cache_dir = output_dir / "_month_cache"
     month_cache_dir.mkdir(parents=True, exist_ok=True)
     months = _months(start_month=arguments.start_month, end_month=arguments.end_month)

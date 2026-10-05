@@ -16,7 +16,7 @@ batches take one `--context-dir` for each earlier batch's folder whose arms thei
 name.
 
 The fifth batch fits day 4 of nine products on the shared rows (`FIFTH_NEW_PREFIXES`) and refits no
-reference, into the one folder `FIFTH_OUTPUT_DIR_NAME`. Like the fourth batch, it scores each arm
+reference, into the one folder `FIFTH_OUTPUT_DIR`. Like the fourth batch, it scores each arm
 without the rows where the arm's own columns are null, and computes every contrast on the rows both
 arms score.
 
@@ -63,7 +63,6 @@ from typing import Final, NamedTuple
 
 import polars as pl
 from build_forecast_inputs import (
-    DAY4_OUTPUT_DIR_NAME,
     GFS_NATIVE_DAYS,
     IFS_SINGLE_DAYS,
     PRODUCT_SLUGS,
@@ -91,6 +90,7 @@ from nwp_forecast_comparison import (
 )
 from studies.bootstrap import bootstrap_absolute
 from studies.cross_validation import DeviceType, out_of_fold_losses
+from studies.sources import NFC_DAY4_SHARED_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -433,8 +433,8 @@ FIFTH_ENSEMBLE_TITLE: Final[str] = (
 )
 """The heading of the fifth batch's contrasts against ENS."""
 
-FIFTH_OUTPUT_DIR_NAME: Final[str] = DAY4_OUTPUT_DIR_NAME
-"""Under `data/studies/`, the only folder the fifth batch writes to."""
+FIFTH_OUTPUT_DIR: Final[Path] = NFC_DAY4_SHARED_DIR
+"""The only folder the fifth batch writes to."""
 
 ENSEMBLE_TITLE: Final[str] = (
     "Other products against ENS at the same day (Previous Runs day-0 rows mix "
@@ -562,8 +562,8 @@ class ArmBatch(NamedTuple):
     """The arm whose gap rows the row-set diagnostic drops, where `drop_gap_rows` is set."""
     row_set_reference_arm: str = "ens_mean_day1"
     """The gap-free arm the row-set diagnostic scores on all rows and without the gap rows."""
-    output_dir_name: str | None = None
-    """The one folder name the batch may write to, or `None` for any folder but the published."""
+    output_dir: Path | None = None
+    """The one folder the batch may write to, or `None` for any folder but the published."""
 
 
 BATCHES: Final[dict[ExtraBatchType, ArmBatch]] = {
@@ -625,7 +625,7 @@ BATCHES: Final[dict[ExtraBatchType, ArmBatch]] = {
         drop_gap_rows=True,
         row_set_gap_arm="ifs_single_day4",
         row_set_reference_arm="ens_mean_day4",
-        output_dir_name=FIFTH_OUTPUT_DIR_NAME,
+        output_dir=FIFTH_OUTPUT_DIR,
     ),
 }
 """The five fit batches, by the name `--batch` takes."""
@@ -1310,7 +1310,7 @@ def check_context_arms(
         raise ValueError(msg)
 
 
-def check_output_dir_name(*, output_dir: Path, batch: ArmBatch) -> None:
+def check_output_dir(*, output_dir: Path, batch: ArmBatch) -> None:
     """Raise unless `output_dir` is the one folder the batch may write to, where it names one.
 
     Args:
@@ -1318,11 +1318,11 @@ def check_output_dir_name(*, output_dir: Path, batch: ArmBatch) -> None:
         batch: The batch being fitted.
 
     Raises:
-        ValueError: If the batch names a folder and `output_dir` has another name, which would
+        ValueError: If the batch names a folder and `output_dir` is another folder, which would
             write the batch's outputs into a folder that holds an earlier fit.
     """
-    if batch.output_dir_name is not None and output_dir.name != batch.output_dir_name:
-        msg = f"this batch writes only to a folder named {batch.output_dir_name}, not {output_dir}"
+    if batch.output_dir is not None and output_dir.resolve() != batch.output_dir.resolve():
+        msg = f"this batch writes only to {batch.output_dir}, not {output_dir}"
         raise ValueError(msg)
 
 
@@ -1403,7 +1403,7 @@ def main() -> int:
     if args.output_dir.resolve() == args.published_dir.resolve():
         msg = "the output folder must not be the published folder"
         raise ValueError(msg)
-    check_output_dir_name(output_dir=args.output_dir, batch=batch)
+    check_output_dir(output_dir=args.output_dir, batch=batch)
     check_context_dirs(args=args, batch=batch)
     if args.check:
         for domain in DOMAINS:

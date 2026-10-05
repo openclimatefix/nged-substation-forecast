@@ -28,7 +28,6 @@ def test_the_box_written_from_a_roster_is_widened_by_the_margin_and_read_back(
 ):
     metadata_path = tmp_path / "metadata.parquet"
     pl.DataFrame({"latitude": [52.0, 52.5], "longitude": [-1.0, -0.5]}).write_parquet(metadata_path)
-    monkeypatch.setattr(trial_area, "WEATHER_DATA_DIR", tmp_path / "weather")
     monkeypatch.setattr(trial_area, "TRIAL_AREA_BOX_PATH", tmp_path / "weather" / "box.json")
     monkeypatch.setattr(
         "contracts.settings.get_settings", lambda: SimpleNamespace(metadata_path=metadata_path)

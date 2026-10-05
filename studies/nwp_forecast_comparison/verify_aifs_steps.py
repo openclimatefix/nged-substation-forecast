@@ -68,7 +68,7 @@ from build_forecast_inputs import (
 )
 from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import nearest_era5_cell, pv_sites, read_era5
-from studies.sources import WEATHER_DATA_DIR
+from studies.sources import ECMWF_AIFS_PRODUCT_DIR, ERA5_PRODUCT_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -122,7 +122,7 @@ def era5_column(*, domain: DomainType, sites: list[str]) -> pl.DataFrame:
     """
     if domain == "wind":
         return (
-            pl.read_parquet(WEATHER_DATA_DIR / "ERA5" / "wind_era5.parquet")
+            pl.read_parquet(ERA5_PRODUCT_DIR / "wind_era5.parquet")
             .filter(pl.col("site").is_in(sites))
             .select("site", "time", era5=pl.col("wind_speed_100m") / KM_PER_HOUR_PER_M_PER_S)
             .drop_nulls()
@@ -733,7 +733,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--published-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--weather-dir", type=Path, default=WEATHER_DATA_DIR)
+    parser.add_argument("--weather-dir", type=Path, default=ECMWF_AIFS_PRODUCT_DIR.parent)
     parser.add_argument(
         "--wiring", action="store_true", help="Run the checks that follow the build."
     )

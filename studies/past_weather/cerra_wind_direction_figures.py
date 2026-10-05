@@ -34,11 +34,11 @@ import polars as pl
 from cerra_wind_levels import PRIMARY_SETTING, SENSITIVITY_SETTING
 from studies.charts import PLOT_WIDTH_PX, axis_title_with_direction, figure, interval_panel, wrapped
 from studies.guards import refuse_to_overwrite
-from studies.sources import STUDIES_DATA_DIR
+from studies.sources import CERRA_WIND_DIRECTION_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
-OUTPUT_DIR: Final[Path] = STUDIES_DATA_DIR / "cerra_wind_direction"
+OUTPUT_DIR: Final[Path] = CERRA_WIND_DIRECTION_DIR
 """Where `cerra_wind_direction.py` wrote the intervals and the report."""
 
 ASSETS_DIR: Final[Path] = Path(__file__).resolve().parents[2] / "docs" / "studies" / "assets"

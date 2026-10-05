@@ -6,7 +6,7 @@ import pytest
 from build_forecast_inputs import EXTRA_LEAD_BUILDS, ExtraBatchType, extra_ens_ways
 from fit_extra_leads import (
     BATCHES,
-    FIFTH_OUTPUT_DIR_NAME,
+    FIFTH_OUTPUT_DIR,
     NEW_PREFIXES,
     REFERENCE_PREFIXES,
     ROW_SET_REFERENCE_ARM,
@@ -15,7 +15,7 @@ from fit_extra_leads import (
     arm_rows,
     batch_prefixes,
     check_context_arms,
-    check_output_dir_name,
+    check_output_dir,
     check_saved_losses_hold_arms,
     contrast_arms,
     domain_prefixes,
@@ -499,15 +499,26 @@ def test_the_fifth_batch_needs_the_second_batch_for_icon_eu_and_the_control_memb
 
 
 def test_the_fifth_batch_writes_only_to_its_own_folder(tmp_path: Path) -> None:
-    batch = BATCHES["fifth"]
+    assert BATCHES["fifth"].output_dir == FIFTH_OUTPUT_DIR
+    check_output_dir(output_dir=FIFTH_OUTPUT_DIR, batch=BATCHES["fifth"])
+    own = tmp_path / "own"
+    batch = BATCHES["fifth"]._replace(output_dir=own)
 
-    check_output_dir_name(output_dir=tmp_path / FIFTH_OUTPUT_DIR_NAME, batch=batch)
-    with pytest.raises(ValueError, match=FIFTH_OUTPUT_DIR_NAME):
-        check_output_dir_name(
-            output_dir=tmp_path / "nwp_forecast_comparison_leads_day10", batch=batch
-        )
+    check_output_dir(output_dir=own, batch=batch)
+    with pytest.raises(ValueError, match="writes only to"):
+        check_output_dir(output_dir=tmp_path / "leads_day10", batch=batch)
     # The earlier batches name no folder, so they keep writing wherever they are told.
-    check_output_dir_name(output_dir=tmp_path / "any", batch=BATCHES["fourth"])
+    check_output_dir(output_dir=tmp_path / "any", batch=BATCHES["fourth"])
+
+
+def test_a_symbolic_link_to_the_fifth_batchs_folder_is_accepted(tmp_path: Path) -> None:
+    own = tmp_path / "real"
+    own.mkdir()
+    link = tmp_path / "old_name"
+    link.symlink_to(own, target_is_directory=True)
+    batch = BATCHES["fifth"]._replace(output_dir=own)
+
+    check_output_dir(output_dir=link, batch=batch)
 
 
 def test_the_row_set_diagnostic_names_the_fifth_batchs_own_arms():
@@ -530,9 +541,9 @@ def test_the_row_set_diagnostic_names_the_fifth_batchs_own_arms():
 def test_the_fifth_build_refuses_any_output_folder_but_its_own(tmp_path: Path) -> None:
     from build_forecast_inputs import build_extra_leads
 
-    assert FIFTH_OUTPUT_DIR_NAME == "nwp_forecast_comparison_day4_shared"
+    assert FIFTH_OUTPUT_DIR.name == "nwp_forecast_comparison_day4_shared"
     published = tmp_path / "nwp_forecast_comparison"
-    with pytest.raises(ValueError, match="nwp_forecast_comparison_day4_shared"):
+    with pytest.raises(ValueError, match="the fifth batch builds only into"):
         build_extra_leads(
             domain="solar",
             published_dir=published,
@@ -548,6 +559,9 @@ def _patch_fifth_build(*, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ens: 
 
     published = tmp_path / "nwp_forecast_comparison"
     published.mkdir()
+    monkeypatch.setattr(
+        bfi, "NFC_DAY4_SHARED_DIR", tmp_path / "nwp_forecast_comparison_day4_shared"
+    )
     keys = pl.DataFrame({"site": ["A"], "time": [datetime(2026, 3, 6, 12, tzinfo=UTC)]})
     keys.write_parquet(published / "solar_forecast_inputs.parquet")
     wn3 = tmp_path / "nwp_forecast_comparison_wn3_extra_days"
@@ -600,4 +614,27 @@ def test_the_fifth_build_writes_its_inputs_when_its_ens_mean_equals_the_wn3_fold
         batch="fifth",
     )
 
+    assert pl.read_parquet(path)["ens_mean_day4_ghi"][0] == 7.0
+
+
+def test_the_fifth_build_accepts_a_symbolic_link_to_its_own_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from build_forecast_inputs import build_extra_leads
+
+    published = _patch_fifth_build(monkeypatch=monkeypatch, tmp_path=tmp_path, ens=7.0)
+    real = tmp_path / "nwp_forecast_comparison_day4_shared"
+    real.mkdir()
+    link = tmp_path / "old_name"
+    link.symlink_to(real, target_is_directory=True)
+
+    path = build_extra_leads(
+        domain="solar",
+        published_dir=published,
+        output_dir=link,
+        gefs_window_dir=None,
+        batch="fifth",
+    )
+
+    assert (real / "solar_extra_lead_inputs.parquet").exists()
     assert pl.read_parquet(path)["ens_mean_day4_ghi"][0] == 7.0

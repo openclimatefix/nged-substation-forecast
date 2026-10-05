@@ -58,7 +58,7 @@ from typing import Any, Final
 import numpy as np
 import polars as pl
 from lineage import write_lineage_note, write_readme
-from paths import REPO_DATA_DIR, WEATHER_DOWNLOADS_DIR, open_meteo_api_key
+from paths import open_meteo_api_key
 from studies.anonymise import (
     LABEL_PERMUTATION_SEED,
     SITE_LABELS,
@@ -67,6 +67,7 @@ from studies.anonymise import (
     site_labels_for,
 )
 from studies.solar import cos_zenith_hour_mean, extraterrestrial_horizontal, zenith
+from studies.sources import REPO_DATA_DIR, previous_runs_product_dir_for
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_open_meteo_previous_runs")
@@ -466,7 +467,7 @@ def _fetch_model_checkpointed(
     Args:
         model: The registry entry to fetch.
         sites: The roster (solar and wind sites combined) to request.
-        output_dir: `<WEATHER_DOWNLOADS_DIR>/<model.output_dir>/previous_runs/`.
+        output_dir: `<product folder of model.output_dir>/previous_runs/`.
 
     Returns:
         The combined frame, read back from the per-year cache rather than accumulated in memory
@@ -826,7 +827,7 @@ def main() -> int:
     _LOG.info("fetching %d models for %d sites", len(models), sites.height)
 
     for model in models:
-        output_dir = WEATHER_DOWNLOADS_DIR / model.output_dir / "previous_runs"
+        output_dir = previous_runs_product_dir_for(product=model.output_dir) / "previous_runs"
         output_dir.mkdir(parents=True, exist_ok=True)
         frame = _fetch_model_checkpointed(model=model, sites=sites, output_dir=output_dir)
         combined_path = output_dir / "combined.parquet"

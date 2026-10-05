@@ -103,6 +103,14 @@ from studies.bootstrap import (
 )
 from studies.cross_validation import DeviceType, cut_eras, out_of_fold_losses, search_fold_offsets
 from studies.guards import check_no_missing, refuse_to_overwrite
+from studies.sources import (
+    NFC_AIFS_BLENDS_DIR,
+    NFC_AIFS_DIR,
+    NFC_LEADS_DAY10_DIR,
+    NFC_LEADS_DAY10B_DIR,
+    NFC_LEADS_DAY10D_DIR,
+    NFC_P4_SEEDS_DIR,
+)
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -111,9 +119,8 @@ DOMAINS: Final[tuple[DomainType, DomainType]] = ("solar", "wind")
 DEVICE: Final[DeviceType] = "cuda"
 """The XGBoost device every fit here uses."""
 
-EXISTING_AIFS_DIR_NAME: Final[str] = "nwp_forecast_comparison_aifs"
-"""Under `data/studies/`, the folder of the day-1 and day-2 fit, which the blends fit never writes
-to."""
+EXISTING_AIFS_DIR_NAME: Final[str] = NFC_AIFS_DIR.name
+"""The name of the day-1 and day-2 fit's folder, which the blends fit never writes to."""
 
 PRIMARY: Final[str] = "primary"
 SENSITIVITY: Final[str] = "sensitivity"
@@ -1385,12 +1392,12 @@ NO_SKILL: Final[str] = "no skill to compare at day 14"
 SKILL: Final[str] = "skill to compare at day 14"
 
 EXTRA_FOLDERS: Final[dict[str, str]] = {
-    "leads_day10": "nwp_forecast_comparison_leads_day10",
-    "leads_day10b": "nwp_forecast_comparison_leads_day10b",
-    "leads_day10d": "nwp_forecast_comparison_leads_day10d",
+    "leads_day10": NFC_LEADS_DAY10_DIR.name,
+    "leads_day10b": NFC_LEADS_DAY10B_DIR.name,
+    "leads_day10d": NFC_LEADS_DAY10D_DIR.name,
 }
-"""The extra-lead folders the blends fit reads, by short name, under `data/studies/`. The fit never
-writes to them."""
+"""The names of the extra-lead folders the blends fit reads, by short name. The fit never writes to
+them."""
 
 EQUAL_TO_EXTRA: Final[dict[str, tuple[str, ...]]] = {
     "leads_day10b": ("ens_mean_day7", "ens_control_day7", "ens_control_day14"),
@@ -3532,11 +3539,11 @@ P4_BLENDS: Final[tuple[str, ...]] = ("blend_p4a", "blend_p4b")
 
 UNRESOLVED_ACROSS_SEEDS: Final[str] = "unresolved: the two shuffle seeds disagree on the guard"
 
-P4_DIR_NAME: Final[str] = "nwp_forecast_comparison_p4_seeds"
-"""Under `data/studies/`, the folder the P4 refit writes to, once."""
+P4_DIR_NAME: Final[str] = NFC_P4_SEEDS_DIR.name
+"""The name of the folder the P4 refit writes to, once."""
 
-BLENDS_DIR_NAME: Final[str] = "nwp_forecast_comparison_aifs_blends"
-"""Under `data/studies/`, the folder of the blends fit, which the P4 refit never writes to."""
+BLENDS_DIR_NAME: Final[str] = NFC_AIFS_BLENDS_DIR.name
+"""The name of the blends fit's folder, which the P4 refit never writes to."""
 
 
 def p4_arms() -> tuple[str, ...]:

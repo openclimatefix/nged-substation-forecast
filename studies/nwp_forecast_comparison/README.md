@@ -487,10 +487,12 @@ below zero at both settings.
 Each step after the first needs the step before it to have exited 0. Run `uptime` and `nvidia-smi`
 before the build and before every fit, and start only below a load average of about 24.
 
-1. `uv run python studies/nwp_forecast_comparison/check_arm_columns_unchanged.py` reads every
-   `*_losses.json` stamp under `data/studies/nwp_forecast_comparison_*` and exits 0 if each arm's
-   recorded columns still equal `fit_aifs.arm_features`. The check proves that the one branch added
-   to `nwp_forecast_comparison._wind_weather_fields` leaves every earlier arm alone.
+1. `uv run python studies/nwp_forecast_comparison/check_arm_columns_unchanged.py
+   --expected-stamps 72` reads every `*_losses.json` stamp under
+   `data/studies/nwp_forecast_comparison_*` and exits 0 if the stamp count equals
+   `--expected-stamps` and each arm's recorded columns still equal `fit_aifs.arm_features`. The
+   check proves that the one branch added to `nwp_forecast_comparison._wind_weather_fields` leaves
+   every earlier arm alone.
 2. `uv run python studies/nwp_forecast_comparison/build_ukv_ceda_inputs.py --dry-run` builds one
    month (`--dry-run-month`, default 2026-03), prints the rows lost to each cause, and writes
    nothing.

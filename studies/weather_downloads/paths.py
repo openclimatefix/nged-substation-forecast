@@ -1,21 +1,15 @@
-"""Where every download for issue #841 lands, and the command that writes the trial-area box.
+"""The Open-Meteo API key, and the command that writes the trial-area box.
 
 One-off throwaway module for the downloads in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>, which feed the two
-past-weather studies (#809) and the forecast study (#810). It takes `REPO_DATA_DIR` from
-`studies.sources`, the one place that resolves the `data/` directory, and the box itself lives in
-`studies.trial_area`. Running this file derives the box from the private roster.
+past-weather studies (#809) and the forecast study (#810). Every download folder is named in
+`studies.sources`, and the box itself lives in `studies.trial_area`. Running this file derives the
+box from the private roster.
 """
 
 import os
-from pathlib import Path
-from typing import Final
 
-from studies.sources import REPO_DATA_DIR
 from studies.trial_area import write_trial_area_box_from_roster
-
-WEATHER_DOWNLOADS_DIR: Final[Path] = REPO_DATA_DIR / "studies" / "weather"
-"""One subdirectory per product, e.g. `ECMWF-IFS-HRES`, `NORA3`, `ICON-DREAM-EU`."""
 
 
 def open_meteo_api_key() -> str | None:

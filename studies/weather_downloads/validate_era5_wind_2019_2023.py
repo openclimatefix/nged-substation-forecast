@@ -28,13 +28,15 @@ from typing import Any, Final
 
 import polars as pl
 from era5_cells import half_year_chunks
-from paths import WEATHER_DOWNLOADS_DIR
-
-PRODUCT_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR / "ERA5-WIND-2019-2023"
-OLD_WIND_PATH: Final[Path] = WEATHER_DOWNLOADS_DIR / "ERA5" / "wind_native_cds.parquet"
-MIDAS_WEATHER_PATH: Final[Path] = (
-    WEATHER_DOWNLOADS_DIR / "MIDAS-OPEN" / "uk_hourly_weather_obs.parquet"
+from studies.sources import (
+    ERA5_PRODUCT_DIR,
+    ERA5_WIND_2019_2023_PRODUCT_DIR,
+    MIDAS_OPEN_PRODUCT_DIR,
 )
+
+PRODUCT_DIR: Final[Path] = ERA5_WIND_2019_2023_PRODUCT_DIR
+OLD_WIND_PATH: Final[Path] = ERA5_PRODUCT_DIR / "wind_native_cds.parquet"
+MIDAS_WEATHER_PATH: Final[Path] = MIDAS_OPEN_PRODUCT_DIR / "uk_hourly_weather_obs.parquet"
 VALUE_COLUMNS: Final[tuple[str, ...]] = ("u10", "v10", "u100", "v100")
 FIRST_HOUR: Final[datetime] = datetime(2019, 9, 1, tzinfo=UTC)
 LAST_HOUR: Final[datetime] = datetime(2023, 12, 31, 23, tzinfo=UTC)

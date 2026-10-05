@@ -48,10 +48,12 @@ from studies.era5_grid import PUBLISHED_LAST_DATE
 from studies.power import hourly_from_half_hourly
 from studies.solar import azimuth, extraterrestrial_horizontal, zenith
 from studies.sources import (
+    CAMS_PRODUCT_DIR,
+    ERA5_PRODUCT_DIR,
     EXTRACTED_SOURCES,
     OPEN_METEO_MODELS,
     REPO_DATA_DIR,
-    WEATHER_DATA_DIR,
+    SCRATCH_DIR,
     PointTemporalType,
     SourceType,
     point_output_path_for,
@@ -59,12 +61,12 @@ from studies.sources import (
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
-ERA5_DIR: Final[Path] = WEATHER_DATA_DIR / "ERA5" / "beam_diffuse"
+ERA5_DIR: Final[Path] = ERA5_PRODUCT_DIR / "beam_diffuse"
 POWER_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "NGED" / "power_time_series.delta")
 METADATA_PATH: Final[Path] = REPO_DATA_DIR / "NGED" / "metadata.parquet"
 CAPACITY_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "effective_capacity")
-OPEN_METEO_PATH: Final[Path] = WEATHER_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet"
-CAMS_PATH: Final[Path] = WEATHER_DATA_DIR / "CAMS" / "beam_diffuse_cams.parquet"
+OPEN_METEO_PATH: Final[Path] = ERA5_PRODUCT_DIR / "beam_diffuse_open_meteo.parquet"
+CAMS_PATH: Final[Path] = CAMS_PRODUCT_DIR / "beam_diffuse_cams.parquet"
 
 
 MIN_YEARS_OF_READINGS: Final[float] = 1.0
@@ -295,7 +297,8 @@ def _read_cds_archives() -> pl.DataFrame:
         raise FileNotFoundError(msg)
     _LOG.info("reading %d ERA5 monthly archives", len(archives))
 
-    with tempfile.TemporaryDirectory(dir=REPO_DATA_DIR) as scratch:
+    SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=SCRATCH_DIR) as scratch:
         frames = [
             _read_one_era5_archive(archive=archive, scratch=Path(scratch)) for archive in archives
         ]

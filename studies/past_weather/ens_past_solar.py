@@ -120,7 +120,7 @@ from studies.resample import (
     interpolate_linear,
 )
 from studies.solar_product_frames import with_eras
-from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
+from studies.sources import ENS_PRODUCT_DIR, STUDY_DATA_DIR
 from weather_products import (
     CONTRAST_HEADER,
     METRIC,
@@ -132,7 +132,7 @@ from weather_products import (
 
 _LOG: Final[logging.Logger] = logging.getLogger("ens_past_solar")
 
-T3_PATH: Final[Path] = WEATHER_DATA_DIR / "ENS" / "beam_diffuse_ens.parquet"
+T3_PATH: Final[Path] = ENS_PRODUCT_DIR / "beam_diffuse_ens.parquet"
 """The download this section reads, filtered to `horizon == "T+3"`."""
 
 OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "past_weather_v2" / "ens_past_solar"

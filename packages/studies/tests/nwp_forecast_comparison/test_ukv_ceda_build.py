@@ -555,14 +555,26 @@ def test_the_outputs_are_written_once_with_a_stamp_naming_the_snapshot_and_every
         write()
 
 
-def test_the_build_writes_only_to_a_folder_named_for_the_study(tmp_path: Path):
+def test_the_build_writes_only_to_the_studys_folder(tmp_path: Path):
     reads = [tmp_path / "published"]
+    spec = build.PLANNED_RUN._replace(output_dir=tmp_path / "ukv_ceda_blends")
 
-    build.check_output_dir(output_dir=tmp_path / "ukv_ceda_blends", read_only=reads)
-    with pytest.raises(ValueError, match="writes only to a folder named"):
-        build.check_output_dir(output_dir=tmp_path / "elsewhere", read_only=reads)
-    with pytest.raises(ValueError, match="writes only to a folder named"):
-        build.check_output_dir(output_dir=reads[0], read_only=reads)
+    build.check_output_dir(output_dir=build.PLANNED_RUN.output_dir, read_only=reads)
+    build.check_output_dir(output_dir=tmp_path / "ukv_ceda_blends", read_only=reads, spec=spec)
+    with pytest.raises(ValueError, match="writes only to"):
+        build.check_output_dir(output_dir=tmp_path / "elsewhere", read_only=reads, spec=spec)
+    with pytest.raises(ValueError, match="writes only to"):
+        build.check_output_dir(output_dir=reads[0], read_only=reads, spec=spec)
+
+
+def test_the_build_accepts_a_symbolic_link_to_the_studys_folder(tmp_path: Path):
+    folder = tmp_path / "ukv_ceda_blends"
+    folder.mkdir()
+    link = tmp_path / "old_name"
+    link.symlink_to(folder, target_is_directory=True)
+    spec = build.PLANNED_RUN._replace(output_dir=folder)
+
+    build.check_output_dir(output_dir=link, read_only=[tmp_path / "published"], spec=spec)
 
 
 def _store_with_init_times(*, seconds: list[int]) -> build.StoreRead:
@@ -637,7 +649,7 @@ def test_the_older_run_is_built_for_lead_days_one_to_three_in_its_own_folder_and
     assert build.OLDER_RUN.run_hour == 15
     assert build.OLDER_RUN.extra_days == 1
     assert build.OLDER_RUN.column_prefix == "ukv_ceda_run15"
-    assert build.OLDER_RUN.output_dir_name != build.PLANNED_RUN.output_dir_name
+    assert build.OLDER_RUN.output_dir != build.PLANNED_RUN.output_dir
     assert build.PLANNED_RUN.lead_days == build.LEAD_DAYS == (1, 2, 3, 4)
     assert build.PLANNED_RUN.run_hour == build.RUN_HOUR == 3
 
@@ -735,16 +747,15 @@ def test_the_loss_table_of_the_older_run_has_one_row_per_older_lead_day_and_its_
 
 def test_each_run_writes_only_to_its_own_folder(tmp_path: Path):
     reads = [tmp_path / "published"]
+    planned = build.PLANNED_RUN._replace(output_dir=tmp_path / "ukv_ceda_blends")
+    older = build.OLDER_RUN._replace(output_dir=tmp_path / "ukv_ceda_blends_run15")
 
-    build.check_output_dir(
-        output_dir=tmp_path / "ukv_ceda_blends_run15", read_only=reads, spec=build.OLDER_RUN
-    )
+    build.check_output_dir(output_dir=older.output_dir, read_only=reads, spec=older)
+    build.check_output_dir(output_dir=planned.output_dir, read_only=reads, spec=planned)
     with pytest.raises(ValueError, match="ukv_ceda_blends_run15"):
-        build.check_output_dir(
-            output_dir=tmp_path / "ukv_ceda_blends", read_only=reads, spec=build.OLDER_RUN
-        )
-    with pytest.raises(ValueError, match="folder named ukv_ceda_blends,"):
-        build.check_output_dir(output_dir=tmp_path / "ukv_ceda_blends_run15", read_only=reads)
+        build.check_output_dir(output_dir=planned.output_dir, read_only=reads, spec=older)
+    with pytest.raises(ValueError, match=r"ukv_ceda_blends,"):
+        build.check_output_dir(output_dir=older.output_dir, read_only=reads, spec=planned)
 
 
 def test_the_older_run_outputs_are_written_once_under_its_own_names_and_run_hour(tmp_path: Path):

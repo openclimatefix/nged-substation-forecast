@@ -10,7 +10,7 @@ import polars as pl
 import pytest
 from fit_aifs import PRIMARY, SENSITIVITY, arm_features
 from fit_product_blends import (
-    OUTPUT_DIR_NAME,
+    OUTPUT_DIR,
     SAME_BUILD_KEYS,
     PlannedStage,
     Stage,
@@ -328,12 +328,26 @@ def test_losses_already_saved_and_refitted_are_refused_rather_than_counted_twice
     assert combine_losses(saved=saved, new=None, arms=("b",)).is_empty()
 
 
+@pytest.fixture(autouse=True)
+def output_folder_in_tmp_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point the script's one writable folder at a temporary directory; the guard compares paths."""
+    monkeypatch.setattr(fpb, "OUTPUT_DIR", tmp_path / OUTPUT_DIR.name)
+
+
+def test_a_symbolic_link_to_the_output_folder_is_accepted(tmp_path: Path):
+    (tmp_path / OUTPUT_DIR.name).mkdir()
+    link = tmp_path / "old_name"
+    link.symlink_to(tmp_path / OUTPUT_DIR.name, target_is_directory=True)
+
+    check_output_dir(output_dir=link, read_only=[])
+
+
 def test_the_output_folder_must_be_the_named_one_and_not_a_folder_the_script_reads(
     tmp_path: Path,
 ):
     reused = tmp_path / fit_aifs.BLENDS_DIR_NAME
 
-    check_output_dir(output_dir=tmp_path / OUTPUT_DIR_NAME, read_only=[reused])
+    check_output_dir(output_dir=tmp_path / OUTPUT_DIR.name, read_only=[reused])
     with pytest.raises(ValueError, match="writes only"):
         check_output_dir(output_dir=reused, read_only=[reused])
     with pytest.raises(ValueError, match="writes only"):
@@ -646,7 +660,7 @@ def test_the_run_writes_every_stage_and_the_report_and_a_resume_fits_nothing(
     stub_fit: None, few_resamples: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     reused, planned = _world(tmp_path)
-    output = tmp_path / OUTPUT_DIR_NAME
+    output = tmp_path / OUTPUT_DIR.name
 
     assert run_product_blends(planned=planned, output_dir=output, reused_dir=reused, workers=1) == 0
     first = (output / "report.md").read_text()
@@ -674,7 +688,7 @@ def test_a_resume_refuses_losses_whose_stamp_belongs_to_another_build(
     stub_fit: None, few_resamples: None, tmp_path: Path
 ):
     reused, planned = _world(tmp_path)
-    output = tmp_path / OUTPUT_DIR_NAME
+    output = tmp_path / OUTPUT_DIR.name
     run_product_blends(planned=planned, output_dir=output, reused_dir=reused, workers=1)
     (output / "report.md").unlink()
     changed = [item._replace(stamp={**item.stamp, "gpu": "other"}) for item in planned]
@@ -806,7 +820,7 @@ def _run_main(
             "--published-dir",
             str(published),
             "--output-dir",
-            str(tmp_path / OUTPUT_DIR_NAME),
+            str(tmp_path / OUTPUT_DIR.name),
             "--lookahead-cleared",
             *flags,
         ],
@@ -825,7 +839,7 @@ def test_main_dry_run_lists_the_fits_and_writes_nothing(
     assert "solar single_day1" in out
     assert "blend_ukv_day1@sensitivity" in out
     assert "(arm, site) fits in all" in out
-    assert not (tmp_path / OUTPUT_DIR_NAME).exists()
+    assert not (tmp_path / OUTPUT_DIR.name).exists()
 
 
 def test_main_fits_and_writes_the_report(
@@ -834,7 +848,7 @@ def test_main_fits_and_writes_the_report(
     _, planned = _world(tmp_path)
 
     assert _run_main(monkeypatch, tmp_path, planned) == 0
-    assert (tmp_path / OUTPUT_DIR_NAME / "report.md").exists()
+    assert (tmp_path / OUTPUT_DIR.name / "report.md").exists()
 
 
 def test_main_refuses_to_fit_without_the_lookahead_flag_or_into_another_folder(
@@ -844,7 +858,7 @@ def test_main_refuses_to_fit_without_the_lookahead_flag_or_into_another_folder(
     monkeypatch.setattr(fpb, "plan_stages", lambda **kwargs: planned)
     argv = ["x", "--published-dir", str(tmp_path / "p"), "--dry-run"]
 
-    monkeypatch.setattr(sys, "argv", [*argv, "--output-dir", str(tmp_path / OUTPUT_DIR_NAME)])
+    monkeypatch.setattr(sys, "argv", [*argv, "--output-dir", str(tmp_path / OUTPUT_DIR.name)])
     with pytest.raises(ValueError, match="lookahead"):
         fpb.main()
     monkeypatch.setattr(
@@ -878,7 +892,7 @@ def test_a_report_can_be_built_from_the_saved_losses_into_a_new_folder_without_f
     stub_fit: None, few_resamples: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     reused, planned = _world(tmp_path)
-    output = tmp_path / OUTPUT_DIR_NAME
+    output = tmp_path / OUTPUT_DIR.name
     run_product_blends(planned=planned, output_dir=output, reused_dir=reused, workers=1)
     original = (output / "report.md").read_text()
     saved_files = sorted(p.name for p in output.iterdir())

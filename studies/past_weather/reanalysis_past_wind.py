@@ -81,15 +81,20 @@ from studies.reanalysis_wind import (
     read_nora3_wind,
 )
 from studies.solar_product_frames import with_eras
-from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
+from studies.sources import (
+    CERRA_PRODUCT_DIR,
+    NORA3_10M_PRODUCT_DIR,
+    NORA3_PRODUCT_DIR,
+    STUDY_DATA_DIR,
+)
 from studies.wind_product_frames import SHARED_FEATURES, common_rows, joined, wind_columns
 from weather_products import CONTRAST_HEADER, _contrast_line
 from wind_products import geometry_lines
 
-CERRA_DIR: Final[Path] = WEATHER_DATA_DIR / "CERRA"
+CERRA_DIR: Final[Path] = CERRA_PRODUCT_DIR
 CERRA_GRID_PATH: Final[Path] = CERRA_DIR / "cerra_grid.parquet"
-NORA3_PATH: Final[Path] = WEATHER_DATA_DIR / "NORA3" / "NORA3_wind.parquet"
-NORA3_10M_PATH: Final[Path] = WEATHER_DATA_DIR / "NORA3_10m" / "NORA3_wind.parquet"
+NORA3_PATH: Final[Path] = NORA3_PRODUCT_DIR / "NORA3_wind.parquet"
+NORA3_10M_PATH: Final[Path] = NORA3_10M_PRODUCT_DIR / "NORA3_wind.parquet"
 
 MAIN_PRODUCTS: Final[tuple[str, ...]] = ("era5", "ukv", "icon_d2", "icon_eu", "icon_global")
 """The five main-study products, each refitted on this script's rows."""
