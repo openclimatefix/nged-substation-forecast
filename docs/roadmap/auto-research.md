@@ -264,16 +264,22 @@ one: the research lead is itself a Claude Code session, run interactively or thr
 Python library. For each node the research lead chooses, the research lead launches a worker in the
 worker's own git worktree to implement one idea on top of the parent node's code.
 
-**The trusted submit command trains, tests, and scores each node, and runs as the maintainer's Unix
-user in a process no agent can reach.** The research lead submits a node by calling one narrow
-command, such as `submit_node <commit>`, through a `sudo` rule, the same pattern #958 plans for
-`scripts/score_study.py`. The submit command is plain Python in this repository, tested with the
-rest of the code, and does every step the agents must not control: launching the review, building
-the scored checkout, running the leakage test, handing the predictions to the scorer, logging to
-MLflow, pushing node branches, and opening the hypothesis-store pull request. Workers never report
-their own scores. Every node is logged as an MLflow run under a `study/`-prefixed experiment name,
-so the search is visible on the leaderboard but outside every promotion path. Issue #958 plans the
-same prefix for every autonomous study.
+**The trusted submit command runs as the maintainer's Unix user in a process no agent can reach, and
+is the only process that trains and runs inference for a scored node.** The research lead submits a
+node by calling one narrow command, such as `submit_node <commit>`, through a `sudo` rule, the same
+pattern #958 plans for `scripts/score_study.py`. The submit command is plain Python in this
+repository, tested with the rest of the code, and does every step the agents must not control:
+launching the review, building the scored checkout, training the node and running inference, running
+the leakage test, handing the predictions to the scorer, logging to MLflow, pushing node branches,
+and opening the hypothesis-store pull request.
+
+**No agent trains or predicts for a scored run, and the worker's code never runs as the maintainer's
+user.** The submit command executes the worker's code as a subprocess running as the restricted
+research user, because the worker's code is untrusted. A worker may still train and score freely on
+the training window while developing an idea, but those runs never reach the leaderboard. Workers
+never report their own scores. Every node is logged as an MLflow run under a `study/`-prefixed
+experiment name, so the search is visible on the leaderboard but outside every promotion path. Issue #958
+plans the same prefix for every autonomous study.
 
 **The trusted checks do not live in a Claude Code mod.** A mod is a JavaScript or TypeScript plugin
 that runs inside a Claude Code session's process, with the session's permissions. A mod holding the
