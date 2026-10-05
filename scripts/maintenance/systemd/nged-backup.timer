@@ -1,13 +1,15 @@
-# systemd user timer: run nged-backup.service once a day at 03:20 UTC, and once at start-up if a
-# run was missed while the machine was off. 03:20 falls between the Dagster schedules: the live
-# forecasts at 00:00 and 06:00, the power ingest at 55 minutes past each hour, and the ECMWF
-# download at 10:30.
+# systemd user timer: run nged-backup.service once a day at 03:20 UTC, and 15 minutes after the
+# user's service manager starts. 03:20 falls between the Dagster schedules: the live forecasts at
+# 00:00 and 06:00, the power ingest at 55 minutes past each hour, and the ECMWF download at 10:30.
+# The start-up run replaces Persistent=true, which would run a missed backup the moment the machine
+# boots: /etc/fstab mounts the USB disk with nofail, so it may not be mounted yet, and the service's
+# mount condition would then skip that day's backup.
 [Unit]
 Description=Back up the NGED forecast workstation once a day
 
 [Timer]
 OnCalendar=*-*-* 03:20:00 UTC
-Persistent=true
+OnStartupSec=15min
 
 [Install]
 WantedBy=timers.target

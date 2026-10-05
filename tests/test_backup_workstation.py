@@ -52,7 +52,7 @@ def _make_db(path: Path) -> Path:
     return path
 
 
-def _make_sources(tmp_path: Path) -> list:
+def _make_sources(tmp_path: Path) -> list[BackupSource]:
     """Create two source directories holding one file each."""
     data = tmp_path / "data"
     (data / "power_forecasts").mkdir(parents=True)
@@ -66,7 +66,7 @@ def _make_sources(tmp_path: Path) -> list:
 
 
 def _backup(
-    tmp_path: Path, sources: list, now: datetime, secret_files: tuple[str, ...] = ()
+    tmp_path: Path, sources: list[BackupSource], now: datetime, secret_files: tuple[str, ...] = ()
 ) -> Path:
     """Back up ``sources`` and ``tmp_path / "mlflow.db"`` into ``tmp_path / "backups"``."""
     db_path = tmp_path / "mlflow.db"
@@ -358,3 +358,64 @@ def test_check_main_checkout_refuses_a_worktree(tmp_path: Path) -> None:
     backup_workstation.check_main_checkout(main)
     with pytest.raises(RuntimeError, match="is a git worktree"):
         backup_workstation.check_main_checkout(worktree)
+
+
+def test_build_candidates_marks_only_the_dagster_directories_as_sqlite(tmp_path: Path) -> None:
+    candidates = backup_workstation.build_candidates(
+        data_path_internal="/data",
+        data_path_delivery="/data",
+        local_artifacts_path="/data",
+        project_root=tmp_path,
+        dagster_home="/home/user/dagster_home",
+    )
+
+    by_name = {candidate.name: candidate for candidate in candidates}
+    assert {name for name, c in by_name.items() if c.holds_sqlite} == {
+        "dagster_history",
+        "dagster_home",
+    }
+    assert {name for name, c in by_name.items() if c.required} == {
+        "data_internal",
+        "data_delivery",
+        "local_artifacts",
+    }
+    assert by_name["dagster_history"].path == tmp_path / "dagster_history"
+    assert by_name["dagster_home"].path == Path("/home/user/dagster_home")
+
+
+def test_build_candidates_skips_dagster_home_when_unset(tmp_path: Path) -> None:
+    candidates = backup_workstation.build_candidates(
+        data_path_internal="/data",
+        data_path_delivery="/data",
+        local_artifacts_path="/data",
+        project_root=tmp_path,
+        dagster_home=None,
+    )
+
+    assert "dagster_home" not in {candidate.name for candidate in candidates}
+
+
+def test_check_separate_device_checks_every_path_not_only_the_first(tmp_path: Path) -> None:
+    # /proc is always its own filesystem, so only the second path shares the destination's disk.
+    with pytest.raises(RuntimeError, match="Is the backup disk mounted"):
+        backup_workstation.check_separate_device(
+            paths=[Path("/proc"), tmp_path], destination=tmp_path / "backups"
+        )
+
+
+def test_sqlite_source_keeps_a_directory_and_a_symlink_named_like_a_database(
+    tmp_path: Path,
+) -> None:
+    history = tmp_path / "dagster_history"
+    (history / "logs.db").mkdir(parents=True)
+    (history / "logs.db" / "run.log").write_text("log")
+    (history / "latest.db").symlink_to("logs.db")
+    sources = backup_workstation.collect_sources(
+        candidates=[BackupSource(name="dagster_history", path=history, holds_sqlite=True)]
+    )
+
+    snapshot = _backup(tmp_path, sources, _FIRST_RUN)
+
+    copy = snapshot / "dagster_history"
+    assert (copy / "logs.db" / "run.log").read_text() == "log"
+    assert (copy / "latest.db").readlink() == Path("logs.db")

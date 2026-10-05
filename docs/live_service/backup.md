@@ -19,12 +19,17 @@ systemctl --user enable --now nged-backup.timer
 ```
 
 The timer needs lingering turned on (`loginctl enable-linger`) so that it runs while nobody is
-logged in. If the machine was off at 03:20, the timer runs the backup once at the next start-up.
+logged in. The timer also runs the backup 15 minutes after each start-up, which covers a day the
+machine was off at 03:20 and gives the USB disk time to mount first.
 
 **Read each run's output in the journal.** `systemctl --user list-timers nged-backup.timer` shows
 when the backup last ran and when it runs next, and `journalctl --user -u nged-backup.service` shows
 each run's warnings. A day the disk was unplugged appears as `skipped, unmet condition check
 ConditionPathIsMountPoint=/mnt/wd_18tb`, not as a failure.
+
+**Nothing outside the journal reports a failed or skipped backup.** No alert fires, so check
+`systemctl --user list-timers nged-backup.timer` now and then: a `LAST` time more than a day old, or
+a failed run in the journal, means the backup has stopped.
 
 ## Run the backup by hand
 
@@ -92,13 +97,15 @@ by hand.
 `--delete` makes the restored directory an exact copy of the snapshot. Without `--delete`, a Delta
 commit written after the snapshot would survive the restore, and Delta would go on reading the table
 at that newer version. Set `SNAPSHOT` to the snapshot to restore from, and restore only the
-directories that need it. Every command below runs from the main checkout. For example, to restore
-the `power_forecasts` table:
+directories that need it. Every command below runs from the main checkout. Each command writes
+`${SNAPSHOT:?}` and `${DAGSTER_HOME:?}` rather than `$SNAPSHOT` and `$DAGSTER_HOME`, so that the
+shell stops with an error when a variable is unset instead of running `rsync --delete` against `/`.
+For example, to restore the `power_forecasts` table:
 
 ```bash
 cd ~/dev/nged-substation-forecast
 SNAPSHOT=/mnt/wd_18tb/nged-substation-forecast-backups/2026-10-05T183000Z
-rsync -aH --delete "$SNAPSHOT/data_internal/power_forecasts/" data/power_forecasts/
+rsync -aH --delete "${SNAPSHOT:?}/data_internal/power_forecasts/" data/power_forecasts/
 ```
 
 Never restore the whole of `data_internal/` with `--delete` unless every table needs restoring,
@@ -110,17 +117,18 @@ corrupts the restored copy:
 
 ```bash
 rm -f mlflow.db-wal mlflow.db-shm mlflow.db-journal
-cp "$SNAPSHOT/mlflow.db" mlflow.db
-rsync -aH --delete "$SNAPSHOT/mlruns/" mlruns/
+cp "${SNAPSHOT:?}/mlflow.db" mlflow.db
+rsync -aH --delete "${SNAPSHOT:?}/mlruns/" mlruns/
 ```
 
 Restore Dagster's history the same way, with `dg dev` stopped, and copy the credential files back
 from `secrets/`:
 
 ```bash
-rsync -aH --delete "$SNAPSHOT/dagster_history/" dagster_history/
-rsync -aH --delete "$SNAPSHOT/dagster_home/" "$DAGSTER_HOME/"
-rsync -a "$SNAPSHOT/secrets/" ./
+rsync -aH --delete "${SNAPSHOT:?}/dagster_history/" dagster_history/
+rsync -aH --delete "${SNAPSHOT:?}/dagster_home/" "${DAGSTER_HOME:?}/"
+cp -p "${SNAPSHOT:?}/secrets/.env" "${SNAPSHOT:?}/secrets/.google_account_for_weathernext3.json" ./
+cp -p "${SNAPSHOT:?}/secrets/packages/dashboard/.env.s3" packages/dashboard/
 ```
 
 **Restore `mlruns/` and `mlflow.db` together.** The database names each run's artifact directory, so

@@ -192,6 +192,60 @@ def collect_sources(candidates: Sequence[BackupSource]) -> list[BackupSource]:
     return sources
 
 
+def build_candidates(
+    data_path_internal: str,
+    data_path_delivery: str,
+    local_artifacts_path: str,
+    project_root: Path,
+    dagster_home: str | None,
+) -> list[BackupSource]:
+    """List every directory the backup copies, before ``collect_sources`` drops duplicates.
+
+    Args:
+        data_path_internal: ``Settings.data_path_internal``.
+        data_path_delivery: ``Settings.data_path_delivery``.
+        local_artifacts_path: ``Settings.local_artifacts_path``.
+        project_root: The repository root, which holds ``mlruns/``, ``literature/``, and
+            ``dagster_history/``.
+        dagster_home: The ``DAGSTER_HOME`` environment variable, or ``None`` if it is unset.
+
+    Returns:
+        The three required ``Settings`` roots, then the optional directories. The two Dagster
+        directories are marked as holding SQLite databases.
+    """
+    candidates = [
+        BackupSource(
+            name="data_internal",
+            path=local_path(name="data_path_internal", uri=data_path_internal),
+        ),
+        BackupSource(
+            name="data_delivery",
+            path=local_path(name="data_path_delivery", uri=data_path_delivery),
+        ),
+        BackupSource(
+            name="local_artifacts",
+            path=local_path(name="local_artifacts_path", uri=local_artifacts_path),
+        ),
+        BackupSource(name="mlruns", path=project_root / "mlruns", required=False),
+        BackupSource(name="literature", path=project_root / "literature", required=False),
+        BackupSource(
+            name="dagster_history",
+            path=project_root / "dagster_history",
+            required=False,
+            holds_sqlite=True,
+        ),
+    ]
+    if dagster_home:
+        candidates.append(
+            BackupSource(
+                name="dagster_home", path=Path(dagster_home), required=False, holds_sqlite=True
+            )
+        )
+    else:
+        _LOGGER.warning("Skipping dagster_home: DAGSTER_HOME is not set.")
+    return candidates
+
+
 def mlflow_db_path(tracking_uri: str, project_root: Path) -> Path:
     """Return the local SQLite file an MLflow ``sqlite:///`` tracking URI names.
 
@@ -335,10 +389,14 @@ def _rsync(args: Sequence[str]) -> subprocess.CompletedProcess[str]:
 
 
 def _excludes(source: BackupSource) -> list[str]:
-    """Return the ``rsync`` arguments that skip a source's SQLite files, if it holds any."""
+    """Return the ``rsync`` arguments that skip a source's SQLite files, if it holds any.
+
+    The ``--include`` comes first because ``rsync`` applies the first rule that matches: it keeps
+    a directory whose name happens to end in ``.db``, which the excludes would otherwise drop.
+    """
     if not source.holds_sqlite:
         return []
-    return [f"--exclude={pattern}" for pattern in _SQLITE_PATTERNS]
+    return ["--include=*/", *(f"--exclude={pattern}" for pattern in _SQLITE_PATTERNS)]
 
 
 def _back_up_sqlite(db_path: Path, destination: Path) -> None:
@@ -367,22 +425,26 @@ def _copy_sqlite_files(source: BackupSource, target: Path) -> None:
     """Copy every SQLite database in ``source`` into ``target`` through the backup routine.
 
     A file named like a database that SQLite cannot read is copied as a plain file with a
-    warning, so one damaged Dagster run record cannot stop the whole backup.
+    warning, so one damaged Dagster run record cannot stop the whole backup. A symlink named like
+    a database is copied as a symlink, as ``rsync -a`` copies every other symlink.
 
     Args:
         source: A source whose ``holds_sqlite`` is True.
         target: The source's directory inside the snapshot.
     """
     for db_path in sorted(source.path.rglob("*.db")):
-        if db_path.is_symlink() or not db_path.is_file():
-            continue
         copy = target / db_path.relative_to(source.path)
+        if db_path.is_symlink():
+            copy.parent.mkdir(parents=True, exist_ok=True)
+            copy.symlink_to(db_path.readlink())
+            continue
+        if not db_path.is_file():
+            continue
         copy.parent.mkdir(parents=True, exist_ok=True)
         try:
             _back_up_sqlite(db_path=db_path, destination=copy)
         except sqlite3.DatabaseError as error:
             _LOGGER.warning("Copying %s as a plain file: %s", db_path, error)
-            copy.unlink(missing_ok=True)
             shutil.copy2(db_path, copy)
 
 
@@ -395,12 +457,12 @@ def _copy_source(source: BackupSource, snapshot: Path, link_dest: Path | None) -
         link_dest: The same source's directory in the newest earlier snapshot holding it, or
             ``None`` if no earlier snapshot holds it.
     """
-    args = ["-aH", *_excludes(source)]
+    args = ["-aH", *_excludes(source=source)]
     if link_dest is not None:
         args.append(f"--link-dest={link_dest}")
     _LOGGER.info("Copying %s to %s", source.path, snapshot / source.name)
     # A trailing slash on the source copies the directory's contents, not the directory itself.
-    _rsync([*args, f"{source.path}/", f"{snapshot / source.name}/"])
+    _rsync(args=[*args, f"{source.path}/", f"{snapshot / source.name}/"])
     if source.holds_sqlite:
         _copy_sqlite_files(source=source, target=snapshot / source.name)
 
@@ -504,14 +566,14 @@ def entries_changed_since(sources: Sequence[BackupSource], snapshot: Path) -> li
     changed: list[str] = []
     for source in sources:
         process = _rsync(
-            [
-                "-aHn",
+            args=[
+                "-an",
                 # A directory's modification time changes whenever a file inside it does, so
                 # comparing it only repeats what the file lines already say.
                 "--omit-dir-times",
                 "--delete",
                 "--itemize-changes",
-                *_excludes(source),
+                *_excludes(source=source),
                 f"{source.path}/",
                 f"{snapshot / source.name}/",
             ]
@@ -534,37 +596,14 @@ def main() -> None:
 
     check_main_checkout(PROJECT_ROOT)
     settings = get_settings()
-    candidates = [
-        BackupSource(
-            name="data_internal",
-            path=local_path(name="data_path_internal", uri=settings.data_path_internal),
-        ),
-        BackupSource(
-            name="data_delivery",
-            path=local_path(name="data_path_delivery", uri=settings.data_path_delivery),
-        ),
-        BackupSource(
-            name="local_artifacts",
-            path=local_path(name="local_artifacts_path", uri=settings.local_artifacts_path),
-        ),
-        BackupSource(name="mlruns", path=PROJECT_ROOT / "mlruns", required=False),
-        BackupSource(name="literature", path=PROJECT_ROOT / "literature", required=False),
-        BackupSource(
-            name="dagster_history",
-            path=PROJECT_ROOT / "dagster_history",
-            required=False,
-            holds_sqlite=True,
-        ),
-    ]
-    if dagster_home := os.environ.get("DAGSTER_HOME"):
-        candidates.append(
-            BackupSource(
-                name="dagster_home", path=Path(dagster_home), required=False, holds_sqlite=True
-            )
-        )
-    else:
-        _LOGGER.warning("Skipping dagster_home: DAGSTER_HOME is not set.")
-    sources = collect_sources(candidates)
+    candidates = build_candidates(
+        data_path_internal=settings.data_path_internal,
+        data_path_delivery=settings.data_path_delivery,
+        local_artifacts_path=settings.local_artifacts_path,
+        project_root=PROJECT_ROOT,
+        dagster_home=os.environ.get("DAGSTER_HOME"),
+    )
+    sources = collect_sources(candidates=candidates)
 
     db_path = mlflow_db_path(tracking_uri=settings.mlflow_tracking_uri, project_root=PROJECT_ROOT)
     if not db_path.is_file():
