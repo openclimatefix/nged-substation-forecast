@@ -1,11 +1,13 @@
 # Experiments run by an LLM agent ("auto-research")
 
-> **Status: 🔬 Research.** Planned for v0.5 once the leaderboard (v0.3) is stable, but may have to
-> wait until v2. Gated on [Protect the leaderboard scorer for autonomous
-> research](https://github.com/openclimatefix/nged-substation-forecast/issues/958). The search, the
-> orchestrator, and the leaderboard query on this page are not built yet.
+> **Status: 🚧 Planned.** The infrastructure — the orchestrator, the leaderboard query, the diff
+> check, and the leakage test — is planned for v0.3, alongside the leaderboard. The experiments
+> themselves run in v0.5, alongside the rest of the [XGBoost improvements](xgboost-improvements.md).
+> Gated on [Protect the leaderboard scorer for autonomous
+> research](https://github.com/openclimatefix/nged-substation-forecast/issues/958). Neither the
+> infrastructure nor the search is built yet.
 
-**We plan to have a large language model (LLM) agent run the [XGBoost
+**We plan to have a large language model (LLM) agent run some or all of the [XGBoost
 improvements](xgboost-improvements.md) backlog as a search: implement each idea, score it, and
 combine the ideas that help.** Each idea becomes an experiment: a variant of Flexpectation's XGBoost
 forecasting model, trained and scored the same way as every other variant. The leaderboard is the
@@ -13,6 +15,15 @@ table that ranks those experiments, and the champion is the experiment currently
 production. The agent works in the style of [Karpathy's
 autoresearch](https://github.com/karpathy/autoresearch), registering and running experiments and
 reading the leaderboard with no human in the loop.
+
+**Which of the XGBoost ideas go to the agent is not yet decided.** The options are:
+
+- every idea, screened and combined by the agent;
+- some of the ideas, with the rest tested by hand in the usual way;
+- a broad-but-shallow screen of every idea by the agent, followed by a deeper, curated look at the
+  ideas the screen picks out.
+
+The design below works for all three options, because each option starts from the same screen.
 
 **An agent session is judged on whether a finding moves the leaderboard, not on whether the finding
 is publishable.** A result reaching production has to beat the champion on the honest scorer planned
@@ -107,7 +118,7 @@ about agents here, not just an analogy. Whether the proposed design should add t
 proposed design answers the question differently.** In Co-Scientist, breadth comes from generating
 many hypotheses up front, depth comes from repeated tournament rounds against the current top of the
 ranking, and the balance between breadth and depth emerges from running more rounds. The
-[proposed design](#proposed-design) below sets the balance with a screen of every idea followed by a
+[proposed design](#proposed-design) below sets the balance with a screen of the ideas followed by a
 tree search.
 
 ### Google's ERA: a tree search over code variants
@@ -229,10 +240,12 @@ already lists as optional, is enough for that limited purpose. A mod would add J
 TypeScript code that runs with the user's permissions, without adding any protection the diff check
 does not already give.
 
-**The search first screens every backlog idea once on top of the champion, then runs ERA's
+**The search first screens each idea it is given once on top of the champion, then runs ERA's
 upper-confidence-bound tree search, seeded with pairs of the ideas that passed.** Seeding the tree
 search with every pair of ideas that passed the screen follows ERA's
-[single-cell recombination study](#googles-era-a-tree-search-over-code-variants).
+[single-cell recombination study](#googles-era-a-tree-search-over-code-variants). Under the
+broad-but-shallow option, the screen is the agent's whole job, and the curated deeper look replaces
+the tree search.
 
 **Ideas are ranked on the mean score across their implementations, and an idea is implemented a
 second and third time only when its score is close to a competitor's or the idea is a finalist.**

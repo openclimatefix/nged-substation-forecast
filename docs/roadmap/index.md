@@ -147,6 +147,10 @@ AWS.*
       ([#436](https://github.com/openclimatefix/nged-substation-forecast/issues/436))
     - Score every leaderboard experiment under each scenario, against `manual_heuristic`
       ([#438](https://github.com/openclimatefix/nged-substation-forecast/issues/438))
+- **Infrastructure for experiments run by a large language model (LLM) agent** — the orchestrator,
+  the machine-readable leaderboard query, the diff check, and the leakage test, so that v0.5 can
+  run XGBoost experiments through the agent; see [Experiments run by an LLM
+  agent](auto-research.md)
 - One-command rollback for `promoted_model`
   ([#440](https://github.com/openclimatefix/nged-substation-forecast/issues/440)), plus the runbooks
   that pin down what "one command" means
@@ -216,9 +220,9 @@ quantile pipeline:
   ([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)) — deliberately
   gated on the two items above, since degrading earlier would emit output no scenario has tested
 
-**Automated experimentation ("auto-research")**: once the leaderboard (v0.3) is stable, we plan to
-have an LLM agent run the XGBoost backlog as a search. Automated experimentation may have to wait
-until v2. The work is gated on
+**Automated experimentation ("auto-research")**: an LLM agent runs some or all of the XGBoost
+backlog as a search, on infrastructure built in v0.3. Which ideas go to the agent is not yet
+decided. The work is gated on
 [#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958) landing first, because
 an autonomous session is only trustworthy once the session cannot edit or bypass the scorer the
 session is judged against. [Experiments run by an LLM agent](auto-research.md) gives the published
