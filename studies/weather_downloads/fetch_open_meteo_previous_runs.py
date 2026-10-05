@@ -133,14 +133,11 @@ POWER_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "NGED" / "power_time_series.de
 METADATA_PATH: Final[Path] = REPO_DATA_DIR / "NGED" / "metadata.parquet"
 CAPACITY_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "effective_capacity")
 MIN_YEARS_OF_READINGS: Final[float] = 1.0
-"""Matches `studies/beam_diffuse_split/build_dataset.py`'s own constants of the same name. The
-roster reader below (`_roster`/`_pv_sites`/`_wind_sites`) is a deliberate duplicate of that
-module's functions of the same name, not an import: `paths.py`'s own `_main_checkout` docstring
-records the same choice for `sources.py`, so that this directory stays self-contained the way
-every other study directory is, rather than depending on a sibling study's own internal layout.
-The anonymisation itself — the label permutation and the minimum-history filter — is not
-duplicated: both copies call the shared `studies.anonymise.site_labels_for`, so the labelling
-cannot drift between the two copies."""
+"""Match `studies.pv_dataset`'s constants of the same name. The roster reader below
+(`_roster`/`_pv_sites`/`_wind_sites`) duplicates that module's functions of the same name and omits
+the effective capacity. The anonymisation itself — the label permutation and the minimum-history
+filter — is not duplicated: both copies call the shared `studies.anonymise.site_labels_for`, so the
+labelling cannot drift between the two copies."""
 
 
 def _roster(*, time_series_type: str, labels: tuple[str, ...], seed: int) -> pl.DataFrame:

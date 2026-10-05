@@ -21,7 +21,7 @@ model fitted on the settled plant overshoots every one of these rows by construc
 
 **The cut-off is the fitted changepoint at which the site reaches its settled output, not the date
 the network scheme went live.** The two are 61 days apart and the scheme went live first, so the
-[export cap](export_cap.py) does not mark these hours. Winter has a fifth of summer's bright
+`studies.export_cap` does not mark these hours. Winter has a fifth of summer's bright
 half-hours, so the changepoint is bracketed only to somewhere between October 2024 and March 2025;
 taking the earliest date in that bracket keeps the most data, and every later date would remove
 more rows rather than fewer.

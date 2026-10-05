@@ -444,15 +444,15 @@ Open-Meteo derives it from each weather model's global irradiance with a separat
 (exploratory).** Open-Meteo's documentation says so for both products: only global irradiance is
 native, the diffuse share comes from the Razo, Müller and Witwer separation model, and the direct
 beam is the remainder (<https://open-meteo.com/en/docs/meteofrance-api>,
-<https://open-meteo.com/en/docs/knmi-api>). `sources.py`'s check agrees: the served direct fraction
-varies by only 0.018 inside a bin of similar cloud and sun height, against a threshold of 0.05 — the
-signature of a model applied to the product's own global irradiance, carrying no information beyond
-it. **DMI HARMONIE-AROME's served direct beam is not scored either, for a different reason: on
-daytime rows, it is exactly zero in 50% of them and exceeds the served global flux, which is
-physically impossible, in 6 (`product_checks.md`).** This page does not establish whether that
-defect belongs to DMI's model or to how Open-Meteo's archive serves it; `sources.py` documents the
-check, and the pattern is not a separation model's signature. All three get a global arm only.
-ECMWF-IFS-HRES's own direct beam passes both checks and is scored.
+<https://open-meteo.com/en/docs/knmi-api>). `studies.sources`'s check agrees: the served direct
+fraction varies by only 0.018 inside a bin of similar cloud and sun height, against a threshold of
+0.05 — the signature of a model applied to the product's own global irradiance, carrying no
+information beyond it. **DMI HARMONIE-AROME's served direct beam is not scored either, for a
+different reason: on daytime rows, it is exactly zero in 50% of them and exceeds the served global
+flux, which is physically impossible, in 6 (`product_checks.md`).** This page does not establish
+whether that defect belongs to DMI's model or to how Open-Meteo's archive serves it;
+`studies.sources` documents the check, and the pattern is not a separation model's signature. All
+three get a global arm only. ECMWF-IFS-HRES's own direct beam passes both checks and is scored.
 
 ### The ECMWF ENS arms
 

@@ -3,31 +3,32 @@
 One-off throwaway script for the experiment in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/784>.
 
-**A null result from a gradient-boosted tree is ambiguous, and this script removes the ambiguity.**
-The tree is shown the beam and the diffuse fluxes as two more columns and has to discover from data
-that one of them should be projected onto a tilted plane and the other should not. The physical
-model in `physics_model.py` is given that projection, so if the split carries information about a
-site's output, a model built around the projection is where the information should surface. Up to
-five free parameters per site are fitted on each training fold and scored on the held-out fold, on
-exactly the rows, folds and months `run_experiment.py` uses, so the two instruments' numbers sit
-beside each other. Arm `P_A` identifies only three of the five: with no split there is no
-transposition to do, so its tilt and azimuth never move from where the optimiser starts.
+**A null result from a gradient-boosted tree is ambiguous, and this script removes the
+ambiguity.** The tree is shown the beam and the diffuse fluxes as two more columns and has to
+discover from data that one of them should be projected onto a tilted plane and the other should
+not. The physical model in `studies.physics_model` is given that projection, so if the split
+carries information about a site's output, a model built around the projection is where the
+information should surface. Up to five free parameters per site are fitted on each training fold
+and scored on the held-out fold, on exactly the rows, folds and months `run_experiment.py` uses,
+so the two instruments' numbers sit beside each other. Arm `P_A` identifies only three of the
+five: with no split there is no transposition to do, so its tilt and azimuth never move from
+where the optimiser starts.
 
 The arms differ only in which beam and diffuse fluxes the transposition is handed. Arm `P_A` is
 handed none, and for it the plane-of-array irradiance is the global horizontal irradiance itself:
 with one number there is no transposition to do, which is the physical statement of what a site
 loses when its weather feed carries no direct beam.
 
-Arm `P_E_blended` exists to answer a different question — whether several splits together beat the
-best single one. It is given all three beam estimates at once and fits the weights of a convex
-combination, so it can reproduce any single arm and is free to do better.
+Arm `P_E_blended` exists to answer a different question — whether several splits together beat
+the best single one. It is given all three beam estimates at once and fits the weights of a
+convex combination, so it can reproduce any single arm and is free to do better.
 
 **The seed means something different here from what it means in `run_experiment.py`.** There it
 reseeds XGBoost, so the spread across seeds measures how much of a difference is fitting noise.
-Here it only moves the optimiser's random restarts, and every seed shares the fixed starting point
-that `restart_basins.py` shows reaching the lowest loss in 19 of 30 fits, so the seed-to-seed
-spread this script reports is a few parts in a million and says the seeds inherit one winning start
-rather than that the noise floor is that low. The bootstrap's seed draw
+Here it only moves the optimiser's random restarts, and every seed shares the fixed starting
+point that `restart_basins.py` shows reaching the lowest loss in 19 of 30 fits, so the
+seed-to-seed spread this script reports is a few parts in a million and says the seeds inherit
+one winning start rather than that the noise floor is that low. The bootstrap's seed draw
 likewise adds nothing to this instrument's intervals.
 
 Run it with `uv run python studies/beam_diffuse_split/run_physics_experiment.py --source cams`.
