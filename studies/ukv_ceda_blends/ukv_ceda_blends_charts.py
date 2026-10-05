@@ -6,10 +6,14 @@ One-off throwaway script for
 wrote, and writes SVG files into a new `--figures-dir`, each written once.
 
 - `<domain>_headline.svg`: one panel per lead day, with P1 (the blend minus the padded ENS arm) and
-  P2 (the blend minus each shuffled control) as dots with 95% intervals. The dot is the primary
-  hyperparameter setting and the hollow triangle is the sensitivity setting.
+  P2 (the blend minus each shuffled control) as dots with 95% intervals, at both hyperparameter
+  settings. The filled dot is the primary setting and the lighter hollow mark is the sensitivity
+  setting. The title and each panel's title state the reading that
+  `fit_ukv_ceda_blends.reading` gives from the saved intervals.
 - `<domain>_generators.svg`: P1 at the primary setting, for each generator alone, one panel per
   lead day. This figure is exploratory.
+- `<domain>_errors.svg`: each XGBoost model's own mean absolute error with its 95% interval, one
+  panel per lead day, at both settings, read from the `error` rows of `intervals.parquet`.
 - `<domain>_week<k>.svg`: measured output and the day-1 blend's out-of-fold forecast for each
   generator over one week of era `k - 1`. The week is chosen by `nwp_forecast_charts.choose_week`
   from measured output alone, and the axis counts days 1 to 7, so no figure carries a calendar date.
@@ -42,6 +46,7 @@ sys.path.insert(0, str(_STUDIES_DIR / "beam_diffuse_split"))
 sys.path.insert(0, str(_STUDIES_DIR / "weather_downloads"))
 
 import build_ukv_ceda_inputs as build  # noqa: E402
+import fit_aifs  # noqa: E402
 import fit_ukv_ceda_blends as fit  # noqa: E402
 from nwp_forecast_charts import (  # noqa: E402
     CAPACITY_NOTE,
@@ -63,7 +68,14 @@ from nwp_forecast_comparison import (  # noqa: E402
     DomainType,
 )
 from paths import REPO_DATA_DIR  # noqa: E402
-from studies.charts import CONTENT_WIDTH_PX, figure, interval_panel  # noqa: E402
+from studies.bootstrap import BootstrapInterval  # noqa: E402
+from studies.charts import (  # noqa: E402
+    ABSOLUTE_ERROR_X_TITLE,
+    CONTENT_WIDTH_PX,
+    figure,
+    interval_panel,
+    leaderboard_panel,
+)
 from studies.guards import refuse_to_overwrite  # noqa: E402
 
 DOMAINS: Final[tuple[DomainType, DomainType]] = ("solar", "wind")
@@ -73,9 +85,45 @@ FIGURE_NUMBERS: Final[dict[tuple[DomainType, str], int]] = {
     ("wind", "headline"): 2,
     ("solar", "generators"): 3,
     ("wind", "generators"): 4,
+    ("solar", "errors"): 5,
+    ("wind", "errors"): 6,
+    ("solar", "weeks"): 7,
+    ("wind", "weeks"): 8,
 }
-"""The figure's number on the page, for the headline and per-generator figures. A week figure is
-captioned with its own letter."""
+"""The figure's number on the page. A week figure is captioned with its number and a letter."""
+
+PRIMARY_LABEL: Final[str] = "Primary setting"
+SENSITIVITY_LABEL: Final[str] = "Sensitivity setting"
+SETTING_LABELS: Final[dict[str, str]] = {
+    fit.PRIMARY: PRIMARY_LABEL,
+    fit.SENSITIVITY: SENSITIVITY_LABEL,
+}
+"""Each hyperparameter setting's name in the key, by its code in `intervals.parquet`."""
+
+READING_LABELS: Final[dict[str, str]] = {
+    "lowers": "planned rule met",
+    fit.UNRESOLVED_LOWER: "unresolved (lower than padded ENS, control test not passed)",
+    fit.NO_DETECTABLE_DIFFERENCE: "no detectable difference",
+    "raises": "blend raises the error",
+}
+"""A reading's panel-title label, where the key `lowers` or `raises` stands for the verdict
+`lowers the error at day N` or `raises the error at day N`."""
+
+READING_PHRASES: Final[dict[str, str]] = {
+    "lowers": "lowered the error (planned rule met)",
+    fit.UNRESOLVED_LOWER: "lowered the error below padded ENS's but did not pass the control test",
+    fit.NO_DETECTABLE_DIFFERENCE: "made no detectable difference",
+    "raises": "raised the error",
+}
+"""A reading's phrase in a figure title."""
+
+ARM_LABELS: Final[dict[fit_aifs.BlendRoleType, str]] = {
+    "_pad": "ENS mean, padded to the same column count",
+    "": "ENS mean + UKV-CEDA",
+    "_control": "ENS mean + shuffled UKV-CEDA, seed 0",
+    "_control_b": "ENS mean + shuffled UKV-CEDA, seed 1000",
+}
+"""The error figure's row label of each arm, by its role."""
 
 P1_LABEL: Final[str] = "Blend minus padded ENS"
 P2_LABEL: Final[str] = "Blend minus shuffled UKV-CEDA"
@@ -119,6 +167,145 @@ def scope_note(*, intervals: pl.DataFrame, domain: DomainType) -> str:
     )
 
 
+def contrast_interval(
+    *,
+    intervals: pl.DataFrame,
+    domain: DomainType,
+    day: int,
+    setting: str,
+    contrast: str,
+    scope: str = "all rows",
+) -> BootstrapInterval:
+    """Return one saved interval as the `BootstrapInterval` the reading rule takes.
+
+    Args:
+        intervals: `intervals.parquet`'s rows.
+        domain: `solar` or `wind`.
+        day: The lead day.
+        setting: `primary` or `sensitivity`.
+        contrast: The contrast's code: `p1`, `p2`, or `p2b`.
+        scope: The row set the interval is of.
+
+    Returns:
+        The interval, with the fitting-seed spread, which the reading rule does not use, as zero.
+    """
+    row = intervals.filter(
+        pl.col("domain") == domain,
+        pl.col("day") == day,
+        pl.col("setting") == setting,
+        pl.col("contrast") == contrast,
+        pl.col("scope") == scope,
+    ).row(0, named=True)
+    return {
+        "difference": row["difference"],
+        "lower_95": row["lower"],
+        "upper_95": row["upper"],
+        "seed_spread": 0.0,
+        "n_rows": row["n_rows"],
+        "n_months": row["n_months"],
+    }
+
+
+def day_reading(*, intervals: pl.DataFrame, domain: DomainType, day: int) -> str:
+    """Return the reading the planned rule gives one lead day, from the saved intervals.
+
+    Args:
+        intervals: `intervals.parquet`'s rows.
+        domain: `solar` or `wind`.
+        day: The lead day.
+
+    Returns:
+        `fit_ukv_ceda_blends.reading`'s verdict.
+    """
+    settings = (fit.PRIMARY, fit.SENSITIVITY)
+
+    def of(setting: str, contrast: str) -> BootstrapInterval:
+        return contrast_interval(
+            intervals=intervals, domain=domain, day=day, setting=setting, contrast=contrast
+        )
+
+    return fit.reading(
+        day=day,
+        p1={s: of(s, "p1") for s in settings},
+        p2={s: [of(s, "p2"), of(s, "p2b")] for s in settings},
+    )
+
+
+def reading_kind(*, reading: str) -> str:
+    """Return the key of `READING_LABELS` that a reading falls under."""
+    if reading.startswith("lowers"):
+        return "lowers"
+    if reading.startswith("raises"):
+        return "raises"
+    return reading
+
+
+def days_text(*, days: Sequence[int]) -> str:
+    """Name lead days in words: `day 4`, `days 1 and 2`, `days 1, 2, and 3`."""
+    if len(days) == 1:
+        return f"day {days[0]}"
+    names = [str(day) for day in days]
+    joined = " and ".join(names) if len(names) == 2 else f"{', '.join(names[:-1])}, and {names[-1]}"
+    return f"days {joined}"
+
+
+def finding_title(*, intervals: pl.DataFrame, domain: DomainType) -> str:
+    """State what adding UKV-CEDA to the ENS mean did at each lead day, from the saved intervals.
+
+    Args:
+        intervals: `intervals.parquet`'s rows.
+        domain: `solar` or `wind`.
+
+    Returns:
+        A title that groups the lead days by their reading and is scoped to the generators tested.
+    """
+    by_kind: dict[str, list[int]] = {}
+    for day in build.LEAD_DAYS:
+        kind = reading_kind(reading=day_reading(intervals=intervals, domain=domain, day=day))
+        by_kind.setdefault(kind, []).append(day)
+    clauses = [
+        f"{READING_PHRASES[kind]} at {days_text(days=days)}" for kind, days in by_kind.items()
+    ]
+    return f"For {TECHNOLOGY_NAMES[domain]}, adding UKV-CEDA to the ENS mean " + "; ".join(clauses)
+
+
+def bonferroni_note(*, intervals: pl.DataFrame, domain: DomainType) -> str:
+    """Say at which lead days P1 stays below zero after the Bonferroni correction at both settings.
+
+    Args:
+        intervals: `intervals.parquet`'s rows.
+        domain: `solar` or `wind`.
+
+    Returns:
+        A sentence naming the lead days, or saying there are none.
+    """
+    surviving = []
+    for day in build.LEAD_DAYS:
+        wide = {}
+        for setting in (fit.PRIMARY, fit.SENSITIVITY):
+            interval = contrast_interval(
+                intervals=intervals,
+                domain=domain,
+                day=day,
+                setting=setting,
+                contrast="p1",
+                scope="Bonferroni",
+            )
+            wide[setting] = (interval["lower_95"], interval["upper_95"])
+        if fit.survives_bonferroni(wide=wide):
+            surviving.append(day)
+    where = days_text(days=surviving) if surviving else "no lead day"
+    return (
+        f"After the Bonferroni correction across the {fit.N_P1_INTERVALS} P1 intervals per "
+        f"setting, P1 stays below zero at both settings at {where}."
+    )
+
+
+def scale_of(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Convert saved `difference`, `lower`, and `upper` fractions of capacity to points."""
+    return frame.with_columns(pl.col("difference", "lower", "upper") * PERCENTAGE_POINTS)
+
+
 def headline_rows(*, intervals: pl.DataFrame, domain: DomainType, day: int) -> pl.DataFrame:
     """Shape one lead day's planned contrasts for `interval_panel`.
 
@@ -128,32 +315,31 @@ def headline_rows(*, intervals: pl.DataFrame, domain: DomainType, day: int) -> p
         day: The lead day.
 
     Returns:
-        One row per planned contrast, P1 first, in points of capacity, with the sensitivity
-        setting's estimate as `second_difference`.
+        One row per planned contrast and setting, P1 first, in points of capacity. The row's
+        `condition` is the setting's name, so the panel draws the sensitivity setting's own
+        interval beside the primary setting's.
     """
-    scope = intervals.filter(
-        pl.col("domain") == domain, pl.col("day") == day, pl.col("scope") == "all rows"
-    )
-    primary = scope.filter(pl.col("setting") == fit.PRIMARY)
-    second = scope.filter(pl.col("setting") == fit.SENSITIVITY).select(
-        "contrast", second_difference=pl.col("difference") * PERCENTAGE_POINTS
-    )
-    return (
-        primary.join(second, on="contrast")
-        .with_columns(
-            order=pl.col("contrast").replace_strict(
-                {code: index for index, code in enumerate(CONTRAST_LABELS)}, return_dtype=pl.Int8
-            )
+    scope = scale_of(
+        frame=intervals.filter(
+            pl.col("domain") == domain, pl.col("day") == day, pl.col("scope") == "all rows"
         )
-        .sort("order")
+    ).filter(pl.col("contrast").is_in(list(CONTRAST_LABELS)))
+    order = {code: index for index, code in enumerate(CONTRAST_LABELS)}
+    setting_order = {setting: index for index, setting in enumerate(SETTING_LABELS)}
+    return (
+        scope.with_columns(
+            order=pl.col("contrast").replace_strict(order, return_dtype=pl.Int8),
+            setting_order=pl.col("setting").replace_strict(setting_order, return_dtype=pl.Int8),
+        )
+        .sort("order", "setting_order")
         .select(
             label=pl.col("contrast").replace_strict(CONTRAST_LABELS, return_dtype=pl.String),
             family=pl.lit(FAMILY),
             planned=pl.lit(value=True),
-            difference=pl.col("difference") * PERCENTAGE_POINTS,
-            lower_95=pl.col("lower") * PERCENTAGE_POINTS,
-            upper_95=pl.col("upper") * PERCENTAGE_POINTS,
-            second_difference=pl.col("second_difference"),
+            condition=pl.col("setting").replace_strict(SETTING_LABELS, return_dtype=pl.String),
+            difference=pl.col("difference"),
+            lower_95=pl.col("lower"),
+            upper_95=pl.col("upper"),
         )
     )
 
@@ -184,12 +370,16 @@ def headline(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatChart
         domain: `solar` or `wind`.
 
     Returns:
-        The figure.
+        The figure, titled with the reading the planned rule gives each lead day.
     """
     rows = {
         day: headline_rows(intervals=intervals, domain=domain, day=day) for day in build.LEAD_DAYS
     }
     shared = x_domain_of(rows=list(rows.values()))
+    kinds = {
+        day: reading_kind(reading=day_reading(intervals=intervals, domain=domain, day=day))
+        for day in build.LEAD_DAYS
+    }
     panels = [
         interval_panel(
             rows=day_rows,
@@ -197,9 +387,12 @@ def headline(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatChart
             x_title=DIFFERENCE_TITLE if day == build.LEAD_DAYS[-1] else "",
             zero_label="same error",
             better_label="blend better",
-            panel_title=f"Lead day {day}",
+            panel_title=f"Lead day {day}: {READING_LABELS[kinds[day]]}",
             reference_labels=index == 0,
             family_key=False,
+            conditions=list(SETTING_LABELS.values()),
+            condition_title="Hyperparameter setting",
+            condition_key=index == 0,
             figure_planning="planned",
             colour_by_family=True,
         )
@@ -208,22 +401,131 @@ def headline(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatChart
     return figure(
         panels=panels,
         number=FIGURE_NUMBERS[(domain, "headline")],
-        title=(
-            f"For {TECHNOLOGY_NAMES[domain]}, adding UKV-CEDA to the ENS mean is compared with "
-            "ENS alone and with shuffled UKV-CEDA at lead days 1 to 4"
-        ),
+        title=finding_title(intervals=intervals, domain=domain),
         subtitle=[
             (
                 "Difference in mean absolute error between two XGBoost models, first arm minus "
                 "second, in points of capacity. Negative means the blend forecasts better. "
                 "The blend lowers the error only if its interval and both shuffled-control "
-                "intervals are below zero at both settings. Dot: primary setting. Hollow "
-                "triangle: sensitivity setting. Line: 95% interval from resampling whole months "
-                "and a fitting seed, at the primary setting."
+                "intervals are below zero at both settings. Filled dot: primary setting. Lighter "
+                "hollow mark: sensitivity setting. Line: 95% interval from resampling whole "
+                "months and a fitting seed, at each setting."
             ),
+            bonferroni_note(intervals=intervals, domain=domain),
             f"{scope_note(intervals=intervals, domain=domain)} {CAPACITY_NOTE} {SCALE_NOTE}",
         ],
         figure_planning="planned",
+    )
+
+
+def arm_error_rows(*, intervals: pl.DataFrame, domain: DomainType, day: int) -> pl.DataFrame:
+    """Shape one lead day's arms, each with its own absolute error, for `leaderboard_panel`.
+
+    Args:
+        intervals: `intervals.parquet`'s rows.
+        domain: `solar` or `wind`.
+        day: The lead day.
+
+    Returns:
+        One row per arm and setting, in points of capacity, best primary-setting error first. A
+        sensitivity-setting row is a `reference` row, which the panel draws as a lighter hollow
+        mark.
+    """
+    arms = {fit.arm_name(day=day, role=role): label for role, label in ARM_LABELS.items()}
+    errors = scale_of(
+        frame=intervals.filter(
+            pl.col("domain") == domain,
+            pl.col("day") == day,
+            pl.col("contrast") == "error",
+            pl.col("scope").is_in(list(arms)),
+        )
+    )
+    best_first = (
+        errors.filter(pl.col("setting") == fit.PRIMARY).sort("difference")["scope"].to_list()
+    )
+    rank = {arm: index for index, arm in enumerate(best_first)}
+    setting_order = {setting: index for index, setting in enumerate(SETTING_LABELS)}
+    return (
+        errors.with_columns(
+            rank=pl.col("scope").replace_strict(rank, return_dtype=pl.Int8),
+            setting_order=pl.col("setting").replace_strict(setting_order, return_dtype=pl.Int8),
+        )
+        .sort("rank", "setting_order")
+        .select(
+            label=pl.concat_str(
+                pl.col("scope").replace_strict(arms, return_dtype=pl.String),
+                pl.col("setting").replace_strict(
+                    {fit.PRIMARY: ", primary setting", fit.SENSITIVITY: ", sensitivity setting"},
+                    return_dtype=pl.String,
+                ),
+            ),
+            family=pl.lit(FAMILY),
+            reference=pl.col("setting") == fit.SENSITIVITY,
+            value=pl.col("difference"),
+            lower_95=pl.col("lower"),
+            upper_95=pl.col("upper"),
+        )
+    )
+
+
+def errors_title(*, intervals: pl.DataFrame, domain: DomainType) -> str:
+    """State the padded ENS model's error at lead day 1 and lead day 4, from the saved intervals."""
+    padded = {
+        day: float(
+            arm_error_rows(intervals=intervals, domain=domain, day=day).filter(
+                pl.col("label") == f"{ARM_LABELS['_pad']}, primary setting"
+            )["value"][0]
+        )
+        for day in (build.LEAD_DAYS[0], build.LEAD_DAYS[-1])
+    }
+    return (
+        f"For {TECHNOLOGY_NAMES[domain]}, an XGBoost model given ENS's mean alone has a mean "
+        f"absolute error of {padded[build.LEAD_DAYS[0]]:.1f}% of capacity at lead day "
+        f"{build.LEAD_DAYS[0]} and {padded[build.LEAD_DAYS[-1]]:.1f}% at lead day "
+        f"{build.LEAD_DAYS[-1]}"
+    )
+
+
+def errors(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatChart:
+    """Draw every arm's own absolute error at every lead day: one panel per lead day.
+
+    Args:
+        intervals: `intervals.parquet`'s rows.
+        domain: `solar` or `wind`.
+
+    Returns:
+        The figure.
+    """
+    rows = {
+        day: arm_error_rows(intervals=intervals, domain=domain, day=day) for day in build.LEAD_DAYS
+    }
+    shared = x_domain_of(rows=list(rows.values()))
+    panels = [
+        leaderboard_panel(
+            rows=day_rows,
+            x_domain=(0.0, shared[1]),
+            x_title=ABSOLUTE_ERROR_X_TITLE if day == build.LEAD_DAYS[-1] else "",
+            panel_title=f"Lead day {day}",
+            keys=False,
+        )
+        for index, (day, day_rows) in enumerate(rows.items())
+    ]
+    return figure(
+        panels=panels,
+        number=FIGURE_NUMBERS[(domain, "errors")],
+        title=errors_title(intervals=intervals, domain=domain),
+        subtitle=[
+            (
+                "Mean absolute error of each XGBoost model, in percent of capacity, with its 95% "
+                "interval from resampling whole months and a fitting seed. The arms share their "
+                "rows, so these intervals are wider than the paired differences in the headline "
+                "figure, which cancel the month-to-month swing every arm shares. Each arm has two "
+                "rows: the primary setting, and the sensitivity setting as a lighter hollow row. "
+                "Arms are sorted best first at the primary setting."
+            ),
+            f"{scope_note(intervals=intervals, domain=domain)} {CAPACITY_NOTE}",
+        ],
+        figure_planning=None,
     )
 
 
@@ -300,8 +602,7 @@ def generators(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatCha
                 "blend's column count, blend minus padded ENS, in points of capacity, at each "
                 "generator alone and the primary setting. Negative means the blend forecasts "
                 "better. The 95% interval resamples whole months and a fitting seed within one "
-                "generator, so it does not cover differences between generators. All rows are "
-                "exploratory."
+                "generator, so it does not cover differences between generators."
             ),
             f"{scope_note(intervals=intervals, domain=domain)} {CAPACITY_NOTE} {SCALE_NOTE}",
         ],
@@ -454,7 +755,7 @@ def weeks(
     series = measured_and_forecast(losses=losses, predictions=predictions, arm=BLEND_ARM_DAY1)
     figures: dict[int, tuple[alt.VConcatChart, str]] = {}
     for era, week in era_weeks(series=series, domain=domain).items():
-        letter = f"{FIGURE_NUMBERS[(domain, 'generators')] + 1}{'abc'[era]}"
+        letter = f"{FIGURE_NUMBERS[(domain, 'weeks')]}{'abc'[era]}"
         figures[era] = (
             week_figure(series=series, week=week, domain=domain, letter=letter),
             f"{week:%B %Y}",
@@ -518,6 +819,7 @@ def main() -> int:
         figures = {
             f"{domain}_headline.svg": headline(intervals=intervals, domain=domain),
             f"{domain}_generators.svg": generators(intervals=intervals, domain=domain),
+            f"{domain}_errors.svg": errors(intervals=intervals, domain=domain),
         }
         stage = fit.Stage(domain=domain, day=1)
         losses = fit.saved_losses(output_dir=args.results_dir, stage=stage)

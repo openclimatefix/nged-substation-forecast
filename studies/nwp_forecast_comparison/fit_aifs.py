@@ -309,10 +309,12 @@ BLEND_AIFS_PREFIXES: Final[dict[str, str]] = {
     "icon_eu_conservative": "icon_eu_day{next_day}",
     "ukv": "ukv_day{day}",
     "ukv_ceda": "ukv_ceda_day{day}",
+    "ukv_ceda_stale": "ukv_ceda_day{next_day}",
     "wn3": "wn3_mean_day{day}",
 }
 """Each blend's second product, to the weather-column prefix of that product at one day. The
-conservative ICON-EU blend reads the product one day older than ENS's mean (published blend P4b)."""
+conservative ICON-EU blend reads the product one day older than ENS's mean (published blend P4b),
+and the stale UKV-CEDA blend reads the UKV-CEDA run one day older than ENS's mean."""
 
 BlendRoleType = Literal["", "_control", "_control_b", "_mirror", "_pad"]
 """A blend arm's role: the blend itself, its control (the second product shuffled), the control

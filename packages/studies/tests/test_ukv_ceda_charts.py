@@ -18,74 +18,171 @@ from nwp_forecast_charts import SITES  # noqa: E402
 from nwp_forecast_comparison import DomainType  # noqa: E402
 
 
+def _record(
+    *,
+    domain: DomainType,
+    day: int,
+    setting: str,
+    contrast: str,
+    scope: str,
+    difference: float,
+    lower: float,
+    upper: float,
+    level: float = 95.0,
+) -> dict[str, object]:
+    return {
+        "domain": domain,
+        "day": day,
+        "setting": setting,
+        "contrast": contrast,
+        "scope": scope,
+        "level": level,
+        "difference": difference,
+        "lower": lower,
+        "upper": upper,
+        "n_rows": 1000,
+        "n_months": 21,
+    }
+
+
 def _intervals(*, domain: DomainType) -> pl.DataFrame:
+    """Day 1 and day 3 meet the planned rule, day 2's second-seed control reaches zero, and day 4's
+    P1 includes zero. P1 survives the Bonferroni correction at both settings at days 1 and 2."""
     records = []
     for day in (1, 2, 3, 4):
         for setting in ("primary", "sensitivity"):
-            for contrast, centre in (("p1", -0.002), ("p2", -0.003), ("p2b", -0.0025)):
+            scale = 1 if setting == "primary" else 1.2
+            p1 = (-0.001, -0.004, 0.002) if day == 4 else (-0.003, -0.005, -0.001)
+            p2b_upper = 0.001 if day == 2 else -0.001
+            wide_upper = 0.001 if (day == 3 and setting == "sensitivity") or day == 4 else -0.0005
+            for contrast, (centre, lower, upper) in (
+                ("p1", p1),
+                ("p2", (-0.004, -0.006, -0.002)),
+                ("p2b", (-0.003, -0.007, p2b_upper)),
+            ):
                 records.append(
-                    {
-                        "domain": domain,
-                        "day": day,
-                        "setting": setting,
-                        "contrast": contrast,
-                        "scope": "all rows",
-                        "level": 95.0,
-                        "difference": centre * (1 if setting == "primary" else 1.2),
-                        "lower": centre - 0.002,
-                        "upper": centre + 0.002,
-                        "n_rows": 1000,
-                        "n_months": 21,
-                    }
+                    _record(
+                        domain=domain,
+                        day=day,
+                        setting=setting,
+                        contrast=contrast,
+                        scope="all rows",
+                        difference=centre * scale,
+                        lower=lower,
+                        upper=upper,
+                    )
+                )
+            records.append(
+                _record(
+                    domain=domain,
+                    day=day,
+                    setting=setting,
+                    contrast="p1",
+                    scope="Bonferroni",
+                    difference=p1[0],
+                    lower=-0.007,
+                    upper=wide_upper,
+                    level=99.375,
+                )
+            )
+            for role, level in (
+                ("_pad", 0.080),
+                ("", 0.077),
+                ("_control", 0.081),
+                ("_control_b", 0.079),
+            ):
+                error = level + 0.01 * (day - 1) + (0.001 if setting == "sensitivity" else 0.0)
+                records.append(
+                    _record(
+                        domain=domain,
+                        day=day,
+                        setting=setting,
+                        contrast="error",
+                        scope=f"blend_ukv_ceda_day{day}{role}",
+                        difference=error,
+                        lower=error - 0.005,
+                        upper=error + 0.005,
+                    )
                 )
         records.extend(
-            {
-                "domain": domain,
-                "day": day,
-                "setting": "primary",
-                "contrast": "p1",
-                "scope": f"E5 generator {site}",
-                "level": 95.0,
-                "difference": -0.001,
-                "lower": -0.004,
-                "upper": 0.002,
-                "n_rows": 200,
-                "n_months": 21,
-            }
+            _record(
+                domain=domain,
+                day=day,
+                setting="primary",
+                contrast="p1",
+                scope=f"E5 generator {site}",
+                difference=-0.001,
+                lower=-0.004,
+                upper=0.002,
+            )
             for site in SITES[domain]
         )
     return pl.DataFrame(records)
 
 
-def test_the_headline_rows_are_in_points_of_capacity_with_the_sensitivity_as_a_second_mark():
+def test_the_headline_rows_are_in_points_of_capacity_with_each_setting_as_its_own_interval():
     rows = charts.headline_rows(intervals=_intervals(domain="wind"), domain="wind", day=2)
 
     assert rows["label"].to_list() == [
         "Blend minus padded ENS",
+        "Blend minus padded ENS",
+        "Blend minus shuffled UKV-CEDA",
         "Blend minus shuffled UKV-CEDA",
         "Blend minus shuffled UKV-CEDA, second seed",
+        "Blend minus shuffled UKV-CEDA, second seed",
     ]
-    first = rows.row(0, named=True)
-    assert first["difference"] == pytest.approx(-0.2)
-    assert first["lower_95"] == pytest.approx(-0.4)
-    assert first["upper_95"] == pytest.approx(0.0)
-    assert first["second_difference"] == pytest.approx(-0.24)
+    assert rows["condition"].to_list() == ["Primary setting", "Sensitivity setting"] * 3
+    primary, sensitivity = rows.row(0, named=True), rows.row(1, named=True)
+    assert primary["difference"] == pytest.approx(-0.3)
+    assert primary["lower_95"] == pytest.approx(-0.5)
+    assert primary["upper_95"] == pytest.approx(-0.1)
+    assert sensitivity["difference"] == pytest.approx(-0.36)
     assert rows["planned"].all()
+    assert "Bonferroni" not in rows["label"].to_list()
 
 
-def test_the_headline_draws_one_panel_per_lead_day_under_a_self_contained_caption():
+def test_a_day_reads_the_planned_rule_from_the_saved_intervals():
+    intervals = _intervals(domain="solar")
+
+    readings = [
+        charts.day_reading(intervals=intervals, domain="solar", day=d) for d in (1, 2, 3, 4)
+    ]
+
+    assert readings == [
+        "lowers the error at day 1",
+        charts.fit.UNRESOLVED_LOWER,
+        "lowers the error at day 3",
+        "no detectable difference",
+    ]
+
+
+def test_days_are_named_in_words_with_the_serial_comma():
+    assert charts.days_text(days=[4]) == "day 4"
+    assert charts.days_text(days=[1, 2]) == "days 1 and 2"
+    assert charts.days_text(days=[1, 2, 3]) == "days 1, 2, and 3"
+
+
+def test_the_headline_draws_one_panel_per_lead_day_under_a_title_that_states_the_finding():
     chart = charts.headline(intervals=_intervals(domain="solar"), domain="solar")
 
     spec = chart.to_dict()
     text = json.dumps(spec)
     caption = " ".join([*spec["title"]["text"], *spec["title"]["subtitle"]])
     assert len(spec["vconcat"]) == 4
-    for day in (1, 2, 3, 4):
-        assert f"Lead day {day}" in text
-    assert "Figure 1:" in caption
+    assert (
+        "Figure 1: For the six solar farms, adding UKV-CEDA to the ENS mean lowered the error"
+        in (" ".join(spec["title"]["text"]))
+    )
+    assert "(planned rule met) at days 1 and 3" in caption
+    assert "did not pass the control test at day 2" in caption
+    assert "made no detectable difference at day 4" in caption
+    assert "Lead day 1: planned rule met" in text
+    assert "Lead day 2: unresolved (lower than padded ENS, control test not passed)" in text
+    assert "Lead day 4: no detectable difference" in text
     assert "Negative means the blend forecasts better" in caption
     assert "3 hours fresher than ENS's at every hour" in caption
-    assert "Dot: primary setting. Hollow triangle: sensitivity setting." in caption
+    assert "Filled dot: primary setting. Lighter hollow mark: sensitivity setting." in caption
+    assert "P1 stays below zero at both settings at days 1 and 2." in caption
     assert "the six solar farms" in caption
 
 
@@ -95,10 +192,50 @@ def test_every_lead_day_panel_shares_one_axis_that_includes_zero():
 
     low, high = charts.x_domain_of(rows=rows)
 
-    assert low < -0.4
+    assert low < -0.7
     assert high > 0.0
     assert low <= min(float(np.min(r["lower_95"].to_numpy())) for r in rows)
     assert high >= max(float(np.max(r["upper_95"].to_numpy())) for r in rows)
+
+
+def test_a_title_says_no_lead_day_survives_when_the_bonferroni_interval_reaches_zero_everywhere():
+    intervals = _intervals(domain="wind").with_columns(
+        upper=pl.when(pl.col("scope") == "Bonferroni").then(0.001).otherwise(pl.col("upper"))
+    )
+
+    assert "at no lead day" in charts.bonferroni_note(intervals=intervals, domain="wind")
+
+
+def test_the_error_rows_hold_each_arms_own_error_best_first_at_both_settings():
+    rows = charts.arm_error_rows(intervals=_intervals(domain="wind"), domain="wind", day=2)
+
+    assert rows["label"].to_list()[::2] == [
+        "ENS mean + UKV-CEDA, primary setting",
+        "ENS mean + shuffled UKV-CEDA, seed 1000, primary setting",
+        "ENS mean, padded to the same column count, primary setting",
+        "ENS mean + shuffled UKV-CEDA, seed 0, primary setting",
+    ]
+    first, second = rows.row(0, named=True), rows.row(1, named=True)
+    assert first["value"] == pytest.approx(8.7)
+    assert first["lower_95"] == pytest.approx(8.2)
+    assert second["label"] == "ENS mean + UKV-CEDA, sensitivity setting"
+    assert second["value"] == pytest.approx(8.8)
+    assert rows["reference"].to_list() == [False, True] * 4
+
+
+def test_the_error_figure_has_a_panel_per_lead_day_and_a_title_naming_the_errors():
+    chart = charts.errors(intervals=_intervals(domain="wind"), domain="wind")
+
+    spec = chart.to_dict()
+    title = " ".join(spec["title"]["text"])
+    assert len(spec["vconcat"]) == 4
+    assert "Figure 6:" in title
+    assert "ENS's mean alone has a mean absolute error of 8.0% of capacity at lead day 1" in title
+    assert "and 11.0% at lead day 4" in title
+    text = json.dumps(spec)
+    for day in (1, 2, 3, 4):
+        assert f"Lead day {day}" in text
+    assert "smaller is better" in text
 
 
 def test_the_generator_rows_carry_only_anonymised_labels_in_label_order():
@@ -117,13 +254,13 @@ def test_a_generator_that_is_not_an_anonymised_label_is_refused():
         charts.generator_rows(intervals=intervals, domain="wind", day=1)
 
 
-def test_the_generator_figure_is_exploratory_and_says_its_interval_is_within_one_generator():
+def test_the_generator_figure_says_once_that_it_is_exploratory_and_its_interval_is_within_one():
     chart = charts.generators(intervals=_intervals(domain="solar"), domain="solar")
 
     spec = chart.to_dict()
     caption = " ".join(spec["title"]["subtitle"])
 
-    assert "All rows are exploratory." in caption
+    assert caption.count("All rows are exploratory.") == 1
     assert "does not cover differences between generators" in caption
     text = json.dumps(spec)
     assert "Generator A" in text
@@ -193,6 +330,8 @@ def test_the_week_figures_name_each_weeks_month_and_year_for_the_pages_text(
     figures = charts.weeks(losses=losses, predictions=losses, domain="wind")
 
     assert set(figures) == {0, 1, 2}
+    captions = [" ".join(chart.to_dict()["title"]["text"]) for chart, _ in figures.values()]
+    assert [c.split(":")[0] for c in captions] == ["Figure 8a", "Figure 8b", "Figure 8c"]
     months = [month for _, month in figures.values()]
     assert all(len(month.split()) == 2 and month.split()[1].isdigit() for month in months)
 

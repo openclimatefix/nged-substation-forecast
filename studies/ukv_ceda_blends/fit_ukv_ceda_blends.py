@@ -34,9 +34,20 @@ technology and lead day, `wind_day1_cpu_losses.parquet` (the GPU-CPU noise floor
 nothing. `--check` fits one arm at one wind site twice on the GPU, stops unless the two fingerprints
 agree, prints a time estimate, and compares ENS's mean alone with its padded copy on the wind day-1
 rows. A stage whose losses exist is not refitted. `--only-missing` fits the (arm, setting) pairs no
-saved file holds into a new `_added_<k>` file. `--report-only` writes the report from the saved
-losses to a new `--report-name`, fitting nothing. Run `uptime` and `nvidia-smi` before a fit, and
+saved file holds into a new `_added_<k>` file. `--post-hoc-stale` fits the post hoc stale blend
+(below) into a new `_added_<k>` file per stage, after every planned pair is saved, and writes a
+report under `--report-name`. `--report-only` writes the report from the saved losses to a new
+`--report-name`, fitting nothing. Run `uptime` and `nvidia-smi` before a fit, and
 start only below a load average of about 24.
+
+**Post hoc stale blend.** After the first science review, `--post-hoc-stale` adds, for lead days 1
+to 3, the arm `blend_ukv_ceda_stale_dayN`: ENS day `N` plus UKV-CEDA day `N + 1`, the 03 UTC run one
+day before ENS's run, which is 21 hours staler than ENS's where the planned blend's is 3 hours
+fresher. It has the planned arms' column counts, and its control is the first-seed shuffle of those
+columns (the second seed is not fitted: the stale blend is exploratory, and a second seed can be
+added with the same flag if the stale gain survives). Its padded ENS reference is the planned
+stage's own, reused. Every contrast scores the rows where UKV-CEDA's day `N + 1` is present. These
+arms are exploratory and post hoc.
 
 Run it with `uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --dry-run`.
 """
@@ -118,6 +129,27 @@ N_P1_INTERVALS: Final[int] = 2 * len(DAYS)
 BONFERRONI_LEVEL: Final[float] = 100.0 - 5.0 / N_P1_INTERVALS
 """The coverage, in percent, of the wider P1 interval: 95% corrected across `N_P1_INTERVALS`."""
 
+UNRESOLVED_LOWER: Final[str] = "unresolved: lower than padded ENS, control test not passed"
+"""The reading where P1 is below zero at both settings but some P2 bound is not: the blend's error
+is statistically significantly lower than padded ENS's, and the planned control test is not met."""
+
+STALE_PRODUCT: Final[str] = "ukv_ceda_stale"
+"""The key in `fit_aifs.BLEND_AIFS_PREFIXES` of the post hoc blend that reads UKV-CEDA's run one
+lead day older than ENS's, which makes the UKV-CEDA run 21 hours staler than ENS's."""
+
+STALE_DAYS: Final[tuple[int, ...]] = tuple(day for day in DAYS if day + 1 in DAYS)
+"""The ENS lead days of the stale blend: UKV-CEDA's day `N + 1` must be built."""
+
+STALE_ROLES: Final[tuple[fit_aifs.BlendRoleType, ...]] = ("", "_control")
+"""The roles fitted for the stale blend: the blend and the control of the first shuffle seed. The
+padded reference is the planned stage's own, reused."""
+
+STALE_SCOPE: Final[str] = "post hoc stale"
+"""The `scope` of every stale-blend interval in `intervals.parquet`."""
+
+PADDING_CHECK_NAME: Final[str] = "padding_check.json"
+"""Where `--check` writes whether ENS's mean alone and its padded copy score identically."""
+
 SECOND_SEED_VARIANT: Final[str] = "_b"
 BEFORE_UPGRADE_ERAS: Final[tuple[int, ...]] = (0, 1)
 AFTER_UPGRADE_ERAS: Final[tuple[int, ...]] = (2,)
@@ -170,6 +202,28 @@ def stage_arms(*, day: int) -> tuple[str, str, str, str]:
         arm_name(day=day, role="_control"),
         arm_name(day=day, role="_control_b"),
     )
+
+
+def stale_arm_name(*, day: int, role: fit_aifs.BlendRoleType) -> str:
+    """Return one of the post hoc stale blend's arms, such as `blend_ukv_ceda_stale_day2`."""
+    return fit_aifs.blend_arm_name(product=STALE_PRODUCT, day=day, role=role)
+
+
+def stale_arms(*, day: int) -> tuple[str, ...]:
+    """Return the post hoc stale blend's arms at ENS lead day `day`: the blend and one control."""
+    return tuple(stale_arm_name(day=day, role=role) for role in STALE_ROLES)
+
+
+def is_stale_arm(*, arm: str) -> bool:
+    """Return whether an arm is one of the post hoc stale blend's."""
+    return arm.startswith(f"{fit_aifs.BLEND_PREFIX}{STALE_PRODUCT}_day")
+
+
+def stale_jobs(*, day: int) -> list[fit_aifs.Job]:
+    """Return the post hoc stale fits of a lead day: its arms at both settings, none at day 4."""
+    if day not in STALE_DAYS:
+        return []
+    return [(arm, setting) for arm in stale_arms(day=day) for setting in SETTINGS]
 
 
 def planned_jobs(*, day: int) -> list[fit_aifs.Job]:
@@ -361,6 +415,46 @@ def stage_frame(
     return frame, offsets
 
 
+def stale_stage_frame(*, stage: Stage, frame: pl.DataFrame, inputs: pl.DataFrame) -> pl.DataFrame:
+    """Return the rows of the post hoc stale blend: the stage's rows that hold UKV-CEDA's next day.
+
+    The stale blend reads UKV-CEDA's day `N + 1`, the 03 UTC run one day before ENS's run, so it
+    needs those columns on top of everything the planned arms need. The folds are the stage's, so
+    the planned padded reference, which is reused, scores the same folds.
+
+    Args:
+        stage: The technology and ENS lead day `N`, which must be in `STALE_DAYS`.
+        frame: The stage's rows from `stage_frame`.
+        inputs: The technology's `<domain>_ukv_ceda_inputs.parquet`.
+
+    Returns:
+        The rows of `frame` where UKV-CEDA's day `N + 1` columns are present, with the first-seed
+        shuffle of those columns.
+
+    Raises:
+        ValueError: If a row reads the wrong run, an arm's column holds a missing value, or no row
+            holds UKV-CEDA's day `N + 1`.
+    """
+    domain, day = stage
+    keys = ["site", "time"]
+    next_day = day + 1
+    columns = ukv_columns(domain=domain, day=next_day)
+    stamp = f"{PRODUCT}_day{next_day}_init_time"
+    kept = frame.join(inputs.select(*keys, stamp, *columns), on=keys, how="left").filter(
+        pl.all_horizontal(present(column=column) for column in columns)
+    )
+    if kept.is_empty():
+        msg = f"{domain} day {day}: no row holds UKV-CEDA's day {next_day} columns"
+        raise ValueError(msg)
+    check_init_times(frame=kept, domain=domain, day=next_day)
+    arms = stale_arms(day=day)
+    shuffled = fit_aifs.add_shuffled_columns(
+        frame=kept, domain=domain, shuffles=fit_aifs.control_shuffles(arms=arms)
+    )
+    check_no_missing(frame=shuffled, columns=fit_aifs.source_columns(arms=arms, domain=domain))
+    return shuffled
+
+
 def check_arm_columns(*, frame: pl.DataFrame, domain: DomainType, arms: Sequence[str]) -> None:
     """Raise unless every arm's columns are in the frame and hold the count the arm's kind promises.
 
@@ -480,6 +574,7 @@ def check_saved_file(
     label: str,
     stamp_file: Path,
     stamp: dict[str, str],
+    stale_frame: pl.DataFrame | None = None,
 ) -> None:
     """Raise unless a saved losses file comes from this build, this device, and exactly these rows.
 
@@ -489,18 +584,25 @@ def check_saved_file(
         label: The stage, for messages.
         stamp_file: The stamp written beside the losses.
         stamp: The current build's stamp.
+        stale_frame: The rows of the post hoc stale blend, which a stale arm must score instead of
+            the stage's.
 
     Raises:
-        ValueError: If the stamp is missing or differs, or an (arm, setting) of the losses scores
-            other (site, time, fold) rows than the stage.
+        ValueError: If the stamp is missing or differs, an (arm, setting) of the losses scores
+            other (site, time, fold) rows than its rows, or a stale arm is saved for a stage with no
+            stale rows.
     """
     if not stamp_file.exists() or json.loads(stamp_file.read_text()) != stamp:
         msg = f"{stamp_file} is missing or names another build or device"
         raise ValueError(msg)
-    want = frame.select(ROW_KEYS).unique().sort(ROW_KEYS)
     for (arm, setting), group in losses.group_by(["arm", "setting"]):
+        rows = stale_frame if is_stale_arm(arm=str(arm)) else frame
+        if rows is None:
+            msg = f"{label}: {arm} is a stale arm, but the stage has no stale rows"
+            raise ValueError(msg)
+        want = rows.select(ROW_KEYS).unique().sort(ROW_KEYS)
         if not group.select(ROW_KEYS).unique().sort(ROW_KEYS).equals(want):
-            msg = f"{label}: {arm} at {setting} scores other rows or folds than the stage's"
+            msg = f"{label}: {arm} at {setting} scores other rows or folds than its rows"
             raise ValueError(msg)
 
 
@@ -541,12 +643,16 @@ def predictions_table(*, losses: pl.DataFrame, frame: pl.DataFrame) -> pl.DataFr
 
 
 class PlannedStage(NamedTuple):
-    """A stage ready to fit: its rows, fold offsets, and stamp."""
+    """A stage ready to fit: its rows, fold offsets, stamp, and its post hoc stale blend's rows.
+
+    `stale_frame` is `None` at a lead day with no stale blend.
+    """
 
     stage: Stage
     frame: pl.DataFrame
     offsets: dict[int, int]
     stamp: dict[str, str]
+    stale_frame: pl.DataFrame | None = None
 
 
 def plan_stages(*, published_dir: Path, day4_dir: Path, output_dir: Path) -> list[PlannedStage]:
@@ -580,12 +686,24 @@ def plan_stages(*, published_dir: Path, day4_dir: Path, output_dir: Path) -> lis
                 offsets=offsets,
                 snapshot_id=build_stamp["snapshot_id"],
             )
-            planned.append(PlannedStage(stage=stage, frame=frame, offsets=offsets, stamp=stamp))
+            stale_frame = None
+            if day in STALE_DAYS:
+                stale_frame = stale_stage_frame(stage=stage, frame=frame, inputs=inputs)
+                check_arm_columns(frame=stale_frame, domain=domain, arms=stale_arms(day=day))
+            planned.append(
+                PlannedStage(
+                    stage=stage,
+                    frame=frame,
+                    offsets=offsets,
+                    stamp=stamp,
+                    stale_frame=stale_frame,
+                )
+            )
     return planned
 
 
 def jobs_to_fit(
-    *, output_dir: Path, stage: Stage, only_missing: bool
+    *, output_dir: Path, stage: Stage, only_missing: bool, post_hoc: bool = False
 ) -> tuple[str, list[fit_aifs.Job]]:
     """Return the group to write and the (arm, setting) pairs of a stage to fit.
 
@@ -593,24 +711,43 @@ def jobs_to_fit(
         output_dir: The write-once folder.
         stage: The stage.
         only_missing: Whether a stage that holds some but not all of its pairs may fit the rest.
+        post_hoc: Whether to list the post hoc stale blend's pairs, which need the planned pairs
+            saved first, instead of the planned pairs.
 
     Returns:
         The group name and the pairs: all of them for a stage with no saved file, the missing ones
-        under `--only-missing`, and none for a complete stage.
+        under `--only-missing`, and none for a complete stage. Under `post_hoc`, the stale pairs no
+        saved file holds.
 
     Raises:
-        ValueError: If a stage holds some pairs but not all and `only_missing` is false.
+        ValueError: If a stage holds some pairs but not all and `only_missing` is false, or if
+            `post_hoc` is set before the stage's planned pairs are all saved.
     """
     saved = saved_pairs(output_dir=output_dir, stage=stage)
-    missing = [job for job in planned_jobs(day=stage.day) if job not in saved]
-    if saved and missing and not only_missing:
-        msg = f"{stem(stage=stage, group='*')}: saved fits lack {missing}; pass --only-missing"
+    planned_missing = [job for job in planned_jobs(day=stage.day) if job not in saved]
+    if post_hoc:
+        if planned_missing:
+            msg = f"{stem(stage=stage, group='*')}: fit the planned pairs before the stale ones"
+            raise ValueError(msg)
+        return next_group(output_dir=output_dir, stage=stage), [
+            job for job in stale_jobs(day=stage.day) if job not in saved
+        ]
+    if saved and planned_missing and not only_missing:
+        msg = (
+            f"{stem(stage=stage, group='*')}: saved fits lack {planned_missing}; "
+            "pass --only-missing"
+        )
         raise ValueError(msg)
-    return next_group(output_dir=output_dir, stage=stage), missing
+    return next_group(output_dir=output_dir, stage=stage), planned_missing
 
 
 def fit_stage(
-    *, planned: PlannedStage, output_dir: Path, workers: int, only_missing: bool
+    *,
+    planned: PlannedStage,
+    output_dir: Path,
+    workers: int,
+    only_missing: bool,
+    post_hoc: bool = False,
 ) -> pl.DataFrame:
     """Fit a stage's missing pairs and write them once, then return all its saved losses.
 
@@ -619,13 +756,20 @@ def fit_stage(
         output_dir: The write-once folder.
         workers: How many (arm, site) fits run at once.
         only_missing: Whether to fit the pairs a partly saved stage lacks.
+        post_hoc: Whether to fit the post hoc stale blend's missing pairs on the stale rows.
 
     Returns:
         Every saved loss of the stage at both settings.
     """
     stage = planned.stage
-    group, jobs = jobs_to_fit(output_dir=output_dir, stage=stage, only_missing=only_missing)
+    group, jobs = jobs_to_fit(
+        output_dir=output_dir, stage=stage, only_missing=only_missing, post_hoc=post_hoc
+    )
     if jobs:
+        fit_frame = planned.stale_frame if post_hoc else planned.frame
+        if fit_frame is None:
+            msg = f"{stem(stage=stage, group='*')}: the stage has no stale rows to fit"
+            raise ValueError(msg)
         file = output_dir / f"{stem(stage=stage, group=group)}_losses.parquet"
         predictions = file.with_name(file.name.replace("_losses", "_predictions"))
         refuse_to_overwrite(paths=[file, predictions])
@@ -638,7 +782,7 @@ def fit_stage(
         }
         file.with_suffix(".json").write_text(json.dumps(stamp))
         losses = fit_aifs.fit_jobs(
-            frame=planned.frame, domain=stage.domain, jobs=jobs, workers=workers
+            frame=fit_frame, domain=stage.domain, jobs=jobs, workers=workers
         ).with_columns(device=pl.lit(fit_aifs.DEVICE))
         write_atomically(path=file, frame=losses)
         write_atomically(
@@ -673,6 +817,7 @@ def verified_losses(*, planned: PlannedStage, output_dir: Path) -> pl.DataFrame:
             label=path.name,
             stamp_file=path.with_suffix(".json"),
             stamp=expected,
+            stale_frame=planned.stale_frame,
         )
     return saved_losses(output_dir=output_dir, stage=stage)
 
@@ -752,7 +897,9 @@ def setting_verdict(
     """Return the verdict at one setting.
 
     The blend lowers the error only if P1 and every P2 contrast (both shuffle seeds) have an upper
-    95% bound below zero, so one noisy shuffle cannot decide it.
+    95% bound below zero, so one noisy shuffle cannot decide it. Where P1 alone is below zero, the
+    verdict is `UNRESOLVED_LOWER`, because the blend's error is statistically significantly lower
+    than padded ENS's and the control test is not passed.
 
     Args:
         day: The lead day, for the label.
@@ -760,13 +907,15 @@ def setting_verdict(
         p2: The blend minus each control, one per shuffle seed.
 
     Returns:
-        `verdict`: `lowers the error at day N`, `raises the error at day N` where P1's lower
-        bound is above zero, or `no detectable difference`; and `largest_gain_not_excluded`, the
-        gain P1's lower bound leaves open, or `None` where the verdict is not `no detectable
-        difference`.
+        `verdict`: `lowers the error at day N`, `UNRESOLVED_LOWER`, `raises the error at day N`
+        where P1's lower bound is above zero, or `no detectable difference`; and
+        `largest_gain_not_excluded`, the gain P1's lower bound leaves open, or `None` where the
+        verdict is not `no detectable difference`.
     """
-    if p1["upper_95"] < 0.0 and all(interval["upper_95"] < 0.0 for interval in p2):
-        return {"verdict": f"lowers the error at day {day}", "largest_gain_not_excluded": None}
+    if p1["upper_95"] < 0.0:
+        if all(interval["upper_95"] < 0.0 for interval in p2):
+            return {"verdict": f"lowers the error at day {day}", "largest_gain_not_excluded": None}
+        return {"verdict": UNRESOLVED_LOWER, "largest_gain_not_excluded": None}
     if p1["lower_95"] > 0.0:
         return {"verdict": f"raises the error at day {day}", "largest_gain_not_excluded": None}
     return {
@@ -781,7 +930,7 @@ def reading(
     p1: Mapping[str, BootstrapInterval],
     p2: Mapping[str, Sequence[BootstrapInterval]],
 ) -> str:
-    """Return the verdict that both settings give, or `no detectable difference` if they differ.
+    """Return the verdict that both settings give, or the weaker reading if they differ.
 
     Args:
         day: The lead day.
@@ -789,17 +938,52 @@ def reading(
         p2: The P2 contrasts of both shuffle seeds at each setting.
 
     Returns:
-        The verdict, from `studies.bootstrap.combine_setting_verdicts`.
+        The verdict, from `studies.bootstrap.combine_setting_verdicts`. Where the settings give
+        different verdicts, `UNRESOLVED_LOWER` if P1 is below zero at both, else `no detectable
+        difference`.
     """
     verdicts = {
         setting: str(setting_verdict(day=day, p1=p1[setting], p2=p2[setting])["verdict"])
         for setting in (PRIMARY, SENSITIVITY)
     }
+    p1_below_at_both = all(p1[setting]["upper_95"] < 0.0 for setting in (PRIMARY, SENSITIVITY))
     return combine_setting_verdicts(
         primary=verdicts[PRIMARY],
         sensitivity=verdicts[SENSITIVITY],
-        unresolved=NO_DETECTABLE_DIFFERENCE,
+        unresolved=UNRESOLVED_LOWER if p1_below_at_both else NO_DETECTABLE_DIFFERENCE,
     )
+
+
+def survives_bonferroni(*, wide: Mapping[str, tuple[float, float]]) -> bool:
+    """Return whether P1's Bonferroni-corrected interval is below zero at both settings.
+
+    Args:
+        wide: P1's lower and upper bound at the corrected level, at each setting.
+
+    Returns:
+        True only if the upper bound is below zero at the primary and the sensitivity setting.
+    """
+    return all(wide[setting][1] < 0.0 for setting in (PRIMARY, SENSITIVITY))
+
+
+def left_open_text(*, p1: Mapping[str, BootstrapInterval]) -> str:
+    """State, at each setting, the largest gain P1's interval does not exclude.
+
+    Args:
+        p1: P1 at each setting.
+
+    Returns:
+        `primary X, sensitivity Y` in points of capacity, with `below zero` for a setting where
+        P1's whole interval is below zero.
+    """
+    parts = []
+    for setting in (PRIMARY, SENSITIVITY):
+        interval = p1[setting]
+        if interval["upper_95"] < 0.0:
+            parts.append(f"{setting} below zero")
+        else:
+            parts.append(f"{setting} {max(0.0, -interval['lower_95']) * PERCENTAGE_POINTS:.3f}")
+    return ", ".join(parts)
 
 
 def null_reading(*, interval: BootstrapInterval) -> str:
@@ -941,9 +1125,170 @@ def generator_error_lines(*, losses: pl.DataFrame, arms: Sequence[str]) -> list[
     return lines
 
 
+class StageReading(NamedTuple):
+    """What a stage's section concludes, for the readings table."""
+
+    reading: str
+    survives_bonferroni: bool
+    left_open: str
+
+
+class MonthDrop(NamedTuple):
+    """A contrast recomputed with one calendar month left out."""
+
+    month: str
+    interval: BootstrapInterval
+
+
+def month_drops(*, losses: pl.DataFrame, treatment: str, reference: str) -> list[MonthDrop]:
+    """Return a contrast's interval with each calendar month dropped in turn.
+
+    Args:
+        losses: Per-row losses at one setting, carrying `month` and both arms.
+        treatment: The arm whose error is compared.
+        reference: The arm it is compared against.
+
+    Returns:
+        One `MonthDrop` per month, in month order. Nothing is refitted: the saved losses of the
+        remaining months are resampled again.
+    """
+    return [
+        MonthDrop(
+            month=str(month),
+            interval=difference(
+                losses=losses.filter(pl.col("month") != month),
+                treatment=treatment,
+                reference=reference,
+            ),
+        )
+        for month in sorted(losses["month"].unique().to_list())
+    ]
+
+
+def leave_one_month_out_lines(
+    *,
+    per_setting: Mapping[str, pl.DataFrame],
+    full: Mapping[str, BootstrapInterval],
+    treatment: str,
+    reference: str,
+    stage: Stage,
+    records: list[IntervalRecord],
+) -> list[str]:
+    """Format P1 with each month dropped in turn, at both settings, as an exploratory table.
+
+    Args:
+        per_setting: The stage's losses at each setting.
+        full: P1 over all months at each setting.
+        treatment: The blend.
+        reference: The padded ENS arm.
+        stage: The stage.
+        records: Where the most influential drop's interval is appended for `intervals.parquet`.
+
+    Returns:
+        A Markdown table, one row per setting, giving the lowest and highest point estimate over
+        the drops with the month dropped, the drop that moves the estimate most, and the highest
+        95% upper bound over the drops.
+    """
+    lines = [
+        (
+            "Post hoc, exploratory: P1 with each calendar month dropped in turn (nothing is "
+            "refitted). A drop whose upper bound reaches zero shows that one month carries the "
+            "result."
+        ),
+        "",
+        (
+            "| Setting | All months | Lowest drop (month dropped) | Highest drop (month dropped) "
+            "| Month that moves it most | That drop's difference [interval] "
+            "| Highest upper bound over the drops (month dropped) |"
+        ),
+        "|---|---|---|---|---|---|---|",
+    ]
+    for setting in SETTINGS:
+        drops = month_drops(losses=per_setting[setting], treatment=treatment, reference=reference)
+        point = full[setting]["difference"]
+        lowest = min(drops, key=lambda drop: drop.interval["difference"])
+        highest = max(drops, key=lambda drop: drop.interval["difference"])
+        moves_most = max(drops, key=lambda drop: abs(drop.interval["difference"] - point))
+        loosest = max(drops, key=lambda drop: drop.interval["upper_95"])
+        records.append(
+            record(
+                stage=stage,
+                setting=setting,
+                contrast="p1",
+                scope="E6 most influential month dropped",
+                interval=moves_most.interval,
+            )
+        )
+        lines.append(
+            f"| {setting} | {point * PERCENTAGE_POINTS:+.3f} "
+            f"| {lowest.interval['difference'] * PERCENTAGE_POINTS:+.3f} ({lowest.month}) "
+            f"| {highest.interval['difference'] * PERCENTAGE_POINTS:+.3f} ({highest.month}) "
+            f"| {moves_most.month} | {interval_cell(interval=moves_most.interval)} "
+            f"| {loosest.interval['upper_95'] * PERCENTAGE_POINTS:+.3f} ({loosest.month}) |"
+        )
+    lines.append("")
+    return lines
+
+
+def control_gap_lines(
+    *,
+    per_setting: Mapping[str, pl.DataFrame],
+    control: str,
+    control_b: str,
+    stage: Stage,
+    records: list[IntervalRecord],
+) -> list[str]:
+    """Format the gap between the two shuffled controls at both settings.
+
+    The two controls carry the same (no) information and differ only in their shuffle seed, so a
+    gap between them is the size of difference the pipeline produces from nothing.
+
+    Args:
+        per_setting: The stage's losses at each setting.
+        control: The first-seed control.
+        control_b: The second-seed control.
+        stage: The stage.
+        records: Where each interval is appended for `intervals.parquet`.
+
+    Returns:
+        A Markdown table, one row per setting.
+    """
+    lines = [
+        (
+            "Exploratory: the gap between the two shuffled controls, seed 0 minus seed 1000, "
+            "which differ only in their shuffle seed."
+        ),
+        "",
+        "| Setting | Difference [interval] (points) | Statistically significant at the 5% level |",
+        "|---|---|---|",
+    ]
+    for setting in SETTINGS:
+        interval = difference(losses=per_setting[setting], treatment=control, reference=control_b)
+        records.append(
+            record(
+                stage=stage,
+                setting=setting,
+                contrast="control_gap",
+                scope="control gap",
+                interval=interval,
+            )
+        )
+        significant = interval["upper_95"] < 0.0 or interval["lower_95"] > 0.0
+        lines.append(
+            f"| {setting} | {interval_cell(interval=interval)} | {'yes' if significant else 'no'} |"
+        )
+    lines.append("")
+    return lines
+
+
+def settings_text(*, settings: Sequence[str]) -> str:
+    """Name one or both hyperparameter settings: `the primary setting` or `both settings`."""
+    return "both settings" if len(settings) == len(SETTINGS) else f"the {settings[0]} setting"
+
+
 def stage_lines(
     *, planned: PlannedStage, losses: pl.DataFrame, records: list[IntervalRecord]
-) -> tuple[list[str], str]:
+) -> tuple[list[str], StageReading]:
     """Format one stage's section of the report.
 
     Args:
@@ -952,7 +1297,7 @@ def stage_lines(
         records: Where every printed interval is appended for `intervals.parquet`.
 
     Returns:
-        The section's Markdown lines and the stage's reading.
+        The section's Markdown lines and what the stage concludes.
     """
     stage, frame = planned.stage, planned.frame
     pad, blend, control, control_b = stage_arms(day=stage.day)
@@ -981,6 +1326,20 @@ def stage_lines(
                 stage=stage, setting=setting, contrast="p1", scope="all rows", interval=p1[setting]
             )
         )
+        records.append(
+            record(
+                stage=stage,
+                setting=setting,
+                contrast="p1",
+                scope="Bonferroni",
+                interval={
+                    **p1[setting],
+                    "lower_95": wide[setting][0],
+                    "upper_95": wide[setting][1],
+                },
+                level=BONFERRONI_LEVEL,
+            )
+        )
         for label, interval in zip(("p2", "p2b"), p2[setting], strict=True):
             records.append(
                 record(
@@ -992,6 +1351,8 @@ def stage_lines(
                 )
             )
     verdict = reading(day=stage.day, p1=p1, p2=p2)
+    corrected = survives_bonferroni(wide=wide)
+    level = f"Bonferroni {BONFERRONI_LEVEL}%"
     lines = [
         f"### {stage.domain.capitalize()}, lead day {stage.day}",
         "",
@@ -1001,24 +1362,31 @@ def stage_lines(
             f"{json.dumps(dict(sorted(planned.offsets.items())))}."
         ),
         "",
-        f"| Contrast (points) | Primary | Sensitivity | Primary, Bonferroni {BONFERRONI_LEVEL}% |",
-        "|---|---|---|---|",
+        (
+            f"| Contrast (points) | Primary | Sensitivity | Primary, {level} "
+            f"| Sensitivity, {level} |"
+        ),
+        "|---|---|---|---|---|",
         (
             f"| P1: {SPECS['p1']} | {interval_cell(interval=p1[PRIMARY])} "
             f"| {interval_cell(interval=p1[SENSITIVITY])} "
             f"| {wide[PRIMARY][0] * PERCENTAGE_POINTS:+.3f}, "
-            f"{wide[PRIMARY][1] * PERCENTAGE_POINTS:+.3f} |"
+            f"{wide[PRIMARY][1] * PERCENTAGE_POINTS:+.3f} "
+            f"| {wide[SENSITIVITY][0] * PERCENTAGE_POINTS:+.3f}, "
+            f"{wide[SENSITIVITY][1] * PERCENTAGE_POINTS:+.3f} |"
         ),
         (
             f"| P2: {SPECS['p2']} | {interval_cell(interval=p2[PRIMARY][0])} "
-            f"| {interval_cell(interval=p2[SENSITIVITY][0])} | not adjusted |"
+            f"| {interval_cell(interval=p2[SENSITIVITY][0])} | not adjusted | not adjusted |"
         ),
         (
             f"| P2: {SPECS['p2b']} | {interval_cell(interval=p2[PRIMARY][1])} "
-            f"| {interval_cell(interval=p2[SENSITIVITY][1])} | not adjusted |"
+            f"| {interval_cell(interval=p2[SENSITIVITY][1])} | not adjusted | not adjusted |"
         ),
         "",
         f"Reading: {verdict}.",
+        "",
+        f"P1 survives the Bonferroni correction at both settings: {'yes' if corrected else 'no'}.",
         "",
         (
             f"P1 at the primary setting: {null_reading(interval=p1[PRIMARY])}. "
@@ -1026,9 +1394,15 @@ def stage_lines(
         ),
         "",
     ]
-    near = [s for s in SETTINGS if fit_aifs.near_line(interval=p1[s])]
-    if near:
-        lines += [f"P1 is near the 5% line at the {', '.join(near)} setting.", ""]
+    near_by_contrast = {
+        "P1": [fit_aifs.near_line(interval=p1[s]) for s in SETTINGS],
+        "P2 (first-seed control)": [fit_aifs.near_line(interval=p2[s][0]) for s in SETTINGS],
+        "P2 (second-seed control)": [fit_aifs.near_line(interval=p2[s][1]) for s in SETTINGS],
+    }
+    for name, flags in near_by_contrast.items():
+        near = [s for s, flag in zip(SETTINGS, flags, strict=True) if flag]
+        if near:
+            lines += [f"{name} is near the 5% line at {settings_text(settings=near)}.", ""]
     signs = {s: np.sign(p1[s]["difference"]) for s in SETTINGS}
     if signs[PRIMARY] != signs[SENSITIVITY]:
         lines += ["P1 changes sign between the two settings.", ""]
@@ -1039,6 +1413,21 @@ def stage_lines(
     for setting in SETTINGS:
         board = leaderboard(losses=per_setting[setting], arms=list(stage_arms(day=stage.day)))
         for row in board.iter_rows(named=True):
+            records.append(
+                {
+                    "domain": stage.domain,
+                    "day": stage.day,
+                    "setting": setting,
+                    "contrast": "error",
+                    "scope": row["arm"],
+                    "level": 95.0,
+                    "difference": row["value"],
+                    "lower": row["lower_95"],
+                    "upper": row["upper_95"],
+                    "n_rows": row["n_rows"],
+                    "n_months": row["n_months"],
+                }
+            )
             text = error_text(value=row["value"], lower=row["lower_95"], upper=row["upper_95"])
             value, interval_part = text.split(" [")
             lines.append(
@@ -1048,9 +1437,24 @@ def stage_lines(
     lines += [
         "",
         *generator_error_lines(losses=per_setting[PRIMARY], arms=stage_arms(day=stage.day)),
+        "",
+        *control_gap_lines(
+            per_setting=per_setting,
+            control=control,
+            control_b=control_b,
+            stage=stage,
+            records=records,
+        ),
+        *leave_one_month_out_lines(
+            per_setting=per_setting,
+            full=p1,
+            treatment=blend,
+            reference=pad,
+            stage=stage,
+            records=records,
+        ),
     ]
     lines += [
-        "",
         (
             "Exploratory: P1 by era (primary setting). Era 0 is before 2025-10, era 1 is 2025-10 "
             "to 2025-12, and era 2 starts in 2026-02, after the UKV upgrade settled."
@@ -1097,6 +1501,129 @@ def stage_lines(
         for site in sorted(frame["site"].unique().to_list())
     ]
     lines.append("")
+    return lines, StageReading(
+        reading=verdict, survives_bonferroni=corrected, left_open=left_open_text(p1=p1)
+    )
+
+
+STALE_CONTRASTS: Final[dict[str, str]] = {
+    "stale_p1": "Stale blend minus padded ENS (P1, stale)",
+    "stale_p2": "Stale blend minus its shuffled control (P2, stale; first seed only)",
+    "stale_vs_fresh": "Stale blend minus the planned blend (UKV-CEDA run 21 hours staler)",
+    "fresh_p1_same_rows": "Planned blend minus padded ENS, on the stale blend's rows",
+}
+"""The post hoc stale section's contrasts, by their code in `intervals.parquet`."""
+
+
+def stale_lines(
+    *, planned: PlannedStage, losses: pl.DataFrame, records: list[IntervalRecord]
+) -> tuple[list[str], str | None]:
+    """Format the post hoc stale-blend section of one stage, if its fits are saved.
+
+    The stale blend is ENS day N plus UKV-CEDA day N + 1, so UKV-CEDA's run is 21 hours staler than
+    ENS's, where the planned blend's is 3 hours fresher. If it still lowers the error, the planned
+    gain is not explained by UKV-CEDA's later run alone.
+
+    Args:
+        planned: The stage and its rows.
+        losses: The stage's saved losses at both settings.
+        records: Where every printed interval is appended for `intervals.parquet`.
+
+    Returns:
+        The section's Markdown lines, and the reading of the one-control rule. Both are empty or
+        `None` where the stage has no complete saved stale fit.
+    """
+    stage, rows = planned.stage, planned.stale_frame
+    saved = set(losses.select("arm", "setting").unique().iter_rows())
+    if rows is None or not set(stale_jobs(day=stage.day)) <= saved:
+        return [], None
+    pad, fresh, _, _ = stage_arms(day=stage.day)
+    stale, stale_control = stale_arms(day=stage.day)
+    on_rows = {
+        setting: at_setting(losses=losses, setting=setting).join(
+            rows.select("site", "time"), on=["site", "time"]
+        )
+        for setting in SETTINGS
+    }
+    pairs = {
+        "stale_p1": (stale, pad),
+        "stale_p2": (stale, stale_control),
+        "stale_vs_fresh": (stale, fresh),
+        "fresh_p1_same_rows": (fresh, pad),
+    }
+    intervals = {
+        code: {
+            setting: difference(losses=on_rows[setting], treatment=treatment, reference=reference)
+            for setting in SETTINGS
+        }
+        for code, (treatment, reference) in pairs.items()
+    }
+    for code, by_setting in intervals.items():
+        records.extend(
+            record(
+                stage=stage, setting=setting, contrast=code, scope=STALE_SCOPE, interval=interval
+            )
+            for setting, interval in by_setting.items()
+        )
+    verdict = reading(
+        day=stage.day,
+        p1=intervals["stale_p1"],
+        p2={setting: [intervals["stale_p2"][setting]] for setting in SETTINGS},
+    )
+    lines = [
+        f"#### Post hoc: ENS day {stage.day} plus UKV-CEDA day {stage.day + 1}, {stage.domain}",
+        "",
+        (
+            f"Post hoc and exploratory, added after the first science review. UKV-CEDA's run is "
+            f"21 hours staler than ENS's, so the 3-hour advantage of the planned blend is "
+            f"reversed. {rows.height} of the stage's {planned.frame.height} rows hold UKV-CEDA's "
+            f"day {stage.day + 1}. The padded ENS reference and the planned blend were fitted on "
+            f"all {planned.frame.height} rows, and every contrast below scores the same "
+            f"{rows.height} rows."
+        ),
+        "",
+        "| Contrast (points) | Primary | Sensitivity |",
+        "|---|---|---|",
+        *(
+            f"| {label} | {interval_cell(interval=intervals[code][PRIMARY])} "
+            f"| {interval_cell(interval=intervals[code][SENSITIVITY])} |"
+            for code, label in STALE_CONTRASTS.items()
+        ),
+        "",
+        (
+            f"Reading with one control seed: {verdict}. P1 (stale) at the primary setting: "
+            f"{null_reading(interval=intervals['stale_p1'][PRIMARY])}. At the sensitivity "
+            f"setting: {null_reading(interval=intervals['stale_p1'][SENSITIVITY])}."
+        ),
+        "",
+        "| Arm | Setting | Error (% of capacity) | 95% interval | Rows | Months |",
+        "|---|---|---|---|---|---|",
+    ]
+    for setting in SETTINGS:
+        board = leaderboard(losses=on_rows[setting], arms=[pad, fresh, stale, stale_control])
+        for row in board.iter_rows(named=True):
+            records.append(
+                {
+                    "domain": stage.domain,
+                    "day": stage.day,
+                    "setting": setting,
+                    "contrast": "error",
+                    "scope": f"{STALE_SCOPE} rows: {row['arm']}",
+                    "level": 95.0,
+                    "difference": row["value"],
+                    "lower": row["lower_95"],
+                    "upper": row["upper_95"],
+                    "n_rows": row["n_rows"],
+                    "n_months": row["n_months"],
+                }
+            )
+            text = error_text(value=row["value"], lower=row["lower_95"], upper=row["upper_95"])
+            value, interval_part = text.split(" [")
+            lines.append(
+                f"| `{row['arm']}` | {setting} | {value} | [{interval_part} | {row['n_rows']} "
+                f"| {row['n_months']} |"
+            )
+    lines.append("")
     return lines, verdict
 
 
@@ -1118,14 +1645,18 @@ def report_text(
     *,
     sections: Sequence[tuple[str, list[str]]],
     summary: Sequence[str],
+    stale_summary: Sequence[str],
     cpu_line: str,
+    padding_line: str,
 ) -> str:
     """Return `report.md`: the design, the readings, the columns, and every stage.
 
     Args:
         sections: Each technology's name and its stages' lines.
         summary: The readings table's lines.
+        stale_summary: The post hoc stale blend's readings table, empty if none is saved.
         cpu_line: The GPU-CPU noise-floor sentence.
+        padding_line: The sentence on whether padded and unpadded ENS score identically.
 
     Returns:
         The report.
@@ -1140,18 +1671,45 @@ def report_text(
             "minus each control, whose UKV-CEDA columns are shuffled within generator, year-month, "
             "and hour of day under two seeds. The blend lowers the error at a technology and lead "
             "day only if the upper 95% bound of P1 and of both P2 contrasts is below zero at both "
-            "settings. The Bonferroni interval corrects P1's 95% level across "
-            f"{N_P1_INTERVALS} P1 intervals per setting ({BONFERRONI_LEVEL}%), and P2 is not "
-            "adjusted. UKV-CEDA's lead is 3 hours fresher than ENS's at every hour, which favours "
-            "the blend, and its wind columns are native 10 m and 925 hPa winds, not 100 m winds. "
-            "Rows lost to each cause are in the folder's `README.md`."
+            "settings. Where P1 is below zero at both settings and a P2 bound is not, the reading "
+            f"is `{UNRESOLVED_LOWER}`: the blend's error is statistically significantly lower than "
+            "padded ENS's, and the planned control test is not passed. The Bonferroni interval "
+            f"corrects P1's 95% level across {N_P1_INTERVALS} P1 intervals per setting "
+            f"({BONFERRONI_LEVEL}%), is printed at both settings, and P2 is not adjusted. "
+            "UKV-CEDA's lead is 3 hours fresher than ENS's at every hour, which favours the "
+            "blend, so the planned contrasts cannot separate UKV-CEDA's weather from its later "
+            "run; the post hoc stale blend, where UKV-CEDA's run is 21 hours staler than ENS's, "
+            "tests that. UKV-CEDA's wind columns are native 10 m and 925 hPa winds, not 100 m "
+            "winds, so a wind gain may come from a second vertical level. Rows lost to each cause "
+            "are in the folder's `README.md`."
         ),
         "",
         "## Readings",
         "",
+        (
+            "Where P1's interval includes zero, the last column gives the largest gain the "
+            "interval does not exclude, in points of capacity, at each setting. A reading of "
+            "`no detectable difference` never means no gain."
+        ),
+        "",
         *summary,
         "",
+        *(
+            [
+                (
+                    "Post hoc: ENS day N plus UKV-CEDA day N + 1 (UKV-CEDA 21 hours staler than "
+                    "ENS), read with one control seed."
+                ),
+                "",
+                *stale_summary,
+                "",
+            ]
+            if stale_summary
+            else []
+        ),
         cpu_line,
+        "",
+        padding_line,
         "",
         *columns_lines(),
     ]
@@ -1160,11 +1718,47 @@ def report_text(
     return "\n".join(lines)
 
 
-def summary_lines(*, readings: Mapping[tuple[str, int], str]) -> list[str]:
+def summary_lines(*, readings: Mapping[tuple[str, int], StageReading]) -> list[str]:
     """Format the readings of every stage as one table."""
+    lines = [
+        (
+            "| Technology | Lead day | Reading | P1 survives the Bonferroni correction at both "
+            "settings | Largest gain P1 leaves open (points of capacity) |"
+        ),
+        "|---|---|---|---|---|",
+    ]
+    lines += [
+        f"| {domain} | {day} | {item.reading} | {'yes' if item.survives_bonferroni else 'no'} "
+        f"| {item.left_open} |"
+        for (domain, day), item in readings.items()
+    ]
+    return lines
+
+
+def stale_summary_lines(*, readings: Mapping[tuple[str, int], str]) -> list[str]:
+    """Format the post hoc stale blend's readings as one table, empty if none are saved."""
+    if not readings:
+        return []
     lines = ["| Technology | Lead day | Reading |", "|---|---|---|"]
     lines += [f"| {domain} | {day} | {text} |" for (domain, day), text in readings.items()]
     return lines
+
+
+def padding_check_line(*, output_dir: Path) -> str:
+    """Return the sentence on the saved padding check, or say that none is saved."""
+    path = output_dir / PADDING_CHECK_NAME
+    if not path.exists():
+        return "No padding check is saved."
+    checks: dict[str, dict[str, object]] = json.loads(path.read_text())
+    parts = [
+        f"{name.replace('_', ' ')}: {'identical' if check['identical'] else 'not identical'} "
+        f"(largest per-row gap {float(str(check['largest_gap_mw'])):.3g} MW)"
+        for name, check in checks.items()
+    ]
+    return (
+        "Padding check, ENS's mean alone against its padded copy, per-row losses at the primary "
+        "setting: " + "; ".join(parts) + "."
+    )
 
 
 def report_paths(*, output_dir: Path, name: str) -> tuple[Path, Path]:
@@ -1185,7 +1779,8 @@ def build_report(*, planned: Sequence[PlannedStage], output_dir: Path) -> tuple[
         The report text and one row per printed interval.
     """
     records: list[IntervalRecord] = []
-    readings: dict[tuple[str, int], str] = {}
+    readings: dict[tuple[str, int], StageReading] = {}
+    stale_readings: dict[tuple[str, int], str] = {}
     sections: list[tuple[str, list[str]]] = []
     gpu_wind_day1: pl.DataFrame | None = None
     for domain in fit_aifs.DOMAINS:
@@ -1194,16 +1789,26 @@ def build_report(*, planned: Sequence[PlannedStage], output_dir: Path) -> tuple[
             losses = verified_losses(planned=item, output_dir=output_dir)
             if item.stage == Stage("wind", 1):
                 gpu_wind_day1 = losses
-            stage_text, verdict = stage_lines(planned=item, losses=losses, records=records)
+            stage_text, stage_reading = stage_lines(planned=item, losses=losses, records=records)
             lines += stage_text
-            readings[(domain, item.stage.day)] = verdict
+            readings[(domain, item.stage.day)] = stage_reading
+            stale_text, stale_reading = stale_lines(planned=item, losses=losses, records=records)
+            lines += stale_text
+            if stale_reading is not None:
+                stale_readings[(domain, item.stage.day)] = stale_reading
         sections.append((domain.capitalize(), lines))
     cpu_file = output_dir / f"{stem(stage=Stage('wind', 1), group=CPU_GROUP)}_losses.parquet"
     cpu_line = "No CPU refit is saved."
     if cpu_file.exists() and gpu_wind_day1 is not None:
         cpu_line = noise_floor_line(cpu=pl.read_parquet(cpu_file), gpu=gpu_wind_day1)
     return (
-        report_text(sections=sections, summary=summary_lines(readings=readings), cpu_line=cpu_line),
+        report_text(
+            sections=sections,
+            summary=summary_lines(readings=readings),
+            stale_summary=stale_summary_lines(readings=stale_readings),
+            cpu_line=cpu_line,
+            padding_line=padding_check_line(output_dir=output_dir),
+        ),
         pl.DataFrame(records),
     )
 
@@ -1211,27 +1816,46 @@ def build_report(*, planned: Sequence[PlannedStage], output_dir: Path) -> tuple[
 # --- Modes ----------------------------------------------------------------------------------------
 
 
-def print_plan(*, planned: Sequence[PlannedStage], output_dir: Path, only_missing: bool) -> None:
-    """Print every stage's rows and fits, and the number of (arm, site) fits, without fitting."""
+def print_plan(
+    *, planned: Sequence[PlannedStage], output_dir: Path, only_missing: bool, post_hoc: bool = False
+) -> None:
+    """Print every stage's rows and fits, and the number of (arm, site) fits, without fitting.
+
+    Under `post_hoc` the listed fits are the stale blend's, on the stale rows.
+    """
     total = 0
     for item in planned:
         group, jobs = jobs_to_fit(
-            output_dir=output_dir, stage=item.stage, only_missing=only_missing
+            output_dir=output_dir, stage=item.stage, only_missing=only_missing, post_hoc=post_hoc
         )
-        sites = item.frame["site"].n_unique()
+        rows = item.frame if not post_hoc else item.stale_frame
+        if rows is None:
+            sys.stdout.write(f"{item.stage.domain} day {item.stage.day}: no stale blend\n")
+            continue
+        sites = rows["site"].n_unique()
         total += len(jobs) * sites
+        lacking = f" ({item.frame.height - rows.height} stage rows lack the next day)"
         sys.stdout.write(
-            f"{item.stage.domain} day {item.stage.day}: {item.frame.height} rows, {sites} sites, "
-            f"fold offsets {item.offsets}, group {group}: {len(jobs)} (arm, setting) fits\n"
+            f"{item.stage.domain} day {item.stage.day}: {rows.height} rows"
+            f"{lacking if post_hoc else ''}, {sites} sites, fold offsets {item.offsets}, "
+            f"group {group}: {len(jobs)} (arm, setting) fits\n"
         )
     sys.stdout.write(f"{total} (arm, site) fits in all\n")
 
 
-def padded_matches_unpadded(*, frame: pl.DataFrame, day: int) -> tuple[bool, float]:
+class PaddingCheck(NamedTuple):
+    """Whether ENS's mean alone and its padded copy score identically at one stage."""
+
+    identical: bool
+    largest_gap_mw: float
+
+
+def padded_matches_unpadded(*, frame: pl.DataFrame, domain: DomainType, day: int) -> PaddingCheck:
     """Fit ENS's mean alone and its padded copy at the primary setting and compare per-row losses.
 
     Args:
-        frame: A wind stage's rows.
+        frame: A stage's rows.
+        domain: `solar` or `wind`.
         day: The lead day.
 
     Returns:
@@ -1240,7 +1864,7 @@ def padded_matches_unpadded(*, frame: pl.DataFrame, day: int) -> tuple[bool, flo
     alone = f"ens_mean_day{day}"
     padded = arm_name(day=day, role="_pad")
     losses = fit_aifs.fit_jobs(
-        frame=frame, domain="wind", jobs=[(alone, PRIMARY), (padded, PRIMARY)], workers=1
+        frame=frame, domain=domain, jobs=[(alone, PRIMARY), (padded, PRIMARY)], workers=1
     )
     keys = ["site", "time", "seed"]
     columns = [*keys, "absolute_error_mw"]
@@ -1249,11 +1873,14 @@ def padded_matches_unpadded(*, frame: pl.DataFrame, day: int) -> tuple[bool, flo
     gap = float(
         np.abs(first["absolute_error_mw"].to_numpy() - second["absolute_error_mw"].to_numpy()).max()
     )
-    return first.equals(second), gap
+    return PaddingCheck(identical=first.equals(second), largest_gap_mw=gap)
 
 
 def run_check(*, planned: Sequence[PlannedStage], output_dir: Path) -> int:
     """Time one arm twice, print the run's estimate, and compare padded with unpadded ENS.
+
+    The padding comparison runs at day 1 for wind and for solar, and its result is written once to
+    `PADDING_CHECK_NAME` in `output_dir`, which the report prints.
 
     Args:
         planned: Every stage.
@@ -1262,6 +1889,8 @@ def run_check(*, planned: Sequence[PlannedStage], output_dir: Path) -> int:
     Returns:
         0 if the two GPU runs agree, else 1.
     """
+    check_path = output_dir / PADDING_CHECK_NAME
+    refuse_to_overwrite(paths=[check_path])
     first = next(item for item in planned if item.stage == Stage("wind", 1))
     agree, seconds = fit_aifs.time_two_fits(
         frame=first.frame, arm=arm_name(day=1, role=""), domain="wind"
@@ -1271,20 +1900,48 @@ def run_check(*, planned: Sequence[PlannedStage], output_dir: Path) -> int:
         * item.frame["site"].n_unique()
         for item in planned
     )
-    identical, gap = padded_matches_unpadded(frame=first.frame, day=1)
+    checks = {
+        f"{stage.domain}_day{stage.day}": padded_matches_unpadded(
+            frame=item.frame, domain=stage.domain, day=stage.day
+        )
+        for stage in (Stage("wind", 1), Stage("solar", 1))
+        for item in planned
+        if item.stage == stage
+    }
+    check_path.write_text(
+        json.dumps(
+            {
+                name: {
+                    "identical": check.identical,
+                    "largest_gap_mw": check.largest_gap_mw,
+                    "setting": PRIMARY,
+                }
+                for name, check in checks.items()
+            }
+        )
+    )
     sys.stdout.write(
         f"one arm at one site: {seconds:.0f} s; {n_fits} (arm, site) fits are about "
         f"{n_fits * seconds / 3600:.1f} h on one worker\n"
         f"two GPU runs agree: {agree}\n"
-        f"ENS's mean alone and padded to the blend's column count have identical per-row losses: "
-        f"{identical} (largest gap {gap:.3g} MW)\n"
-        f"CHECK {'PASS' if agree else 'FAIL'}\n"
     )
+    for name, check in checks.items():
+        sys.stdout.write(
+            f"{name}: ENS's mean alone and padded to the blend's column count have identical "
+            f"per-row losses: {check.identical} (largest gap {check.largest_gap_mw:.3g} MW)\n"
+        )
+    sys.stdout.write(f"CHECK {'PASS' if agree else 'FAIL'}\n")
     return 0 if agree else 1
 
 
 def run_fits(
-    *, planned: Sequence[PlannedStage], output_dir: Path, workers: int, only_missing: bool
+    *,
+    planned: Sequence[PlannedStage],
+    output_dir: Path,
+    workers: int,
+    only_missing: bool,
+    post_hoc: bool = False,
+    report_name: str = "report",
 ) -> int:
     """Fit every stage, then the CPU refit, and write the report and intervals once.
 
@@ -1293,17 +1950,24 @@ def run_fits(
         output_dir: The write-once folder.
         workers: How many (arm, site) fits run at once.
         only_missing: Whether to fit the pairs a partly saved stage lacks.
+        post_hoc: Whether to fit the post hoc stale blend instead of the planned arms. The CPU
+            refit is then skipped.
+        report_name: The report's name, `report` or a new name for a rerun.
 
     Returns:
         0.
     """
-    report_path, intervals_path = report_paths(output_dir=output_dir, name="report")
+    report_path, intervals_path = report_paths(output_dir=output_dir, name=report_name)
     refuse_to_overwrite(paths=[report_path, intervals_path])
     for item in planned:
         losses = fit_stage(
-            planned=item, output_dir=output_dir, workers=workers, only_missing=only_missing
+            planned=item,
+            output_dir=output_dir,
+            workers=workers,
+            only_missing=only_missing,
+            post_hoc=post_hoc,
         )
-        if item.stage == Stage("wind", 1):
+        if item.stage == Stage("wind", 1) and not post_hoc:
             cpu_noise_floor(planned=item, output_dir=output_dir, gpu=losses)
         _LOG.info("%s day %d: fitted", item.stage.domain, item.stage.day)
     text, intervals = build_report(planned=planned, output_dir=output_dir)
@@ -1350,6 +2014,11 @@ def main() -> int:
     parser.add_argument("--only-missing", action="store_true", help="Fit the pairs no file holds.")
     parser.add_argument("--report-only", action="store_true", help="Write the report; fit nothing.")
     parser.add_argument(
+        "--post-hoc-stale",
+        action="store_true",
+        help="Fit the post hoc stale UKV-CEDA blend (ENS day N plus UKV-CEDA day N + 1).",
+    )
+    parser.add_argument(
         "--report-name", default="report", help="The report's name, `report` or new."
     )
     args = parser.parse_args()
@@ -1358,7 +2027,12 @@ def main() -> int:
         published_dir=args.published_dir, day4_dir=args.day4_dir, output_dir=args.output_dir
     )
     if args.dry_run:
-        print_plan(planned=planned, output_dir=args.output_dir, only_missing=args.only_missing)
+        print_plan(
+            planned=planned,
+            output_dir=args.output_dir,
+            only_missing=args.only_missing,
+            post_hoc=args.post_hoc_stale,
+        )
         return 0
     if args.report_only:
         report_path, intervals_path = report_paths(
@@ -1378,6 +2052,8 @@ def main() -> int:
         output_dir=args.output_dir,
         workers=args.workers,
         only_missing=args.only_missing,
+        post_hoc=args.post_hoc_stale,
+        report_name=args.report_name,
     )
 
 

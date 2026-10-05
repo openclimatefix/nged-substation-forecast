@@ -63,8 +63,54 @@ before the build and before every fit, and start only below a load average of ab
    `intervals.parquet`. Add `--only-missing` to fit the pairs no saved file holds into a new
    `_added_<k>` file, and `--report-only --report-name NAME` to write the report again from the saved
    losses into new files.
-8. `uv run python studies/ukv_ceda_blends/ukv_ceda_blends_charts.py` draws every figure from the saved
-   losses without fitting.
+8. `uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --post-hoc-stale --dry-run` lists
+   the post hoc stale-blend fits (see "Post hoc stale blend" below) and the rows each stage loses to
+   the blend's extra columns.
+9. `uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --post-hoc-stale --report-name
+   report_2` fits the stale blend into new `_added_<k>` files, never touching the planned fits, and
+   writes `report_2.md` and `report_2_intervals.parquet`.
+10. `uv run python studies/ukv_ceda_blends/ukv_ceda_blends_charts.py --figures-dir DIR
+    --intervals-name report_2_intervals.parquet` draws every figure from the saved intervals and
+    losses without fitting.
+
+## Outputs the report adds after the first science review
+
+- **Three readings.** A technology and lead day reads `lowers the error`, `no detectable
+  difference`, or `unresolved: lower than padded ENS, control test not passed`. The third reading
+  applies where P1 is below zero at both settings and some P2 bound is not.
+- **Bonferroni at both settings.** The report prints P1's 99.375% interval at the primary and the
+  sensitivity setting, and the readings table says whether P1 stays below zero at both. The planned
+  rule is unchanged: the correction is an extra column, not part of the rule.
+- **Largest gain left open.** For every stage the readings table gives the largest gain P1's lower
+  bound does not exclude, at each setting. `no detectable difference` never means no gain.
+- **Control gap.** The report prints seed-0 control minus seed-1000 control at both settings. The
+  two controls carry the same (no) information, so the gap is the size of difference the pipeline
+  produces from nothing. The interval resamples months and a fitting seed, not shuffle seeds.
+- **Leave-one-month-out.** Post hoc and exploratory, the report recomputes every planned P1 with
+  each calendar month dropped in turn from the saved losses, and prints the lowest and highest
+  point estimate, the month that moves it most, and the highest 95% upper bound.
+- **Padding check.** `--check` runs ENS's mean alone against its padded copy at wind day 1 and solar
+  day 1, and writes `padding_check.json` once. The report prints the result.
+- **`intervals.parquet` rows.** Beside the planned and exploratory rows, `scope` can be
+  `Bonferroni` (P1 at `level` 99.375), `control gap` (`contrast` `control_gap`),
+  `E6 most influential month dropped`, `post hoc stale` (contrasts `stale_p1`, `stale_p2`,
+  `stale_vs_fresh`, and `fresh_p1_same_rows`), and the `error` contrast, whose `difference` is an
+  arm's own mean absolute error and whose `scope` is the arm. The charts read every figure number
+  from these rows.
+
+## Post hoc stale blend
+
+**The stale blend tests whether UKV-CEDA's 3-hour lead advantage explains the gain.** The arm
+`blend_ukv_ceda_stale_dayN` is ENS day `N` plus UKV-CEDA day `N + 1` for `N` of 1 to 3, with the
+same column counts as the planned arms. UKV-CEDA's run is the 03 UTC run one day before ENS's run,
+21 hours staler than ENS's run, where the planned blend's run is 3 hours fresher. The arm is fitted
+for both technologies at both settings with one control, the first-seed shuffle of its UKV-CEDA
+columns. The second control seed is not fitted because the arm is exploratory; running
+`--post-hoc-stale` again with a second control is possible if the stale gain survives. The planned
+stage's padded ENS arm is the reference and is not refitted. The fits score the stage's rows where
+UKV-CEDA's day `N + 1` is present, about 0.4% fewer rows, so the reference's training set is slightly
+larger than the stale blend's, and every contrast scores the same rows. The fit count is 108 (arm,
+site) fits.
 
 ## Scripts
 
@@ -78,8 +124,9 @@ before the build and before every fit, and start only below a load average of ab
 - `fit_ukv_ceda_blends.py` imports `fit_aifs` and `nwp_forecast_comparison` from the sibling
   `studies/nwp_forecast_comparison/` directory and changes neither. A stage whose losses exist is
   not refitted, and every output is written once.
-- `ukv_ceda_blends_charts.py` draws the headline figure and the per-generator figure from the saved
-  losses.
+- `ukv_ceda_blends_charts.py` draws the headline figure (both settings' intervals, a title and panel
+  titles that state the reading), the per-generator figure, the per-arm absolute-error figure for
+  every lead day, and the week figures from the saved intervals, losses, and predictions.
 - `check_arm_columns_unchanged.py` is described in step 1. It cannot cover the main matched-lead
   fit, which wrote no stamp. No arm prefix there starts with `ukv_ceda`, so the new branch of
   `_wind_weather_fields` is never reached by that fit.
@@ -88,8 +135,8 @@ before the build and before every fit, and start only below a load average of ab
 
 - `studies.ifs_single_runs.served_init_time` and `served_lead_hours` take `run_hour`, the UTC hour at
   which the run starts (default 0).
-- `fit_aifs.BLEND_AIFS_PREFIXES` has a `ukv_ceda` entry, and `BlendRoleType` has the roles `_pad` and
-  `_control_b`.
+- `fit_aifs.BLEND_AIFS_PREFIXES` has `ukv_ceda` and `ukv_ceda_stale` entries, and `BlendRoleType`
+  has the roles `_pad` and `_control_b`.
 - `nwp_forecast_comparison._wind_weather_fields` returns the 10 m and 925 hPa column names for a
   prefix that starts with `ukv_ceda`.
 
