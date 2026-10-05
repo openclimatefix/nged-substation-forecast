@@ -46,10 +46,10 @@ module. The scripts that feed the past-weather pages are in
 | Script | What it does |
 |---|---|
 | `studies.era5_grid` | The grid and date range both ERA5 downloads share, so "the same cells" is checkable rather than a coincidence of two literals. |
-| `fetch_era5.py` | Downloads `ssrd`, `fdir` and `t2m` from the Copernicus Climate Data Store, six months per request, into `data/studies/weather/ERA5/beam_diffuse/`. Resumable. |
+| `fetch_era5.py` | Downloads `ssrd`, `fdir` and `t2m` from the Copernicus Climate Data Store, six months per request, into `data/studies/downloads/reanalysis/ERA5/beam_diffuse/`. Resumable. |
 | `fetch_era5_open_meteo.py` | Downloads the same fields from Open-Meteo's ERA5 mirror onto the same grid, in about a minute rather than most of a night. |
 | `verify_era5_sources.py` | Compares the two ERA5 downloads hour by hour, which is what establishes that the mirror serves ERA5's own `fdir` rather than a separation model's estimate of it. |
-| `fetch_cams.py` | Downloads the CAMS radiation service's global, beam and diffuse irradiances at each meter's own coordinates, into `data/studies/weather/CAMS/`. |
+| `fetch_cams.py` | Downloads the CAMS radiation service's global, beam and diffuse irradiances at each meter's own coordinates, into `data/studies/downloads/reanalysis/CAMS/`. |
 | `studies.sources` | The source names, which sources are delivered per site, and the registry of Open-Meteo models this experiment can fetch. |
 | `build_dataset.py` | Joins the PV power readings to one source, adds solar geometry, the separation-model estimates and the synthetic control target, and writes the one frame every arm reads. Takes `--source`. |
 | `run_experiment.py` | The XGBoost instrument: fits every arm at every fold, seed and hyperparameter setting, and writes per-row losses, per-site metrics and bootstrap intervals. |

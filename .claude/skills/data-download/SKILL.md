@@ -20,12 +20,12 @@ description: >-
 already fetched when one chunk fails.** The rule is that each chunk reaches disk before the next
 chunk is requested, so a crash costs one chunk and re-running the script resumes where it stopped.
 
-See the `study` skill for where a download's output lives (`data/studies/weather/<PRODUCT>/`) and
-for the CDS and anonymisation rules it already owns, which this skill does not repeat. See the
-`data-validation` skill for the checklist to run once a fetch finishes — a clean run is not evidence
-the data it wrote is right, and a download can store a running mean as though it were an hourly
-value, drop a timestamp at a chunk boundary, or apply a wrong scale factor, with none of those
-defects raising an exception.
+See the `study` skill for where a download's output lives
+(`data/studies/downloads/<kind>/<PRODUCT>/`) and for the CDS and anonymisation rules it already
+owns, which this skill does not repeat. See the `data-validation` skill for the checklist to run
+once a fetch finishes — a clean run is not evidence the data it wrote is right, and a download can
+store a running mean as though it were an hourly value, drop a timestamp at a chunk boundary, or
+apply a wrong scale factor, with none of those defects raising an exception.
 
 ## Checkpoint every chunk to disk immediately, and resume by skipping what is cached
 

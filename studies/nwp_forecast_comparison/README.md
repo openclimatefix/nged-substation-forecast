@@ -88,8 +88,9 @@ ENS, and the UKV-from-CEDA blends. Tests of these scripts are in
   `studies/nwp_forecast_comparison/ens_forecast_horizons.py`. GEFS reads each site's nearest 0.25°
   cell, converts its alternating 3- and 6-hour radiation windows to 3-hour step means
   (`studies.resample.gefs_step_means`) on whole runs before any band is sliced, and averages the 31
-  members. It runs only when `data/studies/weather/GEFS_window_2024-11-01_None/_month_cache/` covers
-  2024-11 to the month the rows end on (the last month may be a `.partial.parquet`), or when
+  members. It runs only when
+  `data/studies/downloads/NWP/windows/GEFS_window_2024-11-01_None/_month_cache/` covers 2024-11 to
+  the month the rows end on (the last month may be a `.partial.parquet`), or when
   `--gefs-window-dir` names a `GEFS_window_*` extract. The build raises if any 00 UTC run the rows
   need is missing or incomplete.
 - `nwp_forecast_comparison.py` reads those files and takes the rows where the target, the baselines'
@@ -116,7 +117,7 @@ ENS, and the UKV-from-CEDA blends. Tests of these scripts are in
   saved losses. It never writes to the published folder.
 - `build_forecast_inputs.py --extra-leads --batch third` writes the native GFS arms
   `gfs_native_day<N>_*` at days 0, 1, 2, 3, 5, 7, 10, and 14, read from Dynamical.org's GFS store
-  (`data/studies/weather/GFS/`) at each generator's nearest 0.25 degree cell. Day 1 and above read
+  (`data/studies/downloads/NWP/GFS/`) at each generator's nearest 0.25 degree cell. Day 1 and above read
   the 00 UTC run issued that many days before, at leads from 24 hours per day. Day 0 reads the
   freshest of the four runs a day, at a lead of 1 to 6 hours for solar and 0 to 5 hours for wind.
   The store's radiation is a mean since the last 6-hourly reset, with the lead labelling the end of
@@ -133,10 +134,10 @@ ENS, and the UKV-from-CEDA blends. Tests of these scripts are in
   batches' GPU fits, through one `--context-dir` for each earlier batch's folder.
 - `build_forecast_inputs.py --extra-leads --batch fourth` writes the arms `ifs_single_day<N>_*` at
   days 0, 1, 2, 3, 5, and 7, read from Open-Meteo's Single Runs archive of ECMWF IFS HRES
-  (`data/studies/weather/ECMWF-IFS-SINGLE-RUNS/`): one 00 UTC run a day with hourly leads 0 to 240.
-  Day `N` reads the 00 UTC run issued `N` days before the hour's own day, at leads from 24 hours per
-  day, so day 0 is the run of the hour's own day. Day 0 covers hours before the 00 UTC run is
-  published, as ENS's day 0 does, so day 0 is not a forecast that could have been used in advance
+  (`data/studies/downloads/NWP/ECMWF-IFS-SINGLE-RUNS/`): one 00 UTC run a day with hourly leads 0 to
+  240. Day `N` reads the 00 UTC run issued `N` days before the hour's own day, at leads from 24
+  hours per day, so day 0 is the run of the hour's own day. Day 0 covers hours before the 00 UTC run
+  is published, as ENS's day 0 does, so day 0 is not a forecast that could have been used in advance
   for those hours. There is no day 10, because day 10 needs leads 240 to 264 hours and the runs end
   at 240 (`studies.ifs_single_runs`). Values are used as the archive serves them: radiation clipped
   at zero, wind as speed and the sine and cosine of the direction (the Previous Runs arms' method,
