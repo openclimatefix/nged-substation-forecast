@@ -46,8 +46,9 @@ best-estimate, not a guarantee.
   the COVID covariate, and why scoring against estimates of past weather is a diagnostic rather than
   a promotion criterion.
 - [Experiments run by an LLM agent](auto-research.md) — a large language model (LLM) agent running
-  the XGBoost backlog as a tree search: what published research agents found, and a proposed design
-  that scores each worker's code from outside the worker's session.
+  the XGBoost backlog, and larger ideas, as a search led by an LLM research lead: what published
+  research agents found, and a proposed design in which every implementation is reviewed before
+  training and scored from outside the worker's session.
 - [Engineering health](engineering-health.md) — scientific-rigor tests and cleanup.
 - [Capacity estimation](capacity-estimation.md) — the v0.7 head-to-head between candidate estimators
   of the time-varying effective capacity of metered generators: a [convex
@@ -221,13 +222,14 @@ quantile pipeline:
   gated on the two items above, since degrading earlier would emit output no scenario has tested
 
 **Automated experimentation ("auto-research")**: an LLM agent runs some or all of the XGBoost
-backlog as a search, on infrastructure built in v0.3. Which ideas go to the agent is not yet
-decided. The work is gated on
+backlog, and possibly larger ideas from other roadmap pages, as a search on infrastructure built in
+v0.3. Which ideas go to the agent is not yet decided. The work is gated on
 [#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958) landing first, because
 an autonomous session is only trustworthy once the session cannot edit or bypass the scorer the
 session is judged against. [Experiments run by an LLM agent](auto-research.md) gives the published
-evidence, and a proposed design in which an idea is implemented again whenever the idea's score is
-close to a competitor's and every experiment is scored from outside the agent's session.
+evidence, and a proposed design in which every implementation is reviewed before training, an idea
+is implemented again whenever the idea's score is close to a competitor's, and every experiment is
+scored from outside the agent's session.
 
 ---
 

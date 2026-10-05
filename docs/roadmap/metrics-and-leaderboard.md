@@ -531,7 +531,7 @@ for [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)'s M3/M4 w
 [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493)'s one-year minimum, both of
 which our own fold already meets in length but not in independence. The winner's reported skill will
 grow more optimistically biased over time, because hundreds of experiments are planned, including a
-tree search run by a large language model (LLM) agent that
+search run by a large language model (LLM) agent that
 [Experiments run by an LLM agent](auto-research.md) describes. Our own fold is small in effective
 sample size rather than in row count, because consecutive half-hours are strongly correlated. The
 epoch mechanism handles *data* changes but not *adaptive selection* on a fixed fold.
