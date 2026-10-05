@@ -29,7 +29,7 @@ snapshot.** ``rsync --link-dest`` creates a hard link instead of a copy for ever
 modification time, and permissions match the newest earlier snapshot holding that source. Delta
 tables never modify a file in place, so after the first snapshot each new one stores only the
 files written since the last run. SQLite databases are the exception: each is copied afresh every
-run, which costs about 450 MB a week for Dagster's history. Every snapshot is still a complete,
+run, which costs about 450 MB per run for Dagster's history. Every snapshot is still a complete,
 independent copy: deleting an old snapshot never damages a newer one.
 
 **Keeping old snapshots is what protects the backup from a mistaken deletion on the workstation.**
@@ -53,6 +53,7 @@ written there would fill the system disk while protecting nothing.
 ``rsync -a`` copies a symlink as a symlink and never follows it, so a link inside a source that
 points at the backup disk cannot make the backup copy itself.
 
+``scripts/maintenance/systemd/`` holds the systemd user units that run the script once a day.
 Run it while no Dagster run is in progress. A Delta table copied while a Dagster run is writing
 to it, or vacuuming it, can be captured with a transaction log that names a data file the copy
 missed. The script finishes by listing every entry that changed while it ran, and a long list

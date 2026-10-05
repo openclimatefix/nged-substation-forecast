@@ -1,10 +1,32 @@
 # Backing up the workstation
 
 How to back up the workstation's data, MLflow store, literature library, Dagster history, and
-credential files to the 18 TB disk mounted at `/mnt/wd_18tb`, and how to restore from that backup.
-The backup is run by hand, about once a week.
+credential files to the 18 TB USB disk mounted at `/mnt/wd_18tb`, and how to restore from that
+backup. A systemd timer runs the backup once a day.
 
-## Run the backup
+## The daily backup
+
+**A systemd user timer runs the backup script every day at 03:20 UTC, and skips the day's run while
+the USB disk is unplugged.** 03:20 falls between the Dagster schedules: the live forecasts at 00:00
+and 06:00, the power ingest at 55 minutes past each hour, and the ECMWF download at 10:30. The unit
+files are `scripts/maintenance/systemd/nged-backup.service` and `nged-backup.timer`. Install them
+once:
+
+```bash
+cp scripts/maintenance/systemd/nged-backup.{service,timer} ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now nged-backup.timer
+```
+
+The timer needs lingering turned on (`loginctl enable-linger`) so that it runs while nobody is
+logged in. If the machine was off at 03:20, the timer runs the backup once at the next start-up.
+
+**Read each run's output in the journal.** `systemctl --user list-timers nged-backup.timer` shows
+when the backup last ran and when it runs next, and `journalctl --user -u nged-backup.service` shows
+each run's warnings. A day the disk was unplugged appears as `skipped, unmet condition check
+ConditionPathIsMountPoint=/mnt/wd_18tb`, not as a failure.
+
+## Run the backup by hand
 
 **Run the script from the main checkout, while no Dagster run is in progress:**
 
@@ -35,9 +57,9 @@ each database, and a plain copy can capture a database and its `-wal` file at di
 
 **The first snapshot copies about 200 GB; each later snapshot stores only the files that changed.**
 The script hard-links every unchanged file to the previous snapshot, so a snapshot takes disk space
-only for new files. The SQLite databases are copied afresh every run, which adds about 450 MB a
-week. Every snapshot is nevertheless a complete copy, and deleting an old snapshot never damages a
-newer one. Delete old snapshots by hand when the disk fills, oldest first.
+only for new files. The SQLite databases are copied afresh every run, which adds about 450 MB a day,
+or about 165 GB a year. Every snapshot is nevertheless a complete copy, and deleting an old snapshot
+never damages a newer one. Delete old snapshots by hand when the disk fills, oldest first.
 
 **The script stops if `data/` or the MLflow database is missing**, for example because `/mnt/data`
 is not mounted, so a snapshot can never look complete while missing the forecasts and models. The

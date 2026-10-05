@@ -1,9 +1,9 @@
 """Tests for `scripts/maintenance/backup_workstation.py`.
 
-The script is run by hand once a week and nobody reads its output closely, so the tests target the
-failures that would leave a backup looking fine while it protects nothing: copying onto the system
-disk, building a snapshot on an interrupted one, swallowing an `rsync` error, silently storing
-every file twice, copying a SQLite database as a torn file, and missing a source.
+The script runs unattended once a day and nobody reads its output closely, so the tests target
+the failures that would leave a backup looking fine while it protects nothing: copying onto the
+system disk, building a snapshot on an interrupted one, swallowing an `rsync` error, silently
+storing every file twice, copying a SQLite database as a torn file, and missing a source.
 """
 
 import importlib.util

@@ -1,0 +1,28 @@
+# systemd user unit: write one backup snapshot with scripts/maintenance/backup_workstation.py.
+# The timer starts it once a day.
+# Install: copy this file and nged-backup.timer to ~/.config/systemd/user/, then
+#   systemctl --user daemon-reload && systemctl --user enable --now nged-backup.timer
+# How to read its output and restore from a snapshot:
+# https://openclimatefix.github.io/nged-substation-forecast/live_service/backup/
+[Unit]
+Description=Back up the NGED forecast workstation to the 18 TB USB disk
+# Skip the run, without counting it as a failure, while the USB disk is unplugged or unmounted.
+# The script also refuses a destination on the same disk as its sources, so this condition is
+# what keeps an unplugged disk out of the failure log rather than what keeps the backup safe.
+ConditionPathIsMountPoint=/mnt/wd_18tb
+# Skip the run until the script exists in the main checkout.
+ConditionPathExists=%h/dev/nged-substation-forecast/scripts/maintenance/backup_workstation.py
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/dev/nged-substation-forecast
+# The script backs up $DAGSTER_HOME, which a login shell sets in ~/.bashrc and a systemd user
+# service never reads.
+Environment=DAGSTER_HOME=%h/dagster_home/
+# The venv's own Python, not `uv run`, so the backup never re-syncs the environment `dg dev` is
+# running from.
+ExecStart=%h/dev/nged-substation-forecast/.venv/bin/python scripts/maintenance/backup_workstation.py
+# The first snapshot copies about 200 GB in under 20 minutes; a later one takes about a minute.
+TimeoutStartSec=3h
+Nice=10
+IOSchedulingClass=idle
