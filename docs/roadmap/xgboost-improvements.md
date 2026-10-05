@@ -1527,3 +1527,8 @@ in, with the 3–10 day band as the headline slice) against the current champion
 [baselines](metrics-and-leaderboard.md#baseline-forecasters). Keep losing experiments in MLflow
 (negative results are results); promote winners' settings into `conf/model/xgboost.yaml` one at a
 time so attribution stays clean.
+
+**One implementation of an idea is weak evidence about the idea.** Where a win is close to the
+champion's score, implement the idea a second way before promoting the idea, because how an idea
+happens to be implemented can move the score more than re-running the implementation does — see
+[Experiments run by an LLM agent](auto-research.md#one-implementation-is-weak-evidence-about-an-idea).

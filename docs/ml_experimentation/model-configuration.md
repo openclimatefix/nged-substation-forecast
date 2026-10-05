@@ -184,12 +184,14 @@ constructed.
 **Every key must name a field the config class declares** — the two tables above. Write
 `n_estimtors` instead of `n_estimators` and registration fails, before a single fold is scheduled,
 with a `ValidationError` naming the key. This matters more than a typo usually would, because the
-searches that drive most registrations are unattended. The LLM auto-research agent registers,
-materialises, and reads the leaderboard with nobody in the loop, and the variant grid sweeps several
-dimensions at once. A key that was quietly dropped would give you a grid of *identical* runs, each
-scoring plausibly, each landing on the leaderboard, and nothing to distinguish that grid from a
-genuine null result. That is [principle
-8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically).
+searches planned to drive most registrations will run unattended. The
+[large language model (LLM) agent](../roadmap/auto-research.md) planned for automated
+experimentation will run experiments and read the leaderboard with nobody in the loop. The
+[variant grid](../roadmap/training-history.md) planned for the training-history experiments will
+sweep several dimensions at once. A key that was quietly dropped would give you a grid of
+*identical* runs, each scoring plausibly, each landing on the leaderboard, and nothing to
+distinguish that grid from a genuine null result. That is
+[principle 8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically).
 
 Two further keys are refused for their own reasons. `_target_` names the forecaster class, and the
 config class follows from it: to use a different one, point `base_model_config` at a different YAML.
