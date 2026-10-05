@@ -1106,3 +1106,19 @@ def test_the_day_5_folder_may_be_reached_through_a_symbolic_link(tmp_path: Path)
     link.symlink_to(tmp_path / DAY5_FOLDER_NAME, target_is_directory=True)
 
     driver.check_output_dir(output_dir=link, published_dir=tmp_path / "nwp_forecast_comparison")
+
+
+def test_the_day_5_wn3_build_accepts_a_symbolic_link_to_its_own_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    published = _patch_day5_build(monkeypatch=monkeypatch, tmp_path=tmp_path, ens=7.0)
+    real = tmp_path / DAY5_FOLDER_NAME
+    real.mkdir()
+    link = tmp_path / "old_name"
+    link.symlink_to(real, target_is_directory=True)
+
+    frame = w.build_domain(
+        domain="wind", published_dir=published, output_dir=link, weather_dir=tmp_path, days=(5,)
+    )
+
+    assert frame["ens_mean_day5_speed_100m"][0] == 7.0

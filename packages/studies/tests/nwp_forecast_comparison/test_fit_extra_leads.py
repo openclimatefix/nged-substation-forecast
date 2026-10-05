@@ -615,3 +615,26 @@ def test_the_fifth_build_writes_its_inputs_when_its_ens_mean_equals_the_wn3_fold
     )
 
     assert pl.read_parquet(path)["ens_mean_day4_ghi"][0] == 7.0
+
+
+def test_the_fifth_build_accepts_a_symbolic_link_to_its_own_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from build_forecast_inputs import build_extra_leads
+
+    published = _patch_fifth_build(monkeypatch=monkeypatch, tmp_path=tmp_path, ens=7.0)
+    real = tmp_path / "nwp_forecast_comparison_day4_shared"
+    real.mkdir()
+    link = tmp_path / "old_name"
+    link.symlink_to(real, target_is_directory=True)
+
+    path = build_extra_leads(
+        domain="solar",
+        published_dir=published,
+        output_dir=link,
+        gefs_window_dir=None,
+        batch="fifth",
+    )
+
+    assert (real / "solar_extra_lead_inputs.parquet").exists()
+    assert pl.read_parquet(path)["ens_mean_day4_ghi"][0] == 7.0
