@@ -39,7 +39,7 @@ the share of hours with a value.
 | ICON global | 0, 1, 2, 3, and 5 | Days 4 and 6 were not in archive. Day 7 is 0% non-null in the archive, so day 6 is the last day with values. |
 | ICON-EU | 0, 1, 2, and 3 | Day 4 was not in archive. Day 5 is 0% non-null in the archive, so day 4 is the last day with values. |
 | ARPEGE Europe (solar only) | 0, 1, 2, and 3 | Beyond the product's horizon from day 4. |
-| UKV | 0 and 1 | Day 2 is 0% non-null in the archive, and the study could not verify UKV's horizon locally. |
+| UKV | 0 and 1 | Day 2 is 0% non-null in the archive, and the study could not verify UKV's horizon locally. The [UKV-CEDA page](ukv-ceda-blends.md) tests UKV at days 1 to 4 from the CEDA archive. |
 | ICON-D2, AROME France (solar only), DMI HARMONIE-AROME, and KNMI HARMONIE-AROME | 0 and 1 | Beyond the product's horizon from day 2. |
 
 **Day 0 reads the freshest run that covers each hour, and its served lead is checked for only
