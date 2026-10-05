@@ -189,7 +189,9 @@ The asset gets its own module rather than joining `defs/assets.py`, which holds 
 
 - Add `"clean_nged_power_data"` to `power_time_series_and_metadata_job`'s selection, so the asset
   runs hourly, straight after ingest and five minutes before each 6-hourly `live_forecasts` slot.
-  That is well over the four runs a day the maintainer requires. #1020 also edits this file (the
+  That is well over the four runs a day the maintainer requires. The job's `description` string
+  and the comment above the job, which both say the job only ingests, are updated to name the
+  cleaning step too. #1020 also edits this file (the
   `ecmwf_ens` schedule), but the maintainer will merge this PR before work on #1020 starts, and a
   comment on #1020 says so.
 
