@@ -79,7 +79,6 @@ from nwp_forecast_comparison import (  # noqa: E402
     candidate_rows,
     rows,
 )
-from paths import REPO_DATA_DIR  # noqa: E402
 from studies.baselines import haurwitz_w_m2  # noqa: E402
 from studies.grid_sampling import nearest_cells  # noqa: E402
 from studies.guards import refuse_to_overwrite  # noqa: E402
@@ -92,6 +91,7 @@ from studies.resample import (  # noqa: E402
     wind_polar,
 )
 from studies.solar import zenith  # noqa: E402
+from studies.sources import REPO_DATA_DIR  # noqa: E402
 from studies.ukv_ceda_profiles import (  # noqa: E402
     PLAIN_LAST_STEP,
     STATUS_COMPLETE,

@@ -54,9 +54,10 @@ from studies.charts import (
     leaderboard_panel,
     wrapped,
 )
-from weather_product_charts import ASSETS_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("ens_forecast_charts")
+
+ASSETS_DIR: Final[Path] = Path(__file__).resolve().parents[2] / "docs" / "studies" / "assets"
 
 _results_dir: Path = OUTPUT_DIR
 """The folder every chart reads its results from: `OUTPUT_DIR` unless `--results-dir` says

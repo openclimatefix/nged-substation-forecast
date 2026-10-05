@@ -74,10 +74,10 @@ sys.path.insert(0, str(_STUDIES_DIR / "weather_downloads"))
 import build_ukv_ceda_inputs as build  # noqa: E402
 import ens_forecast_horizons as efh  # noqa: E402
 from nwp_forecast_comparison import DomainType  # noqa: E402
-from paths import REPO_DATA_DIR  # noqa: E402
 from studies.grid_sampling import nearest_cells  # noqa: E402
 from studies.ifs_single_runs import served_lead_hours  # noqa: E402
 from studies.solar import zenith  # noqa: E402
+from studies.sources import REPO_DATA_DIR  # noqa: E402
 from studies.timestamp_checks import best_offset_minutes, correlation_by_offset  # noqa: E402
 
 SAMPLE_PER_STRATUM: Final[int] = 6

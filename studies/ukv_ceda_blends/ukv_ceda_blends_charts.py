@@ -81,7 +81,6 @@ from nwp_forecast_comparison import (  # noqa: E402
     PERCENTAGE_POINTS,
     DomainType,
 )
-from paths import REPO_DATA_DIR  # noqa: E402
 from studies.bootstrap import BootstrapInterval  # noqa: E402
 from studies.charts import (  # noqa: E402
     ABSOLUTE_ERROR_X_TITLE,
@@ -90,6 +89,7 @@ from studies.charts import (  # noqa: E402
     interval_panel,
 )
 from studies.guards import refuse_to_overwrite  # noqa: E402
+from studies.sources import REPO_DATA_DIR  # noqa: E402
 
 DOMAINS: Final[tuple[DomainType, DomainType]] = ("solar", "wind")
 

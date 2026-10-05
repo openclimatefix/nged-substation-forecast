@@ -105,7 +105,6 @@ from nwp_forecast_comparison import (  # noqa: E402
     leaderboard,
     predictions_from_losses,
 )
-from paths import REPO_DATA_DIR  # noqa: E402
 from studies.bootstrap import (  # noqa: E402
     MIN_MONTHS_FOR_INTERVAL,
     NO_DETECTABLE_DIFFERENCE,
@@ -122,6 +121,7 @@ from studies.cross_validation import (  # noqa: E402
     uncovered_months,
 )
 from studies.guards import check_no_missing, refuse_to_overwrite  # noqa: E402
+from studies.sources import REPO_DATA_DIR  # noqa: E402
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
