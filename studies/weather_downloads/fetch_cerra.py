@@ -74,7 +74,7 @@ import xarray as xr
 from delta_store.nwp import NWP_SIGNIFICAND_BITS
 from delta_store.precision import round_to_significand_bits
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR
+from studies.sources import CERRA_PRODUCT_DIR, SCRATCH_DIR
 from studies.trial_area import load_trial_area_box
 
 SINGLE_LEVELS_DATASET: Final[str] = "reanalysis-cerra-single-levels"
@@ -113,7 +113,7 @@ lead time can't silently desync the request from the boundary-timestamp filter."
 CERRA_TIMES: Final[tuple[str, ...]] = tuple(f"{hour:02d}:00" for hour in range(0, 24, 3))
 """CERRA's own 3-hourly analysis times."""
 
-_SCRATCH_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR.parent.parent / "_scratch" / "cerra"
+_CERRA_SCRATCH_DIR: Final[Path] = SCRATCH_DIR / "cerra"
 """Where a whole-domain NetCDF lands transiently before being cropped and deleted. Under `data/`,
 not `/tmp`: `/tmp` on this machine is tmpfs, and a whole-Europe file (~15 GB per six-month chunk,
 see the module docstring) belongs on real disk — see the `data-download` skill."""
@@ -231,7 +231,7 @@ def download_one_chunk(*, dataset: str, request: dict[str, object], scratch_path
     queueing, an invalid request) and retry later, while a bug in the crop step below is left to
     raise and stop the run — see the `data-download` skill on scoping a resumable catch.
     """
-    _SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
+    _CERRA_SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
     client = cdsapi.Client(quiet=True, progress=False)
     client.retrieve(dataset, request, str(scratch_path))
 
@@ -378,7 +378,7 @@ def _run_variable(
         request = _build_request(
             variable=variable, height_level=height_level, start_date=chunk_start, end_date=chunk_end
         )
-        scratch_path = _SCRATCH_DIR / f"{label}_{chunk_start}_{chunk_end}.nc"
+        scratch_path = _CERRA_SCRATCH_DIR / f"{label}_{chunk_start}_{chunk_end}.nc"
         try:
             download_one_chunk(dataset=dataset, request=request, scratch_path=scratch_path)
         # Only the download step is caught: a failed or timed-out request must not abandon chunks
@@ -473,7 +473,7 @@ def main() -> int:
     arguments = parser.parse_args()
 
     chunks = _six_month_chunks(start_date=arguments.start_date, end_date=arguments.end_date)
-    output_dir = WEATHER_DOWNLOADS_DIR / "CERRA"
+    output_dir = CERRA_PRODUCT_DIR
     output_dir.mkdir(parents=True, exist_ok=True)
 
     if arguments.wind_direction:

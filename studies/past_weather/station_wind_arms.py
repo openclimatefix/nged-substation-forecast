@@ -111,7 +111,7 @@ from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.midas import read_hourly_weather, read_station_metadata, select_nearest_stations
 from studies.pv_dataset import wind_sites
 from studies.solar_product_frames import with_eras
-from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
+from studies.sources import MIDAS_OPEN_PRODUCT_DIR, STUDY_DATA_DIR
 from studies.wind_product_frames import (
     SHARED_FEATURES,
     UKV_80M_COLUMNS,
@@ -129,7 +129,7 @@ OUTPUT_DIR_NAME: Final[str] = "station_wind_arms"
 OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "past_weather_v2" / OUTPUT_DIR_NAME
 """Where this study writes its outputs, and a `superseded/` folder for re-runs."""
 
-MIDAS_DIR: Final[Path] = WEATHER_DATA_DIR / "MIDAS-OPEN"
+MIDAS_DIR: Final[Path] = MIDAS_OPEN_PRODUCT_DIR
 """The MIDAS Open download."""
 
 HOURLY_WEATHER_PATH: Final[Path] = MIDAS_DIR / "uk_hourly_weather_obs.parquet"

@@ -29,14 +29,14 @@ from fetch_ens_forecast_horizons import MARGIN_HOURS, NWP_TABLE, OUTPUT_PATH, _c
 from studies.ens_members import ENSEMBLE_SIZE
 from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import pv_sites, wind_sites
-from studies.sources import STUDIES_DATA_DIR
+from studies.sources import ENS_FORECAST_HORIZONS_DAY4_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_ens_day4_supplement")
 
 DAY: Final[int] = 4
 """The band the extract lacks."""
 
-SUPPLEMENT_DIR: Final = STUDIES_DATA_DIR / "ens_forecast_horizons_day4"
+SUPPLEMENT_DIR: Final = ENS_FORECAST_HORIZONS_DAY4_DIR
 """The new folder holding the supplement, written once."""
 
 SUPPLEMENT_PATH: Final = SUPPLEMENT_DIR / "ens_members_day4.parquet"

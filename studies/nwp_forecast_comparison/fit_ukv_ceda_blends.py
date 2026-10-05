@@ -114,7 +114,6 @@ from studies.cross_validation import (
     uncovered_months,
 )
 from studies.guards import check_no_missing, refuse_to_overwrite
-from studies.sources import REPO_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -2911,7 +2910,7 @@ def check_output_dir(*, output_dir: Path, read_only: Sequence[Path]) -> None:
         read_only: The folders the script only reads.
 
     Raises:
-        ValueError: If `output_dir` is a read-only folder or is not named like the build's.
+        ValueError: If `output_dir` is a read-only folder or is not the build's output folder.
     """
     build.check_output_dir(output_dir=output_dir, read_only=read_only)
 
@@ -2928,13 +2927,10 @@ def workers_argument(text: str) -> int:
 def main() -> int:
     """Fit the blends, or list (`--dry-run`), time (`--check`), or report (`--report-only`)."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    studies_dir = REPO_DATA_DIR / "studies"
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--published-dir", type=Path, default=studies_dir / build.PUBLISHED_DIR_NAME
-    )
-    parser.add_argument("--day4-dir", type=Path, default=studies_dir / build.DAY4_DIR_NAME)
-    parser.add_argument("--output-dir", type=Path, default=studies_dir / build.OUTPUT_DIR_NAME)
+    parser.add_argument("--published-dir", type=Path, default=build.PUBLISHED_DIR)
+    parser.add_argument("--day4-dir", type=Path, default=build.DAY4_DIR)
+    parser.add_argument("--output-dir", type=Path, default=build.OUTPUT_DIR)
     parser.add_argument(
         "--older-dir",
         type=Path,
@@ -2975,7 +2971,7 @@ def main() -> int:
     kind: PostHocKind | None = args.post_hoc
     older_dir: Path | None = args.older_dir
     if kind == "older run" and older_dir is None:
-        older_dir = studies_dir / build.OLDER_RUN.output_dir_name
+        older_dir = build.OLDER_RUN.output_dir
     check_output_dir(output_dir=args.output_dir, read_only=[args.published_dir, args.day4_dir])
     planned = plan_stages(
         published_dir=args.published_dir,

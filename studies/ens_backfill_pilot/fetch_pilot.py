@@ -37,7 +37,6 @@ from pilot_common import (
     MembersType,
     PlannedMessage,
     RequestStats,
-    data_dir,
     fetch_idx,
     fetch_message_prefix,
     files_needed,
@@ -54,6 +53,7 @@ from studies.ens_grib_source import (
     parse_listing,
 )
 from studies.grib1_simple import decode_values, unpack_rows
+from studies.sources import ENS_BACKFILL_PILOT_DIR
 
 
 def list_bucket() -> str:
@@ -75,7 +75,7 @@ def resolve_dates(*, override: str | None) -> list[date]:
     """
     if override:
         return [date.fromisoformat(text) for text in override.split(",")]
-    saved = data_dir() / "pilot_dates.json"
+    saved = ENS_BACKFILL_PILOT_DIR / "pilot_dates.json"
     if saved.exists():
         return [date.fromisoformat(text) for text in json.loads(saved.read_text())["dates"]]
     complete = complete_dates(files_by_date=parse_listing(text=list_bucket()))

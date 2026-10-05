@@ -39,13 +39,13 @@ import numpy as np
 import polars as pl
 import xarray as xr
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR
 from studies.pv_dataset import wind_sites
+from studies.sources import ERA5_PRODUCT_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_era5_wind")
 
-OUTPUT_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR / "ERA5"
+OUTPUT_DIR: Final[Path] = ERA5_PRODUCT_DIR
 CHUNK_DIR: Final[Path] = OUTPUT_DIR / "wind_native_chunks"
 OUTPUT_PATH: Final[Path] = OUTPUT_DIR / "wind_native_cds.parquet"
 VARIABLES: Final[dict[str, str]] = {

@@ -47,7 +47,7 @@ from studies.grid_sampling import nearest_cells, nearest_grid_indices
 from studies.hourly_means import KEY_COLUMN, icon_dream_hourly, sarah_hourly
 from studies.pv_dataset import pv_sites
 from studies.solar import zenith
-from studies.sources import WEATHER_DATA_DIR, point_output_path_for
+from studies.sources import ICON_DREAM_EU_PRODUCT_DIR, SARAH_3_PRODUCT_DIR, point_output_path_for
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("extract_site_series")
@@ -55,13 +55,13 @@ _LOG: Final[logging.Logger] = logging.getLogger("extract_site_series")
 ExtractedProductType = Literal["sarah-3", "icon-dream-eu"]
 """The gridded products this script cuts per-site frames from."""
 
-SARAH_DIR: Final[Path] = WEATHER_DATA_DIR / "SARAH-3"
+SARAH_DIR: Final[Path] = SARAH_3_PRODUCT_DIR
 """Holds `SIS/` (global) and `SID/` (direct) daily files from the CM SAF orders."""
 
 SARAH_GOOD_RECORD: Final[int] = 0
 """The `record_status` of a usable slot; 1 is void and 2 is bad quality."""
 
-ICON_DREAM_DIR: Final[Path] = WEATHER_DATA_DIR / "ICON-DREAM-EU"
+ICON_DREAM_DIR: Final[Path] = ICON_DREAM_EU_PRODUCT_DIR
 """Holds one parquet per variable, keyed by ICON grid cell, from the issue #841 download."""
 
 ICON_DREAM_FILES: Final[dict[str, str]] = {

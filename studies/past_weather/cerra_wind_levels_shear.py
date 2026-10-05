@@ -49,12 +49,12 @@ from cerra_wind_levels import (
 )
 from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import wind_sites
-from studies.sources import STUDIES_DATA_DIR
+from studies.sources import CERRA_WIND_LEVELS_POST_HOC_DIR
 from weather_products import _mae
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
-OUTPUT_DIR: Final = STUDIES_DATA_DIR / "cerra_wind_levels_post_hoc"
+OUTPUT_DIR: Final = CERRA_WIND_LEVELS_POST_HOC_DIR
 """Where this script writes, separate from `cerra_wind_levels.py`'s folder."""
 
 TWO_HEIGHTS: Final[str] = "speed_10m_100m"

@@ -53,7 +53,7 @@ import polars as pl
 import zarr
 from fetch_open_meteo_previous_runs import _pv_sites, _wind_sites
 from fetch_ukv_ceda import GRID_SPACING_M, N_STEPS, _array, _repository_config
-from paths import WEATHER_DOWNLOADS_DIR
+from studies.sources import ERA5_PRODUCT_DIR, product_dir_for
 from studies.ukv_ceda_profiles import CYCLE_HOURS, FIELDS, SLOT_EPOCH, STATUS_COMPLETE
 from validate_ukv_ceda import NAN_ALLOWED, VALUE_RANGES, check_run_spacing, expected_leads
 
@@ -78,7 +78,7 @@ RECENT_VARIABLES: Final[tuple[str, ...]] = (
 `validate_ukv_ceda.VALUE_RANGES`."""
 
 KELVIN: Final[float] = 273.15
-ERA5_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR / "ERA5"
+ERA5_DIR: Final[Path] = ERA5_PRODUCT_DIR
 ERA5_GRID_STEP_DEGREES: Final[float] = 0.25
 KM_PER_DEGREE: Final[float] = 111.2
 LEADS_PER_RUN: Final[int] = 6
@@ -753,7 +753,7 @@ def main() -> int:
         pv_sites = load_sites(_pv_sites())
         wind_sites = load_sites(_wind_sites())
     for name in stores:
-        group = open_group(store_dir=WEATHER_DOWNLOADS_DIR / name)
+        group = open_group(store_dir=product_dir_for(product=name))
         if "recent" in checks:
             newest, verdicts = check_recent(group, n_runs=args.n_runs)
             print(f"{name} recent: newest={newest} {verdicts.summary()}")

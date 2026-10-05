@@ -183,7 +183,7 @@ from studies.grid_sampling import distance_matrix_km
 from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import wind_sites
 from studies.solar_product_frames import with_eras
-from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
+from studies.sources import ECMWF_IFS_HRES_PRODUCT_DIR, ENS_FORECAST_HORIZONS_DIR, STUDY_DATA_DIR
 from studies.trial_area import load_trial_area_box
 from studies.wind_product_frames import (
     SHARED_FEATURES,
@@ -203,7 +203,7 @@ OUTPUT_DIR_NAME: Final[str] = "ens_hres_past_wind"
 OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "past_weather_v2" / OUTPUT_DIR_NAME
 """Where this study writes its losses, intervals, report and README, and a `superseded/` folder."""
 
-HRES_DIR: Final[Path] = WEATHER_DATA_DIR / "ECMWF-IFS-HRES"
+HRES_DIR: Final[Path] = ECMWF_IFS_HRES_PRODUCT_DIR
 """Holds the HRES downloads this script reads."""
 
 HRES_PREVIOUS_RUNS_PATH: Final[Path] = HRES_DIR / "previous_runs" / "combined.parquet"
@@ -213,9 +213,7 @@ the freshest run, in km/h and degrees."""
 HRES_GRID_PATH: Final[Path] = HRES_DIR / "ECMWF-IFS-HRES_2017-01-01_2026-09-22.parquet"
 """The 342-point, 0.05-degree grid of HRES speeds in km/h, read only for the cross-check."""
 
-ENS_INPUTS_PATH: Final[Path] = (
-    STUDY_DATA_DIR.parent / "ens_forecast_horizons" / "wind_inputs.parquet"
-)
+ENS_INPUTS_PATH: Final[Path] = ENS_FORECAST_HORIZONS_DIR / "wind_inputs.parquet"
 """The horizons study's ENS wind inputs: the ensemble mean, hourly, in m/s, per interpolation."""
 
 HORIZONS_REPORT_PATH: Final[Path] = ENS_INPUTS_PATH.parent / "report.md"

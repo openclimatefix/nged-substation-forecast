@@ -99,18 +99,18 @@ from studies.reanalysis_wind import (
     join_centred_power,
     read_cerra_wind,
 )
-from studies.sources import STUDIES_DATA_DIR, WEATHER_DATA_DIR
+from studies.sources import CERRA_PRODUCT_DIR, CERRA_WIND_LEVELS_DIR
 from studies.wind_direction import shuffled_by_month
 from weather_products import METRIC, PERCENTAGE_POINTS, _mae
 
 _LOG: Final[logging.Logger] = logging.getLogger("cerra_wind_levels")
 
-CERRA_DIR: Final[Path] = WEATHER_DATA_DIR / "CERRA"
+CERRA_DIR: Final[Path] = CERRA_PRODUCT_DIR
 GRID_PATH: Final[Path] = CERRA_DIR / "cerra_grid.parquet"
 """The grid's `y_index`, `x_index`, `latitude` and `longitude`. The file is private: nothing reads a
 coordinate out of it into a log, a report or a chart."""
 
-OUTPUT_DIR: Final[Path] = STUDIES_DATA_DIR / "cerra_wind_levels"
+OUTPUT_DIR: Final[Path] = CERRA_WIND_LEVELS_DIR
 """Where the script writes its outputs, and a `superseded/` folder for re-runs."""
 
 MAX_WORKERS: Final[int] = 2

@@ -40,6 +40,17 @@ charts = _load(name="nwp_forecast_charts")
 bfi = _load(name="build_forecast_inputs")
 driver = _load(name="fit_day5_aifs_wn3")
 
+DAY5_FOLDER_NAME: Final[str] = driver.OUTPUT_DIR.name
+"""The real day-5 folder's name, which the tests recreate under a temporary directory."""
+
+
+@pytest.fixture(autouse=True)
+def day5_folder_in_tmp_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point both day-5 guards at a temporary folder, because the guards compare paths."""
+    folder = tmp_path / DAY5_FOLDER_NAME
+    monkeypatch.setattr(driver, "OUTPUT_DIR", folder)
+    monkeypatch.setattr(w, "NFC_DAY5_AIFS_WN3_DIR", folder)
+
 
 def _dataset(*, nan_cell: tuple[int, int] | None = None) -> xr.Dataset:
     """Return a 2-run, 360-lead, 2x2-cell copy whose value is `RUN_STRIDE * run + lead`.
@@ -906,9 +917,9 @@ def test_a_run_missing_from_the_copy_is_not_a_hole_inside_a_band(domain: str) ->
 def test_the_day_5_fits_refuse_every_output_folder_but_their_own(tmp_path: Path) -> None:
     published = tmp_path / "nwp_forecast_comparison"
     for name in ("nwp_forecast_comparison_aifs_extra_days", "nwp_forecast_comparison_leads_day10"):
-        with pytest.raises(ValueError, match=driver.OUTPUT_DIR_NAME):
+        with pytest.raises(ValueError, match="writes only to"):
             driver.check_output_dir(output_dir=tmp_path / name, published_dir=published)
-    driver.check_output_dir(output_dir=tmp_path / driver.OUTPUT_DIR_NAME, published_dir=published)
+    driver.check_output_dir(output_dir=tmp_path / driver.OUTPUT_DIR.name, published_dir=published)
 
 
 def test_the_joined_report_keeps_both_fits_under_one_title_and_refuses_to_overwrite(
@@ -947,7 +958,7 @@ def test_a_hole_in_any_one_value_column_stops_the_build(domain: str, column: str
 
 def test_the_day_5_wn3_build_refuses_any_output_folder_but_its_own(tmp_path: Path) -> None:
     published = tmp_path / "nwp_forecast_comparison"
-    with pytest.raises(ValueError, match="nwp_forecast_comparison_day5_aifs_wn3"):
+    with pytest.raises(ValueError, match="day 5 builds only into"):
         w.build_domain(
             domain="solar",
             published_dir=published,
@@ -955,15 +966,14 @@ def test_the_day_5_wn3_build_refuses_any_output_folder_but_its_own(tmp_path: Pat
             weather_dir=tmp_path,
             days=(3, 5),
         )
-    assert driver.OUTPUT_DIR_NAME == "nwp_forecast_comparison_day5_aifs_wn3"
-    assert bfi.DAY5_OUTPUT_DIR_NAME == "nwp_forecast_comparison_day5_aifs_wn3"
+    assert driver.OUTPUT_DIR.name == "nwp_forecast_comparison_day5_aifs_wn3"
 
 
 def _run_driver(
     *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, existing: list[str]
 ) -> list[str]:
     """Run `driver.main` with both fits stubbed, and return which fits ran."""
-    out = tmp_path / driver.OUTPUT_DIR_NAME
+    out = tmp_path / driver.OUTPUT_DIR.name
     out.mkdir(exist_ok=True)
     for name in existing:
         (out / name).write_text("# done\n\n## x")
@@ -1003,7 +1013,7 @@ def test_the_driver_runs_both_fits_writes_the_readme_once_and_joins_the_reports(
 ) -> None:
     ran = _run_driver(tmp_path=tmp_path, monkeypatch=monkeypatch, existing=[])
 
-    out = tmp_path / driver.OUTPUT_DIR_NAME
+    out = tmp_path / driver.OUTPUT_DIR.name
     assert ran == ["lean", "wn3"]
     assert (out / driver.README_NAME).read_text() == driver.README_TEXT
     assert (out / driver.REPORT_NAME).exists()
@@ -1012,7 +1022,7 @@ def test_the_driver_runs_both_fits_writes_the_readme_once_and_joins_the_reports(
 def test_the_driver_skips_a_fit_whose_report_exists_and_keeps_an_existing_readme(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    out = tmp_path / driver.OUTPUT_DIR_NAME
+    out = tmp_path / driver.OUTPUT_DIR.name
     out.mkdir()
     (out / driver.README_NAME).write_text("mine")
 
@@ -1029,7 +1039,7 @@ def test_the_driver_refuses_before_any_fit_when_report_md_exists(
 ) -> None:
     with pytest.raises(FileExistsError):
         _run_driver(tmp_path=tmp_path, monkeypatch=monkeypatch, existing=[driver.REPORT_NAME])
-    assert not (tmp_path / driver.OUTPUT_DIR_NAME / driver.AIFS_REPORT_NAME).exists()
+    assert not (tmp_path / driver.OUTPUT_DIR.name / driver.AIFS_REPORT_NAME).exists()
 
 
 def _patch_day5_build(*, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ens: float) -> Path:
@@ -1088,3 +1098,11 @@ def test_the_day_5_wn3_build_accepts_an_ens_mean_equal_to_the_extra_lead_folders
     )
 
     assert frame["ens_mean_day5_speed_100m"][0] == 7.0
+
+
+def test_the_day_5_folder_may_be_reached_through_a_symbolic_link(tmp_path: Path) -> None:
+    (tmp_path / DAY5_FOLDER_NAME).mkdir()
+    link = tmp_path / "old_name"
+    link.symlink_to(tmp_path / DAY5_FOLDER_NAME, target_is_directory=True)
+
+    driver.check_output_dir(output_dir=link, published_dir=tmp_path / "nwp_forecast_comparison")

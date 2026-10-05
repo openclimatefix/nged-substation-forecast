@@ -558,8 +558,8 @@ def test_an_inputs_file_changed_after_the_build_is_refused(tmp_path: Path):
 def test_no_fit_may_write_into_a_folder_it_reads(tmp_path: Path):
     reads = [tmp_path / "published", tmp_path / "day4"]
 
-    fit.check_output_dir(output_dir=tmp_path / "ukv_ceda_blends", read_only=reads)
-    with pytest.raises(ValueError, match="writes only to a folder named"):
+    fit.check_output_dir(output_dir=fit.build.OUTPUT_DIR, read_only=reads)
+    with pytest.raises(ValueError, match="writes only to"):
         fit.check_output_dir(output_dir=reads[0], read_only=reads)
 
 

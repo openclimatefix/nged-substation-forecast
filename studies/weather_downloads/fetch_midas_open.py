@@ -67,7 +67,7 @@ from typing import IO, Any, Final, Literal
 
 import polars as pl
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR
+from studies.sources import MIDAS_OPEN_PRODUCT_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_midas_open")
@@ -173,7 +173,7 @@ for _dataset, _ids in STATION_IDS.items():
         )
         raise RuntimeError(_msg)
 
-PRODUCT_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR / "MIDAS-OPEN"
+PRODUCT_DIR: Final[Path] = MIDAS_OPEN_PRODUCT_DIR
 RAW_DIR: Final[Path] = PRODUCT_DIR / "raw"
 STATION_METADATA_DIR: Final[Path] = PRODUCT_DIR / "_station_metadata"
 """Read only. Holds CEDA's station-metadata CSVs, which carry coordinates and station names."""

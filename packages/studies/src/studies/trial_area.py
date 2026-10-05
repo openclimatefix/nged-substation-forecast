@@ -6,21 +6,10 @@ studies that fetch their own grid read it from here as well.
 """
 
 import json
-from pathlib import Path
-from typing import Final
 
 import polars as pl
 
-from studies.sources import WEATHER_DATA_DIR
-
-TRIAL_AREA_BOX_PATH: Final[Path] = WEATHER_DATA_DIR / "_trial_area_box.json"
-"""Where the trial-area box's bounds are kept.
-
-**This file is never read by anything outside this process's private working state, and its
-contents must never be logged, printed, committed, or quoted back in a report.** The bounds are
-derived from the private generator roster (`packages/contracts` `TimeSeriesMetadata`), and NGED's
-generator locations must never appear in anything published — see CLAUDE.md.
-"""
+from studies.sources import TRIAL_AREA_BOX_PATH
 
 
 class TrialAreaBox:
@@ -96,7 +85,7 @@ def write_trial_area_box_from_roster(*, margin_deg: float = 0.15) -> None:
         pl.col("longitude").min().alias("lon_min"),
         pl.col("longitude").max().alias("lon_max"),
     ).row(0)
-    WEATHER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    TRIAL_AREA_BOX_PATH.parent.mkdir(parents=True, exist_ok=True)
     TRIAL_AREA_BOX_PATH.write_text(
         json.dumps(
             {

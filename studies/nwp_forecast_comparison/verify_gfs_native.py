@@ -43,9 +43,7 @@ import numpy as np
 import polars as pl
 from build_forecast_inputs import (
     GFS_NATIVE_DAYS,
-    GFS_NATIVE_DIR_NAME,
     _gefs_cell_selection,
-    _repo_data_dir,
     gfs_native_arm,
 )
 from studies.gfs_native import (
@@ -57,6 +55,7 @@ from studies.gfs_native import (
     step_means,
     window_hours,
 )
+from studies.sources import GFS_PRODUCT_DIR
 
 from studies import ens_members
 
@@ -622,8 +621,7 @@ def main() -> int:
     parser.add_argument("--built-dir", type=Path, default=None)
     parser.add_argument("--gfs-dir", type=Path, default=None)
     args = parser.parse_args()
-    gfs_dir = _repo_data_dir() / "studies" / "weather" / GFS_NATIVE_DIR_NAME
-    gfs_dir = args.gfs_dir or gfs_dir
+    gfs_dir = args.gfs_dir or GFS_PRODUCT_DIR
     verification = args.output_dir / "verification"
     verification.mkdir(parents=True, exist_ok=True)
 

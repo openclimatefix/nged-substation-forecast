@@ -323,6 +323,45 @@ def test_the_check_reads_every_earlier_studys_stamps_and_fails_on_none(tmp_path:
     assert unchanged.check_all(studies_dir=tmp_path / "empty")[0] == 0
 
 
+def _two_good_stamps(*, root: Path) -> None:
+    import fit_aifs
+
+    columns = {"ens_mean_day1": list(fit_aifs.arm_features(arm="ens_mean_day1", domain="solar"))}
+    for batch, name in (("a", "solar_s_losses.json"), ("b", "solar_t_losses.json")):
+        _stamp(folder=root / f"nwp_forecast_comparison_{batch}", name=name, columns=columns)
+
+
+def test_a_wrong_stamp_count_exits_non_zero_and_the_right_one_exits_zero(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    _two_good_stamps(root=tmp_path)
+
+    assert unchanged.main(["--studies-dir", str(tmp_path), "--expected-stamps", "2"]) == 0
+    assert unchanged.main(["--studies-dir", str(tmp_path), "--expected-stamps", "3"]) == 1
+    assert "found 2 stamps, expected 3" in capsys.readouterr().out
+    assert unchanged.main(["--studies-dir", str(tmp_path), "--expected-stamps", "1"]) == 1
+
+
+def test_the_expected_stamp_count_is_required(tmp_path: Path):
+    with pytest.raises(SystemExit):
+        unchanged.main(["--studies-dir", str(tmp_path)])
+
+
+def test_a_folder_and_a_symbolic_link_to_it_count_once(tmp_path: Path):
+    _two_good_stamps(root=tmp_path)
+    (tmp_path / "nwp_forecast_comparison_alias").symlink_to(
+        tmp_path / "nwp_forecast_comparison_a", target_is_directory=True
+    )
+
+    assert unchanged.check_all(studies_dir=tmp_path)[0] == 2
+
+
+def test_the_stamp_glob_comes_from_the_shared_constants():
+    from studies.sources import NFC_STAMP_GLOB
+
+    assert unchanged.STAMP_GLOB == NFC_STAMP_GLOB
+
+
 def test_a_stamp_must_name_its_technology_in_its_file_name(tmp_path: Path):
     assert unchanged.stamp_domain(path=tmp_path / "solar_single_day1_losses.json") == "solar"
     assert unchanged.stamp_domain(path=tmp_path / "wind_ens_losses.json") == "wind"

@@ -25,18 +25,14 @@ Run it with `uv run python studies/nwp_forecast_comparison/verify_extra_leads.py
 
 import argparse
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Final
 
 import polars as pl
-from contracts.settings import PROJECT_ROOT
+from studies.sources import GEFS_WINDOW_DIR, WEATHER_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
-
-GEFS_DIR_NAME: Final[str] = "GEFS_window_2024-11-01_None"
-"""Under `data/studies/weather/`, the finished GEFS download."""
 
 FINE_LAST_LEAD_HOURS: Final[int] = 240
 """GEFS steps every 3 hours to this lead and every 6 hours beyond it."""
@@ -56,25 +52,6 @@ MAX_RATIO_ERROR: Final[float] = 0.10
 
 PRODUCTS: Final[dict[str, str]] = {"ICON-D2": "icon-d2", "ICON-EU": "icon-eu"}
 """Each product's directory under `data/studies/weather/`, and the slug in its file names."""
-
-
-def _repo_data_dir() -> Path:
-    """Return the shared `data/` directory, resolving a linked worktree to the main checkout.
-
-    Duplicated from `verify_previous_runs_leads._repo_data_dir`, because study scripts cannot
-    import one another's private helpers.
-
-    Returns:
-        The directory holding `studies/` and the rest of the shared downloads.
-    """
-    root = PROJECT_ROOT
-    marker = root / ".git"
-    if marker.is_file():
-        pointer = marker.read_text().removeprefix("gitdir:").strip()
-        git_dir = Path(pointer)
-        if git_dir.parent.name == "worktrees":
-            root = git_dir.parent.parent.parent
-    return Path(os.environ.get("DATA_PATH_INTERNAL") or root / "data")
 
 
 def gefs_window_table(*, files: list[Path]) -> pl.DataFrame:
@@ -278,11 +255,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
-    weather_dir = _repo_data_dir() / "studies" / "weather"
     verification = args.output_dir / "verification"
     verification.mkdir(parents=True, exist_ok=True)
 
-    cache = weather_dir / GEFS_DIR_NAME / "_month_cache"
+    cache = GEFS_WINDOW_DIR / "_month_cache"
     cache_files = sorted(cache.glob("*.parquet"))
     table = gefs_window_table(files=cache_files)
     boundary = gefs_boundary_table(files=cache_files)
@@ -343,7 +319,7 @@ def main() -> int:
         day0.extend(
             f"| {product} | {record['column']} | {record['hours']} "
             f"| {record['max_abs_difference']:.4f} | {record['share_within_tolerance']:.4f} |"
-            for record in day0_comparison(weather_dir=weather_dir, product=product, slug=slug)
+            for record in day0_comparison(weather_dir=WEATHER_DATA_DIR, product=product, slug=slug)
         )
     (verification / "day0_matches_past_series.md").write_text("\n".join(day0) + "\n")
     _LOG.info("wrote %s", verification)

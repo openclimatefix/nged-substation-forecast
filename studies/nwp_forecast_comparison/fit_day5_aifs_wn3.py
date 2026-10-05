@@ -28,16 +28,16 @@ from pathlib import Path
 from typing import Final
 
 import fit_aifs
-from build_forecast_inputs import DAY5_OUTPUT_DIR_NAME
 from studies.guards import refuse_to_overwrite
+from studies.sources import NFC_DAY5_AIFS_WN3_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
 DAY5: Final[tuple[int, ...]] = (5,)
 """The one lead day this script fits."""
 
-OUTPUT_DIR_NAME: Final[str] = DAY5_OUTPUT_DIR_NAME
-"""Under `data/studies/`, the only folder this script writes to."""
+OUTPUT_DIR: Final[Path] = NFC_DAY5_AIFS_WN3_DIR
+"""The only folder this script writes to."""
 
 AIFS_REPORT_NAME: Final[str] = "report_aifs.md"
 """The AIFS fit's report, which `fit_aifs.run_lean` writes."""
@@ -77,11 +77,13 @@ def check_output_dir(*, output_dir: Path, published_dir: Path) -> None:
         published_dir: The folder holding the published inputs.
 
     Raises:
-        ValueError: If `output_dir` is the published folder or has a name other than
-            `OUTPUT_DIR_NAME`.
+        ValueError: If `output_dir` is the published folder or is not `OUTPUT_DIR`.
     """
-    if output_dir.resolve() == published_dir.resolve() or output_dir.name != OUTPUT_DIR_NAME:
-        msg = f"this script writes only to a folder named {OUTPUT_DIR_NAME}, not {output_dir}"
+    if (
+        output_dir.resolve() == published_dir.resolve()
+        or output_dir.resolve() != OUTPUT_DIR.resolve()
+    ):
+        msg = f"this script writes only to {OUTPUT_DIR}, not {output_dir}"
         raise ValueError(msg)
 
 

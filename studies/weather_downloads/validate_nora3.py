@@ -23,9 +23,9 @@ from pathlib import Path
 from typing import Any, Final
 
 import polars as pl
-from paths import WEATHER_DOWNLOADS_DIR
+from studies.sources import NORA3_PRODUCT_DIR
 
-PRODUCT_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR / "NORA3"
+PRODUCT_DIR: Final[Path] = NORA3_PRODUCT_DIR
 KEY_COLUMNS: Final[list[str]] = ["time", "height_m", "y_index", "x_index"]
 HEIGHTS_M: Final[set[int]] = {50, 100}
 FIRST_MONTH: Final[str] = "2015-01"

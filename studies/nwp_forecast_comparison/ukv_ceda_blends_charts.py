@@ -83,7 +83,6 @@ from studies.charts import (
     interval_panel,
 )
 from studies.guards import refuse_to_overwrite
-from studies.sources import REPO_DATA_DIR
 
 DOMAINS: Final[tuple[DomainType, DomainType]] = ("solar", "wind")
 
@@ -1352,9 +1351,8 @@ def check_no_dates(*, path: Path) -> None:
 
 def main() -> int:
     """Draw every figure and write the SVGs, once."""
-    studies_dir = REPO_DATA_DIR / "studies"
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--results-dir", type=Path, default=studies_dir / build.OUTPUT_DIR_NAME)
+    parser.add_argument("--results-dir", type=Path, default=build.OUTPUT_DIR)
     parser.add_argument("--intervals-name", default="intervals.parquet")
     parser.add_argument("--figures-dir", type=Path, required=True, help="Where SVGs are written.")
     parser.add_argument("--no-svgo", action="store_true", help="Skip the svgo optimisation.")

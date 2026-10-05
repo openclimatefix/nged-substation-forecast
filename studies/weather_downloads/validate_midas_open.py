@@ -22,14 +22,14 @@ from typing import Any, Final
 
 import numpy as np
 import polars as pl
-from paths import WEATHER_DOWNLOADS_DIR
 from studies.solar import cos_zenith, extraterrestrial_horizontal, zenith
+from studies.sources import ERA5_PRODUCT_DIR, MIDAS_OPEN_PRODUCT_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("validate_midas_open")
 
-PRODUCT_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR / "MIDAS-OPEN"
-ERA5_GRID_PATH: Final[Path] = WEATHER_DOWNLOADS_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet"
+PRODUCT_DIR: Final[Path] = MIDAS_OPEN_PRODUCT_DIR
+ERA5_GRID_PATH: Final[Path] = ERA5_PRODUCT_DIR / "beam_diffuse_open_meteo.parquet"
 """The ERA5 irradiance and temperature on the study grid, hour-ending for irradiance."""
 
 ERA5_HALF_CELL_DEG: Final[float] = 0.125

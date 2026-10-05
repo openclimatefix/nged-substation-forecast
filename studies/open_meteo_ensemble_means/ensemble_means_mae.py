@@ -102,7 +102,13 @@ from studies.pv_dataset import (
     wind_sites,
 )
 from studies.pv_dataset import solar_hourly_power as _solar_hourly_power
-from studies.sources import STUDIES_DATA_DIR, WEATHER_DATA_DIR
+from studies.sources import (
+    CAMS_PRODUCT_DIR,
+    ENS_PRODUCT_DIR,
+    ERA5_PRODUCT_DIR,
+    OPEN_METEO_ENSEMBLE_MEANS_DIR,
+    OPEN_METEO_ENSEMBLE_MEANS_PRODUCT_DIR,
+)
 from studies.stitched_ensemble import (
     hold_backward_mean_hourly,
     interpolate_instants_hourly,
@@ -118,10 +124,10 @@ DesignType = Literal["solar", "wind_10m", "wind_hub"]
 WINDOW_START: Final[datetime] = datetime(2026, 6, 25, tzinfo=UTC)
 """The first hour of the Open-Meteo ensemble-mean archive, and the first day of the first fold."""
 
-OUTPUT_DIR: Final[Path] = STUDIES_DATA_DIR / "open_meteo_ensemble_means"
+OUTPUT_DIR: Final[Path] = OPEN_METEO_ENSEMBLE_MEANS_DIR
 """Where this script writes. A re-run needs the old files moved to `superseded/` by hand."""
 
-ENSEMBLE_MEANS_DIR: Final[Path] = WEATHER_DATA_DIR / "OPEN-METEO-ENSEMBLE-MEANS"
+ENSEMBLE_MEANS_DIR: Final[Path] = OPEN_METEO_ENSEMBLE_MEANS_PRODUCT_DIR
 """One folder per Open-Meteo ensemble-mean product, each holding a parquet named for the folder."""
 
 OPEN_METEO_PRODUCTS: Final[dict[str, str]] = {
@@ -186,18 +192,18 @@ LOCAL_ENS_RUN_LOOKBACK_DAYS: Final[int] = 3
 
 MS_TO_KM_PER_H: Final[float] = 3.6
 
-ENS_DIR: Final[Path] = WEATHER_DATA_DIR / "ENS"
+ENS_DIR: Final[Path] = ENS_PRODUCT_DIR
 CAMS_PATHS: Final[tuple[Path, ...]] = (
-    WEATHER_DATA_DIR / "CAMS" / "beam_diffuse_cams.parquet",
-    WEATHER_DATA_DIR / "CAMS" / "beam_diffuse_cams_2026-08-20_2026-09-21.parquet",
+    CAMS_PRODUCT_DIR / "beam_diffuse_cams.parquet",
+    CAMS_PRODUCT_DIR / "beam_diffuse_cams_2026-08-20_2026-09-21.parquet",
 )
 ERA5_GRID_PATHS: Final[tuple[Path, ...]] = (
-    WEATHER_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet",
-    WEATHER_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo_2026-08-20_2026-09-21.parquet",
+    ERA5_PRODUCT_DIR / "beam_diffuse_open_meteo.parquet",
+    ERA5_PRODUCT_DIR / "beam_diffuse_open_meteo_2026-08-20_2026-09-21.parquet",
 )
 ERA5_WIND_PATHS: Final[tuple[Path, ...]] = (
-    WEATHER_DATA_DIR / "ERA5" / "wind_era5.parquet",
-    WEATHER_DATA_DIR / "ERA5" / "wind_era5_2026-08-20_2026-09-21.parquet",
+    ERA5_PRODUCT_DIR / "wind_era5.parquet",
+    ERA5_PRODUCT_DIR / "wind_era5_2026-08-20_2026-09-21.parquet",
 )
 """Each pair is the original download, then the refreshed one, which wins where they overlap."""
 

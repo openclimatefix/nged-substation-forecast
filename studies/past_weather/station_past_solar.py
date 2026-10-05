@@ -73,7 +73,7 @@ from studies.midas import (
 from studies.product_frames import PERMUTATION_GROUPS, SOLAR, solar_frame
 from studies.pv_dataset import pv_sites
 from studies.solar_product_frames import with_eras
-from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
+from studies.sources import MIDAS_OPEN_PRODUCT_DIR, STUDY_DATA_DIR
 from weather_products import (
     CONTRAST_HEADER,
     METRIC,
@@ -85,7 +85,7 @@ from weather_products import (
 
 _LOG: Final[logging.Logger] = logging.getLogger("station_past_solar")
 
-MIDAS_DIR: Final[Path] = WEATHER_DATA_DIR / "MIDAS-OPEN"
+MIDAS_DIR: Final[Path] = MIDAS_OPEN_PRODUCT_DIR
 RADIATION_PATH: Final[Path] = MIDAS_DIR / "uk_radiation_obs_hourly.parquet"
 WEATHER_PATH: Final[Path] = MIDAS_DIR / "uk_hourly_weather_obs.parquet"
 RADIATION_METADATA_PATH: Final[Path] = (

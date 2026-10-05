@@ -61,7 +61,7 @@ import requests
 import xarray as xr
 from delta_store.precision import round_to_significand_bits
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR
+from studies.sources import ICON_DREAM_EU_PRODUCT_DIR
 from studies.trial_area import load_trial_area_box
 
 BASE_URL: Final[str] = "https://opendata.dwd.de/climate_environment/REA/ICON-DREAM-EU"
@@ -495,7 +495,7 @@ def main() -> int:
     year_months = _year_months(arguments.start_year_month, arguments.end_year_month)
 
     for variable in arguments.variables:
-        output_dir = WEATHER_DOWNLOADS_DIR / "ICON-DREAM-EU"
+        output_dir = ICON_DREAM_EU_PRODUCT_DIR
         output_dir.mkdir(parents=True, exist_ok=True)
         # Every month is checkpointed to its own parquet as soon as it is cropped, so a crash
         # partway through a variable (a missing month, a network drop, a server error) loses at

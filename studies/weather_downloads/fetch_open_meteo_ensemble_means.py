@@ -58,7 +58,7 @@ from fetch_open_meteo_single_runs import (
     _write_atomically,
 )
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR
+from studies.sources import OPEN_METEO_ENSEMBLE_MEANS_PRODUCT_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_open_meteo_ensemble_means")
@@ -66,7 +66,7 @@ _LOG: Final[logging.Logger] = logging.getLogger("fetch_open_meteo_ensemble_means
 ENSEMBLE_URL: Final[str] = "https://customer-ensemble-api.open-meteo.com/v1/ensemble"
 """The commercial Ensemble API host. It needs `OPEN_METEO_TOKEN`."""
 
-OUTPUT_ROOT: Final[Path] = WEATHER_DOWNLOADS_DIR / "OPEN-METEO-ENSEMBLE-MEANS"
+OUTPUT_ROOT: Final[Path] = OPEN_METEO_ENSEMBLE_MEANS_PRODUCT_DIR
 
 BASE_VARIABLES: Final[tuple[str, ...]] = (
     "shortwave_radiation",

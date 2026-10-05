@@ -116,18 +116,18 @@ from studies.reanalysis_wind import (
     read_cerra_direction,
     read_cerra_wind,
 )
-from studies.sources import STUDIES_DATA_DIR
+from studies.sources import CERRA_WIND_DIRECTION_DIR, CERRA_WIND_LEVELS_DIR
 from studies.wind_direction import shuffled_by_month, sine_cosine, veer_degrees
 from weather_products import METRIC, PERCENTAGE_POINTS, _mae
 
 _LOG: Final[logging.Logger] = logging.getLogger("cerra_wind_direction")
 
-OUTPUT_DIR: Final[Path] = STUDIES_DATA_DIR / "cerra_wind_direction"
+OUTPUT_DIR: Final[Path] = CERRA_WIND_DIRECTION_DIR
 """Where the script writes its outputs, and a `superseded/` folder for re-runs. The folder must not
 exist before the first run's outputs: `refuse_to_overwrite` stops on any file."""
 
-PRIOR_ROWS_PATH: Final[Path] = STUDIES_DATA_DIR / "cerra_wind_levels" / "rows.parquet"
-PRIOR_LOSSES_PATH: Final[Path] = STUDIES_DATA_DIR / "cerra_wind_levels" / "losses.parquet"
+PRIOR_ROWS_PATH: Final[Path] = CERRA_WIND_LEVELS_DIR / "rows.parquet"
+PRIOR_LOSSES_PATH: Final[Path] = CERRA_WIND_LEVELS_DIR / "losses.parquet"
 """The prerequisite study's saved row set and per-row losses, read-only."""
 
 HEIGHTS_M: Final[tuple[int, ...]] = (10, 50, 75, 100, 150)

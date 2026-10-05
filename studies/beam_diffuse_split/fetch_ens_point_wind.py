@@ -45,12 +45,12 @@ from fetch_ens_point import (
     _wanted_leads,
 )
 from studies.pv_dataset import wind_sites
-from studies.sources import WEATHER_DATA_DIR
+from studies.sources import ENS_PRODUCT_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-OUTPUT_PATH: Final[Path] = WEATHER_DATA_DIR / "ENS" / "beam_diffuse_ens_wind.parquet"
+OUTPUT_PATH: Final[Path] = ENS_PRODUCT_DIR / "beam_diffuse_ens_wind.parquet"
 """Where this script writes the per-meter, per-member, per-horizon frame."""
 
 WIND_COLUMNS: Final[tuple[str, ...]] = (

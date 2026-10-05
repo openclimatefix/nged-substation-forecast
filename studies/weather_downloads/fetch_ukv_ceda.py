@@ -95,8 +95,8 @@ import requests
 import zarr
 import zarr.errors
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR
 from pyproj import Transformer
+from studies.sources import product_dir_for
 from studies.trial_area import load_trial_area_box
 from studies.ukv_ceda_profiles import (
     DEFAULT_PROFILE,
@@ -1608,7 +1608,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.start is None:
         args.start = profile.slot_epoch.date()
     if args.store_dir is None:
-        args.store_dir = WEATHER_DOWNLOADS_DIR / profile.product_name
+        args.store_dir = product_dir_for(product=profile.product_name)
     return archive(args)
 
 

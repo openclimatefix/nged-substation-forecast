@@ -4,28 +4,32 @@ One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/1016>. The UKV-CEDA study adds
 one branch to `nwp_forecast_comparison._wind_weather_fields`, which every arm's wind columns pass
 through. This script proves the branch leaves every existing arm alone: each `*_losses.json` stamp
-under `data/studies/nwp_forecast_comparison_*` records the `columns` its fit used, and each arm's
-recorded columns must equal `arm_features` for that arm and technology today. It reads the stamps
-and fits nothing, writes nothing, and exits non-zero on any difference or on an arm whose columns
-`arm_features` cannot resolve.
+under the `nwp_forecast_comparison` batch folders of `data/studies/` records the `columns` its fit
+used, and each arm's recorded columns must equal `arm_features` for that arm and technology today.
+It reads the stamps and fits nothing, writes nothing, and exits non-zero on any difference, on an
+arm whose columns `arm_features` cannot resolve, or when the number of stamps found differs from
+`--expected-stamps`, which has no default so that a glob matching too few stamps cannot pass.
 
 (`fit_product_blends.py --dry-run` cannot show this, because its `SAME_BUILD_KEYS` leave `columns`
 out of the comparison.)
 
-Run it with `uv run python studies/nwp_forecast_comparison/check_arm_columns_unchanged.py`.
+Run it with `uv run python studies/nwp_forecast_comparison/check_arm_columns_unchanged.py
+--expected-stamps 72`.
 """
 
 import argparse
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Final
 
 import fit_aifs
-from nwp_forecast_comparison import DomainType, _repo_data_dir
+from nwp_forecast_comparison import DomainType
+from studies.sources import NFC_STAMP_GLOB, PER_STUDY_DIR
 
-STAMP_GLOB: Final[str] = "nwp_forecast_comparison_*/*_losses.json"
-"""Under `data/studies/`, every earlier study's stamps."""
+STAMP_GLOB: Final[str] = NFC_STAMP_GLOB
+"""Under the per-study folder, every earlier study's stamps."""
 
 
 def stamp_domain(*, path: Path) -> DomainType:
@@ -72,12 +76,13 @@ def check_all(*, studies_dir: Path) -> tuple[int, int, list[str]]:
     """Check every earlier study's stamp.
 
     Args:
-        studies_dir: The `data/studies` folder.
+        studies_dir: The folder holding the batch folders, `PER_STUDY_DIR` by default. A folder and
+            a symbolic link to it count once, because each stamp is kept once per resolved path.
 
     Returns:
         The stamps read, the arms compared, and the lines for every arm that differs.
     """
-    paths = sorted(studies_dir.glob(STAMP_GLOB))
+    paths = sorted({path.resolve(): path for path in studies_dir.glob(STAMP_GLOB)}.values())
     arms = 0
     problems: list[str] = []
     for path in paths:
@@ -87,17 +92,30 @@ def check_all(*, studies_dir: Path) -> tuple[int, int, list[str]]:
     return len(paths), arms, problems
 
 
-def main() -> int:
-    """Print the result and return 0 if every recorded arm still resolves to its columns."""
+def main(argv: Sequence[str] | None = None) -> int:
+    """Print the result and return 0 if every recorded arm still resolves to its columns.
+
+    Args:
+        argv: The command line arguments, or `None` to read `sys.argv`.
+
+    Returns:
+        0 when the stamp count equals `--expected-stamps` and no arm differs, otherwise 1.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--studies-dir", type=Path, default=_repo_data_dir() / "studies")
-    args = parser.parse_args()
+    parser.add_argument("--studies-dir", type=Path, default=PER_STUDY_DIR)
+    parser.add_argument(
+        "--expected-stamps",
+        type=int,
+        required=True,
+        help="How many stamps the glob must find. A different count fails the check.",
+    )
+    args = parser.parse_args(argv)
     stamps, arms, problems = check_all(studies_dir=args.studies_dir)
     sys.stdout.write(f"{stamps} stamps, {arms} arms compared\n")
     for line in problems:
         sys.stdout.write(f"DIFFERS: {line}\n")
-    if stamps == 0:
-        sys.stdout.write("CHECK FAIL: no stamp found\n")
+    if stamps != args.expected_stamps:
+        sys.stdout.write(f"CHECK FAIL: found {stamps} stamps, expected {args.expected_stamps}\n")
         return 1
     sys.stdout.write(f"CHECK {'FAIL' if problems else 'PASS'}\n")
     return 1 if problems else 0

@@ -114,7 +114,7 @@ from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SEEDS, SENSITIVIT
 from studies.grid_sampling import nearest_cells
 from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import wind_sites
-from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
+from studies.sources import ICON_DREAM_EU_PRODUCT_DIR, STUDY_DATA_DIR
 from studies.wind_product_frames import (
     SHARED_FEATURES,
     common_rows,
@@ -141,7 +141,7 @@ OUTPUT_DIR_NAME: Final[str] = "wind_icon_dream"
 OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "past_weather_v2" / OUTPUT_DIR_NAME
 """Where this study writes `losses.parquet`, `report.md`, and a `superseded/` folder for re-runs."""
 
-ICON_DREAM_DIR: Final[Path] = WEATHER_DATA_DIR / "ICON-DREAM-EU"
+ICON_DREAM_DIR: Final[Path] = ICON_DREAM_EU_PRODUCT_DIR
 """Holds the wind download this script reads: `WS`, `U`, `V`, and their `_10M` siblings."""
 
 WS_FILE: Final[str] = "WS_201909_202608.parquet"

@@ -55,7 +55,6 @@ Run it with `uv run python studies/nwp_forecast_comparison/dot_interval_vs_ens.p
 
 import argparse
 import logging
-import os
 import re
 import subprocess
 import sys
@@ -76,6 +75,22 @@ from nwp_forecast_charts import (
 from nwp_forecast_comparison import METRIC, PERCENTAGE_POINTS, DomainType
 from studies.bootstrap import MIN_MONTHS_FOR_INTERVAL, bootstrap_difference
 from studies.charts import figure, interval_panel, planning
+from studies.sources import (
+    NFC_AIFS_BLENDS_DIR,
+    NFC_AIFS_EXTRA_DAYS_DIR,
+    NFC_DAY4_SHARED_DIR,
+    NFC_DAY5_AIFS_WN3_DIR,
+    NFC_LEADS_DAY10_DIR,
+    NFC_LEADS_DAY10B_DIR,
+    NFC_LEADS_DAY10C_DIR,
+    NFC_LEADS_DAY10D_DIR,
+    NFC_PRODUCT_BLENDS_DIR,
+    NFC_VS_ENS_DOTS_FINAL_DIR,
+    NFC_WN3_DIR,
+    NFC_WN3_EXTRA_DAYS_DIR,
+    PER_STUDY_DIR,
+    per_study_relative,
+)
 
 _LOG: Final[logging.Logger] = logging.getLogger("dot_interval_vs_ens")
 
@@ -122,50 +137,45 @@ SourceType = Literal[
 class Source(NamedTuple):
     """Where one fit batch saved its per-row losses."""
 
-    folder: str
+    folder: Path
     pattern: str
 
 
-_AIFS_BLENDS: Final[str] = "nwp_forecast_comparison_aifs_blends"
-_AIFS_EXTRA: Final[str] = "nwp_forecast_comparison_aifs_extra_days"
-_DAY5: Final[str] = "nwp_forecast_comparison_day5_aifs_wn3"
-_PRODUCT_BLENDS: Final[str] = "nwp_forecast_comparison_product_blends"
+_LEADS_DAY10: Final[Path] = per_study_relative(folder=NFC_LEADS_DAY10_DIR)
+_LEADS_DAY10B: Final[Path] = per_study_relative(folder=NFC_LEADS_DAY10B_DIR)
+_LEADS_DAY10C: Final[Path] = per_study_relative(folder=NFC_LEADS_DAY10C_DIR)
+_LEADS_DAY10D: Final[Path] = per_study_relative(folder=NFC_LEADS_DAY10D_DIR)
+_AIFS_BLENDS: Final[Path] = per_study_relative(folder=NFC_AIFS_BLENDS_DIR)
+_AIFS_EXTRA: Final[Path] = per_study_relative(folder=NFC_AIFS_EXTRA_DAYS_DIR)
+_DAY4_SHARED: Final[Path] = per_study_relative(folder=NFC_DAY4_SHARED_DIR)
+_DAY5: Final[Path] = per_study_relative(folder=NFC_DAY5_AIFS_WN3_DIR)
+_WN3: Final[Path] = per_study_relative(folder=NFC_WN3_DIR)
+_WN3_EXTRA: Final[Path] = per_study_relative(folder=NFC_WN3_EXTRA_DAYS_DIR)
+_PRODUCT_BLENDS: Final[Path] = per_study_relative(folder=NFC_PRODUCT_BLENDS_DIR)
 _PER_DAY: Final[str] = "{{domain}}_{name}_day{{day}}_losses.parquet"
 
 SOURCES: Final[dict[SourceType, Source]] = {
-    "leads_day10": Source(
-        folder="nwp_forecast_comparison_leads_day10", pattern="{domain}_losses.parquet"
-    ),
-    "leads_day10b": Source(
-        folder="nwp_forecast_comparison_leads_day10b", pattern="{domain}_losses.parquet"
-    ),
-    "leads_day10c": Source(
-        folder="nwp_forecast_comparison_leads_day10c", pattern="{domain}_losses.parquet"
-    ),
-    "leads_day10d": Source(
-        folder="nwp_forecast_comparison_leads_day10d", pattern="{domain}_losses.parquet"
-    ),
+    "leads_day10": Source(folder=_LEADS_DAY10, pattern="{domain}_losses.parquet"),
+    "leads_day10b": Source(folder=_LEADS_DAY10B, pattern="{domain}_losses.parquet"),
+    "leads_day10c": Source(folder=_LEADS_DAY10C, pattern="{domain}_losses.parquet"),
+    "leads_day10d": Source(folder=_LEADS_DAY10D, pattern="{domain}_losses.parquet"),
     "aifs_single_blends": Source(folder=_AIFS_BLENDS, pattern=_PER_DAY.format(name="single")),
     "aifs_ens_blends": Source(folder=_AIFS_BLENDS, pattern=_PER_DAY.format(name="ens")),
     "aifs_single_extra": Source(folder=_AIFS_EXTRA, pattern=_PER_DAY.format(name="single")),
     "aifs_ens_extra": Source(folder=_AIFS_EXTRA, pattern=_PER_DAY.format(name="ens")),
-    "wn3_blends": Source(folder="nwp_forecast_comparison_wn3", pattern=_PER_DAY.format(name="wn3")),
-    "wn3_extra": Source(
-        folder="nwp_forecast_comparison_wn3_extra_days", pattern=_PER_DAY.format(name="wn3")
-    ),
-    "day4_shared": Source(
-        folder="nwp_forecast_comparison_day4_shared", pattern="{domain}_losses.parquet"
-    ),
+    "wn3_blends": Source(folder=_WN3, pattern=_PER_DAY.format(name="wn3")),
+    "wn3_extra": Source(folder=_WN3_EXTRA, pattern=_PER_DAY.format(name="wn3")),
+    "day4_shared": Source(folder=_DAY4_SHARED, pattern="{domain}_losses.parquet"),
     "aifs_single_day5": Source(folder=_DAY5, pattern=_PER_DAY.format(name="single")),
     "aifs_ens_day5": Source(folder=_DAY5, pattern=_PER_DAY.format(name="ens")),
     "wn3_day5": Source(folder=_DAY5, pattern=_PER_DAY.format(name="wn3")),
     "product_blends_single": Source(folder=_PRODUCT_BLENDS, pattern=_PER_DAY.format(name="single")),
     "product_blends_wn3": Source(folder=_PRODUCT_BLENDS, pattern=_PER_DAY.format(name="wn3")),
 }
-"""Each source's folder under `data/studies/`, and its losses file's name. A `{day}` in the name
-means one file per lead day. The `_blends` folders hold days 1, 2, 7, and 14 and the `_extra`
-folders days 0, 3, 4, and 10. The `_product_blends` folder holds the ICON-EU and UKV blends on the
-`single` rows, and the WeatherNext 3 blend on the `wn3` rows. The superseded
+"""Each source's folder relative to the per-study folder, and its losses file's name. A `{day}` in
+the name means one file per lead day. The `_blends` folders hold days 1, 2, 7, and 14 and the
+`_extra` folders days 0, 3, 4, and 10. The `_product_blends` folder holds the ICON-EU and UKV blends
+on the `single` rows, and the WeatherNext 3 blend on the `wn3` rows. The superseded
 `nwp_forecast_comparison_leads` folder is not a source, because the leaderboards do not draw it."""
 
 REFERENCE_NAMES: Final[dict[str, str]] = {
@@ -1408,24 +1418,6 @@ def write_svg(*, path: Path, chart: alt.VConcatChart, replace: bool, svgo: bool)
     draft.replace(path)
 
 
-def repo_data_dir() -> Path:
-    """Return the shared `data/` directory, resolving a linked worktree to the main checkout.
-
-    Duplicated from the other study scripts, because study scripts cannot import one another's
-    private helpers.
-
-    Returns:
-        The directory holding `studies/`.
-    """
-    root = PROJECT_ROOT
-    marker = root / ".git"
-    if marker.is_file():
-        git_dir = Path(marker.read_text().removeprefix("gitdir:").strip())
-        if git_dir.parent.name == "worktrees":
-            root = git_dir.parent.parent.parent
-    return Path(os.environ.get("DATA_PATH_INTERNAL") or root / "data")
-
-
 def main() -> int:
     """Compute every dot, then write the report, the parquet, the README, and the SVGs.
 
@@ -1434,10 +1426,8 @@ def main() -> int:
     """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
-    studies_dir = repo_data_dir() / "studies"
-    parser.add_argument("--data-dir", type=Path, default=studies_dir)
-    default_output_dir = studies_dir / "nwp_forecast_comparison_vs_ens_dots_final"
-    parser.add_argument("--output-dir", type=Path, default=default_output_dir)
+    parser.add_argument("--data-dir", type=Path, default=PER_STUDY_DIR)
+    parser.add_argument("--output-dir", type=Path, default=NFC_VS_ENS_DOTS_FINAL_DIR)
     parser.add_argument(
         "--svg-dir", type=Path, default=PROJECT_ROOT / "docs" / "studies" / "assets"
     )
@@ -1462,7 +1452,7 @@ def main() -> int:
         help="Draw ENS plus one product instead of the single products. Needs --output-dir.",
     )
     args = parser.parse_args()
-    if args.blends and args.output_dir == default_output_dir:
+    if args.blends and args.output_dir == NFC_VS_ENS_DOTS_FINAL_DIR:
         parser.error("--blends needs its own --output-dir, because the default folder is taken")
     rows = {
         domain: compute(data_dir=args.data_dir, domain=domain, blends=args.blends)

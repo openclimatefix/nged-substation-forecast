@@ -23,13 +23,12 @@ Run it with `uv run python studies/nwp_forecast_comparison/check_input_steps.py 
 
 import argparse
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Final
 
 import polars as pl
-from contracts.settings import PROJECT_ROOT
+from studies.sources import previous_runs_product_dir_for
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -51,25 +50,6 @@ STEP_RATIO_THRESHOLD: Final[float] = 1.15
 """A month-to-month change in a site's ratio to the reference beyond this factor is flagged."""
 
 
-def _repo_data_dir() -> Path:
-    """Return the shared `data/` directory, resolving a linked worktree to the main checkout.
-
-    See `verify_previous_runs_leads._repo_data_dir` for the reasoning; duplicated here because
-    study scripts in different directories cannot import one another's private helpers.
-
-    Returns:
-        The directory holding `studies/`, `NGED/` and the rest of the shared downloads.
-    """
-    root = PROJECT_ROOT
-    marker = root / ".git"
-    if marker.is_file():
-        pointer = marker.read_text().removeprefix("gitdir:").strip()
-        git_dir = Path(pointer)
-        if git_dir.parent.name == "worktrees":
-            root = git_dir.parent.parent.parent
-    return Path(os.environ.get("DATA_PATH_INTERNAL") or root / "data")
-
-
 def _monthly_mean(*, product_dir: str, field_column: str) -> pl.DataFrame:
     """Return one product's monthly mean of one field, per site.
 
@@ -80,14 +60,7 @@ def _monthly_mean(*, product_dir: str, field_column: str) -> pl.DataFrame:
     Returns:
         Rows of `site`, `month` (a `%Y-%m` string) and `value`.
     """
-    path = (
-        _repo_data_dir()
-        / "studies"
-        / "weather"
-        / product_dir
-        / "previous_runs"
-        / "combined.parquet"
-    )
+    path = previous_runs_product_dir_for(product=product_dir) / "previous_runs" / "combined.parquet"
     return (
         pl.scan_parquet(path)
         .select("site", "time", value=pl.col(field_column))

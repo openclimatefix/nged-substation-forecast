@@ -57,7 +57,8 @@ from fetch_open_meteo_previous_runs import (
     _wind_sites,
 )
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR, open_meteo_api_key
+from paths import open_meteo_api_key
+from studies.sources import ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_open_meteo_single_runs")
@@ -68,7 +69,7 @@ SINGLE_RUNS_URL: Final[str] = "https://customer-single-runs-api.open-meteo.com/v
 MODELS_PARAMETER: Final[str] = "ecmwf_ifs"
 """The `models=` value for IFS HRES. `ecmwf_ifs025` answers "run not available" on this API."""
 
-PRODUCT_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR / "ECMWF-IFS-SINGLE-RUNS"
+PRODUCT_DIR: Final[Path] = ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR
 COMBINED_FILENAME: Final[str] = "ECMWF-IFS-SINGLE-RUNS.parquet"
 UNAVAILABLE_FILENAME: Final[str] = "_unavailable_runs.json"
 INCOMPLETE_FILENAME: Final[str] = "_incomplete_runs.json"

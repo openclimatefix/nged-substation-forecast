@@ -65,14 +65,15 @@ from studies.bootstrap import (
     combine_setting_verdicts,
 )
 from studies.guards import refuse_to_overwrite
+from studies.sources import NFC_PRODUCT_BLENDS_DIR, NFC_WN3_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
-OUTPUT_DIR_NAME: Final[str] = "nwp_forecast_comparison_product_blends"
-"""Under `data/studies/`, the only folder this script writes to."""
+OUTPUT_DIR: Final[Path] = NFC_PRODUCT_BLENDS_DIR
+"""The only folder this script writes to."""
 
-WN3_DIR_NAME: Final[str] = "nwp_forecast_comparison_wn3"
-"""Under `data/studies/`, the folder holding `<domain>_wn3_inputs.parquet`, which is only read."""
+WN3_DIR: Final[Path] = NFC_WN3_DIR
+"""The folder holding `<domain>_wn3_inputs.parquet`, which is only read."""
 
 REPORT_NAME: Final[str] = "report.md"
 README_NAME: Final[str] = "README.md"
@@ -278,12 +279,11 @@ def check_output_dir(*, output_dir: Path, read_only: list[Path]) -> None:
         read_only: The folders the script reads, which it never writes to.
 
     Raises:
-        ValueError: If `output_dir` is a folder the script reads, or has another name than
-            `OUTPUT_DIR_NAME`.
+        ValueError: If `output_dir` is a folder the script reads, or is not `OUTPUT_DIR`.
     """
     resolved = {folder.resolve() for folder in read_only}
-    if output_dir.resolve() in resolved or output_dir.name != OUTPUT_DIR_NAME:
-        msg = f"this script writes only to a folder named {OUTPUT_DIR_NAME}, not {output_dir}"
+    if output_dir.resolve() in resolved or output_dir.resolve() != OUTPUT_DIR.resolve():
+        msg = f"this script writes only to {OUTPUT_DIR}, not {output_dir}"
         raise ValueError(msg)
 
 
@@ -974,7 +974,7 @@ def main() -> int:
     args = parser.parse_args()
     studies_dir = args.published_dir.resolve().parent
     reused_dir = studies_dir / fit_aifs.BLENDS_DIR_NAME
-    wn3_dir = studies_dir / WN3_DIR_NAME
+    wn3_dir = studies_dir / WN3_DIR.name
     existing_dir = studies_dir / fit_aifs.EXISTING_AIFS_DIR_NAME
     extra_dirs = {name: studies_dir / folder for name, folder in fit_aifs.EXTRA_FOLDERS.items()}
     check_output_dir(

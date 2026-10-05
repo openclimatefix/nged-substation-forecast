@@ -26,13 +26,13 @@ from dot_interval_vs_ens import (
     footnotes_for,
     load_arms,
     ranking_lines,
-    repo_data_dir,
     report_text,
     subtitle_lines,
     write_once,
     write_svg,
 )
 from nwp_forecast_comparison import DomainType
+from studies.sources import NFC_DIR, PER_STUDY_DIR, per_study_relative
 
 METRIC = "absolute_error_capped_fraction_of_capacity"
 SEEDS = (0, 1, 2)
@@ -797,7 +797,7 @@ def test_a_failure_while_replacing_leaves_the_old_svg_and_no_draft(
     assert [p.name for p in tmp_path.iterdir()] == ["figure.svg"]
 
 
-_PAGE_DATA = repo_data_dir() / "studies"
+_PAGE_DATA = PER_STUDY_DIR
 
 
 @cache
@@ -871,7 +871,9 @@ def test_the_plan_holds_every_product_arm_the_leads_folders_hold_and_no_other(
         held = _arm_cells(folder / f"{domain}_losses.parquet")
         planned = {(prefix_of[c.label], c.day) for c in plan if c.treatment_source == source}
         assert planned == held, f"{source}: plan and saved arms differ"
-    published = _arm_cells(_PAGE_DATA / "nwp_forecast_comparison" / f"{domain}_losses.parquet")
+    published = _arm_cells(
+        _PAGE_DATA / per_study_relative(folder=NFC_DIR) / f"{domain}_losses.parquet"
+    )
     assert published <= {(prefix_of[c.label], c.day) for c in plan}
 
 

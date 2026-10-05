@@ -35,7 +35,7 @@ import h3.api.basic_int as h3
 import polars as pl
 from studies.ens_members import ENSEMBLE_SIZE
 from studies.pv_dataset import pv_sites, wind_sites
-from studies.sources import REPO_DATA_DIR, STUDIES_DATA_DIR
+from studies.sources import ENS_FORECAST_HORIZONS_DIR, REPO_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_ens_forecast_horizons")
 
@@ -45,7 +45,7 @@ NWP_TABLE: Final[Path] = REPO_DATA_DIR / "NWP"
 NWP_MODEL_ID: Final[str] = "ECMWF_ENS_0_25_degree"
 """The ENS partition of `NWP_TABLE`."""
 
-OUTPUT_DIR: Final[Path] = STUDIES_DATA_DIR / "ens_forecast_horizons"
+OUTPUT_DIR: Final[Path] = ENS_FORECAST_HORIZONS_DIR
 """Where the horizon study reads its inputs from and writes its results."""
 
 OUTPUT_PATH: Final[Path] = OUTPUT_DIR / "ens_members.parquet"
