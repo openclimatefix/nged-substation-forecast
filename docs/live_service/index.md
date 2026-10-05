@@ -49,5 +49,7 @@ environments, so it lives on one shared page.
   scored from.
 - [Setting up Sentry telemetry](sentry.md) — point error reporting and the missed-check-in alarm at
   a Sentry project: get a DSN, test it from your laptop, and turn it on in production.
+- [Backing up the workstation](backup.md) — copy the experiment outputs to an external USB disk,
+  verify the copy, and restore it.
 - [Configuration reference](setup.md) — what the storage roots, the derive-from-root convention, and
   the credential settings mean, and which combination each environment uses.
