@@ -25,14 +25,8 @@ from typing import Final
 
 import ens_forecast_horizons as efh
 import polars as pl
-from fetch_ens_forecast_horizons import (
-    ENSEMBLE_SIZE,
-    MARGIN_HOURS,
-    NWP_TABLE,
-    OUTPUT_PATH,
-    _cells,
-    _members,
-)
+from fetch_ens_forecast_horizons import MARGIN_HOURS, NWP_TABLE, OUTPUT_PATH, _cells, _members
+from studies.ens_members import ENSEMBLE_SIZE
 from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import pv_sites, wind_sites
 from studies.sources import STUDIES_DATA_DIR

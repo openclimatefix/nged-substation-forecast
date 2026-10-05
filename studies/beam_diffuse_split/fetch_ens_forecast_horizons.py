@@ -33,6 +33,7 @@ from typing import Final
 
 import h3.api.basic_int as h3
 import polars as pl
+from studies.ens_members import ENSEMBLE_SIZE
 from studies.pv_dataset import pv_sites, wind_sites
 from studies.sources import REPO_DATA_DIR, STUDIES_DATA_DIR
 
@@ -59,8 +60,6 @@ BAND_DAYS: Final[tuple[int, ...]] = (0, 1, 2, 3, 5, 7, 10, 14)
 MARGIN_HOURS: Final[int] = 6
 """How many hours of leads either side of each band the extract keeps."""
 
-ENSEMBLE_SIZE: Final[int] = 51
-"""The control member and 50 perturbed members."""
 
 RADIATION: Final[str] = "downward_short_wave_radiation_flux_surface"
 """Global horizontal irradiance, a mean over the step ending at `valid_time`, in W m⁻²."""

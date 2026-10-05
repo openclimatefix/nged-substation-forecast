@@ -70,6 +70,8 @@ import zarr
 from studies.guards import refuse_to_overwrite
 from studies.resample import interpolate_linear, wind_components
 
+from studies import ens_members as ens_member_columns
+
 # `fetch_weathernext3` sets `ICECHUNK_LOG` before `icechunk` is imported below it.
 from studies import wn3_fetch as fetch
 
@@ -453,7 +455,7 @@ def wn3_arm_frame(
         **{field: _masked(values=values, present=present) for field, values in fields.items()}
     )
     stamp = pl.Series(np.where(present, run, np.datetime64("NaT", "h")).astype("datetime64[us]"))
-    return efh.prefixed(frame=reduced, arm=arm, domain=domain).with_columns(
+    return ens_member_columns.prefixed(frame=reduced, arm=arm, domain=domain).with_columns(
         stamp.dt.replace_time_zone("UTC").alias(f"{arm}_init_time")
     )
 
@@ -638,7 +640,7 @@ def ens_vector_mean_frame(*, extract: pl.DataFrame, day: int) -> pl.DataFrame:
         time=init_time + pl.duration(hours=pl.col("lead")),
         init_time=init_time,
     )
-    return efh.prefixed(frame=rows, arm=arm, domain="wind").join(
+    return ens_member_columns.prefixed(frame=rows, arm=arm, domain="wind").join(
         rows.select("site", "time", **{f"{arm}_init_time": "init_time"}),
         on=["site", "time"],
         how="left",

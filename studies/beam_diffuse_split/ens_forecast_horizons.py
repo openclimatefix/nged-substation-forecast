@@ -135,9 +135,8 @@ from typing import Final, Literal, NamedTuple
 
 import numpy as np
 import polars as pl
-from fetch_ens_forecast_horizons import BAND_DAYS, ENSEMBLE_SIZE, OUTPUT_DIR, OUTPUT_PATH
+from fetch_ens_forecast_horizons import BAND_DAYS, OUTPUT_DIR, OUTPUT_PATH
 from studies.arm_runner import MAX_CONCURRENT_FITS, Job, run_all
-from studies.arm_runner import SHARED_FEATURES as SOLAR_SHARED_FEATURES
 from studies.baselines import (
     clear_sky_index,
     climatology,
@@ -163,13 +162,24 @@ from studies.cross_validation import (
     summarise_member_forecasts,
     uncovered_months,
 )
-from studies.ensemble import check_one_run_per_hour
+from studies.ens_members import (
+    ENSEMBLE_SIZE,
+    Steps,
+    clear_sky_arrays,
+    ens_columns,
+    fields,
+    long_frame,
+    prefixed,
+    reduce_members,
+    shared_features,
+)
 from studies.guards import refuse_to_overwrite
 from studies.product_frames import (
     CONTRAST_HEADER,
     SOLAR,
     WIND,
     Domain,
+    DomainType,
     IntervalRecord,
     contrast_interval,
     contrast_line,
@@ -184,7 +194,6 @@ from studies.resample import (
     interpolate_linear,
     interpolate_pchip,
     rescale_to_step_means,
-    step_means,
     wind_components,
     wind_polar,
 )
@@ -193,8 +202,6 @@ from studies.solar_product_frames import with_eras
 from studies.wind_product_frames import wind_hourly_power
 
 _LOG: Final[logging.Logger] = logging.getLogger("ens_forecast_horizons")
-
-DomainType = Literal["solar", "wind"]
 
 MethodType = str
 """An upsampling combination's name, a key of `COMBINATIONS`."""
@@ -220,8 +227,6 @@ PERCENTAGE_POINTS: Final[float] = 100.0
 METRIC: Final[str] = "absolute_error_capped_fraction_of_capacity"
 """The loss every table reports: each row's clamped error over its own generator's capacity."""
 
-CONTROL_MEMBER: Final[int] = 0
-"""The ensemble member ECMWF runs from the unperturbed analysis."""
 
 FINE_STEP_LAST_LEAD: Final[int] = 144
 """The last lead ENS publishes on 3-hour steps; beyond it the steps are 6 hours wide."""
@@ -417,51 +422,7 @@ def baseline_arm(*, name: str, day: int) -> str:
     return f"{name}_day{day}"
 
 
-def fields(*, domain: DomainType) -> tuple[str, ...]:
-    """Return the weather fields an ENS arm is shown, in the order it is shown them.
-
-    Args:
-        domain: `solar` or `wind`.
-
-    Returns:
-        The field names every ENS arm's columns end in.
-    """
-    if domain == "solar":
-        return ("ghi", "temp")
-    return ("speed_100m", "sin_100m", "cos_100m", "speed_10m")
-
-
-def ens_columns(*, arm: str, domain: DomainType) -> tuple[str, ...]:
-    """Return one ENS arm's weather columns.
-
-    Args:
-        arm: The arm's name.
-        domain: `solar` or `wind`.
-
-    Returns:
-        `<arm>_<field>` for each of `fields`.
-    """
-    return tuple(f"{arm}_{field}" for field in fields(domain=domain))
-
-
 # --- ENS on its native steps ------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class Steps:
-    """One band's ENS members on their native steps, one row per (site, run, member)."""
-
-    keys: pl.DataFrame
-    """`site`, `init_time`, and `ensemble_member`, sorted, every (site, run) holding all members."""
-    leads: np.ndarray
-    """Each step's lead in hours."""
-    widths: np.ndarray
-    """How many hours each step's radiation averages over."""
-    values: dict[str, np.ndarray]
-    """Each field's values, shape (n_series, n_steps)."""
-    ensemble_size: int = ENSEMBLE_SIZE
-    """How many members each kept run holds. ENS's 51 by default; a caller building a different
-    ensemble's steps (GEFS's 31, say) passes its own count through `band_steps`."""
 
 
 def _step_width(lead: int, fine_step_last_lead: int = FINE_STEP_LAST_LEAD) -> int:
@@ -594,46 +555,6 @@ def target_leads(*, day: int, domain: DomainType) -> np.ndarray:
     return np.arange(24 * day + offset, 24 * day + 24 + offset, dtype=np.float64)
 
 
-def _clear_sky_arrays(
-    *, steps: Steps, targets: np.ndarray, clear_sky: pl.DataFrame
-) -> tuple[np.ndarray, np.ndarray]:
-    """Return the clear-sky mean over each step and over each target hour, per series.
-
-    Args:
-        steps: The band's steps.
-        targets: The target hours' leads (each hour's end).
-        clear_sky: The hourly clear-sky table from `hourly_clear_sky`.
-
-    Returns:
-        Shapes (n_series, n_steps) and (n_series, n_targets).
-
-    Raises:
-        ValueError: If a run's clear-sky hours are missing from the table.
-    """
-    runs = steps.keys.select("site", "init_time").unique(maintain_order=True)
-    first_hour = int(min(steps.leads[0] - steps.widths[0] + 1, targets[0]))
-    last_hour = int(max(steps.leads[-1], targets[-1]))
-    hours = np.arange(first_hour, last_hour + 1)
-    table = (
-        runs.with_row_index("run")
-        .join(pl.DataFrame({"lead": hours}), how="cross")
-        .with_columns(time=pl.col("init_time") + pl.duration(hours=pl.col("lead")))
-        .join(clear_sky, on=["site", "time"], how="left")
-        .sort("run", "lead")
-    )
-    if table["clear_sky_w_m2"].null_count():
-        msg = "a run's clear-sky hours are missing from the table"
-        raise ValueError(msg)
-    per_hour = table["clear_sky_w_m2"].to_numpy().reshape(runs.height, len(hours))
-    run_of_series = np.repeat(np.arange(runs.height), steps.ensemble_size)
-    return (
-        step_means(
-            hourly=per_hour, first_hour=first_hour, step_leads=steps.leads, step_widths=steps.widths
-        )[run_of_series],
-        per_hour[:, (targets - first_hour).astype(int)][run_of_series],
-    )
-
-
 def upsampled_fields(
     *, steps: Steps, day: int, domain: DomainType, clear_sky: pl.DataFrame
 ) -> dict[str, dict[str, np.ndarray]]:
@@ -656,7 +577,7 @@ def upsampled_fields(
     x = steps.leads
     if domain == "solar":
         temp, ghi = steps.values["temp_c"], steps.values["ghi_w_m2"]
-        step_clear_sky, target_clear_sky = _clear_sky_arrays(
+        step_clear_sky, target_clear_sky = clear_sky_arrays(
             steps=steps, targets=targets, clear_sky=clear_sky
         )
         midpoints = x - steps.widths / 2.0
@@ -738,7 +659,7 @@ def combine(
             "cos_100m": np.cos(direction),
             "speed_10m": upsampled["speed_10m"][choice["speed"]],
         }
-    return _long(steps=steps, targets=target_leads(day=day, domain=domain), values=out)
+    return long_frame(steps=steps, targets=target_leads(day=day, domain=domain), values=out)
 
 
 def native(*, steps: Steps, day: int, domain: DomainType) -> pl.DataFrame:
@@ -768,100 +689,7 @@ def native(*, steps: Steps, day: int, domain: DomainType) -> pl.DataFrame:
             "cos_100m": np.cos(radians),
             "speed_10m": steps.values["speed_10m"][:, own],
         }
-    return _long(steps=steps, targets=steps.leads[own], values=out)
-
-
-def _long(*, steps: Steps, targets: np.ndarray, values: dict[str, np.ndarray]) -> pl.DataFrame:
-    """Turn arrays over (series, target) into rows keyed by site, run, time, and member.
-
-    Args:
-        steps: The band's steps, whose keys name each series.
-        targets: Each column's lead.
-        values: Each field's array, shape (n_series, n_targets).
-
-    Returns:
-        One row per (site, time, member), with the run's `init_time`.
-    """
-    repeat = len(targets)
-    keys = steps.keys.select(
-        pl.col("site", "init_time", "ensemble_member").repeat_by(repeat).explode()
-    )
-    return keys.with_columns(
-        lead=pl.Series(np.tile(targets, steps.keys.height)),
-        **{name: pl.Series(array.reshape(-1).astype(np.float64)) for name, array in values.items()},
-    ).select(
-        "site",
-        *values,
-        init_time=pl.col("init_time").dt.replace_time_zone("UTC", non_existent="raise"),
-        time=pl.col("init_time").dt.replace_time_zone("UTC", non_existent="raise")
-        + pl.duration(hours=pl.col("lead").cast(pl.Int64)),
-        member=pl.col("ensemble_member").cast(pl.Int32),
-    )
-
-
-def reduce_members(
-    *, hourly: pl.DataFrame, domain: DomainType, way: str, ensemble_size: int = ENSEMBLE_SIZE
-) -> pl.DataFrame:
-    """Reduce every member's hourly fields to one value per (site, time).
-
-    Args:
-        hourly: One row per (site, time, member), with `init_time`.
-        domain: `solar` or `wind`.
-        way: `control` for the control member's own values, `mean` for the ensemble mean.
-        ensemble_size: How many members each (site, time) must hold. ENS's 51 by default.
-
-    Returns:
-        One row per (site, time), with `fields(domain=domain)`.
-
-    Raises:
-        ValueError: Unless every (site, time) holds one run and all its members.
-    """
-    check_one_run_per_hour(hourly=hourly, members=ensemble_size)
-    if way == "control":
-        return hourly.filter(pl.col("member") == CONTROL_MEMBER).drop("member", "init_time")
-    if domain == "solar":
-        return hourly.group_by("site", "time").agg(pl.col("ghi", "temp").mean())
-    # The mean direction is the mean wind vector's: each member's direction weighted by its speed.
-    return (
-        hourly.group_by("site", "time")
-        .agg(
-            pl.col("speed_100m", "speed_10m").mean(),
-            east=(pl.col("speed_100m") * pl.col("sin_100m")).mean(),
-            north=(pl.col("speed_100m") * pl.col("cos_100m")).mean(),
-        )
-        .with_columns(norm=(pl.col("east") ** 2 + pl.col("north") ** 2).sqrt())
-        .select(
-            "site",
-            "time",
-            "speed_100m",
-            sin_100m=pl.col("east") / pl.col("norm"),
-            cos_100m=pl.col("north") / pl.col("norm"),
-            speed_10m="speed_10m",
-        )
-    )
-
-
-def prefixed(*, frame: pl.DataFrame, arm: str, domain: DomainType) -> pl.DataFrame:
-    """Rename a reduced frame's fields to one arm's column names.
-
-    Args:
-        frame: One row per (site, time), with `fields(domain=domain)`.
-        arm: The arm.
-        domain: `solar` or `wind`.
-
-    Returns:
-        `site`, `time`, and the arm's columns.
-    """
-    return frame.select(
-        "site",
-        "time",
-        *(
-            pl.col(field).alias(column)
-            for field, column in zip(
-                fields(domain=domain), ens_columns(arm=arm, domain=domain), strict=True
-            )
-        ),
-    )
+    return long_frame(steps=steps, targets=steps.leads[own], values=out)
 
 
 # --- The rows -----------------------------------------------------------------------------------
@@ -1076,21 +904,6 @@ def _complete(*, frame: pl.DataFrame, columns: list[str], domain: DomainType) ->
 
 
 # --- Fitting -----------------------------------------------------------------------------------
-
-
-def shared_features(*, domain: Domain) -> tuple[str, ...]:
-    """Return the columns every ENS arm is shown besides its weather.
-
-    Args:
-        domain: `product_frames.SOLAR` or `product_frames.WIND`.
-
-    Returns:
-        For solar, the past-weather studies' shared columns without ERA5's temperature, which each
-        ENS arm replaces with its own; for wind, the wind study's shared columns.
-    """
-    if domain.name == "solar":
-        return (*(c for c in SOLAR_SHARED_FEATURES if c != "temp_c"), "era_code")
-    return domain.shared_features
 
 
 def reference_features(*, domain: Domain) -> dict[str, tuple[str, ...]]:

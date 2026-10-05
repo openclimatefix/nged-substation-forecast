@@ -32,8 +32,8 @@ other global-only products, carries a global-irradiance arm only.
 **Upsampling to hourly, reusing the study's own tested machinery.** The `T+3` band holds seven
 3-hour steps per run, so each run is rebuilt to 19 hourly values by the clear-sky-index
 reconstruction `ens_forecast_horizons.py` picked as the best technique for ENS's radiation
-(`COMBINATIONS["solar"]["clear_sky"]` there): `ens_forecast_horizons.Steps`,
-`ens_forecast_horizons._clear_sky_arrays`, `studies.resample.clear_sky_index_resample`, and
+(`COMBINATIONS["solar"]["clear_sky"]` there): `ens_members.Steps`,
+`ens_members.clear_sky_arrays`, `studies.resample.clear_sky_index_resample`, and
 `studies.resample.interpolate_linear` are reused unchanged; only the code that arranges this file's
 own seven fixed leads into a `Steps` object is new, because `ens_forecast_horizons.py`'s own
 `band_steps` assumes the wider, day-numbered grid that its own extract holds and this file's data
@@ -95,22 +95,22 @@ import h3
 import h3.api.basic_int as h3_api
 import numpy as np
 import polars as pl
-from ens_forecast_horizons import (
-    Steps,
-    _clear_sky_arrays,
-    _long,
-    ens_columns,
-    prefixed,
-    reduce_members,
-    shared_features,
-)
-from fetch_ens_forecast_horizons import ENSEMBLE_SIZE
 from geo.h3 import compute_h3_grid_weights
 from studies.arm_runner import MAX_CONCURRENT_FITS, Job, run_all
 from studies.baselines import hourly_clear_sky
 from studies.bootstrap import bootstrap_absolute
 from studies.charts import report_errors
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SEEDS, SENSITIVITY_HYPER_PARAMETERS
+from studies.ens_members import (
+    ENSEMBLE_SIZE,
+    Steps,
+    clear_sky_arrays,
+    ens_columns,
+    long_frame,
+    prefixed,
+    reduce_members,
+    shared_features,
+)
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.product_frames import SOLAR, solar_frame
 from studies.pv_dataset import nearest_era5_cell, pv_sites, read_cams, read_era5
@@ -321,7 +321,7 @@ def _t3_upsampled(*, steps: Steps, clear_sky: pl.DataFrame) -> dict[str, np.ndar
         `ghi` and `temp`, each shape (n_series, 19), matching `TARGET_LEADS`.
     """
     x = steps.leads
-    step_clear_sky, target_clear_sky = _clear_sky_arrays(
+    step_clear_sky, target_clear_sky = clear_sky_arrays(
         steps=steps, targets=TARGET_LEADS, clear_sky=clear_sky
     )
     midpoints = x - steps.widths / 2.0
@@ -417,10 +417,10 @@ def _three_hourly_rebuilt(
         widths=np.full(len(STEP_LEADS), STEP_WIDTH_HOURS, dtype=np.float64),
         values={"ghi_w_m2": wide.select(names).to_numpy().astype(np.float64)},
     )
-    step_clear_sky, target_clear_sky = _clear_sky_arrays(
+    step_clear_sky, target_clear_sky = clear_sky_arrays(
         steps=steps, targets=TARGET_LEADS, clear_sky=clear_sky
     )
-    # `_clear_sky_arrays` repeats each run once per ENS member; this frame has one series per run.
+    # `clear_sky_arrays` repeats each run once per ENS member; this frame has one series per run.
     step_clear_sky, target_clear_sky = (
         step_clear_sky[::ENSEMBLE_SIZE],
         target_clear_sky[::ENSEMBLE_SIZE],
@@ -435,7 +435,7 @@ def _three_hourly_rebuilt(
         target_midpoints=TARGET_LEADS - 0.5,
         daylight_floor_w_m2=DEFAULT_DAYLIGHT_FLOOR_W_M2,
     )
-    return _long(steps=steps, targets=TARGET_LEADS, values={column: rebuilt}).select(
+    return long_frame(steps=steps, targets=TARGET_LEADS, values={column: rebuilt}).select(
         "site", "time", column
     )
 
@@ -501,7 +501,7 @@ def build_rows() -> pl.DataFrame:
         last=cast("datetime", steps.keys["init_time"].max()) + timedelta(hours=STEP_LEADS[-1]),
     )
     upsampled = _t3_upsampled(steps=steps, clear_sky=clear_sky)
-    hourly = _long(steps=steps, targets=TARGET_LEADS, values=upsampled)
+    hourly = long_frame(steps=steps, targets=TARGET_LEADS, values=upsampled)
     mean_frame = prefixed(
         frame=reduce_members(hourly=hourly, domain="solar", way="mean"),
         arm=MEAN_ARM,

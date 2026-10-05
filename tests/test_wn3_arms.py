@@ -18,6 +18,8 @@ import polars as pl
 import pytest
 import xarray as xr
 
+from studies import ens_members
+
 STUDIES_DIR: Final[Path] = Path(__file__).resolve().parent.parent / "studies"
 """The `studies/` directory, whose scripts do bare imports of their siblings."""
 
@@ -681,7 +683,7 @@ def test_workers_argument_accepts_one_to_the_cap_and_refuses_the_rest() -> None:
 
 
 def _steps(*, first_lead: float) -> object:
-    return efh.Steps(
+    return ens_members.Steps(
         keys=pl.DataFrame(),
         leads=np.array([first_lead, first_lead + 6.0]),
         widths=np.array([6, 6]),
@@ -830,7 +832,7 @@ def test_a_day_4_band_without_the_supplement_is_refused_and_with_it_accepted(
     monkeypatch: pytest.MonkeyPatch, six_hourly: bool
 ) -> None:
     def steps(leads: list[float]) -> object:
-        return efh.Steps(
+        return ens_members.Steps(
             keys=pl.DataFrame(),
             leads=np.array(leads),
             widths=np.full(len(leads), 6 if six_hourly else 3),

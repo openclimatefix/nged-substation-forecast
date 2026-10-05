@@ -140,7 +140,7 @@ def test_h3_crop_weights_raise_when_the_hexagon_leaves_the_crop() -> None:
         )
 
 
-# `ens_forecast_horizons._long`'s `explode()` raises a Polars 2.0 deprecation warning, which the
+# `ens_members.long_frame`'s `explode()` raises a Polars 2.0 deprecation warning, which the
 # repo's warnings-as-errors setting would turn into a failure; fixing it is out of scope here.
 @pytest.mark.filterwarnings("ignore:In Polars 2.0:DeprecationWarning")
 def test_ens_member_arms_reads_the_run_d_days_before_at_lead_24d_plus_h(
