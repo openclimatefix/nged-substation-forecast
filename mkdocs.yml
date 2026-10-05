@@ -107,6 +107,7 @@ nav:
           - "Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?": studies/forecasts/matched-lead.md
           - "Extra weather products in the day-ahead lead comparison: how they are read, and their results": studies/forecasts/matched-lead-extra-products.md
           - "Which single weather forecast should be added to ECMWF's ensemble mean first?": studies/forecasts/blends-with-ens.md
+          - "Does adding UKV from CEDA to ECMWF's ensemble mean lower the error at lead days 1 to 4?": studies/forecasts/ukv-ceda-blends.md
           - "How do Open-Meteo's ensemble-mean products compare for solar and wind power?": studies/forecasts/ensemble-means.md
   - ML experimentation:
       - Overview: ml_experimentation/index.md

@@ -62,7 +62,7 @@ the
 
 ## Forecasts
 
-**Three studies score power forecasts driven by weather forecasts.**
+**Five studies score power forecasts driven by weather forecasts.**
 
 - [How accurate is a power forecast driven by ECMWF ENS at each
   horizon?](forecasts/ens-horizons.md) — at the 6 solar farms and 3 wind farms, an XGBoost model
@@ -85,6 +85,11 @@ a
   day 1 by 0.58 points of capacity [0.48, 0.69]; AIFS Single
   is the one product the page can name for solar, at day 2, by 0.33 [0.18, 0.48]. Elsewhere AIFS
   Single and ICON-EU are not separable.
+- [Does adding UKV from CEDA to ECMWF's ensemble mean lower the error at lead days 1 to
+  4?](forecasts/ukv-ceda-blends.md) — at the 3 wind farms, adding UKV lowers the error at days 1 and
+  2 under every check, by 0.24 to 0.27 and 0.19 to 0.21 points of capacity; at wind day 3 the gain
+  rests on February 2026; at the 6 solar farms the gain is about 0.1 points at days 1 to 3, as one
+  pattern; and day 4 is inconclusive.
 - [How do Open-Meteo's ensemble-mean products compare for solar and wind
   power?](forecasts/ensemble-means.md) — over 88 summer days at the 6 solar farms and 3 wind farms,
   ICON-D2-EPS's ensemble mean gave the lowest power error of the four Open-Meteo ensemble means,

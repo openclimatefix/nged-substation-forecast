@@ -185,7 +185,8 @@ lead a 09:00 UTC service would read, and more months of data.
 **The results rest on one region, 16 months, and a lead that no live service reads.** The sample is
 weather episodes, not generator-hours, and the intervals resample months. Every figure uses the
 effective-capacity table built for the matched-lead study. The study does not cover blends of two
-products, UKV from the CEDA archive, days 3 and 5, or probabilistic scores.
+products, days 3 and 5, or probabilistic scores. The [UKV-CEDA page](ukv-ceda-blends.md) tests
+UKV from the CEDA archive at days 1 to 4.
 
 ## Data and code availability
 
