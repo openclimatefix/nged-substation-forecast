@@ -7,16 +7,11 @@ number typed by hand.
 
 import importlib
 import json
-from pathlib import Path
 from types import ModuleType
-from typing import Final
 
 import polars as pl
 import pytest
 from studies.charts import RowSetBlock
-
-REPO_ROOT: Final[Path] = Path(__file__).parent.parent
-SCRIPT_DIR: Final[Path] = REPO_ROOT / "studies" / "beam_diffuse_split"
 
 
 def _all_shares() -> dict:

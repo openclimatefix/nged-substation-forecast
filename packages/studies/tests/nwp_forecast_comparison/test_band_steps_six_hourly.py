@@ -1,24 +1,20 @@
-"""Tests for `studies/beam_diffuse_split/ens_forecast_horizons.py`'s `band_steps(six_hourly=True)`.
+"""Tests for `band_steps(six_hourly=True)` in `ens_forecast_horizons.py`.
 
 `coarsen_to_six_hourly` drops a step at a multiple of 6 hours unless the step 3 hours earlier is
 present, but only for a field that is a period mean. A wind field is instantaneous, so a wind band
 in 6-hourly mode must keep every step at a multiple of 6 hours, including lead 0 on day 0.
 """
 
-import importlib.util
-import sys
+import importlib
 from datetime import UTC, datetime
-from pathlib import Path
 from types import ModuleType
 from typing import Final
 
 import numpy as np
 import polars as pl
 
-REPO_ROOT: Final[Path] = Path(__file__).parent.parent
 """The repo root, one level above this `tests/` directory."""
 
-SCRIPT_PATH: Final[Path] = REPO_ROOT / "studies" / "beam_diffuse_split" / "ens_forecast_horizons.py"
 """The study script under test, imported by path because `studies/` is not an importable package."""
 
 ENSEMBLE_SIZE: Final[int] = 2
@@ -26,18 +22,8 @@ ENSEMBLE_SIZE: Final[int] = 2
 
 
 def _load_script() -> ModuleType:
-    """Import `ens_forecast_horizons.py` from its path, with its own directory on `sys.path`."""
-    sys.path.insert(0, str(SCRIPT_PATH.parent))
-    try:
-        spec = importlib.util.spec_from_file_location("ens_forecast_horizons", SCRIPT_PATH)
-        assert spec is not None
-        assert spec.loader is not None
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = module
-        spec.loader.exec_module(module)
-    finally:
-        sys.path.remove(str(SCRIPT_PATH.parent))
-    return module
+    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
+    return importlib.import_module("ens_forecast_horizons")
 
 
 efh = _load_script()

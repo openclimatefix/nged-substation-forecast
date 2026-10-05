@@ -1,19 +1,13 @@
 import re
-import sys
 from collections.abc import Mapping, Sequence
 from functools import cache
 from pathlib import Path
 
 import altair as alt
+import dot_interval_vs_ens as module
 import polars as pl
 import pytest
-
-_STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "nwp_forecast_comparison"
-sys.path.insert(0, str(_STUDY_DIR))
-sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
-
-import dot_interval_vs_ens as module  # noqa: E402
-from dot_interval_vs_ens import (  # noqa: E402
+from dot_interval_vs_ens import (
     BLEND_PRODUCTS,
     FIRST_FIGURE_NUMBER,
     PRODUCTS,
@@ -38,7 +32,7 @@ from dot_interval_vs_ens import (  # noqa: E402
     write_once,
     write_svg,
 )
-from nwp_forecast_comparison import DomainType  # noqa: E402
+from nwp_forecast_comparison import DomainType
 
 METRIC = "absolute_error_capped_fraction_of_capacity"
 SEEDS = (0, 1, 2)

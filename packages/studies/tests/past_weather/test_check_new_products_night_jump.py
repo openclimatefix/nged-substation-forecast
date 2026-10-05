@@ -10,17 +10,13 @@ the true switch, because every hour in the plateau sits above the median alike.
 """
 
 import importlib
-from pathlib import Path
 from types import ModuleType
-from typing import Final
 
 import numpy as np
 import polars as pl
 
-REPO_ROOT: Final[Path] = Path(__file__).parent.parent
 """The repo root, one level above this `tests/` directory."""
 
-SCRIPT_PATH: Final[Path] = REPO_ROOT / "studies" / "beam_diffuse_split" / "check_new_products.py"
 """The study script under test, imported by path because `studies/` is not an importable package."""
 
 

@@ -21,8 +21,6 @@ from studies.cross_validation import (
     uncovered_months,
 )
 
-REPO_ROOT: Final[Path] = Path(__file__).parent.parent
-SCRIPT_DIR: Final[Path] = REPO_ROOT / "studies" / "beam_diffuse_split"
 DAY: Final[datetime] = datetime(2025, 6, 1, tzinfo=UTC)
 UTC_US: Final[pl.Datetime] = pl.Datetime("us", "UTC")
 

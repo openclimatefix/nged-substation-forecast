@@ -4,17 +4,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import fit_aifs
+import fit_product_blends as fpb
 import polars as pl
 import pytest
-
-_STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "nwp_forecast_comparison"
-sys.path.insert(0, str(_STUDY_DIR))
-sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
-
-import fit_aifs  # noqa: E402
-import fit_product_blends as fpb  # noqa: E402
-from fit_aifs import PRIMARY, SENSITIVITY, arm_features  # noqa: E402
-from fit_product_blends import (  # noqa: E402
+from fit_aifs import PRIMARY, SENSITIVITY, arm_features
+from fit_product_blends import (
     OUTPUT_DIR_NAME,
     SAME_BUILD_KEYS,
     PlannedStage,
@@ -38,8 +33,8 @@ from fit_product_blends import (  # noqa: E402
     stage_jobs,
     stage_losses,
 )
-from nwp_forecast_comparison import METRIC, TARGET, DomainType  # noqa: E402
-from studies.bootstrap import NO_DETECTABLE_DIFFERENCE, BootstrapInterval  # noqa: E402
+from nwp_forecast_comparison import METRIC, TARGET, DomainType
+from studies.bootstrap import NO_DETECTABLE_DIFFERENCE, BootstrapInterval
 
 SITES = ("A", "B")
 SEEDS = (0, 1, 2)

@@ -20,10 +20,8 @@ import polars as pl
 import pytest
 from studies.wind_product_frames import wind_columns
 
-REPO_ROOT: Final[Path] = Path(__file__).parent.parent
 """The repo root, one level above this `tests/` directory."""
 
-SCRIPT_PATH: Final[Path] = REPO_ROOT / "studies" / "beam_diffuse_split" / "wind_icon_dream.py"
 """The study script under test, imported by path because `studies/` is not an importable package."""
 
 

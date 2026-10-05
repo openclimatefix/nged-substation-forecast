@@ -14,9 +14,6 @@ from typing import Final
 import polars as pl
 import pytest
 
-MODULE_PATH: Final[Path] = (
-    Path(__file__).parent.parent / "studies" / "beam_diffuse_split" / "check_page_numbers.py"
-)
 HEADING: Final[str] = "## ECMWF wind"
 REPORT: Final[str] = "| all | a − b | +0.2050 | [+0.2050, +0.2050] |\n"
 PAGE: Final[str] = "## ECMWF wind\n\n- **Yes.** The gap was 0.20 points.\n"

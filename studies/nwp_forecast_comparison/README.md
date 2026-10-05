@@ -33,7 +33,7 @@ page](../../docs/studies/forecasts/matched-lead-extra-products.md).
   (wind speeds in m/s), ECMWF ENS's mean at days 0 to 3 and control member at days 0 to 3, the
   no-weather baselines' inputs, and, where GEFS is built, the GEFS mean at days 1 to 3. ENS and GEFS
   are built directly at the chosen upsampling combination (`clear_sky` for solar, `speed_components`
-  for wind) through the public functions of `studies/beam_diffuse_split/ens_forecast_horizons.py`.
+  for wind) through the public functions of `studies/nwp_forecast_comparison/ens_forecast_horizons.py`.
   GEFS reads each site's nearest 0.25° cell, converts its alternating 3- and 6-hour radiation
   windows to 3-hour step means (`studies.resample.gefs_step_means`) on whole runs before any band is
   sliced, and averages the 31 members. It runs only when

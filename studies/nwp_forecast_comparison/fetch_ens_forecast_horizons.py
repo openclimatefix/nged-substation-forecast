@@ -23,7 +23,7 @@ leads each technology scores.
 The extract is read through the Delta transaction log, never by globbing the parquet files, because
 a partition written twice keeps its superseded files on disk.
 
-Run it with `uv run python studies/beam_diffuse_split/fetch_ens_forecast_horizons.py`.
+Run it with `uv run python studies/nwp_forecast_comparison/fetch_ens_forecast_horizons.py`.
 """
 
 import logging

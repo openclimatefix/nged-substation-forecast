@@ -6,12 +6,11 @@ runs, a check that crashes instead of skipping when it has no data, and a valida
 store written under the other product.
 """
 
-import importlib.util
+import importlib
 import sys
 from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType
-from typing import Final
 
 import numpy as np
 import pytest
@@ -22,21 +21,10 @@ pytest.importorskip("pyproj")
 
 import zarr
 
-SCRIPT_DIR: Final[Path] = Path(__file__).parent.parent / "studies" / "weather_downloads"
-
 
 def _load(name: str) -> ModuleType:
-    if str(SCRIPT_DIR) not in sys.path:
-        sys.path.insert(0, str(SCRIPT_DIR))
-    if name in sys.modules:
-        return sys.modules[name]
-    spec = importlib.util.spec_from_file_location(name, SCRIPT_DIR / f"{name}.py")
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
+    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
+    return importlib.import_module(name)
 
 
 fetch = _load("fetch_ukv_ceda")

@@ -1,15 +1,9 @@
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 import polars as pl
 import pytest
-
-_STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "nwp_forecast_comparison"
-sys.path.insert(0, str(_STUDY_DIR))
-sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
-
-from fit_aifs import (  # noqa: E402
+from fit_aifs import (
     WN3_DAYS,
     WN3_SPLITS,
     day0_drop,
@@ -24,8 +18,8 @@ from fit_aifs import (  # noqa: E402
     wn3_split,
     wn3_stage_lines,
 )
-from nwp_forecast_charts import load_row_set_marks  # noqa: E402
-from nwp_forecast_comparison import METRIC  # noqa: E402
+from nwp_forecast_charts import load_row_set_marks
+from nwp_forecast_comparison import METRIC
 
 MONTHS = [2, 4, 6, 7, 8, 9]
 

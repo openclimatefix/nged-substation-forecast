@@ -14,9 +14,6 @@ from typing import Final
 import polars as pl
 from studies.charts import CONTRAST_COLUMNS, CONTRAST_COLUMNS_WITH_MONTHS, report_contrasts
 
-REPO_ROOT: Final[Path] = Path(__file__).parent.parent
-SCRIPT_DIR: Final[Path] = REPO_ROOT / "studies" / "beam_diffuse_split"
-
 
 def _load() -> ModuleType:
     """Import a study script by name, from the study folder pytest puts on `sys.path`."""

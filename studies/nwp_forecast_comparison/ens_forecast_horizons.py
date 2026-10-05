@@ -105,7 +105,7 @@ upsampled by the chosen technique.
 exploratory, and the upsampling contrasts too. The best baseline at each band is chosen after the
 run, so a contrast against it is exploratory as well.
 
-Run it with `uv run python studies/beam_diffuse_split/ens_forecast_horizons.py`, after
+Run it with `uv run python studies/nwp_forecast_comparison/ens_forecast_horizons.py`, after
 `fetch_ens_forecast_horizons.py` and the three past-weather studies. With `--report-only` it
 rebuilds the report from the losses a full run saved, and with `--refit solar` or `--refit wind` it
 refits one technology and reads the other's saved outputs.

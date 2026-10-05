@@ -15,7 +15,7 @@ generator's own capacity, the time axes count hours or days rather than dates, a
 writes its values into the SVG's accessibility text. The example days' weather is drawn with no
 generator label.
 
-Run it with `uv run python studies/beam_diffuse_split/ens_forecast_charts.py`, after
+Run it with `uv run python studies/nwp_forecast_comparison/ens_forecast_charts.py`, after
 `ens_forecast_horizons.py`. Optimise each SVG with `npx svgo@4 --multipass --precision=1
 --final-newline` before committing it.
 """

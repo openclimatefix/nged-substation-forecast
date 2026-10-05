@@ -1,17 +1,9 @@
 import math
-import sys
 from datetime import UTC, datetime
-from pathlib import Path
 
 import numpy as np
 import polars as pl
-from studies.gfs_native import gfs_leads, window_hours
-
-_STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "nwp_forecast_comparison"
-sys.path.insert(0, str(_STUDY_DIR))
-sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
-
-from build_forecast_inputs import (  # noqa: E402
+from build_forecast_inputs import (
     EXTRA_LEAD_BUILDS,
     GFS_NATIVE_DAYS,
     _gfs_native_direct_arm,
@@ -19,6 +11,7 @@ from build_forecast_inputs import (  # noqa: E402
     _gfs_native_weather,
     gfs_native_arm,
 )
+from studies.gfs_native import gfs_leads, window_hours
 
 _INIT = datetime(2025, 3, 8, tzinfo=UTC)
 

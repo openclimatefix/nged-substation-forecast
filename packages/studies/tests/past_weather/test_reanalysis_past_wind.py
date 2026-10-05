@@ -16,8 +16,6 @@ import polars as pl
 import pytest
 from studies.wind_product_frames import wind_columns
 
-REPO_ROOT: Final[Path] = Path(__file__).parent.parent
-SCRIPT_DIR: Final[Path] = REPO_ROOT / "studies" / "beam_diffuse_split"
 DAY: Final[datetime] = datetime(2025, 6, 1, tzinfo=UTC)
 
 

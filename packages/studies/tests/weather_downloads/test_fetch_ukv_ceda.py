@@ -7,8 +7,7 @@ slot of a store opened under the other profile.
 """
 
 import dataclasses
-import importlib.util
-import sys
+import importlib
 from collections.abc import Iterator
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -24,7 +23,6 @@ pytest.importorskip("icechunk")
 pytest.importorskip("zarr")
 pytest.importorskip("pyproj")
 
-SCRIPT_DIR: Final[Path] = Path(__file__).parent.parent / "studies" / "weather_downloads"
 T120_TAGS: Final[tuple[str, ...]] = (
     "Wholesale1T120",
     "Wholesale2T120",
@@ -33,16 +31,8 @@ T120_TAGS: Final[tuple[str, ...]] = (
 
 
 def _load() -> ModuleType:
-    sys.path.insert(0, str(SCRIPT_DIR))
-    spec = importlib.util.spec_from_file_location(
-        "fetch_ukv_ceda", SCRIPT_DIR / "fetch_ukv_ceda.py"
-    )
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
+    return importlib.import_module("fetch_ukv_ceda")
 
 
 fetch = _load()

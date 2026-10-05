@@ -1707,8 +1707,8 @@ scripts. Before they run, the production NWP Delta table must hold the ENS runs;
 HRES files come from two Open-Meteo downloads:
 
 ```bash
-uv run python studies/beam_diffuse_split/fetch_ens_forecast_horizons.py
-uv run python studies/beam_diffuse_split/ens_forecast_horizons.py
+uv run python studies/nwp_forecast_comparison/fetch_ens_forecast_horizons.py
+uv run python studies/nwp_forecast_comparison/ens_forecast_horizons.py
 uv run python studies/weather_downloads/fetch_open_meteo_previous_runs.py --model ecmwf-ifs-hres
 uv run python studies/weather_downloads/fetch_open_meteo_grid.py --model ecmwf-ifs-hres \
     --start-date 2017-01-01 --end-date 2026-09-22

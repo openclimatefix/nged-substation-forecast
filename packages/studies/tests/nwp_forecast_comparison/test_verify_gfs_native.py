@@ -1,15 +1,8 @@
 import math
-import sys
 from datetime import UTC, datetime
-from pathlib import Path
 
 import polars as pl
-
-_STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "nwp_forecast_comparison"
-sys.path.insert(0, str(_STUDY_DIR))
-sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
-
-from verify_gfs_native import (  # noqa: E402
+from verify_gfs_native import (
     expected_served,
     lookup_verdict,
     negative_share_verdict,

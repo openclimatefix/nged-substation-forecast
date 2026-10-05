@@ -1,27 +1,21 @@
 import re
 import subprocess
-import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+import fit_aifs
 import numpy as np
+import nwp_forecast_charts as charts
+import nwp_forecast_comparison
 import polars as pl
 import pytest
 import xgboost
-
-_STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "nwp_forecast_comparison"
-sys.path.insert(0, str(_STUDY_DIR))
-sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
-
-import fit_aifs  # noqa: E402
-import nwp_forecast_charts as charts  # noqa: E402
-import nwp_forecast_comparison  # noqa: E402
-from build_forecast_inputs import (  # noqa: E402
+from build_forecast_inputs import (
     AIFS_VALUE_COLUMNS,
     aifs_members_frame,
     build_aifs,
 )
-from fit_aifs import (  # noqa: E402
+from fit_aifs import (
     BLEND_DAYS,
     ENS_STAMPED,
     LONG_DAYS,
@@ -61,14 +55,14 @@ from fit_aifs import (  # noqa: E402
     summed_arm,
     weather_spread,
 )
-from nwp_forecast_comparison import (  # noqa: E402
+from nwp_forecast_comparison import (
     BLEND_ARMS,
     METRIC,
     DomainType,
     add_blend_guard_columns,
 )
-from nwp_forecast_comparison import jobs as published_jobs  # noqa: E402
-from studies.bootstrap import BootstrapInterval  # noqa: E402
+from nwp_forecast_comparison import jobs as published_jobs
+from studies.bootstrap import BootstrapInterval
 
 
 def _interval(*, difference: float, lower: float, upper: float) -> BootstrapInterval:

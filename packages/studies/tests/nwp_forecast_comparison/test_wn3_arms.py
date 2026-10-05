@@ -20,7 +20,6 @@ import xarray as xr
 
 from studies import ens_members
 
-STUDIES_DIR: Final[Path] = Path(__file__).resolve().parent.parent / "studies"
 """The `studies/` directory, whose scripts do bare imports of their siblings."""
 
 RUNS: Final[np.ndarray] = np.array(["2026-03-01T00", "2026-03-02T00"], dtype="datetime64[h]")
@@ -31,18 +30,8 @@ RUN_STRIDE: Final[float] = 1000.0
 
 
 def _load(*, name: str) -> ModuleType:
-    """Import a study script by name, with the study directories on `sys.path` while it loads."""
-    paths = [
-        str(STUDIES_DIR / "nwp_forecast_comparison"),
-        str(STUDIES_DIR / "beam_diffuse_split"),
-        str(STUDIES_DIR / "weather_downloads"),
-    ]
-    sys.path[:0] = paths
-    try:
-        return importlib.import_module(name)
-    finally:
-        for path in paths:
-            sys.path.remove(path)
+    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
+    return importlib.import_module(name)
 
 
 efh = _load(name="ens_forecast_horizons")

@@ -386,6 +386,7 @@ extra-paths = [
     "studies/beam_diffuse_split",
     "studies/nwp_forecast_comparison",
     "studies/past_weather",
+    "packages/studies/tests/nwp_forecast_comparison",
     "packages/studies/tests/past_weather",
     "studies/ukv_ceda_blends",
     "studies/weather_downloads",
@@ -430,7 +431,10 @@ python_files = ["test_*.py", "*_test.py", "packages/notebooks/plot_missing_NWP_d
 pythonpath = [
     "tests",
     "studies/beam_diffuse_split",
+    "studies/nwp_forecast_comparison",
     "studies/past_weather",
+    "studies/weather_downloads",
+    "packages/studies/tests/nwp_forecast_comparison",
     "packages/studies/tests/past_weather",
 ]
 # `error` first: any warning not explicitly excepted below fails the test that raised it, so a

@@ -10,17 +10,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import leaderboard_by_day as mod
+import nwp_forecast_charts as charts
 import polars as pl
 import pytest
 
-_STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "nwp_forecast_comparison"
-sys.path.insert(0, str(_STUDY_DIR))
-sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
-
-import leaderboard_by_day as mod  # noqa: E402
-import nwp_forecast_charts as charts  # noqa: E402
-
-from studies import charts as study_charts  # noqa: E402
+from studies import charts as study_charts
 
 FULL_PRODUCTS = ("Product A", "Product B", "Product C")
 

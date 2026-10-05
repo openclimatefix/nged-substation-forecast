@@ -26,8 +26,6 @@ from studies.charts import (
 )
 from studies.page_numbers import full_precision_values
 
-REPO_ROOT: Final[Path] = Path(__file__).parent.parent
-SCRIPT_DIR: Final[Path] = REPO_ROOT / "studies" / "beam_diffuse_split"
 METRIC: Final[str] = "absolute_error_capped_fraction_of_capacity"
 SITE_HOURS: Final[int] = 8
 ARMS: Final[tuple[BlockArm, ...]] = (

@@ -1,14 +1,6 @@
-import sys
-from pathlib import Path
-
 import polars as pl
 import pytest
-
-_STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "nwp_forecast_comparison"
-sys.path.insert(0, str(_STUDY_DIR))
-sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
-
-from nwp_forecast_charts import (  # noqa: E402
+from nwp_forecast_charts import (
     KEY_COLUMNS,
     KEY_LABELS,
     KEY_ROW_PX,

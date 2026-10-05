@@ -8,7 +8,6 @@ import hashlib
 import importlib
 import json
 import subprocess
-import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType
@@ -19,19 +18,12 @@ import numpy as np
 import polars as pl
 import pytest
 
-STUDIES_DIR: Final[Path] = Path(__file__).resolve().parent.parent / "studies"
 """The `studies/` directory, whose scripts do bare imports of their siblings."""
 
 
 def _load(*, name: str) -> ModuleType:
-    """Import a study script by name, with both study directories on `sys.path` while it loads."""
-    paths = [str(STUDIES_DIR / "nwp_forecast_comparison"), str(STUDIES_DIR / "beam_diffuse_split")]
-    sys.path[:0] = paths
-    try:
-        return importlib.import_module(name)
-    finally:
-        for path in paths:
-            sys.path.remove(path)
+    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
+    return importlib.import_module(name)
 
 
 b = _load(name="build_forecast_inputs")

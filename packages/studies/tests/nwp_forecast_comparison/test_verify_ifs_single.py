@@ -1,17 +1,11 @@
 import math
-import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
 import polars as pl
-
-_STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "nwp_forecast_comparison"
-sys.path.insert(0, str(_STUDY_DIR))
-sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
-
-from build_forecast_inputs import IFS_SINGLE_DAYS, ifs_single_arm  # noqa: E402
-from verify_ifs_single import (  # noqa: E402
+from build_forecast_inputs import IFS_SINGLE_DAYS, ifs_single_arm
+from verify_ifs_single import (
     expected_served,
     gap_table,
     gap_verdict,

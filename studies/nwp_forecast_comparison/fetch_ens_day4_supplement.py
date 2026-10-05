@@ -16,7 +16,7 @@ the script re-reads the leads that the extract and the table share, and raises u
 every field agrees. That check is what shows the supplement means the same as the extract: same
 table, same units, same anonymous site labels.
 
-Run it with `uv run python studies/beam_diffuse_split/fetch_ens_day4_supplement.py`.
+Run it with `uv run python studies/nwp_forecast_comparison/fetch_ens_day4_supplement.py`.
 """
 
 import logging

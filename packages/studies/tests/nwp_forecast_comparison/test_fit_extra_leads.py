@@ -1,16 +1,10 @@
-import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import polars as pl
 import pytest
-
-_STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "nwp_forecast_comparison"
-sys.path.insert(0, str(_STUDY_DIR))
-sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
-
-from build_forecast_inputs import EXTRA_LEAD_BUILDS, ExtraBatchType, extra_ens_ways  # noqa: E402
-from fit_extra_leads import (  # noqa: E402
+from build_forecast_inputs import EXTRA_LEAD_BUILDS, ExtraBatchType, extra_ens_ways
+from fit_extra_leads import (
     BATCHES,
     FIFTH_OUTPUT_DIR_NAME,
     NEW_PREFIXES,
@@ -31,7 +25,7 @@ from fit_extra_leads import (  # noqa: E402
     row_set_diagnostic,
     shared_rows,
 )
-from nwp_forecast_comparison import METRIC, DomainType, arm_columns  # noqa: E402
+from nwp_forecast_comparison import METRIC, DomainType, arm_columns
 
 
 def test_wind_prefixes_exclude_the_solar_only_products():

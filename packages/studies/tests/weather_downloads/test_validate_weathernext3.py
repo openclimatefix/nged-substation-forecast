@@ -1,12 +1,5 @@
-import sys
-from pathlib import Path
-
 import numpy as np
-
-_STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "weather_downloads"
-sys.path.insert(0, str(_STUDY_DIR))
-
-from validate_weathernext3 import (  # noqa: E402
+from validate_weathernext3 import (
     DIRECT_RADIATION,
     OFFENDING_FRACTION_LIMIT,
     TOTAL_RADIATION,

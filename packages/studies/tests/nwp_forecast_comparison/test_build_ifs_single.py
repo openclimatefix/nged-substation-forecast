@@ -1,23 +1,16 @@
 import math
-import sys
 from datetime import datetime
-from pathlib import Path
 
 import polars as pl
 import pytest
-
-_STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "nwp_forecast_comparison"
-sys.path.insert(0, str(_STUDY_DIR))
-sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
-
-from build_forecast_inputs import (  # noqa: E402
+from build_forecast_inputs import (
     EXTRA_LEAD_BUILDS,
     IFS_SINGLE_DAYS,
     KMH_TO_MS,
     _ifs_single_arm_columns,
     _ifs_single_extract,
 )
-from nwp_forecast_comparison import DomainType, arm_columns  # noqa: E402
+from nwp_forecast_comparison import DomainType, arm_columns
 
 _TIME_DTYPE = pl.Datetime("us", "UTC")
 _RUN = datetime(2025, 3, 8)
