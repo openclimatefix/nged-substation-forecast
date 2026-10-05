@@ -62,9 +62,12 @@ it changed. The PR stays a draft until the maintainer approves.
 **Set A scores each product's hourly value against the station's reading.** The two products are
 ERA5 (nearest 0.25 degree cell) and UKV-CEDA (nearest 2 km cell, at most 2 km from the station).
 Variables: 10 m wind speed (primary), and 2 m (ERA5) or 1.5 m (UKV) air temperature (primary). The
-primary score is the mean absolute error after removing each (station, product, calendar month)
-mean error. This matches what the XGBoost models in set B do, because they recalibrate per
-generator, and it removes offsets from station exposure and cell orography. Bias removal does not
+primary score is the mean absolute error after removing each (station, product, calendar month,
+hour of day) mean error. This is the closest set A analogue of the XGBoost models in set B, which
+recalibrate per generator and learn hour-of-day bias (for UKV-CEDA that includes lead-dependent
+bias, because lead equals hour modulo 6). ERA5's 2 m temperature also has a known diurnal-range
+bias at 25 km. The score with bias removed per (station, product, calendar month) is printed
+beside it. Bias removal removes offsets from station exposure and cell orography. Bias removal does not
 remove the advantage a 2 km cell has over a 0.25 degree cell when scored against a point
 observation, so the page does not attribute a UKV lead to the product alone. The raw mean absolute
 error is printed beside the bias-removed score. The page prints each of the four stations'
@@ -101,16 +104,23 @@ offset for both products, as the study skill requires for every product.
 `solar_azimuth_deg`, `extraterrestrial_horizontal_w_m2`, `hour_of_day`, `day_of_year`, `era_code`,
 and the arm's temperature), plus CAMS global, beam, and diffuse irradiance (3). The two arms differ
 only in the temperature column: `era5_temp` and `ukv_ceda_temp`. Temperature is the mean of the
-instants at the hour's two ends for both products (the power hour ends at the label).
+instants at the hour's two ends for both products (the power hour ends at the label). The two
+instants can come from different runs: 05 UTC is run 00 at lead 5, and 06 UTC is run 06 at lead 0.
+A solar hour therefore needs both instants' runs complete.
 
 ## 3. Decision rule, fixed before any result
 
 **Margins.** A contrast "clearly" favours a product only when its 95% interval lies wholly on one
-side of zero and the point estimate is beyond a margin. The margin for set A is 5% of ERA5's error
-on the same rows (the wind page's 0.44 points was 6% of ERA5's error, so the margin sits just
+side of zero and the point estimate is beyond a margin. The margin for set A is 5% of ERA5's bias-removed
+error on the same rows (the wind page's 0.44 points was 6% of ERA5's error, so the margin sits just
 below the one effect already seen). The margin for set B is the smallest difference the design
-detects, taken from published intervals. The detectable difference is 2.8 times the standard error
-of the paired month-resampled difference (80% power, 5% level, two sided). Half-widths divided by
+detects, taken from published intervals. The margin is 2.8 times the standard error
+of the paired month-resampled difference, the smallest difference whose interval excludes zero at
+80% power (5% level, two sided). A "clear" verdict also needs the point estimate to exceed the
+margin, and a true effect equal to the margin does that only about 50% of the time. The probability
+of a "clear" verdict reaches 80% at about 3.64 standard errors, roughly 0.07 points for solar and
+0.20 points for wind, so the margin is a relevance threshold and not an 80%-power detectable
+difference. Half-widths divided by
 1.96 give standard errors of about 0.040 points for solar at 21 months (the day-1 blend contrast on
 the UKV-CEDA blends page) and about 0.10 points for wind at 25 months (the Open-Meteo UKV against
 ERA5 contrast). Standard error scales with the square root of the number of months, and set B has
@@ -130,6 +140,16 @@ value favouring UKV-CEDA.
 4. **P4, set B solar:** `ukv_ceda_temp` minus `era5_temp`, at both settings. P4 vetoes a UKV-CEDA
    temperature recommendation.
 
+**Pre-registered row P2-lead (planned).** P2 is tilted towards UKV-CEDA by design, in two ways
+that do not depend on how good the product is at a substation. A 2 km cell represents a point
+better than a 25 km cell. The 4 stations are synoptic or automatic stations whose screen
+temperature and 10 m wind the Met Office's hourly data assimilation uses, and UKV-CEDA is read at
+leads 0 to 5 hours from the analysis. ERA5's 2 m analysis also uses screen observations, so the
+second tilt is partly symmetric. P2-lead is P2 split by UKV lead: leads 0 to 2 and leads 3 to 5.
+The study recommends UKV-CEDA temperature only if P2 is clear at leads 3 to 5 as well as overall,
+because the assimilated observation has the least influence there. P2-lead is the cheap way to see
+how much of the P2 effect the assimilation explains.
+
 The four are not corrected for multiple comparisons. Each is read at its own interval and margin,
 and the rule below names the one contrast that decides each variable.
 
@@ -138,13 +158,16 @@ and the rule below names the one contrast that decides each variable.
 - **Wind speed: P3 decides.** Set B measures what the main work does with wind, which is to predict
   power after per-generator recalibration. P3 must agree at both hyperparameter settings. P1 is
   printed beside P3, and where P1 and P3 disagree the page says so and P3 still decides.
-- **Temperature: P2 decides.** The generators are not demand, so set B cannot say how temperature
-  helps a demand forecast. If P4 clearly favours ERA5 at either setting, the study does not
+- **Temperature: P2 decides, with P2-lead as a second condition.** The generators are not demand,
+  so set B cannot say how temperature helps a demand forecast. Set A's point scoring rewards
+  resolution: it favours the product whose cell sits closest to the station, whether or not that
+  product forecasts a substation's demand better. The page states this, and states that P2-lead
+  is the check on it. If P4 clearly favours ERA5 at either setting, the study does not
   recommend UKV-CEDA temperature for solar models.
 
 | Deciding contrast reads | Study reports |
 |---|---|
-| UKV-CEDA clearly better | Recommend UKV-CEDA, subject to the early-years test and the licence |
+| UKV-CEDA clearly better (for temperature, at leads 3 to 5 too) | Recommend UKV-CEDA, subject to the early-years test and the licence |
 | ERA5 clearly better | Recommend ERA5 |
 | No clear difference, or small | Recommend ERA5 (default: no licence limit, no run gaps, one physics version) |
 
@@ -161,17 +184,29 @@ section 10.
 
 **Rows are the intersection across every arm, decided from the target and availability, never from
 a product's values.** An hour stays only if the target exists and every arm's input exists. Set B
-also drops the hours the other wind and solar studies drop: wind hours holding an exactly zero
-half-hour (`wind_product_frames.common_rows`), and for solar the commissioning ramp and the
-export-cap and active-network-management hours (`solar_product_frames.common_rows`). Set A keeps
-a station-hour if the station has a reading and both products have a value. All 3 wind farms have
-power from 2019-09-17, with roughly 10,900 to 11,200 hours before 2021, so set B can read the early
-window for wind.
+also drops the hours the other wind and solar studies drop. For wind, `wind_product_frames.common_rows`
+drops hours holding an exactly zero half-hour and adds `constrained=False`. For solar,
+`solar_product_frames.common_rows` drops hours holding a zero half-hour, the ICON-EU corrupt block
+on 2023-06-21 between 01 and 06 UTC (the drop applies although no ICON column is read), the January
+2026 tail, and the commissioning ramp. It does not drop export-cap or active-network-management
+hours. The solar build therefore calls `studies.export_cap.with_export_cap`, which adds
+`constrained`. The fit loop excludes `constrained` rows from training and still scores them, and the
+report says so. The 12 days 2021-12-01 to 2021-12-12 are dropped for every arm in both sets, because
+the Open-Meteo mirror of ERA5 temperature disagrees with the Copernicus archive on those days by up
+to 2 degrees Celsius (`ERA5/README.md`). This is a source-availability rule, not a value filter, and
+the coverage check prints it. Set A keeps a station-hour if the station has a reading and both
+products have a value. All 3 wind farms have power from 2019-09-17. Before 2021 they hold about
+10,100 (W1), 9,100 (W2), and 4,800 (W3) rows after the zero-half-hour drop, and W3 holds only about
+475 rows in 2019, so the early-window wind reading rests mostly on W1 and W2. The zero-half-hour
+rule is justified by a 2026 feed change, and in 2019 and 2020 it removes more than half of W3's
+hours. The coverage check prints per-farm early-window rows, and an exploratory early-window row
+runs with `drop_zero_hours=False`.
 
 **Gap rule for CEDA runs.** Across the three stores the counts are 9,981 complete, 15 partial, and 82
 missing runs, plus 260 runs on 65 days that CEDA has no directory for. That is 10,338 runs, of which
 357 (3.45%) are missing, unlisted, or partial. An hour whose freshest run is missing or partial is
-dropped for every arm. It is not served by an older run, because that changes the lead mid-series.
+dropped for every arm, and a solar hour is dropped if either of its two instants' runs is missing
+or partial. It is not served by an older run, because that changes the lead mid-series.
 The build's `--check-only` prints the share of hours lost per month, re-checks the 65 days against
 CEDA and the 15 partial runs, and stops if one month loses more than 25% of hours.
 
@@ -189,9 +224,16 @@ becomes an era boundary and a deviation from this plan, recorded on the page. Ev
 
 - **Folds:** `studies.cross_validation.cut_eras` with `first_months=("2020-01", UKV_UPGRADE_MONTH)`,
   five blocks of whole months per (site, era). Era 0 has 3 months, so `assign_folds` gives it folds
-  0, 1, and 3, and two of its five folds (2 and 4) are empty before rotation.
-  `cerra_past_solar.with_covering_folds` picks the rotation, and `raise_on_uncovered_months` stops
-  the build if any calendar month is held out of every training row.
+  0, 1, and 3, and two of its five folds (2 and 4) are empty before rotation. The build calls
+  `search_fold_offsets`, `cut_eras`, `calendar_month_coverage`, and `raise_on_uncovered_months` from
+  `studies.cross_validation` directly, each with `first_months=("2020-01", UKV_UPGRADE_MONTH)`.
+  `cerra_past_solar.with_covering_folds` is not used, because it takes no `first_months` argument
+  and cuts at the module constant `FIRST_MONTHS = (UKV_UPGRADE_MONTH,)`, which would put September to
+  November 2019 and 2020 to 2025 in one era without raising an error. The build drops 2019-12 and
+  2026-01 before `cut_eras`, because otherwise 2026-01 lands in era 1. A build guard stops the build
+  unless set B's `era_code` values are exactly {0, 1, 2} and no row from 2019-12 or 2026-01
+  survives. `raise_on_uncovered_months` stops the build if any calendar month is held out of every
+  training row.
 - **Intervals, set B:** `studies.bootstrap` resamples whole calendar months, paired across arms,
   with one of the three fitting seeds, 2,000 resamples. **Set A:** `bootstrap_row_difference`
   resamples whole months and has no seed. Both cover month-to-month weather, not differences between
@@ -211,12 +253,16 @@ becomes an era boundary and a deviation from this plan, recorded on the page. Ev
 
 ## 6. Controls
 
-- **Negative control, set B:** each product's weather columns shuffled within (site, year-month,
-  hour of day), at one shuffle seed and the primary setting. The shuffled-UKV minus shuffled-ERA5
-  contrast shows the difference the pipeline produces from nothing, and its own month-resampled
-  interval is its spread. Run for wind and solar. A product contrast smaller than the control's
-  spread is not read. Reading `era5_temp` minus its shuffled arm also shows whether temperature
-  adds anything, so the plan has no separate no-temperature arm.
+- **Negative control, set B:** the product's weather columns shuffled within (site, year-month,
+  hour of day), at one shuffle seed and the primary setting. For wind, one joint permutation of the
+  four weather columns per stratum. For solar, only the temperature column is shuffled, and the
+  CAMS irradiance columns stay intact, so the contrast measures temperature alone. The
+  shuffled-UKV minus shuffled-ERA5 contrast checks the pipeline for systematic bias, because two
+  arms carrying no weather information should differ by about zero. The month-resampled interval of
+  each product contrast is the gate, and the control is not used to discard a contrast. Reading
+  `era5_temp` minus its shuffled arm also shows whether temperature adds anything, so the plan has
+  no separate no-temperature arm. A control that lands near the 5% line is rerun at the second
+  hyperparameter setting.
 - **No positive control.** The study skill accepts an interval that bounds the effect instead.
   Every null reading of P1 to P4 therefore carries its bound, as in "an effect as large as 0.1
   points is not excluded".
@@ -228,7 +274,7 @@ becomes an era boundary and a deviation from this plan, recorded on the page. Ev
 
 **The scripts go in `studies/past_weather/`, named `ukv_ceda_*`, because the folder holds the
 scripts of one family of pages and can import the fit and report helpers its siblings already
-use.** The new scripts import `cerra_past_solar.with_covering_folds` and `check_column_counts`, the
+use.** The new scripts import `check_column_counts` from `cerra_past_solar`, the
 `ens_past_solar` report and fingerprint helpers, and `station_wind_arms.py`'s station reading and
 timestamp handling, and model the fit script on `reanalysis_past_wind.py` (new product against
 ERA5, covering folds, both settings, `--check-only`, `--report-only`).
@@ -267,6 +313,9 @@ plumbing into packages/studies") plans to move the downloads from `data/studies/
 to a `data/studies/downloads/` layer, and `sources.py` already defines `DOWNLOADS_DIR`, equal to
 `STUDIES_DATA_DIR` until the data moves. A script that reads only these constants runs before and
 after the move, so no script waits for it. The plan adds no download script.
+
+**Re-running `--report-only`.** A re-run after a review would rewrite `report.md` in a write-once
+folder, so the earlier report moves to `superseded/` first.
 
 **Output.** `UKV_VS_ERA5_DIR` is write-once: `refuse_to_overwrite` stops a second run, and a result
 a merged page quotes moves to `superseded/` first. The folder holds the frames and build stamp, each
@@ -338,8 +387,10 @@ the study PR confined to `studies/`, `packages/studies/`, `docs/studies/`, and `
    no terms, so the survey should cite the record that does.
 2. **Four stations are few.** Each month holds about 4 times 720 station-hours, so the pooled
    interval will probably be narrow, but the interval covers month-to-month weather only. It covers
-   neither differences between stations nor places outside one box, and a 2 km cell favours a point
-   observation. Recommendation: do not widen the UKV crop in this study, print the per-station
+   neither differences between stations nor places outside one box. A 2 km cell favours a point
+   observation, and the 4 stations feed the Met Office's data assimilation, so UKV-CEDA at leads 0
+   to 5 hours is partly scored against observations it has already seen. P2-lead (section 3) is the
+   check. Recommendation: do not widen the UKV crop in this study, print the per-station
    rows, and let a follow-up decide whether to widen the crop.
 3. **CEDA gaps.** 3.45% of runs are missing, unlisted, or partial. Recommendation: drop, never fill
    from an older run, and report the loss per month.
@@ -383,7 +434,16 @@ uv run python studies/past_weather/ukv_ceda_vs_era5_fit.py --dry-run
 Also run the CI steps `pydoclint` and the docs-link checker locally, and the mutation pass whenever
 `packages/studies/` changes. Each new test fails on the bug it exists to catch: a slot mapped to the
 wrong store, a missing run served by an older run, a bias removed across months instead of within
-one, and unequal capacities in the normalisation.
+one, and unequal capacities in the normalisation. Three more tests fail on the bugs most likely
+here:
+
+- a `<` versus `<=` error at the run hour, where 06 UTC must map to run 06 at lead 0 and never to
+  run 00 at lead 6;
+- era labelling, which drops 2019-12 and 2026-01 and leaves an `era_code` set of exactly {0, 1, 2};
+- the two-instant availability rule for solar hours.
+
+The "wrong store" test uses synthetic store boundaries, because the three real stores split the
+record by date (3,440, 3,272, and 3,366 runs).
 
 ## 12. What this plan does not commit the project to
 
@@ -400,6 +460,12 @@ arm, the irradiance context row, and the second shuffle seed and second setting 
 The decision rule now names one deciding contrast per variable, P5 is an exploratory row, the
 scripts moved from nine in a new folder to five in `studies/past_weather/`, and the ERA5 wind
 2024 to 2025 request is gone.
+
+**Changed after the correctness review.** The plan now calls the `cross_validation` fold functions
+directly with both era starts, adds the P2-lead row, drops the 12 days on which the ERA5 mirror's
+temperature is wrong, and corrects the solar row set, the early wind window, the power claim for the
+margins, the negative control, the two-instant availability rule, the set A bias removal, and the
+test list. No finding was rejected.
 
 **Rejected, with one-line reasons.**
 
