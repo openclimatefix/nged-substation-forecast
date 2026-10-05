@@ -320,8 +320,8 @@ to UKV. Three caveats limit what the blending results say about training the wea
 - The UKV fields fetched from CEDA so far hold 10 m wind and winds at 1000 hPa and 925 hPa, with
   no 100 m wind and no orography. Estimating hub-height wind from those levels needs orography,
   and the 1000 hPa level lies below ground in deep lows, which are the windy days.
-- CEDA's UKV archive has three gaps of 15 to 16 missing runs each. ERA5 fills those gaps, which is
-  part of ERA5's gap-filling role.
+- CEDA's UKV archive lacks a small number of runs, and holds a few more only in part. ERA5 fills
+  those hours, which is part of ERA5's gap-filling role.
 
 **Weather inferred from the DP models stays an estimate of past weather, with a circularity that
 bites in training and not at test time.**

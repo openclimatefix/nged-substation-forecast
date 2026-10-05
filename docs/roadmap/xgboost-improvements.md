@@ -879,14 +879,14 @@ because weather anomalies are synoptic-scale — a heatwave does not vary meanin
 cell. CERRA is the tempting alternative — higher-resolution, and since its 2025 timely-update
 extension no longer stuck at 2021 but running to within a few months of present. But CERRA is a
 *different* model (a HARMONIE-based regional system), so z-scoring ECMWF forecasts against a CERRA
-climatology folds a model-pair bias into every anomaly. (This same model-consistency argument,
-together with ERA5T's near-real-time latency, is why [ERA5](data-sources.md#weather-data) is the
-reanalysis planned for capacity estimation and this climatology; CERRA stays documented as a
-higher-resolution option but is deprioritised. The estimates of past weather planned for
-pre-training are a separate choice: CAMS for irradiance and CEDA UKV for other variables, pending
-[checks against ERA5](training-history.md#which-estimate-of-past-weather-to-train-on).) The most
-self-consistent source imaginable would be a climatology from our own archived ENS, but a robust
-day-of-year climatology wants 10+ years and the archive is nowhere near that yet. CEDA's UKV archive
+climatology folds a model-pair bias into every anomaly. (This same model-consistency argument
+is why [ERA5](data-sources.md#weather-data) is the reanalysis planned for this climatology; CERRA
+stays documented as a higher-resolution option but is deprioritised. The estimates of past weather
+planned for pre-training are a separate choice: CAMS for irradiance and CEDA UKV for other
+variables, pending [checks against
+ERA5](training-history.md#which-estimate-of-past-weather-to-train-on).) The most self-consistent
+source imaginable would be a climatology from our own archived ENS, but a robust day-of-year
+climatology wants 10+ years and the archive is nowhere near that yet. CEDA's UKV archive
 starts in 2016, does not share the ENS's IFS lineage, and is not homogeneous across the Met Office's
 PS47 upgrade of 2026-01-21, so ERA5 wins in practice.
 
