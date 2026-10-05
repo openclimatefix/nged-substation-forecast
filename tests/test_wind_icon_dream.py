@@ -19,6 +19,7 @@ from typing import Final
 
 import polars as pl
 import pytest
+from studies.wind_product_frames import wind_columns
 
 REPO_ROOT: Final[Path] = Path(__file__).parent.parent
 """The repo root, one level above this `tests/` directory."""
@@ -339,7 +340,7 @@ def test_icon_dream_site_frame_reads_the_hub_level_and_converts_direction(
     frame = wind_icon_dream.icon_dream_site_frame(sites=sites).sort("time")
 
     assert frame.height == len(_HOURS)
-    hub, sin_c, cos_c, surface = wind_icon_dream._wind_columns(product=wind_icon_dream.PRODUCT)
+    hub, sin_c, cos_c, surface = wind_columns(product=wind_icon_dream.PRODUCT)
     hours = [
         round((t.replace(tzinfo=None) - _T0.replace(tzinfo=None)).total_seconds() / 3600)
         for t in frame["time"]
@@ -398,7 +399,7 @@ def test_icon_dream_common_rows_drops_the_zero_hour_and_matches_on_time(
 
     assert sorted(t.hour for t in rows["time"]) == [h for h in _HOURS if h != zero_hour]
     assert uncovered_hour not in {t.hour for t in rows["time"]}
-    hub = wind_icon_dream._wind_columns(product=wind_icon_dream.PRODUCT)[0]
+    hub = wind_columns(product=wind_icon_dream.PRODUCT)[0]
     assert rows[hub].to_list() == pytest.approx(
         [_level_speed(level=72, hour=t.hour, cell=1) for t in rows["time"]]
     )

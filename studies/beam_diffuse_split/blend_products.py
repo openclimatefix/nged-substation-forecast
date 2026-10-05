@@ -9,29 +9,29 @@ directories.
 
 **Every published single-product arm must reproduce the published losses row for row before any
 blend runs.** Each refitted arm is compared against its study's `losses.parquet`: the same (site,
-time, fold, seed) keys and a bit-identical `signed_error_capped_mw`. If any differs, the rows or the
-folds have changed, and the script stops.
+time, fold, seed) keys and a bit-identical `signed_error_capped_mw`. If any differs, the rows or
+the folds have changed, and the script stops.
 
 **Each set of products is blended twice: from each product's plain columns, and from its enriched
 columns.** The enriched single-product arm, `<product>_rich`, adds what the published solar page
-found helps one product on its own: the neighbouring hours for every product, CAMS's own beam split,
-and UKV's hour rebuilt from the snapshots at both ends. For wind it adds each product's hub-height
-speed at ±1 h and ±2 h and its 10 m speed at ±1 h. The enriched contrasts are the deciding ones.
-They were added after the first run, when the first science review found that much of each plain
-blend's gain was available from one product with those additions.
+found helps one product on its own: the neighbouring hours for every product, CAMS's own beam
+split, and UKV's hour rebuilt from the snapshots at both ends. For wind it adds each product's
+hub-height speed at ±1 h and ±2 h and its 10 m speed at ±1 h. The enriched contrasts are the
+deciding ones. They were added after the first run, when the first science review found that much
+of each plain blend's gain was available from one product with those additions.
 
-**The enriched best single of a set is the best single-product arm measured**, chosen by mean error
-on the common rows at each hyperparameter setting, among every published single-product arm and
-every enriched arm of the set's products. The plain contrasts keep the best single fixed in advance
-from the published tables, as the plan named them.
+**The enriched best single of a set is the best single-product arm measured**, chosen by mean
+error on the common rows at each hyperparameter setting, among every published single-product arm
+and every enriched arm of the set's products. The plain contrasts keep the best single fixed in
+advance from the published tables, as the plan named them.
 
 **Each set is blended four ways**, from its plain or its enriched columns:
 
 - `<set>_xgb`, `<set>_rich_xgb`: XGBoost shown every product's columns, column subsampling at 1.
 - `<set>_mean`, `<set>_rich_mean`: XGBoost shown the mean of the products' values.
 - `<set>_stack`, `<set>_rich_stack`: a linear stack of the single-product models' out-of-fold
-  predictions, with non-negative weights summing to 1, cross-fitted per generator, seed and fold by
-  `studies.blending.stacked_errors`.
+  predictions, with non-negative weights summing to 1, cross-fitted per generator, seed and fold
+  by `studies.blending.stacked_errors`.
 - `<set>_equal`, `<set>_rich_equal`: the equal-weight mean of the single-product predictions.
 
 **Every XGBoost blend has a climatology control**, `<set>_control` or `<set>_rich_control`. The
@@ -39,17 +39,17 @@ control holds the best single's real columns and every other product's columns p
 rows sharing a site, a month and an hour of day, one permutation per product.
 
 **A synthetic product measures how small a gain the pipeline can detect.** `synthetic_xgb` is the
-best single of the `everything` set shown one more column: the generator's own output as a fraction
-of capacity, plus Gaussian noise large enough that the column carries only part of the target.
-`synthetic_control` is shown the same column permuted within site, month and hour of day.
+best single of the `everything` set shown one more column: the generator's own output as a
+fraction of capacity, plus Gaussian noise large enough that the column carries only part of the
+target. `synthetic_control` is shown the same column permuted within site, month and hour of day.
 
-Run it with `uv run python studies/beam_diffuse_split/blend_products.py`, after both weather-product
-studies have been run. `--resume` reuses the per-arm fits a previous run left in `fits/`.
-`--report-only` rebuilds `report.md` from `losses.parquet`, `stack_weights.parquet` and
+Run it with `uv run python studies/beam_diffuse_split/blend_products.py`, after both
+weather-product studies have been run. `--resume` reuses the per-arm fits a previous run left in
+`fits/`. `--report-only` rebuilds `report.md` from `losses.parquet`, `stack_weights.parquet` and
 `intervals.parquet` already on disk, fitting nothing; move the current `report.md` to a
 `superseded/` subfolder first, since this overwrites it. `--report-only` needs `--power-version`,
-the power Delta table version the fits on disk read, which the replaced report prints: the table may
-have gained versions since, so its current version is not the one the results rest on.
+the power Delta table version the fits on disk read, which the replaced report prints: the table
+may have gained versions since, so its current version is not the one the results rest on.
 """
 
 import argparse
@@ -66,7 +66,6 @@ from typing import Final, Literal, NamedTuple, TypedDict, cast
 import numpy as np
 import polars as pl
 import weather_products
-import wind_products
 from deltalake import DeltaTable
 from studies.arm_runner import SHARED_FEATURES as SOLAR_SHARED_FEATURES
 from studies.arm_runner import Job, add_time_features, run_all
@@ -87,7 +86,7 @@ from studies.export_cap import with_export_cap
 from studies.pv_dataset import POWER_DELTA_URI, wind_sites
 from studies.sources import STUDY_DATA_DIR
 
-from studies import solar_product_frames
+from studies import solar_product_frames, wind_product_frames
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -345,7 +344,7 @@ def _wind_columns(product: str) -> tuple[str, str, str, str]:
     Returns:
         The hub-height speed, that height's direction as sine and cosine, and the 10 m speed.
     """
-    return wind_products._wind_columns(product=product)
+    return wind_product_frames.wind_columns(product=product)
 
 
 def _wind_rich_columns(product: str) -> tuple[str, ...]:
@@ -357,7 +356,7 @@ def _wind_rich_columns(product: str) -> tuple[str, ...]:
     Returns:
         The column names.
     """
-    return (*_wind_columns(product), *wind_products.context_columns(product=product))
+    return (*_wind_columns(product), *wind_product_frames.context_columns(product=product))
 
 
 def _solar_published_jobs() -> tuple[Job, ...]:
@@ -377,16 +376,16 @@ def _wind_published_jobs() -> tuple[Job, ...]:
     """Return the published wind study's arms on the common rows, less the step-period arms.
 
     The step indicator works as a date-regime feature, so an arm carrying it is not a fair single.
-    The arms at each of `wind_products.ROW_SET_SETTINGS` are fitted on other row sets, so they are
-    left out too.
+    The arms at each of `wind_product_frames.ROW_SET_SETTINGS` are fitted on other row sets, so they
+    are left out too.
 
     Returns:
-        The jobs, as `wind_products.jobs` builds them.
+        The jobs, as `wind_product_frames.jobs` builds them.
     """
     return tuple(
         job
-        for job in wind_products.jobs()
-        if not job[0].endswith("_step") and job[1] not in wind_products.ROW_SET_SETTINGS
+        for job in wind_product_frames.jobs()
+        if not job[0].endswith("_step") and job[1] not in wind_product_frames.ROW_SET_SETTINGS
     )
 
 
@@ -437,13 +436,13 @@ WIND: Final[Domain] = Domain(
             "the upper bound, inside ICON-D2's domain",
         ),
     ),
-    shared_features=wind_products.SHARED_FEATURES,
+    shared_features=wind_product_frames.SHARED_FEATURES,
     columns=_wind_columns,
     rich_columns=_wind_rich_columns,
     rich_mean_width=10,
     single_suffix="_wind",
     named_sets=("everything", "live_gb"),
-    published_losses=STUDY_DATA_DIR / wind_products.OUTPUT_DIR_NAME / "losses.parquet",
+    published_losses=STUDY_DATA_DIR / wind_product_frames.OUTPUT_DIR_NAME / "losses.parquet",
     published_jobs=_wind_published_jobs(),
     rich_published={},
     synthetic_noise=0.45,
@@ -1911,10 +1910,14 @@ def _wind_frame() -> pl.DataFrame:
     """
     frame = solar_product_frames.with_eras(
         frame=add_time_features(
-            dataset=wind_products.common_rows(frame=wind_products.joined(sites=wind_sites()))
+            dataset=wind_product_frames.common_rows(
+                frame=wind_product_frames.joined(sites=wind_sites())
+            )
         )
     )
-    return _with_blend_columns(frame=wind_products.with_wind_context(frame=frame), domain=WIND)
+    return _with_blend_columns(
+        frame=wind_product_frames.with_wind_context(frame=frame), domain=WIND
+    )
 
 
 class _Outputs(TypedDict):

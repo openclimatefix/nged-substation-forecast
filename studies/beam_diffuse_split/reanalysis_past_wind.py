@@ -1,47 +1,51 @@
 """Does a reanalysis describe past wind better than the five products on the wind leaderboard?
 
-One-off throwaway script for <https://github.com/openclimatefix/nged-substation-forecast/issues/968>.
-The plan is `plans/wind-cerra-nora3.md`. One script fits either reanalysis: `--product cerra` for
-CERRA, a 3-hourly analysis, or `--product nora3` for NORA3, an hourly one. Each product has its own
-row set, its own output folder and its own report.
+One-off throwaway script for
+<https://github.com/openclimatefix/nged-substation-forecast/issues/968>. The plan is
+`plans/wind-cerra-nora3.md`. One script fits either reanalysis: `--product cerra` for CERRA, a
+3-hourly analysis, or `--product nora3` for NORA3, an hourly one. Each product has its own row
+set, its own output folder and its own report.
 
-**Row set.** The main wind study's common rows (`wind_products.common_rows`, from 12 August 2024),
-inner-joined to the reanalysis's wind at each farm's nearest cell, up to 30 June 2026 for CERRA and
-31 August 2026 for NORA3. CERRA has one analysis every 3 hours, so its row set holds one main-study
-hour in three, and `hour_of_day` takes 8 values. Every arm is scored on exactly these rows.
+**Row set.** The main wind study's common rows (`wind_product_frames.common_rows`, from 12 August
+2024), inner-joined to the reanalysis's wind at each farm's nearest cell, up to 30 June 2026 for
+CERRA and 31 August 2026 for NORA3. CERRA has one analysis every 3 hours, so its row set holds
+one main-study hour in three, and `hour_of_day` takes 8 values. Every arm is scored on exactly
+these rows.
 
 **Arms.** Each block refits the five main-study products (ERA5, UKV, ICON-D2, ICON-EU, and ICON
-global) on the block's own rows, beside the new product at its 100 m level. Every arm's inputs are
-`wind_products._wind_columns` column for column: the speed at the arm's hub height, that height's
-direction as a sine and a cosine, the 10 m speed, and the shared hour of day, day of year and
-`era_code`. There are no columns for neighbouring hours. Every fit uses `colsample_bytree=1`, the
-CPU, and `run_experiment.MAX_CONCURRENT_FITS` fits at once.
+global) on the block's own rows, beside the new product at its 100 m level. Every arm's inputs
+are `wind_product_frames.wind_columns` column for column: the speed at the arm's hub height, that
+height's direction as a sine and a cosine, the 10 m speed, and the shared hour of day, day of
+year and `era_code`. There are no columns for neighbouring hours. Every fit uses
+`colsample_bytree=1`, the CPU, and `run_experiment.MAX_CONCURRENT_FITS` fits at once.
 
 **Whether the arms carry direction is decided by a constant, never by which files exist.**
-`CERRA_WITH_DIRECTION` is set before any fit. When True, the CERRA block needs the 100 m direction
-file and raises if it is missing. An exploratory height (75 m or 150 m) whose direction file is
-missing is omitted, and the report names it, so the planned arms' inputs never change. When False,
-the block drops the direction pair from every arm and every reference, so the widths stay equal.
-No arm borrows ERA5's direction. NORA3 needs its 10 m file, and raises if the file is absent.
+`CERRA_WITH_DIRECTION` is set before any fit. When True, the CERRA block needs the 100 m
+direction file and raises if it is missing. An exploratory height (75 m or 150 m) whose direction
+file is missing is omitted, and the report names it, so the planned arms' inputs never change.
+When False, the block drops the direction pair from every arm and every reference, so the widths
+stay equal. No arm borrows ERA5's direction. NORA3 needs its 10 m file, and raises if the file is
+absent.
 
 **Folds.** `cerra_past_solar.with_covering_folds` picks the fold rotation that leaves no calendar
-month without a training row, and cuts the folds inside each era. Intervals resample whole calendar
-months and one of three fitting seeds.
+month without a training row, and cuts the folds inside each era. Intervals resample whole
+calendar months and one of three fitting seeds.
 
 **Planned contrasts** (`PLANNED_CONTRASTS`, written before any fit, each also at the second
-hyperparameter setting): the new product at 100 m against ERA5 at 100 m, and the new product against
-the leading product of the main leaderboard block (`LEADING_MAIN_PRODUCT`). Every other contrast is
-exploratory and labelled so in the report: the new product against each other main-study product,
-ICON-D2 against ERA5 on these rows, and the exploratory heights (CERRA at 75 m and 150 m, NORA3 at
-50 m) against the new product at 100 m. Every arm is fitted at both settings, so each exploratory
-contrast has a second setting too. Comparing the heights of one product is the question of issue
+hyperparameter setting): the new product at 100 m against ERA5 at 100 m, and the new product
+against the leading product of the main leaderboard block (`LEADING_MAIN_PRODUCT`). Every other
+contrast is exploratory and labelled so in the report: the new product against each other
+main-study product, ICON-D2 against ERA5 on these rows, and the exploratory heights (CERRA at 75
+m and 150 m, NORA3 at 50 m) against the new product at 100 m. Every arm is fitted at both
+settings, so each exploratory contrast has a second setting too. Comparing the heights of one
+product is the question of issue
 957. NORA3 against CERRA on their shared site-hours needs the losses of both blocks, and is not
-computed here.
+     computed here.
 
 Run it with `uv run python studies/beam_diffuse_split/reanalysis_past_wind.py --product cerra`.
-`--check-only` builds the rows and checks the inputs, the folds and the column widths, then prints
-counts and stops without fitting or writing. `--report-only` rebuilds `report.md` from the saved
-`losses.parquet`, and still checks the saved fingerprint. A fresh run stops
+`--check-only` builds the rows and checks the inputs, the folds and the column widths, then
+prints counts and stops without fitting or writing. `--report-only` rebuilds `report.md` from the
+saved `losses.parquet`, and still checks the saved fingerprint. A fresh run stops
 (`refuse_to_overwrite`) while `losses.parquet`, `losses.fingerprint` or `report.md` exists, until
 they are moved to a `superseded/` subfolder. Only one agent may run it at a time, because every
 worktree shares one data folder.
@@ -78,14 +82,9 @@ from studies.reanalysis_wind import (
 )
 from studies.solar_product_frames import with_eras
 from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
+from studies.wind_product_frames import SHARED_FEATURES, common_rows, joined, wind_columns
 from weather_products import CONTRAST_HEADER, _contrast_line
-from wind_products import (
-    SHARED_FEATURES,
-    _wind_columns,
-    common_rows,
-    geometry_lines,
-    joined,
-)
+from wind_products import geometry_lines
 
 CERRA_DIR: Final[Path] = WEATHER_DATA_DIR / "CERRA"
 CERRA_GRID_PATH: Final[Path] = CERRA_DIR / "cerra_grid.parquet"
@@ -278,7 +277,7 @@ def arm_features(
     keys += [height_key(spec=spec, height_m=height) for height in extra_heights_m]
     features: dict[str, tuple[str, ...]] = {}
     for key in keys:
-        speed, sine, cosine, surface = _wind_columns(product=key)
+        speed, sine, cosine, surface = wind_columns(product=key)
         wind = (speed, sine, cosine, surface) if with_direction else (speed, surface)
         features[arm_name(key=key)] = (*SHARED_FEATURES, *wind)
     return features
@@ -331,14 +330,14 @@ def product_wind_columns(
         extra_heights_m: The exploratory heights to build columns for.
 
     Returns:
-        `site`, `time`, and the four `wind_products._wind_columns` per arm (two without direction),
-        with the direction as a sine and a cosine.
+        `site`, `time`, and the four `wind_product_frames.wind_columns` per arm (two without
+        direction), with the direction as a sine and a cosine.
     """
     heights = {spec.key: HUB_HEIGHT_M}
     heights |= {height_key(spec=spec, height_m=h): h for h in extra_heights_m}
     columns = [pl.col("site"), pl.col("time")]
     for key, height in heights.items():
-        speed, sine, cosine, surface = _wind_columns(product=key)
+        speed, sine, cosine, surface = wind_columns(product=key)
         columns += [
             pl.col(f"wind_speed_{height}m").alias(speed),
             pl.col("wind_speed_10m").alias(surface),

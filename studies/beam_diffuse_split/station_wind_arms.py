@@ -112,14 +112,14 @@ from studies.midas import read_hourly_weather, read_station_metadata, select_nea
 from studies.pv_dataset import wind_sites
 from studies.solar_product_frames import with_eras
 from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
-from weather_products import METRIC, PERCENTAGE_POINTS
-from wind_products import (
+from studies.wind_product_frames import (
     SHARED_FEATURES,
     UKV_80M_COLUMNS,
-    _wind_columns,
     common_rows,
     joined,
+    wind_columns,
 )
+from weather_products import METRIC, PERCENTAGE_POINTS
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -172,7 +172,7 @@ ERA5_10M_COLUMNS: Final[tuple[str, str, str]] = ("speed_10m_era5", "sin_100m_era
 UKV_PADDING_COLUMNS: Final[tuple[str, ...]] = UKV_80M_COLUMNS[:3]
 """UKV's served 80 m speed and direction only; `UKV_80M_COLUMNS` also holds the 10 m speed."""
 
-ICON_D2_HUB_COLUMNS: Final[tuple[str, ...]] = _wind_columns(product="icon_d2")[:3]
+ICON_D2_HUB_COLUMNS: Final[tuple[str, ...]] = wind_columns(product="icon_d2")[:3]
 """ICON-D2's hub-height speed and the sine and cosine of its hub-height direction."""
 
 PRODUCTS: Final[tuple[str, ...]] = ("era5", "ukv", "icon_d2", "icon_eu", "icon_global")
@@ -617,13 +617,13 @@ def arm_columns() -> dict[str, tuple[str, ...]]:
     arms: dict[str, tuple[str, ...]] = {
         "station_wind": (*SHARED_FEATURES, *STATION_COLUMNS),
         "era5_10m_wind": (*SHARED_FEATURES, *ERA5_10M_COLUMNS),
-        "ukv_station_wind": (*SHARED_FEATURES, *_wind_columns(product="ukv"), *STATION_COLUMNS),
-        "ukv_padded_wind": (*SHARED_FEATURES, *_wind_columns(product="ukv"), *UKV_PADDING_COLUMNS),
+        "ukv_station_wind": (*SHARED_FEATURES, *wind_columns(product="ukv"), *STATION_COLUMNS),
+        "ukv_padded_wind": (*SHARED_FEATURES, *wind_columns(product="ukv"), *UKV_PADDING_COLUMNS),
         "station_k3_wind": (*SHARED_FEATURES, *K3_COLUMNS),
     }
     arms.update(
         {
-            f"{product}_wind": (*SHARED_FEATURES, *_wind_columns(product=product))
+            f"{product}_wind": (*SHARED_FEATURES, *wind_columns(product=product))
             for product in PRODUCTS
         }
     )
@@ -639,7 +639,7 @@ def post_review_arm_columns() -> dict[str, tuple[str, ...]]:
     return {
         "station_speed_only": (*SHARED_FEATURES, STATION_COLUMNS[0]),
         "era5_10m_speed_only": (*SHARED_FEATURES, ERA5_10M_COLUMNS[0]),
-        "ukv_icon_d2_wind": (*SHARED_FEATURES, *_wind_columns(product="ukv"), *ICON_D2_HUB_COLUMNS),
+        "ukv_icon_d2_wind": (*SHARED_FEATURES, *wind_columns(product="ukv"), *ICON_D2_HUB_COLUMNS),
     }
 
 

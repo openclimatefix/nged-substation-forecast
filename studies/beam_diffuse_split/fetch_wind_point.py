@@ -26,20 +26,17 @@ Run it with `uv run python studies/beam_diffuse_split/fetch_wind_point.py`.
 
 import logging
 import sys
-from pathlib import Path
 from typing import Final
 
 import polars as pl
 from fetch_open_meteo_point import fetch_point_frame
-from studies.era5_grid import FIRST_DATE_OVERRIDE, LAST_DATE, LAST_YEAR, suffixed
+from studies.era5_grid import FIRST_DATE_OVERRIDE, LAST_DATE, LAST_YEAR
 from studies.pv_dataset import wind_sites
-from studies.sources import HISTORICAL_FORECAST_URL, WEATHER_DATA_DIR
+from studies.wind_product_frames import PRODUCTS, output_path_for
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_wind_point")
 
-ARCHIVE_URL: Final[str] = "https://archive-api.open-meteo.com/v1/archive"
-"""Open-Meteo's reanalysis endpoint, which serves ERA5 with the same query shape."""
 
 WIND_VARIABLES: Final[tuple[str, ...]] = (
     "wind_speed_100m",
@@ -60,29 +57,6 @@ FIRST_DATE: Final[str] = FIRST_DATE_OVERRIDE or "2024-08-12"
 
 `ERA5_FIRST_DATE` overrides it.
 """
-
-PRODUCTS: Final[dict[str, tuple[str, str]]] = {
-    "era5": ("era5", ARCHIVE_URL),
-    "ukv": ("ukmo_uk_deterministic_2km", HISTORICAL_FORECAST_URL),
-    "icon_d2": ("icon_d2", HISTORICAL_FORECAST_URL),
-    "icon_eu": ("icon_eu", HISTORICAL_FORECAST_URL),
-    "icon_global": ("icon_global", HISTORICAL_FORECAST_URL),
-}
-"""Each product's `models=` value and endpoint."""
-
-
-def output_path_for(*, product: str) -> Path:
-    """Return where one product's wind download is written.
-
-    Args:
-        product: A key of `PRODUCTS`.
-
-    Returns:
-        The parquet path.
-    """
-    return suffixed(
-        WEATHER_DATA_DIR / product.upper().replace("_", "-") / f"wind_{product}.parquet"
-    )
 
 
 def main() -> int:

@@ -190,7 +190,7 @@ from studies.resample import (
 )
 from studies.solar import zenith
 from studies.solar_product_frames import with_eras
-from wind_products import _hourly_power as wind_hourly_power
+from studies.wind_product_frames import wind_hourly_power
 
 _LOG: Final[logging.Logger] = logging.getLogger("ens_forecast_horizons")
 

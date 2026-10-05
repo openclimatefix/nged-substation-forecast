@@ -6,7 +6,7 @@ One-off throwaway script for the study in
 
 **Which grid cell ICON global is read from.** The study reads every product from its nearest land
 cell. This script compares ICON global's nearest cell with its nearest land cell at each
-generator, either side of the two step dates in `wind_products.STEP_DATES`.
+generator, either side of the two step dates in `wind_product_frames.STEP_DATES`.
 
 **How the served 100 m wind is built for each ICON product.** Open-Meteo derives it from the 120 m
 speed; the ratio of the two shows how.
@@ -28,7 +28,7 @@ import polars as pl
 from fetch_open_meteo_point import fetch_point_frame
 from studies.pv_dataset import wind_sites
 from studies.sources import HISTORICAL_FORECAST_URL, STUDY_DATA_DIR
-from wind_products import OUTPUT_DIR_NAME, STEP_DATES
+from studies.wind_product_frames import OUTPUT_DIR_NAME, STEP_DATES
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 

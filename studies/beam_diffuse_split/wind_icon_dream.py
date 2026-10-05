@@ -3,75 +3,79 @@
 One-off throwaway script for the study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>, extending
 `wind_products.py`'s five-product comparison (ERA5, UKV, ICON-D2, ICON-EU, ICON global) with the
-German Weather Service's ICON-DREAM reanalysis. ICON-DREAM-EU is not on Open-Meteo, so its wind is
-read from a gridded download (`data/studies/weather/ICON-DREAM-EU/`) rather than fetched at each
-generator's coordinates: `WS`, `U`, `V` at ten model levels (65-74) and `WS_10M`, `U_10M`, `V_10M`
-at the surface, over 126 cells in a box around the trial area, September 2019 to August 2026.
+German Weather Service's ICON-DREAM reanalysis. ICON-DREAM-EU is not on Open-Meteo, so its wind
+is read from a gridded download (`data/studies/weather/ICON-DREAM-EU/`) rather than fetched at
+each generator's coordinates: `WS`, `U`, `V` at ten model levels (65-74) and `WS_10M`, `U_10M`,
+`V_10M` at the surface, over 126 cells in a box around the trial area, September 2019 to
+August 2026.
 
-**This design is pre-registered and fixed before any fit runs, per the `study` skill.** The row set,
-the arms, the contrasts, the folds, the seeds and the hyperparameters below are written down before
-any result exists, and are not to be changed after seeing one.
+**This design is pre-registered and fixed before any fit runs, per the `study` skill.** The row
+set, the arms, the contrasts, the folds, the seeds and the hyperparameters below are written down
+before any result exists, and are not to be changed after seeing one.
 
 **Row set.** `common_rows(joined(sites=sites))` from `wind_products.py` — the same five products'
 wind, the same power hour (centred on the label, since wind is instantaneous), the same
 zero-half-hour and post-upgrade-tail drops — inner-joined to ICON-DREAM-EU's own columns, at each
-generator's nearest cell. **Every arm below, including the five original products, is refit on this
-row set**: it differs from `wind_products.py`'s own row set because it stops where ICON-DREAM-EU's
-record does (31 August 2026, 10 days short of the other five products' 10 September 2026 end), so a
-saved loss from `wind_products.py`'s run cannot be reused without silently comparing two different
-row sets. The folds, eras, seeds, `SHARED_FEATURES` and hyperparameter settings are exactly
-`wind_products.py`'s.
+generator's nearest cell. **Every arm below, including the five original products, is refit on
+this row set**: it differs from `wind_products.py`'s own row set because it stops where
+ICON-DREAM-EU's record does (31 August 2026, 10 days short of the other five products' 10
+September 2026 end), so a saved loss from `wind_products.py`'s run cannot be reused without
+silently comparing two different row sets. The folds, eras, seeds, `SHARED_FEATURES` and
+hyperparameter settings are exactly `wind_products.py`'s.
 
-**Served lead.** ICON-DREAM-EU is not an hourly analysis: DWD assembles its hourly series from short
-forecast steps run every 3 hours, so a served hour is a 1, 2 or 3 hour forecast, never a T+0 value.
-`STEP_HOURS` and the pre-fit padding-hour evidence below establish which step each hour is. At every
-third hour (`h % 3 == 0`, the hour ICON-EU itself is served as a T+0 analysis), ICON-DREAM-EU's
-served value is the *longest*-lead step, 3 hours, because DWD's short forecasts start from the
-*previous* 3-hourly run.
+**Served lead.** ICON-DREAM-EU is not an hourly analysis: DWD assembles its hourly series from
+short forecast steps run every 3 hours, so a served hour is a 1, 2 or 3 hour forecast, never a
+T+0 value. `STEP_HOURS` and the pre-fit padding-hour evidence below establish which step each
+hour is. At every third hour (`h % 3 == 0`, the hour ICON-EU itself is served as a T+0 analysis),
+ICON-DREAM-EU's served value is the *longest*-lead step, 3 hours, because DWD's short forecasts
+start from the *previous* 3-hourly run.
 
-**Primary arm — `icon_dream_eu_wind`, the same four columns every product gets in the wind study**
-(`_wind_columns` from `wind_products.py`): ICON-DREAM-EU's level-72 speed (about 96 m — DWD's own
-`generalVerticalLayer` numbering, not a 0-based index; see `LEVEL_HEIGHTS_M`), that level's
-direction as sine and cosine from `U` and `V`, and the 10 m speed from `WS_10M`. ERA5 and UKV are
-shown their 100 m wind and the ICON products their 80 m wind, as in `wind_products.py`;
+**Primary arm — `icon_dream_eu_wind`, the same four columns every product gets in the wind
+study** (`wind_columns` from `wind_products.py`): ICON-DREAM-EU's level-72 speed (about 96 m —
+DWD's own `generalVerticalLayer` numbering, not a 0-based index; see `LEVEL_HEIGHTS_M`), that
+level's direction as sine and cosine from `U` and `V`, and the 10 m speed from `WS_10M`. ERA5 and
+UKV are shown their 100 m wind and the ICON products their 80 m wind, as in `wind_products.py`;
 ICON-DREAM-EU is shown its native level 72 because DWD does not serve an 80 m or 100 m
 interpolation of it.
 
-**Planned contrasts, at both hyperparameter settings — the only ones a recommendation may rest on:**
+**Planned contrasts, at both hyperparameter settings — the only ones a recommendation may rest
+on:**
 
 - `icon_dream_eu_wind − era5_wind`: the two reanalyses.
-- `icon_dream_eu_wind − icon_eu_wind`: the reanalysis against ICON-EU, DWD's operational ICON model
-  over Europe at the same 6.5 km grid spacing. ICON-DREAM-EU does not use ICON-EU's output; it is
-  DWD's own reanalysis run of ICON, with its own data assimilation, nested inside a 13 km global
-  run.
+- `icon_dream_eu_wind − icon_eu_wind`: the reanalysis against ICON-EU, DWD's operational ICON
+  model over Europe at the same 6.5 km grid spacing. ICON-DREAM-EU does not use ICON-EU's output;
+  it is DWD's own reanalysis run of ICON, with its own data assimilation, nested inside a 13 km
+  global run.
 
 **Exploratory arms and contrasts, each labelled so in the report:**
 
 - ICON-DREAM-EU's wind against UKV, ICON-D2 and ICON global.
-- `icon_dream_eu_levels`: the four `icon_dream_eu_wind` columns plus the speeds at levels 73 (about
-  42 m) and 71 (about 167 m), against `icon_dream_eu_wind` — whether shear across three heights adds
-  skill. This arm carries two more columns than its reference, so its comparison is read with the
-  column-count caveat the `study` skill states: an arm with more columns can win without carrying
-  more information, and this repository's own measurement puts that effect at up to 10% of mean
-  absolute error at `colsample_bytree` below 1 and about 0.4% even at 1 (this study's setting).
+- `icon_dream_eu_levels`: the four `icon_dream_eu_wind` columns plus the speeds at levels 73
+  (about 42 m) and 71 (about 167 m), against `icon_dream_eu_wind` — whether shear across three
+  heights adds skill. This arm carries two more columns than its reference, so its comparison is
+  read with the column-count caveat the `study` skill states: an arm with more columns can win
+  without carrying more information, and this repository's own measurement puts that effect at up
+  to 10% of mean absolute error at `colsample_bytree` below 1 and about 0.4% even at 1 (this
+  study's setting).
 - A speed-only arm per product (`SHARED_FEATURES` plus one hub-height speed column), showing what
   the speed alone, with no direction, carries.
 - The two planned contrasts, by generator (W1-W3) and by calendar year (the same months in every
   year, the "too few months" rule, `bootstrap_year_change` between 2025 and 2026).
 - Added after the second science review: `icon_eu_wind − era5_wind` by ICON-EU's own served lead
-  (`_icon_eu_era5_by_lead_lines`), the three leading original products against ERA5 at Generator W2
-  alone (`_w2_other_products_lines`), and three of `wind_products.py`'s own published, unrefit
+  (`_icon_eu_era5_by_lead_lines`), the three leading original products against ERA5 at Generator
+  W2 alone (`_w2_other_products_lines`), and three of `wind_products.py`'s own published, unrefit
   contrasts restricted to this study's shorter row set (`_published_fits_on_new_rows_lines`).
 
 **Before any fit runs**, `run_checks` and `_raise_on_failed_checks` establish, and raise if any
-fails: that ICON-DREAM-EU's `U`, `V` and `WS` agree (`check_component_speed`), that direction from
-`U`/`V` agrees with ERA5's 100 m direction (`check_direction_against_era5`), that the two products'
-hour-to-hour changes correlate most at zero offset (`check_timestamp_offset`), and each generator's
-nearest cell and its distance (`icon_dream_site_frame`, via `extract_site_series._log_distances`).
-**The duplicate-key gate is a hard stop, not a warning**: DWD assembles ICON-DREAM-EU's hourly
-series from overlapping short-range forecast steps with no overlap resolved, so a `(valid_time,
-model_level, cell_id)` key held by more than one row means a choice between duplicates that needs a
-design decision, not code silently picking one (`raise_on_duplicate_keys`).
+fails: that ICON-DREAM-EU's `U`, `V` and `WS` agree (`check_component_speed`), that direction
+from `U`/`V` agrees with ERA5's 100 m direction (`check_direction_against_era5`), that the two
+products' hour-to-hour changes correlate most at zero offset (`check_timestamp_offset`), and each
+generator's nearest cell and its distance (`icon_dream_site_frame`, via
+`extract_site_series._log_distances`). **The duplicate-key gate is a hard stop, not a warning**:
+DWD assembles ICON-DREAM-EU's hourly series from overlapping short-range forecast steps with no
+overlap resolved, so a `(valid_time, model_level, cell_id)` key held by more than one row means a
+choice between duplicates that needs a design decision, not code silently picking one
+(`raise_on_duplicate_keys`).
 
 **The pre-fit checks raise, not just report**, if the offset scan peaks anywhere but zero, if
 either component-speed check's median disagreement exceeds `MAX_COMPONENT_SPEED_MEDIAN_DIFF_M_S`,
@@ -97,7 +101,6 @@ from typing import Final, TypedDict
 import numpy as np
 import polars as pl
 from extract_site_series import ICON_DREAM_CELL_CENTRES, _icon_dream_cell_centres, _log_distances
-from fetch_wind_point import output_path_for
 from studies.arm_runner import Job, add_time_features, run_all
 from studies.bootstrap import (
     MIN_MONTHS_FOR_INTERVAL,
@@ -112,6 +115,14 @@ from studies.grid_sampling import nearest_cells
 from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import wind_sites
 from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
+from studies.wind_product_frames import (
+    SHARED_FEATURES,
+    common_rows,
+    hub_height_m,
+    joined,
+    output_path_for,
+    wind_columns,
+)
 from weather_products import (
     CONTRAST_HEADER,
     ERA5_BY_YEAR_MONTHS,
@@ -120,15 +131,7 @@ from weather_products import (
     _contrast_line,
     _mae,
 )
-from wind_products import (
-    SHARED_FEATURES,
-    _hub_height_m,
-    _wind_columns,
-    common_rows,
-    geometry_lines,
-    joined,
-    with_eras,
-)
+from wind_products import geometry_lines, with_eras
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -173,22 +176,24 @@ this points at a generator sitting near or outside the box the download covers.
 """
 
 PRODUCT: Final[str] = "icon_dream_eu"
-"""This study's own product key, matching `wind_products._wind_columns`' naming."""
+"""This study's own product key, matching `wind_product_frames.wind_columns`' naming."""
 
 PRODUCTS: Final[tuple[str, ...]] = ("era5", "ukv", "icon_d2", "icon_eu", "icon_global", PRODUCT)
 """Every product this study refits, the five original products plus ICON-DREAM-EU."""
 
 HUB_HEIGHT_M: Final[dict[str, int]] = {
-    "era5": _hub_height_m(product="era5"),
-    "ukv": _hub_height_m(product="ukv"),
-    "icon_d2": _hub_height_m(product="icon_d2"),
-    "icon_eu": _hub_height_m(product="icon_eu"),
-    "icon_global": _hub_height_m(product="icon_global"),
+    "era5": hub_height_m(product="era5"),
+    "ukv": hub_height_m(product="ukv"),
+    "icon_d2": hub_height_m(product="icon_d2"),
+    "icon_eu": hub_height_m(product="icon_eu"),
+    "icon_global": hub_height_m(product="icon_global"),
     PRODUCT: LEVEL_HEIGHTS_M[HUB_LEVEL],
 }
-"""Every product's hub height, for the report. `wind_products._hub_height_m` reads `icon_dream_eu`
-as an ICON product (80 m) by its name prefix, which is wrong for this study's own product, so its
-entry is set explicitly from `LEVEL_HEIGHTS_M` instead.
+"""Every product's hub height, for the report.
+
+`wind_product_frames.hub_height_m` reads `icon_dream_eu` as an ICON product (80 m) by its name
+prefix, which is wrong for this study's own product, so its entry is set explicitly from
+`LEVEL_HEIGHTS_M` instead.
 """
 
 DECIDING_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
@@ -517,7 +522,7 @@ def icon_dream_site_frame(*, sites: pl.DataFrame) -> pl.DataFrame:
     nearest = icon_dream_cells(sites=sites, cell_ids=cell_ids)
     wanted = nearest["cell_id"].unique().to_list()
 
-    speed_name, sine_name, cosine_name, surface_name = _wind_columns(product=PRODUCT)
+    speed_name, sine_name, cosine_name, surface_name = wind_columns(product=PRODUCT)
 
     hub_u = speed_at_level(frame=u, level=HUB_LEVEL).rename({"u_m_s": "u_hub"})
     hub_v = speed_at_level(frame=v, level=HUB_LEVEL).rename({"v_m_s": "v_hub"})
@@ -788,12 +793,12 @@ def jobs() -> list[Job]:
     """
     job_list: list[Job] = []
     for product in PRODUCTS:
-        columns = (*SHARED_FEATURES, *_wind_columns(product=product))
+        columns = (*SHARED_FEATURES, *wind_columns(product=product))
         job_list.append(
             (f"{product}_wind", "pooled", "power_mw", columns, PRIMARY_HYPER_PARAMETERS, False)
         )
     for product in ("era5", "icon_eu", PRODUCT):
-        columns = (*SHARED_FEATURES, *_wind_columns(product=product))
+        columns = (*SHARED_FEATURES, *wind_columns(product=product))
         job_list.append(
             (
                 f"{product}_wind",
@@ -806,14 +811,14 @@ def jobs() -> list[Job]:
         )
     levels_columns = (
         *SHARED_FEATURES,
-        *_wind_columns(product=PRODUCT),
+        *wind_columns(product=PRODUCT),
         *(f"speed_{level}_{PRODUCT}" for level in LEVELS_ARM_EXTRA_LEVELS),
     )
     job_list.append(
         (f"{PRODUCT}_levels", "pooled", "power_mw", levels_columns, PRIMARY_HYPER_PARAMETERS, False)
     )
     for product in PRODUCTS:
-        hub_speed = _wind_columns(product=product)[0]
+        hub_speed = wind_columns(product=product)[0]
         job_list.append(
             (
                 f"{product}_speed_only",

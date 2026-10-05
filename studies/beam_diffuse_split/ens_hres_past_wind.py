@@ -44,7 +44,7 @@ assigned, then inner-joined to ENS and HRES. Every arm, including the five origi
 refit on this row set. The joins must lose no rows: the row set holds 43,555 rows (W1 14,489, W2
 14,994, W3 14,072) and the script raises otherwise.
 
-**Arms.** Every arm has the page's seven columns, `SHARED_FEATURES` plus `_wind_columns(product)`:
+**Arms.** Every arm has the page's seven columns, `SHARED_FEATURES` plus `wind_columns(product)`:
 the hub-height speed, that height's direction as sine and cosine, and the 10 m speed. ERA5, UKV,
 HRES and ENS are shown 100 m wind; the ICON products are shown 80 m wind, as the page does.
 `colsample_bytree` is never set, so it is 1. HRES speeds are converted from km/h to m/s where the
@@ -185,15 +185,15 @@ from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import wind_sites
 from studies.solar_product_frames import with_eras
 from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
-from weather_products import METRIC, PERCENTAGE_POINTS, _mae
-from wind_products import (
+from studies.wind_product_frames import (
     SHARED_FEATURES,
-    _hub_height_m,
-    _wind_columns,
     common_rows,
-    geometry_lines,
+    hub_height_m,
     joined,
+    wind_columns,
 )
+from weather_products import METRIC, PERCENTAGE_POINTS, _mae
+from wind_products import geometry_lines
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -402,7 +402,7 @@ ALL_PRODUCTS: Final[tuple[str, ...]] = (*PRIMARY_PRODUCTS, *ENS_VARIANT_PRODUCTS
 KMH_PRODUCTS: Final[frozenset[str]] = frozenset(
     {"era5", "ukv", "icon_d2", "icon_eu", "icon_global"}
 )
-"""The products whose columns `wind_products.joined` leaves in Open-Meteo's km/h."""
+"""The products whose columns `wind_product_frames.joined` leaves in Open-Meteo's km/h."""
 
 PLANNED_CONTRASTS: Final[tuple[tuple[str, str, str], ...]] = (
     ("P1", "hres_wind", "ukv_wind"),
@@ -585,7 +585,7 @@ def hres_frame(*, sites: pl.DataFrame) -> pl.DataFrame:
     """Return each wind farm's freshest-run HRES wind, hourly, in the page's four columns.
 
     Speeds are converted from Open-Meteo's km/h to m/s here. The direction becomes a sine and a
-    cosine, as `wind_products.joined` does for every other product.
+    cosine, as `wind_product_frames.joined` does for every other product.
 
     Args:
         sites: The wind roster, carrying `site`.
@@ -594,7 +594,7 @@ def hres_frame(*, sites: pl.DataFrame) -> pl.DataFrame:
         One row per (site, time) with `speed_hub_hres`, `direction_sin_hres`, `direction_cos_hres`
         and `speed_10m_hres`, where the hub height is 100 m.
     """
-    speed, sine, cosine, surface = _wind_columns(product="hres")
+    speed, sine, cosine, surface = wind_columns(product="hres")
     return (
         pl.read_parquet(HRES_PREVIOUS_RUNS_PATH)
         .filter(pl.col("site").is_in(sites["site"].to_list()))
@@ -617,9 +617,9 @@ def ens_frame(*, product: str) -> pl.DataFrame:
         product: A key of `ENS_METHODS`.
 
     Returns:
-        One row per (site, time) with `_wind_columns(product=product)`; speeds in m/s.
+        One row per (site, time) with `wind_columns(product=product)`; speeds in m/s.
     """
-    speed, sine, cosine, surface = _wind_columns(product=product)
+    speed, sine, cosine, surface = wind_columns(product=product)
     return (
         pl.read_parquet(ENS_INPUTS_PATH)
         .filter(pl.col("day") == 0, pl.col("method") == ENS_METHODS[product])
@@ -1209,7 +1209,7 @@ def _arm_jobs(
             f"{product}_wind",
             setting,
             "power_mw",
-            (*SHARED_FEATURES, *_wind_columns(product=product)),
+            (*SHARED_FEATURES, *wind_columns(product=product)),
             hyper_parameters,
             False,
         )
@@ -2107,7 +2107,7 @@ def _jump_control_lines(*, frame: pl.DataFrame) -> list[str]:
     """
     changes = {
         product: _hourly_changes(
-            previous=frame.select("site", "time", variable=_wind_columns(product=product)[0]).sort(
+            previous=frame.select("site", "time", variable=wind_columns(product=product)[0]).sort(
                 "site", "time"
             ),
             variable="variable",
@@ -2440,13 +2440,13 @@ def _mean_speed_ms(*, product: str, column: int) -> pl.Expr:
 
     Args:
         product: A key of `ALL_PRODUCTS`.
-        column: The index into `_wind_columns`: 0 for the hub-height speed, 3 for the 10 m speed.
+        column: The index into `wind_columns`: 0 for the hub-height speed, 3 for the 10 m speed.
 
     Returns:
         An aggregate expression; Open-Meteo's km/h columns are converted.
     """
     divisor = KMH_PER_M_S if product in KMH_PRODUCTS else 1.0
-    return pl.col(_wind_columns(product=product)[column]).mean() / divisor
+    return pl.col(wind_columns(product=product)[column]).mean() / divisor
 
 
 RATIO_PRODUCTS: Final[tuple[str, ...]] = ("ens_mean_day0", "hres", "ukv")
@@ -2457,7 +2457,7 @@ RATIO_SEASON_MONTHS: Final[tuple[int, ...]] = (8, 9, 10)
 
 
 RATIO_HEIGHTS: Final[tuple[tuple[str, int], ...]] = (("10 m", 3), ("100 m", 0))
-"""Each height of the ratio tables, with its index into `_wind_columns`. The 10 m table comes first
+"""Each height of the ratio tables, with its index into `wind_columns`. The 10 m table comes first
 because `ens_hres_past_wind_charts.py` reads the first monthly table it finds."""
 
 
@@ -2718,11 +2718,11 @@ def _mean_speed_lines(*, frame: pl.DataFrame) -> list[str]:
         "|---|---|---|---|",
     ]
     for product in ALL_PRODUCTS:
-        speed, _, _, surface = _wind_columns(product=product)
+        speed, _, _, surface = wind_columns(product=product)
         divisor = KMH_PER_M_S if product in KMH_PRODUCTS else 1.0
         hub_mean = float(frame.select(pl.col(speed).mean()).item()) / divisor
         surface_mean = float(frame.select(pl.col(surface).mean()).item()) / divisor
-        height = _hub_height_m(product=product)
+        height = hub_height_m(product=product)
         lines.append(f"| {product} | {height} | {hub_mean:.2f} | {surface_mean:.2f} |")
     return lines
 

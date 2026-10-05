@@ -15,6 +15,7 @@ from typing import Any, Final
 
 import polars as pl
 import pytest
+from studies.wind_product_frames import wind_columns
 
 REPO_ROOT: Final[Path] = Path(__file__).parent.parent
 SCRIPT_DIR: Final[Path] = REPO_ROOT / "studies" / "beam_diffuse_split"
@@ -367,7 +368,7 @@ def _product_values(*, base: pl.DataFrame, spec: Any) -> pl.DataFrame:
     """Every arm's speed columns, as `assemble_rows` receives them from `product_wind_columns`."""
     columns = []
     for key in (*wind.MAIN_PRODUCTS, spec.key):
-        speed, _, _, surface = wind._wind_columns(product=key)
+        speed, _, _, surface = wind_columns(product=key)
         columns += [pl.lit(6.0).alias(speed), pl.lit(3.0).alias(surface)]
     return base.select("site", "time").with_columns(*columns)
 

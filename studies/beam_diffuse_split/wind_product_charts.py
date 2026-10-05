@@ -31,7 +31,6 @@ from typing import Final
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
-from fetch_wind_point import output_path_for
 from studies.charts import (
     FAMILY_COLOURS,
     PLOT_WIDTH_PX,
@@ -46,6 +45,13 @@ from studies.charts import (
 from studies.figure_numbers import WIND_FIGURE_NUMBERS, wind_figure_number, wind_figure_title
 from studies.pv_dataset import wind_sites
 from studies.sources import STUDY_DATA_DIR
+from studies.wind_product_frames import (
+    OUTPUT_DIR_NAME,
+    STEP_DATES,
+    common_rows,
+    joined,
+    output_path_for,
+)
 from weather_product_charts import (
     ASSETS_DIR,
     CAPACITY,
@@ -64,16 +70,7 @@ from weather_product_charts import (
     era5_by_year_rows,
 )
 from weather_products import _contrast_line
-from wind_products import (
-    ERA5_BY_YEAR_DIR,
-    OUTPUT_DIR_NAME,
-    STEP_DATES,
-    STEP_SITE,
-    _renamed,
-    _scoped,
-    common_rows,
-    joined,
-)
+from wind_products import ERA5_BY_YEAR_DIR, STEP_SITE, _renamed, _scoped
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
