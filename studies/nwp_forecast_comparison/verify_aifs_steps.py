@@ -68,7 +68,7 @@ from build_forecast_inputs import (
 )
 from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import nearest_era5_cell, pv_sites, read_era5
-from studies.sources import ECMWF_AIFS_PRODUCT_DIR, ERA5_SITE_POINTS_DIR
+from studies.sources import ECMWF_AIFS_PRODUCT_DIR, ERA5_SITE_POINTS_DIR, NWP_WINDOWS_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -336,7 +336,8 @@ def orientation_table(*, weather_dir: Path) -> tuple[pl.DataFrame, list[str]]:
     """Check the crop's index order, then each cell's anomaly against GEFS's at its coordinates.
 
     Args:
-        weather_dir: The folder holding the AIFS Single and GEFS downloads.
+        weather_dir: The folder holding the AIFS Single download and the `windows/` folder, which
+            holds the GEFS window.
 
     Returns:
         A table of, for each non-central cell, the correlation of its anomaly and of each mirrored
@@ -371,7 +372,7 @@ def orientation_table(*, weather_dir: Path) -> tuple[pl.DataFrame, list[str]]:
             - pl.col("temperature_2m").mean().over("init_time", "lead_time")
         ).collect()
 
-    gefs_dir = weather_dir / GEFS_WINDOW_DIR_NAME
+    gefs_dir = weather_dir / NWP_WINDOWS_DIR.name / GEFS_WINDOW_DIR_NAME
     gefs_cells = pl.read_parquet(gefs_dir / "_grid_cells.parquet").select(
         "lat_index", "lon_index", *key
     )

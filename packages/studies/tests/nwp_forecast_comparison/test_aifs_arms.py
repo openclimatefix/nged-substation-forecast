@@ -16,6 +16,7 @@ import h3.api.basic_int as h3
 import numpy as np
 import polars as pl
 import pytest
+from studies.sources import NWP_WINDOWS_DIR
 
 
 def _load(*, name: str) -> ModuleType:
@@ -320,7 +321,7 @@ def _orientation_weather_dir(root: Path, *, aifs_lon_cells: int, swap_gefs: bool
         )
 
     aifs_dir = root / v.AIFS_SINGLE_DIR_NAME
-    gefs_dir = root / v.GEFS_WINDOW_DIR_NAME
+    gefs_dir = root / NWP_WINDOWS_DIR.name / v.GEFS_WINDOW_DIR_NAME
     (gefs_dir / "_month_cache").mkdir(parents=True)
     aifs_dir.mkdir()
     grid(columns=aifs_lon_cells).write_parquet(aifs_dir / "_grid_cells.parquet")
