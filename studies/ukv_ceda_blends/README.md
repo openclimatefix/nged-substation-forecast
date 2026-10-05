@@ -120,7 +120,8 @@ before the build and before every fit, and start only below a load average of ab
 
 ## Post hoc stale blend
 
-**The stale blend tests whether UKV-CEDA's 3-hour lead advantage explains the gain.** The arm
+**The stale blend moves UKV-CEDA's run 24 hours earlier, which changes its lead, its start against
+ENS, and at days 1 and 2 its time resolution together.** The arm
 `blend_ukv_ceda_stale_dayN` is ENS day `N` plus UKV-CEDA day `N + 1` for `N` of 1 to 3, with the
 same column counts as the planned arms. UKV-CEDA's run is the 03 UTC run one day before ENS's run,
 21 hours staler than ENS's run, where the planned blend's run is 3 hours fresher. The arm is fitted

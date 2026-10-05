@@ -631,7 +631,7 @@ def arm_dot_panel(
         )
     )
     return alt.layer(marks).properties(  # ty: ignore[invalid-return-type]
-        width=CONTENT_WIDTH_PX - 160,
+        width=CONTENT_WIDTH_PX - 76,
         height=row_height * len(row_order),
         title=alt.TitleParams(panel_title, anchor="start", frame="group"),
     )
@@ -993,7 +993,7 @@ def permutation_figure(*, intervals: pl.DataFrame) -> alt.VConcatChart:
             .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
         )
         panel = (ticks + marker + zero).properties(
-            width=CONTENT_WIDTH_PX - 40,
+            width=CONTENT_WIDTH_PX - 12,
             height=44,
             title=alt.TitleParams(title, anchor="start", frame="group"),
         )
@@ -1255,7 +1255,7 @@ def week_figure(
                     "series:N", scale=alt.Scale(domain=names, range=colours), legend=None
                 ),
             )
-            .properties(width=CONTENT_WIDTH_PX - 120, height=TIME_PANEL_HEIGHT_PX)
+            .properties(width=CONTENT_WIDTH_PX - 100, height=TIME_PANEL_HEIGHT_PX)
         )
     rule = (
         "the week whose daily mean output varies most from day to day"
@@ -1263,7 +1263,10 @@ def week_figure(
         else "the week with the largest mean hour-to-hour change in output"
     )
     return figure(
-        panels=[line_key(labels=names, colours=colours), alt.vconcat(*panels, spacing=4)],
+        panels=[
+            line_key(labels=names, colours=colours, width=CONTENT_WIDTH_PX - 40),
+            alt.vconcat(*panels, spacing=4),
+        ],
         number=letter,
         title=(
             f"Measured output of {TECHNOLOGY_NAMES[domain]} and the XGBoost model's out-of-fold "

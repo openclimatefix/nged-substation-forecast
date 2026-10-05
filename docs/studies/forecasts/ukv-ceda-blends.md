@@ -1,7 +1,7 @@
 # At three Lincolnshire wind farms, adding archived UKV forecasts to ECMWF's ensemble mean lowered the wind power error at lead days 1 and 2, and the solar gain of about 0.1 points is unresolved
 
 **At 3 wind farms in Lincolnshire, an XGBoost model (a gradient-boosted tree model) given the Met
-Office's UKV weather forecast as well as the mean of the European Centre for Medium-Range Weather
+Office's UKV weather forecast from the CEDA archive as well as the mean of the European Centre for Medium-Range Weather
 Forecasts (ECMWF) ensemble forecast (ENS) had a lower power-forecast error than one given the ENS
 mean alone at lead days 1 and 2.** The result holds at both hyperparameter settings, against both
 shuffled controls, after the Bonferroni correction, and with any one calendar month dropped. The gain
@@ -40,7 +40,7 @@ inconclusive](../assets/ukv_ceda_blends_v4/wind_headline.svg)
 ## Key findings
 
 **Take-home for a day-ahead wind forecast.** At the 3 wind farms, adding UKV-CEDA's winds to the ENS
-mean lowers the error at lead days 1 and 2 by about 0.2 to 0.3 points of capacity. A UKV run that is
+mean lowers the error at lead days 1 and 2 by about 0.2 to 0.3 points of capacity. A UKV-CEDA run that is
 12 hours older than the run tested keeps about half the day-1 gain.
 
 **Take-home for solar.** At the 6 solar farms, adding UKV-CEDA lowers the error by about 0.1 points
@@ -114,7 +114,8 @@ monthly distribution of UKV-CEDA at each hour of day, so a shuffled control carr
 information from UKV-CEDA. The study fits two shuffled controls, with shuffle seeds 0 and 1000.
 Equal column counts matter because an XGBoost model with more columns can win without carrying more
 information. A check at wind day 1 and solar day 1 found the padded ENS model's per-row losses
-identical to those of the unpadded ENS model (`report.md` and `report_2.md`). The padded ENS model
+identical to those of the unpadded ENS model (`padding_check.json`, which `fit_ukv_ceda_blends.py --check` writes once and `report_2.md`
+prints). The padded ENS model
 carries no extra information, so P1 measures what UKV-CEDA adds to the ENS columns given, and not
 what it adds beyond every field ENS publishes.
 
@@ -328,7 +329,9 @@ shuffle seeds 2010 to 2150 in steps of 10, and places the planned blend's P1 amo
 numbers are in `report_3.md` and again in `report_5.md`. At days 1 to 3, P1 (-0.105, -0.086, and
 -0.163) is lower than every control: the lowest control is -0.041, -0.025, and -0.067. P1 ranks 1 of
 18, and the one-sided permutation p-value is 0.056, the smallest that 17 controls allow. At day 4,
-P1 (-0.054) ranks 6 of 18 (p = 0.333).
+P1 (-0.054) ranks 6 of 18 (p = 0.333). One shuffled
+control can move far by chance: at day 4 the lowest of the 17 controls is -0.141, larger in size than
+the planned blend's P1 at days 1 and 2.
 
 **The test licenses a ranking and no more.** It licenses no claim of statistical significance at the
 5% level, because the smallest p-value it can give is 0.056. It changes none of the planned
@@ -442,13 +445,15 @@ lead day and both settings](../assets/ukv_ceda_blends_v4/wind_older_run.svg)
 
 **The two blends support one reading: a UKV-CEDA run that starts earlier and leads longer gives
 less of the gain, and the study cannot say how much of the loss each change causes.** The stale
-blend changes the lead and the start together and keeps 65% and 49% of the wind gain at days 2 and 3,
-so the study finds no sign that the 3-hour timing advantage carries most of the wind gain at those
-days, although the stale-minus-planned contrast is not statistically significant at the primary
-setting at either day. The older-run blend
-keeps about half of the planned gain, which brackets the effect of 12 hours of lead and start, and
-its wind day-1 loss holds on hourly rows. The study did not fit the run that would separate the
-two causes.
+blend keeps 65% and 49% of the wind gain at days 2 and 3 at the primary setting (38% and 53% at
+the sensitivity setting, where the stale-minus-planned contrast at day 2 is statistically
+significant: +0.114 [+0.012, +0.208]). At the primary setting the stale-minus-planned intervals are
++0.064 [-0.054, +0.175] at day 2 and +0.137 [-0.015, +0.315] at day 3. Neither interval excludes
+losing most of the gain (0.210 and 0.276 points), and the day-3 interval does not exclude losing
+all of it. The study therefore cannot say how much of the wind gain at days 2 and 3 the 3-hour
+timing advantage carries. The older-run blend keeps about half of the planned gain, which measures
+a 12-hour longer lead and a 12-hour earlier start together, and its wind day-1 loss holds on hourly
+rows. The study did not fit the run that would separate the two causes.
 
 ### What the gain could come from
 

@@ -86,7 +86,7 @@ a
   is the one product the page can name for solar, at day 2, by 0.33 [0.18, 0.48]. Elsewhere AIFS
   Single and ICON-EU are not separable.
 - [Does adding UKV from CEDA to ECMWF's ensemble mean lower the error at lead days 1 to
-  4?](forecasts/ukv-ceda-blends.md) — at the 3 wind farms, adding UKV lowers the error at days 1 and
+  4?](forecasts/ukv-ceda-blends.md) — at the 3 wind farms, adding UKV-CEDA lowers the error at days 1 and
   2 at both hyperparameter settings, against both shuffled controls, after the Bonferroni
   correction, and with any one month dropped, by 0.24 to 0.27 and 0.19 to 0.21 points of capacity;
   at wind day 3 the gain rests on February 2026; at the 6 solar farms the gain is about 0.1 points
