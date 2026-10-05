@@ -37,7 +37,6 @@ from past_solar_leaderboard import (
     contrast_section,
     post_hoc_label,
 )
-from sources import SOLAR_LEADERBOARD_DIR
 from studies.charts import (
     POST_HOC_SUFFIX,
     RowSetBlock,
@@ -45,6 +44,7 @@ from studies.charts import (
     stacked_contrasts,
     stacked_leaderboard,
 )
+from studies.sources import SOLAR_LEADERBOARD_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 

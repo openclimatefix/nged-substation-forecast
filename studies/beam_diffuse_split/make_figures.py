@@ -38,7 +38,7 @@ import plotting.ocf_theme as ocf
 import polars as pl
 from commissioning import drop_commissioning_ramp
 from run_experiment import dataset_path_for, results_dir_for
-from sources import STUDY_DATA_DIR
+from studies.sources import STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("make_figures")

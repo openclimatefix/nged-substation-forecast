@@ -31,7 +31,7 @@ import plotting.ocf_theme as ocf
 import polars as pl
 from build_dataset import _pv_sites
 from export_cap import CAP_FILE_PREFIX
-from sources import ANM_DATA_DIR, REPO_DATA_DIR, STUDY_DATA_DIR
+from studies.sources import ANM_DATA_DIR, REPO_DATA_DIR, STUDY_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("site_e_commissioning")
 

@@ -22,7 +22,7 @@ import sys
 from typing import Final
 
 import polars as pl
-from sources import SOURCE_CHOICES, STUDY_DATA_DIR
+from studies.sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 PERCENTAGE_POINTS: Final[float] = 100.0
 

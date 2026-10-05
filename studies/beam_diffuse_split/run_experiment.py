@@ -50,7 +50,6 @@ import polars as pl
 import xgboost as xgb
 from commissioning import drop_commissioning_ramp
 from export_cap import with_export_cap
-from sources import SOURCE_CHOICES, STUDY_DATA_DIR
 from studies.bootstrap import bootstrap_difference, per_fold_differences
 from studies.cross_validation import (
     N_FOLDS,
@@ -63,6 +62,7 @@ from studies.cross_validation import (
     out_of_fold_losses,
 )
 from studies.fractions_skill_score import MONTH_FORMAT
+from studies.sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("run_experiment")

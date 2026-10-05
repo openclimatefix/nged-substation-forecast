@@ -92,15 +92,6 @@ from run_experiment import (
     dataset_path_for,
     run_all,
 )
-from sources import (
-    IFS_OPEN_DATA_CUTOVER,
-    OPEN_METEO_MODELS,
-    STUDY_DATA_DIR,
-    UNSCORED_EXTRACTED_SPLITS,
-    UPDATE_OUTPUT_DIR,
-    SourceType,
-    point_output_path_for,
-)
 from studies.bootstrap import (
     BOOTSTRAP_SEED,
     MIN_MONTHS_FOR_INTERVAL,
@@ -129,6 +120,15 @@ from studies.raw_comparison import (
     raw_mad_difference,
 )
 from studies.solar import extraterrestrial_horizontal, zenith
+from studies.sources import (
+    IFS_OPEN_DATA_CUTOVER,
+    OPEN_METEO_MODELS,
+    STUDY_DATA_DIR,
+    UNSCORED_EXTRACTED_SPLITS,
+    UPDATE_OUTPUT_DIR,
+    SourceType,
+    point_output_path_for,
+)
 
 _LOG = logging.getLogger(__name__)
 

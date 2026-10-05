@@ -89,7 +89,6 @@ import numpy as np
 import polars as pl
 from build_dataset import _wind_sites
 from run_experiment import Job, _add_time_features, run_all
-from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from studies.bootstrap import (
     BOOTSTRAP_SEED,
     N_BOOTSTRAP_RESAMPLES,
@@ -111,6 +110,7 @@ from studies.cross_validation import (
 )
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.midas import read_hourly_weather, read_station_metadata, select_nearest_stations
+from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from weather_products import METRIC, PERCENTAGE_POINTS, with_eras
 from wind_products import (
     SHARED_FEATURES,

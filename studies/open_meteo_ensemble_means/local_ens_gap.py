@@ -69,7 +69,7 @@ from studies.stitched_ensemble import (
 
 from build_dataset import _add_solar_geometry, _pv_sites  # isort: skip
 from run_experiment import Job, run_all  # isort: skip
-from sources import STUDIES_DATA_DIR, WEATHER_DATA_DIR  # isort: skip
+from studies.sources import STUDIES_DATA_DIR, WEATHER_DATA_DIR  # isort: skip
 
 _LOG: Final[logging.Logger] = logging.getLogger("local_ens_gap")
 

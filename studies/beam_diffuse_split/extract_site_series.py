@@ -44,10 +44,10 @@ import numpy as np
 import polars as pl
 import xarray as xr
 from build_dataset import _pv_sites
-from sources import WEATHER_DATA_DIR, point_output_path_for
 from studies.grid_sampling import nearest_cells, nearest_grid_indices
 from studies.hourly_means import KEY_COLUMN, icon_dream_hourly, sarah_hourly
 from studies.solar import zenith
+from studies.sources import WEATHER_DATA_DIR, point_output_path_for
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("extract_site_series")

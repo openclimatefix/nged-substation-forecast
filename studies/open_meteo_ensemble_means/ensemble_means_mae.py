@@ -108,7 +108,7 @@ from build_dataset import (
 from build_dataset import _hourly_power as _solar_hourly_power
 from export_cap import with_export_cap
 from run_experiment import Job, run_all
-from sources import STUDIES_DATA_DIR, WEATHER_DATA_DIR
+from studies.sources import STUDIES_DATA_DIR, WEATHER_DATA_DIR
 from wind_products import _hourly_power as _wind_hourly_power
 
 _LOG: Final[logging.Logger] = logging.getLogger("ensemble_means_mae")

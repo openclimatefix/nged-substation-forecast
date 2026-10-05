@@ -76,7 +76,6 @@ import polars as pl
 from build_dataset import POWER_DELTA_URI, _wind_sites
 from ens_past_solar import _arm_columns_lines, _fingerprint
 from run_experiment import Job, _add_time_features, run_all
-from sources import STUDIES_DATA_DIR, WEATHER_DATA_DIR
 from studies.bootstrap import (
     bootstrap_absolute,
     bootstrap_difference,
@@ -100,6 +99,7 @@ from studies.reanalysis_wind import (
     join_centred_power,
     read_cerra_wind,
 )
+from studies.sources import STUDIES_DATA_DIR, WEATHER_DATA_DIR
 from studies.wind_direction import shuffled_by_month
 from weather_products import METRIC, PERCENTAGE_POINTS, _mae
 

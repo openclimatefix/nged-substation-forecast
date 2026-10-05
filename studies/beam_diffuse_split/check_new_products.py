@@ -54,7 +54,9 @@ from typing import Final
 import numpy as np
 import polars as pl
 from build_dataset import CAMS_PATH, _pv_sites
-from sources import (
+from studies.served_column_checks import check_direct_is_not_a_separation_model
+from studies.solar import extraterrestrial_horizontal, midpoint_zenith
+from studies.sources import (
     IFS_OPEN_DATA_CUTOVER,
     OPEN_METEO_MODELS,
     UNSCORED_EXTRACTED_SPLITS,
@@ -63,8 +65,6 @@ from sources import (
     point_output_path_for,
     temperature_site_b_path_for,
 )
-from studies.served_column_checks import check_direct_is_not_a_separation_model
-from studies.solar import extraterrestrial_horizontal, midpoint_zenith
 from studies.timestamp_checks import (
     HOUR_ENDING_OFFSET_MINUTES,
     best_offset_minutes,

@@ -38,7 +38,16 @@ import polars as pl
 import pvlib
 import xarray as xr
 from era5_grid import PUBLISHED_LAST_DATE
-from sources import (
+from studies.anonymise import (
+    LABEL_PERMUTATION_SEED,
+    SITE_LABELS,
+    WIND_LABEL_PERMUTATION_SEED,
+    WIND_SITE_LABELS,
+    site_labels_for,
+)
+from studies.power import hourly_from_half_hourly
+from studies.solar import azimuth, extraterrestrial_horizontal, zenith
+from studies.sources import (
     EXTRACTED_SOURCES,
     OPEN_METEO_MODELS,
     PER_SITE_SOURCES,
@@ -50,15 +59,6 @@ from sources import (
     SourceType,
     point_output_path_for,
 )
-from studies.anonymise import (
-    LABEL_PERMUTATION_SEED,
-    SITE_LABELS,
-    WIND_LABEL_PERMUTATION_SEED,
-    WIND_SITE_LABELS,
-    site_labels_for,
-)
-from studies.power import hourly_from_half_hourly
-from studies.solar import azimuth, extraterrestrial_horizontal, zenith
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("build_dataset")

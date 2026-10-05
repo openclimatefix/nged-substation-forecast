@@ -32,7 +32,7 @@ import cdsapi  # ty: ignore[unresolved-import]
 import polars as pl
 from build_dataset import _pv_sites
 from era5_grid import FIRST_YEAR, LAST_DATE, LAST_YEAR, OUTPUT_SUFFIX, first_date_of, suffixed
-from sources import WEATHER_DATA_DIR
+from studies.sources import WEATHER_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_cams")

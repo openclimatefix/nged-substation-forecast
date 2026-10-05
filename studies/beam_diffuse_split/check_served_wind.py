@@ -27,7 +27,7 @@ from typing import Final
 import polars as pl
 from build_dataset import _wind_sites
 from fetch_open_meteo_point import fetch_point_frame
-from sources import HISTORICAL_FORECAST_URL, STUDY_DATA_DIR
+from studies.sources import HISTORICAL_FORECAST_URL, STUDY_DATA_DIR
 from wind_products import OUTPUT_DIR_NAME, STEP_DATES
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)

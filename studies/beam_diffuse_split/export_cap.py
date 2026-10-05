@@ -47,7 +47,7 @@ from typing import Final
 import numpy as np
 import polars as pl
 from build_dataset import _pv_sites
-from sources import ANM_DATA_DIR
+from studies.sources import ANM_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("export_cap")
 

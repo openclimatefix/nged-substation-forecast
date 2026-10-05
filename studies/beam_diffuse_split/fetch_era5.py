@@ -34,7 +34,7 @@ from typing import Final
 # cdsapi is not a workspace dependency; this throwaway script is run with `uv run --with cdsapi`.
 import cdsapi  # ty: ignore[unresolved-import]
 from era5_grid import AREA, FIRST_MONTH_OF_FIRST_YEAR, FIRST_YEAR, LAST_YEAR
-from sources import WEATHER_DATA_DIR
+from studies.sources import WEATHER_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_era5")

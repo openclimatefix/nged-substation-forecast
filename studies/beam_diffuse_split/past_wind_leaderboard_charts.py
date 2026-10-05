@@ -45,7 +45,6 @@ from past_solar_leaderboard_charts import (
     read_report,
 )
 from past_wind_leaderboard import BLOCK_SETTINGS, ROW_SETS
-from sources import WIND_LEADERBOARD_DIR
 from studies.charts import (
     POST_HOC_SUFFIX,
     RowSetBlock,
@@ -53,6 +52,7 @@ from studies.charts import (
     stacked_leaderboard,
     wrapped,
 )
+from studies.sources import WIND_LEADERBOARD_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 

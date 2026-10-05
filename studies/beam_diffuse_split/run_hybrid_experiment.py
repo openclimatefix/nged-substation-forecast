@@ -49,9 +49,9 @@ from run_experiment import (
     run_all,
 )
 from run_physics_experiment import _fit, _predict
-from sources import SOURCE_CHOICES, STUDY_DATA_DIR
 from studies.bootstrap import bootstrap_difference
 from studies.cross_validation import N_FOLDS, PRIMARY_HYPER_PARAMETERS, assign_folds
+from studies.sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("run_hybrid_experiment")

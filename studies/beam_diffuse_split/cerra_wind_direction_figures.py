@@ -32,9 +32,9 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from cerra_wind_levels import PRIMARY_SETTING, SENSITIVITY_SETTING
-from sources import STUDIES_DATA_DIR
 from studies.charts import PLOT_WIDTH_PX, axis_title_with_direction, figure, interval_panel, wrapped
 from studies.guards import refuse_to_overwrite
+from studies.sources import STUDIES_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 

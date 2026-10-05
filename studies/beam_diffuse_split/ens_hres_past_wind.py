@@ -156,7 +156,6 @@ import polars as pl
 from build_dataset import _wind_sites
 from ens_past_solar import _arm_columns_lines, _fingerprint
 from run_experiment import Job, _add_time_features, run_all
-from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from studies.bootstrap import (
     BOOTSTRAP_SEED,
     MIN_MONTHS_FOR_INTERVAL,
@@ -184,6 +183,7 @@ from studies.cross_validation import (
 )
 from studies.grid_sampling import distance_matrix_km
 from studies.guards import refuse_to_overwrite
+from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from weather_products import METRIC, PERCENTAGE_POINTS, _mae, with_eras
 from wind_products import (
     SHARED_FEATURES,

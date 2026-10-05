@@ -27,7 +27,6 @@ from pathlib import Path
 from typing import Final, NamedTuple
 
 import polars as pl
-from sources import UPDATE_OUTPUT_DIR
 from studies.bootstrap import BootstrapInterval, bootstrap_difference
 from studies.charts import (
     PERCENTAGE_POINTS,
@@ -44,6 +43,7 @@ from studies.charts import (
     stacked_leaderboard,
     wrapped,
 )
+from studies.sources import UPDATE_OUTPUT_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 

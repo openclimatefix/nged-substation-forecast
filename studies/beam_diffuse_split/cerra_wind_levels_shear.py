@@ -48,8 +48,8 @@ from cerra_wind_levels import (
     monthly_steps,
     read_wind,
 )
-from sources import STUDIES_DATA_DIR
 from studies.guards import refuse_to_overwrite
+from studies.sources import STUDIES_DATA_DIR
 from weather_products import _mae
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)

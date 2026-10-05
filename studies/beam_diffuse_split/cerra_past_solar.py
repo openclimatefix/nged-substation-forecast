@@ -97,7 +97,6 @@ from ens_past_solar import (
     _fingerprint,
 )
 from run_experiment import MAX_CONCURRENT_FITS, Job, run_all
-from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from station_past_solar import _main_panel_lines
 from studies.baselines import hourly_clear_sky
 from studies.charts import ProductFamily
@@ -114,6 +113,7 @@ from studies.cross_validation import (
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.reanalysis_wind import derive_nearest_cells
 from studies.resample import DEFAULT_DAYLIGHT_FLOOR_W_M2, clear_sky_index_resample
+from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from weather_products import CONTRAST_HEADER, _contrast_line, geometry_lines
 
 _LOG: Final[logging.Logger] = logging.getLogger("cerra_past_solar")

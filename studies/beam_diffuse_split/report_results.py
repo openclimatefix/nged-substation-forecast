@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Final, Literal
 
 import polars as pl
-from sources import SOURCE_CHOICES, STUDY_DATA_DIR
+from studies.sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 InstrumentType = Literal["xgboost", "physics"]
 """Which of the two instruments' results to report.

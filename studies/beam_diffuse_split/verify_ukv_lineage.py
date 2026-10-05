@@ -60,8 +60,8 @@ from fetch_open_meteo_point import (
     fetch_point_frame,
 )
 from pyproj import CRS
-from sources import OPEN_METEO_MODELS
 from studies.grid_sampling import sample_nearest_cell
+from studies.sources import OPEN_METEO_MODELS
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("verify_ukv_lineage")

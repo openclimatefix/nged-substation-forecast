@@ -49,13 +49,13 @@ import numpy as np
 import polars as pl
 import xgboost as xgb
 from run_experiment import SHARED_FEATURES, _add_time_features, dataset_path_for
-from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from studies.cross_validation import (
     N_FOLDS,
     PRIMARY_HYPER_PARAMETERS,
     assign_folds,
     booster_parameters,
 )
+from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)

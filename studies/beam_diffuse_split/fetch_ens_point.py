@@ -34,7 +34,7 @@ from typing import Final
 
 import h3.api.basic_int as h3
 import polars as pl
-from sources import REPO_DATA_DIR, WEATHER_DATA_DIR
+from studies.sources import REPO_DATA_DIR, WEATHER_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)

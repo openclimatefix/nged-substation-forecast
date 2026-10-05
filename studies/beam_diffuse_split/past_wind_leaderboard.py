@@ -36,8 +36,8 @@ import sys
 from typing import Final, NamedTuple
 
 import past_solar_leaderboard as leaderboard
-from sources import STUDY_DATA_DIR, UPDATE_OUTPUT_DIR, WIND_LEADERBOARD_DIR
 from studies.charts import BlockArm, PlannedContrast, ProductFamily
+from studies.sources import STUDY_DATA_DIR, UPDATE_OUTPUT_DIR, WIND_LEADERBOARD_DIR
 
 REFERENCE_ARM: Final[str] = "era5_wind"
 """The arm every contrast is taken against, in every block but the station block."""

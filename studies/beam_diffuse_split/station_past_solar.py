@@ -63,7 +63,6 @@ from blend_products import (
 )
 from build_dataset import _pv_sites
 from run_experiment import MAX_CONCURRENT_FITS, Job, run_all
-from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from studies.blending import climatology_permutation
 from studies.bootstrap import bootstrap_absolute
 from studies.charts import report_errors
@@ -77,6 +76,7 @@ from studies.midas import (
     read_station_metadata,
     select_nearest_stations,
 )
+from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from weather_products import (
     CONTRAST_HEADER,
     METRIC,

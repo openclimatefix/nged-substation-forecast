@@ -45,7 +45,7 @@ from fetch_ens_point import (
     _labelled_by_horizon,
     _wanted_leads,
 )
-from sources import WEATHER_DATA_DIR
+from studies.sources import WEATHER_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)

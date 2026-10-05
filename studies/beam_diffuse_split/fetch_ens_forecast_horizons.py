@@ -34,7 +34,7 @@ from typing import Final
 import h3.api.basic_int as h3
 import polars as pl
 from build_dataset import _pv_sites, _wind_sites
-from sources import REPO_DATA_DIR, STUDIES_DATA_DIR
+from studies.sources import REPO_DATA_DIR, STUDIES_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_ens_forecast_horizons")
 

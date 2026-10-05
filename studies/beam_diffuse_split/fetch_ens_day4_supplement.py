@@ -34,8 +34,8 @@ from fetch_ens_forecast_horizons import (
     _cells,
     _members,
 )
-from sources import STUDIES_DATA_DIR
 from studies.guards import refuse_to_overwrite
+from studies.sources import STUDIES_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_ens_day4_supplement")
 

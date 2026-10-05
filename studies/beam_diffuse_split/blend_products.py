@@ -72,7 +72,6 @@ from deltalake import DeltaTable
 from export_cap import with_export_cap
 from run_experiment import SHARED_FEATURES as SOLAR_SHARED_FEATURES
 from run_experiment import Job, _add_time_features, run_all
-from sources import STUDY_DATA_DIR
 from studies.blending import PERMUTED_SUFFIX, climatology_permutation, stacked_errors
 from studies.bootstrap import (
     bootstrap_absolute,
@@ -86,6 +85,7 @@ from studies.cross_validation import (
     UKV_UPGRADE_MONTH,
     HyperParameters,
 )
+from studies.sources import STUDY_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 

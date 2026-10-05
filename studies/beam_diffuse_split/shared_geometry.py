@@ -31,11 +31,11 @@ from export_cap import with_export_cap
 from run_experiment import _add_time_features, dataset_path_for
 from run_physics_experiment import MAX_ITERATIONS, START_SPREAD, _n_parameters, _predict
 from scipy.optimize import minimize
-from sources import SOURCE_CHOICES
 from studies.bootstrap import bootstrap_difference
 
 # The block bootstrap draws one seed per resample, so every arm it compares shares `SEEDS`.
 from studies.cross_validation import N_FOLDS, SEEDS, assign_folds, clamp_to_cap
+from studies.sources import SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("shared_geometry")

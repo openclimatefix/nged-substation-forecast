@@ -355,6 +355,20 @@ question. `data/NGED/` stays outside it: the pipeline's own power and metadata t
 reads and does not own.
 """
 
+DOWNLOADS_DIR: Final[Path] = STUDIES_DATA_DIR
+"""The layer of `data/studies/` that holds shared downloads, one folder per kind of data.
+
+Every folder a study downloads into is built from this constant, so the layer can move without
+editing each script.
+"""
+
+PER_STUDY_DIR: Final[Path] = STUDIES_DATA_DIR
+"""The layer of `data/studies/` that holds one folder per study.
+
+Every study's own folder is built from this constant, so the layer can move without editing each
+script.
+"""
+
 WEATHER_DATA_DIR: Final[Path] = STUDIES_DATA_DIR / "weather"
 """Where downloaded weather lands, one subdirectory per product (`ERA5`, `CAMS`, `ENS`, `UKV`,
 `ICON-D2`, `ICON-EU`, `ICON-GLOBAL`, `SARAH-3`, `ICON-DREAM-EU`, `ECMWF-IFS-HRES`, `ARPEGE-EUROPE`,

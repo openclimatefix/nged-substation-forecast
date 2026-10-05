@@ -61,7 +61,6 @@ from build_dataset import _wind_sites
 from cerra_past_solar import check_column_counts, uncovered_share, with_covering_folds
 from ens_past_solar import _absolute_table_lines, _arm_columns_lines, _fingerprint
 from run_experiment import MAX_CONCURRENT_FITS, Job, _add_time_features, run_all
-from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
     SENSITIVITY_HYPER_PARAMETERS,
@@ -77,6 +76,7 @@ from studies.reanalysis_wind import (
     read_cerra_wind,
     read_nora3_wind,
 )
+from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from weather_products import CONTRAST_HEADER, _contrast_line, with_eras
 from wind_products import (
     SHARED_FEATURES,

@@ -69,8 +69,8 @@ from build_forecast_inputs import (
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
 import ens_forecast_horizons as efh
 from build_dataset import _pv_sites, nearest_era5_cell, read_era5
-from sources import WEATHER_DATA_DIR
 from studies.guards import refuse_to_overwrite
+from studies.sources import WEATHER_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 

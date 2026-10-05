@@ -109,7 +109,6 @@ from ens_forecast_horizons import (
 from fetch_ens_forecast_horizons import ENSEMBLE_SIZE
 from geo.h3 import compute_h3_grid_weights
 from run_experiment import MAX_CONCURRENT_FITS, Job, run_all
-from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from studies.baselines import hourly_clear_sky
 from studies.bootstrap import bootstrap_absolute
 from studies.charts import report_errors
@@ -120,6 +119,7 @@ from studies.resample import (
     clear_sky_index_resample,
     interpolate_linear,
 )
+from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from weather_products import (
     CONTRAST_HEADER,
     METRIC,

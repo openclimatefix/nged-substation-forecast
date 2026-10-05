@@ -48,7 +48,6 @@ from cerra_past_solar import FAMILIES as CERRA_FAMILIES
 from cerra_past_solar import NAMES as CERRA_NAMES
 from cerra_past_solar import PLANNED_CONTRASTS as CERRA_PLANNED_PAIRS
 from ens_past_solar_charts import NAMES as ENS_NAMES
-from sources import SOLAR_LEADERBOARD_DIR, UPDATE_OUTPUT_DIR
 from studies.charts import (
     CONTRAST_COLUMNS_WITH_MONTHS,
     POST_HOC_SUFFIX,
@@ -63,6 +62,7 @@ from studies.charts import (
     report_contrasts,
     report_errors,
 )
+from studies.sources import SOLAR_LEADERBOARD_DIR, UPDATE_OUTPUT_DIR
 from weather_products import METRIC
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)

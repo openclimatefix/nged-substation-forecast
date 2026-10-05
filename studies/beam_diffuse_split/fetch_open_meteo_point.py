@@ -36,12 +36,6 @@ import numpy as np
 import polars as pl
 from build_dataset import _pv_sites
 from era5_grid import LAST_DATE, LAST_YEAR
-from sources import (
-    HISTORICAL_FORECAST_URL,
-    OPEN_METEO_MODELS,
-    OpenMeteoModel,
-    point_output_path_for,
-)
 from studies.served_column_checks import (
     check_direct_is_not_a_separation_model,
     check_hourly_value_is_a_backward_mean,
@@ -51,6 +45,12 @@ from studies.solar import (
     cos_zenith_hour_mean,
     extraterrestrial_horizontal,
     zenith,
+)
+from studies.sources import (
+    HISTORICAL_FORECAST_URL,
+    OPEN_METEO_MODELS,
+    OpenMeteoModel,
+    point_output_path_for,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

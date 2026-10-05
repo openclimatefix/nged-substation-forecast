@@ -2,9 +2,8 @@
 
 One-off throwaway module for the downloads in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>, which feed the two
-past-weather studies (#809) and the forecast study (#810). It duplicates the small `data/`
-resolution helper in `studies/beam_diffuse_split/sources.py` rather than importing it, so this
-directory stays self-contained the way every other study directory is.
+past-weather studies (#809) and the forecast study (#810). It takes `REPO_DATA_DIR` from
+`studies.sources`, the one place that resolves the `data/` directory.
 """
 
 import json
@@ -13,32 +12,7 @@ from pathlib import Path
 from typing import Final
 
 import polars as pl
-from contracts.settings import PROJECT_ROOT
-
-
-def _main_checkout(root: Path) -> Path:
-    """Return the repository's main working tree, given any working tree's root.
-
-    Copied from `studies.beam_diffuse_split.sources._main_checkout`: see that function's docstring
-    for why a linked worktree must not get its own empty `data/`.
-    """
-    marker = root / ".git"
-    if not marker.is_file():
-        return root
-    pointer = marker.read_text().removeprefix("gitdir:").strip()
-    if not pointer:
-        return root
-    git_dir = Path(pointer)
-    if git_dir.parent.name != "worktrees":
-        return root
-    return git_dir.parent.parent.parent
-
-
-REPO_DATA_DIR: Final[Path] = Path(
-    os.environ.get("DATA_PATH_INTERNAL") or _main_checkout(PROJECT_ROOT) / "data"
-)
-"""Where every download and every built frame lands. See `sources.REPO_DATA_DIR` for the full
-rationale; this is the same resolution, duplicated rather than imported."""
+from studies.sources import REPO_DATA_DIR
 
 WEATHER_DOWNLOADS_DIR: Final[Path] = REPO_DATA_DIR / "studies" / "weather"
 """One subdirectory per product, e.g. `ECMWF-IFS-HRES`, `NORA3`, `ICON-DREAM-EU`."""
