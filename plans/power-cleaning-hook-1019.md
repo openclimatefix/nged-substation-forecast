@@ -117,19 +117,21 @@ comparison, a context window, a re-cleaned recent tail, and a version-triggered 
 ### `packages/delta_store/src/delta_store/cleaned_power_time_series.py` (new)
 
 - `write_cleaned_power_time_series(df: pt.DataFrame[CleanedPowerTimeSeries], table_uri, *,
-  raw_version: int, storage_options, retention_hours: int = 2)` — `write_deltalake(mode="overwrite",
-  partition_by=["time_series_id"])`, one atomic Delta commit (principle 10), then
-  `vacuum(retention_hours=retention_hours, dry_run=False, enforce_retention_duration=False)`. Both
-  flags matter: `dry_run` defaults to `True`, which lists files and deletes none, and delta-rs
-  refuses a retention under 168 hours without `enforce_retention_duration=False`. Without the vacuum
-  every hourly overwrite leaves the previous copy on disk forever. The retention bounds how long the
-  longest reader scan may take: a scan resolves its file list when it starts, and only files
-  tombstoned more than 2 hours ago are deleted, so at steady state about three copies sit on disk
-  (about 110 MB at V1).
+  raw_version: int, code_sha: str, storage_options, retention_hours: int = 2)` —
+  `write_deltalake(mode="overwrite", partition_by=["time_series_id"])`, one atomic Delta commit
+  (principle 10), then `vacuum(retention_hours=retention_hours, dry_run=False,
+  enforce_retention_duration=False)`. Both flags matter: `dry_run` defaults to `True`, which lists
+  files and deletes none, and delta-rs refuses a retention under 168 hours without
+  `enforce_retention_duration=False`. Without the vacuum every hourly overwrite leaves the previous
+  copy on disk forever. The retention bounds how long the longest reader scan may take: a scan
+  resolves its file list when it starts, and only files tombstoned more than 2 hours ago are
+  deleted, so at steady state about three copies sit on disk (about 110 MB at V1).
 - The write commit's `custom_metadata` records `raw_version`, the raw table's Delta version the
-  cleaning run read, for provenance and for the keeping-up check. The vacuum adds two commits of
-  its own (`VACUUM START` and `VACUUM END`) after the write, so a reader of `raw_version` walks
-  `DeltaTable.history()` back to the newest `WRITE` commit rather than taking the latest commit.
+  cleaning run read, and `code_sha`, the git SHA of the code that did the cleaning. `raw_version`
+  serves provenance, the keeping-up check, and the skip below; `code_sha` serves the skip. The
+  vacuum adds two commits of its own (`VACUUM START` and `VACUUM END`) after the write, so a reader
+  of `raw_version` walks `DeltaTable.history()` back to the newest `WRITE` commit rather than taking
+  the latest commit.
 - `write_deltalake` does not keep row order within a partition (the reviewer found 13 of 33
   partitions out of `time` order after one write), so the table on disk is not sorted. That does
   not matter at V1; at V2 it weakens row-group pruning on `time`.
@@ -147,6 +149,25 @@ The asset gets its own module rather than joining `defs/assets.py`, which holds 
 
 - `clean_nged_power_data` — `deps=["power_time_series_and_metadata"]`, production-layer tags. A
   minimal wrapper:
+    - **Skip when nothing has changed.** NGED publishes new power data about every 6 hours, but
+      the ingest job runs hourly as a cheap retry, and the ingest only commits a new raw version
+      when new rows arrive. At the start of each run the asset reads the raw table's current
+      version and the code's git SHA, and compares them with the `raw_version` and `code_sha` in
+      the cleaned table's newest `WRITE` commit. When both match, and the run's config does not
+      set `force`, it returns at once with `skipped: True` metadata, which costs reading two Delta
+      logs. Otherwise it rebuilds. That gives about four rewrites a day instead of 24.
+    - **The skip is also the retry.** A failed rebuild leaves the old `raw_version` in place, so
+      the next hourly run sees a mismatch and rebuilds, every hour until one succeeds. No Dagster
+      `RetryPolicy` is needed, and the keeping-up check below warns if the rebuilds keep failing.
+    - **The git SHA catches a change to the cleaning rules**, which leaves the raw version
+      unchanged. The SHA comes from `ml_core.repro.get_git_info`, falling back to the `GIT_SHA`
+      environment variable the production Docker image sets, because the container has no git
+      repository. When the SHA is `UNKNOWN`, or the working tree is dirty, the asset never skips:
+      rebuilding when unsure is always correct, only slower.
+    - **`force`**: a `CleanNgedPowerDataConfig(force: bool = False)` run config makes a manual run
+      rebuild regardless, for example on a laptop with uncommitted rule changes (where the dirty
+      check already forces a rebuild) or after a hand-edited roster, which neither the raw version
+      nor the SHA records.
     - If the raw table does not exist yet, log and return with `n_rows: 0` metadata rather than
       raising, because an absent input degrades (inherent-stability).
     - Scan the raw table, read the whole roster (with `allow_superfluous_columns=True`, as
@@ -277,7 +298,15 @@ Nothing in this issue builds that table; the mapping is a decision for the issue
       min/max are right;
     - an absent raw table yields `n_rows: 0` and no exception;
     - every assertion reads the written table back through `pl.scan_delta`.
-    - a vacuum that raises still leaves the run successful, with `vacuum_failed: True`.
+    - a vacuum that raises still leaves the run successful, with `vacuum_failed: True`;
+    - a second run with the same raw version and SHA is skipped (`skipped: True`, and the cleaned
+      table's version does not change);
+    - a run after a new raw commit rebuilds;
+    - a run under a different SHA (with `get_git_info` monkeypatched) rebuilds, and an `UNKNOWN`
+      or dirty SHA always rebuilds;
+    - `force=True` rebuilds when nothing changed;
+    - after a rebuild that raises (with `flag_nged_power` monkeypatched to raise), the next run
+      with the same raw version rebuilds rather than skipping.
 - `tests/test_checks.py`: `cleaned_power_keeps_up_with_raw` passes at a lag of 0 and 1 raw commits,
   warns at 3, warns when the cleaned table or its `raw_version` key is absent, and degrades rather
   than raising when a table is unreadable.
@@ -321,8 +350,12 @@ V1 data to check the run time and the on-disk size after vacuum.
 
 ## Risks and open questions
 
-1. **V2 rewrite cost.** A few GB per run, 24 runs a day. Recommendation: measure before V2; the
-   append issue is the answer if the rewrite is too slow.
+1. **V2 rewrite cost.** A few GB per rebuild, about four rebuilds a day once the skip is in.
+   Recommendation: measure before V2; the append issue is the answer if the rewrite is too slow.
+2. **The roster is not part of the skip test.** A roster change with no new power data leaves the
+   cleaned table as it was until the next NGED delivery, at most about 6 hours later. No rule reads
+   the roster today. Recommendation: accept, and add the roster file's modification time to the
+   skip test when the first rule that reads the roster lands.
 
 ## Review log
 
@@ -353,7 +386,8 @@ Accepted:
 - A first-deploy step in `operations.md`.
 - The writer and asset tests read back through `pl.scan_delta`.
 
-Not acted on: skipping the rewrite in hours when ingest found no new data (0.07 s at V1).
+Not acted on at the time: skipping the rewrite in hours when ingest found no new data (0.07 s at
+V1). The maintainer later added the skip, for the reason in the next section.
 
 ### Review of the fixes (fresh Opus sub-agent, with experiments)
 
@@ -378,3 +412,10 @@ Accepted, all ten findings:
   starts, and a comment on #1020 explains the edit.
 - Every reader except the ingest and its freshness check uses cleaned power, including `metrics`
   and the two dashboards.
+
+### Skip when unchanged (maintainer request)
+
+NGED publishes new power data about every 6 hours, and the ingest runs hourly only as a cheap retry.
+The asset therefore skips the rewrite when the raw version and the code's git SHA both match the
+cleaned table's newest write commit, which keeps the hourly retry and cuts the rewrites to about
+four a day. A `force` run config covers manual runs.
