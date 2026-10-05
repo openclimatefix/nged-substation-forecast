@@ -1007,17 +1007,18 @@ This suite is shared machinery: the same transforms drive the continuous-integra
 degradation smoke-tests in [Engineering Health](engineering-health.md) and, later, the outage-shaped
 training augmentation that makes the weather-blind claim true rather than hopeful.
 
-## Scoring against reanalysis — a diagnostic scope 🚧
+## Scoring against estimates of past weather — a diagnostic scope 🚧
 
-Once [ERA5 is ingested](training-history.md), scoring an experiment on ERA5 rather than ENS
-separates the two components total error confounds: the weather-to-power response, which we can
-actually improve, and the implicit hedging against forecast error, which we cannot (NWP error is
-exogenous to us). Without the split, a change in the ENS-scored number could be either.
+Once the [estimates of past weather are ingested](training-history.md), scoring an experiment on an
+estimate of past weather rather than ENS separates the two components total error confounds: the
+weather-to-power response, which we can actually improve, and the implicit hedging against forecast
+error, which we cannot (NWP error is exogenous to us). Without the split, a change in the ENS-scored
+number could be either.
 
-Scoring against reanalysis lands as a **new `evaluation_scope`** alongside `leaderboard` /
-`production_monitoring` / `ad_hoc`, never as a fold. The **ENS-scored leaderboard stays the
-promotion criterion**, because total error at real lead times is what NGED receives — and keeping
-ERA5 out of the fold set is what preserves both [principle
+Scoring against estimates of past weather lands as a **new `evaluation_scope`** alongside
+`leaderboard` / `production_monitoring` / `ad_hoc`, never as a fold. The **ENS-scored leaderboard
+stays the promotion criterion**, because total error at real lead times is what NGED receives — and
+keeping estimates of past weather out of the fold set is what preserves both [principle
 8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically) and the
 standing [rejection of reanalysis-backed validation
 folds](../architecture/ml-orchestration.md#yearly-folds-backed-by-era5-rejected-for-validation).
@@ -1028,34 +1029,49 @@ Train *and* score on near-perfect weather, and the resulting skill bounds what w
 removing **forecast error** from the weather input — the channel that more ensemble members, better
 ensemble post-processing and sharper interpolation all work through. If that ceiling sits close to
 today's ENS-scored skill, most of our error is not the weather forecast's fault and the effort
-belongs in the modelling instead. So run this **before** ingesting another NWP source: it is the
-quick test that sizes the prize that ingesting another NWP source would chase.
+belongs in the modelling instead. The ceiling bounds the skill that ingesting another NWP source
+could add. A low ceiling need not stop anyone trying a new source, because an autonomous study can
+test a new weather product quickly (see [A new weather product with a few months of
+history](training-history.md#a-new-weather-product-with-a-few-months-of-history)). That study trains
+a lag-free XGBoost model on estimates of past weather, which the study calls the weather-response
+model. A lag-free variant of the ceiling's XGBoost model can serve as both, so the ceiling and the
+study can share one XGBoost model. The ceiling proper uses the champion's own feature set, lags
+included.
 
 Two rungs, in increasing order of "cheating":
 
-- **ERA5.** A reanalysis, so it assimilates observations, but still a 31 km model field — good, not
-  perfect. Needs no extra work once the [ingest](training-history.md) lands.
+- **Gridded estimates of past weather, compared with each other.** The planned estimates of past
+  weather are CAMS for irradiance and the early time steps of the UKV archive held by CEDA, the
+  Centre for Environmental Data Analysis, for other variables, pending a [check of UKV against
+  ERA5](training-history.md#which-estimate-of-past-weather-to-train-on) over 2019 to 2024 and of
+  temperature for demand. ERA5 is kept for gap filling and as a comparison arm. ERA5 is a
+  reanalysis, so it assimilates observations, but it is still a 31 km model field — good, not
+  perfect. This rung scores CEDA's UKV and ERA5 against each other, and
+  [#492](https://github.com/openclimatefix/nged-substation-forecast/issues/492) is where that check
+  sits.
 
-- **Observations.** Closer to truth at the site, and worth the second rung precisely because ERA5's
-  remaining error is not small. The UK Met Office's MIDAS Open (via CEDA, the Centre for
-  Environmental Data Analysis) supplies hourly land-surface temperature, wind, and pressure from GB
-  stations — spatially sparse, so nearest-station matched. [CAMS](data-sources.md#weather-data)
-  solar radiation is the equivalent rung for solar, and is already planned for v0.7.
+- **Observations.** Observations are measured at the site rather than averaged over a grid cell.
+  Observations earn the second rung precisely because a gridded estimate's remaining error is not
+  small. The UK Met Office's MIDAS Open (via CEDA) supplies hourly land-surface temperature, wind,
+  and pressure from GB stations — spatially sparse, so nearest-station matched.
+  [CAMS](data-sources.md#weather-data) solar radiation is the equivalent rung for solar, and is
+  also the planned estimate of past irradiance for training.
 
 Three conditions on reading the result.
 
 - **The ceiling must be trained on the better weather, not merely scored on it.** Feeding reanalysis
   to an ENS-trained model measures a train/serve mismatch instead of a ceiling.
 
-- **The ceiling bounds forecast error, not resolution.** ERA5 is a 31 km field, while ICON-EU is
-  ~6.5 km and post-2023 ENS is 9 km, so a finer *forecast* can carry site-relevant structure that a
-  coarse *analysis* averages away. A low ERA5 ceiling therefore deprioritises a second NWP source
-  without ruling one out; it is the observations rung that closes this gap, since station and
-  satellite data are at-site rather than grid-cell means.
+- **The ceiling bounds forecast error, not resolution.** A finer *forecast* can carry site-relevant
+  structure that a coarse *analysis* averages away: ERA5 is a 31 km field, while ICON-EU is ~6.5 km
+  and post-2023 ENS is 9 km. A low ceiling measured on ERA5 therefore deprioritises a second NWP
+  source without ruling one out. CEDA's UKV, at about 2 km, narrows this gap for every variable
+  except irradiance, and the observations rung closes it, since station and satellite data are
+  at-site rather than grid-cell means.
 
 - **It is a ceiling for the current model family and feature set.** A model that cannot exploit
   perfect weather shows a low ceiling for reasons that have nothing to do with weather availability.
-  That does not weaken the decision the ceiling gates — a model that cannot use perfect weather will
+  That does not weaken the decision the ceiling informs — a model that cannot use perfect weather will
   not be rescued by a better forecast of it — but it does mean the ceiling is re-measured after any
   large modelling change rather than treated as a standing fact.
 
@@ -1150,7 +1166,10 @@ heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile) and th
 [degradation-conditional conformal
 calibration](https://github.com/openclimatefix/nged-substation-forecast/issues/443) share one
 implementation and one metric path — once we settle how a wrapper derives its class-level
-`MODEL_NAME` from the model it wraps.
+`MODEL_NAME` from the model it wraps. The product calibrator under research in [A new weather
+product with a few months of
+history](training-history.md#a-new-weather-product-with-a-few-months-of-history) would be the
+wrapper's third consumer.
 
 Spread inflation widens the fan but cannot reshape it (the inflated ensemble is still 51 point
 forecasts, just pushed apart). It is the stopgap the full fix below must beat to earn the effort of
@@ -1190,19 +1209,19 @@ then recombine the 51 members with the **linear-pool mixture** into one set of d
 
 Each ML experiment is tagged with metadata so we can group experiments and compute average
 performance per group (e.g. "does lagged power *always* help, regardless of model sophistication?",
-or "how robust is each model to weather-forecast uncertainty — ERA5 reanalysis vs. operational
-NWP?"). Example tags:
+or "how robust is each model to weather-forecast uncertainty — estimates of past weather vs.
+operational NWP?"). Example tags:
 
 | Tag | Example values |
 |---|---|
 | `time_series_type` | PV, Wind, disaggregated demand (primaries) |
 | `model_family` | manual_heuristic, baseline_persistence, xgboost, pytorch_mlp, pytorch_graph_dp |
-| `weather_source` | none, ecmwf_control, full_ecmwf_ensemble, era5 |
+| `weather_source` | none, ecmwf_control, full_ecmwf_ensemble, cams_ceda_ukv, era5 |
 | `input_features` | datetime, power_lag_24h, power_lag_7d, temperature |
 | `training_strategy` | direct_multistep, horizon_as_feature, end_to_end |
 | `generator_capacity_estimation` | none, simple_p99, convex_envelope, differentiable_physics |
 | `switching_event_detection` | none, simple_statistical |
-| `pre_training` | none, ERA5 |
+| `pre_training` | none, CAMS + CEDA UKV, ERA5 |
 
 **Accuracy is published separately for each class of asset** — grid supply points, bulk supply
 points, primary substations, and metered generators — each against its own stated naive baseline,

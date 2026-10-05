@@ -69,8 +69,8 @@ Live cadence: `ecmwf_ens` 1/day (daily 00Z partition), `power_time_series_and_me
 `metrics(production_monitoring)` step ~4/day (planned —
 [#224](https://github.com/openclimatefix/nged-substation-forecast/issues/224)) → **~33
 materialisations/day ≈ 1,000/month**. This cadence ingests only ECMWF ENS and the NGED power feed
-today; a near-real-time ERA5/ERA5T ingest would join it *only if* live capacity estimation is made
-to depend on ERA5 — a new external dependency we may prefer to avoid by [keeping ERA5
+today; near-real-time CAMS and UKV ingests would join it *only if* live capacity estimation is made
+to depend on them — new external dependencies we may prefer to avoid by [keeping capacity estimation
 offline](../roadmap/capacity-estimation.md#irradiance-inputs). A backtest experiment today is ~4–6
 materialisations (`eligible_time_series` + `trained_cv_model` + `cv_power_forecasts` per fold, plus
 `metrics`; single leaderboard fold), rising to ~15–20 under the future multi-yearly-fold epoch.

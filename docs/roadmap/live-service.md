@@ -444,8 +444,8 @@ fold's training set held post-upgrade months, which is that later case.
 
 **ECMWF upgrades its forecast model roughly once a year, so the ENS version tracks the calendar
 closely.** The trees can use the version as a proxy for the date, and learn capacity changes,
-curtailment regimes, or meter swaps where they should have learned an NWP effect. The ERA5 plan is
-designed to avoid the same [era
+curtailment regimes, or meter swaps where they should have learned an NWP effect. The plan to
+extend the training history with estimates of past weather is designed to avoid the same [era
 confounding](training-history.md#scope-the-ingest-to-include-the-2024-overlap).
 
 ### The plan

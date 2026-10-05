@@ -112,6 +112,29 @@ the whole of Great Britain rather than a substation, and [Buizza and Leutbecher
 distribution 16 to 23 days out — on upper-air variables, not the near-surface temperature and
 irradiance that drive substation load.
 
+### A power-forecasting model trained on past weather does not hedge
+
+**A power-forecasting model trained on an estimate of past weather learns the weather-to-power
+response without the damping that forecast error teaches, so the power-forecasting model is
+over-sensitive when fed forecast weather.** The damping above arises only because the training input
+is a forecast, wrong by a lead-time-dependent amount. An estimate of past weather — a reanalysis
+such as ERA5, a satellite retrieval such as CAMS, or the first time steps of a weather-model run —
+usually carries smaller errors than a forecast at long lead, though not always: at six solar farms
+in the [past-sunshine study](../studies/past-weather/solar.md#ecmwf-ens-beats-era5-and-trails-cams),
+ECMWF ENS's day-1 ensemble mean describes past sunshine better than ERA5 does. The smaller the
+estimate's own error, the closer a power-forecasting model trained on that estimate comes to the
+undamped response. Fed forecast weather, that power-forecasting model reacts fully to every forecast
+swing, including the swings that are forecast error. The damping then has to come from elsewhere:
+from averaging the power-forecasting model's output over ensemble members whose spread honestly
+represents the forecast error, or from a recalibration fitted on forecast inputs.
+
+**Weather forecasters name the two training choices "perfect prognosis" and "model output
+statistics".** Perfect prognosis fits a statistical model on observed or analysed weather and applies
+that model to forecasts; model output statistics fits on the forecasts themselves. [Marzban,
+Sandgathe and Kalnay (2006)](https://doi.org/10.1175/MWR3088.1) show from a formal analysis that
+model output statistics should beat perfect prognosis on mean squared error, bias, and error
+variance.
+
 ## The fix, formally: a mixture of conditional distributions
 
 Ask the model for a full conditional distribution per member — "the distribution of power *given*

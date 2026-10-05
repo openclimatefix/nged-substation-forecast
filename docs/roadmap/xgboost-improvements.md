@@ -879,13 +879,16 @@ because weather anomalies are synoptic-scale — a heatwave does not vary meanin
 cell. CERRA is the tempting alternative — higher-resolution, and since its 2025 timely-update
 extension no longer stuck at 2021 but running to within a few months of present. But CERRA is a
 *different* model (a HARMONIE-based regional system), so z-scoring ECMWF forecasts against a CERRA
-climatology folds a model-pair bias into every anomaly. (This same model-consistency argument,
-together with ERA5T's near-real-time latency, is why the project now [standardises on
-ERA5](data-sources.md#weather-data) as its single reanalysis for every use — pre-training, capacity
-estimation, and this climatology alike; CERRA stays documented as a higher-resolution option but is
-deprioritised.) The most self-consistent source imaginable would be a climatology from our own
-archived ENS, but a robust day-of-year climatology wants 10+ years and the archive is nowhere near
-that yet, so ERA5 wins in practice.
+climatology folds a model-pair bias into every anomaly. (This same model-consistency argument
+is why [ERA5](data-sources.md#weather-data) is the reanalysis planned for this climatology; CERRA
+stays documented as a higher-resolution option but is deprioritised. The estimates of past weather
+planned for pre-training are a separate choice: CAMS for irradiance and CEDA UKV for other
+variables, pending [checks against
+ERA5](training-history.md#which-estimate-of-past-weather-to-train-on).) The most self-consistent
+source imaginable would be a climatology from our own archived ENS, but a robust day-of-year
+climatology wants 10+ years and the archive is nowhere near that yet. CEDA's UKV archive
+starts in 2016, does not share the ENS's IFS lineage, and is not homogeneous across the Met Office's
+PS47 upgrade of 2026-01-21, so ERA5 wins in practice.
 
 **Storage and ingestion — settle the design when the experiment earns it.** The climatology wants
 storing the way the rest of the project stores gridded weather: an **H3-indexed Delta table** keyed
@@ -1002,7 +1005,7 @@ not trade away [principle 8 ("*every experiment is scored
 identically*")](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically):
 the leaderboard measurement is unchanged and stays comparable, and the extrapolation check is an
 *additional* acceptance criterion rather than a substitute score. The feature becomes cleanly
-measurable only once [ERA5 pre-training](training-history.md) extends the training history from one
+measurable only once [pre-training](training-history.md) extends the training history from one
 summer to several.
 
 **Anchor it to init time, and source it from ERA5.** Compute the accumulator once at
@@ -1138,36 +1141,40 @@ either way.
 
 ## Tier 4 — structural model changes (weeks)
 
-### Pre-train on the ERA5-backed history
+### Pre-train on estimates of past weather
 
 Issues: [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143) (ingest),
 [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) (experiments)
 
 Our power data reaches back to late 2019 but our ECMWF ENS archive starts 2024-04-01, so today's
-fold trains on 15 months and one winter. Ingesting ERA5 and pre-training on 2020–2023 takes that to
-roughly 5.5 years, which is what makes the seasonal items on this page cleanly measurable — the
-[long-window accumulators](#the-long-window-variant-drought-and-sustained-heat-state) above all, and
-secondarily the holiday, monotone-constraint and global-model items, whose value all turns on
-seasonal or regime coverage the current window does not have. The design, the era-confounding hazard
-that dictates the ingest's scope, and the COVID covariate are on [Extending the training
-history](training-history.md).
+fold trains on 15 months and one winter. Ingesting estimates of past weather and pre-training on
+2020–2023 takes that to roughly 5.5 years, which is what makes the seasonal items on this page
+cleanly measurable — the [long-window
+accumulators](#the-long-window-variant-drought-and-sustained-heat-state) above all, and secondarily
+the holiday, monotone-constraint and global-model items, whose value all turns on seasonal or regime
+coverage the current window does not have. The design, the era-confounding hazard that dictates the
+ingest's scope, and the COVID covariate are on [Extending the training
+history](training-history.md). For metered wind and solar generators, the pre-training variants are
+also comparison arms in the study of [a new weather product with a few months of
+history](training-history.md#pre-training-then-fine-tuning-becomes-a-comparison-arm-for-wind-and-solar).
 
 **The largest meta-analysis of solar forecasting we have found puts the peak almost exactly where
 5.5 years lands.** [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) pool 4,687 skill
 scores from 188 solar forecasting papers and find that each extra day of training data raises skill
 score at horizons beyond 6 hours by 0.004 percentage points. But they also find that the gain turns
 over at around 2,000 days — roughly 5.5 years — which they attribute to over-fitting. That is a
-reason to expect the ERA5 extension to reach the top of the curve rather than fall short of it, and
-a reason to argue any *further* extension on regime coverage or fold count rather than on volume
-alone. Two caveats before leaning on the number: their sample is deterministic solar forecasting at
-the plant or irradiance level, not substation net demand, and their beyond-6-hours band covers this
-page's 3-to-10-day focus in a single category.
+reason to expect the extension to late 2019 to reach the top of the curve rather than fall short of
+it, and a reason to argue any *further* extension on regime coverage or fold count rather than on
+volume alone. Two caveats before leaning on the number: their sample is deterministic solar
+forecasting at the plant or irradiance level, not substation net demand, and their beyond-6-hours
+band covers this page's 3-to-10-day focus in a single category.
 
 Two sequencing notes. The [lead-time
 feature](#feed-the-model-the-forecast-lead-time-review-discovery-one-line) is a prerequisite,
-because the lowest-effort reconciliation arm leans on it to discount reanalysis weather. And the
-data-hungry items below — batched training, ensemble-member training, the global model — are worth
-running *after* the history lands, since that is where four extra years change the answer most.
+because the lowest-effort reconciliation arm leans on it to discount estimates of past weather. And
+the data-hungry items below — batched training, ensemble-member training, the global model — are
+worth running *after* the history lands, since that is where four extra years change the answer
+most.
 
 ### Per-horizon-window models
 
@@ -1438,6 +1445,10 @@ substation under the same weather system, so hundreds of substations during one 
 one storm's worth of evidence. A few years of history therefore hold few independent examples of
 each kind of weather.
 
+**A weather product whose history is too short to train an XGBoost model on could still enter the
+forecast through a small product calibrator**, under research in [A new weather product with a few
+months of history](training-history.md#a-new-weather-product-with-a-few-months-of-history).
+
 **A cheaper first signal needs only ECMWF ENS: check whether its calibration varies with the weather
 situation once lead time is accounted for.** For a single ensemble, [Allen et al.
 (2020)](https://doi.org/10.1002/qj.3806) found that making ensemble model output statistics (EMOS)
@@ -1483,19 +1494,6 @@ exact zeros at night.)
 
 ## Explicitly deferred (not quick, or not skill)
 
-- **A two-stage weather-to-power model (Stage A frozen, Stage B calibrates) is the classical "perfect
-  prog" method, and a reviewer's conclusion is that it likely gains calibration rather than skill.**
-  The idea: Stage A learns weather to power from best-estimate weather
-  only (CAMS, ERA5, analyses), then freezes; Stage B takes Stage A's output on forecast weather, plus
-  raw forecast weather, lead time and lagged power, and learns to calibrate uncertainty and correct
-  with lags. A model trained only on best-estimate weather learns the power response smoothed by
-  forecast error, so a frozen Stage A is expected to be over-confident at long lead — and because
-  Stage B needs the raw forecast weather too (not just Stage A's output), it becomes ordinary
-  stacking rather than a clean two-stage split. The plausible gain is calibration and diagnosis, not
-  headline skill. If tried, test it in a short study against strong single-stage baselines (the lead-
-  time feature, ensemble statistics, training on members, warm start on ENS), scored on identical
-  rows by lead, with a kill criterion set before the study runs — see [out-of-sample
-  requirements](switching-events.md) for the shared methodology.
 - **[#176](https://github.com/openclimatefix/nged-substation-forecast/issues/176) local-time power
   lags** — a DST edge case affecting a handful of half-hours per year; the issue itself says it may
   not be worth worrying about yet. Revisit if the metrics slices ever show a DST-transition
