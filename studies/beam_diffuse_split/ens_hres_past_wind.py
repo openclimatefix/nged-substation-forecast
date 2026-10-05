@@ -183,8 +183,9 @@ from studies.cross_validation import (
 from studies.grid_sampling import distance_matrix_km
 from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import wind_sites
+from studies.solar_product_frames import with_eras
 from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
-from weather_products import METRIC, PERCENTAGE_POINTS, _mae, with_eras
+from weather_products import METRIC, PERCENTAGE_POINTS, _mae
 from wind_products import (
     SHARED_FEATURES,
     _hub_height_m,

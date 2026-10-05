@@ -134,6 +134,8 @@ from studies.neighbouring_hours import with_neighbouring_hours
 from studies.pv_dataset import CAMS_PATH
 from studies.sources import STUDY_DATA_DIR
 
+from studies import solar_product_frames
+
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
 OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "satellite_blend"
@@ -581,9 +583,11 @@ def build_rows() -> tuple[pl.DataFrame, float]:
         RMS difference between CAMS's and SARAH-3's global irradiance on these rows.
     """
     panel = weather_products.PANELS["record"]
-    rows = weather_products.common_rows(frame=weather_products.joined(products=panel.products))
+    rows = solar_product_frames.common_rows(
+        frame=solar_product_frames.joined(products=panel.products)
+    )
     frame = with_export_cap(
-        dataset=weather_products.with_eras(frame=add_time_features(dataset=rows))
+        dataset=solar_product_frames.with_eras(frame=add_time_features(dataset=rows))
     )
     frame = climatology_permutation(
         frame=frame,

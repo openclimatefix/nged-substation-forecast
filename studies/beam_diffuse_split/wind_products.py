@@ -49,10 +49,10 @@ from studies.guards import refuse_to_overwrite
 from studies.neighbouring_hours import with_neighbouring_hours
 from studies.power import hourly_from_half_hourly
 from studies.pv_dataset import POWER_DELTA_URI, wind_sites
+from studies.solar_product_frames import UPGRADE_DAY, with_eras
 from studies.sources import STUDY_DATA_DIR, UPDATE_OUTPUT_DIR
 from weather_products import (
     CONTRAST_HEADER,
-    UPGRADE_DAY,
     _contrast_line,
     _mae,
     _scope,
@@ -61,7 +61,6 @@ from weather_products import (
     era5_year_change,
     era5_year_change_lines,
     geometry_lines,
-    with_eras,
 )
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)

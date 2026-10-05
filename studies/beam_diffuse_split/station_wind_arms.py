@@ -110,8 +110,9 @@ from studies.cross_validation import (
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.midas import read_hourly_weather, read_station_metadata, select_nearest_stations
 from studies.pv_dataset import wind_sites
+from studies.solar_product_frames import with_eras
 from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
-from weather_products import METRIC, PERCENTAGE_POINTS, with_eras
+from weather_products import METRIC, PERCENTAGE_POINTS
 from wind_products import (
     SHARED_FEATURES,
     UKV_80M_COLUMNS,

@@ -76,8 +76,9 @@ from studies.reanalysis_wind import (
     read_cerra_wind,
     read_nora3_wind,
 )
+from studies.solar_product_frames import with_eras
 from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
-from weather_products import CONTRAST_HEADER, _contrast_line, with_eras
+from weather_products import CONTRAST_HEADER, _contrast_line
 from wind_products import (
     SHARED_FEATURES,
     _wind_columns,

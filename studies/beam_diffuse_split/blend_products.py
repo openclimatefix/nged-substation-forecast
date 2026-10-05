@@ -87,6 +87,8 @@ from studies.export_cap import with_export_cap
 from studies.pv_dataset import POWER_DELTA_URI, wind_sites
 from studies.sources import STUDY_DATA_DIR
 
+from studies import solar_product_frames
+
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
 OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "blend_products"
@@ -306,7 +308,7 @@ def _solar_columns(product: str) -> tuple[str]:
     """Return a solar product's one plain feature column: its global horizontal irradiance.
 
     Args:
-        product: A key of `weather_products.PRODUCTS`.
+        product: A key of `solar_product_frames.PRODUCTS`.
 
     Returns:
         The column name.
@@ -323,7 +325,7 @@ def _solar_rich_columns(product: str) -> tuple[str, ...]:
     `icon_eu_ctx_global` arm's. CAMS adds its own beam split, which the published page found helps.
 
     Args:
-        product: A key of `weather_products.PRODUCTS`.
+        product: A key of `solar_product_frames.PRODUCTS`.
 
     Returns:
         The column names.
@@ -362,11 +364,11 @@ def _solar_published_jobs() -> tuple[Job, ...]:
     """Return the published solar study's pooled arms, less the two the enriched arms reproduce.
 
     Returns:
-        The jobs, as `weather_products.jobs` builds them.
+        The jobs, as `solar_product_frames.jobs` builds them.
     """
     return tuple(
         job
-        for job in weather_products.jobs()
+        for job in solar_product_frames.jobs()
         if job[0] not in ("icon_eu_ctx_global", "ukv_trap_ctx_global")
     )
 
@@ -390,7 +392,7 @@ def _wind_published_jobs() -> tuple[Job, ...]:
 
 SOLAR: Final[Domain] = Domain(
     name="solar",
-    products=tuple(weather_products.PRODUCTS),
+    products=tuple(solar_product_frames.PRODUCTS),
     sets=(
         BlendSet("cams_icon_d2", ("cams", "icon_d2"), "cams", "history, where ICON-D2 covers"),
         BlendSet("cams_icon_eu", ("cams", "icon_eu"), "cams", "history anywhere in Great Britain"),
@@ -402,7 +404,7 @@ SOLAR: Final[Domain] = Domain(
             "icon_d2",
             "live service, where ICON-D2 covers (weather models only)",
         ),
-        BlendSet("everything", tuple(weather_products.PRODUCTS), "cams", "the upper bound"),
+        BlendSet("everything", tuple(solar_product_frames.PRODUCTS), "cams", "the upper bound"),
     ),
     shared_features=(*SOLAR_SHARED_FEATURES, "era_code"),
     columns=_solar_columns,
@@ -410,7 +412,7 @@ SOLAR: Final[Domain] = Domain(
     rich_mean_width=3,
     single_suffix="_global",
     named_sets=("everything", "cams_icon_eu", "live_all"),
-    published_losses=STUDY_DATA_DIR / weather_products.OUTPUT_DIR_NAME / "losses.parquet",
+    published_losses=STUDY_DATA_DIR / solar_product_frames.OUTPUT_DIR_NAME / "losses.parquet",
     published_jobs=_solar_published_jobs(),
     rich_published={"icon_eu_rich": "icon_eu_ctx_global", "ukv_rich": "ukv_trap_ctx_global"},
     synthetic_noise=0.3,
@@ -1890,14 +1892,14 @@ def _solar_frame() -> pl.DataFrame:
         The rows, with the enriched columns and every blend column added.
     """
     frame = with_export_cap(
-        dataset=weather_products.with_eras(
+        dataset=solar_product_frames.with_eras(
             frame=add_time_features(
-                dataset=weather_products.common_rows(frame=weather_products.joined())
+                dataset=solar_product_frames.common_rows(frame=solar_product_frames.joined())
             )
         )
     )
     return _with_blend_columns(
-        frame=weather_products.with_irradiance_context(frame=frame), domain=SOLAR
+        frame=solar_product_frames.with_irradiance_context(frame=frame), domain=SOLAR
     )
 
 
@@ -1907,7 +1909,7 @@ def _wind_frame() -> pl.DataFrame:
     Returns:
         The rows, with the enriched columns and every blend column added.
     """
-    frame = weather_products.with_eras(
+    frame = solar_product_frames.with_eras(
         frame=add_time_features(
             dataset=wind_products.common_rows(frame=wind_products.joined(sites=wind_sites()))
         )

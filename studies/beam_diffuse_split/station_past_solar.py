@@ -76,6 +76,7 @@ from studies.midas import (
     select_nearest_stations,
 )
 from studies.pv_dataset import pv_sites
+from studies.solar_product_frames import with_eras
 from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from weather_products import (
     CONTRAST_HEADER,
@@ -84,7 +85,6 @@ from weather_products import (
     _contrast_line,
     _mae,
     geometry_lines,
-    with_eras,
 )
 
 _LOG: Final[logging.Logger] = logging.getLogger("station_past_solar")

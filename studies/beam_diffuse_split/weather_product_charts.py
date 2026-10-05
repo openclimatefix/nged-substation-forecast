@@ -50,15 +50,13 @@ from studies.charts import (
     ticks,
 )
 from studies.figure_numbers import FIGURE_NUMBERS
+from studies.solar_product_frames import UNUSABLE_SPLITS, common_rows, joined
 from weather_products import (
     METRIC,
     NEW_PLANNED_CONTRASTS,
     PANELS,
     PERCENTAGE_POINTS,
     SARAH_SATELLITE_ERAS,
-    UNUSABLE_SPLITS,
-    common_rows,
-    joined,
 )
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
