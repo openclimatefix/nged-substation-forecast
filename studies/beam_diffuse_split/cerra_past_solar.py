@@ -95,8 +95,8 @@ from ens_past_solar import (
     _era5_and_cams_hourly,
     _fingerprint,
 )
-from run_experiment import MAX_CONCURRENT_FITS, Job, run_all
 from station_past_solar import _main_panel_lines
+from studies.arm_runner import MAX_CONCURRENT_FITS, Job, run_all
 from studies.baselines import hourly_clear_sky
 from studies.charts import ProductFamily
 from studies.cross_validation import (

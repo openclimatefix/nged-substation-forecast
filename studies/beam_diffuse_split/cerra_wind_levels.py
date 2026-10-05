@@ -74,7 +74,7 @@ from typing import Any, Final, NamedTuple
 import numpy as np
 import polars as pl
 from ens_past_solar import _arm_columns_lines, _fingerprint
-from run_experiment import Job, _add_time_features, run_all
+from studies.arm_runner import Job, add_time_features, run_all
 from studies.bootstrap import (
     bootstrap_absolute,
     bootstrap_difference,
@@ -608,7 +608,7 @@ def _joined_rows(
         joined.join(sites.select("site", "effective_capacity_mw"), on="site")
         .filter(~pl.col("has_zero_half_hour"))
         .with_columns(constrained=pl.lit(value=False), cap_mw=pl.lit(None, dtype=pl.Float64))
-        .pipe(lambda rows: _add_time_features(dataset=rows))
+        .pipe(lambda rows: add_time_features(dataset=rows))
         .sort("site", "time")
     )
 

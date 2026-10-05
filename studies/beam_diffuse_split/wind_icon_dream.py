@@ -98,7 +98,7 @@ import numpy as np
 import polars as pl
 from extract_site_series import ICON_DREAM_CELL_CENTRES, _icon_dream_cell_centres, _log_distances
 from fetch_wind_point import output_path_for
-from run_experiment import Job, _add_time_features, run_all
+from studies.arm_runner import Job, add_time_features, run_all
 from studies.bootstrap import (
     MIN_MONTHS_FOR_INTERVAL,
     YearChangeInterval,
@@ -776,7 +776,7 @@ def icon_dream_common_rows(*, sites: pl.DataFrame) -> pl.DataFrame:
     base = common_rows(frame=joined(sites=sites))
     icon_dream = icon_dream_site_frame(sites=sites)
     frame = base.join(icon_dream, on=["site", "time"], how="inner")
-    return with_eras(frame=_add_time_features(dataset=frame))
+    return with_eras(frame=add_time_features(dataset=frame))
 
 
 def jobs() -> list[Job]:

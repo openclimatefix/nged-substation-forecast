@@ -109,8 +109,8 @@ from typing import Final, TypedDict
 import numpy as np
 import polars as pl
 import weather_products
-from run_experiment import SHARED_FEATURES as RUN_SHARED_FEATURES
-from run_experiment import Job, _add_time_features, run_all
+from studies.arm_runner import SHARED_FEATURES as RUN_SHARED_FEATURES
+from studies.arm_runner import Job, add_time_features, run_all
 from studies.blending import climatology_permutation, stacked_errors
 from studies.bootstrap import (
     N_BOOTSTRAP_RESAMPLES,
@@ -583,7 +583,7 @@ def build_rows() -> tuple[pl.DataFrame, float]:
     panel = weather_products.PANELS["record"]
     rows = weather_products.common_rows(frame=weather_products.joined(products=panel.products))
     frame = with_export_cap(
-        dataset=weather_products.with_eras(frame=_add_time_features(dataset=rows))
+        dataset=weather_products.with_eras(frame=add_time_features(dataset=rows))
     )
     frame = climatology_permutation(
         frame=frame,

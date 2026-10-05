@@ -147,8 +147,8 @@ from blend_products import (
     _wind_frame,
 )
 from fetch_ens_forecast_horizons import BAND_DAYS, ENSEMBLE_SIZE, OUTPUT_DIR, OUTPUT_PATH
-from run_experiment import MAX_CONCURRENT_FITS, Job, run_all
-from run_experiment import SHARED_FEATURES as SOLAR_SHARED_FEATURES
+from studies.arm_runner import MAX_CONCURRENT_FITS, Job, run_all
+from studies.arm_runner import SHARED_FEATURES as SOLAR_SHARED_FEATURES
 from studies.baselines import (
     clear_sky_index,
     climatology,

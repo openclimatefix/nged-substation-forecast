@@ -107,7 +107,7 @@ from ens_forecast_horizons import (
 )
 from fetch_ens_forecast_horizons import ENSEMBLE_SIZE
 from geo.h3 import compute_h3_grid_weights
-from run_experiment import MAX_CONCURRENT_FITS, Job, run_all
+from studies.arm_runner import MAX_CONCURRENT_FITS, Job, run_all
 from studies.baselines import hourly_clear_sky
 from studies.bootstrap import bootstrap_absolute
 from studies.charts import report_errors

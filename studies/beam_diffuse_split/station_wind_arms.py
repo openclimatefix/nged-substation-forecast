@@ -87,7 +87,7 @@ from typing import Final, TypedDict
 
 import numpy as np
 import polars as pl
-from run_experiment import Job, _add_time_features, run_all
+from studies.arm_runner import Job, add_time_features, run_all
 from studies.bootstrap import (
     BOOTSTRAP_SEED,
     N_BOOTSTRAP_RESAMPLES,
@@ -599,7 +599,7 @@ def build_frame(
     rows = window.join(nearest, on=["site", "time"], how="inner").join(
         three, on=["site", "time"], how="inner"
     )
-    return with_eras(frame=_add_time_features(dataset=rows.sort("site", "time")))
+    return with_eras(frame=add_time_features(dataset=rows.sort("site", "time")))
 
 
 # ---------------------------------------------------------------------------------------------

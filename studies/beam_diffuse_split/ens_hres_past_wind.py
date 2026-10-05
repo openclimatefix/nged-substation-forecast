@@ -154,7 +154,7 @@ from typing import Final, Protocol, TypedDict
 import numpy as np
 import polars as pl
 from ens_past_solar import _arm_columns_lines, _fingerprint
-from run_experiment import Job, _add_time_features, run_all
+from studies.arm_runner import Job, add_time_features, run_all
 from studies.bootstrap import (
     BOOTSTRAP_SEED,
     MIN_MONTHS_FOR_INTERVAL,
@@ -2318,7 +2318,7 @@ def long_row_frame(*, sites: pl.DataFrame) -> pl.DataFrame:
     if frame.height != n_rows:
         msg = f"joining ENS and HRES to the long row set lost {n_rows - frame.height} rows"
         raise ValueError(msg)
-    return _add_time_features(dataset=frame).sort("site", "time")
+    return add_time_features(dataset=frame).sort("site", "time")
 
 
 def long_row_designs(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
@@ -3178,7 +3178,7 @@ def main() -> int:
 
     sites = wind_sites()
     rows, counts = joined_row_set(sites=sites)
-    timed_rows = _add_time_features(dataset=rows)
+    timed_rows = add_time_features(dataset=rows)
     frame = cut_eras(
         frame=timed_rows,
         first_months=ENS_HRES_WIND_ERA_START_MONTHS,

@@ -61,7 +61,7 @@ from blend_products import (
     SOLAR,
     _solar_frame,
 )
-from run_experiment import MAX_CONCURRENT_FITS, Job, run_all
+from studies.arm_runner import MAX_CONCURRENT_FITS, Job, run_all
 from studies.blending import climatology_permutation
 from studies.bootstrap import bootstrap_absolute
 from studies.charts import report_errors

@@ -74,11 +74,11 @@ from typing import Final, Literal, NamedTuple
 
 import numpy as np
 import polars as pl
-from run_experiment import (
+from studies.arm_runner import (
     MAX_CONCURRENT_FITS,
     SHARED_FEATURES,
     Job,
-    _add_time_features,
+    add_time_features,
     dataset_path_for,
     run_all,
 )
@@ -2647,7 +2647,7 @@ def _panel_frame(*, panel: Panel, panel_jobs: list[Job]) -> pl.DataFrame:
     rows = common_rows(frame=joined(products=panel.products))
     if panel.first_time is not None:
         rows = rows.filter(pl.col("time") >= panel.first_time)
-    frame = with_export_cap(dataset=with_eras(frame=_add_time_features(dataset=rows)))
+    frame = with_export_cap(dataset=with_eras(frame=add_time_features(dataset=rows)))
     check_no_missing(frame=frame, columns=[column for job in panel_jobs for column in job[3]])
     return frame
 

@@ -26,9 +26,9 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from run_experiment import _add_time_features, dataset_path_for
 from run_physics_experiment import MAX_ITERATIONS, START_SPREAD, _n_parameters, _predict
 from scipy.optimize import minimize
+from studies.arm_runner import add_time_features, dataset_path_for
 from studies.bootstrap import bootstrap_difference
 from studies.commissioning import drop_commissioning_ramp
 
@@ -168,7 +168,7 @@ def main() -> int:
 
     dataset = with_export_cap(
         dataset=assign_folds(
-            dataset=_add_time_features(
+            dataset=add_time_features(
                 dataset=drop_commissioning_ramp(
                     dataset=pl.read_parquet(dataset_path_for(source=arguments.source))
                 )

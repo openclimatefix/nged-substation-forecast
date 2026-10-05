@@ -36,7 +36,7 @@ import sys
 from typing import Final
 
 import polars as pl
-from run_experiment import SHARED_FEATURES, _add_time_features, dataset_path_for
+from studies.arm_runner import SHARED_FEATURES, add_time_features, dataset_path_for
 from studies.blending import climatology_permutation
 from studies.bootstrap import bootstrap_difference
 from studies.commissioning import drop_commissioning_ramp
@@ -168,7 +168,7 @@ def main() -> int:
     dataset = with_export_cap(
         dataset=assign_folds(
             dataset=_with_shuffled_second_product(
-                dataset=_add_time_features(dataset=drop_commissioning_ramp(dataset=_joined()))
+                dataset=add_time_features(dataset=drop_commissioning_ramp(dataset=_joined()))
             )
         )
     )

@@ -37,16 +37,9 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from run_experiment import (
-    SHARED_FEATURES,
-    Job,
-    _add_time_features,
-    dataset_path_for,
-    features_for,
-    results_dir_for,
-    run_all,
-)
+from run_experiment import features_for, results_dir_for
 from run_physics_experiment import _fit, _predict
+from studies.arm_runner import SHARED_FEATURES, Job, add_time_features, dataset_path_for, run_all
 from studies.bootstrap import bootstrap_difference
 from studies.commissioning import drop_commissioning_ramp
 from studies.cross_validation import N_FOLDS, PRIMARY_HYPER_PARAMETERS, assign_folds
@@ -180,7 +173,7 @@ def main() -> int:
 
     dataset = with_export_cap(
         dataset=assign_folds(
-            dataset=_add_time_features(
+            dataset=add_time_features(
                 dataset=drop_commissioning_ramp(
                     dataset=pl.read_parquet(dataset_path_for(source=source))
                 )

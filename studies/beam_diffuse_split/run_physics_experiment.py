@@ -42,8 +42,8 @@ from typing import Final, NamedTuple
 
 import numpy as np
 import polars as pl
-from run_experiment import _add_time_features, dataset_path_for
 from scipy.optimize import minimize
+from studies.arm_runner import add_time_features, dataset_path_for
 from studies.bootstrap import bootstrap_difference, per_fold_differences
 from studies.commissioning import drop_commissioning_ramp
 from studies.cross_validation import N_FOLDS, SEEDS, assign_folds, clamp_to_cap
@@ -497,7 +497,7 @@ def main() -> int:
 
     dataset = with_export_cap(
         dataset=assign_folds(
-            dataset=_add_time_features(
+            dataset=add_time_features(
                 dataset=drop_commissioning_ramp(
                     dataset=pl.read_parquet(dataset_path_for(source=source))
                 )

@@ -34,7 +34,7 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from run_experiment import dataset_path_for
+from studies.arm_runner import dataset_path_for
 from studies.sources import ANM_DATA_DIR, SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

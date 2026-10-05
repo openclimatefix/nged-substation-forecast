@@ -29,8 +29,9 @@ import sys
 from typing import Final
 
 import polars as pl
-from run_experiment import dataset_path_for, results_dir_for
+from run_experiment import results_dir_for
 from run_physics_experiment import results_dir_for as physics_results_dir_for
+from studies.arm_runner import dataset_path_for
 from studies.bootstrap import bootstrap_difference
 from studies.sources import SOURCE_CHOICES
 

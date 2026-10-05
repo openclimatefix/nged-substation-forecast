@@ -48,7 +48,7 @@ from typing import Final
 import numpy as np
 import polars as pl
 import xgboost as xgb
-from run_experiment import SHARED_FEATURES, _add_time_features, dataset_path_for
+from studies.arm_runner import SHARED_FEATURES, add_time_features, dataset_path_for
 from studies.cross_validation import (
     N_FOLDS,
     PRIMARY_HYPER_PARAMETERS,
@@ -303,7 +303,7 @@ def _joined(*, three_hourly: pl.DataFrame, ens: pl.DataFrame, horizon: str) -> p
     )
     joined = three_hourly.join(wide, on=["site", "valid_time"], how="inner").drop_nulls()
     return assign_folds(
-        dataset=_add_time_features(dataset=joined.with_columns(time=pl.col("valid_time")))
+        dataset=add_time_features(dataset=joined.with_columns(time=pl.col("valid_time")))
     )
 
 

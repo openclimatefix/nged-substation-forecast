@@ -68,8 +68,8 @@ import polars as pl
 import weather_products
 import wind_products
 from deltalake import DeltaTable
-from run_experiment import SHARED_FEATURES as SOLAR_SHARED_FEATURES
-from run_experiment import Job, _add_time_features, run_all
+from studies.arm_runner import SHARED_FEATURES as SOLAR_SHARED_FEATURES
+from studies.arm_runner import Job, add_time_features, run_all
 from studies.blending import PERMUTED_SUFFIX, climatology_permutation, stacked_errors
 from studies.bootstrap import (
     bootstrap_absolute,
@@ -1891,7 +1891,7 @@ def _solar_frame() -> pl.DataFrame:
     """
     frame = with_export_cap(
         dataset=weather_products.with_eras(
-            frame=_add_time_features(
+            frame=add_time_features(
                 dataset=weather_products.common_rows(frame=weather_products.joined())
             )
         )
@@ -1908,7 +1908,7 @@ def _wind_frame() -> pl.DataFrame:
         The rows, with the enriched columns and every blend column added.
     """
     frame = weather_products.with_eras(
-        frame=_add_time_features(
+        frame=add_time_features(
             dataset=wind_products.common_rows(frame=wind_products.joined(sites=wind_sites()))
         )
     )

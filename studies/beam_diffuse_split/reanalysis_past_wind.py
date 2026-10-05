@@ -59,7 +59,7 @@ from typing import Final, NamedTuple
 import polars as pl
 from cerra_past_solar import check_column_counts, uncovered_share, with_covering_folds
 from ens_past_solar import _absolute_table_lines, _arm_columns_lines, _fingerprint
-from run_experiment import MAX_CONCURRENT_FITS, Job, _add_time_features, run_all
+from studies.arm_runner import MAX_CONCURRENT_FITS, Job, add_time_features, run_all
 from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
     SENSITIVITY_HYPER_PARAMETERS,
@@ -549,7 +549,7 @@ def build_rows(*, spec: ProductSpec, sites: pl.DataFrame) -> Built:
     wind = product_wind_columns(
         raw=raw, spec=spec, with_direction=with_direction, extra_heights_m=extra
     )
-    base = _add_time_features(dataset=common_rows(frame=joined(sites=sites)))
+    base = add_time_features(dataset=common_rows(frame=joined(sites=sites)))
     assembled = assemble_rows(base=base, wind=wind, spec=spec, features=features)
     return Built(
         assembled=assembled,

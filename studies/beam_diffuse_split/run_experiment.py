@@ -38,7 +38,6 @@ Run it with `uv run python studies/beam_diffuse_split/run_experiment.py`.
 """
 
 import argparse
-import concurrent.futures
 import json
 import logging
 import sys
@@ -48,6 +47,13 @@ from typing import Final
 import numpy as np
 import polars as pl
 import xgboost as xgb
+from studies.arm_runner import (
+    SHARED_FEATURES,
+    Job,
+    add_time_features,
+    dataset_path_for,
+    run_all,
+)
 from studies.bootstrap import bootstrap_difference, per_fold_differences
 from studies.commissioning import drop_commissioning_ramp
 from studies.cross_validation import (
@@ -55,13 +61,10 @@ from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
     SEEDS,
     SENSITIVITY_HYPER_PARAMETERS,
-    HyperParameters,
     assign_folds,
     booster_parameters,
-    out_of_fold_losses,
 )
 from studies.export_cap import with_export_cap
-from studies.fractions_skill_score import MONTH_FORMAT
 from studies.sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -75,11 +78,6 @@ is the other instrument rather than another route to this one.
 """
 
 
-def dataset_path_for(*, source: str) -> Path:
-    """Return the frame `build_dataset.py` wrote for one ERA5 source."""
-    return STUDY_DATA_DIR / f"beam_diffuse_dataset_{source}.parquet"
-
-
 def results_dir_for(*, source: str) -> Path:
     """Return where one run's results are written."""
     return STUDY_DATA_DIR / f"beam_diffuse_results_{source}"
@@ -90,22 +88,6 @@ LEARNED_BEAM_TEMPLATE: Final[str] = "learned_bhi_w_m2_fold{fold}"
 
 LEARNED_DIFFUSE_TEMPLATE: Final[str] = "learned_dhi_w_m2_fold{fold}"
 """Column holding the learned separation model's diffuse, for rows scored on one named fold."""
-
-SHARED_FEATURES: Final[tuple[str, ...]] = (
-    "solar_zenith_deg",
-    "solar_azimuth_deg",
-    "extraterrestrial_horizontal_w_m2",
-    "temp_c",
-    "hour_of_day",
-    "day_of_year",
-)
-"""Features every arm gets.
-
-Solar geometry and season are in here deliberately. A fixed-tilt array's sensitivity to the
-beam/diffuse split is partly a function of sun position, which a tree can absorb from these, so
-giving every arm the geometry makes the global-irradiance-only arm as strong as it can be. That
-makes any advantage arm C shows a lower bound on what a transposition model would extract.
-"""
 
 ARM_FEATURES: Final[dict[str, tuple[str, ...]]] = {
     "A_global_only": ("ghi_w_m2",),
@@ -171,23 +153,6 @@ can on the meters.
 """
 
 
-MAX_CONCURRENT_FITS: Final[int] = 8
-"""How many (arm, site) fits to run at once, each on `THREADS_PER_FIT` cores."""
-
-
-def _add_time_features(*, dataset: pl.DataFrame) -> pl.DataFrame:
-    """Add the calendar features and the month label the block bootstrap resamples on."""
-    return dataset.with_columns(
-        hour_of_day=pl.col("time").dt.hour(),
-        day_of_year=pl.col("time").dt.ordinal_day(),
-        month=pl.col("time").dt.strftime(MONTH_FORMAT),
-    )
-
-
-Job = tuple[str, str, str, tuple[str, ...], HyperParameters, bool]
-"""One (arm, setting name, target, features, settings, whether to score quantiles) to fit."""
-
-
 def features_for(*, arm: str) -> tuple[str, ...]:
     """Return the feature columns one of this experiment's arms is shown.
 
@@ -198,49 +163,6 @@ def features_for(*, arm: str) -> tuple[str, ...]:
         The shared features followed by the arm's own irradiance columns, some carrying `{fold}`.
     """
     return (*SHARED_FEATURES, *ARM_FEATURES[arm])
-
-
-def run_all(
-    *, dataset: pl.DataFrame, jobs: list[Job], max_workers: int = MAX_CONCURRENT_FITS
-) -> pl.DataFrame:
-    """Run every (arm, site) job concurrently and concatenate the losses.
-
-    XGBoost releases the interpreter lock while it trains, so threads give real parallelism here
-    without the cost of shipping a copy of the frame to a subprocess.
-
-    Args:
-        dataset: The full frame, already carrying `fold`, `month`, `cap_mw` and `constrained`.
-        jobs: The fits to run.
-        max_workers: How many (arm, site) fits run at once, each on `THREADS_PER_FIT` cores.
-            Lower it to share the machine with another run.
-
-    Returns:
-        Every job's losses, stacked, labelled with the arm, the setting and the target.
-    """
-    sites = sorted(dataset["site"].unique().to_list())
-    outputs: list[pl.DataFrame] = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {}
-        for arm, setting_name, target, features, hyper_parameters, with_quantiles in jobs:
-            for site in sites:
-                future = pool.submit(
-                    out_of_fold_losses,
-                    site_rows=dataset.filter(pl.col("site") == site),
-                    features=features,
-                    target=target,
-                    hyper_parameters=hyper_parameters,
-                    with_quantiles=with_quantiles,
-                )
-                futures[future] = (setting_name, arm, target, site)
-        for done, future in enumerate(concurrent.futures.as_completed(futures), start=1):
-            setting_name, arm, target, site = futures[future]
-            outputs.append(
-                future.result().with_columns(
-                    arm=pl.lit(arm), setting=pl.lit(setting_name), target=pl.lit(target)
-                )
-            )
-            _LOG.info("%d/%d done: %s / %s / site %s", done, len(futures), setting_name, arm, site)
-    return pl.concat(outputs)
 
 
 def _direct_fraction_predictability(*, dataset: pl.DataFrame) -> dict[str, float]:
@@ -478,7 +400,7 @@ def main() -> int:
     results_dir.mkdir(parents=True, exist_ok=True)
     dataset = with_export_cap(
         dataset=assign_folds(
-            dataset=_add_time_features(
+            dataset=add_time_features(
                 dataset=drop_commissioning_ramp(
                     dataset=pl.read_parquet(dataset_path_for(source=source))
                 )
