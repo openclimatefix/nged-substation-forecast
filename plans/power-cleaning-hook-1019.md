@@ -84,10 +84,10 @@ first open question below.
 - `clean_power_time_series(power, cleaning_functions=None) -> pt.LazyFrame[PowerTimeSeries]` —
   applies each function in order and stays lazy. `None` resolves to `POWER_CLEANING_FUNCTIONS` at
   call time, so a test can monkeypatch the module attribute.
-- `power_cleaning_stats(raw, cleaned) -> dict[str, int]` — one `pl.collect_all` over
-  `select(pl.len(), pl.col("time_series_id").n_unique())` on each frame. The query is an aggregate,
-  not a materialisation, so principle 11 holds. Keys: `power_cleaning/n_rows_in`,
-  `power_cleaning/n_rows_out`, `power_cleaning/n_time_series_in`, and
+- `power_cleaning_stats(raw, cleaned) -> dict[str, int]` — one `pl.collect_all(...,
+  engine="streaming")` over `select(pl.len(), pl.col("time_series_id").n_unique())` on each frame.
+  The query is an aggregate, not a materialisation, so principle 11 holds. Keys:
+  `power_cleaning/n_rows_in`, `power_cleaning/n_rows_out`, `power_cleaning/n_time_series_in`, and
   `power_cleaning/n_time_series_out`. Flat string keys go straight into
   `context.add_output_metadata`, and the prefix keeps them clear of each asset's existing keys
   (Dagster raises on a duplicate key).
@@ -117,10 +117,13 @@ Out of bounds and untouched: `metrics` and its helpers (#958).
 - `eligible_time_series`: today it calls `nged_data.storage.time_series_coverage(path)`, which scans
   the path itself. Split that function: a new `coverage_from_power(power: pl.LazyFrame)` holds the
   `group_by` + streaming `collect`, and `time_series_coverage(path)` keeps its existence check and
-  calls it. `eligible_time_series` scans the table, cleans it, and calls `coverage_from_power` on
-  the cleaned frame. `time_series_coverage`'s other callers (the `power_data_is_fresh` check and the
-  ingest's `select_new_rows`) keep reading raw coverage, which is right: freshness and de-duplication
-  are about what NGED delivered.
+  calls it. `eligible_time_series` keeps today's absent-table behaviour (an empty population, not a
+  `TableNotFoundError`) by checking `delta_table_exists` first; when the table exists it scans the
+  table, cleans it, and calls `coverage_from_power` on the cleaned frame. The `coverage_from_power`
+  docstring notes that a cleaning function using `map_batches` or `.over()` may push the streaming
+  engine back to in-memory. `time_series_coverage`'s other callers (the `power_data_is_fresh` check
+  and the ingest's `select_new_rows`) keep reading raw coverage, which is right: freshness and
+  de-duplication are about what NGED delivered.
 
 No `try` in any of these: an exception from a cleaning function propagates and fails the run.
 
@@ -135,7 +138,10 @@ No `try` in any of these: an exception from a cleaning function propagates and f
       at collect time fails *inside* the guard rather than later in `predict`. The live power
       window is 15 days of the trained series, a few MB at V2's 2,500 series, so this one collect is
       a deliberate exception to principle 11.
-    - On failure: log with `context.log.exception`, call
+    - On failure: log with `context.log.exception("Power cleaning failed; forecasting this slot
+      from uncleaned power")`, so the log names the cleaning step rather than only the exception
+      type. The guard also covers the raw Delta read the collect triggers, so an object-store fault
+      during that read is reported the same way, which the log message has to allow for. Then call
       `report_asset_degradation(asset_name="live_forecasts", exc=exc)`, carry on with the raw
       frame, and set `power_cleaning/degraded: True`.
 - On success the metadata carries `power_cleaning/degraded: False` and the counts, merged into the
@@ -187,7 +193,16 @@ In `tests/test_cv_assets.py`:
   `nged_data.cleaning.POWER_CLEANING_FUNCTIONS` with a function dropping one series; assert the
   `effective_capacity` table lacks that series and the materialisation metadata carries the drop
   count. Fails on `main`: nothing applies the registry.
-- `test_eligible_time_series_reads_cleaned_power` — same shape for eligibility.
+- `test_eligible_time_series_reads_cleaned_power` — same shape for eligibility, dropping series 1:
+  the fixture makes only series 1 eligible for `FOLD_ID`, so dropping any other series would leave
+  eligibility unchanged and the population assertion would pass on `main`.
+
+In `tests/test_trained_cv_model.py`:
+
+- `test_trained_cv_model_reads_cleaned_power` — the existing harness already materialises
+  `trained_cv_model` with two eligible series. Drop one through the registry and assert the
+  metadata's `power_cleaning/n_time_series_out` is one fewer than `n_time_series_in`. Fails if the
+  cleaning call is deleted from `trained_cv_model`.
 
 In `tests/test_live_forecasts.py`:
 
@@ -199,15 +214,22 @@ In `tests/test_live_forecasts.py`:
   proves the live wiring: if `live_forecasts` never called the cleaning, nothing would raise and
   `report_asset_degradation` would not be called.
 
-`trained_cv_model` and `cv_power_forecasts` get no dedicated wiring test: their harnesses train real
-models and the call is two lines. The first diff review should judge whether that is enough.
+- The existing happy-path live test gains one assertion: the metadata carries
+  `power_cleaning/degraded: False` and equal in/out row counts.
+
+`cv_power_forecasts` gets no wiring test: the call is one line, it reports no counts, and a test
+would need a frame-level assertion on forecasts that weather-only features can produce without
+power. The mutation-testing diff review should judge whether that is enough.
 
 ## Docs to update
 
 - `docs/roadmap/data-cleaning.md` — a short section saying where cleaning functions go
   (`nged_data.cleaning.POWER_CLEANING_FUNCTIONS`), the row-local constraint, and that production
   falls back to raw power on failure while research fails.
-- `packages/nged_data/README.md` — one line for the new module.
+- `packages/nged_data/README.md` — one line for the new module, and one for `coverage_from_power`
+  beside the existing `time_series_coverage` entry.
+- `TimeSeriesCoverage`'s docstring in `nged_data/storage.py`, which names CV eligibility as a
+  caller of `time_series_coverage`; eligibility now goes through `coverage_from_power`.
 - The docstrings of the five assets touched, which are operator docs in the Dagster UI.
 
 ## Verification commands
@@ -265,3 +287,23 @@ live fallback would need raw and cleaned frames back, and two of the five reader
 loader); cleaning in the feature engineer (misses eligibility and effective capacity, hides the
 counts from Dagster); a materialised `power_data_problems` asset now (a new stored contract and
 schedule wiring in `schedules.py`, which is out of bounds, bought before any detector needs it).
+
+### Correctness review (fresh Opus sub-agent)
+
+Accepted, all four defects:
+
+- `eligible_time_series` would have raised on an absent power table instead of writing an empty
+  population; the plan now keeps the `delta_table_exists` check.
+- Two stale prose sites (the `TimeSeriesCoverage` docstring and the `nged_data` README) added to the
+  docs list.
+- Added a `trained_cv_model` wiring test (the reviewer showed the harness already exists) and a
+  `degraded: False` assertion on the live happy path.
+- The eligibility wiring test now names series 1, the only one eligible in the fixture's fold.
+
+Also taken from the reviewer's caveats: the streaming engine on the counts query, and a live log
+message naming the cleaning step (principle 16).
+
+Confirmed by the reviewer, and so unchanged: the description of current code, that monkeypatching
+the module attribute reaches in-process materialisations, that a raising `map_batches` surfaces at
+the guard's collect, that `/` keys and mixed bool/int metadata work on Dagster 1.13, and that the
+change is a no-op with an empty registry.
