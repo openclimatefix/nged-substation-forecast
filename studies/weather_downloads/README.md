@@ -61,6 +61,16 @@ way):
   Running without `--chunks` fetches the older chunks back to 2019-09; cached chunks are skipped,
   so extending past 2026-09-20 means deleting `era5_wind_2026_07_09.zip` first.
   `compare_era5_wind_openmeteo_cds.py` is that comparison.
+- `fetch_era5_wind_2019_2023.py` and `validate_era5_wind_2019_2023.py` — native ERA5 10 m and 100 m
+  wind from 2019-09-01 to 2023-12-31, from the same Climate Data Store dataset as
+  `fetch_era5_wind.py`, needs `uv run --with cdsapi --with netCDF4`. The cells kept are the
+  trial-area box, a 3 x 3 block around each MIDAS Open station that reports wind speed, and a 3 x 3
+  block around each metered wind farm. The output is the write-once folder `ERA5-WIND-2019-2023/`,
+  keyed by an integer `cell_id`, with half-yearly requests checkpointed per chunk and a
+  `status.json`. The flag `--dry-run` prints each request's cost, and `--trial` fetches 2019-09
+  only into `_trial/`. A second request re-fetches 2024-01 for the wind-farm cells so that the
+  validator can check bit-equality with `ERA5/wind_native_cds.parquet`. `era5_cells.py` holds the
+  tested chunk and cell helpers.
 - `fetch_midas_open.py` and `validate_midas_open.py` — Met Office MIDAS Open station observations.
 - `fetch_icon_dream.py` — DWD's ICON-DREAM-EU, whole-domain monthly GRIB cropped to the box then
   deleted, needs `uv run --with cfgrib --with eccodes --with requests`.
