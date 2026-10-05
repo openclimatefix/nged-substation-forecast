@@ -278,8 +278,8 @@ user.** The submit command executes the worker's code as a subprocess running as
 research user, because the worker's code is untrusted. A worker may still train and score freely on
 the training window while developing an idea, but those runs never reach the leaderboard. Workers
 never report their own scores. Every node is logged as an MLflow run under a `study/`-prefixed
-experiment name, so the search is visible on the leaderboard but outside every promotion path. Issue #958
-plans the same prefix for every autonomous study.
+experiment name, so the search is visible on the leaderboard but outside every promotion path. The
+plan in issue #958 uses the same prefix for every autonomous study.
 
 **The trusted checks do not live in a Claude Code mod.** A mod is a JavaScript or TypeScript plugin
 that runs inside a Claude Code session's process, with the session's permissions. A mod holding the
