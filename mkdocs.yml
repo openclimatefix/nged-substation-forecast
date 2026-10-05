@@ -123,6 +123,7 @@ nav:
       - Configuration reference: live_service/setup.md
   - Roadmap:
       - Overview: roadmap/index.md
+      - Automated experimentation: roadmap/auto-research.md
       - Effective-capacity estimation: roadmap/capacity-estimation.md
       - Cost-savings metrics: roadmap/cost-savings-metrics.md
       - Cleaning the trial-area telemetry: roadmap/data-cleaning.md
