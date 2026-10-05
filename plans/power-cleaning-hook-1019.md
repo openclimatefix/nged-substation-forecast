@@ -214,7 +214,8 @@ Nothing in this issue builds that table; the mapping is a decision for the issue
 - **First deploy**: the cleaned table is absent until the asset first runs, and `live_forecasts`
   raises reading it, exactly as it raises today when the raw table is absent. The deploy step in
   `operations.md` closes that window.
-- **Principle 7 (strict contracts)**: a new Patito model with an Enum of drop reasons.
+- **Principle 7 (strict contracts)**: a new Patito model whose `drop_reason` is constrained to a
+  declared vocabulary.
 - **Principle 11**: the asset materialises the whole table by design; readers stay lazy.
 - **Principle 14**: the asset and `live_forecasts` couple through the cleaned table at rest.
 - **Principle 15**: the raw table is untouched, so changing a rule means re-running one asset over
