@@ -25,7 +25,6 @@ from typing import Final
 
 import ens_forecast_horizons as efh
 import polars as pl
-from build_dataset import _pv_sites, _wind_sites
 from fetch_ens_forecast_horizons import (
     ENSEMBLE_SIZE,
     MARGIN_HOURS,
@@ -35,6 +34,7 @@ from fetch_ens_forecast_horizons import (
     _members,
 )
 from studies.guards import refuse_to_overwrite
+from studies.pv_dataset import pv_sites, wind_sites
 from studies.sources import STUDIES_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_ens_day4_supplement")
@@ -104,7 +104,7 @@ def log_surviving_runs(*, extract_band: pl.DataFrame, supplement: pl.DataFrame) 
         extract_band: The extract's rows at the day-4 band's leads, for every site.
         supplement: The rows about to be written.
     """
-    for domain, roster in (("solar", _pv_sites()), ("wind", _wind_sites())):
+    for domain, roster in (("solar", pv_sites()), ("wind", wind_sites())):
         members = pl.concat([extract_band, supplement.select(extract_band.columns)]).filter(
             pl.col("site").is_in(roster["site"])
         )
@@ -140,8 +140,8 @@ def main() -> int:
 
     sites = pl.concat(
         [
-            _pv_sites().select("site", "latitude", "longitude"),
-            _wind_sites().select("site", "latitude", "longitude"),
+            pv_sites().select("site", "latitude", "longitude"),
+            wind_sites().select("site", "latitude", "longitude"),
         ]
     )
     lookup = _cells(sites=sites)

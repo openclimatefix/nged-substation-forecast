@@ -103,7 +103,7 @@ CONTROL_ARMS: Final[tuple[str, ...]] = ("P_A_global_only", "P_B_erbs", "P_C_sour
 """The arms run against the synthetic transposed-plane target.
 
 **The control is only worth reading because the target is built outside this model's hypothesis
-class.** `build_dataset._add_synthetic_control_target` gives each site its own tilt and azimuth,
+class.** `studies.pv_dataset.add_synthetic_control_target` gives each site its own tilt and azimuth,
 none of them the values the optimiser starts from, and transposes the sky diffuse by the Hay-Davies
 model where this one assumes an isotropic sky. So the fit has to find geometry it was not handed,
 under a sky model it does not implement, which is the situation a real meter puts it in. What the

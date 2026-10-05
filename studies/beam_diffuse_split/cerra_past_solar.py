@@ -89,7 +89,6 @@ from typing import Final, NamedTuple, cast
 import numpy as np
 import polars as pl
 from blend_products import SOLAR, _solar_frame
-from build_dataset import _add_separation_models, _pv_sites
 from ens_past_solar import (
     _absolute_table_lines,
     _arm_columns_lines,
@@ -111,6 +110,7 @@ from studies.cross_validation import (
     uncovered_months,
 )
 from studies.guards import check_no_missing, refuse_to_overwrite
+from studies.pv_dataset import add_separation_models, pv_sites
 from studies.reanalysis_wind import derive_nearest_cells
 from studies.resample import DEFAULT_DAYLIGHT_FLOOR_W_M2, clear_sky_index_resample
 from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
@@ -583,7 +583,7 @@ def with_diffuse_and_erbs(*, frame: pl.DataFrame) -> tuple[pl.DataFrame, int]:
         whose direct beam exceeds the global irradiance, so that diffuse was clipped to zero.
     """
     clipped = int((frame[BHI_COLUMN] > frame[GHI_COLUMN]).sum())
-    separated = _add_separation_models(
+    separated = add_separation_models(
         frame=frame.select(
             "time",
             "solar_zenith_deg",
@@ -866,7 +866,7 @@ def build_rows() -> Built:
             design covers every calendar month, an arm's column holds a missing value, or CERRA's
             and ERA5's peak hours differ.
     """
-    sites = _pv_sites()
+    sites = pv_sites()
     saved = pl.read_parquet(GENERATOR_CELLS_PATH)
     check_cells_match(
         derived=derive_nearest_cells(grid=pl.read_parquet(GRID_PATH), sites=sites), saved=saved
@@ -1225,7 +1225,7 @@ def main() -> int:
     )
     arguments = parser.parse_args()
 
-    sites = _pv_sites()
+    sites = pv_sites()
     built = build_rows()
     frame = built.frame
     _LOG.info("%d rows, %s to %s", frame.height, frame["time"].min(), frame["time"].max())

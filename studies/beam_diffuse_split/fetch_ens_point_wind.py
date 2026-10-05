@@ -37,7 +37,6 @@ from pathlib import Path
 from typing import Final
 
 import polars as pl
-from build_dataset import _wind_sites
 from fetch_ens_point import (
     HORIZONS,
     NWP_ROOT,
@@ -45,6 +44,7 @@ from fetch_ens_point import (
     _labelled_by_horizon,
     _wanted_leads,
 )
+from studies.pv_dataset import wind_sites
 from studies.sources import WEATHER_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -105,7 +105,7 @@ def main() -> int:
         msg = f"{NWP_ROOT} is missing; run the ecmwf_ens asset first"
         raise FileNotFoundError(msg)
 
-    lookup = _cell_for_each_meter(sites=_wind_sites())
+    lookup = _cell_for_each_meter(sites=wind_sites())
     cells = lookup["h3_index"].unique().to_list()
     leads = _wanted_leads()
     logger.info("%d meters in %d cells, %d lead hours", lookup.height, len(cells), len(leads))

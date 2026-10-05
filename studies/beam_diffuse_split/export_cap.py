@@ -46,7 +46,7 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from build_dataset import _pv_sites
+from studies.pv_dataset import pv_sites
 from studies.sources import ANM_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("export_cap")
@@ -109,7 +109,7 @@ def _hourly_cap(*, path: Path) -> pl.DataFrame:
 def with_export_cap(*, dataset: pl.DataFrame) -> pl.DataFrame:
     """Add the export cap and the constrained flag to every row of the experiment dataset.
 
-    The anonymous site labels come from `build_dataset._pv_sites`, so the mapping from NGED's
+    The anonymous site labels come from `studies.pv_dataset.pv_sites`, so the mapping from NGED's
     `time_series_id` to a label stays in the one place that owns it and no export filename has to
     be matched to a label by hand.
 
@@ -120,7 +120,7 @@ def with_export_cap(*, dataset: pl.DataFrame) -> pl.DataFrame:
         `dataset` with `cap_mw` — null where no setpoint record covers the row — and `constrained`,
         which is False both where the cap never moved and where no record exists.
     """
-    labels: dict[int, str] = dict(_pv_sites().select("time_series_id", "site").iter_rows())
+    labels: dict[int, str] = dict(pv_sites().select("time_series_id", "site").iter_rows())
     frames: list[pl.DataFrame] = []
     for path in sorted(ANM_DATA_DIR.glob(f"{CAP_FILE_PREFIX}*.parquet")):
         time_series_id = int(path.stem.removeprefix(CAP_FILE_PREFIX))

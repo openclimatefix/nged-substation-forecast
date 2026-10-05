@@ -96,7 +96,6 @@ from typing import Final, TypedDict
 
 import numpy as np
 import polars as pl
-from build_dataset import _wind_sites
 from extract_site_series import ICON_DREAM_CELL_CENTRES, _icon_dream_cell_centres, _log_distances
 from fetch_wind_point import output_path_for
 from run_experiment import Job, _add_time_features, run_all
@@ -111,6 +110,7 @@ from studies.bootstrap import (
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SEEDS, SENSITIVITY_HYPER_PARAMETERS
 from studies.grid_sampling import nearest_cells
 from studies.guards import refuse_to_overwrite
+from studies.pv_dataset import wind_sites
 from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from weather_products import (
     CONTRAST_HEADER,
@@ -1415,7 +1415,7 @@ def main() -> int:
     )
     arguments = parser.parse_args()
 
-    sites = _wind_sites()
+    sites = wind_sites()
     frame = icon_dream_common_rows(sites=sites)
     _LOG.info(
         "common rows: %d, %s to %s",

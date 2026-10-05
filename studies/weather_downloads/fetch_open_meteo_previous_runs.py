@@ -13,7 +13,7 @@ predicted for that same hour. That is exactly the lead-time axis the forecast st
 Historical Forecast archives do not carry.
 
 **Sites, not the trial-area grid.** This script builds the same anonymised meter roster
-`studies/beam_diffuse_split/build_dataset._pv_sites`/`_wind_sites` does (`_roster` below is a
+`studies/beam_diffuse_split/studies.pv_dataset.pv_sites`/`_wind_sites` does (`_roster` below is a
 deliberate duplicate — see its own docstring for why) and follows the same request/response shape
 as `studies/beam_diffuse_split/fetch_open_meteo_point.py`, rather than the trial-area grid
 `fetch_open_meteo_grid.py` uses: a forecast study scores a specific generator's forecast, not a

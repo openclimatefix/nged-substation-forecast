@@ -53,7 +53,7 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from build_dataset import CAMS_PATH, _pv_sites
+from studies.pv_dataset import CAMS_PATH, pv_sites
 from studies.served_column_checks import check_direct_is_not_a_separation_model
 from studies.solar import extraterrestrial_horizontal, midpoint_zenith
 from studies.sources import (
@@ -516,7 +516,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=UPDATE_OUTPUT_DIR / "product_checks.md")
     arguments = parser.parse_args()
 
-    sites = _pv_sites().select("site", "latitude", "longitude").sort("site")
+    sites = pv_sites().select("site", "latitude", "longitude").sort("site")
     frames: dict[SourceType, pl.DataFrame] = {}
     for source in arguments.sources:
         path = (

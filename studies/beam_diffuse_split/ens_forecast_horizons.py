@@ -146,8 +146,6 @@ from blend_products import (
     _solar_frame,
     _wind_frame,
 )
-from build_dataset import _hourly_power as solar_hourly_power
-from build_dataset import _pv_sites, _wind_sites
 from fetch_ens_forecast_horizons import BAND_DAYS, ENSEMBLE_SIZE, OUTPUT_DIR, OUTPUT_PATH
 from run_experiment import MAX_CONCURRENT_FITS, Job, run_all
 from run_experiment import SHARED_FEATURES as SOLAR_SHARED_FEATURES
@@ -178,6 +176,7 @@ from studies.cross_validation import (
 )
 from studies.ensemble import check_one_run_per_hour
 from studies.guards import refuse_to_overwrite
+from studies.pv_dataset import pv_sites, solar_hourly_power, wind_sites
 from studies.resample import (
     DEFAULT_DAYLIGHT_FLOOR_W_M2,
     clear_sky_index_resample,
@@ -892,8 +891,8 @@ def _hourly_power(*, domain: DomainType) -> pl.DataFrame:
         One row per (site, time) with `power_mw`.
     """
     if domain == "solar":
-        return solar_hourly_power(sites=_pv_sites()).select("site", "time", "power_mw")
-    return wind_hourly_power(sites=_wind_sites()).select("site", "time", "power_mw")
+        return solar_hourly_power(sites=pv_sites()).select("site", "time", "power_mw")
+    return wind_hourly_power(sites=wind_sites()).select("site", "time", "power_mw")
 
 
 def base_frame(*, domain: DomainType) -> pl.DataFrame:
@@ -922,7 +921,7 @@ def site_roster(*, domain: DomainType) -> pl.DataFrame:
     Returns:
         One row per site with `site`, `latitude` and `longitude`.
     """
-    roster = _pv_sites() if domain == "solar" else _wind_sites()
+    roster = pv_sites() if domain == "solar" else wind_sites()
     return roster.select("site", "latitude", "longitude")
 
 
@@ -956,7 +955,7 @@ def with_baselines(*, frame: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
     grid = None
     if domain == "solar":
         clear_sky = hourly_clear_sky(
-            sites=_pv_sites(), first=SPAN[0] - timedelta(days=2), last=SPAN[1]
+            sites=pv_sites(), first=SPAN[0] - timedelta(days=2), last=SPAN[1]
         )
         grid = hourly_grid(hourly=hourly).join(clear_sky, on=["site", "time"], how="inner")
         frame = frame.join(clear_sky, on=["site", "time"], how="left")
@@ -992,7 +991,7 @@ def clear_sky_table(*, domain: DomainType) -> pl.DataFrame:
     """
     if domain == "wind":
         return pl.DataFrame()
-    return hourly_clear_sky(sites=_pv_sites(), first=SPAN[0], last=SPAN[1])
+    return hourly_clear_sky(sites=pv_sites(), first=SPAN[0], last=SPAN[1])
 
 
 def build_inputs(*, domain: DomainType) -> Inputs:
@@ -1338,7 +1337,7 @@ def _daylight(*, frame: pl.DataFrame) -> pl.DataFrame:
     Returns:
         One row per (site, time), with `daylight`.
     """
-    sites = _pv_sites().filter(pl.col("site").is_in(frame["site"].unique().to_list()))
+    sites = pv_sites().filter(pl.col("site").is_in(frame["site"].unique().to_list()))
     hours = pl.datetime_range(SPAN[0], SPAN[1], interval="1h", eager=True, time_zone="UTC")
     parts = []
     for site, latitude, longitude in sites.select("site", "latitude", "longitude").iter_rows():

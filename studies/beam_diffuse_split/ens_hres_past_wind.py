@@ -153,7 +153,6 @@ from typing import Final, Protocol, TypedDict
 
 import numpy as np
 import polars as pl
-from build_dataset import _wind_sites
 from ens_past_solar import _arm_columns_lines, _fingerprint
 from run_experiment import Job, _add_time_features, run_all
 from studies.bootstrap import (
@@ -183,6 +182,7 @@ from studies.cross_validation import (
 )
 from studies.grid_sampling import distance_matrix_km
 from studies.guards import refuse_to_overwrite
+from studies.pv_dataset import wind_sites
 from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from weather_products import METRIC, PERCENTAGE_POINTS, _mae, with_eras
 from wind_products import (
@@ -3176,7 +3176,7 @@ def main() -> int:
     )
     arguments = parser.parse_args()
 
-    sites = _wind_sites()
+    sites = wind_sites()
     rows, counts = joined_row_set(sites=sites)
     timed_rows = _add_time_features(dataset=rows)
     frame = cut_eras(

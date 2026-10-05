@@ -14,7 +14,7 @@ Requests go to the historical-forecast endpoint, which is a different service fr
 endpoint `fetch_era5_open_meteo.py` uses for ERA5, with its own call-weight accounting. Coordinates
 are read at run time from the private roster and sent in the query string. **No coordinate and no
 identifier reaches the written frame**: rows are keyed by the anonymised site label
-`build_dataset._pv_sites` assigns.
+`studies.pv_dataset.pv_sites` assigns.
 
 Two checks run over the downloaded frame before it is written, and each raises with its measured
 number rather than printing for a human to read. What they establish, and what they deliberately do
@@ -34,8 +34,8 @@ from typing import Any, Final
 
 import numpy as np
 import polars as pl
-from build_dataset import _pv_sites
 from studies.era5_grid import LAST_DATE, LAST_YEAR
+from studies.pv_dataset import pv_sites
 from studies.served_column_checks import (
     check_direct_is_not_a_separation_model,
     check_hourly_value_is_a_backward_mean,
@@ -62,9 +62,9 @@ MAX_ATTEMPTS: Final[int] = 5
 HOURLY_VARIABLES: Final[tuple[str, ...]] = ("shortwave_radiation", "direct_radiation")
 """The two horizontal fluxes the arms consume, in Open-Meteo's normalised names.
 
-The served `diffuse_radiation` is not requested. `build_dataset._add_separation_models` derives the
-diffuse flux as global minus direct for every source, so a served diffuse column would reach no arm
-whatever it held.
+The served `diffuse_radiation` is not requested. `studies.pv_dataset.add_separation_models`
+derives the diffuse flux as global minus direct for every source, so a served diffuse column would
+reach no arm whatever it held.
 """
 
 INSTANT_SUFFIX: Final[str] = "_instant"
@@ -287,7 +287,7 @@ def main() -> int:
         )
         raise ValueError(msg)
 
-    sites = _pv_sites()
+    sites = pv_sites()
     first_year = int(model.archive_starts[:4])
     _LOG.info(
         "fetching %s for %d sites, %s to %s, as %d requests",

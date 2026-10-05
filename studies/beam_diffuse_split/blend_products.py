@@ -67,7 +67,6 @@ import numpy as np
 import polars as pl
 import weather_products
 import wind_products
-from build_dataset import POWER_DELTA_URI, _wind_sites
 from deltalake import DeltaTable
 from export_cap import with_export_cap
 from run_experiment import SHARED_FEATURES as SOLAR_SHARED_FEATURES
@@ -85,6 +84,7 @@ from studies.cross_validation import (
     UKV_UPGRADE_MONTH,
     HyperParameters,
 )
+from studies.pv_dataset import POWER_DELTA_URI, wind_sites
 from studies.sources import STUDY_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
@@ -1909,7 +1909,7 @@ def _wind_frame() -> pl.DataFrame:
     """
     frame = weather_products.with_eras(
         frame=_add_time_features(
-            dataset=wind_products.common_rows(frame=wind_products.joined(sites=_wind_sites()))
+            dataset=wind_products.common_rows(frame=wind_products.joined(sites=wind_sites()))
         )
     )
     return _with_blend_columns(frame=wind_products.with_wind_context(frame=frame), domain=WIND)

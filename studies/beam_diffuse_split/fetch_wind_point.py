@@ -30,9 +30,9 @@ from pathlib import Path
 from typing import Final
 
 import polars as pl
-from build_dataset import _wind_sites
 from fetch_open_meteo_point import fetch_point_frame
 from studies.era5_grid import FIRST_DATE_OVERRIDE, LAST_DATE, LAST_YEAR, suffixed
+from studies.pv_dataset import wind_sites
 from studies.sources import HISTORICAL_FORECAST_URL, WEATHER_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -90,7 +90,7 @@ def main() -> int:
 
     Downloads every product, or only those named on the command line.
     """
-    sites = _wind_sites()
+    sites = wind_sites()
     first_year = int(FIRST_DATE[:4])
     products = {name: PRODUCTS[name] for name in sys.argv[1:]} or PRODUCTS
     for product, (models_parameter, base_url) in products.items():

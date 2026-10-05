@@ -75,7 +75,6 @@ from typing import Final, NamedTuple
 
 import numpy as np
 import polars as pl
-from build_dataset import _wind_sites
 from cerra_wind_levels import (
     CERRA_DIR,
     GRID_PATH,
@@ -108,6 +107,7 @@ from studies.cross_validation import (
     raise_on_uncovered_months,
 )
 from studies.guards import check_no_missing, refuse_to_overwrite
+from studies.pv_dataset import wind_sites
 from studies.reanalysis_wind import (
     CERRA_DIRECTION_FILES,
     CERRA_FILES,
@@ -1401,7 +1401,7 @@ def check() -> int:
         height for height in HEIGHTS_M if (CERRA_DIR / CERRA_DIRECTION_FILES[height]).exists()
     )
     lines = check_direction_files(heights=present)
-    sites = _wind_sites()
+    sites = wind_sites()
     cells = derive_nearest_cells(grid=pl.read_parquet(GRID_PATH), sites=sites)
     wind = read_cerra_wind(directory=CERRA_DIR, cells=cells)
     direction = read_cerra_direction(directory=CERRA_DIR, cells=cells, heights=list(present))
@@ -1459,7 +1459,7 @@ def main() -> int:
         raise FileNotFoundError(msg)
     job_list = jobs()
     check_settings_and_arms()
-    sites = _wind_sites()
+    sites = wind_sites()
     cells = derive_nearest_cells(grid=pl.read_parquet(GRID_PATH), sites=sites)
     wind = read_cerra_wind(directory=CERRA_DIR, cells=cells)
     direction = read_cerra_direction(directory=CERRA_DIR, cells=cells, heights=list(HEIGHTS_M))

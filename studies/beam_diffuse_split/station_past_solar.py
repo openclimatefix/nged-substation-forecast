@@ -61,7 +61,6 @@ from blend_products import (
     SOLAR,
     _solar_frame,
 )
-from build_dataset import _pv_sites
 from run_experiment import MAX_CONCURRENT_FITS, Job, run_all
 from studies.blending import climatology_permutation
 from studies.bootstrap import bootstrap_absolute
@@ -76,6 +75,7 @@ from studies.midas import (
     read_station_metadata,
     select_nearest_stations,
 )
+from studies.pv_dataset import pv_sites
 from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from weather_products import (
     CONTRAST_HEADER,
@@ -395,7 +395,7 @@ def _station_inputs(*, base: pl.DataFrame) -> tuple[pl.DataFrame, Selection, dic
         The station columns per `(site, time)`, the in-memory `Selection`, and counts of the
         repairs the reader made (`spike_hours`, `clipped_negative_hours`).
     """
-    sites = _pv_sites().select("site", "latitude", "longitude")
+    sites = pv_sites().select("site", "latitude", "longitude")
     required = base.select("site", "time")
 
     radiation_metadata = read_station_metadata(path=RADIATION_METADATA_PATH)
@@ -1030,7 +1030,7 @@ def main() -> int:
     )
     arguments = parser.parse_args()
 
-    sites = _pv_sites()
+    sites = pv_sites()
     frame, selection, repairs, candidates = build_rows()
     _LOG.info("%d rows, %s to %s", frame.height, frame["time"].min(), frame["time"].max())
 

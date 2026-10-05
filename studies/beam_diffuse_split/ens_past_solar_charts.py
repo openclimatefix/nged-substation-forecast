@@ -23,7 +23,6 @@ from typing import Final
 
 import altair as alt
 import polars as pl
-from build_dataset import _pv_sites
 from ens_past_solar import (
     CAMS_3H_ARM,
     CONFOUND_CONTRASTS,
@@ -51,6 +50,7 @@ from studies.charts import (
     interval_panel,
     report_contrasts,
 )
+from studies.pv_dataset import pv_sites
 from weather_products import METRIC, PERCENTAGE_POINTS, _contrast_line, _mae
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
@@ -290,7 +290,7 @@ def _verify_numbers(*, report: str, losses: pl.DataFrame, sensitivity: pl.DataFr
             _absolute_table_lines(pooled=losses, arms=EXPLORATORY_ARMS),
             _servable_lines(pooled=losses),
             _lead_lines(frame=frame),
-            _support_lines(sites=_pv_sites()),
+            _support_lines(sites=pv_sites()),
             _generator_lines(frame=frame, members=_t3_members()),
             _main_panel_lines(pooled=losses),
         )

@@ -73,7 +73,6 @@ from typing import Any, Final, NamedTuple
 
 import numpy as np
 import polars as pl
-from build_dataset import POWER_DELTA_URI, _wind_sites
 from ens_past_solar import _arm_columns_lines, _fingerprint
 from run_experiment import Job, _add_time_features, run_all
 from studies.bootstrap import (
@@ -94,6 +93,7 @@ from studies.cross_validation import (
 )
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.power import hourly_from_half_hourly
+from studies.pv_dataset import POWER_DELTA_URI, wind_sites
 from studies.reanalysis_wind import (
     derive_nearest_cells,
     join_centred_power,
@@ -1265,7 +1265,7 @@ def main() -> int:
     job_list = jobs()
     check_settings(job_list=job_list)
     check_column_counts(arms=arm_columns())
-    sites = _wind_sites()
+    sites = wind_sites()
     wind = read_wind(sites=sites)
     half_hourly = read_half_hourly_power(sites=sites)
 

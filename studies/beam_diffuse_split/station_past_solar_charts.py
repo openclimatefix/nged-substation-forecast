@@ -28,7 +28,6 @@ from typing import Final
 
 import altair as alt
 import polars as pl
-from build_dataset import _pv_sites
 from ens_past_solar import DECIDING_CONTRASTS
 from ens_past_solar import OUTPUT_DIR as ENS_OUTPUT_DIR
 from ens_past_solar_charts import NAMES as ENS_NAMES
@@ -52,6 +51,7 @@ from studies.charts import (
     interval_panel,
     report_contrasts,
 )
+from studies.pv_dataset import pv_sites
 from weather_product_charts import (
     MODELS_WORK_SITES,
 )
@@ -156,7 +156,7 @@ def _check_report(
     regenerated = _report(
         frame=frame,
         losses=all_losses,
-        sites=_pv_sites(),
+        sites=pv_sites(),
         job_list=jobs(),
         selection=selection,
         repairs=repairs,

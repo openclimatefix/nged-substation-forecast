@@ -43,9 +43,9 @@ from typing import Final, Literal
 import numpy as np
 import polars as pl
 import xarray as xr
-from build_dataset import _pv_sites
 from studies.grid_sampling import nearest_cells, nearest_grid_indices
 from studies.hourly_means import KEY_COLUMN, icon_dream_hourly, sarah_hourly
+from studies.pv_dataset import pv_sites
 from studies.solar import zenith
 from studies.sources import WEATHER_DATA_DIR, point_output_path_for
 
@@ -344,7 +344,7 @@ def main() -> int:
     arguments = parser.parse_args()
     product: ExtractedProductType = arguments.product
 
-    sites = _pv_sites().select("site", "latitude", "longitude")
+    sites = pv_sites().select("site", "latitude", "longitude")
     frame = (
         extract_sarah(sites=sites, first=arguments.first_date, last=arguments.last_date)
         if product == "sarah-3"

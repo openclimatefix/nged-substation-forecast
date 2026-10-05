@@ -35,10 +35,10 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from build_dataset import METADATA_PATH, _pv_sites
 from contracts.settings import Settings
 from run_experiment import dataset_path_for, results_dir_for
 from studies.bootstrap import bootstrap_difference
+from studies.pv_dataset import METADATA_PATH, pv_sites
 from studies.sources import SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -109,7 +109,7 @@ def _site_labels() -> pl.DataFrame:
     """Return the site labels `build_dataset` applies, with substation numbers."""
     metadata = pl.read_parquet(METADATA_PATH).select("time_series_id", "substation_number")
     return (
-        _pv_sites()
+        pv_sites()
         .join(metadata, on="time_series_id", how="inner")
         .select("site", "substation_number")
     )

@@ -178,13 +178,13 @@ def main() -> int:
     Raises:
         FileNotFoundError: If the ENS table is not on disk.
     """
-    from build_dataset import _pv_sites
+    from studies.pv_dataset import pv_sites
 
     if not NWP_ROOT.exists():
         msg = f"{NWP_ROOT} is missing; run the ecmwf_ens asset first"
         raise FileNotFoundError(msg)
 
-    lookup = _cell_for_each_meter(sites=_pv_sites())
+    lookup = _cell_for_each_meter(sites=pv_sites())
     cells = lookup["h3_index"].unique().to_list()
     leads = _wanted_leads()
     logger.info("%d meters in %d cells, %d lead hours", lookup.height, len(cells), len(leads))

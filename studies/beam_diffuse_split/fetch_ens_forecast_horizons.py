@@ -33,7 +33,7 @@ from typing import Final
 
 import h3.api.basic_int as h3
 import polars as pl
-from build_dataset import _pv_sites, _wind_sites
+from studies.pv_dataset import pv_sites, wind_sites
 from studies.sources import REPO_DATA_DIR, STUDIES_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_ens_forecast_horizons")
@@ -154,8 +154,8 @@ def main() -> int:
 
     sites = pl.concat(
         [
-            _pv_sites().select("site", "latitude", "longitude"),
-            _wind_sites().select("site", "latitude", "longitude"),
+            pv_sites().select("site", "latitude", "longitude"),
+            wind_sites().select("site", "latitude", "longitude"),
         ]
     )
     lookup = _cells(sites=sites)

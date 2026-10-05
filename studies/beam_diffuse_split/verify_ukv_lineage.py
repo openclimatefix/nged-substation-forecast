@@ -51,7 +51,6 @@ from typing import Final, NamedTuple
 import numpy as np
 import polars as pl
 import xarray as xr
-from build_dataset import _pv_sites
 from fetch_open_meteo_point import (
     HOURLY_VARIABLES,
     INSTANT_SUFFIX,
@@ -61,6 +60,7 @@ from fetch_open_meteo_point import (
 )
 from pyproj import CRS
 from studies.grid_sampling import sample_nearest_cell
+from studies.pv_dataset import pv_sites
 from studies.sources import OPEN_METEO_MODELS
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -445,7 +445,7 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=0, help="Seeds the choice of instants.")
     arguments = parser.parse_args()
 
-    sites = _pv_sites()
+    sites = pv_sites()
     instants: list[SampledInstant] = []
     served_by_era: dict[str, pl.DataFrame] = {}
     for era in ("pre-PS47", "post-PS47"):

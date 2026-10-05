@@ -25,8 +25,8 @@ import sys
 from typing import Final
 
 import polars as pl
-from build_dataset import _wind_sites
 from fetch_open_meteo_point import fetch_point_frame
+from studies.pv_dataset import wind_sites
 from studies.sources import HISTORICAL_FORECAST_URL, STUDY_DATA_DIR
 from wind_products import OUTPUT_DIR_NAME, STEP_DATES
 
@@ -164,7 +164,7 @@ def main() -> int:
     """Run the three checks and write the report."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     argparse.ArgumentParser(description=__doc__).parse_args()
-    sites = _wind_sites()
+    sites = wind_sites()
     lines = [
         *_cell_lines(sites=sites),
         "",

@@ -42,13 +42,13 @@ from pathlib import Path
 from typing import Final
 
 import polars as pl
-from build_dataset import POWER_DELTA_URI, _wind_sites
 from fetch_wind_point import PRODUCTS, output_path_for
 from run_experiment import Job, _add_time_features, run_all
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SENSITIVITY_HYPER_PARAMETERS
 from studies.guards import refuse_to_overwrite
 from studies.neighbouring_hours import with_neighbouring_hours
 from studies.power import hourly_from_half_hourly
+from studies.pv_dataset import POWER_DELTA_URI, wind_sites
 from studies.sources import STUDY_DATA_DIR, UPDATE_OUTPUT_DIR
 from weather_products import (
     CONTRAST_HEADER,
@@ -871,7 +871,7 @@ def main() -> int:
         write_era5_by_year()
         return 0
 
-    sites = _wind_sites()
+    sites = wind_sites()
     frame = with_eras(frame=_add_time_features(dataset=common_rows(frame=joined(sites=sites))))
     frames = {
         "hour_ending": with_eras(

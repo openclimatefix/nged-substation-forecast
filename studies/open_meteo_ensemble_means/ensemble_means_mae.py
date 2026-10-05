@@ -97,17 +97,17 @@ from studies.stitched_ensemble import (
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
 # The underscore-named helpers below are the roster, power and geometry code the earlier studies
 # use, and reusing them keeps every convention identical. Importing private names is a one-off here.
-from build_dataset import (
-    _add_solar_geometry,
-    _drop_false_zeros,
-    _drop_outages_and_spikes,
-    _pv_sites,
-    _wind_sites,
-    nearest_era5_cell,
-)
-from build_dataset import _hourly_power as _solar_hourly_power
 from export_cap import with_export_cap
 from run_experiment import Job, run_all
+from studies.pv_dataset import (
+    add_solar_geometry,
+    drop_false_zeros,
+    drop_outages_and_spikes,
+    nearest_era5_cell,
+    pv_sites,
+    wind_sites,
+)
+from studies.pv_dataset import solar_hourly_power as _solar_hourly_power
 from studies.sources import STUDIES_DATA_DIR, WEATHER_DATA_DIR
 from wind_products import _hourly_power as _wind_hourly_power
 
@@ -371,12 +371,12 @@ def build_solar_frame() -> tuple[pl.DataFrame, list[tuple[str, int]], dict[str, 
         original and refreshed downloads differ, by download name.
     """
     funnel: list[tuple[str, int]] = []
-    sites = _pv_sites()
+    sites = pv_sites()
     era5, era5_differing = _read_extended(
         paths=ERA5_GRID_PATHS, key=["time", "latitude", "longitude"]
     )
     cams, cams_differing = _read_extended(paths=CAMS_PATHS, key=["site", "time"])
-    power = _drop_outages_and_spikes(power=_solar_hourly_power(sites=sites), sites=sites).filter(
+    power = drop_outages_and_spikes(power=_solar_hourly_power(sites=sites), sites=sites).filter(
         pl.col("time") >= WINDOW_START
     )
     funnel.append(("hourly power after outage and spike rules", power.height))
@@ -392,9 +392,9 @@ def build_solar_frame() -> tuple[pl.DataFrame, list[tuple[str, int]], dict[str, 
         .drop("time_series_id", "cell_latitude", "cell_longitude")
     )
     funnel.append(("joined ERA5 grid cells", joined.height))
-    kept = _drop_false_zeros(joined=joined).drop("ghi_w_m2")
+    kept = drop_false_zeros(joined=joined).drop("ghi_w_m2")
     funnel.append(("after the false-zero rule", kept.height))
-    daylight = _add_solar_geometry(joined=kept).filter(pl.col("solar_elevation_deg") > 0.0)
+    daylight = add_solar_geometry(joined=kept).filter(pl.col("solar_elevation_deg") > 0.0)
     funnel.append(("sun above the horizon", daylight.height))
     frame = with_export_cap(
         dataset=daylight.drop("latitude", "longitude").with_columns(
@@ -431,7 +431,7 @@ def build_wind_frame() -> tuple[pl.DataFrame, list[tuple[str, int]], dict[str, i
         original and refreshed ERA5 wind downloads differ.
     """
     funnel: list[tuple[str, int]] = []
-    sites = _wind_sites()
+    sites = wind_sites()
     era5, era5_differing = _read_extended(paths=ERA5_WIND_PATHS, key=["site", "time"])
     power = (
         _wind_hourly_power(sites=sites, centred=True)

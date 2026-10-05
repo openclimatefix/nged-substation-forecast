@@ -57,7 +57,6 @@ from types import MappingProxyType
 from typing import Final, NamedTuple
 
 import polars as pl
-from build_dataset import _wind_sites
 from cerra_past_solar import check_column_counts, uncovered_share, with_covering_folds
 from ens_past_solar import _absolute_table_lines, _arm_columns_lines, _fingerprint
 from run_experiment import MAX_CONCURRENT_FITS, Job, _add_time_features, run_all
@@ -67,6 +66,7 @@ from studies.cross_validation import (
     calendar_month_coverage,
 )
 from studies.guards import check_no_missing, refuse_to_overwrite
+from studies.pv_dataset import wind_sites
 from studies.reanalysis_wind import (
     CERRA_DIRECTION_FILES,
     NORA3_SURFACE_HEIGHT_M,
@@ -820,7 +820,7 @@ def main() -> int:
     arguments = parser.parse_args()
     spec = SPECS[arguments.product]
 
-    sites = _wind_sites()
+    sites = wind_sites()
     built = build_rows(spec=spec, sites=sites)
     frame = built.assembled.frame
     paths = output_paths(spec=spec)

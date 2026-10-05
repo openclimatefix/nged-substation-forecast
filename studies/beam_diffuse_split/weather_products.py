@@ -74,7 +74,6 @@ from typing import Final, Literal, NamedTuple
 
 import numpy as np
 import polars as pl
-from build_dataset import CAMS_PATH, _hourly_power, _pv_sites, nearest_era5_cell, read_era5
 from export_cap import with_export_cap
 from run_experiment import (
     MAX_CONCURRENT_FITS,
@@ -114,6 +113,7 @@ from studies.physics_model import (
     Geometry,
     plane_of_array,
 )
+from studies.pv_dataset import CAMS_PATH, nearest_era5_cell, pv_sites, read_era5, solar_hourly_power
 from studies.raw_comparison import (
     mean_per_site_correlation,
     raw_column_comparison,
@@ -719,7 +719,7 @@ def _ukv_snapshots() -> pl.DataFrame:
     download = pl.read_parquet(point_output_path_for(source="ukv")).select(
         "site", "time", ghi_instant_ukv=pl.col("ghi_instant_w_m2")
     )
-    clean = _without_sunrise_spikes(frame=download, sites=_pv_sites())
+    clean = _without_sunrise_spikes(frame=download, sites=pv_sites())
     previous = clean.select(
         "site",
         time=pl.col("time").dt.offset_by("1h"),
@@ -773,7 +773,7 @@ def _irradiance_download(*, product: str) -> pl.DataFrame:
     """
     if product == "era5":
         gridded = read_era5(source="open-meteo")
-        cells = nearest_era5_cell(sites=_pv_sites(), era5=gridded)
+        cells = nearest_era5_cell(sites=pv_sites(), era5=gridded)
         return cells.join(
             gridded,
             left_on=["cell_latitude", "cell_longitude"],
@@ -830,7 +830,9 @@ def common_rows(*, frame: pl.DataFrame) -> pl.DataFrame:
         January 2026, and the commissioning ramp.
     """
     zero_hours = (
-        _hourly_power(sites=_pv_sites()).filter(pl.col("has_zero_half_hour")).select("site", "time")
+        solar_hourly_power(sites=pv_sites())
+        .filter(pl.col("has_zero_half_hour"))
+        .select("site", "time")
     )
     start, end = ICON_EU_CORRUPT_BLOCK
     february = datetime(2026, 2, 1, tzinfo=UTC)
@@ -2557,7 +2559,7 @@ def _report(
         lines += ["", *_lead_tables(losses=pooled)]
     lines += _optional_section_lines(name=name, panel=panel, frame=frame, losses=losses)
     lines += ["", *era5_by_year_lines(by_year=by_year, months_note="January to August")]
-    lines += ["", *geometry_lines(sites=_pv_sites(), noun="solar farms")]
+    lines += ["", *geometry_lines(sites=pv_sites(), noun="solar farms")]
     return "\n".join(lines) + "\n"
 
 

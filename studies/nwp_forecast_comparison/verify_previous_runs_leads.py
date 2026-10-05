@@ -70,7 +70,9 @@ from studies.timestamp_checks import (
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-from build_dataset import _pv_sites  # the private solar roster, for coordinates read at run time
+from studies.pv_dataset import (
+    pv_sites,  # the private solar roster, for coordinates read at run time
+)
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -606,7 +608,7 @@ def run_v3(*, output_dir: Path) -> None:
     Args:
         output_dir: Where `v3_conventions.md` is written.
     """
-    sites = _pv_sites().select("site", "latitude", "longitude").sort("site")
+    sites = pv_sites().select("site", "latitude", "longitude").sort("site")
     lines = [
         (
             f"Clear-sky check on `{V3_RADIATION_COLUMN}` (median over {sites.height} solar sites "

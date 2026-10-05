@@ -31,7 +31,6 @@ from typing import Final
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
-from build_dataset import _wind_sites
 from fetch_wind_point import output_path_for
 from figure_numbers import WIND_FIGURE_NUMBERS, wind_figure_number, wind_figure_title
 from studies.charts import (
@@ -45,6 +44,7 @@ from studies.charts import (
     report_errors,
     select_contrasts,
 )
+from studies.pv_dataset import wind_sites
 from studies.sources import STUDY_DATA_DIR
 from weather_product_charts import (
     ASSETS_DIR,
@@ -744,7 +744,7 @@ def _models_work_frame() -> pl.DataFrame:
         One row per (site, time) the pooled run scored, carrying `power_mw` and
         `effective_capacity_mw`.
     """
-    return common_rows(frame=joined(sites=_wind_sites())).select(
+    return common_rows(frame=joined(sites=wind_sites())).select(
         "site", "time", "power_mw", "effective_capacity_mw"
     )
 

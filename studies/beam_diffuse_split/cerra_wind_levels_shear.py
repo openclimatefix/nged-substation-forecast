@@ -33,7 +33,6 @@ import sys
 from typing import Final
 
 import polars as pl
-from build_dataset import _wind_sites
 from cerra_wind_levels import (
     OUTPUT_DIR as SOURCE_DIR,
 )
@@ -49,6 +48,7 @@ from cerra_wind_levels import (
     read_wind,
 )
 from studies.guards import refuse_to_overwrite
+from studies.pv_dataset import wind_sites
 from studies.sources import STUDIES_DATA_DIR
 from weather_products import _mae
 
@@ -140,7 +140,7 @@ def _era_lines() -> list[str]:
     Returns:
         Markdown lines, header included.
     """
-    wind = read_wind(sites=_wind_sites())
+    wind = read_wind(sites=wind_sites())
     monthly = (
         wind.with_columns(month=pl.col("time").dt.strftime("%Y-%m"))
         .group_by("month")

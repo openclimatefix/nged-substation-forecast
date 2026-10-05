@@ -96,7 +96,6 @@ import h3.api.basic_int as h3_api
 import numpy as np
 import polars as pl
 from blend_products import SOLAR, _solar_frame
-from build_dataset import _pv_sites, _read_cams, nearest_era5_cell, read_era5
 from ens_forecast_horizons import (
     Steps,
     _clear_sky_arrays,
@@ -114,6 +113,7 @@ from studies.bootstrap import bootstrap_absolute
 from studies.charts import report_errors
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SEEDS, SENSITIVITY_HYPER_PARAMETERS
 from studies.guards import check_no_missing, refuse_to_overwrite
+from studies.pv_dataset import nearest_era5_cell, pv_sites, read_cams, read_era5
 from studies.resample import (
     DEFAULT_DAYLIGHT_FLOOR_W_M2,
     clear_sky_index_resample,
@@ -349,12 +349,12 @@ def _era5_and_cams_hourly() -> dict[str, pl.DataFrame]:
         `era5` and `cams`, each with `site`, `time` and `ghi_w_m2`.
     """
     era5 = read_era5(source="open-meteo")
-    cells = nearest_era5_cell(sites=_pv_sites(), era5=era5).select(
+    cells = nearest_era5_cell(sites=pv_sites(), era5=era5).select(
         "site", latitude="cell_latitude", longitude="cell_longitude"
     )
     return {
         "era5": cells.join(era5, on=["latitude", "longitude"]).select("site", "time", "ghi_w_m2"),
-        "cams": _read_cams(min_reliability=0.0).select("site", "time", "ghi_w_m2"),
+        "cams": read_cams(min_reliability=0.0).select("site", "time", "ghi_w_m2"),
     }
 
 
@@ -452,7 +452,7 @@ def _era5_three_by_three() -> pl.DataFrame:
     era5 = read_era5(source="open-meteo")
     latitudes = np.sort(era5["latitude"].unique().to_numpy())
     longitudes = np.sort(era5["longitude"].unique().to_numpy())
-    cells = nearest_era5_cell(sites=_pv_sites(), era5=era5)
+    cells = nearest_era5_cell(sites=pv_sites(), era5=era5)
     blocks = []
     for site, latitude, longitude in cells.select(
         "site", "cell_latitude", "cell_longitude"
@@ -490,7 +490,7 @@ def build_rows() -> pl.DataFrame:
     Raises:
         ValueError: If a (site, time) is duplicated, or an ENS column holds a missing value.
     """
-    sites = _pv_sites()
+    sites = pv_sites()
     base = _solar_frame().filter(pl.col("time") >= ENS_START)
     used_sites = sorted(base["site"].unique().to_list())
     members = _t3_members().filter(pl.col("site").is_in(used_sites))
@@ -1039,7 +1039,7 @@ def main() -> int:
     )
     arguments = parser.parse_args()
 
-    sites = _pv_sites()
+    sites = pv_sites()
     frame = build_rows()
     _LOG.info("%d rows, %s to %s", frame.height, frame["time"].min(), frame["time"].max())
 
