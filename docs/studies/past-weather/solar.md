@@ -1783,9 +1783,10 @@ extra models, a throwaway download not scripted with its own command
 control" and skips each model's row. The extra row set's report lands in
 `past_weather_v2/solar_all/report.md`.
 
-The ENS row set's `ens_past_solar.py` reads `data/studies/downloads/NWP/ENS_SITE_EXTRACT/beam_diffuse_ens.parquet` (no
-fetch needed) and the saved solar dataset that `weather_products.py` writes, and writes its report
-to `past_weather_v2/ens_past_solar/report.md`. `--report-only` rebuilds the report from the saved
+The ENS row set's `ens_past_solar.py` reads
+`data/studies/downloads/NWP/ENS_SITE_EXTRACT/site_points/beam_diffuse_ens.parquet` (no fetch needed)
+and the saved solar dataset that `weather_products.py` writes, and writes its report to
+`past_weather_v2/ens_past_solar/report.md`. `--report-only` rebuilds the report from the saved
 losses without refitting, checking a fingerprint against what a fresh run would now fit.
 
 The CERRA script `cerra_past_solar.py` reads the CERRA files under `data/studies/downloads/reanalysis/CERRA/`,
