@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import polars as pl
 import pytest
+from studies.commissioning import SETTLED_OUTPUT_FROM
 from studies.cross_validation import N_FOLDS, UKV_UPGRADE_MONTH
 
 from studies import solar_product_frames
@@ -28,27 +29,42 @@ def test_eras_split_at_the_ukv_upgrade_month_and_folds_are_cut_within_each_era()
         assert sorted(set(folds)) == list(range(N_FOLDS))
 
 
-def test_common_rows_drops_zero_half_hour_hours_the_corrupt_block_and_the_upgrade_tail(
+def test_common_rows_drops_zero_half_hour_hours_the_corrupt_block_the_upgrade_tail_and_the_ramp(
     monkeypatch: pytest.MonkeyPatch,
 ):
     start, end = solar_product_frames.ICON_EU_CORRUPT_BLOCK
+    ramp_site, settled_from = next(iter(SETTLED_OUTPUT_FROM.items()))
     times = {
         "kept": datetime(2025, 5, 1, 12, tzinfo=UTC),
         "zero_hour": datetime(2025, 5, 1, 13, tzinfo=UTC),
-        "corrupt_block": start + timedelta(hours=1),
+        "corrupt_block_start": start,
+        "corrupt_block_end": end,
         "after_corrupt_block": end + timedelta(hours=1),
+        "upgrade_day": solar_product_frames.UPGRADE_DAY,
         "upgrade_tail": solar_product_frames.UPGRADE_DAY + timedelta(days=3),
         "february": datetime(2026, 2, 1, tzinfo=UTC),
     }
-    frame = pl.DataFrame({"site": ["A"] * len(times), "time": list(times.values())})
+    frame = pl.DataFrame({"site": ["A"] * len(times), "time": list(times.values())}).vstack(
+        pl.DataFrame(
+            {
+                "site": [ramp_site, ramp_site],
+                "time": [settled_from - timedelta(days=1), settled_from + timedelta(days=1)],
+            }
+        )
+    )
     hourly = pl.DataFrame(
-        {"site": ["A"], "time": [times["zero_hour"]], "has_zero_half_hour": [True]}
+        {
+            "site": ["A", "A"],
+            "time": [times["zero_hour"], times["kept"]],
+            "has_zero_half_hour": [True, False],
+        }
     )
     monkeypatch.setattr(solar_product_frames, "pv_sites", pl.DataFrame)
     monkeypatch.setattr(solar_product_frames, "solar_hourly_power", lambda *, sites: hourly)
 
     result = solar_product_frames.common_rows(frame=frame)
 
-    assert result["time"].to_list() == sorted(
+    assert result.filter(site="A")["time"].to_list() == sorted(
         [times["kept"], times["after_corrupt_block"], times["february"]]
     )
+    assert result.filter(site=ramp_site)["time"].to_list() == [settled_from + timedelta(days=1)]

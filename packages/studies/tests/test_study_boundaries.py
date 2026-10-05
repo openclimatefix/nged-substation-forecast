@@ -176,12 +176,15 @@ def test_an_import_of_a_script_in_another_folder_is_a_crossing_and_one_in_the_sa
             "alpha/one.py": "import two\nimport sibling\nimport numpy\n",
             "alpha/sibling.py": "",
             "beta/two.py": "from sibling import x\n",
+            "beta/three.py": "import numpy, _private\nimport two.sub\n",
+            "alpha/_private.py": "",
             "era_fold_design/frozen.py": "import one\n",
         },
     )
 
     assert crossing_imports(studies_dir=tmp_path) == {
         "alpha/one.py": ["two"],
+        "beta/three.py": ["_private"],
         "beta/two.py": ["sibling"],
     }
 
@@ -194,6 +197,7 @@ def test_every_form_of_path_mutation_and_path_loading_is_found(tmp_path: Path):
             "alpha/b.py": "import sys\nsys.path[:0] = ['.']\n",
             "alpha/c.py": "import site\nsite.addsitedir('.')\n",
             "alpha/d.py": "import importlib.util as u\nu.spec_from_file_location('a', 'b')\n",
+            "alpha/f.py": "import importlib\nimportlib.util.spec_from_file_location('a', 'b')\n",
             "alpha/e.py": "import sys\nprint(len(sys.argv))\n",
         },
     )
@@ -203,6 +207,7 @@ def test_every_form_of_path_mutation_and_path_loading_is_found(tmp_path: Path):
         "alpha/b.py": ["sys.path"],
         "alpha/c.py": ["site.addsitedir"],
         "alpha/d.py": ["spec_from_file_location"],
+        "alpha/f.py": ["spec_from_file_location"],
     }
 
 
@@ -219,12 +224,16 @@ def test_a_package_module_importing_a_scripts_bare_name_is_reported(tmp_path: Pa
     _write(root=tmp_path / "studies", files={"alpha/one.py": ""})
     _write(
         root=tmp_path / "src",
-        files={"studies/bad.py": "from one import y\n", "studies/good.py": "import polars\n"},
+        files={
+            "studies/bad.py": "from one import y\n",
+            "studies/good.py": "import polars\n",
+            "studies/nested/deeper.py": "import numpy, one\n",
+        },
     )
 
     assert package_imports_of_scripts(
         studies_dir=tmp_path / "studies", package_src_dir=tmp_path / "src"
-    ) == {"studies/bad.py": ["one"]}
+    ) == {"studies/bad.py": ["one"], "studies/nested/deeper.py": ["one"]}
 
 
 def test_production_code_importing_studies_or_a_script_is_reported(tmp_path: Path):
@@ -232,12 +241,17 @@ def test_production_code_importing_studies_or_a_script_is_reported(tmp_path: Pat
     _write(root=tmp_path / "packages" / "studies", files={"src/studies/x.py": "import one\n"})
     _write(
         root=tmp_path / "packages" / "other",
-        files={"src/other/a.py": "import studies\n", "src/other/b.py": "import one\n"},
+        files={
+            "src/other/a.py": "import studies\n",
+            "src/other/b.py": "import one\n",
+            "src/other/c.py": "import studies.sources\n",
+        },
     )
     _write(root=tmp_path / "src", files={"app/c.py": "from studies.sources import X\nimport os\n"})
 
     assert production_imports_of_studies(repo_root=tmp_path) == {
         "packages/other/src/other/a.py": ["studies"],
         "packages/other/src/other/b.py": ["one"],
+        "packages/other/src/other/c.py": ["studies"],
         "src/app/c.py": ["studies"],
     }

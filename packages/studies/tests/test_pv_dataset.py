@@ -3,6 +3,13 @@ from pathlib import Path
 
 import polars as pl
 import pytest
+from studies.anonymise import (
+    LABEL_PERMUTATION_SEED,
+    SITE_LABELS,
+    WIND_LABEL_PERMUTATION_SEED,
+    WIND_SITE_LABELS,
+    site_labels_for,
+)
 
 from studies import pv_dataset
 
@@ -11,14 +18,19 @@ START = datetime(2024, 1, 1, tzinfo=UTC)
 
 
 def _serve_tables(
-    *, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, series: dict[int, tuple[str, int, float]]
+    *,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    series: dict[int, tuple[str, int, list[float]]],
 ) -> None:
     """Point the roster readers at synthetic tables.
 
     Args:
         monkeypatch: The pytest fixture, used to swap the metadata path and the Delta scan.
         tmp_path: Where the metadata parquet is written.
-        series: For each `time_series_id`, its technology, its row count and its capacity.
+        series: For each `time_series_id`, its technology, its row count, and its capacities from
+            the oldest to the newest, each one day after the last. An empty list means the
+            capacity table holds nothing for the series.
     """
     metadata_path = tmp_path / "metadata.parquet"
     pl.DataFrame(
@@ -36,12 +48,19 @@ def _serve_tables(
             ],
         }
     )
+    capacity_rows = [
+        (identifier, START + timedelta(days=day), value)
+        for identifier, (_, _, capacities) in series.items()
+        for day, value in reversed(list(enumerate(capacities)))
+    ]
     capacity = pl.DataFrame(
-        {
-            "time_series_id": list(series),
-            "time": [START] * len(series),
-            "effective_capacity_mw": [capacity for _, _, capacity in series.values()],
-        }
+        capacity_rows,
+        schema={
+            "time_series_id": pl.Int64,
+            "time": pl.Datetime("us", "UTC"),
+            "effective_capacity_mw": pl.Float64,
+        },
+        orient="row",
     )
     tables = {
         pv_dataset.POWER_DELTA_URI: power.lazy(),
@@ -51,32 +70,40 @@ def _serve_tables(
     monkeypatch.setattr(pl, "scan_delta", lambda uri, **_: tables[str(uri)])
 
 
-def test_the_pv_roster_labels_the_long_enough_pv_series_and_leaves_out_wind_and_short_series(
+def test_the_pv_roster_labels_the_long_enough_pv_series_with_their_latest_capacity(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
-    series = {identifier: ("PV", MIN_ROWS + 1, 10.0 + identifier) for identifier in range(1, 7)}
-    series[7] = ("PV", MIN_ROWS - 1, 5.0)
-    series[8] = ("Wind", MIN_ROWS + 1, 7.0)
+    series = {
+        identifier: ("PV", MIN_ROWS + 1, [99.0, 10.0 + identifier]) for identifier in range(1, 7)
+    }
+    series[7] = ("PV", MIN_ROWS - 1, [5.0])  # too little history
+    series[8] = ("Wind", MIN_ROWS + 1, [7.0])  # wrong technology
+    series[9] = ("PV", MIN_ROWS + 1, [])  # no capacity recorded
     _serve_tables(monkeypatch=monkeypatch, tmp_path=tmp_path, series=series)
 
     roster = pv_dataset.pv_sites()
 
     assert roster["time_series_id"].to_list() == [1, 2, 3, 4, 5, 6]
-    assert sorted(roster["site"].to_list()) == ["A", "B", "C", "D", "E", "F"]
     assert roster["effective_capacity_mw"].to_list() == [11.0, 12.0, 13.0, 14.0, 15.0, 16.0]
+    expected_labels = site_labels_for(
+        eligible_ids=[1, 2, 3, 4, 5, 6], labels=SITE_LABELS, seed=LABEL_PERMUTATION_SEED
+    )
+    assert dict(roster.select("time_series_id", "site").iter_rows()) == expected_labels
 
 
-def test_the_wind_roster_labels_only_the_wind_series(
+def test_the_wind_roster_labels_only_the_wind_series_with_the_wind_seed(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
-    series = dict.fromkeys(range(1, 4), ("Wind", MIN_ROWS + 1, 3.0))
-    series[4] = ("PV", MIN_ROWS + 1, 5.0)
+    series = {identifier: ("Wind", MIN_ROWS + 1, [3.0]) for identifier in range(1, 4)}
+    series[4] = ("PV", MIN_ROWS + 1, [5.0])
     _serve_tables(monkeypatch=monkeypatch, tmp_path=tmp_path, series=series)
 
     roster = pv_dataset.wind_sites()
 
-    assert roster["time_series_id"].to_list() == [1, 2, 3]
-    assert sorted(roster["site"].to_list()) == ["W1", "W2", "W3"]
+    expected_labels = site_labels_for(
+        eligible_ids=[1, 2, 3], labels=WIND_SITE_LABELS, seed=WIND_LABEL_PERMUTATION_SEED
+    )
+    assert dict(roster.select("time_series_id", "site").iter_rows()) == expected_labels
 
 
 def test_hourly_power_is_period_ending_and_covers_only_the_roster(

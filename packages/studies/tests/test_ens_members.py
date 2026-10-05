@@ -56,13 +56,14 @@ def test_the_solar_mean_averages_the_members():
     hourly = _members(
         rows=[
             {"member": 0, "ghi": 10.0, "temp": 5.0},
-            {"member": 1, "ghi": 30.0, "temp": 7.0},
+            {"member": 1, "ghi": 10.0, "temp": 5.0},
+            {"member": 2, "ghi": 70.0, "temp": 11.0},
         ]
     )
 
-    result = ens_members.reduce_members(hourly=hourly, domain="solar", way="mean", ensemble_size=2)
+    result = ens_members.reduce_members(hourly=hourly, domain="solar", way="mean", ensemble_size=3)
 
-    assert result.select("ghi", "temp").row(0) == (20.0, 6.0)
+    assert result.select("ghi", "temp").row(0) == (30.0, 7.0)
 
 
 def test_the_wind_mean_direction_is_the_mean_wind_vectors_not_the_mean_of_directions():
@@ -123,3 +124,51 @@ def test_long_frame_keys_each_value_by_site_run_time_and_member():
         (1, RUN + timedelta(hours=1), 20.0),
         (1, RUN + timedelta(hours=2), 21.0),
     ]
+
+
+def test_clear_sky_arrays_average_the_table_over_each_step_and_read_it_at_each_target_hour():
+    run = datetime(2025, 5, 1)
+    keys = pl.DataFrame({"site": ["A", "A"], "init_time": [run, run], "ensemble_member": [0, 1]})
+    steps = ens_members.Steps(
+        keys=keys,
+        leads=np.array([3, 6]),
+        widths=np.array([3, 3]),
+        values={},
+        ensemble_size=2,
+    )
+    # Each hour's clear-sky value is its lead, so a three-hour step's mean is its middle hour.
+    clear_sky = pl.DataFrame(
+        {
+            "site": ["A"] * 6,
+            "time": [run + timedelta(hours=hour) for hour in range(1, 7)],
+            "clear_sky_w_m2": [float(hour) for hour in range(1, 7)],
+        }
+    )
+
+    step_clear_sky, target_clear_sky = ens_members.clear_sky_arrays(
+        steps=steps, targets=np.array([2, 5]), clear_sky=clear_sky
+    )
+
+    np.testing.assert_allclose(step_clear_sky, [[2.0, 5.0], [2.0, 5.0]])
+    np.testing.assert_allclose(target_clear_sky, [[2.0, 5.0], [2.0, 5.0]])
+
+
+def test_clear_sky_arrays_refuse_a_run_whose_hours_are_missing_from_the_table():
+    run = datetime(2025, 5, 1)
+    steps = ens_members.Steps(
+        keys=pl.DataFrame({"site": ["A"], "init_time": [run], "ensemble_member": [0]}),
+        leads=np.array([3]),
+        widths=np.array([3]),
+        values={},
+        ensemble_size=1,
+    )
+    clear_sky = pl.DataFrame(
+        {
+            "site": ["A"],
+            "time": [run + timedelta(hours=1)],
+            "clear_sky_w_m2": [1.0],
+        }
+    )
+
+    with pytest.raises(ValueError, match="clear-sky"):
+        ens_members.clear_sky_arrays(steps=steps, targets=np.array([2]), clear_sky=clear_sky)

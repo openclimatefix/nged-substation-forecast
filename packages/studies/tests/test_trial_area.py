@@ -10,15 +10,17 @@ from studies import trial_area
 
 
 def test_the_grid_covers_the_box_with_one_point_per_spacing_step():
-    box = TrialAreaBox(lat_min=52.0, lat_max=52.2, lon_min=-1.0, lon_max=-0.8)
+    box = TrialAreaBox(lat_min=52.0, lat_max=52.2, lon_min=-1.0, lon_max=-0.6)
 
     points = box.grid_points(spacing_deg=0.1)
 
     assert points.columns == ["point_id", "latitude", "longitude"]
-    assert points.height == 9
+    assert points.height == 15
     assert points["latitude"].unique().sort().to_list() == pytest.approx([52.0, 52.1, 52.2])
-    assert points["longitude"].unique().sort().to_list() == pytest.approx([-1.0, -0.9, -0.8])
-    assert points["point_id"].to_list() == list(range(9))
+    assert points["longitude"].unique().sort().to_list() == pytest.approx(
+        [-1.0, -0.9, -0.8, -0.7, -0.6]
+    )
+    assert points["point_id"].to_list() == list(range(15))
 
 
 def test_the_box_written_from_a_roster_is_widened_by_the_margin_and_read_back(
