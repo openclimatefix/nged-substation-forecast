@@ -1,8 +1,11 @@
 """Which irradiance sources the experiment runs on, and what each Open-Meteo model serves.
 
-One-off throwaway module for the experiment in
+Written for the experiment in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/784> and its UKV extension in
-<https://github.com/openclimatefix/nged-substation-forecast/issues/800>.
+<https://github.com/openclimatefix/nged-substation-forecast/issues/800>. Scripts in
+`studies/beam_diffuse_split/`, `studies/nwp_forecast_comparison/`,
+`studies/open_meteo_ensemble_means/`, `studies/past_weather/`, and `studies/weather_downloads/`
+import it.
 
 `SOURCE_CHOICES` is the single copy of the source list, imported by every `argparse` parser that
 offers `--source`. A further Open-Meteo model needs its own entries in `SourceType`,
@@ -358,15 +361,13 @@ reads and does not own.
 DOWNLOADS_DIR: Final[Path] = STUDIES_DATA_DIR
 """The layer of `data/studies/` that holds shared downloads, one folder per kind of data.
 
-Every folder a study downloads into is built from this constant, so the layer can move without
-editing each script.
+Equal to `STUDIES_DATA_DIR` until the data moves. No script reads this constant yet.
 """
 
 PER_STUDY_DIR: Final[Path] = STUDIES_DATA_DIR
 """The layer of `data/studies/` that holds one folder per study.
 
-Every study's own folder is built from this constant, so the layer can move without editing each
-script.
+Equal to `STUDIES_DATA_DIR` until the data moves. No script reads this constant yet.
 """
 
 WEATHER_DATA_DIR: Final[Path] = STUDIES_DATA_DIR / "weather"
