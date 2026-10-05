@@ -6,15 +6,18 @@ live forecasting, eligibility, and effective capacity — scans the raw `power_t
 table directly, so a cleaning function today would have to be wired into five places by hand, and
 nothing would report what it removed.
 
-**The planned solution.** Add two functions in a new module `nged_data.cleaning`.
-`clean_power_time_series` takes a lazy `PowerTimeSeries` frame, applies an ordered tuple of plain
-cleaning functions (empty today, so the frame passes through unchanged), and returns the cleaned
-lazy frame. `power_cleaning_stats` compares the raw and cleaned frames and returns a small
-dictionary of counts: rows and series in, rows and series out. Five assets that read power call the
-first at read time, and four of them add the counts to their own Dagster output metadata. The raw
-table is never rewritten and no new table is created. The production caller, `live_forecasts`, wraps
-the call so that a failing cleaning function degrades the slot to raw power and reports to Sentry;
-the research callers let the exception propagate and fail the run.
+**The planned solution.** Add a new module `nged_data.cleaning` holding an ordered tuple of
+cleaning steps, empty today. Each step pairs a cleaning function (a lazy power frame in, a lazy
+power frame out) with an optional logging function. `clean_power_time_series` applies the steps in
+order and stays lazy, so with no steps the frame passes through unchanged. `power_cleaning_stats`
+reports, per step, how many rows the step dropped, how many series it touched, and the time range
+it dropped, plus whatever the step's own logging function computes from the rows it dropped (for
+example the min and max of the extreme values removed). All of it is one lazy query collected once.
+Five assets that read power call the cleaning at read time, and four add the stats to their own
+Dagster output metadata. The raw table is never rewritten and no new table is created. In
+production, `live_forecasts` guards the cleaning and the stats separately: a failing cleaning
+function falls back to raw power, a failing logging function loses only the stats, and both report
+to Sentry. The research assets let either exception propagate and fail the run.
 
 ## Verdict, size and departures
 
@@ -37,9 +40,10 @@ Complex buys both plan reviews (simplicity, then correctness) and both diff revi
 
 - The issue speaks of a cleaning "asset". The plan makes it a read-time step, not an asset — see the
   next section for why.
+
 - The issue describes one function that both cleans and reports. The plan splits those into two
   functions, so a caller that runs the cleaning many times on the same window
-  (`cv_power_forecasts`, once per `init_time` chunk) does not pay for the counts each time.
+  (`cv_power_forecasts`, once per `init_time` chunk) does not compute the stats each time.
 
 ## Decision: a read-time step, not a materialised cleaned-power asset
 
@@ -74,29 +78,52 @@ first open question below.
 
 ### `packages/nged_data/src/nged_data/cleaning.py` (new)
 
-- `PowerCleaningFunction` — a type alias for
-  `Callable[[pt.LazyFrame[PowerTimeSeries]], pt.LazyFrame[PowerTimeSeries]]`. The interface a
-  colleague drops a function into: take a lazy power frame, return a lazy power frame with rows
-  dropped (or values changed), no other side effects, no `collect`.
-- `POWER_CLEANING_FUNCTIONS: Final[tuple[PowerCleaningFunction, ...]] = ()` — the ordered registry.
-  Adding a cleaning rule means writing a function and appending it here. The docstring states the
-  row-local constraint from the decision above.
-- `clean_power_time_series(power, cleaning_functions=None) -> pt.LazyFrame[PowerTimeSeries]` —
-  applies each function in order and stays lazy. `None` resolves to `POWER_CLEANING_FUNCTIONS` at
-  call time, so a test can monkeypatch the module attribute.
-- `power_cleaning_stats(raw, cleaned) -> dict[str, int]` — one `pl.collect_all(...,
-  engine="streaming")` over `select(pl.len(), pl.col("time_series_id").n_unique())` on each frame.
-  The query is an aggregate, not a materialisation, so principle 11 holds. Keys:
-  `power_cleaning/n_rows_in`, `power_cleaning/n_rows_out`, `power_cleaning/n_time_series_in`, and
-  `power_cleaning/n_time_series_out`. Flat string keys go straight into
-  `context.add_output_metadata`, and the prefix keeps them clear of each asset's existing keys
-  (Dagster raises on a duplicate key).
+**The interface a colleague writes against is a cleaning step: a cleaning function, optionally
+paired with a logging function.**
 
-Rows dropped per cleaning function is deliberately left out until the first function exists: with
-an empty registry there is nothing to attribute, and attribution is the largest piece of logic the
-module would otherwise carry. It can be added then, together with the delivery table of data
-problems, without changing the `PowerCleaningFunction` signature — an anti-join of each stage
-against the one before yields the rows each function removed.
+- `PowerCleaningStep` — a frozen dataclass with two fields:
+    - `clean: Callable[[pt.LazyFrame[PowerTimeSeries]], pt.LazyFrame[PowerTimeSeries]]` — takes a
+      lazy power frame and returns one with rows dropped or values changed. No side effects and no
+      `collect`, and it must be deterministic, because `power_cleaning_stats` re-applies it to
+      build the frames it compares. The step's name is `clean.__name__`, so a `lambda` is not
+      allowed (its name would be `<lambda>`).
+    - `summarise: Callable[[CleaningStepFrames], pl.LazyFrame] | None = None` — the optional
+      logging function. It returns a lazy query that collects to exactly one row; each column
+      becomes one metadata entry. Returning a lazy query rather than Python values is what lets
+      every step's summary run in one collect, and stops a logging function forcing the data into
+      memory on its own.
+- `CleaningStepFrames` — a frozen dataclass of three lazy frames, the logging function's input:
+    - `before` — the frame going into this step.
+    - `after` — the frame coming out.
+    - `dropped` — the rows of `before` whose `(time_series_id, time)` key is absent from `after`
+      (an anti-join). Most logging functions read only `dropped`; `before` and `after` are there
+      for a step that changes values rather than dropping rows, whose logging function joins the
+      two to summarise the change.
+- `POWER_CLEANING_STEPS: Final[tuple[PowerCleaningStep, ...]] = ()` — the ordered registry. Adding a
+  cleaning rule means writing a function (and optionally a logging function) and appending a step
+  here. The docstring states the row-local constraint from the decision above.
+- `clean_power_time_series(power, steps=None) -> pt.LazyFrame[PowerTimeSeries]` — applies each
+  step's `clean` in order and stays lazy. `None` resolves to `POWER_CLEANING_STEPS` at call time, so
+  a test can monkeypatch the module attribute.
+- `power_cleaning_stats(power, steps=None) -> dict[str, int | float | str | bool]` — takes the raw
+  frame, rebuilds each step's `CleaningStepFrames`, and runs one `pl.collect_all` over:
+    - the whole run: `power_cleaning/n_rows_in`, `power_cleaning/n_rows_out`,
+      `power_cleaning/n_time_series_in`, and `power_cleaning/n_time_series_out`;
+    - every step, built in, whether or not it has a logging function:
+      `power_cleaning/<step>/n_rows_dropped`, `power_cleaning/<step>/n_time_series_affected`, and
+      `power_cleaning/<step>/first_time_dropped` and `.../last_time_dropped` as ISO-8601 strings
+      (empty when nothing was dropped);
+    - every step's logging function, if it has one: `power_cleaning/<step>/<column>` per column.
+
+  The flat string keys go straight into `context.add_output_metadata`, and the prefix keeps them
+  clear of each asset's existing keys (Dagster raises on a duplicate key). The function raises
+  `ValueError` on our own bugs: two steps sharing a name, a logging function whose result is not
+  exactly one row, or a logging-function column colliding with a built-in key. Every value is
+  aggregated, so principle 11 holds; the anti-joins are the cost, one per step over the caller's
+  read window.
+
+Because each step's `dropped` frame is labelled by the step's name, the later delivery table of data
+problems can be built from those frames without changing the interface.
 
 `nged_data` is the home because the step cleans NGED's telemetry and the package already depends on
 `contracts`. A new package is only worth it if the cleaning functions grow dependencies (`scipy`, a
@@ -107,13 +134,15 @@ solar-geometry library) that `nged_data` should not carry; that is cheap to do l
 Out of bounds and untouched: `metrics` and its helpers (#958).
 
 - `trained_cv_model`: call `clean_power_time_series` on the frame `load_engineering_inputs`
-  returns, and merge `power_cleaning_stats(raw, cleaned)` into the existing `add_output_metadata`
-  call.
+  returns, and merge `power_cleaning_stats` of that raw frame into the existing
+  `add_output_metadata` call.
 - `cv_power_forecasts`: call `clean_power_time_series` inside the `init_time` chunk loop and report
-  no counts. The power window is the validation window in every chunk, and `trained_cv_model`
-  already reports the training window's counts.
+  no stats. The power window is the validation window in every chunk, and `trained_cv_model`
+  already reports the training window's stats.
 - `effective_capacity`: clean the full-table scan before `compute_effective_capacity`; merge the
-  counts.
+  stats. This is the one caller whose stats query runs over the whole table, so each step's
+  anti-join runs over the whole table too.
+
 - `eligible_time_series`: today it calls `nged_data.storage.time_series_coverage(path)`, which scans
   the path itself. Split that function: a new `coverage_from_power(power: pl.LazyFrame)` holds the
   `group_by` + streaming `collect`, and `time_series_coverage(path)` keeps its existence check and
@@ -129,23 +158,30 @@ No `try` in any of these: an exception from a cleaning function propagates and f
 
 ### `src/nged_substation_forecast/defs/live_forecast_assets.py` (production — degrade)
 
-- Right after `load_engineering_inputs`, an inline `try` block, copying the shape of the existing
-  control-member guard (the same `BaseException` catch, re-raising `KeyboardInterrupt`,
-  `SystemExit`, and `DagsterExecutionInterruptedError`). No shared helper for the two guards: two
-  short inline blocks read more clearly than an abstraction with one reuse.
-    - Inside the guard: call `clean_power_time_series`, collect the cleaned frame and re-wrap it as
-      lazy, then call `power_cleaning_stats`. The collect means a cleaning function that only fails
-      at collect time fails *inside* the guard rather than later in `predict`. The live power
-      window is 15 days of the trained series, a few MB at V2's 2,500 series, so this one collect is
-      a deliberate exception to principle 11.
-    - On failure: log with `context.log.exception("Power cleaning failed; forecasting this slot
-      from uncleaned power")`, so the log names the cleaning step rather than only the exception
-      type. The guard also covers the raw Delta read the collect triggers, so an object-store fault
-      during that read is reported the same way, which the log message has to allow for. Then call
+**Two guards, not one, so a failing logging function costs the stats and never the cleaning.**
+Logging is not what the forecast depends on: a bug in a logging function that switched the live
+forecast to raw power would degrade the forecast for a fault that has nothing to do with the
+forecast. Both guards sit right after `load_engineering_inputs` and copy the shape of the existing
+control-member guard (the same `BaseException` catch, re-raising `KeyboardInterrupt`,
+`SystemExit`, and `DagsterExecutionInterruptedError`). No shared helper for the three guards: short
+inline blocks read more clearly than an abstraction.
+
+- **Cleaning guard.** Call `clean_power_time_series`, collect the cleaned frame and re-wrap it as
+  lazy. The collect means a cleaning function that only fails at collect time fails *inside* the
+  guard rather than later in `predict`. The live power window is 15 days of the trained series, a
+  few MB at V2's 2,500 series, so this one collect is a deliberate exception to principle 11.
+    - On failure: `context.log.exception("Power cleaning failed; forecasting this slot from
+      uncleaned power")`. The guard also covers the raw Delta read the collect triggers, so the
+      message must not claim the cleaning function was at fault. Then call
       `report_asset_degradation(asset_name="live_forecasts", exc=exc)`, carry on with the raw
-      frame, and set `power_cleaning/degraded: True`.
-- On success the metadata carries `power_cleaning/degraded: False` and the counts, merged into the
-  existing `add_output_metadata` call.
+      frame, set `power_cleaning/degraded: True`, and skip the stats guard.
+- **Stats guard**, run only when cleaning succeeded. Call `power_cleaning_stats` on the raw frame.
+    - On failure: `context.log.exception("Power cleaning statistics failed; the slot was still
+      forecast from cleaned power")`, call `report_asset_degradation(asset_name="live_forecasts",
+      exc=exc)`, and set `power_cleaning/stats_failed: True` in place of the stats.
+- On success the metadata carries `power_cleaning/degraded: False`, `power_cleaning/stats_failed:
+  False`, and the stats, merged into the existing `add_output_metadata` call.
+
 - The forecast rows record no degradation flag: `PowerForecast` has no degradation column today, and
   adding one is a contract change outside this issue. The degradation is recorded in Sentry and the
   materialisation metadata, as the control-member probe does.
@@ -158,29 +194,47 @@ loader keeps returning raw power.
 ## Design-philosophy check
 
 - **Production degrades, research fails fast** (inherent-stability rules 1 and 7): `live_forecasts`
-  catches, falls back to raw power, logs, and reports with the `degraded_asset=live_forecasts` tag
-  (principle 16 — the telemetry names the asset). The research assets have no guard.
+  falls back to raw power when cleaning fails, drops only the stats when logging fails, logs, and
+  reports with the `degraded_asset=live_forecasts` tag (principle 16 — the telemetry names the
+  asset, and the log message names which of the two steps failed). The research assets have no
+  guard.
+
 - **No asset check is added.** The counts go to output metadata. A `WARN`/`blocking=False` check
   would need the counts persisted somewhere a separate op can read them, and nothing yet defines a
   threshold to warn at. When the delivery table of data problems exists, a check over it is the
   natural place for a warning.
 - **Principle 3 (one execution path)**: research and production call the same
   `clean_power_time_series`; only the failure handling differs.
-- **Principle 11**: the counts are aggregates; the one `collect` is the live path's degrade guard,
-  stated above.
+
+- **Principle 11**: the stats are aggregates collected once; the one `collect` of a frame is the
+  live cleaning guard's, stated above.
+
 - **Principle 15**: honoured by cleaning at read time.
 
 ## Tests
 
 In `packages/nged_data/tests/test_cleaning.py` (new):
 
-- `test_no_cleaning_functions_returns_input_unchanged` — the cleaned frame equals the input and
+- `test_no_cleaning_steps_returns_input_unchanged` — the cleaned frame equals the input and
   `n_rows_in == n_rows_out`. Fails on `main` because the module does not exist; it pins the
   identity default the issue asks for.
-- `test_cleaning_functions_run_in_order` — two injected functions where the second only has an
-  effect if the first ran before it; asserts the result.
-- `test_stats_count_rows_and_series_removed` — an injected function dropping two rows of one series
-  and every row of another; asserts all four counts.
+- `test_cleaning_steps_run_in_order` — two injected steps where the second only has an effect if the
+  first ran before it; asserts the result.
+- `test_rows_dropped_are_attributed_to_each_step` — a step dropping zeros, then a step dropping
+  values outside a plausible range whose lower bound is above zero, on data where one series has
+  two zeros and another has one extreme value.
+  Asserts each step's `n_rows_dropped`, `n_time_series_affected`, and first and last dropped time,
+  and the run's four totals. Would fail if `dropped` were computed against the raw frame rather than
+  the step's own `before`, which would double-count a row both steps match; the data includes such
+  a row (a zero, which the second step's range also excludes) to pin that.
+- `test_a_logging_function_summarises_the_rows_its_step_dropped` — the extreme-value step paired
+  with a logging function returning the min and max of `dropped.power`; asserts both metadata
+  values.
+- `test_a_logging_function_sees_values_a_step_changed` — a step that clips values rather than
+  dropping rows, with a logging function joining `before` to `after` to count changed rows; asserts
+  `n_rows_dropped == 0` and the changed count.
+- `test_power_cleaning_stats_rejects_our_own_bugs` — parametrised over the three `ValueError` cases:
+  duplicate step names, a two-row summary, and a summary column named `n_rows_dropped`.
 
 In `packages/nged_data/tests/test_storage.py`:
 
@@ -190,9 +244,10 @@ In `packages/nged_data/tests/test_storage.py`:
 In `tests/test_cv_assets.py`:
 
 - `test_effective_capacity_reads_cleaned_power` — monkeypatch
-  `nged_data.cleaning.POWER_CLEANING_FUNCTIONS` with a function dropping one series; assert the
-  `effective_capacity` table lacks that series and the materialisation metadata carries the drop
-  count. Fails on `main`: nothing applies the registry.
+  `nged_data.cleaning.POWER_CLEANING_STEPS` with a step dropping one series; assert the
+  `effective_capacity` table lacks that series and the materialisation metadata carries the step's
+  `n_rows_dropped`. Fails on `main`: nothing applies the registry.
+
 - `test_eligible_time_series_reads_cleaned_power` — same shape for eligibility, dropping series 1:
   the fixture makes only series 1 eligible for `FOLD_ID`, so dropping any other series would leave
   eligibility unchanged and the population assertion would pass on `main`.
@@ -206,16 +261,21 @@ In `tests/test_trained_cv_model.py`:
 
 In `tests/test_live_forecasts.py`:
 
-- `test_a_failing_cleaning_function_degrades_the_slot_instead_of_failing_it` — a raising function
-  (raising at collect time, via a `map_batches` that raises, to prove the guard's collect is what
-  catches it); assert forecasts are written, `report_asset_degradation` was called with
+- `test_a_failing_cleaning_function_degrades_the_slot_instead_of_failing_it` — a raising cleaning
+  function (raising at collect time, via a `map_batches` that raises, to prove the guard's collect
+  is what catches it); assert forecasts are written, `report_asset_degradation` was called with
   `asset_name="live_forecasts"`, and the metadata has `power_cleaning/degraded: True`. Modelled on
   `test_a_failing_control_member_probe_degrades_the_slot_instead_of_failing_it`. The test also
   proves the live wiring: if `live_forecasts` never called the cleaning, nothing would raise and
   `report_asset_degradation` would not be called.
-
+- `test_a_failing_logging_function_keeps_the_cleaned_power` — a step whose cleaning drops one
+  trained series and whose logging function raises. Assert forecasts are written,
+  `report_asset_degradation` was called, and the metadata has `power_cleaning/degraded: False` and
+  `power_cleaning/stats_failed: True`. Fails if the two guards are merged into one, because the
+  merged guard would set `degraded: True` and fall back to raw power.
 - The existing happy-path live test gains one assertion: the metadata carries
-  `power_cleaning/degraded: False` and equal in/out row counts.
+  `power_cleaning/degraded: False`, `power_cleaning/stats_failed: False`, and equal in/out row
+  counts.
 
 `cv_power_forecasts` gets no wiring test: the call is one line, it reports no counts, and a test
 would need a frame-level assertion on forecasts that weather-only features can produce without
@@ -223,9 +283,11 @@ power. The mutation-testing diff review should judge whether that is enough.
 
 ## Docs to update
 
-- `docs/roadmap/data-cleaning.md` — a short section saying where cleaning functions go
-  (`nged_data.cleaning.POWER_CLEANING_FUNCTIONS`), the row-local constraint, and that production
-  falls back to raw power on failure while research fails.
+- `docs/roadmap/data-cleaning.md` — a short section saying where cleaning steps go
+  (`nged_data.cleaning.POWER_CLEANING_STEPS`), what a logging function receives and returns, the
+  row-local constraint, and that production falls back to raw power when cleaning fails, and loses
+  only the stats when logging fails, while research fails.
+
 - `packages/nged_data/README.md` — one line for the new module, and one for `coverage_from_power`
   beside the existing `time_series_coverage` entry.
 - `TimeSeriesCoverage`'s docstring in `nged_data/storage.py`, which names CV eligibility as a
@@ -241,25 +303,27 @@ the `pymarkdown` scan), plus `pydoclint` and the docs-link checker as CI runs th
 ## Risks and open questions
 
 1. **Window-dependent cleaning functions.** Recommendation: state the row-local constraint in the
-   `PowerCleaningFunction` docstring now. When the first detector needs full history, it becomes a
+   `PowerCleaningStep` docstring now. When the first detector needs full history, it becomes a
    materialised asset of flagged rows (`power_data_problems`, computed over the whole table, which
    also feeds the delivery table), and the read-time step drops the flagged rows. That is a separate
    issue; this plan's interface does not block it.
+
 2. **Should `metrics` score against cleaned actuals?** Probably yes for rows that describe a plant
    that no longer exists (the commissioning ramp), but `metrics` belongs to #958. Recommendation:
    leave it untouched here and raise it on #958 or a follow-up issue.
 3. **Should `power_data_is_fresh` and the ingest de-duplication see cleaned power?** Recommendation:
    no — both are about what NGED delivered, not about what is fit to train on.
-4. **A cleaning function as a frame-to-frame function, or as a named "bad row" predicate?** The
-   simplicity review proposed `POWER_CLEANING_RULES: dict[str, pl.Expr]`, each expression True for
-   a row to drop (`.over("time_series_id")` allowed). Cleaning becomes one
-   `filter(~pl.any_horizontal(...))`; per-rule counts and the delivery table of data problems come
-   from one aggregate pass with the rule name attached. What it gives up: a rule cannot rewrite
-   values or join to another frame (the neighbour-median ramp detector in
-   `docs/roadmap/data-cleaning.md`). Recommendation: keep frame-to-frame functions, the more general
-   interface and the one the issue describes, unless whoever writes the cleaning functions finds
-   predicates fit everything they plan; this decides what they write, so it is their call.
-5. **Package home.** `nged_data.cleaning` unless the cleaning functions bring heavy dependencies;
+
+4. **Settled by the maintainer: frame-to-frame cleaning functions, each with an optional logging
+   function.** The simplicity review's alternative — each rule a named `pl.Expr` predicate — would
+   have made per-rule stats cheaper, but cannot change values or join to another frame. The
+   anti-join per step is the price of keeping both.
+5. **The stats on `effective_capacity` run one anti-join per step over the whole power table.**
+   Cheap today with no steps; at V2's 2,500 series and several steps it becomes the most expensive
+   part of that asset. Recommendation: measure when the first steps land, and drop
+   `effective_capacity`'s stats (keeping `trained_cv_model`'s) if they are slow.
+
+6. **Package home.** `nged_data.cleaning` unless the cleaning functions bring heavy dependencies;
    then a new `power_cleaning` package. Confirm with whoever is writing the functions.
 
 ## Review log
@@ -307,3 +371,11 @@ Confirmed by the reviewer, and so unchanged: the description of current code, th
 the module attribute reaches in-process materialisations, that a raising `map_batches` surfaces at
 the guard's collect, that `/` keys and mixed bool/int metadata work on Dagster 1.13, and that the
 change is a no-op with an empty registry.
+
+### Maintainer-directed redesign of the stats
+
+The maintainer asked for stats expressive enough to tell zeros dropped from extreme values dropped,
+and to summarise the extreme values themselves. Per-step attribution, which the simplicity review
+had deferred, is back, and each cleaning function can be paired with an optional logging function
+that receives `before`, `after`, and `dropped` for its step. The live path now has a second guard
+so a failing logging function costs only the stats.
