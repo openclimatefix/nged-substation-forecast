@@ -1,438 +1,260 @@
-# Plan: a power-cleaning hook in the Dagster pipeline (#1019)
+# Plan: a cleaned copy of NGED's power telemetry (#1019)
 
-**The problem.** Cleaning algorithms for NGED's power telemetry are being written now, and the
-pipeline has no place to put them. Every asset that reads observed power — training, CV prediction,
-live forecasting, eligibility, and effective capacity — scans the raw `power_time_series` Delta
-table directly, so a cleaning function today would have to be wired into five places by hand, and
-nothing would report what it removed.
+**The problem.** Cleaning rules for NGED's power telemetry are being written now, and the pipeline
+has no place to run them. Every asset that reads observed power — training, CV prediction, live
+forecasting, eligibility, and effective capacity — reads the raw `power_time_series` Delta table
+directly. There is nowhere to drop the first three months of a substation's data, a substation's
+false zeros, a physically implausible reading, or a generator's spurious zeros, and nothing to
+report what was dropped.
 
-**The planned solution.** Add a new module `nged_data.cleaning` holding an ordered tuple of cleaning
-steps, empty today. Each step pairs a cleaning function (a lazy power frame in, a lazy power frame
-out) with an optional logging function. `clean_power_time_series` applies the steps in order and
-stays lazy, so with no steps the frame passes through unchanged. `power_cleaning_stats` reports, per
-step, how many rows the step dropped and how many series it touched, plus whatever the step's own
-logging function computes from the rows it dropped (for example the min and max of the extreme
-values removed). All of it is collected in one `pl.collect_all` call. Five assets that read power
-call the cleaning at read time, and three (`trained_cv_model`, `effective_capacity`, and
-`live_forecasts`) add the stats to their own Dagster output metadata. The raw table is never
-rewritten and no new table is created. In production, `live_forecasts` guards the cleaning and the
-stats separately: a failing cleaning function falls back to raw power, a failing logging function
-loses only the stats, and both report to Sentry. The research assets let either exception propagate
-and fail the run.
+**The planned solution.** A new Dagster asset, `clean_nged_power_data`, runs in the hourly ingest
+job straight after `power_time_series_and_metadata`. It reads the whole raw power table and the
+`TimeSeriesMetadata` roster, passes both to one function, `nged_data.cleaning.flag_nged_power`, and
+writes the result over a new Delta table, `cleaned_power_time_series`. That table holds every raw
+row plus a nullable `drop_reason` column: null for a row that passed, otherwise the name of the rule
+that rejected it. Today `flag_nged_power` flags nothing. The asset reports, per drop reason, how
+many rows and series were flagged and the range of the flagged values, as Dagster output metadata.
+The power readers switch from the raw table to the cleaned table's unflagged rows. The raw table is
+never modified.
 
 ## Verdict, size and departures
 
-**Verdict: worth implementing, roughly as described.** The issue is current: no cleaning step exists
-anywhere (`docs/roadmap/data-cleaning.md` says versions 0.1 to 0.3 train on uncleaned telemetry
-apart from the timestamp repair at ingest).
+**Verdict: worth implementing.** No cleaning step exists anywhere: `docs/roadmap/data-cleaning.md`
+says versions 0.1 to 0.3 train on uncleaned telemetry apart from the timestamp repair at ingest.
 
 **Size: complex.** The five triggers:
 
-- What gets stored: **no** — read-time cleaning writes no new table and changes no contract.
-- The production serving path: **yes** — `live_forecasts` gains a call and a fallback.
-- A degradation rule: **yes** — a new degrade-on-failure path in production.
-- More than one defensible design: **yes** — a materialised cleaned-power asset is the obvious
-  alternative (settled below).
-- Callers not nameable without searching: no — the five read sites are named below.
+- What gets stored: **yes** — a new Delta table and a new Patito contract,
+  `CleanedPowerTimeSeries`.
+- The production serving path: **yes** — `live_forecasts` reads the cleaned table, and the new
+  asset joins the hourly production ingest job.
+- A degradation rule: **yes** — `live_forecasts` now depends on a second hop from the raw data.
+- More than one defensible design: **yes** — the alternatives are recorded below.
+- Callers not nameable without searching: no — the readers are named below.
 
-Complex buys both plan reviews (simplicity, then correctness) and both diff reviews.
+Complex buys both plan reviews and both diff reviews. The design was settled in discussion with the
+maintainer after two earlier designs (read-time cleaning with a list of rule functions) were each
+reviewed; this design gets a fresh review.
 
 **Departures from the issue body.**
 
-- The issue speaks of a cleaning "asset". The plan makes it a read-time step, not an asset — see the
-  next section for why.
+- The issue imagines a function that returns the lazy frame it receives, unchanged. Here the
+  function returns the same rows plus a `drop_reason` column that is null everywhere today, so
+  readers see exactly the rows they see now.
+- The issue asks for "a" cleaning asset; the plan's asset materialises a cleaned table rather than
+  passing a frame through.
 
-- The issue describes one function that both cleans and reports. The plan splits those into two
-  functions, so a caller that runs the cleaning many times on the same window
-  (`cv_power_forecasts`, once per `init_time` chunk) does not compute the stats each time.
+## Why the whole cleaned table is written eagerly, not cleaned lazily at read time
 
-## Decision: a read-time step, not a materialised cleaned-power asset
+**The cleaning rules need context that the reader's request does not carry, so the cleaning has to
+run once over the whole table, and the result has to be stored.** Two of the planned rules show it:
 
-**Clean at read time, because the policy for a failure differs between the production and research
-callers, and only the caller knows which it is.** A materialised `cleaned_power_time_series` asset
-would be one asset shared by `live_forecasts` (must degrade) and `trained_cv_model` (must fail
-fast). Either the asset degrades and research silently trains on raw data when cleaning breaks, or
-the asset fails and the live forecast loses its fresh power. The read-time step lets each caller
-apply its own policy around one shared function.
+- "Drop the first three months of each substation's data" needs each series' first reading. A
+  reader asking for a 15-day live window, or for a training window starting after the series began,
+  sees a different "first reading" and would drop the wrong rows.
+- A rule comparing a PV site with its neighbours needs the neighbours' readings. A reader asking for
+  one site would get a different cleaning result from a reader asking for all of them.
 
-The other reasons, in order of weight:
+Lazy cleaning could only give consistent answers by reading every series' full history on every
+read. That removes laziness's only advantage, and at V2 scale costs up to about 5 GB in memory per
+read (2,500 series, about 16 bytes per row in memory as measured on V1, 4 to 7 years of
+half-hours).
 
-- **No new staleness path in production.** A materialised table becomes a second hop between ingest
-  and `live_forecasts`. If that hop lags, the live forecast reads stale power although fresh raw
-  power is on disk, and the job wiring that would schedule the hop lives in `defs/schedules.py`,
-  which another session (#1020) owns.
-- **Principle 15 ("transform in feature engineering, not in the ingest, unless it saves a lot of
-  storage").** Cleaning throws rows away and saves no storage, so the principle puts it on the read
-  side, where changing a cleaning rule means re-running an experiment rather than rebuilding a
-  table.
-- **Today the step is the identity.** A materialised copy of a table identical to its input is a
-  second copy of the power archive bought for nothing.
+**A stored table also makes the failure policy simple.** If cleaning fails, the asset fails loudly
+(the job's Sentry failure hook) and every reader carries on with the last good cleaned table.
+Production degrades through data at rest (principle 14) with no guard in any reader, and research
+reads a table that is stale rather than silently uncleaned.
 
-**The cost of this choice is that a cleaning function sees only the caller's read window, not the
-whole history.** `live_forecasts` reads 15 days; `trained_cv_model` reads the training window plus
-the longest power lag. A function that is row-local (drop rows before a commissioning cut-off, drop
-values outside a physical range) gives the same answer in every window. A detector that needs long
-history — a stuck-value run crossing a window edge, a ramp detected against a neighbour's median —
-would give a different answer in live than in training. That is training–serving skew, and is the
-first open question below.
+**Storage is cheap.** The raw table measured 36 MB for 3.3M rows across 33 series on 2026-10-05,
+about 11 bytes per row. At V2 (about 2,500 series), 4 years is about 175M rows, 1 to 2 GB on disk;
+the cleaned copy roughly doubles that.
+
+**What it costs** is a full rewrite of the cleaned table on every run — trivial at V1, where
+rewriting the 36 MB table took 0.08 s, and a few GB per run at V2, to be re-measured before V2 —
+and one more hop between NGED's data and `live_forecasts`. Appending only new rows instead of
+rewriting is deferred to its own issue under the v0.9 epic, because appending needs a key
+comparison, a context window, a re-cleaned recent tail, and a version-triggered rebuild.
 
 ## What changes, file by file
 
+### `packages/contracts/src/contracts/power_schemas.py` — new contract (maintainer-approved)
+
+- `DROP_REASONS: Final[tuple[str, ...]]` — the vocabulary of drop reasons. An empty `pl.Enum` is
+  unusable, so the tuple starts with the four planned rules' names
+  (`"substation_first_three_months"`, `"substation_zero"`, `"implausible_value"`, and
+  `"generator_spurious_zero"`), and the docstring says a rule's author adds a value here with the
+  rule.
+- `CleanedPowerTimeSeries(PowerTimeSeries)` — the same three fields plus `drop_reason: str | None`
+  with `dtype=pl.Enum(DROP_REASONS)`. Subclassing should keep `PowerTimeSeries.validate`'s
+  datetime-bound and key-uniqueness checks; confirm that while implementing.
+
 ### `packages/nged_data/src/nged_data/cleaning.py` (new)
 
-**The interface a colleague writes against is a cleaning step: a cleaning function, optionally
-paired with a logging function.**
+- `flag_nged_power(power: pt.LazyFrame[PowerTimeSeries], metadata:
+  pt.DataFrame[TimeSeriesMetadata]) -> pt.LazyFrame[CleanedPowerTimeSeries]` — the function the
+  rules go into. `power` is always the whole raw table. Today the function adds a null `drop_reason`
+  column and nothing else. The docstring states the contract a rule must keep: return every input
+  row exactly once, never change `time_series_id` or `time`, flag rather than delete, and when two
+  rules match one row, record the first in the function's order.
+- No `first_times` argument. Because `power` is the whole table, a rule computes each series' first
+  reading itself (`pl.col("time").min().over("time_series_id")`). The append design will see only a
+  window, so it will need the first readings passed in; that issue adds the argument.
 
-- `PowerCleaningStep` — a frozen dataclass with two fields:
-    - `clean: Callable[[pt.LazyFrame[PowerTimeSeries]], pt.LazyFrame[PowerTimeSeries]]` — takes a
-      lazy power frame and returns one with rows dropped or values changed, but never a changed key:
-      a step that shifted `time` would have every shifted row counted as dropped. No side effects
-      and no `collect`, and it must be deterministic, because `power_cleaning_stats` re-applies it
-      to build the frames it compares. The step's name is `clean.__name__`, so a `lambda` is not
-      allowed (its name would be `<lambda>`).
-    - `summarise: Callable[[CleaningStepFrames], pl.LazyFrame] | None = None` — the optional
-      logging function. It returns a lazy query that collects to exactly one row; each column
-      becomes one metadata entry. Returning a lazy query rather than Python values is what lets
-      every step's summary run in one collect, and stops a logging function forcing the data into
-      memory on its own.
-- `CleaningStepFrames` — a frozen dataclass of three lazy frames, the logging function's input:
-    - `before` — the frame going into this step.
-    - `after` — the frame coming out.
-    - `dropped` — the rows of `before` whose `(time_series_id, time)` key is absent from `after` (an
-      anti-join, correct because `PowerTimeSeries.validate` enforces unique keys). Built lazily, so
-      the anti-join runs only for a step whose logging function reads `dropped`. Most logging
-      functions read only `dropped`; `before` and `after` are there for a step that changes values
-      rather than dropping rows, whose logging function joins the two to summarise the change.
-- `POWER_CLEANING_STEPS: Final[tuple[PowerCleaningStep, ...]] = ()` — the ordered registry. Adding a
-  cleaning rule means writing a function (and optionally a logging function) and appending a step
-  here. The docstring states the row-local constraint from the decision above.
-- `clean_power_time_series(power, steps=None) -> pt.LazyFrame[PowerTimeSeries]` — applies each
-  step's `clean` in order and stays lazy. `None` resolves to `POWER_CLEANING_STEPS` at call time, so
-  a test can monkeypatch the module attribute.
-- `power_cleaning_stats(power, steps=None) -> dict[str, int | float | str | bool | None]` — takes
-  the raw frame, rebuilds each step's `CleaningStepFrames`, and runs one
-  `pl.collect_all(..., engine="streaming")` over:
-    - the whole run: `power_cleaning/n_rows_in`, `power_cleaning/n_rows_out`,
-      `power_cleaning/n_time_series_in`, and `power_cleaning/n_time_series_out`;
-    - every step, built in, whether or not it has a logging function, and with no anti-join:
-      `power_cleaning/<step>/n_rows_dropped` (the row count of `before` minus that of `after`) and
-      `power_cleaning/<step>/n_time_series_affected` (series whose per-series row count differs
-      between `before` and `after`, from two `group_by` counts joined on a few thousand rows);
-    - every step's logging function, if it has one: `power_cleaning/<step>/<column>` per column.
+### `packages/nged_data/src/nged_data/storage.py`
 
-  The flat string keys go straight into `context.add_output_metadata`, and the prefix keeps them
-  clear of each asset's existing keys (Dagster raises on a duplicate key). The function raises
-  `ValueError` on our own bugs: two steps sharing a name, a logging function whose result is not
-  exactly one row, or a logging-function column colliding with a built-in key. It converts each
-  collected value to a type `add_output_metadata` accepts — `datetime`, `date`, `time`, and
-  `timedelta` to ISO-8601 strings — and raises `ValueError` for any other type outside `None`,
-  `bool`, `int`, `float`, and `str` (Dagster raises `DagsterInvalidMetadata` on a `Decimal`, for
-  example). The conversion matters in production: `live_forecasts` calls `add_output_metadata`
-  after writing the forecast and outside both guards, so an unconvertible value must fail inside
-  the stats guard, not after the write. Every value is aggregated, so principle 11 holds.
+- `scan_cleaned_power(path, storage_options) -> pt.LazyFrame[PowerTimeSeries]` — scans the cleaned
+  table, keeps rows where `drop_reason` is null, and selects the three `PowerTimeSeries` columns.
+  It is the one read path for every consumer, so no consumer can forget the filter.
+- `coverage_from_power(power: pt.LazyFrame[PowerTimeSeries]) -> pt.DataFrame[TimeSeriesCoverage]` —
+  split out of `time_series_coverage(path)`, which keeps its absent-table check and calls it. The
+  other two callers of `time_series_coverage` (`power_data_is_fresh` and the ingest's
+  `select_new_rows`) keep reading raw coverage, because freshness and de-duplication are about what
+  NGED delivered.
 
-  **The stats cost is small without logging functions and large with them at full-table scale.**
-  The reviewer measured a V2-sized table (2,500 series, a year, 43.8M rows) on the streaming engine:
-  the empty registry's counts peak at about 194 MB, and one anti-join step at about 4.0 GB, and
-  `collect_all` rescans the Delta table for each step rather than sharing one scan. At V1's 32
-  series both are trivial. Risk 5 below covers the V2 case.
+### `packages/delta_store/src/delta_store/cleaned_power_time_series.py` (new)
 
-Because each step's `dropped` frame is labelled by the step's name, the later delivery table of data
-problems can be built from those frames without changing the interface.
+- `write_cleaned_power_time_series(df: pt.DataFrame[CleanedPowerTimeSeries], table_uri, *,
+  storage_options)` — `write_deltalake(mode="overwrite", partition_by=["time_series_id"])`, one
+  atomic Delta commit (principle 10), then `vacuum` with a 24-hour retention. Without the vacuum
+  every hourly overwrite leaves the previous copy on disk: 24 copies a day, about 0.9 GB a day at
+  V1 and tens of GB a day at V2.
 
-`nged_data` is the home because the step cleans NGED's telemetry and the package already depends on
-`contracts`. A new package is only worth it if the cleaning functions grow dependencies (`scipy`, a
-solar-geometry library) that `nged_data` should not carry; that is cheap to do later.
+### `packages/contracts/src/contracts/settings.py`
 
-### `src/nged_substation_forecast/defs/cv_assets.py` (research — fail fast)
+- `cleaned_power_time_series_data_path`, derived beside `power_time_series_data_path` in
+  `_derive_unset_paths`.
 
-Out of bounds and untouched: `metrics` and its helpers (#958).
+### `src/nged_substation_forecast/defs/cleaning_assets.py` (new)
 
-- `trained_cv_model`: call `clean_power_time_series` on the frame `load_engineering_inputs`
-  returns, and merge `power_cleaning_stats` of that raw frame into the existing
-  `add_output_metadata` call.
-- `cv_power_forecasts`: call `clean_power_time_series` inside the `init_time` chunk loop and report
-  no stats. The power window is the validation window in every chunk, and `trained_cv_model`
-  already reports the training window's stats.
-- `effective_capacity`: clean the full-table scan before `compute_effective_capacity`; merge the
-  stats. This is the one caller whose stats query runs over the whole table.
+`defs/assets.py` belongs to #1020, so the asset gets its own module.
 
-- `eligible_time_series`: today it calls `nged_data.storage.time_series_coverage(path)`, which scans
-  the path itself. Split that function: a new `coverage_from_power(power: pl.LazyFrame)` holds the
-  `group_by` + streaming `collect`, and `time_series_coverage(path)` keeps its existence check and
-  calls it. `eligible_time_series` keeps today's absent-table behaviour (an empty population, not a
-  `TableNotFoundError`) by checking `delta_table_exists` first; when the table exists it scans the
-  table, cleans it, and calls `coverage_from_power` on the cleaned frame. It reports no stats:
-  `effective_capacity` already reports them over the same whole table. The `coverage_from_power`
-  docstring notes that a cleaning function using `map_batches` or `.over()` may push the streaming
-  engine back to in-memory. `time_series_coverage`'s other callers (the `power_data_is_fresh` check
-  and the ingest's `select_new_rows`) keep reading raw coverage, which is right: freshness and
-  de-duplication are about what NGED delivered.
+- `clean_nged_power_data` — `deps=["power_time_series_and_metadata"]`, production-layer tags. A
+  minimal wrapper:
+    - If the raw table does not exist yet, log and return with `n_rows: 0` metadata rather than
+      raising, because an absent input degrades (inherent-stability).
+    - Scan the raw table, read the whole roster, call `flag_nged_power`, collect with the streaming
+      engine, `CleanedPowerTimeSeries.validate`, write.
+    - Metadata: `n_rows`, `n_rows_kept`, `n_time_series`, and per drop reason
+      `drop_reason/<reason>/n_rows`, `.../n_time_series`, `.../min_power`, and `.../max_power`,
+      computed from the collected frame with one `group_by("drop_reason")`.
+    - No `try`: a failing rule or a contract violation is our bug, so the asset raises and the
+      readers keep the last good table.
+- Registered wherever the asset modules are collected (confirm while implementing).
 
-No `try` in any of these: an exception from a cleaning function propagates and fails the run.
+### `src/nged_substation_forecast/defs/schedules.py` — out of bounds; needs coordination
 
-### `src/nged_substation_forecast/defs/live_forecast_assets.py` (production — degrade)
+- Add `"clean_nged_power_data"` to `power_time_series_and_metadata_job`'s selection, so the asset
+  runs hourly, straight after ingest and five minutes before each 6-hourly `live_forecasts` slot.
+  That is well over the four runs a day the maintainer requires. #1020 owns this file; see open
+  question 1.
 
-**Two guards, not one, so a failing logging function costs the stats and never the cleaning.**
-Logging is not what the forecast depends on: a bug in a logging function that switched the live
-forecast to raw power would degrade the forecast for a fault that has nothing to do with the
-forecast. Both guards sit right after `load_engineering_inputs` and copy the shape of the existing
-control-member guard (the same `BaseException` catch, re-raising `KeyboardInterrupt`,
-`SystemExit`, and `DagsterExecutionInterruptedError`). No shared helper for the three guards: short
-inline blocks read more clearly than an abstraction.
+### Readers
 
-- **Cleaning guard.** Collect the raw frame once (`raw_df`), call `clean_power_time_series` on
-  `raw_df.lazy()`, collect the cleaned frame and re-wrap it as lazy. The collect means a cleaning
-  function that only fails at collect time fails *inside* the guard rather than later in
-  `predict`. Collecting the raw frame first means the stats guard reads the same rows the forecast
-  used, rather than a second Delta read that an hourly ingest commit could change and an
-  object-store fault could fail. The live power window is 15 days of the trained series, a
-  few MB at V2's 2,500 series, so this one collect is a deliberate exception to principle 11.
-    - On failure: `context.log.exception("Power cleaning failed; forecasting this slot from
-      uncleaned power")`. The guard also covers the raw Delta read, so the message must not claim
-      the cleaning function was at fault. Then call
-      `report_asset_degradation(asset_name="live_forecasts", exc=exc)`, carry on with the raw
-      frame, set `power_cleaning/degraded: True`, and skip the stats guard.
-- **Stats guard**, run only when cleaning succeeded. Call `power_cleaning_stats` on
-  `raw_df.lazy()`.
-    - On failure: `context.log.exception("Power cleaning statistics failed; the slot was still
-      forecast from cleaned power")`, call `report_asset_degradation(asset_name="live_forecasts",
-      exc=exc)`, and set `power_cleaning/stats_failed: True` in place of the stats.
-- On success the metadata carries `power_cleaning/degraded: False`, `power_cleaning/stats_failed:
-  False`, and the stats, merged into the existing `add_output_metadata` call.
+- `_engineering_inputs.py`, `load_engineering_inputs`: read `scan_cleaned_power` instead of the raw
+  path. This covers `trained_cv_model`, `cv_power_forecasts`, and `live_forecasts`.
+- `cv_assets.py`, `effective_capacity`: read `scan_cleaned_power`.
+- `cv_assets.py`, `eligible_time_series`: `coverage_from_power(scan_cleaned_power(...))`, behind a
+  `delta_table_exists` check on the cleaned table, so an absent table still yields an empty
+  population.
+- The `deps` of `eligible_time_series`, `effective_capacity`, `trained_cv_model`, and
+  `live_forecasts` change from `power_time_series_and_metadata` to `clean_nged_power_data`.
+- The provenance tags `trained_cv_model` and `cv_power_forecasts` write to MLflow (the Delta
+  version of `power_time_series`) record the cleaned table's version as well.
+- Untouched: `metrics` (owned by #958, still reads raw actuals), `power_data_is_fresh`, the ingest,
+  and the two dashboard notebooks.
 
-- The forecast rows record no degradation flag: `PowerForecast` has no degradation column today, and
-  adding one is a contract change outside this issue. The degradation is recorded in Sentry and the
-  materialisation metadata, as the control-member probe does.
+## How the cleaned table could drive `asset_health_history`
 
-### `_engineering_inputs.py`
-
-Unchanged. Keeping cleaning out of the shared loader keeps the failure policy at the caller, and the
-loader keeps returning raw power.
+**The cleaned table already holds most of what the delivery table `asset_health_history` needs.**
+That table has one row per `(time_series_id, time)` and a `warning_type` from a fixed vocabulary
+(`HEALTHY`, `MISSING VALUE`, `STUCK TIMESERIES`, `INVALID TIMESERIES VALUE`, `GENERATOR OR CIRCUIT
+FAULT`, and others). A later asset could build it from the cleaned table by mapping each
+`drop_reason` to a `warning_type` — `implausible_value` to `INVALID TIMESERIES VALUE`,
+`generator_spurious_zero` to `GENERATOR OR CIRCUIT FAULT`, and a null to `HEALTHY` — and by adding
+`MISSING VALUE` rows for half-hours absent from the table. Some reasons describe data policy rather
+than asset health (`substation_first_three_months`) and would map to `HEALTHY` or be left out.
+Nothing in this issue builds that table; the mapping is a decision for the issue that does.
 
 ## Design-philosophy check
 
-- **Production degrades, research fails fast** (inherent-stability rules 1 and 7): `live_forecasts`
-  falls back to raw power when cleaning fails, drops only the stats when logging fails, logs, and
-  reports with the `degraded_asset=live_forecasts` tag (principle 16 — the telemetry names the
-  asset, and the log message names which of the two steps failed). The research assets have no
-  guard.
-
-- **No asset check is added.** The counts go to output metadata. A `WARN`/`blocking=False` check
-  would need the counts persisted somewhere a separate op can read them, and nothing yet defines a
-  threshold to warn at. When the delivery table of data problems exists, a check over it is the
-  natural place for a warning.
-- **Principle 3 (one execution path)**: research and production call the same
-  `clean_power_time_series`; only the failure handling differs.
-
-- **Principle 11**: the stats are aggregates collected once; the one `collect` of a frame is the
-  live cleaning guard's, stated above.
-
-- **Principle 15**: honoured by cleaning at read time.
+- **Production degrades, research fails fast.** The asset raises on our own bugs; readers in
+  production carry on with the last good cleaned table, as `live_forecasts` already does when the
+  ingest misses an hour. Research reads the same table.
+- **No asset check is added.** The stats go to output metadata, and a failed cleaning run alerts
+  through the job's Sentry failure hook. A WARN check comparing the cleaned table's latest reading
+  with the raw table's would catch a cleaning run that silently stopped running; see open question
+  3.
+- **Principle 7 (strict contracts)**: a new Patito model with an Enum of drop reasons.
+- **Principle 11**: the asset materialises the whole table by design; readers stay lazy.
+- **Principle 14**: the asset and `live_forecasts` couple through the cleaned table at rest.
+- **Principle 15**: the raw table is untouched, so changing a rule means re-running one asset over
+  data already on disk, never re-downloading.
 
 ## Tests
 
-In `packages/nged_data/tests/test_cleaning.py` (new):
-
-- `test_no_cleaning_steps_returns_input_unchanged` — the cleaned frame equals the input and
-  `n_rows_in == n_rows_out`. Fails on `main` because the module does not exist; it pins the
-  identity default the issue asks for.
-- `test_cleaning_steps_run_in_order` — two injected steps where the second only has an effect if the
-  first ran before it; asserts the result.
-- `test_rows_dropped_are_attributed_to_each_step` — a step dropping zeros, then a step dropping
-  values outside a plausible range whose lower bound is above zero, on data where one series has
-  two zeros and another has one extreme value.
-  Asserts each step's `n_rows_dropped`, `n_time_series_affected`, and first and last dropped time,
-  and the run's four totals. Would fail if `dropped` were computed against the raw frame rather than
-  the step's own `before`, which would double-count a row both steps match; the data includes such
-  a row (a zero, which the second step's range also excludes) to pin that.
-- `test_a_logging_function_summarises_the_rows_its_step_dropped` — the extreme-value step paired
-  with a logging function returning the min and max of `dropped.power`; asserts both metadata
-  values.
-- `test_a_logging_function_sees_values_a_step_changed` — a step that clips values rather than
-  dropping rows, with a logging function joining `before` to `after` to count changed rows; asserts
-  `n_rows_dropped == 0` and the changed count.
-- `test_power_cleaning_stats_rejects_our_own_bugs` — parametrised over the four `ValueError` cases:
-  duplicate step names, a two-row summary, a summary column named `n_rows_dropped`, and a summary
-  value of a type Dagster rejects (a `Decimal` column).
-- `test_temporal_summaries_become_iso_strings` — a logging function returning `time.min()`; asserts
-  the metadata value is an ISO-8601 string, and that a summary over an empty `dropped` yields `None`
-  rather than raising.
-
-In `packages/nged_data/tests/test_storage.py`:
-
-- The existing `time_series_coverage` tests keep passing unchanged, which is the evidence the split
-  is a pure refactor. No new test.
-
-In `tests/test_cv_assets.py`:
-
-- `test_effective_capacity_reads_cleaned_power` — monkeypatch
-  `nged_data.cleaning.POWER_CLEANING_STEPS` with a step dropping one series; assert the
-  `effective_capacity` table lacks that series and the materialisation metadata carries the step's
-  `n_rows_dropped`. Fails on `main`: nothing applies the registry.
-
-- `test_eligible_time_series_reads_cleaned_power` — same shape for eligibility, dropping series 1:
-  the fixture makes only series 1 eligible for `FOLD_ID`, so dropping any other series would leave
-  eligibility unchanged and the population assertion would pass on `main`.
-
-In `tests/test_trained_cv_model.py`:
-
-- `test_trained_cv_model_reads_cleaned_power` — the existing harness already materialises
-  `trained_cv_model`, but only series 1 has power inside the training window, and dropping all of
-  series 1 leaves nothing to train. Drop a subset of series 1's rows instead (for example
-  `power > 120`) and assert the metadata's `power_cleaning/n_rows_out` is below `n_rows_in` while
-  training still succeeds. Fails if the cleaning call is deleted from `trained_cv_model`.
-
-In `tests/test_live_forecasts.py`:
-
-- `test_a_failing_cleaning_function_degrades_the_slot_instead_of_failing_it` — a raising cleaning
-  function (raising at collect time, via a `map_batches` with an explicit `return_dtype` so the
-  function runs at collect rather than at schema resolution, to prove the guard's collect is what
-  catches it); assert forecasts are written, `report_asset_degradation` was called with
-  `asset_name="live_forecasts"`, and the metadata has `power_cleaning/degraded: True`. Modelled on
-  `test_a_failing_control_member_probe_degrades_the_slot_instead_of_failing_it`. The test also
-  proves the live wiring: if `live_forecasts` never called the cleaning, nothing would raise and
-  `report_asset_degradation` would not be called.
-- `test_a_failing_logging_function_keeps_the_cleaned_power` — a step whose cleaning drops one
-  trained series and whose logging function raises. Assert forecasts are written,
-  `report_asset_degradation` was called, and the metadata has `power_cleaning/degraded: False` and
-  `power_cleaning/stats_failed: True`, and spy on `build_live_power_frame` to assert the dropped
-  series' rows are absent from the power it received. Fails if the two guards are merged into one,
-  because the merged guard would fall back to raw power; the spy is what catches that, because the
-  test model's weather-only features forecast identically either way.
-- The existing happy-path live test gains one assertion: the metadata carries
-  `power_cleaning/degraded: False`, `power_cleaning/stats_failed: False`, and equal in/out row
-  counts.
-
-`cv_power_forecasts` gets no wiring test: the call is one line, it reports no counts, and a test
-would need a frame-level assertion on forecasts that weather-only features can produce without
-power. The mutation-testing diff review should judge whether that is enough.
+- `packages/contracts/tests`: `CleanedPowerTimeSeries.validate` accepts a null and a known
+  `drop_reason`, rejects an unknown one, and rejects a duplicate key.
+- `packages/nged_data/tests/test_cleaning.py`: `flag_nged_power` returns every input row with a null
+  `drop_reason`. Fails on `main`, where the function does not exist.
+- `packages/nged_data/tests/test_storage.py`: `scan_cleaned_power` drops flagged rows and returns
+  the `PowerTimeSeries` columns only. The existing `time_series_coverage` tests stay green, which is
+  the evidence the coverage split is a pure refactor.
+- `packages/delta_store/tests`: the writer overwrites rather than appends (two writes; only the
+  second write's rows remain).
+- `tests/test_cleaning_assets.py` (new):
+    - the asset writes every raw row with null reasons and reports `n_rows`;
+    - with `flag_nged_power` monkeypatched to flag some rows, the per-reason metadata counts and
+      min/max are right;
+    - an absent raw table yields `n_rows: 0` and no exception.
+- Readers: one test per read path proves flagged rows are excluded — `effective_capacity`,
+  `eligible_time_series` (flagging series 1, the only series eligible for the fixture's `FOLD_ID`),
+  and `live_forecasts` (a spy on `build_live_power_frame`, because the test model's weather-only
+  features forecast identically with or without power). `trained_cv_model` and
+  `cv_power_forecasts` share `load_engineering_inputs` with `live_forecasts`, so the live test
+  covers that path.
+- **Fixture churn**: `test_cv_assets.py`, `test_trained_cv_model.py`, `test_cv_power_forecasts.py`,
+  and `test_live_forecasts.py` write a raw power table; each must also write the cleaned table. A
+  shared helper in `tests/` writes an all-unflagged cleaned copy of a raw fixture.
 
 ## Docs to update
 
-- `docs/live_service/operations.md` — the passage telling operators that a
-  `degraded_asset:live_forecasts` event means a missing NWP control member gains a sibling
-  paragraph for a failed power cleaning and for failed cleaning statistics, which send the same tag
-  and are told apart by the log message.
-- `docs/design-philosophy/inherent-stability.md` — a row in the degradation table for the new
-  production fallback to uncleaned power.
-- `docs/roadmap/data-cleaning.md` — a short section saying where cleaning steps go
-  (`nged_data.cleaning.POWER_CLEANING_STEPS`), what a logging function receives and returns, the
-  row-local constraint, and that production falls back to raw power when cleaning fails, and loses
-  only the stats when logging fails, while research fails.
-
-- `packages/nged_data/README.md` — one line for the new module, and one for `coverage_from_power`
-  beside the existing `time_series_coverage` entry.
-- `TimeSeriesCoverage`'s docstring in `nged_data/storage.py`, which names CV eligibility as a
-  caller of `time_series_coverage`; eligibility now goes through `coverage_from_power`.
-- The docstrings of the five assets touched, which are operator docs in the Dagster UI.
+- `docs/roadmap/data-cleaning.md` — where rules go (`flag_nged_power`, `DROP_REASONS`), the
+  contract a rule keeps, and that a failed cleaning run leaves readers on the last good table.
+- `docs/design-philosophy/inherent-stability.md` — the degradation table gains the cleaned-table
+  hop.
+- `docs/live_service/operations.md` — what an operator does when `clean_nged_power_data` fails.
+- `packages/nged_data/README.md`, `packages/delta_store/README.md`, and
+  `packages/contracts/README.md` — the new functions and contract.
+- `CLAUDE.md` — the Dagster assets list and the contracts list.
+- The docstrings of every touched asset, which are operator docs in the Dagster UI.
 
 ## Verification commands
 
-The `implement-issue` green-before-push set (`ruff check`, `ruff format`, `ty check`, `pytest`,
-the `pymarkdown` scan), plus `pydoclint` and the docs-link checker as CI runs them, plus
-`uv run mkdocs build --strict` for the roadmap edit.
+The `implement-issue` green-before-push set (`ruff check`, `ruff format`, `ty check`, `pytest`, and
+the `pymarkdown` scan), plus `pydoclint` and the docs-link checker as CI runs them, plus `uv run
+mkdocs build --strict`, plus one local materialisation of `clean_nged_power_data` against the real
+V1 data to check the run time and the on-disk size after vacuum.
 
 ## Risks and open questions
 
-1. **Window-dependent cleaning functions.** Recommendation: state the row-local constraint in the
-   `PowerCleaningStep` docstring now. When the first detector needs full history, it becomes a
-   materialised asset of flagged rows (`power_data_problems`, computed over the whole table, which
-   also feeds the delivery table), and the read-time step drops the flagged rows. That is a separate
-   issue; this plan's interface does not block it.
-
-2. **Should `metrics` score against cleaned actuals?** Probably yes for rows that describe a plant
-   that no longer exists (the commissioning ramp), but `metrics` belongs to #958. Recommendation:
-   leave it untouched here and raise it on #958 or a follow-up issue.
-3. **Should `power_data_is_fresh` and the ingest de-duplication see cleaned power?** Recommendation:
-   no — both are about what NGED delivered, not about what is fit to train on.
-
-4. **Settled by the maintainer: frame-to-frame cleaning functions, each with an optional logging
-   function.** The simplicity review's alternative — each rule a named `pl.Expr` predicate — would
-   have made per-rule stats cheaper, but cannot change values or join to another frame. The
-   anti-join per step is the price of keeping both.
-5. **A logging function that reads `dropped` costs one anti-join, and at V2 scale that is about
-   4 GB per step over the whole table.** The built-in counts need no anti-join. At V1's 32 series
-   none of this matters. Recommendation: measure when V2 data arrives, and if the full-table stats
-   on `effective_capacity` are too heavy, drop them there and keep `trained_cv_model`'s and
-   `live_forecasts`' (smaller windows).
-
-6. **Package home.** `nged_data.cleaning` unless the cleaning functions bring heavy dependencies;
-   then a new `power_cleaning` package. Confirm with whoever is writing the functions.
+1. **`defs/schedules.py` belongs to #1020.** Without the one-line selection change, the cleaned
+   table is never refreshed in production and `live_forecasts` reads stale power. Recommendation:
+   implement everything else now, and add the line after #1020 merges (or ask that session to add
+   it). This PR must not merge before the line is in.
+2. **Should `metrics` score against cleaned actuals?** Probably yes for rows describing a plant that
+   no longer exists, but `metrics` belongs to #958. Recommendation: raise it there.
+3. **A WARN check that the cleaned table keeps up with the raw one?** Recommendation: add it in a
+   follow-up if the Sentry failure alert proves insufficient.
+4. **Starting `DROP_REASONS` with the four planned names** commits names before the rules exist.
+   Recommendation: accept; renaming a value is a one-line contract edit plus a re-run.
+5. **V2 rewrite cost.** A few GB per run, 24 runs a day. Recommendation: measure before V2; the
+   append issue is the answer if the rewrite is too slow.
 
 ## Review log
 
-### Simplicity review (fresh Opus sub-agent)
-
-Accepted:
-
-- Split the cleaning from the counting, so `cv_power_forecasts` stops recounting the same window
-  per chunk and reports no counts.
-- Drop per-function attribution until the first cleaning function exists.
-- Inline the live guard instead of a `_clean_or_degrade` helper.
-- Drop the conditional `inherent-stability.md` edit, the `NamedTuple`, the research fail-fast test
-  (it tests the absence of a `try`), and the separate live wiring test (the degrade test already
-  proves the wiring).
-
-Kept as the plan had it: the `coverage_from_power` split (the reviewer agreed it earns its place),
-and both research wiring tests, because they exercise different code paths (a full-table scan
-versus the coverage split).
-
-Passed to the human reviewer: predicate rules instead of frame-to-frame functions (open question 4).
-
-Rejected architectures, agreeing with the reviewer: cleaning inside `load_engineering_inputs` (the
-live fallback would need raw and cleaned frames back, and two of the five readers do not use the
-loader); cleaning in the feature engineer (misses eligibility and effective capacity, hides the
-counts from Dagster); a materialised `power_data_problems` asset now (a new stored contract and
-schedule wiring in `schedules.py`, which is out of bounds, bought before any detector needs it).
-
-### Correctness review (fresh Opus sub-agent)
-
-Accepted, all four defects:
-
-- `eligible_time_series` would have raised on an absent power table instead of writing an empty
-  population; the plan now keeps the `delta_table_exists` check.
-- Two stale prose sites (the `TimeSeriesCoverage` docstring and the `nged_data` README) added to the
-  docs list.
-- Added a `trained_cv_model` wiring test (the reviewer showed the harness already exists) and a
-  `degraded: False` assertion on the live happy path.
-- The eligibility wiring test now names series 1, the only one eligible in the fixture's fold.
-
-Also taken from the reviewer's caveats: the streaming engine on the counts query, and a live log
-message naming the cleaning step (principle 16).
-
-Confirmed by the reviewer, and so unchanged: the description of current code, that monkeypatching
-the module attribute reaches in-process materialisations, that a raising `map_batches` surfaces at
-the guard's collect, that `/` keys and mixed bool/int metadata work on Dagster 1.13, and that the
-change is a no-op with an empty registry.
-
-### Maintainer-directed redesign of the stats
-
-The maintainer asked for stats expressive enough to tell zeros dropped from extreme values dropped,
-and to summarise the extreme values themselves. Per-step attribution, which the simplicity review
-had deferred, is back, and each cleaning function can be paired with an optional logging function
-that receives `before`, `after`, and `dropped` for its step. The live path now has a second guard
-so a failing logging function costs only the stats.
-
-### Correctness re-review of the redesign (fresh Opus sub-agent)
-
-Accepted:
-
-- A logging function returning a datetime would have failed the live slot after the forecast write,
-  because Dagster rejects `datetime` metadata and the metadata call sits outside both guards.
-  `power_cleaning_stats` now converts temporal values to ISO strings and raises inside the guard on
-  any other unsupported type; the return type includes `None`.
-- The `trained_cv_model` test could not be written as described (only series 1 has power in the
-  training window); it now drops a subset of series 1's rows.
-- The built-in per-step stats no longer need an anti-join (`n_rows_dropped` is a count difference),
-  the first and last dropped time are gone from the built-ins, `dropped` is built lazily, and the
-  streaming engine is named. The measured cost of an anti-join is now stated.
-- The plan said four assets report stats but named three; `eligible_time_series` now explicitly
-  reports none.
-- Live collects the raw frame once so the stats describe the rows the forecast used.
-- The degrade test uses `return_dtype`; the logging-failure test spies on `build_live_power_frame`.
-- The `PowerCleaningStep` docstring forbids changing keys.
-- Two operator docs added: `operations.md` and the inherent-stability degradation table.
-
-Confirmed by the reviewer, and so unchanged: monkeypatching reaches the assets; neither guard's
-handler can raise; the coverage split is a pure refactor; the issue body is current.
+Earlier versions of this plan cleaned power at read time, first with a list of rule functions and
+then with per-step logging functions. Each version had a simplicity review and a correctness review;
+the git history of this file holds them. The maintainer then chose a stored cleaned table, for the
+reasons in "Why the whole cleaned table is written eagerly". Findings from those reviews that carry
+over are already folded in: the coverage split, the `delta_table_exists` check in
+`eligible_time_series`, the series-1 eligibility fixture, and the `build_live_power_frame` spy.
