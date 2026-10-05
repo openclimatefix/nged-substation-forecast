@@ -1,4 +1,4 @@
-"""Back up the workstation's data, MLflow store, and production model to a second disk.
+"""Back up the workstation's data, MLflow store, Dagster history, and secrets to a second disk.
 
 Each run writes one dated snapshot directory under ``--destination``, such as
 ``2026-10-05T183000Z/``, holding a full copy of every source. The snapshot copies:
@@ -9,16 +9,28 @@ Each run writes one dated snapshot directory under ``--destination``, such as
   production model;
 - the MLflow artifacts directory ``mlruns/`` at the repository root, which holds the trained models;
 - ``literature/`` at the repository root, the git-ignored library of papers and reference documents;
-- the MLflow database named by ``mlflow_tracking_uri``, copied through SQLite's own backup routine.
-  A plain file copy of an SQLite database that MLflow is writing to can capture a half-finished
-  transaction; the backup routine always produces a consistent file.
+- Dagster's run history: ``dagster_history/`` at the repository root, which the ``base_dir`` in
+  ``$DAGSTER_HOME/dagster.yaml`` names, and ``$DAGSTER_HOME`` itself;
+- the MLflow database named by ``mlflow_tracking_uri``;
+- the credential files in ``SECRET_FILES``, which the docs cannot recreate, under ``secrets/``.
+
+A missing ``Settings`` root or MLflow database stops the run, because a snapshot without them
+would look complete while missing the data that matters most. The other directories are skipped
+with a warning when absent.
+
+**Every SQLite database is copied through SQLite's own backup routine, never as a plain file.**
+Dagster keeps its run history in SQLite databases in write-ahead-log mode, where recent commits sit
+in a ``-wal`` file beside the database. A file copy can capture the database and its log at
+different moments, and so capture a torn database. The backup routine reads through the log and
+always produces a consistent file.
 
 **Unchanged files cost no disk space, because each snapshot hard-links them to the previous
 snapshot.** ``rsync --link-dest`` creates a hard link instead of a copy for every file whose size,
-modification time, and permissions match the previous snapshot. Delta tables never modify a file
-in place, so after the first snapshot each new one stores only the files written since the last
-run. Every snapshot is still a complete, independent copy: deleting an old snapshot never damages
-a newer one.
+modification time, and permissions match the newest earlier snapshot holding that source. Delta
+tables never modify a file in place, so after the first snapshot each new one stores only the
+files written since the last run. SQLite databases are the exception: each is copied afresh every
+run, which costs about 450 MB a week for Dagster's history. Every snapshot is still a complete,
+independent copy: deleting an old snapshot never damages a newer one.
 
 **Keeping old snapshots is what protects the backup from a mistaken deletion on the workstation.**
 A file deleted from the workstation is missing from the next snapshot but stays in every earlier
@@ -30,9 +42,9 @@ A snapshot is written under a ``.partial`` name and renamed only once every copy
 an interrupted run never looks complete and is never used as the base for the next snapshot's hard
 links. Delete a leftover ``.partial`` directory by hand.
 
-**The script refuses to run from a git worktree.** ``mlruns/``, ``literature/``, ``.env``, and a
-relative MLflow database path are all found relative to the checkout the script runs from, and in
-a worktree those are missing or different.
+**The script refuses to run from a git worktree.** ``mlruns/``, ``literature/``,
+``dagster_history/``, the secret files, and a relative MLflow database path are all found relative
+to the checkout the script runs from, and in a worktree those are missing or different.
 
 **The script also refuses to run if the destination is on the same disk as any source.** If the
 backup disk is not mounted, ``/mnt/wd_18tb`` is an empty directory on the system disk, and a backup
@@ -43,7 +55,7 @@ points at the backup disk cannot make the backup copy itself.
 
 Run it while no Dagster run is in progress. A Delta table copied while a Dagster run is writing
 to it, or vacuuming it, can be captured with a transaction log that names a data file the copy
-missed. The script finishes by listing every file that changed while it ran, and a long list
+missed. The script finishes by listing every entry that changed while it ran, and a long list
 means the snapshot is worth repeating. How to restore from a snapshot is on
 <https://openclimatefix.github.io/nged-substation-forecast/live_service/backup/>.
 
@@ -56,11 +68,13 @@ Usage::
 import argparse
 import json
 import logging
+import os
+import shutil
 import sqlite3
 import subprocess
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from contextlib import closing
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
@@ -72,6 +86,13 @@ _LOGGER: Final[logging.Logger] = logging.getLogger(__name__)
 DEFAULT_DESTINATION: Final[Path] = Path("/mnt/wd_18tb/nged-substation-forecast-backups")
 """Where snapshots go unless ``--destination`` says otherwise: the workstation's 18 TB disk."""
 
+SECRET_FILES: Final[tuple[str, ...]] = (
+    ".env",
+    ".google_account_for_weathernext3.json",
+    "packages/dashboard/.env.s3",
+)
+"""Credential files, relative to the repository root, copied into each snapshot's ``secrets/``."""
+
 SNAPSHOT_NAME_FORMAT: Final[str] = "%Y-%m-%dT%H%M%SZ"
 """``strftime`` format of a snapshot directory's name, in UTC, so names sort by time."""
 
@@ -81,8 +102,14 @@ PARTIAL_SUFFIX: Final[str] = ".partial"
 MLFLOW_DB_NAME: Final[str] = "mlflow.db"
 """File name of the MLflow database inside a snapshot."""
 
+SECRETS_DIR_NAME: Final[str] = "secrets"
+"""Directory inside a snapshot holding the files in ``SECRET_FILES``."""
+
 MANIFEST_NAME: Final[str] = "sources.json"
 """File inside a snapshot mapping each copied directory's name to the path it was copied from."""
+
+_SQLITE_PATTERNS: Final[tuple[str, ...]] = ("*.db", "*.db-wal", "*.db-shm", "*.db-journal")
+"""Files ``rsync`` skips in a source holding SQLite databases; the backup routine copies them."""
 
 _RSYNC_EXIT_FILES_VANISHED: Final[int] = 24
 """``rsync`` exit code for "some source files vanished before they could be transferred"."""
@@ -94,50 +121,73 @@ class BackupSource:
 
     Attributes:
         name: The directory's name inside a snapshot.
-        path: The absolute, symlink-resolved directory on the workstation.
+        path: The directory on the workstation. ``collect_sources`` resolves it through symlinks.
+        required: Whether a missing directory stops the run. When False, a missing directory is
+            skipped with a warning.
+        holds_sqlite: Whether the directory holds SQLite databases, which are then copied through
+            SQLite's backup routine instead of by ``rsync``.
     """
 
     name: str
     path: Path
+    required: bool = True
+    holds_sqlite: bool = False
 
 
-def collect_sources(roots: Mapping[str, str]) -> list[BackupSource]:
-    """Turn named root directories into the de-duplicated list of directories to copy.
-
-    A root nested inside another root, or equal to one, is dropped, because copying the outer
-    root already copies it. On the workstation all three ``Settings`` roots are ``data/``, so they
-    collapse to one source.
+def local_path(name: str, uri: str) -> Path:
+    """Return ``uri`` as a local path, refusing a remote URI that ``rsync`` cannot read.
 
     Args:
-        roots: Each root's name inside a snapshot, mapped to its path. Paths are resolved through
-            symlinks before comparing, so ``data/`` and the directory it links to count as equal.
+        name: The setting ``uri`` came from, named in the error.
+        uri: A ``Settings`` storage root.
 
     Returns:
-        One ``BackupSource`` per existing, non-nested root, in the order ``roots`` lists them.
-        A root that does not exist is skipped with a warning.
+        ``uri`` as a ``Path``.
 
     Raises:
-        ValueError: If a root is a remote URI such as ``s3://bucket/data``, which ``rsync`` cannot
-            read.
+        ValueError: If ``uri`` is a remote URI such as ``s3://bucket/data``.
     """
-    resolved: dict[str, Path] = {}
-    for name, root in roots.items():
-        if "://" in root:
-            raise ValueError(f"{name} is the remote URI {root!r}; this script copies local paths.")
-        path = Path(root).resolve()
-        if not path.is_dir():
-            _LOGGER.warning("Skipping %s: %s is not a directory.", name, path)
-            continue
-        resolved[name] = path
+    if "://" in uri:
+        raise ValueError(f"{name} is the remote URI {uri!r}; this script copies local paths.")
+    return Path(uri)
+
+
+def collect_sources(candidates: Sequence[BackupSource]) -> list[BackupSource]:
+    """Resolve the candidate directories and drop any that another candidate already contains.
+
+    A directory nested inside another candidate, or equal to one, is dropped, because copying the
+    outer directory already copies it. On the workstation all three ``Settings`` roots are
+    ``data/``, so they collapse to one source.
+
+    Args:
+        candidates: The directories to copy. Paths are resolved through symlinks before comparing,
+            so ``data/`` and the directory it links to count as equal.
+
+    Returns:
+        One ``BackupSource`` per existing, non-nested candidate, with its path resolved, in the
+        order ``candidates`` lists them.
+
+    Raises:
+        FileNotFoundError: If a required candidate is not a directory.
+    """
+    existing: list[BackupSource] = []
+    for candidate in candidates:
+        path = candidate.path.resolve()
+        if path.is_dir():
+            existing.append(replace(candidate, path=path))
+        elif candidate.required:
+            raise FileNotFoundError(f"{candidate.name}: {path} is not a directory.")
+        else:
+            _LOGGER.warning("Skipping %s: %s is not a directory.", candidate.name, path)
 
     sources: list[BackupSource] = []
-    for name, path in resolved.items():
-        if any(source.path == path or path.is_relative_to(source.path) for source in sources):
+    for candidate in existing:
+        if any(candidate.path.is_relative_to(source.path) for source in sources):
             continue
         # Drop any already-kept source this one contains, so the outer directory wins whatever
-        # order the roots arrive in.
-        sources = [source for source in sources if not source.path.is_relative_to(path)]
-        sources.append(BackupSource(name=name, path=path))
+        # order the candidates arrive in.
+        sources = [source for source in sources if not source.path.is_relative_to(candidate.path)]
+        sources.append(candidate)
     return sources
 
 
@@ -187,26 +237,28 @@ def check_main_checkout(project_root: Path) -> None:
         )
 
 
-def check_separate_device(sources: Sequence[BackupSource], destination: Path) -> None:
-    """Raise unless the destination is on a different filesystem from every source.
+def check_separate_device(paths: Sequence[Path], destination: Path) -> None:
+    """Raise unless the destination is on a different filesystem from every path.
 
     Args:
-        sources: The directories about to be copied.
+        paths: The directories about to be copied, and the directory holding the MLflow
+            database. The repository root is always among them, so the check holds even when
+            every optional directory is absent.
         destination: The snapshot directory's parent. It need not exist yet; its nearest existing
             ancestor is checked instead.
 
     Raises:
-        RuntimeError: If the destination shares a filesystem with a source. On the workstation
-            that almost always means the backup disk is not mounted.
+        RuntimeError: If the destination shares a filesystem with a path. On the workstation that
+            almost always means the backup disk is not mounted.
     """
     existing = destination
     while not existing.exists():
         existing = existing.parent
     destination_device = existing.stat().st_dev
-    for source in sources:
-        if source.path.stat().st_dev == destination_device:
+    for path in paths:
+        if path.stat().st_dev == destination_device:
             raise RuntimeError(
-                f"{destination} is on the same disk as {source.path}. Is the backup disk mounted?"
+                f"{destination} is on the same disk as {path}. Is the backup disk mounted?"
             )
 
 
@@ -224,7 +276,7 @@ def warn_about_unbacked_artifacts(db_path: Path, sources: Sequence[BackupSource]
     with closing(sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)) as connection:
         rows = connection.execute("SELECT name, artifact_location FROM experiments").fetchall()
     for name, location in rows:
-        path = Path(location.removeprefix("file://"))
+        path = Path(location.removeprefix("file://")).resolve()
         if not any(path.is_relative_to(source.path) for source in sources):
             _LOGGER.warning(
                 "MLflow experiment %r stores its artifacts at %s, which this backup does not copy.",
@@ -233,18 +285,18 @@ def warn_about_unbacked_artifacts(db_path: Path, sources: Sequence[BackupSource]
             )
 
 
-def find_previous_snapshot(destination: Path) -> Path | None:
-    """Return the newest complete snapshot under ``destination``, or ``None`` if there is none.
+def list_snapshots(destination: Path) -> list[Path]:
+    """Return every complete snapshot under ``destination``, newest first.
 
     Args:
         destination: The directory holding the snapshots.
 
     Returns:
-        The snapshot directory with the latest timestamp name. A ``.partial`` directory, or any
-        directory whose name is not a timestamp, is ignored.
+        The snapshot directories, sorted newest first. A ``.partial`` directory, or any directory
+        whose name is not a timestamp, is left out. Empty if ``destination`` does not exist.
     """
     if not destination.is_dir():
-        return None
+        return []
     snapshots: list[Path] = []
     for child in destination.iterdir():
         try:
@@ -253,7 +305,7 @@ def find_previous_snapshot(destination: Path) -> Path | None:
             continue
         if child.is_dir():
             snapshots.append(child)
-    return max(snapshots, default=None)
+    return sorted(snapshots, reverse=True)
 
 
 def _rsync(args: Sequence[str]) -> subprocess.CompletedProcess[str]:
@@ -281,20 +333,11 @@ def _rsync(args: Sequence[str]) -> subprocess.CompletedProcess[str]:
     return process
 
 
-def _copy_source(source: BackupSource, snapshot: Path, previous: Path | None) -> None:
-    """Copy one source into ``snapshot``, hard-linking files unchanged since ``previous``.
-
-    Args:
-        source: The directory to copy.
-        snapshot: The snapshot being written.
-        previous: The newest complete snapshot, or ``None`` on the first run.
-    """
-    args = ["-aH"]
-    if previous is not None and (previous / source.name).is_dir():
-        args.append(f"--link-dest={previous / source.name}")
-    _LOGGER.info("Copying %s to %s", source.path, snapshot / source.name)
-    # A trailing slash on the source copies the directory's contents, not the directory itself.
-    _rsync([*args, f"{source.path}/", f"{snapshot / source.name}/"])
+def _excludes(source: BackupSource) -> list[str]:
+    """Return the ``rsync`` arguments that skip a source's SQLite files, if it holds any."""
+    if not source.holds_sqlite:
+        return []
+    return [f"--exclude={pattern}" for pattern in _SQLITE_PATTERNS]
 
 
 def _back_up_sqlite(db_path: Path, destination: Path) -> None:
@@ -302,10 +345,12 @@ def _back_up_sqlite(db_path: Path, destination: Path) -> None:
 
     Args:
         db_path: The live database.
-        destination: Where the copy goes. Must not exist yet.
+        destination: Where the copy goes. Must not exist yet: SQLite writes into an existing file
+            in place, which would also change every snapshot hard-linked to it.
 
     Raises:
-        RuntimeError: If SQLite's integrity check of the copy reports a fault.
+        sqlite3.DatabaseError: If ``db_path`` is not a database, or SQLite's integrity check of
+            the copy reports a fault.
     """
     with (
         closing(sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)) as source,
@@ -314,17 +359,90 @@ def _back_up_sqlite(db_path: Path, destination: Path) -> None:
         source.backup(copy)
         result = copy.execute("PRAGMA integrity_check").fetchone()[0]
     if result != "ok":
-        raise RuntimeError(f"Integrity check of {destination} failed: {result}")
+        raise sqlite3.DatabaseError(f"Integrity check of {destination} failed: {result}")
+
+
+def _copy_sqlite_files(source: BackupSource, target: Path) -> None:
+    """Copy every SQLite database in ``source`` into ``target`` through the backup routine.
+
+    A file named like a database that SQLite cannot read is copied as a plain file with a
+    warning, so one damaged Dagster run record cannot stop the whole backup.
+
+    Args:
+        source: A source whose ``holds_sqlite`` is True.
+        target: The source's directory inside the snapshot.
+    """
+    for db_path in sorted(source.path.rglob("*.db")):
+        if db_path.is_symlink() or not db_path.is_file():
+            continue
+        copy = target / db_path.relative_to(source.path)
+        copy.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            _back_up_sqlite(db_path=db_path, destination=copy)
+        except sqlite3.DatabaseError as error:
+            _LOGGER.warning("Copying %s as a plain file: %s", db_path, error)
+            copy.unlink(missing_ok=True)
+            shutil.copy2(db_path, copy)
+
+
+def _copy_source(source: BackupSource, snapshot: Path, link_dest: Path | None) -> None:
+    """Copy one source into ``snapshot``, hard-linking files unchanged since ``link_dest``.
+
+    Args:
+        source: The directory to copy.
+        snapshot: The snapshot being written.
+        link_dest: The same source's directory in the newest earlier snapshot holding it, or
+            ``None`` if no earlier snapshot holds it.
+    """
+    args = ["-aH", *_excludes(source)]
+    if link_dest is not None:
+        args.append(f"--link-dest={link_dest}")
+    _LOGGER.info("Copying %s to %s", source.path, snapshot / source.name)
+    # A trailing slash on the source copies the directory's contents, not the directory itself.
+    _rsync([*args, f"{source.path}/", f"{snapshot / source.name}/"])
+    if source.holds_sqlite:
+        _copy_sqlite_files(source=source, target=snapshot / source.name)
+
+
+def _copy_secrets(project_root: Path, secret_files: Sequence[str], target: Path) -> list[str]:
+    """Copy each existing secret file into ``target``, keeping its path relative to the root.
+
+    Args:
+        project_root: The repository root the paths in ``secret_files`` are relative to.
+        secret_files: The credential files to copy.
+        target: The snapshot's secrets directory, readable by its owner only.
+
+    Returns:
+        The paths in ``secret_files`` that existed and were copied.
+    """
+    target.mkdir(mode=0o700)
+    copied: list[str] = []
+    for relative in secret_files:
+        path = project_root / relative
+        if not path.is_file():
+            _LOGGER.warning("Skipping secret file %s: it does not exist.", path)
+            continue
+        (target / relative).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, target / relative)
+        copied.append(relative)
+    return copied
 
 
 def run_backup(
-    sources: Sequence[BackupSource], db_path: Path, destination: Path, now: datetime
+    sources: Sequence[BackupSource],
+    db_path: Path,
+    project_root: Path,
+    secret_files: Sequence[str],
+    destination: Path,
+    now: datetime,
 ) -> Path:
-    """Write one complete snapshot of every source and the MLflow database.
+    """Write one complete snapshot of every source, the MLflow database, and the secret files.
 
     Args:
         sources: The directories to copy.
         db_path: The MLflow SQLite database.
+        project_root: The repository root the paths in ``secret_files`` are relative to.
+        secret_files: The credential files to copy.
         destination: The directory holding the snapshots. Created if missing.
         now: The time the snapshot is named after.
 
@@ -338,43 +456,61 @@ def run_backup(
     for leftover in destination.glob(f"*{PARTIAL_SUFFIX}"):
         _LOGGER.warning("%s is left from an interrupted run; delete it by hand.", leftover)
 
-    previous = find_previous_snapshot(destination)
+    snapshots = list_snapshots(destination)
     name = now.astimezone(UTC).strftime(SNAPSHOT_NAME_FORMAT)
     final = destination / name
     partial = destination / f"{name}{PARTIAL_SUFFIX}"
-    if final.exists() or partial.exists():
+    if final.exists():
         raise FileExistsError(f"A snapshot named {name} already exists in {destination}.")
-    partial.mkdir()
+    partial.mkdir()  # Raises FileExistsError if this run's partial snapshot already exists.
 
     for source in sources:
-        _copy_source(source=source, snapshot=partial, previous=previous)
+        link_dest = next(
+            (snapshot / source.name for snapshot in snapshots if (snapshot / source.name).is_dir()),
+            None,
+        )
+        _copy_source(source=source, snapshot=partial, link_dest=link_dest)
     _back_up_sqlite(db_path=db_path, destination=partial / MLFLOW_DB_NAME)
+    copied = _copy_secrets(
+        project_root=project_root, secret_files=secret_files, target=partial / SECRETS_DIR_NAME
+    )
+
     manifest = {source.name: str(source.path) for source in sources}
     manifest[MLFLOW_DB_NAME] = str(db_path)
+    for relative in copied:
+        manifest[f"{SECRETS_DIR_NAME}/{relative}"] = str(project_root / relative)
     (partial / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2) + "\n")
 
     partial.rename(final)
     return final
 
 
-def files_changed_since(sources: Sequence[BackupSource], snapshot: Path) -> list[str]:
-    """List every source file that differs from its copy in ``snapshot``.
+def entries_changed_since(sources: Sequence[BackupSource], snapshot: Path) -> list[str]:
+    """List every file or directory in the sources that differs from its copy in ``snapshot``.
 
-    Run straight after a backup, the list holds only the files that changed while the backup ran.
-    An empty list means the snapshot matches the workstation exactly, compared on size and
-    modification time.
+    Run straight after a backup, the list holds only the entries created, changed, or deleted
+    while the backup ran. An empty list means the snapshot matches the workstation exactly,
+    compared on size and modification time. SQLite databases are left out, because their copies
+    never match the live file's modification time.
 
     Args:
         sources: The directories that were copied.
         snapshot: The finished snapshot.
 
     Returns:
-        One ``rsync --itemize-changes`` line per differing file, prefixed with its source's name.
+        One ``rsync --itemize-changes`` line per differing entry, prefixed with its source's name.
     """
     changed: list[str] = []
     for source in sources:
         process = _rsync(
-            ["-aHn", "--itemize-changes", f"{source.path}/", f"{snapshot / source.name}/"]
+            [
+                "-aHn",
+                "--delete",
+                "--itemize-changes",
+                *_excludes(source),
+                f"{source.path}/",
+                f"{snapshot / source.name}/",
+            ]
         )
         changed += [f"{source.name}: {line}" for line in process.stdout.splitlines()]
     return changed
@@ -394,26 +530,59 @@ def main() -> None:
 
     check_main_checkout(PROJECT_ROOT)
     settings = get_settings()
-    sources = collect_sources(
-        {
-            "data_internal": settings.data_path_internal,
-            "data_delivery": settings.data_path_delivery,
-            "local_artifacts": settings.local_artifacts_path,
-            "mlruns": str(PROJECT_ROOT / "mlruns"),
-            "literature": str(PROJECT_ROOT / "literature"),
-        }
-    )
+    candidates = [
+        BackupSource(
+            name="data_internal",
+            path=local_path(name="data_path_internal", uri=settings.data_path_internal),
+        ),
+        BackupSource(
+            name="data_delivery",
+            path=local_path(name="data_path_delivery", uri=settings.data_path_delivery),
+        ),
+        BackupSource(
+            name="local_artifacts",
+            path=local_path(name="local_artifacts_path", uri=settings.local_artifacts_path),
+        ),
+        BackupSource(name="mlruns", path=PROJECT_ROOT / "mlruns", required=False),
+        BackupSource(name="literature", path=PROJECT_ROOT / "literature", required=False),
+        BackupSource(
+            name="dagster_history",
+            path=PROJECT_ROOT / "dagster_history",
+            required=False,
+            holds_sqlite=True,
+        ),
+    ]
+    if dagster_home := os.environ.get("DAGSTER_HOME"):
+        candidates.append(
+            BackupSource(
+                name="dagster_home", path=Path(dagster_home), required=False, holds_sqlite=True
+            )
+        )
+    else:
+        _LOGGER.warning("Skipping dagster_home: DAGSTER_HOME is not set.")
+    sources = collect_sources(candidates)
+
     db_path = mlflow_db_path(tracking_uri=settings.mlflow_tracking_uri, project_root=PROJECT_ROOT)
-    check_separate_device(sources=sources, destination=args.destination)
+    if not db_path.is_file():
+        raise FileNotFoundError(f"The MLflow database {db_path} does not exist.")
+    check_separate_device(
+        paths=[*(source.path for source in sources), db_path.parent, PROJECT_ROOT],
+        destination=args.destination,
+    )
     warn_about_unbacked_artifacts(db_path=db_path, sources=sources)
 
     snapshot = run_backup(
-        sources=sources, db_path=db_path, destination=args.destination, now=datetime.now(tz=UTC)
+        sources=sources,
+        db_path=db_path,
+        project_root=PROJECT_ROOT,
+        secret_files=SECRET_FILES,
+        destination=args.destination,
+        now=datetime.now(tz=UTC),
     )
-    changed = files_changed_since(sources=sources, snapshot=snapshot)
+    changed = entries_changed_since(sources=sources, snapshot=snapshot)
     if changed:
         _LOGGER.warning(
-            "%d files changed while the backup ran:\n%s", len(changed), "\n".join(changed)
+            "%d entries changed while the backup ran:\n%s", len(changed), "\n".join(changed)
         )
     _LOGGER.info("Backup complete: %s", snapshot)
 

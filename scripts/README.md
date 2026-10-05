@@ -100,7 +100,8 @@ alone.
 ## `maintenance/` — looking after the workstation
 
 - `backup_workstation.py` — **run by hand, about once a week.** Copies `data/`, `mlruns/`,
-  `literature/`, and the MLflow database into a dated snapshot on the workstation's backup disk,
-  hard-linking every file unchanged since the previous snapshot. [Backing up the
+  `literature/`, Dagster's run history, the credential files, and the MLflow database into a dated
+  snapshot on the workstation's backup disk, hard-linking every file unchanged since the previous
+  snapshot. [Backing up the
   workstation](https://openclimatefix.github.io/nged-substation-forecast/live_service/backup/)
   covers running it and restoring from it.

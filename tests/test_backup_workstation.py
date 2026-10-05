@@ -2,8 +2,8 @@
 
 The script is run by hand once a week and nobody reads its output closely, so the tests target the
 failures that would leave a backup looking fine while it protects nothing: copying onto the system
-disk, building a snapshot on an interrupted one, silently storing every file twice, and missing a
-source.
+disk, building a snapshot on an interrupted one, swallowing an `rsync` error, silently storing
+every file twice, copying a SQLite database as a torn file, and missing a source.
 """
 
 import importlib.util
@@ -35,9 +35,11 @@ def _load_script() -> ModuleType:
 
 
 backup_workstation = _load_script()
+BackupSource = backup_workstation.BackupSource
 
 _FIRST_RUN: Final[datetime] = datetime(2026, 10, 5, 18, 0, tzinfo=UTC)
 _SECOND_RUN: Final[datetime] = datetime(2026, 10, 12, 18, 0, tzinfo=UTC)
+_THIRD_RUN: Final[datetime] = datetime(2026, 10, 19, 18, 0, tzinfo=UTC)
 
 
 def _make_db(path: Path) -> Path:
@@ -57,97 +59,196 @@ def _make_sources(tmp_path: Path) -> list:
     literature = tmp_path / "literature"
     literature.mkdir()
     (literature / "paper.pdf").write_text("paper")
-    return backup_workstation.collect_sources({"data": str(data), "literature": str(literature)})
+    return backup_workstation.collect_sources(
+        [BackupSource(name="data", path=data), BackupSource(name="literature", path=literature)]
+    )
+
+
+def _backup(
+    tmp_path: Path, sources: list, now: datetime, secret_files: tuple[str, ...] = ()
+) -> Path:
+    """Back up ``sources`` and ``tmp_path / "mlflow.db"`` into ``tmp_path / "backups"``."""
+    db_path = tmp_path / "mlflow.db"
+    if not db_path.exists():
+        _make_db(db_path)
+    return backup_workstation.run_backup(
+        sources=sources,
+        db_path=db_path,
+        project_root=tmp_path,
+        secret_files=secret_files,
+        destination=tmp_path / "backups",
+        now=now,
+    )
 
 
 def test_run_backup_copies_every_source_and_the_database(tmp_path: Path) -> None:
     sources = _make_sources(tmp_path)
-    db_path = _make_db(tmp_path / "mlflow.db")
 
-    snapshot = backup_workstation.run_backup(
-        sources=sources, db_path=db_path, destination=tmp_path / "backups", now=_FIRST_RUN
-    )
+    snapshot = _backup(tmp_path, sources, _FIRST_RUN)
 
     assert snapshot.name == "2026-10-05T180000Z"
     assert (snapshot / "data" / "power_forecasts" / "part-0.parquet").read_text() == "forecasts"
     assert (snapshot / "literature" / "paper.pdf").read_text() == "paper"
     with closing(sqlite3.connect(snapshot / "mlflow.db")) as connection:
         assert connection.execute("SELECT name FROM experiments").fetchall() == [("baseline",)]
-    assert backup_workstation.files_changed_since(sources=sources, snapshot=snapshot) == []
+    assert backup_workstation.entries_changed_since(sources=sources, snapshot=snapshot) == []
 
 
-def test_second_snapshot_hard_links_unchanged_files(tmp_path: Path) -> None:
+def test_plain_source_copies_a_database_file_with_rsync(tmp_path: Path) -> None:
     sources = _make_sources(tmp_path)
-    db_path = _make_db(tmp_path / "mlflow.db")
-    destination = tmp_path / "backups"
+    (tmp_path / "data" / "cache.db").write_text("study cache")
 
-    first = backup_workstation.run_backup(
-        sources=sources, db_path=db_path, destination=destination, now=_FIRST_RUN
+    snapshot = _backup(tmp_path, sources, _FIRST_RUN)
+
+    assert (snapshot / "data" / "cache.db").read_text() == "study cache"
+
+
+def test_run_backup_copies_secret_files_into_an_owner_only_directory(tmp_path: Path) -> None:
+    (tmp_path / "packages" / "dashboard").mkdir(parents=True)
+    (tmp_path / "packages" / "dashboard" / ".env.s3").write_text("KEY=1")
+    sources = _make_sources(tmp_path)
+
+    snapshot = _backup(
+        tmp_path, sources, _FIRST_RUN, secret_files=("packages/dashboard/.env.s3", ".env")
     )
-    second = backup_workstation.run_backup(
-        sources=sources, db_path=db_path, destination=destination, now=_SECOND_RUN
-    )
+
+    secrets = snapshot / "secrets"
+    assert (secrets / "packages" / "dashboard" / ".env.s3").read_text() == "KEY=1"
+    assert not (secrets / ".env").exists()
+    assert secrets.stat().st_mode & 0o777 == 0o700
+
+
+def test_snapshot_hard_links_unchanged_files_to_the_newest_snapshot(tmp_path: Path) -> None:
+    sources = _make_sources(tmp_path)
+    forecasts = tmp_path / "data" / "power_forecasts" / "part-0.parquet"
+
+    _backup(tmp_path, sources, _FIRST_RUN)
+    forecasts.write_text("forecasts, rewritten")
+    second = _backup(tmp_path, sources, _SECOND_RUN)
+    third = _backup(tmp_path, sources, _THIRD_RUN)
 
     relative = Path("data") / "power_forecasts" / "part-0.parquet"
-    assert (first / relative).stat().st_ino == (second / relative).stat().st_ino
+    assert (second / relative).stat().st_ino == (third / relative).stat().st_ino
+
+
+def test_snapshot_links_against_the_newest_snapshot_holding_each_source(tmp_path: Path) -> None:
+    sources = _make_sources(tmp_path)
+    first = _backup(tmp_path, sources, _FIRST_RUN)
+    literature_only = [source for source in sources if source.name == "literature"]
+    _backup(tmp_path, literature_only, _SECOND_RUN)
+
+    third = _backup(tmp_path, sources, _THIRD_RUN)
+
+    relative = Path("data") / "power_forecasts" / "part-0.parquet"
+    assert (first / relative).stat().st_ino == (third / relative).stat().st_ino
+
+
+def test_run_backup_keeps_hard_links_inside_a_source(tmp_path: Path) -> None:
+    sources = _make_sources(tmp_path)
+    (tmp_path / "literature" / "copy.pdf").hardlink_to(tmp_path / "literature" / "paper.pdf")
+
+    snapshot = _backup(tmp_path, sources, _FIRST_RUN)
+
+    paper = (snapshot / "literature" / "paper.pdf").stat()
+    assert paper.st_ino == (snapshot / "literature" / "copy.pdf").stat().st_ino
 
 
 def test_deleted_file_survives_in_the_earlier_snapshot(tmp_path: Path) -> None:
     sources = _make_sources(tmp_path)
-    db_path = _make_db(tmp_path / "mlflow.db")
-    destination = tmp_path / "backups"
 
-    first = backup_workstation.run_backup(
-        sources=sources, db_path=db_path, destination=destination, now=_FIRST_RUN
-    )
+    first = _backup(tmp_path, sources, _FIRST_RUN)
     (tmp_path / "literature" / "paper.pdf").unlink()
-    second = backup_workstation.run_backup(
-        sources=sources, db_path=db_path, destination=destination, now=_SECOND_RUN
-    )
+    second = _backup(tmp_path, sources, _SECOND_RUN)
 
     assert (first / "literature" / "paper.pdf").exists()
     assert not (second / "literature" / "paper.pdf").exists()
 
 
-def test_find_previous_snapshot_ignores_partial_and_unrelated_directories(tmp_path: Path) -> None:
-    (tmp_path / "2026-10-05T180000Z").mkdir()
-    (tmp_path / "2026-10-12T180000Z.partial").mkdir()
+def test_rsync_failure_leaves_only_a_partial_snapshot(tmp_path: Path) -> None:
+    sources = _make_sources(tmp_path)
+    unreadable = tmp_path / "literature" / "locked.pdf"
+    unreadable.write_text("locked")
+    unreadable.chmod(0o000)
+
+    try:
+        with pytest.raises(subprocess.CalledProcessError):
+            _backup(tmp_path, sources, _FIRST_RUN)
+    finally:
+        unreadable.chmod(0o600)
+
+    assert backup_workstation.list_snapshots(tmp_path / "backups") == []
+    assert (tmp_path / "backups" / "2026-10-05T180000Z.partial").is_dir()
+
+
+def test_sqlite_source_copies_wal_commits_through_the_backup_routine(tmp_path: Path) -> None:
+    history = tmp_path / "dagster_history"
+    history.mkdir()
+    (history / "broken.db").write_text("not a database")
+    sources = backup_workstation.collect_sources(
+        [BackupSource(name="dagster_history", path=history, holds_sqlite=True)]
+    )
+
+    # Keep the live connection open with checkpointing off, so the committed row sits only in
+    # runs.db-wal, as it does while Dagster is running.
+    with closing(sqlite3.connect(history / "runs.db")) as live:
+        live.execute("PRAGMA journal_mode=WAL")
+        live.execute("PRAGMA wal_autocheckpoint=0")
+        live.execute("CREATE TABLE runs (id INTEGER)")
+        live.execute("INSERT INTO runs VALUES (1)")
+        live.commit()
+        snapshot = _backup(tmp_path, sources, _FIRST_RUN)
+
+    copy = snapshot / "dagster_history"
+    with closing(sqlite3.connect(copy / "runs.db")) as connection:
+        assert connection.execute("SELECT id FROM runs").fetchall() == [(1,)]
+    assert not (copy / "runs.db-wal").exists()
+    assert (copy / "broken.db").read_text() == "not a database"
+    assert backup_workstation.entries_changed_since(sources=sources, snapshot=snapshot) == []
+
+
+def test_list_snapshots_ignores_partial_and_unrelated_directories(tmp_path: Path) -> None:
+    for name in ("2026-10-05T180000Z", "2026-10-19T180000Z", "2026-10-12T180000Z"):
+        (tmp_path / name).mkdir()
+    (tmp_path / "2026-10-26T180000Z.partial").mkdir()
     (tmp_path / "notes").mkdir()
 
-    assert backup_workstation.find_previous_snapshot(tmp_path) == tmp_path / "2026-10-05T180000Z"
+    assert [path.name for path in backup_workstation.list_snapshots(tmp_path)] == [
+        "2026-10-19T180000Z",
+        "2026-10-12T180000Z",
+        "2026-10-05T180000Z",
+    ]
 
 
-def test_find_previous_snapshot_returns_none_for_missing_destination(tmp_path: Path) -> None:
-    assert backup_workstation.find_previous_snapshot(tmp_path / "absent") is None
+def test_list_snapshots_returns_empty_for_missing_destination(tmp_path: Path) -> None:
+    assert backup_workstation.list_snapshots(tmp_path / "absent") == []
 
 
 def test_run_backup_refuses_to_overwrite_a_snapshot(tmp_path: Path) -> None:
     sources = _make_sources(tmp_path)
-    db_path = _make_db(tmp_path / "mlflow.db")
-    destination = tmp_path / "backups"
-    backup_workstation.run_backup(
-        sources=sources, db_path=db_path, destination=destination, now=_FIRST_RUN
-    )
+    _backup(tmp_path, sources, _FIRST_RUN)
 
     with pytest.raises(FileExistsError):
-        backup_workstation.run_backup(
-            sources=sources, db_path=db_path, destination=destination, now=_FIRST_RUN
-        )
+        _backup(tmp_path, sources, _FIRST_RUN)
 
 
-def test_files_changed_since_reports_a_file_written_after_the_backup(tmp_path: Path) -> None:
+def test_run_backup_refuses_to_overwrite_a_partial_snapshot(tmp_path: Path) -> None:
     sources = _make_sources(tmp_path)
-    db_path = _make_db(tmp_path / "mlflow.db")
-    snapshot = backup_workstation.run_backup(
-        sources=sources, db_path=db_path, destination=tmp_path / "backups", now=_FIRST_RUN
-    )
+    (tmp_path / "backups" / "2026-10-05T180000Z.partial").mkdir(parents=True)
+
+    with pytest.raises(FileExistsError):
+        _backup(tmp_path, sources, _FIRST_RUN)
+
+
+def test_entries_changed_since_reports_created_and_deleted_files(tmp_path: Path) -> None:
+    sources = _make_sources(tmp_path)
+    snapshot = _backup(tmp_path, sources, _FIRST_RUN)
 
     (tmp_path / "literature" / "new.pdf").write_text("new")
+    (tmp_path / "data" / "power_forecasts" / "part-0.parquet").unlink()
 
-    changed = backup_workstation.files_changed_since(sources=sources, snapshot=snapshot)
-    assert len(changed) == 1
-    assert changed[0].startswith("literature: ")
-    assert changed[0].endswith("new.pdf")
+    changed = backup_workstation.entries_changed_since(sources=sources, snapshot=snapshot)
+    assert any(line.startswith("literature: ") and line.endswith("new.pdf") for line in changed)
+    assert any(line.startswith("data: *deleting") for line in changed)
 
 
 def test_collect_sources_drops_nested_and_duplicate_roots(tmp_path: Path) -> None:
@@ -155,25 +256,36 @@ def test_collect_sources_drops_nested_and_duplicate_roots(tmp_path: Path) -> Non
     (tmp_path / "link").symlink_to(tmp_path / "data")
 
     sources = backup_workstation.collect_sources(
-        {
-            "production_model": str(tmp_path / "data" / "production_model"),
-            "data": str(tmp_path / "data"),
-            "link": str(tmp_path / "link"),
-        }
+        [
+            BackupSource(name="production_model", path=tmp_path / "data" / "production_model"),
+            BackupSource(name="data", path=tmp_path / "data"),
+            BackupSource(name="link", path=tmp_path / "link"),
+        ]
     )
 
-    assert sources == [backup_workstation.BackupSource(name="data", path=tmp_path / "data")]
+    assert sources == [BackupSource(name="data", path=tmp_path / "data")]
 
 
-def test_collect_sources_skips_a_missing_root(tmp_path: Path) -> None:
-    sources = backup_workstation.collect_sources({"mlruns": str(tmp_path / "mlruns")})
+def test_collect_sources_skips_a_missing_optional_root(tmp_path: Path) -> None:
+    sources = backup_workstation.collect_sources(
+        [BackupSource(name="mlruns", path=tmp_path / "mlruns", required=False)]
+    )
 
     assert sources == []
 
 
-def test_collect_sources_rejects_a_remote_root() -> None:
+def test_collect_sources_refuses_a_missing_required_root(tmp_path: Path) -> None:
+    (tmp_path / "data").symlink_to(tmp_path / "unmounted")
+
+    with pytest.raises(FileNotFoundError, match="data_internal"):
+        backup_workstation.collect_sources(
+            [BackupSource(name="data_internal", path=tmp_path / "data")]
+        )
+
+
+def test_local_path_rejects_a_remote_root() -> None:
     with pytest.raises(ValueError, match="remote URI"):
-        backup_workstation.collect_sources({"data": "s3://bucket/data"})
+        backup_workstation.local_path(name="data_path_internal", uri="s3://bucket/data")
 
 
 def test_mlflow_db_path_resolves_a_relative_path_against_the_project_root(tmp_path: Path) -> None:
@@ -200,45 +312,35 @@ def test_mlflow_db_path_rejects_a_tracking_server() -> None:
 
 
 def test_check_separate_device_refuses_the_same_disk(tmp_path: Path) -> None:
-    sources = _make_sources(tmp_path)
-
     with pytest.raises(RuntimeError, match="Is the backup disk mounted"):
         backup_workstation.check_separate_device(
-            sources=sources, destination=tmp_path / "unmounted" / "backups"
+            paths=[tmp_path], destination=tmp_path / "unmounted" / "backups"
         )
 
 
-def test_warn_about_unbacked_artifacts_names_the_experiment(
+def test_warn_about_unbacked_artifacts_names_only_the_experiment_outside_the_sources(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     sources = _make_sources(tmp_path)
     db_path = _make_db(tmp_path / "mlflow.db")
+    with closing(sqlite3.connect(db_path)) as connection:
+        connection.execute(
+            "INSERT INTO experiments VALUES ('kept', ?)", (f"file://{tmp_path}/data/mlruns/2",)
+        )
+        connection.commit()
 
     backup_workstation.warn_about_unbacked_artifacts(db_path=db_path, sources=sources)
 
     assert "'baseline'" in caplog.text
+    assert "'kept'" not in caplog.text
 
 
 def test_check_main_checkout_refuses_a_worktree(tmp_path: Path) -> None:
     main = tmp_path / "main"
     main.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=main, check=True)
-    subprocess.run(
-        [
-            "git",
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@t",
-            "commit",
-            "-q",
-            "--allow-empty",
-            "-m",
-            "init",
-        ],
-        cwd=main,
-        check=True,
-    )
+    commit = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty"]
+    subprocess.run([*commit, "-m", "init"], cwd=main, check=True)
     worktree = tmp_path / "worktree"
     subprocess.run(["git", "worktree", "add", "-q", str(worktree)], cwd=main, check=True)
 
