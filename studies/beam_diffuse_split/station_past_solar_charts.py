@@ -32,7 +32,6 @@ from ens_past_solar import DECIDING_CONTRASTS
 from ens_past_solar import OUTPUT_DIR as ENS_OUTPUT_DIR
 from ens_past_solar_charts import NAMES as ENS_NAMES
 from ens_past_solar_charts import per_generator_rows
-from figure_numbers import FIGURE_NUMBERS, FigureKey
 from station_past_solar import (
     BLEND_ARM,
     BLEND_CONTROL_ARM,
@@ -51,6 +50,7 @@ from studies.charts import (
     interval_panel,
     report_contrasts,
 )
+from studies.figure_numbers import FIGURE_NUMBERS, FigureKey
 from studies.pv_dataset import pv_sites
 from weather_product_charts import (
     MODELS_WORK_SITES,

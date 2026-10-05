@@ -1,14 +1,13 @@
-"""Tests for `studies/beam_diffuse_split/figure_numbers.py`."""
+"""Tests for `studies.figure_numbers`."""
 
-import importlib.util
 import re
-import sys
 from pathlib import Path
 from types import ModuleType
 from typing import Final
 
-REPO_ROOT: Final[Path] = Path(__file__).parent.parent
-MODULE_PATH: Final[Path] = REPO_ROOT / "studies" / "beam_diffuse_split" / "figure_numbers.py"
+from studies import figure_numbers
+
+REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 ASSETS_DIR: Final[Path] = REPO_ROOT / "docs" / "studies" / "assets"
 SOLAR_SVG_PREFIXES: Final[tuple[str, ...]] = ("sunshine_", "ens_past_solar_", "station_past_solar_")
 WIND_SVG_PREFIXES: Final[tuple[str, ...]] = ("wind_", "ens_hres_wind_", "station_wind_")
@@ -19,13 +18,7 @@ stem from here when its SVG is redrawn; a test fails if the stem stays after the
 
 
 def _load() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("figure_numbers", MODULE_PATH)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    return figure_numbers
 
 
 def test_figure_numbers_run_from_1_to_17_with_no_gap_or_duplicate() -> None:
@@ -161,7 +154,7 @@ BLOCK_TITLE: Final[re.Pattern[str]] = re.compile(
 
 def _written_stems() -> dict[str, list[str]]:
     """Return, for each wind chart script, the SVG stems its `charts` dict writes."""
-    scripts_dir = MODULE_PATH.parent
+    scripts_dir = REPO_ROOT / "studies" / "beam_diffuse_split"
     return {
         script: WRITTEN_STEM.findall((scripts_dir / script).read_text())
         for script in WIND_CHART_SCRIPTS

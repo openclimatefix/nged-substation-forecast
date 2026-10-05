@@ -24,7 +24,6 @@ from typing import Final
 
 import altair as alt
 import polars as pl
-from figure_numbers import WIND_FIGURE_NUMBERS
 from studies.bootstrap import bootstrap_absolute
 from studies.charts import (
     figure,
@@ -33,6 +32,7 @@ from studies.charts import (
     report_contrasts,
     report_errors,
 )
+from studies.figure_numbers import WIND_FIGURE_NUMBERS
 from weather_products import METRIC, PERCENTAGE_POINTS
 from wind_icon_dream import DECIDING_CONTRASTS, OUTPUT_DIR
 

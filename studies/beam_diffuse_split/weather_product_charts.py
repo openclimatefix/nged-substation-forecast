@@ -33,7 +33,6 @@ from typing import Final
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
-from figure_numbers import FIGURE_NUMBERS
 from studies.charts import (
     CONTENT_WIDTH_PX,
     FAMILY_COLOURS,
@@ -50,6 +49,7 @@ from studies.charts import (
     select_contrasts,
     ticks,
 )
+from studies.figure_numbers import FIGURE_NUMBERS
 from weather_products import (
     METRIC,
     NEW_PLANNED_CONTRASTS,

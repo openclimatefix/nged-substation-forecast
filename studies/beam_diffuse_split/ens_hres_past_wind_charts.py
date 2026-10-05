@@ -35,7 +35,6 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from ens_hres_past_wind import OUTPUT_DIR
-from figure_numbers import WIND_FIGURE_NUMBERS, wind_figure_number, wind_figure_title
 from studies.charts import (
     CONTENT_WIDTH_PX,
     figure,
@@ -43,6 +42,7 @@ from studies.charts import (
     leaderboard_panel,
     wrapped,
 )
+from studies.figure_numbers import WIND_FIGURE_NUMBERS, wind_figure_number, wind_figure_title
 from weather_product_charts import (
     ASSETS_DIR,
     CAPACITY,

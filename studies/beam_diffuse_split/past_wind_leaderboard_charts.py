@@ -34,7 +34,6 @@ from typing import Final, NamedTuple
 
 import altair as alt
 import polars as pl
-from figure_numbers import WIND_FIGURE_NUMBERS
 from past_solar_leaderboard import ABSOLUTE_SECTION, contrast_section
 from past_solar_leaderboard_charts import (
     ASSETS_DIR,
@@ -52,6 +51,7 @@ from studies.charts import (
     stacked_leaderboard,
     wrapped,
 )
+from studies.figure_numbers import WIND_FIGURE_NUMBERS
 from studies.sources import WIND_LEADERBOARD_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)

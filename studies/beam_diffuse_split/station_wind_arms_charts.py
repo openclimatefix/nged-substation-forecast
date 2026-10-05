@@ -37,7 +37,6 @@ from typing import Any, Final, cast
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
-from figure_numbers import WIND_FIGURE_NUMBERS, wind_figure_number, wind_figure_title
 from station_wind_arms import OUTPUT_DIR, PLANNED_CONTRASTS
 from studies.charts import (
     CONDITION_COLOURS,
@@ -48,6 +47,7 @@ from studies.charts import (
     leaderboard_panel,
     wrapped,
 )
+from studies.figure_numbers import WIND_FIGURE_NUMBERS, wind_figure_number, wind_figure_title
 from weather_product_charts import ASSETS_DIR, CAPACITY, LEADERBOARD_X_TITLE, X_TITLE
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)

@@ -28,7 +28,6 @@ from typing import Final, NamedTuple
 
 import altair as alt
 import polars as pl
-from figure_numbers import FIGURE_NUMBERS
 from past_solar_leaderboard import (
     ABSOLUTE_SECTION,
     POST_HOC_ARMS,
@@ -44,6 +43,7 @@ from studies.charts import (
     stacked_contrasts,
     stacked_leaderboard,
 )
+from studies.figure_numbers import FIGURE_NUMBERS
 from studies.sources import SOLAR_LEADERBOARD_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)

@@ -43,13 +43,13 @@ from ens_past_solar import (
     _t3_members,
     build_rows,
 )
-from figure_numbers import FIGURE_NUMBERS
 from studies.bootstrap import bootstrap_absolute
 from studies.charts import (
     figure,
     interval_panel,
     report_contrasts,
 )
+from studies.figure_numbers import FIGURE_NUMBERS
 from studies.pv_dataset import pv_sites
 from weather_products import METRIC, PERCENTAGE_POINTS, _contrast_line, _mae
 

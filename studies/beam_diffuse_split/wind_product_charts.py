@@ -32,7 +32,6 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from fetch_wind_point import output_path_for
-from figure_numbers import WIND_FIGURE_NUMBERS, wind_figure_number, wind_figure_title
 from studies.charts import (
     FAMILY_COLOURS,
     PLOT_WIDTH_PX,
@@ -44,6 +43,7 @@ from studies.charts import (
     report_errors,
     select_contrasts,
 )
+from studies.figure_numbers import WIND_FIGURE_NUMBERS, wind_figure_number, wind_figure_title
 from studies.pv_dataset import wind_sites
 from studies.sources import STUDY_DATA_DIR
 from weather_product_charts import (
