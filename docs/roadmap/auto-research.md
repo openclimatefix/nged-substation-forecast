@@ -2,10 +2,14 @@
 
 > **Status: 🚧 Planned.** The infrastructure — the trusted submit command, the review step, the
 > leakage test, the research repository, the hypothesis store, and the leaderboard query — is
-> planned for v0.3, alongside the leaderboard. The experiments themselves run in v0.5, alongside
-> the rest of the [XGBoost improvements](xgboost-improvements.md). Gated on [Protect the
-> leaderboard scorer for autonomous
-> research](https://github.com/openclimatefix/nged-substation-forecast/issues/958). Neither the
+> planned for v0.3, alongside the leaderboard. The experiments themselves run in v0.5, alongside the
+> rest of the [XGBoost improvements](xgboost-improvements.md). Gated on [Protect the leaderboard
+> scorer for autonomous
+> research](https://github.com/openclimatefix/nged-substation-forecast/issues/958). The
+> infrastructure is tracked in [issue
+> #1031](https://github.com/openclimatefix/nged-substation-forecast/issues/1031), and the
+> experiments in [issue
+> #1038](https://github.com/openclimatefix/nged-substation-forecast/issues/1038). Neither the
 > infrastructure nor the search is built yet.
 
 **We plan to have a large language model (LLM) agent run some or all of the

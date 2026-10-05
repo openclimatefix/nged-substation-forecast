@@ -150,7 +150,8 @@ AWS.*
       ([#438](https://github.com/openclimatefix/nged-substation-forecast/issues/438))
 - **Infrastructure for experiments run by a large language model (LLM) agent** — the trusted submit
   command, the review step, the leakage test, the research repository, the hypothesis store, and the
-  machine-readable leaderboard query, so that v0.5 can run experiments through the agent; see
+  machine-readable leaderboard query, so that v0.5 can run experiments through the agent
+  ([#1031](https://github.com/openclimatefix/nged-substation-forecast/issues/1031)); see
   [Experiments run by an LLM agent](auto-research.md)
 - One-command rollback for `promoted_model`
   ([#440](https://github.com/openclimatefix/nged-substation-forecast/issues/440)), plus the runbooks
