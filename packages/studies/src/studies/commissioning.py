@@ -1,7 +1,8 @@
 """Drop the half-hours in which a generator was still being built.
 
-One-off throwaway script for the experiment in
-<https://github.com/openclimatefix/nged-substation-forecast/issues/784>.
+Written for the experiment in
+<https://github.com/openclimatefix/nged-substation-forecast/issues/784>. Scripts in
+`studies/beam_diffuse_split/` import it.
 
 **A solar farm's first months of telemetry measure a smaller plant than the one the site's capacity
 describes, so those rows are removed from the experiment entirely.** Site E's output relative to

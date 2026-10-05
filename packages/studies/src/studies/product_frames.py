@@ -1,10 +1,11 @@
 """Describe the solar and wind domains of the blending study, and build the rows each domain fits.
 
-One-off throwaway module for the blending study in
-<https://github.com/openclimatefix/nged-substation-forecast/issues/836>. A `Domain` names a
-domain's products, its blend sets, and its feature columns. `solar_frame` and `wind_frame` build the
-common rows with every blend column added, and `contrast_interval` and `contrast_line` turn a
-paired contrast into the interval and the report row every later study reuses.
+Written for the blending study in
+<https://github.com/openclimatefix/nged-substation-forecast/issues/836>. A `Domain` names a domain's
+products, its blend sets, and its feature columns. `solar_frame` and `wind_frame` build the common
+rows with every blend column added, and `contrast_interval` and `contrast_line` turn a paired
+contrast into the interval and the report row every later study reuses. Scripts in
+`studies/nwp_forecast_comparison/` and `studies/past_weather/` import it.
 """
 
 from collections.abc import Callable

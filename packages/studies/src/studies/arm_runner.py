@@ -1,9 +1,10 @@
 """Run one XGBoost fit per (arm, site) concurrently, and the features every arm shares.
 
-One-off throwaway module for the experiment in
-<https://github.com/openclimatefix/nged-substation-forecast/issues/784>. Every later study that
-fits arms reuses `run_all`, `Job` and `add_time_features`, so a change to how the fits run changes
-every study at once.
+Written for the experiment in
+<https://github.com/openclimatefix/nged-substation-forecast/issues/784>. Every later study that fits
+arms reuses `run_all`, `Job` and `add_time_features`, so a change to how the fits run changes every
+study at once. Scripts in `studies/beam_diffuse_split/`, `studies/nwp_forecast_comparison/`,
+`studies/open_meteo_ensemble_means/`, and `studies/past_weather/` import it.
 """
 
 import concurrent.futures

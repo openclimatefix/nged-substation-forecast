@@ -1,10 +1,11 @@
 """Build the wind past-weather study's common rows, which every later wind study starts from.
 
-One-off throwaway module for the study in
-<https://github.com/openclimatefix/nged-substation-forecast/issues/826>. It holds each wind
-product's download location, the hourly power a wind generator is scored on, the feature columns of
-every arm, and the common rows. The blending study and the ENS forecast study read these rows, so
-they live here and not in a script.
+Written for the study in <https://github.com/openclimatefix/nged-substation-forecast/issues/826>. It
+holds each wind product's download location, the hourly power a wind generator is scored on, the
+feature columns of every arm, and the common rows. The blending study and the ENS forecast study
+read these rows, so they live here and not in a script. Scripts in
+`studies/nwp_forecast_comparison/`, `studies/open_meteo_ensemble_means/`, and
+`studies/past_weather/` import it.
 """
 
 from datetime import UTC, datetime

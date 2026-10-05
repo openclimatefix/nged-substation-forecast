@@ -1,10 +1,12 @@
 """Join NGED PV power to ERA5 irradiance: the readers, rosters, filters and columns arms share.
 
-One-off throwaway module for the experiment in
+Written for the experiment in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/784>. It builds its frames
 locally rather than routing ERA5 through `contracts.weather_schemas.Nwp`, and writes nothing the
 rest of the repo reads. The command line that builds and writes one frame is
-`studies/beam_diffuse_split/build_dataset.py`.
+`studies/beam_diffuse_split/build_dataset.py`. Scripts in `studies/beam_diffuse_split/`,
+`studies/nwp_forecast_comparison/`, `studies/open_meteo_ensemble_means/`, `studies/past_weather/`,
+and `studies/weather_downloads/` import it.
 
 The whole experiment turns on every arm seeing identical rows, so all the filtering, resampling and
 solar-geometry work happens here, once, before the arms exist. `studies.arm_runner` then chooses

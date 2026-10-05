@@ -1,10 +1,10 @@
 """Read an ECMWF ENS forecast's members into the columns the ENS forecast study fits.
 
-One-off throwaway module for the ENS forecast study in
+Written for the ENS forecast study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/810>. It names the weather fields
 and the columns of each ENS arm, reduces the members of a run to the arm's statistic, and builds the
 shared feature list. The past-weather studies score ENS against other products, so they read these
-columns too.
+columns too. Scripts in `studies/nwp_forecast_comparison/` and `studies/past_weather/` import it.
 """
 
 from dataclasses import dataclass

@@ -1,7 +1,9 @@
 """Put NGED's active-network-management export cap on the experiment's hourly grid.
 
-One-off throwaway script for the experiment in
-<https://github.com/openclimatefix/nged-substation-forecast/issues/784>.
+Written for the experiment in
+<https://github.com/openclimatefix/nged-substation-forecast/issues/784>. Scripts in
+`studies/beam_diffuse_split/`, `studies/open_meteo_ensemble_means/`, and `studies/past_weather/`
+import it.
 
 `anm_setpoints.py` turns NGED's raw setpoint export into a half-hourly export cap, one file per
 generator. This module joins that cap onto the modelling dataset and marks the hours in which the

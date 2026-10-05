@@ -1,7 +1,8 @@
 """A small fitted PV model, used as a second instrument beside XGBoost.
 
-One-off throwaway module for the experiment in
-<https://github.com/openclimatefix/nged-substation-forecast/issues/784>.
+Written for the experiment in
+<https://github.com/openclimatefix/nged-substation-forecast/issues/784>. Scripts in
+`studies/beam_diffuse_split/` and `studies/past_weather/` import it.
 
 **XGBoost has to learn the transposition from data; this model is given it.** The physical route
 from irradiance to power runs through the plane of array, and the plane-of-array irradiance is where

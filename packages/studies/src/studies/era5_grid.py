@@ -1,7 +1,8 @@
 """The ERA5 grid and date range both downloads share.
 
-One-off throwaway module for the experiment in
-<https://github.com/openclimatefix/nged-substation-forecast/issues/784>.
+Written for the experiment in
+<https://github.com/openclimatefix/nged-substation-forecast/issues/784>. Scripts in
+`studies/beam_diffuse_split/` and `studies/past_weather/` import it.
 
 The two sources have to land on the same cells and the same hours, or the replication would be
 comparing the arms *and* the grid at once. Keeping the grid in one place is what makes "the same

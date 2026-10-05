@@ -1,11 +1,12 @@
 """Build the solar past-weather study's common rows, which every later solar study starts from.
 
-One-off throwaway module for the past-weather studies in
+Written for the past-weather studies in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/809>. The rows join the
 per-product builds of `studies/beam_diffuse_split/build_dataset.py` onto one frame, keep the hours
 every product covers, and add the era, neighbouring-hour, and irradiance-context columns. The
 sunshine page's report script, the blending study, and the ENS forecast study all start from these
-rows, so they live here and not in a script.
+rows, so they live here and not in a script. Scripts in `studies/nwp_forecast_comparison/` and
+`studies/past_weather/` import it.
 """
 
 from datetime import UTC, datetime
