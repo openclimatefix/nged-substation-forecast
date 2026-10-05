@@ -389,7 +389,6 @@ extra-paths = [
     "studies/open_meteo_ensemble_means",
     "studies/past_weather",
     "studies/weather_downloads",
-    "packages/studies/tests/nwp_forecast_comparison",
     "packages/studies/tests/past_weather",
 ]
 
@@ -437,7 +436,6 @@ pythonpath = [
     "studies/open_meteo_ensemble_means",
     "studies/past_weather",
     "studies/weather_downloads",
-    "packages/studies/tests/nwp_forecast_comparison",
     "packages/studies/tests/past_weather",
 ]
 # `error` first: any warning not explicitly excepted below fails the test that raised it, so a
