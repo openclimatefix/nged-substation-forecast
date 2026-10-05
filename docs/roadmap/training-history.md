@@ -10,50 +10,51 @@
 Our ECMWF ENS archive starts 2024-04-01; most trial-area power series go back to late 2019. An
 estimate of past weather ([defined
 below](#train-on-the-long-power-history-then-calibrate-per-weather-product)) covers the gap.
-[ERA5](data-sources.md#weather-data) is the estimate planned for ingest, and shares the ENS's IFS
-lineage, so the reanalysis-to-forecast domain shift is smaller than a different-model reanalysis
-would give. Which estimate of past weather to train on, per weather variable, is an [open
-question](#open-questions). Most of this page names ERA5 because ERA5 is the planned ingest.
+The planned estimates of past weather are CAMS for irradiance and CEDA UKV for other variables,
+pending a check of UKV against ERA5 over 2019 to 2024 and of temperature for demand. ERA5 is kept
+for gap filling and as a comparison arm. The evidence and the caveats are under [Which estimate of
+past weather to train on](#which-estimate-of-past-weather-to-train-on).
 
-Almost all the cost is in the data layer. Once ERA5 and the paired residual statistics exist, moving
-between the variants below is mostly configuration — so they are leaderboard arms, not decisions to
-make up front.
+Almost all the cost is in the data layer. Once the estimates of past weather and the paired residual
+statistics exist, moving between the variants below is mostly configuration — so they are
+leaderboard arms, not decisions to make up front.
 
 ## Scope the ingest to include the 2024+ overlap
 
-**Fetch ERA5 across the 2024+ ENS overlap as well as the 2020–2023 gap.** This is the one design
-decision that changes what the ingest builds, and it exists to avoid *era confounding*: a feature
-value that occurs in only one time period is learned as a proxy for that period, not for the
-underlying quantity we mean by it. If NaN-NWP appears only before 2024, "weather is missing" becomes
-a perfect proxy for "2020–2023" — a demand regime carrying COVID distortions, less embedded PV, and
-lower EV and heat-pump penetration. So a 2027 feed failure would be forecast from a 2021 regime. The
-same trap applies to a source flag, to a lead-time-zero encoding, and to the ENS-only spread and
-quantile columns, which have no ERA5 equivalent.
+**Fetch the estimates of past weather across the 2024+ ENS overlap as well as the 2020–2023 gap.**
+This is the one design decision that changes what the ingest builds, and it exists to avoid *era
+confounding*: a feature value that occurs in only one time period is learned as a proxy for that
+period, not for the underlying quantity we mean by it. If NaN-NWP appears only before 2024, "weather
+is missing" becomes a perfect proxy for "2020–2023" — a demand regime carrying COVID distortions,
+less embedded PV, and lower EV and heat-pump penetration. So a 2027 feed failure would be forecast
+from a 2021 regime. The same trap applies to a source flag, to a lead-time-zero encoding, and to the
+ENS-only spread and quantile columns, which no estimate of past weather has an equivalent for.
 
 The general rule: **an era covariate is safe exactly when the value production will see is
 well-represented in the modern era.** So, alongside the overlap fetch, randomly mask NWP features
 and spread/quantile columns on a subset of 2024+ rows, as a configurable augmentation step.
 
-The overlap has a second payoff: paired ERA5 and ENS on identical target times, which turns the
-reconciliation question below into estimation rather than guesswork.
+The overlap has a second payoff: paired estimates of past weather and ENS on identical target times,
+which turns the reconciliation question below into estimation rather than guesswork.
 
-## Reconciling ERA5 with ENS
+## Reconciling estimates of past weather with ENS
 
-- **Lead-time-zero framing.** Do not degrade; treat ERA5 as a forecast at lead zero and let the
-  lead-time feature carry the discounting. That framing separates the physical weather-to-power
-  response (genuinely lead-time-invariant) from how far to trust it as forecast error grows.
-  Cheapest arm and the right first run, but note the tension: pre-2024 rows then carry only lead
-  zero, so every split on lead time partitions the modern rows off beneath it, and the extra history
-  reaches the 3–10 day band only through the structure above such splits and in the trees that never
-  make one. Boosting shares more across trees than that phrasing might suggest, so this is a
-  weakening rather than a wall — but expect the win at short leads unless the invariance assumption
-  holds strongly.
+- **Lead-time-zero framing.** Do not degrade; treat the estimate of past weather as a forecast at
+  lead zero and let the lead-time feature carry the discounting. That framing separates the physical
+  weather-to-power response (genuinely lead-time-invariant) from how far to trust it as forecast
+  error grows. Cheapest arm and the right first run, but note the tension: pre-2024 rows then carry
+  only lead zero, so every split on lead time partitions the modern rows off beneath it, and the
+  extra history reaches the 3–10 day band only through the structure above such splits and in the
+  trees that never make one. Boosting shares more across trees than that phrasing might suggest, so
+  this is a weakening rather than a wall — but expect the win at short leads unless the invariance
+  assumption holds strongly.
 
-- **Degrade ERA5 towards ENS error statistics.** Fit the `ENS − ERA5` residual distribution per
-  variable, per lead time, per season on the overlap, then sample from it when synthesising pre-2024
-  features. Quantile mapping per horizon is the cheap version and is probably enough for
-  temperature. Degrading towards ENS error statistics is not merely an alternative to lead-zero
-  framing: it is what makes the extra history populate the long leads at all.
+- **Degrade the estimate of past weather towards ENS error statistics.** Fit the distribution of ENS
+  minus the estimate of past weather per variable, per lead time, per season on the overlap, then
+  sample from it when synthesising pre-2024 features. Quantile mapping per horizon is the cheap
+  version and is probably enough for temperature. Degrading towards ENS error statistics is not
+  merely an alternative to lead-zero framing: it is what makes the extra history populate the long
+  leads at all.
 
 - **ENS reforecasts — considered and rejected.** Under Cycle 49r1 the medium-range reforecasts run
   over the past 20 years with an 11-member ensemble, so they are real forecasts with real lead-time
@@ -68,14 +69,14 @@ reconciliation question below into estimation rather than guesswork.
   history into the forecast. The design is under research: see [A new weather product
   with a few months of history](#a-new-weather-product-with-a-few-months-of-history).
 
-## ERA5 splits one horizon into two
+## An estimate of past weather splits one horizon into two
 
 Today `nwp_lead_time_hours` (how old the weather is) and the forecast horizon (which power lags are
-available) differ only by the constant `NWP_PUBLICATION_DELAY_HOURS`, so one column carries both.
-ERA5 decouples them: weather age is zero. But power-lag availability must still mirror production,
-or pre-training teaches the model to lean on lags that vanish at serve time. Pre-training rows
-therefore need a *sampled* pseudo-horizon driving `_nullify_leaky_lags`, carried separately from
-weather age.
+available) differ only by the constant `NWP_PUBLICATION_DELAY_HOURS`, so one column carries both. An
+estimate of past weather decouples them: weather age is zero. But power-lag availability must still
+mirror production, or pre-training teaches the model to lean on lags that vanish at serve time.
+Pre-training rows therefore need a *sampled* pseudo-horizon driving `_nullify_leaky_lags`, carried
+separately from weather age.
 
 ## Single pool vs two-phase warm start
 
@@ -85,11 +86,12 @@ weather age.
   item on the [XGBoost
   improvements](xgboost-improvements.md#early-stopping-instead-of-fixed-n_estimators500) page.
 
-- **Two-phase warm start.** Train on the ERA5 history, then continue boosting on 2024+ ENS data.
-  Warm start only *adds* trees, so the correcting trees see roughly 2 years and very few examples of
-  each season. And if phase one over-trusts weather, shrinking an over-confident component
-  additively is harder than never building it. **Mixed phase two** — keeping down-weighted (and
-  possibly degraded) ERA5 rows in phase two — is the middle path.
+- **Two-phase warm start.** Train on the pre-2024 history of estimates of past weather, then
+  continue boosting on 2024+ ENS data. Warm start only *adds* trees, so the correcting trees see
+  roughly 2 years and very few examples of each season. And if phase one over-trusts weather,
+  shrinking an over-confident component additively is harder than never building it. **Mixed phase
+  two** — keeping down-weighted (and possibly degraded) pre-2024 rows in phase two — is the middle
+  path.
 
 - **The source flag follows from that choice, not the other way round.** In a *pure* phase two the
   flag has zero variance and XGBoost can never split on it, so drop it there. Under a single pool or
@@ -249,16 +251,36 @@ a version built on DP models after v2.**
 
 ### Which estimate of past weather to train on
 
-**Which estimate of past weather the weather-response model trains on is an open question.** At the
-trial area's solar and wind farms, the past-weather studies find ERA5 is not the best estimate of
-either sunshine or wind. Given ERA5, an XGBoost model's error on past sunshine is 9.08% of capacity
-on the solar study's main row set, and given CAMS it is 5.09%
+**The plan is CAMS for irradiance and CEDA UKV for other variables, pending a check of UKV against
+ERA5 over 2019 to 2024 and of temperature for demand. ERA5 is kept for gap filling and as a
+comparison arm.** The same choice applies to the weather-response model and to pre-training. ERA5
+shares the ENS's IFS lineage and CAMS and UKV do not, so the shift between the training input and
+the ENS forecasts served live is likely to be larger under the plan than under ERA5. The
+[reconciliations](#reconciling-estimates-of-past-weather-with-ens) and the product calibrator are
+what absorb that shift.
+
+**On past sunshine, CAMS beats ERA5 by a wide margin on each of the solar study's five headline row
+sets.** On the solar study's main row set, six solar farms from December 2022 to August 2026, an
+XGBoost model's error given ERA5 is 9.08% of capacity and given CAMS 5.09%
 ([solar](../studies/past-weather/solar.md#cams-describes-past-sunshine-best-of-the-eight-main-row-set-products-by-a-wide-margin)).
-At three wind farms, the error given UKV's T+0 wind as Open-Meteo serves it is 0.44 points [0.24,
-0.63] lower than given ERA5's wind
+Across the study's five headline row sets, CAMS beats ERA5 by 3.7 to 4.1 points of capacity on each
+row set, an exploratory comparison.
+
+**On past wind, UKV beats ERA5 over the wind study's window, which starts in August 2024, with a
+seasonal caveat.** At three wind farms from August 2024 to September 2026, the error given UKV's T+0
+wind as Open-Meteo serves it is 0.44 points [0.24, 0.63] lower than given ERA5's wind, a planned
+comparison
 ([wind](../studies/past-weather/wind.md#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested)).
-The working guess is CAMS for irradiance and the early time steps of CEDA's UKV archive for the
-other variables, each tested against ERA5.
+In an exploratory seasonal split, UKV's advantage over ERA5 is not statistically significant at the
+5% level from October to March; only ICON-D2's is.
+
+**No study has compared UKV's wind with ERA5's before August 2024, which is why the plan is
+pending.** Open-Meteo's UKV wind starts in August 2024, and CEDA's archive is the first UKV source
+the studies have found that reaches back to 2019. The check of CEDA UKV against ERA5 sits under
+[#492](https://github.com/openclimatefix/nged-substation-forecast/issues/492), which measures the
+perfect-weather ceiling and compares the estimates of past weather. A study comparing CEDA UKV with
+ERA5 from 2019 to 2026 has been requested and is not yet scheduled. The temperature check is for
+the demand substations.
 
 **The best estimate of past weather may be a blend of several products rather than any one
 product.** In the [blending study](../studies/past-weather/blending.md), an XGBoost model given all
@@ -287,7 +309,7 @@ to UKV. Three caveats limit what the blending results say about training the wea
 - **The blending study's four headline comparisons are post hoc**, chosen after a first run's
   results, as the study page says.
 
-**CEDA's UKV archive carries three caveats as a training input.**
+**CEDA's UKV archive carries four caveats as a training input.**
 
 - CEDA's UKV is statistically different from the UKV the Met Office serves live. If the live
   service does not serve UKV, a weather-response model trained on CEDA's UKV never meets live UKV
@@ -298,6 +320,8 @@ to UKV. Three caveats limit what the blending results say about training the wea
 - The UKV fields fetched from CEDA so far hold 10 m wind and winds at 1000 hPa and 925 hPa, with
   no 100 m wind and no orography. Estimating hub-height wind from those levels needs orography,
   and the 1000 hPa level lies below ground in deep lows, which are the windy days.
+- CEDA's UKV archive has three gaps of 15 to 16 missing runs each. ERA5 fills those gaps, which is
+  part of ERA5's gap-filling role.
 
 **Weather inferred from the DP models stays an estimate of past weather, with a circularity that
 bites in training and not at test time.**
@@ -324,8 +348,8 @@ model trained natively on the same months of the same product, on identical rows
 the product calibrator is fitted on the N months before that month and scored on that month, for N
 in 1, 2, 3, 6, and 12. GEFS, the Global Ensemble Forecast System of the US National Oceanic and
 Atmospheric Administration, is the primary stand-in. The GEFS archive starts 2020-10-01 and GEFS
-comes from a different weather-model family from ERA5's, so the curve can be averaged over start
-months in every season. ECMWF ENS, from 2024-04-01, is the secondary and optimistic stand-in.
+comes from a different weather-model family from UKV's and ERA5's, so the curve can be averaged over
+start months in every season. ECMWF ENS, from 2024-04-01, is the secondary and optimistic stand-in.
 AIFS-ENS, from 2025-07-02, is the real short-history case, entering as a blend with ECMWF ENS. The
 controls are the weather-response model fed raw forecast members with no product calibrator, an
 XGBoost model trained natively on the same N months, and the ENS champion trained on its full fold,
@@ -348,9 +372,10 @@ pipeline.
 - **The product calibrator absorbing the weather-response model's errors**, such as demand drift.
   Keep date and calendar features out of the product calibrator, and measure the weather-response
   model's own error by fitting the same calibrator on estimate-of-past-weather inputs.
-- **An optimistic stand-in.** ECMWF ENS shares ERA5's IFS lineage, so a calibrator mapping an
-  ERA5-trained weather-response model onto ENS needs fewer months than a calibrator mapping the
-  same weather-response model onto a product from another weather-model family.
+- **An optimistic stand-in.** ECMWF ENS shares ERA5's IFS lineage, so in the ERA5 comparison arm a
+  calibrator mapping an ERA5-trained weather-response model onto ENS needs fewer months than a
+  calibrator mapping the same weather-response model onto a product from another weather-model
+  family.
 - **Season confounded with history length.** A calibrator fitted on the last 3 months before July
   sees only spring and early summer. The learning curve must be averaged over several start months.
 - **A change of feed.** Open-Meteo's ICON-EU may differ from Dynamical.org's ICON-EU.
@@ -364,10 +389,11 @@ variants as comparison arms.** Warm start can only add trees, so an over-confide
 sensitivity learned in the first phase is hard to shrink. The design replaces that second phase with
 a product calibrator small enough to fit on a few months. The
 [single-pool](#single-pool-vs-two-phase-warm-start), [lead-time-zero, and
-degraded-past-weather](#reconciling-era5-with-ens) arms are the fairer comparisons, because each
-trains one XGBoost model on every row. For demand substations the design does not apply, because
-their forecasts lean on power lags, which the lag-free weather-response model does not use. So #167
-still owns the longer training history for the champion model at demand substations.
+degraded-past-weather](#reconciling-estimates-of-past-weather-with-ens) arms are the fairer
+comparisons, because each trains one XGBoost model on every row. For demand substations the design
+does not apply, because their forecasts lean on power lags, which the lag-free weather-response
+model does not use. So #167 still owns the longer training history for the champion model at demand
+substations.
 
 ### The design moves a calibration step into the serving path
 
@@ -397,10 +423,11 @@ the step is safe to ship.
   ([#437](https://github.com/openclimatefix/nged-substation-forecast/issues/437)) gain "one weather
   source absent" before that contract freezes?
 - **Which estimate of past weather, per variable.** CAMS for irradiance and CEDA's UKV early time
-  steps for the other variables is the working guess; ERA5, weather stations, weather satellites,
-  and weather inferred from DP models are the alternatives. The best estimate may be a blend of
-  several products. If it is, the weather-response model can either take every product's columns
-  or take a weather-space blend (see [the blending
+  steps for the other variables is the plan, pending the checks against ERA5 described under [Which
+  estimate of past weather to train on](#which-estimate-of-past-weather-to-train-on). ERA5, weather
+  stations, weather satellites, and weather inferred from DP models are the alternatives. The best
+  estimate may be a blend of several products. If it is, the weather-response model can either take
+  every product's columns or take a weather-space blend (see [the blending
   caveats](#which-estimate-of-past-weather-to-train-on)).
 
 ## Era covariates
@@ -495,12 +522,12 @@ ingests carry the connection dates needed to check.
 
 ## Evaluation
 
-- **Scoring against ERA5 is a diagnostic, never the promotion criterion.** It decomposes total error
-  into the weather-to-power response — the part we can actually improve, since NWP error is
-  exogenous to us — and the implicit hedging against forecast error. Expect the two rankings to
-  disagree: under perfect weather the best model leans hard on weather features, so a large
-  divergence is information about how much hedging a model does, not a bug. The same scope carries
-  the [perfect-weather
+- **Scoring against an estimate of past weather is a diagnostic, never the promotion criterion.** It
+  decomposes total error into the weather-to-power response — the part we can actually improve,
+  since NWP error is exogenous to us — and the implicit hedging against forecast error. Expect the
+  two rankings to disagree: under perfect weather the best model leans hard on weather features, so
+  a large divergence is information about how much hedging a model does, not a bug. The same scope
+  carries the [perfect-weather
   ceiling](metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates), which sizes how
   much of our error is the weather *forecast's* fault and so gates how much to invest in the weather
   input at all. It lands as a new `evaluation_scope`, not as a new fold, so leaderboard folds stay
@@ -521,8 +548,9 @@ ingests carry the connection dates needed to check.
   improvement from run-to-run variance.
 
 - ERA5 is a single frozen IFS cycle across the whole archive, so year-over-year comparison within it
-  is not contaminated by NWP system upgrades. The flipside: our ENS archive spans cycle changes, so
-  some apparent drift there is the weather model changing rather than the electricity network.
+  is not contaminated by NWP system upgrades, which suits ERA5's role as the comparison arm. Our ENS
+  archive spans cycle changes, and CEDA's UKV spans the PS47 upgrade of 2026-01-21, so some apparent
+  drift in either is the weather model changing rather than the electricity network.
 
 ## A staged-GRIB route fills three of the missing years without waiting for the Zarr backfill
 
@@ -566,23 +594,25 @@ Two details still worth tracking regardless of which route lands:
   in 2023-06 (18→9 km, within the staged bucket's complete-date range), and 49r1 in 2024-11. Each is
   an era boundary under the `study` skill.
 
-The **ERA5 ingest is unconditional** either way: capacity estimation, the [weather-abnormality
-climatology](xgboost-improvements.md#weather-abnormality-climatology-z-score-features), and the ERA5
-diagnostic scope all need it regardless of which ENS backfill route lands.
+**The ERA5 ingest is needed whichever ENS backfill route lands.** ERA5 fills the gaps in CEDA's
+UKV archive and is the comparison arm, and capacity estimation and the [weather-abnormality
+climatology](xgboost-improvements.md#weather-abnormality-climatology-z-score-features) use ERA5.
 
 ## Implementation details (deleted when this ships)
 
 Ordered, and deliberately not one PR. Steps 1–2 are the data layer; the rest are experiments.
 
-1. Ingest ERA5 for 2020 to present, gap **and** overlap
-   ([#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143)).
-2. Compute paired `ENS − ERA5` residual statistics on the overlap, per variable, per lead time, per
-   season.
+1. Ingest the estimates of past weather for 2020 to present, gap **and** overlap: CAMS for
+   irradiance and CEDA UKV for other variables, pending the checks against ERA5, with ERA5 for gap
+   filling and as a comparison arm (ERA5:
+   [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143)).
+2. Compute paired residual statistics of ENS minus each estimate of past weather on the overlap, per
+   variable, per lead time, per season.
 3. Build the masking augmentation (NWP features, and spread/quantile columns separately) as a
    configurable step, plus the sampled pseudo-horizon for lag nullification.
 4. Add the lockdown covariate and the per-era sample weights.
-5. Define the evaluation protocol and the variance-versus-improvement test, and add the ERA5
-   diagnostic `evaluation_scope`.
+5. Define the evaluation protocol and the variance-versus-improvement test, and add the diagnostic
+   `evaluation_scope` that scores against estimates of past weather.
 6. Sweep the variant grid
    ([#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167)): reconciliation
    method × single-pool/two-phase × pure/mixed phase two × flag on/off × spread columns
@@ -594,8 +624,8 @@ history](#a-new-weather-product-with-a-few-months-of-history)
 under `studies/`:
 
 1. Build the weather-response model at the nine metered generators, lag-free and out-of-fold over
-   month blocks, once per estimate of past weather under test (ERA5, CAMS for irradiance, CEDA's
-   UKV early time steps for the other variables).
+   month blocks, once per estimate of past weather under test (CAMS for irradiance and CEDA's UKV
+   early time steps for the other variables, with ERA5 as the comparison arm).
 2. Fit the power-space calibrator per technology, smooth in lead time, in capacity-factor units,
    censored at 0 and 1, and shrunk towards the ECMWF ENS calibrator, refitted on a rolling origin.
 3. Measure the learning curves on GEFS and ECMWF ENS, and on the blend of ECMWF ENS with AIFS-ENS,

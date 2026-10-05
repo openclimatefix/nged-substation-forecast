@@ -882,10 +882,13 @@ extension no longer stuck at 2021 but running to within a few months of present.
 climatology folds a model-pair bias into every anomaly. (This same model-consistency argument,
 together with ERA5T's near-real-time latency, is why [ERA5](data-sources.md#weather-data) is the
 reanalysis planned for capacity estimation and this climatology; CERRA stays documented as a
-higher-resolution option but is deprioritised. Which estimate of past weather to pre-train on is a
-separate [open question](training-history.md#open-questions).) The most self-consistent source
-imaginable would be a climatology from our own archived ENS, but a robust day-of-year climatology
-wants 10+ years and the archive is nowhere near that yet, so ERA5 wins in practice.
+higher-resolution option but is deprioritised. The estimates of past weather planned for
+pre-training are a separate choice: CAMS for irradiance and CEDA UKV for other variables, pending
+[checks against ERA5](training-history.md#which-estimate-of-past-weather-to-train-on).) The most
+self-consistent source imaginable would be a climatology from our own archived ENS, but a robust
+day-of-year climatology wants 10+ years and the archive is nowhere near that yet. CEDA's UKV archive
+starts in 2016, does not share the ENS's IFS lineage, and is not homogeneous across the Met Office's
+PS47 upgrade of 2026-01-21, so ERA5 wins in practice.
 
 **Storage and ingestion — settle the design when the experiment earns it.** The climatology wants
 storing the way the rest of the project stores gridded weather: an **H3-indexed Delta table** keyed
@@ -1138,18 +1141,19 @@ either way.
 
 ## Tier 4 — structural model changes (weeks)
 
-### Pre-train on the ERA5-backed history
+### Pre-train on estimates of past weather
 
 Issues: [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143) (ingest),
 [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) (experiments)
 
 Our power data reaches back to late 2019 but our ECMWF ENS archive starts 2024-04-01, so today's
-fold trains on 15 months and one winter. Ingesting ERA5 and pre-training on 2020–2023 takes that to
-roughly 5.5 years, which is what makes the seasonal items on this page cleanly measurable — the
-[long-window accumulators](#the-long-window-variant-drought-and-sustained-heat-state) above all, and
-secondarily the holiday, monotone-constraint and global-model items, whose value all turns on
-seasonal or regime coverage the current window does not have. The design, the era-confounding hazard
-that dictates the ingest's scope, and the COVID covariate are on [Extending the training
+fold trains on 15 months and one winter. Ingesting estimates of past weather and pre-training on
+2020–2023 takes that to roughly 5.5 years, which is what makes the seasonal items on this page
+cleanly measurable — the [long-window
+accumulators](#the-long-window-variant-drought-and-sustained-heat-state) above all, and secondarily
+the holiday, monotone-constraint and global-model items, whose value all turns on seasonal or regime
+coverage the current window does not have. The design, the era-confounding hazard that dictates the
+ingest's scope, and the COVID covariate are on [Extending the training
 history](training-history.md). For metered wind and solar generators, the pre-training variants are
 also comparison arms in the study of [a new weather product with a few months of
 history](training-history.md#pre-training-then-fine-tuning-becomes-a-comparison-arm-for-wind-and-solar).
@@ -1159,17 +1163,18 @@ history](training-history.md#pre-training-then-fine-tuning-becomes-a-comparison-
 scores from 188 solar forecasting papers and find that each extra day of training data raises skill
 score at horizons beyond 6 hours by 0.004 percentage points. But they also find that the gain turns
 over at around 2,000 days — roughly 5.5 years — which they attribute to over-fitting. That is a
-reason to expect the ERA5 extension to reach the top of the curve rather than fall short of it, and
-a reason to argue any *further* extension on regime coverage or fold count rather than on volume
-alone. Two caveats before leaning on the number: their sample is deterministic solar forecasting at
-the plant or irradiance level, not substation net demand, and their beyond-6-hours band covers this
-page's 3-to-10-day focus in a single category.
+reason to expect the extension to late 2019 to reach the top of the curve rather than fall short of
+it, and a reason to argue any *further* extension on regime coverage or fold count rather than on
+volume alone. Two caveats before leaning on the number: their sample is deterministic solar
+forecasting at the plant or irradiance level, not substation net demand, and their beyond-6-hours
+band covers this page's 3-to-10-day focus in a single category.
 
 Two sequencing notes. The [lead-time
 feature](#feed-the-model-the-forecast-lead-time-review-discovery-one-line) is a prerequisite,
-because the lowest-effort reconciliation arm leans on it to discount reanalysis weather. And the
-data-hungry items below — batched training, ensemble-member training, the global model — are worth
-running *after* the history lands, since that is where four extra years change the answer most.
+because the lowest-effort reconciliation arm leans on it to discount estimates of past weather. And
+the data-hungry items below — batched training, ensemble-member training, the global model — are
+worth running *after* the history lands, since that is where four extra years change the answer
+most.
 
 ### Per-horizon-window models
 
