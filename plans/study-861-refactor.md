@@ -12,15 +12,15 @@ import scan sees. Published pages cite script paths on 81 lines in 11 files in `
 naming a script that moves, not the 30 the issue estimated.
 
 **The plan is to sort the scripts into folders that mirror the docs page families, and to make the
-crossings impossible rather than merely rare.** A script may import only from its own folder, from `studies.*` (`packages/studies`), and from the
-other reviewed packages in `packages/*`. No code in `src/` or in `packages/*` other than
-`packages/studies` may import `studies` or a study script, because humans review that code and the
-study code is fast-moving and agent-written. Everything a second folder needs moves into the package, in
-two layers. One AST test, added in the last commit, enforces the rule over `studies/` and over
-`packages/studies/src`. Tests of study scripts move to one tree. The study data under `data/studies/`
-is reorganised in a separate, gated sequence of renames after the code lands (see "Data"). The
-general Fractions Skill Score and paired block bootstrap are not extracted here (issues #805 and #808):
-they wait for their production callers.
+crossings impossible rather than merely rare.** A script may import only from its own folder, from
+`studies.*` (`packages/studies`), and from the other reviewed packages in `packages/*`. No code in
+`src/` or in `packages/*` other than `packages/studies` may import `studies` or a study script,
+because humans review that code and the study code is fast-moving and agent-written. Everything a
+second folder needs moves into the package, in two layers. One AST test, added in the last commit,
+enforces the rule over `studies/` and over `packages/studies/src`. Tests of study scripts move to
+one tree. The study data under `data/studies/` is reorganised in a separate, gated sequence of
+renames after the code lands (see "Data"). The general Fractions Skill Score and paired block
+bootstrap are not extracted here (issues #805 and #808): they wait for their production callers.
 
 ## Verdict, size and departures
 
