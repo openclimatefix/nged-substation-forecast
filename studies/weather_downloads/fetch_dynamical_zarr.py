@@ -39,11 +39,12 @@ noaa-gfs-forecast`, `--dataset noaa-gefs-forecast-35-day`, `--dataset
 ecmwf-aifs-single-forecast`, or `--dataset ecmwf-aifs-ens-forecast` (the last two land in
 `ECMWF-AIFS/` and `ECMWF-AIFS-ENS/`). `--workers` sets how many months are fetched concurrently.
 `--extra-east-columns N` widens the crop by `N` grid columns on the east side and
-`--output-suffix=-WIDE` appends a suffix to the product directory name, so a wider crop lands
-beside the default one; `check_aifs_crop_covers_sites.py` checks that a crop covers every study
-site's H3 cell. Passing `--start-date` and `--end-date` (both `YYYY-MM-DD`, inclusive) fetches
-only that window, into its own directory, for a trial run. Then check the output with
-`validate_dynamical_zarr.py`.
+`--output-suffix=-WIDE` appends a suffix to the product directory name, so a wider crop lands beside
+the default one (add the suffixed name to `NWP_PRODUCT_NAMES` in `studies.sources` first, because
+`product_dir_for` raises for a product it does not know); `check_aifs_crop_covers_sites.py` checks
+that a crop covers every study site's H3 cell. Passing `--start-date` and `--end-date` (both
+`YYYY-MM-DD`, inclusive) fetches only that window, into its own directory, for a trial run. Then
+check the output with `validate_dynamical_zarr.py`.
 """
 
 import argparse

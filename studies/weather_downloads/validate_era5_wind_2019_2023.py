@@ -3,12 +3,11 @@
 One-off throwaway script for <https://github.com/openclimatefix/nged-substation-forecast/issues/841>,
 following the `data-validation` skill. It reads
 `data/studies/downloads/reanalysis/ERA5-WIND-2019-2023/` and runs the checks in `main`: columns and
-dtypes, exact row count (cells x 37,992 hours), duplicate keys, nulls and NaNs, a contiguous
-hourly axis, speed range, the hour-of-day profile, stuck runs,
-level steps between months, 100 m against 10 m speed, the offsets of the cell blocks, the
-correlation with the MIDAS Open station observations at lags of -2 to +2 hours, the step across
-2023-12-31 to 2024-01-01 against the on-disk 2024 file, and bit-equality of the re-fetched 2024-01
-with that file.
+dtypes, exact row count (cells x 37,992 hours), duplicate keys, nulls and NaNs, a contiguous hourly
+axis, speed range, the hour-of-day profile, stuck runs, level steps between months, 100 m against 10
+m speed, the offsets of the cell blocks, the correlation with the MIDAS Open station observations at
+lags of -2 to +2 hours, the step across 2023-12-31 to 2024-01-01 against the on-disk 2024 file, and
+bit-equality of the re-fetched 2024-01 with that file.
 
 Grid orientation and a whole-hour time shift are tested by data, not by the cell plan: the station
 correlation peaks at lag 0 only if each cell holds the right place and the right hour, and the
