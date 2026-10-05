@@ -37,7 +37,6 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from export_cap import with_export_cap
 from run_experiment import (
     SHARED_FEATURES,
     Job,
@@ -51,6 +50,7 @@ from run_physics_experiment import _fit, _predict
 from studies.bootstrap import bootstrap_difference
 from studies.commissioning import drop_commissioning_ramp
 from studies.cross_validation import N_FOLDS, PRIMARY_HYPER_PARAMETERS, assign_folds
+from studies.export_cap import with_export_cap
 from studies.sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

@@ -48,7 +48,6 @@ from typing import Final
 import numpy as np
 import polars as pl
 import xgboost as xgb
-from export_cap import with_export_cap
 from studies.bootstrap import bootstrap_difference, per_fold_differences
 from studies.commissioning import drop_commissioning_ramp
 from studies.cross_validation import (
@@ -61,6 +60,7 @@ from studies.cross_validation import (
     booster_parameters,
     out_of_fold_losses,
 )
+from studies.export_cap import with_export_cap
 from studies.fractions_skill_score import MONTH_FORMAT
 from studies.sources import SOURCE_CHOICES, STUDY_DATA_DIR
 

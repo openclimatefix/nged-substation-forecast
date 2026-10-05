@@ -74,7 +74,6 @@ from typing import Final, Literal, NamedTuple
 
 import numpy as np
 import polars as pl
-from export_cap import with_export_cap
 from run_experiment import (
     MAX_CONCURRENT_FITS,
     SHARED_FEATURES,
@@ -104,6 +103,7 @@ from studies.cross_validation import (
     clamp_to_cap,
     fit_one_fold,
 )
+from studies.export_cap import with_export_cap
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.neighbouring_hours import with_neighbouring_hours
 from studies.physics_model import (

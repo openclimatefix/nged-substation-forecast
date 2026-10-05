@@ -68,7 +68,6 @@ import polars as pl
 import weather_products
 import wind_products
 from deltalake import DeltaTable
-from export_cap import with_export_cap
 from run_experiment import SHARED_FEATURES as SOLAR_SHARED_FEATURES
 from run_experiment import Job, _add_time_features, run_all
 from studies.blending import PERMUTED_SUFFIX, climatology_permutation, stacked_errors
@@ -84,6 +83,7 @@ from studies.cross_validation import (
     UKV_UPGRADE_MONTH,
     HyperParameters,
 )
+from studies.export_cap import with_export_cap
 from studies.pv_dataset import POWER_DELTA_URI, wind_sites
 from studies.sources import STUDY_DATA_DIR
 

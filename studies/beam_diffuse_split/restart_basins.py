@@ -21,7 +21,6 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from export_cap import with_export_cap
 from run_experiment import _add_time_features, dataset_path_for
 from run_physics_experiment import (
     ARM_SPLITS,
@@ -33,6 +32,7 @@ from run_physics_experiment import (
 from scipy.optimize import minimize
 from studies.commissioning import drop_commissioning_ramp
 from studies.cross_validation import assign_folds
+from studies.export_cap import with_export_cap
 from studies.sources import SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

@@ -109,7 +109,6 @@ from typing import Final, TypedDict
 import numpy as np
 import polars as pl
 import weather_products
-from export_cap import with_export_cap
 from run_experiment import SHARED_FEATURES as RUN_SHARED_FEATURES
 from run_experiment import Job, _add_time_features, run_all
 from studies.blending import climatology_permutation, stacked_errors
@@ -129,6 +128,7 @@ from studies.cross_validation import (
     SENSITIVITY_HYPER_PARAMETERS,
     HyperParameters,
 )
+from studies.export_cap import with_export_cap
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.neighbouring_hours import with_neighbouring_hours
 from studies.pv_dataset import CAMS_PATH

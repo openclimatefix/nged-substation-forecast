@@ -97,8 +97,8 @@ from studies.stitched_ensemble import (
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
 # The underscore-named helpers below are the roster, power and geometry code the earlier studies
 # use, and reusing them keeps every convention identical. Importing private names is a one-off here.
-from export_cap import with_export_cap
 from run_experiment import Job, run_all
+from studies.export_cap import with_export_cap
 from studies.pv_dataset import (
     add_solar_geometry,
     drop_false_zeros,

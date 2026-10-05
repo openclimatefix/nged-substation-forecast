@@ -46,10 +46,11 @@ from typing import Final
 
 import numpy as np
 import polars as pl
+
 from studies.pv_dataset import pv_sites
 from studies.sources import ANM_DATA_DIR
 
-_LOG: Final[logging.Logger] = logging.getLogger("export_cap")
+_LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
 CAP_FILE_PREFIX: Final[str] = "export_cap_"
 """The filenames `anm_setpoints.py` writes, each ending in the generator's `time_series_id`."""

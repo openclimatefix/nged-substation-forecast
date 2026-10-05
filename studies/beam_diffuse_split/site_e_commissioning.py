@@ -29,7 +29,7 @@ import numpy as np
 # Importing the theme module registers and enables the OCF Altair theme as a side effect.
 import plotting.ocf_theme as ocf
 import polars as pl
-from export_cap import CAP_FILE_PREFIX
+from studies.export_cap import CAP_FILE_PREFIX
 from studies.pv_dataset import pv_sites
 from studies.sources import ANM_DATA_DIR, REPO_DATA_DIR, STUDY_DATA_DIR
 
