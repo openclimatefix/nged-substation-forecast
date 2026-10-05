@@ -608,8 +608,8 @@ physical model per site, and several of its by-products bear directly on this pl
 is [Does a weather product's beam/diffuse split help a PV
 forecast?](../studies/beam-diffuse-split.md); the code is in a pull request kept open for reference
 rather than merged,
-[#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785), answering [issue
-#784](https://github.com/openclimatefix/nged-substation-forecast/issues/784). None of it is a
+[#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785), answering
+[issue #784](https://github.com/openclimatefix/nged-substation-forecast/issues/784). None of it is a
 capacity estimator, and none of it settles which of the candidates above to build. What follows is
 what it established and the traps it hit.
 
