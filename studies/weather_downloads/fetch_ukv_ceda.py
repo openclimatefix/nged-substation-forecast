@@ -95,8 +95,9 @@ import requests
 import zarr
 import zarr.errors
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR, load_trial_area_box
+from paths import WEATHER_DOWNLOADS_DIR
 from pyproj import Transformer
+from studies.trial_area import load_trial_area_box
 from studies.ukv_ceda_profiles import (
     DEFAULT_PROFILE,
     FIELDS,

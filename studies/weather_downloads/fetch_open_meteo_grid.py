@@ -30,7 +30,8 @@ from typing import Any, Final
 
 import polars as pl
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR, load_trial_area_box, open_meteo_api_key
+from paths import WEATHER_DOWNLOADS_DIR, open_meteo_api_key
+from studies.trial_area import load_trial_area_box
 
 HISTORICAL_FORECAST_URL: Final[str] = (
     "https://customer-historical-forecast-api.open-meteo.com/v1/forecast"

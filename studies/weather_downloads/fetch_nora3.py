@@ -55,9 +55,10 @@ import requests
 from delta_store.nwp import NWP_SIGNIFICAND_BITS
 from delta_store.precision import round_to_significand_bits
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR, load_trial_area_box
+from paths import WEATHER_DOWNLOADS_DIR
 from pydap.client import open_url  # ty: ignore[unresolved-import]
 from pyproj import Transformer
+from studies.trial_area import load_trial_area_box
 
 CATALOG_URL: Final[str] = (
     "https://thredds.met.no/thredds/dodsC/nora3_subset_atmos/wind_hourly_v2_agg/nora3_wind_hourly.ncml"

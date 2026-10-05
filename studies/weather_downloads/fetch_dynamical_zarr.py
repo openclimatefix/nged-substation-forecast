@@ -61,7 +61,8 @@ import pyarrow.parquet as pq
 import xarray as xr
 from delta_store.precision import round_to_significand_bits
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR, load_trial_area_box
+from paths import WEATHER_DOWNLOADS_DIR
+from studies.trial_area import load_trial_area_box
 
 VARIABLES: Final[tuple[str, ...]] = (
     "downward_short_wave_radiation_flux_surface",

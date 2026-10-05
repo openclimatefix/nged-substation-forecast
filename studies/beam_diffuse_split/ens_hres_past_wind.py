@@ -140,7 +140,6 @@ and the hyperparameters) no longer matches what this code would fit.
 
 import argparse
 import hashlib
-import importlib.util
 import logging
 import re
 import subprocess
@@ -149,7 +148,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import MappingProxyType
-from typing import Final, Protocol, TypedDict
+from typing import Final, TypedDict
 
 import numpy as np
 import polars as pl
@@ -185,6 +184,7 @@ from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import wind_sites
 from studies.solar_product_frames import with_eras
 from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
+from studies.trial_area import load_trial_area_box
 from studies.wind_product_frames import (
     SHARED_FEATURES,
     common_rows,
@@ -220,11 +220,6 @@ ENS_INPUTS_PATH: Final[Path] = (
 
 HORIZONS_REPORT_PATH: Final[Path] = ENS_INPUTS_PATH.parent / "report.md"
 """The horizons study's report, read for the published day-0 contrast against ERA5."""
-
-TRIAL_AREA_PATHS_MODULE: Final[Path] = (
-    Path(__file__).parent.parent / "weather_downloads" / "paths.py"
-)
-"""The module that holds the trial-area box, loaded by path because `studies/` is not a package."""
 
 ROW_SET_START_DATE: Final[datetime] = datetime(2024, 12, 1, tzinfo=UTC)
 """The first hour of the row set: the first whole month after IFS Cycle 49r1 (12 November 2024)."""
@@ -559,28 +554,6 @@ class ChecksResult(TypedDict):
     previous_day: PreviousDayEvidence
 
 
-class TrialAreaBox(Protocol):
-    """The part of `weather_downloads.paths.TrialAreaBox` this script reads."""
-
-    def grid_points(self, *, spacing_deg: float) -> pl.DataFrame:
-        """Return the grid's `point_id`, `latitude` and `longitude`, one row per point."""
-        ...
-
-
-def _trial_area_box() -> TrialAreaBox:
-    """Load the trial-area box from `studies/weather_downloads/paths.py`, held in memory only.
-
-    Returns:
-        The box, whose `grid_points` method returns the 342-point grid's coordinates.
-    """
-    spec = importlib.util.spec_from_file_location("weather_download_paths", TRIAL_AREA_PATHS_MODULE)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.load_trial_area_box()
-
-
 def hres_frame(*, sites: pl.DataFrame) -> pl.DataFrame:
     """Return each wind farm's freshest-run HRES wind, hourly, in the page's four columns.
 
@@ -796,7 +769,7 @@ def hres_grid_check(*, sites: pl.DataFrame) -> dict[str, float]:
     Raises:
         ValueError: If any farm has no matching point among its nearest `GRID_NEAREST_RANK`.
     """
-    points = _trial_area_box().grid_points(spacing_deg=0.05)
+    points = load_trial_area_box().grid_points(spacing_deg=0.05)
     ranked = _nearest_grid_points(sites=sites, points=points)
     candidates = sorted({point for ids in ranked.values() for point in ids})
     grid = (
