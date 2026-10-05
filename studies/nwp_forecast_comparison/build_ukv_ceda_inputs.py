@@ -48,7 +48,7 @@ stamp checks, and counts a gap in the 15 UTC run under the same run-gap causes.
 `--dry-run` builds one month (`--dry-run-month`), prints the same tables on the runs the store
 holds, and writes nothing.
 
-Run it with `uv run python studies/ukv_ceda_blends/build_ukv_ceda_inputs.py`.
+Run it with `uv run python studies/nwp_forecast_comparison/build_ukv_ceda_inputs.py`.
 """
 
 import argparse
@@ -1002,7 +1002,7 @@ def readme_text(
             f"# UKV-CEDA inputs for the blends study, {spec.run_hour:02d} UTC run (write-once)",
             "",
             (
-                "Built by `studies/ukv_ceda_blends/build_ukv_ceda_inputs.py` for "
+                "Built by `studies/nwp_forecast_comparison/build_ukv_ceda_inputs.py` for "
                 "`docs/studies/forecasts/ukv-ceda-blends.md`. Never overwrite a file here."
             ),
             "",

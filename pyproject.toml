@@ -388,7 +388,6 @@ extra-paths = [
     "studies/past_weather",
     "packages/studies/tests/nwp_forecast_comparison",
     "packages/studies/tests/past_weather",
-    "studies/ukv_ceda_blends",
     "studies/weather_downloads",
 ]
 

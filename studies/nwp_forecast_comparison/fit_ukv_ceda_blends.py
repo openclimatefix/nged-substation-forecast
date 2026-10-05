@@ -66,7 +66,7 @@ settings with a padded ENS reference refitted on its rows and one shuffled contr
 arm tests how the gain falls as the UKV-CEDA run gets older. It cannot separate the effect of the
 run's lead from the effect of its timing against ENS's run, because the two move together.
 
-Run it with `uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --dry-run`.
+Run it with `uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --dry-run`.
 """
 
 import argparse

@@ -35,7 +35,8 @@ Every chart refuses a site label that is not one of the technology's anonymised 
 mark has accessibility text turned off, because Vega would otherwise write each point's value into
 the SVG.
 
-Run it with `uv run python studies/ukv_ceda_blends/ukv_ceda_blends_charts.py --figures-dir DIR`.
+Run it with
+`uv run python studies/nwp_forecast_comparison/ukv_ceda_blends_charts.py --figures-dir DIR`.
 """
 
 import argparse

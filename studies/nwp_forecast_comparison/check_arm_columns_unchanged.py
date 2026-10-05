@@ -12,7 +12,7 @@ and fits nothing, writes nothing, and exits non-zero on any difference or on an 
 (`fit_product_blends.py --dry-run` cannot show this, because its `SAME_BUILD_KEYS` leave `columns`
 out of the comparison.)
 
-Run it with `uv run python studies/ukv_ceda_blends/check_arm_columns_unchanged.py`.
+Run it with `uv run python studies/nwp_forecast_comparison/check_arm_columns_unchanged.py`.
 """
 
 import argparse

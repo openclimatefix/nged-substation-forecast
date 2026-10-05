@@ -48,7 +48,7 @@ planned run's on the same rows, and writes `verify.json` into the older-run fold
 is that the correlation never rises from one lead day to the next, and that the older run never
 correlates better than the planned run at the same lead day by more than `OLDER_TOLERANCE`.
 
-Run it with `uv run python studies/ukv_ceda_blends/verify_ukv_ceda_inputs.py`.
+Run it with `uv run python studies/nwp_forecast_comparison/verify_ukv_ceda_inputs.py`.
 """
 
 import argparse

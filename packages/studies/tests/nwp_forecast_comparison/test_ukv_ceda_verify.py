@@ -1,5 +1,4 @@
 import json
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -8,10 +7,6 @@ import polars as pl
 import pytest
 
 _STUDIES_DIR = Path(__file__).resolve().parents[3] / "studies"
-sys.path.insert(0, str(_STUDIES_DIR / "ukv_ceda_blends"))
-sys.path.insert(0, str(_STUDIES_DIR / "nwp_forecast_comparison"))
-sys.path.insert(0, str(_STUDIES_DIR / "beam_diffuse_split"))
-sys.path.insert(0, str(_STUDIES_DIR / "weather_downloads"))
 
 import build_ukv_ceda_inputs as build  # noqa: E402
 import check_arm_columns_unchanged as unchanged  # noqa: E402
