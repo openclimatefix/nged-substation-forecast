@@ -2422,6 +2422,17 @@ leaderboard is still open.
 | Predico ([Elia Group](https://innovation.eliagroup.eu/en/projects/predico-collaborative-forecasting-platform)) | Quarter-hourly probabilistic generation: Belgian solar out to 10 days ahead, and the German wind and solar markets that 50Hertz runs day-ahead | National generation totals of two transmission networks | Forecasters join by application; the number taking part is not published | Standing |
 | **Flexpectation's leaderboards** | Net demand at substations, and output at metered generators | One board per class of time series | Public to view and reproducible; outside entries not invited | Standing |
 
+**Two standing public leaderboards score weather forecasts rather than energy forecasts, so they are
+not in the table.** [Operational WeatherBench](https://owb.brightband.com/), run by Brightband,
+scores global medium-range weather models, both AI and physics-based, every forecast cycle. It
+scores each model against that model's own analysis, with the metrics and code of Google Research's
+WeatherBench-X, including root-mean-square error, anomaly correlation, and probabilistic scores for
+ensembles. [ForecastWatch](https://forecastwatch.com/) publishes accuracy leaderboards and, from
+2026, awards for commercial weather providers. The awards score temperature and wind forecasts by
+region and by horizon out to 14 days, using a 0-to-100 accuracy score that ForecastWatch defines.
+Neither leaderboard scores electricity demand or generation. Both show that a standing leaderboard
+on a common verification can rank forecasters who are rivals.
+
 **No leaderboard in the table combines the three properties of Flexpectation's leaderboards: they
 keep running rather than closing after a fixed period, they forecast at substation level, and they
 score methods on NGED's own data.** We found no example of a standing leaderboard for substation
