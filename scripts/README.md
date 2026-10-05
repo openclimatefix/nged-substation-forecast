@@ -96,3 +96,11 @@ alone.
   Delta table whose Parquet row groups span more than one ensemble member, so that a single-member
   read can skip the rest of the partition. A one-off migration: the script measures before writing,
   skips a partition that is already aligned, and therefore resumes cleanly after an interruption.
+
+## `maintenance/` — looking after the workstation
+
+- `backup_workstation.py` — **run by hand, about once a week.** Copies `data/`, `mlruns/`,
+  `literature/`, and the MLflow database into a dated snapshot on the workstation's backup disk,
+  hard-linking every file unchanged since the previous snapshot. [Backing up the
+  workstation](https://openclimatefix.github.io/nged-substation-forecast/live_service/backup/)
+  covers running it and restoring from it.

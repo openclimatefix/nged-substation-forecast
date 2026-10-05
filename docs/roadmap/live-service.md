@@ -626,7 +626,7 @@ that epic is the record of what landed when.
 |---|---|
 | [#246 Scale `power_fcst` to [−1, +1] using the static P99 effective capacity](https://github.com/openclimatefix/nged-substation-forecast/issues/246) | Not detailed on this page — decided 2026-07-03 (see the issue for the full worklist); an open follow-up, not required for v0.1 |
 | [#96 Write power forecasts in schema agreed with NGED](https://github.com/openclimatefix/nged-substation-forecast/issues/96) | Deferred to the v1.0 epic ([#133](https://github.com/openclimatefix/nged-substation-forecast/issues/133)) — v0.1 is "forecast running", not "delivery contract live" |
-| [#5 Backup procedure for data & models on Jack's workstation](https://github.com/openclimatefix/nged-substation-forecast/issues/5) | Shipped as a manual weekly copy to an external USB disk, documented in [Backing up the workstation](../live_service/backup.md) |
+| [#5 Backup procedure for data & models on Jack's workstation](https://github.com/openclimatefix/nged-substation-forecast/issues/5) | Shipped as `scripts/maintenance/backup_workstation.py`, run by hand about once a week to write a snapshot to the workstation's 18 TB disk; documented in [Backing up the workstation](../live_service/backup.md) |
 
 ### Monitoring — tests and verification
 

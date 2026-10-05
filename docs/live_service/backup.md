@@ -1,153 +1,89 @@
 # Backing up the workstation
 
-How to copy the machine-learning experiment outputs on the workstation to an external USB hard disk.
-The procedure is manual, and is meant to run about once a week.
+How to back up the workstation's data, MLflow store, and literature library to the 18 TB disk
+mounted at `/mnt/wd_18tb`, and how to restore from that backup. The backup is run by hand, about
+once a week.
 
-**Back up the experiment outputs first, because they cannot be re-downloaded.** The NWP and NGED
-power tables can be downloaded again in an evening, so they are an optional second command. The
-experiment outputs took compute time to produce:
+## Run the backup
 
-- the `power_forecasts` Delta table, which holds the forecasts from every experiment
-- the `forecast_metrics` Delta table
-- the MLflow store, which is the `mlflow.db` SQLite database plus the `mlruns/` artifacts directory
-  holding the trained models
-- the promoted production model directory
-
-## Before you start
-
-**Run the backup only while no Dagster run is in progress and the MLflow UI is stopped.** A copy
-taken while a run is writing can capture a Delta table whose transaction log and data files
-disagree, or an `mlflow.db` file that is half-way through a transaction. Neither fault shows up
-until a restore. Check the Dagster UI (`http://localhost:3000`, Runs tab) for runs in the `Started`
-or `Queued` state, and stop `uv run mlflow ui` if it is running.
-
-**Use an ext4 disk.** The commands below use `rsync -a`, which keeps permissions, modification
-times, and symlinks. An exFAT or NTFS disk cannot hold those, and `rsync -a` reports an error on
-every file. If the disk is exFAT, replace `-aH` with `-rt` in every command below.
-
-## Find the mount point
-
-Plug in the disk and list the block devices:
+**Run the script from the main checkout, while no Dagster run is in progress:**
 
 ```bash
-lsblk -o NAME,LABEL,SIZE,FSTYPE,MOUNTPOINT
+cd ~/dev/nged-substation-forecast
+uv run python scripts/maintenance/backup_workstation.py
 ```
 
-The disk is the row with a `MOUNTPOINT` such as `/media/jack/<label>`. If `MOUNTPOINT` is empty,
-mount it from the desktop's file manager, or run `udisksctl mount -b /dev/sdX1`, where `sdX1` is the
-partition's `NAME` from the listing. Then set the destination used by every command below:
+Check the Dagster UI (`http://localhost:3000`, Runs tab) first for runs in the `Started` or `Queued`
+state. A Delta table copied while a run is writing to it can be captured inconsistently.
 
-```bash
-BACKUP=/media/jack/<label>/nged-backup
-mkdir -p "$BACKUP"
-```
+The script writes one snapshot directory per run, named after the time in UTC, such as
+`/mnt/wd_18tb/nged-substation-forecast-backups/2026-10-05T183000Z/`. Each snapshot holds:
 
-## Find the source paths
+- `data_internal/` — the whole of `data/`: the NWP and NGED power tables, `power_forecasts`,
+  `forecast_metrics`, the production model, and the study outputs under `data/studies/`
+- `mlruns/` — the MLflow artifacts, which hold the trained models
+- `literature/` — the git-ignored library of papers and reference documents
+- `mlflow.db` — the MLflow database, copied through SQLite's backup routine
+- `sources.json` — the workstation path each directory above was copied from
 
-The data paths come from `Settings`
-([`packages/contracts/src/contracts/settings.py`](../api/contracts/index.md)), so they follow
-`DATA_PATH_INTERNAL`, `DATA_PATH_DELIVERY`, `LOCAL_ARTIFACTS_PATH`, and `MLFLOW_TRACKING_URI` in
-`.env`. Run this from the repository root. On the workstation, `data/` is a symlink to `/mnt/data`,
-and the paths below resolve through it.
+**The first snapshot copies about 200 GB; each later snapshot stores only the files that changed.**
+The script hard-links every unchanged file to the previous snapshot, so a snapshot takes disk space
+only for new files. Every snapshot is nevertheless a complete copy, and deleting an old snapshot
+never damages a newer one. Delete old snapshots by hand when the disk fills, oldest first.
 
-```bash
-eval "$(uv run python - <<'PY'
-from contracts.settings import get_settings
-s = get_settings()
-print(f"POWER_FORECASTS={s.power_forecasts_data_path}")
-print(f"FORECAST_METRICS={s.forecast_metrics_data_path}")
-print(f"PRODUCTION_MODEL={s.production_model_path}")
-print(f"MLFLOW_DB={s.mlflow_tracking_uri.removeprefix('sqlite:///')}")
-print(f"NWP={s.nwp_data_path}")
-print(f"NGED={s.nged_data_path}")
-PY
-)"
-echo "$POWER_FORECASTS" "$FORECAST_METRICS" "$PRODUCTION_MODEL" "$MLFLOW_DB"
-```
+**The script refuses to run when the backup disk is not mounted.** An unmounted `/mnt/wd_18tb` is an
+empty directory on the system disk, so the script checks that the destination is on a different
+disk from every source. The script also refuses to run from a git worktree, because `mlruns/`,
+`literature/`, `.env`, and the MLflow database path are all found relative to the checkout the
+script runs from.
 
-Each printed path must be a local directory or file. A path starting with `s3://` is in an S3
-bucket, and `rsync` cannot copy it. A relative `MLFLOW_DB` such as `mlflow.db` is relative to the
-repository root. MLflow stores its artifacts in `mlruns/` in the directory where the run started,
-which is the repository root.
+## Read the output
 
-## Back up the experiment outputs
+**A warning naming an MLflow experiment means that experiment's trained models are not being backed
+up.** MLflow stores each experiment's artifact location as an absolute path, and an experiment
+created from a git worktree stores its models inside that worktree rather than in `mlruns/`. Move
+the models into `mlruns/`, or accept that they are lost when the worktree is removed.
 
-```bash
-rsync -aH --info=progress2 "$POWER_FORECASTS/" "$BACKUP/power_forecasts/"
-rsync -aH --info=progress2 "$FORECAST_METRICS/" "$BACKUP/forecast_metrics/"
-rsync -aH --info=progress2 "$PRODUCTION_MODEL/" "$BACKUP/production_model/"
-rsync -aH --info=progress2 mlruns/ "$BACKUP/mlruns/"
-sqlite3 "$MLFLOW_DB" ".backup '$BACKUP/mlflow.db'"
-```
+**The script ends by listing every file that changed while the backup ran.** An empty list means the
+snapshot matches the workstation exactly. A long list usually means a Dagster run was writing during
+the backup: delete that snapshot and run the script again.
 
-What each part does:
-
-- `-a` keeps permissions, modification times, and symlinks, which is what lets a second run skip
-  every file that has not changed.
-- `-H` keeps hard links as hard links, so linked files are not stored twice.
-- `--info=progress2` prints one progress line for the whole transfer instead of one per file.
-- A trailing `/` on the source copies the directory's contents into the destination directory.
-  Without it, `rsync` creates a nested `power_forecasts/power_forecasts/`.
-- `sqlite3 ... ".backup"` copies the MLflow database through SQLite's own backup routine, which
-  produces a consistent file. A plain `rsync` of an SQLite file can miss changes sitting in its
-  write-ahead log, which is a sidecar file next to the database.
-
-The commands never pass `--delete`, so a file deleted from the workstation stays on the disk. That
-keeps one mistaken deletion from reaching the backup. The cost is that the backup slowly gains the
-old files that Delta compaction replaces. Delta ignores files its transaction log does not name,
-so the extra files are harmless.
-
-## Optionally back up the NWP and NGED power tables
-
-These tables are large, so run this only if the disk has the space. Check with `du -sh "$NWP"
-"$NGED"` and `df -h "$BACKUP"`.
-
-```bash
-rsync -aH --info=progress2 "$NWP/" "$BACKUP/NWP/"
-rsync -aH --info=progress2 "$NGED/" "$BACKUP/NGED/"
-```
-
-## Verify the copy
-
-A dry run with `--itemize-changes` lists each file that still differs. Right after a backup, it must
-print nothing:
-
-```bash
-for pair in "$POWER_FORECASTS:power_forecasts" "$FORECAST_METRICS:forecast_metrics" \
-            "$PRODUCTION_MODEL:production_model"; do
-  rsync -aHn --itemize-changes "${pair%%:*}/" "$BACKUP/${pair##*:}/"
-done
-rsync -aHn --itemize-changes mlruns/ "$BACKUP/mlruns/"
-```
-
-Add `--checksum` to any of these to compare file contents instead of sizes and modification times.
-That reads every byte on both disks, so use it occasionally rather than every week.
-
-Then check that the copies open. Delta must read the backed-up `power_forecasts` table, and SQLite
-must accept the backed-up database:
-
-```bash
-uv run python -c "import polars as pl, sys; print(pl.scan_delta(sys.argv[1]).select(pl.len()).collect())" \
-  "$BACKUP/power_forecasts"
-sqlite3 "$BACKUP/mlflow.db" "PRAGMA integrity_check;"
-```
-
-The first command prints the row count. The second prints `ok`.
+A directory ending in `.partial` is a snapshot whose run was interrupted. The script never uses a
+`.partial` snapshot as the base for the next snapshot, and warns about each one it finds. Delete it
+by hand.
 
 ## Restore
 
-Stop Dagster and the MLflow UI first, so that nothing writes while the files are being replaced.
-Restore into the paths printed by the "Find the source paths" step, by swapping source and
-destination:
+**Restore one directory at a time, with `--delete`, after stopping Dagster and the MLflow UI.**
+`--delete` makes the restored directory an exact copy of the snapshot. Without `--delete`, a Delta
+commit written after the snapshot would survive the restore, and Delta would go on reading the table
+at that newer version. Set `SNAPSHOT` to the snapshot to restore from, and restore only the
+directories that need it. For example, to restore the `power_forecasts` table:
 
 ```bash
-rsync -aH --info=progress2 "$BACKUP/power_forecasts/" "$POWER_FORECASTS/"
-rsync -aH --info=progress2 "$BACKUP/forecast_metrics/" "$FORECAST_METRICS/"
-rsync -aH --info=progress2 "$BACKUP/production_model/" "$PRODUCTION_MODEL/"
-rsync -aH --info=progress2 "$BACKUP/mlruns/" mlruns/
-cp "$BACKUP/mlflow.db" "$MLFLOW_DB"
+SNAPSHOT=/mnt/wd_18tb/nged-substation-forecast-backups/2026-10-05T183000Z
+rsync -aH --delete "$SNAPSHOT/data_internal/power_forecasts/" data/power_forecasts/
 ```
 
-To restore onto a fresh machine, run `uv sync` and create `.env` first, as in [Getting
-started](../getting-started.md). Then run the "Find the source paths" step so the variables point at
-the new machine's directories, and run the commands above.
+Never restore the whole of `data_internal/` with `--delete` unless every table needs restoring,
+because `--delete` also removes every table and study output written since the snapshot.
+
+**Delete the database's sidecar files before restoring `mlflow.db`.** SQLite applies a leftover
+`mlflow.db-wal` or `mlflow.db-journal` file to whatever database file sits beside it, and doing so
+corrupts the restored copy:
+
+```bash
+rm -f mlflow.db-wal mlflow.db-shm mlflow.db-journal
+cp "$SNAPSHOT/mlflow.db" mlflow.db
+rsync -aH --delete "$SNAPSHOT/mlruns/" mlruns/
+```
+
+**Restore `mlruns/` and `mlflow.db` together.** The database names each run's artifact directory,
+so a database from one snapshot and artifacts from another can point at models that are missing.
+
+**On a fresh machine, clone the repository to the same path as before.** MLflow stores artifact
+locations as absolute paths, such as `/home/jack/dev/nged-substation-forecast/mlruns/1`, so a clone
+at a different path finds no models. Run `uv sync`, create `.env` as in [Getting
+started](../getting-started.md), recreate the `data/` symlink if `data/` lived on another disk, and
+then restore each directory as above. `sources.json` in the snapshot lists where each directory
+came from.
