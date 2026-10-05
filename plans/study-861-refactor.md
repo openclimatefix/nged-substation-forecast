@@ -15,9 +15,10 @@ naming a script that moves, not the 30 the issue estimated.
 crossings impossible rather than merely rare.** A script may import only from its own folder and
 from `studies.*` (`packages/studies`). Everything a second folder needs moves into the package, in
 two layers. One AST test, added in the last commit, enforces the rule over `studies/` and over
-`packages/studies/src`. Study outputs stay where they
-are. Tests of study scripts move to one tree. The general Fractions Skill Score and paired block
-bootstrap are not extracted here (issues #805 and #808): they wait for their production callers.
+`packages/studies/src`. Tests of study scripts move to one tree. The study data under `data/studies/`
+is reorganised in a separate, gated sequence of renames after the code lands (see "Data"). The
+general Fractions Skill Score and paired block bootstrap are not extracted here (issues #805 and #808):
+they wait for their production callers.
 
 ## Verdict, size and departures
 
@@ -37,8 +38,9 @@ named step.
 
 **Size: complex.** The five triggers:
 
-- **What gets stored:** no. No Patito model, Delta table or asset changes, and every output keeps
-  its path.
+- **What gets stored:** no Patito model, Delta table or Dagster asset changes. The study files under
+  `data/studies/` do change path, by rename on one device with every file hashed before and after,
+  and nothing Dagster-managed moves.
 - **Production serving path:** no. Nothing in `src/` or `packages/` imports `studies` today, and a
   new test pins that.
 - **A degradation rule:** no.
@@ -92,12 +94,18 @@ layer 1. The scripts of `past_weather/` that today read each other, such as the 
 page-number checker and the timestamp-lag check, and the scan decides whether any of them crosses a
 folder. If one does, the crossing is a layer-1 or layer-2 symbol like any other.
 
-**`era_fold_design/scripts/` is left untouched.** `common.py` puts a different worktree
-(`.claude/worktrees/era-fold-design`) and a frozen scratch copy of the ENS script on `sys.path`, so
-those scripts do not import this repository's scripts at all. The `partB_*`, `partP` and
-`common.py` files also import `wind_products`, `weather_products`, `run_experiment`, `export_cap`
-and `build_dataset`. Repointing any of them at `studies.*` would change the code the recorded
-numbers came from. The `ruff`, `ty` and boundary-test configurations exclude the folder.
+**`era_fold_design/scripts/` is left untouched, except for the absolute paths in three files.**
+`common.py` puts a different worktree (`.claude/worktrees/era-fold-design`) and a frozen scratch
+copy of the ENS script on `sys.path`, so those scripts do not import this repository's scripts at
+all. The `partB_*`, `partP` and `common.py` files also import `wind_products`, `weather_products`,
+`run_experiment`, `export_cap` and `build_dataset`. Repointing any of them at `studies.*` would
+change the code the recorded numbers came from. The `ruff`, `ty` and boundary-test configurations
+exclude the folder. The maintainer's decision supersedes "untouched" for one thing only: `common.py`,
+`saved_cov.py` and `two_shares.py` spell `/home/jack/...` literally (seven literals in all), and each
+becomes `Path("~/...").expanduser()`. The repository has no helper for this, so
+`Path.expanduser()` is used directly. The data folders those literals name move in the data
+sequence below, and the three files follow in the same step (see "Data"). The reproduction check for
+them is under "Reproduction".
 
 ## What moves to `packages/studies`
 
@@ -231,27 +239,160 @@ with `ty` `extra-paths` to match.
 
 ## Data
 
-**Leave every output where it is.** Moving 45 directories under `data/studies/` would change the
-path in saved fingerprints, in 50 `docs/` references and in every script's constants, and the study
-skill forbids overwriting an output a merged page quotes. The issue allows this ("leave them in
-place and point the new scripts at them"). The path constants move with `studies.sources` and no
-registry or role functions are added, because no caller needs them.
+**Every file a study downloads or builds moves under `data/studies/`, in folders named for what the
+data is, and each study keeps one folder of its own outputs.** The maintainer decided the rules and
+the placement; the audit behind them is `data-audit-report.md` in the session scratch. The code that
+names the folders is changed first, in a code-only change that leaves the data where it is (step 2a
+below), and the files then move in waves.
 
-- **`studies/README.md` gains a "Where data lives" table.** It states the convention that a cached
-  intermediate frame goes under `data/studies/cache/<kind>/` and that `data/studies/<study>/` holds
-  only final losses, intervals and reports. Existing caches are not moved. One row per reusable
-  cache gives the path, the producing script and the scripts that read it. Candidates are
-  `weather/<PRODUCT>/`, `beam_diffuse_dataset_<source>.parquet`,
-  `ens_forecast_horizons/ens_members.parquet`, and the per-site frames `extract_site_series.py` and
-  `fetch_open_meteo_point.py` write. A table can go stale without a test noticing; the issue asks
-  only for a convention a later study can find.
-- **Duplicated caches:** the issue reports two studies rebuilding the same CAMS extract. The
-  implementer lists every writer of CAMS-derived frames (`grep` for the CAMS paths, `du` the
-  directories; read-only). Where two caches hold byte-identical content, the later script reads the
-  earlier path and the table says so. Where they differ, both stay and the table says why. Nothing
-  under `data/` is deleted or rewritten.
-- **The existing table of studies in `studies/README.md` gains one row per folder.** It
-  lists three of the ten today. Each folder README maps every script to its published page.
+**Decisions taken by the maintainer, and what each settles:**
+
+1. All study downloads live in `data/studies/`, apart from Dagster-managed data (`data/NGED`,
+   `data/NWP` and the other pipeline tables), which no study writes.
+2. Data used, or plausibly usable, by several studies is filed by what it is: `NWP/`,
+   `reanalysis/` and `observations/`. A folder is never named after the study that first wrote it.
+3. Each study has one folder with `inputs/` (cached intermediate frames), `results/` (losses,
+   predictions, stamps, intervals), `reports/` and `superseded/`. The 21 `nwp_forecast_comparison*`
+   folders become one.
+4. The nwp-archivist store (`/mnt/data/nwp-archive*`) is not a study and not Dagster-managed. It
+   stays where it is, as do its caches and the MOGREPS copy on `/mnt/wd_18tb`, and no study script
+   reads them.
+5. The ECMWF ENS backfill ultimately belongs in the `data/NWP` Delta table, ingested by Dagster.
+   That ingest is not part of this refactor. Issue #959 ("Extend ECMWF ENS training history") carries
+   the fetch, and the ingest needs an issue of its own once #959 settles the fetch scope. Until
+   then, fetched files are staged in `data/studies/NWP/ENS_BACKFILL_STAGING/`.
+6. The three `UKV-CEDA` stores are not merged.
+7. `data.old` is deleted only after a Dagster run succeeds against the new data location, as the
+   gated step in "Data migration" below.
+8. The three `era_fold_design` scripts use `~/` paths (above).
+
+**The target layout.**
+
+```text
+data/studies/
+  NWP/                       forecasts: runs, previous runs, and the extracts made from them
+    ECMWF-AIFS/  ECMWF-AIFS-ENS/  ECMWF-IFS-SINGLE-RUNS/  GEFS/  GFS/
+    WeatherNext3/            from WeatherNext3_trial_area
+    UKV-CEDA/  UKV-CEDA-part2/  UKV-CEDA-part3/  UKV-CEDA-T120/
+    OPEN-METEO-ENSEMBLE-MEANS/
+    OPEN-METEO-PREVIOUS-RUNS/<model>/   the eleven Previous Runs products
+    ENS/                     per-site extracts of data/NWP
+    ENS_SITE_EXTRACT/        ens_members, solar and wind inputs, member summaries (shared)
+    ENS_BACKFILL_STAGING/    the #959 fetch, until Dagster ingests it
+    windows/<product>_<start>_<end>/    the eight window or trial copies
+    superseded/
+  reanalysis/                ERA5  CERRA  NORA3  NORA3_10m  ICON-DREAM-EU  CAMS
+  observations/              MIDAS-OPEN  SARAH-3  NGED-ANM
+  _scratch/                  transient downloads (today data/_scratch)
+  _private/                  trial_area_box.json (never published or committed)
+  <study>/{inputs,results,reports,superseded}/
+    beam_diffuse_split  ens_forecast_horizons  nwp_forecast_comparison
+    ukv_ceda_blends  cerra_wind  open_meteo_ensemble_means  open_meteo_ens_gap
+    icon_eu_compare  era5_wind_compare  ens_backfill_pilot
+```
+
+**Old path to new path.** Audit section 6 holds the full table; these are its rules.
+
+- `weather/<forecast product>` moves to `NWP/`, `weather/{ERA5,CERRA,NORA3,NORA3_10m,ICON-DREAM-EU,CAMS}`
+  to `reanalysis/`, and `weather/{MIDAS-OPEN,SARAH-3}` to `observations/`. `anm/` becomes
+  `observations/NGED-ANM/`.
+- The per-site extracts that sit inside raw product folders (`beam_diffuse_<product>.parquet`,
+  `wind_*.parquet`, `temperature_2m_site_b.parquet`) move to `beam_diffuse_split/inputs/`, so a raw
+  product folder holds only the download.
+- `ens_forecast_horizons/{ens_members,solar_inputs,wind_inputs,*_member_summary}.parquet` moves to
+  `NWP/ENS_SITE_EXTRACT/`. The rest of that folder splits into `results/`, `reports/` and
+  `superseded/`.
+- `nwp_forecast_comparison_<batch>` (20 folders) and the flat files of `nwp_forecast_comparison/`
+  become `nwp_forecast_comparison/{inputs,results,reports}/<batch>/`. Each file's class is read from
+  the script that writes it, not guessed from its name.
+- `ukv_ceda_blends` and `ukv_ceda_blends_run15` become one study folder, and the four `cerra_wind_*`
+  folders become `cerra_wind/{levels,levels_post_hoc,shear,direction}`.
+- `WeatherNext3_icechunk_test` has no README or lineage. It moves to `_scratch/` and is not deleted.
+
+**Why renaming is safe for the stamps.** A grep over every `*_losses.json`, `losses.fingerprint`,
+`build.json` and `lineage.json` found no absolute path, because the stamps hold content hashes and
+Icechunk snapshot IDs. A rename therefore leaves every stamp valid, and what breaks is code that
+names a folder. The audit lists roughly 25 hard-coded folder names in `nwp_forecast_comparison/`
+(several guarded by `output_dir.name == <constant>`, so the constant and the guard change
+together), ten copies of `_repo_data_dir()`, and the constants in `weather_downloads/paths.py` and
+`beam_diffuse_split/sources.py`.
+
+### Data migration
+
+**The data moves are not part of the git diff, so they run as a separate sequence after the code PR
+has merged, one wave per step, each verified before the next starts.** Every move is a rename on the
+one device that holds `data/` (`/mnt/data`), so a wave takes seconds. Nothing is deleted by a move,
+and nothing a running process holds open is touched.
+
+- **Step D0, baseline manifest (no change to data).** From `data/studies`, run `find . -type f
+  -not -path '*/UKV-CEDA-T120/*' -not -path '*/ukv_ceda_blends/*' -print0 | xargs -0 -P8
+  sha256sum`, writing to a file outside `data/` (about 58 GB read, 5 to 15 minutes). Record the file
+  count per top-level folder as well. Links are never followed. The two excluded folders are
+  re-baselined once their writers finish.
+- **Step D1, code-only change (lands with step 2 of the code order).** Every folder name comes from
+  one constants module (`studies.sources`, plus the existing `weather_downloads/paths.py` constant
+  that now imports from it), the ten copies of `_repo_data_dir()` are replaced by that module, and
+  `STAMP_GLOB` and the ~25 folder names in `nwp_forecast_comparison/` become constants. Data stays at
+  the old paths, so the tests and the reproduction check cover this change alone.
+- **Step D2, folders no process reads:** `data/_scratch`, the top-level `superseded/`, the four
+  `cerra_wind_*` folders, and `WeatherNext3_icechunk_test`.
+- **Step D3, Previous Runs products and window copies:** `weather/<11 products>` to
+  `NWP/OPEN-METEO-PREVIOUS-RUNS/` and the window folders to `NWP/windows/`.
+- **Step D4, reanalysis, observations and `anm/`.** No fetch is running on these folders.
+- **Step D5, `nwp_forecast_comparison` consolidation.** This is the last single-study move, because
+  the ~25 constants, the guards and `STAMP_GLOB` change in one commit. It is not started while any
+  `fit_*` run is writing to a batch folder.
+- **Step D6, the shared ENS extract:** `ens_members.parquet`, the `*_inputs.parquet` frames and the
+  member summaries move to `NWP/ENS_SITE_EXTRACT/`. The byte-identical copies in
+  `ens_forecast_horizons/superseded/2026-09-23/` (0.91 GB) are not deleted by this refactor; the
+  maintainer decides separately.
+- **Step D7, work in flight, last.** `UKV-CEDA-T120`, `ukv_ceda_blends` and `ukv_ceda_blends_run15`
+  move only when the `ukv-t120` unit has exited and the #1016 fit and report passes have finished.
+  `UKV-CEDA`, `-part2` and `-part3` move as three separate stores, never merged, and only while no
+  fetch is running on them. **Never moved while they run:** `UKV-CEDA-T120`, `ukv_ceda_blends*`, the
+  MOGREPS copy on `/mnt/wd_18tb`, and the `nwp-archive*` stores and caches (which never move).
+
+**A symlink is left at each old path while a wave runs, and the `STAMP_GLOB` double match is handled
+explicitly.** A symlink to a directory is followed by `pathlib`, `pl.scan_parquet`, `pl.scan_delta`
+and `icechunk.local_filesystem_storage`, and `Path.exists()` is true for it, so the write-once
+refusals still fire. Four cases need care:
+
+- **`STAMP_GLOB` (`nwp_forecast_comparison_*/*_losses.json`, in `ukv_ceda_blends/
+  check_arm_columns_unchanged.py` from #1016) and every glob of `nwp_forecast_comparison_*`** match
+  both an old symlink and a new real folder, so a stamp can be read twice. In step D5 no symlink is
+  left at any of the 20 old batch paths, because the same commit changes every script that read
+  them. The glob changes in step D1 to match the new layout, the check script keeps one entry per
+  `Path.resolve()` result, and its stamp count must equal the count in the baseline manifest. A
+  check that passes with fewer stamps than the baseline is a failure.
+- **`output_dir.resolve() == published_dir.resolve()` comparisons** give the same answer through a
+  symlink, but a guard that tests `output_dir.name` sees the symlink's name. Those guards are
+  converted in step D1.
+- **`du`, `find` and `rsync -a`** double-count or copy links. The manifest commands use `find -type f`
+  and never follow links.
+- **A symlink cannot replace a folder a writer holds open**, which is why step D7 waits.
+
+A symlink is removed once `grep` finds no referrer to its old path in `studies/`, `packages/`,
+`docs/` and `.claude/`.
+
+**The three `era_fold_design` scripts follow the data.** They name `data/studies/beam_diffuse_split`
+and `data/studies`, which step D2 to D6 move. Each of those steps updates the three literals in the
+same step, so the three files keep resolving their inputs.
+
+**Step G, deleting `data.old` (separate and gated, not part of any move).** `data.old` (143 GB, on
+the root device) is deleted only after a Dagster run has succeeded against the new data location.
+The run is `ecmwf_ens_job` (`defs/schedules.py`), because it reads and appends to `data/NWP` and
+`data.old` holds the stale copy of that table. It must be a run that succeeded after the moves, not
+one from before. The maintainer confirms it in the Dagster UI at `http://localhost:3000` (Runs page,
+status `Success`, start time after the last wave) and then deletes `data.old`. The audit could not
+confirm that any run has succeeded.
+
+**Duplicated caches** (the issue's CAMS example): the audit found no byte-identical CAMS files, so
+nothing is merged. The only byte-identical files are the 1.32 GB listed in the audit, and the
+refactor deletes none of them.
+
+**`studies/README.md` gains a "Where data lives" table**, one row per kind folder and per study
+folder, giving what the folder holds and the script that writes it. The existing table of studies
+gains one row per script folder.
 
 ## Order of mechanical steps
 
@@ -271,6 +412,8 @@ rule. A `git mv` commit changes no content beyond path strings, so `git diff -M`
    (`era5_grid`, `commissioning`, `physics_model`, `export_cap`, `figure_numbers`, `sources`) are
    deleted from `studies/`. The implementer checks that the number of `def` and `class`
    statements removed from the scripts equals the number added to the package.
+   **Step 2a (code only, data unmoved):** step D1 under "Data migration", the folder-name
+   constants and `STAMP_GLOB`, lands here, in or straight after the `sources` commit.
 3. **Layer 2, one commit per module,** after the maintainer has seen the step 0 closure report.
    Characterisation tests land in a commit before the move.
 4. **The folder move, one commit per destination folder** (`past_weather/`, the four ENS
@@ -282,9 +425,7 @@ rule. A `git mv` commit changes no content beyond path strings, so `git diff -M`
    `packages/studies/tests/<study>/`; split `beam_diffuse_split/README.md` into one README per
    folder, each with a table mapping every script to its published page; update every path in
    `docs/`, scripts' docstrings and comments, `studies/README.md`, and the skills that name a path
-   (found by `grep`; `data-download` is one). The 20 lineage READMEs under `data/` that cite
-   `studies/beam_diffuse_split/...` paths are left stale by design, because nothing under `data/`
-   is rewritten. Each folder's `pythonpath` and
+   (found by `grep`; `data-download` is one). Each folder's `pythonpath` and
    `extra-paths` entries are added in its own commit. **The last of these commits adds
    `test_study_boundaries`.**
 5. **Skills and `CLAUDE.md`.** In `.claude/skills/study/SKILL.md`, the "Where a study's pieces live"
@@ -294,6 +435,8 @@ rule. A `git mv` commit changes no content beyond path strings, so `git diff -M`
    per the project memory). In `docs/architecture/testing.md`, a "Study tests" paragraph recording the
    convention, because the issue requires it there.
 6. **Verification and reviews** (below).
+7. **Data migration (after the merge).** Steps D0 and D2 to D7, then the gated step G, under
+   "Data migration". Each wave repeats the manifest comparison and the grep gate.
 
 **Which parts a Sonnet implementer does mechanically:** steps 0, 1, 4 and 5, and the moves in steps
 2 and 3 once the closure report is approved. Judgement stays with the maintainer or Opus in two
@@ -364,6 +507,27 @@ implementer adds a per-row bit-for-bit check: write the row frame the script bui
   studies/<folder> && uv run python -c 'import <script>'`. A pytest or `PYTHONPATH` setup that
   lists every folder hides cross-folder imports, which is the cost this plan names under "Tests".
   The study skill's rule applies too: no linter evaluates a `sys.path` string.
+- **Hash manifests and the grep gate, for the data migration.** After each wave, a second SHA-256
+  manifest is compared with the D0 baseline through the old-to-new map: every hash reappears
+  exactly once, and the file count per folder matches. Active folders are skipped and re-baselined
+  after they finish. Stamps are re-checked by recomputing `inputs_sha256` and `published_sha256`
+  against the files at their new paths. At the end, this grep returns nothing:
+
+  ```bash
+  grep -rnE "studies/weather|nwp_forecast_comparison_[a-z]|data/_scratch|data/studies/anm" \
+    studies packages docs .claude CLAUDE.md
+  ```
+
+  `check_arm_columns_unchanged.py` must report the baseline stamp count.
+- **`era_fold_design` reproduction check.** The audit and this plan found that
+  `.claude/worktrees/era-fold-design` no longer exists, and the frozen copy at
+  `.claude/worktrees/scratch/era-fold/code/` holds only `ens_forecast_horizons.py`, so
+  `import common` cannot succeed on this machine today. Before the edit, the implementer records the
+  result of `cd studies/era_fold_design/scripts && uv run python -c "import common"`. After it, the
+  check asserts that each of the seven `Path(...).expanduser()` values equals the literal it
+  replaced (true when `$HOME` is `/home/jack`), that `import common` gives the same result as
+  before, and that `ens_forecast_horizons` still imports from the frozen directory. `saved_cov.py`
+  and `two_shares.py` are re-run only if they ran before the edit, and their output is compared.
 - **Run order respects the review rule.** The branch runs only after the Opus diff review is
   triaged, because the moved scripts are changed scripts.
 - **Reproduction log.** The implementer writes one line per script (the 18 above plus the
@@ -382,10 +546,23 @@ implementer adds a per-row bit-for-bit check: write the row frame the script bui
   `CLAUDE.md` and `README.md`, and fails if any file does not exist. The implementer saves it as
   `scripts/lint/check_study_script_paths.py` only if the maintainer wants it kept; otherwise it
   stays in the session scratch and runs before each folder-move commit. Paths in the `data/`
-  lineage READMEs are out of scope.
+  READMEs are not checked (see Risks).
 - **Outside `docs/`:** a `grep` finds 177 lines in scripts and READMEs under `studies/` and
   `packages/` that name a script path, plus the skills that name a path, `pyproject.toml` comments,
   `studies/README.md`, and `packages/studies/README.md`.
+- **Data paths:** the files that name `data/studies/weather`, `anm/`, `ens_forecast_horizons/`
+  parquet names or `nwp_forecast_comparison_<batch>` are updated in the wave that moves them. The
+  audit counts hits in `docs/studies/forecasts/matched-lead.md` (19), `docs/studies/past-weather/wind.md`
+  (11), `solar.md` (6), `ensemble-means.md` (4), `cerra-wind-levels.md` (3), `beam-diffuse-split.md`
+  (3), and a few more; `docs/live_service/setup.md`, `aws.md`, `docs/getting-started.md`,
+  `docs/architecture/ensemble-archive.md` and `packages/dashboard/README.md` probably name the Dagster
+  data path, which does not move, so each is checked before editing. Also updated: the study
+  READMEs under `studies/` (`nwp_forecast_comparison` 14 hits, `beam_diffuse_split` 12,
+  `weather_downloads` 3, and three more with 2 each or fewer),
+  `.claude/skills/study/SKILL.md` (the "Where a study's pieces live" table, lines 50 to 52, and
+  line 270), `.claude/skills/data-download/SKILL.md` (lines 23 and 306 to 307), and
+  `studies/README.md`. `CLAUDE.md` names no `data/studies` path, so it changes only if the
+  `studies` Packages row or the skills table does.
 - **Prose:** written about the present ("each family has a folder"), with no history of the old
   layout, per the repository's prose rules.
 
@@ -421,7 +598,7 @@ third-party dependency (`pv_dataset` already needs only `pvlib`, `xarray` and `p
     - no moved code uses `__file__`;
     - each private name made public keeps its signature and default arguments;
     - `logging.getLogger("<old name>")` calls are updated;
-    - the `era_fold_design` scripts are untouched;
+    - the `era_fold_design` scripts differ from `main` only in the seven `expanduser` path literals;
     - the path-check loop passes;
     - the reproduction log shows a result for each script plus the `blend_products` gate, and records
       every fingerprint refusal.
@@ -463,11 +640,16 @@ third-party dependency (`pv_dataset` already needs only `pvlib`, `xarray` and `p
   find a page's scripts, and a reader must use it instead of the folder name.
 - **The tests move from `tests/` to `packages/studies/tests/`.** The package is a leaf dependency
   absent from the production image, so the move cannot reach production.
+- **The reproduction check runs before any data moves**, against data at the old paths, because the
+  code change (step 2a) merges first. The data waves have their own checks (manifests, stamps, grep
+  gate).
 - **Reproduction needs a scratch data root of several gigabytes.** The home partition has room
   (486 GB free). Nothing is written under the shared `data/`, and the write-path audit and the
   before-and-after listing make a stray write fail the run.
-- **Lineage READMEs under `data/` go stale.** Twenty cite `studies/beam_diffuse_split/...` paths,
-  and the plan leaves them as they are.
+- **Generated READMEs under `data/` go stale.** About 50 `weather/*/README.md` files and 20 lineage
+  READMEs embed the old paths as text. Nothing reads them, and rewriting them would change their
+  hashes in the manifest comparison, so the plan leaves them. The maintainer may prefer a scripted
+  rewrite after the last wave.
 - **Other branches and services:** no other open branch touches `studies/`, no systemd unit or
   `.github` workflow calls a study script by path, and no study script is running now. A fresh fit
   after the move records the move commit in `_script_commit()` (`ens_hres_past_wind.py:3048`,
