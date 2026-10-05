@@ -24,12 +24,12 @@ setting in brackets or in a second row).
 
 ![Figure 1: For six solar farms, adding UKV-CEDA lowered the ENS mean's error by about 0.1 points of
 capacity at lead days 1 to 3. The planned rule is met at day 3 only, and day 4 is
-inconclusive](../assets/ukv_ceda_blends_v4/solar_headline.svg)
+inconclusive](../assets/ukv_ceda_blends_v5/solar_headline.svg)
 
 ![Figure 2: For three wind farms, adding UKV-CEDA's winds lowered the ENS mean's error at lead days 1
 and 2 at both hyperparameter settings, against both shuffled controls, after the Bonferroni
 correction, and with any one month dropped. Day 3 rests on February 2026, and day 4 is
-inconclusive](../assets/ukv_ceda_blends_v4/wind_headline.svg)
+inconclusive](../assets/ukv_ceda_blends_v5/wind_headline.svg)
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
@@ -166,19 +166,19 @@ show the weeks of February 2025 and March 2026. Figures 4a, 4b, and 4c show the 
 September 2025, December 2025, and February 2026.
 
 ![Figure 3a: Measured output of the six solar farms and the XGBoost model's out-of-fold forecast over
-one week](../assets/ukv_ceda_blends_v4/solar_week1.svg)
+one week](../assets/ukv_ceda_blends_v5/solar_week1.svg)
 
 ![Figure 3b: Measured output of the six solar farms and the XGBoost model's out-of-fold forecast over
-one week](../assets/ukv_ceda_blends_v4/solar_week3.svg)
+one week](../assets/ukv_ceda_blends_v5/solar_week3.svg)
 
 ![Figure 4a: Measured output of the three wind farms and the XGBoost model's out-of-fold forecast over
-one week](../assets/ukv_ceda_blends_v4/wind_week1.svg)
+one week](../assets/ukv_ceda_blends_v5/wind_week1.svg)
 
 ![Figure 4b: Measured output of the three wind farms and the XGBoost model's out-of-fold forecast over
-one week](../assets/ukv_ceda_blends_v4/wind_week2.svg)
+one week](../assets/ukv_ceda_blends_v5/wind_week2.svg)
 
 ![Figure 4c: Measured output of the three wind farms and the XGBoost model's out-of-fold forecast over
-one week](../assets/ukv_ceda_blends_v4/wind_week3.svg)
+one week](../assets/ukv_ceda_blends_v5/wind_week3.svg)
 
 **The mean absolute error of every model rises with the lead day, and the padded ENS model's error
 is the reference level.** For solar, the padded ENS model's error is 8.820% of capacity at day 1 and
@@ -211,17 +211,17 @@ Figures 5 and 6 draw the primary-setting errors, and Figures 7 and 8 draw them a
 
 ![Figure 5: For the six solar farms, an XGBoost model given ENS's mean alone has a mean absolute error
 of 8.8% of capacity at lead day 1 and 11.7% at lead day 4, and the four models differ by at most 0.19
-points at any lead day](../assets/ukv_ceda_blends_v4/solar_errors.svg)
+points at any lead day](../assets/ukv_ceda_blends_v5/solar_errors.svg)
 
 ![Figure 6: For the three wind farms, an XGBoost model given ENS's mean alone has a mean absolute
 error of 8.2% of capacity at lead day 1 and 12.3% at lead day 4, and the four models differ by at
-most 0.28 points at any lead day](../assets/ukv_ceda_blends_v4/wind_errors.svg)
+most 0.28 points at any lead day](../assets/ukv_ceda_blends_v5/wind_errors.svg)
 
 ![Figure 7: At the six solar farms, the blend's mean absolute error runs from 8.0% to 10.4% of
-capacity at lead day 1, and from 11.0% to 13.2% at lead day 4](../assets/ukv_ceda_blends_v4/solar_generator_errors.svg)
+capacity at lead day 1, and from 11.0% to 13.2% at lead day 4](../assets/ukv_ceda_blends_v5/solar_generator_errors.svg)
 
 ![Figure 8: At the three wind farms, the blend's mean absolute error runs from 6.7% to 9.4% of
-capacity at lead day 1, and from 11.2% to 13.2% at lead day 4](../assets/ukv_ceda_blends_v4/wind_generator_errors.svg)
+capacity at lead day 1, and from 11.2% to 13.2% at lead day 4](../assets/ukv_ceda_blends_v5/wind_generator_errors.svg)
 
 ### Wind days 1 and 2 meet the planned rule and survive four robustness checks
 
@@ -253,7 +253,7 @@ is statistically significant at the 5% level. At wind days 1 and 2 the gap betwe
 therefore far smaller than P1.
 
 ![Figure 9: At each of the three wind farms, the blend's point estimate is below padded ENS's at days
-1, 2, 3, and 4, by 0.05 to 0.45 points](../assets/ukv_ceda_blends_v4/wind_generators.svg)
+1, 2, 3, and 4, by 0.05 to 0.45 points](../assets/ukv_ceda_blends_v5/wind_generators.svg)
 
 ### Wind day 3 rests on February 2026
 
@@ -317,7 +317,7 @@ them. By era, solar day 3 gives -0.154 [-0.254, -0.059] in era 0 and -0.159 [-0.
 2, and days 1 and 2 give similar point estimates with intervals that include zero.
 
 ![Figure 10: At each of the six solar farms, the blend's point estimate is below padded ENS's at days
-1, 2, and 3, by 0.02 to 0.20 points](../assets/ukv_ceda_blends_v4/solar_generators.svg)
+1, 2, and 3, by 0.02 to 0.20 points](../assets/ukv_ceda_blends_v5/solar_generators.svg)
 
 ### A post hoc permutation test places the solar gain below all 17 shuffled controls' differences
 
@@ -340,7 +340,7 @@ because the days share months and shuffle seeds. It makes no claim about other m
 does not resample months, and so answers a different question from the bootstrap intervals.
 
 ![Figure 11: For six solar farms, the planned blend's gain over padded ENS is larger than all 17
-shuffled controls' at days 1, 2, and 3](../assets/ukv_ceda_blends_v4/solar_permutation.svg)
+shuffled controls' at days 1, 2, and 3](../assets/ukv_ceda_blends_v5/solar_permutation.svg)
 
 ### Day 4 is inconclusive
 
@@ -437,11 +437,11 @@ either one.
 
 ![Figure 12: For the six solar farms, the blend with UKV-CEDA's older run, which starts 9 hours before
 ENS's run, gains less over padded ENS than the planned blend, in the point estimates at every lead
-day and both settings](../assets/ukv_ceda_blends_v4/solar_older_run.svg)
+day and both settings](../assets/ukv_ceda_blends_v5/solar_older_run.svg)
 
 ![Figure 13: For the three wind farms, the blend with UKV-CEDA's older run, which starts 9 hours
 before ENS's run, gains less over padded ENS than the planned blend, in the point estimates at every
-lead day and both settings](../assets/ukv_ceda_blends_v4/wind_older_run.svg)
+lead day and both settings](../assets/ukv_ceda_blends_v5/wind_older_run.svg)
 
 **The two blends support one reading: a UKV-CEDA run that starts earlier and leads longer gives
 less of the gain, and the study cannot say how much of the loss each change causes.** The stale
@@ -561,7 +561,7 @@ uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --post-hoc-older-ru
 uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --report-only --post-hoc-older-run \
   --report-name report_5
 uv run python studies/ukv_ceda_blends/ukv_ceda_blends_charts.py \
-  --figures-dir docs/studies/assets/ukv_ceda_blends_v4 \
+  --figures-dir docs/studies/assets/ukv_ceda_blends_v5 \
   --intervals-name report_5_intervals.parquet
 ```
 
