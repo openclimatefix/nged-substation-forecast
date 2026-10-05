@@ -7,12 +7,9 @@ month dropped. The gain is 0.24 to 0.27 points of capacity at day 1 and 0.19 to 
 At day 4 the study is inconclusive for both technologies. UKV's run starts 3 hours after ENS's run. Two post hoc tests that move UKV's run earlier cannot say how much of any gain comes from UKV's weather and how much from the later start. This page calls the UKV data from the CEDA archive UKV-CEDA.
 
 **The error is a mean absolute error in percentage points of the generator's capacity, and every
-difference is the first XGBoost model's error minus the second XGBoost model's error.** A negative difference means the XGBoost model given UKV-CEDA forecasts better. Each bracketed pair is a 95% interval from resampling whole calendar
-months and a fitting seed. Every number comes from one of the study's five reports: `report.md`, and
+difference is the first XGBoost model's error minus the second XGBoost model's error.** A negative difference means the XGBoost model given UKV-CEDA forecasts better. Each bracketed pair is a 95% interval from resampling whole calendar months and a fitting seed (the random-number seed of XGBoost's training). Every number comes from one of the study's five reports: `report.md`, and
 the post hoc `report_2.md`, `report_3.md`, `report_4.md`, and `report_5.md`. The page names the
-report wherever the number is not in `report.md` or `report_2.md`. The two hyperparameter settings
-are the primary setting and a sensitivity setting (the primary setting first, then the sensitivity
-setting in brackets or in a second row).
+report wherever the number is not in `report.md` or `report_2.md`. The two hyperparameter settings, the XGBoost training options fixed before any fit, are the primary setting and a sensitivity setting (the primary setting first, then the sensitivity setting in brackets or in a second row). [Data and methods](#data-and-methods) defines the shuffled controls, the planned rule, and the Bonferroni correction.
 
 ![Figure 1: For six solar farms, adding UKV-CEDA lowered the ENS mean's error by about 0.1 points of
 capacity at lead days 1 to 3. The planned rule is met at day 3 only, and day 4 is
@@ -62,9 +59,7 @@ helps.**
   to 3.
 - **Older UKV-CEDA runs keep part of the gain, and the study cannot say whether lead or run timing
   causes the loss
-  ([older runs](#how-the-gain-changes-when-ukv-cedas-run-is-older)).** The post hoc stale blend
-  keeps 65% and 49% of the planned wind gain at days 2 and 3, and 30% at day 1. The post hoc
-  older-run blend keeps 40% to 70% of the planned gain at the primary setting (`report_5.md`).
+  ([older runs](#how-the-gain-changes-when-ukv-cedas-run-is-older)).** The post hoc stale blend, which reads a UKV-CEDA run one day older, keeps 65% and 49% of the planned wind gain at days 2 and 3, and 30% at day 1. The post hoc older-run blend, which reads a UKV-CEDA run 12 hours older, keeps 40% to 70% of the planned gain at the primary setting (`report_5.md`).
 
 ## Introduction
 
@@ -83,7 +78,7 @@ UKV-CEDA's lead is therefore 3 hours shorter at every hour.
 
 | Product | Grid | Coverage | History | Assumed availability |
 |---|---|---|---|---|
-| ECMWF ENS mean (51 members) | About 9 km native, served on 0.25° cells; the study averages the cells overlapping each generator's H3 hexagon | Global | From 2024-04-01 | Not measured; the 00 UTC run is assumed readable at 09:00 UTC |
+| ECMWF ENS mean (51 members) | About 9 km native, served on 0.25° cells; the study averages the cells overlapping each generator's H3 hexagon (a cell of the H3 hexagonal grid) | Global | From 2024-04-01 | Not measured; the 00 UTC run is assumed readable at 09:00 UTC |
 | UKV-CEDA | 2 km; the study reads the cell nearest each generator | United Kingdom | CEDA's archive holds runs from 2016-03-16, and the study reads December 2024 to September 2026 | Not measured for CEDA; the 03 UTC run is assumed readable at 09:00 UTC |
 
 | Product | Run read for lead day N | Lead of the hour of day h | Resolution in time |
@@ -113,14 +108,14 @@ ENS publishes.
 **The solar models are given ENS's mean global irradiance and temperature, and UKV-CEDA's
 global irradiance and temperature.** The wind models are given ENS's 100 m wind speed, the sine and
 cosine of its 100 m direction, and its 10 m wind speed. UKV-CEDA's wind columns are its native 10 m
-wind speed, the sine and cosine of its 10 m direction, and its 925 hPa wind speed. None of UKV-CEDA's wind columns is a 100 m wind. Every XGBoost model also has the hour of day, the day of the year, and an era code, and the solar
+wind speed, the sine and cosine of its 10 m direction, and its wind speed at the 925 hPa pressure level, roughly 750 m above sea level. None of UKV-CEDA's wind columns is a 100 m wind. Every XGBoost model also has the hour of day, the day of the year, and an era code (the three eras are set out in the next paragraph), and the solar
 models have the sun's elevation and azimuth. Each model named above is fitted separately at each generator, as one XGBoost model per generator.
 
 **The rows, folds, and intervals follow the matched-lead page.** The study scores 21 months of valid
 hours, from December 2024 to September 2026, with January 2026 dropped because the Met Office
 upgraded UKV on 21 January 2026. The eras are: era 0 before October 2025 (10 months), era 1 from
 October to December 2025 (3 months, too few for an interval), and era 2 from February 2026 (8
-months). Folds are blocks of whole months within each era. Each row, one generator at one valid hour, is scored only if ENS and UKV-CEDA both have values for the row, so every XGBoost model of a lead day is trained and scored on the same
+months). Folds are blocks of whole months within each era, and every forecast is made out of fold, by an XGBoost model not trained on that forecast's fold. Each row, one generator at one valid hour, is scored only if ENS and UKV-CEDA both have values for the row, so every XGBoost model of a lead day is trained and scored on the same
 rows: 38,253 to 38,287 solar rows and 41,526 to 41,541 wind rows per lead day. Each row's error is
 divided by its own generator's capacity before any mean or difference. The intervals resample whole
 calendar months and one of three fitting seeds, paired across XGBoost models. The intervals cover month-to-month
@@ -130,8 +125,7 @@ weather and fitting-seed variation, and not differences between generators.
 existed. P1 is the blend minus the padded ENS model. P2 is the blend minus each shuffled control,
 with one contrast per shuffle seed. The reading rule is: the blend "lowers the error" at a
 technology and lead day only if the upper 95% bound of P1 and of both P2 contrasts is below zero at
-both settings. The study reports P1's Bonferroni-adjusted 99.375% interval, which corrects across
-the 8 P1 intervals per setting. The study does not adjust P2. Where P1 is below zero at both settings
+both settings. The study reports P1's Bonferroni-adjusted 99.375% interval, a wider interval that allows for reading the 8 P1 intervals per setting at once. The study does not adjust P2. Where P1 is below zero at both settings
 and a P2 bound is not, the reading is "unresolved: lower than padded ENS, control test not passed".
 
 **Every other number is exploratory, and the page does not correct the exploratory rows for
