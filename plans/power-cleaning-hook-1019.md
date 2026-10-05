@@ -14,8 +14,9 @@ writes the result over a new Delta table, `cleaned_power_time_series`. That tabl
 row plus a nullable `drop_reason` column: null for a row that passed, otherwise the name of the rule
 that rejected it. Today `flag_nged_power` flags nothing. The asset reports, per drop reason, how
 many rows and series were flagged and the range of the flagged values, as Dagster output metadata.
-The power readers switch from the raw table to the cleaned table's unflagged rows. The raw table is
-never modified.
+Every reader of power except the ingest and its freshness check — training, CV prediction, live
+forecasting, eligibility, effective capacity, the leaderboard's `metrics`, and the two dashboards —
+switches to the cleaned table's unflagged rows. The raw table is never modified.
 
 ## Verdict, size and departures
 
@@ -82,18 +83,20 @@ comparison, a context window, a re-cleaned recent tail, and a version-triggered 
 - `DROP_REASONS: Final[tuple[str, ...]] = ()` — the vocabulary of drop reasons, empty today. The
   docstring says a rule's author adds the rule's reason here with the rule.
 - `CleanedPowerTimeSeries(PowerTimeSeries)` — the same three fields plus `drop_reason: str | None`,
-  stored as `pl.String` with the constraint `drop_reason.is_null() | drop_reason.is_in(DROP_REASONS)`.
-  Not a `pl.Enum`: the reviewer showed that an Enum column written through `write_deltalake` makes
-  every later read raise a `SchemaError` (gotcha 5 in `polars-patito-gotchas`), and the readers
-  filter on this column. Subclassing keeps `PowerTimeSeries.validate`'s datetime-bound, sort-order,
-  and key-uniqueness checks (the reviewer confirmed all three run on the subclass).
+  stored as `pl.String` with the constraint `drop_reason.is_null() |
+  drop_reason.is_in(DROP_REASONS)`. Not a `pl.Enum`: the reviewer showed that an Enum column written
+  through `write_deltalake` makes every later read raise a `SchemaError` (gotcha 5 in
+  `polars-patito-gotchas`), and the readers filter on this column. Subclassing keeps
+  `PowerTimeSeries.validate`'s datetime-bound, sort-order, and key-uniqueness checks (the reviewer
+  confirmed all three run on the subclass).
 
 ### `packages/nged_data/src/nged_data/cleaning.py` (new)
 
 - `flag_nged_power(power: pt.LazyFrame[PowerTimeSeries], metadata:
   pt.DataFrame[TimeSeriesMetadata]) -> pt.LazyFrame[CleanedPowerTimeSeries]` — the function the
   rules go into. `power` is always the whole raw table. Today the function adds a null `drop_reason`
-  column and nothing else. The docstring states the contract a rule must keep: return every input
+  column (`pl.lit(None, dtype=pl.String)`; a bare `pl.lit(None)` has the `Null` dtype) and nothing
+  else. The docstring states the contract a rule must keep: return every input
   row exactly once, never change `time_series_id` or `time`, flag rather than delete, and when two
   rules match one row, record the first in the function's order.
 - No `first_times` argument. Because `power` is the whole table, a rule computes each series' first
@@ -114,15 +117,24 @@ comparison, a context window, a re-cleaned recent tail, and a version-triggered 
 ### `packages/delta_store/src/delta_store/cleaned_power_time_series.py` (new)
 
 - `write_cleaned_power_time_series(df: pt.DataFrame[CleanedPowerTimeSeries], table_uri, *,
-  storage_options)` — `write_deltalake(mode="overwrite", partition_by=["time_series_id"])`, one
-  atomic Delta commit (principle 10), then `vacuum(retention_hours=2,
-  enforce_retention_duration=False)` (delta-rs refuses a retention under 168 hours without that
-  flag). Without the vacuum every hourly overwrite leaves the previous copy on disk forever. The
-  retention bounds how long the longest reader scan may take: a scan resolves its file list when it
-  starts, and only files tombstoned more than 2 hours ago are deleted, so at steady state about
-  three copies sit on disk (about 110 MB at V1).
-- The commit's `custom_metadata` records the raw table's Delta version the cleaning run read, for
-  provenance (see Readers).
+  raw_version: int, storage_options, retention_hours: int = 2)` — `write_deltalake(mode="overwrite",
+  partition_by=["time_series_id"])`, one atomic Delta commit (principle 10), then
+  `vacuum(retention_hours=retention_hours, dry_run=False, enforce_retention_duration=False)`. Both
+  flags matter: `dry_run` defaults to `True`, which lists files and deletes none, and delta-rs
+  refuses a retention under 168 hours without `enforce_retention_duration=False`. Without the vacuum
+  every hourly overwrite leaves the previous copy on disk forever. The retention bounds how long the
+  longest reader scan may take: a scan resolves its file list when it starts, and only files
+  tombstoned more than 2 hours ago are deleted, so at steady state about three copies sit on disk
+  (about 110 MB at V1).
+- The write commit's `custom_metadata` records `raw_version`, the raw table's Delta version the
+  cleaning run read, for provenance and for the keeping-up check. The vacuum adds two commits of
+  its own (`VACUUM START` and `VACUUM END`) after the write, so a reader of `raw_version` walks
+  `DeltaTable.history()` back to the newest `WRITE` commit rather than taking the latest commit.
+- `write_deltalake` does not keep row order within a partition (the reviewer found 13 of 33
+  partitions out of `time` order after one write), so the table on disk is not sorted. That does
+  not matter at V1; at V2 it weakens row-group pruning on `time`.
+- `delta_store/__init__.py` lists every module in its docstring and `__all__`; both gain the new
+  module.
 
 ### `packages/contracts/src/contracts/settings.py`
 
@@ -131,7 +143,7 @@ comparison, a context window, a re-cleaned recent tail, and a version-triggered 
 
 ### `src/nged_substation_forecast/defs/cleaning_assets.py` (new)
 
-`defs/assets.py` belongs to #1020, so the asset gets its own module.
+The asset gets its own module rather than joining `defs/assets.py`, which holds the ingest assets.
 
 - `clean_nged_power_data` — `deps=["power_time_series_and_metadata"]`, production-layer tags. A
   minimal wrapper:
@@ -142,54 +154,75 @@ comparison, a context window, a re-cleaned recent tail, and a version-triggered 
       collect with the streaming engine, sort by `(time_series_id, time)` —
       `PowerTimeSeries.validate` rejects unsorted rows, and Delta file order is not sorted, which
       the reviewer confirmed fails on the real V1 data — then `CleanedPowerTimeSeries.validate`,
-      then write.
+      then write, passing the raw table's version read at the start of the run.
     - Metadata: `n_rows`, `n_rows_kept`, `n_time_series`, and per drop reason
       `drop_reason/<reason>/n_rows`, `.../n_time_series`, `.../min_power`, and `.../max_power`,
       computed from the collected frame with one `group_by("drop_reason")`.
-    - No `try`: a failing rule or a contract violation is our bug, so the asset raises and the
-      readers keep the last good table.
+    - No `try` around the cleaning: a failing rule or a contract violation is our bug, so the asset
+      raises and the readers keep the last good table.
+    - The vacuum is housekeeping, and a vacuum failure (for example a transient object-store
+      error) comes from the outside world after the fresh table is already written. The writer
+      therefore runs the vacuum in its own `try`; the asset catches a vacuum failure, reports it
+      with `report_asset_degradation(asset_name="clean_nged_power_data", ...)`, and records
+      `vacuum_failed: True` in the metadata rather than failing the run.
 - Registered in `src/nged_substation_forecast/definitions.py`'s `load_assets_from_modules` list.
+  The new asset check below goes in the same file's explicit `asset_checks=[...]` list.
 
 ### `src/nged_substation_forecast/defs/checks.py`
 
 - `cleaned_power_keeps_up_with_raw` — a `WARN`, `blocking=False` asset check on
-  `power_time_series_and_metadata`, beside `power_data_is_fresh`. It warns when the cleaned table's
-  latest reading is more than two hourly runs behind the raw table's, or when the cleaned table is
-  absent. The body sits inside the same `BaseException` guard as the other checks and reports with
-  `report_check_degradation`, so it cannot raise. It is the only signal for a cleaning asset that
-  silently stopped running, because `power_data_is_fresh` reads raw coverage and the Sentry
-  failure hook fires only on a run that failed. The roster is a new way for that to happen:
-  `live_forecasts` deliberately avoids the roster, but a bad roster now stops cleaning and so makes
-  live power go stale.
+  `power_time_series_and_metadata`, beside `power_data_is_fresh`. It compares the raw table's
+  current Delta version with the `raw_version` recorded in the cleaned table's newest `WRITE`
+  commit, and warns when the cleaned table is 3 or more raw commits behind, when the cleaned table
+  is absent, or when the key is missing. Counting raw commits rather than hours of reading time
+  counts missed runs, which is the unit inherent-stability asks for. A lag of 0 or 1 commits is
+  healthy: the check runs in parallel with `clean_nged_power_data` in the same job, so it may see
+  the cleaning from the previous run. Reading time would false-alarm after an NGED backlog, when one
+  ingest catches up several hours of readings at once. The body sits inside the same `BaseException`
+  guard as the other checks and reports with `report_check_degradation`, so it cannot raise. It is
+  the only signal for a cleaning asset that silently stopped running, because `power_data_is_fresh`
+  reads raw coverage and the Sentry failure hook fires only on a run that failed. The roster is a
+  new way for that to happen: `live_forecasts` deliberately avoids the roster, but a bad roster now
+  stops cleaning and so makes live power go stale.
 
-### `src/nged_substation_forecast/defs/schedules.py` — out of bounds; needs coordination
+### `src/nged_substation_forecast/defs/schedules.py`
 
 - Add `"clean_nged_power_data"` to `power_time_series_and_metadata_job`'s selection, so the asset
   runs hourly, straight after ingest and five minutes before each 6-hourly `live_forecasts` slot.
-  That is well over the four runs a day the maintainer requires. #1020 owns this file; see open
-  question 1.
+  That is well over the four runs a day the maintainer requires. #1020 also edits this file (the
+  `ecmwf_ens` schedule), but the maintainer will merge this PR before work on #1020 starts, and a
+  comment on #1020 says so.
 
 ### Readers
 
 - `_engineering_inputs.py`, `load_engineering_inputs`: read `scan_cleaned_power` instead of the raw
   path. This covers `trained_cv_model`, `cv_power_forecasts`, and `live_forecasts`.
 - `cv_assets.py`, `effective_capacity`: read `scan_cleaned_power`.
+- `cv_assets.py`, `metrics`: the actuals it scores against come from `scan_cleaned_power` instead
+  of the raw path (cv_assets.py:986–989). The maintainer decided that the leaderboard scores
+  against cleaned actuals. `metrics` is also being edited for #958, so this one-line change may need
+  a trivial rebase in whichever PR merges second.
 - `cv_assets.py`, `eligible_time_series`: `coverage_from_power(scan_cleaned_power(...))`, behind a
   `delta_table_exists` check on the cleaned table, so an absent table still yields an empty
   population.
-- The `deps` of `eligible_time_series`, `effective_capacity`, `trained_cv_model`, and
+- The two dashboard notebooks (`packages/dashboard/view_forecasts.py:332` and
+  `map_and_timeseries.py:122`) read `scan_cleaned_power`, following the `marimo-notebooks` skill.
+- The `deps` of `eligible_time_series`, `effective_capacity`, `trained_cv_model`, `metrics`, and
   `live_forecasts` change from `power_time_series_and_metadata` to `clean_nged_power_data`.
-- Provenance: `trained_cv_model` and `cv_power_forecasts` stamp the `power_time_series` Delta
-  version in MLflow so a run can be replayed with `scan_delta(version=N)`. The cleaned table's own
-  versions are vacuumed after 2 hours, so they are not replayable. Those assets instead stamp the
-  raw version recorded in the cleaned table's latest commit metadata: replaying means re-running
-  the cleaning over that raw version at the run's git SHA. The stamped raw version also stops being
-  one ahead of the data actually used, which reading the raw table's current version could be.
-  `ml_core/repro.py`'s `TableNameType` and its docstring change to say so.
+- Provenance: `trained_cv_model`, `cv_power_forecasts`, and `metrics` stamp the
+  `power_time_series` Delta version in MLflow so a run can be replayed with
+  `scan_delta(version=N)`. The cleaned table's own versions are vacuumed after 2 hours, so they are
+  not replayable. The three assets instead stamp a new key, `cleaned_power_time_series_source`: the
+  `raw_version` from the cleaned table's newest `WRITE` commit, read at the start of the asset, or
+  `ABSENT` when the table or the key is missing. Replaying means re-running the cleaning over that
+  raw version at the run's git SHA. `ml_core/repro.py` gains the `TableNameType` value and a small
+  lookup function beside `get_delta_versions`, which only reads `DeltaTable.version()`. The stamp
+  is approximate in one way: `cv_power_forecasts` re-scans power for every `init_time` chunk, so one
+  long run can span several hourly cleaned tables.
 - `tests/test_asset_layer_tags.py` pins the production-layer assets; `clean_nged_power_data` is
   added there, and that test requires `docs/architecture/overview.md` to change with it.
-- Untouched: `metrics` (owned by #958, still reads raw actuals), `power_data_is_fresh`, the ingest,
-  and the two dashboard notebooks.
+- Still reading raw power: the ingest itself and its `power_data_is_fresh` check, which measure
+  what NGED delivered, and the cleaning asset. Nothing else reads the raw table.
 
 ## How the cleaned table could drive `asset_health_history`
 
@@ -224,9 +257,8 @@ Nothing in this issue builds that table; the mapping is a decision for the issue
 ## Tests
 
 - `packages/contracts/tests`: `CleanedPowerTimeSeries.validate` accepts a null `drop_reason`,
-  accepts a known value (with `DROP_REASONS` monkeypatched, since it is empty today), rejects an
-  unknown string, rejects a duplicate key, and rejects unsorted rows. `test_settings.py` gains a
-  case for the derived `cleaned_power_time_series_data_path`.
+  rejects an unknown string, rejects a duplicate key, and rejects unsorted rows. `test_settings.py`
+  gains a case for the derived `cleaned_power_time_series_data_path`.
 - `packages/nged_data/tests/test_cleaning.py`: `flag_nged_power` returns every input row with a null
   `drop_reason`. Fails on `main`, where the function does not exist.
 - `packages/nged_data/tests/test_storage.py`: `scan_cleaned_power` drops flagged rows and returns
@@ -234,26 +266,31 @@ Nothing in this issue builds that table; the mapping is a decision for the issue
   the evidence the coverage split is a pure refactor.
 - `packages/delta_store/tests`: the writer overwrites rather than appends (two writes; only the
   second write's rows remain), read back through `pl.scan_delta` so a dtype that breaks Delta reads
-  fails the test; and the vacuum runs without raising.
+  fails the test; and with `retention_hours=0` the superseded parquet files are gone after the
+  second write, which fails if `dry_run=False` is missing. The `raw_version` is readable from the
+  newest `WRITE` commit after the vacuum's two commits.
 - `tests/test_cleaning_assets.py` (new):
     - the asset writes every raw row with null reasons and reports `n_rows`;
     - with `flag_nged_power` monkeypatched to flag some rows, the per-reason metadata counts and
       min/max are right;
     - an absent raw table yields `n_rows: 0` and no exception;
     - every assertion reads the written table back through `pl.scan_delta`.
-- `tests/test_checks.py`: `cleaned_power_keeps_up_with_raw` passes when the two tables agree, warns
-  when the cleaned table lags or is absent, and degrades rather than raising when a table is
-  unreadable.
+    - a vacuum that raises still leaves the run successful, with `vacuum_failed: True`.
+- `tests/test_checks.py`: `cleaned_power_keeps_up_with_raw` passes at a lag of 0 and 1 raw commits,
+  warns at 3, warns when the cleaned table or its `raw_version` key is absent, and degrades rather
+  than raising when a table is unreadable.
+- `ml_core` tests: the new provenance lookup returns the newest `WRITE` commit's `raw_version`, and
+  `ABSENT` for a missing table or key.
 - Readers: one test per read path proves flagged rows are excluded — `effective_capacity`,
   `eligible_time_series` (flagging series 1, the only series eligible for the fixture's `FOLD_ID`),
-  and `live_forecasts` (a spy on `build_live_power_frame`, because the test model's weather-only
-  features forecast identically with or without power). `trained_cv_model` and
-  `cv_power_forecasts` share `load_engineering_inputs` with `live_forecasts`, so the live test
-  covers that path.
+  `metrics` (a flagged actual is not scored), and `live_forecasts` (a spy on
+  `build_live_power_frame`, because the test model's weather-only features forecast identically with
+  or without power). `trained_cv_model` and `cv_power_forecasts` share `load_engineering_inputs`
+  with `live_forecasts`, so the live test covers that path.
 - **Fixture churn**: `test_cv_assets.py`, `test_trained_cv_model.py`, `test_cv_power_forecasts.py`,
   `test_live_forecasts.py`, and `test_metrics.py` (which materialises `effective_capacity`) write a
-  raw power table; each must also write the cleaned table. A
-  shared helper in `tests/` writes an all-unflagged cleaned copy of a raw fixture.
+  raw power table; each must also write the cleaned table. A shared helper in `tests/` writes an
+  all-unflagged cleaned copy of a raw fixture.
 
 ## Docs to update
 
@@ -267,6 +304,7 @@ Nothing in this issue builds that table; the mapping is a decision for the issue
   and the slot fails reading it.
 - `docs/architecture/overview.md` — the new production asset (required by
   `test_asset_layer_tags.py`).
+- `ml_core/repro.py`'s module docstring, which promises replay with `scan_delta(version=N)`.
 - `packages/nged_data/README.md`, `packages/delta_store/README.md`, and
   `packages/contracts/README.md` — the new functions and contract.
 - `CLAUDE.md` — the Dagster assets list and the contracts list.
@@ -281,13 +319,7 @@ V1 data to check the run time and the on-disk size after vacuum.
 
 ## Risks and open questions
 
-1. **`defs/schedules.py` belongs to #1020.** Without the one-line selection change, the cleaned
-   table is never refreshed in production and `live_forecasts` reads stale power. Recommendation:
-   implement everything else now, and add the line after #1020 merges (or ask that session to add
-   it). This PR must not merge before the line is in.
-2. **Should `metrics` score against cleaned actuals?** Probably yes for rows describing a plant that
-   no longer exists, but `metrics` belongs to #958. Recommendation: raise it there.
-3. **V2 rewrite cost.** A few GB per run, 24 runs a day. Recommendation: measure before V2; the
+1. **V2 rewrite cost.** A few GB per run, 24 runs a day. Recommendation: measure before V2; the
    append issue is the answer if the rewrite is too slow.
 
 ## Review log
@@ -309,8 +341,8 @@ Accepted:
 - `vacuum` needs `enforce_retention_duration=False` below 168 hours; the retention is now 2 hours,
   and the plan states what the retention bounds.
 - Sort before `validate`, which rejects the real V1 data in Delta file order.
-- Missing files added: `definitions.py`, `test_asset_layer_tags.py`, `docs/architecture/overview.md`,
-  `ml_core/repro.py`, `test_metrics.py`, and `test_settings.py`.
+- Missing files added: `definitions.py`, `test_asset_layer_tags.py`,
+  `docs/architecture/overview.md`, `ml_core/repro.py`, `test_metrics.py`, and `test_settings.py`.
 - Provenance stamps the raw version the cleaning read, recorded in the cleaned commit's metadata,
   because vacuumed cleaned versions are not replayable.
 - The roster is read with `allow_superfluous_columns=True`, and the WARN check comparing the two
@@ -320,3 +352,27 @@ Accepted:
 - The writer and asset tests read back through `pl.scan_delta`.
 
 Not acted on: skipping the rewrite in hours when ingest found no new data (0.07 s at V1).
+
+### Review of the fixes (fresh Opus sub-agent, with experiments)
+
+Accepted, all ten findings:
+
+- The vacuum call needs `dry_run=False`; without it nothing is deleted. The retention is now a
+  writer keyword so a test can pass 0 and assert the old files are gone.
+- The provenance stamp reads the newest `WRITE` commit, not the latest commit (the vacuum adds two),
+  uses a new key rather than redefining `power_time_series`, and maps a missing table or key to
+  `ABSENT`. The claim that the stamp stops being one version ahead was false and is gone.
+- The keeping-up check counts raw commits, not hours of reading time, which avoids a false alarm
+  after an NGED backlog, and is registered in `definitions.py`'s `asset_checks` list.
+- The monkeypatched-`DROP_REASONS` test case is dropped: Patito captures the tuple when the class is
+  defined.
+- The table on disk is not sorted within a partition; the plan now says so.
+- A vacuum failure degrades rather than failing a run whose table is already written.
+- `delta_store/__init__.py` and the typed null literal are named.
+
+### Maintainer decisions after that review
+
+- This PR edits `defs/schedules.py` itself; the maintainer will merge it before work on #1020
+  starts, and a comment on #1020 explains the edit.
+- Every reader except the ingest and its freshness check uses cleaned power, including `metrics`
+  and the two dashboards.
