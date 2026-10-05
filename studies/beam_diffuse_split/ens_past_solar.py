@@ -95,7 +95,6 @@ import h3
 import h3.api.basic_int as h3_api
 import numpy as np
 import polars as pl
-from blend_products import SOLAR, _solar_frame
 from ens_forecast_horizons import (
     Steps,
     _clear_sky_arrays,
@@ -113,6 +112,7 @@ from studies.bootstrap import bootstrap_absolute
 from studies.charts import report_errors
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SEEDS, SENSITIVITY_HYPER_PARAMETERS
 from studies.guards import check_no_missing, refuse_to_overwrite
+from studies.product_frames import SOLAR, solar_frame
 from studies.pv_dataset import nearest_era5_cell, pv_sites, read_cams, read_era5
 from studies.resample import (
     DEFAULT_DAYLIGHT_FLOOR_W_M2,
@@ -491,7 +491,7 @@ def build_rows() -> pl.DataFrame:
         ValueError: If a (site, time) is duplicated, or an ENS column holds a missing value.
     """
     sites = pv_sites()
-    base = _solar_frame().filter(pl.col("time") >= ENS_START)
+    base = solar_frame().filter(pl.col("time") >= ENS_START)
     used_sites = sorted(base["site"].unique().to_list())
     members = _t3_members().filter(pl.col("site").is_in(used_sites))
     steps = _t3_steps(members=members)

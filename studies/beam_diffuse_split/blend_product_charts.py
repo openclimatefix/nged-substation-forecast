@@ -34,23 +34,21 @@ import altair as alt
 import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
-from blend_products import (
-    METRIC,
-    MOST_IMPROVED_SHARE,
-    OUTPUT_DIR,
-    PERCENTAGE_POINTS,
-    SOLAR,
-    WIND,
-    _headline_line,
-    _interval,
-    _line,
-)
+from blend_products import MOST_IMPROVED_SHARE, OUTPUT_DIR, _headline_line
 from studies.charts import (
     CONTENT_WIDTH_PX,
     figure,
     interval_panel,
     leaderboard_panel,
     wrapped,
+)
+from studies.product_frames import (
+    METRIC,
+    PERCENTAGE_POINTS,
+    SOLAR,
+    WIND,
+    contrast_interval,
+    contrast_line,
 )
 from weather_product_charts import (
     ASSETS_DIR,
@@ -386,7 +384,7 @@ def _reproduce(*, report_text: str) -> None:
     lines = report_text.splitlines()
     for line in (
         _headline_line(
-            _interval(
+            contrast_interval(
                 losses=losses,
                 contrast=("everything_rich_xgb", "ukv_rich"),
                 domain=WIND,
@@ -394,8 +392,8 @@ def _reproduce(*, report_text: str) -> None:
                 section="deciding",
             )
         ),
-        _line(
-            _interval(
+        contrast_line(
+            contrast_interval(
                 losses=losses.filter(pl.col("site") == "W2"),
                 contrast=("everything_rich_xgb", "ukv_rich"),
                 domain=WIND,

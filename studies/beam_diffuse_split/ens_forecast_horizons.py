@@ -135,17 +135,6 @@ from typing import Final, Literal, NamedTuple
 
 import numpy as np
 import polars as pl
-from blend_products import (
-    CONTRAST_HEADER,
-    SOLAR,
-    WIND,
-    Domain,
-    IntervalRecord,
-    _interval,
-    _line,
-    _solar_frame,
-    _wind_frame,
-)
 from fetch_ens_forecast_horizons import BAND_DAYS, ENSEMBLE_SIZE, OUTPUT_DIR, OUTPUT_PATH
 from studies.arm_runner import MAX_CONCURRENT_FITS, Job, run_all
 from studies.arm_runner import SHARED_FEATURES as SOLAR_SHARED_FEATURES
@@ -176,6 +165,17 @@ from studies.cross_validation import (
 )
 from studies.ensemble import check_one_run_per_hour
 from studies.guards import refuse_to_overwrite
+from studies.product_frames import (
+    CONTRAST_HEADER,
+    SOLAR,
+    WIND,
+    Domain,
+    IntervalRecord,
+    contrast_interval,
+    contrast_line,
+    solar_frame,
+    wind_frame,
+)
 from studies.pv_dataset import pv_sites, solar_hourly_power, wind_sites
 from studies.resample import (
     DEFAULT_DAYLIGHT_FLOOR_W_M2,
@@ -904,7 +904,7 @@ def base_frame(*, domain: DomainType) -> pl.DataFrame:
     Returns:
         The rows, from the first run's first scored day onwards.
     """
-    frame = _solar_frame() if domain == "solar" else _wind_frame()
+    frame = solar_frame() if domain == "solar" else wind_frame()
     return frame.filter(pl.col("time") > SPAN[0] + timedelta(days=1))
 
 
@@ -1082,7 +1082,7 @@ def shared_features(*, domain: Domain) -> tuple[str, ...]:
     """Return the columns every ENS arm is shown besides its weather.
 
     Args:
-        domain: `blend_products.SOLAR` or `blend_products.WIND`.
+        domain: `product_frames.SOLAR` or `product_frames.WIND`.
 
     Returns:
         For solar, the past-weather studies' shared columns without ERA5's temperature, which each
@@ -1927,7 +1927,7 @@ def _intervals(
 
     def _one(contrast: Contrast) -> IntervalRecord:
         section, setting, treatment, reference = contrast
-        return _interval(
+        return contrast_interval(
             losses=by_setting[setting].filter(pl.col("arm").is_in([treatment, reference])),
             contrast=(treatment, reference),
             domain=domain,
@@ -2067,7 +2067,7 @@ def _contrast_lines(*, records: list[IntervalRecord]) -> list[str]:
                     f"#### Contrasts: {section}, {setting} setting",
                     "",
                     *CONTRAST_HEADER,
-                    *(_line(record) for record in chosen),
+                    *(contrast_line(record) for record in chosen),
                     "",
                 ]
     return lines

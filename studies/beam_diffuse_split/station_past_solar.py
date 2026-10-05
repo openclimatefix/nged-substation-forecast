@@ -19,7 +19,7 @@ converted to W m⁻²) and air temperature from 38 stations (an instant at `time
 **The selection rule, fixed before any score existed.** `studies.midas.select_nearest_stations`
 with `MIN_COVERAGE`: stations are ranked by great-circle distance (ties to the lower station id) and
 a station is eligible when it has a usable value at no less than `MIN_COVERAGE` of the site's
-candidate hours, the blend study's common rows (`blend_products._solar_frame`) before
+candidate hours, the blend study's common rows (`product_frames.solar_frame`) before
 `ROW_SET_END`. The nearest radiation stations and
 the nearest air-temperature stations are chosen independently. Hours where any station input an arm
 needs is missing are dropped from every arm's rows, so every arm scores the same rows. The choice
@@ -56,11 +56,6 @@ from typing import Final, cast
 
 import numpy as np
 import polars as pl
-from blend_products import (
-    PERMUTATION_GROUPS,
-    SOLAR,
-    _solar_frame,
-)
 from studies.arm_runner import MAX_CONCURRENT_FITS, Job, run_all
 from studies.blending import climatology_permutation
 from studies.bootstrap import bootstrap_absolute
@@ -75,6 +70,7 @@ from studies.midas import (
     read_station_metadata,
     select_nearest_stations,
 )
+from studies.product_frames import PERMUTATION_GROUPS, SOLAR, solar_frame
 from studies.pv_dataset import pv_sites
 from studies.solar_product_frames import with_eras
 from studies.sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
@@ -490,7 +486,7 @@ def build_rows() -> tuple[pl.DataFrame, Selection, dict[str, int], int]:
     Raises:
         ValueError: If a `(site, time)` is duplicated, or a station column holds a missing value.
     """
-    base = _solar_frame().filter(pl.col("time") < ROW_SET_END)
+    base = solar_frame().filter(pl.col("time") < ROW_SET_END)
     stations, selection, repairs = _station_inputs(base=base)
     joined = (
         base.join(stations, on=["site", "time"], how="inner")

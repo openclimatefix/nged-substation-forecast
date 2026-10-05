@@ -39,7 +39,7 @@ the published panel's, and `check_column_counts` raises if a contrast's two arms
 - `cerra_erbs`: that column, with the Erbs separation model's beam and diffuse.
 - `era5_global`, `cams_global`, `era5_3h`, `cams_3h`: the reference arms.
 
-**Row set.** The main study's site-hours (`blend_products._solar_frame`) up to the last CERRA
+**Row set.** The main study's site-hours (`product_frames.solar_frame`) up to the last CERRA
 label, 2026-07-01 00:00 UTC (the window that ends there is 21 to 24 UTC on 30 June), and only the
 hours where CERRA, ERA5 and CAMS all have a value, so every arm scores the same rows. The row set
 is a near-subset of the main rows and ends about 10 weeks before them.
@@ -88,7 +88,6 @@ from typing import Final, NamedTuple, cast
 
 import numpy as np
 import polars as pl
-from blend_products import SOLAR, _solar_frame
 from ens_past_solar import (
     _absolute_table_lines,
     _arm_columns_lines,
@@ -110,6 +109,7 @@ from studies.cross_validation import (
     uncovered_months,
 )
 from studies.guards import check_no_missing, refuse_to_overwrite
+from studies.product_frames import SOLAR, solar_frame
 from studies.pv_dataset import add_separation_models, pv_sites
 from studies.reanalysis_wind import derive_nearest_cells
 from studies.resample import DEFAULT_DAYLIGHT_FLOOR_W_M2, clear_sky_index_resample
@@ -768,7 +768,7 @@ def assemble_rows(
     adds.
 
     Args:
-        base: The main study's site-hours (`blend_products._solar_frame`), carrying its published
+        base: The main study's site-hours (`product_frames.solar_frame`), carrying its published
             `fold`, `month` and the columns every arm shares.
         cerra: `site`, `time`, `ghi_cerra` and `bhi_cerra`, the rebuilt hourly means.
         era5_3h: `site`, `time` and `ghi_era5_3h`.
@@ -873,7 +873,7 @@ def build_rows() -> Built:
     )
     cells = saved.select("site", "y_index", "x_index")
 
-    base = _solar_frame()
+    base = solar_frame()
     first_day = cast("datetime", base["time"].min()).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
