@@ -123,13 +123,13 @@ nav:
       - Configuration reference: live_service/setup.md
   - Roadmap:
       - Overview: roadmap/index.md
-      - Automated experimentation: roadmap/auto-research.md
       - Effective-capacity estimation: roadmap/capacity-estimation.md
       - Cost-savings metrics: roadmap/cost-savings-metrics.md
       - Cleaning the trial-area telemetry: roadmap/data-cleaning.md
       - Data sources: roadmap/data-sources.md
       - Delivery tables: roadmap/delivery-tables.md
       - Engineering health: roadmap/engineering-health.md
+      - Experiments run by an LLM agent: roadmap/auto-research.md
       - How NGED assembles forecasts: roadmap/forecast-building-blocks.md
       - Handover to NGED: roadmap/handover.md
       - "Live service: what's left to build": roadmap/live-service.md

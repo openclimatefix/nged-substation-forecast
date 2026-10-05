@@ -1531,4 +1531,4 @@ time so attribution stays clean.
 **One implementation of an idea is weak evidence about the idea.** Where a win is close to the
 champion's score, implement the idea a second way before promoting the idea, because how an idea
 happens to be implemented can move the score more than re-running the implementation does — see
-[Automated experimentation](auto-research.md#one-implementation-is-weak-evidence-about-an-idea).
+[Experiments run by an LLM agent](auto-research.md#one-implementation-is-weak-evidence-about-an-idea).

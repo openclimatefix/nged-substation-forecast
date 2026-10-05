@@ -1,4 +1,4 @@
-# Automated experimentation ("auto-research")
+# Experiments run by an LLM agent ("auto-research")
 
 > **Status: 🔬 Research.** Planned for v0.5 once the leaderboard (v0.3) is stable, but may have to
 > wait until v2. Gated on [Protect the leaderboard scorer for autonomous
@@ -7,29 +7,31 @@
 
 **We plan to have a large language model (LLM) agent run the [XGBoost
 improvements](xgboost-improvements.md) backlog as a search: implement each idea, score it, and
-combine the ideas that help.** The agent works in the style of [Karpathy's
-autoresearch](https://github.com/karpathy/autoresearch): it registers experiments programmatically,
-materialises them, reads the MLflow leaderboard, and iterates, with no human in the loop and no
-Dagster UI in the path.
+combine the ideas that help.** Each idea becomes an experiment: a variant of Flexpectation's XGBoost
+forecasting model, trained and scored the same way as every other variant. The leaderboard is the
+table that ranks those experiments, and the champion is the experiment currently promoted to
+production. The agent works in the style of [Karpathy's
+autoresearch](https://github.com/karpathy/autoresearch), registering and running experiments and
+reading the leaderboard with no human in the loop.
 
-## The goal is the best forecast, not a publishable result
-
-**An autonomous session is judged on whether a finding moves the leaderboard, not on whether the
-finding is publishable.** A result reaching production has to beat the standing champion on the
-honest scorer ([#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958)).
-Publishable results are a welcome side effect, never the target.
+**An agent session is judged on whether a finding moves the leaderboard, not on whether the finding
+is publishable.** A result reaching production has to beat the champion on the honest scorer planned
+in [#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958). The honest scorer
+runs from the reviewed `main` branch as the maintainer's Unix user, and agent sessions run as a
+separate Unix user that cannot read the validation data the scorer holds back. Publishable results
+are a welcome side effect, never the target.
 
 ## Why energy forecasting suits automated research
 
 **Energy forecasting has an advantage over the fields some research agents are built for: a
-genuine, uncheatable check on results.** The AI Scientist and Co-Scientist, reviewed
-[below](#agents-that-generate-rank-and-critique-ideas), rely on a simulated review or on a
-tournament between the system's own agents to judge whether a result is good. The system being
-judged had a hand in constructing that check. A promoted forecasting model is instead checked
-against power measured at the substation after the forecast was made, both in a held-out historical
+genuine, uncheatable check on results.** Two of the research agents reviewed
+[below](#agents-that-generate-rank-and-critique-ideas), the AI Scientist and Co-Scientist, judge
+whether a result is good by a review or a tournament run by the system's own agents. The system
+being judged had a hand in constructing that check. A promoted forecasting model is instead checked
+against power measured at the substation after the forecast was made, both in a held-back historical
 window and in [live monitoring](live-service.md#production-monitoring). A session that has read the
-validation set could game the first check but not the second, and the scorer protection in #958 is
-what stops the session reading the validation set.
+held-back data could game the first check but not the second, and the separate Unix user in #958 is
+what stops the session reading the held-back data.
 
 **Data is comparatively plentiful and each experiment is cheap.** Once the training-history
 extension ([#959](https://github.com/openclimatefix/nged-substation-forecast/issues/959)) lands,
@@ -40,11 +42,12 @@ is worth building here, even though the wider literature finds genuine recursive
 still blocked in most domains ([Duan et al., 2026](https://arxiv.org/abs/2609.11873), surveying the
 obstacles across scientific discovery, embodied AI, and software engineering).
 
-## What the experiment platform already provides
+## What the experiment platform provides, and the leaderboard query it lacks
 
-**The ML-assets architecture was designed to support an agent from day one.** Experiments are
-registered programmatically, MLflow serves as a machine-readable leaderboard, and a manual retirement
-job prunes the experiment catalogue.
+**The experiment platform was designed to support an agent from day one.** The pipeline runs on
+Dagster, experiments are registered programmatically rather than through the Dagster UI, MLflow
+records every run's metrics in a form a program can read, and a manual retirement job prunes
+experiments nobody needs any more.
 
 **The one piece the platform lacks for an agent to read results is a machine-readable leaderboard
 query.** That query is a thin, typed Python surface answering "fetch the aggregate leaderboard
@@ -54,51 +57,55 @@ without scraping a UI. The visual leaderboard
 underneath it. Writing the query as a reusable function, rather than burying the query in the chart
 script, leaves the agent's surface at a few lines of code when we get there.
 
-**MLflow's own MCP server does not serve this need, so the server is not a shortcut we can take
-instead.** The server's tools are generated by capturing the stdout of a curated subset of MLflow
-CLI commands, so a client receives rendered text tables rather than structured data. And the two
-run-reading tools the server exposes (`list_runs`, `describe_run`) accept neither a filter nor an
-`order_by`. Ranking N experiments therefore takes N+1 round trips of text to parse — precisely the
-operation a leaderboard exists to perform.
+**MLflow's own Model Context Protocol (MCP) server, the standard interface through which an AI agent
+calls a tool, does not serve this need.** The server's tools are generated by capturing the stdout
+of a curated subset of MLflow CLI commands, so a client receives rendered text tables rather than
+structured data. And the two run-reading tools the server exposes (`list_runs`, `describe_run`)
+accept neither a filter nor an `order_by`. Ranking N experiments therefore takes N+1 round trips of
+text to parse — precisely the operation a leaderboard exists to perform.
 
-## What published research agents found
+## Published evidence on research agents
 
 ### Agents that generate, rank and critique ideas
 
-**Published research agents already generate, critique, and rank their own ideas, and debate
-between model instances measurably improved reasoning accuracy.** [Lu et al.
-(2024)](https://arxiv.org/abs/2408.06292)'s AI Scientist generates an idea, writes code, runs the
-experiment, writes the result up as a paper, and then runs an automated peer review. The review
-alone costs $0.25 to $0.50 in API calls per paper, and the AI Scientist's automated reviewer reaches
-an F1 score of 0.57 against a human NeurIPS baseline of 0.49. That automated reviewer's scores
-correlate more closely with the average human reviewer's score than individual human reviewers'
-scores correlate with each other. [Gottweis et al. (2025)](https://arxiv.org/abs/2502.18864)'s
-Co-Scientist ranks candidate hypotheses through an Elo-rated tournament between specialised agents
-(generation, reflection, ranking, evolution, proximity, and meta-review). Across 203 research goals,
-hypothesis quality (measured by Elo rating) kept rising through more tournament rounds rather than
-plateauing quickly, evidence that spending more compute on ranking and revision continues to improve
-the hypotheses. [Du et al. (2023)](https://arxiv.org/abs/2305.14325) show that a few rounds of
-debate between separate instances of a language model beats both a single instance and simple
-majority voting: three agents debating over two rounds raised arithmetic accuracy from 67.0% to
-81.8%, and grade-school-math accuracy from 77.0% to 85.0%.
+**The AI Scientist's automated reviewer agreed with human reviewers more closely than individual
+human reviewers agree with each other.** [Lu et al. (2024)](https://arxiv.org/abs/2408.06292)'s AI
+Scientist generates an idea, writes code, runs the experiment, writes the result up as a paper, and
+then runs an automated peer review. The review alone costs $0.25 to $0.50 in API calls per paper,
+and the AI Scientist's automated reviewer reaches an F1 score of 0.57 against a human NeurIPS
+baseline of 0.49. That automated reviewer's scores correlate more closely with the average human
+reviewer's score than individual human reviewers' scores correlate with each other.
 
-**An automated reviewer, debate between agents, and a tournament each answer one question raised in
-internal discussion.** Adversarial review can be a large part of the answer to "is this finding
-real", not just a formality. The AI Scientist's automated reviewer already exceeds a single human
-reviewer's F1 score on the same task, and an autonomous session here has an even stronger check
-available than a simulated paper review: the leaderboard's honest scorer. Cross-critique between
-agents (debate) measurably improves reasoning on tasks close to what a research session does day to
-day. Arithmetic and word-problem accuracy resemble the reasoning a session does when checking its
-own feature-engineering logic or reading a metrics table, which is direct evidence for, not just an
-analogy to, the "how do we get AI agents to critique each other's work" question raised in
-discussion. And a tournament-style search over candidate hypotheses (Co-Scientist) is one concrete
-answer to the breadth-versus-depth question. In Co-Scientist, breadth comes from generating many
-hypotheses up front, depth comes from repeated tournament rounds against the current top of the
-ranking, and the balance between breadth and depth emerges from running more rounds. The [proposed
-design](#proposed-design) below sets that balance explicitly instead, with a screen of every idea
+**Co-Scientist's hypotheses kept improving as its tournament between agents ran more rounds.**
+[Gottweis et al. (2025)](https://arxiv.org/abs/2502.18864)'s Co-Scientist ranks candidate
+hypotheses through an Elo-rated tournament between specialised agents (generation, reflection,
+ranking, evolution, proximity, and meta-review). Across 203 research goals, hypothesis quality
+(measured by Elo rating) kept rising through more tournament rounds rather than plateauing quickly,
+evidence that spending more compute on ranking and revision continues to improve the hypotheses.
+
+**Debate between separate instances of a language model beat both a single instance and majority
+voting.** [Du et al. (2023)](https://arxiv.org/abs/2305.14325) show that three agents debating over
+two rounds raised arithmetic accuracy from 67.0% to 81.8%, and grade-school-math accuracy from 77.0%
+to 85.0%.
+
+**For deciding whether a finding is real, the proposed design relies on the honest scorer rather
+than on agents reviewing each other.** Adversarial review can be a large part of the answer to "is
+this finding real", not just a formality. But an autonomous session here has a stronger check
+available than a simulated paper review: the leaderboard's honest scorer.
+
+**Debate between agents is direct evidence on how agents should critique each other's work.**
+Arithmetic and word-problem accuracy resemble the reasoning a session does when checking its own
+feature-engineering logic or reading a metrics table, so the gains Du et al. measured are evidence
+for, not just an analogy to, agents critiquing each other here. Whether the proposed design should
+add that critique is an [open question](#open-questions).
+
+**Co-Scientist balances breadth against depth by running more tournament rounds; the proposed design
+sets that balance explicitly instead.** In Co-Scientist, breadth comes from generating many
+hypotheses up front, and depth comes from repeated tournament rounds against the current top of the
+ranking. The [proposed design](#proposed-design) below sets the balance with a screen of every idea
 followed by a tree search.
 
-### Tree search over code beat expert forecasters in retrospective studies
+### Google's ERA: a tree search over code variants
 
 **Google's Empirical Research Assistance (ERA) system searches a tree of code variants against a
 fixed score, and two of its tasks are forecasting problems.** [Aygün et al.
@@ -120,13 +127,13 @@ scored on weighted interval score (WIS). Aygün et al. ran the study retrospecti
 season, selecting a model each week on the preceding six weeks. ERA's retrospective model averaged a
 WIS of 26 against the CovidHub Ensemble's 29. The comparison favours ERA, because the retrospective
 study used the hospitalisation data available on 1 May 2025 for the whole season, whereas the
-ensemble forecast in real time from the data available each week. In a separate three-week
-comparison of forecasting strategies, 14 strategies beat the CovidHub Ensemble, and 10 of those 14
-were recombinations of two existing methods.
+ensemble forecast in real time from the data available each week.
 
 **ERA's gains often came from recombining known methods, which matches Flexpectation's backlog of
-known ideas.** In ERA's single-cell genomics task, Aygün et al. prompted the search with each of the
-55 pairs of 11 methods. Of the 55 recombinations, 24 beat both of their parent methods.
+known ideas.** In the COVID-19 task, a separate three-week comparison of forecasting strategies
+found 14 strategies that beat the CovidHub Ensemble, and 10 of those 14 were recombinations of two
+existing methods. In ERA's single-cell genomics task, Aygün et al. prompted the search with each of
+the 55 pairs of 11 methods. Of the 55 recombinations, 24 beat both of their parent methods.
 
 ### One implementation is weak evidence about an idea
 
@@ -156,7 +163,7 @@ or modified steps in the baselines or the proposed methods, and in some cases de
 functions incorrectly. One baseline the agent wrote was a five-keyword filter that any LLM-based
 method would beat.
 
-### The score that steers a search should not also certify the result
+### The score that guides a search should not also confirm the result
 
 **He et al. argue that a search steered by a score overfits to that score, so a separate, protected
 evaluation has to certify the result.** [He et al. (2026)](https://arxiv.org/abs/2608.09855) argue,
@@ -170,28 +177,37 @@ leaderboard design already names for hundreds of experiments scored on one fold.
 ## Proposed design
 
 **A Python orchestrator holds the search tree, launches Claude Code workers, and scores their code
-itself.** The orchestrator picks the next node to extend, and launches a headless `claude -p` worker
-in its own git worktree to implement one idea on top of that node's code. The orchestrator then
-trains and predicts with the worker's code as the restricted research user planned in #958, so
-worker code cannot read the validation actuals. Workers never report their own scores. Every node is
-logged as an MLflow run with a `study/`-prefixed experiment name, as #958 plans for autonomous
-studies, so the search tree is visible on the leaderboard but no promotion path reads the tree.
+itself.** Claude Code is Anthropic's coding agent. The orchestrator picks the next node to extend,
+and launches a headless `claude -p` worker in its own git worktree to implement one idea on top of
+that node's code. The orchestrator then trains and predicts with the worker's code as the restricted
+research user planned in #958, so worker code cannot read the held-back data. Workers never report
+their own scores.
 
-**The orchestrator rejects, and logs, any diff that touches the evaluation code.** The scorer
-protection planned in #958 runs the scorer from `main` as the maintainer's user, so once #958 lands
-a worker cannot change how forecasts are scored. But a worker's own code produces the forecasts, and
-the [Si et al. finding](#coding-agents-change-experiments-without-saying-so) is that an agent can
-change the experiment around the method it was asked to test. The protected paths are `conf/cv/`,
-`packages/contracts/`, and, under `packages/ml_core/src/ml_core/`, `metrics.py`, `cv_helpers.py`,
-and `features/_lags.py`, which holds the lag nullification that prevents lookahead. The diff check
-catches an edit to a protected path however the worker made the edit, including through a shell
-command.
+**Every node is logged as an MLflow run under a `study/`-prefixed experiment name, so the search
+tree is visible on the leaderboard but outside every promotion path.** #958 plans the same prefix
+for every autonomous study.
+
+**The orchestrator rejects, and logs, any diff that touches the evaluation code.** The honest scorer
+planned in #958 runs from `main`, so once #958 lands a worker cannot change how forecasts are
+scored. But a worker's own code produces the forecasts, and the [Si et al.
+finding](#coding-agents-change-experiments-without-saying-so) is that an agent can change the
+experiment around the method it was asked to test. The protected paths are:
+
+- `conf/cv/`, which defines the cross-validation folds;
+- `packages/contracts/`, which defines the data schemas;
+- `metrics.py` and `cv_helpers.py` under `packages/ml_core/src/ml_core/`, which compute the scores;
+- `features/_lags.py` under the same directory, which nulls any power lag the forecast could not
+  have known at its initialisation time.
+
+The diff check catches an edit to a protected path however the worker made the edit, including
+through a shell command.
 
 **A diff check cannot catch lookahead written into new feature code, so the orchestrator also runs
-a leakage test on every node.** A worker can add a centred rolling window, join on the wrong time
-column, or remove the call to the lag nullification, all inside feature code the worker is allowed
-to edit. The leakage test perturbs every power observation after each forecast's initialisation
-time, predicts again, and rejects the node if any forecast changes.
+a leakage test on every node.** Lookahead is a feature using data from after the forecast was made.
+A worker can add a centred rolling window, join on the wrong time column, or remove the call to the
+lag nullification, all inside feature code the worker is allowed to edit. The leakage test perturbs
+every power observation after each forecast's initialisation time, predicts again, and rejects the
+node if any forecast changes.
 
 **The guard against editing the evaluation code lives in the orchestrator and the Unix user, not
 inside the worker's Claude Code session.** A guard inside the session — a deny rule in
@@ -202,23 +218,24 @@ worktree to remove any hook or deny rule. A deny rule, which #958 already lists 
 enough for that limited purpose. A mod would add JavaScript or TypeScript code that runs with the
 user's permissions, without adding any protection the diff check does not already give.
 
-**The search runs in two stages.** The first stage implements every idea in the backlog once, on
-top of the current champion, as a screen. The second stage runs ERA's upper-confidence-bound tree
-search, seeded with every pair of ideas that passed the screen, as ERA's [single-cell recombination
-study](#tree-search-over-code-beat-expert-forecasters-in-retrospective-studies) was.
+**The search first screens every backlog idea once on top of the champion, then runs ERA's tree
+search over pairs of the ideas that passed.** The second stage is seeded with every pair of ideas
+that passed the screen, as ERA's [single-cell recombination
+study](#googles-era-a-tree-search-over-code-variants) was.
 
-**Each idea is implemented once, and a second and third time when the idea's score is close to a
-competitor's or when the idea goes forward as a finalist. Ideas are ranked on the mean across
-implementations.** Ranking on the mean is the policy [Ning et al.](#one-implementation-is-weak-evidence-about-an-idea)
+**Ideas are ranked on the mean score across their implementations, and an idea is implemented a
+second and third time only when its score is close to a competitor's or the idea is a finalist.**
+Ranking on the mean is the policy [Ning et al.](#one-implementation-is-weak-evidence-about-an-idea)
 propose for crediting an idea rather than one implementation of the idea, although Ning et al. did
 not test that policy inside a tree search. The best single implementation of a winning idea is the
 one handed to a reviewer, who re-implements the idea for promotion, as #958 requires of every
 autonomous study.
 
-**The search steers on the leaderboard's headline score, NMAE ([How each win is
-evaluated](xgboost-improvements.md#how-each-win-is-evaluated)), on the 3–10 day band once the scorer
-reports that band.** Using the leaderboard's own score means the search and the leaderboard cannot
-disagree about which experiment is best. Whether tail skill, scored by [threshold-weighted
+**The search steers on the leaderboard's headline score, normalised mean absolute error (NMAE) ([How
+each win is evaluated](xgboost-improvements.md#how-each-win-is-evaluated)), over forecast lead times
+of 3 to 10 days once the scorer reports that band.** Using the leaderboard's own score means the
+search and the leaderboard cannot disagree about which experiment is best. Whether tail skill,
+scored by [threshold-weighted
 CRPS](metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks),
 should steer the search instead is open. Steering on the headline score is the goal-oriented
 optimisation He et al. criticise, so the protection this design relies on is the separate certifying
@@ -229,22 +246,25 @@ recommendation already separates steering from certifying.** The recommendation 
 whole-month-block cross-validation "discovery lane" that ranks ideas cheaply, and a rolling-origin
 evaluation that confirms the winners. #960 says both can be designed and built against the current
 single fold, `mid_2025_to_mid_2026`, without waiting for more history. Until that design lands, the
-search would steer on the same fold that decides promotion, and the planned
-[Ladder guard](metrics-and-leaderboard.md#fold-hygiene-selection-bias-and-a-final-test-window),
-which publishes a new best only when the new best beats the standing best by a declared margin,
-would be the only protection against selection bias. The scale of search this page proposes is a
-reason to build #960's design before the search runs, not after.
+search would steer on the same fold that decides promotion, and the planned [Ladder
+guard](metrics-and-leaderboard.md#fold-hygiene-selection-bias-and-a-final-test-window), which
+publishes a new best only when the new best beats the standing best by a declared margin, would be
+the only protection against selection bias. The scale of search this page proposes is a reason to
+build #960's design before the search runs, not after.
 
 ## Open questions
 
-**Which experiment would be most informative to run next?** ERA's upper-confidence-bound rule
-chooses which node to extend, and Co-Scientist's tournament ranks hypotheses that already exist.
-Neither chooses which idea to generate next to learn the most. He et al. propose one answer, an
-intermediate signal of progress that chooses the next experiment, but test the proposal only in a
-simulated physics environment. An idea raised in internal discussion, drawn from self-driving-lab
-practice in materials science rather than from a paper this project has reviewed directly, is that
-this choice is the crucial component of an autonomous research loop. That claim is worth checking
-against the self-driving-lab literature before relying on it.
+**Nothing in the design chooses which idea to try next so as to learn the most.** ERA's
+upper-confidence-bound rule chooses which node to extend, and Co-Scientist's tournament ranks
+hypotheses that already exist. He et al. propose one answer, an intermediate signal of progress that
+chooses the next experiment, but test the proposal only in a simulated physics environment.
+Self-driving-lab practice in materials science may treat this choice as the crucial component of an
+autonomous research loop, but this project has not reviewed that literature, so the claim needs
+checking before the design relies on it.
+
+**Whether agents should critique each other's code before the scorer runs is undecided.** The
+debate results above suggest a second worker reviewing each diff could catch a mistake the leakage
+test cannot, such as an implementation that quietly drops part of the idea it was asked to test.
 
 **How a session records its own experience over time is still undecided.** The options are a
 dedicated hypothesis store — a structured record of what was tried, what was found, and why a branch

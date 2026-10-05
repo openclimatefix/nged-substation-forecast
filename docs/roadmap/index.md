@@ -45,7 +45,7 @@ best-estimate, not a guarantee.
   pooling variants, how a weather product with a few months of history could enter the forecast,
   the COVID covariate, and why scoring against estimates of past weather is a diagnostic rather than
   a promotion criterion.
-- [Automated experimentation](auto-research.md) — an LLM agent running the XGBoost backlog as a
+- [Experiments run by an LLM agent](auto-research.md) — an LLM agent running the XGBoost backlog as a
   tree search: what published research agents found, and a proposed design that scores each
   worker's code from outside the worker's session.
 - [Engineering health](engineering-health.md) — scientific-rigor tests and cleanup.
@@ -220,9 +220,9 @@ quantile pipeline:
 have an LLM agent run the XGBoost backlog as a search. This may have to wait until v2, and is gated
 on [#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958) landing first,
 because an autonomous session is only trustworthy once it cannot edit or bypass the scorer it is
-judged against. The published evidence, and a proposed design in which each idea is implemented
-several times and scored from outside the agent's session, are in [Automated
-experimentation](auto-research.md).
+judged against. The published evidence, and a proposed design in which an idea is implemented again
+whenever the idea's score is close to a competitor's and every experiment is scored from outside the
+agent's session, are in [Experiments run by an LLM agent](auto-research.md).
 
 ---
 
