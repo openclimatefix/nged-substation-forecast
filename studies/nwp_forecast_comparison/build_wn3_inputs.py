@@ -65,13 +65,13 @@ from build_forecast_inputs import (
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "weather_downloads"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
 import ens_forecast_horizons as efh
-
-# `fetch_weathernext3` sets `ICECHUNK_LOG` before `icechunk` is imported below it.
-import fetch_weathernext3 as fetch
 import icechunk
 import zarr
 from studies.guards import refuse_to_overwrite
 from studies.resample import interpolate_linear, wind_components
+
+# `fetch_weathernext3` sets `ICECHUNK_LOG` before `icechunk` is imported below it.
+from studies import wn3_fetch as fetch
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
