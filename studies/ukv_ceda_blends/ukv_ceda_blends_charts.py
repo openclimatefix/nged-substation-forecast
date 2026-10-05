@@ -710,8 +710,8 @@ def permutation_figure(*, intervals: pl.DataFrame) -> alt.VConcatChart:
         draws, single = values[day]
         last = index == len(days) - 1
         title = (
-            f"Lead day {day}: P1 {single['p1']:+.3f} points, rank {int(single['rank'])} of "
-            f"{len(draws) + 1} from the lowest, permutation p-value {single['p_value']:.3f}"
+            f"Lead day {day}: P1 {single['p1']:+.3f}, rank {int(single['rank'])} of "
+            f"{len(draws) + 1}, p-value {single['p_value']:.3f}"
         )
         controls = pl.DataFrame({"x": draws, "kind": ["Shuffled control"] * len(draws)})
         planned = pl.DataFrame({"x": [single["p1"]], "kind": ["Planned blend (P1)"]})
@@ -771,7 +771,7 @@ def permutation_figure(*, intervals: pl.DataFrame) -> alt.VConcatChart:
             ),
             (
                 "The p-value is the share of the 18 values (17 controls and P1) at or below P1, so "
-                "with 17 controls it cannot go below 0.056. Six solar farms, "
+                "with 17 controls it cannot go below 0.056. Rank 1 is the lowest error. "
                 f"{CAPACITY_NOTE}"
             ),
         ],
@@ -818,6 +818,41 @@ def older_rows(*, intervals: pl.DataFrame, domain: DomainType, day: int) -> pl.D
     )
 
 
+def older_title(*, intervals: pl.DataFrame, domain: DomainType) -> str:
+    """State, from the saved intervals, whether the older run's gain is smaller at every lead day.
+
+    Args:
+        intervals: A report's `*_intervals.parquet` rows, holding the older-run section.
+        domain: `solar` or `wind`.
+
+    Returns:
+        A finding if the older-run P1's point estimate is above the planned P1's on the same rows at
+        every lead day and both settings, else a plain description of the comparison.
+    """
+    smaller = True
+    for day in fit.OLDER_DAYS:
+        rows = older_rows(intervals=intervals, domain=domain, day=day)
+        for setting_label in SETTING_LABELS.values():
+            by_label = {
+                row["label"]: row["difference"]
+                for row in rows.filter(pl.col("condition") == setting_label).iter_rows(named=True)
+            }
+            planned = by_label[OLDER_LABELS["fresh_p1_same_rows"]]
+            older = by_label[OLDER_LABELS["older_p1"]]
+            smaller = smaller and older > planned
+    name = TECHNOLOGY_NAMES[domain]
+    if smaller:
+        return (
+            f"For {name}, the blend with UKV-CEDA's older run, which starts 9 hours before ENS's "
+            "run, gains less over padded ENS than the planned blend, in the point estimates at "
+            "every lead day and both settings"
+        )
+    return (
+        f"For {name}, the blend with UKV-CEDA's older run, which starts 9 hours before ENS's run, "
+        "against the planned blend"
+    )
+
+
 def older_figure(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatChart:
     """Draw the older-run contrasts of one technology: one panel per lead day, one shared axis.
 
@@ -852,10 +887,7 @@ def older_figure(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatC
     return figure(
         panels=panels,
         number=POST_HOC_FIGURE_NUMBERS[(domain, "older")],
-        title=(
-            f"For {TECHNOLOGY_NAMES[domain]}, adding UKV-CEDA's 15 UTC run of the day before "
-            "ENS's run, which starts 9 hours before ENS's run, against the planned blend"
-        ),
+        title=older_title(intervals=intervals, domain=domain),
         subtitle=[
             (
                 "Post hoc. Difference in mean absolute error between two XGBoost models, first "

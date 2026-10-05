@@ -480,8 +480,8 @@ def test_the_permutation_figure_titles_each_panel_with_its_rank_and_the_figure_w
     chart = charts.permutation_figure(intervals=_post_hoc_intervals())
 
     text = json.dumps(chart.to_dict()).replace('", "', " ")
-    assert "rank 1 of 18 from the lowest, permutation p-value 0.056" in text
-    assert "rank 4 of 18 from the lowest, permutation p-value 0.222" in text
+    assert "rank 1 of 18, p-value 0.056" in text
+    assert "rank 4 of 18, p-value 0.222" in text
     assert "larger than all 17 shuffled controls' at day 1" in text
     assert "cannot go below 0.056" in text
     assert "Figure 9:" in text
@@ -508,3 +508,21 @@ def test_the_older_figure_has_a_panel_per_lead_day_and_says_what_it_cannot_separ
     assert "cannot separate the longer lead from the earlier start" in text
     assert "Figure 10:" in text
     assert "Post hoc." in text
+
+
+def test_the_older_title_states_a_finding_only_when_every_point_estimate_supports_it():
+    intervals = _post_hoc_intervals()
+
+    plain = charts.older_title(intervals=intervals, domain="wind")
+
+    # In the fixture the older P1 (-0.001) is above the planned P1 (-0.003) everywhere.
+    assert "gains less over padded ENS than the planned blend" in plain
+    flipped = intervals.with_columns(
+        difference=pl.when(
+            (pl.col("contrast") == "older_p1") & (pl.col("day") == 2) & (pl.col("domain") == "wind")
+        )
+        .then(-0.01)
+        .otherwise(pl.col("difference"))
+    )
+    assert "against the planned blend" in charts.older_title(intervals=flipped, domain="wind")
+    assert "gains less" not in charts.older_title(intervals=flipped, domain="wind")
