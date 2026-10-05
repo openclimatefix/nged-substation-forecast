@@ -2,7 +2,7 @@
 
 Each test is written to fail on the defect it names. The store is a tiny synthetic copy whose
 value at each run and lead is a known number, so a wrong run, lead, unit or site shows up as a
-wrong number. The scripts are imported by path because `studies/` is not an importable package.
+wrong number.
 """
 
 import importlib
@@ -19,8 +19,6 @@ import pytest
 import xarray as xr
 
 from studies import ens_members
-
-"""The `studies/` directory, whose scripts do bare imports of their siblings."""
 
 RUNS: Final[np.ndarray] = np.array(["2026-03-01T00", "2026-03-02T00"], dtype="datetime64[h]")
 """The two 00 UTC runs of the synthetic copy."""

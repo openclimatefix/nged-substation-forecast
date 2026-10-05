@@ -4,18 +4,12 @@ Each test is built to fail on the bug it exists for: a caveat dropped from a fig
 post hoc row drawn without its label, and a headline that states an exploratory row as planned.
 """
 
-import importlib
 from collections import defaultdict
-from types import ModuleType
 
+import past_solar_leaderboard_charts as lb_solar_charts
 import polars as pl
 import pytest
 from studies.charts import BlockArm, RowSetBlock
-
-
-def _load() -> ModuleType:
-    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
-    return importlib.import_module("past_solar_leaderboard_charts")
 
 
 def _contrast_block(*, cams: float) -> RowSetBlock:
@@ -53,9 +47,8 @@ def _caption(*, spec: dict) -> str:
 
 
 def test_the_contrast_figures_title_and_subtitle_say_the_cams_row_is_exploratory() -> None:
-    module = _load()
 
-    spec = module.contrasts_figure(
+    spec = lb_solar_charts.contrasts_figure(
         blocks=[_contrast_block(cams=-3.7), _contrast_block(cams=-4.1)]
     ).to_dict()
 
@@ -65,9 +58,8 @@ def test_the_contrast_figures_title_and_subtitle_say_the_cams_row_is_exploratory
 
 
 def test_the_contrast_figure_warns_that_a_difference_from_era5_moves_between_blocks() -> None:
-    module = _load()
 
-    spec = module.contrasts_figure(
+    spec = lb_solar_charts.contrasts_figure(
         blocks=[_contrast_block(cams=-3.7), _contrast_block(cams=-4.2)]
     ).to_dict()
 
@@ -76,9 +68,8 @@ def test_the_contrast_figure_warns_that_a_difference_from_era5_moves_between_blo
 
 
 def test_the_spread_is_taken_from_the_data_not_a_literal() -> None:
-    module = _load()
 
-    assert "moves by as much as 1.2 points" in module.contrasts_not_comparable(
+    assert "moves by as much as 1.2 points" in lb_solar_charts.contrasts_not_comparable(
         cams_differences=[-3.0, -4.2, -3.5]
     )
 
@@ -93,9 +84,8 @@ def test_the_spread_is_taken_from_the_data_not_a_literal() -> None:
     ],
 )
 def test_both_figures_carry_the_lead_and_pyranometer_caveats(caveat: str) -> None:
-    module = _load()
     blocks = [_contrast_block(cams=-3.7)]
-    leaderboard = module.leaderboard_figure(
+    leaderboard = lb_solar_charts.leaderboard_figure(
         blocks=[
             RowSetBlock(
                 "Main",
@@ -105,18 +95,17 @@ def test_both_figures_carry_the_lead_and_pyranometer_caveats(caveat: str) -> Non
             )
         ]
     ).to_dict()
-    contrasts = module.contrasts_figure(blocks=blocks).to_dict()
+    contrasts = lb_solar_charts.contrasts_figure(blocks=blocks).to_dict()
 
     assert caveat in _caption(spec=leaderboard)
     assert caveat in _caption(spec=contrasts)
 
 
 def test_the_leaderboard_names_both_post_hoc_ukv_rebuilds_in_its_note() -> None:
-    module = _load()
     rows = _contrast_block(cams=-3.7).rows.rename({"difference": "value"})
 
     caption = _caption(
-        spec=module.leaderboard_figure(
+        spec=lb_solar_charts.leaderboard_figure(
             blocks=[RowSetBlock("Main", "January 2025", 8, rows)]
         ).to_dict()
     )
@@ -126,9 +115,10 @@ def test_the_leaderboard_names_both_post_hoc_ukv_rebuilds_in_its_note() -> None:
 
 
 def test_the_contrast_figure_says_two_leads_are_unmeasured_or_unequal() -> None:
-    module = _load()
 
-    caption = _caption(spec=module.contrasts_figure(blocks=[_contrast_block(cams=-3.7)]).to_dict())
+    caption = _caption(
+        spec=lb_solar_charts.contrasts_figure(blocks=[_contrast_block(cams=-3.7)]).to_dict()
+    )
 
     assert "KNMI HARMONIE-AROME's lead not measured" in caption
     assert "ECMWF-IFS-HRES never shorter than ICON-EU's" in caption
@@ -138,7 +128,7 @@ def test_the_contrast_figure_says_two_leads_are_unmeasured_or_unequal() -> None:
 def _intervals(*, arms: dict[str, float]) -> pl.DataFrame:
     return pl.DataFrame(
         {
-            "section": _load().ABSOLUTE_SECTION,
+            "section": lb_solar_charts.ABSOLUTE_SECTION,
             "setting": "pooled",
             "treatment": arm,
             "value": value,
@@ -150,21 +140,20 @@ def _intervals(*, arms: dict[str, float]) -> pl.DataFrame:
 
 
 def test_a_post_hoc_rebuild_is_labelled_post_hoc_on_the_leaderboard_and_others_are_not() -> None:
-    module = _load()
-    printed = module.PrintedRow(8.18, 7.78, 8.58, None)
-    row_set = module.ROW_SETS[0]._replace(
+    printed = lb_solar_charts.PrintedRow(8.18, 7.78, 8.58, None)
+    row_set = lb_solar_charts.ROW_SETS[0]._replace(
         leaderboard_arms=(
             BlockArm("ukv_trap_global", "UKV rebuilt from its snapshots", "weather model"),
             BlockArm("icon_eu_global", "ICON-EU", "weather model"),
         )
     )
 
-    rows = module.absolute_rows(
+    rows = lb_solar_charts.absolute_rows(
         frame=_intervals(arms={"ukv_trap_global": 8.18, "icon_eu_global": 8.386}),
         row_set=row_set,
         printed={
             "UKV rebuilt from its snapshots": printed,
-            "ICON-EU": module.PrintedRow(8.386, 7.986, 8.786, None),
+            "ICON-EU": lb_solar_charts.PrintedRow(8.386, 7.986, 8.786, None),
         },
     )
 
@@ -176,12 +165,11 @@ def test_a_post_hoc_rebuild_is_labelled_post_hoc_on_the_leaderboard_and_others_a
 
 
 def test_the_figures_carry_the_scope_caveats_added_after_review() -> None:
-    module = _load()
     block = _contrast_block(cams=-3.7)
-    leaderboard = module.leaderboard_figure(
+    leaderboard = lb_solar_charts.leaderboard_figure(
         blocks=[RowSetBlock("Main", "January 2025", 8, block.rows.rename({"difference": "value"}))]
     ).to_dict()
-    contrasts = module.contrasts_figure(blocks=[block]).to_dict()
+    contrasts = lb_solar_charts.contrasts_figure(blocks=[block]).to_dict()
 
     assert "not a gridded product" in _caption(spec=leaderboard)
     assert "36.9% of its hours" in _caption(spec=leaderboard)
@@ -210,17 +198,18 @@ def _five_blocks() -> list[RowSetBlock]:
 
 
 def test_the_cerra_row_set_has_a_block_label_and_both_figures_draw_five_blocks() -> None:
-    module = _load()
-    contrasts = module.contrasts_figure(blocks=_five_blocks()).to_dict()
-    leaderboard = module.leaderboard_figure(
+    contrasts = lb_solar_charts.contrasts_figure(blocks=_five_blocks()).to_dict()
+    leaderboard = lb_solar_charts.leaderboard_figure(
         blocks=[
             RowSetBlock(b.label, b.dates, b.site_hours, b.rows.rename({"difference": "value"}))
             for b in _five_blocks()
         ]
     ).to_dict()
 
-    assert module.BLOCK_LABELS["cerra"] == "CERRA"
-    assert set(module.BLOCK_LABELS) == {row_set.key for row_set in module.ROW_SETS}
+    assert lb_solar_charts.BLOCK_LABELS["cerra"] == "CERRA"
+    assert set(lb_solar_charts.BLOCK_LABELS) == {
+        row_set.key for row_set in lb_solar_charts.ROW_SETS
+    }
     assert "CERRA: January 2025, 8 site-hours" in str(contrasts)
     assert "CERRA: January 2025, 8 site-hours" in str(leaderboard)
     assert "on each of the five row sets" in _caption(spec=leaderboard)
@@ -228,11 +217,10 @@ def test_the_cerra_row_set_has_a_block_label_and_both_figures_draw_five_blocks()
 
 
 def test_the_two_figures_draw_their_plots_at_the_same_width() -> None:
-    module = _load()
     blocks = _five_blocks()
 
-    contrasts = module.contrasts_figure(blocks=blocks).to_dict()
-    leaderboard = module.leaderboard_figure(
+    contrasts = lb_solar_charts.contrasts_figure(blocks=blocks).to_dict()
+    leaderboard = lb_solar_charts.leaderboard_figure(
         blocks=[
             RowSetBlock(b.label, b.dates, b.site_hours, b.rows.rename({"difference": "value"}))
             for b in blocks
@@ -255,15 +243,14 @@ def test_the_two_figures_draw_their_plots_at_the_same_width() -> None:
     ],
 )
 def test_both_figures_carry_the_cerra_row_set_caveats(caveat: str) -> None:
-    module = _load()
     blocks = _five_blocks()
-    leaderboard = module.leaderboard_figure(
+    leaderboard = lb_solar_charts.leaderboard_figure(
         blocks=[
             RowSetBlock(b.label, b.dates, b.site_hours, b.rows.rename({"difference": "value"}))
             for b in blocks
         ]
     ).to_dict()
-    contrasts = module.contrasts_figure(blocks=blocks).to_dict()
+    contrasts = lb_solar_charts.contrasts_figure(blocks=blocks).to_dict()
 
     assert caveat in _caption(spec=contrasts)
     if "subsets" not in caveat:
@@ -277,7 +264,6 @@ def _absolute(*, values: dict[str, tuple[float, str]]) -> pl.DataFrame:
 
 
 def test_the_title_check_raises_when_a_cerra_arm_beats_cams() -> None:
-    module = _load()
     rows = _absolute(
         values={
             "cams_global": (7.0, "satellite"),
@@ -287,11 +273,10 @@ def test_the_title_check_raises_when_a_cerra_arm_beats_cams() -> None:
     )
 
     with pytest.raises(ValueError, match=r"CERRA: .*cerra_global does"):
-        module.check_cams_lowest_of_gridded(label="CERRA", rows=rows)
+        lb_solar_charts.check_cams_lowest_of_gridded(label="CERRA", rows=rows)
 
 
 def test_the_title_check_accepts_cams_averaged_to_3_hour_steps_and_ignores_station_arms() -> None:
-    module = _load()
     rows = _absolute(
         values={
             "station_blend": (5.0, "station observations"),
@@ -300,32 +285,33 @@ def test_the_title_check_accepts_cams_averaged_to_3_hour_steps_and_ignores_stati
         }
     )
 
-    module.check_cams_lowest_of_gridded(label="Stations", rows=rows)
+    lb_solar_charts.check_cams_lowest_of_gridded(label="Stations", rows=rows)
 
 
 def test_build_blocks_stops_before_drawing_when_a_cerra_arm_beats_cams(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    module = _load()
-    row_set = module.ROW_SETS[-1]
+    row_set = lb_solar_charts.ROW_SETS[-1]
     absolute = _absolute(
         values={"cams_global": (7.0, "satellite"), "cerra_global": (6.5, "reanalysis")}
     )
-    monkeypatch.setattr(module, "ROW_SETS", (row_set,))
-    monkeypatch.setattr(module, "absolute_rows", lambda **_: absolute)
-    monkeypatch.setattr(module, "contrast_rows", lambda **_: absolute)
-    monkeypatch.setattr(module, "planned_rows", lambda **_: absolute)
-    printed = module.PrintedBlock(
+    monkeypatch.setattr(lb_solar_charts, "ROW_SETS", (row_set,))
+    monkeypatch.setattr(lb_solar_charts, "absolute_rows", lambda **_: absolute)
+    monkeypatch.setattr(lb_solar_charts, "contrast_rows", lambda **_: absolute)
+    monkeypatch.setattr(lb_solar_charts, "planned_rows", lambda **_: absolute)
+    printed = lb_solar_charts.PrintedBlock(
         first_day="2025-01-01", last_day="2025-06-30", site_hours=8, tables=defaultdict(dict)
     )
     intervals = pl.DataFrame({"row_set": row_set.key, "n_rows": [8]})
 
     with pytest.raises(ValueError, match="cerra_global does"):
-        module.build_blocks(intervals=intervals, report={row_set.label: printed})
+        lb_solar_charts.build_blocks(intervals=intervals, report={row_set.label: printed})
 
     passing = _absolute(
         values={"cams_global": (6.0, "satellite"), "cerra_global": (6.5, "reanalysis")}
     )
-    monkeypatch.setattr(module, "absolute_rows", lambda **_: passing)
-    leaderboard, _ = module.build_blocks(intervals=intervals, report={row_set.label: printed})
+    monkeypatch.setattr(lb_solar_charts, "absolute_rows", lambda **_: passing)
+    leaderboard, _ = lb_solar_charts.build_blocks(
+        intervals=intervals, report={row_set.label: printed}
+    )
     assert [block.label for block in leaderboard] == ["CERRA"]

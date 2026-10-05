@@ -6,13 +6,13 @@ every rebuilt hour by 3 hours without any value looking wrong), a row cut that l
 missing hour into the row set, and a fold design that leaves a calendar month untrained.
 """
 
-import importlib
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from types import ModuleType
-from typing import Final
+from typing import Any, Final
 
+import cerra_past_solar as cerra_solar
 import numpy as np
+import past_solar_leaderboard as lb_solar
 import polars as pl
 import pytest
 from studies.cross_validation import (
@@ -23,11 +23,6 @@ from studies.cross_validation import (
 
 DAY: Final[datetime] = datetime(2025, 6, 1, tzinfo=UTC)
 UTC_US: Final[pl.Datetime] = pl.Datetime("us", "UTC")
-
-
-def _load() -> ModuleType:
-    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
-    return importlib.import_module("cerra_past_solar")
 
 
 def _sun(*, hour_end: np.ndarray) -> np.ndarray:
@@ -86,7 +81,6 @@ ASYMMETRIC_DAY: Final[dict[int, float]] = {
 
 
 def test_ten_point_eight_million_joules_over_three_hours_is_a_thousand_watts() -> None:
-    module = _load()
     accumulation = pl.DataFrame(
         {
             "site": ["A", "A"],
@@ -96,7 +90,7 @@ def test_ten_point_eight_million_joules_over_three_hours_is_a_thousand_watts() -
         schema_overrides={"valid_time": pl.Datetime("ns")},
     )
 
-    windows = module.windows_from_accumulation(
+    windows = cerra_solar.windows_from_accumulation(
         accumulation=accumulation, value_column="value", name="ghi"
     )
 
@@ -117,12 +111,11 @@ def test_ten_point_eight_million_joules_over_three_hours_is_a_thousand_watts() -
 def test_windows_refuse_a_time_column_of_the_wrong_kind_or_a_label_off_the_grid(
     valid_time: datetime, dtype: pl.Datetime
 ) -> None:
-    module = _load()
     accumulation = pl.DataFrame({"site": ["A"], "valid_time": [valid_time], "value": [1.0]})
     accumulation = accumulation.cast({"valid_time": dtype})
 
     with pytest.raises(ValueError, match=r"valid_time|multiples"):
-        module.windows_from_accumulation(
+        cerra_solar.windows_from_accumulation(
             accumulation=accumulation, value_column="value", name="ghi"
         )
 
@@ -130,15 +123,14 @@ def test_windows_refuse_a_time_column_of_the_wrong_kind_or_a_label_off_the_grid(
 def test_the_rebuilt_hours_peak_in_the_exact_hour_and_a_start_labelled_reading_moves_the_peak() -> (
     None
 ):
-    module = _load()
     clear_sky = _clear_sky()
     windows = _windows(clear_sky=clear_sky, index_by_window_end=ASYMMETRIC_DAY)
 
-    rebuilt = module.rebuild_hourly_from_windows(
+    rebuilt = cerra_solar.rebuild_hourly_from_windows(
         windows=windows, clear_sky=clear_sky, column="ghi_cerra"
     )
     # A reader who took each label as its window's start would move every window 3 hours later.
-    misread = module.rebuild_hourly_from_windows(
+    misread = cerra_solar.rebuild_hourly_from_windows(
         windows=windows.with_columns(time=pl.col("time") + pl.duration(hours=3)),
         clear_sky=_clear_sky(days=2).filter(pl.col("time") <= DAY + timedelta(hours=27)),
         column="ghi_cerra",
@@ -150,44 +142,41 @@ def test_the_rebuilt_hours_peak_in_the_exact_hour_and_a_start_labelled_reading_m
 
 
 def test_a_constant_clear_sky_index_rebuilds_the_clear_sky_and_each_window_keeps_its_mean() -> None:
-    module = _load()
     clear_sky = _clear_sky()
     windows = _windows(clear_sky=clear_sky, index_by_window_end=dict.fromkeys(range(0, 24, 3), 0.6))
 
-    rebuilt = module.rebuild_hourly_from_windows(
+    rebuilt = cerra_solar.rebuild_hourly_from_windows(
         windows=windows, clear_sky=clear_sky, column="ghi_cerra"
     )
     joined = rebuilt.join(clear_sky, on=["site", "time"])
-    gaps = module.window_mean_gaps(windows=windows, rebuilt=rebuilt, column="ghi_cerra")
+    gaps = cerra_solar.window_mean_gaps(windows=windows, rebuilt=rebuilt, column="ghi_cerra")
 
     np.testing.assert_allclose(
         joined["ghi_cerra"].to_numpy(), 0.6 * joined["clear_sky_w_m2"].to_numpy(), atol=1e-9
     )
     assert gaps.len() > 0
-    assert gaps.max() < 1e-9
+    assert (gaps < 1e-9).all()
 
 
 def test_a_stepped_clear_sky_index_keeps_each_windows_mean_within_a_stated_tolerance() -> None:
-    module = _load()
     clear_sky = _clear_sky()
     windows = _windows(clear_sky=clear_sky, index_by_window_end=ASYMMETRIC_DAY)
 
-    rebuilt = module.rebuild_hourly_from_windows(
+    rebuilt = cerra_solar.rebuild_hourly_from_windows(
         windows=windows, clear_sky=clear_sky, column="ghi_cerra"
     )
-    gaps = module.window_mean_gaps(windows=windows, rebuilt=rebuilt, column="ghi_cerra")
+    gaps = cerra_solar.window_mean_gaps(windows=windows, rebuilt=rebuilt, column="ghi_cerra")
 
-    assert gaps.max() < 0.2
-    assert gaps.max() > 1e-3  # No rescaling is applied, so the gap is not zero.
+    assert (gaps < 0.2).all()
+    assert (gaps > 1e-3).any()  # No rescaling is applied, so the gap is not zero.
 
 
 def test_a_missing_window_leaves_its_three_hours_out_and_no_other_hour() -> None:
-    module = _load()
     clear_sky = _clear_sky()
     windows = _windows(clear_sky=clear_sky, index_by_window_end=ASYMMETRIC_DAY)
     missing = DAY + timedelta(hours=12)
 
-    rebuilt = module.rebuild_hourly_from_windows(
+    rebuilt = cerra_solar.rebuild_hourly_from_windows(
         windows=windows.filter(pl.col("time") != missing), clear_sky=clear_sky, column="ghi_cerra"
     )
 
@@ -198,12 +187,11 @@ def test_a_missing_window_leaves_its_three_hours_out_and_no_other_hour() -> None
 
 
 def test_a_rebuild_with_no_clear_sky_for_an_hour_it_covers_raises() -> None:
-    module = _load()
     clear_sky = _clear_sky()
     windows = _windows(clear_sky=clear_sky, index_by_window_end=ASYMMETRIC_DAY)
 
     with pytest.raises(ValueError, match="clear_sky misses an hour"):
-        module.rebuild_hourly_from_windows(
+        cerra_solar.rebuild_hourly_from_windows(
             windows=windows, clear_sky=clear_sky.head(10), column="ghi_cerra"
         )
 
@@ -219,34 +207,31 @@ def _hourly(
 
 
 def test_a_windowed_mean_averages_its_three_hours_and_drops_partial_windows() -> None:
-    module = _load()
     # Hours ending 01:00 to 07:00: windows ending 03:00 (hours 1, 2, 3) and 06:00 (hours 4, 5, 6)
     # are whole, and the hour ending 07:00 opens a window that is not.
     hourly = _hourly(
         values=[10.0, 20.0, 60.0, 1.0, 2.0, 9.0, 100.0], first_end=DAY + timedelta(hours=1)
     )
 
-    windows = module.windowed_mean(hourly=hourly, column="ghi_w_m2")
+    windows = cerra_solar.windowed_mean(hourly=hourly, column="ghi_w_m2")
 
     assert windows["time"].to_list() == [DAY + timedelta(hours=3), DAY + timedelta(hours=6)]
     assert windows["ghi_w_m2"].to_list() == [30.0, 4.0]
 
 
 def test_the_hour_ending_at_midnight_belongs_to_the_previous_days_last_window() -> None:
-    module = _load()
     hourly = _hourly(values=[3.0, 6.0, 9.0], first_end=DAY + timedelta(hours=22))
 
-    windows = module.windowed_mean(hourly=hourly, column="ghi_w_m2")
+    windows = cerra_solar.windowed_mean(hourly=hourly, column="ghi_w_m2")
 
     assert windows["time"].to_list() == [DAY + timedelta(days=1)]
     assert windows["ghi_w_m2"].to_list() == [6.0]
 
 
 def test_a_window_with_a_missing_hour_is_dropped_not_averaged_over_two() -> None:
-    module = _load()
     hourly = _hourly(values=[10.0, None, 30.0, 1.0, 2.0, 3.0], first_end=DAY + timedelta(hours=1))
 
-    windows = module.windowed_mean(hourly=hourly, column="ghi_w_m2")
+    windows = cerra_solar.windowed_mean(hourly=hourly, column="ghi_w_m2")
 
     assert windows["time"].to_list() == [DAY + timedelta(hours=6)]
 
@@ -275,7 +260,6 @@ def _product(*, base: pl.DataFrame, columns: dict[str, float | None]) -> pl.Data
 
 
 def test_join_rows_drops_hours_after_the_window_end_and_hours_any_product_lacks() -> None:
-    module = _load()
     end = datetime(2026, 7, 1, tzinfo=UTC)
     base = _base(
         hours=6, first_end=end - timedelta(hours=3)
@@ -292,7 +276,7 @@ def test_join_rows_drops_hours_after_the_window_end_and_hours_any_product_lacks(
         .otherwise(pl.col("ghi_cams_3h"))
     )
 
-    joined, lost = module.join_rows(
+    joined, lost = cerra_solar.join_rows(
         base=base, cerra=cerra, era5_3h=era5_3h, cams_3h=cams_3h, window_end=end
     )
 
@@ -305,7 +289,6 @@ def test_join_rows_drops_hours_after_the_window_end_and_hours_any_product_lacks(
 
 
 def test_join_rows_raises_on_a_naive_or_wrongly_united_time_column() -> None:
-    module = _load()
     base = _base(hours=2, first_end=DAY)
     cerra = _product(base=base, columns={"ghi_cerra": 1.0, "bhi_cerra": 0.5})
     era5_3h = _product(base=base, columns={"ghi_era5_3h": 1.0})
@@ -316,7 +299,7 @@ def test_join_rows_raises_on_a_naive_or_wrongly_united_time_column() -> None:
         cerra.with_columns(time=pl.col("time").dt.cast_time_unit("ns")),
     ):
         with pytest.raises(ValueError, match="time must be"):
-            module.join_rows(
+            cerra_solar.join_rows(
                 base=base,
                 cerra=bad,
                 era5_3h=era5_3h,
@@ -326,7 +309,6 @@ def test_join_rows_raises_on_a_naive_or_wrongly_united_time_column() -> None:
 
 
 def test_diffuse_is_global_minus_direct_clipped_at_zero_and_the_clipped_hours_are_counted() -> None:
-    module = _load()
     frame = pl.DataFrame(
         {
             "time": [DAY + timedelta(hours=h) for h in (10, 11, 12)],
@@ -337,33 +319,31 @@ def test_diffuse_is_global_minus_direct_clipped_at_zero_and_the_clipped_hours_ar
         schema_overrides={"time": UTC_US},
     )
 
-    result, clipped = module.with_diffuse_and_erbs(frame=frame)
+    result, clipped = cerra_solar.with_diffuse_and_erbs(frame=frame)
 
     assert result["dhi_cerra"].to_list() == [200.0, 0.0, 0.0]
     assert clipped == 1
     for column in ("erbs_bhi_cerra", "erbs_dhi_cerra"):
-        assert result[column].min() >= 0.0
+        assert (result[column] >= 0.0).all()
     assert (result["erbs_bhi_cerra"] <= result["ghi_cerra"]).all()
 
 
 def test_the_four_planned_contrasts_are_exactly_the_four_the_plan_names() -> None:
-    module = _load()
 
-    assert set(module.PLANNED_CONTRASTS) == {
+    assert set(cerra_solar.PLANNED_CONTRASTS) == {
         ("cerra_global", "era5_global"),
         ("cerra_global", "cams_global"),
         ("cerra_global", "era5_3h"),
         ("cerra_split", "cerra_erbs"),
     }
-    assert len(module.PLANNED_CONTRASTS) == 4
+    assert len(cerra_solar.PLANNED_CONTRASTS) == 4
 
 
 def test_every_arm_carries_the_same_number_of_distinct_columns_where_a_contrast_pairs_them() -> (
     None
 ):
-    module = _load()
 
-    features = module._arm_features()
+    features = cerra_solar._arm_features()
 
     assert {arm: len(columns) for arm, columns in features.items()} == {
         "cerra_global": 8,
@@ -374,37 +354,34 @@ def test_every_arm_carries_the_same_number_of_distinct_columns_where_a_contrast_
         "era5_3h": 8,
         "cams_3h": 8,
     }
-    assert set(features) == set(module.ARM_ORDER)
+    assert set(features) == set(cerra_solar.ARM_ORDER)
 
 
 def test_only_the_planned_contrasts_arms_are_fitted_at_the_second_setting() -> None:
-    module = _load()
 
-    settings = {(job[0], job[1]) for job in module.jobs()}
+    settings = {(job[0], job[1]) for job in cerra_solar.jobs()}
 
     assert settings == {
-        *((arm, "pooled") for arm in module.ARM_ORDER),
-        *((arm, "sensitivity") for arm in module.PLANNED_ARMS),
+        *((arm, "pooled") for arm in cerra_solar.ARM_ORDER),
+        *((arm, "sensitivity") for arm in cerra_solar.PLANNED_ARMS),
     }
     assert ("cams_3h", "sensitivity") not in settings
-    assert set(module.PLANNED_ARMS) == set(module.ARM_ORDER) - {"cams_3h"}
+    assert set(cerra_solar.PLANNED_ARMS) == set(cerra_solar.ARM_ORDER) - {"cams_3h"}
 
 
 def test_a_contrast_between_arms_of_different_widths_raises() -> None:
-    module = _load()
     features = {"a": ("x", "y"), "b": ("x", "y", "z")}
 
     with pytest.raises(ValueError, match="equal counts are required"):
-        module.check_column_counts(features=features, contrasts=(("a", "b"),))
+        cerra_solar.check_column_counts(features=features, contrasts=(("a", "b"),))
 
 
 def test_an_arm_that_repeats_a_column_or_a_contrast_naming_an_unknown_arm_raises() -> None:
-    module = _load()
 
     with pytest.raises(ValueError, match="repeats a feature column"):
-        module.check_column_counts(features={"a": ("x", "x")}, contrasts=())
+        cerra_solar.check_column_counts(features={"a": ("x", "x")}, contrasts=())
     with pytest.raises(ValueError, match="has no feature columns"):
-        module.check_column_counts(features={"a": ("x",)}, contrasts=(("a", "b"),))
+        cerra_solar.check_column_counts(features={"a": ("x",)}, contrasts=(("a", "b"),))
 
 
 def _two_era_frame() -> pl.DataFrame:
@@ -421,21 +398,21 @@ def _two_era_frame() -> pl.DataFrame:
 
 
 def test_the_chosen_fold_offsets_cover_every_month_where_all_zero_offsets_do_not() -> None:
-    module = _load()
     frame = _two_era_frame()
-    unrotated = cut_eras(frame=frame, first_months=module.FIRST_MONTHS, fold_offsets={0: 0, 1: 0})
+    unrotated = cut_eras(
+        frame=frame, first_months=cerra_solar.FIRST_MONTHS, fold_offsets={0: 0, 1: 0}
+    )
 
-    chosen, offsets = module.with_covering_folds(frame=frame)
+    chosen, offsets = cerra_solar.with_covering_folds(frame=frame)
 
     assert uncovered_months(coverage=calendar_month_coverage(frame=unrotated)).height == 5
-    assert module.uncovered_share(frame=unrotated) == 1.0
+    assert cerra_solar.uncovered_share(frame=unrotated) == 1.0
     assert uncovered_months(coverage=calendar_month_coverage(frame=chosen)).is_empty()
-    assert module.uncovered_share(frame=chosen) == 0.0
+    assert cerra_solar.uncovered_share(frame=chosen) == 0.0
     assert offsets != {0: 0, 1: 0}
 
 
 def test_folds_raise_where_no_rotation_covers_every_calendar_month() -> None:
-    module = _load()
     # Ten months in one era give two months per fold, so the two Februaries that come first share
     # fold 0, and no rotation of the second era (which holds no rows) can separate them.
     months = ["2024-02", "2025-02", *(f"2025-{m:02d}" for m in range(3, 11))]
@@ -445,7 +422,7 @@ def test_folds_raise_where_no_rotation_covers_every_calendar_month() -> None:
     )
 
     with pytest.raises(ValueError, match="no fold rotation"):
-        module.choose_fold_offsets(frame=frame)
+        cerra_solar.choose_fold_offsets(frame=frame)
 
 
 def _clear_day_hours(*, peak: int = 12) -> pl.DataFrame:
@@ -472,14 +449,13 @@ def _clear_day_hours(*, peak: int = 12) -> pl.DataFrame:
     )
 
 
-def _tail_inputs(*, main_fold_all_zero: bool) -> dict[str, pl.DataFrame]:
+def _tail_inputs(*, main_fold_all_zero: bool) -> dict[str, Any]:
     """Return the four frames `assemble_rows` takes, shaped like the study's own."""
-    module = _load()
     plain = _clear_day_hours()
-    for column in module.SOLAR.shared_features:
+    for column in cerra_solar.SOLAR.shared_features:
         if column not in plain.columns and column != "era_code":
             plain = plain.with_columns(pl.lit(1.0).alias(column))
-    base, _ = module.with_covering_folds(frame=plain)
+    base, _ = cerra_solar.with_covering_folds(frame=plain)
     if main_fold_all_zero:
         base = base.with_columns(fold=pl.lit(0))
     keys = base.select("site", "time")
@@ -492,10 +468,9 @@ def _tail_inputs(*, main_fold_all_zero: bool) -> dict[str, pl.DataFrame]:
 
 
 def test_the_row_set_tail_runs_end_to_end_and_checks_the_columns_after_the_folds_are_cut() -> None:
-    module = _load()
     inputs = _tail_inputs(main_fold_all_zero=False)
 
-    rows = module.assemble_rows(**inputs)
+    rows = cerra_solar.assemble_rows(**inputs)
 
     assert rows.frame.height == inputs["base"].height
     assert {"era_code", "fold", "dhi_cerra", "erbs_bhi_cerra"} <= set(rows.frame.columns)
@@ -506,10 +481,9 @@ def test_the_row_set_tail_runs_end_to_end_and_checks_the_columns_after_the_folds
 
 
 def test_the_main_rows_uncovered_share_is_taken_on_the_published_fold_column() -> None:
-    module = _load()
 
-    covered = module.assemble_rows(**_tail_inputs(main_fold_all_zero=False))
-    uncovered = module.assemble_rows(**_tail_inputs(main_fold_all_zero=True))
+    covered = cerra_solar.assemble_rows(**_tail_inputs(main_fold_all_zero=False))
+    uncovered = cerra_solar.assemble_rows(**_tail_inputs(main_fold_all_zero=True))
 
     # A recut of the shorter row set would give the same share whatever the published folds were.
     assert covered.uncovered_main_folds == 0.0
@@ -517,23 +491,21 @@ def test_the_main_rows_uncovered_share_is_taken_on_the_published_fold_column() -
 
 
 def test_the_report_names_the_rows_each_input_lost_and_the_months_dropped() -> None:
-    module = _load()
     inputs = _tail_inputs(main_fold_all_zero=False)
     inputs["cerra"] = inputs["cerra"].filter(pl.col("time").dt.strftime("%Y-%m") != "2025-03")
 
-    rows = module.assemble_rows(**inputs)
+    rows = cerra_solar.assemble_rows(**inputs)
 
     assert rows.rows_lost["cerra"] == 3 * 24
     assert rows.months_dropped == ["2025-03"]
 
 
 def test_a_missing_value_in_an_arms_column_stops_the_tail_after_the_folds_are_cut() -> None:
-    module = _load()
     inputs = _tail_inputs(main_fold_all_zero=False)
     inputs["base"] = inputs["base"].with_columns(temp_c=pl.lit(None, dtype=pl.Float64))
 
     with pytest.raises(ValueError, match="missing values in columns an arm is shown"):
-        module.assemble_rows(**inputs)
+        cerra_solar.assemble_rows(**inputs)
 
 
 def _profile_frame(*, cerra_peak: int, era5_peak: int) -> pl.DataFrame:
@@ -551,27 +523,25 @@ def _profile_frame(*, cerra_peak: int, era5_peak: int) -> pl.DataFrame:
 
 
 def test_the_clear_day_peak_hour_is_the_exact_hour_of_the_mean_profile() -> None:
-    module = _load()
     frame = _profile_frame(cerra_peak=11, era5_peak=11)
 
     assert (
-        module.clear_day_peak_hour(frame=frame, column="ghi_cerra", ranking_column="ghi_era5") == 11
+        cerra_solar.clear_day_peak_hour(frame=frame, column="ghi_cerra", ranking_column="ghi_era5")
+        == 11
     )
-    assert module.check_peak_hours_agree(frame=frame) == (11, 11)
+    assert cerra_solar.check_peak_hours_agree(frame=frame) == (11, 11)
 
 
 def test_peak_hours_that_differ_by_a_shifted_window_convention_stop_the_run() -> None:
-    module = _load()
     frame = _profile_frame(cerra_peak=14, era5_peak=11)
 
     with pytest.raises(ValueError, match="peak is at hour 14 UTC and ERA5's at hour 11"):
-        module.check_peak_hours_agree(frame=frame)
+        cerra_solar.check_peak_hours_agree(frame=frame)
 
 
 def test_the_nearest_cell_is_by_distance_on_the_sphere_and_a_longitude_above_180_is_wrapped() -> (
     None
 ):
-    module = _load()
     # At 53 N a degree of longitude is about 0.6 of a degree of latitude on the ground. The site is
     # 0.4 degrees east of cell 0 and 0.3 degrees north of cell 1: cell 0 is nearer on the sphere
     # (0.4 * 0.6 = 0.24 against 0.3) though it is farther in degrees.
@@ -585,21 +555,20 @@ def test_the_nearest_cell_is_by_distance_on_the_sphere_and_a_longitude_above_180
     )
     sites = pl.DataFrame({"site": ["A"], "latitude": [53.0], "longitude": [-0.6]})
 
-    nearest = module.derive_nearest_cells(grid=grid, sites=sites)
+    nearest = cerra_solar.derive_nearest_cells(grid=grid, sites=sites)
 
     assert nearest.select("site", "y_index", "x_index").rows() == [("A", 10, 20)]
     assert 20.0 < nearest["distance_km"][0] < 30.0
 
 
 def test_cells_that_differ_from_the_saved_table_stop_the_run_without_naming_a_cell() -> None:
-    module = _load()
     derived = pl.DataFrame({"site": ["A", "B"], "y_index": [10, 11], "x_index": [20, 21]})
     same = derived.clone()
     different = derived.with_columns(x_index=pl.Series([20, 99]))
 
-    module.check_cells_match(derived=derived, saved=same)
+    cerra_solar.check_cells_match(derived=derived, saved=same)
     with pytest.raises(ValueError, match="1 of 2 generators") as error:
-        module.check_cells_match(derived=derived, saved=different)
+        cerra_solar.check_cells_match(derived=derived, saved=different)
 
     assert "99" not in str(error.value)
     assert "21" not in str(error.value)
@@ -643,13 +612,13 @@ def _synthetic_losses(
 def test_the_report_the_script_writes_is_reproduced_by_the_leaderboard_scoring(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    module = _load()
-    leaderboard = _load_leaderboard()
-    losses = _synthetic_losses(arms=module.ARM_ORDER, second_setting_arms=module.PLANNED_ARMS)
+    losses = _synthetic_losses(
+        arms=cerra_solar.ARM_ORDER, second_setting_arms=cerra_solar.PLANNED_ARMS
+    )
     frame = losses.filter(
         pl.col("arm") == "cerra_global", pl.col("setting") == "pooled", pl.col("seed") == 0
     ).select("site", "time")
-    built = module.Built(
+    built = cerra_solar.Built(
         frame=frame,
         candidates=0,
         within_window=0,
@@ -671,15 +640,15 @@ def test_the_report_the_script_writes_is_reproduced_by_the_leaderboard_scoring(
         "_main_panel_lines",
         "geometry_lines",
     ):
-        monkeypatch.setattr(module, name, lambda **_: [])
-    report = module._report(
-        built=built, losses=losses, sites=pl.DataFrame(), job_list=module.jobs()
+        monkeypatch.setattr(cerra_solar, name, lambda **_: [])
+    report = cerra_solar._report(
+        built=built, losses=losses, sites=pl.DataFrame(), job_list=cerra_solar.jobs()
     )
     path = tmp_path / "report.md"
     path.write_text(report)
-    row_set = leaderboard.ROW_SETS[-1]
+    row_set = lb_solar.ROW_SETS[-1]
 
-    result = leaderboard.score_row_set(
+    result = lb_solar.score_row_set(
         row_set=row_set, losses=losses, report_text=report, report_path=path
     )
 
@@ -697,8 +666,3 @@ def test_the_report_the_script_writes_is_reproduced_by_the_leaderboard_scoring(
     second = report.split("The same contrasts at the second hyperparameter setting")[1]
     assert "| sensitivity | era5_global − era5_3h |" in second
     assert "| sensitivity | cerra_global − cams_3h |" not in second
-
-
-def _load_leaderboard() -> ModuleType:
-    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
-    return importlib.import_module("past_solar_leaderboard")

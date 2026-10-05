@@ -10,27 +10,14 @@ wrong direction convention, a timestamp shift, a skipped `common_rows`, or a rem
 gate changes an assertion's outcome, not just a hidden intermediate value.
 """
 
-import importlib
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from types import ModuleType
 from typing import Final
 
 import polars as pl
 import pytest
+import wind_icon_dream
 from studies.wind_product_frames import wind_columns
-
-"""The repo root, one level above this `tests/` directory."""
-
-"""The study script under test, imported by path because `studies/` is not an importable package."""
-
-
-def _load_script() -> ModuleType:
-    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
-    return importlib.import_module("wind_icon_dream")
-
-
-wind_icon_dream = _load_script()
 
 
 def test_filter_nan_padding_drops_nan_rows() -> None:

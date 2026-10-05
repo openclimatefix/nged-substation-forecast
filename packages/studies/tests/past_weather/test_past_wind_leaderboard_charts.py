@@ -5,28 +5,21 @@ share, the station block's contrasts drawn as if against ERA5's hub-height wind,
 number typed by hand.
 """
 
-import importlib
 import json
-from types import ModuleType
 
+import past_wind_leaderboard_charts as lb_wind_charts
 import polars as pl
 import pytest
 from studies.charts import RowSetBlock
 
 
 def _all_shares() -> dict:
-    module = _load()
     return {
-        "main": module.MonthShares(uncovered=16.4, one_year_only=0.0),
-        "icon_dream_eu": module.MonthShares(uncovered=25.1, one_year_only=0.0),
-        "ecmwf": module.MonthShares(uncovered=0.0, one_year_only=9.4),
-        "station": module.MonthShares(uncovered=0.0, one_year_only=42.2),
+        "main": lb_wind_charts.MonthShares(uncovered=16.4, one_year_only=0.0),
+        "icon_dream_eu": lb_wind_charts.MonthShares(uncovered=25.1, one_year_only=0.0),
+        "ecmwf": lb_wind_charts.MonthShares(uncovered=0.0, one_year_only=9.4),
+        "station": lb_wind_charts.MonthShares(uncovered=0.0, one_year_only=42.2),
     }
-
-
-def _load() -> ModuleType:
-    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
-    return importlib.import_module("past_wind_leaderboard_charts")
 
 
 def _intervals(*, rows: list[dict]) -> pl.DataFrame:
@@ -99,27 +92,27 @@ def _block(*, reference_name: str) -> RowSetBlock:
 
 def test_a_block_with_no_uncovered_month_share_stops_the_figure() -> None:
     # Catches a block drawn without the share of its rows whose month its fold never trains on.
-    module = _load()
-    shares = {**module.UNCOVERED_MONTH_SHARES, "ecmwf": None}
+    shares = {**lb_wind_charts.UNCOVERED_MONTH_SHARES, "ecmwf": None}
 
     with pytest.raises(ValueError, match="ECMWF rows"):
-        module.uncovered_month_note(shares=shares)
+        lb_wind_charts.uncovered_month_note(shares=shares)
 
 
 def test_the_caption_states_each_blocks_uncovered_month_share() -> None:
-    module = _load()
     expected = {
         "main": (16.4, 0.0),
         "icon_dream_eu": (25.1, 0.0),
         "ecmwf": (0.0, 9.4),
         "station": (0.0, 42.2),
     }
-    shares = module.UNCOVERED_MONTH_SHARES
+    shares = lb_wind_charts.UNCOVERED_MONTH_SHARES
     assert {
-        key: (share.uncovered, share.one_year_only) for key, share in shares.items()
+        key: (share.uncovered, share.one_year_only)
+        for key, share in shares.items()
+        if share is not None
     } == expected
 
-    lines = module.uncovered_month_note(shares=shares)
+    lines = lb_wind_charts.uncovered_month_note(shares=shares)
 
     assert [line.split(":")[0] for line in lines] == ["Main", "ICON-DREAM-EU", "ECMWF", "Station"]
     assert "16.4% of scored rows are in a calendar month, seen in two or more years" in lines[0]
@@ -137,17 +130,17 @@ def test_the_caption_states_each_blocks_uncovered_month_share() -> None:
 
 def test_month_names_are_cut_to_three_letters_in_a_block_title() -> None:
     # Catches a block title so long that the panel clips it ("50,041 farm-hour").
-    module = _load()
 
-    assert module.short_months(text="August 2024 to September 2026") == "Aug 2024 to Sep 2026"
+    assert (
+        lb_wind_charts.short_months(text="August 2024 to September 2026") == "Aug 2024 to Sep 2026"
+    )
 
 
 def test_the_contrast_figure_names_the_arm_the_station_block_is_against() -> None:
     # Catches the station block's zero rule reading "same as ERA5" when it is ERA5's 10 m wind.
-    module = _load()
     blocks = [_block(reference_name="ERA5"), _block(reference_name="ERA5's 10 m wind")]
 
-    figure = module.contrasts_figure(
+    figure = lb_wind_charts.contrasts_figure(
         blocks=blocks, shares=_all_shares(), intervals=_intervals(rows=[])
     ).to_dict()
     spec = json.dumps(figure, ensure_ascii=False)
@@ -186,9 +179,10 @@ def test_each_figure_carries_its_own_number_from_the_wind_map(
     # Catches a title number typed by hand, and a leaderboard figure that takes the contrasts
     # figure's number: the two figures' numbers are asserted apart, under the real map and under
     # a map with both numbers changed.
-    module = _load()
-    leaderboard = module.leaderboard_figure(blocks=[_leaderboard_block()], shares=_all_shares())
-    contrasts = module.contrasts_figure(
+    leaderboard = lb_wind_charts.leaderboard_figure(
+        blocks=[_leaderboard_block()], shares=_all_shares()
+    )
+    contrasts = lb_wind_charts.contrasts_figure(
         blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
     )
 
@@ -199,12 +193,12 @@ def test_each_figure_carries_its_own_number_from_the_wind_map(
     assert leaderboard_title == "Figure 1"
     assert contrasts_title == "Figure 2"
     assert "Figure 2's paired contrasts" in leaderboard_spec
-    monkeypatch.setitem(module.WIND_FIGURE_NUMBERS, "leaderboard", 7)
-    monkeypatch.setitem(module.WIND_FIGURE_NUMBERS, "contrasts", 9)
-    moved_leaderboard = module.leaderboard_figure(
+    monkeypatch.setitem(lb_wind_charts.WIND_FIGURE_NUMBERS, "leaderboard", 7)
+    monkeypatch.setitem(lb_wind_charts.WIND_FIGURE_NUMBERS, "contrasts", 9)
+    moved_leaderboard = lb_wind_charts.leaderboard_figure(
         blocks=[_leaderboard_block()], shares=_all_shares()
     )
-    moved_contrasts = module.contrasts_figure(
+    moved_contrasts = lb_wind_charts.contrasts_figure(
         blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
     )
     moved_title, _ = _title_and_cross_reference(figure=moved_leaderboard)
@@ -216,11 +210,10 @@ def test_each_figure_carries_its_own_number_from_the_wind_map(
 
 def test_no_block_title_carries_a_wind_height_or_runs_past_55_characters() -> None:
     # Catches the hub heights moved back into the block titles, which then wrap or overflow.
-    module = _load()
-    longest_dates = module.short_months(text="September 2026 to September 2026")
+    longest_dates = lb_wind_charts.short_months(text="September 2026 to September 2026")
 
-    for key, label in module.BLOCK_LABELS.items():
-        setting = module.BLOCK_SETTINGS[key]
+    for key, label in lb_wind_charts.BLOCK_LABELS.items():
+        setting = lb_wind_charts.BLOCK_SETTINGS[key]
         block = RowSetBlock(
             label,
             longest_dates,
@@ -234,9 +227,8 @@ def test_no_block_title_carries_a_wind_height_or_runs_past_55_characters() -> No
 
 
 def test_the_captions_state_each_blocks_wind_heights_and_the_dream_caveat() -> None:
-    module = _load()
 
-    notes = module.block_notes()
+    notes = lb_wind_charts.block_notes()
 
     assert notes[0] == "Wind heights of each block's arms:"
     assert "Main: 100 m; ICON 80 m." in notes
@@ -245,7 +237,7 @@ def test_the_captions_state_each_blocks_wind_heights_and_the_dream_caveat() -> N
         "own 80 m wind at 100 m and 80 m; UKV + nearest station at 100 m and the station's 10 m."
     )
     assert not any("planned contrasts were written" in note for note in notes)
-    (caveat,) = module.block_caveats()
+    (caveat,) = lb_wind_charts.block_caveats()
     assert caveat.startswith("Caveat on the ICON-DREAM-EU block: planned contrasts were written")
 
 
@@ -257,8 +249,7 @@ def _subtitle(*, figure: object) -> str:
 
 def test_the_dream_caveat_is_not_a_line_under_the_wind_heights_lead() -> None:
     # Catches the caveat reading as the fifth wind height in the caption.
-    module = _load()
-    figure = module.contrasts_figure(
+    figure = lb_wind_charts.contrasts_figure(
         blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
     )
     lines = figure.to_dict()["title"]["subtitle"]
@@ -270,18 +261,18 @@ def test_the_dream_caveat_is_not_a_line_under_the_wind_heights_lead() -> None:
 
 def test_the_interval_sentence_says_what_is_resampled_and_what_is_not() -> None:
     # Catches a caption that says only "whole months" and claims no more than the bootstrap does.
-    module = _load()
 
-    assert "whole calendar months" in module.DOTS
-    assert "a fitting seed" in module.DOTS
-    assert "does not cover variation between the three farms" in module.DOTS
-    assert "17 calendar months" in module.STATION_SCOPE
+    assert "whole calendar months" in lb_wind_charts.DOTS
+    assert "a fitting seed" in lb_wind_charts.DOTS
+    assert "does not cover variation between the three farms" in lb_wind_charts.DOTS
+    assert "17 calendar months" in lb_wind_charts.STATION_SCOPE
 
 
 def test_figure_1_says_overlap_does_not_show_equality_and_figure_2_says_where_errors_are() -> None:
-    module = _load()
-    leaderboard = module.leaderboard_figure(blocks=[_leaderboard_block()], shares=_all_shares())
-    contrasts = module.contrasts_figure(
+    leaderboard = lb_wind_charts.leaderboard_figure(
+        blocks=[_leaderboard_block()], shares=_all_shares()
+    )
+    contrasts = lb_wind_charts.contrasts_figure(
         blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
     )
 
@@ -296,14 +287,13 @@ def test_figure_1_says_overlap_does_not_show_equality_and_figure_2_says_where_er
 def test_the_second_setting_line_names_post_hoc_contrasts_and_the_both_arms_condition() -> None:
     # Catches the solar wording, which leaves out post hoc contrasts and the second-setting
     # losses a contrast near the 5% line needs.
-    module = _load()
     block = _block(reference_name="ERA5")
     assert block.planned_rows is not None
     block = block._replace(
         planned_rows=block.planned_rows.with_columns(second_difference=pl.lit(-0.05))
     )
 
-    figure = module.contrasts_figure(
+    figure = lb_wind_charts.contrasts_figure(
         blocks=[block], shares=_all_shares(), intervals=_intervals(rows=[])
     )
 
@@ -316,7 +306,6 @@ def test_the_second_setting_line_names_post_hoc_contrasts_and_the_both_arms_cond
 def test_a_contrast_that_loses_significance_at_the_second_setting_is_named_in_the_caption() -> None:
     # Catches a caption that omits a contrast whose interval crosses zero only at the second
     # setting, and one that names contrasts whose significance does not change.
-    module = _load()
     intervals = _intervals(
         rows=[
             _row(setting="pooled", values=(0.126, 0.009, 0.232)),
@@ -326,7 +315,7 @@ def test_a_contrast_that_loses_significance_at_the_second_setting_is_named_in_th
         ]
     )
 
-    notes = module.significance_change_notes(intervals=intervals)
+    notes = lb_wind_charts.significance_change_notes(intervals=intervals)
 
     assert notes == [
         (
@@ -338,7 +327,6 @@ def test_a_contrast_that_loses_significance_at_the_second_setting_is_named_in_th
 
 
 def test_a_contrast_that_gains_significance_at_the_second_setting_is_named_the_other_way() -> None:
-    module = _load()
     intervals = _intervals(
         rows=[
             _row(setting="pooled", values=(0.08, -0.02, 0.18)),
@@ -346,7 +334,7 @@ def test_a_contrast_that_gains_significance_at_the_second_setting_is_named_the_o
         ]
     )
 
-    (note,) = module.significance_change_notes(intervals=intervals)
+    (note,) = lb_wind_charts.significance_change_notes(intervals=intervals)
 
     assert note.endswith(
         "not statistically significant at the 5% level at the primary setting and significant "
@@ -355,7 +343,6 @@ def test_a_contrast_that_gains_significance_at_the_second_setting_is_named_the_o
 
 
 def test_the_contrast_figure_carries_the_significance_change_line() -> None:
-    module = _load()
     intervals = _intervals(
         rows=[
             _row(setting="pooled", values=(0.126, 0.009, 0.232)),
@@ -363,15 +350,15 @@ def test_the_contrast_figure_carries_the_significance_change_line() -> None:
         ]
     )
 
-    figure = module.contrasts_figure(
+    figure = lb_wind_charts.contrasts_figure(
         blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=intervals
     )
 
     assert "ICON-EU minus UKV is +0.126 points" in json.dumps(figure.to_dict())
 
 
-def _planned_titles(*, block: RowSetBlock, module: ModuleType) -> list[str]:
-    figure = module.contrasts_figure(
+def _planned_titles(*, block: RowSetBlock) -> list[str]:
+    figure = lb_wind_charts.contrasts_figure(
         blocks=[block], shares=_all_shares(), intervals=_intervals(rows=[])
     ).to_dict()
     texts = [
@@ -399,7 +386,6 @@ def _titles(spec: object) -> list[dict]:
 def test_a_block_with_post_hoc_rows_titles_its_planned_panel_planned_and_post_hoc() -> None:
     # Catches a panel holding post hoc rows called "planned contrasts", and a panel of purely
     # planned rows that gains the post hoc wording.
-    module = _load()
     plain = _block(reference_name="ERA5")
     assert plain.planned_rows is not None
     marked = plain._replace(
@@ -407,27 +393,23 @@ def test_a_block_with_post_hoc_rows_titles_its_planned_panel_planned_and_post_ho
             label=pl.col("label") + " (post hoc)", planned=pl.lit(value=False)
         )
     )
-    build = module._block
-    common = module._CommonFields(
+    build = lb_wind_charts._block
+    common = lb_wind_charts._CommonFields(
         label="Main", dates="Aug 2024", site_hours=8, hours_unit="farm-hours", reference_name="ERA5"
     )
 
     plain_block = build(common=common, rows=plain.rows, planned=plain.planned_rows)
     marked_block = build(common=common, rows=plain.rows, planned=marked.planned_rows)
 
-    assert _planned_titles(block=plain_block, module=module)[-1] == "Main: planned contrasts"
-    assert (
-        _planned_titles(block=marked_block, module=module)[-1]
-        == "Main: planned and post hoc contrasts"
-    )
+    assert _planned_titles(block=plain_block)[-1] == "Main: planned contrasts"
+    assert _planned_titles(block=marked_block)[-1] == "Main: planned and post hoc contrasts"
 
 
 def test_the_contrast_figure_says_the_plans_100_m_icon_contrasts_are_not_drawn() -> None:
     # Catches a figure whose planned-contrast panels leave out the ICON contrasts the plan named
     # without saying that they are reported elsewhere.
-    module = _load()
 
-    figure = module.contrasts_figure(
+    figure = lb_wind_charts.contrasts_figure(
         blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
     )
 
@@ -439,9 +421,10 @@ def test_the_contrast_figure_says_the_plans_100_m_icon_contrasts_are_not_drawn()
 
 def test_both_figures_carry_the_three_product_caveats_with_their_figure_pointers() -> None:
     # Catches a caveat dropped from either figure, or a pointer that stops following the map.
-    module = _load()
-    leaderboard = module.leaderboard_figure(blocks=[_leaderboard_block()], shares=_all_shares())
-    contrasts = module.contrasts_figure(
+    leaderboard = lb_wind_charts.leaderboard_figure(
+        blocks=[_leaderboard_block()], shares=_all_shares()
+    )
+    contrasts = lb_wind_charts.contrasts_figure(
         blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
     )
 
@@ -455,8 +438,7 @@ def test_both_figures_carry_the_three_product_caveats_with_their_figure_pointers
 
 
 def test_figure_2_states_the_chance_rate_and_defines_planned_and_post_hoc_rows() -> None:
-    module = _load()
-    contrasts = module.contrasts_figure(
+    contrasts = lb_wind_charts.contrasts_figure(
         blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
     )
 
@@ -471,20 +453,22 @@ def test_figure_2_states_the_chance_rate_and_defines_planned_and_post_hoc_rows()
 
 def test_no_wind_caption_line_runs_past_the_caption_width() -> None:
     # Catches a long line that reaches the figure's right edge and clips.
-    module = _load()
-    leaderboard = module.leaderboard_figure(blocks=[_leaderboard_block()], shares=_all_shares())
+    leaderboard = lb_wind_charts.leaderboard_figure(
+        blocks=[_leaderboard_block()], shares=_all_shares()
+    )
 
     lines = leaderboard.to_dict()["title"]["subtitle"]
 
     # The figure helper appends the reference-row note after the lines this script narrows.
     narrowed = [line for line in lines if not line.startswith("Lighter, hollow rows")]
-    assert max(len(line) for line in narrowed) <= module.CAPTION_CHARACTERS
+    assert max(len(line) for line in narrowed) <= lb_wind_charts.CAPTION_CHARACTERS
 
 
 def test_figure_1_explains_farm_hours_and_capacity() -> None:
     # Catches a caption that leaves a planner to guess what a farm-hour and a capacity are.
-    module = _load()
-    leaderboard = module.leaderboard_figure(blocks=[_leaderboard_block()], shares=_all_shares())
+    leaderboard = lb_wind_charts.leaderboard_figure(
+        blocks=[_leaderboard_block()], shares=_all_shares()
+    )
 
     text = " ".join(leaderboard.to_dict()["title"]["subtitle"])
 

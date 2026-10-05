@@ -6,10 +6,11 @@ heading, four printed decimals, a `farm-hours` heading, second-setting rows in a
 own), and fails on the solar parser, which reads none of those shapes.
 """
 
-import importlib
 from pathlib import Path
 from typing import Any, Final
 
+import past_solar_leaderboard as lb_solar
+import past_solar_leaderboard_charts as lb_solar_charts
 import polars as pl
 import pytest
 from studies.charts import (
@@ -21,7 +22,7 @@ from studies.charts import (
     planned_contrast_rows,
     report_contrasts,
 )
-from test_past_solar_leaderboard import ARMS, METRIC, SITE_HOURS, _load, _losses
+from test_past_solar_leaderboard import ARMS, METRIC, SITE_HOURS, _losses
 
 REFERENCE: Final[BlockArm] = ARMS[0]
 ENS: Final[BlockArm] = ARMS[2]
@@ -119,8 +120,8 @@ def _report(*, losses: pl.DataFrame, tweak: str | None = None, suffix: str = "")
     return "\n".join(lines) + "\n"
 
 
-def _row_set(module: Any, tmp_path: Path) -> Any:
-    return module.RowSet(
+def _row_set(tmp_path: Path) -> Any:
+    return lb_solar.RowSet(
         key="test",
         label="Test farms",
         directory=tmp_path,
@@ -143,13 +144,12 @@ def _row_set(module: Any, tmp_path: Path) -> Any:
 
 
 def _score(*, tmp_path: Path, tweak: str | None = None, suffix: str = "", **changes: Any) -> Any:
-    module = _load()
     losses = _fine_losses()
     report_path = tmp_path / "report.md"
     text = _report(losses=losses, tweak=tweak, suffix=suffix)
     report_path.write_text(text)
-    row_set = _row_set(module, tmp_path)._replace(**changes)
-    return module.score_row_set(
+    row_set = _row_set(tmp_path)._replace(**changes)
+    return lb_solar.score_row_set(
         row_set=row_set, losses=losses, report_text=text, report_path=report_path
     )
 
@@ -160,53 +160,45 @@ def test_a_wind_shaped_report_is_scored_against_its_own_reference_arm(tmp_path: 
 
     assert set(result.contrasts["arm"]) == {ERA5.arm, ENS.arm}
     assert result.planned["reference_arm"].to_list() == [REFERENCE.arm]
-    intervals = _load().intervals_frame(results=[result])
+    intervals = lb_solar.intervals_frame(results=[result])
     contrast_rows = intervals.filter(pl.col("section") == "Mean absolute error minus ERA5's")
     assert set(contrast_rows["reference"]) == {REFERENCE.arm}
-
-
-def _charts_module() -> Any:
-    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
-    return importlib.import_module("past_solar_leaderboard_charts")
 
 
 def test_a_blocks_contrast_heading_names_its_own_reference_arm(tmp_path: Path) -> None:
     # Catches a station-style block whose contrasts against ERA5's 10 m wind are headed "minus
     # ERA5's", in the report and in the `section` column of the intervals, and a default block
     # whose heading changed.
-    module = _load()
     default = _score(tmp_path=tmp_path)
     named = _score(tmp_path=tmp_path, reference_label="ERA5's 10 m wind")
 
-    default_text = module.render_report(results=[default])
-    named_text = module.render_report(results=[named])
+    default_text = lb_solar.render_report(results=[default])
+    named_text = lb_solar.render_report(results=[named])
 
     assert "#### Mean absolute error minus ERA5's\n" in default_text
     assert "#### Mean absolute error minus ERA5's 10 m wind\n" in named_text
     assert "#### Mean absolute error minus ERA5's\n" not in named_text
     contrast_sections = {
         section
-        for section in module.intervals_frame(results=[named])["section"]
+        for section in lb_solar.intervals_frame(results=[named])["section"]
         if section.startswith("Mean absolute error minus")
     }
     assert contrast_sections == {"Mean absolute error minus ERA5's 10 m wind"}
-    default_sections = set(module.intervals_frame(results=[default])["section"])
-    assert module.CONTRAST_SECTION in default_sections
-    assert module.CONTRAST_SECTION == "Mean absolute error minus ERA5's"
+    default_sections = set(lb_solar.intervals_frame(results=[default])["section"])
+    assert lb_solar.CONTRAST_SECTION in default_sections
+    assert lb_solar.CONTRAST_SECTION == "Mean absolute error minus ERA5's"
 
 
 def test_the_charts_read_a_blocks_contrasts_under_its_own_heading(tmp_path: Path) -> None:
     # Catches the chart script looking for the contrasts under the fixed "minus ERA5's" heading, so
     # a block with its own reference heading is found empty or stops with a KeyError.
-    module = _load()
-    charts = _charts_module()
     result = _score(tmp_path=tmp_path, reference_label="ERA5's 10 m wind")
-    report = charts.read_report(report_text=module.render_report(results=[result]))
+    report = lb_solar_charts.read_report(report_text=lb_solar.render_report(results=[result]))
     printed = report["Test farms"]
-    intervals = module.intervals_frame(results=[result])
+    intervals = lb_solar.intervals_frame(results=[result])
 
     assert "Mean absolute error minus ERA5's 10 m wind" in printed.tables
-    drawn = charts.contrast_rows(
+    drawn = lb_solar_charts.contrast_rows(
         frame=intervals,
         row_set=result.row_set,
         order=[],
@@ -220,30 +212,28 @@ def test_a_post_hoc_planned_contrast_is_marked_in_the_report_and_the_figures(
 ) -> None:
     # Catches a planned contrast whose arms were chosen after the first run being printed and
     # drawn as an unmarked planned contrast, and a mark that reaches a contrast it was not set for.
-    module = _load()
-    charts = _charts_module()
     plain = _score(tmp_path=tmp_path)
     marked = _score(tmp_path=tmp_path, post_hoc_contrasts=((ENS.arm, REFERENCE.arm),))
     label = PLANNED.label
 
     assert plain.planned["label"].to_list() == [label]
     assert marked.planned["label"].to_list() == [f"{label} (post hoc)"]
-    assert f"| {label} (post hoc) |" in module.render_report(results=[marked])
-    assert f"| {label} |" in module.render_report(results=[plain])
-    report = charts.read_report(report_text=module.render_report(results=[marked]))
-    intervals = module.intervals_frame(results=[marked])
-    drawn_planned = charts.planned_rows(
+    assert f"| {label} (post hoc) |" in lb_solar.render_report(results=[marked])
+    assert f"| {label} |" in lb_solar.render_report(results=[plain])
+    report = lb_solar_charts.read_report(report_text=lb_solar.render_report(results=[marked]))
+    intervals = lb_solar.intervals_frame(results=[marked])
+    drawn_planned = lb_solar_charts.planned_rows(
         frame=intervals,
         row_set=marked.row_set,
-        printed=report["Test farms"].tables[module.PLANNED_CONTRAST_SECTION],
+        printed=report["Test farms"].tables[lb_solar.PLANNED_CONTRAST_SECTION],
     )
     assert drawn_planned["label"].to_list() == [f"{label} (post hoc)"]
     assert drawn_planned["planned"].to_list() == [False]
-    drawn_contrasts = charts.contrast_rows(
+    drawn_contrasts = lb_solar_charts.contrast_rows(
         frame=intervals,
         row_set=marked.row_set,
         order=[],
-        printed=report["Test farms"].tables[module.CONTRAST_SECTION],
+        printed=report["Test farms"].tables[lb_solar.CONTRAST_SECTION],
     )
     labels = dict(zip(drawn_contrasts["arm"], drawn_contrasts["label"], strict=True))
     assert labels[ENS.arm].endswith(" (post hoc)")
@@ -255,7 +245,6 @@ def test_a_post_hoc_contrast_is_marked_post_hoc_in_the_report_table_and_the_inte
 ) -> None:
     # Catches a post-hoc planned contrast that the figure marks but the contrast table and
     # `intervals.parquet` still call planned, because `planning` was set from the arms alone.
-    module = _load()
     plain = _score(tmp_path=tmp_path)
     marked = _score(tmp_path=tmp_path, post_hoc_contrasts=((ENS.arm, REFERENCE.arm),))
 
@@ -267,20 +256,20 @@ def test_a_post_hoc_contrast_is_marked_post_hoc_in_the_report_table_and_the_inte
     assert planning_of(plain)[ENS.arm] == "planned"
     report_rows = [
         line
-        for line in module.render_report(results=[marked]).splitlines()
+        for line in lb_solar.render_report(results=[marked]).splitlines()
         if line.startswith(f"| {ENS.label} ")
     ]
     assert report_rows
     assert any("| post hoc |" in line for line in report_rows)
-    intervals = module.intervals_frame(results=[marked])
-    for section in (module.CONTRAST_SECTION, module.PLANNED_CONTRAST_SECTION):
+    intervals = lb_solar.intervals_frame(results=[marked])
+    for section in (lb_solar.CONTRAST_SECTION, lb_solar.PLANNED_CONTRAST_SECTION):
         rows = intervals.filter(pl.col("section") == section, pl.col("treatment") == ENS.arm)
         assert rows.height > 0
         assert set(rows["planning"]) == {"post hoc"}
-        if section == module.PLANNED_CONTRAST_SECTION:
+        if section == lb_solar.PLANNED_CONTRAST_SECTION:
             assert all(label.endswith(" (post hoc)") for label in rows["label"])
-    plain_rows = module.intervals_frame(results=[plain]).filter(
-        pl.col("section") == module.PLANNED_CONTRAST_SECTION
+    plain_rows = lb_solar.intervals_frame(results=[plain]).filter(
+        pl.col("section") == lb_solar.PLANNED_CONTRAST_SECTION
     )
     assert set(plain_rows["planning"]) == {"planned"}
 
@@ -290,21 +279,19 @@ def test_a_post_hoc_contrast_is_drawn_unplanned_even_if_its_interval_row_says_pl
 ) -> None:
     # Catches the figure deciding `planned` from the interval row's `planning` alone, so a
     # post-hoc contrast whose row says "planned" is drawn as a planned one.
-    module = _load()
-    charts = _charts_module()
     marked = _score(tmp_path=tmp_path, post_hoc_contrasts=((ENS.arm, REFERENCE.arm),))
-    report = charts.read_report(report_text=module.render_report(results=[marked]))
-    intervals = module.intervals_frame(results=[marked]).with_columns(
+    report = lb_solar_charts.read_report(report_text=lb_solar.render_report(results=[marked]))
+    intervals = lb_solar.intervals_frame(results=[marked]).with_columns(
         planning=pl.when(pl.col("planning") == "post hoc")
         .then(pl.lit("planned"))
         .otherwise(pl.col("planning"))
     )
 
-    drawn = charts.contrast_rows(
+    drawn = lb_solar_charts.contrast_rows(
         frame=intervals,
         row_set=marked.row_set,
         order=[],
-        printed=report["Test farms"].tables[module.CONTRAST_SECTION],
+        printed=report["Test farms"].tables[lb_solar.CONTRAST_SECTION],
     )
 
     flags = dict(zip(drawn["arm"], drawn["planned"], strict=True))
@@ -316,26 +303,24 @@ def test_a_row_sets_planned_heading_names_its_report_table_and_its_intervals_sec
 ) -> None:
     # Catches a report that heads a table holding post hoc rows "Planned contrasts", and a
     # default row set whose heading moved.
-    module = _load()
-    charts = _charts_module()
     plain = _score(tmp_path=tmp_path)
-    heading = module.POST_HOC_PLANNED_CONTRAST_SECTION
+    heading = lb_solar.POST_HOC_PLANNED_CONTRAST_SECTION
     marked = _score(
         tmp_path=tmp_path,
         post_hoc_contrasts=((ENS.arm, REFERENCE.arm),),
         planned_heading=heading,
     )
 
-    assert plain.row_set.planned_heading == module.PLANNED_CONTRAST_SECTION
-    assert f"#### {module.PLANNED_CONTRAST_SECTION}" in module.render_report(results=[plain])
-    assert f"#### {heading}" in module.render_report(results=[marked])
+    assert plain.row_set.planned_heading == lb_solar.PLANNED_CONTRAST_SECTION
+    assert f"#### {lb_solar.PLANNED_CONTRAST_SECTION}" in lb_solar.render_report(results=[plain])
+    assert f"#### {heading}" in lb_solar.render_report(results=[marked])
     assert heading.startswith("Planned and post hoc contrasts")
-    sections = set(module.intervals_frame(results=[marked])["section"])
+    sections = set(lb_solar.intervals_frame(results=[marked])["section"])
     assert heading in sections
-    assert module.PLANNED_CONTRAST_SECTION not in sections
-    report = charts.read_report(report_text=module.render_report(results=[marked]))
-    drawn = charts.planned_rows(
-        frame=module.intervals_frame(results=[marked]),
+    assert lb_solar.PLANNED_CONTRAST_SECTION not in sections
+    report = lb_solar_charts.read_report(report_text=lb_solar.render_report(results=[marked]))
+    drawn = lb_solar_charts.planned_rows(
+        frame=lb_solar.intervals_frame(results=[marked]),
         row_set=marked.row_set,
         printed=report["Test farms"].tables[heading],
     )
@@ -344,12 +329,11 @@ def test_a_row_sets_planned_heading_names_its_report_table_and_its_intervals_sec
 
 def test_a_farm_hours_heading_is_read() -> None:
     # Catches a heading regex that knows only "common site-hours".
-    module = _load()
 
-    assert module.read_heading(
+    assert lb_solar.read_heading(
         report_text="### T on 43,555 common farm-hours (2024-12-01 to 2026-09-10)"
     ) == (43555, "2024-12-01 to 2026-09-10")
-    assert module.read_heading(
+    assert lb_solar.read_heading(
         report_text="### T on 34,156 farm-hours (2024-08-12 to 2025-12-31)"
     ) == (
         34156,
@@ -388,28 +372,25 @@ def test_an_interval_table_that_prints_a_column_the_row_set_did_not_declare_stop
 
 
 def test_an_interval_table_the_row_set_expects_but_the_report_lacks_stops_the_script() -> None:
-    module = _load()
     text = "### T\n\n| Arm | MAE |\n|---|---|\n| `a` | 1.0 |\n"
 
     with pytest.raises(ValueError, match="declares intervals='table'"):
-        module.printed_table_intervals(
+        lb_solar.printed_table_intervals(
             report_text=text, section_prefix=None, column="MAE", arm_suffix="", intervals="table"
         )
 
 
 def test_an_interval_cell_that_is_not_a_bracketed_pair_stops_the_script() -> None:
-    module = _load()
     text = "| Arm | MAE | 95% interval |\n|---|---|---|\n| `a` | 1.0 | 0.5 to 1.5 |\n"
 
     with pytest.raises(ValueError, match="is not '\\[low, high\\]'"):
-        module.printed_table_intervals(
+        lb_solar.printed_table_intervals(
             report_text=text, section_prefix=None, column="MAE", arm_suffix="", intervals="table"
         )
 
 
 def test_an_arm_with_a_blank_interval_cell_is_left_out_of_the_interval_check() -> None:
     # Catches a parser that fails on a product the report prints with no interval.
-    module = _load()
     text = (
         "| Product | MAE | 95% interval |\n"
         "|---|---|---|\n"
@@ -417,7 +398,7 @@ def test_an_arm_with_a_blank_interval_cell_is_left_out_of_the_interval_check() -
         "| b | 2.0 |  |\n"
     )
 
-    printed = module.printed_table_intervals(
+    printed = lb_solar.printed_table_intervals(
         report_text=text, section_prefix=None, column="MAE", arm_suffix="_wind", intervals="table"
     )
 
@@ -425,11 +406,10 @@ def test_an_arm_with_a_blank_interval_cell_is_left_out_of_the_interval_check() -
 
 
 def test_a_report_with_no_intervals_is_checked_for_none_when_the_row_set_says_none() -> None:
-    module = _load()
     text = "| Product | All sites |\n|---|---|\n| a | 1.0 |\n"
 
     assert (
-        module.printed_table_intervals(
+        lb_solar.printed_table_intervals(
             report_text=text,
             section_prefix=None,
             column="All sites",
@@ -490,7 +470,6 @@ def test_a_second_setting_pass_that_compares_nothing_although_rows_exist_stops_t
 ) -> None:
     # Catches a second-setting check that silently compares zero contrasts: every printed row is
     # filtered out by the section options, so a wrong second-setting number would pass.
-    module = _load()
     result = _score(tmp_path=tmp_path)
     printed = report_contrasts(report_path=tmp_path / "report.md")
     options: dict[str, Any] = {
@@ -503,16 +482,15 @@ def test_a_second_setting_pass_that_compares_nothing_although_rows_exist_stops_t
         "decimals": 4,
     }
 
-    assert module.check_contrasts(**options, section_prefix=SENSITIVITY) == []
+    unprinted_scope: dict[str, Any] = {**options, "scope": "no such scope"}
+
+    assert lb_solar.check_contrasts(**options, section_prefix=SENSITIVITY) == []
     with pytest.raises(ValueError, match="none was compared"):
-        module.check_contrasts(
+        lb_solar.check_contrasts(
             **options, section_prefix=SENSITIVITY, other_fit_sections=(SENSITIVITY,)
         )
     # A scope the report prints no row for is the report's own gap, not a filtered-out check.
-    assert (
-        module.check_contrasts(**{**options, "scope": "no such scope"}, section_prefix=SENSITIVITY)
-        == []
-    )
+    assert lb_solar.check_contrasts(**unprinted_scope, section_prefix=SENSITIVITY) == []
 
 
 def test_a_second_setting_row_the_report_does_not_print_stops_the_script(tmp_path: Path) -> None:
@@ -524,7 +502,6 @@ def test_a_contrast_table_with_a_months_column_is_read_only_where_the_row_set_sa
     tmp_path: Path,
 ) -> None:
     # Catches contrast tables that carry a `Months` column being skipped without a word.
-    module = _load()
     losses = _fine_losses()
     text = _report(losses=losses)
     header = "| " + " | ".join(CONTRAST_COLUMNS_WITH_MONTHS) + " |"
@@ -541,13 +518,13 @@ def test_a_contrast_table_with_a_months_column_is_read_only_where_the_row_set_sa
     )
     report_path = tmp_path / "report.md"
     report_path.write_text(wide)
-    row_set = _row_set(module, tmp_path)
+    row_set = _row_set(tmp_path)
 
     with pytest.raises(ValueError, match="no contrast table read from the report"):
-        module.score_row_set(
+        lb_solar.score_row_set(
             row_set=row_set, losses=losses, report_text=wide, report_path=report_path
         )
-    module.score_row_set(
+    lb_solar.score_row_set(
         row_set=row_set._replace(wide_contrast_tables=True),
         losses=losses,
         report_text=wide,
@@ -557,10 +534,9 @@ def test_a_contrast_table_with_a_months_column_is_read_only_where_the_row_set_sa
 
 def test_the_shared_run_writes_the_title_it_is_given(tmp_path: Path) -> None:
     # Catches a report whose heading says "Past-solar" whichever row sets it holds.
-    module = _load()
     result = _score(tmp_path=tmp_path)
 
-    module.write_outputs(
+    lb_solar.write_outputs(
         results=[result], output_dir=tmp_path / "out", title="Wind title", introduction="Intro."
     )
 
@@ -580,9 +556,8 @@ def test_the_arm_suffix_is_added_to_the_names_of_the_printed_intervals(tmp_path:
 
 
 def test_the_cerra_row_set_keeps_the_solar_report_shape_the_default_options_read() -> None:
-    module = _load()
-    cerra = module.ROW_SETS[-1]
-    ens = next(row_set for row_set in module.ROW_SETS if row_set.key == "ens")
+    cerra = lb_solar.ROW_SETS[-1]
+    ens = next(row_set for row_set in lb_solar.ROW_SETS if row_set.key == "ens")
 
     for name in (
         "printed_column",

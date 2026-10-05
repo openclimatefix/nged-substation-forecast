@@ -6,29 +6,20 @@ runs, a check that crashes instead of skipping when it has no data, and a valida
 store written under the other product.
 """
 
-import importlib
 import sys
 from collections.abc import Iterator
 from pathlib import Path
-from types import ModuleType
 
+import fetch_ukv_ceda as fetch
 import numpy as np
 import pytest
+import validate_ukv_ceda as validate
 
 pytest.importorskip("icechunk")
 pytest.importorskip("zarr")
 pytest.importorskip("pyproj")
 
 import zarr
-
-
-def _load(name: str) -> ModuleType:
-    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
-    return importlib.import_module(name)
-
-
-fetch = _load("fetch_ukv_ceda")
-validate = _load("validate_ukv_ceda")
 
 
 @pytest.fixture(autouse=True)

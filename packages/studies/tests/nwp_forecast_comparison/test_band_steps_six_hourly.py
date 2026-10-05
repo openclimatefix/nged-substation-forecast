@@ -5,28 +5,15 @@ present, but only for a field that is a period mean. A wind field is instantaneo
 in 6-hourly mode must keep every step at a multiple of 6 hours, including lead 0 on day 0.
 """
 
-import importlib
 from datetime import UTC, datetime
-from types import ModuleType
 from typing import Final
 
+import ens_forecast_horizons as efh
 import numpy as np
 import polars as pl
 
-"""The repo root, one level above this `tests/` directory."""
-
-"""The study script under test, imported by path because `studies/` is not an importable package."""
-
 ENSEMBLE_SIZE: Final[int] = 2
 """Members per run in the synthetic extract."""
-
-
-def _load_script() -> ModuleType:
-    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
-    return importlib.import_module("ens_forecast_horizons")
-
-
-efh = _load_script()
 
 
 def _extract(*, domain: str) -> pl.DataFrame:

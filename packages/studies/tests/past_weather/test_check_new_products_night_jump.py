@@ -9,23 +9,9 @@ neighbours would pass a plateau spanning hours 8 to 16 without ever showing whic
 the true switch, because every hour in the plateau sits above the median alike.
 """
 
-import importlib
-from types import ModuleType
-
+import check_new_products
 import numpy as np
 import polars as pl
-
-"""The repo root, one level above this `tests/` directory."""
-
-"""The study script under test, imported by path because `studies/` is not an importable package."""
-
-
-def _load_script() -> ModuleType:
-    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
-    return importlib.import_module("check_new_products")
-
-
-check_new_products = _load_script()
 
 
 def test_a_run_every_three_hours_peaks_at_every_third_hour() -> None:

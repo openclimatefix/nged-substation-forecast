@@ -5,26 +5,17 @@ what the script adds: reading its arguments, finding `intervals.parquet` beside 
 raising on a mismatch.
 """
 
-import importlib
 import sys
 from pathlib import Path
-from types import ModuleType
 from typing import Final
 
+import check_page_numbers as page_numbers
 import polars as pl
 import pytest
 
 HEADING: Final[str] = "## ECMWF wind"
 REPORT: Final[str] = "| all | a − b | +0.2050 | [+0.2050, +0.2050] |\n"
 PAGE: Final[str] = "## ECMWF wind\n\n- **Yes.** The gap was 0.20 points.\n"
-
-
-def _load_module() -> ModuleType:
-    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
-    return importlib.import_module("check_page_numbers")
-
-
-CHECK = _load_module()
 
 
 def _write(*, directory: Path, page: str) -> tuple[Path, Path]:
@@ -55,7 +46,7 @@ def test_main_checks_a_section_and_reads_the_intervals_beside_the_report(
     monkeypatch.setattr(
         sys, "argv", ["check", str(page_path), str(report_path), "--section", HEADING]
     )
-    assert CHECK.main() == 0
+    assert page_numbers.main() == 0
 
 
 def test_main_checks_a_bullet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -63,7 +54,7 @@ def test_main_checks_a_bullet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(
         sys, "argv", ["check", str(page_path), str(report_path), "--bullet", HEADING, "- **Yes"]
     )
-    assert CHECK.main() == 0
+    assert page_numbers.main() == 0
 
 
 def test_main_raises_when_a_section_number_is_not_in_the_report(
@@ -74,4 +65,4 @@ def test_main_raises_when_a_section_number_is_not_in_the_report(
         sys, "argv", ["check", str(page_path), str(report_path), "--section", HEADING]
     )
     with pytest.raises(ValueError, match=r"0\.22"):
-        CHECK.main()
+        page_numbers.main()

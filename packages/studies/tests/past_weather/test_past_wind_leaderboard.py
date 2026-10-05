@@ -6,26 +6,19 @@ row set is declared consistently, so a typo in an arm name stops here and not in
 the saved losses.
 """
 
-import importlib
 from pathlib import Path
-from types import ModuleType
 from typing import Final
 
+import past_wind_leaderboard as lb_wind
 import polars as pl
 from studies.charts import CONTRAST_COLUMNS, CONTRAST_COLUMNS_WITH_MONTHS, report_contrasts
-
-
-def _load() -> ModuleType:
-    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
-    return importlib.import_module("past_wind_leaderboard")
 
 
 def test_each_block_is_contrasted_with_its_own_reference_arm() -> None:
     # Catches the station block contrasted with ERA5's 100 m wind, or a block left on the default
     # solar reference arm, which no wind loss file holds.
-    module = _load()
 
-    references = {row_set.key: row_set.reference_arm for row_set in module.ROW_SETS}
+    references = {row_set.key: row_set.reference_arm for row_set in lb_wind.ROW_SETS}
 
     assert references == {
         "main": "era5_wind",
@@ -36,9 +29,8 @@ def test_each_block_is_contrasted_with_its_own_reference_arm() -> None:
 
 
 def test_the_reference_arm_is_a_reference_row_in_its_block_and_not_a_contrast() -> None:
-    module = _load()
 
-    for row_set in module.ROW_SETS:
+    for row_set in lb_wind.ROW_SETS:
         reference_rows = [arm.arm for arm in row_set.leaderboard_arms if arm.reference]
         assert reference_rows == [row_set.reference_arm], row_set.key
         assert row_set.reference_arm not in [arm.arm for arm in row_set.contrast_arms]
@@ -47,20 +39,18 @@ def test_the_reference_arm_is_a_reference_row_in_its_block_and_not_a_contrast() 
 def test_every_planned_contrast_is_between_two_arms_of_its_block() -> None:
     # Catches a planned contrast naming an arm the block does not score, whose losses the
     # block's bootstrap would then not find.
-    module = _load()
 
-    for row_set in module.ROW_SETS:
+    for row_set in lb_wind.ROW_SETS:
         scored = {arm.arm for arm in row_set.leaderboard_arms}
         for contrast in row_set.planned_contrasts:
             assert {contrast.treatment.arm, contrast.reference.arm} <= scored, row_set.key
 
 
 def test_every_block_has_a_setting_and_every_arm_a_label() -> None:
-    module = _load()
 
-    assert set(module.BLOCK_SETTINGS) == {row_set.key for row_set in module.ROW_SETS}
-    for row_set in module.ROW_SETS:
-        assert {arm.arm for arm in row_set.leaderboard_arms} <= set(module.ARM_LABELS)
+    assert set(lb_wind.BLOCK_SETTINGS) == {row_set.key for row_set in lb_wind.ROW_SETS}
+    for row_set in lb_wind.ROW_SETS:
+        assert {arm.arm for arm in row_set.leaderboard_arms} <= set(lb_wind.ARM_LABELS)
 
 
 def _table(*, rows: list[tuple[str, str, int]], months: bool = False) -> str:
@@ -187,9 +177,8 @@ def test_each_blocks_planned_contrasts_are_the_rows_its_report_prints_at_scope_a
 ) -> None:
     # Catches a planned-contrast declaration that drifts from the pairs the report prints, or a
     # `planned_section` heading that matches none of them.
-    module = _load()
 
-    for row_set in module.ROW_SETS:
+    for row_set in lb_wind.ROW_SETS:
         printed = _printed(key=row_set.key, tmp_path=tmp_path)
         rows = printed.filter(
             printed["section"].str.starts_with(row_set.planned_section),
@@ -207,9 +196,8 @@ def test_each_blocks_second_setting_scope_is_the_scope_its_report_prints(tmp_pat
     # Catches a block left on the solar default `sensitivity`, which its wind report never prints:
     # the ICON-DREAM-EU, ECMWF and station reports print `all` under their second-setting headings,
     # the main report prints `second setting`.
-    module = _load()
 
-    for row_set in module.ROW_SETS:
+    for row_set in lb_wind.ROW_SETS:
         printed = _printed(key=row_set.key, tmp_path=tmp_path)
         rows = printed.filter(
             printed["section"].str.starts_with(row_set.second_section),
@@ -226,8 +214,7 @@ def test_each_blocks_second_setting_scope_is_the_scope_its_report_prints(tmp_pat
 def test_the_station_block_tells_its_two_era5_arms_apart() -> None:
     # Catches two arms both labelled "ERA5" in the station block, and a station contrast heading
     # that says "minus ERA5's" when the reference is ERA5's 10 m wind.
-    module = _load()
-    by_key = {row_set.key: row_set for row_set in module.ROW_SETS}
+    by_key = {row_set.key: row_set for row_set in lb_wind.ROW_SETS}
 
     station_labels = {arm.arm: arm.label for arm in by_key["station"].leaderboard_arms}
     assert station_labels["era5_10m_wind"] == "ERA5 10\u00a0m"
@@ -242,9 +229,8 @@ def test_the_station_block_tells_its_two_era5_arms_apart() -> None:
 def test_only_the_main_block_marks_the_three_contrasts_that_use_the_80_m_icon_arms() -> None:
     # Catches the post-hoc marks missing from the main block, or set on a block whose planned
     # contrasts were written before the run.
-    module = _load()
 
-    marked = {row_set.key: row_set.post_hoc_contrasts for row_set in module.ROW_SETS}
+    marked = {row_set.key: row_set.post_hoc_contrasts for row_set in lb_wind.ROW_SETS}
 
     assert marked == {
         "main": (
@@ -256,15 +242,14 @@ def test_only_the_main_block_marks_the_three_contrasts_that_use_the_80_m_icon_ar
         "ecmwf": (),
         "station": (),
     }
-    main = module.ROW_SETS[0]
+    main = lb_wind.ROW_SETS[0]
     planned = {(c.treatment.arm, c.reference.arm) for c in main.planned_contrasts}
     assert set(main.post_hoc_contrasts) <= planned
 
 
 def test_the_icon_dream_eu_block_carries_the_post_scoring_note() -> None:
-    module = _load()
 
-    notes = {key: setting.note for key, setting in module.BLOCK_SETTINGS.items()}
+    notes = {key: setting.note for key, setting in lb_wind.BLOCK_SETTINGS.items()}
 
     assert notes["icon_dream_eu"] == (
         "planned contrasts were written after the main block's five products were scored."
@@ -275,9 +260,8 @@ def test_the_icon_dream_eu_block_carries_the_post_scoring_note() -> None:
 def test_a_block_reads_a_months_column_exactly_where_its_report_prints_one(tmp_path: Path) -> None:
     # Catches a block whose report tables carry a `Months` column being read as if they did not,
     # which skips every one of its contrast tables, and the reverse.
-    module = _load()
 
-    for row_set in module.ROW_SETS:
+    for row_set in lb_wind.ROW_SETS:
         path = tmp_path / f"{row_set.key}.md"
         path.write_text(REPORT_TEXTS[row_set.key])
         read_without_months = report_contrasts(report_path=path).height > 0

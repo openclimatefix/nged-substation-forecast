@@ -6,14 +6,13 @@ a near-the-line contrast missed, a printed row from another section's fit compar
 write into the write-once folder.
 """
 
-import importlib
 import re
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from types import ModuleType
 from typing import Any, Final
 
+import past_solar_leaderboard as lb_solar
 import polars as pl
 import pytest
 from studies.charts import (
@@ -35,11 +34,6 @@ ARMS: Final[tuple[BlockArm, ...]] = (
 )
 ENS_AGAINST_ERA5: Final[PlannedContrast] = PlannedContrast(ARMS[2], ARMS[1])
 CAMS_AGAINST_ENS: Final[PlannedContrast] = PlannedContrast(ARMS[0], ARMS[2])
-
-
-def _load() -> ModuleType:
-    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
-    return importlib.import_module("past_solar_leaderboard")
 
 
 def _losses() -> pl.DataFrame:
@@ -179,8 +173,8 @@ def _contrast_section(
     return lines
 
 
-def _row_set(module: ModuleType, tmp_path: Path) -> Any:
-    return module.RowSet(
+def _row_set(tmp_path: Path) -> Any:
+    return lb_solar.RowSet(
         key="test",
         label="Test rows",
         directory=tmp_path,
@@ -193,13 +187,12 @@ def _row_set(module: ModuleType, tmp_path: Path) -> Any:
 
 
 def _score(*, tmp_path: Path, tweak: str | None = None) -> Any:
-    module = _load()
     losses = _losses()
     report_path = tmp_path / "report.md"
     text = _printed_report(losses=losses, tweak=tweak)
     report_path.write_text(text)
-    return module.score_row_set(
-        row_set=_row_set(module, tmp_path),
+    return lb_solar.score_row_set(
+        row_set=_row_set(tmp_path),
         losses=losses,
         report_text=text,
         report_path=report_path,
@@ -247,15 +240,14 @@ def test_a_planned_contrast_with_a_second_setting_but_no_printed_second_row_stop
 
 
 def test_a_leaderboard_arm_with_no_printed_error_stops_the_script(tmp_path: Path) -> None:
-    module = _load()
     losses = _losses()
     report_path = tmp_path / "report.md"
     text = _printed_report(losses=losses)
     report_path.write_text(text)
-    row_set = _row_set(module, tmp_path)._replace(arm_suffix="_typo")
+    row_set = _row_set(tmp_path)._replace(arm_suffix="_typo")
 
     with pytest.raises(ValueError, match="prints no error"):
-        module.score_row_set(
+        lb_solar.score_row_set(
             row_set=row_set, losses=losses, report_text=text, report_path=report_path
         )
 
@@ -273,15 +265,14 @@ def test_a_contrast_named_only_in_an_exploratory_section_stays_exploratory(
 def test_a_post_hoc_arm_is_labelled_post_hoc(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    module = _load()
-    monkeypatch.setattr(module, "POST_HOC_ARMS", ["cams_global"])
+    monkeypatch.setattr(lb_solar, "POST_HOC_ARMS", ["cams_global"])
     losses = _losses()
     report_path = tmp_path / "report.md"
     text = _printed_report(losses=losses)
     report_path.write_text(text)
 
-    result = module.score_row_set(
-        row_set=_row_set(module, tmp_path), losses=losses, report_text=text, report_path=report_path
+    result = lb_solar.score_row_set(
+        row_set=_row_set(tmp_path), losses=losses, report_text=text, report_path=report_path
     )
 
     planning = dict(zip(result.contrasts["label"], result.contrasts["planning"], strict=True))
@@ -297,9 +288,8 @@ def _contrasts_with_flags(*, near_line: dict[str, bool]) -> pl.DataFrame:
 
 
 def test_second_setting_is_computed_for_an_exploratory_row_near_the_line() -> None:
-    module = _load()
 
-    result = module._second_setting(
+    result = lb_solar._second_setting(
         contrasts=_contrasts_with_flags(near_line={"cams_global": True, "ens_mean_t3": False}),
         arms=ARMS,
         losses=_losses(),
@@ -314,11 +304,10 @@ def test_second_setting_is_computed_for_an_exploratory_row_near_the_line() -> No
 def test_write_outputs_writes_report_and_intervals_and_refuses_a_second_write(
     tmp_path: Path,
 ) -> None:
-    module = _load()
     result = _score(tmp_path=tmp_path)
     output = tmp_path / "solar_leaderboard"
 
-    module.write_outputs(results=[result], output_dir=output)
+    lb_solar.write_outputs(results=[result], output_dir=output)
 
     assert "exploratory" in (output / "report.md").read_text()
     intervals = pl.read_parquet(output / "intervals.parquet")
@@ -330,13 +319,12 @@ def test_write_outputs_writes_report_and_intervals_and_refuses_a_second_write(
         ("Planned contrasts, first product minus second", "sensitivity", 1),
     ]
     with pytest.raises(FileExistsError):
-        module.write_outputs(results=[result], output_dir=output)
+        lb_solar.write_outputs(results=[result], output_dir=output)
 
 
 def test_the_written_intervals_are_accepted_by_the_page_number_gate(tmp_path: Path) -> None:
-    module = _load()
     result = _score(tmp_path=tmp_path)
-    module.write_outputs(results=[result], output_dir=tmp_path / "out")
+    lb_solar.write_outputs(results=[result], output_dir=tmp_path / "out")
     intervals = pl.read_parquet(tmp_path / "out" / "intervals.parquet")
     lower = float(intervals.filter(pl.col("treatment") == "ens_mean_t3")["lower"][0])
 
@@ -398,33 +386,30 @@ def _planned_frame(*, contrasts: tuple[PlannedContrast, ...]) -> pl.DataFrame:
 def test_a_planned_contrast_against_another_product_is_checked_against_its_printed_row(
     tmp_path: Path,
 ) -> None:
-    module = _load()
     printed = _planned_report(tmp_path=tmp_path, contrasts=PLANNED_TWO)
 
-    module.check_planned_contrasts(
+    lb_solar.check_planned_contrasts(
         planned=_planned_frame(contrasts=PLANNED_TWO), printed=printed, site_hours=SITE_HOURS
     )
 
 
 def test_a_planned_contrast_drawn_with_the_wrong_sign_stops_the_script(tmp_path: Path) -> None:
-    module = _load()
     printed = _planned_report(tmp_path=tmp_path, contrasts=PLANNED_TWO, flip=True)
 
     with pytest.raises(
         ValueError,
         match=r"all difference: bootstrapped -0\.200 but the report says 0\.2",
     ):
-        module.check_planned_contrasts(
+        lb_solar.check_planned_contrasts(
             planned=_planned_frame(contrasts=PLANNED_TWO), printed=printed, site_hours=SITE_HOURS
         )
 
 
 def test_a_planned_contrast_with_no_printed_row_stops_the_script(tmp_path: Path) -> None:
-    module = _load()
     printed = _planned_report(tmp_path=tmp_path, contrasts=(ENS_AGAINST_ERA5,))
 
     with pytest.raises(ValueError, match="planned, but the report prints no row"):
-        module.check_planned_contrasts(
+        lb_solar.check_planned_contrasts(
             planned=_planned_frame(contrasts=PLANNED_TWO), printed=printed, site_hours=SITE_HOURS
         )
 
@@ -432,18 +417,17 @@ def test_a_planned_contrast_with_no_printed_row_stops_the_script(tmp_path: Path)
 def test_the_two_lists_of_planned_contrasts_must_agree_in_both_directions(
     tmp_path: Path,
 ) -> None:
-    module = _load()
     printed = _planned_report(tmp_path=tmp_path, contrasts=PLANNED_TWO)
 
-    dropped = module.unlisted_planned_contrasts(
+    dropped = lb_solar.unlisted_planned_contrasts(
         contrasts=(ENS_AGAINST_ERA5,), printed=printed, site_hours=SITE_HOURS
     )
-    invented = module.unlisted_planned_contrasts(
+    invented = lb_solar.unlisted_planned_contrasts(
         contrasts=(*PLANNED_TWO, PlannedContrast(ARMS[1], ARMS[0])),
         printed=printed,
         site_hours=SITE_HOURS,
     )
-    agreed = module.unlisted_planned_contrasts(
+    agreed = lb_solar.unlisted_planned_contrasts(
         contrasts=PLANNED_TWO, printed=printed, site_hours=SITE_HOURS
     )
 
@@ -459,15 +443,14 @@ def test_the_two_lists_of_planned_contrasts_must_agree_in_both_directions(
 def test_a_row_set_whose_report_prints_a_planned_contrast_the_script_omits_stops_the_script(
     tmp_path: Path,
 ) -> None:
-    module = _load()
     losses = _losses()
     report_path = tmp_path / "report.md"
     text = _printed_report(losses=losses)
     report_path.write_text(text)
-    row_set = _row_set(module, tmp_path)._replace(planned_contrasts=())
+    row_set = _row_set(tmp_path)._replace(planned_contrasts=())
 
     with pytest.raises(ValueError, match="the script does not list it"):
-        module.score_row_set(
+        lb_solar.score_row_set(
             row_set=row_set, losses=losses, report_text=text, report_path=report_path
         )
 
@@ -484,17 +467,16 @@ def test_score_row_set_holds_each_planned_contrast_with_its_second_setting(
 
 
 def test_the_written_report_and_intervals_hold_the_planned_contrasts(tmp_path: Path) -> None:
-    module = _load()
     result = _score(tmp_path=tmp_path)
     output = tmp_path / "solar_leaderboard"
 
-    module.write_outputs(results=[result], output_dir=output)
+    lb_solar.write_outputs(results=[result], output_dir=output)
 
     report = (output / "report.md").read_text()
     assert "#### Planned contrasts, first product minus second" in report
     assert "| ENS against ERA5 |" in report
     intervals = pl.read_parquet(output / "intervals.parquet").filter(
-        pl.col("section") == module.PLANNED_CONTRAST_SECTION
+        pl.col("section") == lb_solar.PLANNED_CONTRAST_SECTION
     )
     assert intervals.sort("setting").select("setting", "treatment", "reference").rows() == [
         ("pooled", "ens_mean_t3", "era5_global"),
@@ -503,16 +485,14 @@ def test_the_written_report_and_intervals_hold_the_planned_contrasts(tmp_path: P
 
 
 def test_every_row_set_lists_the_planned_contrasts_the_study_names() -> None:
-    module = _load()
 
-    counts = {row_set.key: len(row_set.planned_contrasts) for row_set in module.ROW_SETS}
+    counts = {row_set.key: len(row_set.planned_contrasts) for row_set in lb_solar.ROW_SETS}
 
     assert counts == {"main": 6, "extra": 3, "ens": 2, "station": 3, "cerra": 4}
 
 
 def test_the_second_setting_is_bootstrapped_from_the_sensitivity_losses(tmp_path: Path) -> None:
     """Each arm's `sensitivity` losses sit a different distance above its `pooled` ones (1 pp)."""
-    module = _load()
     result = _score(tmp_path=tmp_path)
 
     planned = result.planned.row(0, named=True)
@@ -520,19 +500,18 @@ def test_the_second_setting_is_bootstrapped_from_the_sensitivity_losses(tmp_path
     ens = result.contrasts.filter(pl.col("label") == "ENS").row(0, named=True)
     assert ens["second_difference"] == pytest.approx(ens["difference"] + 1.0)
     output = tmp_path / "solar_leaderboard"
-    module.write_outputs(results=[result], output_dir=output)
+    lb_solar.write_outputs(results=[result], output_dir=output)
     intervals = pl.read_parquet(output / "intervals.parquet").filter(
-        pl.col("section") == module.PLANNED_CONTRAST_SECTION, pl.col("setting") == "sensitivity"
+        pl.col("section") == lb_solar.PLANNED_CONTRAST_SECTION, pl.col("setting") == "sensitivity"
     )
     assert intervals["value"].to_list() == pytest.approx([planned["second_difference"]])
     contrast_second = pl.read_parquet(output / "intervals.parquet").filter(
-        pl.col("section") == module.CONTRAST_SECTION, pl.col("setting") == "sensitivity"
+        pl.col("section") == lb_solar.CONTRAST_SECTION, pl.col("setting") == "sensitivity"
     )
     assert contrast_second["value"].to_list() == pytest.approx([ens["second_difference"]])
 
 
 def test_a_contrast_gets_no_second_setting_where_era5_has_no_sensitivity_losses() -> None:
-    module = _load()
     losses = _losses().filter(
         ~((pl.col("arm") == "era5_global") & (pl.col("setting") == "sensitivity"))
     )
@@ -540,7 +519,7 @@ def test_a_contrast_gets_no_second_setting_where_era5_has_no_sensitivity_losses(
         {"arm": ["ens_mean_t3"], "planning": ["planned"], "planned": [True], "near_line": [True]}
     )
 
-    result = module._second_setting(
+    result = lb_solar._second_setting(
         contrasts=contrasts, arms=ARMS, losses=losses, site_hours=SITE_HOURS
     )
 
@@ -548,10 +527,9 @@ def test_a_contrast_gets_no_second_setting_where_era5_has_no_sensitivity_losses(
 
 
 def test_the_report_prints_a_positive_difference_with_a_plus_sign(tmp_path: Path) -> None:
-    module = _load()
     result = _score(tmp_path=tmp_path)
 
-    lines = module.render_report(results=[result]).splitlines()
+    lines = lb_solar.render_report(results=[result]).splitlines()
 
     (row,) = [line for line in lines if line.startswith("| ENS against ERA5 |")]
     assert "| -0.2" in row
@@ -559,7 +537,6 @@ def test_the_report_prints_a_positive_difference_with_a_plus_sign(tmp_path: Path
 
 
 def test_a_second_setting_row_is_not_compared_with_a_printed_first_setting_row() -> None:
-    module = _load()
     contrasts = pl.DataFrame(
         {
             "arm": "ens_mean_t3",
@@ -581,11 +558,11 @@ def test_a_second_setting_row_is_not_compared_with_a_printed_first_setting_row()
         }
     )
 
-    problems = module.check_contrasts(
+    problems = lb_solar.check_contrasts(
         contrasts=contrasts,
         printed=printed,
         site_hours=SITE_HOURS,
-        scope=module.SECOND_SETTING_SCOPE,
+        scope=lb_solar.SECOND_SETTING_SCOPE,
         column_prefix="second_",
     )
 
@@ -606,31 +583,29 @@ def test_a_second_setting_row_is_not_compared_with_a_printed_first_setting_row()
 def test_near_the_line_is_a_bound_within_a_fifth_of_the_width_from_zero(
     lower: float, upper: float, near: bool
 ) -> None:
-    module = _load()
     frame = pl.DataFrame({"lower_95": [lower], "upper_95": [upper]})
 
-    assert frame.select(module.near_line()).item() is near
+    assert frame.select(lb_solar.near_line()).item() is near
 
 
 def test_score_row_set_flags_rows_with_the_near_line_rule(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    module = _load()
-    monkeypatch.setattr(module, "near_line", lambda: pl.lit(True))
+    monkeypatch.setattr(lb_solar, "near_line", lambda: pl.lit(True))
 
-    result = _score_with(module=module, tmp_path=tmp_path)
+    result = _score_with(tmp_path=tmp_path)
 
     assert result.contrasts["near_line"].all()
     assert result.planned["near_line"].all()
 
 
-def _score_with(*, module: ModuleType, tmp_path: Path) -> Any:
+def _score_with(*, tmp_path: Path) -> Any:
     losses = _losses()
     report_path = tmp_path / "report.md"
     text = _printed_report(losses=losses)
     report_path.write_text(text)
-    return module.score_row_set(
-        row_set=_row_set(module, tmp_path),
+    return lb_solar.score_row_set(
+        row_set=_row_set(tmp_path),
         losses=losses,
         report_text=text,
         report_path=report_path,
@@ -638,13 +613,12 @@ def _score_with(*, module: ModuleType, tmp_path: Path) -> Any:
 
 
 def test_the_report_prints_the_near_line_and_reference_flags(tmp_path: Path) -> None:
-    module = _load()
     result = _score(tmp_path=tmp_path)
     flagged = result._replace(
         contrasts=result.contrasts.with_columns(near_line=pl.col("label") == "CAMS")
     )
 
-    lines = module.render_report(results=[flagged]).splitlines()
+    lines = lb_solar.render_report(results=[flagged]).splitlines()
 
     assert any(line.startswith("| CAMS |") and "| exploratory | yes |" in line for line in lines)
     assert any(line.startswith("| ENS |") and "| planned | no |" in line for line in lines)
@@ -653,9 +627,8 @@ def test_the_report_prints_the_near_line_and_reference_flags(tmp_path: Path) -> 
 
 
 def test_every_row_set_marks_cams_and_era5_as_reference_rows() -> None:
-    module = _load()
 
-    for row_set in module.ROW_SETS:
+    for row_set in lb_solar.ROW_SETS:
         flagged = {arm.arm for arm in row_set.leaderboard_arms if arm.reference}
         assert flagged == {"cams_global", "era5_global"}, row_set.key
 
@@ -663,21 +636,19 @@ def test_every_row_set_marks_cams_and_era5_as_reference_rows() -> None:
 def test_the_main_contrasts_hold_the_ukv_rebuilds_and_no_row_set_contrasts_era5_with_itself() -> (
     None
 ):
-    module = _load()
 
-    main_arms = {arm.arm for arm in module.ROW_SETS[0].contrast_arms}
+    main_arms = {arm.arm for arm in lb_solar.ROW_SETS[0].contrast_arms}
     assert {"ukv_trap_global", "ukv_pair_global"} <= main_arms
-    for row_set in module.ROW_SETS:
+    for row_set in lb_solar.ROW_SETS:
         assert "era5_global" not in {arm.arm for arm in row_set.contrast_arms}
 
 
 def test_the_intervals_and_the_report_hold_every_row_set(tmp_path: Path) -> None:
-    module = _load()
     first = _score(tmp_path=tmp_path)
     second = first._replace(row_set=first.row_set._replace(key="other", label="Other rows"))
 
-    intervals = module.intervals_frame(results=[first, second])
-    report = module.render_report(results=[first, second])
+    intervals = lb_solar.intervals_frame(results=[first, second])
+    report = lb_solar.render_report(results=[first, second])
 
     assert set(intervals["row_set"].to_list()) == {"test", "other"}
     assert "### Test rows:" in report
@@ -685,7 +656,7 @@ def test_the_intervals_and_the_report_hold_every_row_set(tmp_path: Path) -> None
 
 
 def _main_with(
-    *, module: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str]
+    *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str]
 ) -> tuple[int, Path]:
     """Run `main` on one synthetic row set, with the output folder under `tmp_path`."""
     data = tmp_path / "data"
@@ -694,18 +665,15 @@ def _main_with(
     losses.write_parquet(data / "losses.parquet")
     (data / "report.md").write_text(_printed_report(losses=losses))
     output = tmp_path / "solar_leaderboard"
-    monkeypatch.setattr(module, "ROW_SETS", (_row_set(module, data),))
-    monkeypatch.setattr(module, "SOLAR_LEADERBOARD_DIR", output)
+    monkeypatch.setattr(lb_solar, "ROW_SETS", (_row_set(data),))
+    monkeypatch.setattr(lb_solar, "SOLAR_LEADERBOARD_DIR", output)
     monkeypatch.setattr(sys, "argv", ["past_solar_leaderboard.py", *argv])
-    return module.main(), output
+    return lb_solar.main(), output
 
 
 def test_check_only_writes_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    module = _load()
 
-    code, output = _main_with(
-        module=module, tmp_path=tmp_path, monkeypatch=monkeypatch, argv=["--check-only"]
-    )
+    code, output = _main_with(tmp_path=tmp_path, monkeypatch=monkeypatch, argv=["--check-only"])
 
     assert code == 0
     assert not output.exists()
@@ -714,12 +682,11 @@ def test_check_only_writes_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPat
 def test_a_full_run_writes_the_folder_and_refuses_to_run_again(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    module = _load()
 
-    code, output = _main_with(module=module, tmp_path=tmp_path, monkeypatch=monkeypatch, argv=[])
+    code, output = _main_with(tmp_path=tmp_path, monkeypatch=monkeypatch, argv=[])
     assert code == 0
     assert (output / "report.md").exists()
-    second_code = module.main()
+    second_code = lb_solar.main()
 
     assert second_code == 1
 
@@ -727,22 +694,20 @@ def test_a_full_run_writes_the_folder_and_refuses_to_run_again(
 def test_a_full_run_refuses_an_existing_folder_before_scoring(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    module = _load()
     (tmp_path / "solar_leaderboard").mkdir()
 
-    code, _ = _main_with(module=module, tmp_path=tmp_path, monkeypatch=monkeypatch, argv=[])
+    code, _ = _main_with(tmp_path=tmp_path, monkeypatch=monkeypatch, argv=[])
 
     assert code == 1
 
 
 def _score_with_exploratory(*, tmp_path: Path) -> Any:
-    module = _load()
     losses = _losses()
     report_path = tmp_path / "report.md"
     text = _printed_report(losses=losses)
     report_path.write_text(text)
-    row_set = _row_set(module, tmp_path)._replace(exploratory_contrasts=(CAMS_AGAINST_ENS,))
-    return module.score_row_set(
+    row_set = _row_set(tmp_path)._replace(exploratory_contrasts=(CAMS_AGAINST_ENS,))
+    return lb_solar.score_row_set(
         row_set=row_set, losses=losses, report_text=text, report_path=report_path
     )
 
@@ -750,18 +715,17 @@ def _score_with_exploratory(*, tmp_path: Path) -> Any:
 def test_an_exploratory_contrast_is_scored_labelled_and_written_without_a_second_setting(
     tmp_path: Path,
 ) -> None:
-    module = _load()
     result = _score_with_exploratory(tmp_path=tmp_path)
 
-    report = module.render_report(results=[result])
-    intervals = module.intervals_frame(results=[result])
+    report = lb_solar.render_report(results=[result])
+    intervals = lb_solar.intervals_frame(results=[result])
 
     assert result.exploratory["label"].to_list() == ["CAMS against ENS"]
     assert result.exploratory["planned"].to_list() == [False]
     assert result.exploratory["difference"].to_list() == pytest.approx([-0.8])
     assert "#### Exploratory contrasts, first product minus second" in report
     assert any(line.startswith("| CAMS against ENS | -0.800") for line in report.splitlines())
-    rows = intervals.filter(pl.col("section") == module.EXPLORATORY_CONTRAST_SECTION)
+    rows = intervals.filter(pl.col("section") == lb_solar.EXPLORATORY_CONTRAST_SECTION)
     assert rows["planning"].to_list() == ["exploratory"]
     assert rows["setting"].to_list() == ["pooled"]
     assert rows["treatment"].to_list() == ["cams_global"]
@@ -771,32 +735,29 @@ def test_an_exploratory_contrast_is_scored_labelled_and_written_without_a_second
 def test_a_row_set_with_no_exploratory_contrast_writes_no_exploratory_section(
     tmp_path: Path,
 ) -> None:
-    module = _load()
 
     result = _score(tmp_path=tmp_path)
 
-    assert "#### Exploratory contrasts" not in module.render_report(results=[result])
-    assert module.EXPLORATORY_CONTRAST_SECTION not in set(
-        module.intervals_frame(results=[result])["section"].to_list()
+    assert "#### Exploratory contrasts" not in lb_solar.render_report(results=[result])
+    assert lb_solar.EXPLORATORY_CONTRAST_SECTION not in set(
+        lb_solar.intervals_frame(results=[result])["section"].to_list()
     )
 
 
 def test_the_report_prints_one_dash_for_an_absent_second_setting(tmp_path: Path) -> None:
-    module = _load()
     result = _score(tmp_path=tmp_path)
 
-    report = module.render_report(results=[result])
+    report = lb_solar.render_report(results=[result])
 
     assert "| — |" in report
     assert "— —" not in report
 
 
 def test_only_the_extra_rows_hold_the_exploratory_sarah3_minus_cams_contrast() -> None:
-    module = _load()
 
     held = {
         row_set.key: [(c.treatment.arm, c.reference.arm) for c in row_set.exploratory_contrasts]
-        for row_set in module.ROW_SETS
+        for row_set in lb_solar.ROW_SETS
     }
 
     assert held == {
@@ -809,18 +770,16 @@ def test_only_the_extra_rows_hold_the_exploratory_sarah3_minus_cams_contrast() -
 
 
 def test_the_main_leaderboard_holds_the_two_ukv_rebuilds_after_the_products() -> None:
-    module = _load()
 
-    arms = [arm.arm for arm in module.ROW_SETS[0].leaderboard_arms]
+    arms = [arm.arm for arm in lb_solar.ROW_SETS[0].leaderboard_arms]
 
     assert arms[-2:] == ["ukv_trap_global", "ukv_pair_global"]
-    assert not any(arm.reference for arm in module.UKV_REBUILDS)
+    assert not any(arm.reference for arm in lb_solar.UKV_REBUILDS)
 
 
 def test_a_rebuilds_error_is_read_from_the_reports_mae_line() -> None:
-    module = _load()
 
-    printed = module.printed_rebuild_errors(
+    printed = lb_solar.printed_rebuild_errors(
         report_text="text\n\nMAE: ukv_trap_global 8.180, ukv_pair_global 8.125.\n\nmore"
     )
 
@@ -839,11 +798,10 @@ def _report_with_ens_error_on_an_mae_line(*, losses: pl.DataFrame, printed: floa
 
 
 def _score_text(*, tmp_path: Path, losses: pl.DataFrame, text: str) -> Any:
-    module = _load()
     report_path = tmp_path / "report.md"
     report_path.write_text(text)
-    return module.score_row_set(
-        row_set=_row_set(module, tmp_path),
+    return lb_solar.score_row_set(
+        row_set=_row_set(tmp_path),
         losses=losses,
         report_text=text,
         report_path=report_path,
@@ -875,22 +833,20 @@ def test_a_leaderboard_arm_printed_only_on_an_mae_line_is_scored_and_checked(
 
 
 def test_the_five_row_sets_stack_in_the_page_order_and_the_fifth_reads_the_cerra_folder() -> None:
-    module = _load()
 
-    assert [row_set.key for row_set in module.ROW_SETS] == [
+    assert [row_set.key for row_set in lb_solar.ROW_SETS] == [
         "main",
         "extra",
         "ens",
         "station",
         "cerra",
     ]
-    assert module.ROW_SETS[-1].directory.name == "cerra_past_solar"
+    assert lb_solar.ROW_SETS[-1].directory.name == "cerra_past_solar"
 
 
 def test_the_cerra_planned_contrasts_are_the_four_named_before_the_run() -> None:
-    module = _load()
 
-    pairs = {(c.treatment.arm, c.reference.arm) for c in module.CERRA_PLANNED}
+    pairs = {(c.treatment.arm, c.reference.arm) for c in lb_solar.CERRA_PLANNED}
 
     assert pairs == {
         ("cerra_global", "era5_global"),
@@ -898,12 +854,11 @@ def test_the_cerra_planned_contrasts_are_the_four_named_before_the_run() -> None
         ("cerra_global", "era5_3h"),
         ("cerra_split", "cerra_erbs"),
     }
-    assert module.ROW_SETS[-1].planned_contrasts == module.CERRA_PLANNED
+    assert lb_solar.ROW_SETS[-1].planned_contrasts == lb_solar.CERRA_PLANNED
 
 
 def test_the_cerra_leaderboard_holds_every_fitted_arm_and_contrasts_all_but_era5() -> None:
-    module = _load()
-    row_set = module.ROW_SETS[-1]
+    row_set = lb_solar.ROW_SETS[-1]
 
     assert [arm.arm for arm in row_set.leaderboard_arms] == [
         "cerra_global",
@@ -925,6 +880,5 @@ def test_the_cerra_leaderboard_holds_every_fitted_arm_and_contrasts_all_but_era5
 
 
 def test_the_past_solar_leaderboard_writes_to_the_third_write_once_folder() -> None:
-    module = _load()
 
-    assert module.SOLAR_LEADERBOARD_DIR.name == "solar_leaderboard_3"
+    assert lb_solar.SOLAR_LEADERBOARD_DIR.name == "solar_leaderboard_3"

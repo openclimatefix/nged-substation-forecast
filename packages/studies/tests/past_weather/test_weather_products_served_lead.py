@@ -8,23 +8,10 @@ side of the cutover it picks -- gets one of the two rows below wrong, because ho
 lead under a 12-hour and a 6-hour cadence.
 """
 
-import importlib
 from datetime import UTC, datetime
-from types import ModuleType
 
 import polars as pl
-
-"""The repo root, one level above this `tests/` directory."""
-
-"""The study script under test, imported by path because `studies/` is not an importable package."""
-
-
-def _load_script() -> ModuleType:
-    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
-    return importlib.import_module("weather_products")
-
-
-weather_products = _load_script()
+import weather_products
 
 
 def test_ifs_hres_lead_follows_the_cutover_date() -> None:

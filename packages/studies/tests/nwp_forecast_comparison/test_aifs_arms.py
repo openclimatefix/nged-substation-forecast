@@ -1,7 +1,6 @@
 """Tests for the AIFS build, verify and fit scripts under `studies/nwp_forecast_comparison/`.
 
-Each test is written to fail on the defect it names. The scripts are imported by path because
-`studies/` is not an importable package.
+Each test is written to fail on the defect it names.
 """
 
 import hashlib
@@ -17,8 +16,6 @@ import h3.api.basic_int as h3
 import numpy as np
 import polars as pl
 import pytest
-
-"""The `studies/` directory, whose scripts do bare imports of their siblings."""
 
 
 def _load(*, name: str) -> ModuleType:

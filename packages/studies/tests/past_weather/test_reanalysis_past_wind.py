@@ -6,25 +6,16 @@ for: a CERRA row set that is not one main-study hour in three, a block whose arm
 block that runs without its 10 m speed.
 """
 
-import importlib
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from types import ModuleType
 from typing import Any, Final
 
 import polars as pl
 import pytest
+import reanalysis_past_wind as wind
 from studies.wind_product_frames import wind_columns
 
 DAY: Final[datetime] = datetime(2025, 6, 1, tzinfo=UTC)
-
-
-def _load() -> ModuleType:
-    """Import a study script by name, from the study folder pytest puts on `sys.path`."""
-    return importlib.import_module("reanalysis_past_wind")
-
-
-wind = _load()
 
 
 def _hours(*, days: int, step: int = 1, sites: tuple[str, ...] = ("W1", "W2")) -> pl.DataFrame:
