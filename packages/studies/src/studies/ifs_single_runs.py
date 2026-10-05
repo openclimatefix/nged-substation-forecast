@@ -2,7 +2,9 @@
 
 The archive holds one 00 UTC run a day with every hourly lead from 0 to 240 hours. Day `N` of a
 lead-day comparison reads the 00 UTC run issued `N` days before the target hour's own day, at the
-lead the hour falls on, the rule the ENS and GEFS arms of the matched-lead comparison follow.
+lead the hour falls on, the rule the ENS and GEFS arms of the matched-lead comparison follow. A
+forecast that starts later in the day, such as the 03 UTC run of a UKV archive, reads the run of the
+same day at `run_hour`, and its lead is `run_hour` hours shorter.
 
 **A solar hour is labelled by its end, so its own day is the day of the instant an hour earlier.**
 The lead of a solar hour at day `N` is `24 * N + 1` to `24 * N + 24` hours, and the lead of a wind
@@ -40,33 +42,38 @@ def _instant(*, time: pl.Expr, domain: DomainType) -> pl.Expr:
     return time - pl.duration(hours=1) if domain == "solar" else time
 
 
-def served_init_time(*, time: pl.Expr, day: int, domain: DomainType) -> pl.Expr:
-    """Return the start of the 00 UTC run that serves a target hour at a lead day.
+def served_init_time(*, time: pl.Expr, day: int, domain: DomainType, run_hour: int = 0) -> pl.Expr:
+    """Return the start of the run that serves a target hour at a lead day.
 
     Args:
         time: The target hour's label, timezone-aware.
         day: The lead day: the run is issued this many days before the hour's own day, and day 0
             is the run of the hour's own day.
         domain: `solar` or `wind`.
+        run_hour: The UTC hour of day at which the run starts, 0 for a 00 UTC run.
 
     Returns:
-        The run's start, timezone-aware.
+        The run's start, timezone-aware: midnight of the day `day` days before the hour's own
+        day, plus `run_hour` hours.
     """
-    return _instant(time=time, domain=domain).dt.truncate("1d") - pl.duration(days=day)
+    start = _instant(time=time, domain=domain).dt.truncate("1d") - pl.duration(days=day)
+    return start + pl.duration(hours=run_hour)
 
 
-def served_lead_hours(*, time: pl.Expr, day: int, domain: DomainType) -> pl.Expr:
+def served_lead_hours(*, time: pl.Expr, day: int, domain: DomainType, run_hour: int = 0) -> pl.Expr:
     """Return the lead in whole hours at which a target hour reads its serving run.
 
     Args:
         time: The target hour's label, timezone-aware.
         day: The lead day, as in `served_init_time`.
         domain: `solar` or `wind`.
+        run_hour: The UTC hour of day at which the run starts, as in `served_init_time`.
 
     Returns:
-        `24 * day + 1` to `24 * day + 24` for solar, and `24 * day` to `24 * day + 23` for wind.
+        `24 * day + 1 - run_hour` to `24 * day + 24 - run_hour` for solar, and
+        `24 * day - run_hour` to `24 * day + 23 - run_hour` for wind.
     """
-    init = served_init_time(time=time, day=day, domain=domain)
+    init = served_init_time(time=time, day=day, domain=domain, run_hour=run_hour)
     return (time - init).dt.total_hours().cast(pl.Int32)
 
 
