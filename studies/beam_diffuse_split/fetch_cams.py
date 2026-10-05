@@ -39,13 +39,13 @@ from studies.era5_grid import (
     suffixed,
 )
 from studies.pv_dataset import pv_sites
-from studies.sources import CAMS_PRODUCT_DIR
+from studies.sources import CAMS_PRODUCT_DIR, CAMS_SITE_POINTS_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_cams")
 
 CAMS_DIR: Final[Path] = CAMS_PRODUCT_DIR
-OUTPUT_PATH: Final[Path] = suffixed(CAMS_DIR / "beam_diffuse_cams.parquet")
+OUTPUT_PATH: Final[Path] = suffixed(CAMS_SITE_POINTS_DIR / "beam_diffuse_cams.parquet")
 
 ADS_URL: Final[str] = "https://ads.atmosphere.copernicus.eu/api"
 DATASET: Final[str] = "cams-solar-radiation-timeseries"
@@ -240,6 +240,7 @@ def main() -> int:
         .unique(subset=["site", "time"], keep="first")
         .sort("site", "time")
     )
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     cams.write_parquet(OUTPUT_PATH)
     _LOG.info(
         "wrote %d rows covering %s to %s for %d sites",

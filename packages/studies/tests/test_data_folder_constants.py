@@ -26,6 +26,7 @@ from studies.sources import (
     per_study_relative,
     previous_runs_product_dir_for,
     product_dir_for,
+    site_points_dir_for,
     study_dir_for,
 )
 
@@ -33,30 +34,47 @@ from studies import sources
 
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 
-OLD_PRODUCT_FOLDERS: Final[dict[str, str]] = {
-    "ERA5_PRODUCT_DIR": "ERA5",
-    "ERA5_WIND_2019_2023_PRODUCT_DIR": "ERA5-WIND-2019-2023",
-    "CAMS_PRODUCT_DIR": "CAMS",
-    "ENS_PRODUCT_DIR": "ENS",
-    "CERRA_PRODUCT_DIR": "CERRA",
-    "NORA3_PRODUCT_DIR": "NORA3",
-    "NORA3_10M_PRODUCT_DIR": "NORA3_10m",
-    "ICON_DREAM_EU_PRODUCT_DIR": "ICON-DREAM-EU",
-    "MIDAS_OPEN_PRODUCT_DIR": "MIDAS-OPEN",
-    "SARAH_3_PRODUCT_DIR": "SARAH-3",
-    "ECMWF_IFS_HRES_PRODUCT_DIR": "ECMWF-IFS-HRES",
-    "ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR": "ECMWF-IFS-SINGLE-RUNS",
-    "ECMWF_AIFS_PRODUCT_DIR": "ECMWF-AIFS",
-    "ECMWF_AIFS_ENS_PRODUCT_DIR": "ECMWF-AIFS-ENS",
-    "GEFS_WINDOW_DIR": "GEFS_window_2024-11-01_None",
-    "GFS_PRODUCT_DIR": "GFS",
-    "GFS_WINDOW_DIR": "GFS_window_2025-07-01_2025-07-02",
-    "WEATHERNEXT3_PRODUCT_DIR": "WeatherNext3_trial_area",
-    "UKV_CEDA_T120_PRODUCT_DIR": "UKV-CEDA-T120",
-    "OPEN_METEO_ENSEMBLE_MEANS_PRODUCT_DIR": "OPEN-METEO-ENSEMBLE-MEANS",
+PRODUCT_FOLDERS: Final[dict[str, str]] = {
+    "ERA5_PRODUCT_DIR": "downloads/reanalysis/ERA5",
+    "ERA5_WIND_2019_2023_PRODUCT_DIR": "downloads/reanalysis/ERA5-WIND-2019-2023",
+    "CAMS_PRODUCT_DIR": "downloads/reanalysis/CAMS",
+    "ENS_PRODUCT_DIR": "downloads/NWP/ENS_SITE_EXTRACT",
+    "CERRA_PRODUCT_DIR": "downloads/reanalysis/CERRA",
+    "NORA3_PRODUCT_DIR": "downloads/reanalysis/NORA3",
+    "NORA3_10M_PRODUCT_DIR": "downloads/reanalysis/NORA3_10m",
+    "ICON_DREAM_EU_PRODUCT_DIR": "downloads/reanalysis/ICON-DREAM-EU",
+    "MIDAS_OPEN_PRODUCT_DIR": "downloads/observations/MIDAS-OPEN",
+    "SARAH_3_PRODUCT_DIR": "downloads/observations/SARAH-3",
+    "ECMWF_IFS_HRES_PRODUCT_DIR": "downloads/NWP/OPEN-METEO-PREVIOUS-RUNS/ECMWF-IFS-HRES",
+    "ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR": "downloads/NWP/ECMWF-IFS-SINGLE-RUNS",
+    "ECMWF_AIFS_PRODUCT_DIR": "downloads/NWP/ECMWF-AIFS",
+    "ECMWF_AIFS_ENS_PRODUCT_DIR": "downloads/NWP/ECMWF-AIFS-ENS",
+    "GEFS_WINDOW_DIR": "downloads/NWP/windows/GEFS_window_2024-11-01_None",
+    "GFS_PRODUCT_DIR": "downloads/NWP/GFS",
+    "GFS_WINDOW_DIR": "downloads/NWP/windows/GFS_window_2025-07-01_2025-07-02",
+    "WEATHERNEXT3_PRODUCT_DIR": "downloads/NWP/WeatherNext3",
+    "UKV_CEDA_T120_PRODUCT_DIR": "weather/UKV-CEDA-T120",
+    "OPEN_METEO_ENSEMBLE_MEANS_PRODUCT_DIR": "downloads/NWP/OPEN-METEO-ENSEMBLE-MEANS",
 }
-"""Each weather-product constant against the folder name under `data/studies/weather/` that the
-scripts spelled out before the constants existed."""
+"""Each product constant against its folder under `data/studies/`.
+
+The UKV-on-CEDA T120 store has not moved, so its row still names `weather/`.
+"""
+
+PREVIOUS_RUNS_FOLDERS: Final[tuple[str, ...]] = (
+    "AROME-FRANCE",
+    "ARPEGE-EUROPE",
+    "DMI-HARMONIE-AROME",
+    "ECMWF-IFS-025",
+    "ECMWF-IFS-HRES",
+    "GFS-SEAMLESS",
+    "ICON-D2",
+    "ICON-EU",
+    "ICON-GLOBAL",
+    "KNMI-HARMONIE-AROME",
+    "UKV",
+)
+"""The eleven Open-Meteo Previous Runs products, as the folders they were in under `weather/`."""
 
 OLD_STUDY_FOLDERS: Final[dict[str, str]] = {
     "STUDY_DATA_DIR": "beam_diffuse_split",
@@ -67,10 +85,10 @@ OLD_STUDY_FOLDERS: Final[dict[str, str]] = {
     "ICON_EU_COMPARE_DIR": "icon_eu_compare",
     "ERA5_WIND_COMPARE_DIR": "era5_wind_compare",
     "ENS_BACKFILL_PILOT_DIR": "ens_backfill_pilot",
-    "CERRA_WIND_LEVELS_DIR": "cerra_wind_levels",
-    "CERRA_WIND_LEVELS_POST_HOC_DIR": "cerra_wind_levels_post_hoc",
-    "CERRA_WIND_LEVELS_SHEAR_DIR": "cerra_wind_levels_shear",
-    "CERRA_WIND_DIRECTION_DIR": "cerra_wind_direction",
+    "CERRA_WIND_LEVELS_DIR": "per_study/cerra_wind/levels",
+    "CERRA_WIND_LEVELS_POST_HOC_DIR": "per_study/cerra_wind/levels_post_hoc",
+    "CERRA_WIND_LEVELS_SHEAR_DIR": "per_study/cerra_wind/shear",
+    "CERRA_WIND_DIRECTION_DIR": "per_study/cerra_wind/direction",
     "UKV_CEDA_BLENDS_DIR": "ukv_ceda_blends",
     "UKV_CEDA_BLENDS_RUN15_DIR": "ukv_ceda_blends_run15",
     "NFC_DIR": "nwp_forecast_comparison",
@@ -97,14 +115,21 @@ OLD_STUDY_FOLDERS: Final[dict[str, str]] = {
     "NFC_WN3_DIR": "nwp_forecast_comparison_wn3",
     "NFC_WN3_EXTRA_DAYS_DIR": "nwp_forecast_comparison_wn3_extra_days",
 }
-"""Each study-folder constant against its folder name under `data/studies/` before the constants."""
+"""Each study-folder constant against its folder under `data/studies/`."""
 
 HAND_WRITTEN_FOLDER_NAMES: Final[frozenset[str]] = frozenset(
     {
-        *OLD_PRODUCT_FOLDERS.values(),
-        *OLD_STUDY_FOLDERS.values(),
+        *(Path(folder).name for folder in PRODUCT_FOLDERS.values()),
+        *(Path(folder).name for folder in OLD_STUDY_FOLDERS.values()),
+        *PREVIOUS_RUNS_FOLDERS,
+        "downloads",
+        "reanalysis",
+        "observations",
+        "windows",
+        "site_points",
+        "per_study",
         "weather",
-        "anm",
+        "NGED-ANM",
         "_trial_area_box.json",
     }
 )
@@ -117,32 +142,82 @@ SCANNED_FOLDERS: Final[tuple[Path, ...]] = (
 FROZEN_FOLDER: Final[str] = "era_fold_design"
 
 
-@pytest.mark.parametrize(("constant", "folder"), OLD_PRODUCT_FOLDERS.items())
-def test_each_product_constant_is_the_path_the_scripts_spelled_out_before(
-    constant: str, folder: str
-):
-    assert getattr(sources, constant) == REPO_DATA_DIR / "studies" / "weather" / folder
-
-
-@pytest.mark.parametrize(("constant", "folder"), OLD_STUDY_FOLDERS.items())
-def test_each_study_constant_is_the_path_the_scripts_spelled_out_before(constant: str, folder: str):
+@pytest.mark.parametrize(("constant", "folder"), PRODUCT_FOLDERS.items())
+def test_each_product_constant_is_the_folder_the_data_was_moved_to(constant: str, folder: str):
     assert getattr(sources, constant) == REPO_DATA_DIR / "studies" / folder
 
 
-def test_the_remaining_constants_are_the_paths_the_scripts_spelled_out_before():
+@pytest.mark.parametrize("model", PREVIOUS_RUNS_FOLDERS)
+def test_each_previous_runs_product_has_a_folder_of_its_own_under_the_previous_runs_folder(
+    model: str,
+):
+    expected = DOWNLOADS_DIR / "NWP" / "OPEN-METEO-PREVIOUS-RUNS" / model
+
+    assert product_dir_for(product=model) == expected
+    assert previous_runs_product_dir_for(product=model) == expected
+    assert site_points_dir_for(product=model) == expected / "site_points"
+
+
+@pytest.mark.parametrize(("constant", "folder"), OLD_STUDY_FOLDERS.items())
+def test_each_study_constant_is_the_folder_the_study_has_now(constant: str, folder: str):
+    assert getattr(sources, constant) == REPO_DATA_DIR / "studies" / folder
+
+
+def test_the_remaining_constants_are_the_paths_the_data_was_moved_to():
     assert STUDIES_DATA_DIR == REPO_DATA_DIR / "studies"
-    assert sources.WEATHER_DATA_DIR == REPO_DATA_DIR / "studies" / "weather"
-    assert sources.ANM_DATA_DIR == REPO_DATA_DIR / "studies" / "anm"
-    assert SCRATCH_DIR == REPO_DATA_DIR / "_scratch"
-    assert TRIAL_AREA_BOX_PATH == REPO_DATA_DIR / "studies" / "weather" / "_trial_area_box.json"
-    assert sources.point_output_path_for(source="ukv") == (
-        REPO_DATA_DIR / "studies" / "weather" / "UKV" / "beam_diffuse_ukv.parquet"
+    assert DOWNLOADS_DIR == STUDIES_DATA_DIR / "downloads"
+    assert PER_STUDY_DIR == STUDIES_DATA_DIR
+    assert sources.WEATHER_DATA_DIR == STUDIES_DATA_DIR / "weather"
+    assert sources.ANM_DATA_DIR == DOWNLOADS_DIR / "observations" / "NGED-ANM"
+    assert SCRATCH_DIR == STUDIES_DATA_DIR / "_scratch"
+    assert TRIAL_AREA_BOX_PATH == STUDIES_DATA_DIR / "weather" / "_trial_area_box.json"
+
+
+def test_the_per_site_frames_of_a_product_sit_in_its_site_points_folder():
+    ukv = DOWNLOADS_DIR / "NWP" / "OPEN-METEO-PREVIOUS-RUNS" / "UKV" / "site_points"
+
+    assert sources.point_output_path_for(source="ukv") == ukv / "beam_diffuse_ukv.parquet"
+    assert sources.temperature_site_b_path_for(source="icon-d2") == (
+        DOWNLOADS_DIR
+        / "NWP"
+        / "OPEN-METEO-PREVIOUS-RUNS"
+        / "ICON-D2"
+        / "site_points"
+        / "temperature_2m_site_b.parquet"
+    )
+    assert sources.point_output_path_for(source="sarah-3") == (
+        DOWNLOADS_DIR / "observations" / "SARAH-3" / "site_points" / "beam_diffuse_sarah-3.parquet"
+    )
+    assert sources.ERA5_SITE_POINTS_DIR == sources.ERA5_PRODUCT_DIR / "site_points"
+    assert sources.CAMS_SITE_POINTS_DIR == sources.CAMS_PRODUCT_DIR / "site_points"
+    assert sources.ENS_SITE_POINTS_DIR == sources.ENS_PRODUCT_DIR / "site_points"
+
+
+def test_a_window_of_dates_is_filed_under_the_windows_folder():
+    name = "GEFS_window_2099-01-01_2099-01-02"
+
+    assert product_dir_for(product=name) == DOWNLOADS_DIR / "NWP" / "windows" / name
+
+
+def test_an_unknown_product_name_raises_rather_than_naming_a_stray_folder():
+    with pytest.raises(ValueError, match="unknown product"):
+        product_dir_for(product="ICON-D3")
+    with pytest.raises(ValueError, match="not an Open-Meteo Previous Runs product"):
+        previous_runs_product_dir_for(product="ERA5")
+
+
+def test_every_product_the_scripts_name_is_filed_under_downloads_except_the_ukv_ceda_stores():
+    names = (
+        *sources.PREVIOUS_RUNS_PRODUCTS,
+        *sources.NWP_PRODUCT_NAMES,
+        *sources.REANALYSIS_PRODUCT_NAMES,
+        *sources.OBSERVATION_PRODUCT_NAMES,
+        "ENS",
+        "WeatherNext3_trial_area",
     )
 
-
-def test_the_two_new_layers_equal_the_studies_folder_until_the_data_moves():
-    assert DOWNLOADS_DIR == STUDIES_DATA_DIR
-    assert PER_STUDY_DIR == STUDIES_DATA_DIR
+    assert all(DOWNLOADS_DIR in product_dir_for(product=name).parents for name in names)
+    assert product_dir_for(product="UKV-CEDA-T120").parent == sources.WEATHER_DATA_DIR
 
 
 def test_the_batch_folders_are_the_twenty_two_siblings_of_the_original_batch():
@@ -165,7 +240,7 @@ def test_every_batch_constant_is_listed_among_the_batch_folders():
 
 
 def test_the_name_helpers_join_one_folder_name_onto_their_layer():
-    assert product_dir_for(product="ICON-D2") == sources.WEATHER_DATA_DIR / "ICON-D2"
+    assert product_dir_for(product="ICON-D2") == sources.PREVIOUS_RUNS_DIR / "ICON-D2"
     assert previous_runs_product_dir_for(product="ICON-D2") == product_dir_for(product="ICON-D2")
     assert study_dir_for(study="x") == PER_STUDY_DIR / "x"
     assert per_study_relative(folder=study_dir_for(study="x")) == Path("x")
@@ -184,11 +259,11 @@ def test_the_stamp_glob_reads_every_batch_folder_and_nothing_else(tmp_path: Path
 
 
 @pytest.mark.skipif(
-    not (STUDIES_DATA_DIR / "weather").exists(),
+    not STUDIES_DATA_DIR.exists(),
     reason="the private study data is not in this checkout",
 )
 def test_every_folder_constant_names_a_folder_that_exists_on_disk():
-    constants = {**OLD_PRODUCT_FOLDERS, **OLD_STUDY_FOLDERS}
+    constants = {**PRODUCT_FOLDERS, **OLD_STUDY_FOLDERS}
     missing = [name for name in constants if not getattr(sources, name).exists()]
 
     assert missing == []

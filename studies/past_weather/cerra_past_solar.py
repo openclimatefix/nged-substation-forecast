@@ -1,16 +1,16 @@
 """Score the Copernicus regional reanalysis CERRA in the past-solar weather-products study.
 
-One-off throwaway script for <https://github.com/openclimatefix/nged-substation-forecast/issues/938>,
-extending `weather_products.py`'s comparison with CERRA, a 5.5 km regional reanalysis of Europe. The
-plan was committed before the first fit, and stays in the git history after `plans/` is emptied at
-merge.
+One-off throwaway script for
+<https://github.com/openclimatefix/nged-substation-forecast/issues/938>, extending
+`weather_products.py`'s comparison with CERRA, a 5.5 km regional reanalysis of Europe. The plan was
+committed before the first fit, and stays in the git history after `plans/` is emptied at merge.
 
-**Data.** `data/studies/weather/CERRA/`: two parquet files of 3-hour accumulations in J m⁻², at the
-190 grid cells around the generators. `surface_solar_radiation_downwards` is global horizontal
-irradiance, and `time_integrated_surface_direct_short_wave_radiation_flux` is the direct beam on a
-horizontal surface. CERRA has no analysis product for either field, so each value is the energy over
-the 3 hours ending at its label (00, 03, ..., 21 UTC), one to three hours into a short forecast from
-the preceding 3-hourly analysis. Dividing by 10,800 s gives the mean flux in W m⁻².
+**Data.** `data/studies/downloads/reanalysis/CERRA/`: two parquet files of 3-hour accumulations in J
+m⁻², at the 190 grid cells around the generators. `surface_solar_radiation_downwards` is global
+horizontal irradiance, and `time_integrated_surface_direct_short_wave_radiation_flux` is the direct
+beam on a horizontal surface. CERRA has no analysis product for either field, so each value is the
+energy over the 3 hours ending at its label (00, 03, ..., 21 UTC), one to three hours into a short
+forecast from the preceding 3-hourly analysis. Dividing by 10,800 s gives the mean flux in W m⁻².
 
 **No hourly values, so hourly means are rebuilt.** `windows_from_accumulation` turns the
 accumulations into window means, and `rebuild_hourly_from_windows` rebuilds the mean over each hour

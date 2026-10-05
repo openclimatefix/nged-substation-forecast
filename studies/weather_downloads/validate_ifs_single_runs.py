@@ -2,8 +2,8 @@
 
 One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/810>. It reads
-`data/studies/weather/ECMWF-IFS-SINGLE-RUNS/ECMWF-IFS-SINGLE-RUNS.parquet` and runs the checks in
-`CHECK_NAMES`: run spacing (every run day missing from the first day the archive serves listed,
+`data/studies/downloads/NWP/ECMWF-IFS-SINGLE-RUNS/ECMWF-IFS-SINGLE-RUNS.parquet` and runs the checks
+in `CHECK_NAMES`: run spacing (every run day missing from the first day the archive serves listed,
 and any gap in neither ledger a failure), 241 leads per run per site, all seven variables, nulls
 only in radiation at lead 0, physical ranges (radiation may equal exactly -1.0 W/m^2, counted and
 reported), a diurnal check on radiation, and nine site labels in every month file.

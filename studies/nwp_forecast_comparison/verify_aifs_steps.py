@@ -68,7 +68,7 @@ from build_forecast_inputs import (
 )
 from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import nearest_era5_cell, pv_sites, read_era5
-from studies.sources import ECMWF_AIFS_PRODUCT_DIR, ERA5_PRODUCT_DIR
+from studies.sources import ECMWF_AIFS_PRODUCT_DIR, ERA5_SITE_POINTS_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -122,7 +122,7 @@ def era5_column(*, domain: DomainType, sites: list[str]) -> pl.DataFrame:
     """
     if domain == "wind":
         return (
-            pl.read_parquet(ERA5_PRODUCT_DIR / "wind_era5.parquet")
+            pl.read_parquet(ERA5_SITE_POINTS_DIR / "wind_era5.parquet")
             .filter(pl.col("site").is_in(sites))
             .select("site", "time", era5=pl.col("wind_speed_100m") / KM_PER_HOUR_PER_M_PER_S)
             .drop_nulls()

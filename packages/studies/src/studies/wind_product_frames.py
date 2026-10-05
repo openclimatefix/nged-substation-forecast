@@ -21,7 +21,7 @@ from studies.neighbouring_hours import with_neighbouring_hours
 from studies.power import hourly_from_half_hourly
 from studies.pv_dataset import POWER_DELTA_URI
 from studies.solar_product_frames import UPGRADE_DAY
-from studies.sources import HISTORICAL_FORECAST_URL, product_dir_for
+from studies.sources import HISTORICAL_FORECAST_URL, site_points_dir_for
 
 ARCHIVE_URL: Final[str] = "https://archive-api.open-meteo.com/v1/archive"
 """Open-Meteo's reanalysis endpoint, which serves ERA5 with the same query shape."""
@@ -47,7 +47,7 @@ def output_path_for(*, product: str) -> Path:
         The parquet path.
     """
     return suffixed(
-        product_dir_for(product=product.upper().replace("_", "-")) / f"wind_{product}.parquet"
+        site_points_dir_for(product=product.upper().replace("_", "-")) / f"wind_{product}.parquet"
     )
 
 

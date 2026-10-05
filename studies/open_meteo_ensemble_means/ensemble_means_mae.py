@@ -60,8 +60,8 @@ between them measures the pipeline.
 against the reference (CAMS irradiance in W/m2, ERA5 wind speed in km/h) on the same rows.
 
 **Data.** The four Open-Meteo means are under
-`data/studies/weather/OPEN-METEO-ENSEMBLE-MEANS/`. CAMS and ERA5 come from the original downloads,
-which end on 2026-09-10 and 2026-09-11, extended by the refreshed downloads that start on
+`data/studies/downloads/NWP/OPEN-METEO-ENSEMBLE-MEANS/`. CAMS and ERA5 come from the original
+downloads, which end on 2026-09-10 and 2026-09-11, extended by the refreshed downloads that start on
 2026-08-20. Where the two overlap the refreshed download is used, and the report counts the overlap
 rows on which the values differ. Only anonymised site labels (`A` to `F`, `W1` to `W3`) reach any
 output; the site roster's coordinates and identifiers stay inside `build_dataset`.
@@ -103,9 +103,9 @@ from studies.pv_dataset import (
 )
 from studies.pv_dataset import solar_hourly_power as _solar_hourly_power
 from studies.sources import (
-    CAMS_PRODUCT_DIR,
-    ENS_PRODUCT_DIR,
-    ERA5_PRODUCT_DIR,
+    CAMS_SITE_POINTS_DIR,
+    ENS_SITE_POINTS_DIR,
+    ERA5_SITE_POINTS_DIR,
     OPEN_METEO_ENSEMBLE_MEANS_DIR,
     OPEN_METEO_ENSEMBLE_MEANS_PRODUCT_DIR,
 )
@@ -192,18 +192,18 @@ LOCAL_ENS_RUN_LOOKBACK_DAYS: Final[int] = 3
 
 MS_TO_KM_PER_H: Final[float] = 3.6
 
-ENS_DIR: Final[Path] = ENS_PRODUCT_DIR
+ENS_DIR: Final[Path] = ENS_SITE_POINTS_DIR
 CAMS_PATHS: Final[tuple[Path, ...]] = (
-    CAMS_PRODUCT_DIR / "beam_diffuse_cams.parquet",
-    CAMS_PRODUCT_DIR / "beam_diffuse_cams_2026-08-20_2026-09-21.parquet",
+    CAMS_SITE_POINTS_DIR / "beam_diffuse_cams.parquet",
+    CAMS_SITE_POINTS_DIR / "beam_diffuse_cams_2026-08-20_2026-09-21.parquet",
 )
 ERA5_GRID_PATHS: Final[tuple[Path, ...]] = (
-    ERA5_PRODUCT_DIR / "beam_diffuse_open_meteo.parquet",
-    ERA5_PRODUCT_DIR / "beam_diffuse_open_meteo_2026-08-20_2026-09-21.parquet",
+    ERA5_SITE_POINTS_DIR / "beam_diffuse_open_meteo.parquet",
+    ERA5_SITE_POINTS_DIR / "beam_diffuse_open_meteo_2026-08-20_2026-09-21.parquet",
 )
 ERA5_WIND_PATHS: Final[tuple[Path, ...]] = (
-    ERA5_PRODUCT_DIR / "wind_era5.parquet",
-    ERA5_PRODUCT_DIR / "wind_era5_2026-08-20_2026-09-21.parquet",
+    ERA5_SITE_POINTS_DIR / "wind_era5.parquet",
+    ERA5_SITE_POINTS_DIR / "wind_era5_2026-08-20_2026-09-21.parquet",
 )
 """Each pair is the original download, then the refreshed one, which wins where they overlap."""
 
@@ -289,7 +289,7 @@ def _local_ens_members(*, path: Path, value_columns: Sequence[str]) -> pl.DataFr
     """Read this repository's ENS member table over the lead bands that chain in 3-hour steps.
 
     Args:
-        path: The member parquet under `data/studies/weather/ENS/`.
+        path: The member parquet under `data/studies/downloads/NWP/ENS_SITE_EXTRACT/`.
         value_columns: The columns to keep beside the keys.
 
     Returns:

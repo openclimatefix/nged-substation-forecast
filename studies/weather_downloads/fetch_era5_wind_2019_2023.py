@@ -2,8 +2,9 @@
 
 One-off throwaway script for the downloads in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>. It extends the 2024 to
-2026 wind in `data/studies/weather/ERA5/wind_native_cds.parquet` (made by `fetch_era5_wind.py`) back
-to the start of the metered generators' history, from the same product by the same route.
+2026 wind in `data/studies/downloads/reanalysis/ERA5/wind_native_cds.parquet` (made by
+`fetch_era5_wind.py`) back to the start of the metered generators' history, from the same product by
+the same route.
 
 **Three groups of cells are kept.** The trial-area box (every 0.25 degree cell inside it), a 3 x 3
 block of cells around each MIDAS Open station that reports wind speed, and a 3 x 3 block around each

@@ -55,12 +55,12 @@ from studies.cross_validation import (
     assign_folds,
     booster_parameters,
 )
-from studies.sources import ENS_PRODUCT_DIR, STUDY_DATA_DIR
+from studies.sources import ENS_SITE_POINTS_DIR, STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-ENS_PATH: Final[Path] = ENS_PRODUCT_DIR / "beam_diffuse_ens.parquet"
+ENS_PATH: Final[Path] = ENS_SITE_POINTS_DIR / "beam_diffuse_ens.parquet"
 """Where `fetch_ens_point.py` wrote the per-meter, per-member, per-horizon frame."""
 
 OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "beam_diffuse_ens_horizons"

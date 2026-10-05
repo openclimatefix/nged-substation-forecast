@@ -38,13 +38,13 @@ import numpy as np
 import polars as pl
 from lineage import write_lineage_note
 from scipy.optimize import nnls
-from studies.sources import ERA5_PRODUCT_DIR, ERA5_WIND_COMPARE_DIR
+from studies.sources import ERA5_PRODUCT_DIR, ERA5_SITE_POINTS_DIR, ERA5_WIND_COMPARE_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("compare_era5_wind_openmeteo_cds")
 
 ERA5_DIR: Final[Path] = ERA5_PRODUCT_DIR
-OPEN_METEO_PATH: Final[Path] = ERA5_DIR / "wind_era5.parquet"
+OPEN_METEO_PATH: Final[Path] = ERA5_SITE_POINTS_DIR / "wind_era5.parquet"
 NATIVE_PATH: Final[Path] = ERA5_DIR / "wind_native_cds.parquet"
 OUTPUT_DIR: Final[Path] = ERA5_WIND_COMPARE_DIR
 METRES_PER_SECOND_TO_KM_PER_HOUR: Final[float] = 3.6

@@ -5,18 +5,19 @@ The plan is `plans/study-994-cerra-wind-direction.md` and was committed before t
 `cerra_wind_levels.py` (issue 957) is the prerequisite study: this script reuses its row set, folds,
 seeds, bootstrap and gates, and adds the direction columns it lacked.
 
-**Data.** `data/studies/weather/CERRA/`: CERRA's wind speed and wind direction at 10, 50, 75, 100,
-and 150 m, at the 190 grid cells around the trial area, every 3 hours from 2019-09-01 to 2026-06-30.
-Direction is in degrees clockwise from north, the direction the wind blows from. The files' circular
-mean at 100 m is about 227 degrees, the south-westerly of the UK's prevailing wind, which confirms
-that convention. An arm gets a direction as its sine and cosine, which is the same under either
-convention. `studies.wind_direction` holds the encoding, the veer and the month shuffle.
+**Data.** `data/studies/downloads/reanalysis/CERRA/`: CERRA's wind speed and wind direction at 10,
+50, 75, 100, and 150 m, at the 190 grid cells around the trial area, every 3 hours from 2019-09-01
+to 2026-06-30. Direction is in degrees clockwise from north, the direction the wind blows from. The
+files' circular mean at 100 m is about 227 degrees, the south-westerly of the UK's prevailing wind,
+which confirms that convention. An arm gets a direction as its sine and cosine, which is the same
+under either convention. `studies.wind_direction` holds the encoding, the veer and the month
+shuffle.
 
 **Row set.** Exactly `cerra_wind_levels.py`'s: every 3-hourly wind-farm hour with a centred power
 hour, minus every hour holding an exactly-zero half-hour. The rule reads the target only, so every
 arm scores the same rows. The run stops unless the row set's (farm, time) keys equal the saved keys
-of `data/studies/cerra_wind_levels/rows.parquet`, which also settles that the power-hour offset and
-the zero rule are inherited from that study.
+of `data/studies/per_study/cerra_wind/levels/rows.parquet`, which also settles that the power-hour
+offset and the zero rule are inherited from that study.
 
 **Arms.** Every arm carries `hour_of_day`, `day_of_year`, and wind columns, with column subsampling
 off. Arms sit in two families, and every arm of a family has the same number of columns, so no

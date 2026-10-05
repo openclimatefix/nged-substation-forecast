@@ -1,9 +1,10 @@
 """Validate the 2019 to 2023 ERA5 wind parquet that `fetch_era5_wind_2019_2023.py` wrote.
 
 One-off throwaway script for <https://github.com/openclimatefix/nged-substation-forecast/issues/841>,
-following the `data-validation` skill. It reads `data/studies/weather/ERA5-WIND-2019-2023/` and
-runs the checks in `main`: columns and dtypes, exact row count (cells x 37,992 hours), duplicate
-keys, nulls and NaNs, a contiguous hourly axis, speed range, the hour-of-day profile, stuck runs,
+following the `data-validation` skill. It reads
+`data/studies/downloads/reanalysis/ERA5-WIND-2019-2023/` and runs the checks in `main`: columns and
+dtypes, exact row count (cells x 37,992 hours), duplicate keys, nulls and NaNs, a contiguous
+hourly axis, speed range, the hour-of-day profile, stuck runs,
 level steps between months, 100 m against 10 m speed, the offsets of the cell blocks, the
 correlation with the MIDAS Open station observations at lags of -2 to +2 hours, the step across
 2023-12-31 to 2024-01-01 against the on-disk 2024 file, and bit-equality of the re-fetched 2024-01
