@@ -217,13 +217,12 @@ quantile pipeline:
   gated on the two items above, since degrading earlier would emit output no scenario has tested
 
 **Automated experimentation ("auto-research")**: once the leaderboard (v0.3) is stable, we plan to
-have an LLM agent run the XGBoost backlog as a search, implementing each idea several times, scoring
-each implementation from outside the agent's session, and combining the ideas that help. This may
-have to wait until v2, and is gated on
-[#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958) landing first, because
-an autonomous session is only trustworthy once it cannot edit or bypass the scorer it is judged
-against. The published evidence and the proposed design are in
-[Automated experimentation](auto-research.md).
+have an LLM agent run the XGBoost backlog as a search. This may have to wait until v2, and is gated
+on [#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958) landing first,
+because an autonomous session is only trustworthy once it cannot edit or bypass the scorer it is
+judged against. The published evidence, and a proposed design in which each idea is implemented
+several times and scored from outside the agent's session, are in [Automated
+experimentation](auto-research.md).
 
 ---
 
