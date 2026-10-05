@@ -112,8 +112,9 @@ before the build and before every fit, and start only below a load average of ab
 - **`intervals.parquet` rows.** Beside the planned and exploratory rows, `scope` can be
   `Bonferroni` (P1 at `level` 99.375), `control gap` (`contrast` `control_gap`),
   `E6 most influential month dropped`, `generator error <site>: <arm>` (contrast `generator_error`,
-  the arm's mean absolute error at one generator, with no interval), `post hoc stale` (contrasts `stale_p1`, `stale_p2`,
-  `stale_p2b`, `stale_vs_fresh`, `fresh_p1_same_rows`, and `training_rows`), and the `error`
+  the arm's mean absolute error at one generator, with no interval), `post hoc stale` (contrasts
+  `stale_p1`, `stale_p2`, `stale_p2b`, `stale_vs_fresh`, `fresh_p1_same_rows`, and
+  `training_rows`), and the `error`
   contrast, whose `difference` is an arm's own mean absolute error and whose `scope` is the arm.
   The charts read every figure number from these rows.
 
