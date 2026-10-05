@@ -8,11 +8,13 @@ because humans review that code and the study code is fast-moving and agent-writ
 **What the tests check, over every script under `studies/` except those in `era_fold_design`:**
 
 - no import of a module that lives in a different `studies/` folder;
-- no use of `sys.path` and no `site.addsitedir`;
-- no use of `importlib.util.spec_from_file_location`;
+- no use of `sys.path`, `site.addsitedir`, `spec_from_file_location`, `SourceFileLoader`,
+  `importlib.import_module`, `__import__`, or `runpy`, however the name is imported or aliased;
+- no Python file directly under `studies/`, because no check would scan it;
 - no basename shared by two scripts, because every study folder is on pytest's path;
 - no module under `packages/studies/src` that imports the basename of a script;
-- no import of `studies` or of a script from `src/` or from a package other than `packages/studies`.
+- no import of `studies` or of a script from `src/`, the root `tests/` and `scripts/` folders, or a
+  package other than `packages/studies`.
 
 The rules are documented in `CLAUDE.md` (Architecture, "Import rules"), in `studies/README.md`, and
 in `.claude/skills/study/SKILL.md` ("Where a study's pieces live").
@@ -28,9 +30,9 @@ FROZEN_FOLDER: Final[str] = "era_fold_design"
 
 
 def _scripts_by_folder(*, studies_dir: Path) -> dict[str, list[Path]]:
-    """Return each study folder's scripts, skipping the frozen folder."""
+    """Return each study folder's scripts, nested folders included, skipping the frozen folder."""
     return {
-        folder.name: sorted(folder.glob("*.py"))
+        folder.name: sorted(folder.rglob("*.py"))
         for folder in sorted(studies_dir.iterdir())
         if folder.is_dir() and folder.name != FROZEN_FOLDER
     }
@@ -48,20 +50,66 @@ def _imported_modules(*, source_path: Path) -> set[str]:
     return modules
 
 
+FORBIDDEN_LEAF_NAMES: Final[frozenset[str]] = frozenset(
+    {
+        "spec_from_file_location",
+        "SourceFileLoader",
+        "addsitedir",
+        "run_path",
+        "run_module",
+        "import_module",
+        "__import__",
+    }
+)
+"""Functions that load a script by path or by a computed name, wherever they are imported from."""
+
+
+def _dotted_name(*, node: ast.expr) -> list[str] | None:
+    """Return `["a", "b", "c"]` for the expression `a.b.c`, or None for any other expression."""
+    parts: list[str] = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if not isinstance(node, ast.Name):
+        return None
+    return [node.id, *reversed(parts)]
+
+
 def _path_mutations(*, source_path: Path) -> list[str]:
-    """Return each use of `sys.path`, `site.addsitedir`, or `spec_from_file_location`."""
+    """Return each use of `sys.path` or of a function that loads a script by path or by name.
+
+    A module imported under another name (`import sys as s`) is resolved back to its real name,
+    and a function imported by name (`from importlib.util import spec_from_file_location`) is
+    reported at its import.
+    """
+    tree = ast.parse(source_path.read_text())
+    real_module = {
+        (alias.asname or alias.name.split(".")[0]): alias.name
+        if alias.asname
+        else alias.name.split(".")[0]
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    }
     found: list[str] = []
-    for node in ast.walk(ast.parse(source_path.read_text())):
-        if not isinstance(node, ast.Attribute):
-            continue
-        owner = node.value
-        if isinstance(owner, ast.Name) and (owner.id, node.attr) in {
-            ("sys", "path"),
-            ("site", "addsitedir"),
-        }:
-            found.append(f"{owner.id}.{node.attr}")
-        if node.attr == "spec_from_file_location":
-            found.append("spec_from_file_location")
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.level == 0:
+            for alias in node.names:
+                if node.module == "sys" and alias.name == "path":
+                    found.append("sys.path")
+                elif alias.name in FORBIDDEN_LEAF_NAMES:
+                    found.append(alias.name)
+        elif isinstance(node, ast.Attribute):
+            parts = _dotted_name(node=node)
+            if parts is not None and [real_module.get(parts[0], parts[0]), *parts[1:]] == [
+                "sys",
+                "path",
+            ]:
+                found.append("sys.path")
+            elif node.attr in FORBIDDEN_LEAF_NAMES:
+                found.append(node.attr)
+        elif isinstance(node, ast.Name) and node.id == "__import__":
+            found.append("__import__")
     return found
 
 
@@ -78,18 +126,23 @@ def crossing_imports(*, studies_dir: Path) -> dict[str, list[str]]:
                 if module in folder_of and folder_of[module] != folder
             )
             if foreign:
-                crossings[f"{folder}/{path.name}"] = foreign
+                crossings[path.relative_to(studies_dir).as_posix()] = foreign
     return crossings
 
 
 def path_mutations(*, studies_dir: Path) -> dict[str, list[str]]:
     """Return, for each script, its uses of `sys.path`, `site.addsitedir` and path loaders."""
     return {
-        f"{folder}/{path.name}": found
+        path.relative_to(studies_dir).as_posix(): found
         for folder, paths in _scripts_by_folder(studies_dir=studies_dir).items()
         for path in paths
         if (found := _path_mutations(source_path=path))
     }
+
+
+def loose_scripts(*, studies_dir: Path) -> list[str]:
+    """Return the Python files that sit directly under `studies/`, which no folder check scans."""
+    return sorted(path.name for path in studies_dir.glob("*.py"))
 
 
 def shared_basenames(*, studies_dir: Path) -> dict[str, list[str]]:
@@ -123,7 +176,7 @@ def production_imports_of_studies(*, repo_root: Path) -> dict[str, list[str]]:
         for path in paths
     }
     packages = repo_root / "packages"
-    roots = [repo_root / "src"] + [
+    roots = [repo_root / "src", repo_root / "tests", repo_root / "scripts"] + [
         package for package in sorted(packages.iterdir()) if package.name != "studies"
     ]
     files = [path for root in roots if root.is_dir() for path in root.rglob("*.py")]
@@ -148,6 +201,10 @@ def test_no_study_script_imports_a_script_of_another_folder():
 
 def test_no_study_script_touches_sys_path_or_loads_a_script_by_path():
     assert path_mutations(studies_dir=REPO_ROOT / "studies") == {}
+
+
+def test_no_python_file_sits_directly_under_studies():
+    assert loose_scripts(studies_dir=REPO_ROOT / "studies") == []
 
 
 def test_no_two_study_scripts_share_a_basename():
@@ -199,16 +256,57 @@ def test_every_form_of_path_mutation_and_path_loading_is_found(tmp_path: Path):
             "alpha/d.py": "import importlib.util as u\nu.spec_from_file_location('a', 'b')\n",
             "alpha/f.py": "import importlib\nimportlib.util.spec_from_file_location('a', 'b')\n",
             "alpha/e.py": "import sys\nprint(len(sys.argv))\n",
+            "alpha/g.py": "from importlib.util import spec_from_file_location\n",
+            "alpha/h.py": "from sys import path\n",
+            "alpha/i.py": "import sys as s\ns.path.insert(0, '.')\n",
+            "alpha/j.py": "from site import addsitedir\n",
+            "alpha/k.py": "import importlib\nimportlib.import_module('weather_products')\n",
+            "alpha/l.py": "__import__('weather_products')\n",
+            "alpha/m.py": "import runpy\nrunpy.run_path('x.py')\n",
+            "alpha/n.py": "import importlib.machinery as m\nm.SourceFileLoader('a', 'b')\n",
+            "alpha/o.py": "from importlib import import_module\n",
+            "alpha/p.py": "from runpy import run_path\n",
         },
     )
 
     assert path_mutations(studies_dir=tmp_path) == {
         "alpha/a.py": ["sys.path"],
         "alpha/b.py": ["sys.path"],
-        "alpha/c.py": ["site.addsitedir"],
+        "alpha/c.py": ["addsitedir"],
         "alpha/d.py": ["spec_from_file_location"],
         "alpha/f.py": ["spec_from_file_location"],
+        "alpha/g.py": ["spec_from_file_location"],
+        "alpha/h.py": ["sys.path"],
+        "alpha/i.py": ["sys.path"],
+        "alpha/j.py": ["addsitedir"],
+        "alpha/k.py": ["import_module"],
+        "alpha/l.py": ["__import__"],
+        "alpha/m.py": ["run_path"],
+        "alpha/n.py": ["SourceFileLoader"],
+        "alpha/o.py": ["import_module"],
+        "alpha/p.py": ["run_path"],
     }
+
+
+def test_a_script_in_a_nested_folder_is_scanned_by_every_check(tmp_path: Path):
+    _write(
+        root=tmp_path,
+        files={
+            "alpha/deep/down/one.py": "import two\nimport sys\nsys.path.append('.')\n",
+            "beta/two.py": "",
+            "beta/sub/two.py": "",
+        },
+    )
+
+    assert crossing_imports(studies_dir=tmp_path) == {"alpha/deep/down/one.py": ["two"]}
+    assert path_mutations(studies_dir=tmp_path) == {"alpha/deep/down/one.py": ["sys.path"]}
+    assert shared_basenames(studies_dir=tmp_path) == {"two": ["beta", "beta"]}
+
+
+def test_a_python_file_directly_under_studies_is_reported(tmp_path: Path):
+    _write(root=tmp_path, files={"loose.py": "", "alpha/one.py": ""})
+
+    assert loose_scripts(studies_dir=tmp_path) == ["loose.py"]
 
 
 def test_a_basename_in_two_folders_is_reported_with_both_folders(tmp_path: Path):
@@ -248,10 +346,14 @@ def test_production_code_importing_studies_or_a_script_is_reported(tmp_path: Pat
         },
     )
     _write(root=tmp_path / "src", files={"app/c.py": "from studies.sources import X\nimport os\n"})
+    _write(root=tmp_path / "tests", files={"test_x.py": "import studies\n"})
+    _write(root=tmp_path / "scripts", files={"lint/y.py": "import one\n"})
 
     assert production_imports_of_studies(repo_root=tmp_path) == {
         "packages/other/src/other/a.py": ["studies"],
         "packages/other/src/other/b.py": ["one"],
         "packages/other/src/other/c.py": ["studies"],
+        "scripts/lint/y.py": ["one"],
         "src/app/c.py": ["studies"],
+        "tests/test_x.py": ["studies"],
     }
