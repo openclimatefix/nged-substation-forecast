@@ -43,9 +43,13 @@ Run it with `uv run python studies/nwp_forecast_comparison/build_wn3_inputs.py -
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Final
+
+# The Rust core of Icechunk reads this variable when it is imported, so it must be set first.
+os.environ.setdefault("ICECHUNK_LOG", "error")
 
 import ens_forecast_horizons as efh
 import icechunk
@@ -66,8 +70,6 @@ from studies.guards import refuse_to_overwrite
 from studies.resample import interpolate_linear, wind_components
 
 from studies import ens_members as ens_member_columns
-
-# `fetch_weathernext3` sets `ICECHUNK_LOG` before `icechunk` is imported below it.
 from studies import wn3_fetch as fetch
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
