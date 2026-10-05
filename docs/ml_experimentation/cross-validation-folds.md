@@ -82,10 +82,11 @@ The fold design for a rolling-origin evaluation over whichever history lands —
 exactly how often production ends up retraining — is tracked separately in
 [#960](https://github.com/openclimatefix/nged-substation-forecast/issues/960).
 
-Because of that timescale, the plan is to **pre-train** on an estimate of past weather (ERA5 is the
-planned ingest) and fine-tune on ECMWF ENS, using the long power histories some assets have back
-to 2020. Pre-training is a training-time technique, distinct from the validation folds described
-here; the design is in [Extending the training history](../roadmap/training-history.md).
+Because of that timescale, the plan is to **pre-train** on an estimate of past weather (e.g. CAMS,
+or the first time steps of an NWP) and fine-tune on ECMWF ENS, using the long power histories some
+assets have back to 2020. Pre-training is a training-time technique, distinct from the validation
+folds described here; the design is in [Extending the training
+history](../roadmap/training-history.md).
 
 ---
 
@@ -99,9 +100,10 @@ archive starts later than the leaderboard folds, leaving no overlapping history 
 **For a new *weather* source, the ceiling bounds the skill the source could add.** [The
 perfect-weather
 ceiling](../roadmap/metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates) measures
-how much forecast skill near-perfect weather would add. If a model trained and scored on reanalysis
-barely beats the ENS-scored champion, there is little forecast-error headroom for a further source
-to recover — unless the candidate's case rests on *resolution*, which that ceiling does not bound.
+how much forecast skill near-perfect weather would add. If an XGBoost model trained and scored on an
+estimate of past weather barely beats the ENS-scored champion, there is little forecast-error
+headroom for a further source to recover — unless the candidate's case rests on *resolution*, which
+that ceiling does not bound.
 
 Three patterns answer three different questions. A fourth question is under research in [A new
 weather product with a few months of
