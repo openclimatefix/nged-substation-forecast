@@ -1,4 +1,4 @@
-# At three Lincolnshire wind farms, adding archived UKV forecasts to ECMWF's ensemble mean lowered the wind power error at lead days 1 and 2, and the solar gain of about 0.1 points is unresolved
+# At three Lincolnshire wind farms, adding archived UKV forecasts to ECMWF's ensemble mean lowered the wind power error at lead days 1 and 2, and the solar gain of about 0.1 points met the planned rule at day 3 only
 
 **At three wind farms in Lincolnshire, the power-forecast error at lead days 1 and 2 was lower for
 an XGBoost model (a gradient-boosted tree model) given the Met Office's UK variable-resolution (UKV)
@@ -336,7 +336,7 @@ include zero.
 ![Figure 10: At each of the six solar farms, the blend's point estimate is below padded ENS's at
 days 1, 2, and 3, by 0.02 to 0.20 points](../assets/ukv_ceda_blends_v5/solar_generators.svg)
 
-### The solar gain beats all 17 shuffled controls in a post hoc permutation test
+### At solar days 1 to 3, the gain beats all 17 shuffled controls in a post hoc permutation test
 
 **At solar days 1 to 3, the planned blend's gain over padded ENS is larger than the gain of every
 one of 17 shuffled controls.** The test was added after the two planned controls had been seen, so
@@ -424,8 +424,8 @@ the primary setting. At the sensitivity setting the contrast is significant at w
 solar, a stale-blend gain of 0.071, 0.135, and 0.057 points at days 1, 2, and 3 is not excluded at
 the primary setting.
 
-**A stale UKV-CEDA run still carries some information that the shuffled copy lacks.** The stale
-blend is lower than its shuffled controls at wind day 1 at both settings and both seeds.
+**At wind day 1, a stale UKV-CEDA run still carries some information that the shuffled copy lacks.**
+The stale blend is lower than its shuffled controls at wind day 1 at both settings and both seeds.
 
 **The older-run blend keeps 40% to 70% of the planned gain at the primary setting, and its loss at
 wind day 1 is statistically significant at both settings.** The older-run blend's P1 is -0.138
@@ -500,16 +500,18 @@ rows. The study did not fit the run that would separate the two causes.
 **For wind at days 1 and 2, the result supports testing live UKV as an addition to the ENS mean.**
 This page cannot say how a blend with live UKV would do, and the licence of the UKV-CEDA data does
 not settle whether the data may be used in production. If a service's UKV run is 12 hours older than
-the run tested here, the service should expect about half of the day-1 wind gain (the older-run
-blend keeps 57% at the primary setting and 42% at the sensitivity setting). A run 24 hours older
-should give less (30% and 24%, `report_5.md`). What would change this recommendation: a blend that
-reads a hexagon mean of UKV-CEDA, the same blend fitted on live UKV, and more months of data.
+the run tested here, the post hoc older-run blend suggests the service would keep about half of the
+day-1 wind gain (the older-run blend keeps 57% at the primary setting and 42% at the sensitivity
+setting). The post hoc stale blend suggests a run 24 hours older would keep less (30% and 24%,
+`report_5.md`). What would change this recommendation: a blend that reads a hexagon mean of
+UKV-CEDA, the same blend fitted on live UKV, and more months of data.
 
 **For solar and for wind at day 3, the page does not recommend adding UKV-CEDA.** The solar gain of
-about 0.1 points is unresolved under the planned rule. A post hoc permutation test ranks the solar
-gain first of 18 at days 1 to 3, which licenses no claim of statistical significance at the 5%
-level. The wind day-3 gain rests on one month. At day 4 the study is inconclusive, and the page does
-not say that UKV-CEDA does not help there.
+about 0.1 points meets the planned rule at day 3 only, and is unresolved under the planned rule at
+days 1 and 2. Two shuffled controls differ from each other by about as much as the solar gain. A
+post hoc permutation test ranks the solar gain first of 18 at days 1 to 3, which licenses no claim
+of statistical significance at the 5% level. The wind day-3 gain rests on one month. At day 4 the
+study is inconclusive, and the page does not say that UKV-CEDA does not help there.
 
 ## Limitations
 
