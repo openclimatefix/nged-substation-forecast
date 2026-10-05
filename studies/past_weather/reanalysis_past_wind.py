@@ -17,7 +17,7 @@ global) on the block's own rows, beside the new product at its 100 m level. Ever
 are `wind_product_frames.wind_columns` column for column: the speed at the arm's hub height, that
 height's direction as a sine and a cosine, the 10 m speed, and the shared hour of day, day of
 year and `era_code`. There are no columns for neighbouring hours. Every fit uses
-`colsample_bytree=1`, the CPU, and `run_experiment.MAX_CONCURRENT_FITS` fits at once.
+`colsample_bytree=1`, the CPU, and `studies.arm_runner.MAX_CONCURRENT_FITS` fits at once.
 
 **Whether the arms carry direction is decided by a constant, never by which files exist.**
 `CERRA_WITH_DIRECTION` is set before any fit. When True, the CERRA block needs the 100 m
