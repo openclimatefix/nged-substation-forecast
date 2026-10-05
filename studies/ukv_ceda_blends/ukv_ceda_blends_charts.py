@@ -39,6 +39,7 @@ Run it with `uv run python studies/ukv_ceda_blends/ukv_ceda_blends_charts.py --f
 """
 
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -487,6 +488,9 @@ ARM_SHAPES: Final[dict[fit_aifs.BlendRoleType, str]] = {
 
 ERROR_ROW_HEIGHT_PX: Final[int] = 24
 """The height of one row of an absolute-error panel, before the marks are spread within it."""
+ARM_SPREAD_OF_ROW: Final[float] = 0.2
+"""The gap, as a share of a row's height, between the marks of two neighbouring arms."""
+
 GENERATOR_ARM_ROLES: Final[tuple[fit_aifs.BlendRoleType, ...]] = ("_pad", "")
 """The two arms the per-generator error figure draws; the shuffled controls are in the report."""
 
@@ -576,20 +580,27 @@ def arm_dot_panel(
         x_title: The x axis title, or an empty string for no title.
         panel_title: The panel's title.
         roles: The arm roles drawn, whose labels, colours, and shapes form the key.
-        row_height: The height of one row. The arms' marks are spread evenly down the row, so
-            marks of nearly equal value do not hide one another.
+        row_height: The height of one row. The arms' marks are spread down the row, by
+            `ARM_SPREAD_OF_ROW` of a row each, so marks of nearly equal value do not hide one
+            another.
 
     Returns:
         The panel.
     """
     labels = [ARM_LABELS[role] for role in roles]
-    step = row_height / (len(roles) + 1)
-    offsets = [step * (index - (len(roles) - 1) / 2) for index in range(len(roles))]
-    drawn = frame.with_columns(
-        arm=pl.col("role").replace_strict(ARM_LABELS, return_dtype=pl.String)
+    row_index = {row: index for index, row in enumerate(row_order)}
+    spread = ARM_SPREAD_OF_ROW
+    placed = frame.with_columns(
+        arm=pl.col("role").replace_strict(ARM_LABELS, return_dtype=pl.String),
+        position=pl.col("row").replace_strict(row_index, return_dtype=pl.Float64)
+        + pl.col("role").replace_strict(
+            {role: spread * (index - (len(roles) - 1) / 2) for index, role in enumerate(roles)},
+            return_dtype=pl.Float64,
+        ),
     )
+    names = json.dumps({str(index): row for row, index in row_index.items()})
     marks = (
-        alt.Chart(drawn)
+        alt.Chart(placed)
         .mark_point(filled=True, size=70, opacity=0.9, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
@@ -597,7 +608,17 @@ def arm_dot_panel(
                 scale=alt.Scale(domain=list(x_domain), nice=False),
                 title=x_title or None,
             ),
-            y=alt.Y("row:N", sort=list(row_order), title=None),
+            y=alt.Y(
+                "position:Q",
+                scale=alt.Scale(domain=[len(row_order) - 0.5, -0.5], nice=False),
+                axis=alt.Axis(
+                    values=list(range(len(row_order))),
+                    labelExpr=f"{names}[datum.value]",
+                    ticks=False,
+                    grid=False,
+                    title=None,
+                ),
+            ),
             color=alt.Color(
                 "arm:N",
                 scale=alt.Scale(domain=labels, range=[ARM_COLOURS[role] for role in roles]),
@@ -607,7 +628,6 @@ def arm_dot_panel(
                 "arm:N",
                 scale=alt.Scale(domain=labels, range=[ARM_SHAPES[role] for role in roles]),
             ),
-            yOffset=alt.YOffset("arm:N", scale=alt.Scale(domain=labels, range=offsets)),
         )
     )
     return alt.layer(marks).properties(  # ty: ignore[invalid-return-type]

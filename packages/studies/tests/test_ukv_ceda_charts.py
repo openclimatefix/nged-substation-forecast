@@ -239,8 +239,12 @@ def test_the_error_figure_is_one_panel_of_lead_day_rows_under_a_title_naming_the
     for day in (1, 2, 3, 4):
         assert f"Lead day {day}" in text
     assert "smaller is better" in text
-    assert "lowerBound" not in text.lower()
-    assert '"sort": ["Lead day 1", "Lead day 2", "Lead day 3", "Lead day 4"]' in text
+    assert "lower_95" not in text
+    # Each lead day's row is labelled by its index, and its four arms sit at -0.3, -0.1, +0.1, and
+    # +0.3 of a row from the label, in the order of `ARM_LABELS`.
+    assert '\\"3\\": \\"Lead day 4\\"}[datum.value]' in text
+    assert '"position": 2.7' in text
+    assert '"position": 3.3' in text
 
 
 def test_the_generator_error_rows_hold_the_padded_arm_and_the_blend_at_each_generator():
@@ -638,3 +642,31 @@ def test_the_week_figures_are_lettered_in_order_even_when_an_era_has_no_week(
     assert set(figures) == {0, 2}
     captions = [" ".join(chart.to_dict()["title"]["text"]) for chart, _ in figures.values()]
     assert [c.split(":")[0] for c in captions] == ["Figure 3a", "Figure 3b"]
+
+
+def test_the_marks_of_one_row_are_spread_down_it_in_the_order_of_the_arms():
+    frame = pl.DataFrame(
+        {
+            "row": ["Row A", "Row A", "Row B", "Row B"],
+            "role": ["_pad", "", "_pad", ""],
+            "value": [5.0, 4.0, 7.0, 6.0],
+        }
+    )
+
+    panel = charts.arm_dot_panel(
+        frame=frame,
+        row_order=["Row A", "Row B"],
+        x_domain=(3.0, 8.0),
+        x_title="",
+        panel_title="Panel",
+        roles=("_pad", ""),
+    )
+
+    spec = panel.to_dict()
+    (dataset,) = spec["datasets"].values()
+    by_arm = {(r["row"], r["role"]): r["position"] for r in dataset}
+    assert by_arm[("Row A", "_pad")] == pytest.approx(-0.1)
+    assert by_arm[("Row A", "")] == pytest.approx(0.1)
+    assert by_arm[("Row B", "_pad")] == pytest.approx(0.9)
+    assert by_arm[("Row B", "")] == pytest.approx(1.1)
+    assert spec["layer"][0]["encoding"]["y"]["scale"]["domain"] == [1.5, -0.5]
