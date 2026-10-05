@@ -198,8 +198,16 @@ The asset gets its own module rather than joining `defs/assets.py`, which holds 
       the reviewer confirmed fails on the real V1 data — then `CleanedPowerTimeSeries.validate`,
       then write with the `CleaningProvenance`.
     - Metadata: `n_rows`, `n_rows_kept`, `n_time_series`, and per drop reason
-      `drop_reason/<reason>/n_rows`, `.../n_time_series`, `.../min_power`, and `.../max_power`,
-      computed from the collected frame with one `group_by("drop_reason")`.
+      `drop_reason/<reason>/n_rows`, `.../n_time_series`, `.../min_power`, `.../max_power`,
+      `.../first_time`, and `.../last_time`, computed from the collected frame with one
+      `group_by("drop_reason")`. The two times are the earliest and latest flagged `time` for the
+      reason, as ISO-8601 strings, because Dagster rejects `datetime` metadata values.
+    - The cleaning function itself passes nothing to Dagster: `drop_reason` is the whole channel,
+      so a rule's author gets these stats by choosing a distinct reason name, and
+      `flag_nged_power` imports nothing from Dagster. Text logged with Python's `logging` from
+      inside the function reaches only the step's captured stderr, because the Dagster instance
+      has no `python_logs: managed_python_loggers` setting; `docs/roadmap/data-cleaning.md` says
+      so.
     - No `try` around the cleaning: a failing rule or a contract violation is our bug, so the asset
       raises and the readers keep the last good table.
     - The vacuum is housekeeping, and a vacuum failure (for example a transient object-store
@@ -321,8 +329,8 @@ Nothing in this issue builds that table; the mapping is a decision for the issue
   newest `WRITE` commit after the vacuum's two commits.
 - `tests/test_cleaning_assets.py` (new):
     - the asset writes every raw row with null reasons and reports `n_rows`;
-    - with `flag_nged_power` monkeypatched to flag some rows, the per-reason metadata counts and
-      min/max are right;
+    - with `flag_nged_power` monkeypatched to flag some rows, the per-reason metadata counts,
+      min and max power, and first and last flagged time (as ISO-8601 strings) are right;
     - an absent raw table yields `n_rows: 0` and no exception;
     - every assertion reads the written table back through `pl.scan_delta`.
     - a vacuum that raises still leaves the run successful, with `vacuum_failed: True`;
@@ -479,3 +487,9 @@ Accepted:
 
 Confirmed by the reviewer: the raw table commits only when new rows arrive; the first write is a
 `WRITE` commit; `force` with a default runs from a schedule with no `run_config`.
+
+### Per-reason stats (maintainer decision)
+
+The cleaning function reports to Dagster only through `drop_reason`. The asset's per-reason
+metadata gains the first and last flagged `time`, as ISO-8601 strings. A richer channel (an
+optional frame of extra stats returned by `flag_nged_power`) waits until a rule needs it.
