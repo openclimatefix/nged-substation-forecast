@@ -1912,3 +1912,87 @@ def test_fit_jobs_accepts_every_ukv_ceda_arm_at_the_blends_column_count(
     )
 
     assert set(losses["arm"]) == set(arms)
+
+
+# --- shuffles that carry their own seed, and the UKV-CEDA 15 UTC columns --------------------------
+
+
+def test_a_seeded_variant_names_its_seed_and_the_planned_variants_keep_theirs():
+    assert fit_aifs.shuffle_seed(variant="") == 0
+    assert fit_aifs.shuffle_seed(variant="_b") == 1000
+    assert fit_aifs.shuffle_seed(variant="_s2010") == 2010
+    assert fit_aifs.shuffle_seed(variant="_s7") == 7
+    for bad in ("_x", "_s", "_s20a", "s2010", "_b2"):
+        with pytest.raises(ValueError, match="is not a shuffle variant"):
+            fit_aifs.shuffle_seed(variant=bad)
+
+
+def test_a_seeded_shuffle_is_the_planned_shuffle_when_it_carries_the_planned_seed():
+    frame = _shuffle_frame(domain="solar")
+    source = "aifs_single_day7"
+
+    planned = add_shuffled_columns(frame=frame, domain="solar", shuffles={source: ("", "_b")})
+    seeded = add_shuffled_columns(
+        frame=frame, domain="solar", shuffles={source: ("_s0", "_s1000", "_s2010")}
+    )
+
+    assert seeded[f"{source}_permuted_s0_ghi"].equals(planned[f"{source}_permuted_ghi"])
+    assert seeded[f"{source}_permuted_s1000_temp"].equals(planned[f"{source}_permuted_b_temp"])
+    other = seeded[f"{source}_permuted_s2010_ghi"].to_numpy()
+    assert not np.array_equal(other, planned[f"{source}_permuted_ghi"].to_numpy())
+    assert not np.array_equal(other, planned[f"{source}_permuted_b_ghi"].to_numpy())
+
+
+def test_a_seeded_shuffle_stays_within_its_group_and_is_deterministic():
+    frame = _shuffle_frame(domain="solar")
+    source = "aifs_single_day7"
+    lookup = dict(zip(frame["value"], frame["code"], strict=True))
+
+    shuffled = add_shuffled_columns(frame=frame, domain="solar", shuffles={source: ("_s2010",)})
+    again = add_shuffled_columns(frame=frame, domain="solar", shuffles={source: ("_s2010",)})
+
+    assert shuffled.equals(again)
+    moved = shuffled[f"{source}_permuted_s2010_ghi"]
+    assert [lookup[value] for value in moved] == frame["code"].to_list()
+
+
+def test_a_seeded_control_shuffles_the_blends_own_product_under_its_seed():
+    arm = "blend_ukv_ceda_day2_control_s2010"
+
+    assert arm_prefixes(arm=arm) == ("ens_mean_day2", "ukv_ceda_day2_permuted_s2010")
+    assert control_shuffles(arms=[arm, "blend_ukv_ceda_day2_control_b"]) == {
+        "ukv_ceda_day2": ("_s2010", "_b")
+    }
+    assert control_shuffles(arms=["blend_ukv_ceda_day2_control_s7"]) == {"ukv_ceda_day2": ("_s7",)}
+    assert control_shuffles(arms=["blend_ukv_ceda_day2_pad"]) == {}
+    for domain, count in (("solar", 9), ("wind", 11)):
+        assert expected_column_count(arm=arm, domain=domain) == count
+        assert len(arm_features(arm=arm, domain=domain)) == count
+    assert arm_features(arm=arm, domain="solar")[-2:] == (
+        "ukv_ceda_day2_permuted_s2010_ghi",
+        "ukv_ceda_day2_permuted_s2010_temp",
+    )
+
+
+def test_the_ukv_ceda_15_utc_blend_reads_its_own_columns_and_swallows_no_other_name():
+    arm = "blend_ukv_ceda_run15_day3"
+
+    assert arm_prefixes(arm=arm) == ("ens_mean_day3", "ukv_ceda_run15_day3")
+    assert arm_prefixes(arm=f"{arm}_control") == (
+        "ens_mean_day3",
+        "ukv_ceda_run15_day3_permuted",
+    )
+    assert arm_prefixes(arm=f"{arm}_pad") == ("ens_mean_day3", "ens_mean_day3_copy")
+    assert arm_features(arm=arm, domain="wind")[-4:] == (
+        "ukv_ceda_run15_day3_speed_10m",
+        "ukv_ceda_run15_day3_sin_10m",
+        "ukv_ceda_run15_day3_cos_10m",
+        "ukv_ceda_run15_day3_speed_925hpa",
+    )
+    assert arm_features(arm=arm, domain="solar")[-2:] == (
+        "ukv_ceda_run15_day3_ghi",
+        "ukv_ceda_run15_day3_temp",
+    )
+    assert arm_prefixes(arm="blend_ukv_ceda_day3") == ("ens_mean_day3", "ukv_ceda_day3")
+    assert arm_prefixes(arm="blend_ukv_ceda_stale_day3") == ("ens_mean_day3", "ukv_ceda_day4")
+    assert control_shuffles(arms=[f"{arm}_control"]) == {"ukv_ceda_run15_day3": ("",)}

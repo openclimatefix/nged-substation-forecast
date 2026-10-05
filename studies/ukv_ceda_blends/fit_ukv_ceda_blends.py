@@ -50,6 +50,22 @@ rows, and the report prints the planned reference minus the stale-rows reference
 tilt from the planned reference's extra training rows. Every contrast scores the rows where
 UKV-CEDA's day `N + 1` is present. These arms are exploratory and post hoc.
 
+**Post hoc permutation test (solar).** After the second science review, `--post-hoc-permutation`
+fits, for each solar stage (lead days 1 to 4), 15 further shuffled controls
+(`blend_ukv_ceda_dayN_control_s<seed>`) at the primary setting only. They use the same shuffle
+groups as the planned control (within generator, year-month, and hour of day) under seeds that no
+planned shuffle uses. The report prints the planned blend's P1 against the distribution of
+(control minus padded ENS) over all 17 shuffled controls (the planned two and the 15 extra), with
+the rank of P1 and a permutation p-value, per stage. The test is exploratory and post hoc.
+
+**Post hoc older run.** `--post-hoc-older-run` adds, for lead days 1 to 3 and both technologies,
+the arm `blend_ukv_ceda_run15_dayN`: ENS day `N` plus UKV-CEDA columns built from the 15 UTC run of
+the day before ENS's run (`build.OLDER_RUN`), read from `--older-dir`. That run starts 9 hours
+before ENS's 00 UTC run and leads 12 hours longer than the planned blend's run. It is fitted at both
+settings with a padded ENS reference refitted on its rows and one shuffled control (seed 0). The
+arm tests how the gain falls as the UKV-CEDA run gets older. It cannot separate the effect of the
+run's lead from the effect of its timing against ENS's run, because the two move together.
+
 Run it with `uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --dry-run`.
 """
 
@@ -61,7 +77,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from itertools import combinations
 from pathlib import Path
-from typing import Final, NamedTuple, TypedDict
+from typing import Final, Literal, NamedTuple, TypedDict
 
 import numpy as np
 import polars as pl
@@ -149,6 +165,34 @@ both shuffle seeds, all trained on the stale rows."""
 STALE_SCOPE: Final[str] = "post hoc stale"
 """The `scope` of every stale-blend interval in `intervals.parquet`."""
 
+PostHocKind = Literal["stale", "permutation", "older run"]
+"""Which post hoc analysis a fit adds."""
+
+PERMUTATION_SEEDS: Final[tuple[int, ...]] = tuple(range(2010, 2160, 10))
+"""The shuffle seeds of the post hoc permutation test's 15 extra controls. A shuffle of two columns
+(solar) uses its seed and the next one (`studies.blending.climatology_permutation`), so no two draws
+share a seed, and none shares one with the planned shuffles (0, 1, 1000, and 1001)."""
+
+PERMUTATION_SCOPE: Final[str] = "post hoc permutation"
+"""The `scope` of every permutation-test row in `intervals.parquet`."""
+
+PERMUTATION_DRAWS: Final[int] = len(PERMUTATION_SEEDS) + len(fit_aifs.SHUFFLE_SEEDS)
+"""The shuffled controls the permutation test compares with: the planned two and the extra 15."""
+
+OLDER_PRODUCT: Final[str] = "ukv_ceda_run15"
+"""The key in `fit_aifs.BLEND_AIFS_PREFIXES` of the post hoc blend that reads UKV-CEDA's 15 UTC run
+of the day before ENS's run."""
+
+OLDER_DAYS: Final[tuple[int, ...]] = build.OLDER_RUN.lead_days
+"""The ENS lead days of the older-run blend."""
+
+OLDER_ROLES: Final[tuple[fit_aifs.BlendRoleType, ...]] = ("_pad", "", "_control")
+"""The roles fitted for the older-run blend: the padded ENS reference, the blend, and one control
+(shuffle seed 0), all trained on the rows where the older run is present."""
+
+OLDER_SCOPE: Final[str] = "post hoc older run"
+"""The `scope` of every older-run interval in `intervals.parquet`."""
+
 PADDING_CHECK_NAME: Final[str] = "padding_check.json"
 """Where `--check` writes whether ENS's mean alone and its padded copy score identically."""
 
@@ -228,6 +272,54 @@ def stale_jobs(*, day: int) -> list[fit_aifs.Job]:
     return [(arm, setting) for arm in stale_arms(day=day) for setting in SETTINGS]
 
 
+def permutation_arm_name(*, day: int, seed: int) -> str:
+    """Return one extra shuffled control, such as `blend_ukv_ceda_day2_control_s2010`."""
+    return f"{arm_name(day=day, role='_control')}_s{seed}"
+
+
+def permutation_arms(*, day: int) -> tuple[str, ...]:
+    """Return a lead day's 15 extra shuffled controls, one per `PERMUTATION_SEEDS`."""
+    return tuple(permutation_arm_name(day=day, seed=seed) for seed in PERMUTATION_SEEDS)
+
+
+def is_permutation_arm(*, arm: str) -> bool:
+    """Return whether an arm is one of the post hoc permutation test's extra controls."""
+    pattern = rf"{fit_aifs.BLEND_PREFIX}{PRODUCT}_day\d+_control_s\d+"
+    return re.fullmatch(pattern, arm) is not None
+
+
+def permutation_jobs(*, stage: Stage) -> list[fit_aifs.Job]:
+    """Return the permutation test's fits of a stage: each extra control at the primary setting.
+
+    Only solar stages are tested, so a wind stage has none.
+    """
+    if stage.domain != "solar":
+        return []
+    return [(arm, PRIMARY) for arm in permutation_arms(day=stage.day)]
+
+
+def older_arm_name(*, day: int, role: fit_aifs.BlendRoleType) -> str:
+    """Return one of the post hoc older-run blend's arms, such as `blend_ukv_ceda_run15_day2`."""
+    return fit_aifs.blend_arm_name(product=OLDER_PRODUCT, day=day, role=role)
+
+
+def older_arms(*, day: int) -> tuple[str, ...]:
+    """Return the older-run arms of lead day `day`: padded reference, blend, and one control."""
+    return tuple(older_arm_name(day=day, role=role) for role in OLDER_ROLES)
+
+
+def is_older_arm(*, arm: str) -> bool:
+    """Return whether an arm is one of the post hoc older-run blend's."""
+    return arm.startswith(f"{fit_aifs.BLEND_PREFIX}{OLDER_PRODUCT}_day")
+
+
+def older_jobs(*, day: int) -> list[fit_aifs.Job]:
+    """Return the older-run fits of a lead day: its arms at both settings, none at day 4."""
+    if day not in OLDER_DAYS:
+        return []
+    return [(arm, setting) for arm in older_arms(day=day) for setting in SETTINGS]
+
+
 def planned_jobs(*, day: int) -> list[fit_aifs.Job]:
     """Return every (arm, setting) fit of a lead day: each arm at both settings."""
     return [(arm, setting) for arm in stage_arms(day=day) for setting in SETTINGS]
@@ -297,32 +389,47 @@ def present(*, column: str) -> pl.Expr:
     return pl.col(column).is_not_null() & ~pl.col(column).is_nan().fill_null(value=False)
 
 
-def ukv_columns(*, domain: DomainType, day: int) -> list[str]:
-    """Return UKV-CEDA's weather columns at one lead day."""
-    return [f"{PRODUCT}_day{day}_{field}" for field in build.WEATHER_FIELDS[domain]]
+def ukv_columns(
+    *, domain: DomainType, day: int, spec: build.RunSpec = build.PLANNED_RUN
+) -> list[str]:
+    """Return UKV-CEDA's weather columns at one lead day, from the planned or the older run."""
+    return [f"{spec.column_prefix}_day{day}_{field}" for field in build.WEATHER_FIELDS[domain]]
 
 
-def check_init_times(*, frame: pl.DataFrame, domain: DomainType, day: int) -> None:
-    """Raise unless every row's stamped run is the 03 UTC run `day` days before its own day.
+def check_init_times(
+    *,
+    frame: pl.DataFrame,
+    domain: DomainType,
+    day: int,
+    spec: build.RunSpec = build.PLANNED_RUN,
+) -> None:
+    """Raise unless every row's stamped run is the run `spec` says its hour reads.
 
     The expected run is recomputed here from the plan's rule and not from the function the build
-    stamps with. A solar label names the hour ending at it, so its day is the day of the label minus
-    one hour. A wind label is an instant, so its day is its own.
+    stamps with: the run that starts at `spec.run_hour` UTC on the day `day + spec.extra_days` days
+    before the hour's own day. A solar label names the hour ending at it, so its day is the day of
+    the label minus one hour. A wind label is an instant, so its day is its own.
 
     Args:
-        frame: Rows carrying `time` and `ukv_ceda_day<N>_init_time`.
+        frame: Rows carrying `time` and `<prefix>_day<N>_init_time`.
         domain: `solar` or `wind`.
         day: The lead day.
+        spec: Which run is read.
 
     Raises:
-        ValueError: Naming how many rows read another run than the 03 UTC run of day D-`day`.
+        ValueError: Naming how many rows read another run than the one the plan names.
     """
     instant = pl.col("time") - pl.duration(hours=1) if domain == "solar" else pl.col("time")
-    expected = instant.dt.truncate("1d") - pl.duration(days=day) + pl.duration(hours=build.RUN_HOUR)
-    wrong = frame.filter(pl.col(f"{PRODUCT}_day{day}_init_time") != expected).height
+    expected = (
+        instant.dt.truncate("1d")
+        - pl.duration(days=day + spec.extra_days)
+        + pl.duration(hours=spec.run_hour)
+    )
+    wrong = frame.filter(pl.col(f"{spec.column_prefix}_day{day}_init_time") != expected).height
     if wrong:
         msg = (
-            f"{domain} day {day}: {wrong} rows read a run other than the 03 UTC run of day D-{day}"
+            f"{domain} day {day}: {wrong} rows read a run other than the {spec.run_hour:02d} UTC "
+            f"run of day D-{day + spec.extra_days}"
         )
         raise ValueError(msg)
 
@@ -372,7 +479,11 @@ def add_copy_columns(*, frame: pl.DataFrame, domain: DomainType, day: int) -> pl
 
 
 def stage_frame(
-    *, stage: Stage, candidates: pl.DataFrame, inputs: pl.DataFrame
+    *,
+    stage: Stage,
+    candidates: pl.DataFrame,
+    inputs: pl.DataFrame,
+    permutation: bool = False,
 ) -> tuple[pl.DataFrame, dict[int, int]]:
     """Return the rows every arm of one stage is trained and scored on.
 
@@ -380,6 +491,8 @@ def stage_frame(
         stage: The technology and lead day.
         candidates: `build_ukv_ceda_inputs.published_rows`' result for the technology.
         inputs: The technology's `<domain>_ukv_ceda_inputs.parquet`.
+        permutation: Whether to add the permutation test's 15 extra shuffles as well. They are
+            further columns on the same rows, so no planned arm's rows or columns change.
 
     Returns:
         The rows with folds, ENS's copies, and the shuffled UKV-CEDA copies, and the fold offsets.
@@ -409,8 +522,9 @@ def stage_frame(
     cut, offsets = cut_folds(frame=kept)
     padded = add_copy_columns(frame=cut, domain=domain, day=day)
     arms = stage_arms(day=day)
+    shuffled_arms = (*arms, *permutation_arms(day=day)) if permutation else arms
     frame = fit_aifs.add_shuffled_columns(
-        frame=padded, domain=domain, shuffles=fit_aifs.control_shuffles(arms=arms)
+        frame=padded, domain=domain, shuffles=fit_aifs.control_shuffles(arms=shuffled_arms)
     )
     check_no_missing(frame=frame, columns=fit_aifs.source_columns(arms=arms, domain=domain))
     coverage_table(frame=frame)
@@ -457,6 +571,49 @@ def stale_stage_frame(*, stage: Stage, frame: pl.DataFrame, inputs: pl.DataFrame
     return shuffled
 
 
+def older_stage_frame(*, stage: Stage, frame: pl.DataFrame, inputs: pl.DataFrame) -> pl.DataFrame:
+    """Return the rows of the post hoc older-run blend: the stage's rows that hold the older run.
+
+    The older run is the 15 UTC run of the day before ENS's run (`build.OLDER_RUN`), so a row needs
+    those columns on top of everything the planned arms need. The folds are the stage's, so the
+    planned arms score the same folds.
+
+    Args:
+        stage: The technology and ENS lead day `N`, which must be in `OLDER_DAYS`.
+        frame: The stage's rows from `stage_frame`.
+        inputs: The technology's `<domain>_ukv_ceda_run15_inputs.parquet`.
+
+    Returns:
+        The rows of `frame` where the older run's day `N` columns are present, with the shuffle of
+        those columns under the first seed.
+
+    Raises:
+        ValueError: If a candidate row has no row in the inputs, a row reads the wrong run, an
+            arm's column holds a missing value, or no row holds the older run's columns.
+    """
+    domain, day = stage
+    spec = build.OLDER_RUN
+    keys = ["site", "time"]
+    if frame.select(keys).join(inputs.select(keys), on=keys, how="anti").height:
+        msg = f"{domain}: stage rows are missing from the older-run inputs"
+        raise ValueError(msg)
+    columns = ukv_columns(domain=domain, day=day, spec=spec)
+    stamp = f"{spec.column_prefix}_day{day}_init_time"
+    kept = frame.join(inputs.select(*keys, stamp, *columns), on=keys, how="left").filter(
+        pl.all_horizontal(present(column=column) for column in columns)
+    )
+    if kept.is_empty():
+        msg = f"{domain} day {day}: no row holds the older run's columns"
+        raise ValueError(msg)
+    check_init_times(frame=kept, domain=domain, day=day, spec=spec)
+    arms = older_arms(day=day)
+    shuffled = fit_aifs.add_shuffled_columns(
+        frame=kept, domain=domain, shuffles=fit_aifs.control_shuffles(arms=arms)
+    )
+    check_no_missing(frame=shuffled, columns=fit_aifs.source_columns(arms=arms, domain=domain))
+    return shuffled
+
+
 def check_arm_columns(*, frame: pl.DataFrame, domain: DomainType, arms: Sequence[str]) -> None:
     """Raise unless every arm's columns are in the frame and hold the count the arm's kind promises.
 
@@ -483,11 +640,14 @@ def check_arm_columns(*, frame: pl.DataFrame, domain: DomainType, arms: Sequence
 # --- The build gate and the stamp -----------------------------------------------------------------
 
 
-def read_build_stamp(*, output_dir: Path) -> dict[str, object]:
+def read_build_stamp(
+    *, output_dir: Path, spec: build.RunSpec = build.PLANNED_RUN
+) -> dict[str, object]:
     """Return `build.json`, after checking the build passed its coverage guard and is unchanged.
 
     Args:
         output_dir: The folder holding the build's outputs.
+        spec: Which run the build read, which names its inputs files.
 
     Returns:
         The stamp.
@@ -500,8 +660,13 @@ def read_build_stamp(*, output_dir: Path) -> dict[str, object]:
     if stamp.get("coverage_guard_passed") is not True:
         msg = "the build did not pass its coverage guard, so no stage may run"
         raise ValueError(msg)
+    if stamp.get("run_hour") != spec.run_hour:
+        msg = f"the build read the {stamp.get('run_hour')} UTC run, not the {spec.run_hour} UTC run"
+        raise ValueError(msg)
     for domain in fit_aifs.DOMAINS:
-        actual = fit_aifs.sha256_of(path=output_dir / f"{domain}_ukv_ceda_inputs.parquet")
+        actual = fit_aifs.sha256_of(
+            path=output_dir / f"{domain}_{spec.column_prefix}_inputs.parquet"
+        )
         if stamp["inputs_sha256"][domain] != actual:
             msg = f"{domain}: the inputs file is not the one build.json recorded"
             raise ValueError(msg)
@@ -577,6 +742,7 @@ def check_saved_file(
     stamp_file: Path,
     stamp: dict[str, str],
     stale_frame: pl.DataFrame | None = None,
+    older_frame: pl.DataFrame | None = None,
 ) -> None:
     """Raise unless a saved losses file comes from this build, this device, and exactly these rows.
 
@@ -588,19 +754,25 @@ def check_saved_file(
         stamp: The current build's stamp.
         stale_frame: The rows of the post hoc stale blend, which a stale arm must score instead of
             the stage's.
+        older_frame: The rows of the post hoc older-run blend, which an older-run arm must score
+            instead of the stage's.
 
     Raises:
         ValueError: If the stamp is missing or differs, an (arm, setting) of the losses scores
-            other (site, time, fold) rows than its rows, or a stale arm is saved for a stage with no
-            stale rows.
+            other (site, time, fold) rows than its rows, or a stale or older-run arm is saved for
+            a stage with no such rows.
     """
     if not stamp_file.exists() or json.loads(stamp_file.read_text()) != stamp:
         msg = f"{stamp_file} is missing or names another build or device"
         raise ValueError(msg)
     for (arm, setting), group in losses.group_by(["arm", "setting"]):
-        rows = stale_frame if is_stale_arm(arm=str(arm)) else frame
+        rows, kind = frame, "stage"
+        if is_stale_arm(arm=str(arm)):
+            rows, kind = stale_frame, "stale"
+        elif is_older_arm(arm=str(arm)):
+            rows, kind = older_frame, "older-run"
         if rows is None:
-            msg = f"{label}: {arm} is a stale arm, but the stage has no stale rows"
+            msg = f"{label}: {arm} is a {kind} arm, but the stage has no {kind} rows"
             raise ValueError(msg)
         want = rows.select(ROW_KEYS).unique().sort(ROW_KEYS)
         if not group.select(ROW_KEYS).unique().sort(ROW_KEYS).equals(want):
@@ -645,9 +817,12 @@ def predictions_table(*, losses: pl.DataFrame, frame: pl.DataFrame) -> pl.DataFr
 
 
 class PlannedStage(NamedTuple):
-    """A stage ready to fit: its rows, fold offsets, stamp, and its post hoc stale blend's rows.
+    """A stage ready to fit: its rows, fold offsets, stamp, and its post hoc blends' rows.
 
-    `stale_frame` is `None` at a lead day with no stale blend.
+    `stale_frame` is `None` at a lead day with no stale blend, and `older_frame` is `None` unless
+    the older-run inputs were read and the lead day has an older-run blend. `older_stamp` names the
+    older-run inputs file's SHA-256 and the Icechunk snapshot it was built from, and is `None`
+    where `older_frame` is.
     """
 
     stage: Stage
@@ -655,29 +830,55 @@ class PlannedStage(NamedTuple):
     offsets: dict[int, int]
     stamp: dict[str, str]
     stale_frame: pl.DataFrame | None = None
+    older_frame: pl.DataFrame | None = None
+    older_stamp: dict[str, str] | None = None
 
 
-def plan_stages(*, published_dir: Path, day4_dir: Path, output_dir: Path) -> list[PlannedStage]:
+def plan_stages(
+    *,
+    published_dir: Path,
+    day4_dir: Path,
+    output_dir: Path,
+    older_dir: Path | None = None,
+    permutation: bool = False,
+) -> list[PlannedStage]:
     """Build every stage's rows and check its arms, after the build gate.
 
     Args:
         published_dir: The folder holding the published inputs.
         day4_dir: The folder holding ENS's day-4 mean.
         output_dir: The folder holding the UKV-CEDA inputs, and where results are written.
+        older_dir: The older-run build's folder, or `None` to leave the older-run blend out.
+        permutation: Whether to add the permutation test's extra shuffles to the solar stages.
 
     Returns:
         The stages, solar before wind.
     """
     build_stamp = read_build_stamp(output_dir=output_dir)
+    older_build_stamp = (
+        None if older_dir is None else read_build_stamp(output_dir=older_dir, spec=build.OLDER_RUN)
+    )
     planned: list[PlannedStage] = []
     for domain in fit_aifs.DOMAINS:
         candidates = build.published_rows(
             published_dir=published_dir, day4_dir=day4_dir, domain=domain
         )
         inputs = pl.read_parquet(output_dir / f"{domain}_ukv_ceda_inputs.parquet")
+        older_inputs = (
+            None
+            if older_dir is None
+            else pl.read_parquet(
+                older_dir / f"{domain}_{build.OLDER_RUN.column_prefix}_inputs.parquet"
+            )
+        )
         for day in DAYS:
             stage = Stage(domain=domain, day=day)
-            frame, offsets = stage_frame(stage=stage, candidates=candidates, inputs=inputs)
+            frame, offsets = stage_frame(
+                stage=stage,
+                candidates=candidates,
+                inputs=inputs,
+                permutation=permutation and domain == "solar",
+            )
             check_arm_columns(frame=frame, domain=domain, arms=stage_arms(day=day))
             stamp = stage_stamp(
                 published_dir=published_dir,
@@ -692,6 +893,22 @@ def plan_stages(*, published_dir: Path, day4_dir: Path, output_dir: Path) -> lis
             if day in STALE_DAYS:
                 stale_frame = stale_stage_frame(stage=stage, frame=frame, inputs=inputs)
                 check_arm_columns(frame=stale_frame, domain=domain, arms=stale_arms(day=day))
+            older_frame = None
+            older_stamp = None
+            if (
+                older_inputs is not None
+                and older_dir is not None
+                and older_build_stamp is not None
+                and day in OLDER_DAYS
+            ):
+                older_frame = older_stage_frame(stage=stage, frame=frame, inputs=older_inputs)
+                check_arm_columns(frame=older_frame, domain=domain, arms=older_arms(day=day))
+                older_stamp = {
+                    "older_run_inputs_sha256": fit_aifs.sha256_of(
+                        path=older_dir / f"{domain}_{build.OLDER_RUN.column_prefix}_inputs.parquet"
+                    ),
+                    "older_run_snapshot": str(older_build_stamp["snapshot_id"]),
+                }
             planned.append(
                 PlannedStage(
                     stage=stage,
@@ -699,13 +916,33 @@ def plan_stages(*, published_dir: Path, day4_dir: Path, output_dir: Path) -> lis
                     offsets=offsets,
                     stamp=stamp,
                     stale_frame=stale_frame,
+                    older_frame=older_frame,
+                    older_stamp=older_stamp,
                 )
             )
     return planned
 
 
+def post_hoc_jobs(*, stage: Stage, kind: PostHocKind) -> list[fit_aifs.Job]:
+    """Return the (arm, setting) pairs of one post hoc analysis at a stage, saved or not."""
+    if kind == "stale":
+        return stale_jobs(day=stage.day)
+    if kind == "permutation":
+        return permutation_jobs(stage=stage)
+    return older_jobs(day=stage.day)
+
+
+def post_hoc_frame(*, planned: PlannedStage, kind: PostHocKind) -> pl.DataFrame | None:
+    """Return the rows a post hoc analysis's arms are trained and scored on, or `None` if none."""
+    if kind == "stale":
+        return planned.stale_frame
+    if kind == "permutation":
+        return planned.frame
+    return planned.older_frame
+
+
 def jobs_to_fit(
-    *, output_dir: Path, stage: Stage, only_missing: bool, post_hoc: bool = False
+    *, output_dir: Path, stage: Stage, only_missing: bool, post_hoc: PostHocKind | None = None
 ) -> tuple[str, list[fit_aifs.Job]]:
     """Return the group to write and the (arm, setting) pairs of a stage to fit.
 
@@ -713,13 +950,13 @@ def jobs_to_fit(
         output_dir: The write-once folder.
         stage: The stage.
         only_missing: Whether a stage that holds some but not all of its pairs may fit the rest.
-        post_hoc: Whether to list the post hoc stale blend's pairs, which need the planned pairs
-            saved first, instead of the planned pairs.
+        post_hoc: Which post hoc analysis's pairs to list instead of the planned pairs, which need
+            the planned pairs saved first.
 
     Returns:
         The group name and the pairs: all of them for a stage with no saved file, the missing ones
-        under `--only-missing`, and none for a complete stage. Under `post_hoc`, the stale pairs no
-        saved file holds.
+        under `--only-missing`, and none for a complete stage. Under `post_hoc`, the pairs of that
+        analysis no saved file holds.
 
     Raises:
         ValueError: If a stage holds some pairs but not all and `only_missing` is false, or if
@@ -727,12 +964,14 @@ def jobs_to_fit(
     """
     saved = saved_pairs(output_dir=output_dir, stage=stage)
     planned_missing = [job for job in planned_jobs(day=stage.day) if job not in saved]
-    if post_hoc:
+    if post_hoc is not None:
         if planned_missing:
-            msg = f"{stem(stage=stage, group='*')}: fit the planned pairs before the stale ones"
+            msg = (
+                f"{stem(stage=stage, group='*')}: fit the planned pairs before the {post_hoc} ones"
+            )
             raise ValueError(msg)
         return next_group(output_dir=output_dir, stage=stage), [
-            job for job in stale_jobs(day=stage.day) if job not in saved
+            job for job in post_hoc_jobs(stage=stage, kind=post_hoc) if job not in saved
         ]
     if saved and planned_missing and not only_missing:
         msg = (
@@ -743,13 +982,49 @@ def jobs_to_fit(
     return next_group(output_dir=output_dir, stage=stage), planned_missing
 
 
+def file_stamp(*, planned: PlannedStage, arms: Sequence[str]) -> dict[str, str]:
+    """Return what a saved losses file of these arms must match.
+
+    The stage's stamp and the arms' columns, plus the older-run inputs' SHA-256 and snapshot if any
+    arm is an older-run arm, plus the permutation seeds if any arm is a permutation control. A file
+    of planned or stale arms therefore keeps the stamp it was written with.
+
+    Args:
+        planned: The stage.
+        arms: The arms the file holds.
+
+    Returns:
+        The stamp.
+
+    Raises:
+        ValueError: If an older-run arm is listed for a stage with no older-run inputs.
+    """
+    stamp = {
+        **planned.stamp,
+        "columns": json.dumps(
+            {
+                arm: fit_aifs.arm_features(arm=arm, domain=planned.stage.domain)
+                for arm in sorted(arms)
+            }
+        ),
+    }
+    if any(is_older_arm(arm=arm) for arm in arms):
+        if planned.older_stamp is None:
+            msg = f"{stem(stage=planned.stage, group='*')}: no older-run inputs were read"
+            raise ValueError(msg)
+        stamp.update(planned.older_stamp)
+    if any(is_permutation_arm(arm=arm) for arm in arms):
+        stamp["permutation_seeds"] = json.dumps(PERMUTATION_SEEDS)
+    return stamp
+
+
 def fit_stage(
     *,
     planned: PlannedStage,
     output_dir: Path,
     workers: int,
     only_missing: bool,
-    post_hoc: bool = False,
+    post_hoc: PostHocKind | None = None,
 ) -> pl.DataFrame:
     """Fit a stage's missing pairs and write them once, then return all its saved losses.
 
@@ -758,7 +1033,7 @@ def fit_stage(
         output_dir: The write-once folder.
         workers: How many (arm, site) fits run at once.
         only_missing: Whether to fit the pairs a partly saved stage lacks.
-        post_hoc: Whether to fit the post hoc stale blend's missing pairs on the stale rows.
+        post_hoc: Which post hoc analysis's missing pairs to fit, on that analysis's rows.
 
     Returns:
         Every saved loss of the stage at both settings.
@@ -768,20 +1043,17 @@ def fit_stage(
         output_dir=output_dir, stage=stage, only_missing=only_missing, post_hoc=post_hoc
     )
     if jobs:
-        fit_frame = planned.stale_frame if post_hoc else planned.frame
+        fit_frame = (
+            planned.frame if post_hoc is None else post_hoc_frame(planned=planned, kind=post_hoc)
+        )
         if fit_frame is None:
-            msg = f"{stem(stage=stage, group='*')}: the stage has no stale rows to fit"
+            msg = f"{stem(stage=stage, group='*')}: the stage has no {post_hoc} rows to fit"
             raise ValueError(msg)
         file = output_dir / f"{stem(stage=stage, group=group)}_losses.parquet"
         predictions = file.with_name(file.name.replace("_losses", "_predictions"))
         refuse_to_overwrite(paths=[file, predictions])
         arms = list(dict.fromkeys(arm for arm, _ in jobs))
-        stamp = {
-            **planned.stamp,
-            "columns": json.dumps(
-                {arm: fit_aifs.arm_features(arm=arm, domain=stage.domain) for arm in sorted(arms)}
-            ),
-        }
+        stamp = file_stamp(planned=planned, arms=arms)
         file.with_suffix(".json").write_text(json.dumps(stamp))
         losses = fit_aifs.fit_jobs(
             frame=fit_frame, domain=stage.domain, jobs=jobs, workers=workers
@@ -807,19 +1079,14 @@ def verified_losses(*, planned: PlannedStage, output_dir: Path) -> pl.DataFrame:
     for path in group_files(output_dir=output_dir, stage=stage):
         losses = pl.read_parquet(path)
         arms = sorted(set(losses["arm"].unique().to_list()))
-        expected = {
-            **planned.stamp,
-            "columns": json.dumps(
-                {arm: fit_aifs.arm_features(arm=arm, domain=stage.domain) for arm in arms}
-            ),
-        }
         check_saved_file(
             losses=losses,
             frame=planned.frame,
             label=path.name,
             stamp_file=path.with_suffix(".json"),
-            stamp=expected,
+            stamp=file_stamp(planned=planned, arms=arms),
             stale_frame=planned.stale_frame,
+            older_frame=planned.older_frame,
         )
     return saved_losses(output_dir=output_dir, stage=stage)
 
@@ -1657,6 +1924,364 @@ def stale_lines(
     return lines, verdict
 
 
+class PermutationSummary(NamedTuple):
+    """Where the planned blend's P1 falls among the shuffled controls' differences from padded ENS.
+
+    Every value is in the loss column's own units (a share of capacity), and a negative value is a
+    lower error than padded ENS's.
+    """
+
+    planned: float
+    draws: tuple[float, ...]
+    rank: int
+    p_value: float
+
+
+def permutation_summary(*, planned: float, draws: Sequence[float]) -> PermutationSummary:
+    """Place the planned blend's P1 among the shuffled controls' differences from padded ENS.
+
+    The null hypothesis is that UKV-CEDA's columns carry no information the shuffles remove, so the
+    planned blend's P1 is one more draw from the controls' distribution. A lower (more negative)
+    value is a larger gain, so the one-sided permutation p-value counts the planned value and the
+    draws at or below it.
+
+    Args:
+        planned: The planned blend minus padded ENS (P1).
+        draws: Each shuffled control minus padded ENS.
+
+    Returns:
+        The inputs, the rank of `planned` among all of them (1 for the lowest, with a tie ranked
+        above the draws it equals), and the p-value `(1 + draws at or below planned) / (1 + draws)`.
+    """
+    at_or_below = sum(draw <= planned for draw in draws)
+    return PermutationSummary(
+        planned=planned,
+        draws=tuple(draws),
+        rank=1 + sum(draw < planned for draw in draws),
+        p_value=(1 + at_or_below) / (1 + len(draws)),
+    )
+
+
+def mean_difference(
+    *, losses: pl.DataFrame, treatment: str, reference: str
+) -> tuple[float, int, int]:
+    """Return the mean paired difference of two arms, with the rows and months it rests on.
+
+    Args:
+        losses: Per-row losses at one setting, carrying both arms.
+        treatment: The arm whose error is compared.
+        reference: The arm it is compared against.
+
+    Returns:
+        The treatment-minus-reference mean over fitting seeds and rows, the rows per seed, and the
+        months.
+    """
+    differences, months = paired_differences(
+        losses=losses, treatment=treatment, reference=reference, metric=METRIC
+    )
+    return float(differences.mean()), differences.shape[1], len(np.unique(months))
+
+
+def permutation_record(
+    *, stage: Stage, contrast: str, scope: str, value: float, n_rows: int, n_months: int
+) -> IntervalRecord:
+    """Return one permutation-test value as a row of `intervals.parquet`, with no interval."""
+    return {
+        "domain": stage.domain,
+        "day": stage.day,
+        "setting": PRIMARY,
+        "contrast": contrast,
+        "scope": scope,
+        "level": 0.0,
+        "difference": value,
+        "lower": float("nan"),
+        "upper": float("nan"),
+        "n_rows": n_rows,
+        "n_months": n_months,
+    }
+
+
+def permutation_lines(
+    *, planned: PlannedStage, losses: pl.DataFrame, records: list[IntervalRecord]
+) -> tuple[list[str], PermutationSummary | None]:
+    """Format the post hoc permutation test of one solar stage, if its fits are saved.
+
+    Args:
+        planned: The stage and its rows.
+        losses: The stage's saved losses at both settings.
+        records: Where every printed value is appended for `intervals.parquet`.
+
+    Returns:
+        The section's Markdown lines and the summary. Both are empty or `None` where the stage is
+        not solar or its extra controls are not all saved.
+    """
+    stage = planned.stage
+    saved = set(losses.select("arm", "setting").unique().iter_rows())
+    if not permutation_jobs(stage=stage) or not set(permutation_jobs(stage=stage)) <= saved:
+        return [], None
+    pad, blend, control, control_b = stage_arms(day=stage.day)
+    primary = at_setting(losses=losses, setting=PRIMARY)
+    seeded = {
+        0: control,
+        1000: control_b,
+        **dict(zip(PERMUTATION_SEEDS, permutation_arms(day=stage.day), strict=True)),
+    }
+    draws: dict[int, float] = {}
+    for seed, arm in seeded.items():
+        value, n_rows, n_months = mean_difference(losses=primary, treatment=arm, reference=pad)
+        draws[seed] = value
+        records.append(
+            permutation_record(
+                stage=stage,
+                contrast="permutation_draw",
+                scope=f"{PERMUTATION_SCOPE}: seed {seed}",
+                value=value,
+                n_rows=n_rows,
+                n_months=n_months,
+            )
+        )
+    p1, n_rows, n_months = mean_difference(losses=primary, treatment=blend, reference=pad)
+    summary = permutation_summary(planned=p1, draws=list(draws.values()))
+    for contrast, value in (
+        ("permutation_p1", p1),
+        ("permutation_rank", float(summary.rank)),
+        ("permutation_p", summary.p_value),
+    ):
+        records.append(
+            permutation_record(
+                stage=stage,
+                contrast=contrast,
+                scope=PERMUTATION_SCOPE,
+                value=value,
+                n_rows=n_rows,
+                n_months=n_months,
+            )
+        )
+    scale = PERCENTAGE_POINTS
+    lines = [
+        f"#### Post hoc: permutation test, {stage.domain} lead day {stage.day}",
+        "",
+        (
+            f"Post hoc and exploratory, added after the second science review. Each of the "
+            f"{len(draws)} shuffled controls (the planned two and {len(PERMUTATION_SEEDS)} "
+            "extra, fitted at the primary setting only) shuffles UKV-CEDA's columns within "
+            "generator, year-month, and hour of day under its own seed. The table gives each "
+            "control's mean error minus padded ENS's, in points of capacity on the stage's rows."
+        ),
+        "",
+        "| Shuffle seed | Control minus padded ENS (points) |",
+        "|---|---|",
+        *(f"| {seed} | {value * scale:+.3f} |" for seed, value in sorted(draws.items())),
+        f"| planned blend (P1) | {p1 * scale:+.3f} |",
+        "",
+        (
+            f"The planned blend's P1 is {p1 * scale:+.3f} points. The lowest control is "
+            f"{min(draws.values()) * scale:+.3f} and the median is "
+            f"{float(np.median(list(draws.values()))) * scale:+.3f}. Among the {len(draws) + 1} "
+            f"values (the {len(draws)} controls and P1), P1 ranks {summary.rank} from the lowest. "
+            f"The one-sided permutation p-value is {summary.p_value:.3f}; with {len(draws)} "
+            f"controls the smallest value it can take is {1 / (len(draws) + 1):.3f}."
+        ),
+        "",
+    ]
+    return lines, summary
+
+
+def permutation_summary_lines(
+    *, summaries: Mapping[tuple[str, int], PermutationSummary]
+) -> list[str]:
+    """Format every solar stage's permutation test as one table, empty if none is saved."""
+    if not summaries:
+        return []
+    scale = PERCENTAGE_POINTS
+    lines = [
+        (
+            "| Technology | Lead day | Planned P1 (points) | Lowest control (points) "
+            "| Median control (points) | Highest control (points) | Rank of P1 (1 is lowest) "
+            "| Permutation p-value |"
+        ),
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    lines += [
+        f"| {domain} | {day} | {item.planned * scale:+.3f} | {min(item.draws) * scale:+.3f} "
+        f"| {float(np.median(item.draws)) * scale:+.3f} | {max(item.draws) * scale:+.3f} "
+        f"| {item.rank} of {len(item.draws) + 1} | {item.p_value:.3f} |"
+        for (domain, day), item in summaries.items()
+    ]
+    return lines
+
+
+OLDER_CONTRASTS: Final[dict[str, str]] = {
+    "older_p1": "Older-run blend minus padded ENS trained on the older-run rows (P1, older run)",
+    "older_p2": "Older-run blend minus its shuffled control (P2, older run; first seed)",
+    "older_vs_fresh": "Older-run blend minus the planned blend (UKV-CEDA run 12 hours older)",
+    "fresh_p1_same_rows": "Planned blend minus padded ENS, on the older-run rows",
+    "training_rows": (
+        "Tilt: padded ENS trained on all rows minus padded ENS trained on the older-run rows"
+    ),
+}
+"""The post hoc older-run section's contrasts, by their code in `intervals.parquet`."""
+
+
+class OlderReading(NamedTuple):
+    """What a stage's older-run section concludes, for the older-run readings table."""
+
+    reading: str
+    p1: dict[str, BootstrapInterval]
+    p2: dict[str, BootstrapInterval]
+    fresh_p1: dict[str, BootstrapInterval]
+
+
+def older_lines(
+    *, planned: PlannedStage, losses: pl.DataFrame, records: list[IntervalRecord]
+) -> tuple[list[str], OlderReading | None]:
+    """Format the post hoc older-run section of one stage, if its fits are saved.
+
+    The older-run blend reads UKV-CEDA's 15 UTC run of the day before ENS's run, which starts 9
+    hours before ENS's 00 UTC run and leads 12 hours longer than the planned blend's run.
+
+    Args:
+        planned: The stage and its rows.
+        losses: The stage's saved losses at both settings.
+        records: Where every printed interval is appended for `intervals.parquet`.
+
+    Returns:
+        The section's Markdown lines, and what the stage concludes. Both are empty or `None` where
+        the stage has no complete saved older-run fit.
+    """
+    stage, rows = planned.stage, planned.older_frame
+    saved = set(losses.select("arm", "setting").unique().iter_rows())
+    if rows is None or not set(older_jobs(day=stage.day)) <= saved:
+        return [], None
+    pad, fresh, _, _ = stage_arms(day=stage.day)
+    older_pad, older, older_control = older_arms(day=stage.day)
+    on_rows = {
+        setting: at_setting(losses=losses, setting=setting).join(
+            rows.select("site", "time"), on=["site", "time"]
+        )
+        for setting in SETTINGS
+    }
+    pairs = {
+        "older_p1": (older, older_pad),
+        "older_p2": (older, older_control),
+        "older_vs_fresh": (older, fresh),
+        "fresh_p1_same_rows": (fresh, pad),
+        "training_rows": (pad, older_pad),
+    }
+    intervals = {
+        code: {
+            setting: difference(losses=on_rows[setting], treatment=treatment, reference=reference)
+            for setting in SETTINGS
+        }
+        for code, (treatment, reference) in pairs.items()
+    }
+    for code, by_setting in intervals.items():
+        records.extend(
+            record(
+                stage=stage, setting=setting, contrast=code, scope=OLDER_SCOPE, interval=interval
+            )
+            for setting, interval in by_setting.items()
+        )
+    verdict = reading(
+        day=stage.day,
+        p1=intervals["older_p1"],
+        p2={setting: [intervals["older_p2"][setting]] for setting in SETTINGS},
+    )
+    lines = [
+        f"#### Post hoc: ENS day {stage.day} plus UKV-CEDA's older run, {stage.domain}",
+        "",
+        (
+            "Post hoc and exploratory, added after the second science review. UKV-CEDA's columns "
+            "come from the 15 UTC run of the day before ENS's run. That run starts 9 hours before "
+            "ENS's 00 UTC run, where the planned blend's run starts 3 hours after it, and its lead "
+            "is 12 hours longer. The two changes move together, so this contrast cannot separate "
+            f"the effect of the longer lead from the effect of the earlier start. {rows.height} of "
+            f"the stage's {planned.frame.height} rows hold the older run. The older-run blend, its "
+            "control, and its padded ENS reference were fitted on those rows. The planned blend "
+            f"and the planned padded ENS reference were fitted on all {planned.frame.height} "
+            f"rows, and every contrast below scores the same {rows.height} rows. The last "
+            "contrast is the measured effect of the planned reference's extra training rows."
+        ),
+        "",
+        "| Contrast (points) | Primary | Sensitivity |",
+        "|---|---|---|",
+        *(
+            f"| {label} | {interval_cell(interval=intervals[code][PRIMARY])} "
+            f"| {interval_cell(interval=intervals[code][SENSITIVITY])} |"
+            for code, label in OLDER_CONTRASTS.items()
+        ),
+        "",
+        (
+            f"Post hoc reading, one control seed: {verdict}. P1 (older run) at the primary "
+            f"setting: {null_reading(interval=intervals['older_p1'][PRIMARY])}. At the "
+            f"sensitivity setting: {null_reading(interval=intervals['older_p1'][SENSITIVITY])}."
+        ),
+        "",
+        "| Arm | Setting | Error (% of capacity) | 95% interval | Rows | Months |",
+        "|---|---|---|---|---|---|",
+    ]
+    for setting in SETTINGS:
+        board = leaderboard(
+            losses=on_rows[setting], arms=[pad, fresh, older_pad, older, older_control]
+        )
+        for row in board.iter_rows(named=True):
+            records.append(
+                {
+                    "domain": stage.domain,
+                    "day": stage.day,
+                    "setting": setting,
+                    "contrast": "error",
+                    "scope": f"{OLDER_SCOPE} rows: {row['arm']}",
+                    "level": 95.0,
+                    "difference": row["value"],
+                    "lower": row["lower_95"],
+                    "upper": row["upper_95"],
+                    "n_rows": row["n_rows"],
+                    "n_months": row["n_months"],
+                }
+            )
+            text = error_text(value=row["value"], lower=row["lower_95"], upper=row["upper_95"])
+            value, interval_part = text.split(" [")
+            lines.append(
+                f"| `{row['arm']}` | {setting} | {value} | [{interval_part} | {row['n_rows']} "
+                f"| {row['n_months']} |"
+            )
+    lines.append("")
+    return lines, OlderReading(
+        reading=verdict,
+        p1=intervals["older_p1"],
+        p2=intervals["older_p2"],
+        fresh_p1=intervals["fresh_p1_same_rows"],
+    )
+
+
+def older_summary_lines(*, readings: Mapping[tuple[str, int], OlderReading]) -> list[str]:
+    """Format the older-run readings as one table, empty if none are saved."""
+    if not readings:
+        return []
+    scale = PERCENTAGE_POINTS
+    lines = [
+        (
+            "| Technology | Lead day | Reading | Planned P1, same rows, primary / sensitivity "
+            "| Older-run P1, primary / sensitivity "
+            "| Older-run P2 (control), primary / sensitivity |"
+        ),
+        "|---|---|---|---|---|---|",
+    ]
+    for (domain, day), item in readings.items():
+        cells = [
+            " / ".join(
+                f"{interval[setting]['difference'] * scale:+.3f} "
+                f"[{interval[setting]['lower_95'] * scale:+.3f}, "
+                f"{interval[setting]['upper_95'] * scale:+.3f}]"
+                for setting in SETTINGS
+            )
+            for interval in (item.fresh_p1, item.p1, item.p2)
+        ]
+        lines.append(f"| {domain} | {day} | {item.reading} | " + " | ".join(cells) + " |")
+    return lines
+
+
 def columns_lines() -> list[str]:
     """Print every arm's feature columns at lead day 1 for each technology, for a reviewer."""
     lines = ["## Columns of every arm at lead day 1", ""]
@@ -1678,6 +2303,8 @@ def report_text(
     stale_summary: Sequence[str],
     cpu_line: str,
     padding_line: str,
+    permutation_summary: Sequence[str] = (),
+    older_summary: Sequence[str] = (),
 ) -> str:
     """Return `report.md`: the design, the readings, the columns, and every stage.
 
@@ -1687,6 +2314,8 @@ def report_text(
         stale_summary: The post hoc stale blend's readings table, empty if none is saved.
         cpu_line: The GPU-CPU noise-floor sentence.
         padding_line: The sentence on whether padded and unpadded ENS score identically.
+        permutation_summary: The post hoc permutation test's table, empty if none is saved.
+        older_summary: The post hoc older-run readings table, empty if none is saved.
 
     Returns:
         The report.
@@ -1735,6 +2364,37 @@ def report_text(
                 "",
             ]
             if stale_summary
+            else []
+        ),
+        *(
+            [
+                (
+                    "Post hoc: permutation test of the solar blend. The planned blend's P1 is "
+                    "placed among the differences from padded ENS of the planned two shuffled "
+                    "controls and 15 extra, all at the primary setting."
+                ),
+                "",
+                *permutation_summary,
+                "",
+            ]
+            if permutation_summary
+            else []
+        ),
+        *(
+            [
+                (
+                    "Post hoc: ENS day N plus UKV-CEDA's 15 UTC run of the day before ENS's run. "
+                    "This tests how the gain falls as the UKV-CEDA run gets older: the run "
+                    "starts 9 hours before ENS's 00 UTC run, where the planned blend's run starts "
+                    "3 hours after it, and the lead is 12 hours longer. It cannot separate the "
+                    "effect of the longer lead from the effect of the earlier start, because "
+                    "the two change together. The planned P1 on the same rows is the reference."
+                ),
+                "",
+                *older_summary,
+                "",
+            ]
+            if older_summary
             else []
         ),
         cpu_line,
@@ -1811,6 +2471,8 @@ def build_report(*, planned: Sequence[PlannedStage], output_dir: Path) -> tuple[
     records: list[IntervalRecord] = []
     readings: dict[tuple[str, int], StageReading] = {}
     stale_readings: dict[tuple[str, int], str] = {}
+    permutations: dict[tuple[str, int], PermutationSummary] = {}
+    older_readings: dict[tuple[str, int], OlderReading] = {}
     sections: list[tuple[str, list[str]]] = []
     gpu_wind_day1: pl.DataFrame | None = None
     for domain in fit_aifs.DOMAINS:
@@ -1826,6 +2488,16 @@ def build_report(*, planned: Sequence[PlannedStage], output_dir: Path) -> tuple[
             lines += stale_text
             if stale_reading is not None:
                 stale_readings[(domain, item.stage.day)] = stale_reading
+            permutation_text, permutation = permutation_lines(
+                planned=item, losses=losses, records=records
+            )
+            lines += permutation_text
+            if permutation is not None:
+                permutations[(domain, item.stage.day)] = permutation
+            older_text, older_reading = older_lines(planned=item, losses=losses, records=records)
+            lines += older_text
+            if older_reading is not None:
+                older_readings[(domain, item.stage.day)] = older_reading
         sections.append((domain.capitalize(), lines))
     cpu_file = output_dir / f"{stem(stage=Stage('wind', 1), group=CPU_GROUP)}_losses.parquet"
     cpu_line = "No CPU refit is saved."
@@ -1838,6 +2510,8 @@ def build_report(*, planned: Sequence[PlannedStage], output_dir: Path) -> tuple[
             stale_summary=stale_summary_lines(readings=stale_readings),
             cpu_line=cpu_line,
             padding_line=padding_check_line(output_dir=output_dir),
+            permutation_summary=permutation_summary_lines(summaries=permutations),
+            older_summary=older_summary_lines(readings=older_readings),
         ),
         pl.DataFrame(records),
     )
@@ -1847,28 +2521,35 @@ def build_report(*, planned: Sequence[PlannedStage], output_dir: Path) -> tuple[
 
 
 def print_plan(
-    *, planned: Sequence[PlannedStage], output_dir: Path, only_missing: bool, post_hoc: bool = False
+    *,
+    planned: Sequence[PlannedStage],
+    output_dir: Path,
+    only_missing: bool,
+    post_hoc: PostHocKind | None = None,
 ) -> None:
     """Print every stage's rows and fits, and the number of (arm, site) fits, without fitting.
 
-    Under `post_hoc` the listed fits are the stale blend's, on the stale rows.
+    Under `post_hoc` the listed fits are that analysis's, on its rows.
     """
     total = 0
     for item in planned:
         group, jobs = jobs_to_fit(
             output_dir=output_dir, stage=item.stage, only_missing=only_missing, post_hoc=post_hoc
         )
-        rows = item.frame if not post_hoc else item.stale_frame
-        if rows is None:
-            sys.stdout.write(f"{item.stage.domain} day {item.stage.day}: no stale blend\n")
+        rows = item.frame if post_hoc is None else post_hoc_frame(planned=item, kind=post_hoc)
+        if rows is None or (
+            post_hoc is not None and not post_hoc_jobs(stage=item.stage, kind=post_hoc)
+        ):
+            sys.stdout.write(f"{item.stage.domain} day {item.stage.day}: no {post_hoc} fits\n")
             continue
         sites = rows["site"].n_unique()
         total += len(jobs) * sites
-        lacking = f" ({item.frame.height - rows.height} stage rows lack the next day)"
+        missing = "the next day" if post_hoc == "stale" else "the older run"
+        lacking = f" ({item.frame.height - rows.height} stage rows lack {missing})"
         sys.stdout.write(
             f"{item.stage.domain} day {item.stage.day}: {rows.height} rows"
-            f"{lacking if post_hoc else ''}, {sites} sites, fold offsets {item.offsets}, "
-            f"group {group}: {len(jobs)} (arm, setting) fits\n"
+            f"{lacking if post_hoc in ('stale', 'older run') else ''}, {sites} sites, "
+            f"fold offsets {item.offsets}, group {group}: {len(jobs)} (arm, setting) fits\n"
         )
     sys.stdout.write(f"{total} (arm, site) fits in all\n")
 
@@ -1970,7 +2651,7 @@ def run_fits(
     output_dir: Path,
     workers: int,
     only_missing: bool,
-    post_hoc: bool = False,
+    post_hoc: PostHocKind | None = None,
     report_name: str = "report",
 ) -> int:
     """Fit every stage, then the CPU refit, and write the report and intervals once.
@@ -1980,8 +2661,8 @@ def run_fits(
         output_dir: The write-once folder.
         workers: How many (arm, site) fits run at once.
         only_missing: Whether to fit the pairs a partly saved stage lacks.
-        post_hoc: Whether to fit the post hoc stale blend instead of the planned arms. The CPU
-            refit is then skipped.
+        post_hoc: Which post hoc analysis to fit instead of the planned arms. The CPU refit is
+            then skipped.
         report_name: The report's name, `report` or a new name for a rerun.
 
     Returns:
@@ -1997,7 +2678,7 @@ def run_fits(
             only_missing=only_missing,
             post_hoc=post_hoc,
         )
-        if item.stage == Stage("wind", 1) and not post_hoc:
+        if item.stage == Stage("wind", 1) and post_hoc is None:
             cpu_noise_floor(planned=item, output_dir=output_dir, gpu=losses)
         _LOG.info("%s day %d: fitted", item.stage.domain, item.stage.day)
     text, intervals = build_report(planned=planned, output_dir=output_dir)
@@ -2038,30 +2719,61 @@ def main() -> int:
     )
     parser.add_argument("--day4-dir", type=Path, default=studies_dir / build.DAY4_DIR_NAME)
     parser.add_argument("--output-dir", type=Path, default=studies_dir / build.OUTPUT_DIR_NAME)
+    parser.add_argument(
+        "--older-dir",
+        type=Path,
+        default=None,
+        help="The older-run build's folder; read to fit or to report the older-run blend.",
+    )
     parser.add_argument("--workers", type=workers_argument, default=MAX_WORKERS)
     parser.add_argument("--dry-run", action="store_true", help="List the fits; fit nothing.")
     parser.add_argument("--check", action="store_true", help="Time one fit twice; compare padding.")
     parser.add_argument("--only-missing", action="store_true", help="Fit the pairs no file holds.")
     parser.add_argument("--report-only", action="store_true", help="Write the report; fit nothing.")
-    parser.add_argument(
+    post_hoc = parser.add_mutually_exclusive_group()
+    post_hoc.add_argument(
         "--post-hoc-stale",
-        action="store_true",
+        action="store_const",
+        const="stale",
+        dest="post_hoc",
         help="Fit the post hoc stale UKV-CEDA blend (ENS day N plus UKV-CEDA day N + 1).",
+    )
+    post_hoc.add_argument(
+        "--post-hoc-permutation",
+        action="store_const",
+        const="permutation",
+        dest="post_hoc",
+        help="Fit 15 extra shuffled controls per solar stage at the primary setting.",
+    )
+    post_hoc.add_argument(
+        "--post-hoc-older-run",
+        action="store_const",
+        const="older run",
+        dest="post_hoc",
+        help="Fit the post hoc older-run blend (UKV-CEDA's 15 UTC run of the day before ENS's).",
     )
     parser.add_argument(
         "--report-name", default="report", help="The report's name, `report` or new."
     )
     args = parser.parse_args()
+    kind: PostHocKind | None = args.post_hoc
+    older_dir: Path | None = args.older_dir
+    if kind == "older run" and older_dir is None:
+        older_dir = studies_dir / build.OLDER_RUN.output_dir_name
     check_output_dir(output_dir=args.output_dir, read_only=[args.published_dir, args.day4_dir])
     planned = plan_stages(
-        published_dir=args.published_dir, day4_dir=args.day4_dir, output_dir=args.output_dir
+        published_dir=args.published_dir,
+        day4_dir=args.day4_dir,
+        output_dir=args.output_dir,
+        older_dir=older_dir,
+        permutation=kind == "permutation" and not args.report_only,
     )
     if args.dry_run:
         print_plan(
             planned=planned,
             output_dir=args.output_dir,
             only_missing=args.only_missing,
-            post_hoc=args.post_hoc_stale,
+            post_hoc=kind,
         )
         return 0
     if args.report_only:
@@ -2077,12 +2789,17 @@ def main() -> int:
     if args.check:
         return run_check(planned=planned, output_dir=args.output_dir)
     check_verified(output_dir=args.output_dir, stamp=read_build_stamp(output_dir=args.output_dir))
+    if older_dir is not None:
+        check_verified(
+            output_dir=older_dir,
+            stamp=read_build_stamp(output_dir=older_dir, spec=build.OLDER_RUN),
+        )
     return run_fits(
         planned=planned,
         output_dir=args.output_dir,
         workers=args.workers,
         only_missing=args.only_missing,
-        post_hoc=args.post_hoc_stale,
+        post_hoc=kind,
         report_name=args.report_name,
     )
 

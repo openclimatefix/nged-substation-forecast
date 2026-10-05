@@ -333,3 +333,113 @@ def test_a_stamp_must_name_its_technology_in_its_file_name(tmp_path: Path):
     assert unchanged.stamp_domain(path=tmp_path / "wind_ens_losses.json") == "wind"
     with pytest.raises(ValueError, match="solar or wind"):
         unchanged.stamp_domain(path=tmp_path / "p4_losses.json")
+
+
+# --- the post hoc older run -----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("domain", "label", "day", "init", "lead"),
+    [
+        ("wind", datetime(2026, 3, 10, 12), 1, datetime(2026, 3, 8, 15), 45),
+        ("wind", datetime(2026, 3, 10, 0), 3, datetime(2026, 3, 6, 15), 81),
+        ("solar", datetime(2026, 3, 10, 13), 2, datetime(2026, 3, 7, 15), 70),
+        ("solar", datetime(2026, 3, 11, 0), 1, datetime(2026, 3, 8, 15), 57),
+    ],
+)
+def test_the_older_run_rule_is_restated_independently_of_the_build(
+    domain: DomainType, label: datetime, day: int, init: datetime, lead: int
+):
+    got_init, slot, got_lead = verify.run_of_row(
+        time=label.replace(tzinfo=UTC), day=day, domain=domain, spec=build.OLDER_RUN
+    )
+
+    assert got_init == init.replace(tzinfo=UTC)
+    assert got_lead == lead
+    assert build.slot_init_time(slot=slot) == got_init
+
+
+def test_the_older_run_rule_agrees_with_the_builds_own_for_every_hour_of_a_day():
+    hours = [datetime(2026, 3, 10, hour, tzinfo=UTC) for hour in range(24)]
+    for domain in ("solar", "wind"):
+        for day in build.OLDER_RUN.lead_days:
+            built = build.with_run(
+                frame=pl.DataFrame({"site": ["A"] * 24, "time": hours}),
+                day=day,
+                domain=domain,
+                spec=build.OLDER_RUN,
+            )
+            for row in built.iter_rows(named=True):
+                got = verify.run_of_row(
+                    time=row["time"], day=day, domain=domain, spec=build.OLDER_RUN
+                )
+                assert got == (row["init_time"], row["slot"], row["lead_hours"])
+
+
+def test_the_older_runs_sample_reads_its_own_columns_and_leads():
+    times = [datetime(2026, 3, day, hour, tzinfo=UTC) for day in range(5, 25) for hour in range(24)]
+    fields = build.WEATHER_FIELDS["wind"]
+    built = pl.DataFrame({"site": ["A"] * len(times), "time": times}).with_columns(
+        **{f"ukv_ceda_run15_day{d}_{field}": pl.lit(1.0) for d in (1, 2, 3) for field in fields}
+    )
+
+    strata = verify.sample_rows(built=built, domain="wind", day=1, spec=build.OLDER_RUN)
+
+    # A wind hour at lead day 1 of the older run has lead 33 + h: native up to h of 15 (lead 48),
+    # first rebuilt for h of 16 to 21 (leads 49 to 54), and late for h of 22 and 23.
+    assert {row["time"].hour for row in strata["native"]} <= set(range(16))
+    assert {row["time"].hour for row in strata["first rebuilt"]} <= set(range(16, 22))
+    assert {row["time"].hour for row in strata["late"]} <= {22, 23}
+    assert all(strata[name] for name in ("native", "first rebuilt", "late"))
+    assert f"ukv_ceda_run15_day1_{fields[0]}" in strata["native"][0]
+    assert verify.OLDER_DAY1_SNAPSHOT_LEADS.start == 33
+
+
+def test_the_older_skill_gate_fails_when_the_correlation_rises_or_beats_the_planned_run():
+    assert verify.older_skill_gate(older=[0.90, 0.88, 0.86], planned=[0.92, 0.90, 0.88]) == []
+    rising = verify.older_skill_gate(older=[0.88, 0.89, 0.86], planned=[0.92, 0.91, 0.88])
+    assert len(rising) == 1
+    assert "rises with the lead day" in rising[0]
+    better = verify.older_skill_gate(older=[0.935, 0.90, 0.86], planned=[0.92, 0.91, 0.88])
+    assert len(better) == 1
+    assert "day-1 correlation 0.935 of the older run is above the planned run's 0.920" in better[0]
+    # Within the tolerance of the planned run's correlation is allowed.
+    assert verify.older_skill_gate(older=[0.925, 0.90, 0.86], planned=[0.92, 0.91, 0.88]) == []
+
+
+def test_the_older_skill_lines_compare_both_runs_on_the_rows_both_hold():
+    rows = 50
+    truth = np.linspace(0.0, 1.0, rows)
+    older_noise = np.sin(np.arange(rows) * 7.0)
+    planned_noise = np.sin(np.arange(rows) * 3.0)
+    data = {"speed_10m_era5": truth}
+    for day, scale in zip((1, 2, 3), (0.1, 0.2, 0.4), strict=True):
+        data[f"ukv_ceda_run15_day{day}_speed_10m"] = truth + scale * older_noise
+        data[f"ukv_ceda_day{day}_speed_10m"] = truth + 0.05 * planned_noise
+    joined = pl.DataFrame(data)
+
+    lines, ok = verify.older_skill_lines(domain="wind", joined=joined)
+
+    assert ok
+    assert f"on the {rows} rows both runs hold at every lead day" in lines[0]
+    # A row missing the older run at one lead day leaves the shared rows.
+    holed = joined.with_columns(
+        ukv_ceda_run15_day2_speed_10m=pl.when(pl.int_range(pl.len()) == 0)
+        .then(None)
+        .otherwise(pl.col("ukv_ceda_run15_day2_speed_10m"))
+    )
+    holed_lines, _ = verify.older_skill_lines(domain="wind", joined=holed)
+    assert f"on the {rows - 1} rows both runs hold" in holed_lines[0]
+
+
+def test_the_older_verify_stamp_names_the_older_inputs_files(tmp_path: Path):
+    for domain in ("solar", "wind"):
+        pl.DataFrame({"a": [1]}).write_parquet(tmp_path / f"{domain}_ukv_ceda_run15_inputs.parquet")
+
+    verify.write_verify_stamp(output_dir=tmp_path, passed=True, spec=build.OLDER_RUN)
+
+    stamp = json.loads((tmp_path / "verify.json").read_text())
+    assert stamp["inputs_sha256"] == {
+        domain: build.sha256_of(path=tmp_path / f"{domain}_ukv_ceda_run15_inputs.parquet")
+        for domain in ("solar", "wind")
+    }

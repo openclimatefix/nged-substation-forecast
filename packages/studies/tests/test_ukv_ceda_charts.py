@@ -397,3 +397,114 @@ def test_each_headline_carries_its_own_technologys_title():
         chart = charts.headline(intervals=_intervals(domain=domain), domain=domain)
 
         assert charts.TITLES[domain] in " ".join(chart.to_dict()["title"]["text"])
+
+
+# --- the post hoc figures -------------------------------------------------------------------------
+
+
+def _post_hoc_intervals() -> pl.DataFrame:
+    records = []
+    for day, p1, rank, p_value in ((1, -0.0016, 1, 1 / 18), (2, -0.0008, 4, 4 / 18)):
+        draws = {
+            0: 0.0004,
+            1000: -0.0007,
+            **{2010 + 10 * k: 0.0001 * k - 0.0005 for k in range(15)},
+        }
+        for seed, value in draws.items():
+            records.append(
+                {
+                    **_record(
+                        domain="solar",
+                        day=day,
+                        setting="primary",
+                        contrast="permutation_draw",
+                        scope=f"post hoc permutation: seed {seed}",
+                        difference=value,
+                        lower=float("nan"),
+                        upper=float("nan"),
+                    )
+                }
+            )
+        for contrast, value in (
+            ("permutation_p1", p1),
+            ("permutation_rank", float(rank)),
+            ("permutation_p", p_value),
+        ):
+            records.append(
+                _record(
+                    domain="solar",
+                    day=day,
+                    setting="primary",
+                    contrast=contrast,
+                    scope="post hoc permutation",
+                    difference=value,
+                    lower=float("nan"),
+                    upper=float("nan"),
+                )
+            )
+    for domain in ("solar", "wind"):
+        for day in (1, 2, 3):
+            for setting in ("primary", "sensitivity"):
+                for code, centre in (
+                    ("fresh_p1_same_rows", -0.003),
+                    ("older_p1", -0.001),
+                    ("older_p2", -0.002),
+                ):
+                    records.append(
+                        _record(
+                            domain=domain,
+                            day=day,
+                            setting=setting,
+                            contrast=code,
+                            scope="post hoc older run",
+                            difference=centre,
+                            lower=centre - 0.001,
+                            upper=centre + 0.001,
+                        )
+                    )
+    return pl.DataFrame(records)
+
+
+def test_the_permutation_values_are_in_points_with_the_rank_and_p_value_of_p1():
+    draws, single = charts.permutation_values(intervals=_post_hoc_intervals(), day=2)
+
+    assert len(draws) == 17
+    assert single["p1"] == pytest.approx(-0.08)
+    assert single["rank"] == 4.0
+    assert single["p_value"] == pytest.approx(4 / 18)
+    assert min(draws) == pytest.approx(-0.07)  # seed 1000: -0.0007 of capacity
+    assert max(draws) == pytest.approx(0.09)  # the last extra seed: +0.0009
+
+
+def test_the_permutation_figure_titles_each_panel_with_its_rank_and_the_figure_with_the_days():
+    chart = charts.permutation_figure(intervals=_post_hoc_intervals())
+
+    text = json.dumps(chart.to_dict()).replace('", "', " ")
+    assert "rank 1 of 18 from the lowest, permutation p-value 0.056" in text
+    assert "rank 4 of 18 from the lowest, permutation p-value 0.222" in text
+    assert "larger than all 17 shuffled controls' at day 1" in text
+    assert "cannot go below 0.056" in text
+    assert "Figure 9:" in text
+
+
+def test_the_older_rows_hold_three_contrasts_at_both_settings_in_points():
+    rows = charts.older_rows(intervals=_post_hoc_intervals(), domain="wind", day=2)
+
+    assert rows["label"].to_list()[:2] == [
+        "Planned blend minus padded ENS, same rows",
+        "Planned blend minus padded ENS, same rows",
+    ]
+    assert rows.height == 6
+    assert set(rows["condition"]) == {"Primary setting", "Sensitivity setting"}
+    assert rows["difference"].to_list()[:2] == [pytest.approx(-0.3)] * 2
+    assert rows["lower_95"][0] == pytest.approx(-0.4)
+
+
+def test_the_older_figure_has_a_panel_per_lead_day_and_says_what_it_cannot_separate():
+    chart = charts.older_figure(intervals=_post_hoc_intervals(), domain="solar")
+
+    text = json.dumps(chart.to_dict()).replace('", "', " ")
+    assert text.count("Lead day ") >= 3
+    assert "cannot separate the longer lead from the earlier start" in text
+    assert "Figure 10:" in text
+    assert "Post hoc." in text

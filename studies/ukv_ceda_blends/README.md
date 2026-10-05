@@ -73,6 +73,18 @@ before the build and before every fit, and start only below a load average of ab
     --intervals-name report_2_intervals.parquet` draws every figure from the saved intervals and
     losses without fitting.
 
+11. `uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --post-hoc-permutation --dry-run`
+    lists the post hoc permutation test's fits (see "Post hoc permutation test" below), and the same
+    command with `--report-name report_3` instead of `--dry-run` fits them into new `_added_<k>`
+    files and writes `report_3.md` and `report_3_intervals.parquet`.
+12. `uv run python studies/ukv_ceda_blends/build_ukv_ceda_inputs.py --older-run --dry-run`, then
+    without `--dry-run` and with the same `--unlisted-days`, builds the older-run inputs into the
+    write-once folder `data/studies/ukv_ceda_blends_run15/`. `verify_ukv_ceda_inputs.py --older-run`
+    verifies them. `fit_ukv_ceda_blends.py --post-hoc-older-run --report-name report_4` fits the
+    older-run blend and writes `report_4.md` (see "Post hoc older run" below).
+13. `uv run python studies/ukv_ceda_blends/ukv_ceda_blends_charts.py --post-hoc-only --figures-dir DIR
+    --intervals-name report_4_intervals.parquet` draws the permutation and older-run figures.
+
 ## Outputs the report adds after the first science review
 
 - **Three readings.** A technology and lead day reads `lowers the error`, `no detectable
@@ -111,6 +123,36 @@ scores those rows. The report prints the planned padded reference minus the stal
 reference as the measured tilt from the planned reference's extra training rows. The fit count is
 216 (arm, site) fits: 3 lead days, 2 settings, 4 arms, and 9 generators. The stale blend is a post
 hoc, exploratory analysis added after the first science review.
+
+## Post hoc permutation test
+
+**The permutation test asks whether the solar blend's gain is larger than shuffled controls give by
+chance.** For each solar lead day, `--post-hoc-permutation` fits 15 further shuffled controls
+(`blend_ukv_ceda_dayN_control_s<seed>`, seeds 2010 to 2150 in steps of 10) at the primary setting
+only. Each shuffles UKV-CEDA's columns within generator, year-month, and hour of day, with the same
+groups as the planned control. The report prints the planned blend's P1 against the 17 values of
+(shuffled control minus padded ENS) from the planned two controls and the 15 extra ones, the rank of
+P1 among the 18 values, and the one-sided permutation p-value `(1 + controls at or below P1) / 18`,
+whose smallest possible value is 0.056. The test is exploratory and post hoc. It fits
+6 generators x 4 lead days x 15 seeds, 360 fits.
+
+## Post hoc older run
+
+**The older-run blend tests how the gain falls as the UKV-CEDA run gets older.** The arm
+`blend_ukv_ceda_run15_dayN` is ENS day `N` plus UKV-CEDA columns built from the 15 UTC run of the
+day before ENS's run, for `N` of 1 to 3. For an hour on day `D` at lead day `N`, the run starts at
+15:00 UTC on day `D - N - 1` and the lead is `24 * N + h + 9` hours (`h` the hour of the hour's
+instant, plus 1 for a solar label). That run starts 9 hours before ENS's 00 UTC run of day `D - N`,
+where the planned blend's run starts 3 hours after it, and leads 12 hours longer than the planned
+run. Day 4 cannot be built: its lead reaches 129 hours, beyond the store's 120, for every hour after
+14:00 UTC. The two changes, a longer lead and an earlier start against ENS, move together, so the
+arm cannot separate the effect of the lead from the effect of the timing. The arm has its own padded
+ENS reference refitted on its rows, one shuffled control (seed 0), and equal column counts (9 for
+solar, 11 for wind), at both settings, for both technologies. The report prints the older-run blend
+minus its padded ENS (P1), minus its control (P2), minus the planned blend, and the planned P1 on
+the same rows. Its inputs are built by `build_ukv_ceda_inputs.py --older-run` with the same coverage
+guard, stamp checks, and init-time assertions as the main build, into
+`data/studies/ukv_ceda_blends_run15/`.
 
 ## Scripts
 

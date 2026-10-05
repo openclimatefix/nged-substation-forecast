@@ -40,6 +40,14 @@ every gating check passed and the SHA-256 of each inputs file it read. `fit_ukv_
 refuses to fit unless that stamp passed and its hashes are the inputs' current ones. A later run
 replaces the stamp, because it describes the latest verification and not an output of the study.
 
+**The older-run inputs (`--older-run`) have their own entries.** The post hoc build reads the 15 UTC
+run of the day before ENS's run (`build.OLDER_RUN`) for lead days 1 to 3, and this script then
+recomputes its values, checks its run and lead restated independently of the build, gates the
+radiation timing at day 1, compares each lead day's correlation with CAMS and ERA5 against the
+planned run's on the same rows, and writes `verify.json` into the older-run folder. The skill gate
+is that the correlation never rises from one lead day to the next, and that the older run never
+correlates better than the planned run at the same lead day by more than `OLDER_TOLERANCE`.
+
 Run it with `uv run python studies/ukv_ceda_blends/verify_ukv_ceda_inputs.py`.
 """
 
@@ -96,6 +104,13 @@ MEAN_PEAK_TOLERANCE_MINUTES: Final[int] = 10
 DAY1_SNAPSHOT_LEADS: Final[range] = range(21, 46)
 """The native leads whose snapshots the day-1 rows average, in hours."""
 
+OLDER_DAY1_SNAPSHOT_LEADS: Final[range] = range(33, 49)
+"""The native hourly leads of the older run at day 1: its day-1 rows read leads 33 to 56, and the
+store is hourly only to lead 48."""
+
+OLDER_TOLERANCE: Final[float] = 0.01
+"""How far above the planned run's correlation the older run's may sit at the same lead day."""
+
 STEP_RATIO_THRESHOLD: Final[float] = 1.15
 """A month-to-month change in a generator's UKV-CEDA to ENS ratio beyond this factor is flagged."""
 
@@ -131,20 +146,26 @@ def haurwitz(*, zenith_deg: float) -> float:
     return 1098.0 * cosine * math.exp(-0.059 / cosine)
 
 
-def run_of_row(*, time: datetime, day: int, domain: DomainType) -> tuple[datetime, int, int]:
-    """Return the 03 UTC run a row reads, its slot in the store, and the lead of the row's label.
+def run_of_row(
+    *, time: datetime, day: int, domain: DomainType, spec: build.RunSpec = build.PLANNED_RUN
+) -> tuple[datetime, int, int]:
+    """Return the run a row reads, its slot in the store, and the lead of the row's label.
+
+    The run starts at `spec.run_hour` UTC on the day `day + spec.extra_days` days before the hour's
+    own day, restated here from `build.RunSpec`'s fields and not from `build.with_run`.
 
     Args:
         time: The hour's label.
-        day: The lead day.
+        day: The ENS lead day.
         domain: `solar` or `wind`.
+        spec: Which run is read.
 
     Returns:
         The run's start, its slot on the store's 12-hourly grid, and the lead in hours.
     """
     instant = time - timedelta(hours=1) if domain == "solar" else time
     midnight = datetime(instant.year, instant.month, instant.day, tzinfo=UTC)
-    init = midnight - timedelta(days=day) + timedelta(hours=build.RUN_HOUR)
+    init = midnight - timedelta(days=day + spec.extra_days) + timedelta(hours=spec.run_hour)
     slot = int((init - build.T120_PROFILE.slot_epoch) / timedelta(hours=build.SLOT_HOURS))
     lead = int((time - init) / timedelta(hours=1))
     return init, slot, lead
@@ -289,7 +310,7 @@ def read_run(*, store: build.StoreRead, variable: str, slot: int, cell: int) -> 
 
 
 def sample_rows(
-    *, built: pl.DataFrame, domain: DomainType, day: int
+    *, built: pl.DataFrame, domain: DomainType, day: int, spec: build.RunSpec = build.PLANNED_RUN
 ) -> dict[str, list[dict[str, Any]]]:
     """Shuffle the rows with values for one lead day into strata, ready to be sampled from.
 
@@ -297,16 +318,20 @@ def sample_rows(
         built: The technology's built inputs.
         domain: `solar` or `wind`.
         day: The lead day.
+        spec: Which run the inputs read.
 
     Returns:
         Each stratum of `STRATA`, and for wind `WIND_EARLY_HOURS`, to its rows as dictionaries of
         `site`, `time`, and the day's columns, in a seeded random order.
     """
-    columns = [f"ukv_ceda_day{day}_{field}" for field in build.WEATHER_FIELDS[domain]]
+    columns = [f"{spec.column_prefix}_day{day}_{field}" for field in build.WEATHER_FIELDS[domain]]
     present = built.filter(pl.col(columns[0]).is_not_null()).select("site", "time", *columns)
     marked = present.with_columns(
         lead=served_lead_hours(
-            time=pl.col("time"), day=day, domain=domain, run_hour=build.RUN_HOUR
+            time=pl.col("time"),
+            day=day + spec.extra_days,
+            domain=domain,
+            run_hour=spec.run_hour,
         ),
         hour=pl.col("time").dt.hour(),
     )
@@ -387,6 +412,7 @@ def check_row(
     day: int,
     row: dict[str, Any],
     cell: SiteCell,
+    spec: build.RunSpec = build.PLANNED_RUN,
 ) -> tuple[int, list[Mismatch]]:
     """Recompute one row's columns from the store and compare them with the built values.
 
@@ -396,12 +422,13 @@ def check_row(
         day: The lead day.
         row: A sampled row, with `site`, `time` and the day's columns.
         cell: The site's cell.
+        spec: Which run the inputs read.
 
     Returns:
         How many columns were recomputed (0 if the row was not checkable), and the mismatches.
     """
-    init, slot, lead = run_of_row(time=row["time"], day=day, domain=domain)
-    prefix = f"ukv_ceda_day{day}_"
+    init, slot, lead = run_of_row(time=row["time"], day=day, domain=domain, spec=spec)
+    prefix = f"{spec.column_prefix}_day{day}_"
     if domain == "solar":
         recomputed = recompute_solar(
             store=store, init=init, slot=slot, lead=lead, cell=cell, prefix=prefix
@@ -426,7 +453,11 @@ def _linear_fill(*, values: Sequence[float], lead: int) -> float:
 
 
 def check_values(
-    *, store: build.StoreRead, domain: DomainType, built: pl.DataFrame
+    *,
+    store: build.StoreRead,
+    domain: DomainType,
+    built: pl.DataFrame,
+    spec: build.RunSpec = build.PLANNED_RUN,
 ) -> tuple[int, list[Mismatch]]:
     """Recompute a stratified sample of one technology at every lead day.
 
@@ -434,6 +465,7 @@ def check_values(
         store: The opened store.
         domain: `solar` or `wind`.
         built: The technology's built inputs.
+        spec: Which run the inputs read.
 
     Returns:
         How many values were recomputed, and every mismatch.
@@ -441,15 +473,20 @@ def check_values(
     cells = site_cells(store=store, domain=domain, sites=built["site"].unique().to_list())
     checked = 0
     found: list[Mismatch] = []
-    for day in build.LEAD_DAYS:
+    for day in spec.lead_days:
         recomputed_rows: dict[str, int] = {}
-        for name, records in sample_rows(built=built, domain=domain, day=day).items():
+        for name, records in sample_rows(built=built, domain=domain, day=day, spec=spec).items():
             done = 0
             for row in records:
                 if done >= SAMPLE_PER_STRATUM:
                     break
                 count, mismatches = check_row(
-                    store=store, domain=domain, day=day, row=row, cell=cells[row["site"]]
+                    store=store,
+                    domain=domain,
+                    day=day,
+                    row=row,
+                    cell=cells[row["site"]],
+                    spec=spec,
                 )
                 if count:
                     done += 1
@@ -500,6 +537,32 @@ def skill_gate(
     return reasons
 
 
+def older_skill_gate(*, older: Sequence[float], planned: Sequence[float]) -> list[str]:
+    """Return why the older run's skill check fails, if it does.
+
+    The older run leads 12 hours longer than the planned run at every lead day, so its correlation
+    with the reference must not rise with the lead day and must not beat the planned run's at the
+    same lead day by more than `OLDER_TOLERANCE`.
+
+    Args:
+        older: The older run's correlation with the reference at each lead day, day 1 first.
+        planned: The planned run's correlation on the same rows, at the same lead days.
+
+    Returns:
+        The reasons, empty if the check passes.
+    """
+    reasons = []
+    if not non_increasing(values=older):
+        reasons.append(f"the correlation rises with the lead day: {[round(v, 3) for v in older]}")
+    for day, (older_value, planned_value) in enumerate(zip(older, planned, strict=True), start=1):
+        if older_value > planned_value + OLDER_TOLERANCE:
+            reasons.append(
+                f"day-{day} correlation {older_value:.3f} of the older run is above the planned "
+                f"run's {planned_value:.3f} by more than {OLDER_TOLERANCE}"
+            )
+    return reasons
+
+
 def alignment_gate(*, raw_peaks: Sequence[int], rebuilt_peaks: Sequence[int]) -> list[str]:
     """Return why the day-1 radiation timing fails, if it does, from the median over generators.
 
@@ -527,13 +590,20 @@ def alignment_gate(*, raw_peaks: Sequence[int], rebuilt_peaks: Sequence[int]) ->
     return reasons
 
 
-def raw_day1_peak(*, store: build.StoreRead, cell: SiteCell, init_times: Sequence[datetime]) -> int:
+def raw_day1_peak(
+    *,
+    store: build.StoreRead,
+    cell: SiteCell,
+    init_times: Sequence[datetime],
+    leads: range = DAY1_SNAPSHOT_LEADS,
+) -> int:
     """Return where a site's raw day-1 radiation snapshots track the sun best, in minutes.
 
     Args:
         store: The opened store.
         cell: The site's cell.
         init_times: The runs the site's day-1 rows read.
+        leads: The native leads whose snapshots are correlated.
 
     Returns:
         The offset of the correlation's peak.
@@ -543,7 +613,7 @@ def raw_day1_peak(*, store: build.StoreRead, cell: SiteCell, init_times: Sequenc
     for init in init_times:
         slot = int((init - build.T120_PROFILE.slot_epoch) / timedelta(hours=build.SLOT_HOURS))
         series = read_run(store=store, variable="shortwave_down", slot=slot, cell=cell.cell)
-        for lead in DAY1_SNAPSHOT_LEADS:
+        for lead in leads:
             if math.isfinite(series[lead]):
                 times.append(init + timedelta(hours=lead))
                 values.append(series[lead])
@@ -562,6 +632,7 @@ def alignment_lines(
     joined: pl.DataFrame,
     cells: dict[str, SiteCell],
     store: build.StoreRead,
+    spec: build.RunSpec = build.PLANNED_RUN,
 ) -> tuple[list[str], bool]:
     """Run the radiation peak-offset check at every lead day, gating day 1 on the median.
 
@@ -570,6 +641,7 @@ def alignment_lines(
         joined: Built inputs with `site` and `time`.
         cells: Each site's coordinates.
         store: The opened store, read for the raw day-1 snapshots.
+        spec: Which run the inputs read.
 
     Returns:
         The printed lines, and whether the day-1 gate passed.
@@ -579,14 +651,15 @@ def alignment_lines(
     lines: list[str] = []
     raw_peaks: list[int] = []
     rebuilt_peaks: list[int] = []
-    for day in build.LEAD_DAYS:
+    prefix = spec.column_prefix
+    for day in spec.lead_days:
         for site, cell in sorted(cells.items()):
             frame = joined.filter(
-                pl.col("site") == site, pl.col(f"ukv_ceda_day{day}_ghi").is_not_null()
+                pl.col("site") == site, pl.col(f"{prefix}_day{day}_ghi").is_not_null()
             )
             correlations = correlation_by_offset(
                 times=frame["time"],
-                ghi=frame[f"ukv_ceda_day{day}_ghi"].to_numpy(),
+                ghi=frame[f"{prefix}_day{day}_ghi"].to_numpy(),
                 latitude=cell.latitude,
                 longitude=cell.longitude,
             )
@@ -599,7 +672,8 @@ def alignment_lines(
                 raw = raw_day1_peak(
                     store=store,
                     cell=cell,
-                    init_times=frame["ukv_ceda_day1_init_time"].unique().to_list(),
+                    init_times=frame[f"{prefix}_day1_init_time"].unique().to_list(),
+                    leads=OLDER_DAY1_SNAPSHOT_LEADS if spec.extra_days else DAY1_SNAPSHOT_LEADS,
                 )
                 raw_peaks.append(raw)
                 lines.append(f"solar day 1 site {site}: raw snapshots peak at {raw:+d} minutes")
@@ -612,7 +686,9 @@ def alignment_lines(
     return lines, not reasons
 
 
-def wind_offset_lines(*, joined: pl.DataFrame) -> list[str]:
+def wind_offset_lines(
+    *, joined: pl.DataFrame, spec: build.RunSpec = build.PLANNED_RUN
+) -> list[str]:
     """Print the correlation of day-1 10 m wind speed with wind power at each shift in hours."""
     lines = ["wind day 1: correlation of UKV-CEDA 10 m speed with power, speed shifted by hours"]
     power = joined.select("site", "time", "power_mw")
@@ -620,7 +696,7 @@ def wind_offset_lines(*, joined: pl.DataFrame) -> list[str]:
         moved = joined.select(
             "site",
             time=pl.col("time").dt.offset_by(f"{shift}h"),
-            speed=pl.col("ukv_ceda_day1_speed_10m"),
+            speed=pl.col(f"{spec.column_prefix}_day1_speed_10m"),
         )
         paired = power.join(moved, on=["site", "time"]).drop_nulls()
         value = correlation(first=paired["speed"], second=paired["power_mw"])
@@ -628,20 +704,23 @@ def wind_offset_lines(*, joined: pl.DataFrame) -> list[str]:
     return lines
 
 
-def step_lines(*, joined: pl.DataFrame, domain: DomainType) -> list[str]:
+def step_lines(
+    *, joined: pl.DataFrame, domain: DomainType, spec: build.RunSpec = build.PLANNED_RUN
+) -> list[str]:
     """Flag a month whose UKV-CEDA to ENS mean ratio differs from the month before by 15% or more.
 
     Args:
         joined: Built inputs joined with ENS's day-1 mean, with `site` and `time`.
         domain: `solar` or `wind`.
+        spec: Which run the inputs read.
 
     Returns:
         One line per flagged generator and month.
     """
     column, ens = (
-        ("ukv_ceda_day1_ghi", "ens_mean_day1_ghi")
+        (f"{spec.column_prefix}_day1_ghi", "ens_mean_day1_ghi")
         if domain == "solar"
-        else ("ukv_ceda_day1_speed_10m", "ens_mean_day1_speed_10m")
+        else (f"{spec.column_prefix}_day1_speed_10m", "ens_mean_day1_speed_10m")
     )
     monthly = (
         joined.drop_nulls([column, ens])
@@ -660,16 +739,57 @@ def step_lines(*, joined: pl.DataFrame, domain: DomainType) -> list[str]:
     return lines or [f"{domain}: no month-to-month change of {STEP_RATIO_THRESHOLD}x or more"]
 
 
-def skill_lines(*, domain: DomainType, joined: pl.DataFrame) -> tuple[list[str], bool]:
+def older_skill_lines(*, domain: DomainType, joined: pl.DataFrame) -> tuple[list[str], bool]:
+    """Print the older run's correlation at each lead day beside the planned run's, and gate it.
+
+    Args:
+        domain: `solar` or `wind`.
+        joined: Rows carrying the published reference, both runs' columns
+            (`ukv_ceda_day<N>_*` and `ukv_ceda_run15_day<N>_*`) at lead days 1 to 3.
+
+    Returns:
+        The printed lines and whether the skill check passed.
+    """
+    truth, field = ("ghi_cams", "ghi") if domain == "solar" else ("speed_10m_era5", "speed_10m")
+    days = build.OLDER_RUN.lead_days
+    older_columns = [f"{build.OLDER_RUN.column_prefix}_day{day}_{field}" for day in days]
+    planned_columns = [f"{build.PLANNED_RUN.column_prefix}_day{day}_{field}" for day in days]
+    shared = joined.drop_nulls([truth, *older_columns, *planned_columns]).drop_nans(
+        [truth, *older_columns, *planned_columns]
+    )
+    older = [correlation(first=shared[column], second=shared[truth]) for column in older_columns]
+    planned = [
+        correlation(first=shared[column], second=shared[truth]) for column in planned_columns
+    ]
+    reasons = older_skill_gate(older=older, planned=planned)
+    lines = [
+        (
+            f"{domain}: correlation of the older run's {field} with {truth} by lead day, on the "
+            f"{shared.height} rows both runs hold at every lead day, "
+            f"{[round(v, 3) for v in older]}; the planned run's on the same rows, "
+            f"{[round(v, 3) for v in planned]}"
+        ),
+        *(f"FAIL {domain}: {reason}" for reason in reasons),
+    ]
+    return lines, not reasons
+
+
+def skill_lines(
+    *, domain: DomainType, joined: pl.DataFrame, spec: build.RunSpec = build.PLANNED_RUN
+) -> tuple[list[str], bool]:
     """Print UKV-CEDA's skill at each lead day beside Open-Meteo UKV's day 1, and gate it.
 
     Args:
         domain: `solar` or `wind`.
         joined: Built inputs joined with the published reference columns.
+        spec: Which run the inputs read. The older run is compared with the planned run instead
+            (`older_skill_lines`), and `joined` must then carry the planned run's columns too.
 
     Returns:
         The printed lines and whether the skill check passed.
     """
+    if spec.extra_days:
+        return older_skill_lines(domain=domain, joined=joined)
     truth, open_meteo, field = (
         ("ghi_cams", "ukv_day1_ghi", "ghi")
         if domain == "solar"
@@ -696,24 +816,37 @@ def skill_lines(*, domain: DomainType, joined: pl.DataFrame) -> tuple[list[str],
     return lines, not reasons
 
 
-def write_verify_stamp(*, output_dir: Path, passed: bool) -> None:
+def write_verify_stamp(
+    *, output_dir: Path, passed: bool, spec: build.RunSpec = build.PLANNED_RUN
+) -> None:
     """Record whether verification passed and which inputs it read, replacing any earlier stamp.
 
     Args:
         output_dir: The build's folder, holding the inputs files.
         passed: Whether every gating check passed.
+        spec: Which run the inputs read, which names the inputs files.
     """
     stamp = {
         "passed": passed,
         "inputs_sha256": {
-            domain: build.sha256_of(path=output_dir / f"{domain}_ukv_ceda_inputs.parquet")
+            domain: build.sha256_of(
+                path=output_dir / f"{domain}_{spec.column_prefix}_inputs.parquet"
+            )
             for domain in build.DOMAINS
         },
     }
     (output_dir / build.VERIFY_STAMP_NAME).write_text(json.dumps(stamp, indent=2) + "\n")
 
 
-def verify(*, published_dir: Path, day4_dir: Path, store_dir: Path, output_dir: Path) -> bool:
+def verify(
+    *,
+    published_dir: Path,
+    day4_dir: Path,
+    store_dir: Path,
+    output_dir: Path,
+    spec: build.RunSpec = build.PLANNED_RUN,
+    planned_dir: Path | None = None,
+) -> bool:
     """Run every check and print the result of each.
 
     Args:
@@ -721,6 +854,9 @@ def verify(*, published_dir: Path, day4_dir: Path, store_dir: Path, output_dir: 
         day4_dir: The folder holding ENS's day-4 mean.
         store_dir: The `UKV-CEDA-T120` folder.
         output_dir: The folder holding the build's outputs.
+        spec: Which run the inputs read.
+        planned_dir: For the older run, the planned build's folder, whose inputs the older run's
+            correlations are compared with.
 
     Returns:
         Whether every gating check passed.
@@ -728,28 +864,34 @@ def verify(*, published_dir: Path, day4_dir: Path, store_dir: Path, output_dir: 
     store = build.open_store(store_dir=store_dir)
     ok = True
     for domain in build.DOMAINS:
-        built = pl.read_parquet(output_dir / f"{domain}_ukv_ceda_inputs.parquet")
+        built = pl.read_parquet(output_dir / f"{domain}_{spec.column_prefix}_inputs.parquet")
         published = build.published_rows(
             published_dir=published_dir, day4_dir=day4_dir, domain=domain
         )
         joined = published.join(built, on=["site", "time"], how="left")
-        checked, mismatches = check_values(store=store, domain=domain, built=built)
+        if spec.extra_days:
+            if planned_dir is None:
+                msg = "the older run's skill check needs the planned build's folder"
+                raise ValueError(msg)
+            planned = pl.read_parquet(planned_dir / f"{domain}_ukv_ceda_inputs.parquet")
+            joined = joined.join(planned, on=["site", "time"], how="left")
+        checked, mismatches = check_values(store=store, domain=domain, built=built, spec=spec)
         sys.stdout.write(f"{domain}: {checked} built values recomputed, {len(mismatches)} differ\n")
         for mismatch in mismatches[:10]:
             sys.stdout.write(f"FAIL {mismatch}\n")
         ok = ok and checked > 0 and not mismatches
-        lines, skill_ok = skill_lines(domain=domain, joined=joined)
+        lines, skill_ok = skill_lines(domain=domain, joined=joined, spec=spec)
         sys.stdout.write("\n".join(lines) + "\n")
         cells = site_cells(store=store, domain=domain, sites=built["site"].unique().to_list())
         aligned_lines, aligned = alignment_lines(
-            domain=domain, joined=joined, cells=cells, store=store
+            domain=domain, joined=joined, cells=cells, store=store, spec=spec
         )
         sys.stdout.write("\n".join(aligned_lines) + ("\n" if aligned_lines else ""))
         if domain == "wind":
-            sys.stdout.write("\n".join(wind_offset_lines(joined=joined)) + "\n")
-        sys.stdout.write("\n".join(step_lines(joined=joined, domain=domain)) + "\n")
+            sys.stdout.write("\n".join(wind_offset_lines(joined=joined, spec=spec)) + "\n")
+        sys.stdout.write("\n".join(step_lines(joined=joined, domain=domain, spec=spec)) + "\n")
         ok = ok and skill_ok and aligned
-    write_verify_stamp(output_dir=output_dir, passed=ok)
+    write_verify_stamp(output_dir=output_dir, passed=ok, spec=spec)
     sys.stdout.write(f"VERIFY {'PASS' if ok else 'FAIL'}\n")
     return ok
 
@@ -765,13 +907,21 @@ def main() -> int:
     parser.add_argument(
         "--store-dir", type=Path, default=studies_dir / "weather" / build.STORE_DIR_NAME
     )
-    parser.add_argument("--output-dir", type=Path, default=studies_dir / build.OUTPUT_DIR_NAME)
+    parser.add_argument("--output-dir", type=Path, default=None)
+    parser.add_argument(
+        "--older-run",
+        action="store_true",
+        help="Verify the post hoc older-run inputs (15 UTC run of the day before ENS's run).",
+    )
     args = parser.parse_args()
+    spec = build.OLDER_RUN if args.older_run else build.PLANNED_RUN
     ok = verify(
         published_dir=args.published_dir,
         day4_dir=args.day4_dir,
         store_dir=args.store_dir,
-        output_dir=args.output_dir,
+        output_dir=args.output_dir or studies_dir / spec.output_dir_name,
+        spec=spec,
+        planned_dir=studies_dir / build.PLANNED_RUN.output_dir_name,
     )
     return 0 if ok else 1
 

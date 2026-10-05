@@ -19,6 +19,14 @@ wrote, and writes SVG files into a new `--figures-dir`, each written once.
   from measured output alone, and the axis counts days 1 to 7, so no figure carries a calendar date.
   The months and years of the weeks are printed for the page's text.
 
+Two post hoc figures read the rows a later report adds (`--post-hoc-only` draws only these):
+
+- `solar_permutation.svg`: for each solar lead day, the 17 shuffled controls' differences from
+  padded ENS as grey ticks and the planned blend's P1 as a marker, with its rank and permutation
+  p-value.
+- `<domain>_older_run.svg`: for each lead day 1 to 3, the planned blend's P1 on the older run's
+  rows, the older-run blend's P1, and its P2 against its shuffled control, at both settings.
+
 Every chart refuses a site label that is not one of the technology's anonymised labels, and every
 mark has accessibility text turned off, because Vega would otherwise write each point's value into
 the SVG.
@@ -37,6 +45,7 @@ from typing import Final
 
 import altair as alt
 import numpy as np
+import plotting.ocf_theme as ocf
 import polars as pl
 
 _STUDIES_DIR: Final[Path] = Path(__file__).resolve().parent.parent
@@ -142,6 +151,22 @@ CONTRAST_LABELS: Final[dict[str, str]] = {
     "p2b": P2_SECOND_LABEL,
 }
 """Each planned contrast's row label, by its code in `intervals.parquet`."""
+
+AXIS_TITLE: Final[str] = "Error minus padded ENS's (points of capacity; more negative is better)"
+
+POST_HOC_FIGURE_NUMBERS: Final[dict[tuple[DomainType, str], int]] = {
+    ("solar", "permutation"): 9,
+    ("solar", "older"): 10,
+    ("wind", "older"): 11,
+}
+"""The post hoc figures' numbers, after the eight of `FIGURE_NUMBERS`."""
+
+OLDER_LABELS: Final[dict[str, str]] = {
+    "fresh_p1_same_rows": "Planned blend minus padded ENS, same rows",
+    "older_p1": "Older-run blend minus its padded ENS",
+    "older_p2": "Older-run blend minus its shuffled control",
+}
+"""The older-run figure's row labels, by contrast code in `intervals.parquet`."""
 
 FAMILY: Final[str] = "weather model"
 """Every row is the same kind of comparison, so every row takes the one family's colour."""
@@ -628,6 +653,225 @@ def generators(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatCha
     )
 
 
+def permutation_values(
+    *, intervals: pl.DataFrame, day: int
+) -> tuple[list[float], dict[str, float]]:
+    """Return one solar lead day's shuffled-control differences and its P1, rank, and p-value.
+
+    Args:
+        intervals: A report's `*_intervals.parquet` rows, holding the permutation test.
+        day: The lead day.
+
+    Returns:
+        The 17 controls' differences from padded ENS in points of capacity, and `p1`, `rank`, and
+        `p_value` for the planned blend.
+    """
+    rows = intervals.filter(
+        pl.col("domain") == "solar",
+        pl.col("day") == day,
+        pl.col("scope").str.starts_with(fit.PERMUTATION_SCOPE),
+    )
+    draws = rows.filter(pl.col("contrast") == "permutation_draw")["difference"].to_list()
+    single = {
+        row["contrast"]: row["difference"]
+        for row in rows.filter(pl.col("contrast") != "permutation_draw").iter_rows(named=True)
+    }
+    return [value * PERCENTAGE_POINTS for value in draws], {
+        "p1": single["permutation_p1"] * PERCENTAGE_POINTS,
+        "rank": single["permutation_rank"],
+        "p_value": single["permutation_p"],
+    }
+
+
+def permutation_figure(*, intervals: pl.DataFrame) -> alt.VConcatChart:
+    """Draw the solar permutation test: one panel per lead day on one shared axis.
+
+    Args:
+        intervals: A report's `*_intervals.parquet` rows, holding the permutation test.
+
+    Returns:
+        The figure, titled from the ranks the intervals hold.
+    """
+    days = [
+        day
+        for day in build.LEAD_DAYS
+        if not intervals.filter(
+            pl.col("day") == day, pl.col("contrast") == "permutation_p", pl.col("domain") == "solar"
+        ).is_empty()
+    ]
+    values = {day: permutation_values(intervals=intervals, day=day) for day in days}
+    low, high = padded_domain(
+        low=min(min([*draws, single["p1"]]) for draws, single in values.values()),
+        high=max(max([*draws, single["p1"]]) for draws, single in values.values()),
+        include_zero=True,
+    )
+    panels = []
+    for index, day in enumerate(days):
+        draws, single = values[day]
+        last = index == len(days) - 1
+        title = (
+            f"Lead day {day}: P1 {single['p1']:+.3f} points, rank {int(single['rank'])} of "
+            f"{len(draws) + 1} from the lowest, permutation p-value {single['p_value']:.3f}"
+        )
+        controls = pl.DataFrame({"x": draws, "kind": ["Shuffled control"] * len(draws)})
+        planned = pl.DataFrame({"x": [single["p1"]], "kind": ["Planned blend (P1)"]})
+        scale = alt.Scale(
+            domain=["Shuffled control", "Planned blend (P1)"],
+            range=[ocf.ENSEMBLE_LINE, ocf.DATA_BLUE],
+        )
+        x = alt.X(
+            "x:Q",
+            scale=alt.Scale(domain=[low, high], nice=False),
+            title=AXIS_TITLE if last else None,
+        )
+        colour = alt.Color("kind:N", scale=scale, legend=None)
+        ticks = (
+            alt.Chart(controls)
+            .mark_tick(thickness=2.5, size=34, aria=False)
+            .encode(x=x, color=colour)  # ty: ignore[unresolved-attribute]
+        )
+        marker = (
+            alt.Chart(planned)
+            .mark_point(shape="diamond", size=220, filled=True, aria=False)
+            .encode(x=x, color=colour)  # ty: ignore[unresolved-attribute]
+        )
+        zero = (
+            alt.Chart(pl.DataFrame({"x": [0.0]}))
+            .mark_rule(color=ocf.BLACK_1, strokeDash=[4, 3])
+            .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+        )
+        panel = (ticks + marker + zero).properties(
+            width=CONTENT_WIDTH_PX - 120,
+            height=44,
+            title=alt.TitleParams(title, anchor="start", frame="group"),
+        )
+        panels.append(panel)
+    rank_one = [day for day in days if int(values[day][1]["rank"]) == 1]
+    where = days_text(days=rank_one) if rank_one else "no lead day"
+    return figure(
+        panels=[
+            line_key(
+                labels=["Shuffled control", "Planned blend (P1)"],
+                colours=[ocf.ENSEMBLE_LINE, ocf.DATA_BLUE],
+            ),
+            *panels,
+        ],
+        number=POST_HOC_FIGURE_NUMBERS[("solar", "permutation")],
+        title=(
+            "For six solar farms, the planned blend's gain over padded ENS is larger than all "
+            f"17 shuffled controls' at {where}"
+        ),
+        subtitle=[
+            (
+                "Each grey tick is one shuffled control: UKV-CEDA's columns shuffled within "
+                "generator, year-month, and hour of day under its own seed, minus padded ENS, as a "
+                "difference in mean absolute error in points of capacity at the primary setting. "
+                "The blue diamond is the planned blend minus padded ENS. The dashed line is zero: "
+                "no difference from padded ENS."
+            ),
+            (
+                "The p-value is the share of the 18 values (17 controls and P1) at or below P1, so "
+                "with 17 controls it cannot go below 0.056. Six solar farms, "
+                f"{CAPACITY_NOTE}"
+            ),
+        ],
+        figure_planning="exploratory",
+    )
+
+
+def older_rows(*, intervals: pl.DataFrame, domain: DomainType, day: int) -> pl.DataFrame:
+    """Shape one lead day's older-run contrasts for `interval_panel`, at both settings.
+
+    Args:
+        intervals: A report's `*_intervals.parquet` rows, holding the older-run section.
+        domain: `solar` or `wind`.
+        day: The lead day.
+
+    Returns:
+        One row per contrast and setting, in points of capacity.
+    """
+    scope = scale_of(
+        frame=intervals.filter(
+            pl.col("domain") == domain,
+            pl.col("day") == day,
+            pl.col("scope") == fit.OLDER_SCOPE,
+            pl.col("contrast").is_in(list(OLDER_LABELS)),
+        )
+    )
+    order = {code: index for index, code in enumerate(OLDER_LABELS)}
+    setting_order = {setting: index for index, setting in enumerate(SETTING_LABELS)}
+    return (
+        scope.with_columns(
+            order=pl.col("contrast").replace_strict(order, return_dtype=pl.Int8),
+            setting_order=pl.col("setting").replace_strict(setting_order, return_dtype=pl.Int8),
+        )
+        .sort("order", "setting_order")
+        .select(
+            label=pl.col("contrast").replace_strict(OLDER_LABELS, return_dtype=pl.String),
+            family=pl.lit(FAMILY),
+            planned=pl.lit(value=False),
+            condition=pl.col("setting").replace_strict(SETTING_LABELS, return_dtype=pl.String),
+            difference=pl.col("difference"),
+            lower_95=pl.col("lower"),
+            upper_95=pl.col("upper"),
+        )
+    )
+
+
+def older_figure(*, intervals: pl.DataFrame, domain: DomainType) -> alt.VConcatChart:
+    """Draw the older-run contrasts of one technology: one panel per lead day, one shared axis.
+
+    Args:
+        intervals: A report's `*_intervals.parquet` rows, holding the older-run section.
+        domain: `solar` or `wind`.
+
+    Returns:
+        The figure.
+    """
+    days = fit.OLDER_DAYS
+    rows = {day: older_rows(intervals=intervals, domain=domain, day=day) for day in days}
+    shared = x_domain_of(rows=list(rows.values()))
+    panels = [
+        interval_panel(
+            rows=day_rows,
+            x_domain=shared,
+            x_title=DIFFERENCE_TITLE if day == days[-1] else "",
+            zero_label="same error",
+            better_label="blend better",
+            panel_title=f"Lead day {day}",
+            reference_labels=index == 0,
+            family_key=False,
+            conditions=list(SETTING_LABELS.values()),
+            condition_title="Hyperparameter setting",
+            condition_key=index == 0,
+            figure_planning="exploratory",
+            colour_by_family=True,
+        )
+        for index, (day, day_rows) in enumerate(rows.items())
+    ]
+    return figure(
+        panels=panels,
+        number=POST_HOC_FIGURE_NUMBERS[(domain, "older")],
+        title=(
+            f"For {TECHNOLOGY_NAMES[domain]}, adding UKV-CEDA's 15 UTC run of the day before "
+            "ENS's run, which starts 9 hours before ENS's run, against the planned blend"
+        ),
+        subtitle=[
+            (
+                "Post hoc. Difference in mean absolute error between two XGBoost models, first "
+                "arm minus second, in points of capacity; negative means the first forecasts "
+                "better. All rows are the rows where the older run is present. The older run "
+                "leads 12 hours longer than the planned run, so the figure cannot separate the "
+                "longer lead from the earlier start. Filled dot: primary setting. Lighter hollow "
+                "mark: sensitivity setting. Line: 95% interval from resampling whole months and a "
+                "fitting seed."
+            ),
+            f"{scope_note(intervals=intervals, domain=domain)} {CAPACITY_NOTE}",
+        ],
+        figure_planning="exploratory",
+    )
+
+
 def era_of(*, month: pl.Expr) -> pl.Expr:
     """Return the era code of a `%Y-%m` month label, by the shared design's era start months."""
     return pl.lit(0, dtype=pl.Int8) + sum(
@@ -831,8 +1075,24 @@ def main() -> int:
     parser.add_argument("--intervals-name", default="intervals.parquet")
     parser.add_argument("--figures-dir", type=Path, required=True, help="Where SVGs are written.")
     parser.add_argument("--no-svgo", action="store_true", help="Skip the svgo optimisation.")
+    parser.add_argument(
+        "--post-hoc-only",
+        action="store_true",
+        help="Draw only the permutation and older-run figures.",
+    )
     args = parser.parse_args()
     intervals = pl.read_parquet(args.results_dir / args.intervals_name)
+    if args.post_hoc_only:
+        post_hoc = {
+            "solar_permutation.svg": permutation_figure(intervals=intervals),
+            **{
+                f"{domain}_older_run.svg": older_figure(intervals=intervals, domain=domain)
+                for domain in DOMAINS
+            },
+        }
+        for name, chart in post_hoc.items():
+            write_figure(chart=chart, path=args.figures_dir / name, svgo=not args.no_svgo)
+        return 0
     for domain in DOMAINS:
         figures = {
             f"{domain}_headline.svg": headline(intervals=intervals, domain=domain),

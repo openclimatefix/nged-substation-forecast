@@ -17,6 +17,7 @@ sys.path.insert(0, str(_STUDIES_DIR / "beam_diffuse_split"))
 sys.path.insert(0, str(_STUDIES_DIR / "weather_downloads"))
 
 import build_ukv_ceda_inputs as build  # noqa: E402
+from nwp_forecast_comparison import DomainType  # noqa: E402
 from studies.baselines import haurwitz_w_m2  # noqa: E402
 from studies.solar import zenith  # noqa: E402
 
@@ -440,8 +441,10 @@ def test_the_03_utc_run_reaches_day_5_only_for_wind_hours_0_to_3():
     hours = [datetime(2026, 3, 10, hour) for hour in range(24)]
     keys = _keys(*hours)
 
-    assert build.day5_share(candidates=keys, domain="wind") == pytest.approx(4 / 24)
-    assert build.day5_share(candidates=_keys(datetime(2026, 3, 10, 12)), domain="solar") == 0.0
+    assert build.beyond_day_share(candidates=keys, domain="wind") == pytest.approx(4 / 24)
+    assert (
+        build.beyond_day_share(candidates=_keys(datetime(2026, 3, 10, 12)), domain="solar") == 0.0
+    )
 
 
 # --- hourly series --------------------------------------------------------------------------------
@@ -585,3 +588,234 @@ def test_the_slot_arithmetic_must_match_the_stores_own_init_time_coordinate():
     )
     with pytest.raises(ValueError, match=r"slots \[2\]"):
         build.check_slot_times(store=shifted, slots=[0, 1, 2])
+
+
+# --- the post hoc older run -----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("domain", "label", "day", "init", "lead"),
+    [
+        # Wind label 12:00 on 10 March, lead day 1: the 15 UTC run of 8 March, 45 hours before.
+        ("wind", datetime(2026, 3, 10, 12), 1, datetime(2026, 3, 8, 15), 45),
+        # Wind label at midnight, lead day 3: the 15 UTC run of 6 March, 3 days and 9 hours before.
+        ("wind", datetime(2026, 3, 10, 0), 3, datetime(2026, 3, 6, 15), 81),
+        # Solar label 13:00 names the hour ending then, which starts at 12:00 on 10 March. Lead day
+        # 2 reads the 15 UTC run of 7 March, 70 hours before the label.
+        ("solar", datetime(2026, 3, 10, 13), 2, datetime(2026, 3, 7, 15), 70),
+        # Solar label 00:00 on 11 March names the hour that started at 23:00 on 10 March, whose
+        # own day is 10 March, so lead day 1 reads the 15 UTC run of 8 March, 57 hours before.
+        ("solar", datetime(2026, 3, 11, 0), 1, datetime(2026, 3, 8, 15), 57),
+        # The longest lead the older run needs: lead day 3, the last solar hour of the day.
+        ("solar", datetime(2026, 3, 11, 0), 3, datetime(2026, 3, 6, 15), 105),
+    ],
+)
+def test_the_older_run_lead_mapping_is_the_15_utc_run_of_the_day_before_ens_runs_day(
+    domain: DomainType, label: datetime, day: int, init: datetime, lead: int
+):
+    keys = _keys(label)
+
+    run = build.with_run(frame=keys, day=day, domain=domain, spec=build.OLDER_RUN).row(
+        0, named=True
+    )
+
+    assert run["init_time"] == init.replace(tzinfo=UTC)
+    assert run["lead_hours"] == lead
+    assert run["slot"] % 2 == 1
+    assert build.slot_init_time(slot=run["slot"]) == run["init_time"]
+    # The planned run of the same row starts 12 hours after the older run of the day before.
+    planned = build.with_run(frame=keys, day=day, domain=domain).row(0, named=True)
+    assert planned["init_time"] - run["init_time"] == timedelta(hours=12)
+    assert run["lead_hours"] - planned["lead_hours"] == 12
+
+
+def test_the_older_run_starts_nine_hours_before_ens_run_whose_lead_it_shares():
+    label = datetime(2026, 3, 10, 12, tzinfo=UTC)
+    ens_init = datetime(2026, 3, 9, tzinfo=UTC)  # ENS's 00 UTC run at lead day 1
+    run = build.with_run(frame=_keys(label), day=1, domain="wind", spec=build.OLDER_RUN)
+
+    assert ens_init - run["init_time"][0] == timedelta(hours=9)
+
+
+def test_the_older_run_is_built_for_lead_days_one_to_three_in_its_own_folder_and_columns():
+    assert build.OLDER_RUN.lead_days == (1, 2, 3)
+    assert build.OLDER_RUN.run_hour == 15
+    assert build.OLDER_RUN.extra_days == 1
+    assert build.OLDER_RUN.column_prefix == "ukv_ceda_run15"
+    assert build.OLDER_RUN.output_dir_name != build.PLANNED_RUN.output_dir_name
+    assert build.PLANNED_RUN.lead_days == build.LEAD_DAYS == (1, 2, 3, 4)
+    assert build.PLANNED_RUN.run_hour == build.RUN_HOUR == 3
+
+
+def test_the_older_run_reaches_day_4_for_wind_hours_0_to_15_only():
+    hours = [datetime(2026, 3, 10, hour) for hour in range(24)]
+
+    share = build.beyond_day_share(candidates=_keys(*hours), domain="wind", spec=build.OLDER_RUN)
+
+    # Lead at day 4 is 120 + h - 15 = 105 + h hours, inside the store's 120 for h of 0 to 15.
+    assert share == pytest.approx(16 / 24)
+
+
+def test_the_older_runs_columns_carry_its_own_prefix_and_the_planned_columns_do_not_change():
+    joined = pl.DataFrame(
+        {
+            "site": ["A"],
+            "time": [datetime(2026, 3, 10, 12, tzinfo=UTC)],
+            "init_time": [datetime(2026, 3, 8, 15, tzinfo=UTC)],
+            "cause": [None],
+            "ghi": [1.0],
+            "temp": [2.0],
+        },
+        schema_overrides={"cause": pl.String},
+    )
+
+    older = build.day_columns(joined=joined, day=1, domain="solar", spec=build.OLDER_RUN)
+    planned = build.day_columns(joined=joined, day=1, domain="solar")
+
+    assert older.columns == [
+        "site",
+        "time",
+        "ukv_ceda_run15_day1_ghi",
+        "ukv_ceda_run15_day1_temp",
+        "ukv_ceda_run15_day1_init_time",
+        "ukv_ceda_run15_day1_cause",
+    ]
+    assert planned.columns[2:4] == ["ukv_ceda_day1_ghi", "ukv_ceda_day1_temp"]
+
+
+def test_the_morning_flag_of_a_rebuilt_radiation_follows_the_runs_start_hour(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    seen: list[np.ndarray] = []
+
+    def spy(**kwargs: np.ndarray) -> np.ndarray:
+        seen.append(np.asarray(kwargs["morning"]))
+        return np.zeros((1, len(build.FILLED_LEADS)))
+
+    monkeypatch.setattr(build, "clear_sky_index_resample", spy)
+    snapshots = np.ones((1, build.N_LEADS))
+    clear_sky = np.ones((1, build.N_LEADS))
+
+    build.fill_radiation(snapshots=snapshots, clear_sky=clear_sky)
+    build.fill_radiation(snapshots=snapshots, clear_sky=clear_sky, run_hour=15)
+
+    leads = build.ANCHOR_LEADS
+    assert seen[0].tolist() == [(3 + lead) % 24 < 12 for lead in leads]
+    assert seen[1].tolist() == [(15 + lead) % 24 < 12 for lead in leads]
+    # Lead 48 of a 03 UTC run is 03:00 UTC (morning); of a 15 UTC run it is 15:00 UTC (afternoon).
+    assert seen[0][0]
+    assert not seen[1][0]
+
+
+def test_the_loss_table_of_the_older_run_has_one_row_per_older_lead_day_and_its_own_causes():
+    candidates = pl.DataFrame(
+        {
+            "site": ["A"] * 3,
+            "time": [datetime(2026, 3, 1, hour, tzinfo=UTC) for hour in range(3)],
+            "power_mw": [1.0] * 3,
+            **{
+                f"ens_mean_day{day}_{field}": [1.0] * 3
+                for day in (1, 2, 3, 4)
+                for field in ("ghi", "temp")
+            },
+        }
+    )
+    built = candidates.select("site", "time").with_columns(
+        **{
+            f"ukv_ceda_run15_day{day}_cause": pl.Series(
+                [None, "run missing", "run not listed by CEDA"], dtype=pl.String
+            )
+            for day in build.OLDER_RUN.lead_days
+        }
+    )
+
+    table = build.loss_table(
+        candidates=candidates, built=built, domain="solar", spec=build.OLDER_RUN
+    )
+
+    assert table["day"].to_list() == [1, 2, 3]
+    day1 = table.row(0, named=True)
+    assert (day1["kept"], day1["run missing"], day1["run not listed by CEDA"]) == (1, 1, 1)
+
+
+def test_each_run_writes_only_to_its_own_folder(tmp_path: Path):
+    reads = [tmp_path / "published"]
+
+    build.check_output_dir(
+        output_dir=tmp_path / "ukv_ceda_blends_run15", read_only=reads, spec=build.OLDER_RUN
+    )
+    with pytest.raises(ValueError, match="ukv_ceda_blends_run15"):
+        build.check_output_dir(
+            output_dir=tmp_path / "ukv_ceda_blends", read_only=reads, spec=build.OLDER_RUN
+        )
+    with pytest.raises(ValueError, match="folder named ukv_ceda_blends,"):
+        build.check_output_dir(output_dir=tmp_path / "ukv_ceda_blends_run15", read_only=reads)
+
+
+def test_the_older_run_outputs_are_written_once_under_its_own_names_and_run_hour(tmp_path: Path):
+    import json
+
+    published, day4 = tmp_path / "published", tmp_path / "day4"
+    _write_published(folder=published)
+    _write_published(folder=day4)
+    outputs = {
+        domain: pl.DataFrame({"site": ["A"], "time": [datetime(2026, 3, 1, tzinfo=UTC)]})
+        for domain in build.DOMAINS
+    }
+    store = build.StoreRead(
+        group=cast("zarr.Group", None), snapshot_id="SNAP", statuses=np.zeros(0, dtype=np.int8)
+    )
+    output_dir = tmp_path / "ukv_ceda_blends_run15"
+
+    def write() -> None:
+        build.write_outputs(
+            output_dir=output_dir,
+            outputs=outputs,
+            tables=["| table |"],
+            store=store,
+            published_dir=published,
+            day4_dir=day4,
+            unlisted_days=[],
+            spec=build.OLDER_RUN,
+        )
+
+    write()
+
+    stamp = json.loads((output_dir / "build.json").read_text())
+    assert (stamp["run_hour"], stamp["extra_days"]) == (15, 1)
+    assert (output_dir / "solar_ukv_ceda_run15_inputs.parquet").exists()
+    assert not (output_dir / "solar_ukv_ceda_inputs.parquet").exists()
+    assert stamp["inputs_sha256"]["wind"] == build.sha256_of(
+        path=output_dir / "wind_ukv_ceda_run15_inputs.parquet"
+    )
+    readme = (output_dir / "README.md").read_text()
+    assert "15 UTC run" in readme
+    assert "`D - N - 1`" in readme
+    with pytest.raises(FileExistsError):
+        write()
+
+
+def test_the_solar_hourly_series_rebuilds_its_radiation_for_the_runs_own_start_hour(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    seen: list[int] = []
+    real = build.fill_radiation
+
+    def spy(*, snapshots: np.ndarray, clear_sky: np.ndarray, run_hour: int = 3) -> np.ndarray:
+        seen.append(run_hour)
+        return real(snapshots=snapshots, clear_sky=clear_sky, run_hour=run_hour)
+
+    monkeypatch.setattr(build, "fill_radiation", spy)
+    slots = [1]
+    series = {
+        "shortwave_down": np.full((1, build.N_LEADS, 1), 1.0),
+        "temperature_1p5m": np.full((1, build.N_LEADS, 1), 280.0),
+    }
+    coordinates = {"A": (54.0, -1.5)}
+
+    build.solar_hourly(slots=slots, series=series, sites=["A"], coordinates=coordinates)
+    build.solar_hourly(
+        slots=slots, series=series, sites=["A"], coordinates=coordinates, run_hour=15
+    )
+
+    assert seen == [3, 15]

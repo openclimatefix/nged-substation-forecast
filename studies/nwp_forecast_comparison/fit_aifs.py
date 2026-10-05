@@ -134,6 +134,33 @@ SHUFFLE_SEEDS: Final[dict[str, int]] = {"": 0, "_b": 1000}
 reference (and the blend control's shuffled columns); `_b` is its null repeat."""
 
 
+_SEED_VARIANT: Final[re.Pattern[str]] = re.compile(r"_s(\d+)")
+
+
+def shuffle_seed(*, variant: str) -> int:
+    """Return the seed of a shuffle variant.
+
+    Args:
+        variant: A key of `SHUFFLE_SEEDS` (`""` or `"_b"`), or `_s<seed>` for a shuffle that carries
+            its own seed in its name, such as the extra draws of a permutation test.
+
+    Returns:
+        The seed.
+
+    Raises:
+        ValueError: If the variant is neither.
+    """
+    if variant in SHUFFLE_SEEDS:
+        return SHUFFLE_SEEDS[variant]
+    match = _SEED_VARIANT.fullmatch(variant)
+    if match is None:
+        msg = (
+            f"{variant!r} is not a shuffle variant: use one of {sorted(SHUFFLE_SEEDS)} or _s<seed>"
+        )
+        raise ValueError(msg)
+    return int(match[1])
+
+
 def shuffled_prefix(*, source: str, variant: str = "") -> str:
     """Return the prefix of `source`'s shuffled copy: `<source>_permuted` and the variant."""
     return f"{source}{PERMUTED}{variant}"
@@ -310,11 +337,13 @@ BLEND_AIFS_PREFIXES: Final[dict[str, str]] = {
     "ukv": "ukv_day{day}",
     "ukv_ceda": "ukv_ceda_day{day}",
     "ukv_ceda_stale": "ukv_ceda_day{next_day}",
+    "ukv_ceda_run15": "ukv_ceda_run15_day{day}",
     "wn3": "wn3_mean_day{day}",
 }
 """Each blend's second product, to the weather-column prefix of that product at one day. The
 conservative ICON-EU blend reads the product one day older than ENS's mean (published blend P4b),
-and the stale UKV-CEDA blend reads the UKV-CEDA run one day older than ENS's mean."""
+the stale UKV-CEDA blend reads the UKV-CEDA run one day older than ENS's mean, and the UKV-CEDA
+`run15` blend reads columns built from the 15 UTC run of the day before ENS's run."""
 
 BlendRoleType = Literal["", "_control", "_control_b", "_mirror", "_pad"]
 """A blend arm's role: the blend itself, its control (the second product shuffled), the control
@@ -328,7 +357,8 @@ _P4_ARM: Final[re.Pattern[str]] = re.compile(r"blend_(p4a|p4b)(_control|_control
 """The published P4 blends and their two controls: the first shuffle and the second seed's."""
 
 _BLEND_ARM: Final[re.Pattern[str]] = re.compile(
-    rf"{BLEND_PREFIX}({'|'.join(BLEND_AIFS_PREFIXES)})_day(\d+)(_control|_control_b|_mirror|_pad)?"
+    rf"{BLEND_PREFIX}({'|'.join(BLEND_AIFS_PREFIXES)})_day(\d+)"
+    r"(_control|_control_b|_control_s\d+|_mirror|_pad)?"
 )
 _DAY_OF_PREFIX: Final[re.Pattern[str]] = re.compile(r".*_day(\d+)")
 
@@ -344,8 +374,8 @@ def arm_prefixes(*, arm: str) -> tuple[str, ...]:
     Args:
         arm: An arm's name; `NO_DOY_SUFFIX` marks the refit without `day_of_year`. A blend arm is
             `blend_<product>_day<N>`, where the product is a key of `BLEND_AIFS_PREFIXES`, with an
-            optional role: `_control`, `_control_b`, `_mirror`, or `_pad`. Any other arm is its
-            own prefix.
+            optional role: `_control`, `_control_b`, `_control_s<seed>` (a control shuffled under
+            that seed), `_mirror`, or `_pad`. Any other arm is its own prefix.
 
     Returns:
         A single product's prefix, or, for a blend, ENS's mean first and then the second product's.
@@ -371,6 +401,8 @@ def arm_prefixes(*, arm: str) -> tuple[str, ...]:
         aifs = shuffled_prefix(source=aifs)
     elif role == "_control_b":
         aifs = shuffled_prefix(source=aifs, variant="_b")
+    elif role is not None and role.startswith("_control_s"):
+        aifs = shuffled_prefix(source=aifs, variant=role.removeprefix("_control"))
     elif role == "_mirror":
         ens = shuffled_prefix(source=ens)
     elif role == "_pad":
@@ -452,7 +484,7 @@ def add_shuffled_columns(
     """Add shuffled copies of each source product's weather columns.
 
     Every copy moves a source's values only among the hours that share a site, a year-month and an
-    hour of day, under the seed of its variant (`SHUFFLE_SEEDS`), so a shuffle is deterministic and
+    hour of day, under the seed of its variant (`shuffle_seed`), so a shuffle is deterministic and
     never crosses a site, a year-month or an hour of day. A product's direction sine and cosine
     (wind) are shuffled together.
 
@@ -460,7 +492,7 @@ def add_shuffled_columns(
         frame: Rows carrying `site`, `month`, `hour_of_day` and each source's columns.
         domain: `solar` or `wind`.
         shuffles: Each prefix to shuffle, such as `aifs_single_day7`, to the variant suffixes to
-            build for it (keys of `SHUFFLE_SEEDS`).
+            build for it (keys of `SHUFFLE_SEEDS`, or `_s<seed>`).
 
     Returns:
         `frame` with `<source>_permuted<variant>_<field>` for every source, variant and field.
@@ -483,7 +515,7 @@ def add_shuffled_columns(
                 frame=output,
                 column_groups=groups,
                 by=("site", "month", "hour_of_day"),
-                seed=SHUFFLE_SEEDS[variant],
+                seed=shuffle_seed(variant=variant),
                 suffix=f"_{prefix}",
             ).rename(
                 {
@@ -1527,8 +1559,8 @@ def control_shuffles(*, arms: Sequence[str]) -> dict[str, tuple[str, ...]]:
 
     Returns:
         Each shuffled product's prefix to the variants of `SHUFFLE_SEEDS` to build for it: the
-        first seed (`""`) for a `_control` arm and the second (`"_b"`) for a `_control_b` arm of a
-        blend.
+        first seed (`""`) for a `_control` arm, the second (`"_b"`) for a `_control_b` arm of a
+        blend, and `_s<seed>` for a `_control_s<seed>` arm.
     """
     variants: dict[str, list[str]] = {}
     for arm in arms:
@@ -1536,6 +1568,10 @@ def control_shuffles(*, arms: Sequence[str]) -> dict[str, tuple[str, ...]]:
             variant = ""
         elif arm.endswith("_control_b") and _BLEND_ARM.fullmatch(arm):
             variant = "_b"
+        elif (match := _BLEND_ARM.fullmatch(arm)) is not None and (match[3] or "").startswith(
+            "_control_s"
+        ):
+            variant = str(match[3]).removeprefix("_control")
         else:
             continue
         source = arm_prefixes(arm=arm)[1].removesuffix(f"{PERMUTED}{variant}")

@@ -1,3 +1,4 @@
+import itertools
 import json
 import sys
 from datetime import UTC, datetime
@@ -530,6 +531,7 @@ def _build_folder(*, folder: Path, passed: bool = True) -> dict[str, object]:
     folder.mkdir(exist_ok=True)
     stamp: dict[str, object] = {
         "snapshot_id": "SNAP",
+        "run_hour": 3,
         "coverage_guard_passed": passed,
         "inputs_sha256": {},
     }
@@ -1256,11 +1258,11 @@ def test_the_stale_fits_wait_for_every_planned_pair_and_then_list_the_eight_stal
 ):
     stage = stale_stage.stage
     with pytest.raises(ValueError, match="fit the planned pairs before the stale ones"):
-        fit.jobs_to_fit(output_dir=tmp_path, stage=stage, only_missing=False, post_hoc=True)
+        fit.jobs_to_fit(output_dir=tmp_path, stage=stage, only_missing=False, post_hoc="stale")
 
     _save_planned(folder=tmp_path, stage=stale_stage)
     group, jobs = fit.jobs_to_fit(
-        output_dir=tmp_path, stage=stage, only_missing=False, post_hoc=True
+        output_dir=tmp_path, stage=stage, only_missing=False, post_hoc="stale"
     )
 
     assert group == "added_1"
@@ -1288,10 +1290,10 @@ def test_a_post_hoc_fit_scores_the_stale_rows_into_a_new_file_and_never_refits(
     monkeypatch.setattr(fit_aifs, "fit_jobs", fake)
 
     merged = fit.fit_stage(
-        planned=stale_stage, output_dir=tmp_path, workers=1, only_missing=False, post_hoc=True
+        planned=stale_stage, output_dir=tmp_path, workers=1, only_missing=False, post_hoc="stale"
     )
     again = fit.fit_stage(
-        planned=stale_stage, output_dir=tmp_path, workers=1, only_missing=False, post_hoc=True
+        planned=stale_stage, output_dir=tmp_path, workers=1, only_missing=False, post_hoc="stale"
     )
 
     assert calls == [(fit.stale_jobs(day=1), stale_stage.frame.height - 1)]
@@ -1316,7 +1318,7 @@ def test_a_saved_stale_arm_that_scores_other_rows_than_the_stale_rows_is_refused
 
     monkeypatch.setattr(fit_aifs, "fit_jobs", fake)
     fit.fit_stage(
-        planned=stale_stage, output_dir=tmp_path, workers=1, only_missing=False, post_hoc=True
+        planned=stale_stage, output_dir=tmp_path, workers=1, only_missing=False, post_hoc="stale"
     )
     assert stale_stage.stale_frame is not None
     narrower = stale_stage._replace(stale_frame=stale_stage.stale_frame.head(3))
@@ -1337,7 +1339,7 @@ def test_a_post_hoc_fit_at_a_stage_with_no_stale_blend_fits_nothing(
     losses.write_parquet(tmp_path / "wind_day4_planned_losses.parquet")
 
     group, jobs = fit.jobs_to_fit(
-        output_dir=tmp_path, stage=day4, only_missing=False, post_hoc=True
+        output_dir=tmp_path, stage=day4, only_missing=False, post_hoc="stale"
     )
 
     assert (group, jobs) == ("added_1", [])
@@ -1485,9 +1487,755 @@ def test_the_dry_run_lists_the_stale_fits_and_the_rows_that_lack_the_next_day(
 ):
     _save_planned(folder=tmp_path, stage=stale_stage)
 
-    fit.print_plan(planned=[stale_stage], output_dir=tmp_path, only_missing=False, post_hoc=True)
+    fit.print_plan(planned=[stale_stage], output_dir=tmp_path, only_missing=False, post_hoc="stale")
 
     out = capsys.readouterr().out
     assert "wind day 1: 5 rows (1 stage rows lack the next day)" in out
     assert "8 (arm, setting) fits" in out
     assert "8 (arm, site) fits in all" in out
+
+
+# --- the post hoc permutation test ----------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def solar_data() -> tuple[pl.DataFrame, pl.DataFrame]:
+    candidates = _candidates(domain="solar")
+    return candidates, _inputs(candidates=candidates, domain="solar")
+
+
+def test_the_permutation_test_has_fifteen_extra_controls_under_seeds_no_planned_shuffle_uses():
+    arms = fit.permutation_arms(day=2)
+
+    assert len(arms) == 15
+    assert arms[0] == "blend_ukv_ceda_day2_control_s2010"
+    assert arms[-1] == "blend_ukv_ceda_day2_control_s2150"
+    assert len(set(fit.PERMUTATION_SEEDS)) == 15
+    # A two-column shuffle uses its seed and the next, so no two draws may be one apart or equal.
+    seeds = sorted({*fit.PERMUTATION_SEEDS, *fit_aifs.SHUFFLE_SEEDS.values()})
+    assert all(later - earlier >= 2 for earlier, later in itertools.pairwise(seeds))
+    assert fit.PERMUTATION_DRAWS == 17
+    assert all(fit.is_permutation_arm(arm=arm) for arm in arms)
+    for planned_arm in fit.stage_arms(day=2):
+        assert not fit.is_permutation_arm(arm=planned_arm)
+    assert not fit.is_permutation_arm(arm="blend_ukv_ceda_stale_day2_control")
+
+
+def test_the_permutation_fits_are_the_primary_setting_only_and_solar_only():
+    assert fit.permutation_jobs(stage=Stage("solar", 4)) == [
+        (arm, PRIMARY) for arm in fit.permutation_arms(day=4)
+    ]
+    assert len(fit.permutation_jobs(stage=Stage("solar", 1))) == 15
+    assert fit.permutation_jobs(stage=Stage("wind", 1)) == []
+    assert fit.post_hoc_jobs(stage=Stage("solar", 2), kind="permutation") == fit.permutation_jobs(
+        stage=Stage("solar", 2)
+    )
+
+
+def test_the_extra_shuffles_add_columns_and_change_no_planned_column(
+    solar_data: tuple[pl.DataFrame, pl.DataFrame],
+):
+    candidates, inputs = solar_data
+    stage = Stage("solar", 1)
+
+    plain, plain_offsets = fit.stage_frame(stage=stage, candidates=candidates, inputs=inputs)
+    extra, extra_offsets = fit.stage_frame(
+        stage=stage, candidates=candidates, inputs=inputs, permutation=True
+    )
+
+    assert plain_offsets == extra_offsets
+    for column in plain.columns:
+        assert extra[column].equals(plain[column]), column
+    added = set(extra.columns) - set(plain.columns)
+    assert added == {
+        f"ukv_ceda_day1_permuted_s{seed}_{field}"
+        for seed in fit.PERMUTATION_SEEDS
+        for field in ("ghi", "temp")
+    }
+    for arm in fit.permutation_arms(day=1):
+        assert set(fit_aifs.arm_features(arm=arm, domain="solar")) <= set(extra.columns)
+        assert len(fit_aifs.arm_features(arm=arm, domain="solar")) == 9
+    # A shuffle keeps each (generator, year-month, hour) group's values.
+    one = f"ukv_ceda_day1_permuted_s{fit.PERMUTATION_SEEDS[0]}_ghi"
+    for _, group in extra.group_by("site", "month", "hour_of_day"):
+        assert sorted(group["ukv_ceda_day1_ghi"]) == sorted(group[one])
+
+
+def test_the_permutation_summary_ranks_the_planned_gain_among_the_draws_and_counts_ties():
+    summary = fit.permutation_summary(planned=-0.10, draws=[-0.20, -0.05, 0.0, -0.10, 0.10])
+
+    # Draws at or below the planned value: -0.20 and the tie at -0.10. Draws strictly below: one.
+    assert summary.p_value == pytest.approx((1 + 2) / 6)
+    assert summary.rank == 2
+    assert summary.planned == -0.10
+    assert summary.draws == (-0.20, -0.05, 0.0, -0.10, 0.10)
+
+
+def test_a_planned_gain_below_every_draw_has_rank_one_and_the_smallest_p_value():
+    draws = [-0.01 * k for k in range(17)]
+
+    summary = fit.permutation_summary(planned=-0.5, draws=draws)
+
+    assert summary.rank == 1
+    assert summary.p_value == pytest.approx(1 / 18)
+
+
+def test_a_planned_gain_above_every_draw_has_the_largest_rank_and_a_p_value_of_one():
+    summary = fit.permutation_summary(planned=0.3, draws=[0.0, 0.1, 0.2])
+
+    assert summary.rank == 4
+    assert summary.p_value == pytest.approx(1.0)
+
+
+def _permutation_losses(*, stage: fit.PlannedStage, levels: dict[str, float]) -> pl.DataFrame:
+    """Per-arm constant losses on every row of the stage, so every difference is exact."""
+    return pl.concat(
+        stage.frame.with_columns(
+            arm=pl.lit(arm),
+            setting=pl.lit(setting),
+            seed=pl.lit(seed),
+            signed_error_capped_mw=pl.lit(0.0),
+            **{METRIC: pl.lit(level)},
+        )
+        for arm, level in levels.items()
+        for setting in (PRIMARY, SENSITIVITY)
+        if setting == PRIMARY or not fit.is_permutation_arm(arm=arm)
+        for seed in range(3)
+    )
+
+
+def _solar_stage(*, day: int = 2) -> fit.PlannedStage:
+    base, _ = _report_stage()
+    return base._replace(stage=Stage("solar", day))
+
+
+def _permutation_levels(*, day: int = 2) -> dict[str, float]:
+    levels = {
+        f"blend_ukv_ceda_day{day}_pad": 0.10,
+        f"blend_ukv_ceda_day{day}": 0.09,
+        f"blend_ukv_ceda_day{day}_control": 0.10,
+        f"blend_ukv_ceda_day{day}_control_b": 0.095,
+    }
+    for index, arm in enumerate(fit.permutation_arms(day=day)):
+        levels[arm] = {0: 0.08, 1: 0.085}.get(index, 0.10 + 0.001 * index)
+    return levels
+
+
+def test_the_permutation_section_places_p1_among_the_seventeen_controls():
+    stage = _solar_stage()
+    losses = _permutation_losses(stage=stage, levels=_permutation_levels())
+    records: list[fit.IntervalRecord] = []
+
+    lines, summary = fit.permutation_lines(planned=stage, losses=losses, records=records)
+
+    assert summary is not None
+    text = "\n".join(lines)
+    # P1 is 0.09 - 0.10; two extra controls (0.08, 0.085) are lower, so rank 3 of 18.
+    assert summary.planned == pytest.approx(-0.01)
+    assert summary.rank == 3
+    assert summary.p_value == pytest.approx(3 / 18)
+    assert len(summary.draws) == 17
+    assert min(summary.draws) == pytest.approx(-0.02)
+    assert "Post hoc: permutation test, solar lead day 2" in text
+    assert "| 2010 | -2.000 |" in text
+    assert "| 0 | +0.000 |" in text
+    assert "| 1000 | -0.500 |" in text
+    assert "| planned blend (P1) | -1.000 |" in text
+    assert "P1 ranks 3 from the lowest" in text
+    assert "The one-sided permutation p-value is 0.167" in text
+    assert "smallest value it can take is 0.056" in text
+    by_contrast = {r["contrast"]: r for r in records if r["contrast"] != "permutation_draw"}
+    assert by_contrast["permutation_p"]["difference"] == pytest.approx(3 / 18)
+    assert by_contrast["permutation_rank"]["difference"] == 3.0
+    assert by_contrast["permutation_p1"]["difference"] == pytest.approx(-0.01)
+    draws = [r for r in records if r["contrast"] == "permutation_draw"]
+    assert len(draws) == 17
+    assert {r["scope"] for r in draws} == {
+        f"{fit.PERMUTATION_SCOPE}: seed {seed}" for seed in (0, 1000, *fit.PERMUTATION_SEEDS)
+    }
+    assert {r["setting"] for r in records} == {PRIMARY}
+    assert all(r["domain"] == "solar" and r["day"] == 2 for r in records)
+
+
+def test_the_permutation_section_waits_for_every_extra_control_and_skips_wind():
+    stage = _solar_stage()
+    levels = _permutation_levels()
+    last = fit.permutation_arms(day=2)[-1]
+    without_last = _permutation_losses(
+        stage=stage, levels={arm: level for arm, level in levels.items() if arm != last}
+    )
+
+    assert fit.permutation_lines(planned=stage, losses=without_last, records=[]) == ([], None)
+    wind = stage._replace(stage=Stage("wind", 2))
+    assert fit.permutation_lines(
+        planned=wind, losses=_permutation_losses(stage=stage, levels=levels), records=[]
+    ) == ([], None)
+
+
+def test_the_permutation_summary_table_lists_each_stage_and_is_empty_without_one():
+    summary = fit.permutation_summary(planned=-0.01, draws=[0.0, -0.02, 0.01])
+
+    lines = fit.permutation_summary_lines(summaries={("solar", 3): summary})
+
+    assert lines[2] == ("| solar | 3 | -1.000 | -2.000 | +0.000 | +1.000 | 2 of 4 | 0.500 |")
+    assert fit.permutation_summary_lines(summaries={}) == []
+
+
+def _save_group(
+    *,
+    folder: Path,
+    planned: fit.PlannedStage,
+    group: str,
+    jobs: list[fit_aifs.Job],
+    frame: pl.DataFrame | None = None,
+) -> None:
+    """Write a losses file and its stamp for `jobs`, scored on `frame` (default: the stage's)."""
+    arms = list(dict.fromkeys(arm for arm, _ in jobs))
+    path = folder / f"{fit.stem(stage=planned.stage, group=group)}_losses.parquet"
+    pl.concat(
+        _losses(arms=[arm], settings=[setting], frame=frame if frame is not None else planned.frame)
+        for arm, setting in jobs
+    ).write_parquet(path)
+    path.with_suffix(".json").write_text(json.dumps(fit.file_stamp(planned=planned, arms=arms)))
+
+
+@pytest.fixture
+def tiny_solar_stage(solar_data: tuple[pl.DataFrame, pl.DataFrame]) -> fit.PlannedStage:
+    candidates, inputs = solar_data
+    frame, offsets = fit.stage_frame(
+        stage=Stage("solar", 1), candidates=candidates, inputs=inputs, permutation=True
+    )
+    return fit.PlannedStage(
+        stage=Stage("solar", 1),
+        frame=frame.sort("site", "time").head(6),
+        offsets=offsets,
+        stamp={"build": "1", "device": "cuda"},
+    )
+
+
+def test_the_permutation_fits_wait_for_the_planned_pairs_then_list_fifteen_primary_pairs(
+    tmp_path: Path, tiny_solar_stage: fit.PlannedStage
+):
+    stage = tiny_solar_stage.stage
+    with pytest.raises(ValueError, match="fit the planned pairs before the permutation ones"):
+        fit.jobs_to_fit(
+            output_dir=tmp_path, stage=stage, only_missing=False, post_hoc="permutation"
+        )
+
+    _save_group(
+        folder=tmp_path, planned=tiny_solar_stage, group="planned", jobs=fit.planned_jobs(day=1)
+    )
+    group, jobs = fit.jobs_to_fit(
+        output_dir=tmp_path, stage=stage, only_missing=False, post_hoc="permutation"
+    )
+
+    assert group == "added_1"
+    assert jobs == fit.permutation_jobs(stage=stage)
+    assert len(jobs) == 15
+
+
+def test_the_permutation_fit_scores_the_whole_stage_into_a_new_file_and_stamps_its_seeds(
+    tmp_path: Path, tiny_solar_stage: fit.PlannedStage, monkeypatch: pytest.MonkeyPatch
+):
+    _save_group(
+        folder=tmp_path, planned=tiny_solar_stage, group="planned", jobs=fit.planned_jobs(day=1)
+    )
+    planned_file = tmp_path / "solar_day1_planned_losses.parquet"
+    before = (planned_file.read_bytes(), planned_file.with_suffix(".json").read_bytes())
+    calls: list[tuple[list[fit_aifs.Job], int]] = []
+
+    def fake(
+        *, frame: pl.DataFrame, domain: DomainType, jobs: list[fit_aifs.Job], workers: int
+    ) -> pl.DataFrame:
+        calls.append((jobs, frame.height))
+        return pl.concat(
+            _losses(arms=[arm], settings=[setting], frame=frame) for arm, setting in jobs
+        )
+
+    monkeypatch.setattr(fit_aifs, "fit_jobs", fake)
+
+    merged = fit.fit_stage(
+        planned=tiny_solar_stage,
+        output_dir=tmp_path,
+        workers=1,
+        only_missing=False,
+        post_hoc="permutation",
+    )
+    again = fit.fit_stage(
+        planned=tiny_solar_stage,
+        output_dir=tmp_path,
+        workers=1,
+        only_missing=False,
+        post_hoc="permutation",
+    )
+
+    assert calls == [(fit.permutation_jobs(stage=tiny_solar_stage.stage), 6)]
+    assert (planned_file.read_bytes(), planned_file.with_suffix(".json").read_bytes()) == before
+    added = tmp_path / "solar_day1_added_1_losses.parquet"
+    assert added.exists()
+    stamp = json.loads(added.with_suffix(".json").read_text())
+    assert json.loads(stamp["permutation_seeds"]) == list(fit.PERMUTATION_SEEDS)
+    assert "older_run_inputs_sha256" not in stamp
+    assert set(merged["arm"]) == {*fit.stage_arms(day=1), *fit.permutation_arms(day=1)}
+    assert set(merged.filter(pl.col("arm").str.contains("_control_s"))["setting"]) == {PRIMARY}
+    assert merged.height == again.height
+    planned_stamp = json.loads(planned_file.with_suffix(".json").read_text())
+    assert set(planned_stamp) == {*tiny_solar_stage.stamp, "columns"}
+
+
+def test_a_file_of_planned_or_stale_arms_keeps_its_stamp_and_only_new_arms_add_keys(
+    tiny_solar_stage: fit.PlannedStage,
+):
+    planned_arms = fit.stage_arms(day=1)
+
+    stamp = fit.file_stamp(planned=tiny_solar_stage, arms=planned_arms)
+
+    assert set(stamp) == {*tiny_solar_stage.stamp, "columns"}
+    assert (
+        fit.file_stamp(planned=tiny_solar_stage, arms=fit.stale_arms(day=1)).keys() == stamp.keys()
+    )
+    seeded = fit.file_stamp(planned=tiny_solar_stage, arms=fit.permutation_arms(day=1))
+    assert set(seeded) == {*stamp, "permutation_seeds"}
+    with pytest.raises(ValueError, match="no older-run inputs were read"):
+        fit.file_stamp(planned=tiny_solar_stage, arms=fit.older_arms(day=1))
+    with_older = tiny_solar_stage._replace(
+        older_stamp={"older_run_inputs_sha256": "abc", "older_run_snapshot": "SNAP"}
+    )
+    older_stamp = fit.file_stamp(planned=with_older, arms=fit.older_arms(day=1))
+    assert older_stamp["older_run_inputs_sha256"] == "abc"
+    assert older_stamp["older_run_snapshot"] == "SNAP"
+    assert "permutation_seeds" not in older_stamp
+
+
+# --- the post hoc older run -----------------------------------------------------------------------
+
+
+def _older_inputs(*, candidates: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
+    """UKV-CEDA's 15 UTC run of the day before ENS's run, with the run restated by hand."""
+    rng = np.random.default_rng(6)
+    instant = pl.col("time") - pl.duration(hours=1) if domain == "solar" else pl.col("time")
+    frame = candidates.select("site", "time")
+    n = frame.height
+    columns: dict[str, pl.Series | pl.Expr] = {}
+    for day in build.OLDER_RUN.lead_days:
+        for field in build.WEATHER_FIELDS[domain]:
+            columns[f"ukv_ceda_run15_day{day}_{field}"] = pl.Series(rng.uniform(0, 1, n))
+        columns[f"ukv_ceda_run15_day{day}_init_time"] = (
+            instant.dt.truncate("1d") - pl.duration(days=day + 1) + pl.duration(hours=15)
+        )
+    return frame.with_columns(**columns)
+
+
+@pytest.fixture(scope="module")
+def wind_older(wind_data: tuple[pl.DataFrame, pl.DataFrame]) -> pl.DataFrame:
+    candidates, _ = wind_data
+    return _older_inputs(candidates=candidates, domain="wind")
+
+
+def test_the_older_run_blend_has_the_stale_blends_lead_days_and_the_planned_column_counts():
+    pad, blend, control = fit.older_arms(day=2)
+
+    assert (pad, blend, control) == (
+        "blend_ukv_ceda_run15_day2_pad",
+        "blend_ukv_ceda_run15_day2",
+        "blend_ukv_ceda_run15_day2_control",
+    )
+    assert fit.OLDER_DAYS == (1, 2, 3)
+    assert fit.older_jobs(day=4) == []
+    assert fit.older_jobs(day=1) == [
+        (arm, setting) for arm in fit.older_arms(day=1) for setting in (PRIMARY, SENSITIVITY)
+    ]
+    assert fit.post_hoc_jobs(stage=Stage("wind", 3), kind="older run") == fit.older_jobs(day=3)
+    wind = fit_aifs.arm_features(arm=blend, domain="wind")
+    assert wind[3:7] == tuple(
+        f"ens_mean_day2_{f}" for f in ("speed_100m", "sin_100m", "cos_100m", "speed_10m")
+    )
+    assert wind[-4:] == (
+        "ukv_ceda_run15_day2_speed_10m",
+        "ukv_ceda_run15_day2_sin_10m",
+        "ukv_ceda_run15_day2_cos_10m",
+        "ukv_ceda_run15_day2_speed_925hpa",
+    )
+    assert fit_aifs.arm_features(arm=control, domain="solar")[-2:] == (
+        "ukv_ceda_run15_day2_permuted_ghi",
+        "ukv_ceda_run15_day2_permuted_temp",
+    )
+    for domain, count in (("solar", 9), ("wind", 11)):
+        for arm in (*fit.older_arms(day=2), *fit.stage_arms(day=2)):
+            assert len(fit_aifs.arm_features(arm=arm, domain=domain)) == count
+    assert fit.is_older_arm(arm=blend)
+    assert not fit.is_older_arm(arm="blend_ukv_ceda_day2")
+    assert not fit.is_older_arm(arm="blend_ukv_ceda_stale_day2")
+    assert not fit.is_stale_arm(arm=blend)
+
+
+def test_the_stamp_check_restates_the_older_run_as_15_utc_of_the_day_before_ens_runs_day():
+    spec = build.OLDER_RUN
+    wind = pl.DataFrame(
+        {
+            "time": [datetime(2026, 3, 10, 0, tzinfo=UTC), datetime(2026, 3, 10, 23, tzinfo=UTC)],
+            "ukv_ceda_run15_day2_init_time": [datetime(2026, 3, 7, 15, tzinfo=UTC)] * 2,
+        }
+    )
+    fit.check_init_times(frame=wind, domain="wind", day=2, spec=spec)
+
+    solar = wind.with_columns(
+        time=pl.Series(
+            [datetime(2026, 3, 11, 0, tzinfo=UTC), datetime(2026, 3, 10, 24 - 1, tzinfo=UTC)]
+        )
+    )
+    # A solar label of 00:00 on 11 March is the hour that started at 23:00 on 10 March.
+    fit.check_init_times(frame=solar, domain="solar", day=2, spec=spec)
+    for wrong in (
+        datetime(2026, 3, 7, 3, tzinfo=UTC),  # the 03 UTC run of the same day
+        datetime(2026, 3, 8, 15, tzinfo=UTC),  # the 15 UTC run one day too late
+        datetime(2026, 3, 6, 15, tzinfo=UTC),  # one day too early
+    ):
+        bad = wind.with_columns(ukv_ceda_run15_day2_init_time=pl.lit(wrong))
+        with pytest.raises(ValueError, match="other than the 15 UTC run of day D-3"):
+            fit.check_init_times(frame=bad, domain="wind", day=2, spec=spec)
+
+
+def test_the_older_frame_keeps_the_stage_folds_and_drops_rows_without_the_older_run(
+    wind_data: tuple[pl.DataFrame, pl.DataFrame], wind_older: pl.DataFrame
+):
+    candidates, inputs = wind_data
+    frame, _ = fit.stage_frame(stage=Stage("wind", 1), candidates=candidates, inputs=inputs)
+    first_times = sorted(frame["time"].unique().to_list())[:3]
+    missing = frame.filter(pl.col("time").is_in(first_times)).select("site", "time")
+    holed = wind_older.with_columns(
+        ukv_ceda_run15_day1_speed_925hpa=pl.when(pl.col("time").is_in(first_times))
+        .then(float("nan"))
+        .otherwise(pl.col("ukv_ceda_run15_day1_speed_925hpa"))
+    )
+
+    older = fit.older_stage_frame(stage=Stage("wind", 1), frame=frame, inputs=holed)
+
+    assert older.height == frame.height - missing.height
+    assert older.join(missing, on=["site", "time"], how="inner").is_empty()
+    folds = older.select("site", "time", "fold").join(
+        frame.select("site", "time", "fold"), on=["site", "time"], suffix="_stage"
+    )
+    assert folds["fold"].equals(folds["fold_stage"])
+    for field in build.WEATHER_FIELDS["wind"]:
+        assert f"ukv_ceda_run15_day1_{field}" in older.columns
+        assert f"ukv_ceda_run15_day1_permuted_{field}" in older.columns
+        assert f"ukv_ceda_run15_day1_permuted_b_{field}" not in older.columns
+    for arm in fit.older_arms(day=1):
+        assert set(fit_aifs.arm_features(arm=arm, domain="wind")) <= set(older.columns)
+
+
+def test_the_older_frame_refuses_the_wrong_run_missing_rows_and_an_empty_older_run(
+    wind_data: tuple[pl.DataFrame, pl.DataFrame], wind_older: pl.DataFrame
+):
+    candidates, inputs = wind_data
+    frame, _ = fit.stage_frame(stage=Stage("wind", 1), candidates=candidates, inputs=inputs)
+    stage = Stage("wind", 1)
+
+    planned_run = wind_older.with_columns(
+        ukv_ceda_run15_day1_init_time=pl.col("ukv_ceda_run15_day1_init_time")
+        - pl.duration(hours=12)
+    )
+    with pytest.raises(ValueError, match="other than the 15 UTC run of day D-2"):
+        fit.older_stage_frame(stage=stage, frame=frame, inputs=planned_run)
+    with pytest.raises(ValueError, match="missing from the older-run inputs"):
+        fit.older_stage_frame(stage=stage, frame=frame, inputs=wind_older.head(10))
+    empty = wind_older.with_columns(ukv_ceda_run15_day1_speed_10m=pl.lit(None, dtype=pl.Float64))
+    with pytest.raises(ValueError, match="no row holds the older run's columns"):
+        fit.older_stage_frame(stage=stage, frame=frame, inputs=empty)
+
+
+@pytest.fixture
+def older_stage(
+    wind_data: tuple[pl.DataFrame, pl.DataFrame],
+    wind_older: pl.DataFrame,
+    tiny_stage: fit.PlannedStage,
+) -> fit.PlannedStage:
+    lacking = tiny_stage.frame.sort("site", "time").row(0, named=True)
+    holed = wind_older.with_columns(
+        ukv_ceda_run15_day1_speed_10m=pl.when(
+            (pl.col("site") == lacking["site"]) & (pl.col("time") == lacking["time"])
+        )
+        .then(None)
+        .otherwise(pl.col("ukv_ceda_run15_day1_speed_10m"))
+    )
+    older = fit.older_stage_frame(stage=tiny_stage.stage, frame=tiny_stage.frame, inputs=holed)
+    assert older.height == tiny_stage.frame.height - 1
+    return tiny_stage._replace(
+        older_frame=older,
+        older_stamp={"older_run_inputs_sha256": "abc", "older_run_snapshot": "SNAP"},
+    )
+
+
+def test_an_older_run_fit_scores_the_older_rows_stamps_the_older_inputs_and_never_refits(
+    tmp_path: Path, older_stage: fit.PlannedStage, monkeypatch: pytest.MonkeyPatch
+):
+    _save_group(folder=tmp_path, planned=older_stage, group="planned", jobs=fit.planned_jobs(day=1))
+    calls: list[tuple[list[fit_aifs.Job], int]] = []
+
+    def fake(
+        *, frame: pl.DataFrame, domain: DomainType, jobs: list[fit_aifs.Job], workers: int
+    ) -> pl.DataFrame:
+        calls.append((jobs, frame.height))
+        return pl.concat(
+            _losses(arms=[arm], settings=[setting], frame=frame) for arm, setting in jobs
+        )
+
+    monkeypatch.setattr(fit_aifs, "fit_jobs", fake)
+
+    merged = fit.fit_stage(
+        planned=older_stage,
+        output_dir=tmp_path,
+        workers=1,
+        only_missing=False,
+        post_hoc="older run",
+    )
+    fit.fit_stage(
+        planned=older_stage,
+        output_dir=tmp_path,
+        workers=1,
+        only_missing=False,
+        post_hoc="older run",
+    )
+
+    assert calls == [(fit.older_jobs(day=1), older_stage.frame.height - 1)]
+    stamp = json.loads((tmp_path / "wind_day1_added_1_losses.json").read_text())
+    assert stamp["older_run_inputs_sha256"] == "abc"
+    assert stamp["older_run_snapshot"] == "SNAP"
+    assert set(merged["arm"]) == {*fit.stage_arms(day=1), *fit.older_arms(day=1)}
+    # A different older build is refused when the saved file is read again.
+    changed = older_stage._replace(
+        older_stamp={"older_run_inputs_sha256": "other", "older_run_snapshot": "SNAP"}
+    )
+    with pytest.raises(ValueError, match="names another build or device"):
+        fit.verified_losses(planned=changed, output_dir=tmp_path)
+    narrower = older_stage._replace(older_frame=older_stage.older_frame.head(3))  # ty: ignore[unresolved-attribute]
+    with pytest.raises(ValueError, match="other rows or folds than its rows"):
+        fit.verified_losses(planned=narrower, output_dir=tmp_path)
+    no_older = older_stage._replace(older_frame=None)
+    with pytest.raises(ValueError, match="older-run arm, but the stage has no older-run rows"):
+        fit.verified_losses(planned=no_older, output_dir=tmp_path)
+
+
+def test_the_older_fits_wait_for_every_planned_pair(tmp_path: Path, older_stage: fit.PlannedStage):
+    with pytest.raises(ValueError, match="fit the planned pairs before the older run ones"):
+        fit.jobs_to_fit(
+            output_dir=tmp_path, stage=older_stage.stage, only_missing=False, post_hoc="older run"
+        )
+    _save_group(folder=tmp_path, planned=older_stage, group="planned", jobs=fit.planned_jobs(day=1))
+    group, jobs = fit.jobs_to_fit(
+        output_dir=tmp_path, stage=older_stage.stage, only_missing=False, post_hoc="older run"
+    )
+    assert (group, jobs) == ("added_1", fit.older_jobs(day=1))
+
+
+def _older_losses(
+    *, stage: fit.PlannedStage, levels: dict[str, float]
+) -> tuple[fit.PlannedStage, pl.DataFrame]:
+    """Planned arms on every row, older-run arms on the rows outside 2025-10; exact losses."""
+    frame = stage.frame
+    older_rows = frame.filter(pl.col("month") != "2025-10")
+    losses = pl.concat(
+        rows.with_columns(
+            arm=pl.lit(arm),
+            setting=pl.lit(setting),
+            seed=pl.lit(seed),
+            signed_error_capped_mw=pl.lit(0.0),
+            **{METRIC: pl.lit(level)},
+        )
+        for arm, level in levels.items()
+        for rows in ([older_rows] if fit.is_older_arm(arm=arm) else [frame])
+        for setting in (PRIMARY, SENSITIVITY)
+        for seed in range(3)
+    )
+    return stage._replace(older_frame=older_rows), losses
+
+
+_OLDER_LEVELS = {
+    "blend_ukv_ceda_day2_pad": 0.10,
+    "blend_ukv_ceda_day2": 0.09,
+    "blend_ukv_ceda_day2_control": 0.11,
+    "blend_ukv_ceda_day2_control_b": 0.11,
+    "blend_ukv_ceda_run15_day2_pad": 0.105,
+    "blend_ukv_ceda_run15_day2": 0.097,
+    "blend_ukv_ceda_run15_day2_control": 0.11,
+}
+
+
+def test_the_older_section_scores_every_contrast_on_the_older_rows_against_its_own_reference(
+    few_resamples: None,
+):
+    base, _ = _report_stage()
+    stage, losses = _older_losses(stage=base, levels=_OLDER_LEVELS)
+    records: list[fit.IntervalRecord] = []
+
+    lines, older_reading = fit.older_lines(planned=stage, losses=losses, records=records)
+
+    text = "\n".join(lines)
+    assert "Post hoc: ENS day 2 plus UKV-CEDA's older run, wind" in text
+    assert "starts 9 hours before ENS's 00 UTC run" in text
+    assert "its lead is 12 hours longer" in text
+    assert (
+        "cannot separate the effect of the longer lead from the effect of the earlier start" in text
+    )
+    assert older_reading is not None
+    assert older_reading.reading == "lowers the error at day 2"
+    older_rows = stage.older_frame
+    assert older_rows is not None
+    assert older_rows.height < stage.frame.height
+    by_code = {(r["contrast"], r["setting"]): r for r in records if r["scope"] == fit.OLDER_SCOPE}
+    assert set(by_code) == {
+        (code, setting) for code in fit.OLDER_CONTRASTS for setting in (PRIMARY, SENSITIVITY)
+    }
+    assert all(r["n_rows"] == older_rows.height for r in by_code.values())
+    for setting in (PRIMARY, SENSITIVITY):
+        # Older-run blend 0.097 against its own padded reference 0.105 and its control 0.11.
+        assert by_code[("older_p1", setting)]["difference"] == pytest.approx(-0.008)
+        assert by_code[("older_p2", setting)]["difference"] == pytest.approx(-0.013)
+        # Against the planned blend (0.09), and the planned gain on the same rows.
+        assert by_code[("older_vs_fresh", setting)]["difference"] == pytest.approx(0.007)
+        assert by_code[("fresh_p1_same_rows", setting)]["difference"] == pytest.approx(-0.01)
+        assert by_code[("training_rows", setting)]["difference"] == pytest.approx(-0.005)
+    errors = {r["scope"] for r in records if r["contrast"] == "error"}
+    assert errors == {
+        f"{fit.OLDER_SCOPE} rows: {arm}"
+        for arm in (
+            "blend_ukv_ceda_day2_pad",
+            "blend_ukv_ceda_day2",
+            *fit.older_arms(day=2),
+        )
+    }
+
+
+def test_an_older_run_blend_whose_control_matches_it_does_not_lower_the_error(few_resamples: None):
+    base, _ = _report_stage()
+    stage, losses = _older_losses(
+        stage=base,
+        levels={
+            **_OLDER_LEVELS,
+            "blend_ukv_ceda_run15_day2_control": 0.097,
+        },
+    )
+
+    _, older_reading = fit.older_lines(planned=stage, losses=losses, records=[])
+
+    assert older_reading is not None
+    assert older_reading.reading != "lowers the error at day 2"
+    assert older_reading.p2[PRIMARY]["difference"] == pytest.approx(0.0, abs=1e-9)
+    assert older_reading.p1[PRIMARY]["difference"] == pytest.approx(-0.008)
+
+
+def test_the_older_section_is_absent_until_every_older_pair_is_saved(few_resamples: None):
+    base, losses = _report_stage()
+    with_rows = base._replace(older_frame=base.frame.head(60))
+
+    assert fit.older_lines(planned=with_rows, losses=losses, records=[]) == ([], None)
+    assert fit.older_lines(planned=base, losses=losses, records=[]) == ([], None)
+
+
+def test_the_older_readings_table_gives_both_settings_of_each_contrast():
+    p1 = {
+        PRIMARY: _interval(difference=-0.002, lower=-0.003, upper=-0.001),
+        SENSITIVITY: _interval(difference=-0.001, lower=-0.002, upper=0.0005),
+    }
+    p2 = {
+        PRIMARY: _interval(difference=-0.004, lower=-0.005, upper=-0.003),
+        SENSITIVITY: _interval(difference=-0.003, lower=-0.004, upper=-0.002),
+    }
+    fresh = {
+        PRIMARY: _interval(difference=-0.01, lower=-0.012, upper=-0.008),
+        SENSITIVITY: _interval(difference=-0.009, lower=-0.011, upper=-0.007),
+    }
+
+    lines = fit.older_summary_lines(
+        readings={("wind", 1): fit.OlderReading(reading="x", p1=p1, p2=p2, fresh_p1=fresh)}
+    )
+
+    assert lines[2] == (
+        "| wind | 1 | x | -1.000 [-1.200, -0.800] / -0.900 [-1.100, -0.700] "
+        "| -0.200 [-0.300, -0.100] / -0.100 [-0.200, +0.050] "
+        "| -0.400 [-0.500, -0.300] / -0.300 [-0.400, -0.200] |"
+    )
+    assert fit.older_summary_lines(readings={}) == []
+
+
+def test_the_report_adds_the_permutation_and_older_tables_only_when_they_are_given():
+    text = fit.report_text(
+        sections=[],
+        summary=[],
+        stale_summary=[],
+        cpu_line="",
+        padding_line="",
+        permutation_summary=["| permutation row |"],
+        older_summary=["| older row |"],
+    )
+
+    assert "| permutation row |" in text
+    assert "15 extra, all at the primary setting" in text
+    assert "| older row |" in text
+    assert "tests how the gain falls as the UKV-CEDA run gets older" in text
+    assert (
+        "cannot separate the effect of the longer lead from the effect of the earlier start" in text
+    )
+    plain = fit.report_text(sections=[], summary=[], stale_summary=[], cpu_line="", padding_line="")
+    assert "permutation test" not in plain
+    assert "15 UTC run" not in plain
+
+
+def test_the_dry_run_lists_the_older_run_fits_and_the_rows_that_lack_the_older_run(
+    tmp_path: Path, older_stage: fit.PlannedStage, capsys: pytest.CaptureFixture[str]
+):
+    _save_group(folder=tmp_path, planned=older_stage, group="planned", jobs=fit.planned_jobs(day=1))
+
+    fit.print_plan(
+        planned=[older_stage], output_dir=tmp_path, only_missing=False, post_hoc="older run"
+    )
+
+    out = capsys.readouterr().out
+    assert "wind day 1: 5 rows (1 stage rows lack the older run)" in out
+    assert "6 (arm, setting) fits" in out
+    assert "6 (arm, site) fits in all" in out
+
+
+def test_the_dry_run_of_the_permutation_test_lists_solar_fits_and_no_wind_fits(
+    tmp_path: Path,
+    tiny_solar_stage: fit.PlannedStage,
+    tiny_stage: fit.PlannedStage,
+    capsys: pytest.CaptureFixture[str],
+):
+    _save_group(
+        folder=tmp_path, planned=tiny_solar_stage, group="planned", jobs=fit.planned_jobs(day=1)
+    )
+    _save_group(folder=tmp_path, planned=tiny_stage, group="planned", jobs=fit.planned_jobs(day=1))
+
+    fit.print_plan(
+        planned=[tiny_solar_stage, tiny_stage],
+        output_dir=tmp_path,
+        only_missing=False,
+        post_hoc="permutation",
+    )
+
+    out = capsys.readouterr().out
+    assert "solar day 1: 6 rows, 1 sites, " in out
+    assert "15 (arm, setting) fits" in out
+    assert "wind day 1: no permutation fits" in out
+    assert "15 (arm, site) fits in all" in out
+
+
+def test_a_build_that_read_another_run_than_the_one_asked_for_is_refused(tmp_path: Path):
+    _build_folder(folder=tmp_path)
+
+    with pytest.raises(ValueError, match="read the 3 UTC run, not the 15 UTC run"):
+        fit.read_build_stamp(output_dir=tmp_path, spec=build.OLDER_RUN)
+    stamp = json.loads((tmp_path / "build.json").read_text())
+    older = tmp_path / "older"
+    older.mkdir()
+    for domain in ("solar", "wind"):
+        path = older / f"{domain}_ukv_ceda_run15_inputs.parquet"
+        pl.DataFrame({"a": [1]}).write_parquet(path)
+        stamp["inputs_sha256"][domain] = fit_aifs.sha256_of(path=path)
+    stamp["run_hour"] = 15
+    (older / "build.json").write_text(json.dumps(stamp))
+    assert fit.read_build_stamp(output_dir=older, spec=build.OLDER_RUN)["run_hour"] == 15
+    with pytest.raises(ValueError, match="read the 15 UTC run, not the 3 UTC run"):
+        fit.read_build_stamp(output_dir=older)

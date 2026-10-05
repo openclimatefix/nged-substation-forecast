@@ -39,6 +39,12 @@ must be at or before the first run any row reads, and every run slot in the wind
 marks as never attempted must be named in `--unlisted-days`, after the fetcher has been re-run once
 over those days.
 
+**The older-run build (`--older-run`) is post hoc.** It reads the 15 UTC run of the day before the
+ENS run's own day, which starts 9 hours before ENS's 00 UTC run, for lead days 1 to 3. See
+`OLDER_RUN` for the lead mapping. It writes `<domain>_ukv_ceda_run15_inputs.parquet`, `build.json`,
+and `README.md` into its own write-once folder, applies the same coverage guard and the same
+stamp checks, and counts a gap in the 15 UTC run under the same run-gap causes.
+
 `--dry-run` builds one month (`--dry-run-month`), prints the same tables on the runs the store
 holds, and writes nothing.
 
@@ -55,7 +61,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Final
+from typing import Final, NamedTuple
 
 import icechunk
 import numpy as np
@@ -101,9 +107,6 @@ _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
 DOMAINS: Final[tuple[DomainType, DomainType]] = ("solar", "wind")
 
-OUTPUT_DIR_NAME: Final[str] = "ukv_ceda_blends"
-"""Under `data/studies/`, the only folder this script writes to."""
-
 STORE_DIR_NAME: Final[str] = T120_PROFILE.product_name
 """Under `data/studies/weather/`, the store this script reads."""
 
@@ -111,10 +114,53 @@ PUBLISHED_DIR_NAME: Final[str] = "nwp_forecast_comparison"
 DAY4_DIR_NAME: Final[str] = "nwp_forecast_comparison_day4_shared"
 """Under `data/studies/`, the folders holding ENS's mean at days 1 to 3 and at day 4."""
 
-RUN_HOUR: Final[int] = T120_PROFILE.run_hours[0]
+
+class RunSpec(NamedTuple):
+    """Which UKV-CEDA run a build reads for each ENS lead day, and where it writes.
+
+    An hour on day `D` at ENS lead day `N` reads the run that starts at `run_hour` UTC on day
+    `D - N - extra_days`, at lead `24 * N + h - run_hour + 24 * extra_days`, where `h` is the hour
+    of day of the hour's instant (plus 1 for a solar label, which names the hour ending at it).
+    """
+
+    run_hour: int
+    extra_days: int
+    column_prefix: str
+    lead_days: tuple[int, ...]
+    output_dir_name: str
+    description: str
+
+
+PLANNED_RUN: Final[RunSpec] = RunSpec(
+    run_hour=T120_PROFILE.run_hours[0],
+    extra_days=0,
+    column_prefix="ukv_ceda",
+    lead_days=(1, 2, 3, 4),
+    output_dir_name="ukv_ceda_blends",
+    description="the 03 UTC run of the ENS run's own day, which a 09:00 UTC service could read",
+)
+"""The planned run: 03 UTC of day `D - N`, at lead `24 * N + h - 3` hours, 3 hours after ENS's 00
+UTC run starts. Day 5 would need leads beyond the store's last step."""
+
+OLDER_RUN: Final[RunSpec] = RunSpec(
+    run_hour=T120_PROFILE.run_hours[1],
+    extra_days=1,
+    column_prefix="ukv_ceda_run15",
+    lead_days=(1, 2, 3),
+    output_dir_name="ukv_ceda_blends_run15",
+    description="the 15 UTC run of the day before the ENS run's own day, 9 hours before ENS's run",
+)
+"""The post hoc older run: 15 UTC of day `D - N - 1`, at lead `24 * N + h + 9` hours, which starts 9
+hours before ENS's 00 UTC run of day `D - N` and leads 12 hours longer than the planned run's. Day 4
+would need leads up to 129 hours, beyond the store's 120, for every hour after 14:00 UTC."""
+
+OUTPUT_DIR_NAME: Final[str] = PLANNED_RUN.output_dir_name
+"""Under `data/studies/`, the folder the planned run writes to."""
+
+RUN_HOUR: Final[int] = PLANNED_RUN.run_hour
 """The UTC hour of the run every lead day reads: 03 UTC, readable before 09:00 UTC."""
 
-LEAD_DAYS: Final[tuple[int, ...]] = (1, 2, 3, 4)
+LEAD_DAYS: Final[tuple[int, ...]] = PLANNED_RUN.lead_days
 """The lead days built. Day 5 would need leads beyond the store's last step."""
 
 N_LEADS: Final[int] = T120_PROFILE.n_steps
@@ -199,7 +245,9 @@ def bracketing_anchors_finite(*, values: np.ndarray) -> np.ndarray:
     return np.isfinite(anchors[:, _LEFT_ANCHOR]) & np.isfinite(anchors[:, _LEFT_ANCHOR + 1])
 
 
-def fill_radiation(*, snapshots: np.ndarray, clear_sky: np.ndarray) -> np.ndarray:
+def fill_radiation(
+    *, snapshots: np.ndarray, clear_sky: np.ndarray, run_hour: int = RUN_HOUR
+) -> np.ndarray:
     """Rebuild the radiation at the leads the store lacks, through the clear-sky index.
 
     The value at each anchor is an instantaneous snapshot, so five conditions hold. The clear sky is
@@ -215,11 +263,13 @@ def fill_radiation(*, snapshots: np.ndarray, clear_sky: np.ndarray) -> np.ndarra
             has no value.
         clear_sky: Shape (n_runs, `N_LEADS`), the instantaneous clear-sky irradiance at each lead's
             instant, in W/m2.
+        run_hour: The UTC hour at which every run starts, which sets whether an anchor is before
+            noon.
 
     Returns:
         A copy of `snapshots` with every lead in `FILLED_LEADS` rebuilt.
     """
-    morning = (RUN_HOUR + ANCHOR_LEADS) % 24 < 12
+    morning = (run_hour + ANCHOR_LEADS) % 24 < 12
     rebuilt = clear_sky_index_resample(
         values=snapshots[:, ANCHOR_LEADS],
         step_clear_sky=clear_sky[:, ANCHOR_LEADS],
@@ -483,6 +533,7 @@ def solar_hourly(
     series: Mapping[str, np.ndarray],
     sites: Sequence[str],
     coordinates: Mapping[str, tuple[float, float]],
+    run_hour: int = RUN_HOUR,
 ) -> pl.DataFrame:
     """Return the hour-ending radiation and temperature of every run at every site.
 
@@ -491,6 +542,7 @@ def solar_hourly(
         series: Each store variable to its array from `read_cells`, cells in `sites` order.
         sites: The site labels, in the cells' order.
         coordinates: Each site's latitude and longitude, read from the private roster.
+        run_hour: The UTC hour at which every run starts.
 
     Returns:
         `key`, `time` (the label), `ghi` in W/m2 and `temp` in degrees Celsius, each the mean of the
@@ -505,6 +557,7 @@ def solar_hourly(
             clear_sky=clear_sky_by_lead(
                 init_times=init_times, latitude=latitude, longitude=longitude
             ),
+            run_hour=run_hour,
         )
         temperature = fill_linear(values=series["temperature_1p5m"][:, :, index] - KELVIN)
         frames.append(
@@ -570,13 +623,20 @@ def wind_instants(
 # --- Assigning rows to runs and causes ------------------------------------------------------------
 
 
-def with_run(*, frame: pl.DataFrame, day: int, domain: DomainType) -> pl.DataFrame:
+def with_run(
+    *, frame: pl.DataFrame, day: int, domain: DomainType, spec: RunSpec = PLANNED_RUN
+) -> pl.DataFrame:
     """Add the run, its slot, its lead, and its key that a lead day reads for each row.
+
+    **The lead mapping.** The run is the one that starts at `spec.run_hour` UTC on the day
+    `day + spec.extra_days` days before the hour's own day. The planned run (`PLANNED_RUN`) is the
+    03 UTC run of day `D - N`, and the older run (`OLDER_RUN`) is the 15 UTC run of day `D - N - 1`.
 
     Args:
         frame: Rows carrying `site` and `time`.
-        day: The lead day.
+        day: The ENS lead day.
         domain: `solar` or `wind`.
+        spec: Which run is read.
 
     Returns:
         `frame` with `init_time`, `slot`, `lead_hours`, and `key`.
@@ -585,9 +645,11 @@ def with_run(*, frame: pl.DataFrame, day: int, domain: DomainType) -> pl.DataFra
         ValueError: If a run does not fall on the store's 12-hourly slot grid.
     """
     found = frame.with_columns(
-        init_time=served_init_time(time=pl.col("time"), day=day, domain=domain, run_hour=RUN_HOUR),
+        init_time=served_init_time(
+            time=pl.col("time"), day=day + spec.extra_days, domain=domain, run_hour=spec.run_hour
+        ),
         lead_hours=served_lead_hours(
-            time=pl.col("time"), day=day, domain=domain, run_hour=RUN_HOUR
+            time=pl.col("time"), day=day + spec.extra_days, domain=domain, run_hour=spec.run_hour
         ),
     ).with_columns(slot=slot_of(init_time=pl.col("init_time")))
     off_grid = found.filter(
@@ -635,19 +697,22 @@ def attribute_causes(
     )
 
 
-def day_columns(*, joined: pl.DataFrame, day: int, domain: DomainType) -> pl.DataFrame:
-    """Rename one lead day's joined columns to `ukv_ceda_day<N>_*` and keep the stamp and cause.
+def day_columns(
+    *, joined: pl.DataFrame, day: int, domain: DomainType, spec: RunSpec = PLANNED_RUN
+) -> pl.DataFrame:
+    """Rename one lead day's joined columns to `<prefix>_day<N>_*` and keep the stamp and cause.
 
     Args:
         joined: Rows from `attribute_causes` joined with the hourly series.
         day: The lead day.
         domain: `solar` or `wind`.
+        spec: Which run was read, which names the columns' prefix.
 
     Returns:
         `site`, `time`, the day's weather columns as `Float64`, `ukv_ceda_day<N>_init_time`, and
         `ukv_ceda_day<N>_cause`.
     """
-    prefix = f"ukv_ceda_day{day}"
+    prefix = f"{spec.column_prefix}_day{day}"
     return joined.select(
         "site",
         "time",
@@ -667,6 +732,7 @@ def build_day(
     domain: DomainType,
     hourly: pl.DataFrame,
     statuses: np.ndarray,
+    spec: RunSpec = PLANNED_RUN,
 ) -> pl.DataFrame:
     """Join one lead day's UKV-CEDA columns onto the candidate rows.
 
@@ -676,17 +742,20 @@ def build_day(
         domain: `solar` or `wind`.
         hourly: `solar_hourly` or `wind_instants`' result.
         statuses: The store's status of every slot.
+        spec: Which run is read.
 
     Returns:
         `day_columns`' result for every row of `keys`.
     """
-    runs = with_run(frame=keys, day=day, domain=domain)
+    runs = with_run(frame=keys, day=day, domain=domain, spec=spec)
     joined = runs.join(hourly, on=["key", "time"], how="left")
     labelled = attribute_causes(frame=joined, statuses=statuses, columns=WEATHER_FIELDS[domain])
-    return day_columns(joined=labelled, day=day, domain=domain)
+    return day_columns(joined=labelled, day=day, domain=domain, spec=spec)
 
 
-def check_complete_runs_hold_values(*, columns: pl.DataFrame, domain: DomainType) -> None:
+def check_complete_runs_hold_values(
+    *, columns: pl.DataFrame, domain: DomainType, spec: RunSpec = PLANNED_RUN
+) -> None:
     """Raise if a run the store marks complete lacks a value a row needs.
 
     A 925 hPa level below the ground is stored as a missing value, and dropping the rows it affects
@@ -695,15 +764,16 @@ def check_complete_runs_hold_values(*, columns: pl.DataFrame, domain: DomainType
     Args:
         columns: The joined `build_day` results of every day, keyed by `site` and `time`.
         domain: `solar` or `wind`.
+        spec: Which run was read.
 
     Raises:
         ValueError: Naming each day and how many rows lack a value under a complete run.
     """
     problems = {
         day: columns.filter(
-            pl.col(f"ukv_ceda_day{day}_cause") == "complete run lacks a value"
+            pl.col(f"{spec.column_prefix}_day{day}_cause") == "complete run lacks a value"
         ).height
-        for day in LEAD_DAYS
+        for day in spec.lead_days
     }
     problems = {day: count for day, count in problems.items() if count}
     if problems:
@@ -752,7 +822,11 @@ def ens_columns(*, domain: DomainType, day: int) -> list[str]:
 
 
 def loss_table(
-    *, candidates: pl.DataFrame, built: pl.DataFrame, domain: DomainType
+    *,
+    candidates: pl.DataFrame,
+    built: pl.DataFrame,
+    domain: DomainType,
+    spec: RunSpec = PLANNED_RUN,
 ) -> pl.DataFrame:
     """Count the candidate rows lost to each cause, per lead day.
 
@@ -762,13 +836,14 @@ def loss_table(
         candidates: `published_rows`' result.
         built: Every day's `build_day` columns, keyed by `site` and `time`.
         domain: `solar` or `wind`.
+        spec: Which run was read.
 
     Returns:
         One row per lead day with `candidates`, one column per cause, and `kept`.
     """
     joined = candidates.join(built, on=["site", "time"], how="left")
     records = []
-    for day in LEAD_DAYS:
+    for day in spec.lead_days:
         ens_absent = pl.any_horizontal(
             pl.col(column).is_null() for column in ens_columns(domain=domain, day=day)
         )
@@ -777,7 +852,7 @@ def loss_table(
             .then(pl.lit("target absent"))
             .when(ens_absent)
             .then(pl.lit("ENS absent"))
-            .otherwise(pl.col(f"ukv_ceda_day{day}_cause"))
+            .otherwise(pl.col(f"{spec.column_prefix}_day{day}_cause"))
         )
         counts = dict(joined.select(cause.alias("cause")).group_by("cause").len().iter_rows())
         records.append(
@@ -792,22 +867,35 @@ def loss_table(
     return pl.DataFrame(records)
 
 
-def day5_share(*, candidates: pl.DataFrame, domain: DomainType) -> float:
-    """Return the share of candidate rows whose day-5 lead is inside the store's 120 hours.
+def beyond_day_share(
+    *, candidates: pl.DataFrame, domain: DomainType, spec: RunSpec = PLANNED_RUN
+) -> float:
+    """Return the share of candidate rows whose lead at the first unbuilt day is inside the store.
 
     Args:
         candidates: Rows carrying `site` and `time`.
         domain: `solar` or `wind`.
+        spec: Which run is read. The first unbuilt day is the one after `spec.lead_days`' last.
 
     Returns:
-        The share, from 0 to 1.
+        The share, from 0 to 1, of rows whose lead at that day is within the store's 120 hours.
     """
-    lead = served_lead_hours(time=pl.col("time"), day=5, domain=domain, run_hour=RUN_HOUR)
+    lead = served_lead_hours(
+        time=pl.col("time"),
+        day=spec.lead_days[-1] + 1 + spec.extra_days,
+        domain=domain,
+        run_hour=spec.run_hour,
+    )
     return float(candidates.select((lead <= LAST_LEAD_HOURS).mean()).item())
 
 
 def table_lines(
-    *, table: pl.DataFrame, domain: DomainType, shared_kept: int, share: float
+    *,
+    table: pl.DataFrame,
+    domain: DomainType,
+    shared_kept: int,
+    share: float,
+    spec: RunSpec = PLANNED_RUN,
 ) -> list[str]:
     """Format one technology's loss table as Markdown lines.
 
@@ -815,7 +903,8 @@ def table_lines(
         table: `loss_table`'s result.
         domain: `solar` or `wind`.
         shared_kept: How many rows `nwp_forecast_comparison.rows` keeps, for comparison.
-        share: `day5_share`'s result.
+        share: `beyond_day_share`'s result.
+        spec: Which run was read.
 
     Returns:
         The lines.
@@ -836,8 +925,9 @@ def table_lines(
     lines += [
         "",
         (
-            f"`nwp_forecast_comparison.rows` would keep {shared_kept} rows. The 03 UTC run reaches "
-            f"lead day 5 for {share:.1%} of candidate rows, so day 5 is not built."
+            f"`nwp_forecast_comparison.rows` would keep {shared_kept} rows. The "
+            f"{spec.run_hour:02d} UTC run read here reaches lead day {spec.lead_days[-1] + 1} for "
+            f"{share:.1%} of candidate rows, so day {spec.lead_days[-1] + 1} is not built."
         ),
         "",
     ]
@@ -900,19 +990,22 @@ def sha256_of(*, path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def readme_text(*, stamp: Mapping[str, object], tables: Sequence[str]) -> str:
+def readme_text(
+    *, stamp: Mapping[str, object], tables: Sequence[str], spec: RunSpec = PLANNED_RUN
+) -> str:
     """Return the folder's `README.md`.
 
     Args:
         stamp: The contents of `build.json`.
         tables: The loss tables' Markdown lines.
+        spec: Which run was read.
 
     Returns:
         The README text.
     """
     return "\n".join(
         [
-            "# UKV-CEDA inputs for the blends study (write-once)",
+            f"# UKV-CEDA inputs for the blends study, {spec.run_hour:02d} UTC run (write-once)",
             "",
             (
                 "Built by `studies/ukv_ceda_blends/build_ukv_ceda_inputs.py` for "
@@ -920,10 +1013,12 @@ def readme_text(*, stamp: Mapping[str, object], tables: Sequence[str]) -> str:
             ),
             "",
             (
-                "- `<domain>_ukv_ceda_inputs.parquet` holds, on the published `(site, time)` rows, "
-                "each UKV-CEDA column at lead days 1 to 4 (`ukv_ceda_day<N>_*`), the run read "
-                "(`ukv_ceda_day<N>_init_time`), and why a day's columns are absent "
-                "(`ukv_ceda_day<N>_cause`). Every row carries only the anonymised `site` label."
+                f"- `<domain>_{spec.column_prefix}_inputs.parquet` holds, on the published "
+                f"`(site, time)` rows, each UKV-CEDA column at lead days {spec.lead_days[0]} to "
+                f"{spec.lead_days[-1]} (`{spec.column_prefix}_day<N>_*`), the run read "
+                f"(`{spec.column_prefix}_day<N>_init_time`), and why a day's columns are absent "
+                f"(`{spec.column_prefix}_day<N>_cause`). Every row carries only the anonymised "
+                "`site` label."
             ),
             (
                 "- `build.json` names the Icechunk snapshot read, the window's coverage guard, and "
@@ -939,8 +1034,9 @@ def readme_text(*, stamp: Mapping[str, object], tables: Sequence[str]) -> str:
             "",
             f"- Icechunk snapshot: `{stamp['snapshot_id']}`",
             (
-                f"- Runs read: the {RUN_HOUR:02d} UTC run of the day `N` days before each hour's "
-                "own day, at lead `24 * N + h - 3` hours, `UKV-CEDA-T120` only."
+                f"- Runs read: {spec.description}, `UKV-CEDA-T120` only. For an hour on day `D` at "
+                f"lead day `N`, the run starts at {spec.run_hour:02d} UTC on day "
+                f"`D - N - {spec.extra_days}`."
             ),
             f"- Days never archived and named in `--unlisted-days`: {stamp['unlisted_days']}",
             "",
@@ -951,13 +1047,20 @@ def readme_text(*, stamp: Mapping[str, object], tables: Sequence[str]) -> str:
     )
 
 
-def build_domain(*, store: StoreRead, domain: DomainType, candidates: pl.DataFrame) -> pl.DataFrame:
+def build_domain(
+    *,
+    store: StoreRead,
+    domain: DomainType,
+    candidates: pl.DataFrame,
+    spec: RunSpec = PLANNED_RUN,
+) -> pl.DataFrame:
     """Build every lead day's UKV-CEDA columns for one technology.
 
     Args:
         store: The opened store.
         domain: `solar` or `wind`.
         candidates: `published_rows`' result.
+        spec: Which run is read.
 
     Returns:
         `site`, `time`, and every day's columns, stamp, and cause.
@@ -973,8 +1076,10 @@ def build_domain(*, store: StoreRead, domain: DomainType, candidates: pl.DataFra
     slots = sorted(
         {
             int(slot)
-            for day in LEAD_DAYS
-            for slot in with_run(frame=keys, day=day, domain=domain)["slot"].unique().to_list()
+            for day in spec.lead_days
+            for slot in with_run(frame=keys, day=day, domain=domain, spec=spec)["slot"]
+            .unique()
+            .to_list()
         }
     )
     check_slot_times(store=store, slots=slots)
@@ -987,17 +1092,25 @@ def build_domain(*, store: StoreRead, domain: DomainType, candidates: pl.DataFra
     )
     _LOG.info("%s: read %d runs in %.0f s", domain, len(slots), time.monotonic() - started)
     if domain == "solar":
-        hourly = solar_hourly(slots=slots, series=series, sites=sites, coordinates=coordinates)
+        hourly = solar_hourly(
+            slots=slots,
+            series=series,
+            sites=sites,
+            coordinates=coordinates,
+            run_hour=spec.run_hour,
+        )
     else:
         hourly = wind_instants(slots=slots, series=series, sites=sites)
     days = [
-        build_day(keys=keys, day=day, domain=domain, hourly=hourly, statuses=store.statuses)
-        for day in LEAD_DAYS
+        build_day(
+            keys=keys, day=day, domain=domain, hourly=hourly, statuses=store.statuses, spec=spec
+        )
+        for day in spec.lead_days
     ]
     built = days[0]
     for other in days[1:]:
         built = built.join(other, on=["site", "time"], how="left")
-    check_complete_runs_hold_values(columns=built, domain=domain)
+    check_complete_runs_hold_values(columns=built, domain=domain, spec=spec)
     return built
 
 
@@ -1009,6 +1122,7 @@ def run_build(
     output_dir: Path | None,
     unlisted_days: Sequence[date],
     dry_run_month: str | None,
+    spec: RunSpec = PLANNED_RUN,
 ) -> int:
     """Build both technologies' inputs, print the loss tables, and write them unless a dry run.
 
@@ -1019,6 +1133,7 @@ def run_build(
         output_dir: The write-once folder, or `None` for a dry run.
         unlisted_days: Dates CEDA does not list, confirmed after one retry.
         dry_run_month: A `%Y-%m` month to build alone without the coverage guard, or `None`.
+        spec: Which run is read.
 
     Returns:
         0.
@@ -1034,9 +1149,9 @@ def run_build(
         else:
             needed = {
                 int(slot)
-                for day in LEAD_DAYS
+                for day in spec.lead_days
                 for slot in with_run(
-                    frame=candidates.select("site", "time"), day=day, domain=domain
+                    frame=candidates.select("site", "time"), day=day, domain=domain, spec=spec
                 )["slot"].unique()
             }
             accepted = sorted(
@@ -1050,15 +1165,16 @@ def run_build(
                 }
             )
         started = time.monotonic()
-        built = build_domain(store=store, domain=domain, candidates=candidates)
+        built = build_domain(store=store, domain=domain, candidates=candidates, spec=spec)
         sys.stdout.write(f"{domain}: built in {time.monotonic() - started:.0f} s\n")
-        table = loss_table(candidates=candidates, built=built, domain=domain)
+        table = loss_table(candidates=candidates, built=built, domain=domain, spec=spec)
         shared = rows(input_dir=published_dir, domain=domain).height
         lines = table_lines(
             table=table,
             domain=domain,
             shared_kept=shared,
-            share=day5_share(candidates=candidates, domain=domain),
+            share=beyond_day_share(candidates=candidates, domain=domain, spec=spec),
+            spec=spec,
         )
         sys.stdout.write("\n".join(lines) + "\n")
         tables += lines
@@ -1073,6 +1189,7 @@ def run_build(
         published_dir=published_dir,
         day4_dir=day4_dir,
         unlisted_days=accepted,
+        spec=spec,
     )
     return 0
 
@@ -1086,6 +1203,7 @@ def write_outputs(
     published_dir: Path,
     day4_dir: Path,
     unlisted_days: Sequence[date],
+    spec: RunSpec = PLANNED_RUN,
 ) -> None:
     """Write each technology's inputs, `build.json`, and `README.md`, refusing to overwrite.
 
@@ -1097,9 +1215,10 @@ def write_outputs(
         published_dir: The folder holding the published inputs.
         day4_dir: The folder holding ENS's day-4 mean.
         unlisted_days: The never-archived days the build accepted.
+        spec: Which run was read.
     """
     targets = [
-        *(output_dir / f"{domain}_ukv_ceda_inputs.parquet" for domain in DOMAINS),
+        *(output_dir / f"{domain}_{spec.column_prefix}_inputs.parquet" for domain in DOMAINS),
         output_dir / STAMP_NAME,
         output_dir / README_NAME,
     ]
@@ -1107,12 +1226,13 @@ def write_outputs(
     output_dir.mkdir(exist_ok=True)
     for domain in DOMAINS:
         outputs[domain].sort("site", "time").write_parquet(
-            output_dir / f"{domain}_ukv_ceda_inputs.parquet"
+            output_dir / f"{domain}_{spec.column_prefix}_inputs.parquet"
         )
     stamp = {
         "snapshot_id": store.snapshot_id,
         "store": T120_PROFILE.product_name,
-        "run_hour": RUN_HOUR,
+        "run_hour": spec.run_hour,
+        "extra_days": spec.extra_days,
         "coverage_guard_passed": True,
         "unlisted_days": [str(day) for day in unlisted_days],
         "published_sha256": {
@@ -1124,28 +1244,32 @@ def write_outputs(
             for domain in DOMAINS
         },
         "inputs_sha256": {
-            domain: sha256_of(path=output_dir / f"{domain}_ukv_ceda_inputs.parquet")
+            domain: sha256_of(path=output_dir / f"{domain}_{spec.column_prefix}_inputs.parquet")
             for domain in DOMAINS
         },
     }
     (output_dir / STAMP_NAME).write_text(json.dumps(stamp, indent=2))
-    (output_dir / README_NAME).write_text(readme_text(stamp=stamp, tables=tables))
+    (output_dir / README_NAME).write_text(readme_text(stamp=stamp, tables=tables, spec=spec))
 
 
-def check_output_dir(*, output_dir: Path, read_only: Sequence[Path]) -> None:
-    """Raise unless `output_dir` is the one folder this script may write to.
+def check_output_dir(
+    *, output_dir: Path, read_only: Sequence[Path], spec: RunSpec = PLANNED_RUN
+) -> None:
+    """Raise unless `output_dir` is the one folder this script may write to for a run.
 
     Args:
         output_dir: Where the build would write.
         read_only: The folders the script reads.
+        spec: Which run is read, whose `output_dir_name` the folder must carry.
 
     Raises:
-        ValueError: If `output_dir` is a folder the script reads, or is not named `OUTPUT_DIR_NAME`.
+        ValueError: If `output_dir` is a folder the script reads, or is not named
+            `spec.output_dir_name`.
     """
     if output_dir.resolve() in {folder.resolve() for folder in read_only} or (
-        output_dir.name != OUTPUT_DIR_NAME
+        output_dir.name != spec.output_dir_name
     ):
-        msg = f"this script writes only to a folder named {OUTPUT_DIR_NAME}, not {output_dir}"
+        msg = f"this run writes only to a folder named {spec.output_dir_name}, not {output_dir}"
         raise ValueError(msg)
 
 
@@ -1162,28 +1286,37 @@ def main() -> int:
     parser.add_argument("--published-dir", type=Path, default=studies_dir / PUBLISHED_DIR_NAME)
     parser.add_argument("--day4-dir", type=Path, default=studies_dir / DAY4_DIR_NAME)
     parser.add_argument("--store-dir", type=Path, default=studies_dir / "weather" / STORE_DIR_NAME)
-    parser.add_argument("--output-dir", type=Path, default=studies_dir / OUTPUT_DIR_NAME)
+    parser.add_argument("--output-dir", type=Path, default=None)
+    parser.add_argument(
+        "--older-run",
+        action="store_true",
+        help="Post hoc: read the 15 UTC run of the day before ENS's run, for lead days 1 to 3.",
+    )
     parser.add_argument(
         "--unlisted-days",
         nargs="*",
         default=[],
         type=lambda text: parse_days(text=text),
-        help="Dates CEDA lists no 03 UTC run for, after the fetcher was re-run over them once.",
+        help="Dates CEDA lists no run for, after the fetcher was re-run over them once.",
     )
     parser.add_argument("--dry-run", action="store_true", help="Build one month; write nothing.")
     parser.add_argument("--dry-run-month", default="2026-03", help="The month `--dry-run` builds.")
     args = parser.parse_args()
+    spec = OLDER_RUN if args.older_run else PLANNED_RUN
+    output_dir = args.output_dir or studies_dir / spec.output_dir_name
     check_output_dir(
-        output_dir=args.output_dir,
+        output_dir=output_dir,
         read_only=[args.published_dir, args.day4_dir, args.store_dir],
+        spec=spec,
     )
     return run_build(
         published_dir=args.published_dir,
         day4_dir=args.day4_dir,
         store_dir=args.store_dir,
-        output_dir=None if args.dry_run else args.output_dir,
+        output_dir=None if args.dry_run else output_dir,
         unlisted_days=args.unlisted_days,
         dry_run_month=args.dry_run_month if args.dry_run else None,
+        spec=spec,
     )
 
 
