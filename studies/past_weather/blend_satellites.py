@@ -60,17 +60,17 @@ and ICON-DREAM-EU, 2021 to August 2026, with the same folds, eras, seeds, export
   figure as a percentage of capacity to 2 decimal places.
 
 **Post hoc, added after the first science review of this section.** The review found that the
-section's reference, plain `cams_split`, was not enriched with CAMS's own neighbouring hours the
-way every other section's single-product reference is, and that a single column averaging CAMS's
-and SARAH-3's irradiance already gains about as much as CAMS's own split does. Three more arms
-answer both: `cams_rich` (CAMS's split plus `ghi_previous_cams` and `ghi_next_cams`, its own
+section's reference, plain `cams_split`, was not enriched with CAMS's own neighbouring hours the way
+every other section's single-product reference is, and that a single column averaging CAMS's and
+SARAH-3's irradiance already gains about as much as CAMS's own split does. Three more arms answer
+both: `cams_rich` (CAMS's split plus `ghi_previous_cams` and `ghi_next_cams`, its own
 neighbouring-hour global irradiance from `studies.pv_dataset.CAMS_PATH`, read separately from the
 scored rows as `studies.neighbouring_hours.with_neighbouring_hours` requires),
-`cams_rich_sarah3_xgb` (`cams_rich` plus SARAH-3), and `cams_rich_sarah3_control` (`cams_rich` plus SARAH-3's permuted
-column). Both post hoc contrasts, `cams_rich_sarah3_xgb` − `cams_rich` and `cams_rich_sarah3_xgb` −
-`cams_rich_sarah3_control`, are refitted at the second hyperparameter setting too. All three arms
-are fitted, never reused from an earlier run's `cams_split` fit, because `cams_rich` reads columns
-no earlier arm read.
+`cams_rich_sarah3_xgb` (`cams_rich` plus SARAH-3), and `cams_rich_sarah3_control` (`cams_rich` plus
+SARAH-3's permuted column). Both post hoc contrasts, `cams_rich_sarah3_xgb` − `cams_rich` and
+`cams_rich_sarah3_xgb` − `cams_rich_sarah3_control`, are refitted at the second hyperparameter
+setting too. All three arms are fitted, never reused from an earlier run's `cams_split` fit, because
+`cams_rich` reads columns no earlier arm read.
 
 **Post hoc, added after the second science review of this section.** The review asked whether a
 second product other than SARAH-3 gives CAMS's split as much of a gain, since the section's
