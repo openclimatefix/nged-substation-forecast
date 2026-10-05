@@ -567,6 +567,15 @@ rule. A `git mv` commit changes no content beyond path strings, so `git diff -M`
    Packages table row for `studies` and the skills table if any summary changed (sweep the summaries,
    per the project memory). In `docs/architecture/testing.md`, a "Study tests" paragraph recording the
    convention, because the issue requires it there.
+   **Document the import rules in four places, each stating both halves:** study scripts may import
+   from their own folder, from `studies.*`, and from the other reviewed packages in `packages/*`; and
+   `src/` and every package under `packages/` except `packages/studies` must never import `studies`
+   or a study script, because humans review that code and the study code is fast-moving and
+   agent-written. The four places are the `studies` row and a short "Import rules" paragraph in
+   `CLAUDE.md`'s Architecture section, the study skill's "Where a study's pieces live" section,
+   `studies/README.md` (the top of the file), and the docstring of `test_study_boundaries`, which names
+   the rule it enforces and says where the rule is documented. `packages/studies/README.md` gets the
+   same paragraph if the file exists.
 6. **Verification and reviews** (below).
 7. **Data migration (after the merge).** Steps D0 and D2 to D8, then the gated step G, under
    "Data migration". Each wave repeats the manifest comparison and the grep gate.
