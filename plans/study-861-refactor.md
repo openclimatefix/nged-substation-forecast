@@ -3,29 +3,37 @@
 **The problem is that `studies/beam_diffuse_split/` holds 79 scripts for about ten different study
 pages, and the scripts reach each other, and other folders, by bare imports.** The issue counted 44
 scripts; `main` now holds 79 in that folder, 128 under `studies/` in all (excluding
-`era_fold_design/scripts`), and 77,000 lines. An AST scan of the imports found 56 pairs of
-(importing folder, imported module) that cross a folder boundary once the scripts are sorted by
-study family. Ten scripts hide a crossing behind `sys.path.insert`, which `ruff` and `ty` cannot
-check. Published pages cite script paths on 81 lines in 11 files in `docs/`, 58 of them naming a
-script that moves, not the 30 the issue estimated.
+`era_fold_design/scripts`), and 92,483 lines. An AST scan of the imports found 25 pairs of
+(importing folder, imported module) that cross a folder boundary once the scripts are sorted by the
+folder map below. Ten scripts call `sys.path.insert`, and nine of those hide a crossing, which
+`ruff` and `ty` cannot check (`stamp_alignment.py` inserts its own folder). One more script,
+`ens_hres_past_wind.py`, loads `weather_downloads/paths.py` with `spec_from_file_location`, which no
+import scan sees. Published pages cite script paths on 81 lines in 11 files in `docs/`, 58 of them
+naming a script that moves, not the 30 the issue estimated.
 
 **The plan is to sort the scripts into folders that mirror the docs page families, and to make the
 crossings impossible rather than merely rare.** A script may import only from its own folder and
 from `studies.*` (`packages/studies`). Everything a second folder needs moves into the package, in
-two layers. One AST test, added in the last commit, enforces the rule. Study outputs stay where they
+two layers. One AST test, added in the last commit, enforces the rule over `studies/` and over
+`packages/studies/src`. Study outputs stay where they
 are. Tests of study scripts move to one tree. The general Fractions Skill Score and paired block
 bootstrap are not extracted here (issues #805 and #808): they wait for their production callers.
 
 ## Verdict, size and departures
 
 **Verdict: worth doing, with four departures from the issue body.** The preconditions (#858, #859)
-have merged. This plan is written against `main`. Branch `study-1016-ukv-blends` is running a study
-and is unmerged. It edits `nwp_forecast_comparison/fit_aifs.py`, `nwp_forecast_comparison.py` and
-`packages/studies/src/studies/ifs_single_runs.py`, and adds `studies/ukv_ceda_blends/` (five
-scripts that reach `nwp_forecast_comparison/`, `beam_diffuse_split/` and `weather_downloads/`
-through `sys.path` inserts). This plan names no module for that branch. The implementer re-runs the
-import scan in step 0 on whatever `main` holds then. If the branch has merged, the scan lists the
-crossings it adds, and they join layer 1 or layer 2 like any other.
+have merged. This plan is written against `main`. Branch `study-1016-ukv-blends` (#1016) is running
+a study and is unmerged. It edits `nwp_forecast_comparison/fit_aifs.py`,
+`nwp_forecast_comparison.py` and `packages/studies/src/studies/ifs_single_runs.py`, and adds
+`studies/ukv_ceda_blends/` (five scripts that reach `nwp_forecast_comparison/`,
+`beam_diffuse_split/` and `weather_downloads/` through `sys.path` inserts). The implementer starts
+only after #1016 merges, so that the work is not rebased over a moving folder, and re-runs the
+import scan in step 0 on the merged `main`. The scan of the branch shows what it adds: about 59
+layer-2 symbols, 50 of them from `ukv_ceda_blends/` into `nwp_forecast_comparison/` (from `fit_aifs`
+21, `nwp_forecast_comparison` 15, `nwp_forecast_charts` 12, `fit_extra_leads` 2,
+`weather_downloads/fetch_ukv_ceda` 7, and `paths`). The folder map below therefore folds
+`ukv_ceda_blends/` into `nwp_forecast_comparison/`, and the layer-2 re-scan after the fold is a
+named step.
 
 **Size: complex.** The five triggers:
 
@@ -36,8 +44,8 @@ crossings it adds, and they join layer 1 or layer 2 like any other.
 - **A degradation rule:** no.
 - **More than one defensible design:** yes. The folder grouping, the number of extraction layers,
   the test location, and the #805/#808 boundary each have a defensible alternative.
-- **Callers not nameable without searching:** yes. 128 scripts, 49 files in `tests/` and 41 in
-  `packages/studies/tests/`, and 81 docs lines.
+- **Callers not nameable without searching:** yes. 128 scripts, 49 files in `tests/` (17 of them
+  test scripts) and 41 in `packages/studies/tests/`, and 81 docs lines.
 
 Either of those two triggers alone makes the issue complex: it gets this plan and both plan reviews
 (run by the caller, not by this planner), and both diff reviews. The maintainer asked for one Opus
@@ -58,8 +66,12 @@ whenever `packages/studies` changes, limited to the tests this work adds.
 
 **Two new folders mirror the docs.** `past_weather/` mirrors `docs/studies/past-weather/`, and
 `nwp_forecast_comparison/` already mirrors the Forecasts pages. Existing folders keep their names:
-`beam_diffuse_split/`, `era_fold_design/`, `weather_downloads/`, `open_meteo_ensemble_means/`,
-`ens_backfill_pilot/` and `ukv_ceda_blends/` (where it exists).
+`beam_diffuse_split/`, `era_fold_design/`, `weather_downloads/`, `open_meteo_ensemble_means/` and
+`ens_backfill_pilot/`. The one exception is `ukv_ceda_blends/` (from #1016), which folds into
+`nwp_forecast_comparison/` because it feeds a Forecasts page and the rule is that folders mirror
+page families. Its five scripts, its tests (`packages/studies/tests/test_ukv_ceda_*.py`, which
+use `sys.path.insert` today) and its `extra-paths` line in `pyproject.toml` move with it, and its
+`sys.path.insert` calls are removed.
 
 | Folder | Scripts |
 |---|---|
@@ -80,43 +92,69 @@ layer 1. The scripts of `past_weather/` that today read each other, such as the 
 page-number checker and the timestamp-lag check, and the scan decides whether any of them crosses a
 folder. If one does, the crossing is a layer-1 or layer-2 symbol like any other.
 
-**`era_fold_design/scripts/partC_*.py` import `ens_forecast_horizons` and `blend_products`, which
-both move.** Those scripts are a record the `ruff` and `ty` configurations exclude, and the boundary
-test excludes them too. The implementer repoints their imports at the layer-2 `studies.*` modules
-and confirms each still imports. A symbol that did not move is left alone and reported.
+**`era_fold_design/scripts/` is left untouched.** `common.py` puts a different worktree
+(`.claude/worktrees/era-fold-design`) and a frozen scratch copy of the ENS script on `sys.path`, so
+those scripts do not import this repository's scripts at all. The `partB_*`, `partP` and
+`common.py` files also import `wind_products`, `weather_products`, `run_experiment`, `export_cap`
+and `build_dataset`. Repointing any of them at `studies.*` would change the code the recorded
+numbers came from. The `ruff`, `ty` and boundary-test configurations exclude the folder.
 
 ## What moves to `packages/studies`
 
 **Layer 1 moves code every study reads; each module is one commit, with tests.** Underscore-private
-names lose their underscore on the way, because a name imported from a package is public.
+names lose their underscore on the way, because a name imported from a package is public. Two
+rules apply to every moved definition. First, a definition that uses `__file__` is rewritten
+against `PROJECT_ROOT` or stays in the script: `weather_product_charts.ASSETS_DIR` is
+`Path(__file__).resolve().parents[2] / "docs" / ...`, which from `packages/studies/src/studies/`
+resolves to `packages/studies` and would write charts to the wrong directory without an error.
+Second, `logging.getLogger("<old script name>")` calls in moved code are updated.
 
 | New module | Comes from | What it holds |
 |---|---|---|
 | `studies.sources` | `sources.py`, wholesale | `SourceType`, `SOURCE_CHOICES`, `PER_SITE_SOURCES`, `OpenMeteoModel` and its registry, `point_output_path_for`, and the path constants (`REPO_DATA_DIR`, `STUDIES_DATA_DIR`, `WEATHER_DATA_DIR`, `ANM_DATA_DIR`). `weather_downloads/paths.py` imports `REPO_DATA_DIR` from here instead of defining it a second time. |
-| `studies.pv_dataset` | `build_dataset.py` | The site rosters (`pv_sites`, `wind_sites`), `hourly_power`, `read_era5`, `nearest_era5_cell`, `read_cams`, the outage and false-zero filters, the separation-model columns. The build's command line stays in `beam_diffuse_split/build_dataset.py`. |
+| `studies.pv_dataset` | `build_dataset.py` | The site rosters (`pv_sites`, `wind_sites`), `solar_hourly_power` (from `build_dataset._hourly_power`, which builds a period-ending hour), `read_era5`, `nearest_era5_cell`, `read_cams`, the outage and false-zero filters, the separation-model columns. The build's command line stays in `beam_diffuse_split/build_dataset.py`. `wind_products._hourly_power` is a different function (it shifts every stamp by 30 minutes), becomes `wind_hourly_power` in the layer-2 commit, and a test asserts that the two give different timestamps for the same input, so a swapped import is caught. `ensemble_means_mae` and `ens_forecast_horizons` import both under aliases. |
 | `studies.arm_runner` | `run_experiment.py` | `Job`, `run_all`, `MAX_CONCURRENT_FITS`, `SHARED_FEATURES`, `add_time_features`, `dataset_path_for`. |
 | `studies.commissioning`, `studies.export_cap`, `studies.physics_model`, `studies.era5_grid`, `studies.figure_numbers` | the scripts of the same name | Whole modules. |
 | `studies.open_meteo_point` | `fetch_open_meteo_point.py` | `fetch_point_frame`, `HOURLY_VARIABLES`, the timestamp-convention checks. The `--model` command line stays. It moves because `weather_downloads/` and `beam_diffuse_split/` scripts import it as well as `past_weather/`. |
 
-**Layer 2 is expected to be about 28 symbols in 8 (importing folder, imported module) pairs.** The
-scan counts 114 symbols in 24 pairs under the one-folder-per-page grouping this plan replaced, and
-the `past_weather/` and `nwp_forecast_comparison/` grouping turns most of them into same-folder
-imports. The 28 are an estimate from the measured scan, not a contract: the implementer re-derives
-them in step 0 and records the real number. The estimate divides as follows.
+**Layer 2 is about 1,000 lines of code, not about 28 symbols, because a package module cannot import
+a script.** The scan counts 29 symbols in 8 (importing folder, imported module) pairs on `main`.
+Each symbol must take its whole transitive call closure into the package, though. For example,
+`blend_products._solar_frame` calls `weather_products.joined`, `common_rows`, `with_eras` and
+`with_irradiance_context`, `wind_products.joined`, `common_rows` and `with_wind_context`, and
+`_with_blend_columns` (`blend_products.py:1886-1915`).
 
-| Candidate module | Symbols | Used by |
+| Candidate module | Closure measured on `main` | Used by |
 |---|---|---|
-| `studies.product_frames` | About 9: `solar_frame`, `wind_frame`, `SOLAR`, `WIND`, `Domain`, `PERMUTATION_GROUPS` and neighbours, from `blend_products.py` | `nwp_forecast_comparison/`, `open_meteo_ensemble_means/`, `era_fold_design/scripts/partC_*.py` |
-| `studies.ens_members` | About 7: the symbols other folders take from `ens_forecast_horizons.py` (`ENSEMBLE_SIZE`, `H3_RESOLUTION`, `reduce_members`, `ens_columns` and neighbours) | `past_weather/`, `era_fold_design/scripts/partC_*.py` |
-| `studies.wn3_fetch` | About 8 attributes of `weather_downloads/fetch_weathernext3.py` | `nwp_forecast_comparison/build_wn3_inputs.py` |
-| singletons | About 4 | the scan lists them |
+| `studies.product_frames` | The nine symbols (`solar_frame`, `wind_frame`, `SOLAR`, `WIND`, `Domain`, `PERMUTATION_GROUPS` and neighbours) reach about 77 definitions and about 1,040 lines, from `blend_products`, `weather_products`, `wind_products` and `fetch_wind_point` | `nwp_forecast_comparison/`, `open_meteo_ensemble_means/` |
+| `studies.ens_members` | About 14 definitions and 235 lines, reaching into `blend_products` as well | `past_weather/` |
+| `studies.wn3_fetch` | Only the eight constants of `weather_downloads/fetch_weathernext3.py`. A wholesale move would pull `gcsfs`, `icechunk`, `zarr` and `delta_store` into `packages/studies`, which declares none of them | `nwp_forecast_comparison/build_wn3_inputs.py` |
+| `_power_version` | Stays in the script: it imports `deltalake`, which `packages/studies` does not declare | |
+| singletons | The scan lists them | |
+
+**Step 0 measures call closures, not import names**, using a transitive call-graph scan over the
+layer-2 symbols (saved as `closure.py` in the session scratch, with the import scan `edges.py`).
+It records, per (importing folder, imported module) pair, the symbols, the definitions in the
+closure, the lines, and the third-party imports the closure needs. After the `ukv_ceda_blends/`
+fold lands, the scan runs again, because the fold turns most of the 59 new symbols into same-folder
+imports and the remainder are listed as layer-2 candidates.
+
+**Decision rule when a closure is too large to move safely.** The implementer moves a closure only
+if it needs no third-party package that `packages/studies` lacks, and if its callers can be given a
+characterisation test first. If a closure fails either test, its pair stays as a documented
+exception: the importing script keeps a single cross-folder import, listed by name in the
+boundary test's one-line allowlist and in the folder README. The cost is that the boundary rule has
+a named exception and the two folders stay coupled for that pair. The implementer reports each such
+pair to the maintainer before the layer-2 commits start, with the line count it would have moved.
+The expected outcome is that `studies.product_frames` moves (the 1,040 lines are about 1 percent
+of the code under `studies/`) and the others are decided by the scan.
 
 **Departure from "every function carries tests" for layer 2, with its reason.** A moved
 report-line builder is covered by a stronger check than a unit test: the saved-loss reports must
 come out byte for byte identical (see "Reproduction"). Row builders, fold cutters and anything that
 changes a number get a characterisation test written *before* the move, against the unmoved code,
-and moved with it. That covers `solar_frame`, `wind_frame`, `add_time_features`, the site rosters
-and `with_export_cap`. Existing tests of moved code (`test_weather_products_served_lead`,
+and moved with it. That covers `solar_frame`, `wind_frame`, `add_time_features`, the site rosters,
+`with_export_cap`, and the two hourly-power functions. Existing tests of moved code (`test_weather_products_served_lead`,
 `test_cerra_past_solar`, `test_reanalysis_past_wind` and others) move with it and change only their
 import line.
 
@@ -147,14 +185,20 @@ interim package, then into the production one) doubles the reproduction risk.
 
 **One convention: every test of study code lives under `packages/studies/tests/`, with the tests of
 a study's scripts in `packages/studies/tests/<study>/`.** Library tests stay at the top of that
-directory. Today 18 files in `tests/` and 12 in `packages/studies/tests/` test scripts, using two
+directory. Today 17 files in `tests/` and 12 in `packages/studies/tests/` test scripts, using two
 styles: `spec_from_file_location` with a copied `SCRIPT_DIR`, and `sys.path.insert` at module top
 with `ty` `extra-paths` to match.
 
 - **Each study folder is listed once in pytest `pythonpath` and once in `ty` `extra-paths`.** Tests
-  then keep static lines such as `from wind_products import ...`, which `ty` checks. Both settings
-  already list some folders, and the entries for folders that hold no test-imported script are
-  fine to keep, because the boundary test guarantees basenames are unique across `studies/`.
+  then keep static lines such as `from wind_products import ...`, which `ty` checks. Only `ty`
+  `extra-paths` lists study folders today (`beam_diffuse_split`, `nwp_forecast_comparison`,
+  `weather_downloads`, and `tests`); pytest `pythonpath` lists only `tests`. An entry for a folder
+  is added in the commit where that folder is complete, never earlier. Once every folder is on the
+  path, a module under `packages/studies/src` that still does `from build_dataset import ...`
+  would pass `pytest` and `ty` and fail only when a script in another folder runs, which is why
+  the boundary test also scans `packages/studies/src` (below). The entries are fine to keep for
+  folders that hold no test-imported script, because the boundary test guarantees basenames are
+  unique across `studies/`.
 - **Pytest discovery needs no other change.** It already collects `packages/*/tests/`, and importlib
   mode (`addopts`) lets two test files share a basename. The one rule is that no script under
   `studies/` is named `test_*.py`.
@@ -172,13 +216,18 @@ with `ty` `extra-paths` to match.
 
   | Test | Fails on `main` because |
   |---|---|
-  | `test_study_boundaries` (one AST test, last commit) | `main` has crossing imports, `sys.path.insert` calls and duplicate basenames |
+  | `test_study_boundaries` (one AST test, last commit) | `main` has crossing imports, `sys.path` mutations, a `spec_from_file_location` load, and (after the layer-1 moves begin) would catch a bare script import in `packages/studies/src` |
   | `test_production_does_not_import_studies` | passes today; it is a guard, listed as one |
   | characterisation tests listed under "What moves" | the moved functions are untested by name today |
+  | a test that `solar_hourly_power` and `wind_hourly_power` give different timestamps for one input | a swap of the two aliased imports would pass every other test |
 
-  `test_study_boundaries` asserts three things over every script under `studies/` except
-  `era_fold_design/scripts`: no import of a module that lives in a different `studies/` folder, no
-  `sys.path.insert`, and no basename shared by two scripts.
+  `test_study_boundaries` asserts these over every script under `studies/` except
+  `era_fold_design/scripts`: no import of a module that lives in a different `studies/` folder;
+  no `sys.path` mutation of any form and no `site.addsitedir`; no use of
+  `importlib.util.spec_from_file_location` (which `ens_hres_past_wind.py` uses to load
+  `weather_downloads/paths.py`; the trial-area box it reads moves into a layer-1 module); and no
+  basename shared by two scripts. It also scans every module under `packages/studies/src` and
+  fails on any import whose module name is the basename of a script under `studies/`.
 
 ## Data
 
@@ -214,22 +263,29 @@ rule. A `git mv` commit changes no content beyond path strings, so `git diff -M`
    the session scratch), record the real layer-2 count, save the golden outputs (see
    "Reproduction"), and check the CPU load.
 1. **Guard.** Add `test_production_does_not_import_studies`.
-2. **Layer 1, one commit per module** in the table order: `sources`, `era5_grid`, `commissioning`,
-   `physics_model`, `export_cap`, `pv_dataset`, `arm_runner`, `open_meteo_point`, `figure_numbers`.
-   Each commit moves the code, deletes the script's copy, switches every caller from a bare import to
-   `from studies.<module> import`, and adds or moves its tests. Scripts that were only a library
+2. **Layer 1, one commit per module** in topological order, because `export_cap.py:49` imports
+   `build_dataset._pv_sites`: `sources`, `era5_grid`, `commissioning`, `physics_model`,
+   `pv_dataset`, `export_cap`, `arm_runner`, `open_meteo_point`, `figure_numbers`. Each commit moves
+   the code, deletes the script's copy, switches every caller from a bare import to `from
+   studies.<module> import`, and adds or moves its tests. Scripts that were only a library
    (`era5_grid`, `commissioning`, `physics_model`, `export_cap`, `figure_numbers`, `sources`) are
-   deleted from `studies/`.
-3. **Layer 2, one commit per module.** Characterisation tests land in a commit before the move.
-4. **The folder move, one commit per destination folder** (`past_weather/`, then the four ENS
-   scripts into `nwp_forecast_comparison/`). `git mv`; replace every `sys.path.insert` into a
+   deleted from `studies/`. The implementer checks that the number of `def` and `class`
+   statements removed from the scripts equals the number added to the package.
+3. **Layer 2, one commit per module,** after the maintainer has seen the step 0 closure report.
+   Characterisation tests land in a commit before the move.
+4. **The folder move, one commit per destination folder** (`past_weather/`, the four ENS
+   scripts into `nwp_forecast_comparison/`, then `ukv_ceda_blends/` into
+   `nwp_forecast_comparison/`). `git mv`; replace every `sys.path.insert` into a
    sibling folder (none should remain); update `pyproject.toml` `pythonpath` and `extra-paths`; fix
    each script's own `parents[...]` (depth stays at `studies/<folder>/`, so `parents[2]` is still the
    repository root: the 38 `Path(__file__)` uses are checked, not assumed); move the tests to
    `packages/studies/tests/<study>/`; split `beam_diffuse_split/README.md` into one README per
    folder, each with a table mapping every script to its published page; update every path in
    `docs/`, scripts' docstrings and comments, `studies/README.md`, and the skills that name a path
-   (found by `grep`; `data-download` is one). **The last of these commits adds
+   (found by `grep`; `data-download` is one). The 20 lineage READMEs under `data/` that cite
+   `studies/beam_diffuse_split/...` paths are left stale by design, because nothing under `data/`
+   is rewritten. Each folder's `pythonpath` and
+   `extra-paths` entries are added in its own commit. **The last of these commits adds
    `test_study_boundaries`.**
 5. **Skills and `CLAUDE.md`.** In `.claude/skills/study/SKILL.md`, the "Where a study's pieces live"
    table (new folder rule, the import rule, the test location, the data convention) and the sentence
@@ -239,43 +295,79 @@ rule. A `git mv` commit changes no content beyond path strings, so `git diff -M`
    convention, because the issue requires it there.
 6. **Verification and reviews** (below).
 
-**Which parts a Sonnet implementer does mechanically:** steps 0, 1, 4 and 5, and the moves in steps 2
-and 3. Judgement stays with the maintainer or Opus in two places: the public names chosen when an
-underscore-private symbol becomes a package API, and the layer-2 module names, which the step 0 scan
-may change.
+**Which parts a Sonnet implementer does mechanically:** steps 0, 1, 4 and 5, and the moves in steps
+2 and 3 once the closure report is approved. Judgement stays with the maintainer or Opus in two
+places: the public names chosen when an underscore-private symbol becomes a package API, and the
+layer-2 module names, which the step 0 scan may change.
 
 ## Reproduction
 
-**Every report-producing script must print the same published numbers after the move.** The 17
-scripts with `--report-only` are `blend_products`, `blend_satellites`, `cerra_past_solar`,
-`cerra_wind_direction`, `cerra_wind_levels`, `ens_forecast_horizons`, `ens_hres_past_wind`,
-`ens_past_solar`, `reanalysis_past_wind`, `station_past_solar`, `station_wind_arms`,
-`weather_products`, `wind_icon_dream`, `fit_extra_leads`, `nwp_forecast_comparison`,
-`ensemble_means_mae` and `local_ens_gap`. The leaderboard scripts (`past_solar_leaderboard`,
-`past_wind_leaderboard`) and `fractions_skill_score` read saved losses with no flag.
+**Every report-producing script must print the same published numbers after the move.** Eighteen
+scripts take part. Seventeen have `--report-only`: `blend_products`, `blend_satellites`,
+`cerra_past_solar`, `cerra_wind_direction`, `cerra_wind_levels`, `ens_forecast_horizons`,
+`ens_hres_past_wind`, `ens_past_solar`, `reanalysis_past_wind`, `station_past_solar`,
+`station_wind_arms`, `weather_products`, `wind_icon_dream`, `fit_extra_leads`,
+`nwp_forecast_comparison`, `ensemble_means_mae` and `local_ens_gap`. `wind_products` has no
+`--report-only` flag: the implementer runs it as far as its report step against the scratch root if
+its fits are cached, and otherwise records it as covered only by the `blend_products` gate and the
+unit tests. The leaderboard scripts (`past_solar_leaderboard`, `past_wind_leaderboard`) and
+`fractions_skill_score` read saved losses with no flag. Step 0 re-counts the scripts after the
+`ukv_ceda_blends/` fold.
 
-- **Run against a scratch data root, never the shared one.** `--report-only` rewrites `report.md`,
-  and every worktree shares the main checkout's `data/studies/`. Set `DATA_PATH_INTERNAL` to a
-  scratch directory on the home partition (not `/tmp`), holding copies of only the output
-  directories those scripts read (small compared with the 4.8 GB `ens_forecast_horizons/`, but the
-  implementer measures with `du` first). Run the 19 scripts on the branch into the scratch root and
-  compare each `report.md`, `intervals.parquet` and leaderboard output against the file already on
-  disk in the shared `data/studies/`, using `cmp` for reports and a Polars `frame_equal` for parquet
-  files. For a script whose output differs, run `main` into the scratch root too: a difference
-  present on `main` is a stale file on disk, not a regression. This saves the full `main` baseline
-  and is sound because an equal result needs no baseline and a different one gets one.
+**What a `--report-only` run proves is limited.** The frame fingerprint casts every float column to
+Float32 before hashing (`station_past_solar.py:517-545`), so a match proves that the input frames
+agree to Float32 precision, not bit for bit. Five of the scripts (`ens_forecast_horizons`,
+`weather_products`, `ensemble_means_mae`, `local_ens_gap`, `blend_products`) carry no frame
+fingerprint, so their `--report-only` runs only re-read losses saved on disk. Where feasible the
+implementer adds a per-row bit-for-bit check: write the row frame the script builds to Parquet on
+`main` and on the branch in the scratch root, and compare with Polars `frame_equal`.
+
+- **Scratch data root, laid out before any run.** `DATA_PATH_INTERNAL` is a directory on the home
+  partition (not `/tmp`; hard links are not possible across `/mnt/data`, so symlinks and copies are
+  the only options). `REPO_DATA_DIR` (`sources.py:328`) is the root of every input, and each
+  fingerprinted `--report-only` run rebuilds its whole row frame from the power Delta table, the
+  weather directories, the CAMS extract and the ENS members before it compares the fingerprint.
+  The layout is therefore: every input directory is a symlink to the shared `data/`, and every
+  directory a script writes to is a real copy (or an empty directory the script fills). Before any
+  run, the implementer lists every write path of every script (`write_parquet`, `write_text`,
+  `mkdir`, the cache writers) and puts each under a real directory. A write through a symlinked
+  input would land in the shared `data/`, which this plan promises never to touch, so the
+  reproduction fails loudly: it runs the scripts as a user without write permission on the shared
+  `data/` if the machine allows that, and otherwise takes a `find data -newer <marker>` listing
+  before and after, and any file the listing shows is a failure. The implementer measures with `du`
+  first (`ens_forecast_horizons/` alone is 4.8 GB).
+- **Compare outputs.** Run the scripts on the branch into the scratch root and compare each
+  `report.md`, `intervals.parquet` and leaderboard output against the file already on disk in the
+  shared `data/studies/`, using `cmp` for reports and a Polars `frame_equal` for parquet files.
+  Exclude the generated output READMEs that `ens_hres_past_wind.py:3015` and
+  `station_wind_arms.py:2497` write: they name their own path, which changes by design. A
+  fingerprint `ValueError` from a `--report-only` run counts as "differs". For any script whose
+  output differs, run `main` into the scratch root too: a difference present on `main` is a stale
+  file on disk, not a regression. `blend_products --report-only` needs `--power-version N`, read
+  from the report it replaces.
 - **Per-row outputs are the bit-for-bit level**, as the study skill requires. Because `--report-only`
-  recomputes no per-row loss, add two checks that do: rebuild one
+  recomputes no per-row loss, add three checks that do. First, rebuild one
   `beam_diffuse_dataset_<source>.parquet` with `build_dataset.py` into the scratch root and compare
-  its hash with the one on disk, and run `blend_products.py` once, which refits every published
-  single-product arm and **stops unless each reproduces the published per-row losses bit for bit**
-  (`reproduction.md`). That is the one expensive run; the implementer confirms the machine is idle
-  first and states the runtime from the last run rather than guessing it.
-- **Run a moved script end to end, and smoke every script.** `uv run python
-  studies/<folder>/<script>.py --help` for each script with a command line (exit 0), and an import
-  of each of the rest. The study skill's rule applies: no linter evaluates a `sys.path` string.
+  its hash with the one on disk. Second, re-run the ENS input builders that consume the moved
+  `ens_members` code (`build_forecast_inputs`, `build_wn3_inputs`, and the `verify_*` scripts) into
+  scratch: at minimum one ENS-derived input, hashed against the copy on disk. Third, run
+  `blend_products.py` once into scratch, which refits every published single-product arm and
+  **stops unless each reproduces the published per-row losses bit for bit** (`reproduction.md`).
+  The full run goes on to fit every blend and takes hours, so the implementer stops it once
+  `reproduction.md` is written and records the result. The machine must be idle first, and the
+  runtime is quoted from the last run rather than guessed.
+- **Chart scripts.** Re-run every moved chart script inside the worktree and require `git status
+  docs/` to show no change. A change means the chart or its output path differs (the
+  `ASSETS_DIR` rule above is the likely cause).
+- **Smoke every script with only its own folder on `sys.path`.** For each script with a command
+  line, `cd studies/<folder> && uv run python <script>.py --help` (exit 0), and for the rest `cd
+  studies/<folder> && uv run python -c 'import <script>'`. A pytest or `PYTHONPATH` setup that
+  lists every folder hides cross-folder imports, which is the cost this plan names under "Tests".
+  The study skill's rule applies too: no linter evaluates a `sys.path` string.
 - **Run order respects the review rule.** The branch runs only after the Opus diff review is
   triaged, because the moved scripts are changed scripts.
+- **Reproduction log.** The implementer writes one line per script (the 18 above plus the
+  `blend_products` gate): the comparison result, and any fingerprint refusal.
 
 ## Docs to update
 
@@ -283,9 +375,14 @@ scripts with `--report-only` are `blend_products`, `blend_satellites`, `cerra_pa
   moves (70 name a `beam_diffuse_split` script). A `git mv` map file drives one scripted replacement
   of `studies/<old>/<name>.py` with `studies/<new>/<name>.py`. Pages that name only a folder (`wind.md`
   line 1640: "in `studies/beam_diffuse_split/`") are edited by hand.
-- **Rendered check:** `uv run mkdocs build --strict` and `check_docs_links.py` pass, and the
-  implementer opens the wind and solar pages' reproduction-command blocks in the built HTML and
-  confirms each command's file exists.
+- **Path check:** `mkdocs build --strict` and `check_docs_links.py` check neither of the two ways
+  the docs name a script (81 lines in a code span, and README and skill paths), because
+  `check_docs_links.py` checks only URLs on the published site. A grep loop therefore extracts
+  every `studies/<folder>/<name>.py` from `docs/`, `studies/`, `packages/`, `.claude/skills/`,
+  `CLAUDE.md` and `README.md`, and fails if any file does not exist. The implementer saves it as
+  `scripts/lint/check_study_script_paths.py` only if the maintainer wants it kept; otherwise it
+  stays in the session scratch and runs before each folder-move commit. Paths in the `data/`
+  lineage READMEs are out of scope.
 - **Outside `docs/`:** a `grep` finds 177 lines in scripts and READMEs under `studies/` and
   `packages/` that name a script path, plus the skills that name a path, `pyproject.toml` comments,
   `studies/README.md`, and `packages/studies/README.md`.
@@ -314,7 +411,20 @@ third-party dependency (`pv_dataset` already needs only `pvlib`, `xarray` and `p
 
 - **Plan reviews (caller runs them):** the simplicity review first, then correctness.
 - **Diff review 1 (Opus), once, over the whole branch:** correctness, and cutting the diff to what
-  the change needs. It also reviews the public names and module grouping of layers 1 and 2.
+  the change needs. It also reviews the public names and module grouping of layers 1 and 2. The
+  brief tells it to check that:
+    - every moved definition is deleted from its original script, not copied (compare the `def` and
+      `class` counts before and after);
+    - no module under `packages/studies/src` imports a bare script name;
+    - each caller of `solar_hourly_power` and `wind_hourly_power` still calls the function it called
+      before the move;
+    - no moved code uses `__file__`;
+    - each private name made public keeps its signature and default arguments;
+    - `logging.getLogger("<old name>")` calls are updated;
+    - the `era_fold_design` scripts are untouched;
+    - the path-check loop passes;
+    - the reproduction log shows a result for each script plus the `blend_products` gate, and records
+      every fingerprint refusal.
 - **Diff review 2 (Opus mutation pass), limited to the tests this work adds** (the characterisation
   tests and the guards), as the study skill requires whenever `packages/studies` changes.
 - **No Sonnet review of its own output**: Sonnet implements, Opus reviews, per the project memory.
@@ -340,9 +450,9 @@ third-party dependency (`pv_dataset` already needs only `pvlib`, `xarray` and `p
 - **The 44-versus-79 and 30-versus-81 counts mean the issue under-sized itself.** The plan covers
   the true counts. If the maintainer wants a smaller first PR, the natural cut is steps 1 and 2 (the
   guard and layer 1), with the folder move following.
-- **The layer-2 estimate of 28 symbols is from a scan of `main` without branch 1016.** The
-  implementer re-runs the scan and records the real number. If it is far above 28, the grouping is
-  wrong and the maintainer is told before the moves start.
+- **Layer 2 is about 1,040 plus 235 lines, and about 59 more symbols arrive with #1016.** The
+  decision rule under "What moves" says which closures stay as documented exceptions. The
+  maintainer sees the step 0 closure report before any layer-2 commit.
 - **Placement judgement calls:** `stamp_alignment` and the three other orphans stay in
   `beam_diffuse_split/`; `ens_horizons` and `multi_nwp` (early ENS and second-NWP studies, the first
   superseded by the ENS-horizons page) stay there too. Whether they still earn a place under
@@ -354,7 +464,17 @@ third-party dependency (`pv_dataset` already needs only `pvlib`, `xarray` and `p
 - **The tests move from `tests/` to `packages/studies/tests/`.** The package is a leaf dependency
   absent from the production image, so the move cannot reach production.
 - **Reproduction needs a scratch data root of several gigabytes.** The home partition has room
-  (486 GB free). Nothing is written under the shared `data/`.
+  (486 GB free). Nothing is written under the shared `data/`, and the write-path audit and the
+  before-and-after listing make a stray write fail the run.
+- **Lineage READMEs under `data/` go stale.** Twenty cite `studies/beam_diffuse_split/...` paths,
+  and the plan leaves them as they are.
+- **Other branches and services:** no other open branch touches `studies/`, no systemd unit or
+  `.github` workflow calls a study script by path, and no study script is running now. A fresh fit
+  after the move records the move commit in `_script_commit()` (`ens_hres_past_wind.py:3048`,
+  `station_wind_arms.py:397`); saved `script_commit.txt` files are unaffected.
+- **Optional, not in scope:** `nwp_forecast_comparison/` holds copies of `_repo_data_dir` in
+  `build_forecast_inputs`, `check_input_steps` and `verify_previous_runs_leads`, natural callers of
+  `studies.sources.REPO_DATA_DIR`.
 - **No reviewer or implementer should publish a generator's name, ID or coordinates** in a commit,
   README or PR body while splitting the READMEs; the existing anonymisation rules still apply to
   every moved chart script.
