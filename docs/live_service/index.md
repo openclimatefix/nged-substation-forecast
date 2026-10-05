@@ -50,6 +50,7 @@ environments, so it lives on one shared page.
 - [Setting up Sentry telemetry](sentry.md) — point error reporting and the missed-check-in alarm at
   a Sentry project: get a DSN, test it from your laptop, and turn it on in production.
 - [Backing up the workstation](backup.md) — run the weekly backup script that snapshots the data,
-  the MLflow store, and the literature library to the 18 TB disk, and restore from a snapshot.
+  the MLflow store, the literature library, Dagster's history, and the credential files to the
+  18 TB disk, and restore from a snapshot.
 - [Configuration reference](setup.md) — what the storage roots, the derive-from-root convention, and
   the credential settings mean, and which combination each environment uses.
