@@ -1,9 +1,10 @@
 # Experiments run by an LLM agent ("auto-research")
 
-> **Status: 🚧 Planned.** The infrastructure — the orchestrator, the review step, the leakage test,
-> the research repository, the hypothesis store, and the leaderboard query — is planned for v0.3,
-> alongside the leaderboard. The experiments themselves run in v0.5, alongside the rest of the
-> [XGBoost improvements](xgboost-improvements.md). Gated on [Protect the leaderboard scorer for autonomous
+> **Status: 🚧 Planned.** The infrastructure — the trusted submit command, the review step, the
+> leakage test, the research repository, the hypothesis store, and the leaderboard query — is
+> planned for v0.3, alongside the leaderboard. The experiments themselves run in v0.5, alongside
+> the rest of the [XGBoost improvements](xgboost-improvements.md). Gated on [Protect the
+> leaderboard scorer for autonomous
 > research](https://github.com/openclimatefix/nged-substation-forecast/issues/958). Neither the
 > infrastructure nor the search is built yet.
 
@@ -126,7 +127,7 @@ scorer.
 Arithmetic and word-problem accuracy resemble the reasoning a session does when checking its own
 feature-engineering logic or reading a metrics table, so the gains Du et al. measured are evidence
 about agents here, not just an analogy. The proposed design adds that critique as a
-[review before training](#the-orchestrator-the-workers-and-the-review).
+[review before training](#the-research-lead-the-submit-command-and-the-review).
 
 **Co-Scientist's tournament is one concrete answer to the breadth-versus-depth question, and the
 proposed design answers the question differently.** In Co-Scientist, breadth comes from generating
@@ -253,34 +254,55 @@ decision. ERA's upper-confidence-bound rule is one tool the research lead can us
 node to extend. The same rule is also a baseline against which to measure the research lead's
 choices.
 
-### The orchestrator, the workers, and the review
+### The research lead, the submit command, and the review
 
-**A Python orchestrator launches workers, and trains and scores the workers' code itself.** For each
-node the research lead chooses, the orchestrator launches a headless `claude -p` worker in its own
-git worktree to implement one idea on top of the parent node's code. Workers never report their own
-scores. Every node is logged as an MLflow run under a `study/`-prefixed experiment name, so the
-search is visible on the leaderboard but outside every promotion path. Issue #958 plans the same
-prefix for every autonomous study.
+**The design splits into an agent loop, which reuses Claude Code, and a small trusted submit
+command, which no agent can touch.** The agent loop is the research lead choosing ideas, launching
+workers, and reading results. The agent loop is a standard harness, so the design does not build
+one: the research lead is itself a Claude Code session, run interactively or through the
+[Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk), which packages Claude Code as a
+Python library. For each node the research lead chooses, the research lead launches a worker in the
+worker's own git worktree to implement one idea on top of the parent node's code.
+
+**The trusted submit command trains, tests, and scores each node, and runs as the maintainer's Unix
+user in a process no agent can reach.** The research lead submits a node by calling one narrow
+command, such as `submit_node <commit>`, through a `sudo` rule, the same pattern #958 plans for
+`scripts/score_study.py`. The submit command is plain Python in this repository, tested with the
+rest of the code, and does every step the agents must not control: launching the review, building
+the scored checkout, running the leakage test, handing the predictions to the scorer, logging to
+MLflow, pushing node branches, and opening the hypothesis-store pull request. Workers never report
+their own scores. Every node is logged as an MLflow run under a `study/`-prefixed experiment name,
+so the search is visible on the leaderboard but outside every promotion path. Issue #958 plans the
+same prefix for every autonomous study.
+
+**The trusted checks do not live in a Claude Code mod.** A mod is a JavaScript or TypeScript plugin
+that runs inside a Claude Code session's process, with the session's permissions. A mod holding the
+trusted checks would sit inside the trust boundary the checks exist to guard, because the research
+lead's session could edit the mod's source or tamper with the mod's state. A mod could still draw a
+live pane of the search tree, with each node's score and review verdict, for a person watching an
+interactive research-lead session. That pane is optional and can wait until the search runs.
 
 **A fresh reviewer agent reads every implementation before the implementation trains a model.** The
+submit command, not the research lead, launches the reviewer, so no agent can skip the review. The
 reviewer is given the written idea and the worker's diff, but not the worker's reasoning, so the
 worker's rationale cannot anchor the review. The reviewer checks three properties: that the diff
-implements the idea the worker was given, against the [silent changes Si et al.
-found](#coding-agents-change-experiments-without-saying-so); that no feature uses data from after
-the forecast was made; and that the code has no plain bug. The reviewer's findings go back to the
-worker for a capped number of rounds. An implementation the reviewer still rejects after the last
-round is recorded in the hypothesis store as failed review, and is not trained. A review does not
-guarantee a correct implementation. A review does make it less likely that a good idea is discarded
-because one implementation was broken, which is one source of the variance between implementations
-that [Ning et al.](#one-implementation-is-weak-evidence-about-an-idea) measured.
+implements the idea the worker was given, against the
+[silent changes Si et al. found](#coding-agents-change-experiments-without-saying-so); that no
+feature uses data from after the forecast was made; and that the code has no plain bug. The
+reviewer's findings go back to the worker for a capped number of rounds. An implementation the
+reviewer still rejects after the last round is recorded in the hypothesis store as failed review,
+and is not trained. A review does not guarantee a correct implementation. A review does make it less
+likely that a good idea is discarded because one implementation was broken, which is one source of
+the variance between implementations that
+[Ning et al.](#one-implementation-is-weak-evidence-about-an-idea) measured.
 
 ### Protecting the evaluation code
 
-**The orchestrator builds the scored run's checkout itself, so a worker's edits to its own copy of a
-protected file change nothing in the scored run.** The orchestrator checks out the node's commit,
-restores every protected path from the commit the session started from, removing any file the node
-added under a protected path, and places the checkout in a directory the worker's Unix user cannot
-write. The protected paths are:
+**The submit command builds the scored run's checkout itself, so a worker's edits to its own copy of
+a protected file change nothing in the scored run.** The submit command checks out the node's
+commit, restores every protected path from the commit the session started from, removing any file
+the node added under a protected path, and places the checkout in a directory the worker's Unix user
+cannot write. The protected paths are:
 
 - `conf/cv/`, which defines the cross-validation folds;
 - `packages/contracts/`, which defines the data schemas;
@@ -290,7 +312,7 @@ write. The protected paths are:
 - `features/_lags.py` under the same directory, which builds the lag features and holds the
   function that nulls any power lag the forecast could not have known at its initialisation time.
 
-The orchestrator also rejects, and logs, any diff against the same session base that touches a
+The submit command also rejects, and logs, any diff against the same session base that touches a
 protected path, so that an implementation is never scored on evaluation code its author did not
 expect.
 
@@ -302,14 +324,13 @@ code, so the worker's code could replace the lag-nullification function in memor
 behaviour instead. The row-set refusal planned in #958 stops a worker dropping hard series from the
 forecast. The leakage test stops lookahead.
 
-**The orchestrator's harness, not the worker's code, truncates the training data at the fold's
-`train_end`, and the leakage test re-runs the pipeline on perturbed data.** For a sample of cut-off
-times, the leakage test perturbs every power observation, and every weather-forecast run published,
-after the cut-off. The test re-runs the worker's whole pipeline from the perturbed raw tables,
-including any upstream data product the worker added, and rejects the node if any forecast
-initialised at or before the cut-off changes. The test also checks that the pipeline's unperturbed
-output equals the rows handed to the scorer, so the tested code and the scored code are the same
-code.
+**The submit command, not the worker's code, truncates the training data at the fold's `train_end`,
+and the leakage test re-runs the pipeline on perturbed data.** For a sample of cut-off times, the
+leakage test perturbs every power observation, and every weather-forecast run published, after the
+cut-off. The test re-runs the worker's whole pipeline from the perturbed raw tables, including any
+upstream data product the worker added, and rejects the node if any forecast initialised at or
+before the cut-off changes. The test also checks that the pipeline's unperturbed output equals the
+rows handed to the scorer, so the tested code and the scored code are the same code.
 
 **A worker's prediction code needs power observed inside the validation window, and #958 plans to
 bar the research sessions' Unix user from reading that window.** Forecasting a validation row needs
@@ -320,12 +341,12 @@ the research user against the staged copy. Or the design could accept that a ses
 power, and rely on a separate certifying window and on live monitoring to catch any gaming. The
 choice between the two options belongs in issue #958.
 
-**A guard inside the worker's Claude Code session adds no protection beyond the orchestrator's
+**A guard inside the worker's Claude Code session adds no protection beyond the submit command's
 checks.** A worker can bypass a deny rule in `.claude/settings.json` with a shell command, and can
 edit the `.claude/settings.json` in its own worktree to remove a deny rule or a `PreToolUse` hook. A
 Claude Code mod handling tool-call events would add JavaScript or TypeScript code that runs with the
-user's permissions, without adding any protection the orchestrator does not already give. A deny
-rule is still worth having to save a worker from wasting a run on an edit the orchestrator would
+user's permissions, without adding any protection the submit command does not already give. A deny
+rule is still worth having to save a worker from wasting a run on an edit the submit command would
 reject.
 
 ### Ranking and steering
@@ -360,17 +381,17 @@ build the design in issue #960 before the search runs.
 ### Recording what was learned
 
 **Every implementation is kept as a branch in a separate research repository, which starts as a
-private mirror of this repository.** Before each session, the orchestrator copies the latest `main`
-into the research repository, so every session starts from the current reviewed code and the
-champion's configuration. Each node is a branch created from its parent node's commit, so a child
-node inherits every change its parent made. A worker pushes to the research repository only. The
-node's MLflow run records the commit hash, so every score links to the exact code behind the score.
-Old branches stay pinned to the commit they started from and are never updated after a refactor,
-which is the rule `studies/` already follows.
+private mirror of this repository.** Before each session, the submit command's setup step copies the
+latest `main` into the research repository, so every session starts from the current reviewed code
+and the champion's configuration. Each node is a branch created from its parent node's commit, so a
+child node inherits every change its parent made. A worker pushes to the research repository only.
+The node's MLflow run records the commit hash, so every score links to the exact code behind the
+score. Old branches stay pinned to the commit they started from and are never updated after a
+refactor, which is the rule `studies/` already follows.
 
 **A separate repository keeps the workers' credentials away from this repository without any rules
 per branch.** Workers, reviewers, and the research lead hold a token for the research repository
-only. The orchestrator runs as the maintainer's user and is the only process holding a token for
+only. The submit command runs as the maintainer's user and is the only process holding a token for
 this repository. A separate repository also keeps hundreds of node branches out of the branch list
 people work from.
 
@@ -386,10 +407,10 @@ same fields in every file:
 - the reason for abandoning the idea, where the idea was abandoned.
 
 Within a session, the research lead updates the store on the session's branch in the research
-repository. At the end of the session, the orchestrator opens one pull request carrying the updated
-store into this repository, and the maintainer merges the pull request. A new session starts only
-after the previous session's pull request has merged, so every session reads every earlier finding.
-No worker, reviewer, or research-lead agent holds write access to `main`. The store carries
+repository. At the end of the session, the submit command opens one pull request carrying the
+updated store into this repository, and the maintainer merges the pull request. A new session starts
+only after the previous session's pull request has merged, so every session reads every earlier
+finding. No worker, reviewer, or research-lead agent holds write access to `main`. The store carries
 aggregate scores only, because a per-series score could identify a metered generator. A person
 curates the findings worth publishing into `docs/`, the way studies are written up today.
 

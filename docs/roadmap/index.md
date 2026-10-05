@@ -148,8 +148,8 @@ AWS.*
       ([#436](https://github.com/openclimatefix/nged-substation-forecast/issues/436))
     - Score every leaderboard experiment under each scenario, against `manual_heuristic`
       ([#438](https://github.com/openclimatefix/nged-substation-forecast/issues/438))
-- **Infrastructure for experiments run by a large language model (LLM) agent** — the orchestrator,
-  the review step, the leakage test, the research repository, the hypothesis store, and the
+- **Infrastructure for experiments run by a large language model (LLM) agent** — the trusted submit
+  command, the review step, the leakage test, the research repository, the hypothesis store, and the
   machine-readable leaderboard query, so that v0.5 can run experiments through the agent; see
   [Experiments run by an LLM agent](auto-research.md)
 - One-command rollback for `promoted_model`
