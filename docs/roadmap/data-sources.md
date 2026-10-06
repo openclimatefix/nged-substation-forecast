@@ -230,13 +230,13 @@ Reanalyses and satellite products carry no forecast horizon and are left off.
 | **ECMWF ENS** (Dynamical.org) | ✅ | Main NWP source: 51-member ensemble, distributed as live-updating Zarrs. OCF converts gridded NWP to tabular via the H3 spatial index and stores as Delta Lake, stored as `Float32` rounded to a 13-bit significand, with zstd compression (~40 GB/year for all of GB; ~1 minute to download+convert one day). **The archive currently only extends back to 2024-04-01**; Dynamical.org are back-filling the operational archive from MARS to 2016-03-08 (51 members, 0.25°, 00Z inits only), but at ~0.8 TB/day against ~446 TB remaining the estimate is **~November 2027** — after v1.0, which is why we [extend the training history](training-history.md) with an estimate of past weather instead. Radiation: no direct component, which is what forces [DP forecasting of PV](disaggregation.md) (v2) to find the beam/diffuse split elsewhere — see [which sources carry which irradiance components](#which-sources-carry-which-irradiance-components). |
 | **ERA5** (ECMWF global reanalysis) | 🚧 (v0.5) | The reanalysis planned for ingest, serving the [weather-abnormality climatology](xgboost-improvements.md#weather-abnormality-climatology-z-score-features). For **pre-training**, the version-1 plan is ERA5 as the estimate of past weather for every variable except irradiance, and CAMS for irradiance — see [Which estimate of past weather to train on](training-history.md#which-estimate-of-past-weather-to-train-on). A [study of CEDA's UKV archive against ERA5](../studies/past-weather/ukv-ceda-vs-era5.md) found no clear advantage for CEDA's UKV in wind-farm power forecasts. ERA5 is not ingested yet. Covers 1940 to the present, so it spans every power history that predates the ENS archive (2024-04-01). Its 31 km resolution is coarser than CERRA, which is acceptable because weather anomalies are synoptic-scale and the high-resolution *solar* irradiance comes from CAMS regardless. Carries the [beam/diffuse split](#which-sources-carry-which-irradiance-components), which the live ENS feed does not. Its **ERA5T** near-real-time stream lands ~5 days behind real time, and final ERA5 overwrites it ~2–3 months later after quality control. Shares the ECMWF **IFS lineage** with the ENS forecasts, so systematic biases largely cancel when the two are combined. Ingest **2020 to present**, including the 2024+ ENS overlap, which is not optional — see [Extending the training history](training-history.md). [Which access route](#era5-which-access-route) is still open. |
 | **CERRA** (Copernicus regional reanalysis for Europe) | 🔬 (deprioritised) | Higher-resolution (5.5 km) European reanalysis. Per the [Copernicus CDS](https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels), it now runs from **September 1984 to the present** — monthly updates, but **about 3 months behind real time**: on 2026-09-23 the latest data ended 2026-06-30, 12 weeks earlier. **Not in the active plan**, which takes its estimates of past weather from CAMS and ERA5; that latency of about 3 months would also rule CERRA out of near-real-time capacity estimation. Kept here because its 5.5 km resolution could still earn a place for fine-scale work (e.g. wind over complex terrain) if that ever proves decisive. Its [direct short-wave](#which-sources-carry-which-irradiance-components) is time-integrated from 3-hourly forecast cycles, so temporally coarser than SARAH-3. On past sunshine at six solar farms, an XGBoost model given CERRA's global irradiance is no better than one given ERA5 and 4.045 points of capacity behind one given CAMS (9.164% against 9.135% and 5.118%, on the CERRA row set; [results](../studies/past-weather/solar.md#cerra-is-no-better-than-era5-and-trails-cams-by-about-4-points)). Grid, coverage, wind heights, and access are in the [survey's reanalysis table](../background/weather-products-survey.md#reanalyses-hindcasts-and-satellite-retrievals). |
-| **CEDA UKV** (the Met Office's UKV as archived by the Centre for Environmental Data Analysis) | 🔬 (not ingested in version 1) | A candidate estimate of past weather for every variable except irradiance, read from the early time steps of each archived run. The version-1 plan is ERA5 for those variables, and CEDA's UKV is not ingested. In the [CEDA UKV against ERA5 study](../studies/past-weather/ukv-ceda-vs-era5.md), pooled over three wind farms in Lincolnshire, an XGBoost model given ERA5's wind had a lower power error than an XGBoost model given CEDA's 10 m and 925 hPa wind, by 0.125 points of capacity [+0.033, +0.216], which is below the study's 0.16-point margin for a clear difference. CEDA's 1.5 m temperature was closer than ERA5's by 0.124 K [0.113, 0.135] at four weather stations that UKV probably assimilates. CEDA's archive is the first UKV source the studies have found that reaches back to 2019. The fields fetched so far hold 10 m wind and winds at 925 hPa and 1000 hPa, with no 100 m wind and no orography. CEDA's archive lacks a small number of runs and holds a few more only in part. The Met Office's PS47 upgrade on 2026-01-21 changed the regional models, so a UKV series spanning that date is not homogeneous. CEDA's UKV is statistically different from the UKV served live on AWS and Open-Meteo. The catalogue record states the CC BY-NC-SA 4.0 licence, and access is by application; archive start and grid are in the [survey's forecast-model table](../background/weather-products-survey.md#forecast-models). |
+| **CEDA UKV** (the Met Office's UKV as archived by the Centre for Environmental Data Analysis) | 🔬 (not ingested in version 1) | A candidate estimate of past weather for every variable except irradiance, read from the early time steps of each archived run. The version-1 plan is ERA5 for those variables, and CEDA's UKV is not ingested. In the [CEDA UKV against ERA5 study](../studies/past-weather/ukv-ceda-vs-era5.md), pooled over three wind farms in Lincolnshire, an XGBoost model given ERA5's wind had a lower power error than an XGBoost model given CEDA's 10 m and 925 hPa wind, by 0.125 points of capacity [+0.033, +0.216], which is below the study's 0.16-point margin for a clear difference. CEDA's 1.5 m temperature was closer than ERA5's by 0.124 K [0.113, 0.135] at four weather stations that UKV probably assimilates. CEDA's archive is the first UKV source the studies have found that reaches back to 2019. The fields fetched so far hold 10 m wind and winds at 925 hPa and 1000 hPa, with no 100 m wind and no orography. CEDA's archive lacks a small number of runs and holds a few more only in part. The Met Office's PS47 upgrade on 2026-01-21 changed the regional models, so a UKV series spanning that date is not homogeneous. CEDA's UKV differs from Open-Meteo's UKV and from the Met Office's AWS bucket in runs and lead, grid, irradiance, wind units and heights, eras, and licence — see [how the three archives differ](#ukv-from-cedas-archive-differs-from-ukv-as-open-meteo-serves-it-in-lead-irradiance-temperature-and-units). The catalogue record states the CC BY-NC-SA 4.0 licence, and access is by application; archive start and grid are in the [survey's forecast-model table](../background/weather-products-survey.md#forecast-models). |
 | **CM SAF** (Satellite Application Facility on Climate Monitoring) | 🔬 (v2 comparison) | SARAH-3 carries [every irradiance component](#which-sources-carry-which-irradiance-components) on a 0.05° grid at 30 minutes from 1983. Two reasons SARAH-3 is not the first ingest. Its climate data record ends 2020-12-31 and the Interim Climate Data Record extends that record, putting a version seam inside the 2019-onward history we train on. And its 30-minute values are **instantaneous snapshots**, whereas CAMS accumulates over the step, which is what a period-ending meter reading measures — under broken cloud an instantaneous sample and a 30-minute mean can differ a lot. Its gridded delivery would suit the H3 pipeline better than CAMS point requests, and comparing the two resolutions is not straightforward, because the CAMS point service interpolates to the requested location rather than publishing a grid. Latency is 2–5 days ([Pfeifroth et al. (2024)](https://doi.org/10.5194/essd-16-5243-2024)), immaterial offline. Worth a genuine head-to-head against CAMS in v2 — see [Correcting satellite irradiance over Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-britain). |
 | **CAMS solar radiation** (Copernicus Atmosphere Monitoring Service) | 🚧 (v0.7) | The satellite-derived irradiance we ingest, used to estimate **solar PV** capacity, and the planned estimate of past irradiance for [pre-training](training-history.md#which-estimate-of-past-weather-to-train-on). Used **offline only** — capacity estimation and pre-training run over history, and the production serving path takes no dependency on it. The CAMS Radiation Service carries [every irradiance component](#which-sources-carry-which-irradiance-components), under both clear sky and observed cloud, from 2004-02, under CC-BY-4.0, at steps of 1 minute, 15 minutes, 1 hour, 1 day, or 1 month — the beam/diffuse split the [DP solar model](../techniques/differentiable-physics.md#the-core-building-block-differentiablesolarplant) needs. Cloud information comes from Meteosat Second Generation; aerosol, ozone, and water vapour come from the CAMS global forecasting system, so aerosol optical depth is a 3-hourly analysis rather than SARAH-3's monthly climatology. Values are interpolated to the requested location rather than served on a grid. Chosen over SARAH-3 on **delivery and record continuity, not on measured accuracy over Great Britain** — see [CAMS: use the point API, not the gridded product](#cams-use-the-point-api-not-the-gridded-product) for the route and its traps, and [Correcting satellite irradiance over Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-britain) for what is known about this source's error and what v2 might do about it. |
 | **ICON-EU** (Dynamical.org) | 🔬 (v0.9, uncertain) | Possible additional NWP source to test whether it improves skill over ECMWF ENS: a deterministic run from DWD, Germany's national weather service, on a ~6.5 km grid, 4 runs a day out to 5 days. Already carries the [beam/diffuse split](#which-sources-carry-which-irradiance-components) [the PV forward model](disaggregation.md#the-forward-model) needs, and holds the earliest roadmap slot of any source that does. Starts early 2026, so it can't enter the canonical CV folds directly — assessed via ad-hoc ablation first. Archive start, latency, and access routes are in the [survey's forecast-model table](../background/weather-products-survey.md#forecast-models). |
 | **AIFS-ENS** (ECMWF) | 🔬 (v2.1, uncertain) | ECMWF's machine-learned ensemble, now operational with the same 51 members and 15-day horizon as the physics ensemble, and more accurate than it on the majority of variables and lead times ([Lang et al. (2026)](https://doi.org/10.1038/s44387-026-00073-7)). Whether that translates into a better substation-load forecast is an open question. AIFS-ENS member *n* starts from the [same initial conditions](https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+ENS+v1) as ECMWF ENS member *n*, so the two can be fed [side by side](xgboost-improvements.md#several-nwp-sources-as-features-v21) rather than swapped. Unlike the physics ensemble, AIFS has [no direct-beam field](#which-sources-carry-which-irradiance-components) to ask for at all, in either the ensemble or the deterministic AIFS Single: on the 2026-09-19 00Z run, AIFS-ENS open data carries 29 parameters and AIFS Single 30, and `ssrd` and `strd` are the only radiation fields in either. **Both AIFS streams arrive on 6-hourly steps across the whole 15-day horizon — 61 steps, against the physics ensemble's 85** — where the physics ensemble is [3-hourly out to 144 hours](../architecture/nwp-variable-conventions.md#the-forecast-step-grid) and only then drops to 6-hourly. Twice the step width over days 0 to 6 costs most on irradiance, whose diurnal cycle varies faster than any other field we use: the [reconstructed solar day](../architecture/nwp-variable-conventions.md#period-ending-variables-are-interpolated-as-though-they-were-instantaneous) lags the true one by half a step width, so 3 hours at AIFS's steps against 1.5 hours at the physics ensemble's, and the modelled clear-sky peak falls from 816 W m⁻² to 756 at 3-hourly steps and 590 at 6-hourly. Same folds problem as ICON-EU: the archive starts mid-2025, so it is an ad-hoc ablation before it is a canonical source. Archive start and access are in the [survey's forecast-model table](../background/weather-products-survey.md#forecast-models). The evidence on whether AIFS improves faster than the physics-based IFS, and the reason each AIFS version is scored separately, are in the survey ([evidence](../background/weather-products-survey.md#aifs-has-not-been-shown-to-improve-faster-than-the-physics-based-ifs), [version eras](../background/weather-products-survey.md#score-each-aifs-version-separately)). |
 | **WeatherNext 3** (Google DeepMind) | 🔬 (after v2, unlikely for production; ensemble-mean fetched for a study) | Google DeepMind's machine-learned 64-member ensemble (grid, cycles, and horizons are in the [survey's forecast-model table](../background/weather-products-survey.md#forecast-models)), following [Google's guide to WeatherNext 3 on Cloud Storage](https://developers.google.com/weathernext/guides/gcs). 2 m temperature and dewpoint also arrive at 0.05°, from a neural-network output head trained directly on in-situ surface observations from airport stations, regional station networks, ships, and buoys ([Rasp et al. (2026)](https://arxiv.org/abs/2609.03582); [model specs](https://developers.google.com/weathernext/guides/models)). Carries the [beam/diffuse split](#which-sources-carry-which-irradiance-components) [the PV forward model](disaggregation.md#the-forward-model) needs, as named fields rather than by subtraction. The paper reports a lower [continuous ranked probability score](../techniques/evaluation-metrics.md#crps-continuous-ranked-probability-score) than ECMWF ENS on surface solar radiation, scored on the 6-hour accumulations rather than the hourly fields. Every radiation evaluation in the paper scores against an ECMWF analysis, and none scores against a surface measurement, so any irradiance gain would have to be measured downstream on power. Two structural differences from AIFS-ENS: all 64 members start from one analysis, so the ensemble's spread comes from the model alone rather than from perturbed initial conditions, and no member pairs with an ECMWF ENS member. Access needs [a request form](https://developers.google.com/weathernext/guides/access-forecast), and the survey gives the licence terms. BigQuery and Earth Engine serve six summary statistics per variable (the mean, and the 10th, 25th, 50th, 75th, and 90th percentiles), matching a third route: a Cloud Storage Zarr store of precomputed statistics, distinct from the 64-member store the ensemble itself sits in. The [matched-lead study](../studies/forecasts/matched-lead.md) fetches the ensemble mean from that statistics store, cropped to a wide United Kingdom box and held in OCF's own Icechunk store (`ocf-weathernext3-uk`) — see [the survey's findings](../background/weather-products-survey.md#what-we-learnt-about-weathernexts-precomputed-statistics-store) for the route, the cost, and how to open the result. That fetch is a study input, not production ingestion: the folds problem remains worse than ICON-EU's or AIFS-ENS's, since the archive starts 2026-01-01 with no back-fill before it, so on current priorities we do not expect to reach this source for production inside the Network Innovation Allowance project. The survey lists the other AI weather models and commercial archives of AI forecasts under [AI weather models beyond AIFS](../background/weather-products-survey.md#ai-weather-models-beyond-aifs). |
-| **UKV and MOGREPS-UK** (Met Office, via AWS) | 🔬 (uncertain) | The Met Office's 2 km deterministic UK model and its 2.2 km UK ensemble. Both publish [every irradiance component](#which-sources-carry-which-irradiance-components) as its own field, so neither needs a subtraction to give [the PV forward model](disaggregation.md#the-forward-model) its beam/diffuse split, and both are free on AWS under British Crown copyright and CC BY-SA 4.0 ([UKV](https://registry.opendata.aws/met-office-uk-deterministic/), [MOGREPS-UK](https://registry.opendata.aws/met-office-uk-ensemble/)). Verified by listing the `met-office-atmospheric-model-data` and `met-office-uk-ensemble-model-data` buckets rather than from the documentation. Neither the horizons nor the archives suit the canonical folds — MOGREPS-UK is held as a 30-day rolling window — see [which feed carries a direct beam](#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost). How Open-Meteo archives UKV is in the [survey](../background/weather-products-survey.md#which-archives-keep-whole-past-forecast-runs). |
+| **UKV and MOGREPS-UK** (Met Office, via AWS) | 🔬 (uncertain) | The Met Office's 2 km deterministic UK model and its 2.2 km UK ensemble. Both publish [every irradiance component](#which-sources-carry-which-irradiance-components) as its own field, so neither needs a subtraction to give [the PV forward model](disaggregation.md#the-forward-model) its beam/diffuse split, and both are free on AWS under British Crown copyright and CC BY-SA 4.0 ([UKV](https://registry.opendata.aws/met-office-uk-deterministic/), [MOGREPS-UK](https://registry.opendata.aws/met-office-uk-ensemble/)). Verified by listing the `met-office-atmospheric-model-data` and `met-office-uk-ensemble-model-data` buckets rather than from the documentation. Neither the horizons nor the archives suit the canonical folds — MOGREPS-UK is held as a 30-day rolling window — see [which feed carries a direct beam](#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost). How Open-Meteo archives UKV is in the [survey](../background/weather-products-survey.md#which-archives-keep-whole-past-forecast-runs), and how the bucket's UKV differs from CEDA's and Open-Meteo's is in [the comparison of the three archives](#the-met-offices-aws-bucket-keeps-every-hourly-run-on-a-different-grid). |
 
 **ERA6 is a future upgrade, not a current option.** ECMWF began ERA6 production in March 2026, but
 the phased release runs from late 2027 (first 20 years) into 2028, so it is out of scope for the
@@ -923,6 +923,181 @@ that one era of UKV stands in for another.
   later than the hour's centre.
 - **That conversion is skipped where the ratio falls below 0.05**, near sunrise and sunset, so the
   round trip between the two columns does not hold at very low sun.
+
+### UKV from CEDA's archive differs from UKV as Open-Meteo serves it in lead, irradiance, temperature, and units
+
+**The project can read UKV from three archives, and the three hold the same Met Office weather
+model but not the same series.** An XGBoost model trained on one archive and scored on another
+therefore meets inputs that its training never showed. The comparison of CEDA's archive with
+Open-Meteo's rests on the [study of UKV from CEDA against UKV from
+Open-Meteo](../studies/past-weather/ukv-ceda-vs-openmeteo.md), which compares the two archives at
+nine metered generators over the 23 whole months they share. The facts about the Met Office's own
+AWS bucket are pilot findings, from a listing of the bucket and a download of two days of runs. The
+last column of the table says where each row's evidence comes from.
+
+| Difference | UKV from CEDA's archive | UKV as Open-Meteo serves it | UKV in the Met Office's AWS bucket | Evidence |
+|---|---|---|---|---|
+| [Runs and lead](#each-archive-serves-a-different-lead) | 8 runs a day; the studies read the 00, 06, 12, and 18 UTC runs at leads of 0 to 5 hours | Every hourly run, a later run overwriting an earlier one, so in effect the T+0 analysis | Every hourly run, each kept whole to 54 hours, or to 120 hours for the 03 and 15 UTC runs | CEDA: catalogue record and download script; Open-Meteo: measured for irradiance; AWS: pilot |
+| [History](#the-archives-differ-in-how-much-of-each-physics-era-they-hold) | From 2016-03; the studies' download from 2019-09 | Live ingest from 2024-08-12, and a backfill of unnamed origin before that date | A rolling window of about two years, reaching back to 2024-10-04 on 2026-10-06 | Documented; AWS: pilot |
+| [Grid and files](#the-met-offices-aws-bucket-keeps-every-hourly-run-on-a-different-grid) | GRIB files on a 548 by 704 grid on the Ordnance Survey national grid, first row in the north | Values at the requested coordinates | One NetCDF file per variable and valid time, on a 970 by 1042 Lambert azimuthal equal-area grid, first row in the south | Download script; AWS: pilot |
+| [Irradiance](#open-meteos-hourly-irradiance-is-a-scaled-snapshot-whose-construction-changes-after-ps47) | One global short-wave snapshot | The snapshot at the hour's end, scaled by a ratio of cosines of the solar zenith angle, and built differently after PS47 | Global, direct, and diffuse short-wave, each a snapshot; the three do not add up in 2024 | Measured; AWS: pilot |
+| [Temperature](#temperature-agrees-closely-at-lead-0-and-wind-differs-in-units-level-and-heights) | Hourly instants | Hourly instants, a mean absolute difference of 0.098 K from CEDA's at lead 0 | Hourly instants, and 15-minute files in 2026 runs | Measured; AWS: pilot |
+| [Wind](#temperature-agrees-closely-at-lead-0-and-wind-differs-in-units-level-and-heights) | m/s; 10 m, 925 hPa, and 1000 hPa | km/h; 10 m, 50 m, 80 m, and 100 m; at 10 m about 3% below CEDA's at lead 0, and about 6% above in two spans | m/s; 10 m, pressure levels, and 33 or 56 height levels | Measured at 10 m; AWS: pilot |
+| [Licence](#the-archives-carry-different-licences) | CC BY-NC-SA 4.0 | Open-Meteo's terms | CC BY-SA 4.0 | Documented |
+
+#### Each archive serves a different lead
+
+**CEDA's value for an hour comes from a run that started up to 5 hours earlier, and Open-Meteo's
+value comes from the analysis of that hour.** CEDA's catalogue record describes UKV runs "up to
+eight times a day". The project's CEDA download script records 8 runs a day, with files reaching
+120 hours for the 03 and 15 UTC runs only. The studies read the 00, 06, 12, and 18 UTC
+runs, which reach 54 hours, and take each hour from the latest of those runs that started at or
+before the hour. The lead is therefore 0 to 5 hours, and the hour of day fixes the lead. Open-Meteo
+ingests every hourly run, and a later run overwrites an earlier run for the same valid time, as [the
+section above](#open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill) describes.
+The two archives can hold the same analysis only at 00, 06, 12, and 18 UTC, where CEDA's lead is 0.
+Across the nine generators, the mean absolute difference between the two archives grows from
+0.098 K at lead 0 to 0.557 K at lead 5 for temperature, and from 0.190 m/s to 0.519 m/s for 10 m
+wind speed ([the study's model-free
+comparison](../studies/past-weather/ukv-ceda-vs-openmeteo.md#the-archives-agree-closely-at-lead-0-and-drift-apart-with-cedas-lead)).
+
+#### Open-Meteo's hourly irradiance is a scaled snapshot whose construction changes after PS47
+
+**Open-Meteo's `shortwave_radiation` for an hour is not the end-of-hour snapshot that the Met Office
+publishes.** As [the section
+above](#open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill) says, Open-Meteo
+scales the snapshot by the ratio of the hour's mean cosine of the solar zenith angle to the cosine
+at the hour's end. At CEDA's lead-0 hours from 2024-09 to 2025-12, with Open-Meteo's value above
+50 W m⁻², the median of CEDA's raw snapshot over Open-Meteo's value is 1.355 at 06 UTC, 1.011 at
+12 UTC, and 0.774 at 18 UTC. CEDA's raw snapshot therefore reads 36% high at 06 UTC and 23% low at
+18 UTC against Open-Meteo's value. An XGBoost model trained on the raw snapshot and given
+Open-Meteo's value meets a scaling by hour of day that its training never showed.
+
+**Scaling CEDA's snapshot by the same cosine ratio reproduces Open-Meteo's value at the median
+before the Met Office's PS47 upgrade, and does not after the upgrade.** On the same hours, the
+median ratio of the rebuilt CEDA value to Open-Meteo's is 1.005, 1.000, and 0.996 at 06, 12, and
+18 UTC. From 2026-02 to 2026-08 the median ratios are 1.111, 1.000, and 0.864, so Open-Meteo builds
+the hourly value some other way after PS47. The mismatch after PS47 is not confined to low sun.
+With the sun more than 10 degrees above the horizon the median ratio is 1.000 to 1.004 before and
+after PS47. The 10th to 90th percentile of the ratio at 10 to 20 degrees of elevation is 0.941 to
+1.058 before PS47 and 0.823 to 1.210 after. The mean absolute difference at lead 0 is 8.0 W m⁻²
+before PS47 and 22.9 W m⁻² after. Within a few degrees of the horizon the rebuild fails before and
+after PS47: before PS47 the median ratio is 0.008 up to 2 degrees of elevation and 0.681 from 2 to
+5 degrees ([the study's irradiance
+section](../studies/past-weather/ukv-ceda-vs-openmeteo.md#open-meteo-builds-its-hourly-irradiance-differently-after-the-2026-upgrade-and-in-low-sun)).
+
+#### Temperature agrees closely at lead 0, and wind differs in units, level, and heights
+
+**At lead 0 the two archives' temperatures differ by about a tenth of a degree.** Both archives
+hold hourly instants of temperature, and the study averages the instants at the two ends of each
+hour for both archives. At CEDA's lead 0, the mean difference is −0.021 K (CEDA minus Open-Meteo),
+the mean absolute difference is 0.098 K, and the correlation is 0.9997. The mean lead-0 difference
+at each of the nine generators lies between −0.045 K and −0.006 K, so any adjustment Open-Meteo
+makes for a point's elevation is small at the nine generators. Whether Open-Meteo adjusts
+temperature for elevation at all is not established.
+
+**Open-Meteo serves wind in km/h and CEDA's files hold wind in m/s, and after conversion
+Open-Meteo's 10 m speed is about 3% below CEDA's.** The study divides Open-Meteo's speed by 3.6 and
+stops unless the median ratio of the two archives' 10 m speeds lies between 0.9 and 1.1. At lead 0
+the median ratio of Open-Meteo's speed to CEDA's is 0.968 outside the two spans described below,
+and the monthly median stays between 0.960 and 0.974 in each of the 20 months outside the spans.
+CEDA's 10 m direction is about 1.9 degrees lower than Open-Meteo's at lead 0.
+
+**In two spans, Open-Meteo's 10 m speed is about 6% above CEDA's instead of 3% below.** The spans
+are the UTC days 2024-11-07 to 2024-11-30 and 2025-01-16 to 2025-02-18, and the median ratio of
+Open-Meteo's speed to CEDA's inside them is 1.063. Against ERA5, CEDA's speed stays steady across
+those months while Open-Meteo's speed rises, so the step is in Open-Meteo's served series. The cause
+of the step is unknown, and the study drops both spans from its wind fits ([the
+step](../studies/past-weather/ukv-ceda-vs-openmeteo.md#open-meteos-10-m-wind-speed-is-about-3-below-cedas-and-steps-up-in-two-spans)).
+A training history read from Open-Meteo's UKV contains both spans.
+
+**Even at lead 0, Open-Meteo's value is not the nearest CEDA cell's value.** Of the nine CEDA cells
+around each generator, the nearest cell holds the value closest to Open-Meteo's at 27% of lead-0
+hours for 10 m wind speed and 47% for temperature, averaged over the generators, where chance is
+11%. Interpolation from the native grid and a different grid are both possible causes, and neither
+cause is verified.
+
+**The archives offer different wind heights.** CEDA's files hold 10 m wind and wind at the 925 hPa
+and 1000 hPa pressure levels, and no wind on height levels, so CEDA carries no 100 m wind.
+Open-Meteo serves UKV wind at 10 m, 50 m, 80 m, and 100 m. The study compares 10 m wind only.
+
+#### The Met Office's AWS bucket keeps every hourly run on a different grid
+
+**The Met Office's AWS bucket keeps every hourly UKV run whole for about two years, which neither
+CEDA's archive nor Open-Meteo's archive does.** The findings below come from listing the bucket on
+2026-10-06 and from a pilot download of all 24 runs of 2024-10-08 and of 2026-10-05 at leads 0 to 5
+hours, and are pilot findings rather than a study result.
+
+- **Runs and window.** The bucket `met-office-atmospheric-model-data` holds UKV under the prefix
+  `uk-deterministic-2km/`, with 24 runs a day. Most runs reach 54 hours at hourly steps, and the 03
+  and 15 UTC runs reach 120 hours, hourly to 54 hours and 3-hourly after. The oldest runs are
+  deleted day by day: on 2026-10-06 the first run held was 2024-10-04 21 UTC, and the first whole
+  day was 2024-10-06.
+- **Files and grid.** Each file holds one variable at one valid time on the whole 970 by 1042 grid,
+  a Lambert azimuthal equal-area projection. CEDA's GRIB files sit on a 548 by 704 grid on the
+  Ordnance Survey national grid. The first row of the AWS grid is the southernmost row, and the
+  first row of CEDA's grid is the northernmost row, so code that assumes one orientation reads the
+  other archive upside down. The files are chunked in blocks of 128 by 128 cells, so a range read
+  fetches only the blocks over a small area: the pilot requested 0.43 MB per file on average.
+- **Every field is a snapshot.** The files for the eight variables the pilot read carry no
+  `cell_methods` attribute and no time bounds, so under the CF conventions every field, short-wave
+  included, is a value at the valid time. No file labels a field as instantaneous in words.
+- **Irradiance components.** The bucket publishes global, direct, and diffuse short-wave as three
+  fields, where CEDA's archive holds one short-wave field. On 2024-10-08 the three fields do not add
+  up: in daylight, global minus direct minus diffuse has a mean absolute value of 8 to 42 W m⁻² per
+  run hour. On 2026-10-05 the residual is 0.06 W m⁻² or less. The date from which the three fields
+  add up has not been found.
+- **Height levels.** Wind on height levels comes on 33 levels in the files from 2024-10-15 to
+  2026-01-20 and on 56 levels from 2026-01-22. The 50 m, 75 m, 100 m, and 150 m levels are in every
+  file probed on nine dates, and the 125 m level is only in the 56-level files. Wind on pressure
+  levels is published too.
+- **Files every quarter hour.** Some variables, among them screen temperature and 10 m wind, also have
+  15-minute files out to 54 hours in the 2026 runs. The 2024 runs have none.
+
+#### The archives differ in how much of each physics era they hold
+
+**A series that spans one of the Met Office's upgrades is not homogeneous in any of the three
+archives, and the archives span different eras.** The Met Office's PS43 upgrade of 2019-12-04 moved
+UKV to the RAL2-M physics. No date or content for PS44 could be found. UKV stayed on the RAL2-M
+physics after PS45 in May 2022, and PS46 in May 2025 was a move to a new supercomputer with no
+science change intended. PS47 on 2026-01-21 moved UKV to the RAL3 physics, with new microphysics and
+a new cloud scheme ([the list of upgrades](#nwp-model-upgrades-since-2019)). CEDA's archive starts
+in 2016-03, and the project's CEDA download starts on 2019-09-01, so the download holds three months
+before PS43 and the whole era from PS43 to PS47. Open-Meteo's live ingest starts on 2024-08-12, and
+the AWS bucket's window reached back to 2024-10-04 on 2026-10-06, so neither Open-Meteo's archive
+nor the AWS bucket can test PS43, PS44, or PS45. The 23 whole months that CEDA's and Open-Meteo's
+archives share run from 2024-09 to 2025-12, 16 months before PS47 that include PS46, and from
+2026-02 to 2026-08, 7 months after PS47. The study drops 2026-01, the month of the upgrade.
+
+#### The archives carry different licences
+
+**CEDA's UKV archive is licensed CC BY-NC-SA 4.0, which allows non-commercial use only and requires
+adaptations to be shared alike.** CEDA's catalogue record asks users to cite the data as [Met Office
+(2016): NWP-UKV: Met Office UK Atmospheric High Resolution Model
+data](https://catalogue.ceda.ac.uk/uuid/f47bc62786394626b665e23b658d385f), with CEDA as the
+publisher. The Met Office's AWS bucket is published under British Crown copyright and CC BY-SA 4.0,
+with no non-commercial restriction ([listed above](#weather-data)). Open-Meteo's free API is for
+non-commercial use only, and its paid plans cover commercial use
+([survey](../background/weather-products-survey.md#how-to-read-the-open-meteo-rows)). Whether CEDA's
+licence permits the project's use of CEDA's UKV is a decision for the maintainer.
+
+#### Open-Meteo's UKV is checked against the Met Office's files for irradiance only, and CEDA's for two runs
+
+**Open-Meteo's UKV matches the Met Office's own files for irradiance, and the project has not
+checked Open-Meteo's wind or temperature against those files.** At five instants sampled either side
+of PS47, Open-Meteo's irradiance snapshot agrees with the nearest cell of the Met Office's own file
+to between 0.11 and 0.55 W m⁻². Hours older than the AWS bucket's rolling window, which reached
+back to 2024-10-04 on 2026-10-06, can no longer be checked against the bucket.
+
+**CEDA's UKV agreed closely with the AWS bucket's UKV in a spot check of two runs, too few to settle
+whether the two differ.** For the 00 and 12 UTC runs of 2024-10-08 at leads 0 to 5 hours, with each
+AWS cell matched to the nearest CEDA cell (1.05 km apart on average), the mean difference in screen
+temperature was 0.02 K or less, and the AWS bucket's 10 m speed was higher than CEDA's by 0.04 to
+0.24 m/s. The project's download notes record that CEDA's archive is statistically different from
+the live feed, and that an XGBoost model trained on one should not be used on the other. The
+mechanism behind that note has not been established, and the [study of CEDA against
+Open-Meteo](../studies/past-weather/ukv-ceda-vs-openmeteo.md) compares CEDA's archive with
+Open-Meteo's and not with the Met Office's own files.
 
 ## NWP model upgrades since 2019
 
