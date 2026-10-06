@@ -23,6 +23,14 @@ from studies.ukv_ceda_profiles import DEFAULT_PROFILE, STATUS_COMPLETE, STATUS_P
 from studies.ukv_ceda_stores import make_stores
 
 UTC_US: Final[pl.Datetime] = pl.Datetime("us", "UTC")
+
+
+@pytest.fixture(autouse=True)
+def _few_trend_resamples(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resample the trend 100 times, not 2,000, so the report tests stay fast."""
+    monkeypatch.setattr(scores, "TREND_RESAMPLES", 100)
+
+
 EPOCH: Final[datetime] = DEFAULT_PROFILE.slot_epoch
 
 
@@ -1320,8 +1328,9 @@ def test_set_a_prints_each_lead_and_each_leave_one_station_out_as_post_hoc_rows(
 
     leads = [r for r in records if r["label"] == "post hoc lead"]
     leave_out = [r for r in records if r["label"] == "post hoc leave one out"]
-    assert [r["scope"] for r in leads] == [f"lead {n} h" for n in range(6)]
-    assert sum(r["n_rows"] for r in leads) == records[0]["n_rows"]
+    single = [r for r in leads if r["scope"].startswith("lead ") and "h" in r["scope"]]
+    assert [r["scope"] for r in single] == [f"lead {n} h" for n in range(6)]
+    assert sum(r["n_rows"] for r in single) == records[0]["n_rows"]
     assert sorted(r["scope"] for r in leave_out) == [f"without station S{n}" for n in (1, 2, 3)]
     assert all(r["n_rows"] == records[0]["n_rows"] * 2 // 3 for r in leave_out)
     assert not any(r["planned"] for r in leads + leave_out)
@@ -1487,3 +1496,154 @@ def test_a_prediction_figure_names_each_week_by_its_rule_and_carries_no_calendar
     assert labels == {"Highest mean output", "Largest spread", "Lowest mean output"}
     assert set(weeks) == {"highest mean output", "largest spread", "lowest mean output"}
     assert not any(char.isdigit() for label in labels for char in label)
+
+
+# --- analysis-only refits, trends and eras ------------------------------------------------------
+
+
+def test_the_monthly_trend_recovers_a_straight_line_per_year_and_its_interval_brackets_it():
+    months = np.array([f"{2020 + m // 12}-{m % 12 + 1:02d}" for m in range(36) for _ in range(5)])
+    year = np.array([int(m[:4]) + (int(m[5:7]) - 1) / 12 for m in months])
+    values = 0.5 * year + np.tile([0.1, -0.1, 0.0, 0.2, -0.2], 36)
+
+    slope, lower, upper = scores.monthly_trend(values=values, months=months)
+
+    assert slope == pytest.approx(0.5, abs=0.01)
+    assert lower <= slope <= upper
+    assert (slope, lower, upper) == scores.monthly_trend(values=values, months=months)
+
+
+def test_a_flat_series_has_a_zero_slope_and_a_single_month_has_none():
+    months = np.array([f"2020-{m:02d}" for m in range(1, 13)])
+
+    slope, lower, upper = scores.monthly_trend(values=np.full(12, 3.0), months=months)
+    nan_slope, _, _ = scores.monthly_trend(values=np.ones(4), months=np.array(["2020-01"] * 4))
+
+    assert (slope, lower, upper) == (0.0, 0.0, 0.0)
+    assert np.isnan(nan_slope)
+
+
+def test_set_a_prints_the_first_two_leads_each_era_and_a_trend_as_post_hoc_rows():
+    base = _station_frame(months=8)
+    earlier = base.with_columns(
+        time=pl.col("time").dt.offset_by("-1y"), month=pl.col("month").str.replace("2020", "2019")
+    )
+    frame = pl.concat([earlier, base]).with_columns(
+        station_temp_c=pl.col("station_wind_m_s"),
+        era5_temp_c=pl.col("era5_wind_m_s"),
+        ukv_temp_c=pl.col("ukv_wind_m_s"),
+        lead_hours=pl.col("time").dt.hour() % 6,
+    )
+
+    records = scores.variable_records(frame=frame, variable=scores.VARIABLES[0])
+
+    two = next(r for r in records if r["scope"] == "leads 0 to 1")
+    eras = [r for r in records if r["label"] == "post hoc era"]
+    trend = next(r for r in records if r["label"] == "post hoc trend per year")
+    rows = scores.scored_rows(frame=frame, variable=scores.VARIABLES[0])
+    assert two["n_rows"] == rows.filter(pl.col("lead_hours") <= 1).height
+    assert [r["scope"][:5] for r in eras] == ["era 0", "era 1"]
+    assert sum(r["n_rows"] for r in eras) == rows.height
+    assert trend["scope"] == "slope per year"
+    assert not any(r["planned"] for r in (two, trend, *eras))
+
+
+def test_an_analysis_only_domain_keeps_the_first_leads_and_refits_the_planned_arms_once():
+    frame = pl.DataFrame({"hour_of_day": list(range(24))})
+
+    lead0 = fit.restricted_frame(frame=frame, n_leads=1)["hour_of_day"].to_list()
+    leads01 = fit.restricted_frame(frame=frame, n_leads=2)["hour_of_day"].to_list()
+    jobs = fit.domain_jobs(domain="solar_lead0")
+
+    assert lead0 == [0, 6, 12, 18]
+    assert leads01 == [0, 1, 6, 7, 12, 13, 18, 19]
+    assert [(arm, setting) for arm, setting, *_ in jobs] == [
+        ("solar_era5_temp", "pooled"),
+        ("solar_ukv_ceda_temp", "pooled"),
+    ]
+
+
+def test_analysis_only_and_trend_records_are_post_hoc_and_only_planned_contrasts_get_a_trend():
+    wind = fit.domain_records(domain="wind", losses=_hourly_losses())
+    lead0 = fit.domain_records(
+        domain="wind_lead0",
+        losses=_hourly_losses().filter(
+            pl.col("time").dt.hour() % 6 == 0, pl.col("setting") == "pooled"
+        ),
+    )
+
+    trends = [r for r in wind if r["kind"] == "trend"]
+
+    assert {(r["label"], r["setting"]) for r in trends} == {
+        ("P3 trend per year", "pooled"),
+        ("P3 trend per year", "sensitivity"),
+    }
+    assert all(r["post_hoc"] and not r["planned"] and not r["product_contrast"] for r in trends)
+    assert lead0
+    assert not [r for r in lead0 if r["kind"] == "trend"]
+    assert all(r["post_hoc"] and not r["planned"] for r in lead0)
+    assert {r["setting"] for r in lead0} == {"pooled"}
+
+
+def test_the_hour_starting_power_at_a_label_is_the_hour_ending_power_one_hour_later(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    hours = [EPOCH + timedelta(hours=h) for h in range(4)]
+    ending = pl.DataFrame(
+        {
+            "site": "W1",
+            "time": pl.Series(hours, dtype=UTC_US),
+            "power_mw": [1.0, 2.0, 3.0, 4.0],
+            "has_zero_half_hour": [False, False, True, False],
+        }
+    )
+    monkeypatch.setattr(build, "wind_hourly_power", lambda **_: ending)
+    frame = pl.DataFrame(
+        {"site": "W1", "time": pl.Series(hours[:3], dtype=UTC_US), "power_mw": 0.0}
+    )
+
+    result = build.with_hour_starting_power(frame=frame, sites=pl.DataFrame())
+
+    # The label at hour 0 starts the hour that ends at hour 1 (power 2.0). The label at hour 1 would
+    # read the zero-flagged hour 2 and is dropped. The label at hour 2 reads hour 3 (power 4.0).
+    assert result["time"].to_list() == [hours[0], hours[2]]
+    assert result["power_hour_starting_mw"].to_list() == [2.0, 4.0]
+
+
+def test_the_matched_and_scan_domains_and_the_restricted_domains_are_optional_until_built():
+    assert set(fit.RESTRICTED_DOMAINS) <= set(fit.OPTIONAL_DOMAINS)
+    assert {"wind_matched", "wind_hour_starting"} <= set(fit.OPTIONAL_DOMAINS)
+    assert "wind" not in fit.OPTIONAL_DOMAINS
+
+
+def test_each_utc_hour_scope_holds_exactly_that_hour_and_the_run_boundaries_are_printed():
+    losses = _hourly_losses()
+    records = fit.domain_records(domain="wind", losses=losses)
+    pair = losses.filter(
+        pl.col("setting") == "pooled", pl.col("arm") == "era5_wind", pl.col("seed") == 0
+    )
+
+    by_hour = {
+        r["scope"]: r
+        for r in records
+        if r["kind"] == "hour" and r["setting"] == "pooled" and r["label"] == "P3"
+    }
+    text = " ".join(fit.hour_lines(records=records))
+
+    assert len(by_hour) == 24
+    assert by_hour["UTC hour 06"]["n_rows"] == pair.filter(pl.col("time").dt.hour() == 6).height
+    for before, after in ((5, 6), (11, 12), (17, 18), (23, 0)):
+        first = by_hour[f"UTC hour {before:02d}"]["difference_pp"]
+        second = by_hour[f"UTC hour {after:02d}"]["difference_pp"]
+        assert f"{before:02d} UTC {first:+.3f} to {after:02d} UTC {second:+.3f}" in text
+
+
+def test_the_third_era_line_counts_how_many_of_its_months_fall_in_april_to_september():
+    records = fit.domain_records(domain="wind", losses=_hourly_losses())
+    months = [f"2026-{m:02d}" for m in range(2, 10)]
+
+    lines = fit.era_lines(records=records, era2_months=months)
+
+    assert any(
+        "8 scored months (2026-02 to 2026-09), 6 fall in April to September" in x for x in lines
+    )

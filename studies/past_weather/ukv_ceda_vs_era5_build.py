@@ -115,6 +115,8 @@ STORE_DIRS: Final[tuple[Path, Path, Path]] = (
 STATION_HOURS_NAME: Final[str] = "station_hours.parquet"
 WIND_ROWS_NAME: Final[str] = "wind_rows.parquet"
 WIND_KEEP_ZERO_ROWS_NAME: Final[str] = "wind_rows_keep_zero_hours.parquet"
+WIND_HOUR_STARTING_ROWS_NAME: Final[str] = "wind_rows_hour_starting.parquet"
+"""The wind rows with the power of the hour starting at the label added, for the power-hour scan."""
 WIND_MATCHED_ROWS_NAME: Final[str] = "wind_rows_matched_10m.parquet"
 """The wind rows with ERA5's 10 m direction added, for the post hoc matched-height pair."""
 SOLAR_ROWS_NAME: Final[str] = "solar_rows.parquet"
@@ -144,6 +146,9 @@ DROPPED_ERA5_TEMPERATURE_DAYS: Final[tuple[datetime, datetime]] = (
     datetime(2021, 12, 13, tzinfo=UTC),
 )
 """Half-open range of the 12 days on which Open-Meteo's ERA5 temperature is wrong by up to 2 C."""
+
+FIRST_LATE_ERA_MONTH: Final[str] = ERA_FIRST_MONTHS[0]
+"""The first month of the second UKV era, 2020-01, after the 2019-12-04 physics change."""
 
 EARLY_END_MONTH: Final[str] = "2021-01"
 """The first month of the late window. The early window is every earlier month, from 2019-09."""
@@ -1528,6 +1533,33 @@ def with_era5_10m_direction(*, frame: pl.DataFrame, wind: pl.DataFrame) -> pl.Da
     return joined
 
 
+def with_hour_starting_power(*, frame: pl.DataFrame, sites: pl.DataFrame) -> pl.DataFrame:
+    """Add the power of the hour that starts at each row's label, and keep the rows that have it.
+
+    The hour starting at `T` is the hour ending at `T + 1 hour`, so it is read from the hour-ending
+    series shifted back by an hour. The hours holding an exactly zero half-hour are dropped, as for
+    the centred and the hour-ending powers, so one row set carries all three conventions.
+
+    Args:
+        frame: The wind rows, carrying `site`, `time` and the centred and hour-ending power.
+        sites: The wind roster.
+
+    Returns:
+        `frame`, in its own row order, restricted to the rows with an hour-starting power, with
+        `power_hour_starting_mw`.
+    """
+    starting = (
+        wind_hourly_power(sites=sites, centred=False)
+        .filter(~pl.col("has_zero_half_hour"))
+        .select(
+            "site",
+            time=pl.col("time").dt.offset_by("-1h"),
+            power_hour_starting_mw="power_mw",
+        )
+    )
+    return frame.join(starting, on=["site", "time"], how="inner", maintain_order="left")
+
+
 def dropped_months_text(*, dropped_months: dict[str, float]) -> str:
     """Describe the months the build dropped, and why, for the README.
 
@@ -1678,6 +1710,11 @@ def main() -> int:
         action="store_true",
         help="Add the matched-height wind rows to an existing build; write one new file.",
     )
+    mode.add_argument(
+        "--hour-starting",
+        action="store_true",
+        help="Add the hour-starting power to an existing build; write one new file.",
+    )
     parser.add_argument("--dry-run-month", default="2024-06")
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
     arguments = parser.parse_args()
@@ -1704,6 +1741,19 @@ def main() -> int:
         )
         matched.write_parquet(path)
         sys.stdout.write(f"Wrote {matched.height:,} matched wind rows to {path}.\n")
+        return 0
+
+    if arguments.hour_starting:
+        path = arguments.output_dir / WIND_HOUR_STARTING_ROWS_NAME
+        refuse_to_overwrite(paths=[path])
+        rows = pl.read_parquet(arguments.output_dir / WIND_ROWS_NAME)
+        starting = with_hour_starting_power(frame=rows, sites=wind_sites())
+        check_no_missing(frame=starting, columns=["power_mw", "power_hour_starting_mw"])
+        starting.write_parquet(path)
+        sys.stdout.write(
+            f"Wrote {starting.height:,} of {rows.height:,} wind rows with an hour-starting power "
+            f"to {path}.\n"
+        )
         return 0
 
     ukv = open_ukv_stores()

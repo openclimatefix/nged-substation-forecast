@@ -63,6 +63,7 @@ from studies.bootstrap import (
     MIN_MONTHS_FOR_INTERVAL,
     bootstrap_absolute,
     bootstrap_difference,
+    paired_differences,
 )
 from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
@@ -72,7 +73,7 @@ from studies.cross_validation import (
 from studies.guards import refuse_to_overwrite
 from studies.ukv_ceda_stores import ERA_FIRST_MONTHS, STRADDLING_MONTHS
 from ukv_ceda_station_scores import INTERVALS_NAME as STATION_INTERVALS_NAME
-from ukv_ceda_station_scores import PRIMARY_SCORE
+from ukv_ceda_station_scores import PRIMARY_SCORE, monthly_trend
 from ukv_ceda_vs_era5_build import (
     EARLY_END_MONTH,
     MARGIN_SOLAR_PP,
@@ -80,6 +81,7 @@ from ukv_ceda_vs_era5_build import (
     MAX_MONTH_LOSS_SHARE,
     OUTPUT_DIR,
     SOLAR_ROWS_NAME,
+    WIND_HOUR_STARTING_ROWS_NAME,
     WIND_KEEP_ZERO_ROWS_NAME,
     WIND_MATCHED_ROWS_NAME,
     WIND_ROWS_NAME,
@@ -101,7 +103,36 @@ PERCENTAGE_POINTS: Final[float] = 100.0
 PRIMARY_SETTING: Final[str] = "pooled"
 SECOND_SETTING: Final[str] = "sensitivity"
 
-DomainType = Literal["wind", "solar", "wind_keep_zero", "wind_matched"]
+DomainType = Literal[
+    "wind",
+    "solar",
+    "wind_keep_zero",
+    "wind_matched",
+    "wind_hour_starting",
+    "wind_lead0",
+    "wind_leads01",
+    "solar_lead0",
+    "solar_leads01",
+]
+
+RESTRICTED_DOMAINS: Final[Mapping[DomainType, tuple[DomainType, int]]] = {
+    "wind_lead0": ("wind", 1),
+    "wind_leads01": ("wind", 2),
+    "solar_lead0": ("solar", 1),
+    "solar_leads01": ("solar", 2),
+}
+"""Each analysis-only domain, as its base domain and how many leads it keeps (0 to n - 1).
+
+The rows are the base domain's rows whose hour of day modulo 6 is below the count, so the XGBoost
+models are trained and scored on the first leads of UKV-CEDA's runs only.
+"""
+
+OPTIONAL_DOMAINS: Final[tuple[DomainType, ...]] = (
+    "wind_matched",
+    "wind_hour_starting",
+    *RESTRICTED_DOMAINS,
+)
+"""Domains whose rows and fits are added after the first report, so they exist only once built."""
 
 VERIFY_NAME: Final[str] = "verify.md"
 REPORT_NAME: Final[str] = "report.md"
@@ -109,6 +140,8 @@ DECISION_NAME: Final[str] = "decision.md"
 INTERVALS_NAME: Final[str] = "intervals.parquet"
 STAMP_NAME: Final[str] = "fit_stamp.json"
 MATCHED_STAMP_NAME: Final[str] = "fit_stamp_matched.json"
+LEAD_STAMP_NAME: Final[str] = "fit_stamp_lead_restricted.json"
+HOUR_STARTING_STAMP_NAME: Final[str] = "fit_stamp_hour_starting.json"
 CPU_REFIT_ARM: Final[str] = "era5_wind_cpu_refit"
 """The arm refitted on the CPU for the noise floor: ERA5's wind arm."""
 
@@ -117,6 +150,7 @@ ROW_NAMES: Final[Mapping[DomainType, str]] = {
     "solar": SOLAR_ROWS_NAME,
     "wind_keep_zero": WIND_KEEP_ZERO_ROWS_NAME,
     "wind_matched": WIND_MATCHED_ROWS_NAME,
+    "wind_hour_starting": WIND_HOUR_STARTING_ROWS_NAME,
 }
 """The build's row file of each domain. The matched-height rows exist only after a later step."""
 
@@ -125,6 +159,11 @@ MARGINS_PP: Final[Mapping[DomainType, float]] = {
     "solar": MARGIN_SOLAR_PP,
     "wind_keep_zero": MARGIN_WIND_PP,
     "wind_matched": MARGIN_WIND_PP,
+    "wind_hour_starting": MARGIN_WIND_PP,
+    "wind_lead0": MARGIN_WIND_PP,
+    "wind_leads01": MARGIN_WIND_PP,
+    "solar_lead0": MARGIN_SOLAR_PP,
+    "solar_leads01": MARGIN_SOLAR_PP,
 }
 """The margin of each domain, in percentage points of capacity."""
 
@@ -177,10 +216,28 @@ MATCHED_CONTRAST: Final[Planned] = Planned(
 )
 """The post hoc matched-height pair: both products' 10 m wind alone, UKV-CEDA minus ERA5."""
 
-SPLIT_CONTRASTS: Final[tuple[Planned, ...]] = (*PLANNED_CONTRASTS, MATCHED_CONTRAST)
+ANALYSIS_ONLY_CONTRASTS: Final[tuple[Planned, ...]] = tuple(
+    Planned(
+        f"post hoc analysis-only {base.label} ({'lead 0' if n_leads == 1 else 'leads 0 to 1'})",
+        domain,
+        base.treatment,
+        base.reference,
+        registered=False,
+    )
+    for domain, (base_domain, n_leads) in RESTRICTED_DOMAINS.items()
+    for base in PLANNED_CONTRASTS
+    if base.domain == base_domain
+)
+"""P3 and P4 refitted on the first leads only: UKV-CEDA minus ERA5, post hoc."""
+
+SPLIT_CONTRASTS: Final[tuple[Planned, ...]] = (
+    *PLANNED_CONTRASTS,
+    MATCHED_CONTRAST,
+    *ANALYSIS_ONLY_CONTRASTS,
+)
 """The contrasts split by scope, setting, and generator."""
 
-POST_HOC_DOMAINS: Final[tuple[DomainType, ...]] = ("wind", "wind_matched")
+POST_HOC_DOMAINS: Final[tuple[DomainType, ...]] = ("wind", "wind_matched", "solar")
 """The domains that get the post hoc lead, window, and era splits."""
 
 PUBLISHED_WIND_WINDOW_START: Final[datetime] = datetime(2024, 8, 12, tzinfo=UTC)
@@ -210,6 +267,19 @@ EXPLORATORY_CONTRASTS: Final[Mapping[DomainType, tuple[tuple[str, str, str], ...
     ),
     "wind_keep_zero": (("keep zero hours", "ukv_ceda_wind", "era5_wind"),),
     "wind_matched": (),
+    "wind_hour_starting": (
+        ("scan, centred pair", "ukv_ceda_wind_centred", "era5_wind_centred"),
+        ("scan, hour-ending pair", "ukv_ceda_wind_hour_ending", "era5_wind_hour_ending"),
+        ("scan, hour-starting pair", "ukv_ceda_wind_hour_starting", "era5_wind_hour_starting"),
+        ("scan, ERA5 hour-ending offset", "era5_wind_hour_ending", "era5_wind_centred"),
+        ("scan, ERA5 hour-starting offset", "era5_wind_hour_starting", "era5_wind_centred"),
+        ("scan, UKV-CEDA hour-ending offset", "ukv_ceda_wind_hour_ending", "ukv_ceda_wind_centred"),
+        (
+            "scan, UKV-CEDA hour-starting offset",
+            "ukv_ceda_wind_hour_starting",
+            "ukv_ceda_wind_centred",
+        ),
+    ),
 }
 """The exploratory contrasts of each domain, as (label, treatment, reference)."""
 
@@ -254,12 +324,31 @@ def domain_jobs(*, domain: DomainType) -> list[Job]:
     """List every fit of one domain.
 
     Args:
-        domain: `wind`, `solar`, `wind_keep_zero`, or `wind_matched`.
+        domain: `wind`, `solar`, `wind_keep_zero`, `wind_matched`, or
+            `wind_hour_starting`.
 
     Returns:
         The jobs: the planned arms at both settings, then the controls and checks at the primary
         setting. Every job fits one arm at each generator of the domain.
     """
+    if domain in RESTRICTED_DOMAINS:
+        base = RESTRICTED_DOMAINS[domain][0]
+        return [job for job in domain_jobs(domain=base) if job[1] == PRIMARY_SETTING][:2]
+    if domain == "wind_hour_starting":
+        return [
+            _job(
+                arm=f"{product}_wind_{convention}",
+                setting=PRIMARY_SETTING,
+                columns=wind_arm_columns(product=product),
+                target=target,
+            )
+            for product in ("era5", "ukv_ceda")
+            for convention, target in (
+                ("centred", "power_mw"),
+                ("hour_ending", "power_hour_ending_mw"),
+                ("hour_starting", "power_hour_starting_mw"),
+            )
+        ]
     if domain == "wind_matched":
         return [
             _job(
@@ -535,8 +624,8 @@ def post_hoc_scopes_of() -> list[tuple[str, str, pl.Expr]]:
     """List the post hoc scopes of the wind contrasts, as (kind, label, filter).
 
     Returns:
-        Each single lead, the published wind page's window, and each UKV era. A lead is the UTC hour
-        modulo 6, so it is confounded with the hour of day.
+        Each single lead, each UTC hour, the published wind page's window, and each UKV era. A
+        lead is the UTC hour modulo 6, so it is confounded with the hour of day.
     """
     hour = pl.col("time").dt.hour()
     first_late, first_upgraded = ERA_FIRST_MONTHS
@@ -544,6 +633,8 @@ def post_hoc_scopes_of() -> list[tuple[str, str, pl.Expr]]:
         ("lead", f"lead {lead} h", hour % LEAD_CYCLE_HOURS == lead)
         for lead in range(LEAD_CYCLE_HOURS)
     ]
+    scopes += [("hour", f"UTC hour {h:02d}", hour == h) for h in range(24)]
+    scopes.append(("lead group", "leads 0 to 1", hour % LEAD_CYCLE_HOURS <= 1))
     scopes.append(
         (
             "published window",
@@ -639,6 +730,54 @@ def contrast_record(
     }
 
 
+def trend_record(
+    *, losses: pl.DataFrame, domain: DomainType, setting: str, planned: Planned
+) -> IntervalRecord:
+    """Record the slope per year of a contrast's monthly mean difference, post hoc.
+
+    Args:
+        losses: Losses at one setting holding both arms.
+        domain: The domain.
+        setting: The setting the losses were fitted at.
+        planned: The contrast.
+
+    Returns:
+        A record whose differences are the slope per year in points of capacity, with no margin. It
+        covers month-to-month weather only, and a physics change inside the record is a step that
+        a line smooths.
+    """
+    differences, months = paired_differences(
+        losses=losses, treatment=planned.treatment, reference=planned.reference, metric=METRIC
+    )
+    slope, lower, upper = (
+        value * PERCENTAGE_POINTS
+        for value in monthly_trend(values=differences.mean(axis=0), months=months)
+    )
+    return {
+        "domain": domain,
+        "setting": setting,
+        "label": f"{planned.label} trend per year",
+        "planned": False,
+        "kind": "trend",
+        "scope": "slope per year",
+        "treatment": planned.treatment,
+        "reference": planned.reference,
+        "treatment_mae_pp": float("nan"),
+        "reference_mae_pp": float("nan"),
+        "difference_pp": slope,
+        "lower_95_pp": lower,
+        "upper_95_pp": upper,
+        "margin_pp": float("nan"),
+        "reading": "significant" if lower > 0.0 or upper < 0.0 else "not significant",
+        "n_rows": int(differences.shape[1]),
+        "n_months": len(set(months.tolist())),
+        "enough_months": True,
+        "seed_spread_pp": float("nan"),
+        "product_contrast": False,
+        "post_hoc": True,
+    }
+
+
 def _mean_pp(*, losses: pl.DataFrame, arm: str) -> float:
     """Return one arm's mean loss in percentage points of capacity."""
     mean = losses.filter(pl.col("arm") == arm)[METRIC].mean()
@@ -663,6 +802,8 @@ def domain_records(*, domain: DomainType, losses: pl.DataFrame) -> list[Interval
         for setting in (PRIMARY_SETTING, SECOND_SETTING):
             at_setting = losses.filter(pl.col("setting") == setting)
             pair = at_setting.filter(pl.col("arm").is_in([planned.treatment, planned.reference]))
+            if pair.is_empty():
+                continue
             scopes = [(k, sc, cond, False) for k, sc, cond in scopes_of(losses=pair)]
             if domain in POST_HOC_DOMAINS:
                 scopes += [(k, sc, cond, True) for k, sc, cond in post_hoc_scopes_of()]
@@ -685,6 +826,27 @@ def domain_records(*, domain: DomainType, losses: pl.DataFrame) -> list[Interval
                         post_hoc=post_hoc or not planned.registered,
                     )
                 )
+            if planned.registered:
+                records.append(
+                    trend_record(losses=pair, domain=domain, setting=setting, planned=planned)
+                )
+            if domain in POST_HOC_DOMAINS:
+                records += [
+                    contrast_record(
+                        losses=pair.filter(pl.col("site") != site),
+                        domain=domain,
+                        setting=setting,
+                        label=planned.label,
+                        planned=False,
+                        kind="leave one out",
+                        scope=f"without generator {site}",
+                        treatment=planned.treatment,
+                        reference=planned.reference,
+                        post_hoc=True,
+                    )
+                    for site in sorted(pair["site"].unique().to_list())
+                    if pair["site"].n_unique() > 1
+                ]
             records += [
                 contrast_record(
                     losses=pair.filter(pl.col("site") == site),
@@ -701,7 +863,7 @@ def domain_records(*, domain: DomainType, losses: pl.DataFrame) -> list[Interval
                 for site in sorted(pair["site"].unique().to_list())
             ]
     primary = losses.filter(pl.col("setting") == PRIMARY_SETTING)
-    for label, treatment, reference in EXPLORATORY_CONTRASTS[domain]:
+    for label, treatment, reference in EXPLORATORY_CONTRASTS.get(domain, ()):
         pair = primary.filter(pl.col("arm").is_in([treatment, reference]))
         if pair["arm"].n_unique() < 2:
             continue
@@ -1094,15 +1256,17 @@ def records_lines(*, records: Sequence[IntervalRecord], title: str) -> list[str]
     return [f"#### {title}", "", *RECORD_HEADER, *(_record_line(record=r) for r in records)]
 
 
-def era_lines(*, records: Sequence[IntervalRecord]) -> list[str]:
+def era_lines(*, records: Sequence[IntervalRecord], era2_months: Sequence[str] = ()) -> list[str]:
     """Report P3 in the third UKV era, which is the closest to today's UKV, at both settings.
 
     Args:
         records: Every interval record of set B.
+        era2_months: The scored months of the third era, as `%Y-%m`.
 
     Returns:
         Markdown lines. The sign and the significance at each setting are stated, so a result that
-        is significant at one setting only is not read as settled.
+        is significant at one setting only is not read as settled, and the calendar make-up of the
+        era is counted.
     """
     lines = ["#### The third era (post hoc)", ""]
     for setting in (PRIMARY_SETTING, SECOND_SETTING):
@@ -1128,11 +1292,89 @@ def era_lines(*, records: Sequence[IntervalRecord]) -> list[str]:
             f"{'statistically significant' if significant else 'not statistically significant'} "
             "at the 5% level."
         )
+    if era2_months:
+        summer = [m for m in era2_months if 4 <= int(m[5:7]) <= 9]
+        lines.append(
+            f"- Of the era's {len(era2_months)} scored months ({min(era2_months)} to "
+            f"{max(era2_months)}), {len(summer)} fall in April to September."
+        )
     lines.append(
         "- The era is exploratory, its folds trained mostly on the second era, and set A holds no "
         "station data from it, so P1 and P2 say nothing about it."
     )
     return lines
+
+
+def hour_lines(*, records: Sequence[IntervalRecord]) -> list[str]:
+    """Show P3 at each run boundary and ERA5's own error by lead and by UTC hour, post hoc.
+
+    Each lead pools four UTC hours spread across the day, so a diurnal cycle can masquerade as a
+    lead only if it repeats every 6 hours. The gap between adjacent hours at a run boundary is the
+    sharper test.
+
+    Args:
+        records: Every interval record of set B.
+
+    Returns:
+        Markdown lines.
+    """
+    p3 = [
+        r
+        for r in records
+        if r["label"] == "P3" and r["setting"] == PRIMARY_SETTING and r["domain"] == "wind"
+    ]
+    by_hour = {int(r["scope"][-2:]): r for r in p3 if r["kind"] == "hour"}
+    by_lead = [r for r in p3 if r["kind"] == "lead"]
+    if len(by_hour) != 24 or not by_lead:
+        return []
+    boundaries = [
+        f"{before:02d} UTC {by_hour[before]['difference_pp']:+.3f} to {after:02d} UTC "
+        f"{by_hour[after]['difference_pp']:+.3f}"
+        for before, after in ((5, 6), (11, 12), (17, 18), (23, 0))
+    ]
+    era5_by_hour = [r["reference_mae_pp"] for r in by_hour.values()]
+    era5_by_lead = [r["reference_mae_pp"] for r in by_lead]
+    return [
+        "#### P3 by UTC hour and ERA5's own error (post hoc)",
+        "",
+        f"- P3 across the four run boundaries, in points of capacity: {'; '.join(boundaries)}.",
+        (
+            f"- ERA5's own mean absolute error ranges from {min(era5_by_hour):.2f}% to "
+            f"{max(era5_by_hour):.2f}% across the 24 UTC hours and from "
+            f"{min(era5_by_lead):.2f}% to {max(era5_by_lead):.2f}% across the six leads."
+        ),
+    ]
+
+
+def farm_lines(*, records: Sequence[IntervalRecord]) -> list[str]:
+    """Print P3 leaving each wind farm out, post hoc.
+
+    Args:
+        records: Every interval record of set B.
+
+    Returns:
+        Markdown lines.
+    """
+    found = sorted(
+        (
+            r
+            for r in records
+            if r["label"] == "P3"
+            and r["kind"] == "leave one out"
+            and r["domain"] == "wind"
+            and r["setting"] == PRIMARY_SETTING
+        ),
+        key=lambda r: r["scope"],
+    )
+    return [
+        "#### P3 leaving one wind farm out (post hoc)",
+        "",
+        *(
+            f"- {r['scope']}: {r['difference_pp']:+.3f} [{r['lower_95_pp']:+.3f}, "
+            f"{r['upper_95_pp']:+.3f}] points of capacity."
+            for r in found
+        ),
+    ]
 
 
 def veto_lines(*, records: Sequence[IntervalRecord]) -> list[str]:
@@ -1358,16 +1600,45 @@ def report_text(
         ("half-year", "By half-year"),
         ("site", "By generator"),
         ("lead", "By UKV-CEDA lead (post hoc; a lead is also an hour of day)"),
+        ("lead group", "By the first two leads together (post hoc)"),
         ("published window", "From the published wind page's first day (post hoc)"),
         ("era", "By UKV era (post hoc)"),
     ):
         chosen = [r for r in product if r["kind"] == kind]
         if chosen:
             lines += [*records_lines(records=chosen, title=title), ""]
-    controls = [r for r in records if not r["product_contrast"]]
+    analysis_only = [
+        r for r in product if r["domain"] in RESTRICTED_DOMAINS and r["kind"] in ("all", "window")
+    ]
+    if analysis_only:
+        lines += [
+            *records_lines(
+                records=analysis_only,
+                title="Analysis-only refits: trained and scored on the first leads only (post hoc)",
+            ),
+            "",
+        ]
+    trends = [r for r in records if r["kind"] == "trend"]
+    lines += [
+        *records_lines(records=trends, title="Slope per year of the monthly difference (post hoc)"),
+        "",
+    ]
+    controls = [r for r in records if not r["product_contrast"] and r["kind"] != "trend"]
     lines += [*records_lines(records=controls, title="Controls and replications"), ""]
     lines += [*near_line_lines(records=records), ""]
-    lines += [*era_lines(records=records), ""]
+    lines += [
+        *era_lines(
+            records=records,
+            era2_months=sorted(
+                m for m in frames["wind"]["month"].unique().to_list() if m >= ERA_FIRST_MONTHS[1]
+            ),
+        ),
+        "",
+        *hour_lines(records=records),
+        "",
+        *farm_lines(records=records),
+        "",
+    ]
     lines += [*veto_lines(records=records), ""]
     lines += [*station_lead_lines(set_a=set_a), ""]
     lines += [*costs_lines(build_stamp=build_stamp, frames=frames), ""]
@@ -1470,8 +1741,9 @@ def load_saved(
     Returns:
         Each domain's losses, with the CPU refit added to wind, and the hardware stamp.
     """
-    if "wind_matched" in frames and not (directory / "losses_wind_matched.parquet").exists():
-        del frames["wind_matched"]
+    for domain in OPTIONAL_DOMAINS:
+        if domain in frames and not (directory / f"losses_{domain}.parquet").exists():
+            del frames[domain]
     losses = {
         domain: load_losses(
             stem=f"losses_{domain}",
@@ -1488,6 +1760,22 @@ def load_saved(
     return losses, json.loads((directory / STAMP_NAME).read_text())
 
 
+def restricted_frame(*, frame: pl.DataFrame, n_leads: int) -> pl.DataFrame:
+    """Keep the rows whose lead in UKV-CEDA's 6-hourly runs is below `n_leads`.
+
+    The lead is the hour of day modulo 6. A solar hour's temperature averages the instants at both
+    ends of the hour, so a solar row at lead 0 also reads the previous run's lead 5.
+
+    Args:
+        frame: A domain's rows, carrying `hour_of_day`.
+        n_leads: How many leads to keep, from lead 0.
+
+    Returns:
+        The rows at leads 0 to `n_leads - 1`.
+    """
+    return frame.filter(pl.col("hour_of_day") % LEAD_CYCLE_HOURS < n_leads)
+
+
 def load_frames(*, directory: Path) -> dict[DomainType, pl.DataFrame]:
     """Read every domain's rows, leaving out the matched-height rows until they exist.
 
@@ -1497,11 +1785,55 @@ def load_frames(*, directory: Path) -> dict[DomainType, pl.DataFrame]:
     Returns:
         Each domain's rows.
     """
-    return {
+    frames = {
         domain: pl.read_parquet(directory / name)
         for domain, name in ROW_NAMES.items()
-        if domain != "wind_matched" or (directory / name).exists()
+        if domain not in OPTIONAL_DOMAINS or (directory / name).exists()
     }
+    for domain, (base, n_leads) in RESTRICTED_DOMAINS.items():
+        frames[domain] = restricted_frame(frame=frames[base], n_leads=n_leads)
+    return frames
+
+
+def run_extra_fits(
+    *, arguments: argparse.Namespace, frames: dict[DomainType, pl.DataFrame], directory: Path
+) -> bool:
+    """Fit the post hoc domains that a flag asks for, and say whether one was fitted.
+
+    Args:
+        arguments: The parsed command line.
+        frames: Each domain's rows.
+        directory: The output folder.
+
+    Returns:
+        True if a post hoc fit ran, in which case no report is written.
+    """
+    if arguments.fit_lead_restricted:
+        stamp = hardware_stamp(device=arguments.device)
+        refuse_to_overwrite(paths=[directory / LEAD_STAMP_NAME])
+        (directory / LEAD_STAMP_NAME).write_text(json.dumps(stamp, indent=2))
+        for restricted in RESTRICTED_DOMAINS:
+            fit_domain(
+                domain=restricted,
+                frame=frames[restricted],
+                directory=directory,
+                device=arguments.device,
+            )
+        sys.stdout.write(f"Fitted the analysis-only refits on {arguments.device}.\n")
+        return True
+    if arguments.fit_matched or arguments.fit_hour_starting:
+        domain: DomainType = "wind_matched" if arguments.fit_matched else "wind_hour_starting"
+        stamp_name = MATCHED_STAMP_NAME if arguments.fit_matched else HOUR_STARTING_STAMP_NAME
+        stamp = hardware_stamp(device=arguments.device)
+        refuse_to_overwrite(paths=[directory / stamp_name])
+        (directory / stamp_name).write_text(json.dumps(stamp, indent=2))
+        fit_domain(
+            domain=domain, frame=frames[domain], directory=directory, device=arguments.device
+        )
+        sys.stdout.write(f"Fitted {domain} on {arguments.device}.\n")
+        return True
+
+    return False
 
 
 def main() -> int:
@@ -1510,6 +1842,16 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="List the fits; fit nothing.")
     mode.add_argument("--report-only", action="store_true", help="Rebuild the reports.")
+    mode.add_argument(
+        "--fit-lead-restricted",
+        action="store_true",
+        help="Fit only the post hoc analysis-only refits, and write no report.",
+    )
+    mode.add_argument(
+        "--fit-hour-starting",
+        action="store_true",
+        help="Fit only the post hoc power-hour scan, and write no report.",
+    )
     mode.add_argument(
         "--fit-matched",
         action="store_true",
@@ -1531,17 +1873,7 @@ def main() -> int:
         msg = f"run ukv_ceda_station_scores.py first: {STATION_INTERVALS_NAME} is missing"
         raise SystemExit(msg)
 
-    if arguments.fit_matched:
-        stamp = hardware_stamp(device=arguments.device)
-        refuse_to_overwrite(paths=[directory / MATCHED_STAMP_NAME])
-        (directory / MATCHED_STAMP_NAME).write_text(json.dumps(stamp, indent=2))
-        fit_domain(
-            domain="wind_matched",
-            frame=frames["wind_matched"],
-            directory=directory,
-            device=arguments.device,
-        )
-        sys.stdout.write(f"Fitted the matched-height pair on {arguments.device}.\n")
+    if run_extra_fits(arguments=arguments, frames=frames, directory=directory):
         return 0
 
     if arguments.report_only:
@@ -1556,7 +1888,8 @@ def main() -> int:
         stamp = hardware_stamp(device=arguments.device)
         refuse_to_overwrite(paths=[directory / STAMP_NAME])
         (directory / STAMP_NAME).write_text(json.dumps(stamp, indent=2))
-        frames.pop("wind_matched", None)
+        for optional in OPTIONAL_DOMAINS:
+            frames.pop(optional, None)
         losses = {
             domain: fit_domain(
                 domain=domain, frame=frame, directory=directory, device=arguments.device

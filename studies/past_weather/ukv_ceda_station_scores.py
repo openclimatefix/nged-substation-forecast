@@ -51,6 +51,7 @@ from studies.bootstrap import MIN_MONTHS_FOR_INTERVAL, bootstrap_row_difference
 from studies.guards import refuse_to_overwrite
 from ukv_ceda_vs_era5_build import (
     EARLY_END_MONTH,
+    FIRST_LATE_ERA_MONTH,
     MARGIN_STATION_SHARE,
     OUTPUT_DIR,
     STATION_HOURS_NAME,
@@ -72,6 +73,12 @@ SCORES: Final[tuple[str, ...]] = ("bias_removed_hour", "bias_removed_month", "ra
 """The three scores, the first being the primary."""
 
 PRIMARY_SCORE: Final[str] = SCORES[0]
+
+TREND_RESAMPLES: Final[int] = 2000
+"""How many times `monthly_trend` resamples the months."""
+
+TREND_SEED: Final[int] = 1024
+"""Seeds the month resampling of `monthly_trend`."""
 
 N_LEADS: Final[int] = 6
 """The UKV-CEDA leads, 0 to 5 hours, that a 6-hourly store serves."""
@@ -175,6 +182,74 @@ def scored_rows(*, frame: pl.DataFrame, variable: Variable) -> pl.DataFrame:
             )
         )
     )
+
+
+def monthly_trend(*, values: np.ndarray, months: np.ndarray) -> tuple[float, float, float]:
+    """Fit a straight line through the monthly means of a per-row value, and interval its slope.
+
+    The line is fitted to one mean per calendar month against the month's time in years. The
+    interval resamples whole months with replacement, so it covers month-to-month weather and
+    nothing else. An era or a physics change inside the record is a step, which a line smooths.
+
+    Args:
+        values: One value per row.
+        months: Each row's `%Y-%m` label.
+
+    Returns:
+        The slope per year, and the 2.5th and 97.5th percentiles of the resampled slopes. All are
+        NaN where fewer than two distinct months are present.
+    """
+    labels, inverse = np.unique(months, return_inverse=True)
+    if len(labels) < 2:
+        return float("nan"), float("nan"), float("nan")
+    means = np.bincount(inverse, weights=values) / np.bincount(inverse)
+    years = np.array([int(label[:4]) + (int(label[5:7]) - 1) / 12.0 for label in labels])
+
+    def slope(x: np.ndarray, y: np.ndarray) -> float:
+        centred = x - x.mean()
+        spread = float((centred**2).sum())
+        return float((centred * (y - y.mean())).sum() / spread) if spread > 0.0 else float("nan")
+
+    generator = np.random.default_rng(TREND_SEED)
+    draws = generator.integers(0, len(labels), size=(TREND_RESAMPLES, len(labels)))
+    slopes = np.array([slope(years[draw], means[draw]) for draw in draws])
+    lower, upper = np.nanpercentile(slopes, [2.5, 97.5])
+    return slope(years, means), float(lower), float(upper)
+
+
+def trend_record(*, rows: pl.DataFrame, variable: Variable) -> IntervalRecord:
+    """Record the slope per year of UKV-CEDA minus ERA5 on the primary score, post hoc.
+
+    Args:
+        rows: Scored rows from `scored_rows`.
+        variable: The variable.
+
+    Returns:
+        A record whose `difference` is the slope per year, in the variable's unit per year, with no
+        margin. It reads `significant` where the interval excludes zero.
+    """
+    slope, lower, upper = monthly_trend(
+        values=rows[f"abs_ukv_{PRIMARY_SCORE}"].to_numpy()
+        - rows[f"abs_era5_{PRIMARY_SCORE}"].to_numpy(),
+        months=rows["month"].to_numpy(),
+    )
+    return {
+        "variable": variable.name,
+        "label": "post hoc trend per year",
+        "planned": False,
+        "score": PRIMARY_SCORE,
+        "scope": "slope per year",
+        "era5_mae": float("nan"),
+        "ukv_mae": float("nan"),
+        "difference": slope,
+        "lower_95": lower,
+        "upper_95": upper,
+        "margin": float("nan"),
+        "reading": "significant" if lower > 0.0 or upper < 0.0 else "not significant",
+        "n_rows": rows.height,
+        "n_months": int(rows["month"].n_unique()),
+        "enough_months": True,
+    }
 
 
 def interval_record(
@@ -297,6 +372,32 @@ def variable_records(*, frame: pl.DataFrame, variable: Variable) -> list[Interva
         )
         for lead in range(N_LEADS)
     ]
+    records.append(
+        interval_record(
+            rows=rows.filter(pl.col("lead_hours") <= 1),
+            variable=variable,
+            label="post hoc lead",
+            planned=False,
+            score=PRIMARY_SCORE,
+            scope="leads 0 to 1",
+        )
+    )
+    records += [
+        interval_record(
+            rows=rows.filter(condition),
+            variable=variable,
+            label="post hoc era",
+            planned=False,
+            score=PRIMARY_SCORE,
+            scope=scope,
+        )
+        for scope, condition in (
+            (f"era 0 (before {FIRST_LATE_ERA_MONTH})", pl.col("month") < FIRST_LATE_ERA_MONTH),
+            (f"era 1 ({FIRST_LATE_ERA_MONTH} onward)", pl.col("month") >= FIRST_LATE_ERA_MONTH),
+        )
+        if rows.filter(condition).height
+    ]
+    records.append(trend_record(rows=rows, variable=variable))
     records += [
         interval_record(
             rows=rows.filter(pl.col("site") != site),

@@ -382,8 +382,9 @@ def headline_figure(
         units=units,
         number=1,
         title=(
-            "At four stations UKV-CEDA is closer than ERA5 for wind and temperature, but ERA5 "
-            "gives the lower wind-power error, and the choice does not move solar power"
+            "At four stations UKV-CEDA is closer than ERA5 for wind and temperature, but pooled "
+            "over three wind farms ERA5 gives the lower power error, and the choice does not move "
+            "solar power"
         ),
         subtitle=[
             KEY_SUBTITLE,
@@ -586,10 +587,7 @@ def splits_figures(
                     "ERA5's wind-power advantage is concentrated in October to March and at one of "
                     "three farms"
                 ),
-                subtitle=[
-                    KEY_SUBTITLE,
-                    "All rows are exploratory splits of the planned contrasts.",
-                ],
+                subtitle=[KEY_SUBTITLE],
             ),
             list(set_b_panels.values()),
         ),
@@ -609,18 +607,40 @@ def controls_figure(*, set_b: Sequence[dict[str, Any]]) -> FigureRows:
         The figure and its rows.
     """
     wind_labels = {
-        "control": "Shuffled UKV-CEDA minus shuffled ERA5 (negative control)",
-        "GPU against CPU": "ERA5 arm refitted on the CPU minus fitted on the GPU",
-        "hour-ending pair": "UKV-CEDA minus ERA5, power hour ending at the label",
-        "ERA5 power-hour offset": "ERA5, hour ending at the label minus centred",
-        "UKV-CEDA power-hour offset": "UKV-CEDA, hour ending at the label minus centred",
+        "Shuffled UKV-CEDA minus shuffled ERA5 (negative control)": ("wind", "control"),
+        "ERA5 model refitted on the CPU minus fitted on the GPU": ("wind", "GPU against CPU"),
+        "UKV-CEDA minus ERA5, power hour centred on the label": (
+            "wind_hour_starting",
+            "scan, centred pair",
+        ),
+        "UKV-CEDA minus ERA5, power hour ending at the label": (
+            "wind_hour_starting",
+            "scan, hour-ending pair",
+        ),
+        "UKV-CEDA minus ERA5, power hour starting at the label": (
+            "wind_hour_starting",
+            "scan, hour-starting pair",
+        ),
+        "ERA5, hour ending minus centred": ("wind_hour_starting", "scan, ERA5 hour-ending offset"),
+        "ERA5, hour starting minus centred": (
+            "wind_hour_starting",
+            "scan, ERA5 hour-starting offset",
+        ),
+        "UKV-CEDA, hour ending minus centred": (
+            "wind_hour_starting",
+            "scan, UKV-CEDA hour-ending offset",
+        ),
+        "UKV-CEDA, hour starting minus centred": (
+            "wind_hour_starting",
+            "scan, UKV-CEDA hour-starting offset",
+        ),
     }
     panels = {
         "Wind controls and checks": set_b_rows(
             records=set_b,
             selectors=[
-                (text, {"domain": "wind", "label": label, "scope": "all", "kind": "all"})
-                for label, text in wind_labels.items()
+                (text, {"domain": domain, "label": label, "scope": "all", "kind": "all"})
+                for text, (domain, label) in wind_labels.items()
             ],
             with_second=False,
             with_errors=False,
@@ -645,8 +665,8 @@ def controls_figure(*, set_b: Sequence[dict[str, Any]]) -> FigureRows:
         zero_label="no difference",
         better_label="first arm better",
         title=(
-            "Shuffled UKV-CEDA and shuffled ERA5 differ by about zero, with a wind interval as "
-            "wide as the 0.16-point margin"
+            "Shuffled UKV-CEDA and shuffled ERA5 differ by about zero, with a wind interval "
+            "half-width close to the 0.16-point margin"
         ),
         subtitle=[
             (
