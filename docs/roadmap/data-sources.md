@@ -230,7 +230,7 @@ Reanalyses and satellite products carry no forecast horizon and are left off.
 | **ECMWF ENS** (Dynamical.org) | ✅ | Main NWP source: 51-member ensemble, distributed as live-updating Zarrs. OCF converts gridded NWP to tabular via the H3 spatial index and stores as Delta Lake, stored as `Float32` rounded to a 13-bit significand, with zstd compression (~40 GB/year for all of GB; ~1 minute to download+convert one day). **The archive currently only extends back to 2024-04-01**; Dynamical.org are back-filling the operational archive from MARS to 2016-03-08 (51 members, 0.25°, 00Z inits only), but at ~0.8 TB/day against ~446 TB remaining the estimate is **~November 2027** — after v1.0, which is why we [extend the training history](training-history.md) with an estimate of past weather instead. Radiation: no direct component, which is what forces [DP forecasting of PV](disaggregation.md) (v2) to find the beam/diffuse split elsewhere — see [which sources carry which irradiance components](#which-sources-carry-which-irradiance-components). |
 | **ERA5** (ECMWF global reanalysis) | 🚧 (v0.5) | The reanalysis planned for ingest, serving the [weather-abnormality climatology](xgboost-improvements.md#weather-abnormality-climatology-z-score-features). For **pre-training**, the planned estimates of past weather are CAMS for irradiance and CEDA UKV for other variables, pending a check of UKV against ERA5 over 2019 to 2024 and of temperature for demand, and ERA5 is kept for gap filling and as a comparison arm — see [Which estimate of past weather to train on](training-history.md#which-estimate-of-past-weather-to-train-on). ERA5 is not ingested yet. Covers 1940 to the present, so it spans every power history that predates the ENS archive (2024-04-01). Its 31 km resolution is coarser than CERRA, which is acceptable because weather anomalies are synoptic-scale and the high-resolution *solar* irradiance comes from CAMS regardless. Carries the [beam/diffuse split](#which-sources-carry-which-irradiance-components), which the live ENS feed does not. Its **ERA5T** near-real-time stream lands ~5 days behind real time, and final ERA5 overwrites it ~2–3 months later after quality control. Shares the ECMWF **IFS lineage** with the ENS forecasts, so systematic biases largely cancel when the two are combined. Ingest **2020 to present**, including the 2024+ ENS overlap, which is not optional — see [Extending the training history](training-history.md). [Which access route](#era5-which-access-route) is still open. |
 | **CERRA** (Copernicus regional reanalysis for Europe) | 🔬 (deprioritised) | Higher-resolution (5.5 km) European reanalysis. Per the [Copernicus CDS](https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels), it now runs from **September 1984 to the present** — monthly updates, but **about 3 months behind real time**: on 2026-09-23 the latest data ended 2026-06-30, 12 weeks earlier. **Not in the active plan**, which takes its estimates of past weather from CAMS and CEDA UKV; that latency of about 3 months would also rule CERRA out of near-real-time capacity estimation. Kept here because its 5.5 km resolution could still earn a place for fine-scale work (e.g. wind over complex terrain) if that ever proves decisive. Its [direct short-wave](#which-sources-carry-which-irradiance-components) is time-integrated from 3-hourly forecast cycles, so temporally coarser than SARAH-3. On past sunshine at six solar farms, an XGBoost model given CERRA's global irradiance is no better than one given ERA5 and 4.045 points of capacity behind one given CAMS (9.164% against 9.135% and 5.118%, on the CERRA row set; [results](../studies/past-weather/solar.md#cerra-is-no-better-than-era5-and-trails-cams-by-about-4-points)). Grid, coverage, wind heights, and access are in the [survey's reanalysis table](../background/weather-products-survey.md#reanalyses-hindcasts-and-satellite-retrievals). |
-| **CEDA UKV** (the Met Office's UKV as archived by the Centre for Environmental Data Analysis) | 🚧 (pending checks against ERA5) | The planned estimate of past weather for every variable except irradiance, read from the early time steps of each archived run, pending a check of UKV against ERA5 over 2019 to 2024 and of temperature for demand — see [Which estimate of past weather to train on](training-history.md#which-estimate-of-past-weather-to-train-on). CEDA's archive is the first UKV source the studies have found that reaches back to 2019. The fields fetched so far hold 10 m wind and winds at 925 hPa and 1000 hPa, with no 100 m wind and no orography. CEDA's archive lacks a small number of runs and holds a few more only in part, and ERA5 fills those hours. The Met Office's PS47 upgrade on 2026-01-21 changed the regional models, so a UKV series spanning that date is not homogeneous. CEDA's UKV is statistically different from the UKV served live on AWS and Open-Meteo. Access is by application; archive start, grid, and licence are in the [survey's forecast-model table](../background/weather-products-survey.md#forecast-models). |
+| **CEDA UKV** (the Met Office's UKV as archived by the Centre for Environmental Data Analysis) | 🚧 (pending checks against ERA5) | The planned estimate of past weather for every variable except irradiance, read from the early time steps of each archived run, pending a check of UKV against ERA5 over 2019 to 2024 and of temperature for demand — see [Which estimate of past weather to train on](training-history.md#which-estimate-of-past-weather-to-train-on). CEDA's archive is the first UKV source the studies have found that reaches back to 2019. The fields fetched so far hold 10 m wind and winds at 925 hPa and 1000 hPa, with no 100 m wind and no orography. CEDA's archive lacks a small number of runs and holds a few more only in part, and ERA5 fills those hours. The Met Office's PS47 upgrade on 2026-01-21 changed the regional models, so a UKV series spanning that date is not homogeneous. CEDA's UKV differs from the UKV served live on AWS and Open-Meteo in lead, irradiance construction, temperature, wind units, eras, and licence — see [how the two archives differ](#ukv-from-cedas-archive-differs-from-ukv-as-open-meteo-serves-it-in-lead-irradiance-temperature-and-units). Access is by application; archive start, grid, and licence are in the [survey's forecast-model table](../background/weather-products-survey.md#forecast-models). |
 | **CM SAF** (Satellite Application Facility on Climate Monitoring) | 🔬 (v2 comparison) | SARAH-3 carries [every irradiance component](#which-sources-carry-which-irradiance-components) on a 0.05° grid at 30 minutes from 1983. Two reasons SARAH-3 is not the first ingest. Its climate data record ends 2020-12-31 and the Interim Climate Data Record extends that record, putting a version seam inside the 2019-onward history we train on. And its 30-minute values are **instantaneous snapshots**, whereas CAMS accumulates over the step, which is what a period-ending meter reading measures — under broken cloud an instantaneous sample and a 30-minute mean can differ a lot. Its gridded delivery would suit the H3 pipeline better than CAMS point requests, and comparing the two resolutions is not straightforward, because the CAMS point service interpolates to the requested location rather than publishing a grid. Latency is 2–5 days ([Pfeifroth et al. (2024)](https://doi.org/10.5194/essd-16-5243-2024)), immaterial offline. Worth a genuine head-to-head against CAMS in v2 — see [Correcting satellite irradiance over Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-britain). |
 | **CAMS solar radiation** (Copernicus Atmosphere Monitoring Service) | 🚧 (v0.7) | The satellite-derived irradiance we ingest, used to estimate **solar PV** capacity, and the planned estimate of past irradiance for [pre-training](training-history.md#which-estimate-of-past-weather-to-train-on). Used **offline only** — capacity estimation and pre-training run over history, and the production serving path takes no dependency on it. The CAMS Radiation Service carries [every irradiance component](#which-sources-carry-which-irradiance-components), under both clear sky and observed cloud, from 2004-02, under CC-BY-4.0, at steps of 1 minute, 15 minutes, 1 hour, 1 day, or 1 month — the beam/diffuse split the [DP solar model](../techniques/differentiable-physics.md#the-core-building-block-differentiablesolarplant) needs. Cloud information comes from Meteosat Second Generation; aerosol, ozone, and water vapour come from the CAMS global forecasting system, so aerosol optical depth is a 3-hourly analysis rather than SARAH-3's monthly climatology. Values are interpolated to the requested location rather than served on a grid. Chosen over SARAH-3 on **delivery and record continuity, not on measured accuracy over Great Britain** — see [CAMS: use the point API, not the gridded product](#cams-use-the-point-api-not-the-gridded-product) for the route and its traps, and [Correcting satellite irradiance over Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-britain) for what is known about this source's error and what v2 might do about it. |
 | **ICON-EU** (Dynamical.org) | 🔬 (v0.9, uncertain) | Possible additional NWP source to test whether it improves skill over ECMWF ENS: a deterministic run from DWD, Germany's national weather service, on a ~6.5 km grid, 4 runs a day out to 5 days. Already carries the [beam/diffuse split](#which-sources-carry-which-irradiance-components) [the PV forward model](disaggregation.md#the-forward-model) needs, and holds the earliest roadmap slot of any source that does. Starts early 2026, so it can't enter the canonical CV folds directly — assessed via ad-hoc ablation first. Archive start, latency, and access routes are in the [survey's forecast-model table](../background/weather-products-survey.md#forecast-models). |
@@ -923,6 +923,129 @@ that one era of UKV stands in for another.
   later than the hour's centre.
 - **That conversion is skipped where the ratio falls below 0.05**, near sunrise and sunset, so the
   round trip between the two columns does not hold at very low sun.
+
+### UKV from CEDA's archive differs from UKV as Open-Meteo serves it in lead, irradiance, temperature, and units
+
+**The two archives hold the same Met Office model but not the same series, and the differences below
+decide what a model trained on one can be scored on.** The evidence comes from the project's
+download notes and from a study in progress that compares the two archives over the 23 whole months
+they share, tracked in issue #1051 ("Study: UKV from CEDA or from Open-Meteo for temperature, wind
+power, and solar power"). No study page exists yet. Each row of the table says whether the
+difference was measured in that study's data, taken from a document, or not checked.
+
+| Difference | UKV from CEDA's archive | UKV as Open-Meteo serves it | Status |
+|---|---|---|---|
+| [Lead](#each-archive-serves-a-different-lead) | The freshest of four runs a day, so a lead of 0 to 5 hours | The freshest run for each hour, effectively the T+0 analysis | Measured for Open-Meteo's irradiance, since 2024-08-12; documented for CEDA's runs |
+| [Hourly irradiance](#open-meteos-hourly-irradiance-is-a-scaled-snapshot-whose-construction-changes-after-ps47) | One snapshot of global short-wave per run and lead | The snapshot at the hour's end, scaled by a ratio of cosines of the solar zenith angle | Measured |
+| [Temperature](#the-two-archives-build-temperature-and-wind-from-different-instants-and-units) | Instants at the hour's two ends, which the studies average | A single instant at the hour | Documented for the study's CEDA build; measured at lead 0 |
+| [Wind](#the-two-archives-build-temperature-and-wind-from-different-instants-and-units) | m/s; 10 m, 925 hPa, and 1000 hPa | km/h; 10 m and hub height | Documented; measured at lead 0 for 10 m |
+| [Eras](#the-archives-differ-in-how-much-of-each-physics-era-they-hold) | From 2019-09 in the studies' download | Live ingest from 2024-08-12 and a backfill of unnamed origin before it | Documented |
+| [Licence](#the-archives-carry-different-licences) | CC BY-NC-SA 4.0 | Open-Meteo's terms; the Met Office's own AWS feed is CC BY-SA 4.0 | Documented |
+| [Match to the Met Office's files](#only-irradiance-is-checked-against-the-met-offices-own-files) | Not applicable | Irradiance only | Measured |
+
+#### Each archive serves a different lead
+
+**CEDA's series for an hour comes from a run started up to five hours earlier, and Open-Meteo's
+comes from the analysis of that hour.** CEDA holds up to eight UKV runs a day. The studies read the
+00, 06, 12, and 18 UTC runs, which reach 54 hours, and take each hour from the freshest run that has
+started at or before it, so the lead is the hour minus the run's start: 0 to 5 hours, and the lead
+is therefore also fixed by the hour of day. Open-Meteo ingests every hourly run and a later run
+overwrites an earlier one for the same valid time, as [the section
+above](#open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill) describes. The two
+archives can agree exactly only at the four lead-0 hours of 00, 06, 12, and 18 UTC. In the study in
+progress, the mean absolute difference between the two archives at three wind farms and six solar
+farms grows from 0.10 K at lead 0 to 0.56 K at lead 5 for temperature, and from 0.20 to 0.52 m/s for
+10 m wind speed.
+
+#### Open-Meteo's hourly irradiance is a scaled snapshot whose construction changes after PS47
+
+**Open-Meteo's `shortwave_radiation` for an hour is not the end-of-hour snapshot that the Met Office
+publishes.** As [the section
+above](#open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill) says, Open-Meteo
+scales the snapshot by the ratio of the hour's mean cosine of the solar zenith angle to the cosine
+at the hour's end. Against the snapshot, the median of Open-Meteo's value runs from 0.52 to 0.60 at
+05 UTC and from 1.42 to 1.45 at 19 UTC (two separate checks on the overlap), and is near 1.0 at
+midday. A model trained on CEDA's raw snapshot and scored on Open-Meteo's hourly value therefore
+meets a scaling of up to 40% that depends on the hour of day.
+
+**Scaling CEDA's snapshot by the same cosine ratio reproduces Open-Meteo's value to within 1% at the
+median before the Met Office's PS47 upgrade, and does not after it.** In the study in progress, at
+lead-0 hours with Open-Meteo above 50 W m⁻², the median ratio of the rebuilt CEDA value to
+Open-Meteo's is 1.005, 1.000, and 0.996 at 06, 12, and 18 UTC in 2024-09 to 2025-12. From 2026-02
+the median ratios are 1.111 at 06 UTC and 0.864 at 18 UTC, so Open-Meteo builds the hourly value
+some other way after PS47. A mean of the two end-of-hour snapshots comes closer (about 1.03 and
+0.96) without matching. The mismatch is not confined to low sun. Above 10 degrees of sun elevation
+the median ratio is 1.000 to 1.004 in both eras, but the spread of the ratio is wider after PS47:
+the 10th to 90th percentile runs from 0.94 to 1.06 at 10 to 20 degrees before PS47 and from 0.82 to
+1.21 after, and the mean absolute difference at lead 0 is 8.0 W m⁻² against 22.9 W m⁻². Within a few
+degrees of the horizon the rebuild fails in both eras, with a median ratio of 0.008 up to 2 degrees
+of elevation and 0.68 from 2 to 5 degrees before PS47. These figures are from a report that may
+still change.
+
+#### The two archives build temperature and wind from different instants and units
+
+**The study in progress builds CEDA's hourly temperature as the mean of two instants, and
+Open-Meteo's temperature is one instant.** For CEDA, the study averages the instants at the hour
+before the label and at the label. Open-Meteo serves a single instant at the label, so the study
+averages Open-Meteo's instants at the same two times for its temperature arm. At lead 0, where both
+archives hold an instant, the study in progress finds a mean difference of −0.02 K (CEDA minus
+Open-Meteo), a mean absolute difference of 0.10 K, and a correlation of 0.9997. The mean lead-0
+difference at each of the nine sites lies between −0.05 K and 0 K, so any adjustment of Open-Meteo's
+temperature to the point's elevation is small at lead 0. Whether Open-Meteo makes such an adjustment
+is not established.
+
+**Open-Meteo serves wind in km/h and CEDA's files hold it in m/s, so a unit conversion is needed
+before the two can be compared.** The study in progress divides Open-Meteo's wind by 3.6 and stops
+unless the median ratio of the two archives' 10 m speeds lies between 0.9 and 1.1. After the
+conversion, at lead 0, Open-Meteo's 10 m speed is about 3% below CEDA's nearest cell (a median ratio
+of 0.971 where the CEDA speed exceeds 3 m/s), and Open-Meteo's direction is about 2 degrees off, in
+both eras. The nearest of nine CEDA cells matches Open-Meteo's lead-0 value best in 27% of wind
+hours and 47% of temperature hours, where chance is 11%. Open-Meteo's value is therefore not simply
+the nearest CEDA cell's. Interpolation and a different grid are both possible, and the cause is
+unverified. A review of the study's data also found that the lead-0 speed ratio reverses in 2024-11,
+2025-01, and 2025-02, in months whose lineage in Open-Meteo's archive has not been checked.
+
+**The two archives offer different wind heights.** CEDA's files hold 10 m wind and wind at 925 hPa
+and 1000 hPa pressure levels, and no model-level wind, so they carry neither hub-height wind nor 100
+m wind. Open-Meteo serves hub-height wind in its UKV archive from 2024-08-12. The source of
+Open-Meteo's backfill before that date is not named
+([above](#open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill)).
+
+#### The archives differ in how much of each physics era they hold
+
+**A series that spans the Met Office's upgrades is not homogeneous in either archive, but the two
+archives span different eras.** The Met Office's PS43 upgrade of 2019-12-04 changed UKV's physics,
+the date and content of PS44 could not be found, PS46 in May 2025 was a move to a new supercomputer
+with no science change intended, and PS47 on 2026-01-21 changed the microphysics and cloud scheme
+([the list of upgrades](#nwp-model-upgrades-since-2019)). CEDA's download in the project starts on
+2019-09-01, so it holds three months before PS43 and the whole PS43-to-PS47 era. Open-Meteo's live
+ingest starts on 2024-08-12 and holds only the last of those eras. The 23 whole months that both
+archives share run from 2024-09 to 2025-12 (16 months before PS47, which include PS46) and from
+2026-02 to 2026-08 (7 months after PS47); the study drops 2026-01 because it straddles the upgrade.
+PS43, PS44, and PS45 predate Open-Meteo's UKV, so no comparison of the two archives can test them.
+
+#### The archives carry different licences
+
+**CEDA's UKV archive is licensed CC BY-NC-SA 4.0, which allows non-commercial use only and requires
+adaptations to be shared alike.** CEDA's licence file asks users to cite the data as "Met Office
+(2016): NWP-UKV: Met Office UK Atmospheric High Resolution Model data", with CEDA as the publisher.
+The Met Office's own AWS feed is published under British Crown copyright and CC BY-SA 4.0, with no
+non-commercial restriction ([listed above](#weather-data)). Open-Meteo's free API is for
+non-commercial use only, and its paid plans cover commercial use
+([survey](../background/weather-products-survey.md#how-to-read-the-open-meteo-rows)). The study in
+progress leaves the decision about whether the licence permits the project's use to the maintainer.
+
+#### Only irradiance is checked against the Met Office's own files
+
+**The lineage of Open-Meteo's UKV is verified for irradiance only, and not for wind or
+temperature.** Open-Meteo's irradiance snapshot agrees with the nearest cell of the Met Office's own
+file to between 0.11 and 0.55 W m⁻², for hours since 2024-08-12. Open-Meteo's wind and temperature
+have never been compared with the Met Office's files, and no check exists for the hours before
+2024-08-12. CEDA's UKV is also not compared with the Met Office's files here. The project's download
+notes record that CEDA's archive is statistically different from the live feed, and that a model
+trained on one should not be used on the other. The mechanism of that difference has not been
+established, and the study in progress measures only how far the two archives are apart at each
+lead.
 
 ## NWP model upgrades since 2019
 
