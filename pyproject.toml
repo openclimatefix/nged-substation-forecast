@@ -73,6 +73,9 @@ dev = [
     # Pinned below 1.2.3: that release and later pull in `properdocs` as a transitive dependency,
     # which prints an unsolicited warning urging a switch away from MkDocs on every build.
     "mkdocs-redirects>=1.1.0,<1.2.3",
+    # h5netcdf reads the Met Office UKV files from AWS by HTTP range request in
+    # `fetch_ukv_aws_pilot.py`.
+    "h5netcdf>=1.8.1",
 ]
 
 [project.urls]

@@ -2047,6 +2047,19 @@ wheels = [
 ]
 
 [[package]]
+name = "h5netcdf"
+version = "1.8.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ef/03/92d6cc02c0055158167255980461155d6e17f1c4143c03f8bcc18d3e3f3a/h5netcdf-1.8.1.tar.gz", hash = "sha256:9b396a4cc346050fc1a4df8523bc1853681ec3544e0449027ae397cb953c7a16", size = 78679, upload-time = "2026-01-23T07:35:31.233Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b1/8b/88f16936a8e8070a83d36239555227ecd91728f9ef222c5382cda07e0fd6/h5netcdf-1.8.1-py3-none-any.whl", hash = "sha256:a76ed7cfc9b8a8908ea7057c4e57e27307acff1049b7f5ed52db6c2247636879", size = 62915, upload-time = "2026-01-23T07:35:30.195Z" },
+]
+
+[[package]]
 name = "h5py"
 version = "3.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3268,6 +3281,7 @@ dev = [
     { name = "dagster-dg-cli" },
     { name = "dashboard" },
     { name = "gcsfs" },
+    { name = "h5netcdf" },
     { name = "icechunk" },
     { name = "mkdocs-include-markdown-plugin" },
     { name = "mkdocs-material" },
@@ -3316,6 +3330,7 @@ dev = [
     { name = "dagster-dg-cli" },
     { name = "dashboard", editable = "packages/dashboard" },
     { name = "gcsfs" },
+    { name = "h5netcdf", specifier = ">=1.8.1" },
     { name = "icechunk", specifier = ">=2.2.0" },
     { name = "mkdocs-include-markdown-plugin", specifier = ">=7.2.2" },
     { name = "mkdocs-material", specifier = ">=9.7.6" },
