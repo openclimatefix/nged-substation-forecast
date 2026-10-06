@@ -16,17 +16,17 @@ Nothing is bootstrapped or refitted here.
   solar in Figure 3), in three weeks chosen by a stated rule.
 - **Figure 4.** The mean absolute difference between the two archives by CEDA lead, for each
   variable.
-- **Figure 5.** The median ratio of CEDA's irradiance to Open-Meteo's at lead 0, by era and hour,
-  which shows that Open-Meteo builds its hourly irradiance differently after PS47.
-- **Figure 6.** The mean absolute difference between the two archives by calendar month, with the
+- **Figure 5.** The mean absolute difference between the two archives by calendar month, with the
   PS47 upgrade marked.
-- **Figure 7.** The daily ratio of Open-Meteo's 10 m wind speed to CEDA's around the two spans in
+- **Figure 6.** The daily ratio of Open-Meteo's 10 m wind speed to CEDA's around the two spans in
   which Open-Meteo builds its speed differently.
+- **Figure 7.** The median ratio of CEDA's irradiance to Open-Meteo's at lead 0, by era and hour,
+  which shows that Open-Meteo builds its hourly irradiance differently after PS47.
 - **Figure 8.** The planned contrasts by CEDA lead.
-- **Figure 9.** Every arm's absolute error on the planned scope.
-- **Figure 10.** Each wind arm's mean signed error, which shows the transfer penalty as a level
+- **Figure 9.** Each wind arm's mean signed error, which shows the transfer penalty as a level
   bias.
-- **Figure 11.** The controls and the partial swaps of the transfer scoring (exploratory).
+- **Figure 10.** The controls and the partial swaps of the transfer scoring (exploratory).
+- **Figure 11.** Every arm's absolute error on the planned scope.
 
 Generators appear only as A to F and W1 to W3.
 
@@ -126,6 +126,7 @@ SCOPES: Final[dict[str, tuple[tuple[str, str, str | None], ...]]] = {
         ("all", "Before PS47, trained on era 0 alone", "solar_era0"),
         ("era 1", "After PS47", None),
         ("era 0, lead 0 only", "Before PS47, CEDA lead 0 only", None),
+        ("lead 0 only", "Before PS47, trained on era 0 alone, CEDA lead 0 only", "solar_era0"),
     ),
 }
 """The scopes the headline figure draws for each domain: scope, row label, and the row set where
@@ -341,7 +342,7 @@ def month_figure(*, records: Sequence[dict[str, Any]]) -> alt.VConcatChart:
         )
     return figure(
         panels=panels,  # ty: ignore[invalid-argument-type]
-        number=6,
+        number=5,
         title="Month by month, any step in the difference between the archives shows",
         subtitle=[
             (
@@ -404,7 +405,7 @@ def ratio_figure(*, ratios: pl.DataFrame) -> alt.VConcatChart:
         )
     return figure(
         panels=panels,  # ty: ignore[invalid-argument-type]
-        number=5,
+        number=7,
         title=(
             "Before PS47 CEDA's rebuilt snapshot matches Open-Meteo's irradiance, and after it "
             "does not"
@@ -504,7 +505,7 @@ def absolute_error_rows(*, report: str) -> pl.DataFrame:
 
 
 def absolute_figure(*, errors: pl.DataFrame) -> alt.VConcatChart:
-    """Draw Figure 9: every drawn arm's mean absolute error with its 95% interval.
+    """Draw Figure 11: every drawn arm's mean absolute error with its 95% interval.
 
     Args:
         errors: `absolute_error_rows`'s result.
@@ -548,18 +549,18 @@ def absolute_figure(*, errors: pl.DataFrame) -> alt.VConcatChart:
         )
     return figure(
         panels=panels,  # ty: ignore[invalid-argument-type]
-        number=9,
+        number=11,
         title=("Every XGBoost model's error is within about half a point of the others'"),
         subtitle=[
             "Mean absolute error of the XGBoost models on the planned scope, with 95% intervals.",
-            "Rows are scored on the same hours within each panel. Figure 11 has the controls.",
+            "Rows are scored on the same hours within each panel. Figure 10 has the controls.",
         ],
         figure_planning="exploratory",
     )
 
 
 def signed_error_figure(*, report: str) -> alt.VConcatChart:
-    """Draw Figure 10: each wind arm's mean signed error, in all hours and at CEDA lead 0.
+    """Draw Figure 9: each wind arm's mean signed error, in all hours and at CEDA lead 0.
 
     Args:
         report: The text of `report.md`.
@@ -601,7 +602,7 @@ def signed_error_figure(*, report: str) -> alt.VConcatChart:
     panel = alt.layer(bars, zero).properties(width=380, height=40 * len(order))
     return figure(
         panels=[panel],  # ty: ignore[invalid-argument-type]
-        number=10,
+        number=9,
         title=(
             "A CEDA-trained wind model under-predicts by about 2 points more when given "
             "Open-Meteo's wind"
@@ -615,7 +616,7 @@ def signed_error_figure(*, report: str) -> alt.VConcatChart:
 
 
 def step_figure(*, daily: pl.DataFrame) -> alt.VConcatChart:
-    """Draw Figure 7: the daily ratio of Open-Meteo's 10 m speed to CEDA's around the two spans.
+    """Draw Figure 6: the daily ratio of Open-Meteo's 10 m speed to CEDA's around the two spans.
 
     Args:
         daily: `wind_step_daily.parquet`: `day`, `ratio`, `n` and `in_span`.
@@ -641,7 +642,7 @@ def step_figure(*, daily: pl.DataFrame) -> alt.VConcatChart:
             x=alt.X("day:T", title="UTC day", axis=alt.Axis(format="%Y-%m")),
             y=alt.Y(
                 "ratio:Q",
-                title="Open-Meteo's 10 m speed over CEDA's (1 means equal)",
+                title="Open-Meteo over CEDA (1 = equal)",
                 scale=alt.Scale(domain=[0.85, 1.25], zero=False),
             ),
         )
@@ -650,7 +651,7 @@ def step_figure(*, daily: pl.DataFrame) -> alt.VConcatChart:
     panel = alt.layer(shade, one, line).properties(width=PLOT_WIDTH_PX, height=170)
     return figure(
         panels=[panel],  # ty: ignore[invalid-argument-type]
-        number=7,
+        number=6,
         title="Open-Meteo's 10 m wind speed steps up against CEDA's in two spans",
         subtitle=[
             "Daily median ratio at CEDA lead 0, pooled over the nine generator sites.",
@@ -692,14 +693,20 @@ def by_lead_figure(
             ERA_0_LEAD_FORMAT,
         ),
     }
+    era_0_trained_format = LEAD_FORMAT
     panels = []
     drawn: list[pl.DataFrame] = []
     for title, (domain, label, treatment, scope_format) in specs.items():
+        fits = (
+            [(domain, scope_format, ""), ("solar_era0", era_0_trained_format, ", era-0-trained")]
+            if domain == "solar"
+            else [(domain, scope_format, "")]
+        )
         rows = pl.DataFrame(
             [
                 {
                     "lead": lead,
-                    "setting": record["setting"],
+                    "setting": record["setting"] + suffix,
                     "difference": record["difference_pp"],
                     "lower_95": record["lower_95_pp"],
                     "upper_95": record["upper_95_pp"],
@@ -707,11 +714,12 @@ def by_lead_figure(
                 }
                 for lead in LEADS
                 for setting in ("primary", "second")
+                for fit_domain, fit_format, suffix in fits
                 for record in records
-                if record["domain"] == domain
+                if record["domain"] == fit_domain
                 and record["label"] == label
                 and record["treatment"] == treatment
-                and record["scope"] == scope_format.format(lead=lead)
+                and record["scope"] == fit_format.format(lead=lead)
                 and record["setting"] == setting
             ]
         )
@@ -733,7 +741,13 @@ def by_lead_figure(
                 "setting:N",
                 title="Setting",
                 scale=alt.Scale(
-                    domain=["primary", "second"], range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]
+                    domain=SERIES_ORDER,
+                    range=[
+                        ocf.DATA_BLUE,
+                        ocf.BRAND_ORANGE,
+                        ocf.DATA_BLUE_LIGHT,
+                        ocf.BRAND_ORANGE_LIGHT,
+                    ],
                 ),
             ),
             "xOffset": "setting:N",
@@ -760,16 +774,22 @@ def by_lead_figure(
     chart = figure(
         panels=panels,  # ty: ignore[invalid-argument-type]
         number=8,
-        title=("The gaps between the archives grow with CEDA's lead, and are small at lead 0"),
+        title="Wind gaps between the archives grow with CEDA's lead; solar fits disagree at lead 0",
         subtitle=[
             "Dot: estimate. Line: 95% interval from resampling whole months. Grey: the margin.",
-            "Positive means CEDA's error is larger. Every row is an exploratory subset.",
+            "Positive means CEDA's error is larger. Solar: two fits, both-eras and era-0-trained.",
         ],
         figure_planning="exploratory",
     )
     return chart, drawn
 
 
+SERIES_ORDER: Final[list[str]] = [
+    "primary",
+    "second",
+    "primary, era-0-trained",
+    "second, era-0-trained",
+]
 LEAD_FORMAT: Final[str] = "lead {lead} only"
 ERA_0_LEAD_FORMAT: Final[str] = "era 0, lead {lead} only"
 
@@ -777,7 +797,7 @@ ERA_0_LEAD_FORMAT: Final[str] = "era 0, lead {lead} only"
 def controls_figure(
     *, records: Sequence[dict[str, Any]]
 ) -> tuple[alt.VConcatChart, list[pl.DataFrame]]:
-    """Draw Figure 6: the controls and the partial swaps of the transfer scoring.
+    """Draw Figure 10: the controls and the partial swaps of the transfer scoring.
 
     Args:
         records: The interval records.
@@ -828,7 +848,7 @@ def controls_figure(
     ]
     chart = figure(
         panels=drawn,
-        number=11,
+        number=10,
         title=(
             "Most of the wind transfer penalty is the speed level: rescaling Open-Meteo's speed "
             "removes most of it"
@@ -863,23 +883,23 @@ def main() -> int:
     for rows in (*headline_rows, *controls_rows):
         check_against_report(rows=rows, report=report, name="the set B report")
     headline.save(assets / "fig01_headline.svg")
-    controls.save(assets / "fig11_controls.svg")
+    controls.save(assets / "fig10_controls.svg")
     by_lead, by_lead_rows = by_lead_figure(records=records)
     for rows in by_lead_rows:
         check_against_report(rows=rows, report=report, name="the set B report")
     by_lead.save(assets / "fig08_contrasts_by_lead.svg")
     absolute_figure(errors=absolute_error_rows(report=report)).save(
-        assets / "fig09_absolute_errors.svg"
+        assets / "fig11_absolute_errors.svg"
     )
-    signed_error_figure(report=report).save(assets / "fig10_signed_errors.svg")
+    signed_error_figure(report=report).save(assets / "fig09_signed_errors.svg")
     step_figure(daily=pl.read_parquet(directory / STEP_DAILY_NAME)).save(
-        assets / "fig07_wind_step.svg"
+        assets / "fig06_wind_step.svg"
     )
     ratio_figure(ratios=pl.read_parquet(directory / RATIOS_NAME)).save(
-        assets / "fig05_irradiance_ratio.svg"
+        assets / "fig07_irradiance_ratio.svg"
     )
     lead_figure(records=direct).save(assets / "fig04_leads.svg")
-    month_figure(records=direct).save(assets / "fig06_months.svg")
+    month_figure(records=direct).save(assets / "fig05_months.svg")
 
     lines = ["### Weeks drawn in Figures 2 and 3, chosen by rule", ""]
     for number, (domain, arms) in enumerate(

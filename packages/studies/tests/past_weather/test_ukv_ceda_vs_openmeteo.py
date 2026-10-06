@@ -18,6 +18,7 @@ import polars as pl
 import pytest
 import ukv_ceda_vs_openmeteo_build as build
 import ukv_ceda_vs_openmeteo_compare as compare
+import ukv_ceda_vs_openmeteo_extra_reads as extra_reads
 import ukv_ceda_vs_openmeteo_fit as fit
 import ukv_ceda_vs_openmeteo_wind_steps as steps
 
@@ -1262,3 +1263,64 @@ def test_the_day_flag_includes_the_first_and_last_day_of_each_span():
     flags = pl.DataFrame({"day": days}).select(flag=steps.in_wind_step_days_of_day())
 
     assert flags["flag"].to_list() == [False, True, True, False]
+
+
+# --- extra reads: the first run and the UTC hours -------------------------------------------------
+
+
+def test_the_first_runs_wind_rows_carry_the_current_setting_names(tmp_path: Path):
+    def record(*, label: str, scope: str, setting: str, domain: str = "wind") -> dict[str, object]:
+        return {
+            "domain": domain,
+            "label": label,
+            "scope": scope,
+            "setting": setting,
+            "difference_pp": 0.162,
+            "lower_95_pp": 0.08,
+            "upper_95_pp": 0.241,
+            "reading": "differ",
+            "n_months": 23,
+        }
+
+    pl.DataFrame(
+        [
+            record(label="P1", scope="all", setting="sensitivity"),
+            record(label="P1", scope="all", setting="pooled"),
+            record(label="P1", scope="era 0", setting="pooled"),
+            record(label="P2", scope="all", setting="pooled"),
+            record(label="P1", scope="all", setting="pooled", domain="solar"),
+        ]
+    ).write_parquet(tmp_path / "intervals.parquet")
+
+    lines = extra_reads.first_run_lines(first_run_dir=tmp_path)
+
+    rows = [line for line in lines if line.startswith("| P")]
+    assert [row.split(" | ")[:3] for row in rows] == [
+        ["| P1", "all", "primary"],
+        ["| P1", "all", "second"],
+    ]
+
+
+def test_the_by_hour_read_gives_each_utc_hour_its_run_and_lead():
+    generator = np.random.default_rng(3)
+    records = [
+        {
+            "arm": arm,
+            "site": "A",
+            "time": datetime(2025, month, 1, hour, tzinfo=UTC),
+            "seed": seed,
+            "month": f"2025-{month:02d}",
+            "setting": "primary",
+            extra_reads.METRIC: float(generator.uniform()),
+        }
+        for month in range(1, 8)
+        for hour in range(24)
+        for seed in (0, 1)
+        for arm in ("ceda_wind_10m", "ceda_wind_10m_scored_on_om", "om_wind_10m")
+    ]
+    lines = extra_reads.by_hour_lines(losses=pl.DataFrame(records))
+
+    rows = [line.split(" | ") for line in lines if line.startswith("| ") and "UTC |" in line]
+    assert len(rows) == 24
+    assert rows[17][:3] == ["| 17", "12 UTC", "5"]
+    assert rows[6][:3] == ["| 06", "06 UTC", "0"]

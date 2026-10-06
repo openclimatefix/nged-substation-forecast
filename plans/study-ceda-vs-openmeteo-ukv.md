@@ -458,3 +458,29 @@ power result.
   era-0 sensitivity, an "era 0, lead 0 only" scope, "without 2025-01", each arm's absolute error and
   mean signed error on the planned scope, and the setting names `primary` and `second`.
 - **The two settings of the model are named `primary` and `second`,** replacing the earlier names.
+
+## Changed after the second science review
+
+**The wind P1 verdict depends on a post hoc data decision, so the page reports both runs.** The
+plan's scope for wind was all rows, which kept the two spans. The first run read wind P1 as
++0.162 [+0.080, +0.241] at the primary setting and +0.146 [+0.073, +0.216] at the second
+(unresolved), and the rerun without the spans reads +0.270 [+0.209, +0.333] and +0.243 [+0.192,
++0.294] (differ). The decision to drop the spans came from the ratio of Open-Meteo's speed to
+CEDA's and not from a power result. Wind P3 is a penalty in both runs.
+
+- **A committed script reads the saved intervals and losses and fits nothing.**
+  `ukv_ceda_vs_openmeteo_extra_reads.py` prints the first run's wind P1 and P3 (in all hours and at
+  lead 0) from `superseded/first_run/intervals.parquet`, and wind P1 and P3 by UTC hour. Its output
+  is `extra_reads_report.md`.
+- **The title, Summary, and Figures 1 and 8 no longer rest on exploratory lead-0 rows.** Lead-0 wind
+  holds only after the spans are dropped. For solar the era-0-trained fit reads +0.127 [+0.021,
+  +0.257] at lead 0, so Figures 1 and 8 draw that fit too.
+- **The Discussion says that P3 holds training length equal,** so it does not weigh CEDA's extra
+  history of about 5 years, and that the recommended Open-Meteo history contains the two dropped
+  spans.
+- **Smaller corrections:** the calibrator residual (+0.142) reads "unresolved" under the plan's
+  rule; the era-0-trained solar penalty is part of the transfer penalty; lead is the UTC hour modulo
+  6, and the wind gap is largest after the 12 UTC run; the reachability paragraph states the plan's
+  prior expectation; the noise wording is consistent; Figures 7 and 8 titles are no longer clipped;
+  the wind-step paragraph uses the CEDA-minus-Open-Meteo sign; and the figures are renumbered in
+  reading order.
