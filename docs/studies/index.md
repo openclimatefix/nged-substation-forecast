@@ -60,14 +60,14 @@ the
   satellite retrievals the past-solar study compared, beats CAMS's split with its neighbouring hours
   by 0.18 points and plain CAMS's split by 0.20 points, on a longer row set from January 2021.
 - [Does CEDA's UKV or ERA5 describe past wind and temperature
-  better?](past-weather/ukv-ceda-vs-era5.md) — at the three wind farms, an XGBoost model given
-  ERA5's wind has a power error 0.125 points of capacity lower than one given the 6-hourly UKV
-  archive from CEDA, which is statistically significant and below the planned 0.16-point margin, so
-  the planned rule gives ERA5; the gap grows with the archive's lead, and it does not shrink when
-  both XGBoost models read 10 m wind alone. At four Met Office stations the archived UKV's
-  temperature is 0.124 K closer than ERA5's, so the planned rule gives UKV, but the advantage falls
-  from 0.250 K at lead 0 to 0.035 K at lead 5, and at six solar farms the choice of temperature
-  moves power error by no more than 0.009 points (95% interval, whole row set).
+  better?](past-weather/ukv-ceda-vs-era5.md) — at three wind farms, an XGBoost model given ERA5's
+  wind has a power error 0.125 percentage points of capacity lower than an XGBoost model given the
+  6-hourly UKV archive from CEDA. The difference is statistically significant and below the planned
+  0.16-point margin, so the planned rule gives ERA5. The gap grows with the archive's lead, and the
+  gap does not shrink when both XGBoost models read 10 m wind alone. At four Met Office stations the
+  archived UKV's temperature is 0.124 K closer than ERA5's, so the planned rule gives UKV, but the
+  advantage falls from 0.250 K at lead 0 to 0.035 K at lead 5. At six solar farms the choice of
+  temperature moves power error by no more than 0.009 points (95% interval, whole row set).
 
 ## Forecasts
 

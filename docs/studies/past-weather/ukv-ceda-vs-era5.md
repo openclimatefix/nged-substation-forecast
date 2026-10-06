@@ -3,28 +3,33 @@
 **At three wind farms in Lincolnshire, pooled, an XGBoost model (a gradient-boosted tree model)
 given the 100 m and 10 m wind of ERA5, the reanalysis of the European Centre for Medium-Range
 Weather Forecasts (ECMWF), had a lower power error than an XGBoost model given the Met Office's UK
-variable-resolution (UKV) 10 m and 925 hPa wind from the archive of the Centre for Environmental
-Data Analysis (CEDA), by 0.125 points of capacity [+0.033, +0.216] at the primary hyperparameter
-setting and [+0.035, +0.217] at the second.** The difference is statistically significant at the 5%
-level and smaller than the 0.16-point margin fixed before any result. ERA5 is the planned default.
-The archived UKV, which the page calls UKV-CEDA, would have needed a clear advantage at both
-hyperparameter settings to displace ERA5, so by the planned rule the study recommends ERA5 for past
-wind. UKV-CEDA is a 6-hourly archive read at leads of 0 to 5 hours, so the result says nothing about
-the hourly UKV archive that Open-Meteo serves at lead 0. The [past-wind page](wind.md) found that
-Open-Meteo archive ahead of ERA5. Two post hoc results sit beside the planned result. The gap
-between the two products grows with UKV-CEDA's lead, from -0.058 points at lead 0 to +0.323 points
-at lead 5. The gap does not shrink when both XGBoost models are given 10 m wind alone (+0.505 points
-[+0.394, +0.620]), so giving ERA5 a 100 m column does not explain ERA5's advantage.
+variable-resolution (UKV) 10 m wind and 925 hPa wind (the wind at a fixed pressure level above a
+turbine's hub height) from the archive of the Centre for Environmental Data Analysis (CEDA), by
+0.125 percentage points of capacity [+0.033, +0.216] at the primary hyperparameter setting and
+[+0.035, +0.217] at the second.** A hyperparameter setting is one fixed choice of the XGBoost
+model's tree depth, learning rate, and number of rounds. The difference is statistically significant
+at the 5% level and smaller than the 0.16-point margin, the smallest difference that the study fixed
+before any result as clear. ERA5 is the planned default. The archived UKV, which the page calls
+UKV-CEDA, would have needed a clear advantage at both hyperparameter settings to displace ERA5, so
+by the planned rule the study recommends ERA5 for past wind. UKV-CEDA is a 6-hourly archive read at
+leads of 0 to 5 hours, where the lead is the hours since the run of the weather model started, so
+the result says nothing about the hourly UKV archive that Open-Meteo serves at lead 0. The
+[past-wind page](wind.md) found that Open-Meteo archive ahead of ERA5. Two post hoc results, added
+after the first results were seen, sit beside the planned result. The gap between the two products
+grows with UKV-CEDA's lead, from -0.058 points at lead 0 to +0.323 points at lead 5. The gap does
+not shrink when both XGBoost models are given 10 m wind alone (+0.505 points [+0.394, +0.620]), so
+giving ERA5 a 100 m column does not explain ERA5's advantage.
 
-**At the four Met Office stations inside the UKV-CEDA crop, UKV-CEDA's 1.5 m air temperature was
-closer to the readings than ERA5's 2 m air temperature, by 0.124 K [0.113, 0.135] after removing
-each product's bias, so by the planned rule the study recommends UKV-CEDA for past temperature.**
-The advantage falls from 0.250 K at lead 0 to 0.035 K at lead 5 (post hoc). Two explanations fit
-that decay: the stations' readings may enter UKV's own data assimilation, and forecast error grows
-from each 6-hourly run. The page tests neither explanation. The study does not test how large the
-advantage is away from those stations, or whether the advantage helps a demand forecast. At six
-solar farms, on the whole row set, the choice between the two temperatures changes an XGBoost
-model's power error by no more than 0.009 points of capacity in either direction (the 95% interval).
+**At the four Met Office stations inside the box of the UKV-CEDA archive that the study downloaded,
+UKV-CEDA's 1.5 m air temperature was closer to the readings than ERA5's 2 m air temperature, by
+0.124 K [0.113, 0.135] after removing each product's bias, so by the planned rule the study
+recommends UKV-CEDA for past temperature.** The advantage falls from 0.250 K at lead 0 to 0.035 K at
+lead 5 (post hoc). Two explanations fit that decay: the stations' readings may enter UKV's own data
+assimilation (the step that pulls each run towards observations), and forecast error grows from each
+6-hourly run. The page tests neither explanation. The study does not test how large the advantage is
+away from those stations, or whether the advantage helps a demand forecast. At six solar farms, on
+the whole row set, the choice between the two temperatures changes an XGBoost model's power error by
+no more than 0.009 points of capacity in either direction (the 95% interval).
 
 ![Figure 1: At four stations UKV-CEDA is closer than ERA5 for wind and temperature, but pooled over
 three wind farms ERA5 gives the lower power error, and the choice does not move solar
@@ -75,10 +80,12 @@ forecast-error growth could explain the decay.
 by no more than 0.009 points ([solar](#solar-power-does-not-depend-on-the-temperature-product)).**
 The planned veto could not have fired.
 
-**The shuffled-weather controls differ from zero by less than their own noise, and the wind
-control's interval half-width is close to the wind margin
+**The shuffled-weather controls (XGBoost models given weather shuffled so that the weather carries
+no information) differ from zero by less than their own noise, and the wind control's interval
+half-width is close to the wind margin
 ([controls](#the-controls-show-no-bias-but-too-much-noise-to-validate-small-differences)).** The
-decision holds under three power-hour conventions, and the size of P3 does not.
+decision holds under three power-hour conventions (an hour's power centred on, ending at, or
+starting at the hour's label), and the size of P3 does not.
 
 **A UKV-CEDA training history has costs: 5 dropped months, 3.45% of runs partial, missing, or
 unlisted, a 6-hourly lead pattern, and three physics eras
@@ -128,7 +135,7 @@ post hoc.
 |---|---|---|---|
 | P1 (planned) | A | 10 m wind speed against the stations; context only, never decides | 5% of ERA5's error on the same rows (0.053 m/s) |
 | P2 (planned) | A | Air temperature against the stations; decides temperature | 5% of ERA5's error (0.036 K) |
-| P3 (planned) | B | Wind-farm power, as-available wind; decides wind | 0.16 points of capacity |
+| P3 (planned) | B | Wind-farm power, as-available wind (the heights each product holds); decides wind | 0.16 points of capacity |
 | P4 (planned) | B | Solar-farm power; can veto a UKV-CEDA temperature recommendation | 0.06 points of capacity |
 
 **A contrast reads "clear" only if its 95% interval lies wholly on one side of zero and its point
@@ -152,16 +159,16 @@ station-hours and the temperature rows 200,035.
 
 **Set B gives each XGBoost model the same rows and the same number of columns.** The wind rows
 number 145,758 farm-hours over three farms (W1 to W3), the solar rows 122,890 farm-hours over six
-farms (A to F), and each holds 78 scored months. Each wind XGBoost model has 7 columns: the hour of
-day, the day of year, the UKV era, and 4 weather columns. The ERA5 XGBoost model reads the 100 m
-speed, the sine and cosine of the 100 m direction, and the 10 m speed. The UKV-CEDA XGBoost model
-reads the 10 m speed, the sine and cosine of the 10 m direction, and the 925 hPa speed, because the
-archive holds no 100 m wind. The wind contrast therefore mixes product, height, and served lead, and
-the page claims no cause. Each solar XGBoost model has 10 columns and differs only in the
-temperature: the solar geometry (the sun's zenith and azimuth angles and the irradiance at the top
-of the atmosphere), the hour of day, the day of year, the era, the temperature, and CAMS's global,
-beam, and diffuse irradiance. Column subsampling is off, so an XGBoost model with more columns gets
-no free advantage.
+farms (A to F), and each holds 78 scored months. Each wind XGBoost model has 7 input columns: the
+hour of day, the day of year, the UKV era, and 4 weather columns. The ERA5 XGBoost model reads the
+100 m speed, the sine and cosine of the 100 m direction, and the 10 m speed. The UKV-CEDA XGBoost
+model reads the 10 m speed, the sine and cosine of the 10 m direction, and the 925 hPa speed,
+because the archive holds no 100 m wind. The wind contrast therefore mixes product, height, and
+served lead, and the page claims no cause. Each solar XGBoost model has 10 columns and differs only
+in the temperature: the solar geometry (the sun's zenith and azimuth angles and the irradiance at
+the top of the atmosphere), the hour of day, the day of year, the era, the temperature, and CAMS's
+global, beam, and diffuse irradiance. Column subsampling is off, so an XGBoost model with more
+columns gets no free advantage.
 
 **The rows are decided by the target and by availability, never by a product's values.** An hour is
 kept only if the target exists and every XGBoost model's input exists. The wind rows drop every hour
@@ -182,13 +189,15 @@ maintainer's delegate after the implementer had seen the set A tables in memory.
 choice neutral between the two products. Two more months straddle a change of UKV's physics and are
 dropped too: 2019-12 and 2026-01.
 
-**The folds are blocks of whole months inside each of three UKV eras.** The Met Office changed UKV's
-physics on 2019-12-04 and 2026-01-21, so era 0 is September to November 2019 (3 scored months), era
-1 is 2020-01 to 2026-01 exclusive (67 months), and era 2 is 2026-02 onward (8 months). Each era is
-cut into five folds of whole months, and the fold rotation covers every calendar month with a
-training row. The era is also a column of every XGBoost model. The study did not search again for
-PS44, a possible change of UKV's physics that the repository does not record. The repository's
-roadmap records that no date or content for PS44 could be found.
+**The folds are blocks of whole months inside each of three UKV eras.** Each fold is predicted by an
+XGBoost model trained on the other folds, so every score comes from months that the XGBoost model
+did not train on. The Met Office changed UKV's physics on 2019-12-04 and 2026-01-21, so era 0 is
+September to November 2019 (3 scored months), era 1 is 2020-01 to 2026-01 exclusive (67 months), and
+era 2 is 2026-02 onward (8 months). Each era is cut into five folds of whole months, and the fold
+rotation covers every calendar month with a training row. The era is also a column of every XGBoost
+model. The study did not search again for PS44, a possible change of UKV's physics that the
+repository does not record. The repository's roadmap records that no date or content for PS44 could
+be found.
 
 **Each XGBoost model is fitted three times at each of two hyperparameter settings.** The primary
 setting is `max_depth` 6, `learning_rate` 0.05, `subsample` 0.8, `min_child_weight` 20, `reg_lambda`
@@ -232,12 +241,13 @@ The page counts how many splits reach the 5% level in [Limitations](#limitations
 
 ### The XGBoost models track measured power at every farm
 
-**The out-of-fold predictions follow the measured output of every generator in all three weeks
-chosen by rule.** The rule picks the week of highest mean output, the week of the largest spread of
-output, and the week of lowest mean output, pooled over the generators. The wind weeks fall in
-February 2020 (highest mean output and largest spread) and March 2022 (lowest mean output). The
-solar weeks fall in May 2020 (highest), April 2025 (largest spread), and August 2021 (lowest).
-Figures 2 and 3 show the six weeks. A gap in a line is an hour dropped from the rows.
+**The out-of-fold predictions (each made by an XGBoost model that did not train on that fold) follow
+the measured output of every generator in all three weeks chosen by rule.** The rule picks the week
+of highest mean output, the week of the largest spread of output, and the week of lowest mean
+output, pooled over the generators. The wind weeks fall in February 2020 (highest mean output and
+largest spread) and March 2022 (lowest mean output). The solar weeks fall in May 2020 (highest),
+April 2025 (largest spread), and August 2021 (lowest). Figures 2 and 3 show the six weeks. A gap in
+a line is an hour dropped from the rows.
 
 ![Figure 2: Out-of-fold wind farm power as a share of capacity, in three weeks chosen by
 rule](../assets/ukv_ceda_vs_era5/fig02_wind_weeks.svg)
