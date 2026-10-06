@@ -40,8 +40,8 @@ breakdown, measured on the table's least compressible single file rather than on
 - `power_time_series` — `write_power_time_series()`, an append-only write to the `power_time_series`
   table.
 - `cleaned_power_time_series` — `write_cleaned_power_time_series()`, a whole-table overwrite to the
-  `cleaned_power_time_series` table that records the cleaning's provenance in the commit and then
-  vacuums.
+  `cleaned_power_time_series` table, recording the cleaning's provenance in the overwrite's Delta
+  commit and then vacuuming the superseded files.
 - `eligible_time_series` — `write_eligible_time_series()`, a per-`fold_id`-partition overwrite to
   the `eligible_time_series` table.
 - `effective_capacity` — `write_effective_capacity()`, a whole-table overwrite to the

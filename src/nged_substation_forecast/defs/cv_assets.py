@@ -224,9 +224,9 @@ def _provenance_tags_with_cleaned_power(
     """``provenance_tags`` for ``stage``, plus the cleaned power table's provenance.
 
     The extra tag, ``{stage}_cleaned_power_time_series_source``, names the raw power table and
-    version the cleaning read and the git SHA of the cleaning code, or ``ABSENT``. Why the cleaned
-    table's own Delta version is not stamped is explained in the ``ml_core.repro`` module
-    docstring.
+    version the cleaning read and the git SHA of the cleaning code, or ``ABSENT``. The
+    ``ml_core.repro`` module docstring explains why the cleaned table's own Delta version is not
+    stamped.
 
     Args:
         stage: The stage prefix passed to ``provenance_tags``.

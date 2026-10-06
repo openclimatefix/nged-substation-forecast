@@ -14,8 +14,8 @@ from nged_substation_forecast.defs._tags import LAYER_TAG_KEY
 def test_every_asset_carries_exactly_one_layer() -> None:
     """The production layer is pinned exactly; research is whatever is left, and nothing is both.
 
-    Naming the production five rather than spot-checking them is what makes a mis-tag fail: an
-    asset flipped to the wrong layer still carries exactly one tag, so a partition assertion
+    Naming the five production assets rather than spot-checking them is what makes a mis-tag fail:
+    an asset flipped to the wrong layer still carries exactly one tag, so a partition assertion
     alone cannot see it. This list is also the list
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/> gives the
     reader, so adding a production asset should mean editing both.

@@ -10,7 +10,7 @@ roster.
 ## Public surface
 
 Only `upsert_metadata` is re-exported from the package root (`from nged_data import
-upsert_metadata`); the others live in `nged_data.storage` and `nged_data.cleaning` (`from
+upsert_metadata`); the other functions live in `nged_data.storage` and `nged_data.cleaning` (`from
 nged_data.storage import list_timeseries_json_files`, etc.).
 
 - `nged_data.storage.list_timeseries_json_files(store)` — lists the timeseries JSON files on NGED's
@@ -35,10 +35,10 @@ nged_data.storage import list_timeseries_json_files`, etc.).
   `time_series_id`, from any lazy `PowerTimeSeries` frame.
 - `nged_data.storage.scan_cleaned_power(delta_path, storage_options=None)` — scans the
   `cleaned_power_time_series` Delta table, keeping only the rows no cleaning rule flagged. Every
-  reader of observed power except the ingest uses it.
-- `nged_data.cleaning.flag_nged_power(power, metadata)` — where cleaning rules go. It returns every
-  raw power row plus a `drop_reason` column, and the `clean_nged_power_data` Dagster asset writes
-  the result to the cleaned table. Its docstring says how to add a rule.
+  reader of observed power except the ingest and its freshness check uses `scan_cleaned_power`.
+- `nged_data.cleaning.flag_nged_power(power, metadata)` — where cleaning rules go. `flag_nged_power`
+  returns every raw power row plus a `drop_reason` column, and the `clean_nged_power_data` Dagster
+  asset writes the result to the cleaned table. The function's docstring says how to add a rule.
 - `nged_data.upsert_metadata(new_metadata, metadata_path, storage_options=None)` — merges a
   `TimeSeriesMetadata` snapshot into the stored metadata Parquet file, keeping the newest values per
   `time_series_id` and rewriting the file only if the incoming metadata differs from what is stored.

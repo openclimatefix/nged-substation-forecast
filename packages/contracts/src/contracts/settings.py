@@ -288,8 +288,8 @@ class Settings(BaseSettings):
     power_time_series_data_path: str = ""
     """Delta table of half-hourly power observations (under nged_data_path)."""
     cleaned_power_time_series_data_path: str = ""
-    """Delta table of `CleanedPowerTimeSeries`: every raw power row plus a `drop_reason` column
-    (under nged_data_path). Written by the `clean_nged_power_data` asset and read by every
+    """Delta table of `CleanedPowerTimeSeries` (under nged_data_path): every raw power row plus a
+    `drop_reason` column. Written by the `clean_nged_power_data` asset and read by every
     consumer of observed power except the ingest."""
     metadata_path: str = ""
     """Parquet file of per-series substation metadata (under nged_data_path)."""

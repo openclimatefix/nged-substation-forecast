@@ -8,12 +8,12 @@ Lake time travel makes data versioning one integer per table. A run can therefor
 replayed with ``pl.scan_delta(path, version=N)`` after ``git checkout {sha}``.
 
 The one exception is observed power. The ``cleaned_power_time_series`` table is overwritten and
-vacuumed within hours, so its own versions cannot be replayed, and a stage that reads it cannot use
-``provenance_tags``' ``delta_paths`` for it. Such a stage stamps the cleaning's provenance under
-``{stage}_cleaned_power_time_series_source`` instead: the raw table's id and version that the
-cleaning read, and the git SHA of the cleaning code. Replaying means re-running the cleaning over
-that raw version at that SHA, which can differ from the stage's own SHA because an unchanged
-cleaned table is not rebuilt.
+vacuumed within hours, so its own versions cannot be replayed, and a stage that reads the cleaned
+table cannot use ``provenance_tags``' ``delta_paths`` for the cleaned table. A stage reading the
+cleaned table stamps the cleaning's provenance under ``{stage}_cleaned_power_time_series_source``
+instead: the raw table's id and version that the cleaning read, and the git SHA of the cleaning
+code. Replaying means re-running the cleaning over that raw version at that SHA. The cleaning's SHA
+can differ from the stage's own SHA, because an unchanged cleaned table is not rebuilt.
 
 Every function here is deliberately **non-raising**: the git SHA, the dirty flag, and each Delta
 table's version are a record *about* a run rather than an input to that run. The surrounding

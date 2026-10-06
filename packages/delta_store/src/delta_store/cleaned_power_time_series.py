@@ -39,13 +39,13 @@ class CleaningProvenance:
             table, whose versions restart at 0.
         raw_version: The raw table's Delta version that the cleaning read.
         code_hash: The SHA-256 of the cleaning rules' source file when the cleaning ran.
-        roster_hash: A hash of the `TimeSeriesMetadata` roster that the cleaning read. It is the
-            hex of the sum of Polars' `hash_rows` over the roster sorted by `time_series_id`, so
-            it is stable between runs on one Polars version and changes when any roster value
+        roster_hash: A hash of the `TimeSeriesMetadata` roster that the cleaning read: the
+            SHA-256 of Polars' per-row `hash_rows` over the roster sorted by `time_series_id`. The
+            hash is stable between runs on one Polars version and changes when any roster value
             changes. A change of Polars version can change every hash, which only causes one
             extra rebuild.
-        git_sha: The git SHA of the code that did the cleaning. For provenance only; the skip
-            compares the other four fields.
+        git_sha: The git SHA of the code that did the cleaning, recorded for provenance only:
+            `clean_nged_power_data` skips a rebuild when the other four fields match.
     """
 
     raw_table_id: str
@@ -111,15 +111,16 @@ def write_cleaned_power_time_series(
 ) -> None:
     """Overwrite the ``cleaned_power_time_series`` Delta table with ``cleaned``, then vacuum it.
 
-    The overwrite is one atomic Delta commit, partitioned by ``time_series_id``. Its commit
-    records ``provenance``, so the next run can tell whether the table is up to date. Delta cannot
-    keep row order within a partition, so the files on disk are not sorted by ``time``.
+    The overwrite is one atomic Delta commit, and the table is partitioned by ``time_series_id``.
+    That commit records ``provenance``, so the next run can tell whether the table is up to date.
+    Delta cannot keep row order within a partition, so the files on disk are not sorted by
+    ``time``.
 
-    The vacuum deletes the files the overwrite superseded; without it every overwrite leaves the
-    previous copy on disk forever. A scan resolves its file list when it starts and only files
-    tombstoned more than ``retention_hours`` ago are deleted, so ``retention_hours`` bounds how
-    long the longest reader scan may take. The vacuum adds two commits (``VACUUM START`` and
-    ``VACUUM END``) after the write, which `read_cleaning_provenance` skips.
+    The vacuum deletes the files the overwrite superseded; without the vacuum every overwrite leaves
+    the previous copy on disk forever. A scan resolves its file list when the scan starts, and the
+    vacuum deletes only files tombstoned more than ``retention_hours`` ago. ``retention_hours``
+    therefore bounds how long the longest reader scan may take. The vacuum adds two commits
+    (``VACUUM START`` and ``VACUUM END``) after the write, which `read_cleaning_provenance` skips.
     Both ``dry_run=False`` and ``enforce_retention_duration=False`` matter: ``dry_run`` defaults
     to ``True``, which lists files and deletes none, and delta-rs refuses a retention under 168
     hours without the second flag.

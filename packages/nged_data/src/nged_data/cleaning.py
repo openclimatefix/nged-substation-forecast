@@ -16,7 +16,7 @@ from contracts.power_schemas import CleanedPowerTimeSeries, PowerTimeSeries, Tim
 SUBSTATION_TYPES: Final[tuple[str, ...]] = ("Primary", "BSP", "GSP")
 """The `TimeSeriesMetadata.substation_type` values that mean "a substation", as opposed to a
 generator or a battery at an `HV Customer` or `EHV Customer` connection. The `substation_zero`
-rule applies only to these."""
+rule applies only to these three types."""
 
 CLEANING_CODE_HASH: Final[str] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 """The SHA-256 of this module's own source file, computed at import.
@@ -38,19 +38,17 @@ def flag_nged_power(
     table and the roster, about four times a day, and writes the result to the cleaned table.
     Every reader of power then sees only the rows whose `drop_reason` is null.
 
-    **How to add a rule.** Write a boolean Polars expression that is true for a row to drop. Add it
-    as one more `.when(...).then(pl.lit("<reason>"))` branch of the chain below, and add the reason
-    to `contracts.power_schemas.DROP_REASONS`. The first matching branch wins. A rule that needs a
-    `TimeSeriesMetadata` column other than `substation_type` adds that column to the roster
-    `select` in this function.
+    **How to add a rule.** Write a boolean Polars expression that is true for a row to flag. Add
+    the expression as one more `.when(...).then(pl.lit("<reason>"))` branch of the chain below, and
+    add the reason to `contracts.power_schemas.DROP_REASONS`. The first matching branch wins. A
+    rule needing another `TimeSeriesMetadata` column adds that column to the roster `select` below.
 
-    **The contract a rule keeps.** Return every input row exactly once. Never change
-    `time_series_id` or `time`. Flag rows rather than deleting them. Do not call `collect` inside
-    this function.
+    **The contract a rule keeps.** Return every input row exactly once, flagged rather than
+    deleted. Never change `time_series_id` or `time`. Do not call `collect` inside this function.
 
-    **Logging.** The asset reports to Dagster, per reason, the rows and series flagged, the
-    minimum and maximum flagged power, and the first and last flagged time, so there is no logging
-    code to write. Output from Python's `logging` reaches only the step's captured stderr.
+    **Logging.** `clean_nged_power_data` reports to Dagster, per reason, the rows and series
+    flagged and the range of flagged power and time, so a rule needs no logging code. Python's
+    `logging` output reaches only the step's captured stderr.
 
     The one rule today, `substation_zero`, flags a reading of exactly 0 from a `Primary`, `BSP`,
     or `GSP` series. A substation almost never truly reads zero, so a zero is almost always a

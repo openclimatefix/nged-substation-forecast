@@ -384,9 +384,9 @@ def scan_cleaned_power(
 ) -> pt.LazyFrame[PowerTimeSeries]:
     """Scan the cleaned power table, keeping only the rows that no cleaning rule flagged.
 
-    This is the one read path for every consumer of observed power except the ingest and its
-    freshness check, so no consumer can forget the `drop_reason` filter. The raw table stays the
-    record of what NGED delivered.
+    `scan_cleaned_power` is the one read path for every consumer of observed power except the ingest
+    and its freshness check, so no consumer can forget the `drop_reason` filter. The raw table stays
+    the record of what NGED delivered.
 
     Args:
         delta_path: Path or URI of the `cleaned_power_time_series` Delta table.

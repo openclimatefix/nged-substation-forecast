@@ -1,6 +1,6 @@
 """The Dagster asset that cleans NGED's power telemetry into ``cleaned_power_time_series``.
 
-The table is the one read path for observed power: every consumer except the ingest and its
+The cleaned table is the one read path for observed power: every consumer except the ingest and its
 freshness check reads it through ``nged_data.storage.scan_cleaned_power``.
 """
 
@@ -53,9 +53,9 @@ def current_git_sha() -> str:
 def roster_fingerprint(roster: pl.DataFrame) -> str:
     """Return a hex digest that changes when any value in the roster changes.
 
-    It is the SHA-256 of Polars' per-row hashes (`hash_rows`, default seeds) of the roster sorted
-    by `time_series_id`, so it does not depend on row order. The digest is stable between runs on
-    one Polars version. A Polars upgrade can change it, which causes one extra rebuild.
+    The digest is the SHA-256 of Polars' per-row hashes (`hash_rows`, default seeds) of the roster
+    sorted by `time_series_id`, so it does not depend on row order. The digest is stable between
+    runs on one Polars version. A Polars upgrade can change it, which causes one extra rebuild.
 
     Args:
         roster: The validated `TimeSeriesMetadata` roster.
@@ -115,11 +115,11 @@ def clean_nged_power_data(context: AssetExecutionContext, config: CleanNgedPower
     of the cleaned table. Only the ingest and its ``power_data_is_fresh`` check read the raw table.
 
     Runs hourly in ``power_time_series_and_metadata_job``, straight after the ingest. NGED
-    delivers about every 6 hours, so most runs skip: the asset compares the raw table's id and
-    Delta version, the hash of the cleaning code, and a fingerprint of the ``TimeSeriesMetadata``
-    roster, with what the cleaned table's newest write commit recorded, and returns at once with
-    ``skipped: True`` when all four match. A failed
-    rebuild leaves the old version recorded, so the next hourly run rebuilds again. The
+    delivers about every 6 hours, so most runs skip. The asset compares four values with what the
+    cleaned table's newest write commit recorded — the raw table's id, the raw table's Delta
+    version, the hash of the cleaning code, and a fingerprint of the ``TimeSeriesMetadata`` roster
+    — and returns at once with ``skipped: True`` when all four match. A failed rebuild leaves the
+    old version recorded, so the next hourly run rebuilds again. The
     ``cleaned_power_keeps_up_with_raw`` check warns if rebuilds keep failing. Set the run config
     ``force`` to rebuild regardless.
 
