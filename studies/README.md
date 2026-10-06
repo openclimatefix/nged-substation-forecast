@@ -84,6 +84,8 @@ folder name themselves.
 | `NWP/ECMWF-IFS-SINGLE-RUNS/` | Open-Meteo's Single Runs archive of ECMWF's high-resolution forecast | `weather_downloads/fetch_open_meteo_single_runs.py` |
 | `NWP/OPEN-METEO-ENSEMBLE-MEANS/` | Open-Meteo's ensemble-mean products | `weather_downloads/fetch_open_meteo_ensemble_means.py` |
 | `NWP/WeatherNext3/` | The local copy of WeatherNext 3 over the trial area | `nwp_forecast_comparison/build_wn3_inputs.py` |
+| `NWP/UKV-CEDA/`, `NWP/UKV-CEDA-part2/`, `NWP/UKV-CEDA-part3/` | Three Icechunk stores of the Met Office's UKV archive on CEDA, each holding the 00, 06, 12, and 18 UTC runs to 54 hours, kept as three stores and never merged | `weather_downloads/fetch_ukv_ceda.py` |
+| `NWP/UKV-CEDA-T120/` | The Icechunk store of the 03 and 15 UTC runs of the UKV archive on CEDA, to 120 hours | `weather_downloads/fetch_ukv_ceda.py --product ukv-ceda-t120` |
 | `NWP/ENS_SITE_EXTRACT/` | The extracts of ECMWF ENS built from `data/NWP`: the frames at each site in `site_points/` and the per-member extract `ens_members.parquet` with its day-4 supplement `ens_members_day4.parquet` | `beam_diffuse_split/fetch_ens_point.py`, `beam_diffuse_split/fetch_ens_point_wind.py`, `nwp_forecast_comparison/fetch_ens_forecast_horizons.py`, `nwp_forecast_comparison/fetch_ens_day4_supplement.py` |
 | `reanalysis/ERA5/`, `reanalysis/ERA5-WIND-2019-2023/` | ERA5 irradiance and wind from Open-Meteo's mirror and from the Copernicus Climate Data Store; `ERA5/site_points/` holds the frames at each site | `beam_diffuse_split/fetch_era5.py`, `beam_diffuse_split/fetch_era5_open_meteo.py`, `weather_downloads/fetch_era5_wind.py`, `weather_downloads/fetch_era5_wind_2019_2023.py` |
 | `reanalysis/CAMS/` | The CAMS radiation service's satellite retrieval at each site, and its yearly CSV downloads | `beam_diffuse_split/fetch_cams.py` |
@@ -94,8 +96,8 @@ folder name themselves.
 | `observations/SARAH-3/` | The SARAH-3 satellite retrieval, ordered by hand from CM SAF; `site_points/` holds the frame at each site | `past_weather/extract_site_series.py` |
 | `observations/NGED-ANM/` | NGED's active network management setpoint exports, and the export-cap parquet derived from each | `beam_diffuse_split/anm_setpoints.py` (the exports come from NGED) |
 
-The `UKV-CEDA*` stores, the trial-area box, and the two UKV-on-CEDA blends study folders are still
-directly under `data/studies/`.
+`data/studies/_private/trial_area_box.json` holds the trial-area box, derived from the private
+generator roster.
 
 **Each study keeps one folder under `data/studies/per_study/`.**
 
@@ -107,6 +109,7 @@ directly under `data/studies/`.
 | `open_meteo_ensemble_means/`, `open_meteo_ens_gap/` | The Open-Meteo ensemble-means study, and its comparison of a local ensemble with ENS | `open_meteo_ensemble_means/ensemble_means_mae.py`, `open_meteo_ensemble_means/local_ens_gap.py` |
 | `icon_eu_compare/`, `era5_wind_compare/` | The ICON-EU comparison of Dynamical.org with Open-Meteo, and the ERA5 wind comparison of Open-Meteo with the Climate Data Store | `weather_downloads/compare_icon_eu_dynamical_openmeteo.py`, `weather_downloads/compare_era5_wind_openmeteo_cds.py` |
 | `ens_backfill_pilot/` | The checkpoint files of the ENS backfill pilot | `ens_backfill_pilot/fetch_pilot.py` |
+| `ukv_ceda_blends/` | The UKV-on-CEDA blends study's inputs and results; `run15/` holds the inputs and results of the run on the 15 UTC cycle | `nwp_forecast_comparison/build_ukv_ceda_inputs.py`, `nwp_forecast_comparison/fit_ukv_ceda_blends.py` |
 | `nwp_forecast_comparison/original/` | The published fit of the NWP forecast comparison | `nwp_forecast_comparison/nwp_forecast_comparison.py` |
 | `nwp_forecast_comparison/<batch>/` | One folder for each of the 22 later batches of fits, such as `aifs_blends`, `leads_day10`, and `product_blends`; a batch's `superseded/` folder holds its earlier outputs | the `build_*.py` and `fit_*.py` scripts of `nwp_forecast_comparison/` |
 

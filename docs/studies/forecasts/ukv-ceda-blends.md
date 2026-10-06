@@ -572,7 +572,7 @@ penalty of 5.0, and a subsample of 0.8.
 Run each step only after the step before it exits 0.
 
 ```bash
-D=data/studies/ukv_ceda_blends
+D=data/studies/per_study/ukv_ceda_blends
 uv run python studies/nwp_forecast_comparison/check_arm_columns_unchanged.py --expected-stamps 72
 uv run python studies/nwp_forecast_comparison/build_ukv_ceda_inputs.py
 uv run python studies/nwp_forecast_comparison/verify_ukv_ceda_inputs.py

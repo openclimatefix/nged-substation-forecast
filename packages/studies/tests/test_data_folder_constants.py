@@ -54,13 +54,18 @@ PRODUCT_FOLDERS: Final[dict[str, str]] = {
     "GFS_PRODUCT_DIR": "downloads/NWP/GFS",
     "GFS_WINDOW_DIR": "downloads/NWP/windows/GFS_window_2025-07-01_2025-07-02",
     "WEATHERNEXT3_PRODUCT_DIR": "downloads/NWP/WeatherNext3",
-    "UKV_CEDA_T120_PRODUCT_DIR": "weather/UKV-CEDA-T120",
+    "UKV_CEDA_T120_PRODUCT_DIR": "downloads/NWP/UKV-CEDA-T120",
     "OPEN_METEO_ENSEMBLE_MEANS_PRODUCT_DIR": "downloads/NWP/OPEN-METEO-ENSEMBLE-MEANS",
 }
-"""Each product constant against its folder under `data/studies/`.
+"""Each product constant against its folder under `data/studies/`."""
 
-The UKV-on-CEDA T120 store has not moved, so its row still names `weather/`.
-"""
+UKV_CEDA_STORES: Final[tuple[str, ...]] = (
+    "UKV-CEDA",
+    "UKV-CEDA-part2",
+    "UKV-CEDA-part3",
+    "UKV-CEDA-T120",
+)
+"""The four UKV-on-CEDA Icechunk stores, never merged. Each is a folder of `downloads/NWP/`."""
 
 PREVIOUS_RUNS_FOLDERS: Final[tuple[str, ...]] = (
     "AROME-FRANCE",
@@ -90,8 +95,8 @@ OLD_STUDY_FOLDERS: Final[dict[str, str]] = {
     "CERRA_WIND_LEVELS_POST_HOC_DIR": "per_study/cerra_wind/levels_post_hoc",
     "CERRA_WIND_LEVELS_SHEAR_DIR": "per_study/cerra_wind/shear",
     "CERRA_WIND_DIRECTION_DIR": "per_study/cerra_wind/direction",
-    "UKV_CEDA_BLENDS_DIR": "ukv_ceda_blends",
-    "UKV_CEDA_BLENDS_RUN15_DIR": "ukv_ceda_blends_run15",
+    "UKV_CEDA_BLENDS_DIR": "per_study/ukv_ceda_blends",
+    "UKV_CEDA_BLENDS_RUN15_DIR": "per_study/ukv_ceda_blends/run15",
     "NFC_STUDY_DIR": "per_study/nwp_forecast_comparison",
     "NFC_DIR": "per_study/nwp_forecast_comparison/original",
     "NFC_AIFS_DIR": "per_study/nwp_forecast_comparison/aifs",
@@ -147,7 +152,10 @@ HAND_WRITTEN_FOLDER_NAMES: Final[frozenset[str]] = frozenset(
         "per_study",
         "weather",
         "NGED-ANM",
+        "_private",
+        "trial_area_box.json",
         "_trial_area_box.json",
+        *UKV_CEDA_STORES,
     }
 )
 """Folder names that only `studies.sources` may join onto a path."""
@@ -184,10 +192,14 @@ def test_the_remaining_constants_are_the_paths_the_data_was_moved_to():
     assert STUDIES_DATA_DIR == REPO_DATA_DIR / "studies"
     assert DOWNLOADS_DIR == STUDIES_DATA_DIR / "downloads"
     assert PER_STUDY_DIR == STUDIES_DATA_DIR / "per_study"
-    assert sources.WEATHER_DATA_DIR == STUDIES_DATA_DIR / "weather"
+    assert sources.LEGACY_WEATHER_DATA_DIR == STUDIES_DATA_DIR / "weather"
+    assert sources.PRIVATE_DIR == STUDIES_DATA_DIR / "_private"
     assert sources.ANM_DATA_DIR == DOWNLOADS_DIR / "observations" / "NGED-ANM"
     assert SCRATCH_DIR == STUDIES_DATA_DIR / "_scratch"
-    assert TRIAL_AREA_BOX_PATH == STUDIES_DATA_DIR / "weather" / "_trial_area_box.json"
+    assert TRIAL_AREA_BOX_PATH == STUDIES_DATA_DIR / "_private" / "trial_area_box.json"
+    assert sources.LEGACY_TRIAL_AREA_BOX_PATH == (
+        STUDIES_DATA_DIR / "weather" / "_trial_area_box.json"
+    )
 
 
 def test_the_per_site_frames_of_a_product_sit_in_its_site_points_folder():
@@ -223,7 +235,7 @@ def test_an_unknown_product_name_raises_rather_than_naming_a_stray_folder():
         previous_runs_product_dir_for(product="ERA5")
 
 
-def test_every_product_the_scripts_name_is_filed_under_downloads_except_the_ukv_ceda_stores():
+def test_every_product_the_scripts_name_is_filed_under_downloads():
     names = (
         *sources.PREVIOUS_RUNS_PRODUCTS,
         *sources.NWP_PRODUCT_NAMES,
@@ -234,7 +246,30 @@ def test_every_product_the_scripts_name_is_filed_under_downloads_except_the_ukv_
     )
 
     assert all(DOWNLOADS_DIR in product_dir_for(product=name).parents for name in names)
-    assert product_dir_for(product="UKV-CEDA-T120").parent == sources.WEATHER_DATA_DIR
+
+
+@pytest.mark.parametrize("store", UKV_CEDA_STORES)
+def test_each_ukv_ceda_store_is_its_own_folder_of_the_nwp_downloads(store: str):
+    assert product_dir_for(product=store) == DOWNLOADS_DIR / "NWP" / store
+
+
+def test_the_second_blends_run_is_a_subfolder_of_the_first():
+    assert sources.UKV_CEDA_BLENDS_RUN15_DIR == sources.UKV_CEDA_BLENDS_DIR / "run15"
+    assert sources.UKV_CEDA_BLENDS_DIR == PER_STUDY_DIR / "ukv_ceda_blends"
+
+
+def test_a_moving_path_is_read_from_the_new_folder_once_it_exists_and_from_the_old_one_before(
+    tmp_path: Path,
+):
+    current, legacy = tmp_path / "new" / "box.json", tmp_path / "old" / "box.json"
+
+    assert sources.existing_or_legacy(current=current, legacy=legacy) == current
+    legacy.parent.mkdir()
+    legacy.write_text("{}")
+    assert sources.existing_or_legacy(current=current, legacy=legacy) == legacy
+    current.parent.mkdir()
+    current.write_text("{}")
+    assert sources.existing_or_legacy(current=current, legacy=legacy) == current
 
 
 def test_the_batch_folders_are_the_twenty_two_siblings_of_the_original_batch():
@@ -286,8 +321,12 @@ def test_the_stamp_glob_reads_every_batch_folder_and_nothing_else(tmp_path: Path
 def test_every_folder_constant_names_a_folder_that_exists_on_disk():
     constants = {**PRODUCT_FOLDERS, **OLD_STUDY_FOLDERS}
     missing = [name for name in constants if not getattr(sources, name).exists()]
+    missing_stores = [
+        store for store in UKV_CEDA_STORES if not product_dir_for(product=store).exists()
+    ]
 
     assert missing == []
+    assert missing_stores == []
     assert TRIAL_AREA_BOX_PATH.exists()
 
 
@@ -339,6 +378,41 @@ def test_the_wave_d7_files_are_in_their_new_folders_and_the_old_folders_are_link
     assert (sources.ENS_FORECAST_HORIZONS_DIR / "solar_inputs.parquet").is_file()
     assert list(sources.STUDY_INPUTS_DIR.glob("beam_diffuse_dataset_*.parquet"))
     assert (sources.ENS_FORECAST_HORIZONS_DIR / "era_covered" / "report.md").is_file()
+
+
+MOVED_WAVE_D8_FOLDERS: Final[tuple[str, ...]] = (
+    "UKV-CEDA",
+    "UKV-CEDA-part2",
+    "UKV-CEDA-part3",
+    "UKV-CEDA-T120",
+    "_trial_area_box.json",
+)
+"""The entries of `data/studies/weather/` that wave D8 moved, by their old names. Each is now a
+link to the new path."""
+
+
+@pytest.mark.skipif(
+    not STUDIES_DATA_DIR.exists(),
+    reason="the private study data is not in this checkout",
+)
+def test_the_wave_d8_stores_and_folders_are_in_their_new_places_and_the_old_paths_are_links():
+    stores = [product_dir_for(product=store) for store in UKV_CEDA_STORES]
+    legacy = sources.LEGACY_WEATHER_DATA_DIR
+    real_old_paths = [
+        name
+        for name in MOVED_WAVE_D8_FOLDERS
+        if (legacy / name).exists() and not (legacy / name).is_symlink()
+    ]
+    old_blends = (STUDIES_DATA_DIR / "ukv_ceda_blends", STUDIES_DATA_DIR / "ukv_ceda_blends_run15")
+
+    assert all((store / "store").is_dir() for store in stores)
+    assert all((legacy / store.name).resolve() == store.resolve() for store in stores)
+    assert (sources.UKV_CEDA_BLENDS_DIR / "build.json").is_file()
+    assert (sources.UKV_CEDA_BLENDS_RUN15_DIR / "build.json").is_file()
+    assert TRIAL_AREA_BOX_PATH.is_file()
+    assert sources.LEGACY_TRIAL_AREA_BOX_PATH.resolve() == TRIAL_AREA_BOX_PATH.resolve()
+    assert real_old_paths == []
+    assert all(not path.exists() or path.is_symlink() for path in old_blends)
 
 
 def _joined_folder_names(*, path: Path) -> list[tuple[int, str]]:

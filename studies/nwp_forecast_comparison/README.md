@@ -499,9 +499,9 @@ before the build and before every fit, and start only below a load average of ab
    nothing.
 3. `uv run python studies/nwp_forecast_comparison/build_ukv_ceda_inputs.py` writes
    `<domain>_ukv_ceda_inputs.parquet`, `build.json`, and `README.md` into the write-once folder
-   `data/studies/ukv_ceda_blends/`. The build refuses to run until the download covers the window
-   and every run slot the store marks as never archived has been fetched again once. Name the days
-   CEDA still does not list in `--unlisted-days`.
+   `data/studies/per_study/ukv_ceda_blends/`. The build refuses to run until the download covers
+   the window and every run slot the store marks as never archived has been fetched again once.
+   Name the days CEDA still does not list in `--unlisted-days`.
 4. `uv run python studies/nwp_forecast_comparison/verify_ukv_ceda_inputs.py` recomputes a stratified
    sample of built values in plain Python, gates the radiation timestamp at day 1 (see "The
    radiation timestamp" below), compares each lead day's correlation with the Copernicus Atmosphere
@@ -536,7 +536,7 @@ before the build and before every fit, and start only below a load average of ab
     new `_added_<k>` files and writes `report_3.md` and `report_3_intervals.parquet`.
 12. `uv run python studies/nwp_forecast_comparison/build_ukv_ceda_inputs.py --older-run --dry-run`,
     then without `--dry-run` and with the same `--unlisted-days`, builds the older-run inputs into
-    the write-once folder `data/studies/ukv_ceda_blends_run15/`. `verify_ukv_ceda_inputs.py
+    the write-once folder `data/studies/per_study/ukv_ceda_blends/run15/`. `verify_ukv_ceda_inputs.py
     --older-run` verifies them. `fit_ukv_ceda_blends.py --post-hoc-older-run --report-name report_4`
     fits the older-run blend and writes `report_4.md` (see "Post hoc older run" below).
 13. `uv run python studies/nwp_forecast_comparison/ukv_ceda_blends_charts.py --post-hoc-only
@@ -621,7 +621,7 @@ control (seed 0), and equal column counts (9 for solar, 11 for wind), at both se
 technologies. The report prints the older-run blend minus its padded ENS (P1), minus its control
 (P2), minus the planned blend, and the planned P1 on the same rows. The older-run inputs are built
 by `build_ukv_ceda_inputs.py --older-run` with the same coverage guard, stamp checks, and init-time
-assertions as the main build, into `data/studies/ukv_ceda_blends_run15/`.
+assertions as the main build, into `data/studies/per_study/ukv_ceda_blends/run15/`.
 
 ### Scripts
 
