@@ -438,7 +438,7 @@ uv run python studies/nwp_forecast_comparison/fit_product_blends.py --check --lo
 uv run python studies/nwp_forecast_comparison/fit_product_blends.py --lookahead-cleared \
   --workers 2 --published-dir $P --output-dir $OUT
 uv run python studies/nwp_forecast_comparison/dot_interval_vs_ens.py --blends \
-  --output-dir $D/per_study/nwp_forecast_comparison/blends_vs_ens_dots
+  --output-dir $D/per_study/nwp_forecast_comparison/vs_ens_dots_blends_final
 ```
 
 ## Folds
