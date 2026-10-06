@@ -55,6 +55,9 @@ PRODUCT_FOLDERS: Final[dict[str, str]] = {
     "GFS_WINDOW_DIR": "downloads/NWP/windows/GFS_window_2025-07-01_2025-07-02",
     "WEATHERNEXT3_PRODUCT_DIR": "downloads/NWP/WeatherNext3",
     "UKV_CEDA_T120_PRODUCT_DIR": "downloads/NWP/UKV-CEDA-T120",
+    "UKV_CEDA_PRODUCT_DIR": "downloads/NWP/UKV-CEDA",
+    "UKV_CEDA_PART2_PRODUCT_DIR": "downloads/NWP/UKV-CEDA-part2",
+    "UKV_CEDA_PART3_PRODUCT_DIR": "downloads/NWP/UKV-CEDA-part3",
     "OPEN_METEO_ENSEMBLE_MEANS_PRODUCT_DIR": "downloads/NWP/OPEN-METEO-ENSEMBLE-MEANS",
 }
 """Each product constant against its folder under `data/studies/`."""
@@ -251,6 +254,10 @@ def test_every_product_the_scripts_name_is_filed_under_downloads():
 @pytest.mark.parametrize("store", UKV_CEDA_STORES)
 def test_each_ukv_ceda_store_is_its_own_folder_of_the_nwp_downloads(store: str):
     assert product_dir_for(product=store) == DOWNLOADS_DIR / "NWP" / store
+
+
+def test_the_ukv_against_era5_study_has_a_folder_of_its_own_under_the_per_study_folder():
+    assert sources.UKV_VS_ERA5_DIR == PER_STUDY_DIR / "ukv_ceda_vs_era5"
 
 
 def test_the_second_blends_run_is_a_subfolder_of_the_first():

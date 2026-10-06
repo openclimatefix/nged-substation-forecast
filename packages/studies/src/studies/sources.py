@@ -643,6 +643,15 @@ WEATHERNEXT3_PRODUCT_DIR: Final[Path] = product_dir_for(product="WeatherNext3_tr
 UKV_CEDA_T120_PRODUCT_DIR: Final[Path] = product_dir_for(product="UKV-CEDA-T120")
 """The Met Office's UKV archive on CEDA, run-time 120 forecasts."""
 
+UKV_CEDA_PRODUCT_DIR: Final[Path] = product_dir_for(product="UKV-CEDA")
+"""The first of the three UKV-on-CEDA stores holding the 00, 06, 12, and 18 UTC runs to 54 hours."""
+
+UKV_CEDA_PART2_PRODUCT_DIR: Final[Path] = product_dir_for(product="UKV-CEDA-part2")
+"""The second store of the 00, 06, 12, and 18 UTC runs, which starts where the first ends."""
+
+UKV_CEDA_PART3_PRODUCT_DIR: Final[Path] = product_dir_for(product="UKV-CEDA-part3")
+"""The third store of the 00, 06, 12, and 18 UTC runs, which starts where the second ends."""
+
 OPEN_METEO_ENSEMBLE_MEANS_PRODUCT_DIR: Final[Path] = product_dir_for(
     product="OPEN-METEO-ENSEMBLE-MEANS"
 )
@@ -705,6 +714,9 @@ UKV_CEDA_BLENDS_DIR: Final[Path] = study_dir_for(study="ukv_ceda_blends")
 
 UKV_CEDA_BLENDS_RUN15_DIR: Final[Path] = UKV_CEDA_BLENDS_DIR / "run15"
 """The UKV-on-CEDA blends study's run on the 15 UTC cycle."""
+
+UKV_VS_ERA5_DIR: Final[Path] = study_dir_for(study="ukv_ceda_vs_era5")
+"""The study of whether UKV-on-CEDA or ERA5 describes past wind and temperature better."""
 
 NFC_STUDY_DIR: Final[Path] = study_dir_for(study="nwp_forecast_comparison")
 """The folder of the NWP forecast comparison, one subfolder per batch of fits."""
