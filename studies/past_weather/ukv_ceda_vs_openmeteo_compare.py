@@ -100,6 +100,8 @@ class Variable(NamedTuple):
     om: str
     circular: bool = False
     daylight_only: bool = False
+    level_unit: str = ""
+    """The unit of the mean level where it differs from the difference's, as degrees Celsius do."""
     wind_step: str = "ignore"
     """`exclude` drops the hours of Open-Meteo's wind-step spans, `only` keeps them alone."""
     min_speed_m_s: float = 0.0
@@ -107,7 +109,7 @@ class Variable(NamedTuple):
 
 
 VARIABLES: Final[tuple[Variable, ...]] = (
-    Variable("air temperature", "K", "ceda_temp_c", "om_temp_c"),
+    Variable("air temperature", "K", "ceda_temp_c", "om_temp_c", level_unit="degrees Celsius"),
     Variable(
         "10 m wind speed", "m/s", "ceda_speed_10m_m_s", "om_speed_10m_m_s", wind_step="exclude"
     ),
@@ -454,8 +456,13 @@ def _row(*, record: DifferenceRecord) -> str:
     return (
         f"| {record['label']} | {record['n_rows']:,} | {record['mean_difference']:+.3f} "
         f"{mean_interval} | {record['mean_absolute_difference']:.3f} {absolute_interval} | "
-        f"{record['p99_absolute_difference']:.3f} | {record['correlation']:.4f} |"
+        f"{record['p99_absolute_difference']:.3f} | {_correlation(record['correlation'])} |"
     )
+
+
+def _correlation(value: float) -> str:
+    """Format a correlation, or `n/a` where it has no meaning, as for a circular direction."""
+    return "n/a" if value != value else f"{value:.4f}"  # noqa: PLR0124 - NaN has no correlation
 
 
 def _interval(*, lower: float, upper: float, sign: bool) -> str:
@@ -506,7 +513,7 @@ def report_text(
             lines += [
                 (
                     f"Mean level at lead 0: CEDA {ceda_level:.3f}, Open-Meteo {om_level:.3f} "
-                    f"{variable.unit}."
+                    f"{variable.level_unit or variable.unit}."
                 ),
                 "",
             ]

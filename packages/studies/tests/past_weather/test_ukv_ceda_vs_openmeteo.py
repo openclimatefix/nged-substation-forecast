@@ -19,6 +19,7 @@ import pytest
 import ukv_ceda_vs_openmeteo_build as build
 import ukv_ceda_vs_openmeteo_compare as compare
 import ukv_ceda_vs_openmeteo_fit as fit
+import ukv_ceda_vs_openmeteo_wind_steps as steps
 
 UTC_US: Final[pl.Datetime] = pl.Datetime("us", "UTC")
 
@@ -1194,3 +1195,70 @@ def test_the_hours_outside_a_span_of_a_dropped_month_are_dropped_with_the_month(
 
     assert "2025-02" not in rows["month"].to_list()
     assert datetime(2025, 2, 20, 12, tzinfo=UTC) not in rows["time"].to_list()
+
+
+# --- the wind-step evidence ---------------------------------------------------------------------
+
+
+def _step_frame() -> pl.DataFrame:
+    rows = []
+    for day, step, ratio in (
+        (datetime(2024, 10, 20, 12, tzinfo=UTC), False, 0.97),
+        (datetime(2024, 11, 10, 12, tzinfo=UTC), True, 1.06),
+        (datetime(2024, 11, 11, 12, tzinfo=UTC), True, 1.08),
+    ):
+        rows.append(
+            {
+                "site": "A",
+                "time": day,
+                "month": day.strftime("%Y-%m"),
+                "lead_hours": 0,
+                "om_wind_step": step,
+                "ceda_speed_10m_m_s": 5.0,
+                "om_speed_10m_m_s": 5.0 * ratio,
+                "om_temp_c": 10.0,
+                "ceda_temp_c": 10.0,
+                "om_direction_10m_deg": 100.0,
+                "ceda_direction_10m_deg": 99.0,
+                "ceda_ghi": 100.0,
+                "om_ghi": 100.0,
+                "sun_elevation_deg": 30.0,
+            }
+        )
+    rows.append({**rows[0], "ceda_speed_10m_m_s": 0.5, "om_speed_10m_m_s": 50.0})
+    return pl.DataFrame(rows)
+
+
+def test_the_month_ratio_is_the_median_lead_zero_speed_ratio_and_leaves_out_calm_hours():
+    ratios = steps.month_ratios(frame=_step_frame())
+
+    by_month = dict(zip(ratios["month"].to_list(), ratios["ratio"].to_list(), strict=True))
+    # The calm hour's ratio of 100 would pull October's median to 1.0 or more if it were kept.
+    assert by_month["2024-10"] == pytest.approx(0.97)
+    assert by_month["2024-11"] == pytest.approx(1.07)
+
+
+def test_the_span_table_separates_the_hours_inside_and_outside_the_spans():
+    table = steps.span_ratios(frame=_step_frame())
+
+    inside = table.filter(pl.col("om_wind_step")).row(0, named=True)
+    outside = table.filter(~pl.col("om_wind_step")).row(0, named=True)
+    assert inside["speed_ratio"] == pytest.approx(1.07)
+    assert outside["speed_ratio"] == pytest.approx(0.97)
+    assert inside["direction_difference_deg"] == pytest.approx(1.0)
+
+
+def test_the_daily_ratio_marks_the_days_of_the_spans():
+    daily = steps.daily_ratio(frame=_step_frame())
+
+    flags = dict(zip(daily["day"].to_list(), daily["in_span"].to_list(), strict=True))
+    assert flags[datetime(2024, 10, 20).date()] is False
+    assert flags[datetime(2024, 11, 10).date()] is True
+
+
+def test_the_day_flag_includes_the_first_and_last_day_of_each_span():
+    days = [datetime(2024, 11, d).date() for d in (6, 7, 30)] + [datetime(2024, 12, 1).date()]
+
+    flags = pl.DataFrame({"day": days}).select(flag=steps.in_wind_step_days_of_day())
+
+    assert flags["flag"].to_list() == [False, True, True, False]
