@@ -1,48 +1,75 @@
 # Pooled over three wind farms, ERA5's wind gave a slightly lower power error than CEDA's archived UKV, and CEDA's archived UKV temperature was closer than ERA5's at four weather stations
 
+**This study asks which of two records of past weather the project's power forecasts should learn
+from: a global reconstruction of past weather, or the archive of the Met Office's detailed weather
+model of the United Kingdom.** For past wind, a forecast of wind-farm output given the global
+reconstruction was slightly more accurate at three wind farms in Lincolnshire. The difference is
+small, comes mostly from one of the three farms, and changes size with how each hour of power is
+lined up with the weather. The study keeps the global reconstruction for wind because the plan made
+it the default and the Met Office archive did not clearly beat it. For past temperature, the Met
+Office archive was closer to the readings at four weather stations. The Met Office model probably
+takes those stations' readings as input, its finer grid suits a single station by itself, and its
+advantage shrinks over the hours after each run of the model starts. The choice of temperature
+record changed forecasts of solar-farm output by a very small amount at most, and that test could
+not have detected a difference large enough to change the recommendation.
+
 **At three wind farms in Lincolnshire, pooled, an XGBoost model (a gradient-boosted tree model)
 given the 100 m and 10 m wind of ERA5, the reanalysis of the European Centre for Medium-Range
 Weather Forecasts (ECMWF), had a lower power error than an XGBoost model given the Met Office's UK
 variable-resolution (UKV) 10 m wind and 925 hPa wind (the wind at a fixed pressure level above a
 turbine's hub height) from the archive of the Centre for Environmental Data Analysis (CEDA), by
-0.125 percentage points of capacity [+0.033, +0.216] at the primary hyperparameter setting and
-[+0.035, +0.217] at the second.** A hyperparameter setting is one fixed choice of the XGBoost
-model's tree depth, learning rate, and number of rounds. The difference is statistically significant
-at the 5% level and smaller than the 0.16-point margin, the smallest difference that the study fixed
-before any result as clear. ERA5 is the planned default. The archived UKV, which the page calls
-UKV-CEDA, would have needed a clear advantage at both hyperparameter settings to displace ERA5, so
-by the planned rule the study recommends ERA5 for past wind. UKV-CEDA is a 6-hourly archive read at
-leads of 0 to 5 hours, where the lead is the hours since the run of the weather model started, so
-the result says nothing about the hourly UKV archive that Open-Meteo serves at lead 0. The
-[past-wind page](wind.md) found that Open-Meteo archive ahead of ERA5. Two post hoc results, added
-after the first results were seen, sit beside the planned result. The gap between the two products
-grows with UKV-CEDA's lead, from -0.058 points at lead 0 to +0.323 points at lead 5. The gap does
-not shrink when both XGBoost models are given 10 m wind alone (+0.505 points [+0.394, +0.620]), so
-giving ERA5 a 100 m column does not explain ERA5's advantage.
+0.125 percentage points of capacity [+0.033, +0.216].** The power error is the XGBoost model's mean
+absolute error as a percentage of each farm's capacity, so at a farm of 100 MW a difference of 0.125
+points is 0.125 MW of mean absolute error. The brackets hold the 95% interval at the primary
+hyperparameter setting, one of two fixed, untuned choices of the XGBoost model's tree depth,
+learning rate, and number of rounds. The second setting gives [+0.035, +0.217]. The difference is
+statistically significant at the 5% level and smaller than the 0.16-point margin, the smallest
+difference that the study fixed before any result as clear. ERA5 is the planned default. The
+archived UKV, which the page calls UKV-CEDA, would have needed a clear advantage at both
+hyperparameter settings to displace ERA5, so by the planned rule the study recommends ERA5 for past
+wind. The recommendation therefore means that UKV-CEDA showed no clear advantage, not that ERA5's
+wind is shown to be better. The difference also leans on one farm and on one convention, both post
+hoc: without the farm labelled W1 it is +0.079 [-0.038, +0.194], which is not statistically
+significant, and with each hour of power ending at the weather's time label instead of centred on
+it, the gap is +0.262 [+0.178, +0.345]. UKV-CEDA is a 6-hourly archive read at leads of 0 to 5
+hours, where the lead is the hours since the run of the weather model started, so the result says
+nothing about the hourly UKV archive that Open-Meteo, a public weather-data service, serves at lead
+0. The [past-wind page](wind.md) found that Open-Meteo archive ahead of ERA5. Two more post hoc
+results sit beside the planned result. The gap between the two products grows with UKV-CEDA's lead,
+from -0.058 points at lead 0 to +0.323 points at lead 5. The gap does not shrink when both XGBoost
+models are given 10 m wind alone (+0.505 points [+0.394, +0.620]), so giving ERA5 a 100 m column
+does not explain ERA5's advantage.
 
 **At the four Met Office stations inside the box of the UKV-CEDA archive that the study downloaded,
 UKV-CEDA's 1.5 m air temperature was closer to the readings than ERA5's 2 m air temperature, by
-0.124 K [0.113, 0.135] after removing each product's bias, so by the planned rule the study
-recommends UKV-CEDA for past temperature.** The advantage falls from 0.250 K at lead 0 to 0.035 K at
-lead 5 (post hoc). Two explanations fit that decay: the stations' readings may enter UKV's own data
-assimilation (the step that pulls each run towards observations), and forecast error grows from each
-6-hourly run. The page tests neither explanation. The study does not test how large the advantage is
-away from those stations, or whether the advantage helps a demand forecast. At six solar farms, on
-the whole row set, the choice between the two temperatures changes an XGBoost model's power error by
-no more than 0.009 points of capacity in either direction (the 95% interval).
+0.124 K [0.113, 0.135] in mean absolute error after removing each product's mean error for each
+station, calendar month, and hour of day, so by the planned rule the study recommends UKV-CEDA for
+past temperature.** Three facts limit that result. UKV probably assimilates the four stations'
+readings, that is, pulls each run towards them, although the page has not checked which stations UKV
+assimilates, so the stations are not independent of UKV. A 2 km UKV cell matches a point station
+better than a 25 km ERA5 cell by itself, and the study cannot separate that advantage from the
+product. The advantage falls from 0.250 K at lead 0 to 0.035 K at lead 5 (post hoc), and forecast
+error growing from each 6-hourly run fits that decay as well as assimilation does. The study does
+not test how large the advantage is away from those stations, or whether the advantage helps a
+demand forecast. At six solar farms, on the whole row set, the choice between the two temperatures
+changes an XGBoost model's power error by no more than 0.009 points of capacity in either direction
+(the 95% interval). That solar test could not have vetoed the recommendation, because temperature's
+whole gain for solar power is 0.021 points with ERA5's temperature against a 0.06-point margin. The
+temperature recommendation therefore comes from the planned rule applied to the station scores, not
+from any improvement in a forecast.
 
 ![Figure 1: At four stations UKV-CEDA is closer than ERA5 for wind and temperature, but pooled over
 three wind farms ERA5 gives the lower power error, and the choice does not move solar
 power](../assets/ukv_ceda_vs_era5/fig01_headline.svg)
 
 - **Wind history:** the planned rule gives ERA5, not UKV-CEDA's 6-hourly archive, for the 100 m and
-  10 m wind that an XGBoost model reads. The recommendation is a statement about CEDA's archive at
-  these three farms and not about UKV.
+  10 m wind that an XGBoost model reads, on a small difference that rests mostly on one farm. The
+  recommendation is a statement about CEDA's archive at these three farms and not about UKV.
 - **Temperature history:** the planned rule gives UKV-CEDA, on an advantage of 0.124 K at four
-  stations that falls to 0.035 K at lead 5. No forecast in this study improved by as much as a
-  planned margin (the solar power interval is within 0.009 points, and demand was not tested). A
-  UKV-CEDA history also carries a non-commercial licence, 5 dropped months, and three physics eras
-  ([Discussion](#discussion-what-to-use)).
+  stations that UKV probably assimilates, which falls to 0.035 K at lead 5. No forecast in this
+  study improved by as much as a planned margin (the solar power interval is within 0.009 points,
+  and demand was not tested). A UKV-CEDA history also carries a non-commercial licence, 5 dropped
+  months, and three physics eras ([Discussion](#discussion-what-to-use)).
 - **Training history from 2019:** the early-years test, which checks UKV-CEDA's temperature over
   2019-09 to 2020-12, passes for UKV-CEDA temperature, and era 0 of the UKV physics (before
   2019-12-04) holds only 3 months.
@@ -55,10 +82,22 @@ power](../assets/ukv_ceda_vs_era5/fig01_headline.svg)
 
 ## Key findings
 
+**The page names its planned comparisons P1 to P4, in two sets of experiments.** Set A scores each
+product against the station readings directly: P1 is 10 m wind speed and P2 is air temperature. Set
+B fits XGBoost models and scores their power error: P3 is wind-farm power and P4 is solar-farm
+power. Every comparison is UKV-CEDA minus ERA5, so a negative value favours UKV-CEDA and a positive
+value favours ERA5. The planned comparisons, P1 to P4 and P2-lead (a planned split of P2 by lead),
+were written into the study plan before any result existed. A post hoc row was added after a result
+was seen, and every other number is exploratory. In P3 each product's XGBoost model reads the wind
+heights that the product holds, the as-available wind. The post hoc matched pair gives both XGBoost
+models 10 m wind alone.
+
 **The planned wind contrast P3 favours ERA5 by 0.125 points of capacity, which is statistically
 significant and below the margin ([wind](#era5-gave-the-lower-wind-power-error-by-0125-points)).**
 ERA5 is the planned default, and UKV-CEDA did not clear the margin at both settings, so the planned
-rule gives ERA5. The page does not claim that ERA5's wind is better than UKV's.
+rule gives ERA5. The page does not claim that ERA5's wind is better than UKV's. Without W1 the
+difference is +0.079 [-0.038, +0.194], and with each hour of power ending at the label it is +0.262
+[+0.178, +0.345], both post hoc, so the size of P3 rests on one farm and on the hour convention.
 
 **The wind gap grows with UKV-CEDA's lead, from -0.058 points at lead 0 to +0.323 points at lead 5
 (post hoc) ([lead](#the-wind-gap-grows-with-the-served-lead)).** From 2024-08-12, the first day of
@@ -73,8 +112,10 @@ pair](#giving-both-xgboost-models-10-m-wind-alone-widens-era5s-advantage)).**
 **UKV-CEDA's temperature is closer at the four stations by 0.124 K, and the advantage falls from
 0.250 K to 0.035 K across leads 0 to 5
 ([temperature](#ukv-cedas-temperature-is-closer-at-four-stations-and-less-so-at-longer-leads)).**
-The planned rule gives UKV-CEDA. The advantage is not shown to help a demand forecast, and
-forecast-error growth could explain the decay.
+The planned rule gives UKV-CEDA. UKV probably assimilates the four stations, and a 2 km cell matches
+a point station better than a 25 km cell by itself, so the advantage is not attributed to the
+product alone. The advantage is not shown to help a demand forecast, and forecast-error growth could
+explain the decay.
 
 **For six solar farms, on the whole row set, the choice of temperature product moves the power error
 by no more than 0.009 points ([solar](#solar-power-does-not-depend-on-the-temperature-product)).**
@@ -103,33 +144,35 @@ questions](#two-further-questions-the-first-hours-of-each-ukv-run-and-change-ove
 ## Introduction
 
 **The question is whether the main Flexpectation work should take past wind speed and past air
-temperature from UKV-CEDA or from ERA5.** The main work already takes past irradiance from the
-satellite retrieval of the Copernicus Atmosphere Monitoring Service (CAMS), and this study does not
-reopen that choice. The other weather variables in the main work's configuration (dew point,
-sea-level pressure, surface pressure, 500 hPa height, precipitation type, and windchill) are not
-scored. No page on this site compares UKV with ERA5 before August 2024, and CEDA's archive starts in
-September 2019, so the study tests 2019 and 2020 as well.
+temperature from UKV-CEDA or from ERA5.** Flexpectation is this project's probabilistic power
+forecasting for National Grid Electricity Distribution, and its training history, capacity
+estimates, and historical features read past weather. The main work already takes past irradiance
+from the satellite retrieval of the Copernicus Atmosphere Monitoring Service (CAMS), and this study
+does not reopen that choice. The other weather variables in the main work's configuration (dew
+point, sea-level pressure, surface pressure, 500 hPa height, precipitation type, and windchill) are
+not scored. No page on this site compares UKV with ERA5 before August 2024, and CEDA's archive
+starts in September 2019, so the study tests 2019 and 2020 as well.
 
 | Product | Grid | How read | Served lead |
 |---|---|---|---|
-| ERA5, from Copernicus (wind) and Open-Meteo's copy (temperature) | 0.25 degrees (about 25 km) | The nearest cell at each farm or station; an instantaneous value each hour | An hourly analysis |
+| ERA5, from Copernicus (wind) and Open-Meteo's copy (temperature) | 0.25 degrees (about 25 km) | The nearest cell at each farm or station; an instantaneous value each hour | An hourly analysis, a best estimate of the weather at that hour rather than a forecast |
 | UKV-CEDA, from CEDA's archive of Met Office files in GRIB, the gridded binary format of the World Meteorological Organization | 2 km | The nearest cell, from the freshest run that has started at or before the hour | 0 to 5 hours, because the archive's runs start at 00, 06, 12, and 18 UTC (Coordinated Universal Time) |
 
-**Lead equals the hour of the day modulo 6, so a lead is also an hour of day.** The 06 UTC hour
-reads the 06 UTC run at lead 0, never the 00 UTC run at lead 6. CEDA's archive is 6-hourly and read
-at leads of 0 to 5 hours. The hourly UKV feed that Open-Meteo archives, which the [past-wind
-page](wind.md) used, is read at lead 0, so no result here says how the Open-Meteo feed would
-perform.
+**The served lead, the lead at which the archive's value is read, is the UTC hour minus the start of
+the latest 6-hourly run, so a lead is also an hour of day.** The 06 UTC hour reads the 06 UTC run at
+lead 0, never the 00 UTC run at lead 6. CEDA's archive is 6-hourly and read at leads of 0 to 5
+hours. The hourly UKV feed that Open-Meteo archives, which the [past-wind page](wind.md) used, is
+read at lead 0, so no result here says how the Open-Meteo feed would perform.
 
 ## Data and methods
 
 **Two sets of experiments answer the question, and the rule that combines them was fixed before any
 result.** Set A scores each product against Met Office station readings, with no machine learning.
 Set B fits one XGBoost model per metered generator and per product, and scores the model's power
-error. Four contrasts were planned, each UKV-CEDA minus ERA5 with a negative value favouring
-UKV-CEDA. A planned contrast was written into the study plan before any result existed. Every other
-number on this page is exploratory, and a row added after a result was seen is also labelled
-post hoc.
+error. Four contrasts were planned, P1 to P4, together with P2-lead, a planned split of P2 by lead.
+Each contrast is UKV-CEDA minus ERA5, with a negative value favouring UKV-CEDA. A planned contrast
+was written into the study plan before any result existed. Every other number on this page is
+exploratory, and a row added after a result was seen is also labelled post hoc.
 
 | Label | Set | What it compares | Margin |
 |---|---|---|---|
@@ -195,9 +238,9 @@ did not train on. The Met Office changed UKV's physics on 2019-12-04 and 2026-01
 September to November 2019 (3 scored months), era 1 is 2020-01 to 2026-01 exclusive (67 months), and
 era 2 is 2026-02 onward (8 months). Each era is cut into five folds of whole months, and the fold
 rotation covers every calendar month with a training row. The era is also a column of every XGBoost
-model. The study did not search again for PS44, a possible change of UKV's physics that the
-repository does not record. The repository's roadmap records that no date or content for PS44 could
-be found.
+model. The study did not search again for PS44, a Met Office parallel suite (a numbered package of
+operational model changes) that the repository does not record and that may have changed UKV's
+physics. The repository's roadmap records that no date or content for PS44 could be found.
 
 **Each XGBoost model is fitted three times at each of two hyperparameter settings.** The primary
 setting is `max_depth` 6, `learning_rate` 0.05, `subsample` 0.8, `min_child_weight` 20, `reg_lambda`
@@ -263,8 +306,9 @@ solar XGBoost models given real temperature err by 4.877% (ERA5) and 4.876% (UKV
 power. Figure 4 shows the errors at the primary setting. The matched 10 m XGBoost models err by
 7.312% (ERA5) and 7.817% (UKV-CEDA).
 
-![Figure 4: An XGBoost model given weather that has been shuffled errs about 12 points more than one
-given the real weather](../assets/ukv_ceda_vs_era5/fig04_absolute_errors.svg)
+![Figure 4: A wind-farm XGBoost model given weather that has been shuffled errs about 12 points more
+than a wind-farm XGBoost model given the real
+weather](../assets/ukv_ceda_vs_era5/fig04_absolute_errors.svg)
 
 ### ERA5 gave the lower wind-power error by 0.125 points
 
@@ -334,8 +378,8 @@ the late window (+0.494), and from 2024-08-12 (+0.366 [+0.196, +0.534]). At lead
 trails in the matched pair (+0.292), while the as-available pair is level there (-0.058). At lead 0,
 therefore, the column sets, mostly UKV-CEDA's 925 hPa column, bring the as-available pair level, and
 the lead does not. The UKV-CEDA 10 m XGBoost model errs by more (7.817%) than the as-available
-UKV-CEDA XGBoost model that also reads 925 hPa wind (7.299%). The planned P3 is the smaller of the
-two gaps.
+UKV-CEDA XGBoost model that also reads 925 hPa wind (7.299%). The planned P3 gap (+0.125) is
+therefore smaller than the matched-pair gap (+0.505).
 
 **The matched pair does not show that height is irrelevant.** UKV-CEDA's 10 m wind is closer to the
 stations' 10 m readings than ERA5's (P1, -0.140 m/s) yet a worse predictor of farm power. A 2 km
@@ -488,16 +532,17 @@ physics would make the difference do.
 wind speed, and the point estimates for power differ from ERA5's by less than the planned margins.**
 At lead 0 UKV-CEDA minus ERA5 is -0.250 K [-0.263, -0.237] for temperature and -0.213 m/s [-0.231,
 -0.197] for wind speed. At leads 0 to 1 the differences are -0.214 K [-0.226, -0.204] and -0.177 m/s
-[-0.195, -0.161]. UKV probably assimilates those stations. For wind power, XGBoost models refitted
-on the lead-0 rows alone (24,359 farm-hours) give P3 -0.065 points [-0.203, +0.069], and on leads 0
-to 1 (48,631 farm-hours) +0.007 [-0.107, +0.117]. At lead 0 the interval reaches about 0.2 points in
-UKV-CEDA's favour and at most 0.07 points in ERA5's. The lead-0 interval rules out an ERA5 advantage
-as large as the 0.16-point margin and does not rule out a UKV-CEDA advantage of that size. For solar
-power the refits give -0.007 points [-0.017, +0.004] at lead 0 and -0.010 [-0.020, -0.001] at leads
-0 to 1. The refit on leads 0 to 1 is statistically significant and inside the 0.06-point margin.
-Lead 0 is 00, 06, 12, and 18 UTC, so the lead-0 rows score 4 hours of the day. The analysis-only
-refits ran at the primary setting only. A solar hour's temperature averages the instants at both
-ends of the hour, so a lead-0 solar row also reads the previous run's lead 5.
+[-0.195, -0.161]. UKV probably assimilates those stations, although the page has not checked which
+stations UKV assimilates. For wind power, XGBoost models refitted on the lead-0 rows alone (24,359
+farm-hours) give P3 -0.065 points [-0.203, +0.069], and on leads 0 to 1 (48,631 farm-hours) +0.007
+[-0.107, +0.117]. At lead 0 the interval reaches about 0.2 points in UKV-CEDA's favour and at most
+0.07 points in ERA5's. The lead-0 interval rules out an ERA5 advantage as large as the 0.16-point
+margin and does not rule out a UKV-CEDA advantage of that size. For solar power the refits give
+-0.007 points [-0.017, +0.004] at lead 0 and -0.010 [-0.020, -0.001] at leads 0 to 1. The refit on
+leads 0 to 1 is statistically significant and inside the 0.06-point margin. Lead 0 is 00, 06, 12,
+and 18 UTC, so the lead-0 rows score 4 hours of the day. The analysis-only refits ran at the primary
+setting only. A solar hour's temperature averages the instants at both ends of the hour, so a lead-0
+solar row also reads the previous run's lead 5.
 
 **Answer 2: no UKV-CEDA minus ERA5 difference shows a trend over the years that the study can
 attribute to UKV.** At the stations, the temperature difference has a slope of -0.004 K per year
@@ -540,9 +585,9 @@ difference above 0.009 points. The recommendation carries the costs in [A UKV-CE
 practical costs](#a-ukv-ceda-history-has-practical-costs) and the licence below.
 
 **For training history from 2019, the early-years test passes for UKV-CEDA temperature.** The test
-needs the early window's point estimate below zero and its upper bound below the margin: P2's
-early window is -0.108 K [-0.128, -0.088], with margin 0.035 K. Era 0 holds only 3 months, so the
-early window rests mostly on 2020.
+needs the early window's point estimate below zero and its upper bound below the margin: P2's early
+window is -0.108 K [-0.128, -0.088], with margin 0.035 K, which is 5% of ERA5's error on the
+early-window rows. Era 0 holds only 3 months, so the early window rests mostly on 2020.
 
 **The maintainer has to decide whether the main work's use of UKV-CEDA as training history is
 non-commercial.** CEDA's catalogue record for the NWP-UKV data states the Creative Commons
