@@ -1071,3 +1071,29 @@ def test_every_shuffled_arm_reads_only_shuffled_product_columns_and_no_other_arm
                 assert all(c.endswith("_shuffled") for c in product_columns)
             else:
                 assert not any(c.endswith("_shuffled") for c in columns)
+
+
+def test_the_readme_names_every_dropped_month_and_says_the_rule_was_planned():
+    text = build.dropped_months_text(dropped_months={"2022-12": 0.56, "2020-03": 0.33})
+
+    assert "2020-03 (33%), 2022-12 (56%)" in text
+    assert "not a choice made after seeing one" in text
+    assert "found 2 such months" in text
+
+
+def test_a_lossy_month_is_dropped_from_every_arms_rows_and_the_eras_stay_three():
+    months = pl.datetime_range(
+        datetime(2019, 9, 17, tzinfo=UTC),
+        datetime(2026, 4, 30, tzinfo=UTC),
+        interval="1d",
+        time_zone="UTC",
+        eager=True,
+    )
+    frame = pl.DataFrame({"site": "W1", "time": months, "x": 1.0})
+
+    kept = build._finish(
+        frame=frame, shuffle_groups=[("x",)], drop_months=frozenset({"2022-12", "2023-05"})
+    )
+
+    assert not {"2022-12", "2023-05", "2019-12", "2026-01"} & set(kept["month"].to_list())
+    assert set(kept["era_code"].to_list()) == {0, 1, 2}

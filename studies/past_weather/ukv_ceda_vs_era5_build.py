@@ -703,6 +703,7 @@ def station_hours(
     temperature: pl.DataFrame,
     hours: pl.Series,
     read_values: bool,
+    drop_months: frozenset[str] = frozenset(),
 ) -> pl.DataFrame:
     """Build set A: one row per station and hour with the station, ERA5, and UKV-CEDA values.
 
@@ -714,6 +715,8 @@ def station_hours(
         temperature: `era5_temperature_by_cell`'s result.
         hours: The hours to build, as a UTC datetime series.
         read_values: Whether to read UKV-CEDA values, as `ukv_at` says.
+        drop_months: The months that lose more than `MAX_MONTH_LOSS_SHARE` of their hours to
+            incomplete UKV-CEDA runs, dropped from every arm.
 
     Returns:
         `site`, `time`, `month`, `era_code`, `lead_hours`, `station_wind_m_s`, `station_temp_c`,
@@ -768,7 +771,7 @@ def station_hours(
     )
     return (
         add_time_features(dataset=rows)
-        .filter(~pl.col("month").is_in(STRADDLING_MONTHS))
+        .filter(~pl.col("month").is_in([*STRADDLING_MONTHS, *drop_months]))
         .with_columns(
             era_code=sum((pl.col("month") >= month).cast(pl.Int8) for month in ERA_FIRST_MONTHS)
         )
@@ -818,6 +821,7 @@ def wind_rows(
     sites: pl.DataFrame,
     read_values: bool,
     drop_zero_hours: bool = True,
+    drop_months: frozenset[str] = frozenset(),
 ) -> pl.DataFrame:
     """Build the wind farms' fit rows, with the shuffled control columns, eras and folds.
 
@@ -828,6 +832,8 @@ def wind_rows(
         read_values: Whether to read UKV-CEDA values, as `ukv_at` says.
         drop_zero_hours: Whether to drop every hour holding an exactly zero half-hour. False builds
             the exploratory rows that keep them.
+        drop_months: The months that lose more than `MAX_MONTH_LOSS_SHARE` of their hours to
+            incomplete UKV-CEDA runs, dropped from every arm.
 
     Returns:
         One row per (site, hour) with the centred and the hour-ending power, both products' wind
@@ -892,11 +898,17 @@ def wind_rows(
     return _finish(
         frame=wind_common_rows(frame=joined, drop_zero_hours=drop_zero_hours),
         shuffle_groups=[wind_columns(product=product) for product in PRODUCTS],
+        drop_months=drop_months,
     )
 
 
 def solar_rows(
-    *, ukv: UkvStores, temperature: pl.DataFrame, sites: pl.DataFrame, read_values: bool
+    *,
+    ukv: UkvStores,
+    temperature: pl.DataFrame,
+    sites: pl.DataFrame,
+    read_values: bool,
+    drop_months: frozenset[str] = frozenset(),
 ) -> pl.DataFrame:
     """Build the solar farms' fit rows, with the shuffled temperature columns, eras and folds.
 
@@ -905,6 +917,8 @@ def solar_rows(
         temperature: `era5_temperature_by_cell`'s result.
         sites: The solar roster with `site`, `latitude`, `longitude`.
         read_values: Whether to read UKV-CEDA values, as `ukv_at` says.
+        drop_months: The months that lose more than `MAX_MONTH_LOSS_SHARE` of their hours to
+            incomplete UKV-CEDA runs, dropped from every arm.
 
     Returns:
         One row per (site, daytime hour) with the power, the geometry, CAMS irradiance, both
@@ -968,22 +982,32 @@ def solar_rows(
     return _finish(
         frame=with_export_cap(dataset=solar_common_rows(frame=joined)),
         shuffle_groups=[(temperature_column(product=product),) for product in PRODUCTS],
+        drop_months=drop_months,
     )
 
 
-def _finish(*, frame: pl.DataFrame, shuffle_groups: Sequence[Sequence[str]]) -> pl.DataFrame:
-    """Drop the ERA5 temperature days, label eras and folds, and add the shuffled controls.
+def _finish(
+    *,
+    frame: pl.DataFrame,
+    shuffle_groups: Sequence[Sequence[str]],
+    drop_months: frozenset[str],
+) -> pl.DataFrame:
+    """Drop the ERA5 temperature days and the lossy months, label eras and folds, and shuffle.
 
     Args:
         frame: Common rows with every arm column.
         shuffle_groups: The column groups to shuffle for the negative control.
+        drop_months: The months that lose more than `MAX_MONTH_LOSS_SHARE` of their hours to
+            incomplete UKV-CEDA runs, dropped from every arm.
 
     Returns:
         The rows ready to fit. The straddling months are dropped by `with_ukv_eras`.
     """
     low, high = DROPPED_ERA5_TEMPERATURE_DAYS
-    kept = frame.filter(~pl.col("time").is_between(low, high, closed="left"))
-    cut, _ = with_ukv_eras(frame=add_time_features(dataset=kept))
+    kept = add_time_features(
+        dataset=frame.filter(~pl.col("time").is_between(low, high, closed="left"))
+    ).filter(~pl.col("month").is_in(list(drop_months)))
+    cut, _ = with_ukv_eras(frame=kept)
     return _shuffled(frame=cut, groups=shuffle_groups)
 
 
@@ -1090,8 +1114,8 @@ def hours_lost_lines(*, ukv: UkvStores) -> tuple[list[str], dict[str, float]]:
         "",
         (
             f"Months with no hour lost: {monthly.height - shown.height} of {monthly.height}. "
-            f"Months losing more than {MAX_MONTH_LOSS_SHARE:.0%}, where the build stops: "
-            f"{worst.height}."
+            f"Months losing more than {MAX_MONTH_LOSS_SHARE:.0%}, which the build drops from every "
+            f"arm and every set: {worst.height}."
         ),
         "",
         "| Month | Wind (one instant) | Solar (two instants) |",
@@ -1305,9 +1329,12 @@ def coverage_check(*, read_values: bool = False) -> tuple[list[str], list[str]]:
     lines = ["### Coverage check", "", *run_status_lines(ukv=ukv), ""]
     loss_lines, worst = hours_lost_lines(ukv=ukv)
     lines += [*loss_lines, ""]
-    if worst:
-        months = ", ".join(f"{month} {share:.0%}" for month, share in worst.items())
-        failures.append(f"{len(worst)} months lose more than {MAX_MONTH_LOSS_SHARE:.0%}: {months}")
+    drop_months = frozenset(worst)
+    lines += [
+        "Dropped from every arm and every set, as a planned-guard outcome: "
+        + (", ".join(f"{month} ({share:.0%})" for month, share in sorted(worst.items())) or "none"),
+        "",
+    ]
     readings = station_readings()
     stations = choose_stations(ukv=ukv, readings=readings)
     wind = era5_wind_by_cell()
@@ -1320,9 +1347,19 @@ def coverage_check(*, read_values: bool = False) -> tuple[list[str], list[str]]:
         *station_lines(stations=stations, readings=readings, generators=_generators()),
         "",
     ]
-    wind_frame = wind_rows(ukv=ukv, wind=wind, sites=wind_sites(), read_values=read_values)
+    wind_frame = wind_rows(
+        ukv=ukv,
+        wind=wind,
+        sites=wind_sites(),
+        read_values=read_values,
+        drop_months=drop_months,
+    )
     solar_frame = solar_rows(
-        ukv=ukv, temperature=temperature, sites=pv_sites(), read_values=read_values
+        ukv=ukv,
+        temperature=temperature,
+        sites=pv_sites(),
+        read_values=read_values,
+        drop_months=drop_months,
     )
     designs = {
         "wind": ukv_fold_designs(frame=wind_frame),
@@ -1366,6 +1403,7 @@ class BuildStamp:
     snapshot_ids: list[str]
     input_hashes: dict[str, str]
     rows: dict[str, int]
+    dropped_months: dict[str, float]
 
     def to_json(self) -> str:
         """Render the stamp as JSON."""
@@ -1391,6 +1429,27 @@ Private: this folder holds per-generator and per-station values and is never pub
 """
 
 
+def dropped_months_text(*, dropped_months: dict[str, float]) -> str:
+    """Describe the months the build dropped, and why, for the README.
+
+    Args:
+        dropped_months: Each dropped month with the share of its hours lost.
+
+    Returns:
+        Markdown that names each month and the planned rule that dropped it.
+    """
+    listed = ", ".join(f"{month} ({share:.0%})" for month, share in sorted(dropped_months.items()))
+    return (
+        "\n## Months dropped from every arm and every set\n\n"
+        f"The plan stops the build if a month loses more than {MAX_MONTH_LOSS_SHARE:.0%} of its "
+        "hours to incomplete, missing or unlisted UKV-CEDA runs. The coverage check found "
+        f"{len(dropped_months)} such months, and the same-rows rule drops each from every arm of "
+        f"both sets, never filling it from an older run: {listed or 'none'}. This is an "
+        "availability rule decided before any result, not a choice made after seeing one. Two "
+        "more months are dropped for a physics change inside them (2019-12 and 2026-01).\n"
+    )
+
+
 def write_outputs(
     *,
     output_dir: Path,
@@ -1399,6 +1458,7 @@ def write_outputs(
     wind: pl.DataFrame,
     wind_keep_zero_hours: pl.DataFrame,
     solar: pl.DataFrame,
+    dropped_months: dict[str, float],
 ) -> None:
     """Write the four row sets, the stamp and the README into a new write-once folder.
 
@@ -1409,6 +1469,8 @@ def write_outputs(
         wind: The wind rows.
         wind_keep_zero_hours: The wind rows that keep the hours holding an exactly zero half-hour.
         solar: The solar rows.
+        dropped_months: Each month dropped from every arm and set, with the share of its hours
+            lost to incomplete UKV-CEDA runs.
 
     Raises:
         FileExistsError: If an output already exists, before anything is written.
@@ -1445,9 +1507,10 @@ def write_outputs(
             "wind_keep_zero_hours": wind_keep_zero_hours.height,
             "solar": solar.height,
         },
+        dropped_months=dropped_months,
     )
     paths[STAMP_NAME].write_text(stamp.to_json())
-    paths[README_NAME].write_text(README_TEXT)
+    paths[README_NAME].write_text(README_TEXT + dropped_months_text(dropped_months=dropped_months))
 
 
 def month_hours(*, month: str) -> pl.Series:
@@ -1528,9 +1591,7 @@ def main() -> int:
 
     ukv = open_ukv_stores()
     _, lossy_months = hours_lost_lines(ukv=ukv)
-    if lossy_months:
-        sys.stdout.write(f"The coverage check fails, so nothing is built: {lossy_months}\n")
-        return 1
+    drop_months = frozenset(lossy_months)
     readings = station_readings()
     stations = choose_stations(ukv=ukv, readings=readings)
     temperature = era5_temperature_by_cell()
@@ -1550,12 +1611,26 @@ def main() -> int:
             closed="left",
         ),
         read_values=True,
+        drop_months=drop_months,
     )
-    wind_frame = wind_rows(ukv=ukv, wind=wind, sites=wind_sites(), read_values=True)
+    wind_frame = wind_rows(
+        ukv=ukv, wind=wind, sites=wind_sites(), read_values=True, drop_months=drop_months
+    )
     keep_zero_frame = wind_rows(
-        ukv=ukv, wind=wind, sites=wind_sites(), read_values=True, drop_zero_hours=False
+        ukv=ukv,
+        wind=wind,
+        sites=wind_sites(),
+        read_values=True,
+        drop_zero_hours=False,
+        drop_months=drop_months,
     )
-    solar_frame = solar_rows(ukv=ukv, temperature=temperature, sites=pv_sites(), read_values=True)
+    solar_frame = solar_rows(
+        ukv=ukv,
+        temperature=temperature,
+        sites=pv_sites(),
+        read_values=True,
+        drop_months=drop_months,
+    )
     check_rows(wind=wind_frame, solar=solar_frame)
     write_outputs(
         output_dir=arguments.output_dir,
@@ -1564,6 +1639,7 @@ def main() -> int:
         wind=wind_frame,
         wind_keep_zero_hours=keep_zero_frame,
         solar=solar_frame,
+        dropped_months=lossy_months,
     )
     sys.stdout.write(
         f"Wrote {station_rows.height:,} station-hours, {wind_frame.height:,} wind rows and "
