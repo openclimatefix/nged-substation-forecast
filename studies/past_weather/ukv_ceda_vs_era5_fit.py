@@ -73,7 +73,7 @@ from studies.cross_validation import (
 from studies.guards import refuse_to_overwrite
 from studies.ukv_ceda_stores import ERA_FIRST_MONTHS, STRADDLING_MONTHS
 from ukv_ceda_station_scores import INTERVALS_NAME as STATION_INTERVALS_NAME
-from ukv_ceda_station_scores import PRIMARY_SCORE, monthly_trend
+from ukv_ceda_station_scores import PRIMARY_SCORE, TREND_BLOCKS, monthly_trend
 from ukv_ceda_vs_era5_build import (
     EARLY_END_MONTH,
     MARGIN_SOLAR_PP,
@@ -731,7 +731,13 @@ def contrast_record(
 
 
 def trend_record(
-    *, losses: pl.DataFrame, domain: DomainType, setting: str, planned: Planned
+    *,
+    losses: pl.DataFrame,
+    domain: DomainType,
+    setting: str,
+    planned: Planned,
+    scope: str = "slope per year",
+    block_months: int = 1,
 ) -> IntervalRecord:
     """Record the slope per year of a contrast's monthly mean difference, post hoc.
 
@@ -740,6 +746,8 @@ def trend_record(
         domain: The domain.
         setting: The setting the losses were fitted at.
         planned: The contrast.
+        scope: The record's scope.
+        block_months: The run length of the month resampling.
 
     Returns:
         A record whose differences are the slope per year in points of capacity, with no margin. It
@@ -751,7 +759,9 @@ def trend_record(
     )
     slope, lower, upper = (
         value * PERCENTAGE_POINTS
-        for value in monthly_trend(values=differences.mean(axis=0), months=months)
+        for value in monthly_trend(
+            values=differences.mean(axis=0), months=months, block_months=block_months
+        )
     )
     return {
         "domain": domain,
@@ -759,7 +769,7 @@ def trend_record(
         "label": f"{planned.label} trend per year",
         "planned": False,
         "kind": "trend",
-        "scope": "slope per year",
+        "scope": scope,
         "treatment": planned.treatment,
         "reference": planned.reference,
         "treatment_mae_pp": float("nan"),
@@ -827,9 +837,27 @@ def domain_records(*, domain: DomainType, losses: pl.DataFrame) -> list[Interval
                     )
                 )
             if planned.registered:
-                records.append(
-                    trend_record(losses=pair, domain=domain, setting=setting, planned=planned)
-                )
+                records += [
+                    trend_record(losses=pair, domain=domain, setting=setting, planned=planned),
+                    *(
+                        trend_record(
+                            losses=pair,
+                            domain=domain,
+                            setting=setting,
+                            planned=planned,
+                            scope=f"slope per year, {block}-month blocks",
+                            block_months=block,
+                        )
+                        for block in TREND_BLOCKS
+                    ),
+                    trend_record(
+                        losses=pair.filter(pl.col("month") < ERA_FIRST_MONTHS[1]),
+                        domain=domain,
+                        setting=setting,
+                        planned=planned,
+                        scope="slope per year, without era 2",
+                    ),
+                ]
             if domain in POST_HOC_DOMAINS:
                 records += [
                     contrast_record(
@@ -1664,6 +1692,12 @@ def report_text(
             "no real effect behind it has a nominal 5% chance of reaching that level, the number "
             "of rows with no real effect is unknown, and the rows share their months, so "
             "spurious results cluster. The page does not correct for multiple comparisons."
+        ),
+        (
+            f"- Of those, {sum(r['domain'] == 'wind_matched' for r in significant)} come from the "
+            "matched 10 m pair and "
+            f"{sum(r['kind'] == 'hour' for r in significant)} are splits by UTC hour, so the "
+            "statistically significant splits are not that many independent findings."
         ),
         (
             f"- Separately, {len(significant_controls)} of {len(controls_primary)} controls and "

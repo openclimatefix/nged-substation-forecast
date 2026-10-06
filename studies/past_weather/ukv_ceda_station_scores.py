@@ -77,6 +77,9 @@ PRIMARY_SCORE: Final[str] = SCORES[0]
 TREND_RESAMPLES: Final[int] = 2000
 """How many times `monthly_trend` resamples the months."""
 
+TREND_BLOCKS: Final[tuple[int, int]] = (6, 12)
+"""The run lengths, in months, of the block resamples that keep neighbouring months together."""
+
 TREND_SEED: Final[int] = 1024
 """Seeds the month resampling of `monthly_trend`."""
 
@@ -184,16 +187,22 @@ def scored_rows(*, frame: pl.DataFrame, variable: Variable) -> pl.DataFrame:
     )
 
 
-def monthly_trend(*, values: np.ndarray, months: np.ndarray) -> tuple[float, float, float]:
+def monthly_trend(
+    *, values: np.ndarray, months: np.ndarray, block_months: int = 1
+) -> tuple[float, float, float]:
     """Fit a straight line through the monthly means of a per-row value, and interval its slope.
 
     The line is fitted to one mean per calendar month against the month's time in years. The
-    interval resamples whole months with replacement, so it covers month-to-month weather and
-    nothing else. An era or a physics change inside the record is a step, which a line smooths.
+    interval resamples whole months with replacement, or, where `block_months` exceeds 1, runs of
+    that many consecutive months, which keeps the correlation between neighbouring months. It
+    covers month-to-month weather and nothing else. An era or a physics change inside the record
+    is a step, which a line smooths.
 
     Args:
         values: One value per row.
         months: Each row's `%Y-%m` label.
+        block_months: The length of the runs of consecutive months that each resample draws. A
+            month absent from the record leaves a gap that a run simply spans.
 
     Returns:
         The slope per year, and the 2.5th and 97.5th percentiles of the resampled slopes. All are
@@ -211,18 +220,25 @@ def monthly_trend(*, values: np.ndarray, months: np.ndarray) -> tuple[float, flo
         return float((centred * (y - y.mean())).sum() / spread) if spread > 0.0 else float("nan")
 
     generator = np.random.default_rng(TREND_SEED)
-    draws = generator.integers(0, len(labels), size=(TREND_RESAMPLES, len(labels)))
+    block = min(block_months, len(labels))
+    n_blocks = -(-len(labels) // block)
+    starts = generator.integers(0, len(labels) - block + 1, size=(TREND_RESAMPLES, n_blocks))
+    draws = (starts[:, :, None] + np.arange(block)).reshape(TREND_RESAMPLES, -1)[:, : len(labels)]
     slopes = np.array([slope(years[draw], means[draw]) for draw in draws])
     lower, upper = np.nanpercentile(slopes, [2.5, 97.5])
     return slope(years, means), float(lower), float(upper)
 
 
-def trend_record(*, rows: pl.DataFrame, variable: Variable) -> IntervalRecord:
+def trend_record(
+    *, rows: pl.DataFrame, variable: Variable, scope: str = "slope per year", block_months: int = 1
+) -> IntervalRecord:
     """Record the slope per year of UKV-CEDA minus ERA5 on the primary score, post hoc.
 
     Args:
         rows: Scored rows from `scored_rows`.
         variable: The variable.
+        scope: The record's scope.
+        block_months: The run length of the month resampling.
 
     Returns:
         A record whose `difference` is the slope per year, in the variable's unit per year, with no
@@ -232,13 +248,14 @@ def trend_record(*, rows: pl.DataFrame, variable: Variable) -> IntervalRecord:
         values=rows[f"abs_ukv_{PRIMARY_SCORE}"].to_numpy()
         - rows[f"abs_era5_{PRIMARY_SCORE}"].to_numpy(),
         months=rows["month"].to_numpy(),
+        block_months=block_months,
     )
     return {
         "variable": variable.name,
         "label": "post hoc trend per year",
         "planned": False,
         "score": PRIMARY_SCORE,
-        "scope": "slope per year",
+        "scope": scope,
         "era5_mae": float("nan"),
         "ukv_mae": float("nan"),
         "difference": slope,
@@ -398,6 +415,23 @@ def variable_records(*, frame: pl.DataFrame, variable: Variable) -> list[Interva
         if rows.filter(condition).height
     ]
     records.append(trend_record(rows=rows, variable=variable))
+    records += [
+        trend_record(
+            rows=rows,
+            variable=variable,
+            scope=f"slope per year, {block}-month blocks",
+            block_months=block,
+        )
+        for block in TREND_BLOCKS
+    ]
+    records += [
+        trend_record(
+            rows=rows.filter(pl.col("site") == site),
+            variable=variable,
+            scope=f"slope per year, station {site}",
+        )
+        for site in sorted(rows["site"].unique().to_list())
+    ]
     records += [
         interval_record(
             rows=rows.filter(pl.col("site") != site),

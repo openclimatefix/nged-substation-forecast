@@ -49,38 +49,50 @@ three wind farms ERA5 gives the lower power error, and the choice does not move 
 ## Answers to the two questions: UKV-CEDA's first leads alone, and change over the years
 
 **Question 1: if only UKV-CEDA's first leads are used, as if they were an analysis, UKV-CEDA is
-closer than ERA5 at the four stations for temperature and wind speed, and it is not detectably
-different from ERA5 for wind power or solar power (post hoc).** At the four stations, UKV-CEDA minus
-ERA5 is -0.250 K [-0.263, -0.237] at lead 0 and -0.214 K [-0.226, -0.204] at leads 0 to 1 for
-temperature, and -0.213 m/s [-0.231, -0.197] and -0.177 m/s [-0.195, -0.161] for wind speed. Those
-are the stations that UKV probably assimilates. For wind power, the models given each product's wind
-were refitted on the lead-0 rows alone (24,359 rows): P3 is -0.065 points [-0.203, +0.069], and at
-leads 0 to 1 (48,631 rows) it is +0.007 points [-0.107, +0.117]. Scored from the models trained on
-every lead, P3 is -0.058 [-0.192, +0.070] at lead 0 and +0.017 [-0.094, +0.124] at leads 0 to 1. The
-intervals cannot exclude a gap of 0.2 points either way. For solar power, the refit on lead-0 rows
-(20,429 rows) gives -0.007 points [-0.017, +0.004] and at leads 0 to 1 (40,897 rows) -0.010 points
-[-0.020, -0.001], which is statistically significant and inside the 0.06-point margin. A solar
-hour's temperature averages the instants at both ends of the hour, so a lead-0 solar row also reads
-the previous run's lead 5. The study therefore finds a station-temperature and station-wind
-advantage for the analysis-like leads, and no demonstrated gain in the power forecasts.
+closer than ERA5 at the four stations for temperature and wind speed, and it differs from ERA5 by
+less than the planned margins for wind power and solar power (post hoc).** At the four stations,
+UKV-CEDA minus ERA5 is -0.250 K [-0.263, -0.237] at lead 0 and -0.214 K [-0.226, -0.204] at leads 0
+to 1 for temperature, and -0.213 m/s [-0.231, -0.197] and -0.177 m/s [-0.195, -0.161] for wind
+speed. Those are the stations that UKV probably assimilates. For wind power, the models given each
+product's wind were refitted on the lead-0 rows alone (24,359 rows): P3 is -0.065 points [-0.203,
++0.069], and at leads 0 to 1 (48,631 rows) it is +0.007 points [-0.107, +0.117]. Scored from the
+models trained on every lead, P3 is -0.058 [-0.192, +0.070] at lead 0 and +0.017 [-0.094, +0.124] at
+leads 0 to 1. At lead 0 the intervals reach about 0.2 points in UKV-CEDA's favour and at most 0.07
+points in ERA5's, so they rule out an ERA5 advantage as large as the 0.16-point margin. They do not
+rule out a UKV-CEDA advantage of that size. At leads 0 to 1 they rule out a gap larger than about
+0.12 points either way. For solar power, the refit on lead-0 rows (20,429 rows) gives -0.007 points
+[-0.017, +0.004] and at leads 0 to 1 (40,897 rows) -0.010 points [-0.020, -0.001], which is
+statistically significant and inside the 0.06-point margin. Lead 0 is 00, 06, 12, and 18 UTC, so
+these rows score those four hours of the day only, and the analysis-only refits ran at the primary
+setting only. A solar hour's temperature averages the instants at both ends of the hour, so a lead-0
+solar row also reads the previous run's lead 5. The study therefore finds a station-temperature and
+station-wind advantage for the analysis-like leads, and no gain in the power forecasts as large as
+the planned margins.
 
-**Question 2: the UKV-CEDA minus ERA5 difference shows no clean trend over the years, apart from a
-slow growth in UKV-CEDA's wind-speed advantage at the stations (post hoc).** At the stations, the
-temperature difference by year runs from -0.098 K (2020) to -0.158 K (2022) and -0.116 K (2025),
-with a slope of -0.004 K per year [-0.010, +0.002], and the wind-speed difference runs from -0.106
-m/s (2020) to -0.184 m/s (2025), with a slope of -0.012 m/s per year [-0.020, -0.005], so UKV-CEDA's
-wind advantage grew slightly. For power, P3 by year runs from +0.176 (2020) through -0.004 (2022) to
--0.159 (2026), with a slope of -0.040 points per year [-0.088, +0.008], and P4 has a slope of -0.000
-points per year [-0.003, +0.002]. By UKV era, set A has no data from era 2, and the temperature
-difference is -0.144 K (era 0, three months, no interval) and -0.123 K [-0.135, -0.112] (era 1), the
-wind-speed difference -0.143 m/s (era 0) and -0.140 m/s [-0.156, -0.124] (era 1), so the 2019-12-04
-physics change shows no visible step. For power, P3 is +0.293 (era 0, no interval), +0.154 [+0.057,
-+0.247] (era 1), and -0.159 [-0.340, +0.045] (era 2), and P4 is -0.016 (era 0), +0.001 [-0.004,
-+0.005] (era 1), and -0.016 [-0.051, +0.005] (era 2). The date of PS44 is unknown, and no step in
-UKV-CEDA minus ERA5 appears in the monthly series. Only three eras exist, era 0 holds 3 months, and
-era 2 holds 8 months, 6 of them in April to September, so the eras cannot separate a change of UKV
-from the season. A line smooths a step, and every interval covers month-to-month weather only. The
-early-window and third-era rows quoted later in the page are the same kind of evidence.
+**Question 2: no UKV-CEDA minus ERA5 difference shows a trend over the years that the study can
+attribute to UKV (post hoc).** At the stations, the temperature difference by year runs from -0.098
+K (2020) to -0.158 K (2022) and -0.116 K (2025), with a slope of -0.004 K per year [-0.010, +0.002],
+and the wind-speed difference runs from -0.106 m/s (2020) to -0.184 m/s (2025), with a slope of
+-0.012 m/s per year [-0.020, -0.005]. That interval treats months as independent, and neighbouring
+months are correlated. With resampled runs of 6 consecutive months the interval is [-0.019, +0.000],
+and with runs of 12 months [-0.015, +0.002]. By station, the wind slope is -0.026 m/s per year
+[-0.040, -0.011] at S3 and -0.004, -0.003, and -0.004 (none statistically significant) at S1, S2,
+and S4. One station carries the slope, and a station-side change, such as the step the stations
+share around August 2021, fits as well as a change in UKV, so the page reads the wind slope as
+exploratory and fragile and not as a change in UKV. For power, P3 by year runs from +0.176 (2020)
+through -0.004 (2022) to -0.159 (2026), with a slope of -0.040 points per year [-0.088, +0.008].
+Without the 8 months of 2026 that slope is -0.020 [-0.082, +0.037], so half of it comes from 2026.
+P4 has a slope of -0.000 points per year [-0.003, +0.002]. By UKV era, set A has no data from era 2,
+and the temperature difference is -0.144 K (era 0, three months, no interval) and -0.123 K [-0.135,
+-0.112] (era 1), the wind-speed difference -0.143 m/s (era 0) and -0.140 m/s [-0.156, -0.124] (era
+1), so the 2019-12-04 physics change shows no visible step. For power, P3 is +0.293 (era 0, no
+interval), +0.154 [+0.057, +0.247] (era 1), and -0.159 [-0.340, +0.045] (era 2), and P4 is -0.016
+(era 0), +0.001 [-0.004, +0.005] (era 1), and -0.016 [-0.051, +0.005] (era 2). The date of PS44 is
+unknown, and no step in UKV-CEDA minus ERA5 appears in the monthly series. Only three eras exist,
+era 0 holds 3 months, and era 2 holds 8 months, 6 of them in April to September, so the eras cannot
+separate a change of UKV from the season. A line smooths a step, and every interval covers
+month-to-month weather only. The early-window and third-era rows quoted later in the page are the
+same kind of evidence.
 
 ## Key findings
 
@@ -228,10 +240,11 @@ only in the solar rows, which leaves CAMS's irradiance intact). Two shuffled XGB
 weather information, so their difference should be about zero. The power-hour scan refits both wind
 XGBoost models on one row set with the power of the hour centred on the label, ending at it, and
 starting at it. One ERA5 wind XGBoost model was refitted on the CPU, to measure the difference
-between a GPU fit and a CPU fit. Four post hoc additions came after the first results: single-lead
-and leave-one-out rows, the analysis-only refits (each product's XGBoost model trained and scored on
-the lead-0 rows, or the lead-0 and lead-1 rows, alone), a straight-line slope per year through the
-monthly mean differences (the interval resamples whole months), and the matched 10 m pair.
+between a GPU fit and a CPU fit. Several post hoc additions came after the first results, and
+[Limitations](#limitations) lists them all: single-lead and leave-one-out rows, the analysis-only
+refits (each product's XGBoost model trained and scored on the lead-0 rows, or the lead-0 and lead-1
+rows, alone), a straight-line slope per year through the monthly mean differences (the interval
+resamples whole months, or runs of 6 or 12 months), and the matched 10 m pair.
 
 **Every XGBoost model was fitted on one NVIDIA RTX A6000 GPU with XGBoost 3.4.1, apart from the CPU
 refit.** The fits ran on 2026-10-06. GPU and CPU results are not bit-identical, so the page keeps
@@ -334,13 +347,13 @@ XGBoost model being given a 100 m column (post hoc).** The two matched XGBoost m
 columns: the 3 shared columns and the 10 m speed, sine, and cosine. The pair is ahead in every lead
 (+0.292 at lead 0 to +0.714 at lead 5), in the early window (+0.577) and the late window (+0.494),
 and from 2024-08-12 (+0.366 [+0.196, +0.534]). The matched pair trails at lead 0 too (+0.292), while
-the as-available pair is level there (-0.058), so the 925 hPa column, not the lead, is what brings
-the as-available pair level at lead 0. The UKV-CEDA 10 m model errs by more (7.817%) than the
-as-available UKV-CEDA model that also reads 925 hPa wind (7.299%), and the planned P3 is the smaller
-of the two gaps. The pair does not show that height is irrelevant: UKV-CEDA's 10 m wind is closer to
-the stations' 10 m readings than ERA5's (P1, -0.140 m/s) yet a worse predictor of farm power, which
-may reflect a 2 km surface wind that decouples from hub-height flow. The matched pair is post hoc
-and does not change the planned decision.
+the as-available pair is level there (-0.058), so at lead 0 the column sets, mostly UKV-CEDA's 925
+hPa column, bring the as-available pair level, and the lead does not. The UKV-CEDA 10 m model errs
+by more (7.817%) than the as-available UKV-CEDA model that also reads 925 hPa wind (7.299%), and the
+planned P3 is the smaller of the two gaps. The pair does not show that height is irrelevant:
+UKV-CEDA's 10 m wind is closer to the stations' 10 m readings than ERA5's (P1, -0.140 m/s) yet a
+worse predictor of farm power, which may reflect a 2 km surface wind that decouples from hub-height
+flow. The matched pair is post hoc and does not change the planned decision.
 
 ### UKV-CEDA's temperature is closer at four stations, and less so at longer leads
 
@@ -407,10 +420,14 @@ better noise floor, the refit of the same ERA5 wind XGBoost model on the CPU, wh
 GPU fit by -0.003 points [-0.014, +0.009]. Read P3 as a small difference that the study can resolve,
 and not as one that the shuffled control validates.
 
-**Nine of the 12 controls and replications are statistically significant, and that is expected.**
-Each product's XGBoost model against its own shuffled copy is significant (wind -12.415 points for
-ERA5 and -12.339 for UKV-CEDA, solar -0.021 and -0.026), because real weather carries information
-that shuffled weather does not.
+**Sixteen of the 19 controls and replications are statistically significant, and that is expected.**
+The three that are not are the two negative controls and the refit on the CPU. Four of the 16 are
+each product's XGBoost model against its own shuffled copy (wind -12.415 points for ERA5 and -12.339
+for UKV-CEDA, solar -0.021 and -0.026), significant because real weather carries information that
+shuffled weather does not. The other twelve are the power-hour checks and the keep-zero-hours
+replications. A power-hour offset measures the convention and says nothing about the products,
+because moving the hour is expected to change the error, and a replication of P3 is significant
+because P3 is.
 
 **The decision holds under three power-hour conventions, and the size of P3 does not.** On one row
 set of 143,555 rows, the UKV-CEDA minus ERA5 wind gap is +0.125 [+0.032, +0.217] with the hour
@@ -518,11 +535,13 @@ reaches adapted material is not settled here.
   archives.
 - **ERA5 is read at the nearest 0.25 degree cell.** The temperature comes from Open-Meteo's copy of
   the Copernicus archive, which disagrees with Copernicus on 12 days that the study drops.
-- **The significance statements cover month-to-month weather and the seed.** Of the 66 exploratory
-  and post hoc splits of the UKV-CEDA against ERA5 contrasts at the primary setting, 28 are
-  statistically significant at the 5% level; a split with no real effect has a nominal 5% chance of
-  reaching it, and the page does not correct for that. Separately, 9 of the 12 controls and
-  replications are significant, as the controls section explains.
+- **The significance statements cover month-to-month weather and the seed.** Of the 221 exploratory
+  and post hoc splits of the UKV-CEDA against ERA5 contrasts at the primary setting, 73 are
+  statistically significant at the 5% level, but 47 of the 73 come from the matched 10 m pair and 32
+  are splits by UTC hour, so they are not that many independent findings. A split with no real
+  effect has a nominal 5% chance of reaching the level, and the page does not correct for that.
+  Separately, 16 of the 19 controls and replications are significant, as the controls section
+  explains.
 - **The figures rest on the `effective_capacity` table at Delta version 1, read when the rows were
   built on 2026-10-06.** Each generator's capacity is its 99th percentile of output from that table,
   so a rebuilt table would move every figure.
@@ -535,7 +554,8 @@ reaches adapted material is not settled here.
   row set is the intersection of the centred and hour-ending power targets; the search for PS44 was
   not repeated; and post hoc rows were added after the first results (each single lead and
   leave-one-station-out in set A, the lead, UTC-hour, published-window, and era splits of P3, the
-  matched 10 m pair, the power-hour scan, the analysis-only refits, and the slopes per year).
+  matched 10 m pair, the power-hour scan, the analysis-only refits, and the slopes per year with
+  their block-bootstrap and per-station variants).
 
 ## Scope
 

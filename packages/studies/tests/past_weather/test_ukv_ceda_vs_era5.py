@@ -20,7 +20,7 @@ import ukv_ceda_vs_era5_charts as charts
 import ukv_ceda_vs_era5_fit as fit
 import ukv_ceda_vs_era5_verify as verify
 from studies.ukv_ceda_profiles import DEFAULT_PROFILE, STATUS_COMPLETE, STATUS_PARTIAL
-from studies.ukv_ceda_stores import make_stores
+from studies.ukv_ceda_stores import ERA_FIRST_MONTHS, make_stores
 
 UTC_US: Final[pl.Datetime] = pl.Datetime("us", "UTC")
 
@@ -1647,3 +1647,67 @@ def test_the_third_era_line_counts_how_many_of_its_months_fall_in_april_to_septe
     assert any(
         "8 scored months (2026-02 to 2026-09), 6 fall in April to September" in x for x in lines
     )
+
+
+def test_a_block_resample_gives_a_wider_interval_than_independent_months_for_a_correlated_series():
+    months = np.array([f"{2020 + m // 12}-{m % 12 + 1:02d}" for m in range(48) for _ in range(3)])
+    rng = np.random.default_rng(3)
+    walk = np.cumsum(rng.normal(0, 1.0, 48))
+    values = np.repeat(walk, 3)
+
+    iid = scores.monthly_trend(values=values, months=months)
+    blocked = scores.monthly_trend(values=values, months=months, block_months=12)
+
+    assert iid[0] == blocked[0]
+    assert blocked[2] - blocked[1] > iid[2] - iid[1]
+
+
+def test_a_block_longer_than_the_record_is_cut_to_the_record():
+    months = np.array(["2020-01", "2020-02", "2020-03", "2020-04"])
+
+    slope, lower, upper = scores.monthly_trend(
+        values=np.array([1.0, 2.0, 3.0, 4.0]), months=months, block_months=12
+    )
+
+    assert (slope, lower, upper) == pytest.approx((12.0, 12.0, 12.0))
+
+
+def test_set_a_prints_block_and_per_station_slopes_beside_the_trend():
+    frame = pl.concat(
+        [_station_frame(months=8).with_columns(site=pl.lit(site)) for site in ("S1", "S2", "S3")]
+    ).with_columns(lead_hours=pl.col("time").dt.hour() % 6)
+
+    records = scores.variable_records(frame=frame, variable=scores.VARIABLES[0])
+
+    scopes = [r["scope"] for r in records if r["label"] == "post hoc trend per year"]
+    assert scopes == [
+        "slope per year",
+        "slope per year, 6-month blocks",
+        "slope per year, 12-month blocks",
+        "slope per year, station S1",
+        "slope per year, station S2",
+        "slope per year, station S3",
+    ]
+
+
+def test_the_set_b_trend_is_also_printed_without_era_2_and_with_month_blocks():
+    losses = _hourly_losses()
+    records = fit.domain_records(domain="wind", losses=losses)
+
+    trends = {
+        r["scope"]: r
+        for r in records
+        if r["kind"] == "trend" and r["setting"] == "pooled" and r["label"] == "P3 trend per year"
+    }
+
+    assert set(trends) == {
+        "slope per year",
+        "slope per year, 6-month blocks",
+        "slope per year, 12-month blocks",
+        "slope per year, without era 2",
+    }
+    months = losses["month"].unique().to_list()
+    before_the_upgrade = [m for m in months if m < ERA_FIRST_MONTHS[1]]
+    assert 0 < len(before_the_upgrade) < len(months)
+    assert trends["slope per year"]["n_months"] == len(months)
+    assert trends["slope per year, without era 2"]["n_months"] == len(before_the_upgrade)
