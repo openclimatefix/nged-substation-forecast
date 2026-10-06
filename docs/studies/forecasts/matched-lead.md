@@ -1990,15 +1990,13 @@ and the seeds 0, 1, and 2. Every extra and AIFS fit uses the primary setting on 
 deciding pair, every deciding contrast of the blends fit, and every AIFS pair near the 5% line are
 also fitted at the sensitivity setting, and the P4 refit is fitted at both settings.
 
-**The outputs of the extra arms are in seven write-once folders.** Batches 1 to 4 write to
-`data/studies/nwp_forecast_comparison_leads_day10`, `..._day10b`, `..._day10c`, and `..._day10d`,
-the day-1 and day-2 AIFS arms write to `data/studies/nwp_forecast_comparison_aifs`, the AIFS blends
-and the day-7 and day-14 AIFS arms write to `data/studies/nwp_forecast_comparison_aifs_blends`, and
-the GPU refit of the P4 blends with two shuffle seeds writes to
-`data/studies/nwp_forecast_comparison_p4_seeds`. Each folder holds the extra inputs, the losses and
-predictions, `report.md`, and a `verification/` directory. The folder
-`data/studies/nwp_forecast_comparison_leads` holds an earlier run of batch 1's arms, and the charts
-and tables do not read it.
+**The outputs of the extra arms are in seven write-once folders.** Each folder is under
+`data/studies/per_study/nwp_forecast_comparison/`. Batches 1 to 4 write to `leads_day10`,
+`leads_day10b`, `leads_day10c`, and `leads_day10d`, the day-1 and day-2 AIFS arms write to `aifs`,
+the AIFS blends and the day-7 and day-14 AIFS arms write to `aifs_blends`, and the GPU refit of the
+P4 blends with two shuffle seeds writes to `p4_seeds`. Each folder holds the extra inputs, the
+losses and predictions, `report.md`, and a `verification/` directory. The folder `leads` holds an
+earlier run of batch 1's arms, and the charts and tables do not read it.
 <!-- report: Design constants -->
 
 ## Reproducing this page
@@ -2014,15 +2012,15 @@ from the repository root, in this order. The verification scripts write the `ver
 directories that the reports quote.
 
 ```bash
-P=data/studies/nwp_forecast_comparison
-D1=data/studies/nwp_forecast_comparison_leads_day10
-D2=data/studies/nwp_forecast_comparison_leads_day10b
-D3=data/studies/nwp_forecast_comparison_leads_day10c
-D4=data/studies/nwp_forecast_comparison_leads_day10d
-A=data/studies/nwp_forecast_comparison_aifs
-AB=data/studies/nwp_forecast_comparison_aifs_blends
-PS=data/studies/nwp_forecast_comparison_p4_seeds
-W=data/studies/nwp_forecast_comparison_wn3
+P=data/studies/per_study/nwp_forecast_comparison/original
+D1=data/studies/per_study/nwp_forecast_comparison/leads_day10
+D2=data/studies/per_study/nwp_forecast_comparison/leads_day10b
+D3=data/studies/per_study/nwp_forecast_comparison/leads_day10c
+D4=data/studies/per_study/nwp_forecast_comparison/leads_day10d
+A=data/studies/per_study/nwp_forecast_comparison/aifs
+AB=data/studies/per_study/nwp_forecast_comparison/aifs_blends
+PS=data/studies/per_study/nwp_forecast_comparison/p4_seeds
+W=data/studies/per_study/nwp_forecast_comparison/wn3
 R=studies/nwp_forecast_comparison
 
 # The published run
@@ -2091,8 +2089,8 @@ uv run python $R/dot_interval_vs_ens.py --first-figure-number 1
 ```
 
 The third command writes `solar_forecast_inputs.parquet` and `wind_forecast_inputs.parquet` under
-`data/studies/nwp_forecast_comparison/`. The fourth command fits every arm and saves
-`<domain>_losses.parquet` and `<domain>_predictions.parquet` there. The fifth command rewrites
+`data/studies/per_study/nwp_forecast_comparison/original/`. The fourth command fits every arm and
+saves `<domain>_losses.parquet` and `<domain>_predictions.parquet` there. The fifth command rewrites
 `report.md` from the saved losses without fitting again. In each batch, the build writes the extra
 inputs on the published inputs' own `(site, time)` keys, and `--check` fits one arm at one generator
 twice on a GPU and stops unless the two runs agree. Each later batch takes one `--context-dir` for
@@ -2103,15 +2101,15 @@ wiring, and fit. The blends commands do the same at days 1, 2, 7, and 14, and th
 the published blends on the GPU with two shuffle seeds. The third chart command draws only the two
 AIFS lead charts (Figures 17 and 18). The dot command draws the two dot-and-interval figures
 (Figures 1 and 2) and writes its own `report.md` and `intervals.parquet` to
-`data/studies/nwp_forecast_comparison_vs_ens_dots_final`. Every extra folder is write-once: the
-scripts refuse to overwrite it, and never write to the published folder. The chart script runs `npx
-svgo@4 --multipass --precision=1 --final-newline` on every SVG it writes and reads every folder. The
-dot command runs last, and its script runs the same `svgo` command.
+`data/studies/per_study/nwp_forecast_comparison/vs_ens_dots_final`. Every extra folder is
+write-once: the scripts refuse to overwrite it, and never write to the published folder. The chart
+script runs `npx svgo@4 --multipass --precision=1 --final-newline` on every SVG it writes and reads
+every folder. The dot command runs last, and its script runs the same `svgo` command.
 
 **The inputs are on disk and cannot all be downloaded again.** The build reads the finished GEFS
-download in `data/studies/weather/GEFS_window_2024-11-01_None/`, each Previous Runs product's
+download in `data/studies/downloads/NWP/windows/GEFS_window_2024-11-01_None/`, each Previous Runs product's
 `combined.parquet`, and the native GFS, IFS HRES 9 km, and AIFS downloads under
-`data/studies/weather/`. Dynamical.org's access ends on 2026-09-30. Every worktree writes to the
+`data/studies/downloads/NWP/`. Dynamical.org's access ends on 2026-09-30. Every worktree writes to the
 main checkout's `data/studies/`, so move the saved outputs to `superseded/` before re-running
 the fourth command.
 <!-- plan: Process and constraints -->

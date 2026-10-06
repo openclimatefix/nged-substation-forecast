@@ -16,7 +16,7 @@ import polars as pl
 
 from studies.cross_validation import HyperParameters, out_of_fold_losses
 from studies.fractions_skill_score import MONTH_FORMAT
-from studies.sources import STUDY_DATA_DIR
+from studies.sources import STUDY_INPUTS_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ makes any advantage arm C shows a lower bound on what a transposition model woul
 
 def dataset_path_for(*, source: str) -> Path:
     """Return the frame `build_dataset.py` wrote for one ERA5 source."""
-    return STUDY_DATA_DIR / f"beam_diffuse_dataset_{source}.parquet"
+    return STUDY_INPUTS_DIR / f"beam_diffuse_dataset_{source}.parquet"
 
 
 def add_time_features(*, dataset: pl.DataFrame) -> pl.DataFrame:

@@ -630,9 +630,9 @@ def test_the_day_4_and_day_5_folders_are_default_sources(tmp_path: Path) -> None
 
     sources = mod.default_sources(data_dir=tmp_path, domain="solar")
 
-    assert tmp_path / "nwp_forecast_comparison_day4_shared" in sources.extra_dirs
+    assert tmp_path / "nwp_forecast_comparison/day4_shared" in sources.extra_dirs
     assert sources.day5 == charts.DayFolder(
-        folder=tmp_path / "nwp_forecast_comparison_day5_aifs_wn3", days=(5,)
+        folder=tmp_path / "nwp_forecast_comparison/day5_aifs_wn3", days=(5,)
     )
     assert mod.DAY5 == (5,)
 
@@ -640,11 +640,11 @@ def test_the_day_4_and_day_5_folders_are_default_sources(tmp_path: Path) -> None
 @pytest.mark.parametrize(
     "missing",
     [
-        "nwp_forecast_comparison_day4_shared/wind_losses.parquet",
-        "nwp_forecast_comparison_day5_aifs_wn3/wind_single_day5_losses.parquet",
-        "nwp_forecast_comparison_day5_aifs_wn3/wind_ens_day5_losses.parquet",
-        "nwp_forecast_comparison_day5_aifs_wn3/wind_wn3_day5_losses.parquet",
-        "nwp_forecast_comparison_wn3_extra_days/wind_wn3_day10_losses.parquet",
+        "nwp_forecast_comparison/day4_shared/wind_losses.parquet",
+        "nwp_forecast_comparison/day5_aifs_wn3/wind_single_day5_losses.parquet",
+        "nwp_forecast_comparison/day5_aifs_wn3/wind_ens_day5_losses.parquet",
+        "nwp_forecast_comparison/day5_aifs_wn3/wind_wn3_day5_losses.parquet",
+        "nwp_forecast_comparison/wn3_extra_days/wind_wn3_day10_losses.parquet",
     ],
 )
 def test_a_missing_default_file_raises_naming_it(tmp_path: Path, missing: str) -> None:

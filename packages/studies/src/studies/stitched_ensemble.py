@@ -2,8 +2,8 @@
 
 Open-Meteo's ensemble-mean archive serves, for each hour, a mean from the newest run that covers
 the hour, with no run time attached. The functions here build the same kind of series from this
-repository's own ensemble table (`data/studies/weather/ENS/`), so the two can sit in one
-comparison: average the members, keep the newest run for each valid time, and spread the
+repository's own ensemble table (`data/studies/downloads/NWP/ENS_SITE_EXTRACT/`), so the two can sit
+in one comparison: average the members, keep the newest run for each valid time, and spread the
 three-hourly steps onto hours. The two ways of spreading follow the two kinds of variable.
 """
 

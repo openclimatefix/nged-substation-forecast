@@ -4,9 +4,9 @@ One-off throwaway script for the study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>, extending
 `wind_products.py`'s five-product comparison (ERA5, UKV, ICON-D2, ICON-EU, ICON global) with the
 German Weather Service's ICON-DREAM reanalysis. ICON-DREAM-EU is not on Open-Meteo, so its wind
-is read from a gridded download (`data/studies/weather/ICON-DREAM-EU/`) rather than fetched at
-each generator's coordinates: `WS`, `U`, `V` at ten model levels (65-74) and `WS_10M`, `U_10M`,
-`V_10M` at the surface, over 126 cells in a box around the trial area, September 2019 to
+is read from a gridded download (`data/studies/downloads/reanalysis/ICON-DREAM-EU/`) rather than
+fetched at each generator's coordinates: `WS`, `U`, `V` at ten model levels (65-74) and `WS_10M`,
+`U_10M`, `V_10M` at the surface, over 126 cells in a box around the trial area, September 2019 to
 August 2026.
 
 **This design is pre-registered and fixed before any fit runs, per the `study` skill.** The row

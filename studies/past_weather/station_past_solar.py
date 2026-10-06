@@ -11,10 +11,11 @@ station? A station arm tests how well a pyranometer some tens of kilometres away
 site's own sunshine. The stations publish global irradiance only (diffuse and direct are null at
 every station), so no arm here carries a beam split.
 
-**Data.** `data/studies/weather/MIDAS-OPEN/` (its `README.md` and `lineage.json`), read through
-`studies.midas`: hourly global irradiance from 10 stations (kJ m⁻² over the hour ending at `time`,
-converted to W m⁻²) and air temperature from 38 stations (an instant at `time`). Coverage ends on
-2025-12-31, so this section's row set ends there, about eight months before the page's main row set.
+**Data.** `data/studies/downloads/observations/MIDAS-OPEN/` (its `README.md` and `lineage.json`),
+read through `studies.midas`: hourly global irradiance from 10 stations (kJ m⁻² over the hour ending
+at `time`, converted to W m⁻²) and air temperature from 38 stations (an instant at `time`). Coverage
+ends on 2025-12-31, so this section's row set ends there, about eight months before the page's main
+row set.
 
 **The selection rule, fixed before any score existed.** `studies.midas.select_nearest_stations`
 with `MIN_COVERAGE`: stations are ranked by great-circle distance (ties to the lower station id) and

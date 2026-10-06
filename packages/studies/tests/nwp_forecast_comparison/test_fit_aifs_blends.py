@@ -757,10 +757,10 @@ def test_the_aifs_read_keeps_only_the_leads_of_the_requested_bands(
 
 def test_the_build_refuses_the_published_and_the_existing_aifs_folders(tmp_path: Path):
     studies = tmp_path / "studies"
-    published = studies / "nwp_forecast_comparison"
+    published = studies / "nwp_forecast_comparison/original"
     published.mkdir(parents=True)
 
-    for output in (published, studies / "nwp_forecast_comparison_aifs"):
+    for output in (published, studies / "nwp_forecast_comparison/aifs"):
         with pytest.raises(ValueError, match="must not be"):
             build_aifs(
                 domain="wind",
@@ -842,9 +842,9 @@ def test_saved_losses_are_refused_when_the_stamp_or_the_arms_differ(tmp_path: Pa
 
 
 def test_no_output_may_land_in_a_folder_the_blends_fit_reads(tmp_path: Path):
-    published = tmp_path / "nwp_forecast_comparison"
-    extra = tmp_path / "nwp_forecast_comparison_leads_day10"
-    new = tmp_path / "nwp_forecast_comparison_aifs_blends"
+    published = tmp_path / "nwp_forecast_comparison/original"
+    extra = tmp_path / "nwp_forecast_comparison/leads_day10"
+    new = tmp_path / "nwp_forecast_comparison/aifs_blends"
 
     refuse_read_only_folders(output_dir=new, read_only=[published, extra])
     for folder in (published, extra):
@@ -1207,7 +1207,7 @@ def test_the_p4_stamp_names_the_gpu_and_both_seeds(tmp_path: Path):
 
 def test_the_p4_refit_never_writes_beside_the_blends_or_the_published_folders(tmp_path: Path):
     read_only = [
-        tmp_path / "nwp_forecast_comparison",
+        tmp_path / "nwp_forecast_comparison/original",
         tmp_path / fit_aifs.BLENDS_DIR_NAME,
         tmp_path / fit_aifs.EXISTING_AIFS_DIR_NAME,
     ]

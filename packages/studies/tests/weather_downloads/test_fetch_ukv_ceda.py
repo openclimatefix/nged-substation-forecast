@@ -307,3 +307,21 @@ def test_partial_streak_survives_missing_only_runs_between_identical_problems() 
     streak.record(missing)
     assert streak.length == 2
     assert streak.problems == frozenset({"a: x absent"})
+
+
+def test_the_default_store_is_the_old_folder_until_the_store_has_moved(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    new_root, old_root = tmp_path / "downloads", tmp_path / "weather"
+    monkeypatch.setattr(
+        fetch, "product_dir_for", lambda *, product: new_root / product, raising=True
+    )
+    monkeypatch.setattr(fetch, "LEGACY_WEATHER_DATA_DIR", old_root)
+    (old_root / "UKV-CEDA-T120").mkdir(parents=True)
+
+    before = fetch.default_store_dir(product_name="UKV-CEDA-T120")
+    (new_root / "UKV-CEDA-T120").mkdir(parents=True)
+    after = fetch.default_store_dir(product_name="UKV-CEDA-T120")
+
+    assert (before, after) == (old_root / "UKV-CEDA-T120", new_root / "UKV-CEDA-T120")
+    assert fetch.default_store_dir(product_name="UKV-CEDA") == new_root / "UKV-CEDA"

@@ -26,7 +26,7 @@ from weather_products import common_rows as solar_common_rows  # noqa: E402
 from wind_products import common_rows as wind_common_rows  # noqa: E402
 from wind_products import joined as wind_joined  # noqa: E402
 
-DATA = Path("~/dev/nged-substation-forecast/data/studies/beam_diffuse_split").expanduser()
+DATA = Path("~/dev/nged-substation-forecast/data/studies/per_study/beam_diffuse_split").expanduser()
 
 
 def wind_pre_fold() -> pl.DataFrame:

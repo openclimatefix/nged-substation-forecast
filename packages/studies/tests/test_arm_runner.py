@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 import polars as pl
 import pytest
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, HyperParameters
-from studies.sources import STUDY_DATA_DIR
+from studies.sources import STUDY_INPUTS_DIR
 
 from studies import arm_runner
 
@@ -18,7 +18,7 @@ def test_time_features_are_the_hour_the_day_of_year_and_the_month_label():
 
 def test_the_dataset_path_is_named_for_the_source():
     assert arm_runner.dataset_path_for(source="cams") == (
-        STUDY_DATA_DIR / "beam_diffuse_dataset_cams.parquet"
+        STUDY_INPUTS_DIR / "beam_diffuse_dataset_cams.parquet"
     )
 
 

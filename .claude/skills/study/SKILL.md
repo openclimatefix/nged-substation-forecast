@@ -48,8 +48,9 @@ A PR that touches anything outside that list stops at a reviewed PR, as `impleme
 | Tested machinery shared by studies: the out-of-fold fit loop, the paired bootstrap, grid sampling, anonymisation, solar geometry, power aggregation, served-column checks, the Fractions Skill Score, and the common rows of the past-weather studies | `packages/studies/src/studies/` |
 | The study's own scripts: fetch, build, run, report, chart | `studies/<folder>/`, one folder per family of pages (`past_weather/`, `nwp_forecast_comparison/`, ...), run with `uv run python studies/<folder>/<script>.py` |
 | Tests of a study's scripts | `packages/studies/tests/<folder>/`, and tests of the machinery in `packages/studies/tests/` |
-| Downloaded weather, one directory per product | `data/studies/weather/<PRODUCT>/` |
-| NGED's active-network-management exports | `data/studies/anm/` |
+| Downloaded weather, one directory per product, filed by kind | `data/studies/downloads/NWP/<PRODUCT>/`, `downloads/reanalysis/<PRODUCT>/`, or `downloads/observations/<PRODUCT>/` |
+| A product's frames cut or fetched at each site's coordinates | `site_points/` inside the product's directory |
+| NGED's active-network-management exports | `data/studies/downloads/observations/NGED-ANM/` |
 | A study's datasets and results, and a `superseded/` directory for outputs a later run replaced | `data/studies/<study>/` |
 | The published page and its charts | `docs/studies/<page>.md`, `docs/studies/assets/` |
 

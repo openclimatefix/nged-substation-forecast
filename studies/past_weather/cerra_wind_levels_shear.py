@@ -23,7 +23,7 @@ for each height's ratio to 100 m and its own level.
 
 Run it with `uv run python studies/past_weather/cerra_wind_levels_shear.py`, after
 `cerra_wind_levels.py`. It writes `report.md` and `intervals.parquet` to its own folder,
-`cerra_wind_levels_post_hoc`, and stops while either exists. `report.md` there holds
+`per_study/cerra_wind/levels_post_hoc`, and stops while either exists. `report.md` there holds
 `cerra_wind_levels.py`'s report followed by the post hoc sections, and `intervals.parquet` holds
 both scripts' intervals, so `check_page_numbers.py` can check the whole write-up against one report.
 """

@@ -6,19 +6,19 @@ One-off throwaway script for the study in
 **V1 (a gate).** `_previous_dayN` is not documented as coming from a specific run; this checks the
 working assumption that it comes from the freshest run initialised at least `24N` hours before the
 hour, by comparing Open-Meteo's served GFS `_previous_dayN` values against the raw Dynamical.org GFS
-archive on disk in `data/studies/weather/GFS_window_2025-07-01_2025-07-02/`, for a range of
-candidate runs `24N + k` hours before the hour, `k` from 0 to 12. The gate is that the mean absolute
-difference is lowest at `k = 0`, for `N = 1` and `N = 2`, which is what "the freshest run at least
-`24N` hours old" predicts. **A first pass compared each site's served series with the plain average
-over the extract's 9 grid cells, and the resulting spatial-sampling noise (about 3 km/h) swamped the
-signal at N = 1.** This version instead scores, for each site and each candidate offset, every one
-of the extract's 9 grid cells against that site's own series, and keeps the cell with the lowest
-mean absolute error — no roster coordinate is read, and every offset gets exactly the same freedom
-to pick its best-fitting cell, so a real difference in lead accuracy between offsets survives while
-the noise from not knowing which cell a site truly falls in does not. Wind speed at 100 m compares
-directly; shortwave radiation additionally checks, at hours divisible by 6 (the only hours where the
-two conventions pick a different run), whether Open-Meteo selects the run by the hour's label or by
-the hour's start, with the same per-site best-cell scoring.
+archive on disk in `data/studies/downloads/NWP/windows/GFS_window_2025-07-01_2025-07-02/`, for a
+range of candidate runs `24N + k` hours before the hour, `k` from 0 to 12. The gate is that the mean
+absolute difference is lowest at `k = 0`, for `N = 1` and `N = 2`, which is what "the freshest run
+at least `24N` hours old" predicts. **A first pass compared each site's served series with the plain
+average over the extract's 9 grid cells, and the resulting spatial-sampling noise (about 3 km/h)
+swamped the signal at N = 1.** This version instead scores, for each site and each candidate offset,
+every one of the extract's 9 grid cells against that site's own series, and keeps the cell with the
+lowest mean absolute error — no roster coordinate is read, and every offset gets exactly the same
+freedom to pick its best-fitting cell, so a real difference in lead accuracy between offsets
+survives while the noise from not knowing which cell a site truly falls in does not. Wind speed at
+100 m compares directly; shortwave radiation additionally checks, at hours divisible by 6 (the only
+hours where the two conventions pick a different run), whether Open-Meteo selects the run by the
+hour's label or by the hour's start, with the same per-site best-cell scoring.
 
 **V1b.** For every Previous Runs product, per UTC hour of day, the mean absolute second difference
 of the `_previous_day1` series (100 m wind and 2 m temperature), divided by that statistic's own
@@ -85,7 +85,8 @@ PRODUCT_DIRS: Final[dict[str, str]] = {
     "KNMI HARMONIE-AROME": "KNMI-HARMONIE-AROME",
     "DMI HARMONIE-AROME": "DMI-HARMONIE-AROME",
 }
-"""Every Previous Runs product this study reads, to its `data/studies/weather/<dir>/` directory."""
+"""Every Previous Runs product this study reads, to its
+`data/studies/downloads/NWP/OPEN-METEO-PREVIOUS-RUNS/<dir>/` directory."""
 
 V1_OFFSETS_K: Final[tuple[int, ...]] = tuple(range(13))
 """Candidate offsets, in hours, tried on top of `24N` hours before the target hour."""

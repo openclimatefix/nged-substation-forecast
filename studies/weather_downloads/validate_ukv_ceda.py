@@ -44,8 +44,8 @@ from fetch_ukv_ceda import (
     UkvStore,
     _array,
     add_product_argument,
+    default_store_dir,
 )
-from studies.sources import product_dir_for
 from studies.ukv_ceda_profiles import (
     FIELDS,
     PLAIN_LAST_STEP,
@@ -460,7 +460,7 @@ def main() -> int:
     profile = PROFILES[args.product]
     set_profile(profile)
     if args.store_dir is None:
-        args.store_dir = product_dir_for(product=profile.product_name)
+        args.store_dir = default_store_dir(product_name=profile.product_name)
     store = UkvStore.open(store_path=args.store_dir / "store")
     session = store.repository.readonly_session(branch="main")
     group = zarr.open_group(session.store, mode="r")

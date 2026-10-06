@@ -283,6 +283,13 @@ def _stamp(*, folder: Path, name: str, columns: dict[str, list[str]]) -> Path:
     return path
 
 
+def _nfc(*, root: Path) -> Path:
+    """Return the folder holding the batch folders, under a stand-in for the per-study folder."""
+    from studies.sources import NFC_STUDY_DIR, PER_STUDY_DIR
+
+    return root / NFC_STUDY_DIR.relative_to(PER_STUDY_DIR)
+
+
 def test_a_stamp_whose_columns_still_resolve_passes_and_one_that_differs_is_named(tmp_path: Path):
     import fit_aifs
 
@@ -290,32 +297,29 @@ def test_a_stamp_whose_columns_still_resolve_passes_and_one_that_differs_is_name
         "ukv_day1": list(fit_aifs.arm_features(arm="ukv_day1", domain="wind")),
         "blend_ukv_day1": list(fit_aifs.arm_features(arm="blend_ukv_day1", domain="wind")),
     }
-    path = _stamp(
-        folder=tmp_path / "nwp_forecast_comparison_x", name="wind_a_losses.json", columns=good
-    )
+    path = _stamp(folder=_nfc(root=tmp_path) / "x", name="wind_a_losses.json", columns=good)
     assert unchanged.check_stamp(path=path) == (2, [])
 
     bad = {**good, "ukv_day1": [*good["ukv_day1"][:-1], "ukv_day1_speed_925hpa"]}
-    path = _stamp(
-        folder=tmp_path / "nwp_forecast_comparison_y", name="wind_b_losses.json", columns=bad
-    )
+    path = _stamp(folder=_nfc(root=tmp_path) / "y", name="wind_b_losses.json", columns=bad)
     compared, problems = unchanged.check_stamp(path=path)
 
     assert compared == 2
-    assert problems == ["nwp_forecast_comparison_y/wind_b_losses.json: ukv_day1"]
+    assert problems == ["y/wind_b_losses.json: ukv_day1"]
 
 
 def test_the_check_reads_every_earlier_studys_stamps_and_fails_on_none(tmp_path: Path):
     import fit_aifs
 
     columns = {"ens_mean_day1": list(fit_aifs.arm_features(arm="ens_mean_day1", domain="solar"))}
-    _stamp(
-        folder=tmp_path / "nwp_forecast_comparison_a", name="solar_s_losses.json", columns=columns
-    )
-    _stamp(
-        folder=tmp_path / "nwp_forecast_comparison_b", name="solar_t_losses.json", columns=columns
-    )
+    _stamp(folder=_nfc(root=tmp_path) / "a", name="solar_s_losses.json", columns=columns)
+    _stamp(folder=_nfc(root=tmp_path) / "b", name="solar_t_losses.json", columns=columns)
     _stamp(folder=tmp_path / "other_study", name="solar_u_losses.json", columns={"nope": []})
+    _stamp(
+        folder=_nfc(root=tmp_path) / "a" / "superseded",
+        name="solar_w_losses.json",
+        columns={"nope": []},
+    )
 
     stamps, arms, problems = unchanged.check_all(studies_dir=tmp_path)
 
@@ -328,7 +332,7 @@ def _two_good_stamps(*, root: Path) -> None:
 
     columns = {"ens_mean_day1": list(fit_aifs.arm_features(arm="ens_mean_day1", domain="solar"))}
     for batch, name in (("a", "solar_s_losses.json"), ("b", "solar_t_losses.json")):
-        _stamp(folder=root / f"nwp_forecast_comparison_{batch}", name=name, columns=columns)
+        _stamp(folder=_nfc(root=root) / batch, name=name, columns=columns)
 
 
 def test_a_wrong_stamp_count_exits_non_zero_and_the_right_one_exits_zero(
@@ -349,9 +353,7 @@ def test_the_expected_stamp_count_is_required(tmp_path: Path):
 
 def test_a_folder_and_a_symbolic_link_to_it_count_once(tmp_path: Path):
     _two_good_stamps(root=tmp_path)
-    (tmp_path / "nwp_forecast_comparison_alias").symlink_to(
-        tmp_path / "nwp_forecast_comparison_a", target_is_directory=True
-    )
+    (_nfc(root=tmp_path) / "alias").symlink_to(_nfc(root=tmp_path) / "a", target_is_directory=True)
 
     assert unchanged.check_all(studies_dir=tmp_path)[0] == 2
 

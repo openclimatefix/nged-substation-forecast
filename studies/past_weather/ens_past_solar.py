@@ -17,17 +17,18 @@ its 3-hourly steps, its grid and its model version from one another, and neither
 exploratory arms `era5_3h`, `cams_3h` and `era5_3x3`, which test only the 3-hourly steps and the
 area each value averages over.
 
-**Data.** `data/studies/weather/ENS/beam_diffuse_ens.parquet`
-(`data/studies/weather/ENS/README.md`), filtered to `horizon == "T+3"`: seven 3-hour radiation and
-temperature steps per generator per run, leads 3, 6, ..., 21, all 51 members. ENS's coverage starts
-2024-04-01, well after the main row set's December 2022 start, so this section's row set is shorter
-and later than the rest of the page, the same shape of caveat the "four extra Open-Meteo models" and
-ICON-DREAM-EU sections carry. This section's row set also ends earlier than ENS's own runs allow: it
-is trimmed to `era5_grid.LAST_DATE` (2026-09-10), the date `build_dataset.py` trims every product
-to, even though ENS's own runs go on to 2026-09-22 and the join drops none of the rows inside that
-window. The free open-data subset of ECMWF's ENS, which Dynamical.org's archive is built from,
-carries no direct-beam field (ECMWF's full ENS catalogue does), so this section, like the page's
-other global-only products, carries a global-irradiance arm only.
+**Data.** `data/studies/downloads/NWP/ENS_SITE_EXTRACT/site_points/beam_diffuse_ens.parquet`
+(`data/studies/downloads/NWP/ENS_SITE_EXTRACT/README.md`), filtered to `horizon == "T+3"`: seven
+3-hour radiation and temperature steps per generator per run, leads 3, 6, ..., 21, all 51 members.
+ENS's coverage starts 2024-04-01, well after the main row set's December 2022 start, so this
+section's row set is shorter and later than the rest of the page, the same shape of caveat the "four
+extra Open-Meteo models" and ICON-DREAM-EU sections carry. This section's row set also ends earlier
+than ENS's own runs allow: it is trimmed to `era5_grid.LAST_DATE` (2026-09-10), the date
+`build_dataset.py` trims every product to, even though ENS's own runs go on to 2026-09-22 and the
+join drops none of the rows inside that window. The free open-data subset of ECMWF's ENS, which
+Dynamical.org's archive is built from, carries no direct-beam field (ECMWF's full ENS catalogue
+does), so this section, like the page's other global-only products, carries a global-irradiance arm
+only.
 
 **Upsampling to hourly, reusing the study's own tested machinery.** The `T+3` band holds seven
 3-hour steps per run, so each run is rebuilt to 19 hourly values by the clear-sky-index
@@ -120,7 +121,7 @@ from studies.resample import (
     interpolate_linear,
 )
 from studies.solar_product_frames import with_eras
-from studies.sources import ENS_PRODUCT_DIR, STUDY_DATA_DIR
+from studies.sources import ENS_SITE_POINTS_DIR, STUDY_DATA_DIR
 from weather_products import (
     CONTRAST_HEADER,
     METRIC,
@@ -132,7 +133,7 @@ from weather_products import (
 
 _LOG: Final[logging.Logger] = logging.getLogger("ens_past_solar")
 
-T3_PATH: Final[Path] = ENS_PRODUCT_DIR / "beam_diffuse_ens.parquet"
+T3_PATH: Final[Path] = ENS_SITE_POINTS_DIR / "beam_diffuse_ens.parquet"
 """The download this section reads, filtered to `horizon == "T+3"`."""
 
 OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "past_weather_v2" / "ens_past_solar"
@@ -140,8 +141,8 @@ OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "past_weather_v2" / "ens_past_solar"
 `superseded/` folder for re-runs."""
 
 ENS_START: Final[datetime] = datetime(2024, 4, 1, tzinfo=UTC)
-"""ENS's own coverage start (`data/studies/weather/ENS/README.md`), before which this section's
-row set holds no rows."""
+"""ENS's own coverage start (`data/studies/downloads/NWP/ENS_SITE_EXTRACT/README.md`), before which
+this section's row set holds no rows."""
 
 STEP_LEADS: Final[tuple[int, ...]] = (3, 6, 9, 12, 15, 18, 21)
 """The `T+3` band's seven leads, in hours, each a 3-hour mean ending at the lead."""

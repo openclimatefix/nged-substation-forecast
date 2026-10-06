@@ -27,8 +27,9 @@ The `ecmwf_ens` Dagster asset must already have populated `data/NWP/`, because t
 that ENS Delta table. Then run this script with
 `uv run python studies/beam_diffuse_split/fetch_ens_point_wind.py`.
 
-The script writes one parquet file, `data/studies/weather/ENS/beam_diffuse_ens_wind.parquet`, at the
-path held in `OUTPUT_PATH`.
+The script writes one parquet file,
+`data/studies/downloads/NWP/ENS_SITE_EXTRACT/site_points/beam_diffuse_ens_wind.parquet`, at the path
+held in `OUTPUT_PATH`.
 """
 
 import logging
@@ -45,12 +46,12 @@ from fetch_ens_point import (
     _wanted_leads,
 )
 from studies.pv_dataset import wind_sites
-from studies.sources import ENS_PRODUCT_DIR
+from studies.sources import ENS_SITE_POINTS_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-OUTPUT_PATH: Final[Path] = ENS_PRODUCT_DIR / "beam_diffuse_ens_wind.parquet"
+OUTPUT_PATH: Final[Path] = ENS_SITE_POINTS_DIR / "beam_diffuse_ens_wind.parquet"
 """Where this script writes the per-meter, per-member, per-horizon frame."""
 
 WIND_COLUMNS: Final[tuple[str, ...]] = (

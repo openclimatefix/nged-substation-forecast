@@ -10,11 +10,11 @@ needs the 3-hourly steps from 90 to 126. The extract holds 90 to 102 (band 3's m
 126 (band 5's margin), so a day-4 build finds no step for the hours between them.
 
 **The supplement holds exactly the day-4 leads that the extract lacks, read from the same local
-Delta table, at the same H3 cells, for the runs the extract holds.** The script writes a new
-folder and never touches `ens_forecast_horizons/`, and the Delta table is read only. Before writing,
-the script re-reads the leads that the extract and the table share, and raises unless every row and
-every field agrees. That check is what shows the supplement means the same as the extract: same
-table, same units, same anonymous site labels.
+Delta table, at the same H3 cells, for the runs the extract holds.** The script writes one new
+file beside the extract and never edits the extract, and the Delta table is read only. Before
+writing, the script re-reads the leads that the extract and the table share, and raises unless
+every row and every field agrees. That check is what shows the supplement means the same as the
+extract: same table, same units, same anonymous site labels.
 
 Run it with `uv run python studies/nwp_forecast_comparison/fetch_ens_day4_supplement.py`.
 """
@@ -29,15 +29,15 @@ from fetch_ens_forecast_horizons import MARGIN_HOURS, NWP_TABLE, OUTPUT_PATH, _c
 from studies.ens_members import ENSEMBLE_SIZE
 from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import pv_sites, wind_sites
-from studies.sources import ENS_FORECAST_HORIZONS_DAY4_DIR
+from studies.sources import ENS_PRODUCT_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_ens_day4_supplement")
 
 DAY: Final[int] = 4
 """The band the extract lacks."""
 
-SUPPLEMENT_DIR: Final = ENS_FORECAST_HORIZONS_DAY4_DIR
-"""The new folder holding the supplement, written once."""
+SUPPLEMENT_DIR: Final = ENS_PRODUCT_DIR
+"""The folder holding the supplement, beside the extract."""
 
 SUPPLEMENT_PATH: Final = SUPPLEMENT_DIR / "ens_members_day4.parquet"
 """The supplement: the extract's columns, for the leads the extract lacks at day 4."""
