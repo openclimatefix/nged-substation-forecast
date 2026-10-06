@@ -105,4 +105,6 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 - `wn3_fetch` and `ukv_ceda_profiles` — the store names of the WeatherNext 3 Icechunk store, and the
   product profiles and field table of the CEDA UKV archive, which a fetch script and an input
   builder both read.
+- `ukv_ceda_stores` — the three UKV-on-CEDA stores of 6-hourly runs read at an hour's freshest run
+  (an incomplete run drops the hour), and the three UKV eras with their folds.
 - `figure_numbers` — the figure number of every chart on the past-weather solar and wind pages.
