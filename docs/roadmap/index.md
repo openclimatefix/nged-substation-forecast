@@ -289,9 +289,9 @@ The remaining work items for metered-generator capacity:
   by effective capacity before training the power forecast model
 - Ingest **CAMS** (Copernicus Atmosphere Monitoring Service) solar radiation — satellite-derived
   irradiance, used to estimate solar PV capacity ([data sources](data-sources.md#weather-data)).
-  Wind-farm capacity estimation takes its wind from ERA5, the [planned estimate of past
+  Wind-farm capacity estimation takes its wind from the [planned estimate of past
   weather](training-history.md#which-estimate-of-past-weather-to-train-on) for variables other than
-  irradiance
+  irradiance, which is ERA5 in the version-1 plan
 - Populate the `effective_capacity` Delta table
 
 **CAMS is an offline source**: it feeds historical capacity estimation, and the production serving

@@ -1065,9 +1065,9 @@ Three conditions on reading the result.
 - **The ceiling bounds forecast error, not resolution.** A finer *forecast* can carry site-relevant
   structure that a coarse *analysis* averages away: ERA5 is a 31 km field, while ICON-EU is ~6.5 km
   and post-2023 ENS is 9 km. A low ceiling measured on ERA5 therefore deprioritises a second NWP
-  source without ruling one out. A 2 km analysis such as CEDA's UKV would narrow this gap for every
-  variable except irradiance, and the observations rung closes it, since station and satellite data are
-  at-site rather than grid-cell means.
+  source without ruling one out. A 2 km estimate of past weather such as CEDA's UKV would narrow
+  this gap for every variable except irradiance, and the observations rung closes it, since station
+  and satellite data are at-site rather than grid-cell means.
 
 - **It is a ceiling for the current model family and feature set.** A model that cannot exploit
   perfect weather shows a low ceiling for reasons that have nothing to do with weather availability.

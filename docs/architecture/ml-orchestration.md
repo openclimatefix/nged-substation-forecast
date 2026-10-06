@@ -194,8 +194,8 @@ Rejecting ERA5-backed folds excludes reanalysis only as a *promotion criterion*,
 measurement. Scoring against an estimate of past weather is legitimate as a **diagnostic** — it
 decomposes total error into the weather-to-power response and the implicit hedging against forecast
 error — and lands as its own `evaluation_scope`, leaving the leaderboard folds ENS-only. The planned
-estimates of past weather are CAMS for irradiance and ERA5 for other variables. See [Extending the training
-history](../roadmap/training-history.md#evaluation).
+estimates of past weather are CAMS for irradiance and ERA5 for other variables. See [Extending the
+training history](../roadmap/training-history.md#evaluation).
 
 ## Two metric stores, one division of labour
 
