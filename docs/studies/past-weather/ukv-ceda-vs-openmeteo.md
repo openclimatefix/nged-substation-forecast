@@ -1,4 +1,4 @@
-# A wind model trained on CEDA's archive of UKV loses accuracy on Open-Meteo's wind speeds, and the solar transfer is unresolved
+# An XGBoost model of wind power trained on CEDA's archive of UKV loses accuracy on Open-Meteo's wind speeds, and for solar power the result is unresolved
 
 **This study asks whether the two archives of the Met Office's weather model for the United Kingdom
 (UKV) that the project can read give the same forecasts of wind and solar power.** One archive comes
@@ -8,33 +8,39 @@ overlap for 23 whole months. Each month holds hourly values at the metered wind 
 the question matters because a forecast trained on the longer CEDA history would be used with
 whichever UKV values the forecast meets later.
 
-**The answers, in plain words, are these.** At the start of each run of the weather model, the two
-archives hold almost the same weather: air temperature differs by about a tenth of a degree, and
-Open-Meteo's wind speed is about 3% lower than CEDA's. CEDA's archive is made of 6-hourly runs, and
-its values for the later hours of each run drift away from Open-Meteo's. A forecast of wind-farm or
-solar-farm power built on CEDA's archive has a larger error than one built on Open-Meteo's, and most
-of that gap sits in CEDA's later hours. For wind, the gap at the start of each run lies inside the
-margin only after the study drops two spans in which Open-Meteo's wind speed is built differently,
-a data decision made after the first fit. For solar, the two fits disagree at the start of each run.
-A wind forecast trained on CEDA's archive and then given Open-Meteo's wind speeds loses accuracy,
-because it under-predicts when the speeds are 3% lower, and a simple rescaling of the speeds removes
-most of the loss. That loss is a penalty whether or not the two spans are dropped. For solar power
-the loss could not be resolved. By the rules written before the study, a wind forecast trained on
-CEDA's history should not be given Open-Meteo's values, and solar should be treated the same way by
-default. The study holds the length of the training history equal in both archives, so it does not
-weigh CEDA's extra history of about 5 years against the mismatch. The page gives every number with
-its interval below, defines its terms before it uses them, commits the project to nothing, and does
-not compare CEDA's archive with the Met Office's own live feed.
+**At the start of each run of the weather model, the two archives hold almost the same weather.**
+Air temperature differs by about a tenth of a degree, and Open-Meteo's wind speed is about 3% lower
+than CEDA's. CEDA's archive is made of 6-hourly runs, and its values for the later hours of each run
+drift away from Open-Meteo's.
+
+**A forecast of wind-farm or solar-farm power built on CEDA's archive has a larger error than a
+forecast built on Open-Meteo's, and most of that gap sits in CEDA's later hours.** For wind, the gap
+at the start of each run lies inside the margin, the smallest difference the study counted as
+clear, only after the study drops two spans in which Open-Meteo's wind speed is built differently.
+Dropping the spans is a data decision made after the first fit. For solar, two fits that differ in
+their training months disagree at the start of each run.
+
+**A wind forecast trained on CEDA's archive and then given Open-Meteo's wind speeds loses accuracy,
+because the forecast under-predicts when the speeds are 3% lower.** A simple rescaling of the speeds
+removes most of the loss. That loss is a penalty whether or not the two spans are dropped. For solar
+power the loss could not be resolved.
+
+**By the rules written before the study, a wind forecast trained on CEDA's history should not be
+given Open-Meteo's values, and solar should be treated the same way by default.** The study holds
+the length of the training history equal in both archives, so it does not weigh CEDA's extra
+history of about 5 years against the mismatch. The page below gives every number with its
+interval, commits the project to nothing, and does not compare CEDA's archive with the Met Office's
+own live feed.
 
 ![Figure 1: Moving a CEDA-trained model onto Open-Meteo's values shows a penalty for wind and is
 unresolved for solar. Power errors differ for wind once two spans are dropped, and differ for solar
-before PS47](../assets/ukv_ceda_vs_openmeteo/fig01_headline.svg)
+before the 2026 upgrade (PS47)](../assets/ukv_ceda_vs_openmeteo/fig01_headline.svg)
 
-**The page uses a few terms from the start, so the table below defines them first.** Every
-difference on the page is CEDA's error minus Open-Meteo's, so a positive number means CEDA's is
-larger. Each bracket holds a 95% interval from resampling whole calendar months and one of three
-fitting seeds. The plan fixed the first group of comparisons below before any result existed. Every
-other comparison is exploratory.
+**Every difference on the page is CEDA's error minus Open-Meteo's, so a positive number means
+CEDA's is larger.** Each bracket holds a 95% interval from resampling whole calendar months and one
+of three fitting seeds. The plan fixed comparisons P1 to P3 in the table below before any result
+existed. Every other comparison is exploratory. The table defines the terms the page uses from here
+on.
 
 | Term | Meaning |
 |---|---|
@@ -71,28 +77,28 @@ other comparison is exploratory.
 - **Open-Meteo builds its hourly irradiance from a snapshot with a zenith-angle scaling that CEDA's
   raw snapshot lacks, and the scaling matches before the 2026 upgrade but not after it,** so the
   solar contrasts are planned on era 0 only ([the irradiance
-  construction](#open-meteo-builds-its-hourly-irradiance-differently-after-ps47-and-in-low-sun)).
+  construction](#open-meteo-builds-its-hourly-irradiance-differently-after-the-2026-upgrade-and-in-low-sun)).
 - **Wind power (P1): CEDA's error is larger by +0.270 points [+0.209, +0.333] once the two spans are
   dropped,** a post hoc data decision. The planned scope kept the spans, and the first run read
   +0.162 [+0.080, +0.241], which is unresolved because the second setting disagrees. At lead 0 the
   gap is +0.030 [-0.043, +0.122] after the drop, which lies inside the 0.16-point margin, and -0.051
-  [-0.166, +0.055] in the first run, which does not, so it is "unresolved" ([wind
+  [-0.166, +0.055] in the first run, which does not and so reads "unresolved" ([wind
   P1](#wind-power-ceda-is-0270-points-worse-once-the-two-spans-are-dropped)).
 - **Solar power (P2, era 0): CEDA's error is larger by +0.212 points [+0.109, +0.332], and at lead 0
   the two fits disagree:** -0.028 [-0.117, +0.086] when trained on both eras and +0.127 [+0.021,
   +0.257] when trained on era 0 alone ([solar
-  P2](#solar-power-the-same-pattern-before-the-2026-upgrade)).
-- **Wind transfer penalty (P3): +0.441 points [+0.286, +0.600], a level bias of about 2.4 points of
-  capacity that the speed offset mostly explains, and +0.313 [+0.163, +0.459] in the first run that
-  kept the spans,** and rescaling Open-Meteo's speed leaves +0.142 [+0.066, +0.217] ([the transfer
-  penalty](#a-wind-model-trained-on-ceda-loses-0441-points-on-open-meteos-wind-mostly-through-the-speed-level)).
-- **Solar transfer penalty (P3): unresolved, with a largest upper bound of +0.125 points,** three of
-  the four readings are unresolved on their own, and by the plan's default rule it is treated as a
-  penalty ([solar
-  P3](#the-solar-transfer-penalty-is-unresolved)).
+  P2](#solar-power-ceda-is-0212-points-worse-before-the-2026-upgrade)).
+- **Wind transfer penalty (P3): +0.441 points [+0.286, +0.600], and +0.313 [+0.163, +0.459] in the
+  first run that kept the spans.** The penalty is a level bias of about 2.4 points of capacity that
+  the speed offset mostly explains, and rescaling Open-Meteo's speed leaves +0.142 [+0.066, +0.217]
+  ([the transfer
+  penalty](#an-xgboost-model-trained-on-cedas-wind-loses-0441-points-on-open-meteos-wind-mostly-because-open-meteos-speeds-are-lower)).
+- **Solar transfer penalty (P3): unresolved, with a largest upper bound of +0.125 points.** Three of
+  the four readings are unresolved on their own, and by the plan's default rule the solar result is
+  treated as a penalty ([solar P3](#the-solar-transfer-penalty-is-unresolved)).
 - **The GPU-against-CPU refit sets the noise floor at about 0.05 points,** and the shuffled-weather
   pair is not a clean null ([controls and
-  noise](#the-refit-sets-the-noise-floor-and-the-shuffled-pair-is-not-a-clean-null)).
+  noise](#controls-a-refit-on-the-cpu-and-xgboost-models-given-shuffled-weather)).
 - **By the plan's rule the training-history reading is "do not mix the two archives" for wind and,
   by default, for solar,** within this study's scope and with the licence left to the maintainer
   ([discussion](#discussion-what-to-use)). The Open-Meteo history that rule recommends contains the
@@ -243,41 +249,41 @@ and 14.236% for solar on era 0, so the models use the weather they are given.
 
 ### The archives agree closely at lead 0 and drift apart with CEDA's lead
 
-**The model-free comparison needs no forecast: it reads the two archives' values at the nine
-generator sites and differences them.** At lead 0, where both archives are the same analysis, the
-mean absolute difference in air temperature is 0.098 K [0.088, 0.109] and the correlation is 0.9997.
-The difference grows with CEDA's lead to 0.557 K [0.502, 0.611] at lead 5 (correlation 0.9919). The
-10 m wind speed follows the same pattern: 0.190 m/s [0.185, 0.195] at lead 0 and 0.519 m/s [0.499,
-0.540] at lead 5, with a correlation of 0.9944 at lead 0. The 10 m wind direction differs by 2.580
-degrees [2.393, 2.752] at lead 0 and 8.783 degrees [7.972, 9.668] at lead 5, in hours when CEDA's
-speed exceeds 2 m/s. At lead 0 CEDA's direction is 1.898 degrees [1.754, 2.044] lower than
-Open-Meteo's, a small rotation of about 1.8 degrees in era 0 [1.612, 1.955] and 2.2 in era 1 [2.119,
-2.279]. Figure 4 draws the four variables by lead. The intervals resample whole months, and every
-row is exploratory.
+**The model-free comparison, which differences the two archives' values at the nine generator sites
+with no forecast, finds the closest agreement at lead 0.** At lead 0, where both archives are the
+same analysis, the mean absolute difference in air temperature is 0.098 K [0.088, 0.109] and the
+correlation is 0.9997. The difference grows with CEDA's lead to 0.557 K [0.502, 0.611] at lead 5
+(correlation 0.9919). The 10 m wind speed follows the same pattern: 0.190 m/s [0.185, 0.195] at lead
+0 and 0.519 m/s [0.499, 0.540] at lead 5, with a correlation of 0.9944 at lead 0. The 10 m wind
+direction differs by 2.580 degrees [2.393, 2.752] at lead 0 and 8.783 degrees [7.972, 9.668] at lead
+5, in hours when CEDA's speed exceeds 2 m/s. At lead 0 CEDA's direction is 1.898 degrees [1.754,
+2.044] lower than Open-Meteo's, a small rotation of about 1.8 degrees in era 0 [1.612, 1.955] and
+2.2 in era 1 [2.119, 2.279]. Figure 4 draws the four variables by lead. The intervals resample whole
+months, and every row is exploratory.
 
 ![Figure 4: The two archives agree most closely at lead 0 and drift apart with CEDA's lead](../assets/ukv_ceda_vs_openmeteo/fig04_leads.svg)
 
-**Two features of the table limit what "the same analysis" can mean.** Open-Meteo does not serve the
-nearest CEDA cell's value: the nearest of the nine CEDA cells around a site has the value closest
-to Open-Meteo's at only 27% of lead-0 hours for wind speed and 47% for temperature, against 11% by
-chance. So even at lead 0 the two archives are not one analysis sampled at one cell, and the
-archives differ in how their values are interpolated or in which grid they read. Figure 5
-draws the monthly mean absolute difference with the 2026 upgrade marked. The irradiance difference
-rises after the upgrade, and the other three variables show no step that stands out from their
-month-to-month swings, which is a reading of the chart and not a test. The before-and-after rows at
-May 2025 (PS46) are labelled as not an isolated PS46 effect, because the two rows also differ in the
-months they hold.
+**Even at lead 0, Open-Meteo does not serve the nearest CEDA cell's value.** the nearest of the nine
+CEDA cells around a site has the value closest to Open-Meteo's at only 27% of lead-0 hours for wind
+speed and 47% for temperature, against 11% by chance. So even at lead 0 the two archives are not one
+analysis sampled at one cell, and the archives differ in how their values are interpolated or in
+which grid they read.
+
+**Month by month, the irradiance difference rises after the 2026 upgrade.** Figure 5 draws the
+monthly mean absolute difference with the 2026 upgrade marked. The other three variables show no
+step that stands out from their month-to-month swings, which is a reading of the chart and not a
+test. The before-and-after rows at May 2025 (PS46) are labelled as not an isolated PS46 effect,
+because the two rows also differ in the months they hold.
 
 ![Figure 5: Month by month, any step in the difference between the archives shows](../assets/ukv_ceda_vs_openmeteo/fig05_months.svg)
 
 ### Open-Meteo's 10 m wind speed is about 3% below CEDA's, and steps up in two spans
 
-**At lead 0, Open-Meteo's 10 m wind speed averages 4.052 m/s against CEDA's 4.196 m/s, a
-difference of +0.144 m/s [+0.137, +0.152] in CEDA minus Open-Meteo.** The median ratio of
-Open-Meteo's speed to CEDA's is 0.968 outside the two spans described below, and it stays between
-0.960 and 0.974 in each of the 20 months outside them, so the offset is a level difference between
-the archives and not noise. It
-reappears in the power forecasts as the wind transfer penalty.
+**At lead 0, Open-Meteo's 10 m wind speed averages 4.052 m/s against CEDA's 4.196 m/s, a difference
+of +0.144 m/s [+0.137, +0.152] in CEDA minus Open-Meteo.** The median ratio of Open-Meteo's speed to
+CEDA's is 0.968 outside the two spans described below, and it stays between 0.960 and 0.974 in each
+of the 20 months outside them, so the offset is a level difference between the archives and not
+noise. The offset reappears in the power forecasts as the wind transfer penalty.
 
 **In two spans with sharp edges the ratio rises to 1.063, and the step is in Open-Meteo's served
 series.** The spans are the UTC days 2024-11-07 to 2024-11-30 and 2025-01-16 to 2025-02-18. In them
@@ -295,8 +301,9 @@ Open-Meteo's 10 m speed steps.
 
 ![Figure 6: Open-Meteo's 10 m wind speed steps up against CEDA's in two spans](../assets/ukv_ceda_vs_openmeteo/fig06_wind_step.svg)
 
-**The first fit, which kept the spans, is the planned scope, and the page reports it beside the
-rerun.** The first run read wind P1 as +0.162 [+0.080, +0.241] at the primary setting and +0.146
+**The wind P1 verdict depends on dropping the spans, and the wind P3 verdict does not.** The first
+fit, which kept the spans, is the planned scope, and the page reports it beside the rerun. The first
+run read wind P1 as +0.162 [+0.080, +0.241] at the primary setting and +0.146
 [+0.073, +0.216] at the second, which is "unresolved" because only the primary setting reads
 "differ". The study dropped the spans after the first fit and refitted every arm, and the rerun
 reads +0.270 [+0.209, +0.333] and +0.243 [+0.192, +0.294], "differ" at both settings. The wind P1
@@ -307,7 +314,7 @@ reverses (CEDA minus Open-Meteo is -0.251 m/s at lead 0), so keeping them blurre
 penalty. The step is a risk to every wind result on the page, and the page states it under
 Limitations.
 
-### Open-Meteo builds its hourly irradiance differently after PS47 and in low sun
+### Open-Meteo builds its hourly irradiance differently after the 2026 upgrade and in low sun
 
 **CEDA's raw snapshot and Open-Meteo's hourly irradiance differ by up to 36% by hour of day, and
 rebuilding CEDA's snapshot as Open-Meteo builds its value removes the difference before PS47.** At
@@ -350,16 +357,18 @@ and +0.437 at leads 1 to 4 and +0.536 [+0.383, +0.682] at lead 5. A CEDA-trained
 all leads and so scores the lead-0 subset with a model that also learned from leads 1 to 5, which
 the page notes under Limitations. A lead of 0 hours is the case in which both archives are the same
 analysis, so P1 over all hours measures CEDA's 6-hourly archive against Open-Meteo's hourly analysis
-as much as it measures a difference between the two products. A row's lead is its UTC hour modulo 6,
-so lead and time of day cannot be separated. After the 12 UTC run the gap at the primary setting is
-+0.270 [-0.052, +0.584] at 13 UTC, +0.509 [+0.176, +0.909] at 14 UTC, +0.749 [+0.318, +1.198] at 15
-UTC, +1.108 [+0.709, +1.534] at 16 UTC, and +1.124 [+0.799, +1.483] at 17 UTC, and the other three
-runs give smaller gaps (exploratory, from the saved losses of the rerun).
+as much as it measures a difference between the two products.
+
+**A row's lead is its UTC hour modulo 6, so lead and time of day cannot be separated.** After the 12
+UTC run the gap at the primary setting is +0.270 [-0.052, +0.584] at 13 UTC, +0.509 [+0.176, +0.909]
+at 14 UTC, +0.749 [+0.318, +1.198] at 15 UTC, +1.108 [+0.709, +1.534] at 16 UTC, and +1.124 [+0.799,
++1.483] at 17 UTC, and the other three runs give smaller gaps (exploratory, from the saved losses of
+the rerun).
 
 ![Figure 8: Wind gaps between the archives grow with CEDA's lead, and the solar fits
 disagree at lead 0](../assets/ukv_ceda_vs_openmeteo/fig08_contrasts_by_lead.svg)
 
-### Solar power: the same pattern before the 2026 upgrade
+### Solar power: CEDA is 0.212 points worse before the 2026 upgrade
 
 **On era 0, the model given CEDA's irradiance and temperature has a larger error than the model
 given Open-Meteo's by 0.212 points [+0.109, +0.332] at the primary setting and 0.246 [+0.127,
@@ -372,7 +381,7 @@ is "unresolved", and the fit trained on era 0 alone reads +0.127 [+0.021, +0.257
 exploratory rows read +0.267 [+0.098, +0.452] with the note about Open-Meteo's irradiance
 construction.
 
-### A wind model trained on CEDA loses 0.441 points on Open-Meteo's wind, mostly through the speed level
+### An XGBoost model trained on CEDA's wind loses 0.441 points on Open-Meteo's wind, mostly because Open-Meteo's speeds are lower
 
 **When the model trained on CEDA's wind is given Open-Meteo's wind and scored on the same hours, its
 error is larger than the Open-Meteo-trained model's by 0.441 points [+0.286, +0.600] at the primary
@@ -418,22 +427,25 @@ largest upper bound across the four readings is +0.125 points, against absolute 
 8.9%. By the plan's rule an unresolved reading is treated as a penalty, and the page states that
 this is a default and not a measured penalty.
 
-**The two fits differ in what they show, and the data say which input matters.** On era 0, the
+**The extra era-1 rows did not hurt either solar model on era 0, and at lead 0 the era-0 fit's
+penalty does not come from the input values.** On era 0, the
 Open-Meteo-trained model scores 8.52% when trained on both eras and 8.67% when trained on era 0
 alone, and the CEDA-trained model scored on Open-Meteo's inputs scores 8.53% and 8.73%, so the extra
 era-1 rows did not hurt either model on era 0. At CEDA lead 0 the era-0-trained CEDA model scores
 8.96% on CEDA's inputs and 8.95% on Open-Meteo's, so at lead 0 its penalty does not come from the
 input values. It probably comes from what training on CEDA's leads 1 to 5 taught the model, and it
 is part of the transfer penalty and not a separate effect (exploratory). The page did not run the
-check that would test this, which adds the lead as a model input. Scored on Open-Meteo's irradiance
-alone the CEDA-trained model's error is -0.216 points [-0.352, -0.115] below its error on CEDA's,
-and scored on Open-Meteo's temperature alone it is +0.017 [-0.001, +0.036] above, so irradiance and
-not temperature carries the difference. Open-Meteo's lead-0 irradiance replaces CEDA's irradiance at
-leads 1 to 5, so a lower error is the expected sign. All solar rows rest on the two fits, and the
-all-months fit gives a penalty of +0.103 [+0.027, +0.190] with the note about the irradiance
-construction after PS47, which supports the default rule.
+check that would test this, which adds the lead as a model input.
 
-### The refit sets the noise floor, and the shuffled pair is not a clean null
+**Irradiance, not temperature, carries the difference between the two archives' solar inputs.**
+Scored on Open-Meteo's irradiance alone the CEDA-trained model's error is -0.216 points [-0.352,
+-0.115] below its error on CEDA's, and scored on Open-Meteo's temperature alone it is +0.017
+[-0.001, +0.036] above, so irradiance and not temperature carries the difference. Open-Meteo's
+lead-0 irradiance replaces CEDA's irradiance at leads 1 to 5, so a lower error is the expected sign.
+All solar rows rest on the two fits, and the all-months fit gives a penalty of +0.103 [+0.027,
++0.190] with the note about the irradiance construction after PS47, which supports the default rule.
+
+### Controls: a refit on the CPU and XGBoost models given shuffled weather
 
 **The GPU-against-CPU refit sets the noise floor at about +-0.05 points, and the shuffled-weather
 pair is not a clean null.** The refit of the Open-Meteo wind arm on the CPU reads -0.007 [-0.050,
@@ -454,14 +466,16 @@ absolute error and its interval.
 **The second hyperparameter setting gives the same verdict as the primary setting for wind P1, wind
 P3, and solar P2.** Wind P1 reads "differ" at both settings (+0.270 and +0.243), and wind P3 reads
 "penalty" at both (+0.441 and +0.408). Solar P3 is unresolved because its four readings disagree.
-The exploratory splits agree in sign: wind P1 is +0.254 [+0.176, +0.330] in era 0 and +0.300
-[+0.209, +0.403] in era 1, +0.315 [+0.209, +0.414] from October to March and +0.239 [+0.176, +0.310]
-from April to September, and +0.262 [+0.172, +0.342], +0.242 [+0.128, +0.351], and +0.308 [+0.169,
-+0.444] at W1, W2, and W3. Wind P3 at the three farms reads +0.392 [+0.218, +0.565], +0.514 [+0.331,
-+0.693], and +0.410 [+0.049, +0.746]. The row "without 2025-01" repeats the planned row for wind,
-because the wind rows hold no January 2025, and for solar P2 it reads +0.234 [+0.141, +0.335] over
-all 23 months and both eras, with the note about the irradiance construction after PS47, which is
-not the era-0 planned scope. Every one of these is one of many exploratory rows.
+
+**The exploratory splits by era, season, and farm agree in sign.** Wind P1 is +0.254 [+0.176,
++0.330] in era 0 and +0.300 [+0.209, +0.403] in era 1, +0.315 [+0.209, +0.414] from October to March
+and +0.239 [+0.176, +0.310] from April to September, and +0.262 [+0.172, +0.342], +0.242 [+0.128,
++0.351], and +0.308 [+0.169, +0.444] at W1, W2, and W3. Wind P3 at the three farms reads +0.392
+[+0.218, +0.565], +0.514 [+0.331, +0.693], and +0.410 [+0.049, +0.746]. The row "without 2025-01"
+repeats the planned row for wind, because the wind rows hold no January 2025, and for solar P2 it
+reads +0.234 [+0.141, +0.335] over all 23 months and both eras, with the note about the irradiance
+construction after PS47, which is not the era-0 planned scope. Every one of these is one of many
+exploratory rows.
 
 ## Discussion: what to use
 
@@ -507,8 +521,7 @@ given Open-Meteo's values.
 - **The two spans were found from the served series and dropped.** The edges are whole UTC days, a
   few hours at each edge are dropped without a change, and the choice rests on Open-Meteo's ratio to
   CEDA's and not on a power result. The first run, which kept the spans and is the planned scope,
-  read wind P1 as unresolved.
-  The page cannot rule out that further spans exist at a smaller size.
+  read wind P1 as unresolved. The page cannot rule out that further spans exist at a smaller size.
 - **Leads beyond 5 hours are untested.** A live service would feed forecasts at leads of hours to
   days. A lead-0 analysis is the least noisy input such a model could meet, so the transfer penalty
   probably understates the effect for solar, and for wind the speed scale would carry over.
