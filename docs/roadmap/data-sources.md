@@ -926,10 +926,10 @@ that one era of UKV stands in for another.
 
 ### UKV from CEDA's archive differs from UKV as Open-Meteo serves it in lead, irradiance, temperature, and units
 
-**The project can read UKV from three archives, and the three hold the same Met Office model but not
-the same series.** An XGBoost model trained on one archive therefore meets inputs it never saw in
-training when it is scored on another. The comparison of CEDA's archive with Open-Meteo's rests on
-the [study of UKV from CEDA against UKV from
+**The project can read UKV from three archives, and the three hold the same Met Office weather
+model but not the same series.** An XGBoost model trained on one archive and scored on another
+therefore meets inputs that its training never showed. The comparison of CEDA's archive with
+Open-Meteo's rests on the [study of UKV from CEDA against UKV from
 Open-Meteo](../studies/past-weather/ukv-ceda-vs-openmeteo.md), which compares the two archives at
 nine metered generators over the 23 whole months they share. The facts about the Met Office's own
 AWS bucket are pilot findings, from a listing of the bucket and a download of two days of runs. The
@@ -938,19 +938,19 @@ last column of the table says where each row's evidence comes from.
 | Difference | UKV from CEDA's archive | UKV as Open-Meteo serves it | UKV in the Met Office's AWS bucket | Evidence |
 |---|---|---|---|---|
 | [Runs and lead](#each-archive-serves-a-different-lead) | 8 runs a day; the studies read the 00, 06, 12, and 18 UTC runs at leads of 0 to 5 hours | Every hourly run, a later run overwriting an earlier one, so in effect the T+0 analysis | Every hourly run, each kept whole to 54 hours, or to 120 hours for the 03 and 15 UTC runs | CEDA: catalogue record and download script; Open-Meteo: measured for irradiance; AWS: pilot |
-| [History](#the-archives-differ-in-how-much-of-each-physics-era-they-hold) | From 2016-03; the studies' download from 2019-09 | Live ingest from 2024-08-12, and a backfill of unnamed origin before that date | A rolling window of about two years, which started on 2024-10-04 on 2026-10-06 | Documented; AWS: pilot |
+| [History](#the-archives-differ-in-how-much-of-each-physics-era-they-hold) | From 2016-03; the studies' download from 2019-09 | Live ingest from 2024-08-12, and a backfill of unnamed origin before that date | A rolling window of about two years, reaching back to 2024-10-04 on 2026-10-06 | Documented; AWS: pilot |
 | [Grid and files](#the-met-offices-aws-bucket-keeps-every-hourly-run-on-a-different-grid) | GRIB files on a 548 by 704 grid on the Ordnance Survey national grid, first row in the north | Values at the requested coordinates | One NetCDF file per variable and valid time, on a 970 by 1042 Lambert azimuthal equal-area grid, first row in the south | Download script; AWS: pilot |
 | [Irradiance](#open-meteos-hourly-irradiance-is-a-scaled-snapshot-whose-construction-changes-after-ps47) | One global short-wave snapshot | The snapshot at the hour's end, scaled by a ratio of cosines of the solar zenith angle, and built differently after PS47 | Global, direct, and diffuse short-wave, each a snapshot; the three do not add up in 2024 | Measured; AWS: pilot |
-| [Temperature](#temperature-agrees-closely-at-lead-0-and-wind-differs-in-units-level-and-heights) | Hourly instants | Hourly instants, 0.098 K from CEDA's at lead 0 | Hourly instants, and 15-minute files in 2026 runs | Measured; AWS: pilot |
+| [Temperature](#temperature-agrees-closely-at-lead-0-and-wind-differs-in-units-level-and-heights) | Hourly instants | Hourly instants, a mean absolute difference of 0.098 K from CEDA's at lead 0 | Hourly instants, and 15-minute files in 2026 runs | Measured; AWS: pilot |
 | [Wind](#temperature-agrees-closely-at-lead-0-and-wind-differs-in-units-level-and-heights) | m/s; 10 m, 925 hPa, and 1000 hPa | km/h; 10 m, 50 m, 80 m, and 100 m; at 10 m about 3% below CEDA's at lead 0, and about 6% above in two spans | m/s; 10 m, pressure levels, and 33 or 56 height levels | Measured at 10 m; AWS: pilot |
 | [Licence](#the-archives-carry-different-licences) | CC BY-NC-SA 4.0 | Open-Meteo's terms | CC BY-SA 4.0 | Documented |
 
 #### Each archive serves a different lead
 
-**CEDA's value for an hour comes from a run that started up to five hours earlier, and Open-Meteo's
+**CEDA's value for an hour comes from a run that started up to 5 hours earlier, and Open-Meteo's
 value comes from the analysis of that hour.** CEDA's catalogue record describes UKV runs "up to
-eight times a day", and the project's CEDA download script records eight runs a day, with files
-reaching 120 hours for the 03 and 15 UTC runs only. The studies read the 00, 06, 12, and 18 UTC
+eight times a day". The project's CEDA download script records 8 runs a day, with files reaching
+120 hours for the 03 and 15 UTC runs only. The studies read the 00, 06, 12, and 18 UTC
 runs, which reach 54 hours, and take each hour from the latest of those runs that started at or
 before the hour. The lead is therefore 0 to 5 hours, and the hour of day fixes the lead. Open-Meteo
 ingests every hourly run, and a later run overwrites an earlier run for the same valid time, as [the
@@ -971,7 +971,7 @@ at the hour's end. At CEDA's lead-0 hours from 2024-09 to 2025-12, with Open-Met
 50 W m⁻², the median of CEDA's raw snapshot over Open-Meteo's value is 1.355 at 06 UTC, 1.011 at
 12 UTC, and 0.774 at 18 UTC. CEDA's raw snapshot therefore reads 36% high at 06 UTC and 23% low at
 18 UTC against Open-Meteo's value. An XGBoost model trained on the raw snapshot and given
-Open-Meteo's value meets a scaling by hour of day that it never saw in training.
+Open-Meteo's value meets a scaling by hour of day that its training never showed.
 
 **Scaling CEDA's snapshot by the same cosine ratio reproduces Open-Meteo's value at the median
 before the Met Office's PS47 upgrade, and does not after the upgrade.** On the same hours, the
@@ -993,8 +993,8 @@ hold hourly instants of temperature, and the study averages the instants at the 
 hour for both archives. At CEDA's lead 0, the mean difference is −0.021 K (CEDA minus Open-Meteo),
 the mean absolute difference is 0.098 K, and the correlation is 0.9997. The mean lead-0 difference
 at each of the nine generators lies between −0.045 K and −0.006 K, so any adjustment Open-Meteo
-makes to a point's elevation is small at these generators. Whether Open-Meteo makes such an
-adjustment is not established.
+makes for a point's elevation is small at the nine generators. Whether Open-Meteo adjusts
+temperature for elevation at all is not established.
 
 **Open-Meteo serves wind in km/h and CEDA's files hold wind in m/s, and after conversion
 Open-Meteo's 10 m speed is about 3% below CEDA's.** The study divides Open-Meteo's speed by 3.6 and
@@ -1015,7 +1015,7 @@ A training history read from Open-Meteo's UKV contains both spans.
 around each generator, the nearest cell holds the value closest to Open-Meteo's at 27% of lead-0
 hours for 10 m wind speed and 47% for temperature, averaged over the generators, where chance is
 11%. Interpolation from the native grid and a different grid are both possible causes, and neither
-is verified.
+cause is verified.
 
 **The archives offer different wind heights.** CEDA's files hold 10 m wind and wind at the 925 hPa
 and 1000 hPa pressure levels, and no wind on height levels, so CEDA carries no 100 m wind.
@@ -1026,7 +1026,7 @@ Open-Meteo serves UKV wind at 10 m, 50 m, 80 m, and 100 m. The study compares 10
 **The Met Office's AWS bucket keeps every hourly UKV run whole for about two years, which neither
 CEDA's archive nor Open-Meteo's archive does.** The findings below come from listing the bucket on
 2026-10-06 and from a pilot download of all 24 runs of 2024-10-08 and of 2026-10-05 at leads 0 to 5
-hours. They are pilot findings, not a study result.
+hours, and are pilot findings rather than a study result.
 
 - **Runs and window.** The bucket `met-office-atmospheric-model-data` holds UKV under the prefix
   `uk-deterministic-2km/`, with 24 runs a day. Most runs reach 54 hours at hourly steps, and the 03
@@ -1041,17 +1041,17 @@ hours. They are pilot findings, not a study result.
   fetches only the blocks over a small area: the pilot requested 0.43 MB per file on average.
 - **Every field is a snapshot.** The files for the eight variables the pilot read carry no
   `cell_methods` attribute and no time bounds, so under the CF conventions every field, short-wave
-  included, is a value at the valid time. The files do not say so explicitly.
+  included, is a value at the valid time. No file labels a field as instantaneous in words.
 - **Irradiance components.** The bucket publishes global, direct, and diffuse short-wave as three
   fields, where CEDA's archive holds one short-wave field. On 2024-10-08 the three fields do not add
   up: in daylight, global minus direct minus diffuse has a mean absolute value of 8 to 42 W m⁻² per
-  run hour. On 2026-10-05 that residual is 0.06 W m⁻² or less. The date from which the three fields
+  run hour. On 2026-10-05 the residual is 0.06 W m⁻² or less. The date from which the three fields
   add up has not been found.
 - **Height levels.** Wind on height levels comes on 33 levels in the files from 2024-10-15 to
   2026-01-20 and on 56 levels from 2026-01-22. The 50 m, 75 m, 100 m, and 150 m levels are in every
   file probed on nine dates, and the 125 m level is only in the 56-level files. Wind on pressure
   levels is published too.
-- **15-minute files.** Some variables, among them screen temperature and 10 m wind, also have
+- **Files every quarter hour.** Some variables, among them screen temperature and 10 m wind, also have
   15-minute files out to 54 hours in the 2026 runs. The 2024 runs have none.
 
 #### The archives differ in how much of each physics era they hold
@@ -1064,10 +1064,10 @@ science change intended. PS47 on 2026-01-21 moved UKV to the RAL3 physics, with 
 a new cloud scheme ([the list of upgrades](#nwp-model-upgrades-since-2019)). CEDA's archive starts
 in 2016-03, and the project's CEDA download starts on 2019-09-01, so the download holds three months
 before PS43 and the whole era from PS43 to PS47. Open-Meteo's live ingest starts on 2024-08-12, and
-the AWS bucket's window started on 2024-10-04 on 2026-10-06, so neither can test PS43, PS44, or
-PS45. The 23 whole months that CEDA's and Open-Meteo's archives share run from 2024-09 to 2025-12,
-16 months before PS47 that include PS46, and from 2026-02 to 2026-08, 7 months after PS47. The
-study drops 2026-01, the month of the upgrade.
+the AWS bucket's window reached back to 2024-10-04 on 2026-10-06, so neither Open-Meteo's archive
+nor the AWS bucket can test PS43, PS44, or PS45. The 23 whole months that CEDA's and Open-Meteo's
+archives share run from 2024-09 to 2025-12, 16 months before PS47 that include PS46, and from
+2026-02 to 2026-08, 7 months after PS47. The study drops 2026-01, the month of the upgrade.
 
 #### The archives carry different licences
 
@@ -1086,8 +1086,8 @@ licence permits the project's use of CEDA's UKV is a decision for the maintainer
 **Open-Meteo's UKV matches the Met Office's own files for irradiance, and the project has not
 checked Open-Meteo's wind or temperature against those files.** At five instants sampled either side
 of PS47, Open-Meteo's irradiance snapshot agrees with the nearest cell of the Met Office's own file
-to between 0.11 and 0.55 W m⁻². Hours older than the AWS bucket's rolling window, which started on
-2024-10-04 on 2026-10-06, can no longer be checked against the bucket.
+to between 0.11 and 0.55 W m⁻². Hours older than the AWS bucket's rolling window, which reached
+back to 2024-10-04 on 2026-10-06, can no longer be checked against the bucket.
 
 **CEDA's UKV agreed closely with the AWS bucket's UKV in a spot check of two runs, too few to settle
 whether the two differ.** For the 00 and 12 UTC runs of 2024-10-08 at leads 0 to 5 hours, with each
