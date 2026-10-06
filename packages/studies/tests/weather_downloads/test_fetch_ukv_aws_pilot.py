@@ -152,3 +152,65 @@ def test_list_keys_stops_paging_once_past_the_bound(
     assert pilot.list_keys(prefix="a/", until="a/m") == {"a/z": 1}
     assert len(calls) == 1
     assert set(pilot.list_keys(prefix="a/", until="c")) == {"a/z", "b/y"}
+
+
+def test_day_is_committed_needs_a_complete_record_covering_the_hours(
+    pilot: ModuleType, tmp_path: Path
+) -> None:
+    day = dt.date(2024, 10, 6)
+    everything = list(range(24))
+    assert not pilot.day_is_committed(product_dir=tmp_path, day=day, run_hours=everything)
+    pilot.commit_day(
+        product_dir=tmp_path, day=day, record={"complete": False, "run_hours": everything}
+    )
+    assert not pilot.day_is_committed(product_dir=tmp_path, day=day, run_hours=everything)
+    pilot.commit_day(product_dir=tmp_path, day=day, record={"complete": True, "run_hours": [0, 12]})
+    assert pilot.day_is_committed(product_dir=tmp_path, day=day, run_hours=[0])
+    assert not pilot.day_is_committed(product_dir=tmp_path, day=day, run_hours=everything)
+
+
+def test_day_is_committed_treats_a_record_without_the_new_keys_as_complete(
+    pilot: ModuleType, tmp_path: Path
+) -> None:
+    day = dt.date(2024, 10, 6)
+    pilot.commit_day(product_dir=tmp_path, day=day, record={"runs": 24})
+    assert pilot.day_is_committed(product_dir=tmp_path, day=day, run_hours=list(range(24)))
+
+
+def test_write_durably_leaves_only_the_final_file(pilot: ModuleType, tmp_path: Path) -> None:
+    path = tmp_path / "sub" / "file.bin"
+    pilot.write_durably(path=path, write=lambda handle: handle.write(b"abc"))
+    assert path.read_bytes() == b"abc"
+    assert [item.name for item in path.parent.iterdir()] == ["file.bin"]
+
+
+def test_listing_retries_a_503_then_succeeds(
+    pilot: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    requests = pytest.importorskip("requests")
+    answers = [503, 503, 200]
+    sleeps: list[float] = []
+
+    def fake_get(*_: object, **__: object) -> object:
+        response = requests.Response()
+        response.status_code = answers.pop(0)
+        response._content = b"<R/>"
+        return response
+
+    monkeypatch.setattr(pilot.requests, "get", fake_get)
+    monkeypatch.setattr(pilot.time, "sleep", sleeps.append)
+    pilot._list_page(prefix="p", delimiter=None, token=None)
+    assert sleeps == [5, 10]
+
+
+def test_listing_does_not_retry_a_403(pilot: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    requests = pytest.importorskip("requests")
+
+    def fake_get(*_: object, **__: object) -> object:
+        response = requests.Response()
+        response.status_code = 403
+        return response
+
+    monkeypatch.setattr(pilot.requests, "get", fake_get)
+    with pytest.raises(requests.HTTPError):
+        pilot._list_page(prefix="p", delimiter=None, token=None)

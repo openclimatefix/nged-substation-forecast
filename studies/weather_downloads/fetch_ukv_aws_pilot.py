@@ -42,14 +42,15 @@ import argparse
 import contextlib
 import datetime as dt
 import json
+import os
 import shutil
 import time
 from collections import defaultdict
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, BinaryIO, Final
 from xml.etree import ElementTree
 
 import aiohttp
@@ -102,6 +103,8 @@ per object, so the whole window needs about 360 GB."""
 LISTING_THREADS: Final[int] = 4
 
 WORKERS: Final[int] = 8
+RETRIED_STATUSES: Final[tuple[int, ...]] = (500, 502, 503, 504)
+"""Listing statuses treated as transient, such as S3's `SlowDown` (503)."""
 MAX_ATTEMPTS: Final[int] = 5
 BLOCK_BYTES: Final[int] = 64 * 1024
 MAX_BLOCKS: Final[int] = 64
@@ -167,9 +170,23 @@ def _list_page(*, prefix: str, delimiter: str | None, token: str | None) -> Elem
         params["delimiter"] = delimiter
     if token is not None:
         params["continuation-token"] = token
-    response = requests.get(BUCKET_URL, params=params, timeout=60)
-    response.raise_for_status()
-    return ElementTree.fromstring(response.content)
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            response = requests.get(BUCKET_URL, params=params, timeout=60)
+            response.raise_for_status()
+        except requests.HTTPError as error:
+            status = None if error.response is None else error.response.status_code
+            if status not in RETRIED_STATUSES or attempt == MAX_ATTEMPTS:
+                raise
+            time.sleep(5 * 2 ** (attempt - 1))
+        except requests.ConnectionError, requests.Timeout:
+            if attempt == MAX_ATTEMPTS:
+                raise
+            time.sleep(5 * 2 ** (attempt - 1))
+        else:
+            return ElementTree.fromstring(response.content)
+    message = "unreachable"
+    raise AssertionError(message)
 
 
 def _next_token(*, page: ElementTree.Element) -> str | None:
@@ -250,17 +267,46 @@ def day_range(*, start: dt.date, end: dt.date) -> list[dt.date]:
 
 
 def ledger_path(*, product_dir: Path, day: dt.date) -> Path:
-    """The file whose existence says the day was fetched completely."""
+    """The file whose existence says the day's fetch finished; its `complete` flag says how well."""
     return product_dir / "ledger" / f"{day:%Y%m%d}.json"
 
 
-def commit_day(*, product_dir: Path, day: dt.date, record: Mapping[str, Any]) -> None:
-    """Record a finished day, via a `.partial` file and a rename so it is never half-written."""
-    path = ledger_path(product_dir=product_dir, day=day)
+def write_durably(*, path: Path, write: Callable[[BinaryIO], object]) -> None:
+    """Write a file via `.partial`, flushing it to disk before the rename.
+
+    Without the `fsync`, a power loss after the rename can leave a truncated file under the final
+    name, which a resume then skips for good.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     partial = path.with_name(path.name + ".partial")
-    partial.write_text(json.dumps(record, indent=2))
+    with partial.open("wb") as handle:
+        write(handle)
+        handle.flush()
+        os.fsync(handle.fileno())
     partial.rename(path)
+
+
+def commit_day(*, product_dir: Path, day: dt.date, record: Mapping[str, Any]) -> None:
+    """Record a finished day durably, so the ledger file is never half-written."""
+    write_durably(
+        path=ledger_path(product_dir=product_dir, day=day),
+        write=lambda handle: handle.write(json.dumps(record, indent=2).encode()),
+    )
+
+
+def day_is_committed(*, product_dir: Path, day: dt.date, run_hours: Sequence[int]) -> bool:
+    """Whether the ledger says the day is complete for every requested run hour.
+
+    A day with a missing run or absent object is committed with `complete` false and is retried. A
+    day fetched for a subset of hours covers only those hours. A record without these keys was
+    written for all 24 hours and counts as complete.
+    """
+    path = ledger_path(product_dir=product_dir, day=day)
+    if not path.exists():
+        return False
+    record = json.loads(path.read_text())
+    recorded_hours = set(record.get("run_hours", range(RUNS_PER_DAY)))
+    return bool(record.get("complete", True)) and set(run_hours) <= recorded_hours
 
 
 def listing_bound(*, run: str) -> str:
@@ -625,22 +671,19 @@ def fetch_run(
     found: list[tuple[str, int, str]],
     missing: list[str],
     rectangle: CropRectangle,
+    axes: tuple[np.ndarray, np.ndarray],
     pool: ProcessPoolExecutor,
 ) -> tuple[Path, int]:
-    """Fetch one run's cropped fields and write them atomically to `runs/<run>.npz`.
+    """Fetch one run's cropped fields and write them durably to `runs/<run>.npz`.
+
+    `axes` are the cropped axes read once from the file the rectangle was computed on, and every
+    object is checked against them, so a file on a different grid raises instead of being cropped
+    at the wrong place.
 
     Returns:
         The path written and the bytes requested from the bucket for this run.
     """
     runs_dir = PRODUCT_DIR / "runs"
-    runs_dir.mkdir(parents=True, exist_ok=True)
-    first = next(key for key, lead, _ in found if lead == 0)
-    with _open(key=first) as (dataset, _):
-        x, y = _check_axes(dataset=dataset)
-    axes = (
-        x[rectangle.col_start : rectangle.col_stop],
-        y[rectangle.row_start : rectangle.row_stop],
-    )
     futures = {
         (name, lead): pool.submit(
             _read_object_task,
@@ -651,10 +694,9 @@ def fetch_run(
     results = {item: future.result() for item, future in futures.items()}
     arrays = assemble_run_arrays(results=results, missing=missing, axes=axes)
     final = runs_dir / f"{run}.npz"
-    partial = final.with_name(final.name + ".partial")
-    with partial.open("wb") as handle:
-        np.savez_compressed(handle, allow_pickle=False, **arrays)
-    partial.rename(final)
+    write_durably(
+        path=final, write=lambda handle: np.savez_compressed(handle, allow_pickle=False, **arrays)
+    )
     return final, int(arrays["wire_bytes"])
 
 
@@ -792,11 +834,23 @@ def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def read_cropped_axes(*, key: str, rectangle: CropRectangle) -> tuple[np.ndarray, np.ndarray]:
+    """Read the cropped grid axes once, from the file the rectangle was computed on."""
+    with _open(key=key) as (dataset, _):
+        x, y = _check_axes(dataset=dataset)
+    return (
+        x[rectangle.col_start : rectangle.col_stop],
+        y[rectangle.row_start : rectangle.row_stop],
+    )
+
+
 def _fetch_day(
     *,
     day: dt.date,
     plan: Mapping[str, RunPlan],
+    run_hours: Sequence[int],
     rectangle: CropRectangle,
+    axes: tuple[np.ndarray, np.ndarray],
     pool: ProcessPoolExecutor,
     max_wire_bytes: float,
     wire_total: int,
@@ -814,17 +868,20 @@ def _fetch_day(
             message = f"stopping before {run}: over --max-wire-gb; a re-run resumes here"
             raise SystemExit(message)
         _, run_bytes = fetch_run(
-            run=run, found=found, missing=missing, rectangle=rectangle, pool=pool
+            run=run, found=found, missing=missing, rectangle=rectangle, axes=axes, pool=pool
         )
         day_bytes += run_bytes
+    absent = sum(len(missing) for _, missing, _ in plan.values())
     commit_day(
         product_dir=PRODUCT_DIR,
         day=day,
         record={
             "day": str(day),
+            "complete": len(plan) == len(run_hours) and absent == 0,
+            "run_hours": sorted(run_hours),
             "runs": len(plan),
             "objects": sum(len(found) for found, _, _ in plan.values()),
-            "absent_objects": sum(len(missing) for _, missing, _ in plan.values()),
+            "absent_objects": absent,
             "wire_bytes_this_invocation": day_bytes,
             "code_version": CODE_VERSION,
             "committed_at_utc": dt.datetime.now(dt.UTC).isoformat(),
@@ -851,6 +908,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     first_key = f"{PREFIX}{first_run}/{first_run}-PT0000H00M-{SURFACE_FILES[0]}.nc"
     rectangle, proj4 = load_or_make_rectangle(first_key=first_key, write=not args.dry_run)
     print(f"Grid projection: {proj4}")
+    axes = read_cropped_axes(key=first_key, rectangle=rectangle)
     print(f"Days {days[0]} to {days[-1]}: {len(runs_by_day)} with runs; output {PRODUCT_DIR}")
     if args.dry_run:
         objects = whole_bytes = absent = 0
@@ -870,22 +928,26 @@ def main(argv: Sequence[str] | None = None) -> None:
     try:
         with ProcessPoolExecutor(max_workers=WORKERS) as pool:
             for number, day in enumerate(sorted(runs_by_day), start=1):
-                if ledger_path(product_dir=PRODUCT_DIR, day=day).exists():
+                if day_is_committed(product_dir=PRODUCT_DIR, day=day, run_hours=args.run_hours):
                     print(f"{day}: committed already, skipping", flush=True)
                     continue
                 plan = plan_day(day_runs=runs_by_day[day])
                 day_bytes = _fetch_day(
                     day=day,
                     plan=plan,
+                    run_hours=args.run_hours,
                     rectangle=rectangle,
+                    axes=axes,
                     pool=pool,
                     max_wire_bytes=args.max_wire_gb * 1e9,
                     wire_total=wire_total,
                 )
                 wire_total += day_bytes
+                absent = sum(len(missing) for _, missing, _ in plan.values())
                 print(
                     f"{day}: day {number}/{len(runs_by_day)}, {len(plan)} runs, "
-                    f"{day_bytes / 1e6:.0f} MB, {wire_total / 1e9:.2f} GB in total, "
+                    f"{absent} absent objects, {day_bytes / 1e6:.0f} MB, "
+                    f"{wire_total / 1e9:.2f} GB in total, "
                     f"{(time.monotonic() - started) / 60:.1f} min",
                     flush=True,
                 )
