@@ -137,7 +137,7 @@ significant at one only, in an era whose 8 months are mostly April to September 
 era](#in-2026-the-wind-difference-favours-ukv-ceda-statistically-significantly-at-one-setting-only)).**
 
 **Over hours 0 to 5 of UKV-CEDA, the stations favour UKV-CEDA at every lead and power does not
-([consolidated by lead](#ukv-cedas-first-hours-beat-era5-at-the-stations-but-not-clearly-for-power)).**
+([consolidated by lead](#ukv-ceda-is-closer-than-era5-at-the-stations-at-every-lead-but-not-clearly-better-for-power)).**
 The table gives each product's error and the UKV-CEDA minus ERA5 difference by lead 0 to 5 and
 pooled.
 
@@ -526,18 +526,20 @@ with lead and drops at each run boundary. A feature built over several hours, su
 rolling mean, inherits that pattern. A history from 2019 spans three physics eras, with 3, 67, and 8
 scored months, so the main work would need an era column as the XGBoost models here had.
 
-## UKV-CEDA's first hours beat ERA5 at the stations, but not clearly for power
+## UKV-CEDA is closer than ERA5 at the stations at every lead, but not clearly better for power
 
-**Hours 0 to 5 of UKV-CEDA, the stitched hourly series from the freshest of the four runs per day
-(00, 06, 12, and 18 UTC), were closer than ERA5 to the readings at the four stations at every lead
-(the hours since the run started), and the advantage shrank as the lead grew.** The table below
-puts every number on the question in one place, for set A (temperature and wind speed at the four
-stations) and set B (the power error of XGBoost models at the wind and solar farms). The errors are
-each product's own mean absolute error. The "pooled" row of each outcome is the planned contrast (P1
-to P4), and every single-lead row and refit row is post hoc. Every interval covers month-to-month
-weather, and the power intervals cover the fitting seed too. A negative difference favours
-UKV-CEDA, and the power rows use the primary hyperparameter setting. The table is printed by
-`ukv_ceda_vs_era5_lead_summary.py` into `lead_summary.md`, from the saved intervals.
+**UKV-CEDA was closer than ERA5 to the readings at the four stations at every lead from 0 to 5
+hours, and the advantage shrank as the lead grew.** The lead is the hours since the run started, and
+UKV-CEDA here is the stitched hourly series from the freshest of the four runs per day (00, 06, 12,
+and 18 UTC). The table below gives each product's error and the difference at each lead, for set A
+(temperature and wind speed at the four stations) and set B (the power error of XGBoost models at
+the wind and solar farms). The errors are each product's own mean absolute error. The "pooled" row
+of each outcome is the planned contrast (P1 to P4), and every single-lead row and refit row is post
+hoc. Every interval covers month-to-month weather, and the power intervals cover the fitting seed
+too. A negative difference favours UKV-CEDA, and the power rows use the primary hyperparameter
+setting. The table is printed by `ukv_ceda_vs_era5_lead_summary.py` into `lead_summary.md`, from the
+saved intervals. The planned split of P2 by lead, P2-lead, is not in the table: UKV-CEDA minus ERA5
+is -0.187 K [-0.198, -0.176] over leads 0 to 2 and -0.061 K [-0.075, -0.047] over leads 3 to 5.
 
 | Outcome | Lead (hours since the run started) | Status | ERA5 error | UKV-CEDA error | UKV-CEDA minus ERA5 [95% interval] |
 |---|---|---|---|---|---|
@@ -582,16 +584,16 @@ UKV probably assimilates these four stations, although the page has not checked 
 assimilates, so the stations are not independent of UKV. The advantage falling with lead fits
 assimilation and also fits forecast error growing from each run, and the page tests neither.
 
-**For power, UKV-CEDA was level with ERA5 at leads 0 to 2 and behind it at leads 3 to 5, and no row
-shows UKV-CEDA ahead by as much as a planned margin (post hoc).** For wind power the difference is
--0.058 points [-0.192, +0.070] at lead 0, and ERA5 is statistically significantly ahead at leads 3,
-4, and 5, by +0.173, +0.149, and +0.323 points. The XGBoost models refitted on the lead-0 rows alone
-give -0.065 points [-0.203, +0.069], and on the lead 0 to 1 rows alone +0.007 points [-0.107,
-+0.117]. For solar power, no interval at any lead reaches further than 0.020 points from zero, and
-the refit on the lead 0 to 1 rows gives -0.010 points [-0.020, -0.001], which is statistically
-significant and inside the 0.06-point margin. The page does not claim that ERA5 beats UKV, because
-ERA5's wind and temperature XGBoost models differ from UKV-CEDA's in height and served lead as well
-as in product.
+**For wind power, UKV-CEDA was level with ERA5 at leads 0 to 2 and behind it at leads 3 to 5. For
+solar power, UKV-CEDA was level at every lead. No power row shows UKV-CEDA ahead by as much as a
+planned margin (post hoc).** For wind power the difference is -0.058 points [-0.192, +0.070] at lead
+0, and ERA5 is statistically significantly ahead at leads 3, 4, and 5, by +0.173, +0.149, and +0.323
+points. The XGBoost models refitted on the lead-0 rows alone give -0.065 points [-0.203, +0.069],
+and on the lead 0 to 1 rows alone +0.007 points [-0.107, +0.117]. For solar power, no interval at
+any lead reaches further than 0.020 points from zero, and the refit on the lead 0 to 1 rows gives
+-0.010 points [-0.020, -0.001], which is statistically significant and inside the 0.06-point margin.
+The page does not claim that ERA5 beats UKV, because the XGBoost models given ERA5 and those given
+UKV-CEDA differ in the height and the served lead of their inputs as well as in the product.
 
 **Three scope limits apply to the table.** Lead 0 covers only the 00, 06, 12, and 18 UTC hours, so
 the lead-0 rows score 4 hours of the day, and each lead pools different hours of the day. A solar
