@@ -40,7 +40,6 @@ import argparse
 import concurrent.futures
 import hashlib
 import logging
-import os
 import sys
 import zlib
 from datetime import UTC, date, datetime
@@ -57,7 +56,6 @@ from build_forecast_inputs import (
     PRODUCT_SLUGS,
     SOLAR_ONLY_PRODUCTS,
 )
-from contracts.settings import PROJECT_ROOT
 from deltalake import DeltaTable
 from studies.baselines import climatology, shrunk_persistence
 from studies.blending import climatology_permutation
@@ -83,8 +81,14 @@ from studies.cross_validation import (
     raise_on_uncovered_months,
     score_prediction,
 )
+from studies.sources import (
+    ENS_FORECAST_HORIZONS_DIR,
+    GFS_WINDOW_DIR,
+    NFC_DIR,
+    REPO_DATA_DIR,
+    STUDIES_DATA_DIR,
+)
 from verify_previous_runs_leads import (
-    GFS_WINDOW_DIR_NAME,
     V1_DAYS_N,
     V1B_SIGNATURE_THRESHOLD,
 )
@@ -115,8 +119,8 @@ which #885 also drops."""
 UKV_UPGRADE: Final[datetime] = datetime(2026, 1, 21, tzinfo=UTC)
 """The UKV PS47 upgrade; rows before it are UKV's earlier era, rows after it its later era."""
 
-HORIZONS_REPORT: Final[str] = "ens_forecast_horizons/report.md"
-"""Under `data/studies/`, the ENS horizons page's report, read for the day-1 reconciliation."""
+HORIZONS_REPORT: Final[Path] = ENS_FORECAST_HORIZONS_DIR / "report.md"
+"""The ENS horizons page's report, read for the day-1 reconciliation."""
 
 # --- Folds --------------------------------------------------------------------------------------
 
@@ -246,25 +250,6 @@ PLANNED_PREFIXES: Final[tuple[str, ...]] = (
 )
 """The planned arms (P1 to P4 and their bracket sides), by weather-column prefix, for both
 technologies. Fitted at both hyperparameter settings; every other arm is exploratory."""
-
-
-def _repo_data_dir() -> Path:
-    """Return the shared `data/` directory, resolving a linked worktree to the main checkout.
-
-    Duplicated from `verify_previous_runs_leads._repo_data_dir`, because study scripts cannot
-    import one another's private helpers.
-
-    Returns:
-        The directory holding `studies/`, `NGED/` and the rest of the shared downloads.
-    """
-    root = PROJECT_ROOT
-    marker = root / ".git"
-    if marker.is_file():
-        pointer = marker.read_text().removeprefix("gitdir:").strip()
-        git_dir = Path(pointer)
-        if git_dir.parent.name == "worktrees":
-            root = git_dir.parent.parent.parent
-    return Path(os.environ.get("DATA_PATH_INTERNAL") or root / "data")
 
 
 def baseline_input_columns(*, domain: DomainType) -> tuple[str, ...]:
@@ -2074,7 +2059,7 @@ def _design_lines() -> list[str]:
     Returns:
         The markdown lines of the report's design section.
     """
-    window_start, window_end = GFS_WINDOW_DIR_NAME.removeprefix("GFS_window_").split("_")
+    window_start, window_end = GFS_WINDOW_DIR.name.removeprefix("GFS_window_").split("_")
     window_days = (date.fromisoformat(window_end) - date.fromisoformat(window_start)).days + 1
     seeds = ", ".join(str(seed) for seed in SEEDS)
     v1_days = " and ".join(str(day) for day in V1_DAYS_N)
@@ -2112,7 +2097,7 @@ def _design_lines() -> list[str]:
         ),
         (
             f"- **V1 gate:** Open-Meteo's GFS `previous_dayN` values for N = {v1_days} are "
-            f"compared with the Dynamical.org GFS extract `{GFS_WINDOW_DIR_NAME}`, which "
+            f"compared with the Dynamical.org GFS extract `{GFS_WINDOW_DIR.name}`, which "
             f"holds {window_days} days."
         ),
         (
@@ -2334,7 +2319,7 @@ def _domain_lines(
         _reconciliation_line(
             domain=domain,
             losses=by_setting["primary"],
-            path=_repo_data_dir() / "studies" / HORIZONS_REPORT,
+            path=HORIZONS_REPORT,
         ),
         "",
     ]
@@ -2375,9 +2360,7 @@ def write_report(
         *_design_lines(),
         "## Inputs and verification",
         "",
-        *_effective_capacity_lines(
-            path=_repo_data_dir() / "effective_capacity", input_dir=input_dir
-        ),
+        *_effective_capacity_lines(path=REPO_DATA_DIR / "effective_capacity", input_dir=input_dir),
         "",
         *_verification_lines(directory=output_dir / "verification"),
     ]
@@ -2427,7 +2410,7 @@ def _obtain_losses(
 
 def _is_under_real_data(*, path: Path) -> bool:
     """Whether `path` lies inside the shared `data/studies/` folder."""
-    return path.resolve().is_relative_to((_repo_data_dir() / "studies").resolve())
+    return path.resolve().is_relative_to(STUDIES_DATA_DIR.resolve())
 
 
 def _build_inputs(*, input_dir: Path, domain: DomainType) -> DomainInputs:
@@ -2446,7 +2429,7 @@ def main() -> int:
     """Build rows, folds and jobs, then dry-run, fit, fabricate, or report from saved losses."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
-    default_dir = _repo_data_dir() / "studies" / "nwp_forecast_comparison"
+    default_dir = NFC_DIR
     parser.add_argument("--input-dir", type=Path, default=default_dir)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--dry-run", action="store_true", help="Build rows, folds and jobs; stop.")

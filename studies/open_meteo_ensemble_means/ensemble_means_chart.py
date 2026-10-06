@@ -24,13 +24,11 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from studies.charts import CONTENT_WIDTH_PX, LABEL_WIDTH_PX, wrapped
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-from sources import STUDIES_DATA_DIR
+from studies.sources import OPEN_METEO_ENSEMBLE_MEANS_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("ensemble_means_chart")
 
-MAE_PATH: Final[Path] = STUDIES_DATA_DIR / "open_meteo_ensemble_means" / "mae_by_arm.parquet"
+MAE_PATH: Final[Path] = OPEN_METEO_ENSEMBLE_MEANS_DIR / "mae_by_arm.parquet"
 DEFAULT_OUTPUT: Final[Path] = (
     Path(__file__).resolve().parents[2] / "docs" / "studies" / "assets" / "ensemble_means_mae.svg"
 )

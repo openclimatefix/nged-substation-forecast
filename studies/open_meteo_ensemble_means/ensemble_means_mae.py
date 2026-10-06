@@ -60,15 +60,15 @@ between them measures the pipeline.
 against the reference (CAMS irradiance in W/m2, ERA5 wind speed in km/h) on the same rows.
 
 **Data.** The four Open-Meteo means are under
-`data/studies/weather/OPEN-METEO-ENSEMBLE-MEANS/`. CAMS and ERA5 come from the original downloads,
-which end on 2026-09-10 and 2026-09-11, extended by the refreshed downloads that start on
+`data/studies/downloads/NWP/OPEN-METEO-ENSEMBLE-MEANS/`. CAMS and ERA5 come from the original
+downloads, which end on 2026-09-10 and 2026-09-11, extended by the refreshed downloads that start on
 2026-08-20. Where the two overlap the refreshed download is used, and the report counts the overlap
 rows on which the values differ. Only anonymised site labels (`A` to `F`, `W1` to `W3`) reach any
 output; the site roster's coordinates and identifiers stay inside `build_dataset`.
 
 Run it with `uv run python studies/open_meteo_ensemble_means/ensemble_means_mae.py`. It writes to a
-new folder, `data/studies/open_meteo_ensemble_means/`, and refuses to overwrite: to re-run, move
-the existing files into a `superseded/` subfolder by hand first. Fits run on the CPU.
+new folder, `data/studies/per_study/open_meteo_ensemble_means/`, and refuses to overwrite: to
+re-run, move the existing files into a `superseded/` subfolder by hand first. Fits run on the CPU.
 `--report-only` rebuilds the tables and `report.md` from the saved frames and losses.
 """
 
@@ -82,34 +82,39 @@ from pathlib import Path
 from typing import Final, Literal
 
 import polars as pl
+
+# The underscore-named helpers below are the roster, power and geometry code the earlier studies
+# use, and reusing them keeps every convention identical. Importing private names is a one-off here.
+from studies.arm_runner import Job, run_all
 from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
     SENSITIVITY_HYPER_PARAMETERS,
     assign_week_folds,
 )
+from studies.export_cap import with_export_cap
 from studies.guards import check_no_missing, refuse_to_overwrite
+from studies.pv_dataset import (
+    add_solar_geometry,
+    drop_false_zeros,
+    drop_outages_and_spikes,
+    nearest_era5_cell,
+    pv_sites,
+    wind_sites,
+)
+from studies.pv_dataset import solar_hourly_power as _solar_hourly_power
+from studies.sources import (
+    CAMS_SITE_POINTS_DIR,
+    ENS_SITE_POINTS_DIR,
+    ERA5_SITE_POINTS_DIR,
+    OPEN_METEO_ENSEMBLE_MEANS_DIR,
+    OPEN_METEO_ENSEMBLE_MEANS_PRODUCT_DIR,
+)
 from studies.stitched_ensemble import (
     hold_backward_mean_hourly,
     interpolate_instants_hourly,
     newest_run_member_means,
 )
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-# The underscore-named helpers below are the roster, power and geometry code the earlier studies
-# use, and reusing them keeps every convention identical. Importing private names is a one-off here.
-from build_dataset import (
-    _add_solar_geometry,
-    _drop_false_zeros,
-    _drop_outages_and_spikes,
-    _pv_sites,
-    _wind_sites,
-    nearest_era5_cell,
-)
-from build_dataset import _hourly_power as _solar_hourly_power
-from export_cap import with_export_cap
-from run_experiment import Job, run_all
-from sources import STUDIES_DATA_DIR, WEATHER_DATA_DIR
-from wind_products import _hourly_power as _wind_hourly_power
+from studies.wind_product_frames import wind_hourly_power as _wind_hourly_power
 
 _LOG: Final[logging.Logger] = logging.getLogger("ensemble_means_mae")
 
@@ -119,10 +124,10 @@ DesignType = Literal["solar", "wind_10m", "wind_hub"]
 WINDOW_START: Final[datetime] = datetime(2026, 6, 25, tzinfo=UTC)
 """The first hour of the Open-Meteo ensemble-mean archive, and the first day of the first fold."""
 
-OUTPUT_DIR: Final[Path] = STUDIES_DATA_DIR / "open_meteo_ensemble_means"
+OUTPUT_DIR: Final[Path] = OPEN_METEO_ENSEMBLE_MEANS_DIR
 """Where this script writes. A re-run needs the old files moved to `superseded/` by hand."""
 
-ENSEMBLE_MEANS_DIR: Final[Path] = WEATHER_DATA_DIR / "OPEN-METEO-ENSEMBLE-MEANS"
+ENSEMBLE_MEANS_DIR: Final[Path] = OPEN_METEO_ENSEMBLE_MEANS_PRODUCT_DIR
 """One folder per Open-Meteo ensemble-mean product, each holding a parquet named for the folder."""
 
 OPEN_METEO_PRODUCTS: Final[dict[str, str]] = {
@@ -187,18 +192,18 @@ LOCAL_ENS_RUN_LOOKBACK_DAYS: Final[int] = 3
 
 MS_TO_KM_PER_H: Final[float] = 3.6
 
-ENS_DIR: Final[Path] = WEATHER_DATA_DIR / "ENS"
+ENS_DIR: Final[Path] = ENS_SITE_POINTS_DIR
 CAMS_PATHS: Final[tuple[Path, ...]] = (
-    WEATHER_DATA_DIR / "CAMS" / "beam_diffuse_cams.parquet",
-    WEATHER_DATA_DIR / "CAMS" / "beam_diffuse_cams_2026-08-20_2026-09-21.parquet",
+    CAMS_SITE_POINTS_DIR / "beam_diffuse_cams.parquet",
+    CAMS_SITE_POINTS_DIR / "beam_diffuse_cams_2026-08-20_2026-09-21.parquet",
 )
 ERA5_GRID_PATHS: Final[tuple[Path, ...]] = (
-    WEATHER_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet",
-    WEATHER_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo_2026-08-20_2026-09-21.parquet",
+    ERA5_SITE_POINTS_DIR / "beam_diffuse_open_meteo.parquet",
+    ERA5_SITE_POINTS_DIR / "beam_diffuse_open_meteo_2026-08-20_2026-09-21.parquet",
 )
 ERA5_WIND_PATHS: Final[tuple[Path, ...]] = (
-    WEATHER_DATA_DIR / "ERA5" / "wind_era5.parquet",
-    WEATHER_DATA_DIR / "ERA5" / "wind_era5_2026-08-20_2026-09-21.parquet",
+    ERA5_SITE_POINTS_DIR / "wind_era5.parquet",
+    ERA5_SITE_POINTS_DIR / "wind_era5_2026-08-20_2026-09-21.parquet",
 )
 """Each pair is the original download, then the refreshed one, which wins where they overlap."""
 
@@ -284,7 +289,7 @@ def _local_ens_members(*, path: Path, value_columns: Sequence[str]) -> pl.DataFr
     """Read this repository's ENS member table over the lead bands that chain in 3-hour steps.
 
     Args:
-        path: The member parquet under `data/studies/weather/ENS/`.
+        path: The member parquet under `data/studies/downloads/NWP/ENS_SITE_EXTRACT/`.
         value_columns: The columns to keep beside the keys.
 
     Returns:
@@ -371,12 +376,12 @@ def build_solar_frame() -> tuple[pl.DataFrame, list[tuple[str, int]], dict[str, 
         original and refreshed downloads differ, by download name.
     """
     funnel: list[tuple[str, int]] = []
-    sites = _pv_sites()
+    sites = pv_sites()
     era5, era5_differing = _read_extended(
         paths=ERA5_GRID_PATHS, key=["time", "latitude", "longitude"]
     )
     cams, cams_differing = _read_extended(paths=CAMS_PATHS, key=["site", "time"])
-    power = _drop_outages_and_spikes(power=_solar_hourly_power(sites=sites), sites=sites).filter(
+    power = drop_outages_and_spikes(power=_solar_hourly_power(sites=sites), sites=sites).filter(
         pl.col("time") >= WINDOW_START
     )
     funnel.append(("hourly power after outage and spike rules", power.height))
@@ -392,9 +397,9 @@ def build_solar_frame() -> tuple[pl.DataFrame, list[tuple[str, int]], dict[str, 
         .drop("time_series_id", "cell_latitude", "cell_longitude")
     )
     funnel.append(("joined ERA5 grid cells", joined.height))
-    kept = _drop_false_zeros(joined=joined).drop("ghi_w_m2")
+    kept = drop_false_zeros(joined=joined).drop("ghi_w_m2")
     funnel.append(("after the false-zero rule", kept.height))
-    daylight = _add_solar_geometry(joined=kept).filter(pl.col("solar_elevation_deg") > 0.0)
+    daylight = add_solar_geometry(joined=kept).filter(pl.col("solar_elevation_deg") > 0.0)
     funnel.append(("sun above the horizon", daylight.height))
     frame = with_export_cap(
         dataset=daylight.drop("latitude", "longitude").with_columns(
@@ -431,7 +436,7 @@ def build_wind_frame() -> tuple[pl.DataFrame, list[tuple[str, int]], dict[str, i
         original and refreshed ERA5 wind downloads differ.
     """
     funnel: list[tuple[str, int]] = []
-    sites = _wind_sites()
+    sites = wind_sites()
     era5, era5_differing = _read_extended(paths=ERA5_WIND_PATHS, key=["site", "time"])
     power = (
         _wind_hourly_power(sites=sites, centred=True)

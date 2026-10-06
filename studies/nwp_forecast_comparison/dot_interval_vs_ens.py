@@ -8,15 +8,15 @@ The interval is the 95% interval from resampling whole calendar months and a fit
 (`studies.bootstrap.bootstrap_difference`). A row that rests on fewer than
 `MIN_MONTHS_FOR_INTERVAL` months gets a hollow dot and no interval.
 
-It reads the saved per-row losses of the fits under `data/studies/nwp_forecast_comparison_*` and
-fits nothing. **Each row uses the arms the leaderboards draw**: an arm that a published CPU fit and
-a later GPU refit both hold is read from the GPU refit, as the leaderboards do, so a product and
-its reference were fitted on one device. The reference is the leaderboard's ENS-mean arm of the
-same lead day:
+It reads the saved per-row losses of the fits under
+`data/studies/per_study/nwp_forecast_comparison/*/` and fits nothing. **Each row uses the arms the
+leaderboards draw**: an arm that a published CPU fit and a later GPU refit both hold is read from
+the GPU refit, as the leaderboards do, so a product and its reference were fitted on one device. The
+reference is the leaderboard's ENS-mean arm of the same lead day:
 
-- The products in `_leads_day10`, `_leads_day10b`, `_leads_day10c`, `_leads_day10d`, and
-  `_day4_shared` are subtracted from the ENS mean of `LEADERBOARD_ENS_SOURCES`: `_leads_day10b` at
-  days 2 and 7, `_day4_shared` at day 4, and `_leads_day10` at every other day. The folders hold
+- The products in `leads_day10`, `leads_day10b`, `leads_day10c`, `leads_day10d`, and
+  `day4_shared` are subtracted from the ENS mean of `LEADERBOARD_ENS_SOURCES`: `leads_day10b` at
+  days 2 and 7, `day4_shared` at day 4, and `leads_day10` at every other day. The folders hold
   the same `(site, time, seed)` keys, so the pair joins across folders. Two arms are scored without
   the target days where their own weather is missing, and their paired difference drops the ENS
   mean's rows on those days (`GAPPED_ARMS`): IFS HRES 9 km at every day (1,197 to 1,536 rows fewer
@@ -24,7 +24,7 @@ same lead day:
   4), and ICON global at day 4 for solar (288 rows fewer). `contrast_rows` raises for any other arm
   whose keys differ from its reference's.
 - AIFS Single, the AIFS ENS mean, and WeatherNext 3 (WN3) each sit in a folder with an ENS mean
-  fitted on the same rows, which is the reference (at day 5, in the `_day5_aifs_wn3` folder). For
+  fitted on the same rows, which is the reference (at day 5, in the `day5_aifs_wn3` folder). For
   wind, WN3's reference is `ens_meanvec`, the
   ENS mean built from the mean-vector speed, which matches how WN3's speed is built.
 
@@ -46,7 +46,8 @@ swapped out only once the new one is ready.
 mean's columns plus one product's columns (AIFS Single, ICON-EU at the optimistic and at the
 conservative lead, UKV, and WeatherNext 3), and its dot is the blend's error minus the ENS mean's
 alone on the same rows, at days 1, 2, 7, and 14 where the blend exists. The blends are read from
-`nwp_forecast_comparison_aifs_blends` and `nwp_forecast_comparison_product_blends`. The report adds
+`per_study/nwp_forecast_comparison/aifs_blends` and
+`per_study/nwp_forecast_comparison/product_blends`. The report adds
 the comparison C5, the AIFS Single blend minus each ICON-EU blend, which reuses the keys check. The
 dots are at the primary setting only; `fit_product_blends.py`'s `report.md` holds both settings.
 
@@ -55,7 +56,6 @@ Run it with `uv run python studies/nwp_forecast_comparison/dot_interval_vs_ens.p
 
 import argparse
 import logging
-import os
 import re
 import subprocess
 import sys
@@ -76,6 +76,22 @@ from nwp_forecast_charts import (
 from nwp_forecast_comparison import METRIC, PERCENTAGE_POINTS, DomainType
 from studies.bootstrap import MIN_MONTHS_FOR_INTERVAL, bootstrap_difference
 from studies.charts import figure, interval_panel, planning
+from studies.sources import (
+    NFC_AIFS_BLENDS_DIR,
+    NFC_AIFS_EXTRA_DAYS_DIR,
+    NFC_DAY4_SHARED_DIR,
+    NFC_DAY5_AIFS_WN3_DIR,
+    NFC_LEADS_DAY10_DIR,
+    NFC_LEADS_DAY10B_DIR,
+    NFC_LEADS_DAY10C_DIR,
+    NFC_LEADS_DAY10D_DIR,
+    NFC_PRODUCT_BLENDS_DIR,
+    NFC_VS_ENS_DOTS_FINAL_DIR,
+    NFC_WN3_DIR,
+    NFC_WN3_EXTRA_DAYS_DIR,
+    PER_STUDY_DIR,
+    per_study_relative,
+)
 
 _LOG: Final[logging.Logger] = logging.getLogger("dot_interval_vs_ens")
 
@@ -122,51 +138,47 @@ SourceType = Literal[
 class Source(NamedTuple):
     """Where one fit batch saved its per-row losses."""
 
-    folder: str
+    folder: Path
     pattern: str
 
 
-_AIFS_BLENDS: Final[str] = "nwp_forecast_comparison_aifs_blends"
-_AIFS_EXTRA: Final[str] = "nwp_forecast_comparison_aifs_extra_days"
-_DAY5: Final[str] = "nwp_forecast_comparison_day5_aifs_wn3"
-_PRODUCT_BLENDS: Final[str] = "nwp_forecast_comparison_product_blends"
+_LEADS_DAY10: Final[Path] = per_study_relative(folder=NFC_LEADS_DAY10_DIR)
+_LEADS_DAY10B: Final[Path] = per_study_relative(folder=NFC_LEADS_DAY10B_DIR)
+_LEADS_DAY10C: Final[Path] = per_study_relative(folder=NFC_LEADS_DAY10C_DIR)
+_LEADS_DAY10D: Final[Path] = per_study_relative(folder=NFC_LEADS_DAY10D_DIR)
+_AIFS_BLENDS: Final[Path] = per_study_relative(folder=NFC_AIFS_BLENDS_DIR)
+_AIFS_EXTRA: Final[Path] = per_study_relative(folder=NFC_AIFS_EXTRA_DAYS_DIR)
+_DAY4_SHARED: Final[Path] = per_study_relative(folder=NFC_DAY4_SHARED_DIR)
+_DAY5: Final[Path] = per_study_relative(folder=NFC_DAY5_AIFS_WN3_DIR)
+_WN3: Final[Path] = per_study_relative(folder=NFC_WN3_DIR)
+_WN3_EXTRA: Final[Path] = per_study_relative(folder=NFC_WN3_EXTRA_DAYS_DIR)
+_PRODUCT_BLENDS: Final[Path] = per_study_relative(folder=NFC_PRODUCT_BLENDS_DIR)
 _PER_DAY: Final[str] = "{{domain}}_{name}_day{{day}}_losses.parquet"
 
 SOURCES: Final[dict[SourceType, Source]] = {
-    "leads_day10": Source(
-        folder="nwp_forecast_comparison_leads_day10", pattern="{domain}_losses.parquet"
-    ),
-    "leads_day10b": Source(
-        folder="nwp_forecast_comparison_leads_day10b", pattern="{domain}_losses.parquet"
-    ),
-    "leads_day10c": Source(
-        folder="nwp_forecast_comparison_leads_day10c", pattern="{domain}_losses.parquet"
-    ),
-    "leads_day10d": Source(
-        folder="nwp_forecast_comparison_leads_day10d", pattern="{domain}_losses.parquet"
-    ),
+    "leads_day10": Source(folder=_LEADS_DAY10, pattern="{domain}_losses.parquet"),
+    "leads_day10b": Source(folder=_LEADS_DAY10B, pattern="{domain}_losses.parquet"),
+    "leads_day10c": Source(folder=_LEADS_DAY10C, pattern="{domain}_losses.parquet"),
+    "leads_day10d": Source(folder=_LEADS_DAY10D, pattern="{domain}_losses.parquet"),
     "aifs_single_blends": Source(folder=_AIFS_BLENDS, pattern=_PER_DAY.format(name="single")),
     "aifs_ens_blends": Source(folder=_AIFS_BLENDS, pattern=_PER_DAY.format(name="ens")),
     "aifs_single_extra": Source(folder=_AIFS_EXTRA, pattern=_PER_DAY.format(name="single")),
     "aifs_ens_extra": Source(folder=_AIFS_EXTRA, pattern=_PER_DAY.format(name="ens")),
-    "wn3_blends": Source(folder="nwp_forecast_comparison_wn3", pattern=_PER_DAY.format(name="wn3")),
-    "wn3_extra": Source(
-        folder="nwp_forecast_comparison_wn3_extra_days", pattern=_PER_DAY.format(name="wn3")
-    ),
-    "day4_shared": Source(
-        folder="nwp_forecast_comparison_day4_shared", pattern="{domain}_losses.parquet"
-    ),
+    "wn3_blends": Source(folder=_WN3, pattern=_PER_DAY.format(name="wn3")),
+    "wn3_extra": Source(folder=_WN3_EXTRA, pattern=_PER_DAY.format(name="wn3")),
+    "day4_shared": Source(folder=_DAY4_SHARED, pattern="{domain}_losses.parquet"),
     "aifs_single_day5": Source(folder=_DAY5, pattern=_PER_DAY.format(name="single")),
     "aifs_ens_day5": Source(folder=_DAY5, pattern=_PER_DAY.format(name="ens")),
     "wn3_day5": Source(folder=_DAY5, pattern=_PER_DAY.format(name="wn3")),
     "product_blends_single": Source(folder=_PRODUCT_BLENDS, pattern=_PER_DAY.format(name="single")),
     "product_blends_wn3": Source(folder=_PRODUCT_BLENDS, pattern=_PER_DAY.format(name="wn3")),
 }
-"""Each source's folder under `data/studies/`, and its losses file's name. A `{day}` in the name
-means one file per lead day. The `_blends` folders hold days 1, 2, 7, and 14 and the `_extra`
-folders days 0, 3, 4, and 10. The `_product_blends` folder holds the ICON-EU and UKV blends on the
-`single` rows, and the WeatherNext 3 blend on the `wn3` rows. The superseded
-`nwp_forecast_comparison_leads` folder is not a source, because the leaderboards do not draw it."""
+"""Each source's folder relative to the per-study folder, and its losses file's name. A `{day}` in
+the name means one file per lead day. The `_blends` folders hold days 1, 2, 7, and 14 and the
+`_extra` folders days 0, 3, 4, and 10. The `product_blends` folder holds the ICON-EU and UKV blends
+on the `single` rows, and the WeatherNext 3 blend on the `wn3` rows. The superseded
+`per_study/nwp_forecast_comparison/leads` folder is not a
+source, because the leaderboards do not draw it."""
 
 REFERENCE_NAMES: Final[dict[str, str]] = {
     "ens_mean": "ENS mean",
@@ -839,7 +851,7 @@ FOOTNOTES: Final[tuple[Footnote, ...]] = (
     ),
 )
 """The caveats the figures carry, each from the WN3 fit's own report (`report.md` of
-`nwp_forecast_comparison_wn3_extra_days`, wind day 10, pooled months)."""
+`per_study/nwp_forecast_comparison/wn3_extra_days`, wind day 10, pooled months)."""
 
 
 def footnotes_for(*, domain: DomainType, rows: pl.DataFrame) -> list[Footnote]:
@@ -1107,9 +1119,9 @@ BLENDS_README_TEXT: Final[
 ] = """# ENS plus one weather product minus the ENS mean alone, dots and intervals
 
 Written once by `studies/nwp_forecast_comparison/dot_interval_vs_ens.py --blends` from the saved
-per-row losses of `nwp_forecast_comparison_aifs_blends` (the AIFS Single blend and ENS's mean) and
-`nwp_forecast_comparison_product_blends` (the ICON-EU, UKV, and WeatherNext 3 blends). It fits
-nothing, and it is never overwritten.
+per-row losses of `per_study/nwp_forecast_comparison/aifs_blends` (the AIFS Single blend and
+ENS's mean) and `per_study/nwp_forecast_comparison/product_blends` (the ICON-EU, UKV, and
+WeatherNext 3 blends). It fits nothing, and it is never overwritten.
 
 - `report.md` prints every dot at the primary setting, and comparison C5, the AIFS Single blend
   minus each ICON-EU blend.
@@ -1119,7 +1131,7 @@ nothing, and it is never overwritten.
 - `rankings.parquet` holds one row per C5 comparison, with the same statistics.
 
 Both hyperparameter settings, and the verdicts, are in `report.md` of
-`nwp_forecast_comparison_product_blends`.
+`per_study/nwp_forecast_comparison/product_blends`.
 """
 
 
@@ -1286,7 +1298,8 @@ def readme_text(*, rows: Mapping[DomainType, pl.DataFrame]) -> str:
             "fit and a later GPU refit is read from the GPU refit. The reference is the "
             "leaderboard's ENS-mean arm of the same lead day. The `leads_day10*` folders hold "
             "the same `(site, time, seed)` keys, so a product in one folder pairs with the ENS "
-            "mean of another; day 4 uses the ENS mean of `nwp_forecast_comparison_day4_shared`. "
+            "mean of another; day 4 uses the ENS mean of `"
+            "per_study/nwp_forecast_comparison/day4_shared`. "
             "The exceptions are IFS HRES 9 km, which lacks 1,197 to 1,536 of the ENS mean's "
             "rows at each day (in 2025-08 and 2026-06, where its archive has no run, and about "
             "1.4% and 1.2% at day 4), and ICON global at day 4 (288 rows fewer for solar); their "
@@ -1333,7 +1346,8 @@ def readme_text(*, rows: Mapping[DomainType, pl.DataFrame]) -> str:
             "its error is not comparable with these rows: the Open-Meteo ensemble means, "
             "UKV from the CEDA archive, and NORA3. The climatology and persistence baselines "
             "are not weather products, and the blends are not products, so neither has a row. "
-            "The superseded `nwp_forecast_comparison_leads` folder is not read, because the "
+            "The superseded `"
+            "per_study/nwp_forecast_comparison/leads` folder is not read, because the "
             "leaderboards do not draw it."
         ),
     ]
@@ -1408,24 +1422,6 @@ def write_svg(*, path: Path, chart: alt.VConcatChart, replace: bool, svgo: bool)
     draft.replace(path)
 
 
-def repo_data_dir() -> Path:
-    """Return the shared `data/` directory, resolving a linked worktree to the main checkout.
-
-    Duplicated from the other study scripts, because study scripts cannot import one another's
-    private helpers.
-
-    Returns:
-        The directory holding `studies/`.
-    """
-    root = PROJECT_ROOT
-    marker = root / ".git"
-    if marker.is_file():
-        git_dir = Path(marker.read_text().removeprefix("gitdir:").strip())
-        if git_dir.parent.name == "worktrees":
-            root = git_dir.parent.parent.parent
-    return Path(os.environ.get("DATA_PATH_INTERNAL") or root / "data")
-
-
 def main() -> int:
     """Compute every dot, then write the report, the parquet, the README, and the SVGs.
 
@@ -1434,10 +1430,8 @@ def main() -> int:
     """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
-    studies_dir = repo_data_dir() / "studies"
-    parser.add_argument("--data-dir", type=Path, default=studies_dir)
-    default_output_dir = studies_dir / "nwp_forecast_comparison_vs_ens_dots_final"
-    parser.add_argument("--output-dir", type=Path, default=default_output_dir)
+    parser.add_argument("--data-dir", type=Path, default=PER_STUDY_DIR)
+    parser.add_argument("--output-dir", type=Path, default=NFC_VS_ENS_DOTS_FINAL_DIR)
     parser.add_argument(
         "--svg-dir", type=Path, default=PROJECT_ROOT / "docs" / "studies" / "assets"
     )
@@ -1462,7 +1456,7 @@ def main() -> int:
         help="Draw ENS plus one product instead of the single products. Needs --output-dir.",
     )
     args = parser.parse_args()
-    if args.blends and args.output_dir == default_output_dir:
+    if args.blends and args.output_dir == NFC_VS_ENS_DOTS_FINAL_DIR:
         parser.error("--blends needs its own --output-dir, because the default folder is taken")
     rows = {
         domain: compute(data_dir=args.data_dir, domain=domain, blends=args.blends)

@@ -6,7 +6,7 @@ One-off throwaway script for the WN3 arms of
 `--read-store` opens the WN3 Icechunk repository (`--bucket`, branch `main`) read-only and copies
 the 00 UTC runs' six variables that the arms use (2 m temperature, total solar radiation, and the
 eastward and northward wind at 10 m and 100 m) over a box around the private generator roster to
-`--weather-dir/WeatherNext3_trial_area/`: `trial_area.zarr` and `_grid_cells.parquet`. The box is
+`--weather-dir/WeatherNext3/`: `trial_area.zarr` and `_grid_cells.parquet`. The box is
 the roster's extent plus `PAD_DEGREES` on every side, so every site's H3 resolution-5 hexagon lies
 inside it. It is computed at run time, is never printed, and is never written into a committed
 file. A missing chunk reads as `NaN`, so the read fails if any copied variable is all `NaN`, and it
@@ -43,40 +43,43 @@ Run it with `uv run python studies/nwp_forecast_comparison/build_wn3_inputs.py -
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Final
 
+# The Rust core of Icechunk reads this variable when it is imported, so it must be set first.
+os.environ.setdefault("ICECHUNK_LOG", "error")
+
+import ens_forecast_horizons as efh
+import icechunk
 import numpy as np
 import polars as pl
 import xarray as xr
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+import zarr
 from build_forecast_inputs import (
-    DAY5_OUTPUT_DIR_NAME,
     DomainType,
     _ens_extra_frame,
-    _repo_data_dir,
     aifs_site_weights,
     check_columns_equal,
     ens_members,
 )
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "weather_downloads"))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-import ens_forecast_horizons as efh
-
-# `fetch_weathernext3` sets `ICECHUNK_LOG` before `icechunk` is imported below it.
-import fetch_weathernext3 as fetch
-import icechunk
-import zarr
 from studies.guards import refuse_to_overwrite
 from studies.resample import interpolate_linear, wind_components
+from studies.sources import (
+    NFC_DAY5_AIFS_WN3_DIR,
+    NFC_DIR,
+    NFC_LEADS_DAY10_DIR,
+    WEATHERNEXT3_PRODUCT_DIR,
+)
+
+from studies import ens_members as ens_member_columns
+from studies import wn3_fetch as fetch
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
-WN3_DIR_NAME: Final[str] = "WeatherNext3_trial_area"
-"""Under `data/studies/weather/`, the folder of the local copy."""
+WN3_DIR_NAME: Final[str] = WEATHERNEXT3_PRODUCT_DIR.name
+"""The name of the local copy's folder."""
 
 ZARR_NAME: Final[str] = "trial_area.zarr"
 
@@ -119,8 +122,8 @@ N_LEADS: Final[int] = 360
 WN3_DAYS: Final[tuple[int, ...]] = (1, 2, 7, 14)
 """The lead days built unless `--days` names others."""
 
-LEADS_DAY10_DIR_NAME: Final[str] = "nwp_forecast_comparison_leads_day10"
-"""Under `data/studies/`, the extra-lead folder whose ENS mean at day 5 the same-rows ENS mean at
+LEADS_DAY10_DIR_NAME: Final[str] = NFC_LEADS_DAY10_DIR.name
+"""The name of the extra-lead folder whose ENS mean at day 5 the same-rows ENS mean at
 day 5 must equal."""
 
 ENS_EXTRA_DAYS: Final[tuple[int, ...]] = (4, 5, 7, 10, 14)
@@ -229,7 +232,7 @@ def read_trial_area(*, bucket: str, weather_dir: Path) -> None:
 
     Args:
         bucket: The Cloud Storage bucket holding the Icechunk repository.
-        weather_dir: The folder whose `WeatherNext3_trial_area` subfolder receives the copy.
+        weather_dir: The folder whose `WeatherNext3` subfolder receives the copy.
 
     Raises:
         FileExistsError: If the copy already exists.
@@ -453,7 +456,7 @@ def wn3_arm_frame(
         **{field: _masked(values=values, present=present) for field, values in fields.items()}
     )
     stamp = pl.Series(np.where(present, run, np.datetime64("NaT", "h")).astype("datetime64[us]"))
-    return efh.prefixed(frame=reduced, arm=arm, domain=domain).with_columns(
+    return ens_member_columns.prefixed(frame=reduced, arm=arm, domain=domain).with_columns(
         stamp.dt.replace_time_zone("UTC").alias(f"{arm}_init_time")
     )
 
@@ -638,7 +641,7 @@ def ens_vector_mean_frame(*, extract: pl.DataFrame, day: int) -> pl.DataFrame:
         time=init_time + pl.duration(hours=pl.col("lead")),
         init_time=init_time,
     )
-    return efh.prefixed(frame=rows, arm=arm, domain="wind").join(
+    return ens_member_columns.prefixed(frame=rows, arm=arm, domain="wind").join(
         rows.select("site", "time", **{f"{arm}_init_time": "init_time"}),
         on=["site", "time"],
         how="left",
@@ -669,7 +672,7 @@ def build_domain(
 
     Raises:
         ValueError: If `output_dir` is `published_dir`, `days` holds 5 and `output_dir` is not
-            named `DAY5_OUTPUT_DIR_NAME`, `days` is empty or holds a day below 0, an
+            `NFC_DAY5_AIFS_WN3_DIR`, `days` is empty or holds a day below 0, an
             identity check fails, the ENS mean at day 5 differs from the extra-lead folder's, or a
             built column is null on every row.
         FileExistsError: If the output file already exists.
@@ -677,8 +680,8 @@ def build_domain(
     if output_dir.resolve() == published_dir.resolve():
         msg = f"the WN3 output must not be the published folder {published_dir}"
         raise ValueError(msg)
-    if 5 in days and output_dir.name != DAY5_OUTPUT_DIR_NAME:
-        msg = f"day 5 builds only into a folder named {DAY5_OUTPUT_DIR_NAME}, not {output_dir}"
+    if 5 in days and output_dir.resolve() != NFC_DAY5_AIFS_WN3_DIR.resolve():
+        msg = f"day 5 builds only into {NFC_DAY5_AIFS_WN3_DIR}, not {output_dir}"
         raise ValueError(msg)
     if not days or min(days) < 0:
         msg = f"days must be a non-empty tuple of days from 0, got {days}"
@@ -789,13 +792,13 @@ def main() -> int:
     parser.add_argument(
         "--weather-dir",
         type=Path,
-        default=_repo_data_dir() / "studies" / "weather",
-        help="The folder holding (or receiving) the WeatherNext3_trial_area copy.",
+        default=WEATHERNEXT3_PRODUCT_DIR.parent,
+        help="The folder holding (or receiving) the WeatherNext3 copy.",
     )
     parser.add_argument(
         "--published-dir",
         type=Path,
-        default=_repo_data_dir() / "studies" / "nwp_forecast_comparison",
+        default=NFC_DIR,
         help="With --build: the folder holding the published arm-input parquets.",
     )
     parser.add_argument("--output-dir", type=Path, help="With --build: the new folder to write.")

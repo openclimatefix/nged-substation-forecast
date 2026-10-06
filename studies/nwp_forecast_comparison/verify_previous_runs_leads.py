@@ -6,19 +6,19 @@ One-off throwaway script for the study in
 **V1 (a gate).** `_previous_dayN` is not documented as coming from a specific run; this checks the
 working assumption that it comes from the freshest run initialised at least `24N` hours before the
 hour, by comparing Open-Meteo's served GFS `_previous_dayN` values against the raw Dynamical.org GFS
-archive on disk in `data/studies/weather/GFS_window_2025-07-01_2025-07-02/`, for a range of
-candidate runs `24N + k` hours before the hour, `k` from 0 to 12. The gate is that the mean absolute
-difference is lowest at `k = 0`, for `N = 1` and `N = 2`, which is what "the freshest run at least
-`24N` hours old" predicts. **A first pass compared each site's served series with the plain average
-over the extract's 9 grid cells, and the resulting spatial-sampling noise (about 3 km/h) swamped the
-signal at N = 1.** This version instead scores, for each site and each candidate offset, every one
-of the extract's 9 grid cells against that site's own series, and keeps the cell with the lowest
-mean absolute error — no roster coordinate is read, and every offset gets exactly the same freedom
-to pick its best-fitting cell, so a real difference in lead accuracy between offsets survives while
-the noise from not knowing which cell a site truly falls in does not. Wind speed at 100 m compares
-directly; shortwave radiation additionally checks, at hours divisible by 6 (the only hours where the
-two conventions pick a different run), whether Open-Meteo selects the run by the hour's label or by
-the hour's start, with the same per-site best-cell scoring.
+archive on disk in `data/studies/downloads/NWP/windows/GFS_window_2025-07-01_2025-07-02/`, for a
+range of candidate runs `24N + k` hours before the hour, `k` from 0 to 12. The gate is that the mean
+absolute difference is lowest at `k = 0`, for `N = 1` and `N = 2`, which is what "the freshest run
+at least `24N` hours old" predicts. **A first pass compared each site's served series with the plain
+average over the extract's 9 grid cells, and the resulting spatial-sampling noise (about 3 km/h)
+swamped the signal at N = 1.** This version instead scores, for each site and each candidate offset,
+every one of the extract's 9 grid cells against that site's own series, and keeps the cell with the
+lowest mean absolute error — no roster coordinate is read, and every offset gets exactly the same
+freedom to pick its best-fitting cell, so a real difference in lead accuracy between offsets
+survives while the noise from not knowing which cell a site truly falls in does not. Wind speed at
+100 m compares directly; shortwave radiation additionally checks, at hours divisible by 6 (the only
+hours where the two conventions pick a different run), whether Open-Meteo selects the run by the
+hour's label or by the hour's start, with the same per-site best-cell scoring.
 
 **V1b.** For every Previous Runs product, per UTC hour of day, the mean absolute second difference
 of the `_previous_day1` series (100 m wind and 2 m temperature), divided by that statistic's own
@@ -50,7 +50,6 @@ Run it with `uv run python studies/nwp_forecast_comparison/verify_previous_runs_
 import argparse
 import json
 import logging
-import os
 import re
 import sys
 from collections.abc import Sequence
@@ -60,17 +59,17 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from contracts.settings import PROJECT_ROOT
 from studies.hourly_means import hourly_from_snapshots
+from studies.pv_dataset import (
+    pv_sites,  # the private solar roster, for coordinates read at run time
+)
+from studies.sources import GFS_WINDOW_DIR, previous_runs_product_dir_for
 from studies.timestamp_checks import (
     CANDIDATE_OFFSETS_MINUTES,
     HOUR_ENDING_OFFSET_MINUTES,
     best_offset_minutes,
     correlation_by_offset,
 )
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-from build_dataset import _pv_sites  # the private solar roster, for coordinates read at run time
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -86,42 +85,14 @@ PRODUCT_DIRS: Final[dict[str, str]] = {
     "KNMI HARMONIE-AROME": "KNMI-HARMONIE-AROME",
     "DMI HARMONIE-AROME": "DMI-HARMONIE-AROME",
 }
-"""Every Previous Runs product this study reads, to its `data/studies/weather/<dir>/` directory."""
-
-GFS_WINDOW_DIR_NAME: Final[str] = "GFS_window_2025-07-01_2025-07-02"
-"""The raw Dynamical.org GFS whole-run extract V1 checks Open-Meteo's GFS against."""
+"""Every Previous Runs product this study reads, to its
+`data/studies/downloads/NWP/OPEN-METEO-PREVIOUS-RUNS/<dir>/` directory."""
 
 V1_OFFSETS_K: Final[tuple[int, ...]] = tuple(range(13))
 """Candidate offsets, in hours, tried on top of `24N` hours before the target hour."""
 
 V1_DAYS_N: Final[tuple[int, ...]] = (1, 2)
 """The `previous_dayN` offsets V1's gate is checked on."""
-
-
-def _repo_data_dir() -> Path:
-    """Return the shared `data/` directory, resolving a linked worktree to the main checkout.
-
-    Every worktree's `data/` would otherwise be empty: the downloads under it run to tens of
-    gigabytes and are shared by every branch. A linked worktree marks itself by making `.git` a
-    file holding `gitdir: <main>/.git/worktrees/<name>`, which names the main checkout two levels
-    up; a plain checkout has no such file and resolves to itself.
-
-    Returns:
-        The directory holding `studies/`, `NGED/` and the rest of the shared downloads.
-    """
-    root = PROJECT_ROOT
-    marker = root / ".git"
-    if marker.is_file():
-        pointer = marker.read_text().removeprefix("gitdir:").strip()
-        git_dir = Path(pointer)
-        if git_dir.parent.name == "worktrees":
-            root = git_dir.parent.parent.parent
-    return Path(os.environ.get("DATA_PATH_INTERNAL") or root / "data")
-
-
-def _weather_dir() -> Path:
-    """Return `data/studies/weather/`, where every downloaded weather product lives."""
-    return _repo_data_dir() / "studies" / "weather"
 
 
 def _floor6(moment: datetime) -> datetime:
@@ -172,7 +143,7 @@ def _dynamical_gfs_by_run() -> GridCellByRun:
         Each run's initialisation time to each grid cell id (`lat_index * 10 + lon_index`, never a
         real coordinate) to `{"wind_speed_100m_kmh": {lead: value}, "ghi_raw": {lead: value}}`.
     """
-    path = _weather_dir() / GFS_WINDOW_DIR_NAME / "GFS.parquet"
+    path = GFS_WINDOW_DIR / "GFS.parquet"
     frame = (
         pl.read_parquet(path)
         .with_columns(
@@ -315,7 +286,9 @@ def run_v1(*, output_dir: Path) -> bool:
         extract must fail the gate, not pass it vacuously).
     """
     by_run = _dynamical_gfs_by_run()
-    served = pl.read_parquet(_weather_dir() / "GFS-SEAMLESS" / "previous_runs" / "combined.parquet")
+    served = pl.read_parquet(
+        previous_runs_product_dir_for(product="GFS-SEAMLESS") / "previous_runs" / "combined.parquet"
+    )
     cells = sorted({cell for cell_map in by_run.values() for cell in cell_map})
     cell_rank = {cell: rank for rank, cell in enumerate(cells)}
 
@@ -474,7 +447,9 @@ def run_v1b(*, output_dir: Path) -> None:
         "|---|---|---|" + "---|" * len(hour_headers) + "---|---|",
     ]
     for name, dir_name in PRODUCT_DIRS.items():
-        path = _weather_dir() / dir_name / "previous_runs" / "combined.parquet"
+        path = (
+            previous_runs_product_dir_for(product=dir_name) / "previous_runs" / "combined.parquet"
+        )
         if not path.exists():
             continue
         for field, template in V1B_COLUMN_TEMPLATES.items():
@@ -606,7 +581,7 @@ def run_v3(*, output_dir: Path) -> None:
     Args:
         output_dir: Where `v3_conventions.md` is written.
     """
-    sites = _pv_sites().select("site", "latitude", "longitude").sort("site")
+    sites = pv_sites().select("site", "latitude", "longitude").sort("site")
     lines = [
         (
             f"Clear-sky check on `{V3_RADIATION_COLUMN}` (median over {sites.height} solar sites "
@@ -622,7 +597,7 @@ def run_v3(*, output_dir: Path) -> None:
     ukv_lines: list[str] = []
     chosen: tuple[int, ...] | None = None
     for name, dir_name in PRODUCT_DIRS.items():
-        path = _weather_dir() / dir_name / "previous_runs"
+        path = previous_runs_product_dir_for(product=dir_name) / "previous_runs"
         combined_path = path / "combined.parquet"
         if not combined_path.exists():
             lines.append(f"| {name} | n/a | not measured (no combined.parquet) | n/a |")

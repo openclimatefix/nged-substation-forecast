@@ -39,15 +39,13 @@ import numpy as np
 import polars as pl
 import xarray as xr
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "beam_diffuse_split"))
-from build_dataset import _wind_sites
+from studies.pv_dataset import wind_sites
+from studies.sources import ERA5_PRODUCT_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_era5_wind")
 
-OUTPUT_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR / "ERA5"
+OUTPUT_DIR: Final[Path] = ERA5_PRODUCT_DIR
 CHUNK_DIR: Final[Path] = OUTPUT_DIR / "wind_native_chunks"
 OUTPUT_PATH: Final[Path] = OUTPUT_DIR / "wind_native_cds.parquet"
 VARIABLES: Final[dict[str, str]] = {
@@ -68,7 +66,7 @@ def _site_blocks() -> pl.DataFrame:
 
     Coordinates are held in memory only, as integer quarter-degree indices.
     """
-    sites = _wind_sites()
+    sites = wind_sites()
     rows = []
     for site, lat, lon in sites.select("site", "latitude", "longitude").iter_rows():
         centre_lat, centre_lon = round(lat / GRID_STEP), round(lon / GRID_STEP)

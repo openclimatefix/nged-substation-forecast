@@ -9,13 +9,13 @@ year-month, and hour of day (`fit_aifs.add_shuffled_columns`). The settings, see
 column counts, and GPU device are those of `fit_aifs.py`, which this script imports and does not
 change.
 
-**AIFS Single's blends are reused, not refitted.** `nwp_forecast_comparison_aifs_blends` holds the
-AIFS Single blend, its control, and ENS's mean at days 1, 2, 7, and 14 on the `single` rows. This
-script builds the same rows, computes every (arm, setting) pair the contrasts C1 to C5 need that
-the folder lacks (mostly the second hyperparameter setting), and refits exactly those pairs. Before
-any fit it raises unless its build stamp (inputs, settings, seeds, GPU, XGBoost version) equals the
-reused folder's, and after each fit it raises unless every new arm holds the `(site, time, seed,
-fold)` keys of the saved ENS mean.
+**AIFS Single's blends are reused, not refitted.** `per_study/nwp_forecast_comparison/aifs_blends`
+holds the AIFS Single blend, its control, and ENS's mean at days 1, 2, 7, and 14 on the `single`
+rows. This script builds the same rows, computes every (arm, setting) pair the contrasts C1 to C5
+need that the folder lacks (mostly the second hyperparameter setting), and refits exactly those
+pairs. Before any fit it raises unless its build stamp (inputs, settings, seeds, GPU, XGBoost
+version) equals the reused folder's, and after each fit it raises unless every new arm holds the
+`(site, time, seed, fold)` keys of the saved ENS mean.
 
 The fits, each on the GPU:
 
@@ -65,14 +65,15 @@ from studies.bootstrap import (
     combine_setting_verdicts,
 )
 from studies.guards import refuse_to_overwrite
+from studies.sources import NFC_PRODUCT_BLENDS_DIR, NFC_WN3_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
-OUTPUT_DIR_NAME: Final[str] = "nwp_forecast_comparison_product_blends"
-"""Under `data/studies/`, the only folder this script writes to."""
+OUTPUT_DIR: Final[Path] = NFC_PRODUCT_BLENDS_DIR
+"""The only folder this script writes to."""
 
-WN3_DIR_NAME: Final[str] = "nwp_forecast_comparison_wn3"
-"""Under `data/studies/`, the folder holding `<domain>_wn3_inputs.parquet`, which is only read."""
+WN3_DIR: Final[Path] = NFC_WN3_DIR
+"""The folder holding `<domain>_wn3_inputs.parquet`, which is only read."""
 
 REPORT_NAME: Final[str] = "report.md"
 README_NAME: Final[str] = "README.md"
@@ -110,8 +111,8 @@ Fits for `docs/studies/forecasts/blends-with-ens.md`. Never overwrite a file in 
 
 - `<domain>_single_day<N>_losses.parquet` holds, on the `single` rows, the ICON-EU and UKV blends
   with their controls at both settings, and the (arm, setting) pairs of the AIFS Single blend, its
-  control, and ENS's mean that `nwp_forecast_comparison_aifs_blends` lacks. The other pairs are read
-  from that folder.
+  control, and ENS's mean that `per_study/nwp_forecast_comparison/aifs_blends` lacks. The other
+  pairs are read from that folder.
 - `<domain>_wn3_day<N>_losses.parquet` holds ENS's mean, the WeatherNext 3 blend, and its control on
   the `wn3` rows, at the primary setting.
 - Each losses file has a `_predictions.parquet` and a `.json` stamp naming the device, the inputs'
@@ -278,12 +279,11 @@ def check_output_dir(*, output_dir: Path, read_only: list[Path]) -> None:
         read_only: The folders the script reads, which it never writes to.
 
     Raises:
-        ValueError: If `output_dir` is a folder the script reads, or has another name than
-            `OUTPUT_DIR_NAME`.
+        ValueError: If `output_dir` is a folder the script reads, or is not `OUTPUT_DIR`.
     """
     resolved = {folder.resolve() for folder in read_only}
-    if output_dir.resolve() in resolved or output_dir.name != OUTPUT_DIR_NAME:
-        msg = f"this script writes only to a folder named {OUTPUT_DIR_NAME}, not {output_dir}"
+    if output_dir.resolve() in resolved or output_dir.resolve() != OUTPUT_DIR.resolve():
+        msg = f"this script writes only to {OUTPUT_DIR}, not {output_dir}"
         raise ValueError(msg)
 
 
@@ -974,7 +974,7 @@ def main() -> int:
     args = parser.parse_args()
     studies_dir = args.published_dir.resolve().parent
     reused_dir = studies_dir / fit_aifs.BLENDS_DIR_NAME
-    wn3_dir = studies_dir / WN3_DIR_NAME
+    wn3_dir = studies_dir / WN3_DIR.name
     existing_dir = studies_dir / fit_aifs.EXISTING_AIFS_DIR_NAME
     extra_dirs = {name: studies_dir / folder for name, folder in fit_aifs.EXTRA_FOLDERS.items()}
     check_output_dir(

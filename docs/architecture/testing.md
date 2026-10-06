@@ -52,6 +52,16 @@ rows, in [Performance and Scale](performance.md#the-other-hard-ceiling-polars-32
 - **Test data files go in a `tests/data/` subdirectory** and are loaded relative to the test module
   with `Path(__file__).parent / "data" / filename`. `packages/nged_data/tests/` is the canonical
   example (it also keeps a small script documenting how the fixtures were trimmed down).
+- **Study tests all live under `packages/studies/tests/`.** The tests of the machinery in
+  `packages/studies/src/studies/` sit at the top of that directory. The tests of a study's scripts
+  sit in `packages/studies/tests/<folder>/`, where `<folder>` is the study folder under `studies/`.
+  Each study folder is listed once in pytest's `pythonpath` and once in `ty`'s `extra-paths` in the
+  root `pyproject.toml`, so a test imports a script by its bare name (`import wind_products`).
+  Listing every folder hides a script that imports another folder's script: the import passes under
+  pytest, where every folder is on the path, and fails under `uv run python studies/<folder>/<script>.py`,
+  where only the script's own folder is. `test_study_boundaries` forbids that import, and also
+  `sys.path` changes, path-based module loading, a script basename shared by two folders, and any
+  import of `studies` or of a script by production code.
 
 ## Fixtures and mocking
 

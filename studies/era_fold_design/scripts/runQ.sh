@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /home/jack/dev/nged-substation-forecast/.claude/worktrees/era-fold-design
+cd ~/dev/nged-substation-forecast/.claude/worktrees/era-fold-design
 O=../scratch/era-fold/out; S=../scratch/era-fold/scripts; L=$O/runQ.log
 while pgrep -f "partC_fit.py solar D0 1" >/dev/null; do sleep 20; done
 fit() { echo "=== $* $(uptime | sed 's/.*load/load/')" >> $L

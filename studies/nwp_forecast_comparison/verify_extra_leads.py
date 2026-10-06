@@ -25,18 +25,18 @@ Run it with `uv run python studies/nwp_forecast_comparison/verify_extra_leads.py
 
 import argparse
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Final
 
 import polars as pl
-from contracts.settings import PROJECT_ROOT
+from studies.sources import (
+    GEFS_WINDOW_DIR,
+    SITE_POINTS_FOLDER_NAME,
+    previous_runs_product_dir_for,
+)
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
-
-GEFS_DIR_NAME: Final[str] = "GEFS_window_2024-11-01_None"
-"""Under `data/studies/weather/`, the finished GEFS download."""
 
 FINE_LAST_LEAD_HOURS: Final[int] = 240
 """GEFS steps every 3 hours to this lead and every 6 hours beyond it."""
@@ -55,26 +55,8 @@ MAX_RATIO_ERROR: Final[float] = 0.10
 """How far beyond-240-h mean radiation may sit from the 6-hour reading's, as a share of it."""
 
 PRODUCTS: Final[dict[str, str]] = {"ICON-D2": "icon-d2", "ICON-EU": "icon-eu"}
-"""Each product's directory under `data/studies/weather/`, and the slug in its file names."""
-
-
-def _repo_data_dir() -> Path:
-    """Return the shared `data/` directory, resolving a linked worktree to the main checkout.
-
-    Duplicated from `verify_previous_runs_leads._repo_data_dir`, because study scripts cannot
-    import one another's private helpers.
-
-    Returns:
-        The directory holding `studies/` and the rest of the shared downloads.
-    """
-    root = PROJECT_ROOT
-    marker = root / ".git"
-    if marker.is_file():
-        pointer = marker.read_text().removeprefix("gitdir:").strip()
-        git_dir = Path(pointer)
-        if git_dir.parent.name == "worktrees":
-            root = git_dir.parent.parent.parent
-    return Path(os.environ.get("DATA_PATH_INTERNAL") or root / "data")
+"""Each product's directory under `data/studies/downloads/NWP/OPEN-METEO-PREVIOUS-RUNS/`, and
+the slug in its file names."""
 
 
 def gefs_window_table(*, files: list[Path]) -> pl.DataFrame:
@@ -232,14 +214,12 @@ DAY0_TOLERANCE: Final[float] = 0.01
 """How close the two series must be on an hour to count as equal, in each column's own unit."""
 
 
-def day0_comparison(
-    *, weather_dir: Path, product: str, slug: str
-) -> list[dict[str, str | float | int]]:
+def day0_comparison(*, product_dir: Path, slug: str) -> list[dict[str, str | float | int]]:
     """Compare a product's unsuffixed Previous Runs columns with the past studies' series.
 
     Args:
-        weather_dir: `data/studies/weather/`.
-        product: The product's directory name.
+        product_dir: The product's folder, which holds its `previous_runs/` download and its
+            `site_points/` folder.
         slug: The product's slug in its file names.
 
     Returns:
@@ -247,12 +227,12 @@ def day0_comparison(
         (site, time) hours, the largest absolute difference, and the share of those hours within
         `DAY0_TOLERANCE`.
     """
-    combined = pl.read_parquet(weather_dir / product / "previous_runs" / "combined.parquet")
+    combined = pl.read_parquet(product_dir / "previous_runs" / "combined.parquet")
     records: list[dict[str, str | float | int]] = []
     for column, file_pattern, past_column in DAY0_COLUMNS:
         past = pl.read_parquet(
-            weather_dir
-            / product
+            product_dir
+            / SITE_POINTS_FOLDER_NAME
             / file_pattern.format(slug=slug, underscored=slug.replace("-", "_"))
         ).select("site", "time", past=past_column)
         shared = (
@@ -278,11 +258,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
-    weather_dir = _repo_data_dir() / "studies" / "weather"
     verification = args.output_dir / "verification"
     verification.mkdir(parents=True, exist_ok=True)
 
-    cache = weather_dir / GEFS_DIR_NAME / "_month_cache"
+    cache = GEFS_WINDOW_DIR / "_month_cache"
     cache_files = sorted(cache.glob("*.parquet"))
     table = gefs_window_table(files=cache_files)
     boundary = gefs_boundary_table(files=cache_files)
@@ -343,7 +322,9 @@ def main() -> int:
         day0.extend(
             f"| {product} | {record['column']} | {record['hours']} "
             f"| {record['max_abs_difference']:.4f} | {record['share_within_tolerance']:.4f} |"
-            for record in day0_comparison(weather_dir=weather_dir, product=product, slug=slug)
+            for record in day0_comparison(
+                product_dir=previous_runs_product_dir_for(product=product), slug=slug
+            )
         )
     (verification / "day0_matches_past_series.md").write_text("\n".join(day0) + "\n")
     _LOG.info("wrote %s", verification)

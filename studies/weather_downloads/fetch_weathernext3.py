@@ -86,6 +86,16 @@ import polars as pl
 import xarray as xr
 import zarr
 from delta_store.precision import round_to_significand_bits
+from studies.wn3_fetch import (
+    INIT_TIME,
+    LATITUDE,
+    LEAD_TIME,
+    LONGITUDE,
+    MAIN_BRANCH,
+    RUN_WRITTEN,
+    SOURCE_INIT_TIME,
+    STORE_PREFIX,
+)
 from zarr.codecs import BloscCodec
 from zarr.core.common import JSON
 
@@ -94,11 +104,6 @@ BUCKET_PREFIX: Final[str] = (
 )
 """Where the run stores live, without the `gs://` scheme, as `gcsfs` expects."""
 
-STORE_PREFIX: Final[str] = "weathernext3_statistics_uk"
-"""The directory of the Icechunk repository inside the output bucket."""
-
-MAIN_BRANCH: Final[str] = "main"
-"""The branch colleagues read. Only `validate_weathernext3.py --publish` moves it."""
 
 STAGING_BRANCH: Final[str] = "staging"
 """The branch this script commits to, one commit per run."""
@@ -164,13 +169,6 @@ LATITUDE_DIM: Final[str] = "lat_0p1"
 LONGITUDE_DIM: Final[str] = "lon_0p1"
 """The names of the source store's latitude and longitude dimensions."""
 
-INIT_TIME: Final[str] = "init_time"
-LEAD_TIME: Final[str] = "lead_time"
-LATITUDE: Final[str] = "latitude"
-LONGITUDE: Final[str] = "longitude"
-RUN_WRITTEN: Final[str] = "run_written"
-SOURCE_INIT_TIME: Final[str] = "source_init_time"
-"""Array names in the output. The last two hold one value per `init_time` slot."""
 
 DIMENSIONS: Final[tuple[str, ...]] = (INIT_TIME, LEAD_TIME, LATITUDE, LONGITUDE)
 

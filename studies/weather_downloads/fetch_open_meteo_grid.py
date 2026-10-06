@@ -11,7 +11,7 @@ validated for it.
 
 The trial-area box is never printed, logged, or written into the output: only the grid points'
 `point_id` (a running index) travels into filenames and frames, exactly as
-`studies/beam_diffuse_split/fetch_open_meteo_point.py` keys its per-site output on an anonymised
+`studies/past_weather/fetch_open_meteo_point.py` keys its per-site output on an anonymised
 label rather than a coordinate.
 
 Run it with `uv run python studies/weather_downloads/fetch_open_meteo_grid.py --model ecmwf-ifs-hres
@@ -30,7 +30,9 @@ from typing import Any, Final
 
 import polars as pl
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR, load_trial_area_box, open_meteo_api_key
+from paths import open_meteo_api_key
+from studies.sources import previous_runs_product_dir_for
+from studies.trial_area import load_trial_area_box
 
 HISTORICAL_FORECAST_URL: Final[str] = (
     "https://customer-historical-forecast-api.open-meteo.com/v1/forecast"
@@ -160,7 +162,7 @@ Open-Meteo's docs, which do not list machine-readable identifiers."""
 def _get_json(*, url: str) -> Any:
     """Fetch one URL, retrying a transport failure but never an API refusal.
 
-    Copied from `studies/beam_diffuse_split/fetch_open_meteo_point.py`'s `_get_json`: see that
+    Copied from `studies/past_weather/fetch_open_meteo_point.py`'s `_get_json`: see that
     function's docstring for why a rate-limit refusal must not be retried.
     """
     for attempt in range(MAX_ATTEMPTS):
@@ -292,7 +294,8 @@ def _write_docs_for_model(
             .n_unique()` when regenerating docs for an already-downloaded file, not a fresh
             `box.grid_points(...).height` call, which reflects the trial-area box's *current*
             extent and can differ from what the file was fetched with if the box changed since.
-        output_dir: The product's own directory under `data/studies/weather/`.
+        output_dir: The product's own directory under
+            `data/studies/downloads/NWP/OPEN-METEO-PREVIOUS-RUNS/`.
         start_date: First date actually fetched, `YYYY-MM-DD`.
         end_date: Last date actually fetched, `YYYY-MM-DD`.
     """
@@ -393,7 +396,7 @@ def main() -> int:
         end_date=arguments.end_date,
     )
 
-    output_dir = WEATHER_DOWNLOADS_DIR / model.output_dir
+    output_dir = previous_runs_product_dir_for(product=model.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     filename = f"{model.output_dir}_{arguments.start_date}_{arguments.end_date}.parquet"
     output_path = output_dir / filename

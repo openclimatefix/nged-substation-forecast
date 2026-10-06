@@ -1,7 +1,7 @@
 """Two coverage shares per saved losses file (read-only): (a) months in >=2 years with no training row, (b) months in one year only."""
 from pathlib import Path
 import polars as pl
-ROOT = Path("/home/jack/dev/nged-substation-forecast/data/studies/beam_diffuse_split")
+ROOT = Path("~/dev/nged-substation-forecast/data/studies/per_study/beam_diffuse_split").expanduser()
 FILES = ["beam_diffuse_wind_products/losses.parquet","past_weather_v2/ens_hres_past_wind/losses.parquet","past_weather_v2/ens_hres_past_wind/losses_long_rows.parquet","past_weather_v2/wind_icon_dream/losses.parquet","past_weather_v2/station_wind_arms/losses.parquet"]
 for name in FILES:
     p = ROOT / name

@@ -21,10 +21,10 @@ compared by eye with a dot at day 0. Every dot has one colour. In each panel:
   (the saved losses hold `smart_persistence_day<N>` for days 0 to 3).
 
 Sources: `default_sources` names every fit folder the leaderboard reads, under the data directory:
-the published fit, the extra-lead fits (including `nwp_forecast_comparison_day4_shared`, the day-4
-cells of the full-window products), the AIFS and WeatherNext 3 fits (including
-`nwp_forecast_comparison_day5_aifs_wn3`, their day-5 cells), and it raises if a folder or file is
-missing, so a missing day cannot silently leave a blank cell.
+the published fit, the extra-lead fits (including `per_study/nwp_forecast_comparison/day4_shared`,
+the day-4 cells of the full-window products), the AIFS and WeatherNext 3 fits (including
+`per_study/nwp_forecast_comparison/day5_aifs_wn3`, their day-5 cells), and it raises if a folder or
+file is missing, so a missing day cannot silently leave a blank cell.
 
 `caveat_notes` holds every limiting caveat of the chart, and is the single source for the figure
 captions on the page. The script prints the list and writes it to `report.md`; the figure's own
@@ -41,7 +41,6 @@ import argparse
 import json
 import logging
 import math
-import os
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -73,6 +72,22 @@ from nwp_forecast_charts import (
 )
 from nwp_forecast_comparison import PERCENTAGE_POINTS, DomainType, arms_present, leaderboard
 from studies.charts import CONTENT_WIDTH_PX, figure, wrapped
+from studies.sources import (
+    NFC_AIFS_BLENDS_DIR,
+    NFC_AIFS_EXTRA_DAYS_DIR,
+    NFC_DAY4_SHARED_DIR,
+    NFC_DAY5_AIFS_WN3_DIR,
+    NFC_DIR,
+    NFC_LEADERBOARD_BY_DAY_DIR,
+    NFC_LEADS_DAY10_DIR,
+    NFC_LEADS_DAY10B_DIR,
+    NFC_LEADS_DAY10C_DIR,
+    NFC_LEADS_DAY10D_DIR,
+    NFC_WN3_DIR,
+    NFC_WN3_EXTRA_DAYS_DIR,
+    PER_STUDY_DIR,
+    per_study_relative,
+)
 
 _LOG: Final[logging.Logger] = logging.getLogger("leaderboard_by_day")
 
@@ -139,25 +154,29 @@ LABEL_SHORTENINGS: Final[dict[str, str]] = {
 """Row labels shortened to widen the plot. Each short form names one product: there is one IFS HRES
 9 km row, one ENS control row, and one WeatherNext 3 row in a panel."""
 
-PUBLISHED_FOLDER: Final[str] = "nwp_forecast_comparison"
-EXTRA_LEAD_FOLDERS: Final[tuple[str, ...]] = (
-    "nwp_forecast_comparison_leads_day10",
-    "nwp_forecast_comparison_leads_day10b",
-    "nwp_forecast_comparison_leads_day10c",
-    "nwp_forecast_comparison_leads_day10d",
-    "nwp_forecast_comparison_day4_shared",
+PUBLISHED_FOLDER: Final[Path] = per_study_relative(folder=NFC_DIR)
+EXTRA_LEAD_FOLDERS: Final[tuple[Path, ...]] = tuple(
+    per_study_relative(folder=folder)
+    for folder in (
+        NFC_LEADS_DAY10_DIR,
+        NFC_LEADS_DAY10B_DIR,
+        NFC_LEADS_DAY10C_DIR,
+        NFC_LEADS_DAY10D_DIR,
+        NFC_DAY4_SHARED_DIR,
+    )
 )
 """The extra-lead fits (`<domain>_losses.parquet` each), read like `nwp_forecast_charts.py`'s
 `--extra-dir`. The last holds day 4 of the full-window products."""
 
-AIFS_BLENDS_FOLDER: Final[str] = "nwp_forecast_comparison_aifs_blends"
-AIFS_EXTRA_FOLDER: Final[str] = "nwp_forecast_comparison_aifs_extra_days"
-WN3_FOLDER: Final[str] = "nwp_forecast_comparison_wn3"
-WN3_EXTRA_FOLDER: Final[str] = "nwp_forecast_comparison_wn3_extra_days"
-DAY5_FOLDER: Final[str] = "nwp_forecast_comparison_day5_aifs_wn3"
+AIFS_BLENDS_FOLDER: Final[Path] = per_study_relative(folder=NFC_AIFS_BLENDS_DIR)
+AIFS_EXTRA_FOLDER: Final[Path] = per_study_relative(folder=NFC_AIFS_EXTRA_DAYS_DIR)
+WN3_FOLDER: Final[Path] = per_study_relative(folder=NFC_WN3_DIR)
+WN3_EXTRA_FOLDER: Final[Path] = per_study_relative(folder=NFC_WN3_EXTRA_DAYS_DIR)
+DAY5_FOLDER: Final[Path] = per_study_relative(folder=NFC_DAY5_AIFS_WN3_DIR)
 DAY5: Final[tuple[int, ...]] = (5,)
-"""The folders of AIFS Single, the AIFS ENS mean, and WeatherNext 3 (one losses file per row set
-and lead day, `<domain>_<row set>_day<N>_losses.parquet`), and the one lead day the last holds."""
+"""The folders, relative to the per-study folder, of AIFS Single, the AIFS ENS mean, and WeatherNext
+3 (one losses file per row set and lead day, `<domain>_<row set>_day<N>_losses.parquet`), and the
+one lead day the last holds."""
 
 
 class Sources(NamedTuple):
@@ -176,7 +195,7 @@ def default_sources(*, data_dir: Path, domain: DomainType) -> Sources:
     """Return the leaderboard's fit folders, after checking every file they must hold exists.
 
     Args:
-        data_dir: The directory holding the study folders (`data/studies`).
+        data_dir: The per-study folder, `PER_STUDY_DIR` by default.
         domain: `solar` or `wind`.
 
     Returns:
@@ -909,24 +928,6 @@ def optimise(*, path: Path) -> None:
     )
 
 
-def repo_data_dir() -> Path:
-    """Return the shared `data/` directory, resolving a linked worktree to the main checkout.
-
-    Duplicated from the other study scripts, because study scripts cannot import one another's
-    private helpers.
-
-    Returns:
-        The directory holding `studies/`.
-    """
-    root = PROJECT_ROOT
-    marker = root / ".git"
-    if marker.is_file():
-        git_dir = Path(marker.read_text().removeprefix("gitdir:").strip())
-        if git_dir.parent.name == "worktrees":
-            root = git_dir.parent.parent.parent
-    return Path(os.environ.get("DATA_PATH_INTERNAL") or root / "data")
-
-
 def main() -> int:
     """Draw both technologies' leaderboards by day and write them once.
 
@@ -935,13 +936,8 @@ def main() -> int:
     """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
-    studies_dir = repo_data_dir() / "studies"
-    parser.add_argument("--data-dir", type=Path, default=studies_dir)
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=studies_dir / "nwp_forecast_comparison_leaderboard_by_day",
-    )
+    parser.add_argument("--data-dir", type=Path, default=PER_STUDY_DIR)
+    parser.add_argument("--output-dir", type=Path, default=NFC_LEADERBOARD_BY_DAY_DIR)
     parser.add_argument(
         "--svg-dir", type=Path, default=PROJECT_ROOT / "docs" / "studies" / "assets"
     )

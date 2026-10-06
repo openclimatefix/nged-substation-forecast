@@ -5,10 +5,10 @@ One-off throwaway script for
 from its THREDDS server over OPeNDAP, on its own 3 km Lambert-conformal grid
 (`nora3_subset_atmos/wind_hourly_v2_agg/nora3_wind_hourly.ncml`). The cut to the trial-area box
 happens server-side: each request slices the grid's own `x` and `y` index ranges, so no
-whole-domain file is downloaded. `paths.TrialAreaBox`'s latitude and longitude bounds are converted
-once, locally, to a grid index range (`_box_index_range`). The bounds, and the index range derived
-from them, are as private as the box itself: they go to the OPeNDAP call and nowhere else. No log
-line, error message, lineage note, or README carries them.
+whole-domain file is downloaded. `studies.trial_area.TrialAreaBox`'s latitude and longitude bounds
+are converted once, locally, to a grid index range (`_box_index_range`). The bounds, and the index
+range derived from them, are as private as the box itself: they go to the OPeNDAP call and nowhere
+else. No log line, error message, lineage note, or README carries them.
 
 The script fetches `wind_speed` and `wind_direction` at 50 m and 100 m (`height` indices 2 and 3 of
 the served `[10, 20, 50, 100, 250, 500, 750]`, checked against the served `height` array at run
@@ -55,9 +55,10 @@ import requests
 from delta_store.nwp import NWP_SIGNIFICAND_BITS
 from delta_store.precision import round_to_significand_bits
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR, load_trial_area_box
 from pydap.client import open_url  # ty: ignore[unresolved-import]
 from pyproj import Transformer
+from studies.sources import product_dir_for
+from studies.trial_area import load_trial_area_box
 
 CATALOG_URL: Final[str] = (
     "https://thredds.met.no/thredds/dodsC/nora3_subset_atmos/wind_hourly_v2_agg/nora3_wind_hourly.ncml"
@@ -90,7 +91,8 @@ class HeightSet(NamedTuple):
     heights_m: tuple[int, ...]
     """The heights, in metres, that `indices` must select."""
     product_dir_name: str
-    """The folder under `data/studies/weather/` holding this set's cache, file, and notes."""
+    """The folder under `data/studies/downloads/reanalysis/` holding this set's cache, file,
+    and notes."""
 
 
 TURBINE_HEIGHTS: Final[HeightSet] = HeightSet((2, 3), (50, 100), "NORA3")
@@ -437,7 +439,7 @@ def main() -> int:
     heights_text = " and ".join(f"{height} m" for height in heights_set.heights_m)
     height_options = " or ".join(str(height) for height in heights_set.heights_m)
 
-    output_dir = WEATHER_DOWNLOADS_DIR / heights_set.product_dir_name
+    output_dir = product_dir_for(product=heights_set.product_dir_name)
     month_cache_dir = output_dir / "_month_cache"
     month_cache_dir.mkdir(parents=True, exist_ok=True)
     months = _months(start_month=arguments.start_month, end_month=arguments.end_month)

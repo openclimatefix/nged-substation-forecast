@@ -31,8 +31,8 @@ validated. A check that finds no qualifying rows in a month is skipped for that 
 prints SKIP if that held for every month, and `PASS (n months skipped)` otherwise.
 
 Run it with `uv run python studies/weather_downloads/validate_dynamical_zarr.py --directory
-<directory under data/studies/weather>`, for example `--directory GEFS` or `--directory
-ECMWF-AIFS-ENS`. A level shift at a model-version change is not tested.
+<product or window name under data/studies/downloads/NWP>`, for example `--directory GEFS` or
+`--directory ECMWF-AIFS-ENS`. A level shift at a model-version change is not tested.
 """
 
 import argparse
@@ -45,7 +45,7 @@ from typing import Final
 import polars as pl
 import pyarrow.parquet as pq
 from fetch_dynamical_zarr import DATASETS, VARIABLES
-from paths import WEATHER_DOWNLOADS_DIR
+from studies.sources import product_dir_for
 
 RANGES: Final[dict[str, tuple[float, float]]] = {
     "downward_short_wave_radiation_flux_surface": (0.0, 1500.0),
@@ -269,7 +269,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", required=True, help="Product directory name.")
     arguments = parser.parse_args()
-    product_dir = WEATHER_DOWNLOADS_DIR / arguments.directory
+    product_dir = product_dir_for(product=arguments.directory)
     # The longest matching label wins, since "ECMWF-AIFS" is a prefix of "ECMWF-AIFS-ENS".
     label = max(
         (name for name in DATASETS.values() if arguments.directory.startswith(name)), key=len

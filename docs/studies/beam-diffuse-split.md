@@ -1157,16 +1157,17 @@ uv run python studies/beam_diffuse_split/run_experiment.py --source cams --suffi
 ```
 
 The results this page quotes are filed in the private data store under
-`data/studies/beam_diffuse_split/superseded/`, in directories ending `_piecewise`. Figure 1 is drawn
-from them straight into the docs assets:
+`data/studies/per_study/beam_diffuse_split/superseded/`, in directories ending `_piecewise`. Figure 1
+is drawn from them straight into the docs assets:
 
 ```bash
 uv run python studies/beam_diffuse_split/make_chart.py --subdirectory superseded --suffix _piecewise
 npx svgo@4 --multipass --precision=1 --final-newline docs/studies/assets/beam_diffuse_split_result.svg
 ```
 
-A fresh run writes its results directories straight under `data/studies/beam_diffuse_split/` with no
-suffix, and `make_chart.py` with no flags reads them there. The per-site charts and the
+A fresh run writes its results directories straight under
+`data/studies/per_study/beam_diffuse_split/` with no suffix, and `make_chart.py` with no flags reads
+them there. The per-site charts and the
 sky-condition chart come from `uv run python studies/beam_diffuse_split/make_figures.py`, which
 reads the same fresh-run directories.
 
@@ -1181,7 +1182,7 @@ Eight of those scripts print a single section's numbers rather than the headline
 the same directory as the rest:
 
 - `anm_setpoints.py` builds the export cap from the setpoint extract NGED supplied, which is filed
-  under `data/studies/anm/` in the private data store.
+  under `data/studies/downloads/observations/NGED-ANM/` in the private data store.
 - `anm_curtailment.py` reads the separate curtailment feed, and needs the cloud-storage credentials
   the other scripts do not.
 - `inverter_clipping.py` prints the inverter ceiling and how much of each site's output sits on it.

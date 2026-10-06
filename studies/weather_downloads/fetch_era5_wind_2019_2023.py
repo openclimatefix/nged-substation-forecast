@@ -2,8 +2,9 @@
 
 One-off throwaway script for the downloads in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>. It extends the 2024 to
-2026 wind in `data/studies/weather/ERA5/wind_native_cds.parquet` (made by `fetch_era5_wind.py`) back
-to the start of the metered generators' history, from the same product by the same route.
+2026 wind in `data/studies/downloads/reanalysis/ERA5/wind_native_cds.parquet` (made by
+`fetch_era5_wind.py`) back to the start of the metered generators' history, from the same product by
+the same route.
 
 **Three groups of cells are kept.** The trial-area box (every 0.25 degree cell inside it), a 3 x 3
 block of cells around each MIDAS Open station that reports wind speed, and a 3 x 3 block around each
@@ -61,16 +62,19 @@ from era5_cells import (
 )
 from fetch_midas_open import _FILENAME_VERSION_TAG, STATION_METADATA_DIR, _badc_table
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR, load_trial_area_box
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "beam_diffuse_split"))
-from build_dataset import _wind_sites
+from studies.pv_dataset import wind_sites
+from studies.sources import (
+    ERA5_PRODUCT_DIR,
+    ERA5_WIND_2019_2023_PRODUCT_DIR,
+    MIDAS_OPEN_PRODUCT_DIR,
+)
+from studies.trial_area import load_trial_area_box
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_era5_wind_2019_2023")
 
 SCRIPT_PATH: Final[str] = "studies/weather_downloads/fetch_era5_wind_2019_2023.py"
-PRODUCT_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR / "ERA5-WIND-2019-2023"
+PRODUCT_DIR: Final[Path] = ERA5_WIND_2019_2023_PRODUCT_DIR
 CHUNK_DIR: Final[Path] = PRODUCT_DIR / "_chunks"
 SCRATCH_DIR: Final[Path] = PRODUCT_DIR / "_scratch"
 TRIAL_DIR: Final[Path] = PRODUCT_DIR / "_trial"
@@ -79,10 +83,8 @@ OVERLAP_PATH: Final[Path] = PRODUCT_DIR / "overlap_2024_01.parquet"
 CELLS_PATH: Final[Path] = PRODUCT_DIR / "cells.parquet"
 GROUPS_PATH: Final[Path] = PRODUCT_DIR / "cell_groups.parquet"
 STATUS_PATH: Final[Path] = PRODUCT_DIR / "status.json"
-OLD_WIND_PATH: Final[Path] = WEATHER_DOWNLOADS_DIR / "ERA5" / "wind_native_cds.parquet"
-MIDAS_WEATHER_PATH: Final[Path] = (
-    WEATHER_DOWNLOADS_DIR / "MIDAS-OPEN" / "uk_hourly_weather_obs.parquet"
-)
+OLD_WIND_PATH: Final[Path] = ERA5_PRODUCT_DIR / "wind_native_cds.parquet"
+MIDAS_WEATHER_PATH: Final[Path] = MIDAS_OPEN_PRODUCT_DIR / "uk_hourly_weather_obs.parquet"
 
 DATASET: Final[str] = "reanalysis-era5-single-levels"
 COSTING_URL: Final[str] = (
@@ -176,7 +178,7 @@ def build_group_table() -> pl.DataFrame:
     centres: list[tuple[Literal["station", "wind"], str, Cell]] = [
         ("station", src_id, centre) for src_id, centre in _station_centres()
     ]
-    wind = _wind_sites().select("site", "latitude", "longitude").sort("site")
+    wind = wind_sites().select("site", "latitude", "longitude").sort("site")
     centres.extend(
         (
             "wind",

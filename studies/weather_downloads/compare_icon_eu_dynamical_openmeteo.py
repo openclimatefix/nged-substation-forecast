@@ -43,14 +43,15 @@ import numpy as np
 import polars as pl
 import xarray as xr
 from fetch_open_meteo_previous_runs import _get_json, _pv_sites, _wind_sites
-from paths import REPO_DATA_DIR, open_meteo_api_key
+from paths import open_meteo_api_key
+from studies.sources import ICON_EU_COMPARE_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("compare_icon_eu")
 
 StageType = Literal["runs", "stitch", "analyse", "all"]
 
-OUTPUT_DIR: Final[Path] = REPO_DATA_DIR / "studies" / "icon_eu_compare"
+OUTPUT_DIR: Final[Path] = ICON_EU_COMPARE_DIR
 RUN_CACHE_DIR: Final[Path] = OUTPUT_DIR / "_run_cache"
 DYNAMICAL_CACHE_DIR: Final[Path] = OUTPUT_DIR / "_dynamical_cache"
 STITCH_CACHE_DIR: Final[Path] = OUTPUT_DIR / "_stitch_cache"

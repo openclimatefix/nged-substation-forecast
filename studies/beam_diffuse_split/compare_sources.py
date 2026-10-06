@@ -23,8 +23,8 @@ import sys
 from typing import Final
 
 import polars as pl
-from sources import STUDY_DATA_DIR
 from studies.bootstrap import bootstrap_difference
+from studies.sources import STUDY_DATA_DIR
 
 PERCENTAGE_POINTS: Final[float] = 100.0
 

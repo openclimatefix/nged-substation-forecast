@@ -8,12 +8,13 @@ refits, and for wind the `ens_meanvec_day5` reference), both at day 5 only, with
 seeds, folds, feature columns, and target capping of the days already fitted. It adds no fitting
 code of its own.
 
-The folder `nwp_forecast_comparison_day5_aifs_wn3` must hold `<domain>_aifs_inputs.parquet`, built
-with `build_forecast_inputs.py --aifs --aifs-days 5`, and `<domain>_wn3_inputs.parquet`, built with
-`build_wn3_inputs.py --build --days 5`. The two fits write their losses, predictions, and stamps
-there under different file names, and their two reports as `report_aifs.md` and `report_wn3.md`.
-This script joins those into `report.md`, and writes a `README.md` if none exists. It refuses any
-other output folder name, so it cannot write into a folder that holds an earlier fit.
+The folder `per_study/nwp_forecast_comparison/day5_aifs_wn3` must hold
+`<domain>_aifs_inputs.parquet`, built with `build_forecast_inputs.py --aifs --aifs-days 5`, and
+`<domain>_wn3_inputs.parquet`, built with `build_wn3_inputs.py --build --days 5`. The two fits write
+their losses, predictions, and stamps there under different file names, and their two reports as
+`report_aifs.md` and `report_wn3.md`. This script joins those into `report.md`, and writes a
+`README.md` if none exists. It refuses any other output folder name, so it cannot write into a
+folder that holds an earlier fit.
 
 `--check` fits one arm at one wind site twice on the GPU for each of the two fits, and prints the
 time and the estimated total without fitting anything else.
@@ -28,16 +29,16 @@ from pathlib import Path
 from typing import Final
 
 import fit_aifs
-from build_forecast_inputs import DAY5_OUTPUT_DIR_NAME
 from studies.guards import refuse_to_overwrite
+from studies.sources import NFC_DAY5_AIFS_WN3_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
 DAY5: Final[tuple[int, ...]] = (5,)
 """The one lead day this script fits."""
 
-OUTPUT_DIR_NAME: Final[str] = DAY5_OUTPUT_DIR_NAME
-"""Under `data/studies/`, the only folder this script writes to."""
+OUTPUT_DIR: Final[Path] = NFC_DAY5_AIFS_WN3_DIR
+"""The only folder this script writes to."""
 
 AIFS_REPORT_NAME: Final[str] = "report_aifs.md"
 """The AIFS fit's report, which `fit_aifs.run_lean` writes."""
@@ -77,11 +78,13 @@ def check_output_dir(*, output_dir: Path, published_dir: Path) -> None:
         published_dir: The folder holding the published inputs.
 
     Raises:
-        ValueError: If `output_dir` is the published folder or has a name other than
-            `OUTPUT_DIR_NAME`.
+        ValueError: If `output_dir` is the published folder or is not `OUTPUT_DIR`.
     """
-    if output_dir.resolve() == published_dir.resolve() or output_dir.name != OUTPUT_DIR_NAME:
-        msg = f"this script writes only to a folder named {OUTPUT_DIR_NAME}, not {output_dir}"
+    if (
+        output_dir.resolve() == published_dir.resolve()
+        or output_dir.resolve() != OUTPUT_DIR.resolve()
+    ):
+        msg = f"this script writes only to {OUTPUT_DIR}, not {output_dir}"
         raise ValueError(msg)
 
 

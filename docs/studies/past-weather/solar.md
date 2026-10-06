@@ -444,15 +444,15 @@ Open-Meteo derives it from each weather model's global irradiance with a separat
 (exploratory).** Open-Meteo's documentation says so for both products: only global irradiance is
 native, the diffuse share comes from the Razo, Müller and Witwer separation model, and the direct
 beam is the remainder (<https://open-meteo.com/en/docs/meteofrance-api>,
-<https://open-meteo.com/en/docs/knmi-api>). `sources.py`'s check agrees: the served direct fraction
-varies by only 0.018 inside a bin of similar cloud and sun height, against a threshold of 0.05 — the
-signature of a model applied to the product's own global irradiance, carrying no information beyond
-it. **DMI HARMONIE-AROME's served direct beam is not scored either, for a different reason: on
-daytime rows, it is exactly zero in 50% of them and exceeds the served global flux, which is
-physically impossible, in 6 (`product_checks.md`).** This page does not establish whether that
-defect belongs to DMI's model or to how Open-Meteo's archive serves it; `sources.py` documents the
-check, and the pattern is not a separation model's signature. All three get a global arm only.
-ECMWF-IFS-HRES's own direct beam passes both checks and is scored.
+<https://open-meteo.com/en/docs/knmi-api>). `studies.sources`'s check agrees: the served direct
+fraction varies by only 0.018 inside a bin of similar cloud and sun height, against a threshold of
+0.05 — the signature of a model applied to the product's own global irradiance, carrying no
+information beyond it. **DMI HARMONIE-AROME's served direct beam is not scored either, for a
+different reason: on daytime rows, it is exactly zero in 50% of them and exceeds the served global
+flux, which is physically impossible, in 6 (`product_checks.md`).** This page does not establish
+whether that defect belongs to DMI's model or to how Open-Meteo's archive serves it;
+`studies.sources` documents the check, and the pattern is not a separation model's signature. All
+three get a global arm only. ECMWF-IFS-HRES's own direct beam passes both checks and is scored.
 
 ### The ECMWF ENS arms
 
@@ -1708,7 +1708,7 @@ Lincolnshire, or a comparison of ENS or the weather stations with every other pr
 
 **Every input except the generators' metered output, the generators' coordinates, the capacity
 table, and the station-to-farm mapping is public, and the code is in the repository at the commit
-that merged this page.** The code that produced every figure is in `studies/beam_diffuse_split/` and
+that merged this page.** The code that produced every figure is in `studies/past_weather/` and
 in `packages/studies/`.
 
 - **Public inputs:** the weather-model values and ERA5 from Open-Meteo's archive, CAMS from the CAMS
@@ -1743,38 +1743,38 @@ default `--sources`, all six products the second round adds. The extra models' o
 have to run first, or the check fails on a missing file rather than silently dropping those four
 models' checks.
 
-```bash uv run --with netcdf4 python studies/beam_diffuse_split/extract_site_series.py --product
-sarah-3 uv run python studies/beam_diffuse_split/extract_site_series.py --product icon-dream-eu uv
-run python studies/beam_diffuse_split/fetch_open_meteo_point.py --model ecmwf-ifs-hres  # and
+```bash uv run --with netcdf4 python studies/past_weather/extract_site_series.py --product
+sarah-3 uv run python studies/past_weather/extract_site_series.py --product icon-dream-eu uv
+run python studies/past_weather/fetch_open_meteo_point.py --model ecmwf-ifs-hres  # and
 arpege-europe, dmi-harmonie-arome, knmi-harmonie-arome for source in ecmwf-ifs-hres arpege-europe
 dmi-harmonie-arome knmi-harmonie-arome; do uv run python studies/beam_diffuse_split/build_dataset.py
---source $source done uv run python studies/beam_diffuse_split/check_new_products.py for source in
+--source $source done uv run python studies/past_weather/check_new_products.py for source in
 open-meteo ukv icon-d2 icon-eu icon-global cams sarah-3 icon-dream-eu; do uv run python
 studies/beam_diffuse_split/build_dataset.py --source $source done uv run python
 studies/beam_diffuse_split/build_dataset.py --source cams \ --min-cams-reliability 0 --suffix
-_allhours uv run python studies/beam_diffuse_split/weather_products.py --panel long record uv run
-python studies/beam_diffuse_split/weather_products.py --panel all uv run python
-studies/beam_diffuse_split/weather_product_charts.py uv run python
-studies/beam_diffuse_split/ens_past_solar.py uv run python
-studies/beam_diffuse_split/ens_past_solar_charts.py uv run python
-studies/beam_diffuse_split/station_past_solar.py uv run python
-studies/beam_diffuse_split/station_past_solar_charts.py uv run python
-studies/beam_diffuse_split/cerra_past_solar.py uv run python
-studies/beam_diffuse_split/past_solar_leaderboard.py uv run python
-studies/beam_diffuse_split/past_solar_leaderboard_charts.py ```
+_allhours uv run python studies/past_weather/weather_products.py --panel long record uv run
+python studies/past_weather/weather_products.py --panel all uv run python
+studies/past_weather/weather_product_charts.py uv run python
+studies/past_weather/ens_past_solar.py uv run python
+studies/past_weather/ens_past_solar_charts.py uv run python
+studies/past_weather/station_past_solar.py uv run python
+studies/past_weather/station_past_solar_charts.py uv run python
+studies/past_weather/cerra_past_solar.py uv run python
+studies/past_weather/past_solar_leaderboard.py uv run python
+studies/past_weather/past_solar_leaderboard_charts.py ```
 
 The eight-product report lands in
-`data/studies/beam_diffuse_split/past_weather_v2/solar_long/report.md`, and the longer record's in
+`data/studies/per_study/beam_diffuse_split/past_weather_v2/solar_long/report.md`, and the longer record's in
 `solar_record/report.md` beside it, with each panel's year-by-year table in `era5_by_year.parquet`.
 `weather_products.py --report-only` rebuilds a report from the saved losses without refitting, and
 neither mode overwrites an existing file. `--concurrent-fits` lowers how many XGBoost models are
 fitted at once. The report also prints the distances between the generators and to ICON-D2's edge,
 the ERA5 cells they fall in, and every number the charts share with it. The charts come from `uv run
-python studies/beam_diffuse_split/weather_product_charts.py`, which computes the numbers the report
+python studies/past_weather/weather_product_charts.py`, which computes the numbers the report
 does not print, the leaderboard's intervals and Figures 4 and 5, from the saved losses without
 refitting any XGBoost model. `check_new_products.py` writes the timing and direct-beam checks on all
 six products the second round adds to `past_weather_v2/product_checks.md`. The served-lead check
-runs with `uv run --with cfgrib python studies/beam_diffuse_split/verify_icon_lineage.py --model
+runs with `uv run --with cfgrib python studies/past_weather/verify_icon_lineage.py --model
 icon-eu`, against the runs the German weather service still publishes, which cover about one day.
 
 `check_new_products.py` also reads a single-site hourly 2 m temperature fetch for each of the four
@@ -1783,23 +1783,24 @@ extra models, a throwaway download not scripted with its own command
 control" and skips each model's row. The extra row set's report lands in
 `past_weather_v2/solar_all/report.md`.
 
-The ENS row set's `ens_past_solar.py` reads `data/studies/weather/ENS/beam_diffuse_ens.parquet` (no
-fetch needed) and the saved solar dataset that `weather_products.py` writes, and writes its report
-to `past_weather_v2/ens_past_solar/report.md`. `--report-only` rebuilds the report from the saved
+The ENS row set's `ens_past_solar.py` reads
+`data/studies/downloads/NWP/ENS_SITE_EXTRACT/site_points/beam_diffuse_ens.parquet` (no fetch needed)
+and the saved solar dataset that `weather_products.py` writes, and writes its report to
+`past_weather_v2/ens_past_solar/report.md`. `--report-only` rebuilds the report from the saved
 losses without refitting, checking a fingerprint against what a fresh run would now fit.
 
-The CERRA script `cerra_past_solar.py` reads the CERRA files under `data/studies/weather/CERRA/`,
+The CERRA script `cerra_past_solar.py` reads the CERRA files under `data/studies/downloads/reanalysis/CERRA/`,
 fits every XGBoost model, and writes `report.md`, `losses.parquet`, and `losses.fingerprint` to
-`data/studies/beam_diffuse_split/past_weather_v2/cerra_past_solar/`. It refuses to overwrite an
+`data/studies/per_study/beam_diffuse_split/past_weather_v2/cerra_past_solar/`. It refuses to overwrite an
 existing output.
 
 The weather-station scripts are `station_past_solar.py`, which builds the row set, fits every arm,
 and writes `report.md` and `losses.parquet` to
-`data/studies/beam_diffuse_split/past_weather_v2/station_past_solar/`, and
+`data/studies/per_study/beam_diffuse_split/past_weather_v2/station_past_solar/`, and
 `station_past_solar_charts.py`, which draws Figures 14 to 16 from those two files and stops unless
 the saved report matches the report the current code produces. The MIDAS Open files come from
 `studies/weather_downloads/fetch_midas_open.py`. `past_solar_leaderboard.py` reads every row set's
 saved losses and writes the leaderboard report that Figures 1 and 2 come from, to
-`data/studies/beam_diffuse_split/past_weather_v2/solar_leaderboard_3/report.md`;
+`data/studies/per_study/beam_diffuse_split/past_weather_v2/solar_leaderboard_3/report.md`;
 `past_solar_leaderboard_charts.py` draws them. The two post hoc UKV rebuilds appear in the charts as
 "UKV, snapshot mean" and "UKV, both snapshots".

@@ -1,13 +1,13 @@
 """Validate the 2019 to 2023 ERA5 wind parquet that `fetch_era5_wind_2019_2023.py` wrote.
 
 One-off throwaway script for <https://github.com/openclimatefix/nged-substation-forecast/issues/841>,
-following the `data-validation` skill. It reads `data/studies/weather/ERA5-WIND-2019-2023/` and
-runs the checks in `main`: columns and dtypes, exact row count (cells x 37,992 hours), duplicate
-keys, nulls and NaNs, a contiguous hourly axis, speed range, the hour-of-day profile, stuck runs,
-level steps between months, 100 m against 10 m speed, the offsets of the cell blocks, the
-correlation with the MIDAS Open station observations at lags of -2 to +2 hours, the step across
-2023-12-31 to 2024-01-01 against the on-disk 2024 file, and bit-equality of the re-fetched 2024-01
-with that file.
+following the `data-validation` skill. It reads
+`data/studies/downloads/reanalysis/ERA5-WIND-2019-2023/` and runs the checks in `main`: columns and
+dtypes, exact row count (cells x 37,992 hours), duplicate keys, nulls and NaNs, a contiguous hourly
+axis, speed range, the hour-of-day profile, stuck runs, level steps between months, 100 m against 10
+m speed, the offsets of the cell blocks, the correlation with the MIDAS Open station observations at
+lags of -2 to +2 hours, the step across 2023-12-31 to 2024-01-01 against the on-disk 2024 file, and
+bit-equality of the re-fetched 2024-01 with that file.
 
 Grid orientation and a whole-hour time shift are tested by data, not by the cell plan: the station
 correlation peaks at lag 0 only if each cell holds the right place and the right hour, and the
@@ -28,13 +28,15 @@ from typing import Any, Final
 
 import polars as pl
 from era5_cells import half_year_chunks
-from paths import WEATHER_DOWNLOADS_DIR
-
-PRODUCT_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR / "ERA5-WIND-2019-2023"
-OLD_WIND_PATH: Final[Path] = WEATHER_DOWNLOADS_DIR / "ERA5" / "wind_native_cds.parquet"
-MIDAS_WEATHER_PATH: Final[Path] = (
-    WEATHER_DOWNLOADS_DIR / "MIDAS-OPEN" / "uk_hourly_weather_obs.parquet"
+from studies.sources import (
+    ERA5_PRODUCT_DIR,
+    ERA5_WIND_2019_2023_PRODUCT_DIR,
+    MIDAS_OPEN_PRODUCT_DIR,
 )
+
+PRODUCT_DIR: Final[Path] = ERA5_WIND_2019_2023_PRODUCT_DIR
+OLD_WIND_PATH: Final[Path] = ERA5_PRODUCT_DIR / "wind_native_cds.parquet"
+MIDAS_WEATHER_PATH: Final[Path] = MIDAS_OPEN_PRODUCT_DIR / "uk_hourly_weather_obs.parquet"
 VALUE_COLUMNS: Final[tuple[str, ...]] = ("u10", "v10", "u100", "v100")
 FIRST_HOUR: Final[datetime] = datetime(2019, 9, 1, tzinfo=UTC)
 LAST_HOUR: Final[datetime] = datetime(2023, 12, 31, 23, tzinfo=UTC)

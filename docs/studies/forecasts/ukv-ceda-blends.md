@@ -558,9 +558,8 @@ only, the 15 UTC run of the day before.
 
 **The inputs and fitted losses are in the private data store, and every output carries only the
 anonymised `site` label.** The generators are labelled A to F for solar and W1 to W3 for wind. The
-code is `studies/ukv_ceda_blends/`, with `fit_aifs.py` and `nwp_forecast_comparison.py` from
-`studies/nwp_forecast_comparison/` and `packages/studies/`. The reports were written by the code at
-commit `4d12892c`.
+code is in `studies/nwp_forecast_comparison/` and `packages/studies/`. The reports were written by the
+code at commit `4d12892c`.
 
 **XGBoost 3.4.1 fitted every XGBoost model on one RTX A6000 GPU, at two hyperparameter settings.**
 The primary setting is a learning rate of 0.05, a maximum tree depth of 6, a minimum child weight of
@@ -573,20 +572,20 @@ penalty of 5.0, and a subsample of 0.8.
 Run each step only after the step before it exits 0.
 
 ```bash
-D=data/studies/ukv_ceda_blends
-uv run python studies/ukv_ceda_blends/check_arm_columns_unchanged.py
-uv run python studies/ukv_ceda_blends/build_ukv_ceda_inputs.py
-uv run python studies/ukv_ceda_blends/verify_ukv_ceda_inputs.py
-uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --check
-uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --verified
-uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --post-hoc-stale --report-name report_2
-uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --post-hoc-permutation --report-name report_3
-uv run python studies/ukv_ceda_blends/build_ukv_ceda_inputs.py --older-run
-uv run python studies/ukv_ceda_blends/verify_ukv_ceda_inputs.py --older-run
-uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --post-hoc-older-run --report-name report_4
-uv run python studies/ukv_ceda_blends/fit_ukv_ceda_blends.py --report-only --post-hoc-older-run \
+D=data/studies/per_study/ukv_ceda_blends
+uv run python studies/nwp_forecast_comparison/check_arm_columns_unchanged.py --expected-stamps 72
+uv run python studies/nwp_forecast_comparison/build_ukv_ceda_inputs.py
+uv run python studies/nwp_forecast_comparison/verify_ukv_ceda_inputs.py
+uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --check
+uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --verified
+uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --post-hoc-stale --report-name report_2
+uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --post-hoc-permutation --report-name report_3
+uv run python studies/nwp_forecast_comparison/build_ukv_ceda_inputs.py --older-run
+uv run python studies/nwp_forecast_comparison/verify_ukv_ceda_inputs.py --older-run
+uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --post-hoc-older-run --report-name report_4
+uv run python studies/nwp_forecast_comparison/fit_ukv_ceda_blends.py --report-only --post-hoc-older-run \
   --report-name report_5
-uv run python studies/ukv_ceda_blends/ukv_ceda_blends_charts.py \
+uv run python studies/nwp_forecast_comparison/ukv_ceda_blends_charts.py \
   --figures-dir docs/studies/assets/ukv_ceda_blends_v5 \
   --intervals-name report_5_intervals.parquet
 ```

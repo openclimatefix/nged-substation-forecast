@@ -23,8 +23,8 @@ import sys
 from typing import Final
 
 import polars as pl
-from sources import SOURCE_CHOICES, STUDY_DATA_DIR
 from studies.bootstrap import bootstrap_difference
+from studies.sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("C_era5_split", "B_erbs"),

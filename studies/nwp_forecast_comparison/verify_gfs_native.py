@@ -41,15 +41,9 @@ from typing import Final, NamedTuple
 
 import numpy as np
 import polars as pl
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-import ens_forecast_horizons as efh
 from build_forecast_inputs import (
     GFS_NATIVE_DAYS,
-    GFS_NATIVE_DIR_NAME,
     _gefs_cell_selection,
-    _repo_data_dir,
     gfs_native_arm,
 )
 from studies.gfs_native import (
@@ -61,6 +55,9 @@ from studies.gfs_native import (
     step_means,
     window_hours,
 )
+from studies.sources import GFS_PRODUCT_DIR
+
+from studies import ens_members
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -456,7 +453,7 @@ def _sample_rows(*, built_dir: Path, gfs_dir: Path) -> list[Sample]:
         for day in GFS_NATIVE_DAYS:
             if domain == "solar" and day > HOURLY_SERVED_LAST_DAY:
                 continue
-            for column in efh.ens_columns(arm=gfs_native_arm(day=day), domain=domain):
+            for column in ens_members.ens_columns(arm=gfs_native_arm(day=day), domain=domain):
                 field = column.removeprefix(f"{gfs_native_arm(day=day)}_")
                 for site, time, value in picked.select("site", "time", column).iter_rows():
                     init, lead = expected_served(time=time, day=day, solar=domain == "solar")
@@ -624,8 +621,7 @@ def main() -> int:
     parser.add_argument("--built-dir", type=Path, default=None)
     parser.add_argument("--gfs-dir", type=Path, default=None)
     args = parser.parse_args()
-    gfs_dir = _repo_data_dir() / "studies" / "weather" / GFS_NATIVE_DIR_NAME
-    gfs_dir = args.gfs_dir or gfs_dir
+    gfs_dir = args.gfs_dir or GFS_PRODUCT_DIR
     verification = args.output_dir / "verification"
     verification.mkdir(parents=True, exist_ok=True)
 

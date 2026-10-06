@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /home/jack/dev/nged-substation-forecast/.claude/worktrees/era-fold-design
+cd ~/dev/nged-substation-forecast/.claude/worktrees/era-fold-design
 O=../scratch/era-fold/out; S=../scratch/era-fold/scripts; L=$O/runW.log
 wait_load() { while [ "$(cut -d. -f1 /proc/loadavg)" -ge 20 ]; do sleep 30; done; }
 run() { wait_load; echo "=== $* $(uptime | sed 's/.*load/load/')" >> $L

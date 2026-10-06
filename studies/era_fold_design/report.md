@@ -729,7 +729,7 @@ Coverage: D0 leaves 12,570 of 50,041 hours (25.1%) in uncovered cells, calendar 
 
 ## Pinned code
 
-The worktree branch changed `studies/beam_diffuse_split/ens_forecast_horizons.py` during this work (a later commit moved results into `era_covered/`, kept wind rows from 2024-12-01 and pinned offsets). Every Part C fit here imports the copy of that file from commit `34e6b5f4` (main) kept in `code/ens_forecast_horizons.py`, so all designs use the code that produced the D0 numbers. Nothing else in the imported study modules changed between that commit and the branch head.
+The worktree branch changed `studies/nwp_forecast_comparison/ens_forecast_horizons.py` during this work (a later commit moved results into `era_covered/`, kept wind rows from 2024-12-01 and pinned offsets). Every Part C fit here imports the copy of that file from commit `34e6b5f4` (main) kept in `code/ens_forecast_horizons.py`, so all designs use the code that produced the D0 numbers. Nothing else in the imported study modules changed between that commit and the branch head.
 
 ## Deviations from the study scripts, and uncertainties
 

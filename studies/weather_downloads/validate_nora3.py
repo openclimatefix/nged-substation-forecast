@@ -2,11 +2,11 @@
 
 One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>. It reads
-`data/studies/weather/NORA3/NORA3_wind.parquet` and runs the checks in `CHECK_NAMES`: heights, row
-count against hours x heights x cells, duplicate keys, month-by-month contiguity of the hourly time
-axis, the first and last hour against `FIRST_MONTH` and `LAST_MONTH`, the months against the month
-cache and the lineage note, the step across the join between the aggregated dataset and the monthly
-files, null and NaN counts, value ranges, and floors that catch double-scaled data.
+`data/studies/downloads/reanalysis/NORA3/NORA3_wind.parquet` and runs the checks in `CHECK_NAMES`:
+heights, row count against hours x heights x cells, duplicate keys, month-by-month contiguity of the
+hourly time axis, the first and last hour against `FIRST_MONTH` and `LAST_MONTH`, the months against
+the month cache and the lineage note, the step across the join between the aggregated dataset and
+the monthly files, null and NaN counts, value ranges, and floors that catch double-scaled data.
 
 **The script prints one PASS or FAIL line per check and no count.** Row, cell, and hour counts
 reveal the size of the private trial-area box, so the measured numbers go only to `validation.json`
@@ -23,9 +23,9 @@ from pathlib import Path
 from typing import Any, Final
 
 import polars as pl
-from paths import WEATHER_DOWNLOADS_DIR
+from studies.sources import NORA3_PRODUCT_DIR
 
-PRODUCT_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR / "NORA3"
+PRODUCT_DIR: Final[Path] = NORA3_PRODUCT_DIR
 KEY_COLUMNS: Final[list[str]] = ["time", "height_m", "y_index", "x_index"]
 HEIGHTS_M: Final[set[int]] = {50, 100}
 FIRST_MONTH: Final[str] = "2015-01"

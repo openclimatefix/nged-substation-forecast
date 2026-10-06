@@ -48,19 +48,19 @@ from typing import Final
 import numpy as np
 import polars as pl
 import xgboost as xgb
-from run_experiment import SHARED_FEATURES, _add_time_features, dataset_path_for
-from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
+from studies.arm_runner import SHARED_FEATURES, add_time_features, dataset_path_for
 from studies.cross_validation import (
     N_FOLDS,
     PRIMARY_HYPER_PARAMETERS,
     assign_folds,
     booster_parameters,
 )
+from studies.sources import ENS_SITE_POINTS_DIR, STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-ENS_PATH: Final[Path] = WEATHER_DATA_DIR / "ENS" / "beam_diffuse_ens.parquet"
+ENS_PATH: Final[Path] = ENS_SITE_POINTS_DIR / "beam_diffuse_ens.parquet"
 """Where `fetch_ens_point.py` wrote the per-meter, per-member, per-horizon frame."""
 
 OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "beam_diffuse_ens_horizons"
@@ -303,7 +303,7 @@ def _joined(*, three_hourly: pl.DataFrame, ens: pl.DataFrame, horizon: str) -> p
     )
     joined = three_hourly.join(wide, on=["site", "valid_time"], how="inner").drop_nulls()
     return assign_folds(
-        dataset=_add_time_features(dataset=joined.with_columns(time=pl.col("valid_time")))
+        dataset=add_time_features(dataset=joined.with_columns(time=pl.col("valid_time")))
     )
 
 

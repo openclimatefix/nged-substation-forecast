@@ -45,23 +45,34 @@ A PR that touches anything outside that list stops at a reviewed PR, as `impleme
 
 | What | Where |
 |---|---|
-| Tested machinery shared by studies: the out-of-fold fit loop, the paired bootstrap, grid sampling, anonymisation, solar geometry, power aggregation, served-column checks, the Fractions Skill Score | `packages/studies/src/studies/` |
-| The study's own scripts: fetch, build, run, report, chart | `studies/<study>/`, run with `uv run python studies/<study>/<script>.py` |
-| Downloaded weather, one directory per product | `data/studies/weather/<PRODUCT>/` |
-| NGED's active-network-management exports | `data/studies/anm/` |
+| Tested machinery shared by studies: the out-of-fold fit loop, the paired bootstrap, grid sampling, anonymisation, solar geometry, power aggregation, served-column checks, the Fractions Skill Score, and the common rows of the past-weather studies | `packages/studies/src/studies/` |
+| The study's own scripts: fetch, build, run, report, chart | `studies/<folder>/`, one folder per family of pages (`past_weather/`, `nwp_forecast_comparison/`, ...), run with `uv run python studies/<folder>/<script>.py` |
+| Tests of a study's scripts | `packages/studies/tests/<folder>/`, and tests of the machinery in `packages/studies/tests/` |
+| Downloaded weather, one directory per product, filed by kind | `data/studies/downloads/NWP/<PRODUCT>/`, `downloads/reanalysis/<PRODUCT>/`, or `downloads/observations/<PRODUCT>/` |
+| A product's frames cut or fetched at each site's coordinates | `site_points/` inside the product's directory |
+| NGED's active-network-management exports | `data/studies/downloads/observations/NGED-ANM/` |
 | A study's datasets and results, and a `superseded/` directory for outputs a later run replaced | `data/studies/<study>/` |
 | The published page and its charts | `docs/studies/<page>.md`, `docs/studies/assets/` |
 
 **`packages/studies/` is Claude's to own.** Keep it tidy, and restructure it whenever a study needs
 to. Every function in it carries tests, and each test must be able to fail on the bug it exists to
 catch; run a mutation pass (the `implement-issue` skill, step 7) whenever the package changes. When
-two studies need the same code, move that code into the package with tests. `wind_products.py`
-still imports `weather_products.py`'s private helpers; do not copy that pattern into a new study.
+two studies need the same code, move that code into the package with tests.
 
-**A study script is not unit-tested, so its check is its own output.** Every table the page quotes
-is printed by a committed script into a `report.md`, never transcribed by hand, and every number on
-the page is checked against that report. A number from a diagnostic run during review goes on the
-page only after a committed script prints it into the report.
+**Import rules: a study script imports only from its own folder, from `studies.*`
+(`packages/studies`), and from the other reviewed packages in `packages/*`.** The rule for
+production code is the other half: `src/` and every package under `packages/` except
+`packages/studies` must never import `studies` or a study script, because humans review that code
+and the study code is fast-moving and agent-written. A name that a second study folder needs
+therefore moves into `packages/studies/src/studies/`, and a name imported from a package is public,
+so it loses its leading underscore on the way. A script never mutates `sys.path` and never loads
+another script by path. No two scripts under `studies/` share a basename, because every study folder
+is on pytest's path. `packages/studies/tests/test_study_boundaries.py` enforces all of this.
+
+**A study script is not unit-tested as a whole, so its check is its own output.** Every table the
+page quotes is printed by a committed script into a `report.md`, never transcribed by hand, and
+every number on the page is checked against that report. A number from a diagnostic run during
+review goes on the page only after a committed script prints it into the report.
 
 ## The order of work
 
@@ -267,7 +278,7 @@ sets out the rule and the products the rule covers.
   third or fourth decimal place (#825). Every page states, in its "Limitations" section, which
   `effective_capacity` table its figures rest on and when that table was built.
 - **Never overwrite an output a merged page quotes; move it to `superseded/` first.** Every worktree
-  writes to the main checkout's `data/studies/` (`sources.REPO_DATA_DIR`), so a re-run in a review
+  writes to the main checkout's `data/studies/` (`studies.sources.REPO_DATA_DIR`), so a re-run in a review
   worktree or a parallel session overwrites the same files.
 - **Fit on the GPU when the workstation has one.** Set XGBoost's `device="cuda"` on a fit script if
   `nvidia-smi` shows a GPU. On the RTX A6000, 60,000 rows with 30 to 100 features and 300 rounds fitted

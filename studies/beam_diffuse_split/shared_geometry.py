@@ -26,16 +26,16 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from commissioning import drop_commissioning_ramp
-from export_cap import with_export_cap
-from run_experiment import _add_time_features, dataset_path_for
 from run_physics_experiment import MAX_ITERATIONS, START_SPREAD, _n_parameters, _predict
 from scipy.optimize import minimize
-from sources import SOURCE_CHOICES
+from studies.arm_runner import add_time_features, dataset_path_for
 from studies.bootstrap import bootstrap_difference
+from studies.commissioning import drop_commissioning_ramp
 
 # The block bootstrap draws one seed per resample, so every arm it compares shares `SEEDS`.
 from studies.cross_validation import N_FOLDS, SEEDS, assign_folds, clamp_to_cap
+from studies.export_cap import with_export_cap
+from studies.sources import SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("shared_geometry")
@@ -168,7 +168,7 @@ def main() -> int:
 
     dataset = with_export_cap(
         dataset=assign_folds(
-            dataset=_add_time_features(
+            dataset=add_time_features(
                 dataset=drop_commissioning_ramp(
                     dataset=pl.read_parquet(dataset_path_for(source=arguments.source))
                 )

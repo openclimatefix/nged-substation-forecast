@@ -74,32 +74,19 @@ DIR`.
 
 import argparse
 import logging
-import os
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Final, Literal, NamedTuple
 
+import ens_forecast_horizons as efh
 import h3.api.basic_int as h3
 import numpy as np
 import polars as pl
-from contracts.settings import PROJECT_ROOT
-from geo.h3 import compute_h3_grid_weights
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from verify_extra_leads import (
-    gefs_boundary_table,
-    gefs_boundary_verdict,
-    gefs_window_table,
-    gefs_window_verdict,
-)
-from verify_previous_runs_leads import PRODUCT_DIRS
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-import ens_forecast_horizons as efh
 from fetch_ens_day4_supplement import SUPPLEMENT_PATH as ENS_DAY4_SUPPLEMENT_PATH
 from fetch_ens_forecast_horizons import H3_RESOLUTION
+from geo.h3 import compute_h3_grid_weights
 from studies.gfs_native import (
     HOURLY_SERVED_LAST_DAY,
     LAST_LEAD_HOURS,
@@ -116,13 +103,31 @@ from studies.ifs_single_runs import clip_radiation, last_servable_day
 from studies.ifs_single_runs import served_init_time as ifs_single_init_time
 from studies.ifs_single_runs import served_lead_hours as ifs_single_lead_hours
 from studies.resample import gefs_step_means
+from studies.sources import (
+    ECMWF_AIFS_ENS_PRODUCT_DIR,
+    ECMWF_AIFS_PRODUCT_DIR,
+    ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR,
+    GEFS_WINDOW_DIR,
+    GFS_PRODUCT_DIR,
+    NFC_AIFS_DIR,
+    NFC_DAY4_SHARED_DIR,
+    NFC_DIR,
+    NFC_WN3_EXTRA_DAYS_DIR,
+    previous_runs_product_dir_for,
+)
+from verify_extra_leads import (
+    gefs_boundary_table,
+    gefs_boundary_verdict,
+    gefs_window_table,
+    gefs_window_verdict,
+)
+from verify_previous_runs_leads import PRODUCT_DIRS
+
+from studies import ens_members as ens_member_columns
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
 DomainType = Literal["solar", "wind"]
-
-DEFAULT_OUTPUT_DIR_NAME: Final[str] = "nwp_forecast_comparison"
-"""Under `data/studies/`, the default place this script writes to."""
 
 GEFS_FIRST_MONTH: Final[str] = "2024-11"
 """The first month the study reads GEFS from (the plan reads GEFS from 2024-11-30 onwards)."""
@@ -288,14 +293,10 @@ AIFS_BAND_MARGIN_AFTER: Final[int] = 30
 """Day `N` reads leads from `24 N - 6` to `24 N + 30` hours, as `ens_forecast_horizons.band_steps`
 does, so the upsampling has a step on each side of every target hour."""
 
-EXISTING_AIFS_DIR_NAME: Final[str] = "nwp_forecast_comparison_aifs"
-"""Under `data/studies/`, the folder of the day-1 and day-2 AIFS fit, which a later build never
-writes to."""
-
-AIFS_SINGLE_DIR_NAME: Final[str] = "ECMWF-AIFS"
-AIFS_ENS_DIR_NAME: Final[str] = "ECMWF-AIFS-ENS"
-"""The two AIFS downloads' folders under `data/studies/weather/`. Each holds `<name>.parquet` and
-`_grid_cells.parquet`."""
+AIFS_SINGLE_DIR_NAME: Final[str] = ECMWF_AIFS_PRODUCT_DIR.name
+AIFS_ENS_DIR_NAME: Final[str] = ECMWF_AIFS_ENS_PRODUCT_DIR.name
+"""The two AIFS downloads' folder names, which share a parent folder. Each holds `<name>.parquet`
+and `_grid_cells.parquet`."""
 
 AIFS_SINGLE_FIRST_INIT: Final[datetime] = datetime(2025, 2, 26, tzinfo=UTC)
 """The first 00 UTC AIFS Single run read: the first after v1.0 went operational (2025-02-25 06 UTC).
@@ -333,16 +334,6 @@ SNAPSHOT_RADIATION_PRODUCTS: Final[frozenset[str]] = frozenset({"UKV"})
 EQUAL_TOLERANCE: Final[float] = 1e-6
 """The relative and absolute difference between a built frame's columns and another build's that
 Float32 storage allows."""
-
-DAY4_OUTPUT_DIR_NAME: Final[str] = "nwp_forecast_comparison_day4_shared"
-"""Under `data/studies/`, the only folder the fifth extra-lead batch builds into and fits in."""
-
-WN3_EXTRA_DAYS_DIR_NAME: Final[str] = "nwp_forecast_comparison_wn3_extra_days"
-"""Under `data/studies/`, the folder whose same-rows ENS mean at day 4 the fifth batch's ENS mean
-must equal."""
-
-DAY5_OUTPUT_DIR_NAME: Final[str] = "nwp_forecast_comparison_day5_aifs_wn3"
-"""Under `data/studies/`, the only folder the day-5 AIFS and WeatherNext 3 inputs and fits go in."""
 
 
 def check_columns_equal(
@@ -386,30 +377,6 @@ def check_columns_equal(
     if unequal:
         msg = f"{label}: columns differ from the reference's on some rows: {unequal}"
         raise ValueError(msg)
-
-
-def _repo_data_dir() -> Path:
-    """Return the shared `data/` directory, resolving a linked worktree to the main checkout.
-
-    See `verify_previous_runs_leads._repo_data_dir` for the reasoning; duplicated here because
-    study scripts in different directories cannot import one another's private helpers.
-
-    Returns:
-        The directory holding `studies/`, `NGED/` and the rest of the shared downloads.
-    """
-    root = PROJECT_ROOT
-    marker = root / ".git"
-    if marker.is_file():
-        pointer = marker.read_text().removeprefix("gitdir:").strip()
-        git_dir = Path(pointer)
-        if git_dir.parent.name == "worktrees":
-            root = git_dir.parent.parent.parent
-    return Path(os.environ.get("DATA_PATH_INTERNAL") or root / "data")
-
-
-def _weather_dir() -> Path:
-    """Return `data/studies/weather/`, where every downloaded weather product lives."""
-    return _repo_data_dir() / "studies" / "weather"
 
 
 def _previous_column(*, name: str, day: int) -> str:
@@ -510,7 +477,9 @@ def _previous_runs_frame(
     for product, dir_name in PRODUCT_DIRS.items():
         if product not in day_offsets or (domain == "wind" and product in SOLAR_ONLY_PRODUCTS):
             continue
-        path = _weather_dir() / dir_name / "previous_runs" / "combined.parquet"
+        path = (
+            previous_runs_product_dir_for(product=dir_name) / "previous_runs" / "combined.parquet"
+        )
         if not path.exists():
             _LOG.warning("%s: %s not found, skipping", product, path)
             continue
@@ -548,7 +517,7 @@ lead 6 (midpoint 5.5) would still be a half-hour extrapolation. The hours ending
 
 
 def check_first_step_reaches_targets(
-    *, steps: efh.Steps, day: int, domain: DomainType, arm_prefix: str
+    *, steps: ens_member_columns.Steps, day: int, domain: DomainType, arm_prefix: str
 ) -> None:
     """Refuse a solar band that scores an hour before its first stored step.
 
@@ -603,7 +572,7 @@ def ens_members(*, sites: list[str]) -> pl.DataFrame:
     )
 
 
-def check_no_step_gap(*, steps: efh.Steps, day: int, arm_prefix: str) -> None:
+def check_no_step_gap(*, steps: ens_member_columns.Steps, day: int, arm_prefix: str) -> None:
     """Raise if any step of a band is missing between its first and last step.
 
     `band_steps` keeps whichever leads the extract holds, so a lead missing from the middle of a
@@ -697,11 +666,11 @@ def ens_member_arms(
             steps=steps, upsampled=upsampled, day=day, domain=domain, method=method
         )
         for way in ways:
-            reduced = efh.reduce_members(
+            reduced = ens_member_columns.reduce_members(
                 hourly=combined, domain=domain, way=way, ensemble_size=ensemble_size
             )
             arm = arm_name(way, day)
-            arm_frame = efh.prefixed(frame=reduced, arm=arm, domain=domain)
+            arm_frame = ens_member_columns.prefixed(frame=reduced, arm=arm, domain=domain)
             if keep_init_time:
                 runs = combined.select("site", "time", **{f"{arm}_init_time": "init_time"}).unique(
                     subset=["site", "time"]
@@ -778,7 +747,9 @@ def compare_ens_rebuild(*, domain: DomainType) -> float:
         column
         for day in ENS_DAYS
         for way in ("mean", "control")
-        for column in efh.ens_columns(arm=efh.ens_arm(way=way, day=day), domain=domain)
+        for column in ens_member_columns.ens_columns(
+            arm=efh.ens_arm(way=way, day=day), domain=domain
+        )
     ]
     keys = old.select("site", "time")
     new = _ens_frame(keys=keys, domain=domain)
@@ -795,9 +766,8 @@ def compare_ens_rebuild(*, domain: DomainType) -> float:
     return float(differences.item() or 0.0)
 
 
-GEFS_WINDOW_DIR_NAME: Final[str] = "GEFS_window_2024-11-01_None"
-"""Under `data/studies/weather/`, the finished GEFS download: its `_month_cache/` and
-`_grid_cells.parquet`."""
+GEFS_WINDOW_DIR_NAME: Final[str] = GEFS_WINDOW_DIR.name
+"""The finished GEFS download's folder name: its `_month_cache/` and `_grid_cells.parquet`."""
 
 GEFS_MONTH_CACHE_DIR_NAME: Final[str] = "_month_cache"
 """Inside a GEFS download directory, where `fetch_dynamical_zarr.py` checkpoints each month."""
@@ -822,7 +792,7 @@ def _gefs_months_available(*, last_month: str) -> dict[str, Path]:
     Returns:
         Each cached month's `%Y-%m` label to its parquet path, sorted by month.
     """
-    cache_dir = _weather_dir() / GEFS_WINDOW_DIR_NAME / GEFS_MONTH_CACHE_DIR_NAME
+    cache_dir = GEFS_WINDOW_DIR / GEFS_MONTH_CACHE_DIR_NAME
     if not cache_dir.exists():
         return {}
     months: dict[str, Path] = {}
@@ -1171,7 +1141,7 @@ def _gefs_frame(
                 last_needed,
             )
             return keys
-        path = _weather_dir() / GEFS_WINDOW_DIR_NAME
+        path = GEFS_WINDOW_DIR
         files = list(months.values())
         first_init = max(
             time_range["first"].date() - timedelta(days=max(build_days)),
@@ -1213,8 +1183,8 @@ def _gefs_frame(
     return frame
 
 
-GFS_NATIVE_DIR_NAME: Final[str] = "GFS"
-"""Under `data/studies/weather/`, the native Dynamical.org GFS store: `GFS.parquet` (every run at
+GFS_NATIVE_DIR_NAME: Final[str] = GFS_PRODUCT_DIR.name
+"""The name of the native Dynamical.org GFS store's folder: `GFS.parquet` (every run at
 00, 06, 12 and 18 UTC) and `_grid_cells.parquet`."""
 
 GFS_NATIVE_ARM_PREFIX: Final[str] = "gfs_native"
@@ -1332,7 +1302,7 @@ def _gfs_native_direct_arm(
         init_time=served_init_time(time=pl.col("time"), day=day, domain=domain),
         lead_hours=served_lead_hours(time=pl.col("time"), day=day, domain=domain),
     )
-    columns = efh.ens_columns(arm=gfs_native_arm(day=day), domain=domain)
+    columns = ens_member_columns.ens_columns(arm=gfs_native_arm(day=day), domain=domain)
     join_keys = ["site", "init_time", "lead_hours"]
     if domain == "solar":
         earlier = extract.select(
@@ -1403,7 +1373,7 @@ def _gfs_native_frame(
         keys: `site`, `time` for every row the study scores.
         domain: `solar` or `wind`.
         days: The lead days to build.
-        gfs_dir: The store's folder; `None` reads `GFS_NATIVE_DIR_NAME` under the weather folder.
+        gfs_dir: The store's folder; `None` reads `GFS_PRODUCT_DIR`.
 
     Returns:
         `keys` with `gfs_native_day<N>_<field>` for every `N` in `days`, left-joined.
@@ -1411,7 +1381,7 @@ def _gfs_native_frame(
     Raises:
         RuntimeError: If any arm has a null in more than `GFS_NATIVE_MAX_MISSING_SHARE` of the rows.
     """
-    directory = _weather_dir() / GFS_NATIVE_DIR_NAME if gfs_dir is None else gfs_dir
+    directory = GFS_PRODUCT_DIR if gfs_dir is None else gfs_dir
     sites = sorted(keys["site"].unique().to_list())
     cell_by_site = _gefs_cell_selection(
         grid_cells=pl.read_parquet(directory / "_grid_cells.parquet"), domain=domain, sites=sites
@@ -1487,7 +1457,7 @@ def _gfs_native_frame(
             frame = frame.join(arm_frame, on=["site", "time"], how="left")
     too_many = {}
     for day in days:
-        columns = efh.ens_columns(arm=gfs_native_arm(day=day), domain=domain)
+        columns = ens_member_columns.ens_columns(arm=gfs_native_arm(day=day), domain=domain)
         in_span = frame.filter(
             served_init_time(time=pl.col("time"), day=day, domain=domain) >= first_init
         )
@@ -1514,8 +1484,8 @@ def _gfs_native_frame(
     return frame
 
 
-IFS_SINGLE_DIR_NAME: Final[str] = "ECMWF-IFS-SINGLE-RUNS"
-"""Under `data/studies/weather/`, Open-Meteo's Single Runs archive of ECMWF IFS HRES."""
+IFS_SINGLE_DIR_NAME: Final[str] = ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR.name
+"""The name of the folder of Open-Meteo's Single Runs archive of ECMWF IFS HRES."""
 
 IFS_SINGLE_FILE_NAME: Final[str] = "ECMWF-IFS-SINGLE-RUNS.parquet"
 """Inside `IFS_SINGLE_DIR_NAME`, the combined file: one 00 UTC run a day, hourly leads 0 to 240."""
@@ -1598,8 +1568,8 @@ def _ifs_single_arm_columns(
         init_time=ifs_single_init_time(time=pl.col("time"), day=day, domain=domain),
         lead_hours=ifs_single_lead_hours(time=pl.col("time"), day=day, domain=domain),
     )
-    columns = efh.ens_columns(arm=ifs_single_arm(day=day), domain=domain)
-    fields = efh.fields(domain=domain)
+    columns = ens_member_columns.ens_columns(arm=ifs_single_arm(day=day), domain=domain)
+    fields = ens_member_columns.fields(domain=domain)
     joined = targets.join(extract, on=["site", "init_time", "lead_hours"], how="left")
     return joined.select(
         "site",
@@ -1640,8 +1610,8 @@ def _ifs_single_frame(
         keys: `site`, `time` for every row the study scores.
         domain: `solar` or `wind`.
         days: The lead days to build.
-        ifs_single_dir: The archive's folder; `None` reads `IFS_SINGLE_DIR_NAME` under the weather
-            folder.
+        ifs_single_dir: The archive's folder; `None` reads
+            `ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR`.
 
     Returns:
         `keys` with `ifs_single_day<N>_<field>` for every `N` in `days`, left-joined.
@@ -1649,7 +1619,7 @@ def _ifs_single_frame(
     Raises:
         RuntimeError: If any arm has a null in more than `IFS_SINGLE_MAX_MISSING_SHARE` of the rows.
     """
-    directory = _weather_dir() / IFS_SINGLE_DIR_NAME if ifs_single_dir is None else ifs_single_dir
+    directory = ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR if ifs_single_dir is None else ifs_single_dir
     time_dtype = keys.schema["time"]
     time_range = keys.select(first=pl.col("time").min(), last=pl.col("time").max()).row(
         0, named=True
@@ -1670,7 +1640,7 @@ def _ifs_single_frame(
     for day in days:
         arm = _ifs_single_arm_columns(keys=keys, extract=extract, domain=domain, day=day)
         frame = frame.join(arm, on=["site", "time"], how="left")
-        columns = efh.ens_columns(arm=ifs_single_arm(day=day), domain=domain)
+        columns = ens_member_columns.ens_columns(arm=ifs_single_arm(day=day), domain=domain)
         share = float(
             frame.select(pl.any_horizontal(pl.col(c).is_null() for c in columns).mean()).item()
         )
@@ -1819,18 +1789,15 @@ def build_extra_leads(
 
     Raises:
         ValueError: If `output_dir` is `published_dir`, or `batch` is `fifth` and `output_dir` is
-            not named `DAY4_OUTPUT_DIR_NAME`, or the fifth batch's ENS mean at day 4 differs from
+            not `NFC_DAY4_SHARED_DIR`, or the fifth batch's ENS mean at day 4 differs from
             the WeatherNext 3 folder's.
         FileExistsError: If the output file already exists.
     """
     if output_dir.resolve() == published_dir.resolve():
         msg = f"the extra-lead output must not be the published folder {published_dir}"
         raise ValueError(msg)
-    if batch == "fifth" and output_dir.name != DAY4_OUTPUT_DIR_NAME:
-        msg = (
-            f"the fifth batch builds only into a folder named {DAY4_OUTPUT_DIR_NAME}, "
-            f"not {output_dir}"
-        )
+    if batch == "fifth" and output_dir.resolve() != NFC_DAY4_SHARED_DIR.resolve():
+        msg = f"the fifth batch builds only into {NFC_DAY4_SHARED_DIR}, not {output_dir}"
         raise ValueError(msg)
     output_path = output_dir / f"{domain}_extra_lead_inputs.parquet"
     if output_path.exists():
@@ -1882,7 +1849,7 @@ def build_extra_leads(
             built=frame,
             reference=pl.read_parquet(
                 published_dir.resolve().parent
-                / WN3_EXTRA_DAYS_DIR_NAME
+                / NFC_WN3_EXTRA_DAYS_DIR.name
                 / f"{domain}_wn3_inputs.parquet"
             ),
             columns=[
@@ -1890,7 +1857,7 @@ def build_extra_leads(
                 for column in frame.columns
                 if column.startswith("ens_mean_day4_") and not column.endswith("_init_time")
             ],
-            label=f"{domain}/{WN3_EXTRA_DAYS_DIR_NAME} ens_mean_day4",
+            label=f"{domain}/{NFC_WN3_EXTRA_DAYS_DIR.name} ens_mean_day4",
         )
     frame.write_parquet(output_path)
     _LOG.info("%s: wrote %d rows, %d columns to %s", domain, frame.height, frame.width, output_path)
@@ -2212,7 +2179,7 @@ def build_aifs(
     if output_dir.resolve() == published_dir.resolve():
         msg = f"the AIFS output must not be the published folder {published_dir}"
         raise ValueError(msg)
-    if output_dir.resolve() == published_dir.resolve().parent / EXISTING_AIFS_DIR_NAME:
+    if output_dir.resolve() == published_dir.resolve().parent / NFC_AIFS_DIR.name:
         msg = f"the AIFS output must not be the existing AIFS folder {output_dir}"
         raise ValueError(msg)
     if not days or min(days) < 0:
@@ -2237,7 +2204,7 @@ def main() -> int:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=_repo_data_dir() / "studies" / DEFAULT_OUTPUT_DIR_NAME,
+        default=NFC_DIR,
         help="Directory the two arm-input parquets are written to.",
     )
     parser.add_argument(
@@ -2287,13 +2254,13 @@ def main() -> int:
     parser.add_argument(
         "--aifs-weather-dir",
         type=Path,
-        default=_weather_dir(),
+        default=ECMWF_AIFS_PRODUCT_DIR.parent,
         help="With --aifs: the folder holding the ECMWF-AIFS and ECMWF-AIFS-ENS downloads.",
     )
     parser.add_argument(
         "--published-dir",
         type=Path,
-        default=_repo_data_dir() / "studies" / DEFAULT_OUTPUT_DIR_NAME,
+        default=NFC_DIR,
         help="With --extra-leads or --aifs: the folder holding the published arm-input parquets.",
     )
     parser.add_argument(

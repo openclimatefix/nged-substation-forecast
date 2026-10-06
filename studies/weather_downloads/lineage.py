@@ -3,8 +3,8 @@
 One-off throwaway module for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>. A lineage note is a small
 JSON file written alongside each product's data, recording where the data came from, what was
-requested, and when — so a later reader of `data/studies/weather/<PRODUCT>/` does not have to
-reconstruct the request from the fetch script's git history.
+requested, and when — so a later reader of `data/studies/downloads/<kind>/<PRODUCT>/` does not have
+to reconstruct the request from the fetch script's git history.
 """
 
 import json
@@ -25,7 +25,7 @@ def write_lineage_note(
     """Write (or overwrite) `<product_dir>/<filename>`.
 
     Args:
-        product_dir: The product's own directory under `data/studies/weather/`.
+        product_dir: The product's own directory under `data/studies/downloads/`.
         source_address: The service the data came from (a base URL, an OPeNDAP catalog address, an
             HTTPS index, or a Zarr store URI). Never a request carrying a coordinate.
         request_description: A human-readable account of what was requested — the model/dataset
@@ -72,7 +72,7 @@ def write_readme(
     fetch script itself. See the `data-download` skill for the convention this implements.
 
     Args:
-        product_dir: The product's own directory under `data/studies/weather/`.
+        product_dir: The product's own directory under `data/studies/downloads/`.
         product_name: The product's own name, e.g. "ECMWF IFS HRES 9 km".
         source_web_page: A human-readable web page describing the product or the API that serves it
             — never an API endpoint URL, which belongs in `lineage.json`'s `source_address` instead.
@@ -114,8 +114,8 @@ def write_readme(
 
 One-off throwaway download for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>. `product_dir` is
-`data/studies/weather/{product_dir.name}/`, several directories below the top-level `data/`
-that this repo's `.gitignore` excludes — nothing under it is committed to the repo.
+`{product_dir.name}/`, under `data/studies/downloads/`, several directories below the top-level
+`data/` that this repo's `.gitignore` excludes — nothing under it is committed to the repo.
 
 - **Source:** [{source_web_page}]({source_web_page})
 - **Re-download with:** `{script_path}` — see that script's own docstring for the exact command

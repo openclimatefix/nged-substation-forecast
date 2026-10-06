@@ -1637,7 +1637,7 @@ weather-station feed, the spread of ENS members, or products it does not score.*
 
 **Every input except the generators' metered output, the generators' coordinates, the capacity
 table, and the station-to-farm mapping is public, and the code is in the repository at the commit
-that merged this page.** The code that produced every figure is in `studies/beam_diffuse_split/` and
+that merged this page.** The code that produced every figure is in `studies/past_weather/` and
 in `packages/studies/`.
 
 - **Public inputs:** ERA5 wind from Open-Meteo's copy of the Copernicus archive, the UKV and ICON
@@ -1678,26 +1678,26 @@ draws Figures 4a, 5a, 6, 7a, 8, 9, and 10; `ens_hres_past_wind_charts.py` draws 
 `weather_product_domains.py`.
 
 ```bash
-uv run python studies/beam_diffuse_split/fetch_wind_point.py
-uv run python studies/beam_diffuse_split/wind_products.py
-uv run python studies/beam_diffuse_split/wind_products.py --era5-by-year
-uv run python studies/beam_diffuse_split/wind_product_charts.py
+uv run python studies/past_weather/fetch_wind_point.py
+uv run python studies/past_weather/wind_products.py
+uv run python studies/past_weather/wind_products.py --era5-by-year
+uv run python studies/past_weather/wind_product_charts.py
 uv run python studies/beam_diffuse_split/check_page_numbers.py \
     docs/studies/past-weather/wind.md \
-    data/studies/beam_diffuse_split/beam_diffuse_wind_products/report.md \
+    data/studies/per_study/beam_diffuse_split/beam_diffuse_wind_products/report.md \
     --section "### The power hour, the zero-hour rule, and UKV's hub height each move a result by at most 0.28 points"
 ```
 
 `wind_icon_dream.py` needs ICON-DREAM-EU's own gridded download already on disk in
-`data/studies/weather/ICON-DREAM-EU/`. No committed script reproduces that download in this
+`data/studies/downloads/reanalysis/ICON-DREAM-EU/`. No committed script reproduces that download in this
 repository: it was a one-off backfill for
 [issue #841](https://github.com/openclimatefix/nged-substation-forecast/issues/841), documented in that
 directory's own `README_*.md` files and their `lineage_*.json` siblings, which give the exact
 request and any licence prerequisite. With the download in place:
 
 ```bash
-uv run python studies/beam_diffuse_split/wind_icon_dream.py
-uv run python studies/beam_diffuse_split/wind_icon_dream_charts.py
+uv run python studies/past_weather/wind_icon_dream.py
+uv run python studies/past_weather/wind_icon_dream_charts.py
 ```
 
 The ECMWF section has its own scripts. They need the ENS forecast horizons page's saved inputs and
@@ -1707,8 +1707,8 @@ scripts. Before they run, the production NWP Delta table must hold the ENS runs;
 HRES files come from two Open-Meteo downloads:
 
 ```bash
-uv run python studies/beam_diffuse_split/fetch_ens_forecast_horizons.py
-uv run python studies/beam_diffuse_split/ens_forecast_horizons.py
+uv run python studies/nwp_forecast_comparison/fetch_ens_forecast_horizons.py
+uv run python studies/nwp_forecast_comparison/ens_forecast_horizons.py
 uv run python studies/weather_downloads/fetch_open_meteo_previous_runs.py --model ecmwf-ifs-hres
 uv run python studies/weather_downloads/fetch_open_meteo_grid.py --model ecmwf-ifs-hres \
     --start-date 2017-01-01 --end-date 2026-09-22
@@ -1718,13 +1718,13 @@ uv run python studies/weather_downloads/fetch_open_meteo_grid.py --model ecmwf-i
 With those files in place:
 
 ```bash
-uv run python studies/beam_diffuse_split/ens_hres_past_wind.py
-uv run python studies/beam_diffuse_split/ens_hres_past_wind.py --extra-fits
-uv run python studies/beam_diffuse_split/ens_hres_past_wind.py --report-only
-uv run python studies/beam_diffuse_split/ens_hres_past_wind_charts.py
+uv run python studies/past_weather/ens_hres_past_wind.py
+uv run python studies/past_weather/ens_hres_past_wind.py --extra-fits
+uv run python studies/past_weather/ens_hres_past_wind.py --report-only
+uv run python studies/past_weather/ens_hres_past_wind_charts.py
 uv run python studies/beam_diffuse_split/check_page_numbers.py \
     docs/studies/past-weather/wind.md \
-    data/studies/beam_diffuse_split/past_weather_v2/ens_hres_past_wind/report.md \
+    data/studies/per_study/beam_diffuse_split/past_weather_v2/ens_hres_past_wind/report.md \
     --section "### UKV beats HRES and ENS day 0, and HRES's lead over ERA5 depends on the training design" \
     --section "### The ECMWF arms" \
     --bullet "## Key findings" "- **On 43,555 farm-hours from December 2024" \
@@ -1742,41 +1742,41 @@ The check reads `intervals.parquet` beside the report, so it compares the page's
 with full-precision values.
 
 The ECMWF section's report lands in
-`data/studies/beam_diffuse_split/past_weather_v2/ens_hres_past_wind/report.md`. `--extra-fits` adds
-the post-review fits and leaves the first fit's losses alone, and `--report-only` rebuilds the
-report from the saved losses without fitting.
+`data/studies/per_study/beam_diffuse_split/past_weather_v2/ens_hres_past_wind/report.md`.
+`--extra-fits` adds the post-review fits and leaves the first fit's losses alone, and
+`--report-only` rebuilds the report from the saved losses without fitting.
 
 The wind-products report lands in
-`data/studies/beam_diffuse_split/beam_diffuse_wind_products/report.md`. `wind_products.py
+`data/studies/per_study/beam_diffuse_split/beam_diffuse_wind_products/report.md`. `wind_products.py
 --fit-missing` keeps the losses already saved and fits only the XGBoost models they lack. That
 report also prints the check with the solar study's power hour, the run that keeps the zero hours,
 the step ratios, and the distances between the farms and to ICON-D2's edge. `uv run python
-studies/beam_diffuse_split/check_served_wind.py` writes `served_wind_checks.md` beside it: the
+studies/past_weather/check_served_wind.py` writes `served_wind_checks.md` beside it: the
 grid-cell check, the 100 m rescaling, and when the ICON 80 m wind starts. The hour-to-hour jump
 diagnostics behind the served leads were one-off checks during review, and are in neither
 `report.md` nor `served_wind_checks.md`. `wind_products.py --era5-by-year` reads the saved losses,
 fits nothing, and writes Figure 10's table to
-`data/studies/beam_diffuse_split/past_weather_v2/wind/era5_by_year.md`. `wind_icon_dream.py`'s
+`data/studies/per_study/beam_diffuse_split/past_weather_v2/wind/era5_by_year.md`. `wind_icon_dream.py`'s
 report lands separately, in
-`data/studies/beam_diffuse_split/past_weather_v2/wind_icon_dream/report.md`; `--report-only`
+`data/studies/per_study/beam_diffuse_split/past_weather_v2/wind_icon_dream/report.md`; `--report-only`
 rebuilds it from a saved `losses.parquet` alone, fitting nothing.
 
 `station_wind_arms.py` needs the page's own row set, so the first code block above comes first. It
-also needs the MIDAS Open download in `data/studies/weather/MIDAS-OPEN/`. The download script needs
-a `CEDA_TOKEN` in the main checkout's `.env`. The download script fetches `dataset-version-202607`
-of two datasets, `uk-hourly-weather-obs` and `uk-radiation-obs`, at quality-control version 1. The
-station arms read `uk-hourly-weather-obs` only. The report lands in
-`data/studies/beam_diffuse_split/past_weather_v2/station_wind_arms/report.md`. A run that fits
+also needs the MIDAS Open download in `data/studies/downloads/observations/MIDAS-OPEN/`. The
+download script needs a `CEDA_TOKEN` in the main checkout's `.env`. The download script fetches
+`dataset-version-202607` of two datasets, `uk-hourly-weather-obs` and `uk-radiation-obs`, at
+quality-control version 1. The station arms read `uk-hourly-weather-obs` only. The report lands in
+`data/studies/per_study/beam_diffuse_split/past_weather_v2/station_wind_arms/report.md`. A run that fits
 refuses to overwrite an output that exists, so move earlier outputs aside first.
 
 ```bash
 uv run python studies/weather_downloads/fetch_midas_open.py
-uv run python studies/beam_diffuse_split/station_wind_arms.py
-uv run python studies/beam_diffuse_split/station_wind_arms.py --report-only
-uv run python studies/beam_diffuse_split/station_wind_arms_charts.py
+uv run python studies/past_weather/station_wind_arms.py
+uv run python studies/past_weather/station_wind_arms.py --report-only
+uv run python studies/past_weather/station_wind_arms_charts.py
 uv run python studies/beam_diffuse_split/check_page_numbers.py \
     docs/studies/past-weather/wind.md \
-    data/studies/beam_diffuse_split/past_weather_v2/station_wind_arms/report.md \
+    data/studies/per_study/beam_diffuse_split/past_weather_v2/station_wind_arms/report.md \
     --section "### The weather-station arms" \
     --section "### One nearby 10 m weather station trails ERA5's 10 m wind on its own, and lowers UKV's error when added to it" \
     --bullet "## Key findings" "- **At three farms over 17 months (34,156 farm-hours)" \
@@ -1797,12 +1797,12 @@ the current commit, so this page does not say whether a refit reproduces the sav
 
 `past_wind_leaderboard.py` reads every row set's saved losses without refitting anything, checks
 every number that a row set's report already prints, and writes the report that Figures 1 and 2 come
-from to `data/studies/beam_diffuse_split/past_weather_v2/wind_leaderboard_2/report.md`, together
+from to `data/studies/per_study/beam_diffuse_split/past_weather_v2/wind_leaderboard_2/report.md`, together
 with `intervals.parquet`. The script refuses to overwrite either file. With the losses in place:
 
 ```bash
-uv run python studies/beam_diffuse_split/past_wind_leaderboard.py
-uv run python studies/beam_diffuse_split/past_wind_leaderboard_charts.py
+uv run python studies/past_weather/past_wind_leaderboard.py
+uv run python studies/past_weather/past_wind_leaderboard_charts.py
 ```
 
 [ecmwf-results]: #ukv-beats-hres-and-ens-day-0-and-hress-lead-over-era5-depends-on-the-training-design

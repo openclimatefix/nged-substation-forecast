@@ -1,0 +1,2709 @@
+"""Score ECMWF ENS-driven power forecasts at each forecast horizon, for solar and for wind.
+
+One-off throwaway script for the first step of
+<https://github.com/openclimatefix/nged-substation-forecast/issues/810>. It reads the ENS members
+`fetch_ens_forecast_horizons.py` extracted, and the solar and wind rows the past-weather studies
+built (`weather_products.py`, `wind_products.py`, `blend_products.py`).
+
+**The question is how accurate a power forecast driven by ECMWF ENS is at each horizon.** The answer
+is an absolute mean-absolute-error leaderboard per technology: three ways of using ENS at each
+horizon, four baselines that read no weather forecast, and two reference rows that are not
+forecasts.
+
+**A horizon is a whole UTC day after the ENS run's own day.** Band `day d` forecasts calendar day
+`D` from the 00 UTC run of day `D - d`. The bands are days 0, 1, 2, 3, 5, 7, 10, and 14: every
+day to day 3, where the change from one day to the next is steepest, then days 5, 7, and 10, which
+span the 3-to-10-day band the live service's users care most about, and day 14, near the end of the
+run.
+Every band covers the same hours of the day. The live service reads a 00 UTC run from about 09:00
+UTC (`ml_core.features._nwp.NWP_PUBLICATION_DELAY_HOURS` is 9), so most of day 0 is over before
+the run can be used, and the day-0 row is a best case rather than a product. The day-ahead product
+is day 1, which a forecast issued at 09:00 UTC reaches 15 to 39 hours after issue.
+
+**Every row is scored at hourly resolution**, on the past-weather studies' own hourly rows: every
+daylight hour for solar, and every hour for wind. The commissioning ramp, the zero half-hours, and
+the outages are dropped exactly as there. A row is also dropped from every arm where any band's ENS
+input or any baseline's input is missing, so every arm and baseline scores every row, and each
+panel's rows are shared; `check_shared_rows` stops the run otherwise.
+
+**ENS steps every 3 hours to lead 144 and every 6 hours beyond, so its values are upsampled to
+hourly first, and the first part of the study measures how.** Every upsampling is applied to each
+member before any member is averaged. A combination names one technique per field:
+
+- `native`: not a combination but a reference, ENS on its own steps inside the band's day. For
+  solar each step's power is the mean over every hour of the step, as ENS's step radiation is, with
+  zero for each hour the sun is down, and a step missing any scored daylight hour is dropped; for
+  wind the power is read at the step. It is not hourly, so it is scored on rows of its own.
+- `linear` for every field: radiation read as instantaneous at its stamp, direction interpolated
+  as an angle. This is what the production resample does today.
+- `clear_sky` for radiation: rebuilt through the clear-sky index by
+  `studies.resample.clear_sky_index_resample`.
+- `clear_sky_conserving` for radiation: as `clear_sky`, each step's hours then scaled so they
+  average to the step's own mean (`studies.resample.rescale_to_step_means`), which conserves every
+  step's energy exactly.
+- `pchip` for temperature: a shape-preserving cubic (`studies.resample.interpolate_pchip`). Solar
+  temperature is read at each hour's midpoint.
+- `components` for wind direction, or for wind speed: both winds interpolated as eastward and
+  northward components, the direction, or the speed, then taken from them. The two are separate
+  changes because the magnitude of interpolated components dips between stamps where the direction
+  turns, which changes the speed as well as the direction.
+
+**The rule that chooses the combination every other comparison uses was written before any result
+existed**: start from `linear`, and try each change in `CHANGES` in order, each candidate being the
+combination chosen so far with that one change made. A candidate replaces the combination chosen
+so far only if its ensemble-mean arm's error is lower at day 1, on the 3-hour part of the grid, and
+at day 7, on the 6-hour part. Every combination is fitted at every band, and the page shows each
+candidate against the combination it was judged against, and against `linear`.
+
+**Three ways of using ENS, each trained on the input it is scored with:**
+
+- `ens_control`: the control member, through an XGBoost model trained on the control member.
+- `ens_mean`: the mean of the 51 members' fields, through an XGBoost model trained on that mean.
+  The mean wind direction is the direction of the mean wind vector.
+- `ens_members`: each member through one XGBoost model, then the 51 power forecasts averaged. The
+  model is trained on every member's rows stacked, all 51 carrying the same measured power, because
+  that is the model the scored input needs: one mapping from a member's weather to power, applied to
+  any member. Each member's row carries a weight of 1/51, so an hour weighs as much as it does in
+  the other arms' fits (`studies.cross_validation.out_of_fold_member_forecasts`). The folds are
+  whole months, so every member of a scored month is left out of training together.
+  `ens_members_median` takes the median of the same 51 forecasts instead, because the median
+  minimises the absolute error.
+
+Two checks on the member-by-member arm. Row subsampling drops member rows rather than hours, so
+day 1's member-by-member and ensemble-mean arms are also fitted without row subsampling
+(`no_subsample`). And an exploratory arm, `ens_mean_applied`, is an XGBoost model trained on the
+ensemble mean and applied to each member, the 51 forecasts averaged: it breaks the rule that each
+arm is trained on the input it is scored with, and answers the question as first put literally.
+
+**Each arm is fitted per generator, out of fold**, by `studies.cross_validation.out_of_fold_losses`:
+five folds of whole months cut inside each era of the UKV record, three fitting seeds, the
+absolute-error objective, curtailed hours dropped from training, and the prediction held to the
+export cap at scoring. A solar arm is shown the hour's sun position, the hour of day, the day of
+the year, the UKV era, and the ENS radiation and temperature; a wind arm the hour of day, the day
+of the year, the UKV era, and the wind study's four columns from ENS: the 100 m speed, the 100 m
+direction as sine and cosine, and the 10 m speed.
+
+**The baselines read no weather forecast** and are set out in `studies.baselines`:
+persistence, diurnal persistence, smart persistence, and climatology. Each is issued at 09:00 UTC
+on the run's own day, when the live service can first read the run, except for day 0, whose
+baselines are cut off at the run's 00 UTC init time: an issue at 09:00 on the target day would hand
+them the target's own morning, which the day-0 run never saw.
+
+**The reference rows are not forecasts: each is scored on the same rows to show how good the weather
+input could be.** `era5` is ERA5, the reanalysis, as the past-weather studies gave it, available a
+few days late. `live_gb_rich_xgb` is the blending study's best row that a live service anywhere in
+Great Britain can read: UKV and ICON-EU, each with its neighbouring hours. Both are shown ERA5's
+temperature, as in the past-weather studies.
+
+**An exploratory arm, `ens_mean6_day1`, measures what the 6-hour step costs at a short lead**: day
+1's ensemble mean given only every other stamp, its radiation the 6-hour mean of two 3-hour means,
+upsampled by the chosen technique.
+
+**The planned contrasts, named before any result existed**: `ens_mean_day1 - ens_mean_day0`,
+`ens_mean_day7 - ens_mean_day0`, `ens_members_day1 - ens_mean_day1`,
+`ens_mean_day1 - ens_control_day1`, and `ens_mean_day7 - climatology`. Every other number is
+exploratory, and the upsampling contrasts too. The best baseline at each band is chosen after the
+run, so a contrast against it is exploratory as well.
+
+Run it with `uv run python studies/nwp_forecast_comparison/ens_forecast_horizons.py`, after
+`fetch_ens_forecast_horizons.py` and the three past-weather studies. With `--report-only` it
+rebuilds the report from the losses a full run saved, and with `--refit solar` or `--refit wind` it
+refits one technology and reads the other's saved outputs.
+
+**Every result is written to `RESULTS_DIR`, where each technology's losses are write-once.** Wind
+keeps only rows valid from `ROW_SET_FIRST_HOUR["wind"]`, and each technology's folds are cut with
+the pinned rotation `ROW_SET_FOLD_OFFSETS`, checked for coverage before any fit. A refit of a
+technology raises if `RESULTS_DIR` already holds that technology's losses, so `--refit solar` and
+`--refit wind` each work into a folder that lacks that technology's losses, and either finishes a
+run whose other technology failed. `--fit-missing` and `--fit-baselines` move the losses they
+replace, and the run's report, intervals and leaderboard, into a `RESULTS_DIR/superseded`
+subfolder first, and change nothing when no arm needs fitting. A technology with no saved
+losses that is not being refitted is left out of `--report-only`, `--fit-missing`,
+`--fit-baselines` and the report.
+"""
+
+import argparse
+import concurrent.futures
+import logging
+import sys
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from types import MappingProxyType
+from typing import Final, Literal, NamedTuple
+
+import numpy as np
+import polars as pl
+from fetch_ens_forecast_horizons import BAND_DAYS, OUTPUT_PATH
+from studies.arm_runner import MAX_CONCURRENT_FITS, Job, run_all
+from studies.baselines import (
+    clear_sky_index,
+    climatology,
+    diurnal_persistence,
+    hourly_clear_sky,
+    hourly_grid,
+    issue_time,
+    persistence,
+    shrunk_persistence,
+)
+from studies.bootstrap import bootstrap_absolute
+from studies.cross_validation import (
+    PRIMARY_HYPER_PARAMETERS,
+    SEEDS,
+    SENSITIVITY_HYPER_PARAMETERS,
+    HyperParameters,
+    calendar_month_coverage,
+    out_of_fold_forecasts_for_members,
+    out_of_fold_member_forecasts,
+    raise_on_uncovered_months,
+    rotate_folds,
+    score_prediction,
+    summarise_member_forecasts,
+    uncovered_months,
+)
+from studies.ens_members import (
+    ENSEMBLE_SIZE,
+    Steps,
+    clear_sky_arrays,
+    ens_columns,
+    fields,
+    long_frame,
+    prefixed,
+    reduce_members,
+    shared_features,
+)
+from studies.guards import refuse_to_overwrite
+from studies.product_frames import (
+    CONTRAST_HEADER,
+    SOLAR,
+    WIND,
+    Domain,
+    DomainType,
+    IntervalRecord,
+    contrast_interval,
+    contrast_line,
+    solar_frame,
+    wind_frame,
+)
+from studies.pv_dataset import pv_sites, solar_hourly_power, wind_sites
+from studies.resample import (
+    DEFAULT_DAYLIGHT_FLOOR_W_M2,
+    clear_sky_index_resample,
+    coarsen_to_six_hourly,
+    interpolate_linear,
+    interpolate_pchip,
+    rescale_to_step_means,
+    wind_components,
+    wind_polar,
+)
+from studies.solar import zenith
+from studies.solar_product_frames import with_eras
+from studies.sources import ENS_FORECAST_HORIZONS_DIR
+from studies.wind_product_frames import wind_hourly_power
+
+_LOG: Final[logging.Logger] = logging.getLogger("ens_forecast_horizons")
+
+MethodType = str
+"""An upsampling combination's name, a key of `COMBINATIONS`."""
+
+TechniqueType = Literal["linear", "clear_sky", "clear_sky_conserving", "pchip", "components"]
+"""How one field is upsampled."""
+
+SettingType = Literal["pooled", "sensitivity", "no_subsample"]
+"""The hyperparameter setting: the past-weather studies' two, and the primary setting with row
+subsampling off, for the member-by-member sensitivity check."""
+
+SETTINGS: Final[dict[SettingType, HyperParameters]] = {
+    "pooled": PRIMARY_HYPER_PARAMETERS,
+    "sensitivity": SENSITIVITY_HYPER_PARAMETERS,
+    "no_subsample": {**PRIMARY_HYPER_PARAMETERS, "subsample": 1.0},
+}
+"""`no_subsample` exists because row subsampling on the stacked member rows drops member rows
+rather than hours, which regularises the member-by-member arm differently from an arm with one row
+per hour."""
+
+PERCENTAGE_POINTS: Final[float] = 100.0
+
+METRIC: Final[str] = "absolute_error_capped_fraction_of_capacity"
+"""The loss every table reports: each row's clamped error over its own generator's capacity."""
+
+
+FINE_STEP_LAST_LEAD: Final[int] = 144
+"""The last lead ENS publishes on 3-hour steps; beyond it the steps are 6 hours wide."""
+
+COMBINATIONS: Final[dict[DomainType, dict[str, dict[str, TechniqueType]]]] = {
+    "solar": {
+        "linear": {"ghi": "linear", "temp": "linear"},
+        "clear_sky": {"ghi": "clear_sky", "temp": "linear"},
+        "clear_sky_conserving": {"ghi": "clear_sky_conserving", "temp": "linear"},
+        "linear_pchip": {"ghi": "linear", "temp": "pchip"},
+        "clear_sky_pchip": {"ghi": "clear_sky", "temp": "pchip"},
+        "clear_sky_conserving_pchip": {"ghi": "clear_sky_conserving", "temp": "pchip"},
+    },
+    "wind": {
+        "linear": {"speed": "linear", "direction": "linear"},
+        "direction_components": {"speed": "linear", "direction": "components"},
+        "speed_components": {"speed": "components", "direction": "linear"},
+        "components": {"speed": "components", "direction": "components"},
+    },
+}
+"""Every combination of techniques fitted, per field, by name.
+
+For solar, `ghi` is the radiation and `temp` the temperature. For wind, `speed` and `direction`
+apply to both heights: `components` for the speed takes the magnitude of the interpolated
+eastward and northward components, and for the direction their bearing."""
+
+CHANGES: Final[dict[DomainType, tuple[tuple[str, TechniqueType], ...]]] = {
+    "solar": (("ghi", "clear_sky"), ("ghi", "clear_sky_conserving"), ("temp", "pchip")),
+    "wind": (("direction", "components"), ("speed", "components")),
+}
+"""The changes the choosing rule tries, in order, each one field's technique from `linear`."""
+
+DECIDING_DAYS: Final[tuple[int, int]] = (1, 7)
+"""The bands the choice of technique rests on: one on the 3-hour grid, one on the 6-hour grid."""
+
+WAYS: Final[tuple[str, ...]] = ("control", "mean", "members", "members_median")
+"""The ways of using the members, as each arm's name spells them."""
+
+APPLIED: Final[str] = "mean_applied"
+"""The exploratory way: an XGBoost model trained on the ensemble mean, applied to each member, the
+51 forecasts averaged. It breaks the train-on-what-you-score rule the three ways keep."""
+
+BASELINES: Final[tuple[str, ...]] = ("persistence", "diurnal_persistence", "smart_persistence")
+"""The baselines that depend on the band; climatology does not, and is one arm."""
+
+REFERENCES: Final[tuple[str, ...]] = ("era5", "live_gb_rich_xgb")
+"""The two reference rows, which are not forecasts."""
+
+PLANNED: Final[tuple[tuple[str, str], ...]] = (
+    ("ens_mean_day1", "ens_mean_day0"),
+    ("ens_mean_day7", "ens_mean_day0"),
+    ("ens_members_day1", "ens_mean_day1"),
+    ("ens_mean_day1", "ens_control_day1"),
+    ("ens_mean_day7", "climatology"),
+)
+"""The planned contrasts, named before any result existed."""
+
+MEMBER_SENSITIVITY_DAYS: Final[tuple[int, ...]] = (1, 7)
+"""The bands whose member-by-member arm is fitted at the second setting too."""
+
+NO_SUBSAMPLE_DAY: Final[int] = 1
+"""The band whose member-by-member and ensemble-mean arms are fitted without row subsampling too."""
+
+EMULATED_DAY: Final[int] = 1
+"""The band whose ensemble mean is also given 6-hourly stamps only, to cost the step width."""
+
+CALENDAR_ONLY: Final[str] = "calendar_only"
+"""A post hoc arm: the ensemble arms' non-weather columns only, no weather at all, one fit per
+technology, scored on the same rows every ensemble-mean arm is scored on. Added after the first
+science review, to tell apart ENS running out of skill from the model overfitting the calendar
+columns."""
+
+CALENDAR_ONLY_MONTH: Final[str] = "calendar_only_month"
+"""`CALENDAR_ONLY`, refit with `day_of_year` replaced by `MONTH_FEATURE`, a post hoc sensitivity
+check."""
+
+MONTH_FEATURE: Final[str] = "month_of_year"
+"""The calendar month, 1 to 12, used in place of `day_of_year` by the month sensitivity refit."""
+
+
+def month_ens_arm(*, day: int) -> str:
+    """Return the name of the ensemble-mean arm's month-sensitivity refit at one band.
+
+    Args:
+        day: The band's day.
+
+    Returns:
+        The arm name, such as `ens_mean_month_day1`.
+    """
+    return f"ens_mean_month_day{day}"
+
+
+def _with_month(*, features: tuple[str, ...]) -> tuple[str, ...]:
+    """Return `features` with `day_of_year` replaced by `MONTH_FEATURE`.
+
+    Args:
+        features: A feature tuple that includes `day_of_year`.
+
+    Returns:
+        The same tuple, `day_of_year` replaced by `MONTH_FEATURE`.
+    """
+    return tuple(MONTH_FEATURE if feature == "day_of_year" else feature for feature in features)
+
+
+RESULTS_DIR: Final[Path] = ENS_FORECAST_HORIZONS_DIR / "era_covered"
+"""Where every result file goes: the losses, predictions, leaderboard, intervals, and report.
+
+Each technology's `*_losses.parquet` is write-once: a refit of that technology raises if the file
+exists, and the two modes that replace losses move the old file, and the run's report, intervals and
+leaderboard, to a `superseded/` subfolder first. The input
+extract, `ens_members.parquet`, is in the shared ENS extract folder, and the results the published
+page quotes are in `ENS_FORECAST_HORIZONS_DIR`, so a run never overwrites them."""
+
+RUN_LEVEL_OUTPUTS: Final[tuple[str, ...]] = (
+    "report.md",
+    "intervals.parquet",
+    "leaderboard.parquet",
+)
+"""The files a whole run writes, which `--fit-missing` and `--fit-baselines` move to `superseded/`
+beside the losses they were computed from."""
+
+ROW_SET_FIRST_HOUR: Final[Mapping[DomainType, datetime | None]] = MappingProxyType(
+    {"solar": None, "wind": datetime(2024, 12, 1, tzinfo=UTC)}
+)
+"""The first valid hour each technology keeps; `None` keeps every row.
+
+**Wind keeps rows valid from 2024-12-01.** Those rows, at leads up to day 14, come from runs from
+17 November onwards, all on ECMWF's IFS Cycle 49r1 (live 2024-11-12), so no wind fit trains on a
+mixture of the two model cycles. The past-wind study found a step in ENS's and HRES's 10 m wind at
+that date. Solar keeps every row, because no step in solar has been measured."""
+
+ROW_SET_FOLD_OFFSETS: Final[Mapping[DomainType, Mapping[int, int]]] = MappingProxyType(
+    {
+        "solar": MappingProxyType({0: 0, 1: 3}),
+        "wind": MappingProxyType({0: 0, 1: 2}),
+    }
+)
+"""How far each UKV era's fold numbers are rotated, modulo `studies.cross_validation.N_FOLDS`.
+
+**Each technology's offsets were found on its own row set, and no other.** Wind's `{0: 0, 1: 2}` was
+found on the wind rows valid from `ROW_SET_FIRST_HOUR["wind"]`: of the rotations of era 1, only 2
+and 3 cover every calendar month that a fold design can cover, and 2 is the smaller. Solar's
+`{0: 0, 1: 3}` was found by `studies.cross_validation.search_fold_offsets` on all 50,643 solar
+rows: with no rotation, 2 (site, fold, calendar month) cells holding 685 hours have no training
+row, rotations of 1 and 2 leave cells uncovered, and only 3 and 4 cover every cell; 3 is the
+smaller. The offsets of
+`ens_hres_past_wind` belong to a different row set. A changed row set can leave a cell uncovered,
+so `_complete` raises before any fit if one does."""
+
+SPAN: Final[tuple[datetime, datetime]] = (
+    datetime(2024, 3, 25, tzinfo=UTC),
+    datetime(2026, 10, 15, tzinfo=UTC),
+)
+"""The hours the clear-sky table covers, enough for every band of every run in the extract."""
+
+
+def ens_arm(*, way: str, day: int) -> str:
+    """Return the name of one way's arm at one band.
+
+    Args:
+        way: One of `WAYS`, `APPLIED`, or `mean6` for the 6-hourly emulation.
+        day: The band's day.
+
+    Returns:
+        The arm name, such as `ens_mean_day1`.
+    """
+    return f"ens_{way}_day{day}"
+
+
+def upsampling_arm(*, method: str, day: int) -> str:
+    """Return the name of one upsampling combination's ensemble-mean arm at one band.
+
+    Args:
+        method: A key of `COMBINATIONS`, or `native`.
+        day: The band's day.
+
+    Returns:
+        The arm name, such as `up_linear_day1`.
+    """
+    return f"up_{method}_day{day}"
+
+
+def baseline_arm(*, name: str, day: int) -> str:
+    """Return the name of one baseline at one band.
+
+    Args:
+        name: One of `BASELINES`.
+        day: The band's day.
+
+    Returns:
+        The arm name, such as `persistence_day1`.
+    """
+    return f"{name}_day{day}"
+
+
+# --- ENS on its native steps ------------------------------------------------------------------
+
+
+def _step_width(lead: int, fine_step_last_lead: int = FINE_STEP_LAST_LEAD) -> int:
+    """Return the width in hours of the radiation step ending at `lead`.
+
+    Args:
+        lead: The step's lead.
+        fine_step_last_lead: The last lead on 3-hour steps. ENS's is 144; GEFS's is 240.
+
+    Returns:
+        3 to `fine_step_last_lead` and 6 beyond it.
+    """
+    return 3 if lead <= fine_step_last_lead else 6
+
+
+def members(*, sites: list[str], source: Path = OUTPUT_PATH) -> pl.DataFrame:
+    """Read one ensemble's extract for some generators.
+
+    Args:
+        sites: The generator labels.
+        source: The extract's parquet path. Defaults to ENS's `OUTPUT_PATH`; a caller reading a
+            different ensemble (GEFS, say) passes its own extract's path.
+
+    Returns:
+        One row per generator, run, valid time and member.
+    """
+    return pl.read_parquet(source).filter(pl.col("site").is_in(sites))
+
+
+def band_steps(
+    *,
+    members: pl.DataFrame,
+    day: int,
+    domain: DomainType,
+    six_hourly: bool = False,
+    ensemble_size: int = ENSEMBLE_SIZE,
+    fine_step_last_lead: int = FINE_STEP_LAST_LEAD,
+) -> Steps:
+    """Arrange one band's members as arrays over the band's native steps and a margin either side.
+
+    A (site, run) is dropped whole where any member lacks any step, so every run kept has all
+    `ensemble_size` members, in member order. With `six_hourly`,
+    `studies.resample.coarsen_to_six_hourly` keeps only the steps at multiples of 6 hours, each
+    pair of 3-hour radiation steps averaged into the 6-hour mean it makes up.
+
+    Args:
+        members: The extract, for one technology's generators.
+        day: The band's day.
+        domain: `solar` or `wind`, which decides the fields.
+        six_hourly: Whether to emulate 6-hourly steps.
+        ensemble_size: How many members a run must hold to be kept. ENS's 51 by default; a caller
+            building a different ensemble's steps (GEFS's 31) passes its own count.
+        fine_step_last_lead: The last lead on 3-hour steps, 144 for ENS and 240 for GEFS.
+
+    Returns:
+        The arrays.
+
+    Raises:
+        ValueError: If a kept run does not hold every member.
+    """
+    first, last = max(24 * day - 6, 0), 24 * day + 30
+    columns = (
+        ("ghi_w_m2", "temp_c")
+        if domain == "solar"
+        else ("speed_100m", "direction_100m", "speed_10m", "direction_10m")
+    )
+    rows = members.filter(pl.col("lead_hours").is_between(first, last))
+    if domain == "solar":
+        # Radiation is null at lead 0, where a period mean has no period to cover.
+        rows = rows.filter(pl.col("lead_hours") > 0)
+    leads = np.sort(rows["lead_hours"].unique().to_numpy())
+    wide = rows.pivot(
+        on="lead_hours",
+        index=["site", "init_time", "ensemble_member"],
+        values=list(columns),
+        sort_columns=True,
+    )
+    names = {column: [f"{column}_{lead}" for lead in leads] for column in columns}
+    complete = wide.drop_nulls([name for group in names.values() for name in group])
+    runs = (
+        complete.group_by("site", "init_time")
+        .len()
+        .filter(pl.col("len") == ensemble_size)
+        .select("site", "init_time")
+    )
+    kept = complete.join(runs, on=["site", "init_time"]).sort(
+        "site", "init_time", "ensemble_member"
+    )
+    expected_members = np.tile(np.arange(ensemble_size), kept.height // ensemble_size)
+    if not np.array_equal(kept["ensemble_member"].to_numpy(), expected_members):
+        msg = f"day {day}: a kept run does not hold members 0 to {ensemble_size - 1} in order"
+        raise ValueError(msg)
+    values = {column: kept.select(names[column]).to_numpy() for column in columns}
+    step_leads = leads.astype(np.float64)
+    widths = np.array(
+        [_step_width(int(lead), fine_step_last_lead=fine_step_last_lead) for lead in leads]
+    )
+    if six_hourly:
+        step_leads, values = coarsen_to_six_hourly(
+            leads=step_leads,
+            values=values,
+            period_means=frozenset({"ghi_w_m2"}) if domain == "solar" else frozenset(),
+            last_three_hourly_lead=fine_step_last_lead,
+        )
+        widths = np.full(len(step_leads), 6)
+    return Steps(
+        keys=kept.select("site", "init_time", "ensemble_member"),
+        leads=step_leads,
+        widths=widths,
+        values=values,
+        ensemble_size=ensemble_size,
+    )
+
+
+# --- Upsampling to hourly -----------------------------------------------------------------------
+
+
+def target_leads(*, day: int, domain: DomainType) -> np.ndarray:
+    """Return the leads of the hours one band scores.
+
+    Args:
+        day: The band's day.
+        domain: `solar` or `wind`.
+
+    Returns:
+        For solar, the end of every hour of the band's day, since a solar hour is labelled by its
+        end; for wind, the start of every hour, since a wind value is read at its label.
+    """
+    offset = 1 if domain == "solar" else 0
+    return np.arange(24 * day + offset, 24 * day + 24 + offset, dtype=np.float64)
+
+
+def upsampled_fields(
+    *, steps: Steps, day: int, domain: DomainType, clear_sky: pl.DataFrame
+) -> dict[str, dict[str, np.ndarray]]:
+    """Upsample every member of one band to hourly, every technique for every field.
+
+    A solar temperature is read at each hour's midpoint, where the hour's power is centred; a
+    solar radiation is a mean over the hour ending at its target; a wind is read at its target.
+
+    Args:
+        steps: The band's steps.
+        day: The band's day.
+        domain: `solar` or `wind`.
+        clear_sky: The hourly clear-sky table, read by the clear-sky-index techniques.
+
+    Returns:
+        Per field of `COMBINATIONS`, per technique, the hourly values, shape (n_series, n_targets);
+        wind's `direction` holds degrees.
+    """
+    targets = target_leads(day=day, domain=domain)
+    x = steps.leads
+    if domain == "solar":
+        temp, ghi = steps.values["temp_c"], steps.values["ghi_w_m2"]
+        step_clear_sky, target_clear_sky = clear_sky_arrays(
+            steps=steps, targets=targets, clear_sky=clear_sky
+        )
+        midpoints = x - steps.widths / 2.0
+        clear = clear_sky_index_resample(
+            values=ghi,
+            step_clear_sky=step_clear_sky,
+            step_midpoints=midpoints,
+            morning=np.mod(midpoints, 24.0) < 12.0,
+            target_clear_sky=target_clear_sky,
+            target_midpoints=targets - 0.5,
+            daylight_floor_w_m2=DEFAULT_DAYLIGHT_FLOOR_W_M2,
+        )
+        inside = (x > targets[0] - 1) & (x <= targets[-1])
+        return {
+            "ghi": {
+                "linear": interpolate_linear(values=ghi, x=x, targets=targets),
+                "clear_sky": clear,
+                "clear_sky_conserving": rescale_to_step_means(
+                    values=clear,
+                    target_leads=targets,
+                    step_values=ghi[:, inside],
+                    step_leads=x[inside],
+                    step_widths=steps.widths[inside],
+                ),
+            },
+            "temp": {
+                "linear": interpolate_linear(values=temp, x=x, targets=targets - 0.5),
+                "pchip": interpolate_pchip(values=temp, x=x, targets=targets - 0.5),
+            },
+        }
+    out: dict[str, dict[str, np.ndarray]] = {}
+    for height in ("100m", "10m"):
+        speed = steps.values[f"speed_{height}"]
+        direction = steps.values[f"direction_{height}"]
+        u, v = wind_components(speed=speed, direction_deg=direction)
+        vector_speed, vector_direction = wind_polar(
+            u=interpolate_linear(values=u, x=x, targets=targets),
+            v=interpolate_linear(values=v, x=x, targets=targets),
+        )
+        out[f"speed_{height}"] = {
+            "linear": interpolate_linear(values=speed, x=x, targets=targets),
+            "components": vector_speed,
+        }
+        out[f"direction_{height}"] = {
+            "linear": interpolate_linear(values=direction, x=x, targets=targets),
+            "components": vector_direction,
+        }
+    return out
+
+
+def combine(
+    *,
+    steps: Steps,
+    upsampled: dict[str, dict[str, np.ndarray]],
+    day: int,
+    domain: DomainType,
+    method: MethodType,
+) -> pl.DataFrame:
+    """Assemble one combination's hourly fields for every member of one band.
+
+    Args:
+        steps: The band's steps.
+        upsampled: The output of `upsampled_fields`.
+        day: The band's day.
+        domain: `solar` or `wind`.
+        method: A key of `COMBINATIONS[domain]`.
+
+    Returns:
+        One row per (site, time, member), with `init_time` and `fields(domain=domain)`.
+    """
+    choice = COMBINATIONS[domain][method]
+    if domain == "solar":
+        out = {"ghi": upsampled["ghi"][choice["ghi"]], "temp": upsampled["temp"][choice["temp"]]}
+    else:
+        direction = np.radians(upsampled["direction_100m"][choice["direction"]])
+        out = {
+            "speed_100m": upsampled["speed_100m"][choice["speed"]],
+            "sin_100m": np.sin(direction),
+            "cos_100m": np.cos(direction),
+            "speed_10m": upsampled["speed_10m"][choice["speed"]],
+        }
+    return long_frame(steps=steps, targets=target_leads(day=day, domain=domain), values=out)
+
+
+def native(*, steps: Steps, day: int, domain: DomainType) -> pl.DataFrame:
+    """Return every member at its own steps inside the band's day, as the native technique reads.
+
+    Only the steps the band's own day holds are kept: for solar the steps ending after lead 24d and
+    at or before 24d + 24, for wind the stamps at 24d up to but not including 24d + 24. The margins
+    either side belong to the neighbouring bands' days and would put two runs on one hour.
+
+    Args:
+        steps: The band's steps.
+        day: The band's day.
+        domain: `solar` or `wind`.
+
+    Returns:
+        One row per (site, step end, member), with `init_time` and `fields(domain=domain)`.
+    """
+    if domain == "solar":
+        own = (steps.leads > 24 * day) & (steps.leads <= 24 * day + 24)
+        out = {"ghi": steps.values["ghi_w_m2"][:, own], "temp": steps.values["temp_c"][:, own]}
+    else:
+        own = (steps.leads >= 24 * day) & (steps.leads < 24 * day + 24)
+        radians = np.radians(steps.values["direction_100m"][:, own])
+        out = {
+            "speed_100m": steps.values["speed_100m"][:, own],
+            "sin_100m": np.sin(radians),
+            "cos_100m": np.cos(radians),
+            "speed_10m": steps.values["speed_10m"][:, own],
+        }
+    return long_frame(steps=steps, targets=steps.leads[own], values=out)
+
+
+# --- The rows -----------------------------------------------------------------------------------
+
+
+@dataclass
+class Inputs:
+    """Everything one technology's fits read."""
+
+    frame: pl.DataFrame
+    """The hourly rows every arm scores, with every non-member arm's columns and every baseline."""
+    members: dict[int, pl.DataFrame]
+    """Per band, one row per (site, time, member) with the chosen technique's fields."""
+    native: dict[int, pl.DataFrame]
+    """Per deciding band, the native technique's own rows with its columns."""
+    inputs: pl.DataFrame
+    """The ensemble mean at every band under every technique, for the charts."""
+
+
+def _hourly_power(*, domain: DomainType) -> pl.DataFrame:
+    """Return NGED's hourly power as published, on each technology's hour convention.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        One row per (site, time) with `power_mw`.
+    """
+    if domain == "solar":
+        return solar_hourly_power(sites=pv_sites()).select("site", "time", "power_mw")
+    return wind_hourly_power(sites=wind_sites()).select("site", "time", "power_mw")
+
+
+def base_frame(*, domain: DomainType) -> pl.DataFrame:
+    """Return the past-weather study's hourly rows, with the references' columns.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        The rows, from the first run's first scored day onwards.
+    """
+    frame = solar_frame() if domain == "solar" else wind_frame()
+    return frame.filter(pl.col("time") > SPAN[0] + timedelta(days=1))
+
+
+def site_roster(*, domain: DomainType) -> pl.DataFrame:
+    """Return one technology's site roster, with its coordinates, for a nearest-cell match.
+
+    A caller matching a gridded product's cells to each site (`studies.grid_sampling`, say) needs
+    the roster's `latitude` and `longitude`; nothing about this function prints them, and neither
+    should a caller.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        One row per site with `site`, `latitude` and `longitude`.
+    """
+    roster = pv_sites() if domain == "solar" else wind_sites()
+    return roster.select("site", "latitude", "longitude")
+
+
+def _day_start(*, domain: DomainType) -> pl.Expr:
+    """Return midnight UTC at the start of each row's day.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        The day a solar hour's midpoint falls on, or the day a wind instant falls on.
+    """
+    time = pl.col("time") - pl.duration(minutes=30) if domain == "solar" else pl.col("time")
+    return time.dt.truncate("1d")
+
+
+def with_baselines(*, frame: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
+    """Add every band-dependent baseline's forecast input.
+
+    Args:
+        frame: The rows.
+        domain: `solar` or `wind`.
+
+    Returns:
+        `frame` with `persistence_day<d>`, `diurnal_persistence_day<d>`, and for solar
+        `clear_sky_index_day<d>` for every band, and `clear_sky_w_m2` for solar.
+    """
+    hourly = _hourly_power(domain=domain).filter(pl.col("time") >= SPAN[0] - timedelta(days=8))
+    lag = timedelta(0) if domain == "solar" else timedelta(minutes=30)
+    columns = []
+    grid = None
+    if domain == "solar":
+        clear_sky = hourly_clear_sky(
+            sites=pv_sites(), first=SPAN[0] - timedelta(days=2), last=SPAN[1]
+        )
+        grid = hourly_grid(hourly=hourly).join(clear_sky, on=["site", "time"], how="inner")
+        frame = frame.join(clear_sky, on=["site", "time"], how="left")
+    for day in BAND_DAYS:
+        keys = frame.select(
+            "site", "time", issue_time=issue_time(day_start=_day_start(domain=domain), day=day)
+        )
+        columns.append(
+            persistence(keys=keys, hourly=hourly, observed_lag=lag).alias(
+                baseline_arm(name="persistence", day=day)
+            )
+        )
+        columns.append(
+            diurnal_persistence(keys=keys, hourly=hourly, day=day).alias(
+                baseline_arm(name="diurnal_persistence", day=day)
+            )
+        )
+        if grid is not None:
+            columns.append(
+                clear_sky_index(keys=keys, hourly=grid).alias(f"clear_sky_index_day{day}")
+            )
+    return frame.with_columns(columns)
+
+
+def clear_sky_table(*, domain: DomainType) -> pl.DataFrame:
+    """Return the hourly clear-sky table the solar resample reads, or an empty frame for wind.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        `hourly_clear_sky` over `SPAN` at the solar generators.
+    """
+    if domain == "wind":
+        return pl.DataFrame()
+    return hourly_clear_sky(sites=pv_sites(), first=SPAN[0], last=SPAN[1])
+
+
+def build_inputs(*, domain: DomainType) -> Inputs:
+    """Build one technology's rows, and every combination's ensemble mean at every band.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        The inputs, with every combination's ensemble-mean columns on the rows every arm and
+        baseline can score, the native technique's own rows, and no member rows yet.
+    """
+    frame = with_baselines(frame=base_frame(domain=domain), domain=domain)
+    extract = members(sites=sorted(frame["site"].unique().to_list()))
+    clear_sky = clear_sky_table(domain=domain)
+    native_rows: dict[int, pl.DataFrame] = {}
+    chart_inputs = []
+    for day in BAND_DAYS:
+        steps = band_steps(members=extract, day=day, domain=domain)
+        upsampled = upsampled_fields(steps=steps, day=day, domain=domain, clear_sky=clear_sky)
+        for method in COMBINATIONS[domain]:
+            mean = reduce_members(
+                hourly=combine(
+                    steps=steps, upsampled=upsampled, day=day, domain=domain, method=method
+                ),
+                domain=domain,
+                way="mean",
+            )
+            frame = frame.join(
+                prefixed(frame=mean, arm=upsampling_arm(method=method, day=day), domain=domain),
+                on=["site", "time"],
+                how="left",
+            )
+            chart_inputs.append(mean.with_columns(day=pl.lit(day), method=pl.lit(method)))
+        native_mean = reduce_members(
+            hourly=native(steps=steps, day=day, domain=domain), domain=domain, way="mean"
+        )
+        chart_inputs.append(native_mean.with_columns(day=pl.lit(day), method=pl.lit("native")))
+        native_rows[day] = native_mean
+        _LOG.info(
+            "%s day %d: %d runs upsampled", domain, day, steps.keys.height // steps.ensemble_size
+        )
+    required = [
+        column
+        for day in BAND_DAYS
+        for method in COMBINATIONS[domain]
+        for column in ens_columns(arm=upsampling_arm(method=method, day=day), domain=domain)
+    ]
+    required += [baseline_arm(name=name, day=day) for day in BAND_DAYS for name in BASELINES[:2]]
+    if domain == "solar":
+        required += [f"clear_sky_index_day{day}" for day in BAND_DAYS] + ["clear_sky_w_m2"]
+    return Inputs(
+        frame=_complete(frame=frame, columns=required, domain=domain),
+        members={},
+        native=native_rows,
+        inputs=pl.concat(chart_inputs, how="diagonal"),
+    )
+
+
+def _complete(*, frame: pl.DataFrame, columns: list[str], domain: DomainType) -> pl.DataFrame:
+    """Keep the rows every arm can score, and cut the folds afresh on them.
+
+    Args:
+        frame: The rows, with every arm's columns.
+        columns: Every arm's and baseline's own input columns.
+        domain: `solar` or `wind`.
+
+    Returns:
+        The rows valid from `ROW_SET_FIRST_HOUR[domain]` with no null in `columns`, with `era`,
+        `era_code` and `fold` recomputed, the era-1 folds rotated by `ROW_SET_FOLD_OFFSETS[domain]`.
+
+    Raises:
+        ValueError: If a calendar month is held out with no training row for it.
+    """
+    first_hour = ROW_SET_FIRST_HOUR[domain]
+    within = frame if first_hour is None else frame.filter(pl.col("time") >= first_hour)
+    kept = within.drop_nulls(columns).drop("era", "era_code", "fold").sort("site", "time")
+    _LOG.info("kept %d of %d rows with every arm's input", kept.height, frame.height)
+    cut = rotate_folds(frame=with_eras(frame=kept), fold_offsets=ROW_SET_FOLD_OFFSETS[domain])
+    raise_on_uncovered_months(coverage=calendar_month_coverage(frame=cut))
+    return cut.with_columns(month_of_year=pl.col("time").dt.month())
+
+
+# --- Fitting -----------------------------------------------------------------------------------
+
+
+def reference_features(*, domain: Domain) -> dict[str, tuple[str, ...]]:
+    """Return each reference arm's feature columns, as its past-weather study showed them.
+
+    Args:
+        domain: The domain.
+
+    Returns:
+        Arm name to feature columns.
+    """
+    return {
+        "era5": (*domain.shared_features, *domain.columns("era5")),
+        "live_gb_rich_xgb": (
+            *domain.shared_features,
+            *domain.rich_columns("ukv"),
+            *domain.rich_columns("icon_eu"),
+        ),
+    }
+
+
+def _stacked(
+    *, frame: pl.DataFrame, members: pl.DataFrame, arm: str, domain: Domain
+) -> pl.DataFrame:
+    """Stack every member's fields under the row they belong to, renamed to one arm's columns.
+
+    Args:
+        frame: The rows.
+        members: One row per (site, time, member) with the fields.
+        arm: The arm whose column names the fields take.
+        domain: The domain.
+
+    Returns:
+        One row per (site, time, member), with the fit loop's columns.
+    """
+    columns = ens_columns(arm=arm, domain=domain.name)
+    carried = ["site", "time", "month", "fold", "cap_mw", "constrained", "effective_capacity_mw"]
+    carried += ["power_mw", *shared_features(domain=domain)]
+    return (
+        frame.select(carried)
+        .join(
+            members.drop("init_time").rename(
+                dict(zip(fields(domain=domain.name), columns, strict=True))
+            ),
+            on=["site", "time"],
+        )
+        .sort("site", "time", "member")
+    )
+
+
+def _member_losses(
+    *, frame: pl.DataFrame, summary: pl.DataFrame, day: int, setting: str, ways: dict[str, str]
+) -> pl.DataFrame:
+    """Score the reductions of the member forecasts as arms.
+
+    Args:
+        frame: The rows.
+        summary: The output of `studies.cross_validation.summarise_member_forecasts`.
+        day: The band's day.
+        setting: The setting's name.
+        ways: Each arm's way, mapped to the summary column it is scored on.
+
+    Returns:
+        The arms' losses.
+
+    Raises:
+        ValueError: If a row's forecast does not rest on every member.
+    """
+    if not (summary["members"] == ENSEMBLE_SIZE).all():
+        msg = f"day {day}: a row's forecast does not rest on {ENSEMBLE_SIZE} members"
+        raise ValueError(msg)
+    return pl.concat(
+        [
+            losses_from_prediction(
+                frame=frame,
+                prediction=summary.select("site", "time", "seed", prediction=reduction),
+                arm=ens_arm(way=way, day=day),
+                setting=setting,
+            )
+            for way, reduction in ways.items()
+        ]
+    )
+
+
+def _fit_members(
+    *, frame: pl.DataFrame, members: pl.DataFrame, day: int, domain: Domain, setting: SettingType
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Fit one band's member-by-member arm and score the mean and the median of its forecasts.
+
+    `studies.cross_validation.out_of_fold_member_forecasts` fits one model per generator on every
+    member's rows, each weighted 1/51, with the folds cut by time so that no member of a scored
+    month is trained on.
+
+    Args:
+        frame: The rows.
+        members: One row per (site, time, member) with the chosen combination's fields.
+        day: The band's day.
+        domain: The domain.
+        setting: The hyperparameter setting.
+
+    Returns:
+        The losses of the mean and median arms, and the summary of the 51 forecasts per row and
+        seed.
+    """
+    arm = ens_arm(way="members", day=day)
+    stacked = _stacked(frame=frame, members=members, arm=arm, domain=domain)
+    features = [*shared_features(domain=domain), *ens_columns(arm=arm, domain=domain.name)]
+
+    def _one(site: str) -> pl.DataFrame:
+        return summarise_member_forecasts(
+            forecasts=out_of_fold_member_forecasts(
+                site_rows=stacked.filter(pl.col("site") == site),
+                features=features,
+                target="power_mw",
+                hyper_parameters=SETTINGS[setting],
+            )
+        )
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_FITS) as pool:
+        summary = pl.concat(list(pool.map(_one, sorted(frame["site"].unique().to_list()))))
+    losses = _member_losses(
+        frame=frame,
+        summary=summary,
+        day=day,
+        setting=setting,
+        ways={"members": "mean", "members_median": "median"},
+    )
+    return losses, summary.with_columns(arm=pl.lit(arm), setting=pl.lit(setting))
+
+
+def _fit_mean_applied(
+    *, frame: pl.DataFrame, members: pl.DataFrame, day: int, domain: Domain
+) -> pl.DataFrame:
+    """Fit the exploratory arm: a model trained on the ensemble mean, applied to each member.
+
+    Args:
+        frame: The rows, with the band's ensemble-mean columns.
+        members: One row per (site, time, member) with the chosen combination's fields.
+        day: The band's day.
+        domain: The domain.
+
+    Returns:
+        The arm's losses at the primary setting, scored on the mean of the 51 forecasts.
+    """
+    mean_arm = ens_arm(way="mean", day=day)
+    stacked = _stacked(frame=frame, members=members, arm=mean_arm, domain=domain)
+    features = [*shared_features(domain=domain), *ens_columns(arm=mean_arm, domain=domain.name)]
+
+    def _one(site: str) -> pl.DataFrame:
+        return summarise_member_forecasts(
+            forecasts=out_of_fold_forecasts_for_members(
+                site_rows=frame.filter(pl.col("site") == site),
+                member_rows=stacked.filter(pl.col("site") == site),
+                features=features,
+                target="power_mw",
+                hyper_parameters=SETTINGS["pooled"],
+            )
+        )
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_FITS) as pool:
+        summary = pl.concat(list(pool.map(_one, sorted(frame["site"].unique().to_list()))))
+    return _member_losses(
+        frame=frame, summary=summary, day=day, setting="pooled", ways={APPLIED: "mean"}
+    )
+
+
+def losses_from_prediction(
+    *, frame: pl.DataFrame, prediction: pl.DataFrame, arm: str, setting: str
+) -> pl.DataFrame:
+    """Score a prediction per (site, time, seed) with `studies.cross_validation.score_prediction`.
+
+    Args:
+        frame: The rows, with `power_mw`, `cap_mw`, and the fold and month labels.
+        prediction: `site`, `time`, `seed`, and `prediction` in MW.
+        arm: The arm's name.
+        setting: The setting's name.
+
+    Returns:
+        One row per (site, time, seed), labelled with the arm and the setting.
+    """
+    return score_prediction(rows=frame, prediction=prediction, target="power_mw").with_columns(
+        arm=pl.lit(arm), setting=pl.lit(setting), target=pl.lit("power_mw")
+    )
+
+
+def _baseline_losses(
+    *, frame: pl.DataFrame, domain: DomainType
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Score every baseline at both settings, the same forecast for every seed.
+
+    A baseline has no fitting seed, so its forecast is repeated for each of `SEEDS`, which lets the
+    paired bootstrap pair it with a fitted arm seed by seed. It has no hyperparameters either, so
+    the same losses stand under the primary and the second setting.
+
+    Args:
+        frame: The rows, with each baseline's input columns.
+        domain: `solar` or `wind`.
+
+    Returns:
+        Every baseline's losses, and the wind smart persistence's fitted weights.
+    """
+    frame = frame.with_columns(climatology=climatology(frame=frame))
+    forecasts = {"climatology": pl.col("climatology")}
+    weights = []
+    for day in BAND_DAYS:
+        for name in ("persistence", "diurnal_persistence"):
+            forecasts[baseline_arm(name=name, day=day)] = pl.col(baseline_arm(name=name, day=day))
+        smart = baseline_arm(name="smart_persistence", day=day)
+        if domain == "solar":
+            forecasts[smart] = pl.col(f"clear_sky_index_day{day}") * pl.col("clear_sky_w_m2")
+        else:
+            shrunk = shrunk_persistence(
+                frame=frame, persisted=baseline_arm(name="persistence", day=day)
+            )
+            frame = frame.with_columns(shrunk["shrunk"].alias(smart))
+            forecasts[smart] = pl.col(smart)
+            weights.append(
+                frame.select("site", "fold")
+                .with_columns(weight=shrunk["weight"], day=pl.lit(day))
+                .unique()
+            )
+    seeds = pl.DataFrame({"seed": list(SEEDS)}, schema={"seed": pl.Int32})
+    losses = [
+        losses_from_prediction(
+            frame=frame,
+            prediction=frame.select("site", "time", prediction=expression).join(seeds, how="cross"),
+            arm=arm,
+            setting=setting,
+        )
+        for arm, expression in forecasts.items()
+        for setting in ("pooled", "sensitivity")
+    ]
+    return pl.concat(losses), (pl.concat(weights) if weights else pl.DataFrame())
+
+
+def _daylight(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Return, for every hour of every solar generator's span, whether its sun is up.
+
+    The rule is `build_dataset`'s: the sun above the horizon at the hour's midpoint.
+
+    Args:
+        frame: The solar rows, for the generators and their span.
+
+    Returns:
+        One row per (site, time), with `daylight`.
+    """
+    sites = pv_sites().filter(pl.col("site").is_in(frame["site"].unique().to_list()))
+    hours = pl.datetime_range(SPAN[0], SPAN[1], interval="1h", eager=True, time_zone="UTC")
+    parts = []
+    for site, latitude, longitude in sites.select("site", "latitude", "longitude").iter_rows():
+        angle = zenith(stamps=hours.dt.offset_by("-30m"), latitude=latitude, longitude=longitude)
+        parts.append(pl.DataFrame({"site": site, "time": hours, "daylight": angle < 90.0}))
+    return pl.concat(parts)
+
+
+def _native_solar_rows(*, frame: pl.DataFrame, day: int) -> pl.DataFrame:
+    """Average the solar rows up to ENS's own steps, as the native technique scores them.
+
+    A step's power is the mean over every hour of the step, as ENS's step radiation is: each
+    daylight hour's measured power and zero for each hour with the sun below the horizon. A step
+    with any daylight hour missing from the scored rows, or with no daylight hour, is dropped. The
+    sun position, the hour of day, and the extraterrestrial flux are the means over the step's
+    daylight hours.
+
+    Args:
+        frame: The solar rows.
+        day: The band's day.
+
+    Returns:
+        One row per (site, step end), with the fit loop's columns.
+    """
+    width = _step_width(24 * day + 24)
+    step_end = pl.col("time").dt.truncate(f"{width}h")
+    step_end = (
+        pl.when(step_end == pl.col("time"))
+        .then(step_end)
+        .otherwise(step_end + pl.duration(hours=width))
+    )
+    hours = _daylight(frame=frame).join(
+        frame.select(
+            "site",
+            "time",
+            "power_mw",
+            "solar_zenith_deg",
+            "solar_azimuth_deg",
+            "extraterrestrial_horizontal_w_m2",
+            "cap_mw",
+            "constrained",
+            "effective_capacity_mw",
+            "era_code",
+            scored=pl.lit(value=True),
+        ),
+        on=["site", "time"],
+        how="left",
+    )
+    daylit = pl.col("daylight")
+    return (
+        hours.with_columns(step=step_end)
+        .group_by("site", "step")
+        .agg(
+            hours=pl.len(),
+            daylight_hours=daylit.sum(),
+            scored_daylight=(daylit & pl.col("scored").fill_null(value=False)).sum(),
+            power_mw=pl.when(daylit).then(pl.col("power_mw")).otherwise(0.0).sum() / width,
+            solar_zenith_deg=pl.col("solar_zenith_deg").mean(),
+            solar_azimuth_deg=pl.col("solar_azimuth_deg").mean(),
+            extraterrestrial_horizontal_w_m2=pl.col("extraterrestrial_horizontal_w_m2").mean(),
+            cap_mw=pl.col("cap_mw").mean(),
+            constrained=pl.col("constrained").any(),
+            effective_capacity_mw=pl.col("effective_capacity_mw").drop_nulls().first(),
+            era_code=pl.col("era_code").drop_nulls().first(),
+        )
+        .filter(
+            (pl.col("hours") == width)
+            & (pl.col("daylight_hours") > 0)
+            & (pl.col("scored_daylight") == pl.col("daylight_hours"))
+        )
+        .rename({"step": "time"})
+        .with_columns(
+            hour_of_day=pl.col("time").dt.hour(),
+            day_of_year=pl.col("time").dt.ordinal_day(),
+            month=pl.col("time").dt.strftime("%Y-%m"),
+        )
+        .drop("hours", "daylight_hours", "scored_daylight")
+    )
+
+
+def coverage_counts(*, coverage: pl.DataFrame) -> dict[str, int]:
+    """Count the uncovered cells of a fold cut, split by whether any fold design could cover them.
+
+    Args:
+        coverage: `calendar_month_coverage`'s result.
+
+    Returns:
+        `avoidable_cells`: cells that hold out a calendar month occurring in two or more years and
+        leave no training row for it, which `raise_on_uncovered_months` rejects. `single_year_cells`
+        and `single_year_rows`: the cells, and the scored rows in them, that hold out a calendar
+        month occurring in only one year, so no other row of the site carries that calendar month.
+        No fold design can cover those.
+    """
+    single_year = coverage.filter(~pl.col("covered"), pl.col("n_years") == 1)
+    return {
+        "avoidable_cells": uncovered_months(coverage=coverage).height,
+        "single_year_cells": single_year.height,
+        "single_year_rows": int(single_year["n_scored"].sum()),
+    }
+
+
+def _native_losses(*, inputs: Inputs, domain: Domain) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Fit the native technique's ensemble-mean arm at every band, on its own rows.
+
+    For solar, each row is one ENS step at one generator (`_native_solar_rows`). For wind, each row
+    is a scored hour at one of the band's ENS stamps. Each row takes the fold that the main frame
+    gives its (site, month), so this cut cannot drift from the main one.
+
+    Args:
+        inputs: The technology's inputs.
+        domain: The domain.
+
+    Returns:
+        The losses, and one row per band with `day` and the `coverage_counts` of that band's native
+        rows.
+
+    Raises:
+        ValueError: If a native row's (site, month) is missing from the main frame, or if the folds
+            leave a calendar month that occurs in two or more years uncovered.
+    """
+    main_folds = inputs.frame.select("site", "month", "fold").unique()
+    if main_folds.select("site", "month").n_unique() != main_folds.height:
+        msg = "the main frame gives a (site, month) more than one fold"
+        raise ValueError(msg)
+    outputs = []
+    counts = []
+    for day, mean in inputs.native.items():
+        arm = upsampling_arm(method="native", day=day)
+        columns = ens_columns(arm=arm, domain=domain.name)
+        if domain.name == "solar":
+            rows = _native_solar_rows(frame=inputs.frame, day=day)
+        else:
+            width = _step_width(24 * day + 24)
+            rows = inputs.frame.filter(pl.col("time").dt.hour() % width == 0)
+        joined = (
+            rows.join(prefixed(frame=mean, arm=arm, domain=domain.name), on=["site", "time"])
+            .drop("fold", "era", strict=False)
+            .sort("site", "time")
+        )
+        rows = joined.join(
+            main_folds, on=["site", "month"], how="left", validate="m:1", maintain_order="left"
+        )
+        if rows.height != joined.height or rows["fold"].null_count():
+            msg = (
+                f"day {day}: {rows['fold'].null_count()} native rows have no main-frame fold, "
+                f"or the fold join changed the row count from {joined.height} to {rows.height}"
+            )
+            raise ValueError(msg)
+        coverage = calendar_month_coverage(frame=rows)
+        raise_on_uncovered_months(coverage=coverage)
+        counts.append({"day": day, **coverage_counts(coverage=coverage)})
+        job: Job = (
+            arm,
+            "pooled",
+            "power_mw",
+            (*shared_features(domain=domain), *columns),
+            PRIMARY_HYPER_PARAMETERS,
+            False,
+        )
+        outputs.append(run_all(dataset=rows, jobs=[job]))
+    return pl.concat(outputs, how="diagonal"), pl.DataFrame(counts)
+
+
+class Decision(NamedTuple):
+    """One step of the choosing rule: a candidate combination and the one it was judged against."""
+
+    candidate: str
+    against: str
+    changes: dict[int, float]
+    adopted: bool
+
+
+def _combination_name(*, domain: DomainType, choice: dict[str, TechniqueType]) -> str:
+    """Return the name of the combination that makes these choices.
+
+    Args:
+        domain: `solar` or `wind`.
+        choice: Each field's technique.
+
+    Returns:
+        The key of `COMBINATIONS[domain]` whose techniques equal `choice`.
+    """
+    return next(name for name, techniques in COMBINATIONS[domain].items() if techniques == choice)
+
+
+def choose_method(*, losses: pl.DataFrame, domain: DomainType) -> tuple[MethodType, list[Decision]]:
+    """Apply the rule the module docstring states, one change at a time.
+
+    Starting from `linear`, each candidate is the combination chosen so far with exactly one of
+    `CHANGES[domain]` made, and it replaces the combination chosen so far only if its ensemble-mean
+    arm's error is lower at both of `DECIDING_DAYS`. A technique rejected once is never tried again
+    as part of a later candidate, because each later candidate starts from the chosen combination.
+
+    Args:
+        losses: The upsampling arms' losses at the primary setting.
+        domain: `solar` or `wind`.
+
+    Returns:
+        The chosen combination, and one decision per change tried.
+    """
+    chosen = "linear"
+    decisions = []
+    for field, technique in CHANGES[domain]:
+        candidate = _combination_name(
+            domain=domain, choice={**COMBINATIONS[domain][chosen], field: technique}
+        )
+        changes = {
+            day: _mae(losses=losses, arm=upsampling_arm(method=candidate, day=day))
+            - _mae(losses=losses, arm=upsampling_arm(method=chosen, day=day))
+            for day in DECIDING_DAYS
+        }
+        adopted = all(change < 0.0 for change in changes.values())
+        decisions.append(
+            Decision(candidate=candidate, against=chosen, changes=changes, adopted=adopted)
+        )
+        if adopted:
+            chosen = candidate
+    return chosen, decisions
+
+
+def _decision_lines(*, decisions: list[Decision]) -> list[str]:
+    """Render the choosing rule's decisions.
+
+    Args:
+        decisions: The output of `choose_method`.
+
+    Returns:
+        Markdown lines.
+    """
+    return [
+        f"- {decision.candidate} against {decision.against}: "
+        + ", ".join(f"day {day} {change:+.3f} pp" for day, change in decision.changes.items())
+        + (" — adopted." if decision.adopted else " — not adopted.")
+        for decision in decisions
+    ]
+
+
+def _mae(*, losses: pl.DataFrame, arm: str) -> float:
+    """Return one arm's mean error at the primary setting, in percentage points of capacity.
+
+    Args:
+        losses: Per-row losses.
+        arm: The arm.
+
+    Returns:
+        The mean of each row's capped error over its generator's capacity.
+    """
+    rows = losses.filter((pl.col("arm") == arm) & (pl.col("setting") == "pooled"))
+    return float(rows.select(pl.col(METRIC).mean()).item()) * PERCENTAGE_POINTS
+
+
+def main_frame(*, inputs: Inputs, method: MethodType, domain: DomainType) -> Inputs:
+    """Add the control, ensemble-mean, and 6-hourly-emulation arms under the chosen combination.
+
+    Args:
+        inputs: The technology's inputs.
+        method: The chosen combination.
+        domain: `solar` or `wind`.
+
+    Returns:
+        The inputs with every main arm's columns and, per band, every member's hourly fields under
+        the chosen combination, on the same rows.
+
+    Raises:
+        ValueError: If a main arm lacks an input on a row every combination covered.
+    """
+    frame = inputs.frame
+    keys = frame.select("site", "time")
+    extract = members(sites=sorted(frame["site"].unique().to_list()))
+    clear_sky = clear_sky_table(domain=domain)
+    member_rows: dict[int, pl.DataFrame] = {}
+    for day in BAND_DAYS:
+        steps = band_steps(members=extract, day=day, domain=domain)
+        hourly = combine(
+            steps=steps,
+            upsampled=upsampled_fields(steps=steps, day=day, domain=domain, clear_sky=clear_sky),
+            day=day,
+            domain=domain,
+            method=method,
+        )
+        for way in ("control", "mean"):
+            reduced = reduce_members(hourly=hourly, domain=domain, way=way)
+            frame = frame.join(
+                prefixed(frame=reduced, arm=ens_arm(way=way, day=day), domain=domain),
+                on=["site", "time"],
+                how="left",
+            )
+        member_rows[day] = hourly.join(keys, on=["site", "time"], how="semi")
+    emulated = band_steps(members=extract, day=EMULATED_DAY, domain=domain, six_hourly=True)
+    emulated_mean = reduce_members(
+        hourly=combine(
+            steps=emulated,
+            upsampled=upsampled_fields(
+                steps=emulated, day=EMULATED_DAY, domain=domain, clear_sky=clear_sky
+            ),
+            day=EMULATED_DAY,
+            domain=domain,
+            method=method,
+        ),
+        domain=domain,
+        way="mean",
+    )
+    frame = frame.join(
+        prefixed(frame=emulated_mean, arm=ens_arm(way="mean6", day=EMULATED_DAY), domain=domain),
+        on=["site", "time"],
+        how="left",
+    )
+    added = [
+        column
+        for day in BAND_DAYS
+        for way in ("control", "mean")
+        for column in ens_columns(arm=ens_arm(way=way, day=day), domain=domain)
+    ]
+    added += list(ens_columns(arm=ens_arm(way="mean6", day=EMULATED_DAY), domain=domain))
+    missing = frame.select(pl.any_horizontal(pl.col(added).is_null()).sum()).item()
+    if missing:
+        msg = f"{domain}: {missing} rows lack a main arm's input every combination covered"
+        raise ValueError(msg)
+    return Inputs(frame=frame, members=member_rows, native=inputs.native, inputs=inputs.inputs)
+
+
+def fitted_features(*, domain: Domain) -> dict[str, tuple[str, ...]]:
+    """Return every arm fitted by `run_all`, with its feature columns.
+
+    Args:
+        domain: The domain.
+
+    Returns:
+        Arm name to feature columns: each combination's, the control, and the ensemble-mean arm
+        at every band, the 6-hourly emulation, and the two references.
+    """
+    shared = shared_features(domain=domain)
+    arms = {}
+    for day in BAND_DAYS:
+        for method in COMBINATIONS[domain.name]:
+            arm = upsampling_arm(method=method, day=day)
+            arms[arm] = (*shared, *ens_columns(arm=arm, domain=domain.name))
+        for way in ("control", "mean"):
+            arm = ens_arm(way=way, day=day)
+            arms[arm] = (*shared, *ens_columns(arm=arm, domain=domain.name))
+    emulated = ens_arm(way="mean6", day=EMULATED_DAY)
+    arms[emulated] = (*shared, *ens_columns(arm=emulated, domain=domain.name))
+    return arms | reference_features(domain=domain) | calendar_features(domain=domain)
+
+
+def calendar_features(*, domain: Domain) -> dict[str, tuple[str, ...]]:
+    """Return the post hoc calendar-only and month-sensitivity arms, with their feature columns.
+
+    Args:
+        domain: The domain.
+
+    Returns:
+        `CALENDAR_ONLY` and `CALENDAR_ONLY_MONTH`'s features, and each band's
+        `month_ens_arm`'s features: the ensemble-mean arm's own features with `day_of_year`
+        replaced by `MONTH_FEATURE`.
+    """
+    shared = shared_features(domain=domain)
+    arms = {CALENDAR_ONLY: shared, CALENDAR_ONLY_MONTH: _with_month(features=shared)}
+    for day in BAND_DAYS:
+        mean_arm = ens_arm(way="mean", day=day)
+        mean_features = (*shared, *ens_columns(arm=mean_arm, domain=domain.name))
+        arms[month_ens_arm(day=day)] = _with_month(features=mean_features)
+    return arms
+
+
+def calendar_jobs(*, domain: Domain) -> list[Job]:
+    """Return the post hoc calendar-only and month-sensitivity fits, at the primary setting.
+
+    Args:
+        domain: The domain.
+
+    Returns:
+        The jobs `--fit-missing` runs, and a fresh full run runs alongside every other arm.
+    """
+    return [
+        (arm, "pooled", "power_mw", columns, SETTINGS["pooled"], False)
+        for arm, columns in calendar_features(domain=domain).items()
+    ]
+
+
+def jobs(*, domain: Domain) -> list[Job]:
+    """Return every `run_all` fit and the setting it runs at.
+
+    Every arm runs at the primary setting. The control, the ensemble mean, and the references run
+    at the second setting too, and the day-1 ensemble mean without row subsampling.
+
+    Args:
+        domain: The domain.
+
+    Returns:
+        The jobs.
+    """
+    features = fitted_features(domain=domain)
+    second = {ens_arm(way=way, day=day) for day in BAND_DAYS for way in ("control", "mean")}
+    second |= set(REFERENCES)
+    fits: list[Job] = [
+        (arm, "pooled", "power_mw", columns, SETTINGS["pooled"], False)
+        for arm, columns in features.items()
+    ]
+    fits += [
+        (arm, "sensitivity", "power_mw", features[arm], SETTINGS["sensitivity"], False)
+        for arm in features
+        if arm in second
+    ]
+    no_subsample = ens_arm(way="mean", day=NO_SUBSAMPLE_DAY)
+    fits.append(
+        (
+            no_subsample,
+            "no_subsample",
+            "power_mw",
+            features[no_subsample],
+            SETTINGS["no_subsample"],
+            False,
+        )
+    )
+    return fits
+
+
+# --- Intervals and the report ----------------------------------------------------------------
+
+
+def best_baselines(*, losses: pl.DataFrame) -> dict[int, str]:
+    """Return the baseline with the lowest error at each band, at the primary setting.
+
+    Args:
+        losses: Every arm's losses.
+
+    Returns:
+        Band to the best baseline's arm name, climatology included at every band.
+    """
+    return {
+        day: min(
+            ("climatology", *(baseline_arm(name=name, day=day) for name in BASELINES)),
+            key=lambda arm: _mae(losses=losses, arm=arm),
+        )
+        for day in BAND_DAYS
+    }
+
+
+Contrast = tuple[str, SettingType, str, str]
+"""(section, setting, treatment, reference)."""
+
+
+def _upsampling_contrasts(*, decisions: list[Decision]) -> list[Contrast]:
+    """Return each candidate against what it was judged against, and against linear, every band.
+
+    Args:
+        decisions: The output of `choose_method`.
+
+    Returns:
+        The contrasts.
+    """
+    wanted: list[Contrast] = []
+    for day in BAND_DAYS:
+        for decision in decisions:
+            arm = upsampling_arm(method=decision.candidate, day=day)
+            wanted += [
+                ("upsampling", "pooled", arm, upsampling_arm(method=reference, day=day))
+                for reference in dict.fromkeys((decision.against, "linear"))
+            ]
+    return wanted
+
+
+def _way_contrasts() -> list[Contrast]:
+    """Return every way against day 0, and the ways against each other at every band.
+
+    Returns:
+        The contrasts.
+    """
+    wanted: list[Contrast] = [
+        ("horizon", "pooled", ens_arm(way=way, day=day), ens_arm(way=way, day=0))
+        for way in WAYS
+        for day in BAND_DAYS[1:]
+    ]
+    wanted += [
+        ("horizon", "sensitivity", ens_arm(way="mean", day=day), ens_arm(way="mean", day=0))
+        for day in BAND_DAYS[1:]
+    ]
+    pairs = (("members", "mean"), ("mean", "control"), ("members", "control"))
+    pairs += (("members_median", "members"),)
+    wanted += [
+        ("ways", "pooled", ens_arm(way=treatment, day=day), ens_arm(way=reference, day=day))
+        for day in BAND_DAYS
+        for treatment, reference in pairs
+    ]
+    wanted += [
+        ("ways", "sensitivity", ens_arm(way="members", day=day), ens_arm(way="mean", day=day))
+        for day in MEMBER_SENSITIVITY_DAYS
+    ]
+    wanted.append(
+        (
+            "ways",
+            "no_subsample",
+            ens_arm(way="members", day=NO_SUBSAMPLE_DAY),
+            ens_arm(way="mean", day=NO_SUBSAMPLE_DAY),
+        )
+    )
+    wanted += [
+        ("trained on the mean", "pooled", ens_arm(way=APPLIED, day=day), ens_arm(way=way, day=day))
+        for day in BAND_DAYS
+        for way in ("mean", "members")
+    ]
+    return wanted
+
+
+def contrasts(*, decisions: list[Decision], best: dict[int, str]) -> list[Contrast]:
+    """Return every contrast the report prints, in the order it prints them.
+
+    Args:
+        decisions: The upsampling rule's decisions.
+        best: Each band's best baseline.
+
+    Returns:
+        The contrasts, each once, a planned contrast only in the planned section.
+    """
+    wanted: list[Contrast] = [
+        ("planned", setting, treatment, reference)
+        for setting in ("pooled", "sensitivity")
+        for treatment, reference in PLANNED
+    ]
+    wanted += _upsampling_contrasts(decisions=decisions) + _way_contrasts()
+    wanted += [
+        ("baselines", "pooled", ens_arm(way=way, day=day), reference)
+        for day in BAND_DAYS
+        for way in WAYS
+        for reference in dict.fromkeys((best[day], "climatology"))
+    ]
+    wanted += [
+        ("references", "pooled", ens_arm(way="mean", day=day), reference)
+        for day in (0, 1)
+        for reference in REFERENCES
+    ]
+    wanted += [
+        ("references", "pooled", "live_gb_rich_xgb", "era5"),
+        (
+            "step width",
+            "pooled",
+            ens_arm(way="mean6", day=EMULATED_DAY),
+            ens_arm(way="mean", day=EMULATED_DAY),
+        ),
+    ]
+    wanted += [
+        ("calendar", "pooled", ens_arm(way="mean", day=day), CALENDAR_ONLY) for day in BAND_DAYS
+    ]
+    wanted += [
+        ("calendar", "pooled", ens_arm(way="members", day=day), CALENDAR_ONLY) for day in BAND_DAYS
+    ]
+    wanted += [
+        ("calendar sensitivity", "pooled", month_ens_arm(day=day), ens_arm(way="mean", day=day))
+        for day in BAND_DAYS
+    ]
+    wanted.append(("calendar sensitivity", "pooled", CALENDAR_ONLY_MONTH, CALENDAR_ONLY))
+    wanted += [
+        ("calendar (month)", "pooled", month_ens_arm(day=day), CALENDAR_ONLY_MONTH)
+        for day in BAND_DAYS
+    ]
+    wanted += [
+        ("calendar (month)", "pooled", month_ens_arm(day=day), "climatology") for day in BAND_DAYS
+    ]
+    wanted += [
+        ("calendar (month)", "pooled", CALENDAR_ONLY, "climatology"),
+        ("calendar (month)", "pooled", CALENDAR_ONLY_MONTH, "climatology"),
+    ]
+    wanted.append(("references", "pooled", ens_arm(way="control", day=0), "era5"))
+    planned = {contrast[1:] for contrast in wanted if contrast[0] == "planned"}
+    unique: list[Contrast] = []
+    for contrast in wanted:
+        if contrast not in unique and (contrast[0] == "planned" or contrast[1:] not in planned):
+            unique.append(contrast)
+    return unique
+
+
+def _intervals(
+    *, losses: pl.DataFrame, domain: Domain, wanted: list[Contrast]
+) -> list[IntervalRecord]:
+    """Bootstrap every contrast.
+
+    Args:
+        losses: Every arm's losses, both settings.
+        domain: The domain.
+        wanted: The contrasts.
+
+    Returns:
+        One record per contrast.
+    """
+    by_setting = {setting: losses.filter(pl.col("setting") == setting) for setting in SETTINGS}
+
+    def _one(contrast: Contrast) -> IntervalRecord:
+        section, setting, treatment, reference = contrast
+        return contrast_interval(
+            losses=by_setting[setting].filter(pl.col("arm").is_in([treatment, reference])),
+            contrast=(treatment, reference),
+            domain=domain,
+            setting=setting,
+            section=section,
+        )
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_FITS) as pool:
+        return list(pool.map(_one, wanted))
+
+
+def _leaderboard(*, losses: pl.DataFrame, domain: DomainType) -> list[dict[str, object]]:
+    """Bootstrap every arm's own error, at every setting it was scored at.
+
+    Args:
+        losses: Every arm's losses.
+        domain: `solar` or `wind`.
+
+    Returns:
+        One record per arm and setting.
+    """
+    groups = sorted(losses.partition_by("setting", "arm", as_dict=True).items())
+
+    def _one(item: tuple[tuple[object, ...], pl.DataFrame]) -> dict[str, object]:
+        (setting, arm), scoped = item
+        interval = bootstrap_absolute(losses=scoped, arm=str(arm), metric=METRIC)
+        return {
+            "domain": domain,
+            "setting": setting,
+            "arm": arm,
+            "mae_pp": interval["value"] * PERCENTAGE_POINTS,
+            "lower_95_pp": interval["lower_95"] * PERCENTAGE_POINTS,
+            "upper_95_pp": interval["upper_95"] * PERCENTAGE_POINTS,
+            "seed_spread_pp": interval["seed_spread"] * PERCENTAGE_POINTS,
+            "n_rows": interval["n_rows"],
+            "n_months": interval["n_months"],
+        }
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_FITS) as pool:
+        return list(pool.map(_one, groups))
+
+
+def arm_order(*, domain: DomainType) -> list[str]:
+    """Return every arm in the order the flat leaderboard prints it.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        The native and upsampling arms, then each band's ways, the exploratory arm trained on the
+        mean, the baselines, and the month-sensitivity refit of the mean, then climatology, the
+        emulation, the references, and the two calendar-only arms.
+    """
+    order = [
+        upsampling_arm(method=method, day=day)
+        for day in BAND_DAYS
+        for method in ("native", *COMBINATIONS[domain])
+    ]
+    for day in BAND_DAYS:
+        order += [ens_arm(way=way, day=day) for way in (*WAYS, APPLIED)]
+        order += [baseline_arm(name=name, day=day) for name in BASELINES]
+        order.append(month_ens_arm(day=day))
+    order += [
+        "climatology",
+        ens_arm(way="mean6", day=EMULATED_DAY),
+        *REFERENCES,
+        CALENDAR_ONLY,
+        CALENDAR_ONLY_MONTH,
+    ]
+    return order
+
+
+def _leaderboard_lines(*, board: list[dict[str, object]], domain: DomainType) -> list[str]:
+    """Render one technology's leaderboard, flat and as a horizon table.
+
+    Args:
+        board: The records from `_leaderboard`.
+        domain: `solar` or `wind`.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = []
+    for setting in SETTINGS:
+        by_arm = {row["arm"]: row for row in board if row["setting"] == setting}
+        lines += [
+            f"#### {domain.capitalize()}: every arm's error, {setting} setting",
+            "",
+            (
+                "| Arm | MAE (pp of capacity) | 95% interval, months and seed | Seed spread | Rows "
+                "| Months |"
+            ),
+            "|---|---|---|---|---|---|",
+        ]
+        for arm in arm_order(domain=domain):
+            if arm in by_arm:
+                row = by_arm[arm]
+                lines.append(
+                    f"| {arm} | {row['mae_pp']:.3f} "
+                    f"| [{row['lower_95_pp']:.3f}, {row['upper_95_pp']:.3f}] "
+                    f"| {row['seed_spread_pp']:.4f} | {row['n_rows']:,} | {row['n_months']} |"
+                )
+        lines.append("")
+    pooled = {row["arm"]: row["mae_pp"] for row in board if row["setting"] == "pooled"}
+    columns = [*WAYS, *BASELINES]
+    lines += [
+        f"#### {domain.capitalize()}: MAE by band (pp of capacity, main setting)",
+        "",
+        "| Band | " + " | ".join(columns) + " | climatology |",
+        "|---" * (len(columns) + 2) + "|",
+    ]
+    for day in BAND_DAYS:
+        cells = [
+            f"{pooled[ens_arm(way=c, day=day) if c in WAYS else baseline_arm(name=c, day=day)]:.3f}"
+            for c in columns
+        ]
+        lines.append(f"| day {day} | " + " | ".join(cells) + f" | {pooled['climatology']:.3f} |")
+    return [*lines, ""]
+
+
+def _contrast_lines(*, records: list[IntervalRecord]) -> list[str]:
+    """Render the contrasts, one table per section and setting.
+
+    Args:
+        records: Every interval.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = []
+    sections = list(dict.fromkeys(record["section"] for record in records))
+    for section in sections:
+        for setting in SETTINGS:
+            chosen = [r for r in records if r["section"] == section and r["setting"] == setting]
+            if chosen:
+                lines += [
+                    f"#### Contrasts: {section}, {setting} setting",
+                    "",
+                    *CONTRAST_HEADER,
+                    *(contrast_line(record) for record in chosen),
+                    "",
+                ]
+    return lines
+
+
+def _row_lines(*, frame: pl.DataFrame, domain: DomainType) -> list[str]:
+    """Describe the rows: how many, which span, and how they split by generator and era.
+
+    Args:
+        frame: The rows every arm is scored on.
+        domain: `solar` or `wind`.
+
+    Returns:
+        Markdown lines.
+    """
+    by_site = (
+        frame.group_by("site", "era")
+        .agg(rows=pl.len(), months=pl.col("month").n_unique())
+        .sort("site", "era")
+    )
+    lines = [
+        (
+            f"### {domain.capitalize()}: {frame.height:,} generator-hours "
+            f"({frame['time'].min():%Y-%m-%d} to {frame['time'].max():%Y-%m-%d}), "
+            f"{frame['month'].n_unique()} months, {int(frame['constrained'].sum()):,} curtailed"
+        ),
+        "",
+        "| Generator | UKV era | Rows | Months |",
+        "|---|---|---|---|",
+    ]
+    lines += [
+        f"| {row['site']} | {row['era']} | {row['rows']:,} | {row['months']} |"
+        for row in by_site.iter_rows(named=True)
+    ]
+    return [*lines, ""]
+
+
+def _fold_lines(*, outputs: Outputs, domain: DomainType) -> list[str]:
+    """Report the pinned fold offsets and the uncovered cells of each fold cut, in two counts.
+
+    Args:
+        outputs: The technology's outputs.
+        domain: `solar` or `wind`.
+
+    Returns:
+        Markdown lines.
+    """
+    first_hour = ROW_SET_FIRST_HOUR[domain]
+    main = coverage_counts(coverage=calendar_month_coverage(frame=outputs.frame))
+    kept_from = "every row" if first_hour is None else f"{first_hour:%Y-%m-%d}"
+    offsets = dict(ROW_SET_FOLD_OFFSETS[domain])
+    if outputs.native_coverage is None:
+        native = "not saved by any run of this folder."
+    else:
+        avoidable = int(outputs.native_coverage["avoidable_cells"].sum())
+        cells = int(outputs.native_coverage["single_year_cells"].sum())
+        rows = int(outputs.native_coverage["single_year_rows"].sum())
+        native = (
+            f"{avoidable} cells uncovered among calendar months that occur in two or more years, "
+            f"and {rows:,} rows in {cells} cells (summed over the bands) held out of every "
+            "training row because their calendar month occurs in only one year."
+        )
+    return [
+        (
+            f"Rows kept from: {kept_from}. "
+            f"Era fold offsets pinned in `ROW_SET_FOLD_OFFSETS`: {offsets}."
+        ),
+        "",
+        (
+            "Main fold cut, cells uncovered among calendar months that occur in two or more "
+            f"years: {main['avoidable_cells']} (a fitting run raises if this is not zero). "
+            f"Generator-hours held out of every training row because their calendar month "
+            f"occurs in only one year of that generator's record: {main['single_year_rows']:,} "
+            f"in {main['single_year_cells']} (site, fold, calendar month) cells. No fold design "
+            "can cover those hours, because the record holds one occurrence of that calendar "
+            "month."
+        ),
+        "",
+        ("Native-step fold cut (the main cut's folds joined by site and month): " + native),
+        "",
+    ]
+
+
+def _dropped_lines(*, frame: pl.DataFrame, domain: DomainType) -> list[str]:
+    """Count the past-weather rows every arm lost, and why.
+
+    Rebuilds the past-weather rows and the baselines' inputs, which is cheap, and compares them with
+    the rows the arms scored. Rows before `ROW_SET_FIRST_HOUR` are left out of the comparison,
+    because that filter is deliberate.
+
+    Args:
+        frame: The rows every arm scored.
+        domain: `solar` or `wind`.
+
+    Returns:
+        Markdown lines.
+    """
+    base = with_baselines(frame=base_frame(domain=domain), domain=domain)
+    first_hour = ROW_SET_FIRST_HOUR[domain]
+    if first_hour is not None:
+        base = base.filter(pl.col("time") >= first_hour)
+    dropped = base.join(frame.select("site", "time"), on=["site", "time"], how="anti")
+    inputs = [c for c in base.columns if "persistence_day" in c or "clear_sky_index_day" in c]
+    missing = dropped.filter(pl.any_horizontal(pl.col(inputs).is_null())).height
+    early = dropped.filter(pl.col("time") < SPAN[0] + timedelta(days=max(BAND_DAYS) + 7)).height
+    return [
+        (
+            f"Rows dropped from every arm: {dropped.height:,} of {base.height:,}, of which "
+            f"{missing:,} lack a baseline's input and {early:,} fall in the first three weeks of "
+            "the ENS archive."
+        ),
+        "",
+    ]
+
+
+def _feature_lines(*, domain: Domain) -> list[str]:
+    """Print every fitted arm's feature columns, so a reviewer can check them against the plan.
+
+    Args:
+        domain: The domain.
+
+    Returns:
+        Markdown lines.
+    """
+    features = fitted_features(domain=domain)
+    for day in BAND_DAYS:
+        arm = ens_arm(way="members", day=day)
+        features[arm] = (*shared_features(domain=domain), *ens_columns(arm=arm, domain=domain.name))
+    lines = [
+        f"#### {domain.name.capitalize()}: every fitted arm's feature columns",
+        "",
+        "| Arm | Columns | Features |",
+        "|---|---|---|",
+    ]
+    lines += [
+        f"| {arm} | {len(columns)} | {', '.join(f'`{column}`' for column in columns)} |"
+        for arm, columns in features.items()
+    ]
+    return [*lines, ""]
+
+
+def _per_site_lines(*, losses: pl.DataFrame, domain: DomainType) -> list[str]:
+    """Render the main arms' and the best-known baselines' error at each generator.
+
+    Args:
+        losses: Every arm's losses.
+        domain: `solar` or `wind`.
+
+    Returns:
+        Markdown lines.
+    """
+    pooled = losses.filter(pl.col("setting") == "pooled")
+    sites = sorted(pooled["site"].unique().to_list())
+    table = (
+        pooled.group_by("arm", "site")
+        .agg(mae=pl.col(METRIC).mean() * PERCENTAGE_POINTS)
+        .pivot(on="site", index="arm", values="mae")
+    )
+    by_arm = {row["arm"]: row for row in table.iter_rows(named=True)}
+    arms = [a for a in arm_order(domain=domain) if a in by_arm and not a.startswith("up_")]
+    lines = [
+        f"#### {domain.capitalize()}: MAE by generator (pp of capacity, main setting)",
+        "",
+        "| Arm | " + " | ".join(sites) + " |",
+        "|---" * (len(sites) + 1) + "|",
+    ]
+    lines += [
+        f"| {arm} | " + " | ".join(f"{by_arm[arm][site]:.3f}" for site in sites) + " |"
+        for arm in arms
+    ]
+    return [*lines, ""]
+
+
+def _spread_lines(*, summary: pl.DataFrame, frame: pl.DataFrame) -> list[str]:
+    """Describe the 51 member forecasts: their spread, and how often their 10–90% range holds truth.
+
+    Args:
+        summary: The member summaries from `_fit_members`, primary setting.
+        frame: The rows, with `power_mw` and `effective_capacity_mw`.
+
+    Returns:
+        Markdown lines.
+    """
+    joined = summary.filter(pl.col("setting") == "pooled").join(
+        frame.select("site", "time", "power_mw", "effective_capacity_mw"), on=["site", "time"]
+    )
+    table = (
+        joined.group_by("arm")
+        .agg(
+            spread_pp=(pl.col("spread") / pl.col("effective_capacity_mw")).mean()
+            * PERCENTAGE_POINTS,
+            inside=(
+                (pl.col("power_mw") >= pl.col("p10")) & (pl.col("power_mw") <= pl.col("p90"))
+            ).mean(),
+        )
+        .with_columns(day=pl.col("arm").str.extract(r"day(\d+)$").cast(pl.Int32))
+        .sort("day")
+    )
+    lines = [
+        "#### Member-by-member forecasts: spread, and the 10th-to-90th-percentile range",
+        "",
+        "| Band | Mean standard deviation of the 51 forecasts (pp) | Share of hours inside |",
+        "|---|---|---|",
+    ]
+    lines += [
+        f"| day {row['day']} | {row['spread_pp']:.3f} | {row['inside']:.3f} |"
+        for row in table.iter_rows(named=True)
+    ]
+    return [*lines, ""]
+
+
+def _response_diagnostics_lines(*, domain: DomainType) -> list[str]:
+    """Describe how far each arm's forecast moves against how far the measured output moves.
+
+    The member-by-member arm's 10th-to-90th coverage against the measured output is not valid
+    evidence on its own, because each of the 51 forecasts is a conditional median that leaves out
+    the power's own scatter. This table gives the direct test instead: the measured output's own
+    anomaly against the day's climatology forecast, regressed onto each arm's forecast anomaly
+    against that same climatology forecast, so a slope of 1.0 means the arm moves exactly as far as
+    the truth does on average, a slope below 1.0 means the arm over-reacts to the weather (moves
+    further than the truth does), and a slope above 1.0 means the arm under-reacts (is too flat).
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        Markdown lines.
+    """
+    paths = _paths(domain=domain)
+    all_rows = pl.read_parquet(paths["rows"])
+    rows = all_rows.select("site", "time", "effective_capacity_mw")
+    # Rebuilt from `rows` rather than read from the `climatology` arm's saved predictions: a
+    # `--fit-baselines` rerun rewrites the losses but not the predictions parquet, which would
+    # otherwise leave this table comparing against a stale climatology.
+    clim = (
+        all_rows.select("site", "time", "effective_capacity_mw")
+        .with_columns(climatology_mw=climatology(frame=all_rows))
+        .select("site", "time", c=pl.col("climatology_mw") / pl.col("effective_capacity_mw"))
+    )
+    predictions = pl.scan_parquet(paths["predictions"]).filter(pl.col("setting") == "pooled")
+    labels = {
+        "mean": "ensemble mean",
+        "members": "member by member",
+        APPLIED: "trained on the mean, applied to each member",
+        "control": "control member",
+    }
+    lines = [
+        f"#### {domain.capitalize()}: response to the weather, against a climatology anomaly",
+        "",
+        (
+            "The measured output's own anomaly against the day's climatology forecast, regressed "
+            "onto each arm's forecast anomaly against that climatology forecast. Slope: 1.0 tracks "
+            "the truth exactly, below 1.0 over-reacts, above 1.0 under-reacts (is too flat). SD: "
+            "the forecast anomaly's standard deviation, in percentage points of capacity."
+        ),
+        "",
+        "| Band | Arm | Slope | Forecast anomaly SD (pp) |",
+        "|---|---|---|---|",
+    ]
+    for day in BAND_DAYS:
+        arms = {way: ens_arm(way=way, day=day) for way in labels}
+        scored = (
+            predictions.filter(pl.col("arm").is_in(list(arms.values())))
+            .group_by("site", "time", "arm")
+            .agg(pl.col("prediction_mw").mean(), pl.col("power_mw").first())
+            .collect()
+            .join(rows, on=["site", "time"])
+            .with_columns(
+                f=pl.col("prediction_mw") / pl.col("effective_capacity_mw"),
+                y=pl.col("power_mw") / pl.col("effective_capacity_mw"),
+            )
+        )
+        anomaly = scored.join(clim, on=["site", "time"]).with_columns(
+            fa=pl.col("f") - pl.col("c"), ya=pl.col("y") - pl.col("c")
+        )
+        diagnostics = anomaly.group_by("arm").agg(
+            slope=pl.cov("ya", "fa") / pl.col("fa").var(),
+            sd_pred=pl.col("fa").std() * PERCENTAGE_POINTS,
+        )
+        by_arm = dict(zip(diagnostics["arm"], diagnostics.iter_rows(named=True), strict=True))
+        for way, label in labels.items():
+            row = by_arm[arms[way]]
+            lines.append(f"| day {day} | {label} | {row['slope']:.3f} | {row['sd_pred']:.3f} |")
+    return [*lines, ""]
+
+
+def _weight_lines(*, weights: pl.DataFrame) -> list[str]:
+    """Describe the wind smart persistence's fitted weight on persistence, per band.
+
+    Args:
+        weights: One row per generator, fold, and band.
+
+    Returns:
+        Markdown lines.
+    """
+    table = (
+        weights.group_by("day")
+        .agg(
+            mean=pl.col("weight").mean(),
+            lowest=pl.col("weight").min(),
+            highest=pl.col("weight").max(),
+        )
+        .sort("day")
+    )
+    lines = [
+        "#### Wind smart persistence: the weight on persistence, over generators and folds",
+        "",
+        "| Band | Mean | Lowest | Highest |",
+        "|---|---|---|---|",
+    ]
+    lines += [
+        f"| day {row['day']} | {row['mean']:.2f} | {row['lowest']:.2f} | {row['highest']:.2f} |"
+        for row in table.iter_rows(named=True)
+    ]
+    return [*lines, ""]
+
+
+def check_shared_rows(*, losses: pl.DataFrame) -> None:
+    """Stop unless every arm but the native ones scores the same (site, time, seed) rows.
+
+    A contrast pairs its two arms by an inner join on those keys, so an arm missing rows would
+    silently shrink every contrast it enters rather than fail. This compares row keys only, not
+    `power_mw`, `cap_mw`, or `fold`, so it would not catch two arms scoring the same rows against
+    different targets.
+
+    Args:
+        losses: Every arm's losses.
+
+    Raises:
+        ValueError: If two arms at one setting score different rows.
+    """
+    hourly = losses.filter(~pl.col("arm").str.starts_with("up_native_"))
+    reference = hourly.filter(
+        (pl.col("arm") == "climatology") & (pl.col("setting") == "pooled")
+    ).select("site", "time", "seed")
+    for (arm, setting), rows in hourly.partition_by("arm", "setting", as_dict=True).items():
+        keys = rows.select("site", "time", "seed")
+        if keys.height != reference.height or not keys.sort(pl.all()).equals(
+            reference.sort(pl.all())
+        ):
+            msg = (
+                f"{arm} at {setting} scores a different set of (site, time, seed) rows from "
+                f"climatology: {keys.height:,} rows against {reference.height:,}"
+            )
+            raise ValueError(msg)
+
+
+# --- Running ------------------------------------------------------------------------------------
+
+
+@dataclass
+class Outputs:
+    """Everything one technology's run produced."""
+
+    frame: pl.DataFrame
+    losses: pl.DataFrame
+    summary: pl.DataFrame
+    weights: pl.DataFrame
+    method: MethodType
+    decisions: list[Decision]
+    changed: bool = True
+    """Whether this run replaced any loss. `_fit_missing` sets it to `False` when every arm is
+    already fitted."""
+    native_coverage: pl.DataFrame | None = None
+    """One row per band with the native-step rows' `coverage_counts`, or `None` when no run saved
+    them."""
+
+
+def _paths(*, domain: DomainType) -> dict[str, Path]:
+    """Return where one technology's outputs are written, under `RESULTS_DIR`.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        Output name to path.
+    """
+    return {
+        name: RESULTS_DIR / f"{domain}_{name}.parquet"
+        for name in (
+            "rows",
+            "losses",
+            "member_summary",
+            "weights",
+            "inputs",
+            "predictions",
+            "native_coverage",
+        )
+    }
+
+
+def _read_saved(*, domain: DomainType) -> Outputs:
+    """Read one technology's outputs from disk, choosing the method from the saved losses.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        The outputs, `frame` carrying `MONTH_FEATURE`.
+    """
+    paths = _paths(domain=domain)
+    losses = pl.read_parquet(paths["losses"])
+    method, decisions = choose_method(losses=losses, domain=domain)
+    frame = pl.read_parquet(paths["rows"]).with_columns(
+        **{MONTH_FEATURE: pl.col("time").dt.month()}
+    )
+    return Outputs(
+        frame=frame,
+        losses=losses,
+        summary=pl.read_parquet(paths["member_summary"]),
+        weights=pl.read_parquet(paths["weights"]),
+        method=method,
+        decisions=decisions,
+        native_coverage=(
+            pl.read_parquet(paths["native_coverage"]) if paths["native_coverage"].exists() else None
+        ),
+    )
+
+
+def _fit_missing(*, domain: Domain) -> Outputs:
+    """Fit only the arms missing from the saved losses, and read every other output from disk.
+
+    Currently the only arms this can add are `calendar_jobs`: the post hoc calendar-only and
+    month-sensitivity arms added after the first science review. Re-running with these arms
+    already fitted is a no-op. Rebuilds the full frame (`build_inputs` and `main_frame`, at the
+    method the saved losses already chose) rather than reading the saved `rows` parquet, because
+    that file keeps only the columns the report itself needs and drops every weather column the
+    new arms are shown; rebuilding it is cheap, since it does no fitting.
+
+    Args:
+        domain: The domain.
+
+    Returns:
+        The saved outputs with the missing arms' losses merged in, or the saved outputs with
+        `changed` set to `False` when no arm is missing.
+    """
+    saved = _read_saved(domain=domain.name)
+    fitted = set(saved.losses["arm"].unique().to_list())
+    new_jobs = [job for job in calendar_jobs(domain=domain) if job[0] not in fitted]
+    if not new_jobs:
+        _LOG.info("%s: every calendar arm is already fitted", domain.name)
+        saved.changed = False
+        return saved
+    inputs = build_inputs(domain=domain.name)
+    inputs = main_frame(inputs=inputs, method=saved.method, domain=domain.name)
+    frame = inputs.frame
+    keep = [
+        "site",
+        "time",
+        "month",
+        "fold",
+        "seed",
+        "arm",
+        "setting",
+        METRIC,
+        "signed_error_capped_mw",
+    ]
+    new_losses = run_all(dataset=frame, jobs=new_jobs).select(keep)
+    losses = pl.concat([saved.losses, new_losses])
+    check_shared_rows(losses=losses)
+    return Outputs(
+        frame=saved.frame,
+        losses=losses,
+        summary=saved.summary,
+        weights=saved.weights,
+        method=saved.method,
+        decisions=saved.decisions,
+        native_coverage=saved.native_coverage,
+    )
+
+
+def _fit_baselines(*, domain: Domain) -> Outputs:
+    """Re-score every baseline, and read every fitted arm's losses from disk unchanged.
+
+    None of `_baseline_losses`' four baselines uses XGBoost, so this needs no refit. It exists to
+    re-run `studies.baselines.climatology`'s fallback rule after a fix, without refitting the
+    XGBoost arms the fallback plays no part in. Rebuilds the full frame (`build_inputs` and
+    `main_frame`, at the method the saved losses already chose), the same way `_fit_missing` does,
+    because the saved `rows` parquet keeps only the columns the report needs.
+
+    Args:
+        domain: The domain.
+
+    Returns:
+        The saved outputs with every baseline's losses replaced, and the wind smart-persistence
+        weights replaced for wind.
+    """
+    saved = _read_saved(domain=domain.name)
+    inputs = build_inputs(domain=domain.name)
+    inputs = main_frame(inputs=inputs, method=saved.method, domain=domain.name)
+    frame = inputs.frame
+    keep = [
+        "site",
+        "time",
+        "month",
+        "fold",
+        "seed",
+        "arm",
+        "setting",
+        METRIC,
+        "signed_error_capped_mw",
+    ]
+    baseline_arms = {
+        "climatology",
+        *(baseline_arm(name=name, day=day) for day in BAND_DAYS for name in BASELINES),
+    }
+    baselines, weights = _baseline_losses(frame=frame, domain=domain.name)
+    losses = pl.concat(
+        [saved.losses.filter(~pl.col("arm").is_in(baseline_arms)), baselines.select(keep)]
+    )
+    check_shared_rows(losses=losses)
+    return Outputs(
+        frame=saved.frame,
+        losses=losses,
+        summary=saved.summary,
+        weights=weights if not weights.is_empty() else saved.weights,
+        method=saved.method,
+        decisions=saved.decisions,
+        native_coverage=saved.native_coverage,
+    )
+
+
+def _move_to_superseded(*, paths: Iterable[Path], folder: Path) -> None:
+    """Move each existing output into `folder`, a subfolder of `RESULTS_DIR/superseded`.
+
+    Args:
+        paths: The outputs about to be replaced. Those that do not exist are skipped.
+        folder: The run's own subfolder, named by its timestamp and the mode that replaces the
+            outputs.
+    """
+    for path in paths:
+        if path.exists():
+            folder.mkdir(parents=True, exist_ok=True)
+            target = folder / path.name
+            refuse_to_overwrite(paths=[target])
+            path.rename(target)
+
+
+def run_domain(
+    *,
+    domain: Domain,
+    report_only: bool,
+    superseded: Path,
+    fit_missing: bool = False,
+    fit_baselines: bool = False,
+) -> Outputs:
+    """Build one technology's inputs, choose the upsampling, fit every arm, and score the baselines.
+
+    Args:
+        domain: The domain.
+        report_only: Whether to read the saved outputs instead of fitting.
+        superseded: The folder that `fit_missing` and `fit_baselines` move the losses they replace
+            into.
+        fit_missing: Whether to fit only the arms missing from the saved losses (`_fit_missing`),
+            reading everything else from disk. Ignored if `report_only` is set.
+        fit_baselines: Whether to re-score only the four no-weather baselines (`_fit_baselines`),
+            reading every fitted arm from disk. Ignored if `report_only` or `fit_missing` is set.
+
+    Returns:
+        The outputs.
+    """
+    paths = _paths(domain=domain.name)
+    if report_only:
+        return _read_saved(domain=domain.name)
+    if fit_missing:
+        outputs = _fit_missing(domain=domain)
+        if outputs.changed:
+            _move_to_superseded(paths=[paths["losses"]], folder=superseded)
+            outputs.losses.write_parquet(paths["losses"])
+        return outputs
+    if fit_baselines:
+        outputs = _fit_baselines(domain=domain)
+        _move_to_superseded(paths=[paths["losses"], paths["weights"]], folder=superseded)
+        outputs.losses.write_parquet(paths["losses"])
+        outputs.weights.write_parquet(paths["weights"])
+        return outputs
+    inputs = build_inputs(domain=domain.name)
+    inputs.inputs.join(
+        inputs.frame.select("site", "time", "power_mw", "effective_capacity_mw"),
+        on=["site", "time"],
+        how="left",
+    ).write_parquet(paths["inputs"])
+    upsampling_jobs: list[Job] = [
+        job for job in jobs(domain=domain) if job[0].startswith("up_") and job[1] == "pooled"
+    ]
+    native_losses, native_coverage = _native_losses(inputs=inputs, domain=domain)
+    upsampling_losses = pl.concat(
+        [run_all(dataset=inputs.frame, jobs=upsampling_jobs), native_losses], how="diagonal"
+    )
+    method, decisions = choose_method(losses=upsampling_losses, domain=domain.name)
+    _LOG.info(
+        "%s: chose %s\n%s", domain.name, method, "\n".join(_decision_lines(decisions=decisions))
+    )
+    inputs = main_frame(inputs=inputs, method=method, domain=domain.name)
+    frame = inputs.frame
+    main_losses = run_all(
+        dataset=frame, jobs=[job for job in jobs(domain=domain) if not job[0].startswith("up_")]
+    )
+    member_losses, summaries = [], []
+    for day in BAND_DAYS:
+        settings: list[SettingType] = ["pooled"]
+        settings += ["sensitivity"] if day in MEMBER_SENSITIVITY_DAYS else []
+        settings += ["no_subsample"] if day == NO_SUBSAMPLE_DAY else []
+        for setting in settings:
+            losses, summary = _fit_members(
+                frame=frame, members=inputs.members[day], day=day, domain=domain, setting=setting
+            )
+            member_losses.append(losses)
+            summaries.append(summary)
+            _LOG.info("%s day %d %s: member-by-member arm fitted", domain.name, day, setting)
+        member_losses.append(
+            _fit_mean_applied(frame=frame, members=inputs.members[day], day=day, domain=domain)
+        )
+    baselines, weights = _baseline_losses(frame=frame, domain=domain.name)
+    keep = [
+        "site",
+        "time",
+        "month",
+        "fold",
+        "seed",
+        "arm",
+        "setting",
+        METRIC,
+        "signed_error_capped_mw",
+    ]
+    losses = pl.concat(
+        [
+            frame_losses.select(keep)
+            for frame_losses in (upsampling_losses, main_losses, *member_losses, baselines)
+        ]
+    )
+    summary = pl.concat(summaries)
+    check_shared_rows(losses=losses)
+    frame.select(
+        "site",
+        "time",
+        "month",
+        "fold",
+        "era",
+        "power_mw",
+        "effective_capacity_mw",
+        "cap_mw",
+        "constrained",
+    ).write_parquet(paths["rows"])
+    native_coverage.write_parquet(paths["native_coverage"])
+    summary.write_parquet(paths["member_summary"])
+    weights.write_parquet(paths["weights"])
+    losses.join(frame.select("site", "time", "power_mw"), on=["site", "time"], how="left").select(
+        "site",
+        "time",
+        "arm",
+        "setting",
+        "seed",
+        "power_mw",
+        prediction_mw=pl.col("signed_error_capped_mw") + pl.col("power_mw"),
+    ).write_parquet(paths["predictions"])
+    # Written last: the write-once guard refuses a refit once the losses exist, so their presence
+    # has to mean that every other output of this technology is complete.
+    losses.write_parquet(paths["losses"])
+    return Outputs(
+        frame=frame,
+        losses=losses,
+        summary=summary,
+        weights=weights,
+        method=method,
+        decisions=decisions,
+        native_coverage=native_coverage,
+    )
+
+
+def _refits(*, arguments: argparse.Namespace, domain: Domain) -> bool:
+    """Say whether this run fits `domain` from scratch.
+
+    Args:
+        arguments: The parsed command line.
+        domain: The domain.
+
+    Returns:
+        Whether `--refit` names the domain and no mode that reads saved outputs is set.
+    """
+    return (
+        arguments.refit in (domain.name, "both")
+        and not arguments.report_only
+        and not arguments.fit_missing
+        and not arguments.fit_baselines
+    )
+
+
+def _check_results_folder(*, arguments: argparse.Namespace) -> None:
+    """Fail closed, before any work, if the run does not suit the state of `RESULTS_DIR`.
+
+    Each technology is checked on its own, so a run that failed after fitting one technology can be
+    finished by refitting the other.
+
+    Args:
+        arguments: The parsed command line.
+
+    Raises:
+        FileExistsError: If a technology to be refitted already has saved losses.
+        SystemExit: If a mode that reads saved outputs finds no technology with saved losses.
+    """
+    for domain in (SOLAR, WIND):
+        if _refits(arguments=arguments, domain=domain):
+            refuse_to_overwrite(paths=[_paths(domain=domain.name)["losses"]])
+    fits_from_scratch = not (
+        arguments.report_only or arguments.fit_missing or arguments.fit_baselines
+    )
+    if not fits_from_scratch and not any(
+        _paths(domain=domain.name)["losses"].exists() for domain in (SOLAR, WIND)
+    ):
+        msg = f"this mode reads saved outputs, but {RESULTS_DIR} holds no `*_losses.parquet`"
+        raise SystemExit(msg)
+
+
+def main() -> int:
+    """Run both technologies, bootstrap everything, and write the report."""
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--report-only",
+        action="store_true",
+        help="Rebuild the report from the outputs already on disk instead of refitting.",
+    )
+    parser.add_argument(
+        "--refit",
+        choices=("solar", "wind", "both"),
+        default="both",
+        help=(
+            "Which technology to refit. A refit raises if the results folder already holds that "
+            "technology's `*_losses.parquet`. A technology that is not refitted is read from "
+            "disk, and left out of the report if the folder holds none of its losses."
+        ),
+    )
+    parser.add_argument(
+        "--fit-missing",
+        action="store_true",
+        help=(
+            "Fit only the arms missing from the saved losses (currently the post hoc "
+            "calendar-only and month-sensitivity arms), reading every other arm from disk."
+        ),
+    )
+    parser.add_argument(
+        "--fit-baselines",
+        action="store_true",
+        help=(
+            "Re-score only the four no-weather baselines (persistence, diurnal persistence, "
+            "smart persistence, climatology), reading every fitted XGBoost arm from disk. No "
+            "XGBoost refit runs."
+        ),
+    )
+    arguments = parser.parse_args()
+    _check_results_folder(arguments=arguments)
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    lines = ["# ENS forecast error by horizon", ""]
+    records: list[IntervalRecord] = []
+    boards: list[dict[str, object]] = []
+    superseded_mode = "fit-missing" if arguments.fit_missing else "fit-baselines"
+    superseded = (
+        RESULTS_DIR / "superseded" / f"{datetime.now(tz=UTC):%Y%m%dT%H%M%SZ}-{superseded_mode}"
+    )
+    changed = False
+    for domain in (SOLAR, WIND):
+        refit = _refits(arguments=arguments, domain=domain)
+        if not refit and not _paths(domain=domain.name)["losses"].exists():
+            _LOG.warning(
+                "%s: no saved losses and not refitted; left out of the report", domain.name
+            )
+            lines += [f"### {domain.name.capitalize()}: not run, no saved losses", ""]
+            continue
+        outputs = run_domain(
+            domain=domain,
+            report_only=not refit and not arguments.fit_missing and not arguments.fit_baselines,
+            superseded=superseded,
+            fit_missing=arguments.fit_missing,
+            fit_baselines=arguments.fit_baselines,
+        )
+        changed = changed or outputs.changed
+        best = best_baselines(losses=outputs.losses)
+        domain_records = _intervals(
+            losses=outputs.losses,
+            domain=domain,
+            wanted=contrasts(decisions=outputs.decisions, best=best),
+        )
+        board = _leaderboard(losses=outputs.losses, domain=domain.name)
+        records += domain_records
+        boards += board
+        lines += [
+            *_row_lines(frame=outputs.frame, domain=domain.name),
+            *_fold_lines(outputs=outputs, domain=domain.name),
+            *_dropped_lines(frame=outputs.frame, domain=domain.name),
+            f"#### {domain.name.capitalize()}: the upsampling technique chosen: {outputs.method}",
+            "",
+            *_decision_lines(decisions=outputs.decisions),
+            "",
+            "Best baseline at each band: "
+            + ", ".join(f"day {day} {arm}" for day, arm in best.items())
+            + ".",
+            "",
+            *_feature_lines(domain=domain),
+            *_leaderboard_lines(board=board, domain=domain.name),
+            *_contrast_lines(records=domain_records),
+            *_spread_lines(summary=outputs.summary, frame=outputs.frame),
+            *_response_diagnostics_lines(domain=domain.name),
+            *(_weight_lines(weights=outputs.weights) if domain.name == "wind" else []),
+            *_per_site_lines(losses=outputs.losses, domain=domain.name),
+        ]
+    report = "\n".join(lines) + "\n"
+    sys.stdout.write(report)
+    replaces_losses = arguments.fit_missing or arguments.fit_baselines
+    if replaces_losses and not changed:
+        _LOG.info("nothing was refitted; the saved report, intervals and leaderboard are kept")
+        return 0
+    if replaces_losses:
+        _move_to_superseded(
+            paths=[RESULTS_DIR / name for name in RUN_LEVEL_OUTPUTS], folder=superseded
+        )
+    pl.DataFrame(records).write_parquet(RESULTS_DIR / "intervals.parquet")
+    pl.DataFrame(boards).write_parquet(RESULTS_DIR / "leaderboard.parquet")
+    (RESULTS_DIR / "report.md").write_text(report)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

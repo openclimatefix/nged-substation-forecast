@@ -2,8 +2,9 @@
 
 Run `uv run python studies/ens_backfill_pilot/fetch_pilot.py --dry-run` first. The pilot fetches
 the control member's 12 variables at 85 steps (1,020 messages) for 23 dates, one range request
-per message, and writes one checkpoint file per date under `data/studies/ens_backfill_pilot/`.
-A date already written is skipped, so a crashed run resumes where it stopped.
+per message, and writes one checkpoint file per date under
+`data/studies/per_study/ens_backfill_pilot/`. A date already written is skipped, so a crashed run
+resumes where it stopped.
 """
 
 import argparse
@@ -37,7 +38,6 @@ from pilot_common import (
     MembersType,
     PlannedMessage,
     RequestStats,
-    data_dir,
     fetch_idx,
     fetch_message_prefix,
     files_needed,
@@ -54,6 +54,7 @@ from studies.ens_grib_source import (
     parse_listing,
 )
 from studies.grib1_simple import decode_values, unpack_rows
+from studies.sources import ENS_BACKFILL_PILOT_DIR
 
 
 def list_bucket() -> str:
@@ -75,7 +76,7 @@ def resolve_dates(*, override: str | None) -> list[date]:
     """
     if override:
         return [date.fromisoformat(text) for text in override.split(",")]
-    saved = data_dir() / "pilot_dates.json"
+    saved = ENS_BACKFILL_PILOT_DIR / "pilot_dates.json"
     if saved.exists():
         return [date.fromisoformat(text) for text in json.loads(saved.read_text())["dates"]]
     complete = complete_dates(files_by_date=parse_listing(text=list_bucket()))

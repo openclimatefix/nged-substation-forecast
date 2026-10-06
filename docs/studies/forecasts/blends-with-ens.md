@@ -81,10 +81,10 @@ never ranked.
 **Each blend is compared with an XGBoost model given the ENS mean alone, and with a control of equal
 column count.** The control shuffles the product's columns among hours that share a generator, a
 year-month, and an hour of day. The rows, folds, settings, seeds, and GPU device are those of the
-saved AIFS Single blends in `nwp_forecast_comparison_aifs_blends`, which this study reuses. The
-fitting script fits the ICON-EU, UKV, and WN3 arms, and refits the five AIFS Single (arm, setting)
-pairs that folder lacked. The fitting script raises unless its build stamp and every new arm's
-`(site, time, seed, fold)` keys equal the saved ones.
+saved AIFS Single blends in `per_study/nwp_forecast_comparison/aifs_blends`, which this study
+reuses. The fitting script fits the ICON-EU, UKV, and WN3 arms, and refits the five AIFS Single
+(arm, setting) pairs that folder lacked. The fitting script raises unless its build stamp and every
+new arm's `(site, time, seed, fold)` keys equal the saved ones.
 
 **Five contrasts were planned before any fit.** C1 is the conservative ICON-EU blend minus ENS at
 days 1 and 2. C2 is the AIFS Single blend minus ENS at days 1, 2, and 7. C3 is the UKV blend minus
@@ -203,12 +203,12 @@ before the last command, because the dot script refuses to overwrite them.
 ```bash
 D=data/studies
 uv run python studies/nwp_forecast_comparison/fit_product_blends.py --lookahead-cleared \
-  --workers 2 --published-dir $D/nwp_forecast_comparison \
-  --output-dir $D/nwp_forecast_comparison_product_blends
+  --workers 2 --published-dir $D/per_study/nwp_forecast_comparison/original \
+  --output-dir $D/per_study/nwp_forecast_comparison/product_blends
 uv run python studies/nwp_forecast_comparison/fit_product_blends.py \
-  --published-dir $D/nwp_forecast_comparison \
-  --output-dir $D/nwp_forecast_comparison_product_blends \
-  --report-dir $D/nwp_forecast_comparison_product_blends_report
+  --published-dir $D/per_study/nwp_forecast_comparison/original \
+  --output-dir $D/per_study/nwp_forecast_comparison/product_blends \
+  --report-dir $D/per_study/nwp_forecast_comparison/product_blends_report
 uv run python studies/nwp_forecast_comparison/dot_interval_vs_ens.py --blends \
-  --output-dir $D/nwp_forecast_comparison_vs_ens_dots_blends_final
+  --output-dir $D/per_study/nwp_forecast_comparison/vs_ens_dots_blends_final
 ```

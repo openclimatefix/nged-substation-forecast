@@ -34,7 +34,7 @@ from typing import Final
 
 import h3.api.basic_int as h3
 import polars as pl
-from sources import REPO_DATA_DIR, WEATHER_DATA_DIR
+from studies.sources import ENS_SITE_POINTS_DIR, REPO_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 NWP_ROOT: Final[Path] = REPO_DATA_DIR / "NWP" / "nwp_model_id=ECMWF_ENS_0_25_degree"
 """Where the ENS Delta table's daily run partitions live."""
 
-OUTPUT_PATH: Final[Path] = WEATHER_DATA_DIR / "ENS" / "beam_diffuse_ens.parquet"
+OUTPUT_PATH: Final[Path] = ENS_SITE_POINTS_DIR / "beam_diffuse_ens.parquet"
 """Where this script writes the per-meter, per-member, per-horizon frame."""
 
 H3_RESOLUTION: Final[int] = 5
@@ -178,13 +178,13 @@ def main() -> int:
     Raises:
         FileNotFoundError: If the ENS table is not on disk.
     """
-    from build_dataset import _pv_sites
+    from studies.pv_dataset import pv_sites
 
     if not NWP_ROOT.exists():
         msg = f"{NWP_ROOT} is missing; run the ecmwf_ens asset first"
         raise FileNotFoundError(msg)
 
-    lookup = _cell_for_each_meter(sites=_pv_sites())
+    lookup = _cell_for_each_meter(sites=pv_sites())
     cells = lookup["h3_index"].unique().to_list()
     leads = _wanted_leads()
     logger.info("%d meters in %d cells, %d lead hours", lookup.height, len(cells), len(leads))

@@ -37,8 +37,8 @@ from pathlib import Path
 from typing import Final, Literal, NamedTuple
 
 import polars as pl
-from sources import STUDY_DATA_DIR
 from studies.charts import ProductFamily, figure, interval_panel, planning
+from studies.sources import STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("make_chart")

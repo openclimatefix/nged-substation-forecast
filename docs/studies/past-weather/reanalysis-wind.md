@@ -212,7 +212,7 @@ describes. The nearest cell of each grid to each farm is 0.8 to 2.5 km away for 
 km for NORA3, pooled across the three farms. The XGBoost settings are those of the main wind page,
 with no column subsampling, and the XGBoost version is 3.4.1, the version in `uv.lock` (the saved
 losses do not record the version that fitted them). Every fit ran on the CPU. The code is in
-`studies/beam_diffuse_split/` and `packages/studies/`, and the commit that merged this page holds
+`studies/past_weather/` and `packages/studies/`, and the commit that merged this page holds
 the version that produced the figures.
 
 ## Reproducing the figures
@@ -223,8 +223,8 @@ fit script's report, and writes a new `per_site.md` beside each report, holding 
 differences with their intervals that the page quotes.
 
 ```bash
-uv run python studies/beam_diffuse_split/reanalysis_past_wind.py --product cerra
-uv run python studies/beam_diffuse_split/reanalysis_past_wind.py --product nora3
-uv run python studies/beam_diffuse_split/reanalysis_past_wind_charts.py
+uv run python studies/past_weather/reanalysis_past_wind.py --product cerra
+uv run python studies/past_weather/reanalysis_past_wind.py --product nora3
+uv run python studies/past_weather/reanalysis_past_wind_charts.py
 npx svgo@4 --multipass --precision=1 --final-newline docs/studies/assets/reanalysis_wind_*.svg
 ```

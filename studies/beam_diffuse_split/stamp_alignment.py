@@ -35,23 +35,14 @@ Run it with `uv run python studies/beam_diffuse_split/stamp_alignment.py`.
 """
 
 import logging
-import sys
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Final
 
 import numpy as np
 import polars as pl
 import pvlib
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from build_dataset import (
-    CAMS_PATH,
-    REPO_DATA_DIR,
-    _pv_sites,
-)
 from contracts.power_schemas import POWER_TIMESTAMPS_CORRECTED_BEFORE
+from studies.pv_dataset import CAMS_PATH, REPO_DATA_DIR, pv_sites
 
 _LOG: Final[logging.Logger] = logging.getLogger("stamp_alignment")
 
@@ -239,7 +230,7 @@ def _lags(*, power: pl.DataFrame, cams: pl.DataFrame, site: str) -> pl.DataFrame
 def main() -> int:
     """Measure the stamp offset on both sides of the correction, and print the three readings."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    sites = _pv_sites().sort("site")
+    sites = pv_sites().sort("site")
     cams = pl.read_parquet(CAMS_PATH)
 
     print(

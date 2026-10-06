@@ -41,16 +41,10 @@ from pathlib import Path
 from typing import Final, NamedTuple
 
 import polars as pl
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-import ens_forecast_horizons as efh
 from build_forecast_inputs import (
     IFS_SINGLE_DAYS,
-    IFS_SINGLE_DIR_NAME,
     IFS_SINGLE_FILE_NAME,
     KMH_TO_MS,
-    _repo_data_dir,
     ifs_single_arm,
 )
 from studies.ifs_single_runs import (
@@ -60,6 +54,9 @@ from studies.ifs_single_runs import (
     served_init_time,
     served_lead_hours,
 )
+from studies.sources import ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR
+
+from studies import ens_members
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -409,7 +406,7 @@ def gap_table(*, built_dir: Path, archive_path: Path) -> pl.DataFrame:
         run_type = built.schema["time"]
         present = runs.cast(run_type)
         for day in IFS_SINGLE_DAYS:
-            columns = efh.ens_columns(arm=ifs_single_arm(day=day), domain=domain)
+            columns = ens_members.ens_columns(arm=ifs_single_arm(day=day), domain=domain)
             frame = built.select(
                 "time",
                 null=pl.any_horizontal(pl.col(c).is_null() for c in columns),
@@ -480,7 +477,7 @@ def _sample_rows(*, built_dir: Path) -> list[Sample]:
         built = pl.read_parquet(built_dir / f"{domain}_extra_lead_inputs.parquet")
         picked = built.sort("site", "time").gather_every(max(1, built.height // SAMPLE_ROWS))
         for day in IFS_SINGLE_DAYS:
-            for column in efh.ens_columns(arm=ifs_single_arm(day=day), domain=domain):
+            for column in ens_members.ens_columns(arm=ifs_single_arm(day=day), domain=domain):
                 field = column.removeprefix(f"{ifs_single_arm(day=day)}_")
                 for site, time, value in picked.select("site", "time", column).iter_rows():
                     init, lead = expected_served(time=time, day=day, solar=domain == "solar")
@@ -600,9 +597,7 @@ def main() -> int:
     parser.add_argument("--built-dir", type=Path, default=None)
     parser.add_argument("--ifs-single-dir", type=Path, default=None)
     args = parser.parse_args()
-    directory = (
-        args.ifs_single_dir or _repo_data_dir() / "studies" / "weather" / IFS_SINGLE_DIR_NAME
-    )
+    directory = args.ifs_single_dir or ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR
     archive_path = directory / IFS_SINGLE_FILE_NAME
     verification = args.output_dir / "verification"
     verification.mkdir(parents=True, exist_ok=True)

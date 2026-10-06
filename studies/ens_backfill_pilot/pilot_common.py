@@ -5,7 +5,6 @@ GRIB files. `studies.grib1_simple` reads the messages, `studies.ens_grib_source`
 sidecars, and this module holds the parts that only these two scripts need.
 """
 
-import os
 import random
 import threading
 import time
@@ -16,13 +15,13 @@ from typing import Final, Literal
 
 import numpy as np
 import requests
-from contracts.settings import PROJECT_ROOT
 from studies.ens_grib_source import IdxEntry, parse_idx, prefix_range_header
 from studies.grib1_simple import (
     Grib1Header,
     bytes_needed_for_rows,
     parse_header,
 )
+from studies.sources import ENS_BACKFILL_PILOT_DIR
 
 PROXY_URL: Final[str] = "https://data.source.coop/dynamical/ecmwf-ifs-grib/ecmwf-ifs-ens"
 """Source Cooperative's Cloudflare proxy for the staged files, about 30 times faster than direct
@@ -121,24 +120,10 @@ MAX_WORKERS: Final[int] = 16
 MAX_ATTEMPTS: Final[int] = 8
 
 
-def data_dir() -> Path:
-    """Return where the pilot's downloaded data lives, in the main checkout's `data/` folder."""
-    override = os.environ.get("DATA_PATH_INTERNAL")
-    if override:
-        return Path(override) / "studies" / "ens_backfill_pilot"
-    root = PROJECT_ROOT
-    marker = root / ".git"
-    if marker.is_file():
-        git_dir = Path(marker.read_text().removeprefix("gitdir:").strip())
-        if git_dir.parent.name == "worktrees":
-            root = git_dir.parent.parent.parent
-    return root / "data" / "studies" / "ens_backfill_pilot"
-
-
 def pilot_file_path(*, members: MembersType, day: date) -> Path:
     """Return the path of one date's checkpoint file."""
     folder = "control" if members == "control" else "all_members"
-    return data_dir() / folder / f"{day.isoformat()}.npz"
+    return ENS_BACKFILL_PILOT_DIR / folder / f"{day.isoformat()}.npz"
 
 
 class FetchError(Exception):

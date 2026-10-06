@@ -7,8 +7,8 @@ descriptive.** It states errors over the same 88-day summer window and puts no i
 difference.
 
 **What it reads.** The rows, folds, power, and every product's columns come from the saved frames of
-the earlier run (`data/studies/open_meteo_ensemble_means/frame_*.parquet`), which this script never
-writes. It adds columns, each built for the same generator-hours:
+the earlier run (`data/studies/per_study/open_meteo_ensemble_means/frame_*.parquet`), which this
+script never writes. It adds columns, each built for the same generator-hours:
 
 - `local_kt` (solar): the local ENS mean with its 3-hour irradiance interpolated through the
   clearness index instead of held flat over each step
@@ -18,7 +18,8 @@ writes. It adds columns, each built for the same generator-hours:
   hours ahead of the valid time, so each step comes from a run about a day older than the stored
   series. The increase in error from using an older run bounds how much of the gap a
   difference in lead can explain.
-- Deterministic Open-Meteo runs from `data/studies/weather/<model>/previous_runs/combined.parquet`
+- Deterministic Open-Meteo runs from
+  `data/studies/downloads/NWP/OPEN-METEO-PREVIOUS-RUNS/<model>/previous_runs/combined.parquet`
   (ICON-D2, ICON-EU, ECMWF IFS 0.25 degree, UKV) at `previous_day0`, the freshest run, and
   `previous_day1`, the run 24 hours older. The two days give each model's error at a short lead and
   at a lead a day longer, which is the only run-age evidence in these data. Each ensemble mean is
@@ -41,9 +42,9 @@ its lead is fixed by the hour of day, so the by-step table shows how the gap bet
 changes with local lead.
 
 Run it with `uv run python studies/open_meteo_ensemble_means/local_ens_gap.py`. It writes to a new
-folder, `data/studies/open_meteo_ens_gap/`, and refuses to overwrite. It refuses to fit while the
-one-minute load average is above `LOAD_LIMIT`. `--report-only` rebuilds the tables and `report.md`
-from the saved frames and losses. Fits run on the CPU.
+folder, `data/studies/per_study/open_meteo_ens_gap/`, and refuses to overwrite. It refuses to fit
+while the one-minute load average is above `LOAD_LIMIT`. `--report-only` rebuilds the tables and
+`report.md` from the saved frames and losses. Fits run on the CPU.
 """
 
 import argparse
@@ -67,13 +68,13 @@ from studies.stitched_ensemble import (
     newest_run_member_means,
 )
 
-from build_dataset import _add_solar_geometry, _pv_sites  # isort: skip
-from run_experiment import Job, run_all  # isort: skip
-from sources import STUDIES_DATA_DIR, WEATHER_DATA_DIR  # isort: skip
+from studies.pv_dataset import add_solar_geometry, pv_sites  # isort: skip
+from studies.arm_runner import Job, run_all  # isort: skip
+from studies.sources import OPEN_METEO_ENS_GAP_DIR, previous_runs_product_dir_for  # isort: skip
 
 _LOG: Final[logging.Logger] = logging.getLogger("local_ens_gap")
 
-OUTPUT_DIR: Final[Path] = STUDIES_DATA_DIR / "open_meteo_ens_gap"
+OUTPUT_DIR: Final[Path] = OPEN_METEO_ENS_GAP_DIR
 """Where this script writes. A re-run needs the old files moved to `superseded/` by hand."""
 
 LOAD_LIMIT: Final[float] = 24.0
@@ -93,7 +94,8 @@ DETERMINISTIC_MODELS: Final[dict[str, str]] = {
     "ifs025": "ECMWF-IFS-025",
     "ukv": "UKV",
 }
-"""Each deterministic model's key, and its folder under `data/studies/weather/`."""
+"""Each deterministic model's key, and its folder under
+`data/studies/downloads/NWP/OPEN-METEO-PREVIOUS-RUNS/`."""
 
 RUN_AGES: Final[tuple[int, ...]] = (0, 1)
 """The `previous_day` values read: 0 is the freshest run, 1 the run 24 hours older."""
@@ -217,7 +219,11 @@ def _previous_runs(*, model: str, domain: DomainType) -> pl.DataFrame:
     fields = {"shortwave_radiation": "ghi"} if domain == "solar" else {"wind_speed_10m": "speed10"}
     if domain == "wind" and model in HUB_DETERMINISTIC_MODELS:
         fields["wind_speed_100m"] = "speed100"
-    path = WEATHER_DATA_DIR / DETERMINISTIC_MODELS[model] / "previous_runs" / "combined.parquet"
+    path = (
+        previous_runs_product_dir_for(product=DETERMINISTIC_MODELS[model])
+        / "previous_runs"
+        / "combined.parquet"
+    )
     columns = {
         (source if age == 0 else f"{source}_previous_day{age}"): f"{name}_{model}_det{age}"
         for source, name in fields.items()
@@ -241,12 +247,12 @@ def _hourly_extraterrestrial(*, first: datetime, last: datetime) -> pl.DataFrame
         One row per (site, hour label) with `extraterrestrial_horizontal_w_m2`. The site
         coordinates are used inside this function and never returned.
     """
-    sites = _pv_sites().select("site", "latitude", "longitude")
+    sites = pv_sites().select("site", "latitude", "longitude")
     hours = pl.DataFrame(
         {"time": pl.datetime_range(first, last, "1h", time_zone="UTC", eager=True)}
     )
     grid = sites.join(hours, how="cross")
-    return _add_solar_geometry(joined=grid).select(
+    return add_solar_geometry(joined=grid).select(
         "site", "time", "extraterrestrial_horizontal_w_m2"
     )
 

@@ -387,7 +387,7 @@ the five CERRA serves, or regions other than Lincolnshire.**
 
 **Every input except the wind farms' metered output, coordinates, and capacity table is public, and
 the code is in the repository at the commit that merged this page.** The code is in
-`studies/beam_diffuse_split/` (`cerra_wind_levels.py`, `cerra_wind_levels_shear.py`, and
+`studies/past_weather/` (`cerra_wind_levels.py`, `cerra_wind_levels_shear.py`, and
 `cerra_wind_levels_charts.py`) and in `packages/studies/`.
 
 - **Public inputs:** CERRA's wind speed from the Copernicus Climate Data Store, at 10 m from
@@ -409,20 +409,21 @@ the code is in the repository at the commit that merged this page.** The code is
 ## Reproducing the figures
 
 **Run the commands below in order.** The fit script writes its report and saved losses under
-`data/studies/cerra_wind_levels/`, and the second script reads those losses and writes its report
-under `data/studies/cerra_wind_levels_post_hoc/`. That report holds the first report followed by the
-post hoc sections, and `check_page_numbers.py` checks the page against it. The command checks every
-results section and the Key findings. The Summary was checked the same way, on a copy of the page
-without its disclaimer, because the disclaimer's model version numbers are not in the report.
+`data/studies/per_study/cerra_wind/levels/`, and the second script reads those losses and writes its
+report under `data/studies/per_study/cerra_wind/levels_post_hoc/`. That report holds the first
+report followed by the post hoc sections, and `check_page_numbers.py` checks the page against it.
+The command checks every results section and the Key findings. The Summary was checked the same way,
+on a copy of the page without its disclaimer, because the disclaimer's model version numbers are not
+in the report.
 
 ```bash
-uv run python studies/beam_diffuse_split/cerra_wind_levels.py
-uv run python studies/beam_diffuse_split/cerra_wind_levels_shear.py
-uv run python studies/beam_diffuse_split/cerra_wind_levels_charts.py
+uv run python studies/past_weather/cerra_wind_levels.py
+uv run python studies/past_weather/cerra_wind_levels_shear.py
+uv run python studies/past_weather/cerra_wind_levels_charts.py
 npx svgo@4 --multipass --precision=1 --final-newline docs/studies/assets/cerra_wind_levels_*.svg
 uv run python studies/beam_diffuse_split/check_page_numbers.py \
     docs/studies/past-weather/cerra-wind-levels.md \
-    data/studies/cerra_wind_levels_post_hoc/report.md \
+    data/studies/per_study/cerra_wind/levels_post_hoc/report.md \
     --section "## Key findings" \
     --section "### Each XGBoost model has an error of 7.950 to 8.462 points, and on a synthetic target the models can use a second height" \
     --section "### A second height gives most of the gain from using several heights" \

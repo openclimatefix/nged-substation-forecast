@@ -52,6 +52,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Final, cast
 
+import ens_forecast_horizons as efh
 import polars as pl
 from build_forecast_inputs import (
     AIFS_DAYS,
@@ -65,12 +66,9 @@ from build_forecast_inputs import (
     aifs_site_weights,
     ens_member_arms,
 )
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
-import ens_forecast_horizons as efh
-from build_dataset import _pv_sites, nearest_era5_cell, read_era5
-from sources import WEATHER_DATA_DIR
 from studies.guards import refuse_to_overwrite
+from studies.pv_dataset import nearest_era5_cell, pv_sites, read_era5
+from studies.sources import ECMWF_AIFS_PRODUCT_DIR, ERA5_SITE_POINTS_DIR, NWP_WINDOWS_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -124,13 +122,13 @@ def era5_column(*, domain: DomainType, sites: list[str]) -> pl.DataFrame:
     """
     if domain == "wind":
         return (
-            pl.read_parquet(WEATHER_DATA_DIR / "ERA5" / "wind_era5.parquet")
+            pl.read_parquet(ERA5_SITE_POINTS_DIR / "wind_era5.parquet")
             .filter(pl.col("site").is_in(sites))
             .select("site", "time", era5=pl.col("wind_speed_100m") / KM_PER_HOUR_PER_M_PER_S)
             .drop_nulls()
         )
     gridded = read_era5(source="open-meteo")
-    cells = nearest_era5_cell(sites=_pv_sites().filter(pl.col("site").is_in(sites)), era5=gridded)
+    cells = nearest_era5_cell(sites=pv_sites().filter(pl.col("site").is_in(sites)), era5=gridded)
     return (
         cells.join(
             gridded,
@@ -338,7 +336,8 @@ def orientation_table(*, weather_dir: Path) -> tuple[pl.DataFrame, list[str]]:
     """Check the crop's index order, then each cell's anomaly against GEFS's at its coordinates.
 
     Args:
-        weather_dir: The folder holding the AIFS Single and GEFS downloads.
+        weather_dir: The folder holding the AIFS Single download and the `windows/` folder, which
+            holds the GEFS window.
 
     Returns:
         A table of, for each non-central cell, the correlation of its anomaly and of each mirrored
@@ -373,7 +372,7 @@ def orientation_table(*, weather_dir: Path) -> tuple[pl.DataFrame, list[str]]:
             - pl.col("temperature_2m").mean().over("init_time", "lead_time")
         ).collect()
 
-    gefs_dir = weather_dir / GEFS_WINDOW_DIR_NAME
+    gefs_dir = weather_dir / NWP_WINDOWS_DIR.name / GEFS_WINDOW_DIR_NAME
     gefs_cells = pl.read_parquet(gefs_dir / "_grid_cells.parquet").select(
         "lat_index", "lon_index", *key
     )
@@ -735,7 +734,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--published-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--weather-dir", type=Path, default=WEATHER_DATA_DIR)
+    parser.add_argument("--weather-dir", type=Path, default=ECMWF_AIFS_PRODUCT_DIR.parent)
     parser.add_argument(
         "--wiring", action="store_true", help="Run the checks that follow the build."
     )
