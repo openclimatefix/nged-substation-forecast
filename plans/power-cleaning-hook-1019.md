@@ -12,11 +12,12 @@ job straight after `power_time_series_and_metadata`. It reads the whole raw powe
 `TimeSeriesMetadata` roster, passes both to one function, `nged_data.cleaning.flag_nged_power`, and
 writes the result over a new Delta table, `cleaned_power_time_series`. That table holds every raw
 row plus a nullable `drop_reason` column: null for a row that passed, otherwise the name of the rule
-that rejected it. Today `flag_nged_power` flags nothing. The asset reports, per drop reason, how
-many rows and series were flagged and the range of the flagged values, as Dagster output metadata.
-Every reader of power except the ingest and its freshness check — training, CV prediction, live
-forecasting, eligibility, effective capacity, the leaderboard's `metrics`, and the two dashboards —
-switches to the cleaned table's unflagged rows. The raw table is never modified.
+that rejected it. `flag_nged_power` ships with one example rule, which flags zero readings from
+substations. The asset reports, per drop reason, how many rows and series were flagged and the range
+of the flagged values, as Dagster output metadata. Every reader of power except the ingest and its
+freshness check — training, CV prediction, live forecasting, eligibility, effective capacity, the
+leaderboard's `metrics`, and the two dashboards — switches to the cleaned table's unflagged rows.
+The raw table is never modified.
 
 ## Verdict, size and departures
 
@@ -40,8 +41,10 @@ reviewed; this design gets a fresh review.
 **Departures from the issue body.**
 
 - The issue imagines a function that returns the lazy frame it receives, unchanged. Here the
-  function returns the same rows plus a `drop_reason` column that is null everywhere today, so
-  readers see exactly the rows they see now.
+  function returns the same rows plus a `drop_reason` column, and ships with one example rule at
+  the maintainer's request, so the first person to add a rule has a working pattern to copy. The
+  example changes what readers see: on the V1 data (as of 2026-10-05) it flags 5,363 of the
+  2,140,331 rows from the 20 substation series, about 0.25%, and no generator rows.
 - The issue asks for "a" cleaning asset; the plan's asset materialises a cleaned table rather than
   passing a frame through.
 
@@ -81,8 +84,8 @@ comparison, a context window, a re-cleaned recent tail, and a version-triggered 
 
 ### `packages/contracts/src/contracts/power_schemas.py` — new contract (maintainer-approved)
 
-- `DROP_REASONS: Final[tuple[str, ...]] = ()` — the vocabulary of drop reasons, empty today. The
-  docstring says a rule's author adds the rule's reason here with the rule.
+- `DROP_REASONS: Final[tuple[str, ...]] = ("substation_zero",)` — the vocabulary of drop reasons.
+  The docstring says a rule's author adds the rule's reason here with the rule.
 - `CleanedPowerTimeSeries(PowerTimeSeries)` — the same three fields plus `drop_reason: str | None`,
   stored as `pl.String` with the constraint `drop_reason.is_null() |
   drop_reason.is_in(DROP_REASONS)`. Not a `pl.Enum`: the reviewer showed that an Enum column written
@@ -95,11 +98,31 @@ comparison, a context window, a re-cleaned recent tail, and a version-triggered 
 
 - `flag_nged_power(power: pt.LazyFrame[PowerTimeSeries], metadata:
   pt.DataFrame[TimeSeriesMetadata]) -> pt.LazyFrame[CleanedPowerTimeSeries]` — the function the
-  rules go into. `power` is always the whole raw table. Today the function adds a null `drop_reason`
-  column (`pl.lit(None, dtype=pl.String)`; a bare `pl.lit(None)` has the `Null` dtype) and nothing
-  else. The docstring states the contract a rule must keep: return every input
-  row exactly once, never change `time_series_id` or `time`, flag rather than delete, and when two
-  rules match one row, record the first in the function's order.
+  rules go into. `power` is always the whole raw table.
+- **Written for a first-time contributor.** The person adding the real rules has not worked in this
+  repo before, so the function's docstring and comments are the whole of her onboarding. They are
+  short, and say only four things:
+    - where the function sits: `clean_nged_power_data` calls it with the whole raw power table and
+      the roster, about four times a day, and every reader of power then sees only the rows whose
+      `drop_reason` is null;
+    - how to add a rule: write a boolean Polars expression that is true for a row to drop, add it
+      as one more `.when(...).then(pl.lit("<reason>"))` branch, and add the reason to
+      `DROP_REASONS` — the first matching branch wins;
+    - the contract a rule keeps: return every input row exactly once, never change
+      `time_series_id` or `time`, flag rather than delete, and no `collect` inside the function;
+    - how logging works: the asset reports, per reason, the rows and series flagged, the min and
+      max power, and the first and last flagged time to Dagster automatically, so there is no
+      logging code to write; Python `logging` output reaches only the step's captured stderr.
+- **The body is shaped as a template**: join the columns the rules need from `metadata` onto
+  `power` by `time_series_id`, build `drop_reason` with one `pl.when(...).then(...)` chain ending
+  in `.otherwise(pl.lit(None, dtype=pl.String))` (a bare `pl.lit(None)` has the `Null` dtype), and
+  select the four `CleanedPowerTimeSeries` columns.
+- **The example rule, `substation_zero`**: flag a reading of exactly 0 from a series whose
+  `TimeSeriesMetadata.substation_type` is `Primary`, `BSP`, or `GSP` (a module constant,
+  `SUBSTATION_TYPES`). A substation almost never truly reads zero, so a zero is almost always a
+  telemetry fault. On V1 those three types are exactly the 20 `Disaggregated Demand` and `Raw
+  Flow` series; the generators and the battery are `HV Customer` or `EHV Customer`. A series
+  missing from the roster has a null `substation_type` after the left join and is not flagged.
 - `CLEANING_CODE_HASH: Final[str]` — the SHA-256 of this module's own source file, computed at
   import. The skip compares it, so any edit to a cleaning rule forces a rebuild on the next run,
   whether or not the edit is committed, and whether the code runs from a git checkout or from the
@@ -314,11 +337,14 @@ Nothing in this issue builds that table; the mapping is a decision for the issue
 
 ## Tests
 
-- `packages/contracts/tests`: `CleanedPowerTimeSeries.validate` accepts a null `drop_reason`,
-  rejects an unknown string, rejects a duplicate key, and rejects unsorted rows. `test_settings.py`
-  gains a case for the derived `cleaned_power_time_series_data_path`.
-- `packages/nged_data/tests/test_cleaning.py`: `flag_nged_power` returns every input row with a null
-  `drop_reason`. Fails on `main`, where the function does not exist.
+- `packages/contracts/tests`: `CleanedPowerTimeSeries.validate` accepts a null `drop_reason` and
+  `"substation_zero"`, rejects an unknown string, rejects a duplicate key, and rejects unsorted
+  rows. `test_settings.py` gains a case for the derived `cleaned_power_time_series_data_path`.
+- `packages/nged_data/tests/test_cleaning.py`, for the example rule: a substation's zero is flagged
+  `substation_zero`; a substation's non-zero reading, a generator's zero, and a zero from a series
+  missing from the roster are not flagged; and the output has exactly the input's rows. Each case
+  would fail if the rule's condition were widened or narrowed. Fails on `main`, where the function
+  does not exist.
 - `packages/nged_data/tests/test_storage.py`: `scan_cleaned_power` drops flagged rows and returns
   the `PowerTimeSeries` columns only. The existing `time_series_coverage` tests stay green, which is
   the evidence the coverage split is a pure refactor.
@@ -369,7 +395,9 @@ Nothing in this issue builds that table; the mapping is a decision for the issue
 ## Docs to update
 
 - `docs/roadmap/data-cleaning.md` — where rules go (`flag_nged_power`, `DROP_REASONS`), the
-  contract a rule keeps, and that a failed cleaning run leaves readers on the last good table.
+  contract a rule keeps, that a failed cleaning run leaves readers on the last good table, and the
+  example rule. Its opening, which says versions 0.1 to 0.3 train on telemetry uncleaned apart
+  from the timestamp repair, changes to name substation zeros as the one rule applied.
 - `docs/design-philosophy/inherent-stability.md` — the degradation table gains the cleaned-table
   hop.
 - `docs/live_service/operations.md` — what an operator does when `clean_nged_power_data` fails or
@@ -397,7 +425,11 @@ V1 data to check the run time and the on-disk size after vacuum.
    rebuild falls in the 5 minutes before a `live_forecasts` slot; at V2 one that has not finished
    leaves the slot reading the previous cleaned table, which is safe but up to 6 hours staler.
    Recommendation: measure before V2; the append issue is the answer if the rewrite is too slow.
-2. **The roster is not part of the skip test.** A roster change with no new power data leaves the
+2. **The example rule moves the leaderboard.** `metrics` scores against cleaned actuals, so the
+   0.25% of substation rows that read zero stop being scored, and training stops seeing them.
+   Leaderboard rows scored before this change are not strictly comparable with rows scored after
+   it. Recommendation: re-score the current champion and the baselines once this merges.
+3. **The roster is not part of the skip test.** A roster change with no new power data leaves the
    cleaned table as it was until the next NGED delivery, at most about 6 hours later. No rule reads
    the roster today. Recommendation: accept, and add the roster file's modification time to the
    skip test when the first rule that reads the roster lands.
@@ -416,8 +448,8 @@ over are already folded in: the coverage split, the `delta_table_exists` check i
 Accepted:
 
 - `drop_reason` is a `String` with an `is_in` constraint, not a `pl.Enum`: an Enum written to Delta
-  makes every read raise. `DROP_REASONS` therefore starts empty, and the open question about seeding
-  four names is gone.
+  makes every read raise. `DROP_REASONS` therefore needed no seeded names, and the open question
+  about seeding four names is gone (the example rule's reason was added later).
 - `vacuum` needs `enforce_retention_duration=False` below 168 hours; the retention is now 2 hours,
   and the plan states what the retention bounds.
 - Sort before `validate`, which rejects the real V1 data in Delta file order.
@@ -493,3 +525,10 @@ Confirmed by the reviewer: the raw table commits only when new rows arrive; the 
 The cleaning function reports to Dagster only through `drop_reason`. The asset's per-reason
 metadata gains the first and last flagged `time`, as ISO-8601 strings. A richer channel (an
 optional frame of extra stats returned by `flag_nged_power`) waits until a rule needs it.
+
+### First-contributor comments and an example rule (maintainer request)
+
+The first person to add a cleaning rule is new to the repo, so `flag_nged_power`'s docstring and
+comments say briefly where it sits in the pipeline, how it is called, how to add a rule, and how
+logging works, and the function ships with one example rule, `substation_zero`, shaped as a
+template to copy.
