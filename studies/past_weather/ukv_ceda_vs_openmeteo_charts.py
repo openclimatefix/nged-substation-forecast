@@ -4,8 +4,10 @@ One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/1051>. It reads
 `intervals.parquet` and `report.md` (`ukv_ceda_vs_openmeteo_fit.py`), `direct_differences.parquet`
 and `direct_report.md` (`ukv_ceda_vs_openmeteo_compare.py`), and the saved losses for the
-prediction figures. **Every number a figure draws is read from a table, and the script stops before
-drawing unless each difference it draws appears in the report that table was printed into.**
+prediction figures, and the first run's `intervals.parquet` and `report.md` from
+`superseded/first_run/`. **Every number a figure draws is read from a table. For Figures 1, 8, and
+10 the script stops before drawing unless each difference it draws appears in the report that table
+was printed into.**
 Nothing is bootstrapped or refitted here.
 
 - **Figure 1 (headline).** The planned contrasts, CEDA minus Open-Meteo, with 95% intervals and the
@@ -53,6 +55,7 @@ from ukv_ceda_vs_era5_charts import (
 )
 from ukv_ceda_vs_openmeteo_build import OPEN_METEO_WIND_STEP_DAYS, OUTPUT_DIR
 from ukv_ceda_vs_openmeteo_compare import DIFFERENCES_NAME, RATIOS_NAME
+from ukv_ceda_vs_openmeteo_extra_reads import FIRST_RUN_DIR_NAME, FIRST_RUN_SETTINGS
 from ukv_ceda_vs_openmeteo_fit import (
     INTERVALS_NAME,
     PRIMARY_SETTING,
@@ -103,20 +106,20 @@ def headline_title(*, records: Sequence[dict[str, Any]]) -> str:
         for verdict in verdicts(records=cast("list[IntervalRecord]", list(records)))
     }
     return (
-        "Power errors from CEDA's and Open-Meteo's UKV "
-        f"{READING_WORDS[reading[('wind', 'P1')]]} for wind and "
-        f"{READING_WORDS[reading[('solar', 'P2')]]} for solar before PS47, and moving a "
-        "CEDA-trained model onto Open-Meteo's values "
+        "Moving a CEDA-trained model onto Open-Meteo's values "
         f"{TRANSFER_WORDS[reading[('wind', 'P3')]]} for wind and "
-        f"{TRANSFER_WORDS[reading[('solar', 'P3')]]} for solar"
+        f"{TRANSFER_WORDS[reading[('solar', 'P3')]]} for solar. Power errors "
+        f"{READING_WORDS[reading[('wind', 'P1')]]} for wind once two spans are dropped, and "
+        f"{READING_WORDS[reading[('solar', 'P2')]]} for solar before PS47"
     )
 
 
+FIRST_RUN_LABEL: Final[str] = "Spans kept, first run, all hours"
 ERA_0_LABEL: Final[str] = "Before PS47"
 ERA_1_LABEL: Final[str] = "After PS47"
 SCOPES: Final[dict[str, tuple[tuple[str, str, str | None], ...]]] = {
     "wind": (
-        ("all", "All months and hours", None),
+        ("all", "Spans dropped, rerun, all hours (post hoc)", None),
         ("era 0", "Before PS47", None),
         ("era 1", "After PS47", None),
         ("lead 0 only", "CEDA lead 0 only", None),
@@ -179,12 +182,17 @@ def contrast_rows(
 
 
 def headline_figure(
-    *, records: Sequence[dict[str, Any]]
+    *, records: Sequence[dict[str, Any]], first_run_records: Sequence[dict[str, Any]]
 ) -> tuple[alt.VConcatChart, list[pl.DataFrame]]:
     """Draw Figure 1: the planned contrasts, by scope.
 
+    The wind panels start with the first run's row, which kept the two spans in which Open-Meteo's
+    10 m wind speed is built differently and is the planned scope. The rerun's all-hours row drops
+    the spans after the first fit, so it is drawn as a post hoc row.
+
     Args:
         records: The interval records.
+        first_run_records: The first run's interval records, with the current setting names.
 
     Returns:
         The figure and its rows.
@@ -213,6 +221,26 @@ def headline_figure(
         )
         for title, (domain, planned, treatment) in panels.items()
     }
+    for title in ("Wind power, P1: CEDA minus Open-Meteo", "Wind power, P3: transfer penalty"):
+        domain, planned, treatment = panels[title]
+        first_run = contrast_rows(
+            records=first_run_records,
+            selectors=[
+                (
+                    FIRST_RUN_LABEL,
+                    {
+                        "domain": domain,
+                        "label": planned,
+                        "treatment": treatment,
+                        "scope": "all",
+                    },
+                )
+            ],
+        )
+        rerun = rows[title].with_columns(
+            planned=pl.when(pl.int_range(pl.len()) == 0).then(False).otherwise(pl.col("planned"))
+        )
+        rows[title] = pl.concat([first_run, rerun])
     kind = planning(rows=list(rows.values()))
     drawn = [
         contrast_panel(
@@ -550,7 +578,7 @@ def absolute_figure(*, errors: pl.DataFrame) -> alt.VConcatChart:
     return figure(
         panels=panels,  # ty: ignore[invalid-argument-type]
         number=11,
-        title=("Every XGBoost model's error is within about half a point of the others'"),
+        title="Every model's error is within about half a point of the others'",
         subtitle=[
             "Mean absolute error of the XGBoost models on the planned scope, with 95% intervals.",
             "Rows are scored on the same hours within each panel. Figure 10 has the controls.",
@@ -652,7 +680,7 @@ def step_figure(*, daily: pl.DataFrame) -> alt.VConcatChart:
     return figure(
         panels=[panel],  # ty: ignore[invalid-argument-type]
         number=6,
-        title="Open-Meteo's 10 m wind speed steps up against CEDA's in two spans",
+        title="Open-Meteo's wind speed steps up in two spans",
         subtitle=[
             "Daily median ratio at CEDA lead 0, pooled over the nine generator sites.",
             "Orange bands: the two spans that every wind arm drops. Black rule: equal speeds.",
@@ -774,7 +802,7 @@ def by_lead_figure(
     chart = figure(
         panels=panels,  # ty: ignore[invalid-argument-type]
         number=8,
-        title="Wind gaps between the archives grow with CEDA's lead; solar fits disagree at lead 0",
+        title="Wind gaps grow with CEDA's lead; the solar fits disagree at lead 0",
         subtitle=[
             "Dot: estimate. Line: 95% interval from resampling whole months. Grey: the margin.",
             "Positive means CEDA's error is larger. Solar: two fits, both-eras and era-0-trained.",
@@ -856,8 +884,8 @@ def controls_figure(
         subtitle=[
             "Every row is at the primary setting. Each row's second arm is the reference.",
             (
-                "The shuffled-weather controls and the GPU-against-CPU refit show the noise "
-                "around a difference."
+                "The GPU-against-CPU refit sets the noise floor of a refit. The shuffled pair is "
+                "not a clean null."
             ),
         ],
         figure_planning=kind,
@@ -878,10 +906,19 @@ def main() -> int:
     assets: Path = arguments.assets_dir
     assets.mkdir(parents=True, exist_ok=True)
 
-    headline, headline_rows = headline_figure(records=records)
+    first_run_dir = directory / FIRST_RUN_DIR_NAME
+    first_run_records = (
+        pl.read_parquet(first_run_dir / INTERVALS_NAME)
+        .with_columns(setting=pl.col("setting").replace(FIRST_RUN_SETTINGS))
+        .to_dicts()
+    )
+    first_run_report = (first_run_dir / REPORT_NAME).read_text()
+    headline, headline_rows = headline_figure(records=records, first_run_records=first_run_records)
     controls, controls_rows = controls_figure(records=records)
     for rows in (*headline_rows, *controls_rows):
-        check_against_report(rows=rows, report=report, name="the set B report")
+        check_against_report(
+            rows=rows, report=report + first_run_report, name="the set B and first-run reports"
+        )
     headline.save(assets / "fig01_headline.svg")
     controls.save(assets / "fig10_controls.svg")
     by_lead, by_lead_rows = by_lead_figure(records=records)

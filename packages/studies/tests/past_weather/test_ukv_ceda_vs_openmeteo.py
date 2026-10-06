@@ -409,8 +409,11 @@ def test_the_era_0_sensitivity_has_no_controls_and_reads_the_solar_arms():
 
 
 def test_a_scored_arm_is_named_for_its_scoring_frame():
-    assert fit.scored_arm_name(arm="ceda_wind_10m", scoring="ceda") == "ceda_wind_10m"
-    assert fit.scored_arm_name(arm="ceda_wind_10m", scoring="om") == "ceda_wind_10m_scored_on_om"
+    frame = pl.DataFrame({"scoring_archive": [fit.CEDA_OWN, fit.OM_VALUES]})
+
+    named = frame.select(arm=fit.scored_arm_name(arm="ceda_wind_10m"))
+
+    assert named["arm"].to_list() == ["ceda_wind_10m", f"ceda_wind_10m_scored_on_{fit.OM_VALUES}"]
 
 
 def _solar_site_rows() -> pl.DataFrame:
@@ -1260,7 +1263,7 @@ def test_the_daily_ratio_marks_the_days_of_the_spans():
 def test_the_day_flag_includes_the_first_and_last_day_of_each_span():
     days = [datetime(2024, 11, d).date() for d in (6, 7, 30)] + [datetime(2024, 12, 1).date()]
 
-    flags = pl.DataFrame({"day": days}).select(flag=steps.in_wind_step_days_of_day())
+    flags = pl.DataFrame({"day": days}).select(flag=build.in_wind_step_days(day=pl.col("day")))
 
     assert flags["flag"].to_list() == [False, True, True, False]
 
@@ -1270,12 +1273,13 @@ def test_the_day_flag_includes_the_first_and_last_day_of_each_span():
 
 def test_the_first_runs_wind_rows_carry_the_current_setting_names(tmp_path: Path):
     def record(*, label: str, scope: str, setting: str, domain: str = "wind") -> dict[str, object]:
+        difference = 0.162 if setting == "pooled" else 0.146
         return {
             "domain": domain,
             "label": label,
             "scope": scope,
             "setting": setting,
-            "difference_pp": 0.162,
+            "difference_pp": difference,
             "lower_95_pp": 0.08,
             "upper_95_pp": 0.241,
             "reading": "differ",
@@ -1295,14 +1299,13 @@ def test_the_first_runs_wind_rows_carry_the_current_setting_names(tmp_path: Path
     lines = extra_reads.first_run_lines(first_run_dir=tmp_path)
 
     rows = [line for line in lines if line.startswith("| P")]
-    assert [row.split(" | ")[:3] for row in rows] == [
-        ["| P1", "all", "primary"],
-        ["| P1", "all", "second"],
-    ]
+    cells = [row.split(" | ") for row in rows]
+    assert [cell[:3] for cell in cells] == [["| P1", "all", "primary"], ["| P1", "all", "second"]]
+    assert cells[0][3].startswith("+0.162 [+0.080")
+    assert cells[1][3].startswith("+0.146 [+0.080")
 
 
 def test_the_by_hour_read_gives_each_utc_hour_its_run_and_lead():
-    generator = np.random.default_rng(3)
     records = [
         {
             "arm": arm,
@@ -1311,7 +1314,7 @@ def test_the_by_hour_read_gives_each_utc_hour_its_run_and_lead():
             "seed": seed,
             "month": f"2025-{month:02d}",
             "setting": "primary",
-            extra_reads.METRIC: float(generator.uniform()),
+            extra_reads.METRIC: 0.0 if arm == "om_wind_10m" else hour / 1000,
         }
         for month in range(1, 8)
         for hour in range(24)
@@ -1324,3 +1327,5 @@ def test_the_by_hour_read_gives_each_utc_hour_its_run_and_lead():
     assert len(rows) == 24
     assert rows[17][:3] == ["| 17", "12 UTC", "5"]
     assert rows[6][:3] == ["| 06", "06 UTC", "0"]
+    assert rows[17][3].startswith(f"{17 / 1000 * fit.PERCENTAGE_POINTS:+.3f}")
+    assert rows[3][4].startswith(f"{3 / 1000 * fit.PERCENTAGE_POINTS:+.3f}")

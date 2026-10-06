@@ -206,15 +206,7 @@ def daily_ratio(*, frame: pl.DataFrame) -> pl.DataFrame:
             n=pl.len(),
         )
         .sort("day")
-        .with_columns(in_span=in_wind_step_days_of_day())
-    )
-
-
-def in_wind_step_days_of_day() -> pl.Expr:
-    """Return whether a `day` column falls on a day of `OPEN_METEO_WIND_STEP_DAYS`."""
-    return pl.any_horizontal(
-        (pl.col("day") >= pl.lit(first)) & (pl.col("day") <= pl.lit(last))
-        for first, last in OPEN_METEO_WIND_STEP_DAYS
+        .with_columns(in_span=in_wind_step_days(day=pl.col("day")))
     )
 
 

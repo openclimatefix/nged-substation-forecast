@@ -277,17 +277,21 @@ def scoring_names(*, domain: DomainType) -> tuple[str, ...]:
     return (CEDA_OWN, OM_VALUES, *partial)
 
 
-def scored_arm_name(*, arm: str, scoring: str) -> str:
-    """Name a CEDA-trained arm's losses on one scoring frame.
+def scored_arm_name(*, arm: str) -> pl.Expr:
+    """Name a CEDA-trained arm's losses on each scoring frame, from the `scoring_archive` column.
 
     Args:
         arm: The CEDA arm.
-        scoring: The scoring frame's name.
 
     Returns:
-        The arm itself when scored on CEDA's own values, else `<arm>_scored_on_<scoring>`.
+        An expression giving the arm itself when scored on CEDA's own values, else
+        `<arm>_scored_on_<scoring>`.
     """
-    return arm if scoring == CEDA_OWN else f"{arm}_scored_on_{scoring}"
+    return (
+        pl.when(pl.col("scoring_archive") == CEDA_OWN)
+        .then(pl.lit(arm))
+        .otherwise(pl.lit(f"{arm}_scored_on_") + pl.col("scoring_archive"))
+    )
 
 
 def scoring_frames(*, site_rows: pl.DataFrame, domain: DomainType) -> dict[str, pl.DataFrame]:
@@ -342,10 +346,7 @@ def _transfer_site(
         scoring_site_rows=scoring_frames(site_rows=site_rows, domain=domain),
     )
     return losses.with_columns(
-        arm=pl.struct("scoring_archive").map_elements(
-            lambda row: scored_arm_name(arm=arm, scoring=row["scoring_archive"]),
-            return_dtype=pl.String,
-        ),
+        arm=scored_arm_name(arm=arm),
         setting=pl.lit(setting),
         target=pl.lit(target),
     ).drop("scoring_archive")

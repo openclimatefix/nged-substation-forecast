@@ -425,7 +425,6 @@ def _losses_on(site_rows: pl.DataFrame, scoring: dict[str, pl.DataFrame] | None)
 
 def test_a_scoring_frame_is_predicted_by_the_same_fit_as_the_training_frame():
     site_rows = _site_rows()
-    shifted = _scoring_frame(site_rows=site_rows, shift=500.0)
     train = site_rows.filter((pl.col("fold") != 0) & ~pl.col("constrained"))
     test = site_rows.filter(pl.col("fold") == 0)
 
@@ -450,7 +449,6 @@ def test_a_scoring_frame_is_predicted_by_the_same_fit_as_the_training_frame():
 
     assert many["shifted"][0].tolist() == single.tolist()
     assert many["own"][0].tolist() != many["shifted"][0].tolist()
-    assert shifted.height == site_rows.height
 
 
 def test_the_own_frame_scored_through_the_mapping_equals_the_ordinary_losses():

@@ -484,3 +484,19 @@ CEDA's and not from a power result. Wind P3 is a penalty in both runs.
   prior expectation; the noise wording is consistent; Figures 7 and 8 titles are no longer clipped;
   the wind-step paragraph uses the CEDA-minus-Open-Meteo sign; and the figures are renumbered in
   reading order.
+
+## Changed after the third science review and the diff review
+
+**Figure 1 now draws the planned scope beside the post hoc rerun.** The wind P1 and P3 panels start
+with a "spans kept, first run" row read from `superseded/first_run/`, and the rerun's all-hours row
+is labelled post hoc and no longer drawn as planned. The title leads with the P3 readings.
+
+- **Wording fixes:** the lead-0 wind P1 reading is "unresolved" in the first run because its lower
+  bound lies outside the margin, the direction rotation differs by era (about 1.8 and 2.2
+  degrees), the solar "without 2025-01" row is all 23 months and both eras, and the untested
+  lead-training mechanism is stated as probable.
+- **The reproduce block says how to regenerate the first run** (the scripts at commit `22c2faf6`).
+- **Code tidy-ups:** the arm name of a scored frame is one expression, the wind-step day test is
+  one helper, and one test that tested nothing is removed.
+- **The mutation pass over the new code** killed 9 of 9 mutations after two tests were
+  strengthened.

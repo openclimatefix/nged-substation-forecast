@@ -458,13 +458,16 @@ def read_ceda_instants(
     return pl.concat(frames)
 
 
-def in_wind_step_days() -> pl.Expr:
-    """Return whether `time` falls on a day of `OPEN_METEO_WIND_STEP_DAYS`.
+def in_wind_step_days(*, day: pl.Expr | None = None) -> pl.Expr:
+    """Return whether a date falls on a day of `OPEN_METEO_WIND_STEP_DAYS`.
+
+    Args:
+        day: An expression giving the date, which defaults to the `time` column's date.
 
     Returns:
-        A Boolean expression over the `time` column.
+        A Boolean expression.
     """
-    day = pl.col("time").dt.date()
+    day = pl.col("time").dt.date() if day is None else day
     return pl.any_horizontal(
         (day >= pl.lit(first)) & (day <= pl.lit(last)) for first, last in OPEN_METEO_WIND_STEP_DAYS
     )
