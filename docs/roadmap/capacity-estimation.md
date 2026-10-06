@@ -561,13 +561,13 @@ The beam/diffuse decomposition the physics needs (for either candidate — pvlib
 the same inputs as [the differentiable
 model](../techniques/differentiable-physics.md#the-core-building-block-differentiablesolarplant)) is
 covered by the **CAMS Radiation Service**, with two of its 15-minute values summed to the 30-minute
-window the meter averages over. Wind farms take their wind from **CEDA UKV**, the [planned estimate of
-past weather](training-history.md#which-estimate-of-past-weather-to-train-on) for variables other
-than irradiance. [Data sources → Weather data](data-sources.md#weather-data) has both specs and why
-CAMS is preferred to CM SAF SARAH-3. The live **ECMWF ENS** feed carries only GHI — fine for v0.7,
-but v2 physics *forecasting* of PV needs a differentiable GHI → DNI/DHI decomposition model, or
-`fdir` from another source — see [the forward model](disaggregation.md#the-forward-model) for both routes
-and the sources that take them.
+window the meter averages over. Wind farms take their wind from the [planned estimate of past
+weather](training-history.md#which-estimate-of-past-weather-to-train-on) for variables other than
+irradiance, which is **ERA5** in the version-1 plan. [Data sources → Weather
+data](data-sources.md#weather-data) has both specs and why CAMS is preferred to CM SAF SARAH-3. The
+live **ECMWF ENS** feed carries only GHI — fine for v0.7, but v2 physics *forecasting* of PV needs a
+differentiable GHI → DNI/DHI decomposition model, or `fdir` from another source — see [the forward
+model](disaggregation.md#the-forward-model) for both routes and the sources that take them.
 
 **The shared irradiance-bias term has an expected sign, which gives it a prior.** The CAMS Radiation
 Service reads high in clear conditions and low in cloudy ones ([Lezaca Galeano et al.
@@ -588,18 +588,16 @@ pre-estimate](#honest-caveats-of-the-convex-route), whose fleet-median residual 
 clear-sky-normalised. Correcting the irradiance itself is [v2 work on satellite irradiance over
 Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-britain).
 
-> **Design caveat — should capacity estimation stay offline?** Feeding CAMS and UKV into the *live*
+> **Design caveat — should capacity estimation stay offline?** Feeding CAMS and ERA5 into the *live*
 > system adds two near-real-time data dependencies: external feeds to ingest on a daily-ish cadence,
 > monitor, and recover when they lag. Because effective capacity moves slowly (daily blocks), a
-> tempting alternative is to run capacity estimation **offline** on a periodic job that refreshes the
-> [`effective_capacity`](delivery-tables.md#table-4-effective_capacity) table, and keep the
+> tempting alternative is to run capacity estimation **offline** on a periodic job that refreshes
+> the [`effective_capacity`](delivery-tables.md#table-4-effective_capacity) table, and keep the
 > **production forecast path dependent only on ECMWF ENS** (plus the power feed) — no new real-time
 > dependency, and the live forecast just reads the slowly-updated capacity table. The cost is that
-> ECMWF-only would almost certainly give a slightly *worse* capacity estimate than CAMS and UKV
-> would. A second cost applies to wind: CEDA's archived UKV is statistically different from the UKV
-> served live, so a capacity series fitted on the archive and refreshed on the live feed could step
-> where the two meet. Worth weighing before we commit either feed to the real-time critical path; it
-> shapes the [live-service cadence](../architecture/aws-costs.md#workload-model).
+> ECMWF-only would almost certainly give a slightly *worse* capacity estimate than CAMS and ERA5
+> would. Worth weighing before we commit either feed to the real-time critical path; it shapes the
+> [live-service cadence](../architecture/aws-costs.md#workload-model).
 
 ## What the beam/diffuse experiment measured on this fleet
 

@@ -1041,15 +1041,14 @@ included.
 
 Two rungs, in increasing order of "cheating":
 
-- **Gridded estimates of past weather, compared with each other.** The planned estimates of past
-  weather are CAMS for irradiance and the early time steps of the UKV archive held by CEDA, the
-  Centre for Environmental Data Analysis, for other variables, pending a [check of UKV against
-  ERA5](training-history.md#which-estimate-of-past-weather-to-train-on) over 2019 to 2024 and of
-  temperature for demand. ERA5 is kept for gap filling and as a comparison arm. ERA5 is a
-  reanalysis, so it assimilates observations, but it is still a 31 km model field — good, not
-  perfect. This rung scores CEDA's UKV and ERA5 against each other, and
-  [#492](https://github.com/openclimatefix/nged-substation-forecast/issues/492) is where that check
-  sits.
+- **Gridded estimates of past weather, compared with each other.** The version-1 plan is CAMS for
+  irradiance and ERA5 for other variables (see [which estimate of past weather to train
+  on](training-history.md#which-estimate-of-past-weather-to-train-on)). ERA5 is a reanalysis, so it
+  assimilates observations, but it is still a 31 km model field — good, not perfect. A [study of
+  CEDA's UKV archive against ERA5](../studies/past-weather/ukv-ceda-vs-era5.md) scored the two
+  against each other, and
+  [#492](https://github.com/openclimatefix/nged-substation-forecast/issues/492) is where the
+  perfect-weather ceiling sits.
 
 - **Observations.** Observations are measured at the site rather than averaged over a grid cell.
   Observations earn the second rung precisely because a gridded estimate's remaining error is not
@@ -1066,9 +1065,9 @@ Three conditions on reading the result.
 - **The ceiling bounds forecast error, not resolution.** A finer *forecast* can carry site-relevant
   structure that a coarse *analysis* averages away: ERA5 is a 31 km field, while ICON-EU is ~6.5 km
   and post-2023 ENS is 9 km. A low ceiling measured on ERA5 therefore deprioritises a second NWP
-  source without ruling one out. CEDA's UKV, at about 2 km, narrows this gap for every variable
-  except irradiance, and the observations rung closes it, since station and satellite data are
-  at-site rather than grid-cell means.
+  source without ruling one out. A 2 km estimate of past weather such as CEDA's UKV would narrow
+  this gap for every variable except irradiance, and the observations rung closes it, since station
+  and satellite data are at-site rather than grid-cell means.
 
 - **It is a ceiling for the current model family and feature set.** A model that cannot exploit
   perfect weather shows a low ceiling for reasons that have nothing to do with weather availability.
@@ -1222,7 +1221,7 @@ operational NWP?"). Example tags:
 | `training_strategy` | direct_multistep, horizon_as_feature, end_to_end |
 | `generator_capacity_estimation` | none, simple_p99, convex_envelope, differentiable_physics |
 | `switching_event_detection` | none, simple_statistical |
-| `pre_training` | none, CAMS + CEDA UKV, ERA5 |
+| `pre_training` | none, CAMS + ERA5, ERA5 alone |
 
 **Accuracy is published separately for each class of asset** — grid supply points, bulk supply
 points, primary substations, and metered generators — each against its own stated naive baseline,
