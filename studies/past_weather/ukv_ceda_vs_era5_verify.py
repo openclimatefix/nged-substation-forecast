@@ -14,12 +14,14 @@ minutes ending 10 minutes before its label, and both products are instantaneous 
 product that is lowest at another lag has a timestamp convention that differs from the station's,
 and the script exits non-zero.
 
-**Monthly steps.** The monthly mean of UKV-CEDA minus ERA5 and of UKV-CEDA minus the station, for
-wind and for temperature, is written to a table and a chart. A step in a series that is not one of
-the three eras' boundaries is a change of the product that the eras do not name. `step_candidates`
-lists the months that start the largest differences between the mean of the following 6 months and
-the mean of the preceding 6, in units of the series' own month-to-month spread. A step that is found
-becomes an era boundary and a deviation from the plan.
+**Monthly steps (post hoc and exploratory).** The monthly mean of UKV-CEDA minus ERA5, UKV-CEDA
+minus the station, and ERA5 minus the station, for wind and for temperature, raw and with each
+calendar month's mean removed, is written to a table and a chart. `step_candidates` lists the months
+that start the largest differences between the mean of the following 6 months and the mean of the
+preceding 6, in units of the series' own month-to-month spread. No pass or fail threshold applies,
+because none was stated before the series was seen. The maintainer reads the table and the chart,
+and records any era boundary as a deviation. The report also states what the repository records
+about the Met Office's PS44.
 
 **Lead distribution.** The count of station-hours at each UKV-CEDA lead, which is 0 to 5 hours.
 
@@ -49,6 +51,8 @@ from ukv_ceda_vs_era5_build import (
 )
 
 VERIFY_NAME: Final[str] = "verify.md"
+VERIFY_FAILED_NAME: Final[str] = "verify_failed.md"
+"""A failed run writes this, not `verify.md`, which the fit requires, so a fit cannot start."""
 STEPS_NAME: Final[str] = "monthly_steps.parquet"
 CHART_NAME: Final[str] = "monthly_steps.svg"
 
@@ -57,6 +61,17 @@ LAGS: Final[tuple[int, ...]] = (-3, -2, -1, 0, 1, 2, 3)
 
 STEP_WINDOW_MONTHS: Final[int] = 6
 """How many months either side of a candidate step are averaged."""
+
+STEP_SERIES: Final[tuple[str, ...]] = ("ukv_minus_era5", "ukv_minus_station", "era5_minus_station")
+"""The monthly series whose steps are listed. A step in UKV minus the station that has no matching
+step in UKV minus ERA5 points at the station or at ERA5, not at UKV."""
+
+PS44_NOTE: Final[str] = (
+    "PS44, the Met Office physics version between PS43 and PS45: the repository's data-sources "
+    "roadmap (`docs/roadmap/data-sources.md`, the UKV upgrades table) records that no date or "
+    "content for PS44 could be found. This study did not repeat the search, so the table below is "
+    "the only check for an unnamed change."
+)
 
 N_STEP_CANDIDATES: Final[int] = 3
 """How many candidate steps are listed per series."""
@@ -117,7 +132,7 @@ def lowest_lag(*, scan: pl.DataFrame, product: str) -> int:
 
 
 def monthly_steps(*, frame: pl.DataFrame) -> pl.DataFrame:
-    """Return the monthly mean of UKV-CEDA minus ERA5 and of UKV-CEDA minus the station.
+    """Return the monthly means of UKV minus ERA5, UKV minus station, and ERA5 minus station.
 
     Each series uses the station-hours where the station and both products have a value, so the
     two series of one variable rest on the same rows. Only the stations that have such rows in every
@@ -128,7 +143,7 @@ def monthly_steps(*, frame: pl.DataFrame) -> pl.DataFrame:
         frame: `station_hours.parquet`.
 
     Returns:
-        One row per variable and month with `ukv_minus_era5`, `ukv_minus_station` and `n_rows`.
+        One row per variable and month with the three series of `STEP_SERIES` and `n_rows`.
     """
     parts: list[pl.DataFrame] = []
     for variable in scores.VARIABLES:
@@ -142,11 +157,33 @@ def monthly_steps(*, frame: pl.DataFrame) -> pl.DataFrame:
             .agg(
                 ukv_minus_era5=(pl.col(variable.ukv) - pl.col(variable.era5)).mean(),
                 ukv_minus_station=(pl.col(variable.ukv) - pl.col(variable.station)).mean(),
+                era5_minus_station=(pl.col(variable.era5) - pl.col(variable.station)).mean(),
                 n_rows=pl.len(),
             )
             .with_columns(variable=pl.lit(variable.name))
         )
     return pl.concat(parts).sort("variable", "month")
+
+
+def deseasonalised(*, steps: pl.DataFrame) -> pl.DataFrame:
+    """Remove each calendar month's mean from every series, within each variable.
+
+    A raw monthly series carries a seasonal cycle, which inflates a step statistic. Subtracting
+    each calendar month's mean over the years leaves what the cycle does not explain.
+
+    Args:
+        steps: `monthly_steps`'s result.
+
+    Returns:
+        `steps` with a `<series>_deseasonalised` column for each of `STEP_SERIES`.
+    """
+    calendar_month = pl.col("month").str.slice(5, 2)
+    return steps.with_columns(
+        (pl.col(series) - pl.col(series).mean().over("variable", calendar_month)).alias(
+            f"{series}_deseasonalised"
+        )
+        for series in STEP_SERIES
+    )
 
 
 def step_candidates(
@@ -180,13 +217,13 @@ def steps_chart(*, steps: pl.DataFrame) -> alt.Chart:
     """Draw the monthly means as lines, one panel per variable.
 
     Args:
-        steps: `monthly_steps`'s result.
+        steps: `monthly_steps`'s result, which holds the raw series.
 
     Returns:
         The chart.
     """
     long = steps.unpivot(
-        ["ukv_minus_era5", "ukv_minus_station"],
+        list(STEP_SERIES),
         index=["variable", "month"],
         variable_name="series",
         value_name="mean",
@@ -254,18 +291,44 @@ def report_lines(
                 failures.append(f"{variable.name} {product} is lowest at lag {best:+d}")
             maes = " | ".join(f"{value:.3f}" for value in rows["mae"])
             lines.append(f"| {variable.name} | {product} | {maes} | {best:+d} |")
-    steps = monthly_steps(frame=station_hours)
-    lines += ["", "#### Monthly steps", ""]
+    steps = deseasonalised(steps=monthly_steps(frame=station_hours))
+    lines += [
+        "",
+        "#### Monthly steps (post hoc and exploratory, with no pass or fail threshold)",
+        "",
+        PS44_NOTE,
+        "",
+        (
+            "Each series below is a monthly mean over the stations with values in every month. "
+            "Step candidates are the months that start the largest differences between the mean of "
+            "the following 6 months and the mean of the preceding 6, in units of the series' own "
+            "month-to-month spread. A step in UKV minus the station with no matching step in UKV "
+            "minus ERA5 points at the station or at ERA5. No cut-off is applied, because none was "
+            "stated before the series was seen; the maintainer reads the table and the chart and "
+            "records any era boundary as a deviation."
+        ),
+        "",
+    ]
     for variable in scores.VARIABLES:
-        for series in ("ukv_minus_era5", "ukv_minus_station"):
-            rows = steps.filter(pl.col("variable") == variable.name)
-            found = step_candidates(series=rows[series].to_numpy())
-            months = rows["month"].to_list()
-            text = ", ".join(f"{months[i]} ({size:+.1f})" for i, size in found)
-            lines.append(
-                f"- {variable.name}, {series}: largest steps start at "
-                f"{text or 'none (too short)'}, in units of the series' month-to-month spread."
-            )
+        for series in STEP_SERIES:
+            for suffix in ("", "_deseasonalised"):
+                rows = steps.filter(pl.col("variable") == variable.name)
+                found = step_candidates(series=rows[f"{series}{suffix}"].to_numpy())
+                months = rows["month"].to_list()
+                text = ", ".join(f"{months[i]} ({size:+.1f})" for i, size in found)
+                kind = "deseasonalised" if suffix else "raw"
+                lines.append(
+                    f"- {variable.name}, {series}, {kind}: largest steps start at "
+                    f"{text or 'none (too short)'}."
+                )
+    lines += ["", "| Variable | Month | Station-hours | " + " | ".join(STEP_SERIES) + " |"]
+    lines += ["|---|---|---|" + "---|" * len(STEP_SERIES)]
+    lines += [
+        f"| {row['variable']} | {row['month']} | {row['n_rows']:,} | "
+        + " | ".join(f"{row[series]:+.3f}" for series in STEP_SERIES)
+        + " |"
+        for row in steps.iter_rows(named=True)
+    ]
     lines += [
         "",
         "#### Lead distribution (UKV-CEDA lead of each station-hour, in hours)",
@@ -292,9 +355,15 @@ def main() -> int:
         wind=pl.read_parquet(directory / WIND_ROWS_NAME),
         solar=pl.read_parquet(directory / SOLAR_ROWS_NAME),
     )
-    report = "\n".join(lines) + "\n"
+    status = (
+        "Status: FAILED: " + "; ".join(failures)
+        if failures
+        else "Status: every check passed. The monthly-step section has no pass or fail threshold."
+    )
+    report = "\n".join([lines[0], "", status, *lines[1:]]) + "\n"
     if not arguments.dry_run:
-        paths = [directory / name for name in (VERIFY_NAME, STEPS_NAME, CHART_NAME)]
+        name = VERIFY_FAILED_NAME if failures else VERIFY_NAME
+        paths = [directory / name, directory / STEPS_NAME, directory / CHART_NAME]
         refuse_to_overwrite(paths=paths)
         paths[0].write_text(report)
         steps.write_parquet(paths[1])

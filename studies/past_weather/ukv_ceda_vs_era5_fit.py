@@ -323,6 +323,21 @@ def with_actual_and_prediction(*, fitted: pl.DataFrame, frame: pl.DataFrame) -> 
     return pl.concat(parts)
 
 
+def in_stable_order(*, losses: pl.DataFrame) -> pl.DataFrame:
+    """Sort the losses by arm, setting, target, site, time and seed.
+
+    The fits finish in an order that differs from run to run, so the saved per-row file is sorted
+    to make two runs comparable bit for bit.
+
+    Args:
+        losses: Fitted losses, in completion order.
+
+    Returns:
+        The same rows in a fixed order.
+    """
+    return losses.sort("arm", "setting", "target", "site", "time", "seed")
+
+
 def hardware_stamp(*, device: DeviceType) -> dict[str, str]:
     """Record the device, the XGBoost version, and the machine's load before a fit.
 
@@ -381,7 +396,7 @@ def fit_domain(
     fitted = run_all(
         dataset=frame, jobs=jobs, max_workers=workers_for(device=device), device=device
     )
-    losses = with_actual_and_prediction(fitted=fitted, frame=frame)
+    losses = in_stable_order(losses=with_actual_and_prediction(fitted=fitted, frame=frame))
     losses.write_parquet(losses_path)
     fingerprint_path.write_text(_fingerprint(frame=frame, job_list=jobs))
     return losses
@@ -401,7 +416,7 @@ def fit_cpu_refit(*, frame: pl.DataFrame, directory: Path) -> pl.DataFrame:
     losses_path, fingerprint_path = _paths(directory=directory, stem="losses_cpu_refit")
     refuse_to_overwrite(paths=[losses_path, fingerprint_path])
     fitted = run_all(dataset=frame, jobs=jobs, max_workers=workers_for(device="cpu"), device="cpu")
-    losses = with_actual_and_prediction(fitted=fitted, frame=frame)
+    losses = in_stable_order(losses=with_actual_and_prediction(fitted=fitted, frame=frame))
     losses.write_parquet(losses_path)
     fingerprint_path.write_text(_fingerprint(frame=frame, job_list=jobs))
     return losses
@@ -901,6 +916,65 @@ def absolute_lines(*, domain: DomainType, losses: pl.DataFrame) -> list[str]:
     return lines
 
 
+CONTROL_LABELS: Final[tuple[str, ...]] = (
+    "control",
+    "era5 against its shuffled arm",
+    "UKV-CEDA against its shuffled arm",
+)
+"""The contrasts that are controls, which a result near the 5% line sends to the second setting."""
+
+NEAR_LINE_SHARE: Final[float] = 0.2
+"""A result is near the 5% line when a bound of its interval is within this share of the interval's
+width from zero."""
+
+
+def near_the_line(*, record: IntervalRecord) -> bool:
+    """Say whether a result lies near the 5% line.
+
+    Args:
+        record: One interval record.
+
+    Returns:
+        True when the record has an interval and one bound lies within `NEAR_LINE_SHARE` of the
+        interval's width from zero, on either side.
+    """
+    if not record["enough_months"]:
+        return False
+    lower, upper = record["lower_95_pp"], record["upper_95_pp"]
+    return min(abs(lower), abs(upper)) <= NEAR_LINE_SHARE * (upper - lower)
+
+
+def near_line_lines(*, records: Sequence[IntervalRecord]) -> list[str]:
+    """List every control near the 5% line, which must be rerun at the second setting.
+
+    Args:
+        records: Every interval record of set B.
+
+    Returns:
+        Markdown lines.
+    """
+    flagged = [r for r in records if r["label"] in CONTROL_LABELS and near_the_line(record=r)]
+    lines = ["#### Controls near the 5% line", ""]
+    if not flagged:
+        return [
+            *lines,
+            "- None: no control has a bound within 20% of its interval's width of zero.",
+        ]
+    return [
+        *lines,
+        (
+            "- Each control below has a bound within 20% of its interval's width of zero, so the "
+            "study skill asks for a rerun at the second hyperparameter setting. Nothing reruns it "
+            "here."
+        ),
+        *(
+            f"- {r['domain']}, {r['label']}: {r['treatment']} minus {r['reference']}, "
+            f"{r['difference_pp']:+.3f} [{r['lower_95_pp']:+.3f}, {r['upper_95_pp']:+.3f}]."
+            for r in flagged
+        ),
+    ]
+
+
 def records_lines(*, records: Sequence[IntervalRecord], title: str) -> list[str]:
     """Render records as one markdown table.
 
@@ -971,6 +1045,7 @@ def report_text(
         lines += [*records_lines(records=chosen, title=title), ""]
     exploratory = [r for r in records if not r["planned"] and r["kind"] != "site"]
     lines += [*records_lines(records=exploratory, title="Controls and checks (exploratory)"), ""]
+    lines += [*near_line_lines(records=records), ""]
     primary = [r for r in records if not r["planned"] and r["setting"] == PRIMARY_SETTING]
     excluding = [
         r
@@ -1059,6 +1134,9 @@ def main() -> int:
     if arguments.dry_run:
         sys.stdout.write("\n".join(dry_run_lines(frames=frames)) + "\n")
         return 0
+    if not (directory / STATION_INTERVALS_NAME).exists():
+        msg = f"run ukv_ceda_station_scores.py first: {STATION_INTERVALS_NAME} is missing"
+        raise SystemExit(msg)
 
     if arguments.report_only:
         losses = {
@@ -1080,7 +1158,10 @@ def main() -> int:
         stamp = json.loads((directory / STAMP_NAME).read_text())
     else:
         if not arguments.verified or not (directory / VERIFY_NAME).exists():
-            msg = "run ukv_ceda_vs_era5_verify.py, read verify.md, then pass --verified"
+            msg = (
+                "run ukv_ceda_vs_era5_verify.py until it passes (a failed run writes "
+                "verify_failed.md and no verify.md), read verify.md, then pass --verified"
+            )
             raise SystemExit(msg)
         stamp = hardware_stamp(device=arguments.device)
         refuse_to_overwrite(paths=[directory / STAMP_NAME])

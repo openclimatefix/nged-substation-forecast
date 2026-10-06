@@ -1097,3 +1097,108 @@ def test_a_lossy_month_is_dropped_from_every_arms_rows_and_the_eras_stay_three()
 
     assert not {"2022-12", "2023-05", "2019-12", "2026-01"} & set(kept["month"].to_list())
     assert set(kept["era_code"].to_list()) == {0, 1, 2}
+
+
+# --- review 3 fixes -------------------------------------------------------------------------------
+
+
+def _record(*, lower: float, upper: float, enough: bool = True) -> fit.IntervalRecord:
+    losses = _losses(months=8, treatment_error=0.05, reference_error=0.05)
+    record = fit.contrast_record(
+        losses=losses,
+        domain="wind",
+        setting="pooled",
+        label="control",
+        planned=False,
+        kind="all",
+        scope="all",
+        treatment="t",
+        reference="r",
+    )
+    return {**record, "lower_95_pp": lower, "upper_95_pp": upper, "enough_months": enough}
+
+
+@pytest.mark.parametrize(
+    ("lower", "upper", "enough", "expected"),
+    [
+        (0.01, 0.51, True, True),
+        (-0.51, -0.01, True, True),
+        (-0.30, 0.30, True, False),
+        (0.15, 0.65, True, False),
+        (0.01, 0.51, False, False),
+    ],
+)
+def test_a_control_is_near_the_line_when_a_bound_is_within_a_fifth_of_the_width_from_zero(
+    lower: float, upper: float, enough: bool, expected: bool
+):
+    assert fit.near_the_line(record=_record(lower=lower, upper=upper, enough=enough)) is expected
+
+
+def test_the_report_flags_a_control_near_the_line_and_a_non_control_is_not_flagged():
+    near = _record(lower=0.01, upper=0.51)
+    other = fit.IntervalRecord(**{**near, "label": "P3"})
+
+    flagged = fit.near_line_lines(records=[near, other])
+
+    assert sum("wind, control" in line for line in flagged) == 1
+    assert not any("P3" in line for line in flagged)
+    assert "None" in fit.near_line_lines(records=[other])[-1]
+
+
+def test_fitted_losses_are_saved_in_a_fixed_order_whatever_order_the_fits_finish_in():
+    losses = pl.DataFrame(
+        {
+            "arm": ["b", "a", "a", "a"],
+            "setting": ["pooled"] * 4,
+            "target": ["power_mw"] * 4,
+            "site": ["W1"] * 4,
+            "time": pl.Series([EPOCH] * 4, dtype=UTC_US),
+            "seed": [0, 2, 1, 0],
+        }
+    )
+
+    result = fit.in_stable_order(losses=losses)
+
+    assert result["arm"].to_list() == ["a", "a", "a", "b"]
+    assert result["seed"].to_list() == [0, 1, 2, 0]
+
+
+def test_the_fit_rows_are_sorted_by_site_and_time_so_the_shuffle_and_subsampling_are_repeatable():
+    days = pl.datetime_range(
+        datetime(2019, 9, 17, tzinfo=UTC),
+        datetime(2026, 4, 30, tzinfo=UTC),
+        interval="1d",
+        time_zone="UTC",
+        eager=True,
+    )
+    frame = pl.concat(
+        [pl.DataFrame({"site": site, "time": days, "x": 1.0}) for site in ("W2", "W1")]
+    ).sample(fraction=1.0, shuffle=True, seed=3)
+
+    kept = build._finish(frame=frame, shuffle_groups=[("x",)], drop_months=frozenset())
+
+    assert kept.select("site", "time").equals(kept.select("site", "time").sort("site", "time"))
+
+
+def test_the_monthly_steps_carry_era5_minus_station_and_a_deseasonalised_copy_of_every_series():
+    months = [f"{year}-{m:02d}" for year in (2020, 2021) for m in range(1, 13)]
+    frame = pl.DataFrame({"site": "S1", "month": months}).with_columns(
+        station_wind_m_s=pl.lit(1.0),
+        era5_wind_m_s=pl.lit(3.0),
+        ukv_wind_m_s=pl.lit(2.0),
+        station_temp_c=pl.lit(1.0),
+        era5_temp_c=pl.lit(1.0),
+        ukv_temp_c=pl.lit(1.0),
+    )
+    # A seasonal cycle that repeats every year disappears when each calendar month's mean goes.
+    frame = frame.with_columns(
+        ukv_wind_m_s=pl.col("ukv_wind_m_s") + pl.col("month").str.slice(5, 2).cast(pl.Float64)
+    )
+
+    steps = verify.deseasonalised(steps=verify.monthly_steps(frame=frame))
+    wind = steps.filter(pl.col("variable") == "wind")
+
+    assert wind["era5_minus_station"].to_list() == [2.0] * 24
+    assert wind["ukv_minus_era5_deseasonalised"].abs().max() == pytest.approx(0.0)
+    assert float(np.max(wind["ukv_minus_era5"].abs().to_numpy())) > 5.0
+    assert set(verify.STEP_SERIES) <= set(steps.columns)

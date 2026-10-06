@@ -53,6 +53,7 @@ import numpy as np
 import polars as pl
 import zarr
 from cerra_past_solar import check_column_counts
+from deltalake import DeltaTable
 from studies.arm_runner import add_time_features, dataset_path_for
 from studies.blending import climatology_permutation
 from studies.export_cap import with_export_cap
@@ -60,7 +61,15 @@ from studies.grid_sampling import distance_matrix_km, nearest_cells
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.midas import read_hourly_weather, read_station_metadata
 from studies.neighbouring_hours import with_neighbouring_hours
-from studies.pv_dataset import nearest_era5_cell, pv_sites, read_era5, wind_sites
+from studies.pv_dataset import (
+    CAPACITY_DELTA_URI,
+    OPEN_METEO_PATH,
+    POWER_DELTA_URI,
+    nearest_era5_cell,
+    pv_sites,
+    read_era5,
+    wind_sites,
+)
 from studies.solar_product_frames import common_rows as solar_common_rows
 from studies.sources import (
     ERA5_PRODUCT_DIR,
@@ -1001,25 +1010,35 @@ def _finish(
             incomplete UKV-CEDA runs, dropped from every arm.
 
     Returns:
-        The rows ready to fit. The straddling months are dropped by `with_ukv_eras`.
+        The rows ready to fit, sorted by site and time, because the shuffled controls and XGBoost's
+        row subsampling both depend on row order. The straddling months are dropped by
+        `with_ukv_eras`.
     """
     low, high = DROPPED_ERA5_TEMPERATURE_DAYS
-    kept = add_time_features(
-        dataset=frame.filter(~pl.col("time").is_between(low, high, closed="left"))
-    ).filter(~pl.col("month").is_in(list(drop_months)))
+    kept = (
+        add_time_features(
+            dataset=frame.filter(~pl.col("time").is_between(low, high, closed="left"))
+        )
+        .filter(~pl.col("month").is_in(list(drop_months)))
+        .sort("site", "time")
+    )
     cut, _ = with_ukv_eras(frame=kept)
     return _shuffled(frame=cut, groups=shuffle_groups)
 
 
-def check_rows(*, wind: pl.DataFrame, solar: pl.DataFrame) -> None:
+def check_rows(
+    *, wind: pl.DataFrame, solar: pl.DataFrame, wind_keep_zero_hours: pl.DataFrame
+) -> None:
     """Raise unless every arm's columns are present on every row of both fit row sets.
 
     Args:
         wind: The wind rows.
         solar: The solar rows.
+        wind_keep_zero_hours: The wind rows that keep the hours holding an exactly zero half-hour.
     """
     check_arm_widths()
     for frame, arms in (
+        (wind_keep_zero_hours, [wind_arm_columns(product=p) for p in PRODUCTS]),
         (wind, [wind_arm_columns(product=p, shuffled=s) for p in PRODUCTS for s in (False, True)]),
         (
             solar,
@@ -1354,6 +1373,14 @@ def coverage_check(*, read_values: bool = False) -> tuple[list[str], list[str]]:
         read_values=read_values,
         drop_months=drop_months,
     )
+    keep_zero_frame = wind_rows(
+        ukv=ukv,
+        wind=wind,
+        sites=wind_sites(),
+        read_values=read_values,
+        drop_zero_hours=False,
+        drop_months=drop_months,
+    )
     solar_frame = solar_rows(
         ukv=ukv,
         temperature=temperature,
@@ -1373,7 +1400,7 @@ def coverage_check(*, read_values: bool = False) -> tuple[list[str], list[str]]:
         offsets={"wind": wind_offsets, "solar": solar_offsets},
         n_designs={name: len(found) for name, found in designs.items()},
     )
-    check_rows(wind=wind_frame, solar=solar_frame)
+    check_rows(wind=wind_frame, solar=solar_frame, wind_keep_zero_hours=keep_zero_frame)
     lines += [
         "",
         "- Arm feature columns, by arm type: "
@@ -1391,6 +1418,18 @@ def coverage_check(*, read_values: bool = False) -> tuple[list[str], list[str]]:
 # --- Writing --------------------------------------------------------------------------------------
 
 
+INPUT_FILES: Final[tuple[Path, ...]] = (
+    ERA5_WIND_CDS_PATH,
+    ERA5_WIND_NATIVE_PATH,
+    ERA5_CELL_GROUPS_PATH,
+    OPEN_METEO_PATH,
+    dataset_path_for(source="cams_allhours"),
+    HOURLY_WEATHER_PATH,
+    STATION_METADATA_PATH,
+)
+"""Every file the build reads apart from the stores and the two Delta tables, all hashed."""
+
+
 def _file_hash(*, path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -1404,6 +1443,7 @@ class BuildStamp:
     input_hashes: dict[str, str]
     rows: dict[str, int]
     dropped_months: dict[str, float]
+    delta_versions: dict[str, int]
 
     def to_json(self) -> str:
         """Render the stamp as JSON."""
@@ -1497,9 +1537,10 @@ def write_outputs(
             hashlib.sha256(store.statuses.tobytes()).hexdigest() for store in ukv.stores
         ],
         snapshot_ids=list(ukv.snapshot_ids),
-        input_hashes={
-            path.name: _file_hash(path=path)
-            for path in (ERA5_CELL_GROUPS_PATH, STATION_METADATA_PATH)
+        input_hashes={path.name: _file_hash(path=path) for path in INPUT_FILES},
+        delta_versions={
+            "power_time_series": DeltaTable(POWER_DELTA_URI).version(),
+            "effective_capacity": DeltaTable(CAPACITY_DELTA_URI).version(),
         },
         rows={
             "station_hours": station_rows.height,
@@ -1631,7 +1672,7 @@ def main() -> int:
         read_values=True,
         drop_months=drop_months,
     )
-    check_rows(wind=wind_frame, solar=solar_frame)
+    check_rows(wind=wind_frame, solar=solar_frame, wind_keep_zero_hours=keep_zero_frame)
     write_outputs(
         output_dir=arguments.output_dir,
         ukv=ukv,
