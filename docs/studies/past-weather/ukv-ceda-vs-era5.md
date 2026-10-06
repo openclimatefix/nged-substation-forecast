@@ -136,6 +136,11 @@ unlisted, a 6-hourly lead pattern, and three physics eras
 significant at one only, in an era whose 8 months are mostly April to September ([third
 era](#in-2026-the-wind-difference-favours-ukv-ceda-statistically-significantly-at-one-setting-only)).**
 
+**Over hours 0 to 5 of UKV-CEDA, the stations favour UKV-CEDA at every lead and power does not
+([consolidated by lead](#ukv-ceda-is-closer-than-era5-at-the-stations-at-every-lead-but-not-clearly-better-for-power)).**
+The table gives each product's error and the UKV-CEDA minus ERA5 difference by lead 0 to 5 and
+pooled.
+
 **Two further questions, both post hoc, have answers after the results: UKV-CEDA's first leads are
 closer than ERA5 at the four stations, and no UKV-CEDA minus ERA5 difference shows a trend over the
 years that the study can attribute to UKV ([further
@@ -521,6 +526,80 @@ with lead and drops at each run boundary. A feature built over several hours, su
 rolling mean, inherits that pattern. A history from 2019 spans three physics eras, with 3, 67, and 8
 scored months, so the main work would need an era column as the XGBoost models here had.
 
+## UKV-CEDA is closer than ERA5 at the stations at every lead, but not clearly better for power
+
+**UKV-CEDA was closer than ERA5 to the readings at the four stations at every lead from 0 to 5
+hours, and the advantage shrank as the lead grew.** The lead is the hours since the run started, and
+UKV-CEDA here is the stitched hourly series from the freshest of the four runs per day (00, 06, 12,
+and 18 UTC). The table below gives each product's error and the difference at each lead, for set A
+(temperature and wind speed at the four stations) and set B (the power error of XGBoost models at
+the wind and solar farms). The errors are each product's own mean absolute error. The "pooled" row
+of each outcome is the planned contrast (P1 to P4), and every single-lead row and refit row is post
+hoc. Every interval covers month-to-month weather, and the power intervals cover the fitting seed
+too. A negative difference favours UKV-CEDA, and the power rows use the primary hyperparameter
+setting. The table is printed by `ukv_ceda_vs_era5_lead_summary.py` into `lead_summary.md`, from the
+saved intervals. The planned split of P2 by lead, P2-lead, is not in the table: UKV-CEDA minus ERA5
+is -0.187 K [-0.198, -0.176] over leads 0 to 2 and -0.061 K [-0.075, -0.047] over leads 3 to 5.
+
+| Outcome | Lead (hours since the run started) | Status | ERA5 error | UKV-CEDA error | UKV-CEDA minus ERA5 [95% interval] |
+|---|---|---|---|---|---|
+| Temperature (K) | pooled over leads 0 to 5 | planned | 0.711 | 0.587 | -0.124 [-0.135, -0.113] |
+| Temperature (K) | 0 | post hoc | 0.715 | 0.465 | -0.250 [-0.263, -0.237] |
+| Temperature (K) | 1 | post hoc | 0.706 | 0.527 | -0.179 [-0.192, -0.167] |
+| Temperature (K) | 2 | post hoc | 0.702 | 0.572 | -0.131 [-0.144, -0.118] |
+| Temperature (K) | 3 | post hoc | 0.715 | 0.618 | -0.097 [-0.111, -0.083] |
+| Temperature (K) | 4 | post hoc | 0.711 | 0.660 | -0.050 [-0.065, -0.035] |
+| Temperature (K) | 5 | post hoc | 0.718 | 0.682 | -0.035 [-0.050, -0.021] |
+| Wind speed (m/s) | pooled over leads 0 to 5 | planned | 1.066 | 0.925 | -0.140 [-0.156, -0.125] |
+| Wind speed (m/s) | 0 | post hoc | 1.068 | 0.855 | -0.213 [-0.231, -0.197] |
+| Wind speed (m/s) | 1 | post hoc | 1.061 | 0.920 | -0.141 [-0.161, -0.123] |
+| Wind speed (m/s) | 2 | post hoc | 1.067 | 0.932 | -0.135 [-0.151, -0.118] |
+| Wind speed (m/s) | 3 | post hoc | 1.064 | 0.939 | -0.125 [-0.142, -0.108] |
+| Wind speed (m/s) | 4 | post hoc | 1.066 | 0.944 | -0.122 [-0.141, -0.104] |
+| Wind speed (m/s) | 5 | post hoc | 1.067 | 0.961 | -0.106 [-0.124, -0.088] |
+| Wind power (% of capacity) | pooled over leads 0 to 5 | planned | 7.174 | 7.299 | +0.125 [+0.033, +0.216] |
+| Wind power (% of capacity) | 0 | post hoc | 7.143 | 7.085 | -0.058 [-0.192, +0.070] |
+| Wind power (% of capacity) | 1 | post hoc | 7.024 | 7.115 | +0.091 [-0.021, +0.202] |
+| Wind power (% of capacity) | 2 | post hoc | 7.135 | 7.206 | +0.071 [-0.057, +0.185] |
+| Wind power (% of capacity) | 3 | post hoc | 7.141 | 7.313 | +0.173 [+0.049, +0.288] |
+| Wind power (% of capacity) | 4 | post hoc | 7.341 | 7.491 | +0.149 [+0.030, +0.270] |
+| Wind power (% of capacity) | 5 | post hoc | 7.261 | 7.583 | +0.323 [+0.205, +0.437] |
+| Wind power (% of capacity) | refit on lead 0 rows | post hoc | 7.224 | 7.158 | -0.065 [-0.203, +0.069] |
+| Wind power (% of capacity) | refit on leads 0 to 1 rows | post hoc | 7.121 | 7.128 | +0.007 [-0.107, +0.117] |
+| Solar power (% of capacity) | pooled over leads 0 to 5 | planned | 4.877 | 4.876 | -0.001 [-0.009, +0.004] |
+| Solar power (% of capacity) | 0 | post hoc | 4.541 | 4.544 | +0.003 [-0.008, +0.016] |
+| Solar power (% of capacity) | 1 | post hoc | 4.400 | 4.392 | -0.009 [-0.020, +0.002] |
+| Solar power (% of capacity) | 2 | post hoc | 4.732 | 4.731 | -0.001 [-0.011, +0.009] |
+| Solar power (% of capacity) | 3 | post hoc | 5.162 | 5.161 | -0.001 [-0.012, +0.008] |
+| Solar power (% of capacity) | 4 | post hoc | 5.408 | 5.408 | -0.000 [-0.013, +0.012] |
+| Solar power (% of capacity) | 5 | post hoc | 5.011 | 5.011 | -0.000 [-0.015, +0.012] |
+| Solar power (% of capacity) | refit on lead 0 rows | post hoc | 4.676 | 4.669 | -0.007 [-0.017, +0.004] |
+| Solar power (% of capacity) | refit on leads 0 to 1 rows | post hoc | 4.538 | 4.528 | -0.010 [-0.020, -0.001] |
+
+**At the stations, UKV-CEDA was closer at every lead, from -0.250 K at lead 0 to -0.035 K at lead 5
+for temperature and from -0.213 m/s to -0.106 m/s for wind speed (both post hoc).** ERA5's own
+error stays between 0.702 K and 0.718 K for temperature and between 1.061 m/s and 1.068 m/s for
+wind speed across the six leads, so the shrinking advantage comes from UKV-CEDA's error growing.
+UKV probably assimilates these four stations, although the page has not checked which stations UKV
+assimilates, so the stations are not independent of UKV. The advantage falling with lead fits
+assimilation and also fits forecast error growing from each run, and the page tests neither.
+
+**For wind power, UKV-CEDA was level with ERA5 at leads 0 to 2 and behind it at leads 3 to 5. For
+solar power, UKV-CEDA was level at every lead. No power row shows UKV-CEDA ahead by as much as a
+planned margin (post hoc).** For wind power the difference is -0.058 points [-0.192, +0.070] at lead
+0, and ERA5 is statistically significantly ahead at leads 3, 4, and 5, by +0.173, +0.149, and +0.323
+points. The XGBoost models refitted on the lead-0 rows alone give -0.065 points [-0.203, +0.069],
+and on the lead 0 to 1 rows alone +0.007 points [-0.107, +0.117]. For solar power, no interval at
+any lead reaches further than 0.020 points from zero, and the refit on the lead 0 to 1 rows gives
+-0.010 points [-0.020, -0.001], which is statistically significant and inside the 0.06-point margin.
+The page does not claim that ERA5 beats UKV, because the XGBoost models given ERA5 and those given
+UKV-CEDA differ in the height and the served lead of their inputs as well as in the product.
+
+**Three scope limits apply to the table.** Lead 0 covers only the 00, 06, 12, and 18 UTC hours, so
+the lead-0 rows score 4 hours of the day, and each lead pools different hours of the day. A solar
+hour's temperature averages the instants at both ends of the hour, so a solar lead-0 hour also
+reads the previous run's lead 5. The page does not decide what Flexpectation version 1 will use.
+
 ## Two further questions: the first hours of each UKV run, and change over the years
 
 **The study answers two further questions, both post hoc.** Question 1 is whether UKV-CEDA beats
@@ -684,6 +763,7 @@ uv run python studies/past_weather/ukv_ceda_vs_era5_fit.py --fit-lead-restricted
 D=data/studies/per_study/ukv_ceda_vs_era5
 mkdir -p "$D/superseded" && mv "$D"/{intervals.parquet,report.md,decision.md} "$D/superseded/"
 uv run python studies/past_weather/ukv_ceda_vs_era5_fit.py --report-only
+uv run python studies/past_weather/ukv_ceda_vs_era5_lead_summary.py
 uv run python studies/past_weather/ukv_ceda_vs_era5_charts.py
 npx svgo@4 --multipass --precision=1 --final-newline docs/studies/assets/ukv_ceda_vs_era5/*.svg
 ```

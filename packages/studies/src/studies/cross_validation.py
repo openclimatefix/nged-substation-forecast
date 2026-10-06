@@ -472,28 +472,76 @@ def fit_one_fold(
     Returns:
         The point predictions, and the quantile predictions or `None`.
     """
+    return fit_one_fold_scoring_many(
+        train=train,
+        tests={"test": test},
+        features=features,
+        target=target,
+        hyper_parameters=hyper_parameters,
+        seed=seed,
+        with_quantiles=with_quantiles,
+        weight=weight,
+        device=device,
+    )["test"]
+
+
+def fit_one_fold_scoring_many(
+    *,
+    train: pl.DataFrame,
+    tests: Mapping[str, pl.DataFrame],
+    features: list[str],
+    target: str,
+    hyper_parameters: HyperParameters,
+    seed: int,
+    with_quantiles: bool,
+    weight: str | None = None,
+    device: DeviceType = "cpu",
+) -> dict[str, tuple[np.ndarray, np.ndarray | None]]:
+    """Fit one point model, optionally one quantile model, and predict every test frame with it.
+
+    **One booster scores every frame**, so two frames that carry different values for the same
+    rows are scored by identical trees, and the difference between their errors is the effect of
+    the values alone.
+
+    Args:
+        train: The training rows.
+        tests: The frames to predict, each holding every column in `features`, by name.
+        features: The feature columns to show the model.
+        target: The column to predict.
+        hyper_parameters: Settings shared by every arm.
+        seed: The XGBoost random seed.
+        with_quantiles: Whether to fit the quantile model as well.
+        weight: A column of training-row weights, or `None` to weigh every row alike.
+        device: XGBoost's device, `"cpu"` or `"cuda"`.
+
+    Returns:
+        For each name in `tests`, the point predictions and the quantile predictions or `None`.
+    """
     train_matrix = xgb.DMatrix(
         train.select(features).to_numpy(),
         label=train[target].to_numpy(),
         weight=None if weight is None else train[weight].to_numpy(),
     )
-    test_matrix = xgb.DMatrix(test.select(features).to_numpy())
     shared = booster_parameters(hyper_parameters=hyper_parameters, seed=seed, device=device)
     rounds = hyper_parameters["num_boost_round"]
+    matrices = {name: xgb.DMatrix(test.select(features).to_numpy()) for name, test in tests.items()}
 
     point_model = xgb.train(
         {**shared, "objective": "reg:absoluteerror"}, train_matrix, num_boost_round=rounds
     )
-    point = point_model.predict(test_matrix)
+    points = {name: point_model.predict(matrix) for name, matrix in matrices.items()}
     if not with_quantiles:
-        return point, None
+        return {name: (point, None) for name, point in points.items()}
 
     quantile_model = xgb.train(
         {**shared, "objective": "reg:quantileerror", "quantile_alpha": np.asarray(QUANTILE_LEVELS)},
         train_matrix,
         num_boost_round=rounds,
     )
-    return point, np.atleast_2d(quantile_model.predict(test_matrix))
+    return {
+        name: (points[name], np.atleast_2d(quantile_model.predict(matrix)))
+        for name, matrix in matrices.items()
+    }
 
 
 def out_of_fold_losses(
@@ -505,6 +553,7 @@ def out_of_fold_losses(
     with_quantiles: bool,
     weight: str | None = None,
     device: DeviceType = "cpu",
+    scoring_site_rows: Mapping[str, pl.DataFrame] | None = None,
 ) -> pl.DataFrame:
     """Produce out-of-fold losses for one feature set at one site, one row per (test row, seed).
 
@@ -522,11 +571,34 @@ def out_of_fold_losses(
         with_quantiles: Whether to score the continuous ranked probability score too.
         weight: A column of training-row weights, or `None` to weigh every row alike.
         device: XGBoost's device for every fit, `"cpu"` or `"cuda"`.
+        scoring_site_rows: Frames to score each fold's model on, by name. Each holds the same
+            times as `site_rows` and the feature columns of another source under the training
+            columns' names. One model per fold and seed scores every frame, so the frames' losses
+            differ only by their feature values. The target, `fold`, `cap_mw`, `constrained` and
+            capacity always come from `site_rows`, and a `fold` column in a scoring frame must
+            agree with it. When `None`, each fold is scored on its own `site_rows` rows.
 
     Returns:
         One row per (time, seed) with the losses in megawatts and as a fraction of the row's own
-        capacity.
+        capacity. With `scoring_site_rows`, one row per (frame, time, seed), labelled by a
+        `scoring_archive` column.
+
+    Raises:
+        ValueError: If a scoring frame's times, folds, or feature columns do not match `site_rows`.
     """
+    if scoring_site_rows is not None:
+        return _out_of_fold_losses_on_many_frames(
+            site_rows=site_rows,
+            features=features,
+            target=target,
+            hyper_parameters=hyper_parameters,
+            with_quantiles=with_quantiles,
+            weight=weight,
+            device=device,
+            scoring_frames=_aligned_scoring_frames(
+                site_rows=site_rows, features=features, scoring_site_rows=scoring_site_rows
+            ),
+        )
     outputs: list[pl.DataFrame] = []
     for fold in sorted(site_rows["fold"].unique().to_list()):
         test = site_rows.filter(pl.col("fold") == fold)
@@ -552,6 +624,119 @@ def out_of_fold_losses(
             )
             outputs.append(
                 _losses(test=test, actual=actual, point=point, quantiles=quantiles, seed=seed)
+            )
+    return pl.concat(outputs)
+
+
+def _aligned_scoring_frames(
+    *,
+    site_rows: pl.DataFrame,
+    features: Sequence[str],
+    scoring_site_rows: Mapping[str, pl.DataFrame],
+) -> dict[str, pl.DataFrame]:
+    """Put every scoring frame's feature values on `site_rows`'s rows, in `site_rows`'s order.
+
+    Args:
+        site_rows: Every row for one site.
+        features: The feature columns, which may carry a `{fold}` placeholder.
+        scoring_site_rows: The frames to score on, by name.
+
+    Returns:
+        For each name, a copy of `site_rows` whose feature columns hold the scoring frame's values.
+
+    Raises:
+        ValueError: If a frame repeats a time, holds other times than `site_rows`, lacks a feature
+            column, or carries a `fold` that disagrees with `site_rows`.
+    """
+    columns = sorted(
+        {name.format(fold=fold) for name in features for fold in site_rows["fold"].unique()}
+    )
+    aligned: dict[str, pl.DataFrame] = {}
+    for name, frame in scoring_site_rows.items():
+        missing = [column for column in columns if column not in frame.columns]
+        if missing:
+            msg = f"scoring frame {name!r} lacks the feature columns {missing}"
+            raise ValueError(msg)
+        if frame["time"].n_unique() != frame.height:
+            msg = f"scoring frame {name!r} repeats a time"
+            raise ValueError(msg)
+        if set(frame["time"].to_list()) != set(site_rows["time"].to_list()):
+            msg = f"scoring frame {name!r} holds other times than site_rows"
+            raise ValueError(msg)
+        has_fold = "fold" in frame.columns
+        joined = site_rows.select("time", "fold").join(
+            frame.select(
+                "time", *columns, **({"scoring_fold": pl.col("fold")} if has_fold else {})
+            ),
+            on="time",
+            how="left",
+            maintain_order="left",
+        )
+        if has_fold and not joined["fold"].equals(joined["scoring_fold"]):
+            msg = f"scoring frame {name!r} assigns folds that differ from site_rows"
+            raise ValueError(msg)
+        aligned[name] = site_rows.drop(*(c for c in columns if c in site_rows.columns)).hstack(
+            joined.select(columns)
+        )
+    return aligned
+
+
+def _out_of_fold_losses_on_many_frames(
+    *,
+    site_rows: pl.DataFrame,
+    features: Sequence[str],
+    target: str,
+    hyper_parameters: HyperParameters,
+    with_quantiles: bool,
+    weight: str | None,
+    device: DeviceType,
+    scoring_frames: Mapping[str, pl.DataFrame],
+) -> pl.DataFrame:
+    """Fit each fold once per seed and score the fold's rows in every scoring frame.
+
+    Args:
+        site_rows: Every row for one site.
+        features: The feature columns, which may carry a `{fold}` placeholder.
+        target: The column to predict.
+        hyper_parameters: The setting to fit at.
+        with_quantiles: Whether to score the continuous ranked probability score too.
+        weight: A column of training-row weights, or `None`.
+        device: XGBoost's device.
+        scoring_frames: `_aligned_scoring_frames`'s result.
+
+    Returns:
+        The losses of every frame, with a `scoring_archive` column.
+    """
+    outputs: list[pl.DataFrame] = []
+    for fold in sorted(site_rows["fold"].unique().to_list()):
+        train = site_rows.filter((pl.col("fold") != fold) & ~pl.col("constrained"))
+        tests = {
+            name: frame.filter(pl.col("fold") == fold) for name, frame in scoring_frames.items()
+        }
+        if train.is_empty() or all(test.is_empty() for test in tests.values()):
+            continue
+        fold_features = [name.format(fold=fold) for name in features]
+        for seed in SEEDS:
+            predictions = fit_one_fold_scoring_many(
+                train=train,
+                tests=tests,
+                features=fold_features,
+                target=target,
+                hyper_parameters=hyper_parameters,
+                seed=seed,
+                with_quantiles=with_quantiles,
+                weight=weight,
+                device=device,
+            )
+            outputs.extend(
+                _losses(
+                    test=tests[name],
+                    actual=tests[name][target].to_numpy(),
+                    point=point,
+                    quantiles=quantiles,
+                    seed=seed,
+                ).with_columns(scoring_archive=pl.lit(name))
+                for name, (point, quantiles) in predictions.items()
             )
     return pl.concat(outputs)
 
