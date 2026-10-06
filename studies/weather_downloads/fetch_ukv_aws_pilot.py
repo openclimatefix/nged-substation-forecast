@@ -20,13 +20,14 @@ and printed, and the run stops once `--max-wire-gb` is exceeded.
 
 **What is fetched.** Screen temperature, 10 m wind speed and direction, the total, direct, and
 diffuse downward short-wave, and wind speed and direction at the hub heights in `HUB_HEIGHTS_M`,
-for leads 0 to 5 of every requested run, on at most two days (one near the start of the bucket's
-window and one recent by default; `--allow-more-days` lifts the limit). One compressed `.npz` per
-run holds each variable as `(lead, [height,] row, column)`, decoded with the file's own
-`scale_factor`, `add_offset` and fill value, together with the file's units, cell methods, time
-value and time bounds, which say whether a field is an instant or a mean. Each run is written to a
-`.partial` file and renamed, so a re-run skips the runs already done. The output folder is
-write-once: a run whose file exists is never rewritten.
+for leads 0 to 5 of every requested run, one UTC day at a time. The default range is the first
+day with 24 runs to yesterday (UTC); `--start` and `--end` override it, and a range over `MAX_DAYS`
+is refused. One compressed `.npz` per run holds each variable as `(lead, [height,] row, column)`,
+decoded with the file's own `scale_factor`, `add_offset` and fill value, together with the file's
+units, cell methods, time value and time bounds. Each run is written to a `.partial` file and
+renamed. After a day's runs are all on disk, `ledger/<day>.json` is written the same way, and a
+re-run skips every day that has a ledger entry and every run that has a file, so a restart costs
+at most one day. The output folder (`UKV-AWS`) is write-once and never touches `UKV-AWS_pilot`.
 
 **Concurrency.** `h5py` serialises every call under one global lock and the network read happens
 inside it, so threads would give no concurrency. The script uses a process pool.
@@ -34,8 +35,7 @@ inside it, so threads would give no concurrency. The script uses a process pool.
 Run `--dry-run` first: it lists the bucket, prints the object count, the whole-file bytes and the
 grid projection, and reads only the axes of one small file.
 
-    uv run --with fsspec --with aiohttp python studies/weather_downloads/fetch_ukv_aws_pilot.py \
-        --dry-run
+    uv run python studies/weather_downloads/fetch_ukv_aws_pilot.py --dry-run
 """
 
 import argparse
@@ -46,7 +46,7 @@ import shutil
 import time
 from collections import defaultdict
 from collections.abc import Iterator, Mapping, Sequence
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -66,8 +66,9 @@ CODE_VERSION: Final[str] = "fetch_ukv_aws_pilot-2"
 BUCKET_URL: Final[str] = "https://met-office-atmospheric-model-data.s3-eu-west-2.amazonaws.com"
 PREFIX: Final[str] = "uk-deterministic-2km/"
 REGISTRY_URL: Final[str] = "https://registry.opendata.aws/met-office-uk-deterministic/"
-PRODUCT_DIR: Final[Path] = NWP_DOWNLOADS_DIR / "UKV-AWS_pilot"
-"""The write-once output folder."""
+PRODUCT_DIR: Final[Path] = NWP_DOWNLOADS_DIR / "UKV-AWS"
+"""The write-once output folder. The two-day pilot lives in `UKV-AWS_pilot`, which this script never
+writes."""
 
 LEADS_HOURS: Final[tuple[int, ...]] = (0, 1, 2, 3, 4, 5)
 HUB_HEIGHTS_M: Final[tuple[float, ...]] = (50.0, 75.0, 100.0, 150.0)
@@ -93,12 +94,12 @@ ALL_FILES: Final[tuple[str, ...]] = SURFACE_FILES + LEVEL_FILES
 
 GRID_SHAPE: Final[tuple[int, int]] = (970, 1042)
 RUNS_PER_DAY: Final[int] = 24
-EARLY_MARGIN_DAYS: Final[int] = 2
-"""The early day sits this many days after the window's first full day, because the oldest runs are
-deleted object by object and may be part-gone."""
-MAX_DAYS: Final[int] = 2
-"""The most days one invocation fetches, unless `--allow-more-days` is passed."""
-DEFAULT_MAX_WIRE_GB: Final[float] = 5.0
+MAX_DAYS: Final[int] = 800
+"""The most days one invocation covers. The bucket holds 733 or so, so a typo is bounded."""
+DEFAULT_MAX_WIRE_GB: Final[float] = 600.0
+"""Stop once this many gigabytes have been requested in one invocation. The pilot measured 0.43 MB
+per object, so the whole window needs about 360 GB."""
+LISTING_THREADS: Final[int] = 4
 
 WORKERS: Final[int] = 8
 MAX_ATTEMPTS: Final[int] = 5
@@ -186,8 +187,14 @@ def _next_token(*, page: ElementTree.Element) -> str | None:
     return token
 
 
-def list_keys(*, prefix: str) -> dict[str, int]:
-    """List every object under `prefix` with its size in bytes."""
+def list_keys(*, prefix: str, until: str | None = None) -> dict[str, int]:
+    """List objects under `prefix` with their sizes in bytes.
+
+    Args:
+        prefix: The key prefix to list.
+        until: If given, stop after the first page whose last key sorts after this key. S3 lists
+            keys in order, so every key at or before `until` has been seen by then.
+    """
     sizes: dict[str, int] = {}
     token: str | None = None
     while True:
@@ -197,7 +204,7 @@ def list_keys(*, prefix: str) -> dict[str, int]:
                 item.findtext(f"{_S3_NAMESPACE}Size", "0")
             )
         token = _next_token(page=page)
-        if token is None:
+        if token is None or (until is not None and max(sizes, default="") > until):
             return sizes
 
 
@@ -216,18 +223,52 @@ def list_runs() -> list[str]:
             return sorted(runs)
 
 
-def choose_days(*, runs: Sequence[str]) -> tuple[dt.date, dt.date]:
-    """Pick the early day and the recent day: full days of 24 runs only."""
+def default_range(*, runs: Sequence[str], today: dt.date) -> tuple[dt.date, dt.date]:
+    """Return the first day with all 24 runs, and yesterday (UTC), so that every day is complete."""
     per_day: dict[str, int] = defaultdict(int)
     for run in runs:
         per_day[run[:8]] += 1
     full_days = sorted(day for day, count in per_day.items() if count == RUNS_PER_DAY)
-    if len(full_days) <= EARLY_MARGIN_DAYS:
-        message = "the bucket holds too few full days to choose from"
+    if not full_days:
+        message = "the bucket holds no full day"
         raise RuntimeError(message)
-    early = dt.datetime.strptime(full_days[EARLY_MARGIN_DAYS], "%Y%m%d").date()  # noqa: DTZ007
-    recent = dt.datetime.strptime(full_days[-1], "%Y%m%d").date()  # noqa: DTZ007
-    return early, recent
+    first = dt.datetime.strptime(full_days[0], "%Y%m%d").date()  # noqa: DTZ007
+    return first, today - dt.timedelta(days=1)
+
+
+def day_range(*, start: dt.date, end: dt.date) -> list[dt.date]:
+    """List every date from `start` to `end` inclusive.
+
+    Raises:
+        ValueError: If `end` is before `start`, or the range is longer than `MAX_DAYS`.
+    """
+    count = (end - start).days + 1
+    if count < 1 or count > MAX_DAYS:
+        message = f"{start} to {end} is {count} days; the limit is 1 to {MAX_DAYS}"
+        raise ValueError(message)
+    return [start + dt.timedelta(days=offset) for offset in range(count)]
+
+
+def ledger_path(*, product_dir: Path, day: dt.date) -> Path:
+    """The file whose existence says the day was fetched completely."""
+    return product_dir / "ledger" / f"{day:%Y%m%d}.json"
+
+
+def commit_day(*, product_dir: Path, day: dt.date, record: Mapping[str, Any]) -> None:
+    """Record a finished day, via a `.partial` file and a rename so it is never half-written."""
+    path = ledger_path(product_dir=product_dir, day=day)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    partial = path.with_name(path.name + ".partial")
+    partial.write_text(json.dumps(record, indent=2))
+    partial.rename(path)
+
+
+def listing_bound(*, run: str) -> str:
+    """The largest key that can belong to a wanted object of `run`: its last lead's valid time."""
+    last = dt.datetime.strptime(run, "%Y%m%dT%H%MZ").replace(tzinfo=dt.UTC) + dt.timedelta(
+        hours=max(LEADS_HOURS)
+    )
+    return f"{PREFIX}{run}/{last:%Y%m%dT%H%MZ}-PT9999"
 
 
 def wanted_keys(
@@ -617,29 +658,26 @@ def fetch_run(
     return final, int(arrays["wire_bytes"])
 
 
-def dry_run(*, plan: Mapping[str, tuple[list[tuple[str, int, str]], list[str], int]]) -> None:
-    """Print what would be fetched from a plan of `run -> (found, missing, whole-file bytes)`."""
-    by_day: dict[str, list[int]] = defaultdict(lambda: [0, 0, 0, 0])
-    for run, (found, missing, size) in plan.items():
-        entry = by_day[run[:8]]
-        entry[0] += 1
-        entry[1] += len(found)
-        entry[2] += len(missing)
-        entry[3] += size
-    for day, (runs, objects, absent, size) in by_day.items():
-        print(
-            f"{day}: {runs} runs, {objects} objects, {absent} expected objects absent, "
-            f"{size / 1e9:.2f} GB if fetched whole"
-        )
-    total_objects = sum(len(found) for found, _, _ in plan.values())
-    total_size = sum(size for _, _, size in plan.values())
-    print(f"TOTAL: {total_objects} objects; {total_size / 1e9:.2f} GB whole-file equivalent.")
-    print("Wire bytes are measured on the real run, which sums the bytes requested per object.")
-    print(f"Output folder (write-once): {PRODUCT_DIR}")
+RunPlan = tuple[list[tuple[str, int, str]], list[str], int]
+"""For one run: the objects to fetch, the `lead:file` names absent from the listing, and the
+whole-file bytes of the objects to fetch."""
+
+
+def plan_run(run: str) -> RunPlan:
+    """List one run's first hours and choose its objects."""
+    available = list_keys(prefix=f"{PREFIX}{run}/", until=listing_bound(run=run))
+    found, missing = wanted_keys(run=run, available=available)
+    return found, missing, sum(available[key] for key, _, _ in found)
+
+
+def plan_day(*, day_runs: Sequence[str]) -> dict[str, RunPlan]:
+    """Plan every run of one day, listing the runs concurrently."""
+    with ThreadPoolExecutor(max_workers=LISTING_THREADS) as listing_pool:
+        return dict(zip(day_runs, listing_pool.map(plan_run, day_runs), strict=True))
 
 
 def _summarise_folder() -> dict[str, Any]:
-    """Describe every run file in the folder: runs, variable attributes, absences, wire bytes."""
+    """Describe the run files in the folder: count, span, variable attributes, absences, bytes."""
     runs: list[str] = []
     attributes: dict[str, dict[str, str]] = {}
     missing: dict[str, list[str]] = {}
@@ -651,15 +689,49 @@ def _summarise_folder() -> dict[str, Any]:
             run_missing = json.loads(str(archive["missing"]))
             if run_missing:
                 missing[path.stem] = run_missing
-            for key in archive.files:
-                if key.endswith("__attributes"):
-                    name = key.removesuffix("__attributes")
-                    attributes.setdefault(name, json.loads(str(archive[key])))
+            if not attributes:
+                for key in archive.files:
+                    if key.endswith("__attributes"):
+                        attributes[key.removesuffix("__attributes")] = json.loads(str(archive[key]))
     return {"runs": runs, "attributes": attributes, "missing": missing, "wire_bytes": wire_bytes}
+
+
+GOTCHAS: Final[tuple[str, ...]] = (
+    (
+        "The grid is a Lambert azimuthal equal-area grid (GRS80, latitude of origin 54.9, "
+        "longitude of origin -2.5), not CEDA's national grid."
+    ),
+    (
+        "Row 0 is the southernmost row: `projection_y_coordinate` increases with the row "
+        "index. CEDA's rows run north to south."
+    ),
+    (
+        "Every field is an instantaneous value at its valid time, shortwave included. No file"
+        " carries `cell_methods` or time bounds for any kept variable, so that rests on the "
+        "absence of bounds."
+    ),
+    (
+        "The wind files on height levels hold 33 levels in 2024 and 56 in 2026, and 125 m "
+        "exists only in 2026. The kept heights, 50, 75, 100, and 150 m, are in every file "
+        "checked."
+    ),
+    (
+        "In the two pilot days, total shortwave equalled direct plus diffuse to rounding on "
+        "2026-10-05 but not on 2024-10-08, where the daytime mean absolute residual was 8 to "
+        "42 W m-2 per run hour. Check the residual month by month before relying on the three"
+        " components in 2024."
+    ),
+    (
+        "The files hold no `scale_factor`, `add_offset` or fill value in the pilot days; the "
+        "script decodes them if present."
+    ),
+    ("The bucket is a rolling two-year window, so an early day can no longer be fetched later."),
+)
 
 
 def write_notes(*, summary: Mapping[str, Any]) -> None:
     """Write the lineage note and README from what the run files hold."""
+    runs = summary["runs"]
     write_lineage_note(
         product_dir=PRODUCT_DIR,
         source_address=f"{BUCKET_URL}/{PREFIX}",
@@ -669,7 +741,9 @@ def write_notes(*, summary: Mapping[str, Any]) -> None:
         variables=list(ALL_FILES),
         extra={
             "code_version": CODE_VERSION,
-            "runs": summary["runs"],
+            "run_files": len(runs),
+            "first_run": runs[0] if runs else None,
+            "last_run": runs[-1] if runs else None,
             "attributes_per_variable": summary["attributes"],
             "missing_objects_per_run": summary["missing"],
             "wire_bytes_requested": summary["wire_bytes"],
@@ -692,7 +766,7 @@ def write_notes(*, summary: Mapping[str, Any]) -> None:
     }
     write_readme(
         product_dir=PRODUCT_DIR,
-        product_name="Met Office UKV 2 km from AWS (pilot)",
+        product_name="Met Office UKV 2 km from AWS",
         source_web_page=REGISTRY_URL,
         script_path="studies/weather_downloads/fetch_ukv_aws_pilot.py",
         columns=columns,
@@ -700,10 +774,7 @@ def write_notes(*, summary: Mapping[str, Any]) -> None:
             "NaN where the file holds a fill value or where an object was absent from the listing "
             "(the run file's `missing` entry names it); a variable absent at every lead is not kept"
         ),
-        gotchas=[
-            "The grid is a Lambert azimuthal equal-area grid, not CEDA's national grid.",
-            "Whether a field is an instant or a mean is in its cell methods and time bounds.",
-        ],
+        gotchas=list(GOTCHAS),
         external_docs={"AWS registry entry": REGISTRY_URL},
         lineage_filenames=["lineage.json"],
     )
@@ -713,63 +784,113 @@ def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     """Parse the command line."""
     parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n", maxsplit=1)[0])
     parser.add_argument("--dry-run", action="store_true", help="list and print; fetch nothing")
-    parser.add_argument("--days", nargs="+", type=dt.date.fromisoformat, help="UTC dates to fetch")
-    parser.add_argument(
-        "--allow-more-days", action="store_true", help=f"allow over {MAX_DAYS} days"
-    )
+    parser.add_argument("--start", type=dt.date.fromisoformat, help="first UTC day to fetch")
+    parser.add_argument("--end", type=dt.date.fromisoformat, help="last UTC day to fetch")
     parser.add_argument("--run-hours", nargs="+", type=int, default=list(range(24)))
     parser.add_argument("--min-free-gb", type=float, default=DEFAULT_MIN_FREE_GB)
     parser.add_argument("--max-wire-gb", type=float, default=DEFAULT_MAX_WIRE_GB)
     return parser.parse_args(argv)
 
 
+def _fetch_day(
+    *,
+    day: dt.date,
+    plan: Mapping[str, RunPlan],
+    rectangle: CropRectangle,
+    pool: ProcessPoolExecutor,
+    max_wire_bytes: float,
+    wire_total: int,
+) -> int:
+    """Fetch every run of one day that is not on disk, then commit the day to the ledger.
+
+    Returns:
+        The bytes requested for this day.
+    """
+    day_bytes = 0
+    for run, (found, missing, _) in plan.items():
+        if (PRODUCT_DIR / "runs" / f"{run}.npz").exists():
+            continue
+        if wire_total + day_bytes > max_wire_bytes:
+            message = f"stopping before {run}: over --max-wire-gb; a re-run resumes here"
+            raise SystemExit(message)
+        _, run_bytes = fetch_run(
+            run=run, found=found, missing=missing, rectangle=rectangle, pool=pool
+        )
+        day_bytes += run_bytes
+    commit_day(
+        product_dir=PRODUCT_DIR,
+        day=day,
+        record={
+            "day": str(day),
+            "runs": len(plan),
+            "objects": sum(len(found) for found, _, _ in plan.values()),
+            "absent_objects": sum(len(missing) for _, missing, _ in plan.values()),
+            "wire_bytes_this_invocation": day_bytes,
+            "code_version": CODE_VERSION,
+            "committed_at_utc": dt.datetime.now(dt.UTC).isoformat(),
+        },
+    )
+    return day_bytes
+
+
 def main(argv: Sequence[str] | None = None) -> None:
-    """Parse the arguments, list the bucket, and either print the plan or fetch."""
+    """Parse the arguments, then print the plan or fetch the days that the ledger lacks."""
     args = _parse_arguments(argv)
     all_runs = list_runs()
-    days = args.days or list(choose_days(runs=all_runs))
-    if len(days) > MAX_DAYS and not args.allow_more_days:
-        message = f"{len(days)} days requested; pass --allow-more-days to go over {MAX_DAYS}"
-        raise SystemExit(message)
-    runs = [
-        run
-        for run in all_runs
-        if dt.datetime.strptime(run[:8], "%Y%m%d").date() in days  # noqa: DTZ007
-        and int(run[9:11]) in args.run_hours
-    ]
-    if not runs:
+    first, last = default_range(runs=all_runs, today=dt.datetime.now(dt.UTC).date())
+    days = day_range(start=args.start or first, end=args.end or last)
+    runs_by_day: dict[dt.date, list[str]] = defaultdict(list)
+    for run in all_runs:
+        day = dt.datetime.strptime(run[:8], "%Y%m%d").date()  # noqa: DTZ007
+        if day in days and int(run[9:11]) in args.run_hours:
+            runs_by_day[day].append(run)
+    if not runs_by_day:
         message = "no runs in the bucket for the requested days and hours"
         raise SystemExit(message)
-    plan = {}
-    for run in runs:
-        available = list_keys(prefix=f"{PREFIX}{run}/")
-        found, missing = wanted_keys(run=run, available=available)
-        plan[run] = (found, missing, sum(available[key] for key, _, _ in found))
-    first_key = f"{PREFIX}{runs[0]}/{runs[0]}-PT0000H00M-{SURFACE_FILES[0]}.nc"
+    first_run = runs_by_day[min(runs_by_day)][0]
+    first_key = f"{PREFIX}{first_run}/{first_run}-PT0000H00M-{SURFACE_FILES[0]}.nc"
     rectangle, proj4 = load_or_make_rectangle(first_key=first_key, write=not args.dry_run)
     print(f"Grid projection: {proj4}")
-    dry_run(plan=plan)
+    print(f"Days {days[0]} to {days[-1]}: {len(runs_by_day)} with runs; output {PRODUCT_DIR}")
     if args.dry_run:
+        objects = whole_bytes = absent = 0
+        for day in sorted(runs_by_day):
+            plan = plan_day(day_runs=runs_by_day[day])
+            objects += sum(len(found) for found, _, _ in plan.values())
+            absent += sum(len(missing) for _, missing, _ in plan.values())
+            whole_bytes += sum(size for _, _, size in plan.values())
+        print(f"{objects} objects, {absent} absent, {whole_bytes / 1e9:.1f} GB if fetched whole")
         return
 
     if shutil.disk_usage(NWP_DOWNLOADS_DIR.parent).free < args.min_free_gb * 1e9:
         message = f"less than {args.min_free_gb} GB free"
         raise SystemExit(message)
     wire_total = 0
-    with ProcessPoolExecutor(max_workers=WORKERS) as pool:
-        for run, (found, missing, _) in plan.items():
-            if (PRODUCT_DIR / "runs" / f"{run}.npz").exists():
-                print(f"{run}: already written, skipping")
-                continue
-            if wire_total > args.max_wire_gb * 1e9:
-                message = f"stopping: {wire_total / 1e9:.2f} GB requested exceeds --max-wire-gb"
-                raise SystemExit(message)
-            _, run_bytes = fetch_run(
-                run=run, found=found, missing=missing, rectangle=rectangle, pool=pool
-            )
-            wire_total += run_bytes
-            print(f"{run}: written, {run_bytes / 1e6:.1f} MB, {wire_total / 1e9:.3f} GB in total")
-    write_notes(summary=_summarise_folder())
+    started = time.monotonic()
+    try:
+        with ProcessPoolExecutor(max_workers=WORKERS) as pool:
+            for number, day in enumerate(sorted(runs_by_day), start=1):
+                if ledger_path(product_dir=PRODUCT_DIR, day=day).exists():
+                    print(f"{day}: committed already, skipping", flush=True)
+                    continue
+                plan = plan_day(day_runs=runs_by_day[day])
+                day_bytes = _fetch_day(
+                    day=day,
+                    plan=plan,
+                    rectangle=rectangle,
+                    pool=pool,
+                    max_wire_bytes=args.max_wire_gb * 1e9,
+                    wire_total=wire_total,
+                )
+                wire_total += day_bytes
+                print(
+                    f"{day}: day {number}/{len(runs_by_day)}, {len(plan)} runs, "
+                    f"{day_bytes / 1e6:.0f} MB, {wire_total / 1e9:.2f} GB in total, "
+                    f"{(time.monotonic() - started) / 60:.1f} min",
+                    flush=True,
+                )
+    finally:
+        write_notes(summary=_summarise_folder())
 
 
 if __name__ == "__main__":

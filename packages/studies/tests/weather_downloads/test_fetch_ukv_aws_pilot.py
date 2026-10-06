@@ -5,7 +5,10 @@ or filled variable stored undecoded, an object key built with the wrong valid ti
 rectangle with rows and columns swapped, and a listing that loops forever.
 """
 
+import datetime as dt
 import importlib
+import json
+from pathlib import Path
 from types import ModuleType
 from xml.etree import ElementTree
 
@@ -84,3 +87,68 @@ def test_truncated_listing_without_a_token_raises(pilot: ModuleType) -> None:
     )
     with pytest.raises(RuntimeError):
         pilot._next_token(page=page)
+
+
+def _runs_for(days: list[str], *, hours: int = 24) -> list[str]:
+    return [f"{day}T{hour:02d}00Z" for day in days for hour in range(hours)]
+
+
+def test_default_range_starts_at_the_first_full_day_and_ends_yesterday(pilot: ModuleType) -> None:
+    runs = [
+        "20241004T2100Z",
+        *_runs_for(["20241005"], hours=7),
+        *_runs_for(["20241006", "20241007"]),
+    ]
+    first, last = pilot.default_range(runs=runs, today=dt.date(2026, 10, 7))
+    assert (first, last) == (dt.date(2024, 10, 6), dt.date(2026, 10, 6))
+
+
+def test_default_range_raises_without_a_full_day(pilot: ModuleType) -> None:
+    with pytest.raises(RuntimeError):
+        pilot.default_range(runs=_runs_for(["20241005"], hours=7), today=dt.date(2026, 10, 7))
+
+
+def test_day_range_is_inclusive_and_bounded(pilot: ModuleType) -> None:
+    days = pilot.day_range(start=dt.date(2024, 10, 6), end=dt.date(2024, 10, 8))
+    assert days == [dt.date(2024, 10, 6), dt.date(2024, 10, 7), dt.date(2024, 10, 8)]
+    with pytest.raises(ValueError, match="limit"):
+        pilot.day_range(start=dt.date(2024, 10, 8), end=dt.date(2024, 10, 6))
+    with pytest.raises(ValueError, match="limit"):
+        pilot.day_range(start=dt.date(2020, 1, 1), end=dt.date(2026, 1, 1))
+
+
+def test_commit_day_writes_the_ledger_atomically(pilot: ModuleType, tmp_path: Path) -> None:
+    day = dt.date(2024, 10, 6)
+    path = pilot.ledger_path(product_dir=tmp_path, day=day)
+    assert not path.exists()
+    pilot.commit_day(product_dir=tmp_path, day=day, record={"runs": 24})
+    assert json.loads(path.read_text()) == {"runs": 24}
+    assert not list(path.parent.glob("*.partial"))
+
+
+def test_listing_bound_covers_the_last_lead_but_not_the_next_hour(pilot: ModuleType) -> None:
+    bound = pilot.listing_bound(run="20261002T2100Z")
+    prefix = "uk-deterministic-2km/20261002T2100Z/"
+    assert f"{prefix}20261003T0200Z-PT0005H00M-wind_speed_at_10m.nc" <= bound
+    assert f"{prefix}20261003T0300Z-PT0006H00M-wind_speed_at_10m.nc" > bound
+
+
+def test_list_keys_stops_paging_once_past_the_bound(
+    pilot: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    namespace = pilot._S3_NAMESPACE[1:-1]
+    calls: list[str | None] = []
+
+    def fake_page(*, prefix: str, delimiter: str | None, token: str | None) -> ElementTree.Element:
+        calls.append(token)
+        key = "a/z" if token is None else "b/y"
+        return ElementTree.fromstring(
+            f'<R xmlns="{namespace}"><IsTruncated>{str(token is None).lower()}</IsTruncated>'
+            f"<NextContinuationToken>t</NextContinuationToken>"
+            f"<Contents><Key>{key}</Key><Size>1</Size></Contents></R>"
+        )
+
+    monkeypatch.setattr(pilot, "_list_page", fake_page)
+    assert pilot.list_keys(prefix="a/", until="a/m") == {"a/z": 1}
+    assert len(calls) == 1
+    assert set(pilot.list_keys(prefix="a/", until="c")) == {"a/z", "b/y"}
