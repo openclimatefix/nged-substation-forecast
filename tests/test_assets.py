@@ -1260,15 +1260,18 @@ def test_definitions_resolve(env: Path) -> None:
     assert live_job_checks == {"live_forecasts_are_healthy"}
 
     # A job whose AssetSelection names a missing asset resolves to an empty/wrong key set.
-    for job_name, expected_asset in [
-        ("power_time_series_and_metadata_job", "power_time_series_and_metadata"),
-        ("ecmwf_ens_job", "ecmwf_ens"),
-        ("live_forecasts_job", "live_forecasts"),
+    for job_name, expected_assets in [
+        (
+            "power_time_series_and_metadata_job",
+            {"power_time_series_and_metadata", "clean_nged_power_data"},
+        ),
+        ("ecmwf_ens_job", {"ecmwf_ens"}),
+        ("live_forecasts_job", {"live_forecasts"}),
     ]:
         selected = {
             key.to_user_string() for key in repo.get_job(job_name).asset_layer.executable_asset_keys
         }
-        assert selected == {expected_asset}
+        assert selected == expected_assets
 
     # Neither partitioned job passes `partitions_def` to `define_asset_job` — Dagster infers it from
     # the selected asset at resolution time. Assert the inferred definition equals the one the asset
