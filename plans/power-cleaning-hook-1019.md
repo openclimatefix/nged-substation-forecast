@@ -80,6 +80,33 @@ and one more hop between NGED's data and `live_forecasts`. Appending only new ro
 rewriting is deferred to its own issue under the v0.9 epic, because appending needs a key
 comparison, a context window, a re-cleaned recent tail, and a version-triggered rebuild.
 
+## Rejected: one table, with the ingest leaving `drop_reason` empty for the cleaning to fill in
+
+**A single power table, where the ingest appends rows with an empty `drop_reason` and the cleaning
+asset fills the column in later, was considered and rejected.** It would halve storage (1 to 2 GB at
+V2) and remove the second table's settings path. It would cost the following:
+
+- **The raw data would stop being append-only.** With two tables, a bug in a cleaning rule spoils
+  only the cleaned copy, which the next run rebuilds. With one, a cleaning bug writes into the only
+  copy of NGED's data. For example, an overwrite with a filtered frame would delete rows, and the
+  only recovery is re-downloading from NGED's bucket. This is the deciding cost.
+- **No write is saved.** Delta cannot update one column in place: an update rewrites every Parquet
+  file it touches, and a change to a rule touches every file.
+- **Two writers would share one table.** The ingest appends while the cleaning updates, so the
+  cleaning would need Delta's `MERGE` or `UPDATE` with conflict retries; an overwrite would
+  silently drop rows appended mid-run.
+- **A null `drop_reason` would be ambiguous.** A freshly ingested row would read as clean until the
+  cleaning ran, or indefinitely if it kept failing, so a third state ("not yet checked") and a
+  filter on it in every reader would be needed.
+- **Time travel on the raw table would get worse.** Frequent rewrites, and the vacuum they need,
+  would expire the raw versions the provenance tags rely on for replay.
+- **The raw ingest's contract would change**, because `PowerTimeSeries` would gain a column, which
+  touches `defs/assets.py`.
+
+If storage ever matters, the safe variant keeps the raw rows append-only and writes only
+`(time_series_id, time, drop_reason)` to a separate narrow table, which readers join to the raw
+table.
+
 ## What changes, file by file
 
 ### `packages/contracts/src/contracts/power_schemas.py` — new contract (maintainer-approved)
