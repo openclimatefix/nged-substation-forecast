@@ -322,3 +322,61 @@ def test_current_git_sha_is_unknown_without_git_or_env(
     else:
         monkeypatch.setenv("GIT_SHA", env_value)
     assert current_git_sha() == cleaning_assets.UNKNOWN
+
+
+def test_roster_fingerprint_ignores_row_order_but_not_values() -> None:
+    roster = pl.DataFrame({"time_series_id": [1, 2, 3], "substation_type": ["a", "b", "c"]})
+    changed = roster.with_columns(substation_type=pl.Series(["a", "b", "z"]))
+
+    assert cleaning_assets.roster_fingerprint(roster) == cleaning_assets.roster_fingerprint(
+        roster.reverse()
+    )
+    assert cleaning_assets.roster_fingerprint(roster) != cleaning_assets.roster_fingerprint(changed)
+
+
+def test_the_asset_cleans_exactly_the_raw_version_it_records(
+    raw_data: Settings, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    _write_raw(raw_data, [(1, 3, 7.0)])  # raw version 1, one row more than version 0
+    real_delta_table = cleaning_assets.DeltaTable
+
+    class _LaggingDeltaTable(real_delta_table):  # type: ignore[misc, valid-type]
+        """Reports one version less than the table's real current version."""
+
+        def version(self) -> int:
+            return super().version() - 1
+
+    monkeypatch.setattr(cleaning_assets, "DeltaTable", _LaggingDeltaTable)
+
+    _materialize(dagster_instance)
+
+    assert _cleaned(raw_data).height == len(_RAW_ROWS)
+    provenance = read_cleaning_provenance(raw_data.cleaned_power_time_series_data_path)
+    assert provenance is not None
+    assert provenance.raw_version == 0
+
+
+def test_an_unknown_drop_reason_fails_the_run_and_leaves_the_cleaned_table_alone(
+    raw_data: Settings, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    _materialize(dagster_instance)
+    version = _cleaned_version(raw_data)
+
+    def bad_flag(power: pt.LazyFrame, metadata: pt.DataFrame) -> pt.LazyFrame:
+        return pt.LazyFrame.from_existing(
+            pl.LazyFrame._from_pyldf(power._ldf).with_columns(
+                drop_reason=pl.lit("not_a_real_reason", dtype=pl.String)
+            )
+        )
+
+    monkeypatch.setattr(cleaning_assets, "flag_nged_power", bad_flag)
+
+    failed = materialize(
+        [clean_nged_power_data],
+        instance=dagster_instance,
+        run_config={"ops": {"clean_nged_power_data": {"config": {"force": True}}}},
+        raise_on_error=False,
+    )
+
+    assert not failed.success
+    assert _cleaned_version(raw_data) == version

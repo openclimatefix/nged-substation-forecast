@@ -127,3 +127,17 @@ def test_read_cleaning_provenance_is_none_for_a_write_without_the_keys(tmp_path:
         commit_properties=CommitProperties(custom_metadata={"unrelated": "x"}),
     )
     assert read_cleaning_provenance(table) is None
+
+
+def test_read_cleaning_provenance_is_none_when_reading_the_history_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    table = tmp_path / "cleaned"
+    write_cleaned_power_time_series(_cleaned(1), table, provenance=_provenance(1))
+
+    def failing_history(self: DeltaTable, limit: int | None = None) -> list[dict[str, object]]:
+        raise OSError("the object store is unreachable")
+
+    monkeypatch.setattr(DeltaTable, "history", failing_history)
+
+    assert read_cleaning_provenance(table) is None

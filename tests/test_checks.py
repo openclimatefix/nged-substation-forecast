@@ -1593,6 +1593,12 @@ def test_cleaned_power_keeps_up_warns_when_the_raw_table_id_differs(env: Path) -
     assert result.severity == AssetCheckSeverity.WARN
 
 
+def test_cleaned_power_keeps_up_passes_when_the_raw_table_is_absent(env: Path) -> None:
+    result = _run_keeps_up_check()
+
+    assert result.passed
+
+
 def test_cleaned_power_keeps_up_warns_when_the_cleaned_table_is_absent(env: Path) -> None:
     _write_raw_power_commits(Settings(), 2)
 

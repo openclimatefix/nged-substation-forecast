@@ -15,11 +15,17 @@ import polars as pl
 import pytest
 from _cleaned_power_test_data import write_cleaned_copy
 from contracts.ml_schemas import EligibleTimeSeries
-from contracts.power_schemas import TimeSeriesMetadata
+from contracts.power_schemas import CleanedPowerTimeSeries, TimeSeriesMetadata
+from contracts.settings import Settings
 from dagster import materialize
+from delta_store.cleaned_power_time_series import (
+    CleaningProvenance,
+    write_cleaned_power_time_series,
+)
 from deltalake import write_deltalake
 
 from nged_substation_forecast.defs.cv_assets import (
+    _provenance_tags_with_cleaned_power,
     _time_series_ids_missing_metadata,
     effective_capacity,
     eligible_time_series,
@@ -230,3 +236,37 @@ def test_time_series_ids_missing_metadata_names_the_gap() -> None:
     """Sorted, and reports only the requested ids — extra metadata rows are not a gap."""
     assert _time_series_ids_missing_metadata(_metadata([1, 4]), [4, 1, 3, 2]) == [2, 3]
     assert _time_series_ids_missing_metadata(_metadata([1, 2, 3]), [1, 2]) == []
+
+
+def test_provenance_tags_name_the_raw_table_version_and_git_sha_the_cleaning_recorded(
+    cv_paths: dict[str, str],
+) -> None:
+    settings = Settings()
+    cleaned = (
+        CleanedPowerTimeSeries.DataFrame(
+            {
+                "time_series_id": [1],
+                "time": [_utc(2025, 1, 1)],
+                "power": [1.0],
+                "drop_reason": [None],
+            }
+        )
+        .cast()
+        .validate()
+    )
+    provenance = CleaningProvenance(
+        raw_table_id="raw-id-7",
+        raw_version=7,
+        code_hash="code",
+        roster_hash="roster",
+        git_sha="cafe123",
+    )
+    write_cleaned_power_time_series(
+        cleaned, settings.cleaned_power_time_series_data_path, provenance=provenance
+    )
+
+    tags = _provenance_tags_with_cleaned_power("train", settings, {})
+
+    assert tags["train_cleaned_power_time_series_source"] == (
+        "raw_table_id=raw-id-7;raw_version=7;git_sha=cafe123"
+    )
