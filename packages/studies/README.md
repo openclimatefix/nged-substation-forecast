@@ -35,8 +35,9 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 
 - `cross_validation` — per-site, out-of-fold XGBoost fits and their per-row losses, with the fold
   scheme and the fixed hyperparameters they use; one model fitted on every ensemble member's rows
-  and applied to each member; and the scoring of a forecast made outside the fit loop. The fold
-  schemes are month blocks, and 7-day blocks for a span too short for months.
+  and applied to each member; one model scored on several frames of feature values, which gives a
+  transfer penalty with no second fit; and the scoring of a forecast made outside the fit loop. The
+  fold schemes are month blocks, and 7-day blocks for a span too short for months.
 - `bootstrap` — the paired arm-to-arm difference and its interval, resampling whole months and a
   seed, within each calendar year as well as overall, and a t-interval across the folds' own
   differences.
@@ -47,8 +48,8 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
   from the product's own download so that the rows dropped from scoring cannot leak into it.
 - `anonymise` — the one mapping from a meter's `time_series_id` to the anonymous label a chart or a
   write-up may carry.
-- `solar` — solar position and the extraterrestrial flux, for a series of timestamps at one
-  coordinate.
+- `solar` — solar position, the extraterrestrial flux, and the conversion of an irradiance snapshot
+  to a backward hourly mean, for a series of timestamps at one coordinate.
 - `served_column_checks` — two assertions about a downloaded irradiance column: that the hourly
   value is a backward mean over the hour ending at its label, and that a published direct fraction
   carries information a separation model applied to the total would not.

@@ -718,6 +718,9 @@ UKV_CEDA_BLENDS_RUN15_DIR: Final[Path] = UKV_CEDA_BLENDS_DIR / "run15"
 UKV_VS_ERA5_DIR: Final[Path] = study_dir_for(study="ukv_ceda_vs_era5")
 """The study of whether UKV-on-CEDA or ERA5 describes past wind and temperature better."""
 
+UKV_CEDA_VS_OPEN_METEO_DIR: Final[Path] = study_dir_for(study="ukv_ceda_vs_openmeteo")
+"""The study of whether UKV from CEDA or UKV from Open-Meteo gives the same forecasts."""
+
 NFC_STUDY_DIR: Final[Path] = study_dir_for(study="nwp_forecast_comparison")
 """The folder of the NWP forecast comparison, one subfolder per batch of fits."""
 

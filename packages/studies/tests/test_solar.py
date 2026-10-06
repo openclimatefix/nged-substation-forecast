@@ -8,6 +8,7 @@ from studies.solar import (
     cos_zenith,
     cos_zenith_hour_mean,
     extraterrestrial_horizontal,
+    hourly_mean_from_snapshot,
     midpoint_zenith,
     zenith,
 )
@@ -97,3 +98,17 @@ def test_the_midpoint_zenith_is_the_sun_half_an_hour_before_the_stamp():
         zenith(stamps=stamps.dt.offset_by("-30m"), latitude=LATITUDE, longitude=LONGITUDE)[0]
     )
     assert midpoint[0] > zenith(stamps=stamps, latitude=LATITUDE, longitude=LONGITUDE)[0] + 3.0
+
+
+def test_an_hourly_mean_is_the_snapshot_times_the_hour_mean_over_the_instant_cosine():
+    snapshot = np.array([400.0, 400.0, 400.0])
+    cos_instant = np.array([0.5, 0.5, 0.0])
+    cos_mean = np.array([0.4, 0.8, 0.3])
+
+    result = hourly_mean_from_snapshot(
+        snapshot_w_m2=snapshot, cos_zenith_instant=cos_instant, cos_zenith_hour_mean=cos_mean
+    )
+
+    # A ratio below one when the sun is rising into the hour's end, above one when it is setting,
+    # and zero with the sun at the horizon, where the ratio is undefined.
+    assert result.tolist() == pytest.approx([320.0, 640.0, 0.0])
