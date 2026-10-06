@@ -208,6 +208,34 @@ class PowerTimeSeries(pt.Model):
     columns_to_sort_by: ClassVar[tuple[str, str]] = ("time_series_id", "time")
 
 
+DROP_REASONS: Final[tuple[str, ...]] = ("substation_zero",)
+"""The vocabulary of `CleanedPowerTimeSeries.drop_reason`: one name per cleaning rule.
+
+A rule's author adds the rule's reason here, in the same change that adds the rule to
+`nged_data.cleaning.flag_nged_power`. `drop_reason` is a `String` column constrained to this
+tuple, not a `pl.Enum`: an Enum column written through `write_deltalake` makes every later read
+raise a `SchemaError`, and the readers filter on this column.
+"""
+
+
+class CleanedPowerTimeSeries(PowerTimeSeries):
+    """`PowerTimeSeries` plus the reason a row was flagged by cleaning, one row per input row.
+
+    The cleaned table holds every raw row exactly once. A null `drop_reason` marks a row that
+    passed every cleaning rule, and readers use only those rows. Subclassing keeps
+    `PowerTimeSeries.validate`'s datetime-bound, sort-order, and key-uniqueness checks.
+    """
+
+    drop_reason: str | None = pt.Field(
+        dtype=pl.String,
+        constraints=pl.col("drop_reason").is_null() | pl.col("drop_reason").is_in(DROP_REASONS),
+        description=(
+            "Null for a row that passed every cleaning rule. Otherwise the name of the rule that"
+            " flagged the row, one of `DROP_REASONS`."
+        ),
+    )
+
+
 LIST_OF_TIME_SERIES_TYPES: Final[tuple[str, ...]] = (
     "BESS",
     "Biofuel",

@@ -11,7 +11,9 @@ from nged_data.storage import (
     _process_file_listing,
     _ProcessedFileListing,
     _RawFileListItem,
+    coverage_from_power,
     remove_small_files_from_listing,
+    scan_cleaned_power,
     select_new_rows,
     time_series_coverage,
     upsert_metadata,
@@ -565,3 +567,43 @@ def test_remove_small_files_from_listing_logs_dropped_count(
         "1 out of n_files_before_filter=2" in r.message and r.levelno == logging.INFO
         for r in caplog.records
     )
+
+
+def test_scan_cleaned_power_drops_flagged_rows_and_the_drop_reason_column(tmp_path: Path):
+    delta_path = tmp_path / "cleaned.delta"
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 1, 2], dtype=pl.Int32),
+            "time": pl.Series(
+                [
+                    datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
+                    datetime(2026, 1, 1, 12, 30, tzinfo=UTC),
+                    datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
+                ]
+            ).cast(UTC_DATETIME_DTYPE),
+            "power": pl.Series([1.0, 0.0, 3.0], dtype=pl.Float32),
+            "drop_reason": pl.Series([None, "substation_zero", None], dtype=pl.String),
+        }
+    ).write_delta(delta_path)
+
+    result = scan_cleaned_power(str(delta_path)).collect().sort("time_series_id")
+
+    assert result.columns == ["time_series_id", "time", "power"]
+    assert result["time_series_id"].to_list() == [1, 2]
+    assert result["power"].to_list() == [1.0, 3.0]
+
+
+def test_coverage_from_power_matches_time_series_coverage(tmp_path: Path):
+    delta_path = tmp_path / "power.delta"
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 1], dtype=pl.Int32),
+            "time": pl.Series(
+                [datetime(2026, 1, 1, 12, 0, tzinfo=UTC), datetime(2026, 1, 1, 12, 30, tzinfo=UTC)]
+            ).cast(UTC_DATETIME_DTYPE),
+            "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
+        }
+    ).write_delta(delta_path)
+    power = pt.LazyFrame.from_existing(pl.scan_delta(str(delta_path))).set_model(PowerTimeSeries)
+
+    assert coverage_from_power(power).equals(time_series_coverage(str(delta_path)))

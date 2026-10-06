@@ -1139,6 +1139,7 @@ dependencies = [
     { name = "geoarrow-pyarrow" },
     { name = "lonboard" },
     { name = "marimo" },
+    { name = "nged-data" },
     { name = "patito" },
     { name = "plotting" },
     { name = "polars" },
@@ -1162,6 +1163,7 @@ requires-dist = [
     { name = "geoarrow-pyarrow", specifier = ">=0.2.0" },
     { name = "lonboard", specifier = ">=0.13.0" },
     { name = "marimo", specifier = ">=0.19.7" },
+    { name = "nged-data", editable = "packages/nged_data" },
     { name = "patito", specifier = ">=0.8.5" },
     { name = "plotting", editable = "packages/plotting" },
     { name = "polars", specifier = ">=1.37.1" },
@@ -1207,6 +1209,7 @@ source = { editable = "packages/delta_store" }
 dependencies = [
     { name = "contracts" },
     { name = "deltalake" },
+    { name = "nged-data" },
     { name = "patito" },
     { name = "polars" },
     { name = "pyarrow" },
@@ -1216,6 +1219,7 @@ dependencies = [
 requires-dist = [
     { name = "contracts", editable = "packages/contracts" },
     { name = "deltalake" },
+    { name = "nged-data", editable = "packages/nged_data" },
     { name = "patito" },
     { name = "polars", specifier = ">=1.0.0" },
     { name = "pyarrow" },
@@ -3221,6 +3225,8 @@ version = "0.2.1"
 source = { editable = "packages/nged_data" }
 dependencies = [
     { name = "contracts" },
+    { name = "deltalake" },
+    { name = "ml-core" },
     { name = "obstore" },
     { name = "patito" },
     { name = "polars" },
@@ -3230,6 +3236,8 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "contracts", editable = "packages/contracts" },
+    { name = "deltalake" },
+    { name = "ml-core", editable = "packages/ml_core" },
     { name = "obstore" },
     { name = "patito" },
     { name = "polars", specifier = ">=1.0.0" },
