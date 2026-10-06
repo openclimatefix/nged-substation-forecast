@@ -557,6 +557,54 @@ def irradiance_mismatch_notes(*, frame: pl.DataFrame) -> list[str]:
     return irradiance_ratio_failures(frame=frame, era_code=1)
 
 
+def irradiance_ratios_by_era_hour(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Return the median ratio of CEDA's irradiance to Open-Meteo's at lead 0, by era and hour.
+
+    Args:
+        frame: `model_free_hours`'s result.
+
+    Returns:
+        One row per (era, UTC hour of day) with `rebuilt_ratio` (CEDA's snapshot rebuilt as
+        Open-Meteo built its value before PS47), `raw_ratio` (the unscaled snapshot), and `n`, over
+        the lead-0 rows where Open-Meteo's irradiance exceeds `MIN_GUARD_IRRADIANCE_W_M2`.
+    """
+    return (
+        lead_zero(frame=frame)
+        .filter(pl.col("om_ghi") > MIN_GUARD_IRRADIANCE_W_M2)
+        .group_by("era_code", "hour_of_day")
+        .agg(
+            rebuilt_ratio=(pl.col("ceda_ghi") / pl.col("om_ghi")).median(),
+            raw_ratio=(pl.col("ceda_ghi_snapshot") / pl.col("om_ghi")).median(),
+            n=pl.len(),
+        )
+        .sort("era_code", "hour_of_day")
+    )
+
+
+def era_1_irradiance_note(*, frame: pl.DataFrame) -> str:
+    """Name the post-PS47 irradiance mismatch for the labels of the exploratory solar rows.
+
+    Args:
+        frame: `model_free_hours`'s result.
+
+    Returns:
+        A phrase such as `irradiance construction differs after PS47 (ratio 1.11 at 06 UTC, 0.86 at
+        18 UTC)`, listing the hours of day whose rebuilt ratio misses `IRRADIANCE_RATIO_BOUNDS`, or
+        an empty string where every hour matches.
+    """
+    low, high = IRRADIANCE_RATIO_BOUNDS
+    missed = [
+        f"{row['rebuilt_ratio']:.2f} at {row['hour_of_day']:02d} UTC"
+        for row in irradiance_ratios_by_era_hour(frame=frame)
+        .filter(pl.col("era_code") == 1)
+        .iter_rows(named=True)
+        if not low <= row["rebuilt_ratio"] <= high
+    ]
+    if not missed:
+        return ""
+    return f"irradiance construction differs after PS47 (ratio {', '.join(missed)})"
+
+
 # --- Row builders ---------------------------------------------------------------------------------
 
 
@@ -996,6 +1044,7 @@ def write_outputs(*, output_dir: Path, ukv: UkvStores, frames: Frames) -> None:
         },
         "study_months": list(STUDY_MONTHS),
         "era_1_irradiance_matched": not irradiance_mismatch_notes(frame=frames.model_free),
+        "era_1_irradiance_note": era_1_irradiance_note(frame=frames.model_free),
         "margins_pp": {"wind": MARGIN_WIND_PP, "solar": MARGIN_SOLAR_PP},
     }
     paths[STAMP_NAME].write_text(json.dumps(stamp, indent=2, sort_keys=True))

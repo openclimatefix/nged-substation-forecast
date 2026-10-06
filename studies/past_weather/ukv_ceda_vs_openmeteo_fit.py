@@ -17,7 +17,11 @@ hyperparameter settings.** P1 is the wind arms, P2 the solar arms, and P3 the tr
 CEDA-trained model scored on Open-Meteo's values, minus the Open-Meteo-trained model scored on
 Open-Meteo's values, for wind and for solar. The margins are those of the CEDA-against-ERA5 study,
 frozen in `ukv_ceda_vs_openmeteo_build` before any result: 0.16 points of capacity for wind and
-0.06 for solar. P1 and P2 read `interchangeable`, `differ`, or `unresolved`, and P3 is read
+0.06 for solar. **The solar contrasts P2 and P3 are read on era 0 only** (before the PS47 upgrade
+of 2026-01-21), because Open-Meteo's hourly irradiance is built differently afterwards and the two
+archives' irradiance columns are then not like for like. The solar rows of era 1 and every scope
+that includes them are exploratory and carry a note. Wind and temperature keep the whole overlap.
+P1 and P2 read `interchangeable`, `differ`, or `unresolved`, and P3 is read
 one-sided as `no_penalty`, `penalty`, or `unresolved`. A verdict stands only if both settings
 agree. An unresolved P3 leads to "do not mix the two archives".
 
@@ -94,6 +98,9 @@ from ukv_ceda_vs_openmeteo_build import (
     transfer_frame,
     wind_arm_columns,
     wind_columns,
+)
+from ukv_ceda_vs_openmeteo_build import (
+    STAMP_NAME as BUILD_STAMP_NAME,
 )
 
 _LOG: Final[logging.Logger] = logging.getLogger("ukv_ceda_vs_openmeteo_fit")
@@ -575,6 +582,16 @@ class IntervalRecord(TypedDict):
     n_rows: int
     n_months: int
     enough_months: bool
+    note: str
+
+
+PLANNED_SCOPE: Final[Mapping[DomainType, str]] = {"wind": "all", "solar": "era 0"}
+"""The scope each domain's planned contrasts are read on.
+
+Wind and temperature keep the whole overlap. Solar reads era 0 only, because Open-Meteo's hourly
+irradiance is built differently after the PS47 upgrade, so the two archives' irradiance columns are
+not like for like in era 1. Every other solar scope is exploratory and carries the era-1 note.
+"""
 
 
 def scopes_of(*, losses: pl.DataFrame) -> list[tuple[str, pl.Expr | None]]:
@@ -620,6 +637,7 @@ def contrast_record(
     reference: str,
     one_sided: bool = False,
     read_margin: bool = True,
+    note: str = "",
 ) -> IntervalRecord:
     """Interval one paired contrast on the given losses.
 
@@ -635,6 +653,7 @@ def contrast_record(
         one_sided: Whether to read the contrast as a transfer penalty.
         read_margin: Whether to read the contrast against the margin. A control or a replication
             has no margin and reads `significant` or `not significant`.
+        note: A caveat the report and the figures print beside the row.
 
     Returns:
         The record, in percentage points of capacity. A scope with fewer than
@@ -675,19 +694,25 @@ def contrast_record(
         "n_rows": interval["n_rows"],
         "n_months": interval["n_months"],
         "enough_months": enough,
+        "note": note,
     }
 
 
-def domain_records(*, domain: DomainType, losses: pl.DataFrame) -> list[IntervalRecord]:
+def domain_records(
+    *, domain: DomainType, losses: pl.DataFrame, era_1_note: str = ""
+) -> list[IntervalRecord]:
     """Interval every contrast of one domain, in every scope.
 
     Args:
         domain: `wind` or `solar`.
         losses: The domain's losses, and for wind the CPU refit's.
+        era_1_note: The caveat that Open-Meteo's irradiance is built differently after PS47, which
+            every solar record whose scope includes era-1 rows carries.
 
     Returns:
-        The planned contrasts at both settings in every scope, then the exploratory contrasts at
-        the primary setting.
+        The planned contrasts at both settings in every scope, labelled planned only on the
+        domain's `PLANNED_SCOPE`, then the exploratory contrasts at the primary setting on that
+        scope.
     """
     present = set(losses["arm"].unique().to_list())
     records: list[IntervalRecord] = []
@@ -702,15 +727,16 @@ def domain_records(*, domain: DomainType, losses: pl.DataFrame) -> list[Interval
                     domain=domain,
                     setting=setting,
                     label=planned.label,
-                    planned=True,
+                    planned=scope == PLANNED_SCOPE[domain],
                     scope=scope,
                     treatment=planned.treatment,
                     reference=planned.reference,
                     one_sided=planned.one_sided,
+                    note=era_1_note if domain == "solar" and scope != "era 0" else "",
                 )
                 for setting in (PRIMARY_SETTING, SECOND_SETTING)
             ]
-        if scope != "all":
+        if scope != PLANNED_SCOPE[domain]:
             continue
         primary = scoped.filter(pl.col("setting") == PRIMARY_SETTING)
         records += [
@@ -745,20 +771,24 @@ class Verdict(NamedTuple):
 
 
 def verdicts(*, records: Sequence[IntervalRecord]) -> list[Verdict]:
-    """Read each planned contrast across both settings, over all rows.
+    """Read each planned contrast across both settings, on its domain's planned scope.
 
     Args:
         records: Every interval record.
 
     Returns:
-        One verdict per planned contrast, where a verdict stands only if both settings agree.
+        One verdict per planned contrast of a domain that has records, where a verdict stands
+        only if both settings agree.
     """
     found: list[Verdict] = []
+    domains = {record["domain"] for record in records}
     for planned in PLANNED_CONTRASTS:
+        if planned.domain not in domains:
+            continue
         chosen = {
             record["setting"]: record
             for record in records
-            if record["scope"] == "all"
+            if record["scope"] == PLANNED_SCOPE[planned.domain]
             and record["label"] == planned.label
             and record["domain"] == planned.domain
             and record["treatment"] == planned.treatment
@@ -803,7 +833,7 @@ def decision_text(*, found: Sequence[Verdict]) -> str:
     """
     lines = ["### Decision, by the rule fixed before any result", ""]
     for verdict in found:
-        unit = f"{verdict.domain}, {verdict.label}"
+        unit = f"{verdict.domain}, {verdict.label}, scope {PLANNED_SCOPE[verdict.domain]}"
         lines.append(
             f"- {unit}: {verdict.reading} (primary {verdict.primary['reading']}: "
             f"{verdict.primary['difference_pp']:+.3f} points of capacity "
@@ -812,7 +842,17 @@ def decision_text(*, found: Sequence[Verdict]) -> str:
             f"[{verdict.second['lower_95_pp']:+.3f}, {verdict.second['upper_95_pp']:+.3f}]; "
             f"margin {verdict.primary['margin_pp']:.2f})."
         )
-    lines += ["", "#### Training history (question 5), scoped", ""]
+    lines += [
+        "",
+        (
+            "Solar contrasts are read on era 0 only. After the PS47 upgrade Open-Meteo's hourly "
+            "irradiance is built differently, so every solar scope that includes era 1 is "
+            "exploratory and carries that note."
+        ),
+        "",
+        "#### Training history (question 5), scoped",
+        "",
+    ]
     for verdict in found:
         if verdict.label == "P3":
             lines.append(f"- {verdict.domain}: {RECOMMENDATIONS[verdict.reading]}")
@@ -837,16 +877,17 @@ def _record_line(*, record: IntervalRecord) -> str:
         f"| {record['label']} | {record['scope']} | {record['setting']} | {record['treatment']} | "
         f"{record['reference']} | {record['difference_pp']:+.3f} "
         f"[{record['lower_95_pp']:+.3f}, {record['upper_95_pp']:+.3f}] | {record['reading']} | "
-        f"{record['n_months']} |"
+        f"{record['n_months']} | {'planned' if record['planned'] else 'exploratory'} | "
+        f"{record['note']} |"
     )
 
 
 RECORD_HEADER: Final[tuple[str, str]] = (
     (
         "| Label | Scope | Setting | Treatment | Reference | Difference, points of capacity | "
-        "Reading | Months |"
+        "Reading | Months | Kind | Note |"
     ),
-    "|---|---|---|---|---|---|---|---|",
+    "|---|---|---|---|---|---|---|---|---|---|",
 )
 
 
@@ -987,10 +1028,11 @@ def main() -> int:
         stem=CPU_REFIT_STEM, frame=frames["wind"], jobs=cpu_refit_jobs(), directory=directory
     )
     losses["wind"] = pl.concat([losses["wind"], cpu.select(losses["wind"].columns)])
+    era_1_note = json.loads((directory / BUILD_STAMP_NAME).read_text())["era_1_irradiance_note"]
     records = [
         record
         for domain, domain_losses in losses.items()
-        for record in domain_records(domain=domain, losses=domain_losses)
+        for record in domain_records(domain=domain, losses=domain_losses, era_1_note=era_1_note)
     ]
     found = verdicts(records=records)
     job_list = [job for domain in frames for job in all_jobs(domain=domain)] + cpu_refit_jobs()

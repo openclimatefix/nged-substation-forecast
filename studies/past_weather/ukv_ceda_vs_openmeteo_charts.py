@@ -19,6 +19,8 @@ Nothing is bootstrapped or refitted here.
 - **Figure 5.** The mean absolute difference between the two archives by calendar month, with the
   PS47 upgrade marked.
 - **Figure 6.** The controls and the partial swaps of the transfer scoring (exploratory).
+- **Figure 7.** The median ratio of CEDA's irradiance to Open-Meteo's at lead 0, by era and hour,
+  which shows that Open-Meteo builds its hourly irradiance differently after PS47.
 
 Generators appear only as A to F and W1 to W3.
 
@@ -31,7 +33,7 @@ import argparse
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, cast
 
 import altair as alt
 import plotting.ocf_theme as ocf
@@ -43,12 +45,14 @@ from ukv_ceda_vs_era5_charts import (
     predictions_chart,
 )
 from ukv_ceda_vs_openmeteo_build import OUTPUT_DIR
-from ukv_ceda_vs_openmeteo_compare import DIFFERENCES_NAME
+from ukv_ceda_vs_openmeteo_compare import DIFFERENCES_NAME, RATIOS_NAME
 from ukv_ceda_vs_openmeteo_fit import (
     INTERVALS_NAME,
     PRIMARY_SETTING,
     REPORT_NAME,
     SECOND_SETTING,
+    IntervalRecord,
+    verdicts,
 )
 
 ASSETS_DIR: Final[Path] = (
@@ -61,18 +65,59 @@ FAMILY: Final[str] = "weather model"
 
 CAPACITY_UNIT: Final[str] = "points of capacity"
 WEEKS_NAME: Final[str] = "chart_weeks.md"
-HEADLINE_TITLE: Final[str] = (
-    "Power error of XGBoost models given UKV from CEDA and UKV from Open-Meteo, and the cost of "
-    "moving a CEDA-trained model onto Open-Meteo's values"
-)
-"""A descriptive title. The finding replaces it once the run has a result."""
-SCOPES: Final[tuple[tuple[str, str], ...]] = (
-    ("all", "All hours"),
-    ("era 0", "Before the 2026-01-21 upgrade"),
-    ("era 1", "After the upgrade"),
-    ("lead 0 only", "Hours at CEDA lead 0 only"),
-)
-"""The scopes the headline figure draws, with their row labels."""
+READING_WORDS: Final[dict[str, str]] = {
+    "interchangeable": "interchangeable",
+    "differ": "different",
+    "unresolved": "unresolved",
+    "no_penalty": "no transfer penalty",
+    "penalty": "a transfer penalty",
+}
+"""How a reading appears in the headline title."""
+
+
+def headline_title(*, records: Sequence[dict[str, Any]]) -> str:
+    """State the headline finding from the verdicts, scoped to what was tested.
+
+    Args:
+        records: The interval records.
+
+    Returns:
+        A title naming each planned contrast's reading, with the solar contrasts scoped to the era
+        before PS47 and the transfer scored on Open-Meteo's lead-0 analysis.
+    """
+    reading = {
+        (verdict.domain, verdict.label): READING_WORDS[verdict.reading]
+        for verdict in verdicts(records=cast("list[IntervalRecord]", list(records)))
+    }
+    return (
+        f"UKV from CEDA and from Open-Meteo gave {reading[('wind', 'P1')]} wind power and "
+        f"{reading[('solar', 'P2')]} solar power before PS47, and moving a CEDA-trained model onto "
+        f"Open-Meteo's values showed {reading[('wind', 'P3')]} for wind and "
+        f"{reading[('solar', 'P3')]} for solar"
+    )
+
+
+ERA_0_LABEL: Final[str] = "Before PS47"
+ERA_1_LABEL: Final[str] = "After PS47"
+SCOPES: Final[dict[str, tuple[tuple[str, str], ...]]] = {
+    "wind": (
+        ("all", "All months and hours"),
+        ("era 0", ERA_0_LABEL),
+        ("era 1", ERA_1_LABEL),
+        ("lead 0 only", "Hours at CEDA lead 0 only"),
+    ),
+    "solar": (
+        ("era 0", ERA_0_LABEL),
+        ("all", "Both eras"),
+        ("era 1", ERA_1_LABEL),
+        ("lead 0 only", "Both eras, CEDA lead 0 only"),
+    ),
+}
+"""The scopes the headline figure draws for each domain, with their row labels.
+
+The first row of each domain is its planned scope (`PLANNED_SCOPE`). Solar rows that include era 1
+are exploratory and carry the irradiance-construction note.
+"""
 
 
 def _one(*, records: Sequence[dict[str, Any]], where: dict[str, Any]) -> dict[str, Any]:
@@ -103,9 +148,10 @@ def contrast_rows(
             f"{primary['treatment_mae_pp']:.2f} against {primary['reference_mae_pp']:.2f} "
             "% of capacity"
         )
+        shown = f"{label}, {primary['note']}" if primary["note"] else label
         rows.append(
             {
-                "label": f"{label} ({text})",
+                "label": f"{shown} ({text})",
                 "family": FAMILY,
                 "difference": primary["difference_pp"],
                 "lower_95": primary["lower_95_pp"],
@@ -144,7 +190,7 @@ def headline_figure(
                     label,
                     {"domain": domain, "label": planned, "treatment": treatment, "scope": scope},
                 )
-                for scope, label in SCOPES
+                for scope, label in SCOPES[domain]
             ],
         )
         for title, (domain, planned, treatment) in panels.items()
@@ -164,10 +210,14 @@ def headline_figure(
     chart = figure(
         panels=drawn,
         number=1,
-        title=HEADLINE_TITLE,
+        title=headline_title(records=records),
         subtitle=[
             "Dot: the primary hyperparameter setting. Hollow triangle: the second setting.",
             "Grey band: the margin. Line: 95% interval from resampling whole calendar months.",
+            (
+                "Wind reads the whole overlap. Solar is planned on the era before the PS47 upgrade "
+                "only, because Open-Meteo builds its hourly irradiance differently afterwards."
+            ),
         ],
         figure_planning=kind,
     )
@@ -190,7 +240,12 @@ def lead_figure(*, records: Sequence[dict[str, Any]]) -> alt.VConcatChart:
         )
         unit = data["unit"][0]
         base = alt.Chart(data).encode(
-            x=alt.X("label:N", title="CEDA lead", sort=data["label"].to_list())
+            x=alt.X(
+                "label:N",
+                title="CEDA lead (hours since the run started)",
+                sort=data["label"].to_list(),
+                axis=alt.Axis(labelAngle=0, labelExpr="replace(datum.value, 'lead ', '')"),
+            )
         )
         panels.append(
             alt.layer(
@@ -205,7 +260,9 @@ def lead_figure(*, records: Sequence[dict[str, Any]]) -> alt.VConcatChart:
                     y="mean_absolute_difference:Q"
                 ),
             ).properties(
-                width=PLOT_WIDTH_PX, height=110, title=alt.TitleParams(variable, anchor="start")
+                width=PLOT_WIDTH_PX,
+                height=110,
+                title=alt.TitleParams(variable[:1].upper() + variable[1:], anchor="start"),
             )
         )
     return figure(
@@ -214,7 +271,7 @@ def lead_figure(*, records: Sequence[dict[str, Any]]) -> alt.VConcatChart:
         title="The two archives agree most closely at lead 0 and drift apart with CEDA's lead",
         subtitle=[
             "Mean absolute difference between CEDA and Open-Meteo, at the nine generator sites.",
-            "Line: 95% interval from resampling whole calendar months. All rows are exploratory.",
+            "Line: 95% interval from resampling whole months. A smaller difference means closer.",
         ],
         figure_planning="exploratory",
     )
@@ -255,7 +312,9 @@ def month_figure(*, records: Sequence[dict[str, Any]]) -> alt.VConcatChart:
                 .mark_rule(color=ocf.BRAND_ORANGE, strokeDash=[4, 3])
                 .encode(x="label:N"),  # ty: ignore[unresolved-attribute]
             ).properties(
-                width=PLOT_WIDTH_PX, height=110, title=alt.TitleParams(variable, anchor="start")
+                width=PLOT_WIDTH_PX,
+                height=110,
+                title=alt.TitleParams(variable[:1].upper() + variable[1:], anchor="start"),
             )
         )
     return figure(
@@ -267,7 +326,70 @@ def month_figure(*, records: Sequence[dict[str, Any]]) -> alt.VConcatChart:
                 "Mean absolute difference at all hours. The orange rule marks the first month "
                 "after the PS47 upgrade of 2026-01-21 (2026-01 itself is dropped)."
             ),
-            "All rows are exploratory.",
+        ],
+        figure_planning="exploratory",
+    )
+
+
+def ratio_figure(*, ratios: pl.DataFrame) -> alt.VConcatChart:
+    """Draw Figure 7: CEDA's irradiance over Open-Meteo's at lead 0, by era and hour.
+
+    Args:
+        ratios: The compare script's irradiance ratios by era and hour.
+
+    Returns:
+        The figure.
+    """
+    data = ratios.with_columns(
+        era=pl.when(pl.col("era_code") == 0)
+        .then(pl.lit(ERA_0_LABEL))
+        .otherwise(pl.lit(ERA_1_LABEL))
+    )
+    panels = []
+    for column, title in (
+        ("rebuilt_ratio", "CEDA's snapshot rebuilt as Open-Meteo built its value before PS47"),
+        ("raw_ratio", "CEDA's snapshot, unscaled"),
+    ):
+        encoding = {
+            "x": alt.X(
+                "hour_of_day:O",
+                title="UTC hour of day (lead-0 hours with sunshine)",
+                axis=alt.Axis(labelAngle=0),
+            ),
+            "y": alt.Y(
+                f"{column}:Q",
+                title="Median CEDA over Open-Meteo (1 means equal)",
+                scale=alt.Scale(domain=[0.4, 1.6], zero=False, nice=False),
+            ),
+            "color": alt.Color(
+                "era:N",
+                title="",
+                scale=alt.Scale(
+                    domain=[ERA_0_LABEL, ERA_1_LABEL],
+                    range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE],
+                ),
+            ),
+        }
+        line = alt.Chart(data).mark_line().encode(**encoding)  # ty: ignore[unresolved-attribute]
+        points = (
+            alt.Chart(data).mark_point(filled=True, size=70).encode(**encoding)  # ty: ignore[unresolved-attribute]
+        )
+        rule = alt.Chart(pl.DataFrame({"y": [1.0]})).mark_rule(color=ocf.BLACK_1).encode(y="y:Q")  # ty: ignore[unresolved-attribute]
+        panels.append(
+            alt.layer(rule, line, points).properties(
+                width=PLOT_WIDTH_PX, height=150, title=alt.TitleParams(title, anchor="start")
+            )
+        )
+    return figure(
+        panels=panels,  # ty: ignore[invalid-argument-type]
+        number=7,
+        title=(
+            "Before PS47 CEDA's rebuilt snapshot matches Open-Meteo's irradiance, and after it "
+            "does not"
+        ),
+        subtitle=[
+            "Median ratio at the hours where CEDA's lead is 0, at the nine generator sites.",
+            "Black rule: the two archives equal.",
         ],
         figure_planning="exploratory",
     )
@@ -322,7 +444,7 @@ def controls_figure(
         panels=drawn,
         number=6,
         title="The controls show what the pipeline produces from shuffled weather",
-        subtitle=["All rows are exploratory, at the primary setting."],
+        subtitle=["Every row is at the primary setting."],
         figure_planning=kind,
     )
     return chart, list(rows.values())
@@ -347,6 +469,9 @@ def main() -> int:
         check_against_report(rows=rows, report=report, name="the set B report")
     headline.save(assets / "fig01_headline.svg")
     controls.save(assets / "fig06_controls.svg")
+    ratio_figure(ratios=pl.read_parquet(directory / RATIOS_NAME)).save(
+        assets / "fig07_irradiance_ratio.svg"
+    )
     lead_figure(records=direct).save(assets / "fig04_leads.svg")
     month_figure(records=direct).save(assets / "fig05_months.svg")
 

@@ -539,14 +539,140 @@ def test_the_transfer_run_scores_one_ceda_trained_model_on_every_frame(
         "ceda_wind_10m_scored_on_om",
         "ceda_wind_10m_scored_on_om_direction",
     }
-    own = losses.filter(pl.col("arm") == "ceda_wind_10m")
-    swapped = losses.filter(pl.col("arm") == "ceda_wind_10m_scored_on_om")
-    assert own.height == swapped.height == rows.height * 3 * 2
-    assert set(own["setting"].unique().to_list()) == {fit.PRIMARY_SETTING, fit.SECOND_SETTING}
-    assert swapped["absolute_error_mw"].mean() != own["absolute_error_mw"].mean()
+
+    def mean_error(arm: str) -> float:
+        rows = losses.filter(pl.col("arm") == arm)
+        return float(np.mean(rows["absolute_error_mw"].to_numpy()))
+
+    own_rows = losses.filter(pl.col("arm") == "ceda_wind_10m")
+    swapped_rows = losses.filter(pl.col("arm") == "ceda_wind_10m_scored_on_om")
+    assert own_rows.height == swapped_rows.height == rows.height * 3 * 2
+    assert set(own_rows["setting"].unique().to_list()) == {
+        fit.PRIMARY_SETTING,
+        fit.SECOND_SETTING,
+    }
+    own = mean_error("ceda_wind_10m")
+    swapped = mean_error("ceda_wind_10m_scored_on_om")
+    assert swapped != own
     # The direction swap changes columns the model barely uses here, so it scores like the own frame
     # far more closely than the full swap does.
-    partial = losses.filter(pl.col("arm") == "ceda_wind_10m_scored_on_om_direction")
-    assert abs(partial["absolute_error_mw"].mean() - own["absolute_error_mw"].mean()) < abs(
-        swapped["absolute_error_mw"].mean() - own["absolute_error_mw"].mean()
+    partial = mean_error("ceda_wind_10m_scored_on_om_direction")
+    assert abs(partial - own) < abs(swapped - own)
+
+
+# --- the solar contrasts are planned on era 0 only ----------------------------------------------
+
+
+def _ratio_frame(*, era_1_scale: float) -> pl.DataFrame:
+    """Lead-0 rows with CEDA at 06 and 18 UTC scaled against Open-Meteo, by era."""
+    rows = []
+    for era in (0, 1):
+        for hour, factor in ((6, 1.0), (12, 1.0), (18, 1.0)):
+            for index in range(5):
+                scale = era_1_scale if era == 1 and hour == 6 else 1.0
+                scale = 1.0 / era_1_scale if era == 1 and hour == 18 else scale
+                rows.append(
+                    {
+                        "site": "A",
+                        "time": datetime(2025, 6, 1, tzinfo=UTC) + timedelta(days=index),
+                        "lead_hours": 0,
+                        "hour_of_day": hour,
+                        "era_code": era,
+                        "om_ghi": 300.0,
+                        "ceda_ghi": 300.0 * factor * scale,
+                        "ceda_ghi_snapshot": 450.0,
+                    }
+                )
+    return pl.DataFrame(rows)
+
+
+def test_the_era_1_note_names_the_hours_whose_rebuilt_ratio_misses():
+    note = build.era_1_irradiance_note(frame=_ratio_frame(era_1_scale=1.25))
+
+    assert note == (
+        "irradiance construction differs after PS47 (ratio 1.25 at 06 UTC, 0.80 at 18 UTC)"
     )
+
+
+def test_the_era_1_note_is_empty_where_every_hour_matches():
+    assert build.era_1_irradiance_note(frame=_ratio_frame(era_1_scale=1.0)) == ""
+
+
+def test_the_ratio_table_is_by_era_and_hour_and_reports_the_raw_snapshot_too():
+    table = build.irradiance_ratios_by_era_hour(frame=_ratio_frame(era_1_scale=1.25))
+
+    assert table.height == 6
+    row = table.filter((pl.col("era_code") == 1) & (pl.col("hour_of_day") == 6)).row(0, named=True)
+    assert row["rebuilt_ratio"] == pytest.approx(1.25)
+    assert row["raw_ratio"] == pytest.approx(1.5)
+
+
+def _contrast_losses() -> pl.DataFrame:
+    """Solar losses over 10 months of era 0 and 7 of era 1, three seeds, both settings."""
+    months = [f"2025-{m:02d}" for m in range(3, 13)] + [f"2026-{m:02d}" for m in range(2, 9)]
+    rows = []
+    for month in months:
+        year, number = (int(part) for part in month.split("-"))
+        time = datetime(year, number, 15, 12, tzinfo=UTC)
+        for setting in (fit.PRIMARY_SETTING, fit.SECOND_SETTING):
+            for seed in range(3):
+                for arm, error in (
+                    ("ceda_ghi_temp", 0.10),
+                    ("om_ghi_temp", 0.10),
+                    ("ceda_ghi_temp_scored_on_om", 0.10),
+                    ("ceda_ghi_temp_shuffled", 0.30),
+                    ("om_ghi_temp_shuffled", 0.30),
+                ):
+                    rows.append(
+                        {
+                            "site": "A",
+                            "time": time,
+                            "month": month,
+                            "seed": seed,
+                            "setting": setting,
+                            "arm": arm,
+                            fit.METRIC: error
+                            + (0.5 if (arm == "om_ghi_temp" and year == 2026) else 0.0),
+                        }
+                    )
+    return pl.DataFrame(rows)
+
+
+def test_a_solar_contrast_is_planned_only_on_era_0_and_other_scopes_carry_the_era_1_note():
+    note = "irradiance construction differs after PS47 (ratio 1.11 at 06 UTC, 0.86 at 18 UTC)"
+
+    records = fit.domain_records(domain="solar", losses=_contrast_losses(), era_1_note=note)
+
+    p2 = [r for r in records if r["label"] == "P2"]
+    planned = {r["scope"] for r in p2 if r["planned"]}
+    assert planned == {"era 0"}
+    assert all(r["note"] == "" for r in p2 if r["scope"] == "era 0")
+    assert all(r["note"] == note for r in p2 if r["scope"] != "era 0")
+    # The era-1 months differ by 0.5 per row, so the exploratory era-1 row sees a large difference
+    # while the planned era-0 row sees none.
+    era_0 = next(r for r in p2 if r["scope"] == "era 0" and r["setting"] == fit.PRIMARY_SETTING)
+    era_1 = next(r for r in p2 if r["scope"] == "era 1" and r["setting"] == fit.PRIMARY_SETTING)
+    assert era_0["difference_pp"] == pytest.approx(0.0)
+    assert era_1["difference_pp"] < -1.0
+
+
+def test_the_solar_controls_are_read_on_the_planned_era_only():
+    records = fit.domain_records(domain="solar", losses=_contrast_losses())
+
+    controls = [r for r in records if r["label"] == "control"]
+
+    assert controls
+    assert {r["scope"] for r in controls} == {"era 0"}
+    assert not any(r["planned"] for r in controls)
+
+
+def test_the_solar_verdicts_read_era_0_and_the_wind_verdicts_read_all_rows():
+    assert fit.PLANNED_SCOPE == {"wind": "all", "solar": "era 0"}
+    records = fit.domain_records(domain="solar", losses=_contrast_losses())
+
+    found = [v for v in fit.verdicts(records=records) if v.domain == "solar"]
+
+    assert {v.label for v in found} == {"P2", "P3"}
+    assert all(v.primary["scope"] == "era 0" for v in found)
+    # Era 0 shows no difference, so a verdict read on all rows would not be "interchangeable".
+    assert all(v.primary["difference_pp"] == pytest.approx(0.0) for v in found)

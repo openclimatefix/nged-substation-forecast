@@ -20,7 +20,7 @@ reach (section 3).
 
 ## 1. Verdict, size and departures
 
-**Verdict: worth doing, with four departures from the issue body.**
+**Verdict: worth doing, with five departures from the issue body.**
 
 - **The overlap is 23 whole months.** They are 2024-09 to 2025-12 (16, era 0) and 2026-02 to 2026-08
   (7, era 1). 2024-08 holds 20 days after Open-Meteo's backfill boundary and 2026-09 holds under 25
@@ -32,6 +32,10 @@ reach (section 3).
   stations, which is not on disk. At lead 0 both archives are the same UKV analysis, so a station
   score mostly shows lead-0 against lead-1-to-5 values, which #1024 measured. The page says
   question 4 is answered only through power error, and that a station check would need a fetch.
+- **The solar contrasts are planned on era 0 only.** After the PS47 upgrade Open-Meteo's hourly
+  irradiance is built differently, so the two archives' irradiance columns are not like for like in
+  era 1 (section 2). The solar rows of era 1 are scored as exploratory, labelled "irradiance
+  construction differs after PS47", and wind and temperature keep the whole overlap.
 - **Beam and diffuse irradiance cannot enter any arm,** because CEDA's files hold one downward
   shortwave field. The archives share temperature, 10 m wind, and global horizontal irradiance.
 - **Wind compares the matched 10 m columns only.** CEDA has no 100 m wind, and a model cannot be
@@ -89,8 +93,9 @@ Open-Meteo's values comparable with CEDA's, and a guard checks each at lead-0 ho
   `shortwave_down` at the label, and does not invert Open-Meteo's value to a snapshot, because the
   inverted `ghi_instant_w_m2` spikes after sunrise and dropping the spikes would select rows by
   one archive's values. The build stops unless, at lead-0 hours, the median ratio of CEDA's rebuilt
-  value to Open-Meteo's lies within 0.97 to 1.03 at every hour of day. Without the rebuild the
-  guard fails.
+  value to Open-Meteo's lies within 0.97 to 1.03 at every hour of day in era 0 (before PS47).
+  Without the rebuild the guard fails. After PS47 the ratio does not hold, and that mismatch is a
+  reported diagnostic and not a failure (see "Changed after implementation").
 
 **Which lead each archive stands in for.** Open-Meteo serves each hour's freshest run analysis
 (lead 0). CEDA's 6-hourly archive is read from the freshest run at or before the hour, so its lead
@@ -148,8 +153,8 @@ runs at both hyperparameter settings, and a verdict stands only if both agree.
 | Label | Contrast | Margin |
 |---|---|---|
 | P1 (planned) | Wind power: `ceda_wind_10m` minus `om_wind_10m`, points of capacity | 0.16 |
-| P2 (planned) | Solar power: `ceda_ghi_temp` minus `om_ghi_temp` | 0.06 |
-| P3 (planned) | Transfer penalty: (trained on CEDA, scored on Open-Meteo) minus (trained on Open-Meteo, scored on Open-Meteo), read for the wind arms and for the solar arms | 0.16 wind, 0.06 solar |
+| P2 (planned) | Solar power on era 0: `ceda_ghi_temp` minus `om_ghi_temp` | 0.06 |
+| P3 (planned) | Transfer penalty: (trained on CEDA, scored on Open-Meteo) minus (trained on Open-Meteo, scored on Open-Meteo), read for the wind arms (all months) and for the solar arms (era 0) | 0.16 wind, 0.06 solar |
 
 **P3 is read one-sided, because only a penalty is actionable.** "No penalty" means the interval's
 upper bound is below the margin. "Penalty" means the lower bound is above zero and the estimate
@@ -171,7 +176,9 @@ result. #1024's intervals for nearly this window show how little the design reso
   so with a standard error of 0.077 it needs an estimate within about 0.01 of zero, and with 0.086
   it cannot happen.
 - **Solar.** The different-product irradiance contrasts since August 2024 on the solar page have
-  half-widths of 0.17 to 0.24 points, so P2's margin of 0.06 is probably unreachable.
+  half-widths of 0.17 to 0.24 points, so P2's margin of 0.06 is probably unreachable. Reading solar
+  on era 0 alone (16 months, against 23) widens the intervals by about 20% (the square root of 23
+  over 16), and the margins are unchanged.
 - **Why these figures may overstate the error.** They compare different products, and two copies of
   one weather model should give more strongly correlated errors, so the standard error may be much
   smaller. P3's paired errors share the scored inputs, so its interval may be narrower than P1's.
@@ -185,8 +192,12 @@ extra, because P3 adds no fit.
 **Rules by question.**
 
 - **Question 2 (does the difference matter for power).** P1 and P2 each report their verdict.
-- **Question 3 (eras and years).** Every contrast is reported for era 0 and era 1 separately, and
-  the half-years appear as a chart only. Era 1 holds 7 months, so its intervals are approximate.
+- **Question 3 (eras and years).** Wind contrasts are reported for era 0 and era 1 separately. The
+  solar contrasts are planned on era 0, and the solar rows of era 1 and every solar scope that
+  includes them are exploratory and carry the note "irradiance construction differs after PS47
+  (ratio 1.11 at 06 UTC, 0.86 at 18 UTC)", with the ratios read from the build. The model-free
+  comparison reports the irradiance ratio by era and hour. The half-years and
+  sites appear as charts only. Era 1 holds 7 months, so its intervals are approximate.
   The change across 2026-01-21 is exploratory. Calendar years are not read, because 2024 holds four
   months.
 - **Question 5 (training history).** P3 measures transfer to Open-Meteo's lead-0 analysis only. The
@@ -368,3 +379,21 @@ wind-direction, partial-swap, and capacity-table additions.
 - Training on 2019 to 2024 CEDA and scoring on Open-Meteo: it changes history length and era with
   the archive.
 - Dropping the negative control: the study skill requires one.
+
+## Changed after implementation
+
+**Open-Meteo builds its hourly irradiance differently after the PS47 upgrade.** The first run of the
+irradiance guard on the real data found that CEDA's snapshot, rebuilt with the zenith-cosine ratio,
+matches Open-Meteo's `shortwave_radiation` at lead-0 hours before 2026-01-21 (median ratios 0.99 to
+1.01 at 06, 12, and 18 UTC) and does not afterwards (1.11 at 06 UTC and 0.86 at 18 UTC; the
+unscaled snapshot gives 1.45 and 0.74). The decision, made before any fit or result, is:
+
+- **The solar planned contrasts P2 and P3 are read on era 0 only** (16 months), and the margins are
+  unchanged. Wind and temperature keep the whole overlap.
+- **The solar rows of era 1, and every solar scope that includes them, are exploratory** and
+  labelled "irradiance construction differs after PS47 (ratio 1.11 at 06 UTC, 0.86 at 18 UTC)",
+  with the ratios read from the build.
+- **The era-0 guard stays fatal, and the era-1 mismatch is a reported diagnostic.** The model-free
+  comparison reports the ratio by era and hour (`direct_irradiance_ratios.parquet`).
+- **The fit-set count stays 54**, because every solar row is still fitted and only the scored scope
+  changes. The row counts are 45,948 wind rows, and 42,544 solar rows of which 27,766 are era 0.

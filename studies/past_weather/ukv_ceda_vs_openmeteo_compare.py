@@ -20,6 +20,12 @@ resample whole calendar months (`studies.bootstrap.bootstrap_row_difference`), a
 and the correlation are point values. The irradiance rows compare Open-Meteo with CEDA's snapshot
 rebuilt as Open-Meteo builds its hourly value, and with the raw snapshot.
 
+**The irradiance ratio by era and hour.** At lead 0 both archives are the same UKV snapshot, so the
+median ratio of CEDA's irradiance to Open-Meteo's, by era and UTC hour of day, shows whether
+Open-Meteo builds its hourly value as CEDA's snapshot rebuilt with the zenith-cosine ratio. It does
+before the PS47 upgrade of 2026-01-21 (ratios near 1) and does not after it, so the solar power
+contrasts are planned on era 0 only and the irradiance rows of era 1 carry that caveat.
+
 **Diagnostics, reporting only.** The cell-match diagnostic counts, at lead-0 hours, how often the
 nearest of the nine CEDA cells around a site has the value closest to Open-Meteo's, which says
 whether the archives read the same cell. The elevation diagnostic reports each site's mean
@@ -54,7 +60,9 @@ from ukv_ceda_vs_era5_build import (
 from ukv_ceda_vs_openmeteo_build import (
     MODEL_FREE_NAME,
     OUTPUT_DIR,
+    era_1_irradiance_note,
     generator_roster,
+    irradiance_ratios_by_era_hour,
     lead_zero,
 )
 
@@ -62,6 +70,7 @@ _LOG: Final[logging.Logger] = logging.getLogger("ukv_ceda_vs_openmeteo_compare")
 
 REPORT_NAME: Final[str] = "direct_report.md"
 DIFFERENCES_NAME: Final[str] = "direct_differences.parquet"
+RATIOS_NAME: Final[str] = "direct_irradiance_ratios.parquet"
 
 PS46_FIRST_MONTH: Final[str] = "2025-05"
 """The first month after the Met Office's move to new computers (PS46)."""
@@ -421,6 +430,8 @@ def report_text(
     records: Sequence[DifferenceRecord],
     offsets: pl.DataFrame,
     cell_lines: Sequence[str],
+    ratios: pl.DataFrame,
+    era_1_note: str,
 ) -> str:
     """Render every table the page quotes from the model-free comparison.
 
@@ -428,6 +439,8 @@ def report_text(
         records: `difference_records`'s result.
         offsets: `temperature_offsets`'s result.
         cell_lines: `cell_match_lines`'s result.
+        ratios: `irradiance_ratios_by_era_hour`'s result.
+        era_1_note: `era_1_irradiance_note`'s result, empty where every hour matches.
 
     Returns:
         The report, in Markdown.
@@ -460,6 +473,23 @@ def report_text(
                 "",
             ]
     lines += [
+        "## Irradiance construction, by era and hour",
+        "",
+        (
+            "The median of CEDA's irradiance over Open-Meteo's at lead-0 hours where Open-Meteo "
+            "exceeds 50 W/m2. `Rebuilt` is CEDA's snapshot scaled by the zenith-cosine ratio that "
+            "Open-Meteo applied before PS47, and `raw` is the snapshot itself."
+        ),
+        f"After the upgrade: {era_1_note or 'every hour matches'}.",
+        "",
+        "| Era | UTC hour | Rebuilt ratio | Raw ratio | Rows |",
+        "|---|---|---|---|---|",
+        *(
+            f"| {row['era_code']} | {row['hour_of_day']:02d} | {row['rebuilt_ratio']:.3f} | "
+            f"{row['raw_ratio']:.3f} | {row['n']:,} |"
+            for row in ratios.iter_rows(named=True)
+        ),
+        "",
         "## Diagnostics",
         "",
         "### Cell match",
@@ -489,7 +519,11 @@ def main() -> int:
     parser.add_argument("--frames-dir", type=Path, default=OUTPUT_DIR)
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
     arguments = parser.parse_args()
-    paths = (arguments.output_dir / REPORT_NAME, arguments.output_dir / DIFFERENCES_NAME)
+    paths = (
+        arguments.output_dir / REPORT_NAME,
+        arguments.output_dir / DIFFERENCES_NAME,
+        arguments.output_dir / RATIOS_NAME,
+    )
     refuse_to_overwrite(paths=paths)
 
     frame = pl.read_parquet(arguments.frames_dir / MODEL_FREE_NAME)
@@ -498,9 +532,12 @@ def main() -> int:
         records=records,
         offsets=temperature_offsets(frame=frame),
         cell_lines=cell_match_lines(ukv=open_ukv_stores(), frame=frame),
+        ratios=irradiance_ratios_by_era_hour(frame=frame),
+        era_1_note=era_1_irradiance_note(frame=frame),
     )
     paths[0].write_text(text)
     pl.DataFrame(records).write_parquet(paths[1])
+    irradiance_ratios_by_era_hour(frame=frame).write_parquet(paths[2])
     sys.stdout.write(f"Wrote {len(records)} records to {arguments.output_dir}.\n")
     return 0
 
