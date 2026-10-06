@@ -28,8 +28,8 @@ best-estimate, not a guarantee.
   metrics (flexibility procurement and curtailment), the equal-risk method that avoids needing a
   price for a network breach, their limitations, and the open questions for NGED.
 - [Data sources](data-sources.md) — NGED power data + supporting files, network topology, and the
-  weather datasets (ECMWF ENS, CAMS, CEDA UKV, ERA5), with the dated list of upgrades to each
-  weather model.
+  weather datasets (ECMWF ENS, CAMS, ERA5, and the CEDA UKV archive that version 1 does not
+  ingest), with the dated list of upgrades to each weather model.
 - [Live service](live-service.md) — the AWS deployment: the `live_forecasts` inference asset, the
   champion-model container, the costed AWS architecture options, production monitoring, and the
   handling of NWP model upgrades.
@@ -40,7 +40,7 @@ best-estimate, not a guarantee.
 - [XGBoost improvements](xgboost-improvements.md) — the v0.5 experiment backlog: four effort tiers,
   ordered best bang-for-the-buck within each tier, targeting the 3–10 day user band.
 - [Extending the training history](training-history.md) — using estimates of past weather, CAMS for
-  irradiance and CEDA UKV for other variables, to train on the power data that predates the ECMWF
+  irradiance and ERA5 for other variables, to train on the power data that predates the ECMWF
   ENS archive: the era-confounding hazard that dictates the ingest's scope, the reconciliation and
   pooling variants, how a weather product with a few months of history could enter the forecast,
   the COVID covariate, and why scoring against estimates of past weather is a diagnostic rather than
@@ -192,9 +192,9 @@ This milestone also carries the **ingest of estimates of past weather** (ERA5:
 [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143), moved here from v0.7)
 and the **pre-training experiments** that ingest unlocks
 ([#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167)) — see [Extending the
-training history](training-history.md). The planned estimates are CAMS for irradiance and CEDA UKV
-for other variables, pending a check of UKV against ERA5 over 2019 to 2024 and of temperature for
-demand. ERA5 is kept for gap filling and as a comparison arm. Our power data reaches back to late
+training history](training-history.md). The version-1 plan is CAMS for irradiance and ERA5 for
+other variables, and CEDA UKV is not ingested (see the [CEDA UKV against ERA5
+study](../studies/past-weather/ukv-ceda-vs-era5.md)). Our power data reaches back to late
 2019 while the ENS archive starts 2024-04-01, and Dynamical.org's ENS back-fill is not expected
 until ~November 2027, so an estimate of past weather is how the seasonal experiments on this page
 get more than one winter to learn from. The Tier-1 and Tier-2 config wins do not wait for it.
@@ -289,7 +289,7 @@ The remaining work items for metered-generator capacity:
   by effective capacity before training the power forecast model
 - Ingest **CAMS** (Copernicus Atmosphere Monitoring Service) solar radiation — satellite-derived
   irradiance, used to estimate solar PV capacity ([data sources](data-sources.md#weather-data)).
-  Wind-farm capacity estimation takes its wind from CEDA UKV, the [planned estimate of past
+  Wind-farm capacity estimation takes its wind from ERA5, the [planned estimate of past
   weather](training-history.md#which-estimate-of-past-weather-to-train-on) for variables other than
   irradiance
 - Populate the `effective_capacity` Delta table
