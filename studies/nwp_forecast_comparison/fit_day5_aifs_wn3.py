@@ -8,12 +8,13 @@ refits, and for wind the `ens_meanvec_day5` reference), both at day 5 only, with
 seeds, folds, feature columns, and target capping of the days already fitted. It adds no fitting
 code of its own.
 
-The folder `nwp_forecast_comparison_day5_aifs_wn3` must hold `<domain>_aifs_inputs.parquet`, built
-with `build_forecast_inputs.py --aifs --aifs-days 5`, and `<domain>_wn3_inputs.parquet`, built with
-`build_wn3_inputs.py --build --days 5`. The two fits write their losses, predictions, and stamps
-there under different file names, and their two reports as `report_aifs.md` and `report_wn3.md`.
-This script joins those into `report.md`, and writes a `README.md` if none exists. It refuses any
-other output folder name, so it cannot write into a folder that holds an earlier fit.
+The folder `per_study/nwp_forecast_comparison/day5_aifs_wn3` must hold
+`<domain>_aifs_inputs.parquet`, built with `build_forecast_inputs.py --aifs --aifs-days 5`, and
+`<domain>_wn3_inputs.parquet`, built with `build_wn3_inputs.py --build --days 5`. The two fits write
+their losses, predictions, and stamps there under different file names, and their two reports as
+`report_aifs.md` and `report_wn3.md`. This script joins those into `report.md`, and writes a
+`README.md` if none exists. It refuses any other output folder name, so it cannot write into a
+folder that holds an earlier fit.
 
 `--check` fits one arm at one wind site twice on the GPU for each of the two fits, and prints the
 time and the estimated total without fitting anything else.

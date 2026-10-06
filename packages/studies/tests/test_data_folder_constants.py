@@ -17,6 +17,7 @@ from studies.sources import (
     NFC_BATCH_DIRS,
     NFC_DIR,
     NFC_STAMP_GLOB,
+    NFC_STUDY_DIR,
     PER_STUDY_DIR,
     REPO_DATA_DIR,
     SCRATCH_DIR,
@@ -91,36 +92,52 @@ OLD_STUDY_FOLDERS: Final[dict[str, str]] = {
     "CERRA_WIND_DIRECTION_DIR": "per_study/cerra_wind/direction",
     "UKV_CEDA_BLENDS_DIR": "ukv_ceda_blends",
     "UKV_CEDA_BLENDS_RUN15_DIR": "ukv_ceda_blends_run15",
-    "NFC_DIR": "nwp_forecast_comparison",
-    "NFC_AIFS_DIR": "nwp_forecast_comparison_aifs",
-    "NFC_AIFS_BLENDS_DIR": "nwp_forecast_comparison_aifs_blends",
-    "NFC_AIFS_EXTRA_DAYS_DIR": "nwp_forecast_comparison_aifs_extra_days",
-    "NFC_DAY4_SHARED_DIR": "nwp_forecast_comparison_day4_shared",
-    "NFC_DAY5_AIFS_WN3_DIR": "nwp_forecast_comparison_day5_aifs_wn3",
-    "NFC_LEADERBOARD_BY_DAY_DIR": "nwp_forecast_comparison_leaderboard_by_day",
-    "NFC_LEADERBOARD_BY_DAY_FIG3_DIR": "nwp_forecast_comparison_leaderboard_by_day_fig3",
-    "NFC_LEADS_DIR": "nwp_forecast_comparison_leads",
-    "NFC_LEADS_DAY10_DIR": "nwp_forecast_comparison_leads_day10",
-    "NFC_LEADS_DAY10B_DIR": "nwp_forecast_comparison_leads_day10b",
-    "NFC_LEADS_DAY10C_DIR": "nwp_forecast_comparison_leads_day10c",
-    "NFC_LEADS_DAY10D_DIR": "nwp_forecast_comparison_leads_day10d",
-    "NFC_P4_SEEDS_DIR": "nwp_forecast_comparison_p4_seeds",
-    "NFC_PRODUCT_BLENDS_DIR": "nwp_forecast_comparison_product_blends",
-    "NFC_PRODUCT_BLENDS_REPORT_DIR": "nwp_forecast_comparison_product_blends_report",
-    "NFC_VS_ENS_DOTS_DIR": "nwp_forecast_comparison_vs_ens_dots",
-    "NFC_VS_ENS_DOTS_ALL_DAYS_DIR": "nwp_forecast_comparison_vs_ens_dots_all_days",
-    "NFC_VS_ENS_DOTS_BLENDS_DIR": "nwp_forecast_comparison_vs_ens_dots_blends",
-    "NFC_VS_ENS_DOTS_BLENDS_FINAL_DIR": "nwp_forecast_comparison_vs_ens_dots_blends_final",
-    "NFC_VS_ENS_DOTS_FINAL_DIR": "nwp_forecast_comparison_vs_ens_dots_final",
-    "NFC_WN3_DIR": "nwp_forecast_comparison_wn3",
-    "NFC_WN3_EXTRA_DAYS_DIR": "nwp_forecast_comparison_wn3_extra_days",
+    "NFC_STUDY_DIR": "per_study/nwp_forecast_comparison",
+    "NFC_DIR": "per_study/nwp_forecast_comparison/original",
+    "NFC_AIFS_DIR": "per_study/nwp_forecast_comparison/aifs",
+    "NFC_AIFS_BLENDS_DIR": "per_study/nwp_forecast_comparison/aifs_blends",
+    "NFC_AIFS_EXTRA_DAYS_DIR": "per_study/nwp_forecast_comparison/aifs_extra_days",
+    "NFC_DAY4_SHARED_DIR": "per_study/nwp_forecast_comparison/day4_shared",
+    "NFC_DAY5_AIFS_WN3_DIR": "per_study/nwp_forecast_comparison/day5_aifs_wn3",
+    "NFC_LEADERBOARD_BY_DAY_DIR": "per_study/nwp_forecast_comparison/leaderboard_by_day",
+    "NFC_LEADERBOARD_BY_DAY_FIG3_DIR": "per_study/nwp_forecast_comparison/leaderboard_by_day_fig3",
+    "NFC_LEADS_DIR": "per_study/nwp_forecast_comparison/leads",
+    "NFC_LEADS_DAY10_DIR": "per_study/nwp_forecast_comparison/leads_day10",
+    "NFC_LEADS_DAY10B_DIR": "per_study/nwp_forecast_comparison/leads_day10b",
+    "NFC_LEADS_DAY10C_DIR": "per_study/nwp_forecast_comparison/leads_day10c",
+    "NFC_LEADS_DAY10D_DIR": "per_study/nwp_forecast_comparison/leads_day10d",
+    "NFC_P4_SEEDS_DIR": "per_study/nwp_forecast_comparison/p4_seeds",
+    "NFC_PRODUCT_BLENDS_DIR": "per_study/nwp_forecast_comparison/product_blends",
+    "NFC_PRODUCT_BLENDS_REPORT_DIR": "per_study/nwp_forecast_comparison/product_blends_report",
+    "NFC_VS_ENS_DOTS_DIR": "per_study/nwp_forecast_comparison/vs_ens_dots",
+    "NFC_VS_ENS_DOTS_ALL_DAYS_DIR": "per_study/nwp_forecast_comparison/vs_ens_dots_all_days",
+    "NFC_VS_ENS_DOTS_BLENDS_DIR": "per_study/nwp_forecast_comparison/vs_ens_dots_blends",
+    "NFC_VS_ENS_DOTS_BLENDS_FINAL_DIR": (
+        "per_study/nwp_forecast_comparison/vs_ens_dots_blends_final"
+    ),
+    "NFC_VS_ENS_DOTS_FINAL_DIR": "per_study/nwp_forecast_comparison/vs_ens_dots_final",
+    "NFC_WN3_DIR": "per_study/nwp_forecast_comparison/wn3",
+    "NFC_WN3_EXTRA_DAYS_DIR": "per_study/nwp_forecast_comparison/wn3_extra_days",
 }
 """Each study-folder constant against its folder under `data/studies/`."""
+
+NFC_BATCH_CONSTANTS: Final[frozenset[str]] = frozenset(
+    constant
+    for constant in OLD_STUDY_FOLDERS
+    if constant.startswith("NFC_") and constant != "NFC_STUDY_DIR"
+)
+"""The batch folders of the NWP forecast comparison, whose names (`aifs`, `leads`, `wn3`, ...) are
+too common to flag in a scan for a hand-written folder name."""
 
 HAND_WRITTEN_FOLDER_NAMES: Final[frozenset[str]] = frozenset(
     {
         *(Path(folder).name for folder in PRODUCT_FOLDERS.values()),
-        *(Path(folder).name for folder in OLD_STUDY_FOLDERS.values()),
+        *(
+            Path(folder).name
+            for constant, folder in OLD_STUDY_FOLDERS.items()
+            if constant not in NFC_BATCH_CONSTANTS
+        ),
+        "nwp_forecast_comparison",
         *PREVIOUS_RUNS_FOLDERS,
         "downloads",
         "reanalysis",
@@ -224,8 +241,9 @@ def test_the_batch_folders_are_the_twenty_two_siblings_of_the_original_batch():
     assert len(NFC_BATCH_DIRS) == 22
     assert len(set(NFC_BATCH_DIRS)) == 22
     assert NFC_DIR not in NFC_BATCH_DIRS
-    assert {folder.parent for folder in NFC_BATCH_DIRS} == {PER_STUDY_DIR}
-    assert all(folder.name.startswith("nwp_forecast_comparison_") for folder in NFC_BATCH_DIRS)
+    assert {folder.parent for folder in NFC_BATCH_DIRS} == {NFC_STUDY_DIR}
+    assert NFC_DIR.parent == NFC_STUDY_DIR
+    assert NFC_STUDY_DIR == STUDIES_DATA_DIR / "per_study" / "nwp_forecast_comparison"
     assert nfc_batch_dir_for(batch="wn3") == sources.NFC_WN3_DIR
 
 
@@ -233,7 +251,9 @@ def test_every_batch_constant_is_listed_among_the_batch_folders():
     batch_constants = {
         value
         for name, value in vars(sources).items()
-        if name.startswith("NFC_") and name.endswith("_DIR") and name != "NFC_DIR"
+        if name.startswith("NFC_")
+        and name.endswith("_DIR")
+        and name not in {"NFC_DIR", "NFC_STUDY_DIR"}
     }
 
     assert batch_constants == set(NFC_BATCH_DIRS)
@@ -247,15 +267,16 @@ def test_the_name_helpers_join_one_folder_name_onto_their_layer():
 
 
 def test_the_stamp_glob_reads_every_batch_folder_and_nothing_else(tmp_path: Path):
-    for folder in ("nwp_forecast_comparison_a", "ukv_ceda_blends", "nwp_forecast_comparison"):
-        (tmp_path / folder).mkdir()
-        (tmp_path / folder / "solar_x_losses.json").write_text("{}")
-    (tmp_path / "nwp_forecast_comparison_a" / "superseded").mkdir()
-    (tmp_path / "nwp_forecast_comparison_a" / "superseded" / "solar_y_losses.json").write_text("{}")
+    study = tmp_path / NFC_STUDY_DIR.relative_to(PER_STUDY_DIR)
+    for folder in (study / "a", study / "b", tmp_path / "ukv_ceda_blends"):
+        folder.mkdir(parents=True)
+        (folder / "solar_x_losses.json").write_text("{}")
+    (study / "a" / "superseded").mkdir()
+    (study / "a" / "superseded" / "solar_y_losses.json").write_text("{}")
 
     found = sorted(path.parent.name for path in tmp_path.glob(NFC_STAMP_GLOB))
 
-    assert found == ["nwp_forecast_comparison_a"]
+    assert found == ["a", "b"]
 
 
 @pytest.mark.skipif(
@@ -268,6 +289,17 @@ def test_every_folder_constant_names_a_folder_that_exists_on_disk():
 
     assert missing == []
     assert TRIAL_AREA_BOX_PATH.exists()
+
+
+@pytest.mark.skipif(
+    not STUDIES_DATA_DIR.exists(),
+    reason="the private study data is not in this checkout",
+)
+def test_the_stamp_glob_finds_72_stamps_on_disk_and_no_batch_folder_is_left_at_the_old_paths():
+    stamps = {path.resolve() for path in PER_STUDY_DIR.glob(NFC_STAMP_GLOB)}
+
+    assert len(stamps) == 72
+    assert sorted(STUDIES_DATA_DIR.glob("nwp_forecast_comparison_*")) == []
 
 
 def _joined_folder_names(*, path: Path) -> list[tuple[int, str]]:

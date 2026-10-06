@@ -915,8 +915,11 @@ def test_a_run_missing_from_the_copy_is_not_a_hole_inside_a_band(domain: str) ->
 
 
 def test_the_day_5_fits_refuse_every_output_folder_but_their_own(tmp_path: Path) -> None:
-    published = tmp_path / "nwp_forecast_comparison"
-    for name in ("nwp_forecast_comparison_aifs_extra_days", "nwp_forecast_comparison_leads_day10"):
+    published = tmp_path / "per_study/nwp_forecast_comparison/original"
+    for name in (
+        "per_study/nwp_forecast_comparison/aifs_extra_days",
+        "per_study/nwp_forecast_comparison/leads_day10",
+    ):
         with pytest.raises(ValueError, match="writes only to"):
             driver.check_output_dir(output_dir=tmp_path / name, published_dir=published)
     driver.check_output_dir(output_dir=tmp_path / driver.OUTPUT_DIR.name, published_dir=published)
@@ -957,16 +960,16 @@ def test_a_hole_in_any_one_value_column_stops_the_build(domain: str, column: str
 
 
 def test_the_day_5_wn3_build_refuses_any_output_folder_but_its_own(tmp_path: Path) -> None:
-    published = tmp_path / "nwp_forecast_comparison"
+    published = tmp_path / "per_study/nwp_forecast_comparison/original"
     with pytest.raises(ValueError, match="day 5 builds only into"):
         w.build_domain(
             domain="solar",
             published_dir=published,
-            output_dir=tmp_path / "nwp_forecast_comparison_wn3_extra_days",
+            output_dir=tmp_path / "per_study/nwp_forecast_comparison/wn3_extra_days",
             weather_dir=tmp_path,
             days=(3, 5),
         )
-    assert driver.OUTPUT_DIR.name == "nwp_forecast_comparison_day5_aifs_wn3"
+    assert driver.OUTPUT_DIR.name == "day5_aifs_wn3"
 
 
 def _run_driver(
@@ -998,7 +1001,7 @@ def _run_driver(
         [
             "x",
             "--published-dir",
-            str(tmp_path / "nwp_forecast_comparison"),
+            str(tmp_path / "per_study/nwp_forecast_comparison/original"),
             "--output-dir",
             str(out),
             "--lookahead-cleared",
@@ -1023,7 +1026,7 @@ def test_the_driver_skips_a_fit_whose_report_exists_and_keeps_an_existing_readme
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     out = tmp_path / driver.OUTPUT_DIR.name
-    out.mkdir()
+    out.mkdir(parents=True)
     (out / driver.README_NAME).write_text("mine")
 
     ran = _run_driver(
@@ -1044,13 +1047,13 @@ def test_the_driver_refuses_before_any_fit_when_report_md_exists(
 
 def _patch_day5_build(*, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ens: float) -> Path:
     """Stub everything `build_domain` reads but the keys, the WN3 copy and the ENS reference."""
-    published = tmp_path / "nwp_forecast_comparison"
-    published.mkdir()
+    published = tmp_path / "per_study/nwp_forecast_comparison/original"
+    published.mkdir(parents=True)
     _keys(times=[datetime(2026, 3, 6, 12)]).write_parquet(
         published / "wind_forecast_inputs.parquet"
     )
-    reference = tmp_path / "nwp_forecast_comparison_leads_day10"
-    reference.mkdir()
+    reference = tmp_path / "per_study/nwp_forecast_comparison/leads_day10"
+    reference.mkdir(parents=True)
     _keys(times=[datetime(2026, 3, 6, 12)]).with_columns(
         ens_mean_day5_speed_100m=pl.lit(7.0)
     ).write_parquet(reference / "wind_extra_lead_inputs.parquet")
@@ -1078,7 +1081,7 @@ def test_the_day_5_wn3_build_stops_when_its_ens_mean_differs_from_the_extra_lead
         w.build_domain(
             domain="wind",
             published_dir=published,
-            output_dir=tmp_path / "nwp_forecast_comparison_day5_aifs_wn3",
+            output_dir=tmp_path / DAY5_FOLDER_NAME,
             weather_dir=tmp_path,
             days=(5,),
         )
@@ -1092,7 +1095,7 @@ def test_the_day_5_wn3_build_accepts_an_ens_mean_equal_to_the_extra_lead_folders
     frame = w.build_domain(
         domain="wind",
         published_dir=published,
-        output_dir=tmp_path / "nwp_forecast_comparison_day5_aifs_wn3",
+        output_dir=tmp_path / DAY5_FOLDER_NAME,
         weather_dir=tmp_path,
         days=(5,),
     )
@@ -1105,7 +1108,9 @@ def test_the_day_5_folder_may_be_reached_through_a_symbolic_link(tmp_path: Path)
     link = tmp_path / "old_name"
     link.symlink_to(tmp_path / DAY5_FOLDER_NAME, target_is_directory=True)
 
-    driver.check_output_dir(output_dir=link, published_dir=tmp_path / "nwp_forecast_comparison")
+    driver.check_output_dir(
+        output_dir=link, published_dir=tmp_path / "per_study/nwp_forecast_comparison/original"
+    )
 
 
 def test_the_day_5_wn3_build_accepts_a_symbolic_link_to_its_own_folder(
@@ -1113,7 +1118,7 @@ def test_the_day_5_wn3_build_accepts_a_symbolic_link_to_its_own_folder(
 ) -> None:
     published = _patch_day5_build(monkeypatch=monkeypatch, tmp_path=tmp_path, ens=7.0)
     real = tmp_path / DAY5_FOLDER_NAME
-    real.mkdir()
+    real.mkdir(parents=True)
     link = tmp_path / "old_name"
     link.symlink_to(real, target_is_directory=True)
 

@@ -21,10 +21,10 @@ compared by eye with a dot at day 0. Every dot has one colour. In each panel:
   (the saved losses hold `smart_persistence_day<N>` for days 0 to 3).
 
 Sources: `default_sources` names every fit folder the leaderboard reads, under the data directory:
-the published fit, the extra-lead fits (including `nwp_forecast_comparison_day4_shared`, the day-4
-cells of the full-window products), the AIFS and WeatherNext 3 fits (including
-`nwp_forecast_comparison_day5_aifs_wn3`, their day-5 cells), and it raises if a folder or file is
-missing, so a missing day cannot silently leave a blank cell.
+the published fit, the extra-lead fits (including `per_study/nwp_forecast_comparison/day4_shared`,
+the day-4 cells of the full-window products), the AIFS and WeatherNext 3 fits (including
+`per_study/nwp_forecast_comparison/day5_aifs_wn3`, their day-5 cells), and it raises if a folder or
+file is missing, so a missing day cannot silently leave a blank cell.
 
 `caveat_notes` holds every limiting caveat of the chart, and is the single source for the figure
 captions on the page. The script prints the list and writes it to `report.md`; the figure's own

@@ -29,7 +29,7 @@ from nwp_forecast_comparison import DomainType
 from studies.sources import NFC_STAMP_GLOB, PER_STUDY_DIR
 
 STAMP_GLOB: Final[str] = NFC_STAMP_GLOB
-"""Under the per-study folder, every earlier study's stamps."""
+"""Under the per-study folder, the stamps of every batch folder of the forecast comparison."""
 
 
 def stamp_domain(*, path: Path) -> DomainType:
