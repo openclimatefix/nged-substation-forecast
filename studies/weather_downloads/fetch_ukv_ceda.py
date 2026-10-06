@@ -96,7 +96,7 @@ import zarr
 import zarr.errors
 from lineage import write_lineage_note, write_readme
 from pyproj import Transformer
-from studies.sources import product_dir_for
+from studies.sources import LEGACY_WEATHER_DATA_DIR, existing_or_legacy, product_dir_for
 from studies.trial_area import load_trial_area_box
 from studies.ukv_ceda_profiles import (
     DEFAULT_PROFILE,
@@ -1593,6 +1593,26 @@ def add_product_argument(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def default_store_dir(*, product_name: str) -> Path:
+    """Return the folder of a product's store, wherever the folder is during the last data move.
+
+    The stores move from `LEGACY_WEATHER_DATA_DIR` to `downloads/NWP/` in the last wave of the data
+    migration. Until that wave has run, the new folder does not exist and the old one does, so a
+    run started from new code resumes the existing store rather than creating an empty one beside
+    it.
+
+    Args:
+        product_name: The profile's product name, such as `UKV-CEDA-T120`.
+
+    Returns:
+        The folder to pass to the store, new if it exists or if neither exists.
+    """
+    return existing_or_legacy(
+        current=product_dir_for(product=product_name),
+        legacy=LEGACY_WEATHER_DATA_DIR / product_name,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     """Select the profile from `--product`, fill the profile's defaults, and archive.
 
@@ -1608,7 +1628,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.start is None:
         args.start = profile.slot_epoch.date()
     if args.store_dir is None:
-        args.store_dir = product_dir_for(product=profile.product_name)
+        args.store_dir = default_store_dir(product_name=profile.product_name)
     return archive(args)
 
 

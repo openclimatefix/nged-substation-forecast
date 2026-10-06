@@ -9,7 +9,7 @@ import json
 
 import polars as pl
 
-from studies.sources import TRIAL_AREA_BOX_PATH
+from studies.sources import LEGACY_TRIAL_AREA_BOX_PATH, TRIAL_AREA_BOX_PATH, existing_or_legacy
 
 
 class TrialAreaBox:
@@ -54,6 +54,9 @@ class TrialAreaBox:
 def load_trial_area_box() -> TrialAreaBox:
     """Load the trial-area box written by the setup step.
 
+    The box is read from `TRIAL_AREA_BOX_PATH`, or from `LEGACY_TRIAL_AREA_BOX_PATH` while the file
+    has not yet moved there, so that a script runs on either side of the move.
+
     Returns:
         The box, held only in memory from here on.
 
@@ -61,7 +64,8 @@ def load_trial_area_box() -> TrialAreaBox:
         FileNotFoundError: If the box has not been derived yet (see
             `write_trial_area_box_from_roster` below, run once per checkout).
     """
-    bounds = json.loads(TRIAL_AREA_BOX_PATH.read_text())
+    path = existing_or_legacy(current=TRIAL_AREA_BOX_PATH, legacy=LEGACY_TRIAL_AREA_BOX_PATH)
+    bounds = json.loads(path.read_text())
     return TrialAreaBox(**bounds)
 
 

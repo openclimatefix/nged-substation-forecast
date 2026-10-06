@@ -42,3 +42,20 @@ def test_the_box_written_from_a_roster_is_widened_by_the_margin_and_read_back(
     assert (box.lat_min, box.lat_max, box.lon_min, box.lon_max) == pytest.approx(
         (51.9, 52.6, -1.1, -0.4)
     )
+
+
+def test_the_box_is_read_from_the_old_path_until_the_file_has_moved(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    new, old = tmp_path / "_private" / "box.json", tmp_path / "weather" / "box.json"
+    old.parent.mkdir()
+    old.write_text(json.dumps({"lat_min": 1.0, "lat_max": 2.0, "lon_min": 3.0, "lon_max": 4.0}))
+    monkeypatch.setattr(trial_area, "TRIAL_AREA_BOX_PATH", new)
+    monkeypatch.setattr(trial_area, "LEGACY_TRIAL_AREA_BOX_PATH", old)
+
+    before = load_trial_area_box()
+    new.parent.mkdir()
+    new.write_text(json.dumps({"lat_min": 5.0, "lat_max": 6.0, "lon_min": 7.0, "lon_max": 8.0}))
+    after = load_trial_area_box()
+
+    assert (before.lat_min, after.lat_min) == (1.0, 5.0)

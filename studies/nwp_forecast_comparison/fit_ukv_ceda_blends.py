@@ -25,7 +25,7 @@ ENS's columns at that day, and UKV-CEDA's columns at that day are all present. T
 shared design (`assign_folds_with_eras`); a stage whose rows leave a calendar month uncovered takes
 the first rotation `search_fold_offsets` returns, before any fit.
 
-**Outputs**, all under `--output-dir` (`data/studies/ukv_ceda_blends`) and written once:
+**Outputs**, all under `--output-dir` (`data/studies/per_study/ukv_ceda_blends`) and written once:
 `<domain>_day<N>_planned_losses.parquet`, `_predictions.parquet`, and a `.json` stamp for each
 technology and lead day, `wind_day1_cpu_losses.parquet` (the GPU-CPU noise floor), `report.md`, and
 `intervals.parquet`. Every output carries only the anonymised `site` label.

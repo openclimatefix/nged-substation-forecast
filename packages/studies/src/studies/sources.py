@@ -388,14 +388,20 @@ Under `data/`, not `/tmp`: `/tmp` on this machine is tmpfs, and a multi-gigabyte
 consumes memory rather than disk. The CERRA fetches and the ERA5 archive reader use this folder.
 """
 
-WEATHER_DATA_DIR: Final[Path] = STUDIES_DATA_DIR / "weather"
+LEGACY_WEATHER_DATA_DIR: Final[Path] = STUDIES_DATA_DIR / "weather"
 """The folder that held every downloaded weather product, one subdirectory per product.
 
-Only the UKV-on-CEDA stores and the trial-area box still live here. Every other product has moved
-under `DOWNLOADS_DIR`: `product_dir_for` gives the current folder of a product, given its name.
+Every product, and the trial-area box, has moved: `product_dir_for` gives the current folder of a
+product, given its name. This constant exists for `existing_or_legacy`, which lets a script that
+runs between a code merge and the moves of the last wave (the UKV-on-CEDA stores and the box) find
+the data at either path. Delete it, `LEGACY_TRIAL_AREA_BOX_PATH`, and `existing_or_legacy` once the
+old paths are tombstoned and no checkout names them.
 """
 
-TRIAL_AREA_BOX_PATH: Final[Path] = WEATHER_DATA_DIR / "_trial_area_box.json"
+PRIVATE_DIR: Final[Path] = STUDIES_DATA_DIR / "_private"
+"""Files derived from the private generator roster, which must never be published."""
+
+TRIAL_AREA_BOX_PATH: Final[Path] = PRIVATE_DIR / "trial_area_box.json"
 """Where the trial-area box's bounds are kept.
 
 **This file is never read by anything outside this process's private working state, and its
@@ -403,6 +409,30 @@ contents must never be logged, printed, committed, or quoted back in a report.**
 derived from the private generator roster (`packages/contracts` `TimeSeriesMetadata`), and NGED's
 generator locations must never appear in anything published — see CLAUDE.md.
 """
+
+LEGACY_TRIAL_AREA_BOX_PATH: Final[Path] = LEGACY_WEATHER_DATA_DIR / "_trial_area_box.json"
+"""Where the box was before it moved to `TRIAL_AREA_BOX_PATH`. See `LEGACY_WEATHER_DATA_DIR`."""
+
+
+def existing_or_legacy(*, current: Path, legacy: Path) -> Path:
+    """Return the path to read, for a file or folder that is moving from `legacy` to `current`.
+
+    Between the merge of the code that names `current` and the move of the data, `current` does not
+    exist yet. A reader then finds the data at `legacy`. Once the move has run, `current` exists and
+    wins, so the function needs no change when the data moves. A writer that must create the file
+    at `current` must not call it.
+
+    Args:
+        current: The path the data is moving to.
+        legacy: The path the data is moving from.
+
+    Returns:
+        `current` if it exists, else `legacy` if that exists, else `current`.
+    """
+    if current.exists() or not legacy.exists():
+        return current
+    return legacy
+
 
 PREVIOUS_RUNS_DIR: Final[Path] = NWP_DOWNLOADS_DIR / "OPEN-METEO-PREVIOUS-RUNS"
 """Open-Meteo's Previous Runs and historical-forecast archives, one folder per model."""
@@ -436,8 +466,17 @@ NWP_PRODUCT_NAMES: Final[tuple[str, ...]] = (
     "GEFS",
     "GFS",
     "OPEN-METEO-ENSEMBLE-MEANS",
+    "UKV-CEDA",
+    "UKV-CEDA-part2",
+    "UKV-CEDA-part3",
+    "UKV-CEDA-T120",
 )
-"""The forecast products whose folder under `NWP_DOWNLOADS_DIR` has the product's own name."""
+"""The forecast products whose folder under `NWP_DOWNLOADS_DIR` has the product's own name.
+
+The last four are the Met Office's UKV archive on CEDA, in four Icechunk stores that are never
+merged. `UKV-CEDA`, `-part2` and `-part3` hold the 00, 06, 12, and 18 UTC runs to 54 hours, and
+`-T120` holds the 03 and 15 UTC runs to 120 hours.
+"""
 
 REANALYSIS_PRODUCT_NAMES: Final[tuple[str, ...]] = (
     "CAMS",
@@ -463,11 +502,6 @@ _PRODUCT_DIRS: Final[dict[str, Path]] = {
     **{name: OBSERVATIONS_DOWNLOADS_DIR / name for name in OBSERVATION_PRODUCT_NAMES},
     "ENS": NWP_DOWNLOADS_DIR / "ENS_SITE_EXTRACT",
     "WeatherNext3_trial_area": NWP_DOWNLOADS_DIR / "WeatherNext3",
-    # The UKV-on-CEDA stores have not moved yet.
-    "UKV-CEDA": WEATHER_DATA_DIR / "UKV-CEDA",
-    "UKV-CEDA-part2": WEATHER_DATA_DIR / "UKV-CEDA-part2",
-    "UKV-CEDA-part3": WEATHER_DATA_DIR / "UKV-CEDA-part3",
-    "UKV-CEDA-T120": WEATHER_DATA_DIR / "UKV-CEDA-T120",
 }
 """Each product's folder, keyed by the name scripts and registries give the product.
 
@@ -666,15 +700,11 @@ CERRA_WIND_LEVELS_SHEAR_DIR: Final[Path] = CERRA_WIND_STUDIES_DIR / "shear"
 CERRA_WIND_DIRECTION_DIR: Final[Path] = CERRA_WIND_STUDIES_DIR / "direction"
 """The CERRA wind-direction study."""
 
-UKV_CEDA_BLENDS_DIR: Final[Path] = STUDIES_DATA_DIR / "ukv_ceda_blends"
-"""The planned run of the UKV-on-CEDA blends study.
+UKV_CEDA_BLENDS_DIR: Final[Path] = study_dir_for(study="ukv_ceda_blends")
+"""The planned run of the UKV-on-CEDA blends study."""
 
-Directly under `STUDIES_DATA_DIR`, not `PER_STUDY_DIR`, because the folder moves with the
-UKV-on-CEDA stores in the last step of the migration.
-"""
-
-UKV_CEDA_BLENDS_RUN15_DIR: Final[Path] = STUDIES_DATA_DIR / "ukv_ceda_blends_run15"
-"""The UKV-on-CEDA blends study's run on the 15 UTC cycle. It moves with `UKV_CEDA_BLENDS_DIR`."""
+UKV_CEDA_BLENDS_RUN15_DIR: Final[Path] = UKV_CEDA_BLENDS_DIR / "run15"
+"""The UKV-on-CEDA blends study's run on the 15 UTC cycle."""
 
 NFC_STUDY_DIR: Final[Path] = study_dir_for(study="nwp_forecast_comparison")
 """The folder of the NWP forecast comparison, one subfolder per batch of fits."""
