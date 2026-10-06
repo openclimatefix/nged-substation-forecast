@@ -189,7 +189,6 @@ def effective_capacity(context: AssetExecutionContext) -> None:
     full-history capacity is the NMAE denominator used by the ``metrics`` asset, replacing the
     validation-window P99 that would otherwise vary fold to fold.
 
-
     The whole (small — one row per series) table is overwritten on each materialisation. v0.1 is
     deliberately one scalar row per series, **not** the value repeated at every half-hour —
     densifying a constant buys nothing.
