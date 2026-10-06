@@ -198,8 +198,8 @@ EXPECTED_LEADERBOARD_ENS_SOURCE = {
     14: D10,
 }
 """The folder of the ENS-mean arm the leaderboards draw at each lead day, read off the saved
-folders: `ens_mean_day2` and `ens_mean_day7` are GPU refits in `_leads_day10b`, and every other
-day's GPU refit is in `_leads_day10`."""
+folders: `ens_mean_day2` and `ens_mean_day7` are GPU refits in `leads_day10b`, and every other
+day's GPU refit is in `leads_day10`."""
 
 EXPECTED_SOLAR_LABELS_BY_DAY = {
     0: {
@@ -1163,7 +1163,11 @@ def test_c5_subtracts_the_right_icon_eu_blend_and_raises_for_blends_on_different
     # An ICON-EU blend that lacks a month the AIFS Single blend holds is refused.
     other = tmp_path / "other"
     _write_blend_fixture(other)
-    path = other / "nwp_forecast_comparison_product_blends" / "solar_single_day1_losses.parquet"
+    path = (
+        other
+        / "per_study/nwp_forecast_comparison/product_blends"
+        / "solar_single_day1_losses.parquet"
+    )
     frame = pl.read_parquet(path)
     frame.filter(~((pl.col("arm") == "blend_icon_eu_day1") & (pl.col("month") == 3))).write_parquet(
         path

@@ -587,8 +587,8 @@ def _saved_with_columns(
 
 def _world(tmp_path: Path, *, value: float = 1.0) -> tuple[Path, list[PlannedStage]]:
     """A reused folder of saved losses and every stage planned against it, with no real data."""
-    reused = tmp_path / fit_aifs.BLENDS_DIR_NAME
-    reused.mkdir()
+    reused = tmp_path / "per_study/nwp_forecast_comparison" / fit_aifs.BLENDS_DIR_NAME
+    reused.mkdir(parents=True)
     planned: list[PlannedStage] = []
     for domain in ("solar", "wind"):
         for day in (1, 2, 7):
@@ -810,8 +810,8 @@ def _run_main(
 ) -> int:
     monkeypatch.setattr(fpb, "plan_stages", lambda **kwargs: planned)
     monkeypatch.setattr(fit_aifs, "check_gpu_visible", lambda: None)
-    published = tmp_path / "nwp_forecast_comparison"
-    published.mkdir(exist_ok=True)
+    published = tmp_path / "per_study/nwp_forecast_comparison/original"
+    published.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -907,7 +907,7 @@ def test_a_report_can_be_built_from_the_saved_losses_into_a_new_folder_without_f
         [
             "fit_product_blends.py",
             "--published-dir",
-            str(tmp_path / "nwp_forecast_comparison"),
+            str(tmp_path / "per_study/nwp_forecast_comparison/original"),
             "--output-dir",
             str(output),
             "--report-dir",

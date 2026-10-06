@@ -9,13 +9,13 @@ year-month, and hour of day (`fit_aifs.add_shuffled_columns`). The settings, see
 column counts, and GPU device are those of `fit_aifs.py`, which this script imports and does not
 change.
 
-**AIFS Single's blends are reused, not refitted.** `nwp_forecast_comparison_aifs_blends` holds the
-AIFS Single blend, its control, and ENS's mean at days 1, 2, 7, and 14 on the `single` rows. This
-script builds the same rows, computes every (arm, setting) pair the contrasts C1 to C5 need that
-the folder lacks (mostly the second hyperparameter setting), and refits exactly those pairs. Before
-any fit it raises unless its build stamp (inputs, settings, seeds, GPU, XGBoost version) equals the
-reused folder's, and after each fit it raises unless every new arm holds the `(site, time, seed,
-fold)` keys of the saved ENS mean.
+**AIFS Single's blends are reused, not refitted.** `per_study/nwp_forecast_comparison/aifs_blends`
+holds the AIFS Single blend, its control, and ENS's mean at days 1, 2, 7, and 14 on the `single`
+rows. This script builds the same rows, computes every (arm, setting) pair the contrasts C1 to C5
+need that the folder lacks (mostly the second hyperparameter setting), and refits exactly those
+pairs. Before any fit it raises unless its build stamp (inputs, settings, seeds, GPU, XGBoost
+version) equals the reused folder's, and after each fit it raises unless every new arm holds the
+`(site, time, seed, fold)` keys of the saved ENS mean.
 
 The fits, each on the GPU:
 
@@ -111,8 +111,8 @@ Fits for `docs/studies/forecasts/blends-with-ens.md`. Never overwrite a file in 
 
 - `<domain>_single_day<N>_losses.parquet` holds, on the `single` rows, the ICON-EU and UKV blends
   with their controls at both settings, and the (arm, setting) pairs of the AIFS Single blend, its
-  control, and ENS's mean that `nwp_forecast_comparison_aifs_blends` lacks. The other pairs are read
-  from that folder.
+  control, and ENS's mean that `per_study/nwp_forecast_comparison/aifs_blends` lacks. The other
+  pairs are read from that folder.
 - `<domain>_wn3_day<N>_losses.parquet` holds ENS's mean, the WeatherNext 3 blend, and its control on
   the `wn3` rows, at the primary setting.
 - Each losses file has a `_predictions.parquet` and a `.json` stamp naming the device, the inputs'

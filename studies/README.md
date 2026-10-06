@@ -94,8 +94,16 @@ folder name themselves.
 | `observations/SARAH-3/` | The SARAH-3 satellite retrieval, ordered by hand from CM SAF; `site_points/` holds the frame at each site | `past_weather/extract_site_series.py` |
 | `observations/NGED-ANM/` | NGED's active network management setpoint exports, and the export-cap parquet derived from each | `beam_diffuse_split/anm_setpoints.py` (the exports come from NGED) |
 
-Every other folder directly under `data/studies/` is one study's own inputs and results. The
-`UKV-CEDA*` stores and the trial-area box are in `data/studies/weather/`.
+Every other folder directly under `data/studies/`, apart from `per_study/`, is one study's own
+inputs and results. The `UKV-CEDA*` stores and the trial-area box are in `data/studies/weather/`.
+
+**Each study that has moved keeps one folder under `data/studies/per_study/`.**
+
+| Folder under `data/studies/per_study/` | What it holds | Written by |
+|---|---|---|
+| `cerra_wind/<study>/` | The four CERRA wind studies: `direction`, `levels`, `levels_post_hoc`, and `shear` | `past_weather/cerra_wind_direction.py`, `past_weather/cerra_wind_levels.py` |
+| `nwp_forecast_comparison/original/` | The published fit of the NWP forecast comparison | `nwp_forecast_comparison/nwp_forecast_comparison.py` |
+| `nwp_forecast_comparison/<batch>/` | One folder for each of the 22 later batches of fits, such as `aifs_blends`, `leads_day10`, and `product_blends`; a batch's `superseded/` folder holds its earlier outputs | the `build_*.py` and `fit_*.py` scripts of `nwp_forecast_comparison/` |
 
 ## The studies
 

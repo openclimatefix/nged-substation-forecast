@@ -379,8 +379,8 @@ PER_STUDY_DIR: Final[Path] = STUDIES_DATA_DIR
 """The layer of `data/studies/` that holds one folder per study.
 
 Equal to `STUDIES_DATA_DIR` until the study folders move. Every study folder below is built from
-this constant, except the CERRA wind studies, whose folders already sit in
-`STUDIES_DATA_DIR / "per_study"`.
+this constant, except the CERRA wind studies and the NWP forecast comparison, whose folders already
+sit in `STUDIES_DATA_DIR / "per_study"`.
 """
 
 SCRATCH_DIR: Final[Path] = STUDIES_DATA_DIR / "_scratch"
@@ -680,7 +680,14 @@ UKV_CEDA_BLENDS_DIR: Final[Path] = study_dir_for(study="ukv_ceda_blends")
 UKV_CEDA_BLENDS_RUN15_DIR: Final[Path] = study_dir_for(study="ukv_ceda_blends_run15")
 """The UKV-on-CEDA blends study's run on the 15 UTC cycle."""
 
-NFC_DIR: Final[Path] = study_dir_for(study="nwp_forecast_comparison")
+NFC_STUDY_DIR: Final[Path] = STUDIES_DATA_DIR / "per_study" / "nwp_forecast_comparison"
+"""The folder of the NWP forecast comparison, one subfolder per batch of fits.
+
+The second folder under the `per_study/` layer, after the CERRA wind studies. The other study
+folders stay directly under `PER_STUDY_DIR` until they move.
+"""
+
+NFC_DIR: Final[Path] = NFC_STUDY_DIR / "original"
 """The NWP forecast comparison's original batch, which holds the published fit."""
 
 
@@ -688,12 +695,12 @@ def nfc_batch_dir_for(*, batch: str) -> Path:
     """Return the folder of one batch of the NWP forecast comparison.
 
     Args:
-        batch: The batch's name without its study prefix, such as `aifs_blends`.
+        batch: The batch's folder name under `NFC_STUDY_DIR`, such as `aifs_blends`.
 
     Returns:
         The batch's folder.
     """
-    return study_dir_for(study=f"nwp_forecast_comparison_{batch}")
+    return NFC_STUDY_DIR / batch
 
 
 def per_study_relative(*, folder: Path) -> Path:
@@ -711,10 +718,9 @@ def per_study_relative(*, folder: Path) -> Path:
     return folder.relative_to(PER_STUDY_DIR)
 
 
-# One folder per batch of the NWP forecast comparison, each holding that batch's inputs and
-# fits. The `NFC_` prefix abbreviates `nwp_forecast_comparison`, and a batch's name is the folder's
-# name without that prefix. Some batches have no reader of their own: `NFC_BATCH_DIRS` lists them
-# all, for the data moves that rename every batch folder.
+# One folder per batch of the NWP forecast comparison, each holding that batch's inputs and fits.
+# The `NFC_` prefix abbreviates `nwp_forecast_comparison`. Some batches have no reader of their
+# own: `NFC_BATCH_DIRS` lists them all.
 NFC_AIFS_DIR: Final[Path] = nfc_batch_dir_for(batch="aifs")
 NFC_AIFS_BLENDS_DIR: Final[Path] = nfc_batch_dir_for(batch="aifs_blends")
 NFC_AIFS_EXTRA_DAYS_DIR: Final[Path] = nfc_batch_dir_for(batch="aifs_extra_days")
@@ -764,10 +770,12 @@ NFC_BATCH_DIRS: Final[tuple[Path, ...]] = (
 )
 """Every batch folder of the NWP forecast comparison, apart from the original batch `NFC_DIR`."""
 
-NFC_STAMP_GLOB: Final[str] = "nwp_forecast_comparison_*/*_losses.json"
+NFC_STAMP_GLOB: Final[str] = f"{NFC_STUDY_DIR.relative_to(PER_STUDY_DIR)}/*/*_losses.json"
 """Matches every earlier batch's `*_losses.json` stamp, relative to `PER_STUDY_DIR`.
 
-The stamps record the columns each fit used, which `check_arm_columns_unchanged.py` compares.
+The stamps record the columns each fit used, which `check_arm_columns_unchanged.py` compares. The
+glob reads one folder level below `NFC_STUDY_DIR`, so a `superseded/` folder inside a batch is not
+read. The original batch `original/` is one of those folders and holds no stamp today.
 """
 
 
