@@ -39,7 +39,8 @@ from dagster import (
     build_asset_check_context,
     materialize,
 )
-from deltalake import write_deltalake
+from deltalake import CommitProperties, DeltaTable, write_deltalake
+from nged_data.cleaning import CleaningProvenance
 
 from nged_substation_forecast import _sentry
 from nged_substation_forecast.defs import checks
@@ -1533,3 +1534,117 @@ def test_live_forecasts_are_healthy_re_raises_a_cancelled_run(
 
     with pytest.raises(DagsterExecutionInterruptedError):
         _run_live_check()
+
+
+# --- cleaned_power_keeps_up_with_raw ---------------------------------------------------------
+
+
+def _write_raw_power_commits(settings: Settings, n_commits: int) -> DeltaTable:
+    """Write ``n_commits`` appends to the raw power table, so its Delta version is n_commits - 1."""
+    for index in range(n_commits):
+        pl.DataFrame(
+            {
+                "time_series_id": pl.Series([1], dtype=pl.Int32),
+                "time": pl.Series([datetime(2026, 1, 1, tzinfo=UTC) + timedelta(hours=index)]).cast(
+                    UTC_DATETIME_DTYPE
+                ),
+                "power": pl.Series([1.0], dtype=pl.Float32),
+            }
+        ).write_delta(settings.power_time_series_data_path, mode="append")
+    return DeltaTable(settings.power_time_series_data_path)
+
+
+def _write_cleaned_built_from(settings: Settings, raw_table_id: str, raw_version: int) -> None:
+    provenance = CleaningProvenance(
+        raw_table_id=raw_table_id, raw_version=raw_version, code_hash="hash", git_sha="sha"
+    )
+    write_deltalake(
+        settings.cleaned_power_time_series_data_path,
+        pl.DataFrame({"a": [1]}).to_arrow(),
+        mode="overwrite",
+        commit_properties=CommitProperties(custom_metadata=provenance.to_commit_metadata()),
+    )
+
+
+def _run_keeps_up_check() -> AssetCheckResult:
+    with DagsterInstance.ephemeral() as instance:
+        result = checks.cleaned_power_keeps_up_with_raw(
+            build_asset_check_context(instance=instance)
+        )
+    assert isinstance(result, AssetCheckResult)
+    return result
+
+
+@pytest.mark.parametrize("lag", [0, 1])
+def test_cleaned_power_keeps_up_passes_when_at_most_one_commit_behind(env: Path, lag: int) -> None:
+    settings = Settings()
+    raw = _write_raw_power_commits(settings, 4)
+    _write_cleaned_built_from(settings, str(raw.metadata().id), raw.version() - lag)
+
+    result = _run_keeps_up_check()
+
+    assert result.passed
+    assert result.metadata["n_raw_commits_behind"].value == lag
+
+
+def test_cleaned_power_keeps_up_warns_at_two_commits_behind(env: Path) -> None:
+    settings = Settings()
+    raw = _write_raw_power_commits(settings, 4)
+    _write_cleaned_built_from(settings, str(raw.metadata().id), raw.version() - 2)
+
+    result = _run_keeps_up_check()
+
+    assert not result.passed
+    assert result.severity == AssetCheckSeverity.WARN
+
+
+def test_cleaned_power_keeps_up_warns_when_the_raw_table_id_differs(env: Path) -> None:
+    settings = Settings()
+    raw = _write_raw_power_commits(settings, 2)
+    _write_cleaned_built_from(settings, "some-other-table", raw.version())
+
+    result = _run_keeps_up_check()
+
+    assert not result.passed
+    assert result.severity == AssetCheckSeverity.WARN
+
+
+def test_cleaned_power_keeps_up_warns_when_the_cleaned_table_is_absent(env: Path) -> None:
+    _write_raw_power_commits(Settings(), 2)
+
+    result = _run_keeps_up_check()
+
+    assert not result.passed
+    assert result.severity == AssetCheckSeverity.WARN
+
+
+def test_cleaned_power_keeps_up_warns_when_the_cleaned_table_has_no_provenance(env: Path) -> None:
+    settings = Settings()
+    _write_raw_power_commits(settings, 2)
+    write_deltalake(
+        settings.cleaned_power_time_series_data_path,
+        pl.DataFrame({"a": [1]}).to_arrow(),
+        mode="overwrite",
+    )
+
+    result = _run_keeps_up_check()
+
+    assert not result.passed
+    assert result.severity == AssetCheckSeverity.WARN
+
+
+def test_cleaned_power_keeps_up_degrades_rather_than_raising(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reported: list[str] = []
+    monkeypatch.setattr(
+        checks, "report_check_degradation", lambda check_name, exc: reported.append(check_name)
+    )
+    monkeypatch.setattr(checks, "read_cleaning_provenance", _panic_inside_the_check)
+    _write_raw_power_commits(Settings(), 2)
+
+    result = _run_keeps_up_check()
+
+    assert not result.passed
+    assert result.severity == AssetCheckSeverity.WARN
+    assert reported == ["cleaned_power_keeps_up_with_raw"]

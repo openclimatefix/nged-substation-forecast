@@ -9,8 +9,49 @@
 **The faults to clean are catalogued in [NGED's network and its
 data](../background/network.md#data-quality-in-the-trial-area); this page holds what has since been
 measured about them and what that implies for the cleaning step.** Versions 0.1 to 0.3 train on and
-forecast from telemetry that is uncleaned apart from the timestamp repair below, so every other
-finding here is currently absorbed by the models rather than removed.
+forecast from telemetry that is uncleaned apart from the timestamp repair below and one example
+rule that drops a substation's zero readings, so every other finding here is currently absorbed by
+the models rather than removed.
+
+## Cleaning rules go in one function, and flag rows rather than delete them
+
+**Every cleaning rule is one more branch in `nged_data.cleaning.flag_nged_power`.** The
+`clean_nged_power_data` Dagster asset calls that function with the whole raw `power_time_series`
+table and the `TimeSeriesMetadata` roster, whenever NGED has delivered new data (about four times a
+day), and writes the result over the `cleaned_power_time_series` Delta table. The table holds every
+raw row, plus a nullable `drop_reason` column that is null for a row that passed and otherwise names
+the rule that flagged it. Training, CV prediction, live forecasting, eligibility, effective
+capacity, the leaderboard's `metrics`, and the two dashboards read only the rows whose `drop_reason`
+is null, through `nged_data.storage.scan_cleaned_power`. The raw table is never modified, so
+changing a rule means re-running one asset over data already on disk.
+
+**To add a rule, write a boolean Polars expression that is true for a row to drop.** Add it as one
+more `.when(...).then(pl.lit("<reason>"))` branch of the chain in `flag_nged_power`, and add the
+reason to `contracts.power_schemas.DROP_REASONS`. The first matching branch wins. A rule keeps this
+contract: it returns every input row exactly once, never changes `time_series_id` or `time`, flags
+rather than deletes, and calls no `collect`. A rule that needs more than one series' readings, such
+as comparing a PV site with its neighbours or finding each series' first reading, can have them,
+because the function receives the whole table.
+
+**The asset reports the effect of each rule, so a rule needs no logging code.** For each drop
+reason, the asset's Dagster output metadata holds the rows and series flagged, the minimum and
+maximum flagged power, and the first and last flagged time. A rule's author gets these figures by
+choosing a distinct reason name. Output from Python's `logging` inside the function reaches only the
+step's captured stderr.
+
+**The one rule today is an example, `substation_zero`.** It flags a reading of exactly 0 from a
+`Primary`, `BSP`, or `GSP` series, because a substation almost never truly reads zero. On the V1 data
+as of 2026-10-05 it flags 5,363 of the 2,140,331 rows from the 20 substation series, about 0.25%,
+and no generator rows.
+
+**A failed cleaning run leaves every reader on the last good cleaned table.** The asset fails
+loudly, and the job's Sentry failure hook reports it. The next hourly run rebuilds again, because a
+failed rebuild leaves the old raw version recorded. The `cleaned_power_keeps_up_with_raw` asset
+check warns when the cleaned table is 2 or more raw commits behind.
+
+**The asset rewrites the whole cleaned table, and appending only new rows is not built.** At V1 the
+rewrite takes well under a second. At V2 (about 2,500 series) it rewrites a few gigabytes, which is
+to be measured before V2.
 
 ## A generator's commissioning ramp has to be cut, and one cut-off is already known
 

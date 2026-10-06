@@ -6,12 +6,14 @@ fold and the non-leaderboard ``smoke_test`` fold in ``conf/cv/default.yaml``. Th
 fold-specific eligibility logic is unit-tested in ``packages/ml_core/tests/test_cv_helpers.py``.
 """
 
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
 import patito as pt
 import polars as pl
 import pytest
+from _cleaned_power_test_data import write_cleaned_copy
 from contracts.ml_schemas import EligibleTimeSeries
 from contracts.power_schemas import TimeSeriesMetadata
 from dagster import materialize
@@ -90,6 +92,7 @@ def cv_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     monkeypatch.setenv("EFFECTIVE_CAPACITY_DATA_PATH", str(effective_capacity_path))
 
     _write_synthetic_power(str(nged_path / "power_time_series.delta"))
+    write_cleaned_copy(nged_path / "power_time_series.delta")
     return {"eligible": str(eligible_path), "effective_capacity": str(effective_capacity_path)}
 
 
@@ -104,6 +107,28 @@ def _read_eligible(eligible_path: str, fold_id: str) -> list[int]:
 def test_eligible_time_series_materialises_per_fold_population(cv_paths: dict[str, str]) -> None:
     assert materialize([eligible_time_series], partition_key=FOLD_ID).success
     assert _read_eligible(cv_paths["eligible"], FOLD_ID) == [1]
+
+
+def test_eligible_time_series_ignores_flagged_rows(cv_paths: dict[str, str]) -> None:
+    """Series 1 is the only series eligible for the fold; flagging its rows empties the fold."""
+    nged_path = Path(cv_paths["eligible"]).parent / "NGED"
+    write_cleaned_copy(
+        nged_path / "power_time_series.delta", flag_where=pl.col("time_series_id") == 1
+    )
+
+    assert materialize([eligible_time_series], partition_key=FOLD_ID).success
+
+    assert _read_eligible(cv_paths["eligible"], FOLD_ID) == []
+
+
+def test_eligible_time_series_is_empty_when_the_cleaned_table_is_absent(
+    cv_paths: dict[str, str],
+) -> None:
+    shutil.rmtree(Path(cv_paths["eligible"]).parent / "NGED" / "cleaned_power_time_series.delta")
+
+    assert materialize([eligible_time_series], partition_key=FOLD_ID).success
+
+    assert _read_eligible(cv_paths["eligible"], FOLD_ID) == []
 
 
 def test_eligible_time_series_is_idempotent(cv_paths: dict[str, str]) -> None:
@@ -169,6 +194,18 @@ def test_effective_capacity_materialises_one_row_per_series(cv_paths: dict[str, 
     assert capacity["effective_capacity_mw"].to_list() == pytest.approx([1.0, 1.0, 1.0, 1.0])
     # `time` is the latest observed timestep per series (see _write_synthetic_power coverage).
     assert capacity.filter(pl.col("time_series_id") == 1)["time"][0] == _utc(2026, 7, 1)
+
+
+def test_effective_capacity_ignores_flagged_rows(cv_paths: dict[str, str]) -> None:
+    nged_path = Path(cv_paths["eligible"]).parent / "NGED"
+    write_cleaned_copy(
+        nged_path / "power_time_series.delta", flag_where=pl.col("time_series_id") == 1
+    )
+
+    assert materialize([effective_capacity]).success
+
+    capacity = pl.read_delta(cv_paths["effective_capacity"]).sort("time_series_id")
+    assert capacity["time_series_id"].to_list() == [2, 3, 4]
 
 
 def test_effective_capacity_is_idempotent(cv_paths: dict[str, str]) -> None:

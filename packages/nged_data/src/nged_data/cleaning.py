@@ -19,7 +19,7 @@ from contracts.power_schemas import CleanedPowerTimeSeries, PowerTimeSeries, Tim
 from contracts.typing_utils import typeddict_to_dict
 from contracts.uri import ObjectStoreOptions
 from deltalake import DeltaTable
-from ml_core.repro import UNKNOWN, get_git_info
+from ml_core.repro import ABSENT, UNKNOWN, get_git_info
 
 log = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ def read_cleaning_provenance(
         write_commit = next(
             (commit for commit in history if commit.get("operation") == "WRITE"), None
         )
-        if write_commit is None:
+        if write_commit is None or f"{_PROVENANCE_KEY_PREFIX}raw_table_id" not in write_commit:
             return None
         return CleaningProvenance(
             raw_table_id=str(write_commit[f"{_PROVENANCE_KEY_PREFIX}raw_table_id"]),
@@ -128,6 +128,34 @@ def read_cleaning_provenance(
     except Exception:
         log.warning(f"Could not read cleaning provenance from {table_uri}.", exc_info=True)
         return None
+
+
+def cleaned_power_provenance_tag(
+    table_uri: str | Path,
+    storage_options: ObjectStoreOptions | None = None,
+) -> str:
+    """Return the value an MLflow run stamps to record which cleaned power table it read.
+
+    The cleaned table's own Delta versions are vacuumed after a few hours, so a run cannot be
+    replayed with `scan_delta(version=N)`. The stamp names what the cleaning read instead:
+    replaying means re-running the cleaning over that raw version at the cleaning's git SHA, which
+    can differ from the run's own SHA because an unchanged table is not rebuilt.
+
+    Args:
+        table_uri: Path or URI of the `cleaned_power_time_series` Delta table.
+        storage_options: delta-rs object-store options for a remote `table_uri`.
+
+    Returns:
+        `"raw_table_id=<id>;raw_version=<n>;git_sha=<sha>"`, or `ABSENT` when there is no
+        provenance. Never raises.
+    """
+    provenance = read_cleaning_provenance(table_uri, storage_options)
+    if provenance is None:
+        return ABSENT
+    return (
+        f"raw_table_id={provenance.raw_table_id};raw_version={provenance.raw_version};"
+        f"git_sha={provenance.git_sha}"
+    )
 
 
 def flag_nged_power(

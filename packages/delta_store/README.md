@@ -15,8 +15,8 @@ assumed — see [Storage formats: measured, not
 assumed](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed)
 for the comparison between those two tables, and [design principle
 12](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#12-measure-do-not-assume)
-for why measuring rather than assuming matters project-wide. This package covers six tables. The
-other four carry no writer-properties tuning, because no measurement has yet been made to justify
+for why measuring rather than assuming matters project-wide. This package covers seven tables. The
+other five carry no writer-properties tuning, because no measurement has yet been made to justify
 any tuning.
 
 **The flagship tuned table is the internal `power_forecasts` table, whose storage format shrank a
@@ -39,6 +39,9 @@ breakdown, measured on the table's least compressible single file rather than on
   encodings measured worse on numerical weather prediction (NWP) data.
 - `power_time_series` — `write_power_time_series()`, an append-only write to the `power_time_series`
   table.
+- `cleaned_power_time_series` — `write_cleaned_power_time_series()`, a whole-table overwrite to the
+  `cleaned_power_time_series` table that records the cleaning's provenance in the commit and then
+  vacuums.
 - `eligible_time_series` — `write_eligible_time_series()`, a per-`fold_id`-partition overwrite to
   the `eligible_time_series` table.
 - `effective_capacity` — `write_effective_capacity()`, a whole-table overwrite to the

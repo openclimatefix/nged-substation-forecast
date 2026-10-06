@@ -25,6 +25,7 @@ import mlflow
 import patito as pt
 import polars as pl
 import pytest
+from _cleaned_power_test_data import write_cleaned_copy
 from _nwp_test_data import half_hours, nwp_records, write_test_nwp
 from contracts.ml_schemas import EligibleTimeSeries
 from contracts.power_schemas import (
@@ -146,6 +147,7 @@ def _base_env(
     monkeypatch.setenv("EFFECTIVE_CAPACITY_DATA_PATH", str(effective_capacity_path))
 
     _write_power_with_actuals(str(nged_path / "power_time_series.delta"))
+    write_cleaned_copy(nged_path / "power_time_series.delta")
     _write_nwp(str(tmp_path / "NWP"))
     _write_metadata(nged_path / "metadata.parquet")
     _write_eligible(str(tmp_path / "eligible"))
@@ -335,6 +337,27 @@ def test_metrics_nmae_denominator_is_effective_capacity(
     )["effective_capacity_mw"][0]
 
     assert nmae == pytest.approx(mae / capacity, rel=1e-5)
+
+
+def test_metrics_does_not_score_flagged_actuals(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    tmp_path: Path,
+) -> None:
+    """Flagging validation-day actuals changes the score, because they are no longer scored."""
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    run_config = _metrics_run_config("leaderboard")
+    assert materialize([metrics], run_config=run_config, instance=dagster_instance).success
+    unflagged_mae = _read_metric(file_mlflow_env["metrics"], "mae")
+
+    write_cleaned_copy(
+        tmp_path / "NGED" / "power_time_series.delta",
+        flag_where=(pl.col("time") >= _VAL_DAY) & (pl.col("power") >= 82),
+    )
+    assert materialize([metrics], run_config=run_config, instance=dagster_instance).success
+
+    assert _read_metric(file_mlflow_env["metrics"], "mae") != pytest.approx(unflagged_mae)
 
 
 def _batch_forecast_frame(

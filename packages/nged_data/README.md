@@ -10,8 +10,8 @@ roster.
 ## Public surface
 
 Only `upsert_metadata` is re-exported from the package root (`from nged_data import
-upsert_metadata`); the other five live in `nged_data.storage` (`from nged_data.storage import
-list_timeseries_json_files`, etc.).
+upsert_metadata`); the others live in `nged_data.storage` and `nged_data.cleaning` (`from
+nged_data.storage import list_timeseries_json_files`, etc.).
 
 - `nged_data.storage.list_timeseries_json_files(store)` — lists the timeseries JSON files on NGED's
   S3 bucket, parsing `time_series_id`, `start_time`, and `end_time` out of each file's path.
@@ -31,6 +31,14 @@ list_timeseries_json_files`, etc.).
 - `nged_data.storage.time_series_coverage(delta_path, storage_options=None)` — the earliest and
   latest observation `time` on disk for each `time_series_id` in the `power_time_series` Delta
   table.
+- `nged_data.storage.coverage_from_power(power)` — the same earliest and latest `time` per
+  `time_series_id`, from any lazy `PowerTimeSeries` frame.
+- `nged_data.storage.scan_cleaned_power(delta_path, storage_options=None)` — scans the
+  `cleaned_power_time_series` Delta table, keeping only the rows no cleaning rule flagged. Every
+  reader of observed power except the ingest uses it.
+- `nged_data.cleaning.flag_nged_power(power, metadata)` — where cleaning rules go. It returns every
+  raw power row plus a `drop_reason` column, and the `clean_nged_power_data` Dagster asset writes
+  the result to the cleaned table. Its docstring says how to add a rule.
 - `nged_data.upsert_metadata(new_metadata, metadata_path, storage_options=None)` — merges a
   `TimeSeriesMetadata` snapshot into the stored metadata Parquet file, keeping the newest values per
   `time_series_id` and rewriting the file only if the incoming metadata differs from what is stored.
@@ -49,7 +57,8 @@ Degrading rather than raising on a malformed reading follows [inherent
 stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/):
 a malformed `time` originates upstream of our pipeline, at the meter or in the telemetry export, not
 in our own code. Ingestion therefore keeps the rest of the batch rather than aborting it. No other
-cleaning happens during ingestion.
+cleaning happens during ingestion. Cleaning rules run afterwards, over the whole stored table, in
+`nged_data.cleaning`.
 
 ## Usage
 

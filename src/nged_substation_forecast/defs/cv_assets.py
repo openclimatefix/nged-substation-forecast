@@ -58,8 +58,9 @@ from ml_core.mlflow_runs import (
     get_or_create_parent_run,
     load_experiment_forecaster,
 )
-from ml_core.repro import MlflowTags, provenance_tags
-from nged_data.storage import time_series_coverage
+from ml_core.repro import MlflowTags, StageType, TableNameType, provenance_tags
+from nged_data.cleaning import cleaned_power_provenance_tag
+from nged_data.storage import coverage_from_power, scan_cleaned_power, time_series_coverage
 
 from nged_substation_forecast.defs._engineering_inputs import (
     MAX_NWP_LEAD,
@@ -110,16 +111,17 @@ is still read exactly once. See ``cv_power_forecasts``.
 @asset(
     tags=RESEARCH_LAYER_TAGS,
     partitions_def=cv_fold_partitions,
-    deps=["power_time_series_and_metadata"],
+    deps=["clean_nged_power_data"],
 )
 def eligible_time_series(context: AssetExecutionContext) -> None:
     """Compute and persist the canonical eligible ``time_series_id``s for one CV fold.
 
-    Reads observed-power coverage from the ``power_time_series_and_metadata`` Delta table. A time
-    series is eligible for a fold when its coverage has at least ``min_training_months`` of
-    history before the fold's ``val_start`` *and* reaches the fold's ``val_end``. Eligibility is
-    derived from data coverage alone (not from any model/config), so every experiment evaluates
-    the fold on the identical population — this is what keeps the leaderboard apples-to-apples.
+    Reads observed-power coverage from the unflagged rows of the ``cleaned_power_time_series`` Delta
+    table, which ``clean_nged_power_data`` writes. An absent table gives an empty population. A time
+    series is eligible for a fold when its coverage has at least ``min_training_months`` of history
+    before the fold's ``val_start`` *and* reaches the fold's ``val_end``. Eligibility is derived
+    from data coverage alone (not from any model/config), so every experiment evaluates the fold on
+    the identical population — this is what keeps the leaderboard apples-to-apples.
     See "Eligibility" in
     <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/cross-validation-folds/#eligibility>
     for the fold definitions this population is computed against.
@@ -137,7 +139,11 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
     fold_id = context.partition_key
     fold = _cv_config.get_fold(fold_id)
 
-    coverage = time_series_coverage(settings.power_time_series_data_path, storage_options)
+    cleaned_path = settings.cleaned_power_time_series_data_path
+    if delta_table_exists(cleaned_path, storage_options):
+        coverage = coverage_from_power(scan_cleaned_power(cleaned_path, storage_options))
+    else:
+        coverage = time_series_coverage(cleaned_path, storage_options)  # an empty frame
 
     min_training_months = fold.min_training_months or _cv_config.min_training_months
     eligible_ids = eligible_time_series_ids(coverage, fold, min_training_months=min_training_months)
@@ -172,16 +178,17 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
     )
 
 
-@asset(tags=RESEARCH_LAYER_TAGS, deps=["power_time_series_and_metadata"])
+@asset(tags=RESEARCH_LAYER_TAGS, deps=["clean_nged_power_data"])
 def effective_capacity(context: AssetExecutionContext) -> None:
     """Compute and persist each series' v0.1 effective capacity (full-history P99 of ``|power|``).
 
-    Reads the full ``power_time_series`` Delta and writes one row per ``time_series_id`` to the
-    ``effective_capacity`` Delta table (``Settings.effective_capacity_data_path``): the 99th
-    percentile of ``abs(power)`` over the series' entire observed history, with ``time`` set to
-    the latest observed timestep. This full-history capacity is the NMAE denominator used by the
-    ``metrics`` asset, replacing the validation-window P99 that would otherwise vary fold to
-    fold.
+    Reads the unflagged rows of the full ``cleaned_power_time_series`` Delta and writes one row per
+    ``time_series_id`` to the ``effective_capacity`` Delta table
+    (``Settings.effective_capacity_data_path``): the 99th percentile of ``abs(power)`` over the
+    series' entire observed history, with ``time`` set to the latest observed timestep. This
+    full-history capacity is the NMAE denominator used by the ``metrics`` asset, replacing the
+    validation-window P99 that would otherwise vary fold to fold.
+
 
     The whole (small — one row per series) table is overwritten on each materialisation. v0.1 is
     deliberately one scalar row per series, **not** the value repeated at every half-hour —
@@ -194,11 +201,7 @@ def effective_capacity(context: AssetExecutionContext) -> None:
     """
     settings = Settings()
     storage_options = settings.storage_options
-    power_lf = pt.LazyFrame.from_existing(
-        pl.scan_delta(
-            settings.power_time_series_data_path, storage_options=typeddict_to_dict(storage_options)
-        )
-    ).set_model(PowerTimeSeries)
+    power_lf = scan_cleaned_power(settings.cleaned_power_time_series_data_path, storage_options)
     capacity_df = compute_effective_capacity(power_lf)
 
     if_local_path_then_make_parent_dir(settings.effective_capacity_data_path)
@@ -214,6 +217,30 @@ def effective_capacity(context: AssetExecutionContext) -> None:
             "effective_capacity_data_path": str(settings.effective_capacity_data_path),
         }
     )
+
+
+def _provenance_tags_with_cleaned_power(
+    stage: StageType, settings: Settings, delta_paths: dict[TableNameType, str]
+) -> MlflowTags:
+    """``provenance_tags`` for ``stage``, plus the cleaned power table's provenance.
+
+    The cleaned table is overwritten and vacuumed within hours, so its Delta version cannot be
+    replayed. The extra tag, ``{stage}_cleaned_power_time_series_source``, names the raw power
+    version the cleaning read and the git SHA of the cleaning code, or ``ABSENT``.
+
+    Args:
+        stage: The stage prefix passed to ``provenance_tags``.
+        settings: Supplies the table paths and the object-store options.
+        delta_paths: The other Delta tables this stage reads.
+
+    Returns:
+        The stage-prefixed provenance tags.
+    """
+    tags = provenance_tags(stage, delta_paths, storage_options=settings.storage_options)
+    tags[f"{stage}_cleaned_power_time_series_source"] = cleaned_power_provenance_tag(
+        settings.cleaned_power_time_series_data_path, settings.storage_options
+    )
+    return tags
 
 
 def _time_series_ids_missing_metadata(
@@ -293,7 +320,7 @@ def _load_roster(
 @asset(
     tags=RESEARCH_LAYER_TAGS,
     partitions_def=cv_experiment_folds,
-    deps=["power_time_series_and_metadata", "ecmwf_ens", "eligible_time_series"],
+    deps=["clean_nged_power_data", "ecmwf_ens", "eligible_time_series"],
 )
 def trained_cv_model(context: AssetExecutionContext) -> None:
     """Train one forecaster for a single ``(experiment, fold)`` partition and save it to MLflow.
@@ -403,17 +430,16 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
         )
         # Provenance: the code + data versions that produced this fold's model — the load-bearing
         # stamp, since a fold can be trained days after registration on a different SHA. Tags (not
-        # params) because provenance overwrites cleanly on re-materialise; these are the three
-        # Delta tables the training path reads above.
+        # params) because provenance overwrites cleanly on re-materialise; these are the Delta
+        # tables the training path reads above.
         mlflow.set_tags(
-            provenance_tags(
+            _provenance_tags_with_cleaned_power(
                 "train",
+                settings,
                 {
-                    "power_time_series": settings.power_time_series_data_path,
                     "nwp_data": settings.nwp_data_path,
                     "eligible_time_series": settings.eligible_time_series_data_path,
                 },
-                storage_options=settings.storage_options,
             )
         )
 
@@ -559,13 +585,8 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
         # eligible_time_series, which prediction does not read (the trained series come from the
         # loaded model).
         mlflow.set_tags(
-            provenance_tags(
-                "predict",
-                {
-                    "power_time_series": settings.power_time_series_data_path,
-                    "nwp_data": settings.nwp_data_path,
-                },
-                storage_options=settings.storage_options,
+            _provenance_tags_with_cleaned_power(
+                "predict", settings, {"nwp_data": settings.nwp_data_path}
             )
         )
         # Tags, not metrics, for the same reason the training counters are tags (see
@@ -895,7 +916,10 @@ def _score_forecast_group(
     return enriched.height, None
 
 
-@asset(tags=RESEARCH_LAYER_TAGS, deps=["cv_power_forecasts", "effective_capacity"])
+@asset(
+    tags=RESEARCH_LAYER_TAGS,
+    deps=["cv_power_forecasts", "effective_capacity", "clean_nged_power_data"],
+)
 def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     """Compute evaluation metrics and write to ``forecast_metrics``.
 
@@ -982,11 +1006,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
         )
         return
 
-    actuals_lf = pt.LazyFrame.from_existing(
-        pl.scan_delta(
-            settings.power_time_series_data_path, storage_options=typeddict_to_dict(storage_options)
-        )
-    ).set_model(PowerTimeSeries)
+    actuals_lf = scan_cleaned_power(settings.cleaned_power_time_series_data_path, storage_options)
     # allow_superfluous_columns because the parquet also carries h3_res_5 and other geo columns.
     metadata_df = TimeSeriesMetadata.validate(
         pl.read_parquet(settings.metadata_path, storage_options=typeddict_to_dict(storage_options)),
@@ -1011,14 +1031,13 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     # Provenance for every fold + parent run this materialisation touches: the code SHA and the
     # versions of the three Delta tables scoring reads (forecasts, actuals, capacity). Built once
     # — all groups are scored in this one process, so they share a single code + data snapshot.
-    metrics_provenance = provenance_tags(
+    metrics_provenance = _provenance_tags_with_cleaned_power(
         "metrics",
+        settings,
         {
             "power_forecasts": settings.power_forecasts_data_path,
-            "power_time_series": settings.power_time_series_data_path,
             "effective_capacity": settings.effective_capacity_data_path,
         },
-        storage_options=storage_options,
     )
     total_rows = 0
     # Accumulates per-fold metric values for parent-run aggregation (leaderboard scope only).

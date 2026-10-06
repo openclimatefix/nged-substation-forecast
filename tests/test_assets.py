@@ -1218,7 +1218,12 @@ def test_definitions_resolve(env: Path) -> None:
     asset_graph = repo.asset_graph
 
     asset_keys = {key.to_user_string() for key in asset_graph.get_all_asset_keys()}
-    assert {"power_time_series_and_metadata", "h3_grid_weights", "ecmwf_ens"} <= asset_keys
+    assert {
+        "power_time_series_and_metadata",
+        "clean_nged_power_data",
+        "h3_grid_weights",
+        "ecmwf_ens",
+    } <= asset_keys
 
     for name, layer in [
         ("live_forecasts", "production"),
@@ -1231,7 +1236,7 @@ def test_definitions_resolve(env: Path) -> None:
 
     assert {
         key.to_user_string() for key in asset_graph.get(AssetKey("live_forecasts")).parent_keys
-    } == {"ecmwf_ens", "power_time_series_and_metadata"}
+    } == {"ecmwf_ens", "clean_nged_power_data"}
 
     # A broken deps=[...] string would drop this edge (the unknown key becomes an external asset).
     ecmwf_parents = {

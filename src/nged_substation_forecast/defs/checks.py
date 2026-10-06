@@ -86,6 +86,8 @@ from dagster import (
     TableSchema,
     asset_check,
 )
+from deltalake import DeltaTable
+from nged_data.cleaning import read_cleaning_provenance
 from nged_data.storage import time_series_coverage
 
 from nged_substation_forecast._sentry import report_check_degradation, report_power_freshness
@@ -466,6 +468,118 @@ def power_data_is_fresh() -> AssetCheckResult:
             passed=False,
             severity=AssetCheckSeverity.WARN,
             description=f"Could not evaluate power-data freshness: {exc!r}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# cleaned_power_keeps_up_with_raw: is the cleaned power table built from recent raw data?
+# ---------------------------------------------------------------------------
+
+_CLEANING_LAG_WARN_COMMITS: Final[int] = 2
+"""How many raw-table commits the cleaned table may trail before the check warns.
+
+The ingest commits a new raw version only when NGED delivers new rows, about every 6 hours. A lag
+of 0 or 1 commits is healthy, because the check runs in parallel with ``clean_nged_power_data`` in
+the same job and may see the cleaning from the previous run. A lag of 2 means the cleaning has
+missed at least one NGED delivery, about 6 to 12 hours. Counting raw commits rather than hours of
+reading time counts missed runs, and does not false-alarm after an NGED backlog, when one ingest
+catches up several hours of readings at once."""
+
+
+def _check_cleaned_power_keeps_up() -> AssetCheckResult:
+    """Compare the raw table's Delta version with the version the cleaned table was built from.
+
+    Split out from the check itself so the check's ``except`` wraps the whole body.
+    """
+    settings = Settings()
+    storage_options = settings.storage_options
+    options = typeddict_to_dict(storage_options) or {}
+    raw_path = settings.power_time_series_data_path
+    if not delta_table_exists(raw_path, storage_options):
+        return AssetCheckResult(
+            passed=True, description=f"{raw_path} does not exist yet, so there is nothing to clean."
+        )
+    raw_table = DeltaTable(raw_path, storage_options=options)
+    raw_version = raw_table.version()
+
+    provenance = read_cleaning_provenance(
+        settings.cleaned_power_time_series_data_path, storage_options
+    )
+    if provenance is None:
+        return AssetCheckResult(
+            passed=False,
+            severity=AssetCheckSeverity.WARN,
+            description=(
+                "The cleaned power table is absent, or its newest write records no provenance."
+                " Materialise `clean_nged_power_data`."
+            ),
+            metadata={"raw_version": raw_version},
+        )
+    if provenance.raw_table_id != str(raw_table.metadata().id):
+        return AssetCheckResult(
+            passed=False,
+            severity=AssetCheckSeverity.WARN,
+            description=(
+                "The cleaned power table was built from a different raw power table than the one"
+                " on disk now. Materialise `clean_nged_power_data` with `force` set."
+            ),
+            metadata={"raw_version": raw_version, "cleaned_raw_version": provenance.raw_version},
+        )
+    lag = raw_version - provenance.raw_version
+    passed = lag < _CLEANING_LAG_WARN_COMMITS
+    return AssetCheckResult(
+        passed=passed,
+        severity=AssetCheckSeverity.WARN,
+        description=(
+            f"The cleaned power table is {lag} raw commit(s) behind the raw power table."
+            + ("" if passed else " Check the recent `clean_nged_power_data` runs.")
+        ),
+        metadata={
+            "raw_version": raw_version,
+            "cleaned_raw_version": provenance.raw_version,
+            "n_raw_commits_behind": lag,
+        },
+    )
+
+
+@asset_check(
+    asset=power_time_series_and_metadata,
+    blocking=False,
+    description=(
+        "Warn if the cleaned power table was built from a raw power table 2 or more commits"
+        " (about 6 to 12 hours of NGED deliveries) older than the current one, from a different"
+        " raw table, or if it is absent."
+    ),
+)
+def cleaned_power_keeps_up_with_raw() -> AssetCheckResult:
+    """Report whether ``clean_nged_power_data`` is keeping up with NGED's deliveries.
+
+    Runs alongside every ``power_time_series_and_metadata`` materialisation, in parallel with
+    ``clean_nged_power_data`` in ``power_time_series_and_metadata_job``. It compares the raw
+    ``power_time_series`` table's current Delta version with the ``raw_version`` recorded in the
+    ``cleaned_power_time_series`` table's newest write commit, and warns when the cleaned table is
+    2 or more raw commits behind, was built from a different raw table, is absent, or records no
+    provenance. It is the only signal for a cleaning asset that silently stopped running, because
+    ``power_data_is_fresh`` reads raw coverage and the Sentry failure hook fires only on a run
+    that failed. A stale or unreadable roster is one way for that to happen: ``live_forecasts``
+    avoids the roster, but the cleaning reads it, so a bad roster stops the cleaning and makes the
+    power that ``live_forecasts`` reads go stale.
+
+    Cannot fail its own step: the whole body is guarded, so an unreadable table degrades to a
+    warning rather than failing the hourly production run.
+    """
+    try:
+        return _check_cleaned_power_keeps_up()
+    except BaseException as exc:
+        # The same guard as `power_data_is_fresh`, for the same reasons.
+        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+            raise  # A cancelled run must cancel.
+        logger.exception("Could not compare the cleaned power table with the raw one")
+        report_check_degradation(check_name="cleaned_power_keeps_up_with_raw", exc=exc)
+        return AssetCheckResult(
+            passed=False,
+            severity=AssetCheckSeverity.WARN,
+            description=f"Could not compare the cleaned power table with the raw one: {exc!r}",
         )
 
 
