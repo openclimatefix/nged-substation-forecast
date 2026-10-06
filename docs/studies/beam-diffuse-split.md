@@ -1157,16 +1157,17 @@ uv run python studies/beam_diffuse_split/run_experiment.py --source cams --suffi
 ```
 
 The results this page quotes are filed in the private data store under
-`data/studies/beam_diffuse_split/superseded/`, in directories ending `_piecewise`. Figure 1 is drawn
-from them straight into the docs assets:
+`data/studies/per_study/beam_diffuse_split/superseded/`, in directories ending `_piecewise`. Figure 1
+is drawn from them straight into the docs assets:
 
 ```bash
 uv run python studies/beam_diffuse_split/make_chart.py --subdirectory superseded --suffix _piecewise
 npx svgo@4 --multipass --precision=1 --final-newline docs/studies/assets/beam_diffuse_split_result.svg
 ```
 
-A fresh run writes its results directories straight under `data/studies/beam_diffuse_split/` with no
-suffix, and `make_chart.py` with no flags reads them there. The per-site charts and the
+A fresh run writes its results directories straight under
+`data/studies/per_study/beam_diffuse_split/` with no suffix, and `make_chart.py` with no flags reads
+them there. The per-site charts and the
 sky-condition chart come from `uv run python studies/beam_diffuse_split/make_figures.py`, which
 reads the same fresh-run directories.
 

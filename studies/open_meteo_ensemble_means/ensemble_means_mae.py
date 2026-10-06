@@ -67,8 +67,8 @@ rows on which the values differ. Only anonymised site labels (`A` to `F`, `W1` t
 output; the site roster's coordinates and identifiers stay inside `build_dataset`.
 
 Run it with `uv run python studies/open_meteo_ensemble_means/ensemble_means_mae.py`. It writes to a
-new folder, `data/studies/open_meteo_ensemble_means/`, and refuses to overwrite: to re-run, move
-the existing files into a `superseded/` subfolder by hand first. Fits run on the CPU.
+new folder, `data/studies/per_study/open_meteo_ensemble_means/`, and refuses to overwrite: to
+re-run, move the existing files into a `superseded/` subfolder by hand first. Fits run on the CPU.
 `--report-only` rebuilds the tables and `report.md` from the saved frames and losses.
 """
 

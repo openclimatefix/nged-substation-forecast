@@ -135,7 +135,7 @@ from typing import Final, Literal, NamedTuple
 
 import numpy as np
 import polars as pl
-from fetch_ens_forecast_horizons import BAND_DAYS, OUTPUT_DIR, OUTPUT_PATH
+from fetch_ens_forecast_horizons import BAND_DAYS, OUTPUT_PATH
 from studies.arm_runner import MAX_CONCURRENT_FITS, Job, run_all
 from studies.baselines import (
     clear_sky_index,
@@ -199,6 +199,7 @@ from studies.resample import (
 )
 from studies.solar import zenith
 from studies.solar_product_frames import with_eras
+from studies.sources import ENS_FORECAST_HORIZONS_DIR
 from studies.wind_product_frames import wind_hourly_power
 
 _LOG: Final[logging.Logger] = logging.getLogger("ens_forecast_horizons")
@@ -331,14 +332,14 @@ def _with_month(*, features: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(MONTH_FEATURE if feature == "day_of_year" else feature for feature in features)
 
 
-RESULTS_DIR: Final[Path] = OUTPUT_DIR / "era_covered"
+RESULTS_DIR: Final[Path] = ENS_FORECAST_HORIZONS_DIR / "era_covered"
 """Where every result file goes: the losses, predictions, leaderboard, intervals, and report.
 
 Each technology's `*_losses.parquet` is write-once: a refit of that technology raises if the file
 exists, and the two modes that replace losses move the old file, and the run's report, intervals and
 leaderboard, to a `superseded/` subfolder first. The input
-extract, `ens_members.parquet`, stays in `OUTPUT_DIR`, so the results the published page quotes in
-`OUTPUT_DIR` are never overwritten."""
+extract, `ens_members.parquet`, is in the shared ENS extract folder, and the results the published
+page quotes are in `ENS_FORECAST_HORIZONS_DIR`, so a run never overwrites them."""
 
 RUN_LEVEL_OUTPUTS: Final[tuple[str, ...]] = (
     "report.md",

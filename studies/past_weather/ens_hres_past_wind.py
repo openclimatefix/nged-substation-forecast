@@ -35,7 +35,7 @@ to it must reproduce the Previous Runs speeds at 10 m and 100 m to within 0.05 k
 because Open-Meteo picks its own model cell, which is not always the nearest point. Both files are
 Open-Meteo downloads, so a match shows that two downloads agree, not that the grid or the served
 lead is right. ENS day 0 is read from the horizons study's saved inputs
-(`data/studies/ens_forecast_horizons/wind_inputs.parquet`), not from
+(`data/studies/downloads/NWP/ENS_SITE_EXTRACT/wind_inputs.parquet`), not from
 the `T+3` wind download, so no new ENS code is written.
 
 **Row set.** `common_rows(joined(sites=sites))` from `wind_products.py`, restricted to 1 December
@@ -183,7 +183,12 @@ from studies.grid_sampling import distance_matrix_km
 from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import wind_sites
 from studies.solar_product_frames import with_eras
-from studies.sources import ECMWF_IFS_HRES_PRODUCT_DIR, ENS_FORECAST_HORIZONS_DIR, STUDY_DATA_DIR
+from studies.sources import (
+    ECMWF_IFS_HRES_PRODUCT_DIR,
+    ENS_FORECAST_HORIZONS_DIR,
+    ENS_PRODUCT_DIR,
+    STUDY_DATA_DIR,
+)
 from studies.trial_area import load_trial_area_box
 from studies.wind_product_frames import (
     SHARED_FEATURES,
@@ -213,10 +218,10 @@ the freshest run, in km/h and degrees."""
 HRES_GRID_PATH: Final[Path] = HRES_DIR / "ECMWF-IFS-HRES_2017-01-01_2026-09-22.parquet"
 """The 342-point, 0.05-degree grid of HRES speeds in km/h, read only for the cross-check."""
 
-ENS_INPUTS_PATH: Final[Path] = ENS_FORECAST_HORIZONS_DIR / "wind_inputs.parquet"
+ENS_INPUTS_PATH: Final[Path] = ENS_PRODUCT_DIR / "wind_inputs.parquet"
 """The horizons study's ENS wind inputs: the ensemble mean, hourly, in m/s, per interpolation."""
 
-HORIZONS_REPORT_PATH: Final[Path] = ENS_INPUTS_PATH.parent / "report.md"
+HORIZONS_REPORT_PATH: Final[Path] = ENS_FORECAST_HORIZONS_DIR / "report.md"
 """The horizons study's report, read for the published day-0 contrast against ERA5."""
 
 ROW_SET_START_DATE: Final[datetime] = datetime(2024, 12, 1, tzinfo=UTC)

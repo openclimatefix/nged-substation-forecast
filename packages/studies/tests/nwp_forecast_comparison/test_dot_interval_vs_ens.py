@@ -1163,11 +1163,7 @@ def test_c5_subtracts_the_right_icon_eu_blend_and_raises_for_blends_on_different
     # An ICON-EU blend that lacks a month the AIFS Single blend holds is refused.
     other = tmp_path / "other"
     _write_blend_fixture(other)
-    path = (
-        other
-        / "per_study/nwp_forecast_comparison/product_blends"
-        / "solar_single_day1_losses.parquet"
-    )
+    path = other / "nwp_forecast_comparison/product_blends" / "solar_single_day1_losses.parquet"
     frame = pl.read_parquet(path)
     frame.filter(~((pl.col("arm") == "blend_icon_eu_day1") & (pl.col("month") == 3))).write_parquet(
         path

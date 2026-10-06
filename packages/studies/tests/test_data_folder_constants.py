@@ -78,14 +78,14 @@ PREVIOUS_RUNS_FOLDERS: Final[tuple[str, ...]] = (
 """The eleven Open-Meteo Previous Runs products, as the folders they were in under `weather/`."""
 
 OLD_STUDY_FOLDERS: Final[dict[str, str]] = {
-    "STUDY_DATA_DIR": "beam_diffuse_split",
-    "ENS_FORECAST_HORIZONS_DIR": "ens_forecast_horizons",
-    "ENS_FORECAST_HORIZONS_DAY4_DIR": "ens_forecast_horizons_day4",
-    "OPEN_METEO_ENSEMBLE_MEANS_DIR": "open_meteo_ensemble_means",
-    "OPEN_METEO_ENS_GAP_DIR": "open_meteo_ens_gap",
-    "ICON_EU_COMPARE_DIR": "icon_eu_compare",
-    "ERA5_WIND_COMPARE_DIR": "era5_wind_compare",
-    "ENS_BACKFILL_PILOT_DIR": "ens_backfill_pilot",
+    "STUDY_DATA_DIR": "per_study/beam_diffuse_split",
+    "ENS_FORECAST_HORIZONS_DIR": "per_study/ens_forecast_horizons",
+    "STUDY_INPUTS_DIR": "per_study/beam_diffuse_split/inputs",
+    "OPEN_METEO_ENSEMBLE_MEANS_DIR": "per_study/open_meteo_ensemble_means",
+    "OPEN_METEO_ENS_GAP_DIR": "per_study/open_meteo_ens_gap",
+    "ICON_EU_COMPARE_DIR": "per_study/icon_eu_compare",
+    "ERA5_WIND_COMPARE_DIR": "per_study/era5_wind_compare",
+    "ENS_BACKFILL_PILOT_DIR": "per_study/ens_backfill_pilot",
     "CERRA_WIND_LEVELS_DIR": "per_study/cerra_wind/levels",
     "CERRA_WIND_LEVELS_POST_HOC_DIR": "per_study/cerra_wind/levels_post_hoc",
     "CERRA_WIND_LEVELS_SHEAR_DIR": "per_study/cerra_wind/shear",
@@ -183,7 +183,7 @@ def test_each_study_constant_is_the_folder_the_study_has_now(constant: str, fold
 def test_the_remaining_constants_are_the_paths_the_data_was_moved_to():
     assert STUDIES_DATA_DIR == REPO_DATA_DIR / "studies"
     assert DOWNLOADS_DIR == STUDIES_DATA_DIR / "downloads"
-    assert PER_STUDY_DIR == STUDIES_DATA_DIR
+    assert PER_STUDY_DIR == STUDIES_DATA_DIR / "per_study"
     assert sources.WEATHER_DATA_DIR == STUDIES_DATA_DIR / "weather"
     assert sources.ANM_DATA_DIR == DOWNLOADS_DIR / "observations" / "NGED-ANM"
     assert SCRATCH_DIR == STUDIES_DATA_DIR / "_scratch"
@@ -300,6 +300,51 @@ def test_the_stamp_glob_finds_72_stamps_on_disk_and_no_batch_folder_is_left_at_t
 
     assert len(stamps) == 72
     assert sorted(STUDIES_DATA_DIR.glob("nwp_forecast_comparison_*")) == []
+
+
+MOVED_STUDY_FOLDERS: Final[tuple[str, ...]] = (
+    "beam_diffuse_split",
+    "ens_forecast_horizons",
+    "ens_forecast_horizons_day4",
+    "open_meteo_ensemble_means",
+    "open_meteo_ens_gap",
+    "icon_eu_compare",
+    "era5_wind_compare",
+    "ens_backfill_pilot",
+)
+"""The study folders that wave D7 moved under `per_study/`, by their old names."""
+
+ENS_EXTRACT_FILES: Final[tuple[str, ...]] = (
+    "ens_members.parquet",
+    "ens_members_day4.parquet",
+    "solar_inputs.parquet",
+    "wind_inputs.parquet",
+    "solar_member_summary.parquet",
+    "wind_member_summary.parquet",
+)
+"""The shared ENS extract files that wave D7 moved out of `ens_forecast_horizons/`."""
+
+
+@pytest.mark.skipif(
+    not STUDIES_DATA_DIR.exists(),
+    reason="the private study data is not in this checkout",
+)
+def test_the_wave_d7_files_are_in_their_new_folders_and_the_old_folders_are_links_or_gone():
+    missing = [name for name in ENS_EXTRACT_FILES if not (sources.ENS_PRODUCT_DIR / name).is_file()]
+    stray = [
+        name for name in ENS_EXTRACT_FILES if (sources.ENS_FORECAST_HORIZONS_DIR / name).exists()
+    ]
+    real_old_folders = [
+        name
+        for name in MOVED_STUDY_FOLDERS
+        if (STUDIES_DATA_DIR / name).exists() and not (STUDIES_DATA_DIR / name).is_symlink()
+    ]
+
+    assert missing == []
+    assert stray == []
+    assert real_old_folders == []
+    assert list(sources.STUDY_INPUTS_DIR.glob("beam_diffuse_dataset_*.parquet"))
+    assert (sources.ENS_FORECAST_HORIZONS_DIR / "era_covered" / "report.md").is_file()
 
 
 def _joined_folder_names(*, path: Path) -> list[tuple[int, str]]:

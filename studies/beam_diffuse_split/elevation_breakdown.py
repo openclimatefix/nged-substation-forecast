@@ -22,6 +22,7 @@ import sys
 from typing import Final
 
 import polars as pl
+from studies.arm_runner import dataset_path_for
 from studies.sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 PERCENTAGE_POINTS: Final[float] = 100.0
@@ -42,7 +43,7 @@ def _banded_losses(*, instrument: str, source: str) -> pl.DataFrame:
     losses = pl.read_parquet(
         STUDY_DATA_DIR / f"beam_diffuse_{stem}_{source}" / "per_row_losses.parquet"
     ).filter(pl.col("setting") == "primary")
-    elevation = pl.read_parquet(STUDY_DATA_DIR / f"beam_diffuse_dataset_{source}.parquet").select(
+    elevation = pl.read_parquet(dataset_path_for(source=source)).select(
         "site", "time", "solar_elevation_deg"
     )
     return losses.join(elevation, on=["site", "time"], how="inner").with_columns(

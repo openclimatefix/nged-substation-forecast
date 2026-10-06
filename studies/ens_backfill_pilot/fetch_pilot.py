@@ -2,8 +2,9 @@
 
 Run `uv run python studies/ens_backfill_pilot/fetch_pilot.py --dry-run` first. The pilot fetches
 the control member's 12 variables at 85 steps (1,020 messages) for 23 dates, one range request
-per message, and writes one checkpoint file per date under `data/studies/ens_backfill_pilot/`.
-A date already written is skipped, so a crashed run resumes where it stopped.
+per message, and writes one checkpoint file per date under
+`data/studies/per_study/ens_backfill_pilot/`. A date already written is skipped, so a crashed run
+resumes where it stopped.
 """
 
 import argparse

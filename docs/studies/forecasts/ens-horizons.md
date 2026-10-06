@@ -537,14 +537,14 @@ ENS alone.**
 ```bash
 uv run python studies/nwp_forecast_comparison/fetch_ens_forecast_horizons.py
 uv run python studies/nwp_forecast_comparison/ens_forecast_horizons.py --refit both
-uv run python studies/nwp_forecast_comparison/ens_forecast_charts.py --results-dir data/studies/ens_forecast_horizons/era_covered
+uv run python studies/nwp_forecast_comparison/ens_forecast_charts.py --results-dir data/studies/per_study/ens_forecast_horizons/era_covered
 ```
 
-The report lands in `data/studies/ens_forecast_horizons/era_covered/report.md`, beside the saved
-losses and predictions. The run needs the solar, wind, and blending studies' inputs on disk, and
-takes about one and a half hours on a 32-core machine. The script writes each technology's losses
-once and refuses to overwrite them, and raises before any fit if a calendar month that occurs in two
-or more years would be held out with no training row.
+The report lands in `data/studies/per_study/ens_forecast_horizons/era_covered/report.md`, beside
+the saved losses and predictions. The run needs the solar, wind, and blending studies' inputs on
+disk, and takes about one and a half hours on a 32-core machine. The script writes each
+technology's losses once and refuses to overwrite them, and raises before any fit if a calendar
+month that occurs in two or more years would be held out with no training row.
 
 - `ens_forecast_horizons.py --report-only` rebuilds the report from the saved losses.
 - `ens_forecast_horizons.py --fit-missing` fits only the arms missing from the saved losses, and

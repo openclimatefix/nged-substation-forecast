@@ -359,9 +359,9 @@ npx svgo@4 --multipass --precision=1 --final-newline docs/studies/assets/ensembl
 uv run python studies/open_meteo_ensemble_means/local_ens_gap.py
 ```
 
-The first command writes the tables and `report.md` under `data/studies/open_meteo_ensemble_means/`
-and takes about 15 minutes on the CPU. The script refuses to overwrite, so move the existing files
-to
-a `superseded/` subfolder first. `--report-only` rebuilds the tables from the saved losses. The last
-command writes the tables of the two new sections to `data/studies/open_meteo_ens_gap/`, reads the
-saved frames of the first command, and takes about 8 minutes on the CPU.
+The first command writes the tables and `report.md` under
+`data/studies/per_study/open_meteo_ensemble_means/` and takes about 15 minutes on the CPU. The
+script refuses to overwrite, so move the existing files to a `superseded/` subfolder first.
+`--report-only` rebuilds the tables from the saved losses. The last command writes the tables of the
+two new sections to `data/studies/per_study/open_meteo_ens_gap/`, reads the saved frames of the
+first command, and takes about 8 minutes on the CPU.
