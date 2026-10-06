@@ -41,7 +41,7 @@ stops (`refuse_to_overwrite`) while an output exists.
 import argparse
 import logging
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Final, NamedTuple, TypedDict
 
@@ -100,13 +100,32 @@ class Variable(NamedTuple):
     om: str
     circular: bool = False
     daylight_only: bool = False
+    wind_step: str = "ignore"
+    """`exclude` drops the hours of Open-Meteo's wind-step spans, `only` keeps them alone."""
+    min_speed_m_s: float = 0.0
+    """Rows where CEDA's 10 m speed is at or below this are left out, (no direction when calm)."""
 
 
 VARIABLES: Final[tuple[Variable, ...]] = (
     Variable("air temperature", "K", "ceda_temp_c", "om_temp_c"),
-    Variable("10 m wind speed", "m/s", "ceda_speed_10m_m_s", "om_speed_10m_m_s"),
     Variable(
-        "10 m wind direction", "degrees", "ceda_direction_10m_deg", "om_direction_10m_deg", True
+        "10 m wind speed", "m/s", "ceda_speed_10m_m_s", "om_speed_10m_m_s", wind_step="exclude"
+    ),
+    Variable(
+        "10 m wind speed, inside Open-Meteo's step spans",
+        "m/s",
+        "ceda_speed_10m_m_s",
+        "om_speed_10m_m_s",
+        wind_step="only",
+    ),
+    Variable(
+        "10 m wind direction (hours above 2 m/s)",
+        "degrees",
+        "ceda_direction_10m_deg",
+        "om_direction_10m_deg",
+        circular=True,
+        wind_step="exclude",
+        min_speed_m_s=2.0,
     ),
     Variable("global irradiance (rebuilt)", "W/m2", "ceda_ghi", "om_ghi", daylight_only=True),
     Variable(
@@ -164,6 +183,12 @@ def with_difference(*, frame: pl.DataFrame, variable: Variable) -> pl.DataFrame:
         zero), with `difference`.
     """
     rows = frame.drop_nulls([variable.ceda, variable.om])
+    if variable.wind_step == "exclude":
+        rows = rows.filter(~pl.col("om_wind_step"))
+    elif variable.wind_step == "only":
+        rows = rows.filter(pl.col("om_wind_step"))
+    if variable.min_speed_m_s > 0.0:
+        rows = rows.filter(pl.col("ceda_speed_10m_m_s") > variable.min_speed_m_s)
     if variable.daylight_only:
         rows = rows.filter((pl.col(variable.ceda) > 0.0) | (pl.col(variable.om) > 0.0))
     difference = (
@@ -278,14 +303,14 @@ def splits_of(*, rows: pl.DataFrame) -> list[tuple[str, str, pl.DataFrame]]:
     splits.append(
         (
             "PS46",
-            f"before {PS46_FIRST_MONTH}, lead 0",
+            f"before {PS46_FIRST_MONTH}, lead 0 (not an isolated PS46 effect)",
             era_zero.filter(pl.col("month") < PS46_FIRST_MONTH),
         )
     )
     splits.append(
         (
             "PS46",
-            f"from {PS46_FIRST_MONTH}, lead 0",
+            f"from {PS46_FIRST_MONTH}, lead 0 (not an isolated PS46 effect)",
             era_zero.filter(pl.col("month") >= PS46_FIRST_MONTH),
         )
     )
@@ -416,14 +441,28 @@ def cell_match_lines(*, ukv: UkvStores, frame: pl.DataFrame) -> list[str]:
 
 
 def _row(*, record: DifferenceRecord) -> str:
+    mean_interval = _interval(
+        lower=record["mean_difference_lower_95"],
+        upper=record["mean_difference_upper_95"],
+        sign=True,
+    )
+    absolute_interval = _interval(
+        lower=record["mean_absolute_difference_lower_95"],
+        upper=record["mean_absolute_difference_upper_95"],
+        sign=False,
+    )
     return (
         f"| {record['label']} | {record['n_rows']:,} | {record['mean_difference']:+.3f} "
-        f"[{record['mean_difference_lower_95']:+.3f}, {record['mean_difference_upper_95']:+.3f}] | "
-        f"{record['mean_absolute_difference']:.3f} "
-        f"[{record['mean_absolute_difference_lower_95']:.3f}, "
-        f"{record['mean_absolute_difference_upper_95']:.3f}] | "
+        f"{mean_interval} | {record['mean_absolute_difference']:.3f} {absolute_interval} | "
         f"{record['p99_absolute_difference']:.3f} | {record['correlation']:.4f} |"
     )
+
+
+def _interval(*, lower: float, upper: float, sign: bool) -> str:
+    """Format an interval, or a dash where the split has too few months for one."""
+    if lower != lower or upper != upper:  # noqa: PLR0124 - NaN marks a split with no interval
+        return "(no interval)"
+    return f"[{lower:+.3f}, {upper:+.3f}]" if sign else f"[{lower:.3f}, {upper:.3f}]"
 
 
 def report_text(
@@ -434,6 +473,7 @@ def report_text(
     ratios: pl.DataFrame,
     elevation_ratios: pl.DataFrame,
     era_1_note: str,
+    levels: Mapping[str, tuple[float, float]],
 ) -> str:
     """Render every table the page quotes from the model-free comparison.
 
@@ -444,6 +484,8 @@ def report_text(
         ratios: `irradiance_ratios_by_era_hour`'s result.
         elevation_ratios: `irradiance_ratios_by_elevation`'s result.
         era_1_note: `era_1_irradiance_note`'s result, empty where every hour matches.
+        levels: Each variable's mean level at lead 0 in CEDA and in Open-Meteo, so a difference
+            reads as a share.
 
     Returns:
         The report, in Markdown.
@@ -459,6 +501,15 @@ def report_text(
     ]
     for variable in VARIABLES:
         lines += [f"## {variable.name} ({variable.unit})", ""]
+        if variable.name in levels:
+            ceda_level, om_level = levels[variable.name]
+            lines += [
+                (
+                    f"Mean level at lead 0: CEDA {ceda_level:.3f}, Open-Meteo {om_level:.3f} "
+                    f"{variable.unit}."
+                ),
+                "",
+            ]
         for split in ("all", "lead", "era", "PS46", "site", "month", "hour"):
             chosen = [
                 record
@@ -496,21 +547,33 @@ def report_text(
         "### By sun elevation",
         "",
         (
-            "The same ratio, without the 50 W/m2 cut, by the sun's elevation at the label. A "
+            "The same ratio, without the 50 W/m2 cut, by the sun's elevation at the label, with "
+            "the 10th and 90th percentiles of the ratio and the mean absolute difference. A "
             "rebuild from a snapshot at the label does not reproduce Open-Meteo's value when the "
-            "sun is within a few degrees of the horizon."
+            "sun is within a few degrees of the horizon, and after PS47 the spread is wide above "
+            "10 degrees too, though the median is not."
         ),
         "",
-        "| Era | Sun elevation | Rebuilt ratio | Rows |",
-        "|---|---|---|---|",
+        (
+            "| Era | Sun elevation | Median ratio | 10th to 90th percentile | "
+            "Mean abs. diff. (W/m2) | Rows |"
+        ),
+        "|---|---|---|---|---|---|",
         *(
-            f"| {row['era_code']} | {row['bin']} | {row['rebuilt_ratio']:.3f} | {row['n']:,} |"
+            f"| {row['era_code']} | {row['bin']} | {row['rebuilt_ratio']:.3f} | "
+            f"{row['p10']:.3f} to {row['p90']:.3f} | {row['mean_abs_diff']:.1f} | {row['n']:,} |"
             for row in elevation_ratios.iter_rows(named=True)
         ),
         "",
         "## Diagnostics",
         "",
         "### Cell match",
+        "",
+        (
+            "Open-Meteo does not serve the nearest CEDA cell's value: a share far below 100% means "
+            "it interpolates or reads a different grid, so the two archives are not the same "
+            "analysis sampled at one cell, even at lead 0."
+        ),
         "",
         *cell_lines,
         "",
@@ -528,6 +591,29 @@ def report_text(
         "",
     ]
     return "\n".join(lines)
+
+
+def lead_zero_levels(*, frame: pl.DataFrame) -> dict[str, tuple[float, float]]:
+    """Return each variable's mean level at lead 0 in CEDA and in Open-Meteo.
+
+    Args:
+        frame: `model_free_hours`'s result.
+
+    Returns:
+        The two means, by variable name, over the rows `with_difference` keeps at lead 0.
+    """
+    levels: dict[str, tuple[float, float]] = {}
+    for variable in VARIABLES:
+        if variable.ceda not in frame.columns:
+            continue
+        rows = lead_zero(frame=with_difference(frame=frame, variable=variable))
+        if rows.is_empty():
+            continue
+        levels[variable.name] = (
+            float(np.mean(rows[variable.ceda].to_numpy())),
+            float(np.mean(rows[variable.om].to_numpy())),
+        )
+    return levels
 
 
 def main() -> int:
@@ -553,6 +639,7 @@ def main() -> int:
         ratios=irradiance_ratios_by_era_hour(frame=frame),
         elevation_ratios=irradiance_ratios_by_elevation(frame=frame),
         era_1_note=era_1_irradiance_note(frame=frame),
+        levels=lead_zero_levels(frame=frame),
     )
     paths[0].write_text(text)
     pl.DataFrame(records).write_parquet(paths[1])

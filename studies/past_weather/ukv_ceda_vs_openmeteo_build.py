@@ -42,7 +42,7 @@ import logging
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Final
 
@@ -112,6 +112,21 @@ UNVERIFIED_HOURS: Final[tuple[datetime, datetime]] = (
     datetime(2024, 11, 13, 13, tzinfo=UTC),
 )
 """The 94 hours (inclusive) that `combined.parquet` fills and the `site_points/` extract lacks."""
+
+OPEN_METEO_WIND_STEP_DAYS: Final[tuple[tuple[date, date], ...]] = (
+    (date(2024, 11, 7), date(2024, 11, 30)),
+    (date(2025, 1, 16), date(2025, 2, 18)),
+)
+"""The UTC days (inclusive) on which Open-Meteo's served 10 m wind speed is built differently.
+
+**In these two spans Open-Meteo's 10 m speed is about 6% higher against CEDA's (median ratio 1.064
+against 0.968 elsewhere at lead 0) and about 5% higher against ERA5's, while CEDA's speed against
+ERA5's is steady, and Open-Meteo's temperature, direction, and irradiance do not step.** Its 100 m
+to 10 m speed ratio falls from 1.95 to 1.78. The spans start and end within a day of the dates
+here, which are the whole days that contain each change. The steps are a property of the served
+series, so every wind arm drops the spans. A month that loses more than `MAX_MONTH_LOSS_SHARE` of
+its days to them is dropped whole.
+"""
 
 KM_PER_HOUR_PER_M_PER_S: Final[float] = 3.6
 """Open-Meteo serves wind in km/h and CEDA in m/s, so Open-Meteo's is divided by this."""
@@ -443,6 +458,18 @@ def read_ceda_instants(
     return pl.concat(frames)
 
 
+def in_wind_step_days() -> pl.Expr:
+    """Return whether `time` falls on a day of `OPEN_METEO_WIND_STEP_DAYS`.
+
+    Returns:
+        A Boolean expression over the `time` column.
+    """
+    day = pl.col("time").dt.date()
+    return pl.any_horizontal(
+        (day >= pl.lit(first)) & (day <= pl.lit(last)) for first, last in OPEN_METEO_WIND_STEP_DAYS
+    )
+
+
 def model_free_hours(
     *, ukv: UkvStores, open_meteo: pl.DataFrame, hours: pl.Series, read_values: bool
 ) -> pl.DataFrame:
@@ -457,7 +484,8 @@ def model_free_hours(
     Returns:
         One row per (site, hour) with both archives' temperature, 10 m speed (m/s), 10 m
         direction, and global irradiance, the CEDA lead, `month`, `hour_of_day`, and `era_code`
-        (0 before the PS47 upgrade and 1 after).
+        (0 before the PS47 upgrade and 1 after). `om_wind_step` says whether the hour lies in a
+        span in which Open-Meteo's 10 m speed is built differently.
     """
     ceda = read_ceda_instants(
         ukv=ukv, sites=generator_roster(), hours=hours, read_values=read_values
@@ -467,6 +495,7 @@ def model_free_hours(
         .with_columns(
             month=pl.col("time").dt.strftime("%Y-%m"),
             hour_of_day=pl.col("time").dt.hour(),
+            om_wind_step=in_wind_step_days(),
         )
         .with_columns(era_code=(pl.col("month") >= STRADDLING_MONTHS[1]).cast(pl.Int8))
         .filter(pl.col("month").is_in(list(STUDY_MONTHS)))
@@ -627,8 +656,9 @@ def irradiance_ratios_by_elevation(*, frame: pl.DataFrame) -> pl.DataFrame:
         frame: `model_free_hours`'s result.
 
     Returns:
-        One row per (era, elevation bin) with `bin`, `rebuilt_ratio` and `n`, over the lead-0 rows
-        where Open-Meteo's irradiance is above zero.
+        One row per (era, elevation bin) with `bin`, `rebuilt_ratio` (the median), `p10`, `p90`,
+        `mean_abs_diff` in W/m2, and `n`, over the lead-0 rows where Open-Meteo's irradiance is
+        above zero.
     """
     edges = (None, *SUN_ELEVATION_BINS_DEG)
     uppers = (*SUN_ELEVATION_BINS_DEG, float("inf"))
@@ -639,7 +669,13 @@ def irradiance_ratios_by_elevation(*, frame: pl.DataFrame) -> pl.DataFrame:
             & (pl.col("sun_elevation_deg") <= upper)
         )
         .group_by("era_code")
-        .agg(rebuilt_ratio=(pl.col("ceda_ghi") / pl.col("om_ghi")).median(), n=pl.len())
+        .agg(
+            rebuilt_ratio=(pl.col("ceda_ghi") / pl.col("om_ghi")).median(),
+            p10=(pl.col("ceda_ghi") / pl.col("om_ghi")).quantile(0.1),
+            p90=(pl.col("ceda_ghi") / pl.col("om_ghi")).quantile(0.9),
+            mean_abs_diff=(pl.col("ceda_ghi") - pl.col("om_ghi")).abs().mean(),
+            n=pl.len(),
+        )
         .with_columns(
             bin=pl.lit(elevation_bin_label(upper=upper, lower=lower)),
             order=pl.lit(index, dtype=pl.Int64),
@@ -716,16 +752,83 @@ def _finish(*, frame: pl.DataFrame, shuffle_groups: Sequence[Sequence[str]]) -> 
     )
 
 
-def wind_rows(*, base: pl.DataFrame, open_meteo: pl.DataFrame) -> pl.DataFrame:
+def wind_step_months(*, base: pl.DataFrame) -> dict[str, float]:
+    """Find the months that `OPEN_METEO_WIND_STEP_DAYS` removes more than the loss limit from.
+
+    Args:
+        base: The CEDA-against-ERA5 study's wind rows in the study's months.
+
+    Returns:
+        The share of each such month's rows that lie in the spans, for the months over
+        `MAX_MONTH_LOSS_SHARE`. Those months are dropped from every wind arm, and the other
+        months lose only the hours inside the spans.
+    """
+    kept = base.filter(~in_wind_step_days())
+    return {
+        month: share
+        for month, share in loss_by_month(base=base, kept=kept).items()
+        if share > MAX_MONTH_LOSS_SHARE
+    }
+
+
+def with_rescaled_speed(*, frame: pl.DataFrame, model_free: pl.DataFrame) -> pl.DataFrame:
+    """Add Open-Meteo's 10 m speed rescaled to CEDA's level, learned on the training folds.
+
+    The scale is each site's median ratio of CEDA's to Open-Meteo's 10 m speed at the instants where
+    CEDA's lead is 0, over the months of the site's other folds, so a row's scale never reads the
+    fold the row is scored in. It is the simplest calibrator, and the transfer scoring uses it to
+    test whether a rescale absorbs the transfer penalty.
+
+    Args:
+        frame: Wind rows carrying `site`, `month`, `fold` and `om_speed_10m`.
+        model_free: `model_free_hours`'s result.
+
+    Returns:
+        `frame` with `om_speed_10m_rescaled`, in `frame`'s row order.
+    """
+    ratios = (
+        lead_zero(frame=model_free)
+        .filter(~pl.col("om_wind_step") & (pl.col("ceda_speed_10m_m_s") > 1.0))
+        .select(
+            "site",
+            train_month="month",
+            ratio=pl.col("ceda_speed_10m_m_s") / pl.col("om_speed_10m_m_s"),
+        )
+    )
+    folds = frame.select("site", "month", "fold").unique()
+    per_fold = (
+        folds.rename({"fold": "scored_fold"})
+        .join(folds.rename({"month": "train_month", "fold": "train_fold"}), on="site")
+        .filter(pl.col("train_fold") != pl.col("scored_fold"))
+        .join(ratios, on=["site", "train_month"])
+        .group_by("site", "scored_fold")
+        .agg(scale=pl.col("ratio").median())
+        .rename({"scored_fold": "fold"})
+    )
+    return (
+        frame.join(per_fold, on=["site", "fold"], how="left", maintain_order="left")
+        .with_columns(om_speed_10m_rescaled=pl.col("om_speed_10m") * pl.col("scale"))
+        .drop("scale")
+    )
+
+
+def wind_rows(
+    *, base: pl.DataFrame, open_meteo: pl.DataFrame, model_free: pl.DataFrame
+) -> pl.DataFrame:
     """Build the wind farms' fit rows: CEDA's matched 10 m wind beside Open-Meteo's.
+
+    The hours in `OPEN_METEO_WIND_STEP_DAYS` are dropped from every arm, and so are the months that
+    lose more than `MAX_MONTH_LOSS_SHARE` of their rows to them.
 
     Args:
         base: The CEDA-against-ERA5 study's wind rows in the study's months.
         open_meteo: `read_open_meteo`'s result.
+        model_free: `model_free_hours`'s result, which the speed rescale is learned from.
 
     Returns:
         One row per (site, hour) with the centred power, both archives' three wind columns,
-        `constrained`, `cap_mw`, `month`, `era_code`, `fold`, and the shuffled columns.
+        `constrained`, `cap_mw`, `month`, `era_code`, `fold`, the shuffled columns, and
+        `om_speed_10m_rescaled`.
     """
     ceda_speed, ceda_sin, ceda_cos = wind_columns(archive="ceda")
     om_speed, om_sin, om_cos = wind_columns(archive="om")
@@ -750,10 +853,13 @@ def wind_rows(*, base: pl.DataFrame, open_meteo: pl.DataFrame) -> pl.DataFrame:
         ceda_sin,
         ceda_cos,
     ).join(om_wind, on=["site", "time"], how="inner")
-    return _finish(
+    dropped = list(wind_step_months(base=base))
+    kept = kept.filter(~in_wind_step_days() & ~pl.col("month").is_in(dropped))
+    finished = _finish(
         frame=kept,
         shuffle_groups=[wind_columns(archive=a) for a in ARCHIVES],
     )
+    return with_rescaled_speed(frame=finished, model_free=model_free)
 
 
 def open_meteo_temperature_two_end_mean(
@@ -951,7 +1057,11 @@ def check_rows(
             for shuffled in (False, True)
             for column in function(archive=archive, shuffled=shuffled)
         ]
-        extra = ["om_temp_offset_removed"] if function is solar_arm_columns else []
+        extra = (
+            ["om_temp_offset_removed"]
+            if function is solar_arm_columns
+            else ["om_speed_10m_rescaled"]
+        )
         check_no_missing(
             frame=frame, columns=["power_mw", "effective_capacity_mw", *columns, *extra]
         )
@@ -1027,6 +1137,7 @@ class Frames:
     solar_era_0: pl.DataFrame
     model_free: pl.DataFrame
     wind_loss: dict[str, float]
+    wind_step_months: dict[str, float]
     solar_loss: dict[str, float]
 
 
@@ -1080,7 +1191,9 @@ def build_frames(*, ukv: UkvStores, read_values: bool) -> Frames:
         hours=solar_hours,
         read_values=read_values,
     )
-    wind = wind_rows(base=wind_base, open_meteo=open_meteo)
+    wind = wind_rows(base=wind_base, open_meteo=open_meteo, model_free=free)
+    step_months = wind_step_months(base=wind_base)
+    wind_base = wind_base.filter(~pl.col("month").is_in(list(step_months)))
     solar = solar_rows(
         base=solar_base, open_meteo=open_meteo, ceda_irradiance=ceda_solar, model_free=free
     )
@@ -1090,6 +1203,7 @@ def build_frames(*, ukv: UkvStores, read_values: bool) -> Frames:
         solar_era_0=era_0_solar_rows(solar=solar, model_free=free),
         model_free=free,
         wind_loss=loss_by_month(base=wind_base, kept=wind),
+        wind_step_months=step_months,
         solar_loss=loss_by_month(base=solar_base, kept=solar),
     )
 
@@ -1139,6 +1253,16 @@ def coverage_lines(*, ukv: UkvStores, frames: Frames) -> tuple[list[str], list[s
             ),
             f"- {name}: largest monthly loss to Open-Meteo gaps {max(shares.values()):.1%}.",
         ]
+    lines.append(
+        "- Wind: the spans in which Open-Meteo's 10 m speed is built differently ("
+        + ", ".join(f"{first} to {last}" for first, last in OPEN_METEO_WIND_STEP_DAYS)
+        + ") are dropped from every wind arm, and so are the months they empty: "
+        + (
+            ", ".join(f"{m} ({share:.0%})" for m, share in sorted(frames.wind_step_months.items()))
+            or "none"
+        )
+        + "."
+    )
     lines.append(
         f"- Solar rows of era 0 alone (planned-scope sensitivity): {frames.solar_era_0.height:,}."
     )
@@ -1242,6 +1366,10 @@ def write_outputs(
             "model_free": frames.model_free.height,
         },
         "study_months": list(STUDY_MONTHS),
+        "wind_step_days": [
+            [first.isoformat(), last.isoformat()] for first, last in OPEN_METEO_WIND_STEP_DAYS
+        ],
+        "wind_step_months_dropped": frames.wind_step_months,
         "era_1_irradiance_matched": not irradiance_mismatch_notes(frame=frames.model_free),
         "era_1_irradiance_note": era_1_irradiance_note(frame=frames.model_free),
         "margins_pp": {"wind": MARGIN_WIND_PP, "solar": MARGIN_SOLAR_PP},

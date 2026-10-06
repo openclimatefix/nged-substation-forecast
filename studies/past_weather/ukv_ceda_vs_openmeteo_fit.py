@@ -79,8 +79,6 @@ from studies.guards import refuse_to_overwrite
 from ukv_ceda_vs_era5_fit import (
     METRIC,
     PERCENTAGE_POINTS,
-    PRIMARY_SETTING,
-    SECOND_SETTING,
     hardware_stamp,
     in_stable_order,
     with_actual_and_prediction,
@@ -138,6 +136,10 @@ MARGINS_PP: Final[Mapping[DomainType, float]] = {
     "solar_era0": MARGIN_SOLAR_PP,
 }
 """The margin of each domain, in percentage points of capacity."""
+
+PRIMARY_SETTING: Final[str] = "primary"
+SECOND_SETTING: Final[str] = "second"
+"""The names of the two hyperparameter settings in every table."""
 
 REPORT_NAME: Final[str] = "report.md"
 DECISION_NAME: Final[str] = "decision.md"
@@ -268,7 +270,7 @@ def scoring_names(*, domain: DomainType) -> tuple[str, ...]:
         CEDA's own values, Open-Meteo's values, and the exploratory partial swaps.
     """
     partial = (
-        ("om_direction",)
+        ("om_direction", "om_speed_rescaled")
         if base_domain(domain=domain) == "wind"
         else ("om_temp", "om_ghi", "om_temp_offset_removed")
     )
@@ -310,6 +312,10 @@ def scoring_frames(*, site_rows: pl.DataFrame, domain: DomainType) -> dict[str, 
         _, ceda_sin, ceda_cos = wind_columns(archive="ceda")
         frames["om_direction"] = site_rows.select("time", "fold", *columns).with_columns(
             swapped[ceda_sin].alias(ceda_sin), swapped[ceda_cos].alias(ceda_cos)
+        )
+        ceda_speed = wind_columns(archive="ceda")[0]
+        frames["om_speed_rescaled"] = swapped.select("time", "fold", *columns).with_columns(
+            site_rows["om_speed_10m_rescaled"].alias(ceda_speed)
         )
         return frames
     ceda_ghi, ceda_temp = solar_columns(archive="ceda")
@@ -573,6 +579,11 @@ EXPLORATORY_CONTRASTS: Final[Mapping[DomainType, tuple[tuple[str, str, str], ...
             "ceda_wind_10m_scored_on_om_direction",
             "ceda_wind_10m",
         ),
+        (
+            "CEDA model, Open-Meteo speed rescaled (calibrator test)",
+            "ceda_wind_10m_scored_on_om_speed_rescaled",
+            "om_wind_10m",
+        ),
         ("GPU against CPU", "om_wind_10m_cpu_refit", "om_wind_10m"),
     ),
     "solar_era0": (),
@@ -628,7 +639,15 @@ not like for like in era 1. Every other solar scope is exploratory and carries t
 """
 
 
-ERA_0_SCOPES: Final[tuple[str, ...]] = ("era 0", "era 0, sun above 5 degrees")
+LEAD_SCOPE_FORMAT: Final[str] = "lead {lead} only"
+ERA_0_LEAD_SCOPE_FORMAT: Final[str] = "era 0, lead {lead} only"
+"""The scopes at one CEDA lead, over all rows and over era 0 (the lead is the UTC hour mod 6)."""
+
+ERA_0_SCOPES: Final[tuple[str, ...]] = (
+    "era 0",
+    "era 0, sun above 5 degrees",
+    *(ERA_0_LEAD_SCOPE_FORMAT.format(lead=lead) for lead in range(6)),
+)
 """The scopes that hold no era-1 row, and so carry no era-1 note."""
 
 
@@ -639,7 +658,7 @@ def scopes_of(
 
     Args:
         losses: Losses carrying `time`, `month` and `site`, and for solar `solar_zenith_deg`.
-        domain: The row set. The era-0 solar sensitivity is read on all its rows only.
+        domain: The row set. The era-0 solar sensitivity is read on all its rows and at each lead.
 
     Returns:
         All rows, each UKV era, the two half-years, the lead-0 hours (every row at which CEDA's
@@ -648,7 +667,16 @@ def scopes_of(
         era 0. The filter reads the geometry and neither archive's value.
     """
     if domain == "solar_era0":
-        return [("all", None)]
+        return [
+            ("all", None),
+            *(
+                (
+                    LEAD_SCOPE_FORMAT.format(lead=lead),
+                    pl.col("time").dt.hour() % LEAD_CYCLE_HOURS == lead,
+                )
+                for lead in range(LEAD_CYCLE_HOURS)
+            ),
+        ]
     winter = pl.col("time").dt.month().is_in([10, 11, 12, 1, 2, 3])
     scopes: list[tuple[str, pl.Expr | None]] = [
         ("all", None),
@@ -656,8 +684,13 @@ def scopes_of(
         ("era 1", pl.col("month") >= ERA_BOUNDARY_MONTH),
         ("October to March", winter),
         ("April to September", ~winter),
-        ("lead 0 only", pl.col("time").dt.hour() % LEAD_CYCLE_HOURS == 0),
+        ("without 2025-01", pl.col("month") != "2025-01"),
     ]
+    for lead in range(LEAD_CYCLE_HOURS):
+        at_lead = pl.col("time").dt.hour() % LEAD_CYCLE_HOURS == lead
+        scopes.append((LEAD_SCOPE_FORMAT.format(lead=lead), at_lead))
+        in_era_0 = pl.col("month") < ERA_BOUNDARY_MONTH
+        scopes.append((ERA_0_LEAD_SCOPE_FORMAT.format(lead=lead), at_lead & in_era_0))
     if "solar_zenith_deg" in losses.columns:
         sunny = pl.col("solar_zenith_deg") < LOW_SUN_ZENITH_DEG
         scopes += [
@@ -769,6 +802,8 @@ def domain_records(
     records: list[IntervalRecord] = []
     for scope, condition in scopes_of(losses=losses, domain=domain):
         scoped = losses if condition is None else losses.filter(condition)
+        if scoped.is_empty():
+            continue
         for planned in PLANNED_CONTRASTS:
             if planned.domain != domain:
                 continue
@@ -895,20 +930,40 @@ RECOMMENDATIONS: Final[Mapping[str, str]] = {
         "this input, at the precision tested."
     ),
     "penalty": (
-        "For this input, train on Open-Meteo's UKV history only (from 2024-08), or let a "
-        "calibrator absorb the difference."
+        "For this input, train on Open-Meteo's UKV history only (from 2024-08). A calibrator is "
+        "an alternative only where the exploratory calibrator test in the report shows it "
+        "absorbs the penalty."
     ),
-    "unresolved": "Treat as a penalty: do not mix the two archives until a longer overlap exists.",
+    "unresolved": (
+        "Unresolved, so by the rule fixed in the plan, treat as a penalty: do not mix the two "
+        "archives until a longer overlap exists. This is a default for an unresolved reading, and "
+        "not a measured penalty."
+    ),
 }
 """The scoped recommendation of each P3 reading. P3 measures transfer to Open-Meteo's lead-0
 analysis only, and says nothing about leads beyond 5 hours."""
 
 
-def decision_text(*, found: Sequence[Verdict]) -> str:
+def verdict_bound(*, verdict: Verdict) -> float:
+    """Return the largest upper bound of a verdict's readings, in points of capacity.
+
+    Args:
+        verdict: One planned contrast's verdict.
+
+    Returns:
+        The largest 95% upper bound across its settings and fits, the effect that is not excluded.
+    """
+    records = (verdict.primary, verdict.second, *verdict.sensitivity)
+    return max(record["upper_95_pp"] for record in records)
+
+
+def decision_text(*, found: Sequence[Verdict], observations: Sequence[str] = ()) -> str:
     """Apply the plan's rule to the verdicts.
 
     Args:
         found: `verdicts`' result.
+        observations: Lines of what the saved losses show about the solar fits, which the
+            decision prints in place of a conjecture.
 
     Returns:
         The decision, in Markdown.
@@ -936,10 +991,9 @@ def decision_text(*, found: Sequence[Verdict]) -> str:
             "Solar contrasts are read on era 0 only, by two fits: one trained on the rows of both "
             "eras and one trained on era 0 alone, and a verdict stands only if the two agree. "
             "After the PS47 upgrade Open-Meteo's hourly irradiance is built differently, so the "
-            "all-rows fit trains on era-1 rows whose irradiance is not like for like. If that "
-            "biases anything it makes the Open-Meteo-trained reference model worse, which pushes "
-            "the transfer penalty towards `no_penalty` and the contrast towards CEDA. Every solar "
-            "scope that includes era 1 is exploratory and carries the era-1 note."
+            "all-rows fit trains on era-1 rows whose irradiance is not like for like. The "
+            "observations below say what that did. Every solar scope that includes era 1 is "
+            "exploratory and carries the era-1 note."
         ),
         "",
         "#### Training history (question 5), scoped",
@@ -947,7 +1001,15 @@ def decision_text(*, found: Sequence[Verdict]) -> str:
     ]
     for verdict in found:
         if verdict.label == "P3":
-            lines.append(f"- {verdict.domain}: {RECOMMENDATIONS[verdict.reading]}")
+            bound = (
+                " The largest upper bound across the readings is "
+                f"{verdict_bound(verdict=verdict):+.3f} points of capacity."
+                if verdict.reading == "unresolved"
+                else ""
+            )
+            lines.append(f"- {verdict.domain}: {RECOMMENDATIONS[verdict.reading]}{bound}")
+    if observations:
+        lines += ["", "#### What the saved losses show (exploratory)", "", *observations]
     lines += [
         "",
         (
@@ -1010,6 +1072,295 @@ def absolute_lines(*, losses: pl.DataFrame) -> list[str]:
     return lines
 
 
+def planned_scope_losses(*, domain: DomainType, losses: pl.DataFrame) -> pl.DataFrame:
+    """Restrict a domain's losses to its planned scope.
+
+    Args:
+        domain: The row set.
+        losses: The domain's losses, carrying `month`.
+
+    Returns:
+        The losses of the planned scope: all rows for wind and the era-0 solar fit, and the
+        months before the PS47 upgrade for the solar fit on both eras.
+    """
+    if PLANNED_SCOPE[domain] == "era 0":
+        return losses.filter(pl.col("month") < ERA_BOUNDARY_MONTH)
+    return losses
+
+
+def planned_scope_absolute_lines(*, losses: Mapping[DomainType, pl.DataFrame]) -> list[str]:
+    """Report each arm's absolute error on its domain's planned scope, with its interval.
+
+    Args:
+        losses: Each domain's losses.
+
+    Returns:
+        Markdown lines: one table per domain, on the scope the planned contrasts are read on.
+    """
+    lines: list[str] = []
+    for domain, frame in losses.items():
+        lines += [
+            f"## {domain}: every arm's absolute error, planned scope ({PLANNED_SCOPE[domain]})",
+            "",
+            *absolute_lines(losses=planned_scope_losses(domain=domain, losses=frame)),
+            "",
+        ]
+    return lines
+
+
+def mean_signed_error_pp(*, losses: pl.DataFrame, arm: str, setting: str) -> float:
+    """Return an arm's mean signed capped error as a share of capacity, in percentage points.
+
+    Args:
+        losses: Losses carrying `signed_error_capped_mw` and `effective_capacity_mw`.
+        arm: The arm.
+        setting: The hyperparameter setting.
+
+    Returns:
+        The mean of (prediction minus actual) over capacity, so a negative value is an
+        under-prediction.
+    """
+    rows = losses.filter((pl.col("arm") == arm) & (pl.col("setting") == setting))
+    share = rows["signed_error_capped_mw"] / rows["effective_capacity_mw"]
+    return float(np.mean(share.to_numpy())) * PERCENTAGE_POINTS
+
+
+def signed_error_lines(*, losses: Mapping[DomainType, pl.DataFrame]) -> list[str]:
+    """Report each arm's mean signed error on the planned scope, in all hours and at lead 0.
+
+    Args:
+        losses: Each domain's losses.
+
+    Returns:
+        Markdown lines. A level bias that the absolute error hides, such as a transfer penalty that
+        is a systematic under-prediction, shows here.
+    """
+    lines: list[str] = []
+    for domain, frame in losses.items():
+        scoped = planned_scope_losses(domain=domain, losses=frame)
+        at_lead_0 = scoped.filter(pl.col("time").dt.hour() % LEAD_CYCLE_HOURS == 0)
+        lines += [
+            f"## {domain}: mean signed error on the planned scope ({PLANNED_SCOPE[domain]})",
+            "",
+            (
+                "Prediction minus measured power as a share of capacity, in percentage points, "
+                "so a negative value is an under-prediction."
+            ),
+            "",
+            "| Arm | Setting | All hours | CEDA lead 0 only |",
+            "|---|---|---|---|",
+        ]
+        for arm in sorted(scoped["arm"].unique().to_list()):
+            for setting in (PRIMARY_SETTING, SECOND_SETTING):
+                if scoped.filter(
+                    (pl.col("arm") == arm) & (pl.col("setting") == setting)
+                ).is_empty():
+                    continue
+                lines.append(
+                    f"| {arm} | {setting} | "
+                    f"{mean_signed_error_pp(losses=scoped, arm=arm, setting=setting):+.3f} | "
+                    f"{mean_signed_error_pp(losses=at_lead_0, arm=arm, setting=setting):+.3f} |"
+                )
+        lines.append("")
+    return lines
+
+
+def by_lead_lines(*, records: Sequence[IntervalRecord]) -> list[str]:
+    """Tabulate each planned contrast by CEDA lead, on its planned era, at both settings.
+
+    **P1 and P2 read all hours, so they measure CEDA's lead 0 to 5 archive against Open-Meteo's
+    lead-0 analysis as much as a difference between the two archives.** This table shows how each
+    contrast changes with CEDA's lead.
+
+    Args:
+        records: Every interval record.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        "## Each planned contrast by CEDA lead (exploratory)",
+        "",
+        (
+            "A row's CEDA lead is its UTC hour modulo 6. Wind reads all months, and solar reads "
+            "era 0. The models are trained on all leads, so a lead is a scoring subset."
+        ),
+        "",
+        "| Contrast | Row set | Setting | "
+        + " | ".join(f"Lead {lead}" for lead in range(LEAD_CYCLE_HOURS))
+        + " |",
+        "|---|---|---|" + "---|" * LEAD_CYCLE_HOURS,
+    ]
+    for planned in PLANNED_CONTRASTS:
+        domain = planned.domain
+        for setting in (PRIMARY_SETTING, SECOND_SETTING):
+            cells = []
+            for lead in range(LEAD_CYCLE_HOURS):
+                scope = (
+                    LEAD_SCOPE_FORMAT.format(lead=lead)
+                    if PLANNED_SCOPE[domain] == "all"
+                    else ERA_0_LEAD_SCOPE_FORMAT.format(lead=lead)
+                )
+                found = [
+                    r
+                    for r in records
+                    if r["domain"] == domain
+                    and r["label"] == planned.label
+                    and r["treatment"] == planned.treatment
+                    and r["setting"] == setting
+                    and r["scope"] == scope
+                ]
+                cells.append(
+                    f"{found[0]['difference_pp']:+.3f} "
+                    f"[{found[0]['lower_95_pp']:+.3f}, {found[0]['upper_95_pp']:+.3f}]"
+                    if found
+                    else "-"
+                )
+            lines.append(
+                f"| {planned.label}, {planned.treatment} | {domain} | {setting} | "
+                + " | ".join(cells)
+                + " |"
+            )
+    return [*lines, ""]
+
+
+def _find(
+    *,
+    records: Sequence[IntervalRecord],
+    domain: str,
+    label: str,
+    scope: str,
+    setting: str = PRIMARY_SETTING,
+    treatment: str | None = None,
+) -> IntervalRecord | None:
+    for record in records:
+        if (
+            record["domain"] == domain
+            and record["label"] == label
+            and record["scope"] == scope
+            and record["setting"] == setting
+            and (treatment is None or record["treatment"] == treatment)
+        ):
+            return record
+    return None
+
+
+def _show(*, record: IntervalRecord | None) -> str:
+    if record is None:
+        return "not computed"
+    return (
+        f"{record['difference_pp']:+.3f} [{record['lower_95_pp']:+.3f}, "
+        f"{record['upper_95_pp']:+.3f}] ({record['reading']})"
+    )
+
+
+def observation_lines(
+    *, records: Sequence[IntervalRecord], losses: Mapping[DomainType, pl.DataFrame]
+) -> list[str]:
+    """State what the saved losses show about the contrasts, for the decision and the page.
+
+    Args:
+        records: Every interval record.
+        losses: Each domain's losses.
+
+    Returns:
+        Markdown bullet lines. All are exploratory: the lead-0 reads, the solar fits' absolute
+        errors, the wind transfer penalty's level bias, the calibrator test, the controls, and the
+        refit noise floor.
+    """
+    wind_p1 = _find(records=records, domain="wind", label="P1", scope="lead 0 only")
+    solar_p2 = _find(records=records, domain="solar", label="P2", scope="era 0, lead 0 only")
+    lines = [
+        (
+            "- **P1 and P2 read all hours, so they measure CEDA's lead 0 to 5 archive against "
+            "Open-Meteo's lead-0 analysis.** At CEDA lead 0, P1 reads "
+            f"{_show(record=wind_p1)} and P2 reads {_show(record=solar_p2)}. The by-lead table "
+            "shows how each contrast grows with lead."
+        )
+    ]
+    solar_all = planned_scope_losses(domain="solar", losses=losses["solar"])
+    solar_0 = losses["solar_era0"]
+    lines.append(
+        "- **The Open-Meteo-trained solar model scores "
+        f"{_mae(solar_all, 'om_ghi_temp')} on era 0 when trained on both eras and "
+        f"{_mae(solar_0, 'om_ghi_temp')} when trained on era 0 alone** (percent of capacity, "
+        "primary setting). The CEDA-trained model scored on Open-Meteo's inputs went from "
+        f"{_mae(solar_all, 'ceda_ghi_temp_scored_on_om')} "
+        f"(both eras) to {_mae(solar_0, 'ceda_ghi_temp_scored_on_om')} (era 0 alone)."
+    )
+    zero_0 = solar_0.filter(pl.col("time").dt.hour() % LEAD_CYCLE_HOURS == 0)
+    lines.append(
+        "- **At CEDA lead 0 the era-0-trained CEDA solar model scores "
+        f"{_mae(zero_0, 'ceda_ghi_temp')} on CEDA's inputs and "
+        f"{_mae(zero_0, 'ceda_ghi_temp_scored_on_om')} on Open-Meteo's,** so its transfer penalty "
+        "is a difference between the two models and not an input mismatch: the CEDA-trained "
+        "model also learned from CEDA's lead-1-to-5 inputs."
+    )
+    wind = losses["wind"]
+    signed = {
+        arm: mean_signed_error_pp(losses=wind, arm=arm, setting=PRIMARY_SETTING)
+        for arm in ("ceda_wind_10m", "om_wind_10m", "ceda_wind_10m_scored_on_om")
+    }
+    direction = _find(
+        records=records, domain="wind", label="CEDA model, Open-Meteo direction", scope="all"
+    )
+    rescaled = _find(
+        records=records,
+        domain="wind",
+        label="CEDA model, Open-Meteo speed rescaled (calibrator test)",
+        scope="all",
+    )
+    lines.append(
+        "- **The wind transfer penalty is a level bias.** The mean signed error is "
+        f"{signed['ceda_wind_10m']:+.2f} for the CEDA model on CEDA's inputs, "
+        f"{signed['om_wind_10m']:+.2f} for the Open-Meteo model, and "
+        f"{signed['ceda_wind_10m_scored_on_om']:+.2f} for the CEDA model on Open-Meteo's inputs "
+        "(percentage points of capacity; negative is an under-prediction). Open-Meteo's 10 m "
+        "speed sits about 3% below the nearest CEDA cell's at lead 0, and swapping the direction "
+        f"alone reads {_show(record=direction)}."
+    )
+    lines.append(
+        "- **Calibrator test (exploratory):** the CEDA model scored on Open-Meteo's speed rescaled "
+        f"to CEDA's level, against the Open-Meteo model, reads {_show(record=rescaled)}. The scale "
+        "is each site's median CEDA-to-Open-Meteo speed ratio at lead-0 instants, learned on the "
+        "training folds."
+    )
+    wind_control = _find(
+        records=records,
+        domain="wind",
+        label="control",
+        scope="all",
+        treatment="ceda_wind_10m_shuffled",
+    )
+    solar_control = _find(
+        records=records,
+        domain="solar",
+        label="control",
+        scope="era 0",
+        treatment="ceda_ghi_temp_shuffled",
+    )
+    cpu = _find(records=records, domain="wind", label="GPU against CPU", scope="all")
+    lines.append(
+        "- **The shuffled controls are not a clean null here.** The wind pair reads "
+        f"{_show(record=wind_control)} and the solar pair {_show(record=solar_control)}. A shuffle "
+        "within a site, month, and hour keeps each archive's monthly-hourly distribution, which "
+        "carries Open-Meteo's lower speed level and CEDA's lead-dependent spread, so the two "
+        "shuffled arms are not equally informative by construction. The GPU-against-CPU refit "
+        f"reads {_show(record=cpu)}, which is the noise floor of a refit."
+    )
+    lines.append(
+        "- **About one exploratory row in 20 with no real effect reaches the 5% level by chance,** "
+        "and the report holds many such rows over shared months. Read the exploratory labels "
+        "with their scope and months."
+    )
+    return lines
+
+
+def _mae(losses: pl.DataFrame, arm: str) -> str:
+    rows = losses.filter((pl.col("arm") == arm) & (pl.col("setting") == PRIMARY_SETTING))
+    return f"{float(np.mean(rows[METRIC].to_numpy())) * PERCENTAGE_POINTS:.2f}"
+
+
 def report_text(
     *,
     records: Sequence[IntervalRecord],
@@ -1035,7 +1386,12 @@ def report_text(
         lines += [f"## {domain}: contrasts", "", *RECORD_HEADER]
         lines += [_record_line(record=record) for record in records if record["domain"] == domain]
         lines.append("")
-    lines += [decision_text(found=found)]
+    lines += [
+        *planned_scope_absolute_lines(losses=losses),
+        *signed_error_lines(losses=losses),
+        *by_lead_lines(records=records),
+        decision_text(found=found, observations=observation_lines(records=records, losses=losses)),
+    ]
     return "\n".join(lines)
 
 
@@ -1183,7 +1539,9 @@ def main() -> int:
     if arguments.report_only:
         refuse_to_overwrite(paths=paths)
     paths[0].write_text(report)
-    paths[1].write_text(decision_text(found=found))
+    paths[1].write_text(
+        decision_text(found=found, observations=observation_lines(records=records, losses=losses))
+    )
     pl.DataFrame(records).write_parquet(paths[2])
     sys.stdout.write(f"Wrote the reports to {directory}.\n")
     return 0

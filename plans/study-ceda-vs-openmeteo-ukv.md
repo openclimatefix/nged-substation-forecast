@@ -426,3 +426,35 @@ unscaled snapshot gives 1.45 and 0.74). The decision, made before any fit or res
   only.** It was the mean of the two-end temperature means at the hours where CEDA's lead is 0,
   which averaged in a lead-5 instant and read the scored fold. The fit also checks every output path
   before it writes the hardware stamp.
+
+## Changed after the first fit
+
+**Open-Meteo's 10 m wind speed is built differently in two spans, so every wind arm drops them.**
+The first review of the fit found that Open-Meteo's 10 m speed against CEDA's, at lead 0, reads
+about 0.97 in 20 of the 23 months and 1.01 to 1.06 in 2024-11, 2025-01, and 2025-02. The lineage
+check (committed in the build) finds two spans with sharp edges, 2024-11-07 to 2024-11-30 and
+2025-01-16 to 2025-02-18, in which Open-Meteo's speed is about 6% higher against CEDA's (median
+ratio 1.064 against 0.968) and about 5% higher against ERA5's, while CEDA's speed against ERA5's is
+steady. Open-Meteo's 100 m to 10 m speed ratio falls from 1.95 to 1.78 in them, and its
+temperature, wind direction, and irradiance do not step. `combined.parquet` equals the
+`site_points/` extracts bit for bit in those spans, so the file is the one the other studies read,
+and the step is in what Open-Meteo served. The decision is by the served series and not by any
+power result.
+
+- **The spans are dropped from every wind arm,** and the three months they empty (2024-11, 2025-01,
+  and 2025-02 lose 84%, 52%, and 65% of their rows, over the 25% limit) are dropped whole. The wind
+  rows fall from 45,948 to 40,287 (13 months of era 0 and 7 of era 1). Solar reads no wind, and its
+  inputs do not step, so its rows are unchanged.
+- **The model-free comparison keeps every hour,** flags the spans (`om_wind_step`), reports wind
+  speed and direction outside them, and reports the speed inside them separately.
+- **The first run's outputs moved to `superseded/first_run/`.** In that run wind P1 read unresolved
+  (+0.162 [+0.080, +0.241] at the primary setting and +0.146 [+0.073, +0.216] at the second) and
+  wind P3 read penalty (+0.313 [+0.163, +0.459]). The rule is the same in the rerun.
+- **A wind calibrator test was added at no cost in fits.** The CEDA-trained model also scores a frame
+  holding Open-Meteo's speed rescaled to CEDA's level (each site's median CEDA-to-Open-Meteo speed
+  ratio at lead-0 instants, learned on the training folds). All 78 fit-sets and the CPU refit
+  were rerun from one build, so every output comes from one run.
+- **New report rows,** all exploratory: each planned contrast by CEDA lead (0 to 5) and for the
+  era-0 sensitivity, an "era 0, lead 0 only" scope, "without 2025-01", each arm's absolute error and
+  mean signed error on the planned scope, and the setting names `primary` and `second`.
+- **The two settings of the model are named `primary` and `second`,** replacing the earlier names.

@@ -182,6 +182,7 @@ def _wind_rows_for(*, n_months: int = 23) -> pl.DataFrame:
                     "ukv_ceda_sin_10m": 0.1,
                     "ukv_ceda_cos_10m": 0.9,
                     "om_speed_10m": 50.0 + index + day / 100.0,
+                    "om_speed_10m_rescaled": 5.0 + index + day / 100.0,
                     "om_sin_10m": 0.2,
                     "om_cos_10m": 0.8,
                     "hour_of_day": 12,
@@ -239,13 +240,25 @@ def _open_meteo_for(*, base: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def _wind_model_free(*, base: pl.DataFrame) -> pl.DataFrame:
+    """Lead-0 instants at the base rows' hours, with Open-Meteo 3% below CEDA's speed."""
+    return base.select(
+        "site",
+        "month",
+        lead_hours=pl.lit(0),
+        om_wind_step=pl.lit(value=False),
+        ceda_speed_10m_m_s=pl.col("ukv_ceda_speed_10m"),
+        om_speed_10m_m_s=pl.col("ukv_ceda_speed_10m") * 0.97,
+    )
+
+
 def test_each_archives_control_columns_get_their_own_permutation():
     base = _wind_base()
     # Identical values in both archives: a shared permutation would shuffle them identically, and
     # the control would then differ by zero by construction.
     open_meteo = _open_meteo_for(base=base)
 
-    rows = build.wind_rows(base=base, open_meteo=open_meteo)
+    rows = build.wind_rows(base=base, open_meteo=open_meteo, model_free=_wind_model_free(base=base))
 
     ceda = rows["ukv_ceda_speed_10m_shuffled"].to_list()
     om = rows["om_speed_10m_shuffled"].to_list()
@@ -261,10 +274,14 @@ def test_the_wind_rows_drop_hours_with_a_null_open_meteo_direction_and_carry_two
         .otherwise(pl.col("om_direction_10m_deg"))
     )
 
-    rows = build.wind_rows(base=base, open_meteo=open_meteo)
+    rows = build.wind_rows(base=base, open_meteo=open_meteo, model_free=_wind_model_free(base=base))
 
-    assert rows.height == base.height - 1
+    # One null direction, the two days of 2024-11 inside the first step span (the month keeps its
+    # other hours, being under the loss limit), and all of 2025-02, which the second span empties.
+    assert rows.height == base.height - 1 - 2 - 8
     assert base["time"][0] not in rows["time"].to_list()
+    assert "2025-02" not in rows["month"].to_list()
+    assert "2024-11" in rows["month"].to_list()
     assert sorted(rows["era_code"].unique().to_list()) == [0, 1]
     assert rows.filter(pl.col("month") >= "2026-02")["era_code"].min() == 1
 
@@ -549,6 +566,7 @@ def test_the_transfer_run_scores_one_ceda_trained_model_on_every_frame(
         "ceda_wind_10m",
         "ceda_wind_10m_scored_on_om",
         "ceda_wind_10m_scored_on_om_direction",
+        "ceda_wind_10m_scored_on_om_speed_rescaled",
     }
 
     def mean_error(arm: str) -> float:
@@ -658,7 +676,7 @@ def test_a_solar_contrast_is_planned_only_on_era_0_and_other_scopes_carry_the_er
     planned = {r["scope"] for r in p2 if r["planned"]}
     assert planned == {"era 0"}
     assert all(r["note"] == "" for r in p2 if r["scope"] == "era 0")
-    assert all(r["note"] == note for r in p2 if r["scope"] != "era 0")
+    assert all(r["note"] == note for r in p2 if r["scope"] not in fit.ERA_0_SCOPES)
     # The era-1 months differ by 0.5 per row, so the exploratory era-1 row sees a large difference
     # while the planned era-0 row sees none.
     era_0 = next(r for r in p2 if r["scope"] == "era 0" and r["setting"] == fit.PRIMARY_SETTING)
@@ -721,12 +739,12 @@ def test_a_solar_verdict_stands_only_if_the_all_rows_and_era_0_fits_agree():
     assert all(r["planned"] for r in sensitivity)
 
 
-def test_the_era_0_sensitivity_is_read_on_all_its_rows_only():
+def test_the_era_0_sensitivity_is_read_on_all_its_rows_and_at_each_lead_only():
     losses = _contrast_losses().filter(pl.col("month") < "2026-02")
 
     scopes = [name for name, _ in fit.scopes_of(losses=losses, domain="solar_era0")]
 
-    assert scopes == ["all"]
+    assert scopes == ["all", *(f"lead {lead} only" for lead in range(6))]
 
 
 def _scope_height(*, losses: pl.DataFrame, name: str) -> int:
@@ -916,3 +934,263 @@ def test_the_elevation_ratio_bins_the_sun_and_keeps_the_rows_without_a_light_cut
     assert table["rebuilt_ratio"].to_list() == pytest.approx([0.0, 0.7, 0.9, 1.0, 1.0, 1.0])
     # The zero-irradiance row is left out, and a row exactly at an edge belongs to the lower bin.
     assert table["n"].to_list() == [2, 1, 1, 1, 1, 1]
+
+
+# --- the wind step spans, the speed rescale, and the by-lead and signed-error tables --------------
+
+
+def test_the_step_spans_include_both_end_days_and_nothing_beside_them():
+    times = [
+        datetime(2024, 11, 6, 23, tzinfo=UTC),
+        datetime(2024, 11, 7, 0, tzinfo=UTC),
+        datetime(2024, 11, 30, 23, tzinfo=UTC),
+        datetime(2024, 12, 1, 0, tzinfo=UTC),
+        datetime(2025, 1, 16, 0, tzinfo=UTC),
+        datetime(2025, 2, 18, 23, tzinfo=UTC),
+        datetime(2025, 2, 19, 0, tzinfo=UTC),
+    ]
+
+    flags = pl.DataFrame({"time": times}).select(step=build.in_wind_step_days())
+
+    assert flags["step"].to_list() == [False, True, True, False, True, True, False]
+
+
+def test_a_month_losing_over_a_quarter_of_its_rows_to_the_step_spans_is_dropped_whole():
+    days = [datetime(2024, 11, day, 12, tzinfo=UTC) for day in range(1, 31)]
+    december = [datetime(2024, 12, day, 12, tzinfo=UTC) for day in (1, 8, 15, 22)]
+    base = pl.DataFrame({"time": [*days, *december], "month": ["2024-11"] * 30 + ["2024-12"] * 4})
+
+    months = build.wind_step_months(base=base)
+
+    # 24 of November's 30 days lie in the first span, and none of December's rows do.
+    assert months == {"2024-11": pytest.approx(24 / 30)}
+
+
+def _rescale_inputs() -> tuple[pl.DataFrame, pl.DataFrame]:
+    months = ["2025-03", "2025-04", "2025-05"]
+    frame = pl.DataFrame(
+        {"site": "W1", "month": months, "fold": [0, 1, 2], "om_speed_10m": [10.0, 10.0, 10.0]}
+    )
+    # CEDA over Open-Meteo is 1.1, 1.2, and 1.3 at lead-0 instants of the three months. A lead-3
+    # instant at 9.0 and a calm instant must not count.
+    model_free = pl.DataFrame(
+        {
+            "site": "W1",
+            "month": [*months, "2025-03", "2025-04", "2025-03"],
+            "lead_hours": [0, 0, 0, 3, 0, 0],
+            "om_wind_step": False,
+            "ceda_speed_10m_m_s": [11.0, 12.0, 13.0, 90.0, 0.5, 11.0],
+            "om_speed_10m_m_s": [10.0, 10.0, 10.0, 10.0, 0.1, 10.0],
+        }
+    )
+    return frame, model_free
+
+
+def test_the_speed_rescale_uses_the_median_lead_zero_ratio_of_the_other_folds_only():
+    frame, model_free = _rescale_inputs()
+
+    result = build.with_rescaled_speed(frame=frame, model_free=model_free)
+
+    # Fold 0 learns from months 2 and 3 (ratios 1.2 and 1.3, median 1.25), fold 1 from months 1 and
+    # 3 (1.1 twice in month 1 and 1.3 in month 3, median 1.1), and fold 2 from months 1 and 2 (1.1
+    # twice and 1.2, median 1.1). A row's own month
+    # never enters its scale, and the lead-3 and calm instants are left out.
+    assert result["om_speed_10m_rescaled"].to_list() == pytest.approx([12.5, 11.0, 11.0])
+
+
+def test_the_speed_rescale_ignores_instants_inside_a_step_span():
+    frame, model_free = _rescale_inputs()
+    stepped = model_free.with_columns(om_wind_step=pl.col("ceda_speed_10m_m_s") == 13.0)
+
+    result = build.with_rescaled_speed(frame=frame, model_free=stepped)
+
+    # Month 3's instant is in a span, so fold 0 learns from month 2 alone and fold 1 from month 1.
+    assert result["om_speed_10m_rescaled"].to_list()[:2] == pytest.approx([12.0, 11.0])
+
+
+def test_the_settings_are_named_primary_and_second():
+    assert (fit.PRIMARY_SETTING, fit.SECOND_SETTING) == ("primary", "second")
+
+
+def test_every_ceda_lead_has_a_scope_over_all_rows_and_over_era_0():
+    losses = pl.DataFrame(
+        {
+            "time": [datetime(2025, 6, 1, h, tzinfo=UTC) for h in range(6)]
+            + [datetime(2026, 3, 1, h, tzinfo=UTC) for h in range(6)],
+            "month": ["2025-06"] * 6 + ["2026-03"] * 6,
+            "site": "A",
+        }
+    )
+
+    scopes = dict(fit.scopes_of(losses=losses))
+
+    for lead in range(6):
+        everywhere = scopes[f"lead {lead} only"]
+        era_0 = scopes[f"era 0, lead {lead} only"]
+        assert everywhere is not None
+        assert era_0 is not None
+        assert losses.filter(everywhere)["time"].dt.hour().to_list() == [lead, lead]
+        assert losses.filter(era_0).height == 1
+    without = scopes["without 2025-01"]
+    assert without is not None
+    assert losses.filter(without).height == 12
+    january = losses.with_columns(month=pl.lit("2025-01"))
+    january_scope = dict(fit.scopes_of(losses=january))["without 2025-01"]
+    assert january_scope is not None
+    assert january.filter(january_scope).is_empty()
+
+
+def test_the_mean_signed_error_is_prediction_minus_measured_over_capacity():
+    losses = pl.DataFrame(
+        {
+            "arm": "a",
+            "setting": fit.PRIMARY_SETTING,
+            "signed_error_capped_mw": [-1.0, -3.0],
+            "effective_capacity_mw": [10.0, 20.0],
+        }
+    )
+
+    value = fit.mean_signed_error_pp(losses=losses, arm="a", setting=fit.PRIMARY_SETTING)
+
+    # (-0.1 + -0.15) / 2 = -0.125 of capacity, so an under-prediction of 12.5 points.
+    assert value == pytest.approx(-12.5)
+
+
+def test_the_planned_scope_losses_cut_the_solar_fit_on_both_eras_to_era_0_and_leave_the_rest():
+    losses = _contrast_losses()
+
+    solar = fit.planned_scope_losses(domain="solar", losses=losses)
+    era_0 = fit.planned_scope_losses(domain="solar_era0", losses=losses)
+    wind = fit.planned_scope_losses(domain="wind", losses=losses)
+
+    assert max(solar["month"].to_list()) < "2026-02"
+    assert era_0.height == losses.height
+    assert wind.height == losses.height
+
+
+def test_an_unresolved_verdict_prints_its_bound_and_the_default_wording():
+    # The transfer penalty is a clear penalty at the primary setting and none at the second, so the
+    # two settings disagree and the verdict is unresolved.
+    losses = _contrast_losses().with_columns(
+        pl.when(
+            (pl.col("arm") == "ceda_ghi_temp_scored_on_om")
+            & (pl.col("setting") == fit.PRIMARY_SETTING)
+        )
+        .then(pl.col(fit.METRIC) + 0.01)
+        .otherwise(pl.col(fit.METRIC))
+        .alias(fit.METRIC)
+    )
+    records = fit.domain_records(domain="solar", losses=losses)
+    records += fit.domain_records(
+        domain="solar_era0", losses=losses.filter(pl.col("month") < "2026-02")
+    )
+    found = [v for v in fit.verdicts(records=records) if v.label == "P3"]
+
+    text = fit.decision_text(found=found)
+
+    assert found[0].reading == "unresolved"
+    assert "default for an unresolved reading" in text
+    assert "The largest upper bound" in text
+    assert fit.verdict_bound(verdict=found[0]) == pytest.approx(1.0)
+    penalty = fit.decision_text(found=[v for v in fit.verdicts(records=records) if v.label == "P2"])
+    assert "The largest upper bound" not in penalty
+
+
+def test_the_scoring_frame_of_the_wind_calibrator_swaps_in_the_rescaled_speed():
+    rows = _wind_rows_for()
+
+    frames = fit.scoring_frames(site_rows=rows, domain="wind")
+
+    speed = build.wind_columns(archive="ceda")[0]
+    assert frames["om_speed_rescaled"][speed].to_list() == rows["om_speed_10m_rescaled"].to_list()
+    # The direction columns stay Open-Meteo's.
+    assert frames["om_speed_rescaled"][build.wind_columns(archive="ceda")[1]].to_list() == (
+        rows["om_sin_10m"].to_list()
+    )
+
+
+def test_a_split_with_no_interval_prints_a_label_not_nan():
+    assert compare._interval(lower=float("nan"), upper=float("nan"), sign=True) == "(no interval)"
+    assert compare._interval(lower=-0.1, upper=0.25, sign=True) == "[-0.100, +0.250]"
+
+
+def test_wind_speed_excludes_the_step_spans_and_the_step_variable_keeps_only_them():
+    frame = pl.DataFrame(
+        {
+            "ceda_speed_10m_m_s": [5.0, 5.0, 5.0],
+            "om_speed_10m_m_s": [5.0, 5.2, 4.8],
+            "om_wind_step": [False, True, False],
+        }
+    )
+    speed = next(v for v in compare.VARIABLES if v.name == "10 m wind speed")
+    inside = next(v for v in compare.VARIABLES if "step spans" in v.name)
+
+    assert compare.with_difference(frame=frame, variable=speed).height == 2
+    assert compare.with_difference(frame=frame, variable=inside)["difference"].to_list() == (
+        pytest.approx([-0.2])
+    )
+
+
+def test_wind_direction_leaves_out_calm_hours():
+    frame = pl.DataFrame(
+        {
+            "ceda_speed_10m_m_s": [1.0, 3.0],
+            "ceda_direction_10m_deg": [10.0, 10.0],
+            "om_direction_10m_deg": [200.0, 12.0],
+            "om_wind_step": False,
+        }
+    )
+    direction = next(v for v in compare.VARIABLES if v.name.startswith("10 m wind direction"))
+
+    rows = compare.with_difference(frame=frame, variable=direction)
+
+    assert rows["difference"].to_list() == [-2.0]
+
+
+def test_the_lead_zero_levels_are_the_means_both_archives_hold_at_lead_zero():
+    frame = pl.DataFrame(
+        {
+            "lead_hours": [0, 0, 3],
+            "ceda_temp_c": [10.0, 12.0, 99.0],
+            "om_temp_c": [9.0, 11.0, 0.0],
+            "om_wind_step": False,
+        }
+    )
+
+    levels = compare.lead_zero_levels(frame=frame)
+
+    assert levels["air temperature"] == pytest.approx((11.0, 10.0))
+
+
+def test_the_by_lead_table_prints_each_lead_of_a_contrast_and_a_dash_where_one_is_missing():
+    losses = _contrast_losses().with_columns(
+        time=pl.col("time").dt.replace(hour=15)  # CEDA lead 3 only
+    )
+    records = fit.domain_records(domain="solar", losses=losses)
+
+    lines = fit.by_lead_lines(records=records)
+
+    row = next(line for line in lines if line.startswith("| P2, ceda_ghi_temp | solar | primary"))
+    cells = [cell.strip() for cell in row.strip("|").split("|")[3:]]
+    assert len(cells) == 6
+    assert cells[3].startswith("+0.000 [")
+    assert [cells[i] for i in (0, 1, 2, 4, 5)] == ["-"] * 5
+
+
+def test_the_hours_outside_a_span_of_a_dropped_month_are_dropped_with_the_month():
+    base = _wind_base()
+    # 2025-02-20 lies after the second span ends, but the span empties 2025-02 (days 1 to 8 of the
+    # base are inside it), so the month goes whole, and a row on day 20 goes with it.
+    extra = base.filter(pl.col("time") == datetime(2025, 2, 8, 12, tzinfo=UTC)).with_columns(
+        time=pl.lit(datetime(2025, 2, 20, 12, tzinfo=UTC))
+    )
+    with_day_20 = pl.concat([base, extra]).sort("site", "time")
+
+    rows = build.wind_rows(
+        base=with_day_20,
+        open_meteo=_open_meteo_for(base=with_day_20),
+        model_free=_wind_model_free(base=with_day_20),
+    )
+
+    assert "2025-02" not in rows["month"].to_list()
+    assert datetime(2025, 2, 20, 12, tzinfo=UTC) not in rows["time"].to_list()
