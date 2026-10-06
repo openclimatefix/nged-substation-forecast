@@ -50,7 +50,8 @@ history, historical features, and disaggregation, and each reads one weather pro
   archive's lead, and it does not shrink when both XGBoost models read 10 m wind alone. At four Met
   Office stations the archived UKV's temperature is 0.124 K closer than ERA5's, so the planned rule
   gives UKV, but the advantage falls from 0.250 K at lead 0 to 0.035 K at lead 5, and at six solar
-  farms the choice of temperature moves power error by no more than 0.009 points.
+  farms the choice of temperature moves power error by no more than 0.009 points (95% interval,
+  whole row set).
 
 **The [Methods page](methods.md) states what the studies share.** The Methods page holds the
 row sets and their site-hours, the capacity normalisation, the month-block folds, the bootstrap

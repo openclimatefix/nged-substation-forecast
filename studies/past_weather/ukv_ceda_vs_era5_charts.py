@@ -12,13 +12,16 @@ Nothing is bootstrapped or refitted here.
   95% interval, grouped by variable and window. Each row's label carries both products' absolute
   error. The margin is drawn as a band, and the second hyperparameter setting of P3 and P4 as a
   hollow triangle.
-- **Figure 2.** Set A by calendar year, half-year, station, and UKV-CEDA lead (exploratory, except
-  the planned P2-lead rows).
-- **Figure 3.** Set B by calendar year and half-year (exploratory splits of P3 and P4).
-- **Figure 4.** The controls and checks of set B (exploratory).
-- **Figures 5 and 6.** Out-of-fold power against measured for every generator, in three weeks chosen
-  by a stated rule: the week of highest mean output, the week of the largest hour-to-hour spread,
-  and the week of lowest mean output.
+- **Figures 2 and 3.** Out-of-fold power against measured for every generator (wind in Figure 2,
+  solar in Figure 3), in three weeks chosen by a stated rule: the week of highest mean output, the
+  week of the largest hour-to-hour spread, and the week of lowest mean output.
+- **Figure 4.** Every arm's mean absolute error, with its 95% interval.
+- **Figure 5.** Set B by calendar year, half-year, and generator (exploratory splits of P3 and P4).
+- **Figure 6.** P3 by UKV-CEDA lead, by window and era, and the matched 10 m pair by lead.
+- **Figure 7.** Set A by single UKV-CEDA lead (post hoc).
+- **Figure 8.** Set A by calendar year, half-year, and station (exploratory).
+- **Figure 9.** The controls and checks of set B (exploratory).
+- **Figure 10.** The monthly means of UKV-CEDA and ERA5 against the stations.
 
 Generators appear only as A to F and W1 to W3, and stations as S1 upwards.
 
@@ -44,7 +47,9 @@ from ukv_ceda_station_scores import REPORT_NAME as STATION_REPORT_NAME
 from ukv_ceda_vs_era5_build import OUTPUT_DIR
 from ukv_ceda_vs_era5_fit import INTERVALS_NAME, PRIMARY_SETTING, REPORT_NAME, SECOND_SETTING
 
-ASSETS_DIR: Final[Path] = Path(__file__).resolve().parents[2] / "docs" / "studies" / "assets"
+ASSETS_DIR: Final[Path] = (
+    Path(__file__).resolve().parents[2] / "docs" / "studies" / "assets" / "ukv_ceda_vs_era5"
+)
 """Where the published figures go."""
 
 CAPACITY_UNIT: Final[str] = "points of capacity"
@@ -298,6 +303,7 @@ def _figure(
     x_title: str | None = None,
     zero_label: str = "same as ERA5",
     better_label: str = "better than ERA5",
+    planning_note: str | None = None,
 ) -> alt.VConcatChart:
     kind = planning(rows=list(panels.values()))
     drawn = [
@@ -317,6 +323,7 @@ def _figure(
         title=title,
         subtitle=subtitle,
         figure_planning=kind,
+        planning_note=planning_note,
     )
 
 
@@ -398,7 +405,7 @@ def headline_figure(
 
 
 def station_lead_figure(*, set_a: Sequence[dict[str, Any]]) -> FigureRows:
-    """Draw Figure 5: set A by single UKV-CEDA lead.
+    """Draw Figure 7: set A by single UKV-CEDA lead.
 
     Args:
         set_a: Set A's interval records.
@@ -420,15 +427,13 @@ def station_lead_figure(*, set_a: Sequence[dict[str, Any]]) -> FigureRows:
     chart = _figure(
         panels=panels,
         units=units,
-        number=5,
+        number=7,
         title="UKV-CEDA's advantage at the four stations shrinks as the lead grows",
         subtitle=[
             KEY_SUBTITLE,
-            (
-                "A lead is the UTC hour modulo 6, so a lead is also an hour of day. All rows are "
-                "post hoc."
-            ),
+            "A lead is the UTC hour modulo 6, so a lead is also an hour of day.",
         ],
+        planning_note="All rows are post hoc.",
     )
     return chart, list(panels.values())
 
@@ -478,14 +483,10 @@ def wind_lead_figure(*, set_b: Sequence[dict[str, Any]]) -> FigureRows:
         title=(
             "ERA5's wind-power advantage grows with UKV-CEDA's lead, and holds with 10 m wind alone"
         ),
-        subtitle=[
-            KEY_SUBTITLE,
-            (
-                "Lead is also hour of day. Planned: P3 on all hours and P3's early and late "
-                "windows. "
-                "Every other row is post hoc."
-            ),
-        ],
+        subtitle=[KEY_SUBTITLE, "Lead is also hour of day."],
+        planning_note=(
+            "Planned: P3 on all hours and P3's early and late windows. Every other row is post hoc."
+        ),
     )
     return chart, list(panels.values())
 
@@ -493,7 +494,7 @@ def wind_lead_figure(*, set_b: Sequence[dict[str, Any]]) -> FigureRows:
 def splits_figures(
     *, set_a: Sequence[dict[str, Any]], set_b: Sequence[dict[str, Any]]
 ) -> dict[str, FigureRows]:
-    """Draw Figures 7 and 8: the station splits and the power splits.
+    """Draw Figures 8 and 5: the station splits and the power splits.
 
     Args:
         set_a: Set A's interval records.
@@ -565,11 +566,11 @@ def splits_figures(
         with_second=True,
     )
     return {
-        "fig07_stations": (
+        "fig08_stations": (
             _figure(
                 panels=set_a_panels,
                 units=set_a_units,
-                number=7,
+                number=8,
                 title=(
                     "UKV-CEDA is closer than ERA5 at three of four stations, and no one station "
                     "decides the sign"
@@ -578,11 +579,11 @@ def splits_figures(
             ),
             list(set_a_panels.values()),
         ),
-        "fig08_power_splits": (
+        "fig05_power_splits": (
             _figure(
                 panels=set_b_panels,
                 units=_units(names=list(set_b_panels), unit=CAPACITY_UNIT),
-                number=8,
+                number=5,
                 title=(
                     "ERA5's wind-power advantage is concentrated in October to March and at one of "
                     "three farms"
@@ -672,7 +673,7 @@ def controls_figure(*, set_b: Sequence[dict[str, Any]]) -> FigureRows:
             (
                 "Each dot is the first arm's mean absolute error minus the second's, named in the "
                 "row label, and each line is a 95% interval from resampling whole calendar "
-                "months. All rows are exploratory and have no margin."
+                "months. No row has a margin."
             ),
             (
                 "The control shuffles each product's weather within a generator, month, and hour "
@@ -697,7 +698,7 @@ def interval_figures(
     """
     return {
         "fig01_headline": headline_figure(set_a=set_a, set_b=set_b),
-        "fig05_station_leads": station_lead_figure(set_a=set_a),
+        "fig07_station_leads": station_lead_figure(set_a=set_a),
         "fig06_wind_leads": wind_lead_figure(set_b=set_b),
         **splits_figures(set_a=set_a, set_b=set_b),
         "fig09_controls": controls_figure(set_b=set_b),
@@ -817,13 +818,12 @@ def absolute_figure(*, errors: pl.DataFrame) -> alt.VConcatChart:
                     "about 12 points more than one given the real weather",
                     width=72,
                 ),
-                subtitle=[
-                    (
-                        "Dot: mean absolute error at the primary setting. Line: 95% interval from "
-                        "resampling whole calendar months and a fitting seed. Smaller is better. "
-                        "Rows are scored on the same hours within each panel."
-                    ),
-                ],
+                subtitle=wrapped(
+                    text="Dot: mean absolute error at the primary setting. Line: 95% interval from "
+                    "resampling whole calendar months and a fitting seed. Smaller is better. "
+                    "Rows are scored on the same hours within each panel.",
+                    width=90,
+                ),
                 anchor="start",
                 offset=24,
             )
@@ -882,13 +882,15 @@ def steps_figure(*, steps: pl.DataFrame) -> alt.VConcatChart:
                     width=72,
                 ),
                 subtitle=[
-                    (
-                        "Monthly means at the stations with values in every month. Post hoc and "
-                        "exploratory: no threshold was set before the series was seen."
+                    *wrapped(
+                        text="Monthly means at the stations with values in every month. Post hoc "
+                        "and exploratory: no threshold was set before the series was seen.",
+                        width=90,
                     ),
-                    (
-                        "Contains Met Office UKV data from CEDA (CC BY-NC-SA 4.0), Met Office "
-                        "(2016): NWP-UKV, Centre for Environmental Data Analysis."
+                    *wrapped(
+                        text="Contains Met Office UKV data from CEDA (CC BY-NC-SA 4.0), Met Office "
+                        "(2016): NWP-UKV, Centre for Environmental Data Analysis.",
+                        width=90,
                     ),
                 ],
                 anchor="start",

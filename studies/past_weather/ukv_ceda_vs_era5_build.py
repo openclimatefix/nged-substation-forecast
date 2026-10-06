@@ -1501,6 +1501,25 @@ Private: this folder holds per-generator and per-station values and is never pub
   setting, and the hash of the rows, jobs, seeds and settings.
 - `intervals.parquet`, `report.md`, `decision.md` (`ukv_ceda_vs_era5_fit.py`): set B intervals for
   every scope, every table the page quotes, and the decision rule applied.
+- `wind_rows_matched_10m.parquet` (`ukv_ceda_vs_era5_build.py --matched-10m`) and
+  `wind_rows_hour_starting.parquet` (`--hour-starting`): the wind rows with ERA5's 10 m direction,
+  and the wind rows with the power of the hour that starts at each label.
+- `losses_wind_matched`, `losses_wind_hour_starting`, `losses_wind_lead0`, `losses_wind_leads01`,
+  `losses_solar_lead0`, `losses_solar_leads01`, `losses_wind_keep_zero` and `losses_cpu_refit`, each
+  as `.parquet` and `.fingerprint` (`ukv_ceda_vs_era5_fit.py`): the losses of the matched 10 m
+  pair, the hour-starting power target, the analysis-only refits on the first leads, the
+  keep-zero-hours block, and the CPU refit that sets the noise floor.
+- `fit_stamp.json`, `fit_stamp_matched.json`, `fit_stamp_hour_starting.json` and
+  `fit_stamp_lead_restricted.json` (`ukv_ceda_vs_era5_fit.py`): the hardware and library versions
+  of each fit run.
+- `verify_failed.md` (`ukv_ceda_vs_era5_verify.py`): written instead of `verify.md` when a check
+  fails.
+- `monthly_steps.parquet` and `monthly_steps.svg` (`ukv_ceda_vs_era5_verify.py`): the monthly means
+  behind Figure 10.
+- `chart_weeks.md` (`ukv_ceda_vs_era5_charts.py`): the month and year of each week that Figures 2
+  and 3 draw, which the figures omit.
+- `superseded/`: earlier outputs, moved here before a re-run, because each script refuses to
+  overwrite.
 """
 
 

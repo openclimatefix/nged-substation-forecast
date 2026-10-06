@@ -416,19 +416,6 @@ def cpu_refit_jobs() -> list[Job]:
     ]
 
 
-def fit_set_count(*, jobs: Sequence[Job], n_sites: int) -> int:
-    """Count the fit-sets: one per job and generator, each fitting five folds at three seeds.
-
-    Args:
-        jobs: The jobs.
-        n_sites: The number of generators.
-
-    Returns:
-        The count.
-    """
-    return len(jobs) * n_sites
-
-
 # --- Fitting --------------------------------------------------------------------------------------
 
 
@@ -1405,11 +1392,12 @@ def farm_lines(*, records: Sequence[IntervalRecord]) -> list[str]:
     ]
 
 
-def veto_lines(*, records: Sequence[IntervalRecord]) -> list[str]:
+def veto_lines(*, records: Sequence[IntervalRecord], n_farms: int) -> list[str]:
     """Show that the P4 veto could not have fired, and what P4's bound says instead.
 
     Args:
         records: Every interval record of set B.
+        n_farms: The number of solar farms.
 
     Returns:
         Markdown lines.
@@ -1441,8 +1429,8 @@ def veto_lines(*, records: Sequence[IntervalRecord]) -> list[str]:
             "value of ERA5's temperature."
         ),
         (
-            "- P4's information is its bound: on these 6 solar farms the choice of temperature "
-            "product moves the error by no more than "
+            f"- P4's information is its bound: on these {n_farms} solar farms the choice of "
+            "temperature product moves the error by no more than "
             f"{max(abs(b[k]) for b in bounds for k in ('lower_95_pp', 'upper_95_pp')):.3f} points "
             "at either setting."
         ),
@@ -1537,26 +1525,34 @@ def costs_lines(
     ]
 
 
-DEVIATIONS: Final[tuple[str, ...]] = (
-    (
-        "The 25% monthly-loss guard failed for five months, which are dropped from every arm and "
-        "every set. The maintainer's delegate decided this after the implementer had seen the set "
-        "A tables in memory."
-    ),
-    "The plan's re-check of the 65 unlisted days and the partial runs against CEDA was not done.",
-    "A keep-zero-hours block (all months, not only the early window) was added.",
-    "The wind row set is the intersection of the centred and the hour-ending power targets.",
-    (
-        "The search for the Met Office's PS44 was not repeated. The repository's roadmap records "
-        "that none was found."
-    ),
-    (
-        "Post hoc rows were added after the first results: each single UKV-CEDA lead and "
-        "leave-one-station-out in set A; the lead, published-window, and era splits of P3; and a "
-        "matched-height pair of wind arms (each product's 10 m wind alone)."
-    ),
-)
-"""The plan's departures, printed into the report."""
+def deviation_lines(*, n_dropped_months: int) -> list[str]:
+    """List the plan's departures, for the report.
+
+    Args:
+        n_dropped_months: The number of months the 25% guard dropped, from `build.json`.
+
+    Returns:
+        One line per departure.
+    """
+    return [
+        (
+            f"The 25% monthly-loss guard failed for {n_dropped_months} months, which are dropped "
+            "from every arm and every set. The maintainer's delegate decided this after the "
+            "implementer had seen the set A tables in memory."
+        ),
+        "The plan's re-check of the unlisted days and the partial runs against CEDA was not done.",
+        "A keep-zero-hours block (all months, not only the early window) was added.",
+        "The wind row set is the intersection of the centred and the hour-ending power targets.",
+        (
+            "The search for the Met Office's PS44 was not repeated. The repository's roadmap "
+            "records that none was found."
+        ),
+        (
+            "Post hoc rows were added after the first results: each single UKV-CEDA lead and "
+            "leave-one-station-out in set A; the lead, published-window, and era splits of P3; "
+            "and a matched-height pair of wind arms (each product's 10 m wind alone)."
+        ),
+    ]
 
 
 def report_text(
@@ -1667,7 +1663,7 @@ def report_text(
         *farm_lines(records=records),
         "",
     ]
-    lines += [*veto_lines(records=records), ""]
+    lines += [*veto_lines(records=records, n_farms=frames["solar"]["site"].n_unique()), ""]
     lines += [*station_lead_lines(set_a=set_a), ""]
     lines += [*costs_lines(build_stamp=build_stamp, frames=frames), ""]
     splits = [
@@ -1680,6 +1676,8 @@ def report_text(
         for r in splits
         if r["enough_months"] and (r["lower_95_pp"] > 0.0 or r["upper_95_pp"] < 0.0)
     ]
+    n_matched = sum(r["domain"] == "wind_matched" for r in significant)
+    n_hour = sum(r["domain"] != "wind_matched" and r["kind"] == "hour" for r in significant)
     controls_primary = [r for r in controls if r["setting"] == PRIMARY_SETTING]
     significant_controls = [r for r in controls_primary if r["reading"] == "significant"]
     lines += [
@@ -1687,17 +1685,18 @@ def report_text(
         "",
         (
             f"- {len(significant)} of {len(splits)} exploratory and post hoc splits of the "
-            "contrasts of UKV-CEDA against ERA5 (by year, half-year, generator, lead, window, and "
-            "era) at the primary setting are statistically significant at the 5% level. A row with "
-            "no real effect behind it has a nominal 5% chance of reaching that level, the number "
-            "of rows with no real effect is unknown, and the rows share their months, so "
-            "spurious results cluster. The page does not correct for multiple comparisons."
+            "contrasts of UKV-CEDA against ERA5 (by year, half-year, generator, lead, UTC hour, "
+            "window, era, and with one generator or station left out) at the primary setting are "
+            "statistically significant at the 5% level. A row with no real effect behind it has a "
+            "nominal 5% chance of reaching that level, the number of rows with no real effect is "
+            "unknown, and the rows share their months, so spurious results cluster. The page does "
+            "not correct for multiple comparisons."
         ),
         (
-            f"- Of those, {sum(r['domain'] == 'wind_matched' for r in significant)} come from the "
-            "matched 10 m pair and "
-            f"{sum(r['kind'] == 'hour' for r in significant)} are splits by UTC hour, so the "
-            "statistically significant splits are not that many independent findings."
+            f"- Of those, {n_matched} come from the matched 10 m pair, a further {n_hour} are "
+            "splits of the other contrasts by UTC hour, and the remaining "
+            f"{len(significant) - n_matched - n_hour} are other splits, so the statistically "
+            "significant splits are not that many independent findings."
         ),
         (
             f"- Separately, {len(significant_controls)} of {len(controls_primary)} controls and "
@@ -1707,7 +1706,10 @@ def report_text(
         "",
         "#### Departures from the plan",
         "",
-        *(f"- {line}" for line in DEVIATIONS),
+        *(
+            f"- {line}"
+            for line in deviation_lines(n_dropped_months=len(build_stamp["dropped_months"]))
+        ),
     ]
     return "\n".join(lines) + "\n"
 
@@ -1742,19 +1744,19 @@ def dry_run_lines(*, frames: Mapping[DomainType, pl.DataFrame]) -> list[str]:
     for domain, frame in frames.items():
         n_sites = frame["site"].n_unique()
         jobs = domain_jobs(domain=domain)
-        total += fit_set_count(jobs=jobs, n_sites=n_sites)
+        total += len(jobs) * n_sites
         lines += [f"{domain}: {len(jobs)} jobs on {n_sites} generators"]
         lines += [
             f"- {arm} / {setting} / target {target} / {len(columns)} columns"
             for arm, setting, target, columns, _, _ in jobs
         ]
     cpu = cpu_refit_jobs()
-    n_wind = frames["wind"]["site"].n_unique()
+    cpu_fit_sets = len(cpu) * frames["wind"]["site"].n_unique()
     lines += [
-        f"CPU refit: {CPU_REFIT_ARM}, {fit_set_count(jobs=cpu, n_sites=n_wind)} fit-sets.",
+        f"CPU refit: {CPU_REFIT_ARM}, {cpu_fit_sets} fit-sets.",
         (
-            f"Fit-sets: {total} on the GPU, plus {fit_set_count(jobs=cpu, n_sites=n_wind)} on the "
-            "CPU. Each fits 5 folds at 3 seeds."
+            f"Fit-sets: {total} on the GPU, plus {cpu_fit_sets} on the CPU. "
+            "Each fits 5 folds at 3 seeds."
         ),
     ]
     return lines

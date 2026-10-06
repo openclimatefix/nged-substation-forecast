@@ -67,7 +67,7 @@ the
   both XGBoost models read 10 m wind alone. At four Met Office stations the archived UKV's
   temperature is 0.124 K closer than ERA5's, so the planned rule gives UKV, but the advantage falls
   from 0.250 K at lead 0 to 0.035 K at lead 5, and at six solar farms the choice of temperature
-  moves power error by no more than 0.009 points.
+  moves power error by no more than 0.009 points (95% interval, whole row set).
 
 ## Forecasts
 

@@ -21,21 +21,21 @@ each product's bias, so by the planned rule the study recommends UKV-CEDA for pa
 The advantage falls from 0.250 K at lead 0 to 0.035 K at lead 5 (post hoc). Two explanations fit
 that decay, the stations' readings entering UKV's own data assimilation and ordinary forecast-error
 growth from each 6-hourly run, and the page tests neither. How large the advantage is away from
-those stations, and whether it helps a demand forecast, is untested. The choice between the two
-temperatures moved the power error of an XGBoost model at six solar farms by no more than 0.009
-points of capacity in either direction.
+those stations, and whether it helps a demand forecast, is untested. On the whole row set, the 95%
+interval bounds the change that the choice between the two temperatures makes to the power error of
+an XGBoost model at six solar farms at 0.009 points of capacity in either direction.
 
 ![Figure 1: At four stations UKV-CEDA is closer than ERA5 for wind and temperature, but pooled over
-three wind farms ERA5 gives the lower power error, and the choice does not move solar power]
-(../assets/ukv_ceda_vs_era5/fig01_headline.svg)
+three wind farms ERA5 gives the lower power error, and the choice does not move solar
+power](../assets/ukv_ceda_vs_era5/fig01_headline.svg)
 
 - **Wind history:** the planned rule gives ERA5, not UKV-CEDA's 6-hourly archive, for the 100 m and
   10 m wind that an XGBoost model reads. This is a statement about this archive at these three farms
   and not about UKV.
 - **Temperature history:** the planned rule gives UKV-CEDA, on an advantage of 0.124 K at four
-  stations that falls to 0.035 K at lead 5. No forecast in this study improved with it (solar power
-  moved by no more than 0.009 points, and demand was not tested), and a UKV-CEDA history carries a
-  non-commercial licence, five dropped months, and three physics eras
+  stations that falls to 0.035 K at lead 5. No forecast in this study improved by as much as a
+  planned margin (the solar power interval is within 0.009 points, and demand was not tested), and a
+  UKV-CEDA history carries a non-commercial licence, five dropped months, and three physics eras
   ([Discussion](#discussion-what-to-use)).
 - **Training history from 2019:** the early-years test passes for UKV-CEDA temperature, and era 0 of
   the UKV physics holds only 3 months.
@@ -45,54 +45,6 @@ three wind farms ERA5 gives the lower power error, and the choice does not move 
 > AI model (for this page, Claude Sonnet 5.5, with shared code from earlier Claude Opus 5.5 and
 > Claude Sonnet 5 sessions). Several independent Claude reviewers have checked the method, the
 > evidence, and the prose adversarially.
-
-## Answers to the two questions: UKV-CEDA's first leads alone, and change over the years
-
-**Question 1: if only UKV-CEDA's first leads are used, as if they were an analysis, UKV-CEDA is
-closer than ERA5 at the four stations for temperature and wind speed, and it differs from ERA5 by
-less than the planned margins for wind power and solar power (post hoc).** At the four stations,
-UKV-CEDA minus ERA5 is -0.250 K [-0.263, -0.237] at lead 0 and -0.214 K [-0.226, -0.204] at leads 0
-to 1 for temperature, and -0.213 m/s [-0.231, -0.197] and -0.177 m/s [-0.195, -0.161] for wind
-speed. Those are the stations that UKV probably assimilates. For wind power, the models given each
-product's wind were refitted on the lead-0 rows alone (24,359 rows): P3 is -0.065 points [-0.203,
-+0.069], and at leads 0 to 1 (48,631 rows) it is +0.007 points [-0.107, +0.117]. Scored from the
-models trained on every lead, P3 is -0.058 [-0.192, +0.070] at lead 0 and +0.017 [-0.094, +0.124] at
-leads 0 to 1. At lead 0 the intervals reach about 0.2 points in UKV-CEDA's favour and at most 0.07
-points in ERA5's, so they rule out an ERA5 advantage as large as the 0.16-point margin. They do not
-rule out a UKV-CEDA advantage of that size. At leads 0 to 1 they rule out a gap larger than about
-0.12 points either way. For solar power, the refit on lead-0 rows (20,429 rows) gives -0.007 points
-[-0.017, +0.004] and at leads 0 to 1 (40,897 rows) -0.010 points [-0.020, -0.001], which is
-statistically significant and inside the 0.06-point margin. Lead 0 is 00, 06, 12, and 18 UTC, so
-these rows score those four hours of the day only, and the analysis-only refits ran at the primary
-setting only. A solar hour's temperature averages the instants at both ends of the hour, so a lead-0
-solar row also reads the previous run's lead 5. The study therefore finds a station-temperature and
-station-wind advantage for the analysis-like leads, and no gain in the power forecasts as large as
-the planned margins.
-
-**Question 2: no UKV-CEDA minus ERA5 difference shows a trend over the years that the study can
-attribute to UKV (post hoc).** At the stations, the temperature difference by year runs from -0.098
-K (2020) to -0.158 K (2022) and -0.116 K (2025), with a slope of -0.004 K per year [-0.010, +0.002],
-and the wind-speed difference runs from -0.106 m/s (2020) to -0.184 m/s (2025), with a slope of
--0.012 m/s per year [-0.020, -0.005]. That interval treats months as independent, and neighbouring
-months are correlated. With resampled runs of 6 consecutive months the interval is [-0.019, +0.000],
-and with runs of 12 months [-0.015, +0.002]. By station, the wind slope is -0.026 m/s per year
-[-0.040, -0.011] at S3 and -0.004, -0.003, and -0.004 (none statistically significant) at S1, S2,
-and S4. One station carries the slope, and a station-side change, such as the step the stations
-share around August 2021, fits as well as a change in UKV, so the page reads the wind slope as
-exploratory and fragile and not as a change in UKV. For power, P3 by year runs from +0.176 (2020)
-through -0.004 (2022) to -0.159 (2026), with a slope of -0.040 points per year [-0.088, +0.008].
-Without the 8 months of 2026 that slope is -0.020 [-0.082, +0.037], so half of it comes from 2026.
-P4 has a slope of -0.000 points per year [-0.003, +0.002]. By UKV era, set A has no data from era 2,
-and the temperature difference is -0.144 K (era 0, three months, no interval) and -0.123 K [-0.135,
--0.112] (era 1), the wind-speed difference -0.143 m/s (era 0) and -0.140 m/s [-0.156, -0.124] (era
-1), so the 2019-12-04 physics change shows no visible step. For power, P3 is +0.293 (era 0, no
-interval), +0.154 [+0.057, +0.247] (era 1), and -0.159 [-0.340, +0.045] (era 2), and P4 is -0.016
-(era 0), +0.001 [-0.004, +0.005] (era 1), and -0.016 [-0.051, +0.005] (era 2). The date of PS44 is
-unknown, and no step in UKV-CEDA minus ERA5 appears in the monthly series. Only three eras exist,
-era 0 holds 3 months, and era 2 holds 8 months, 6 of them in April to September, so the eras cannot
-separate a change of UKV from the season. A line smooths a step, and every interval covers
-month-to-month weather only. The early-window and third-era rows quoted later in the page are the
-same kind of evidence.
 
 ## Key findings
 
@@ -116,21 +68,63 @@ pair](#10-m-wind-alone-widens-the-gap)).**
 The planned rule gives UKV-CEDA. The advantage is not shown to help a demand forecast, and
 forecast-error growth could explain the decay.
 
-**For six solar farms the choice of temperature product moves the power error by no more than 0.009
-points ([solar](#solar-power-does-not-depend-on-the-temperature-product)).** The planned veto could
-not have fired.
+**For six solar farms, on the whole row set, the choice of temperature product moves the power error
+by no more than 0.009 points ([solar](#solar-power-does-not-depend-on-the-temperature-product)).**
+The planned veto could not have fired.
 
 **The shuffled-weather controls differ from zero by less than their own noise, and the wind
 control's interval half-width is close to the wind margin
 ([controls](#the-controls-show-no-bias-but-too-much-noise-to-validate-small-differences)).** The
 decision holds under three power-hour conventions, and the size of P3 does not.
 
-**A UKV-CEDA training history has costs: five dropped months, 3.45% of runs missing or partial, a
-6-hourly lead pattern, and three physics eras ([costs](#a-ukv-ceda-history-has-practical-costs)).**
+**A UKV-CEDA training history has costs: five dropped months, 3.45% of runs partial, missing, or
+unlisted, a 6-hourly lead pattern, and three physics eras
+([costs](#a-ukv-ceda-history-has-practical-costs)).**
 
-**In 2026 the wind difference points towards UKV-CEDA at one hyperparameter setting only, in an era
-whose 8 months are mostly April to September ([third
-era](#in-2026-the-wind-difference-points-towards-ukv-ceda-at-one-setting)).**
+**In 2026 the wind difference favours UKV-CEDA at both hyperparameter settings and is statistically
+significant at one only, in an era whose 8 months are mostly April to September ([third
+era](#in-2026-the-wind-difference-favours-ukv-ceda-statistically-significantly-at-one-setting-only)).**
+
+## Answers to the two questions
+
+**The study answers two further questions, both post hoc.** Question 1 is whether UKV-CEDA beats
+ERA5 when only UKV-CEDA's first leads are used, as if they were an analysis. Question 2 is whether
+the difference between UKV-CEDA and ERA5 changes over the years, as a change in UKV's physics would
+make it do.
+
+**Answer 1: at the four stations, UKV-CEDA's first leads are closer than ERA5 for temperature and
+wind speed, and the point estimates for power differ from ERA5's by less than the planned margins.**
+At lead 0 UKV-CEDA minus ERA5 is -0.250 K [-0.263, -0.237] for temperature and -0.213 m/s [-0.231,
+-0.197] for wind speed, and at leads 0 to 1 it is -0.214 K [-0.226, -0.204] and -0.177 m/s [-0.195,
+-0.161]. UKV probably assimilates those stations. For wind power, XGBoost models refitted on the
+lead-0 rows alone (24,359 rows) give P3 -0.065 points [-0.203, +0.069], and on leads 0 to 1 (48,631
+rows) +0.007 [-0.107, +0.117]. At lead 0 the interval reaches about 0.2 points in UKV-CEDA's favour
+and at most 0.07 points in ERA5's. It rules out an ERA5 advantage as large as the 0.16-point margin
+and does not rule out a UKV-CEDA advantage of that size. For solar power the refits give -0.007
+points [-0.017, +0.004] at lead 0 and -0.010 [-0.020, -0.001] at leads 0 to 1, which is
+statistically significant and inside the 0.06-point margin. Lead 0 is 00, 06, 12, and 18 UTC, so
+these rows score four hours of the day, and the analysis-only refits ran at the primary setting
+only. A solar hour's temperature averages the instants at both ends of the hour, so a lead-0 solar
+row also reads the previous run's lead 5.
+
+**Answer 2: no UKV-CEDA minus ERA5 difference shows a trend over the years that the study can
+attribute to UKV.** At the stations, the temperature difference has a slope of -0.004 K per year
+[-0.010, +0.002], and the wind-speed difference -0.012 m/s per year [-0.020, -0.005]. That wind
+interval treats months as independent. With resampled runs of 6 consecutive months it is [-0.019,
++0.000], and with runs of 12 months [-0.015, +0.002]. By station, the wind slope is -0.026 m/s per
+year [-0.040, -0.011] at S3 and -0.004, -0.003, and -0.004 (none statistically significant) at S1,
+S2, and S4. One station carries the slope, and a station-side change, such as the step the stations
+share around August 2021, fits as well as a change in UKV, so the page reads the wind slope as
+exploratory and fragile. For power, the P3 slope is -0.040 points per year [-0.088, +0.008], and
+without the 8 months of 2026 it is -0.020 [-0.082, +0.037], so half of it comes from 2026. The P4
+slope is -0.000 [-0.003, +0.002]. By-year and by-era rows are in [the temperature
+section](#ukv-cedas-temperature-is-closer-at-four-stations-and-less-so-at-longer-leads), [the
+wind-gap sections](#the-wind-gap-grows-with-the-served-lead), and [the 2026
+section](#in-2026-the-wind-difference-favours-ukv-ceda-statistically-significantly-at-one-setting-only).
+The date of PS44 is unknown, and no step in UKV-CEDA minus ERA5 appears in the monthly series. Only
+three eras exist, era 0 holds 3 months, and era 2 holds 8 months, 6 of them in April to September,
+so the eras cannot separate a change of UKV from the season. A line smooths a step, and every
+interval covers month-to-month weather only.
 
 ## Introduction
 
@@ -138,8 +132,9 @@ era](#in-2026-the-wind-difference-points-towards-ukv-ceda-at-one-setting)).**
 temperature from UKV-CEDA or from ERA5.** The main work already takes past irradiance from the CAMS
 satellite retrieval, and this study does not reopen that choice. The other weather variables in the
 main work's configuration (dew point, sea-level pressure, surface pressure, 500 hPa height,
-precipitation type, and windchill) are not scored. No published page compares UKV with ERA5 before
-August 2024, and CEDA's archive starts in September 2019, so the study tests 2019 and 2020 as well.
+precipitation type, and windchill) are not scored. No page on this site compares UKV with ERA5
+before August 2024, and CEDA's archive starts in September 2019, so the study tests 2019 and 2020 as
+well.
 
 | Product | Grid | How read | Served lead |
 |---|---|---|---|
@@ -309,8 +304,8 @@ the pooled result leans on W1 and the page's claim is about the three farms toge
 zero. A stable winter boundary layer, where neither 10 m nor 925 hPa wind stands in for hub height,
 would fit the winter concentration. That is a hypothesis, not a finding.
 
-![Figure 8: ERA5's wind-power advantage is concentrated in October to March and at one of three
-farms](../assets/ukv_ceda_vs_era5/fig08_power_splits.svg)
+![Figure 5: ERA5's wind-power advantage is concentrated in October to March and at one of three
+farms](../assets/ukv_ceda_vs_era5/fig05_power_splits.svg)
 
 ### The wind gap grows with the served lead
 
@@ -378,8 +373,8 @@ while ERA5 is an analysis at every hour, so UKV-CEDA would lose ground with lead
 assimilated none of the four stations. ERA5's own screen-level analysis may also use the same
 stations. The page tests neither explanation.
 
-![Figure 5: UKV-CEDA's advantage at the four stations shrinks as the lead
-grows](../assets/ukv_ceda_vs_era5/fig05_station_leads.svg)
+![Figure 7: UKV-CEDA's advantage at the four stations shrinks as the lead
+grows](../assets/ukv_ceda_vs_era5/fig07_station_leads.svg)
 
 **No single station decides the sign, but the stations differ a great deal.** UKV-CEDA's
 temperature is closer at stations S1 (-0.227 K [-0.245, -0.211]), S3 (-0.194 K), and S2 (-0.077 K),
@@ -387,23 +382,24 @@ and level at S4 (+0.002 K [-0.012, +0.014]), so the planned contrast rests on th
 stations. Leaving one station out moves P2 between -0.166 K and -0.090 K, and wind between -0.185
 and -0.095 m/s. The interval on P2 (±0.011 K) covers month-to-month weather at four stations only.
 By year P2 runs from -0.098 K (2020) to -0.158 K (2022), and from October to March and from April to
-September it is -0.124 and -0.123 K. Figure 7 shows each split.
+September it is -0.124 and -0.123 K. Figure 8 shows each split.
 
-![Figure 7: UKV-CEDA is closer than ERA5 at three of four stations, and no one station decides the
-sign](../assets/ukv_ceda_vs_era5/fig07_stations.svg)
+![Figure 8: UKV-CEDA is closer than ERA5 at three of four stations, and no one station decides the
+sign](../assets/ukv_ceda_vs_era5/fig08_stations.svg)
 
 ### Solar power does not depend on the temperature product
 
 **P4, the planned solar contrast, is -0.001 points [-0.009, +0.004] at the primary setting and
 -0.002 points [-0.006, +0.002] at the second, which reads "no clear difference".** On these six
 farms the choice of temperature product moves the error by no more than 0.009 points at either
-setting. The planned veto of a UKV-CEDA temperature recommendation could never have fired: the
-XGBoost model's whole gain from temperature is 0.021 points for ERA5's temperature (against its own
-shuffled copy) and 0.026 points for UKV-CEDA's, and a clear ERA5 reading needed a difference above
-0.06 points, 2.9 times ERA5's whole gain. P4's information is its bound, and the page does not count
-it as evidence for the temperature recommendation. P4's early window is +0.001 [-0.015, +0.017] and
-its late window -0.002 [-0.009, +0.004]. The solar XGBoost models were not given demand, so the
-study cannot say how temperature helps a demand forecast.
+setting, on the whole row set. The refit on leads 0 to 1 alone reaches -0.010 [-0.020, -0.001]. The
+planned veto of a UKV-CEDA temperature recommendation could never have fired: the XGBoost model's
+whole gain from temperature is 0.021 points for ERA5's temperature (against its own shuffled copy)
+and 0.026 points for UKV-CEDA's, and a clear ERA5 reading needed a difference above 0.06 points, 2.9
+times ERA5's whole gain. P4's information is its bound, and the page does not count it as evidence
+for the temperature recommendation. P4's early window is +0.001 [-0.015, +0.017] and its late window
+-0.002 [-0.009, +0.004]. The solar XGBoost models were not given demand, so the study cannot say how
+temperature helps a demand forecast.
 
 ### The controls show no bias, but too much noise to validate small differences
 
@@ -444,7 +440,7 @@ second-setting rerun.
 ![Figure 9: Shuffled UKV-CEDA and shuffled ERA5 differ by about zero, with a wind interval
 half-width close to the 0.16-point margin](../assets/ukv_ceda_vs_era5/fig09_controls.svg)
 
-### In 2026 the wind difference points towards UKV-CEDA at one setting
+### In 2026 the wind difference favours UKV-CEDA, statistically significantly at one setting only
 
 **In era 2 (2026-02 onward, 8 months), the wind difference is -0.159 points [-0.340, +0.045] at the
 primary setting and -0.192 points [-0.354, -0.009] at the second, so it favours UKV-CEDA and is
@@ -498,9 +494,10 @@ probably assimilated.** UKV-CEDA's 1.5 m temperature is 0.124 K closer to the st
 than ERA5's 2 m temperature, and 0.035 K closer at lead 5. The page says nothing about temperature
 away from those stations, nothing about how it helps a demand forecast, and nothing about the 2 km
 cell against the 25 km cell, which favours a point observation by itself. No forecast in the study
-improved with UKV-CEDA's temperature: for solar power the choice makes no difference above 0.009
-points. The recommendation carries the costs in [A UKV-CEDA history has practical
-costs](#a-ukv-ceda-history-has-practical-costs) and the licence below.
+improved by as much as a planned margin with UKV-CEDA's temperature: for solar power on the whole
+row set, the choice makes no difference above 0.009 points. The recommendation carries the costs in
+[A UKV-CEDA history has practical costs](#a-ukv-ceda-history-has-practical-costs) and the licence
+below.
 
 **For training history from 2019, the early-years test passes for UKV-CEDA temperature.** The test
 needs the early window's point estimate below zero and its upper bound below the margin: P2's
@@ -537,11 +534,11 @@ reaches adapted material is not settled here.
   the Copernicus archive, which disagrees with Copernicus on 12 days that the study drops.
 - **The significance statements cover month-to-month weather and the seed.** Of the 221 exploratory
   and post hoc splits of the UKV-CEDA against ERA5 contrasts at the primary setting, 73 are
-  statistically significant at the 5% level, but 47 of the 73 come from the matched 10 m pair and 32
-  are splits by UTC hour, so they are not that many independent findings. A split with no real
-  effect has a nominal 5% chance of reaching the level, and the page does not correct for that.
-  Separately, 16 of the 19 controls and replications are significant, as the controls section
-  explains.
+  statistically significant at the 5% level, but 47 of the 73 come from the matched 10 m pair, a
+  further 10 are splits of the other contrasts by UTC hour, and 16 are other splits, so they are not
+  that many independent findings. A split with no real effect has a nominal 5% chance of reaching
+  the level, and the page does not correct for that. Separately, 16 of the 19 controls and
+  replications are significant, as the controls section explains.
 - **The figures rest on the `effective_capacity` table at Delta version 1, read when the rows were
   built on 2026-10-06.** Each generator's capacity is its 99th percentile of output from that table,
   so a rebuilt table would move every figure.
@@ -583,7 +580,10 @@ per fit, and the hyperparameter settings are `studies.cross_validation.PRIMARY_H
 
 **Run the commands below in order, after the stores, ERA5, CAMS, and MIDAS downloads are on disk.**
 `--check-only` runs the coverage check without reading a UKV value, and each script refuses to
-overwrite an output, so a re-run first moves the earlier output to `superseded/`.
+overwrite an output, so a re-run first moves the earlier output to `superseded/`. The command
+that runs `--verified` writes `intervals.parquet`, `report.md`, and `decision.md` once, and the
+`--report-only` command near the end writes them again with the extra fits included, so the block
+moves the first three to `superseded/` between the two.
 
 ```bash
 uv run python studies/past_weather/ukv_ceda_vs_era5_build.py --check-only
@@ -596,6 +596,8 @@ uv run python studies/past_weather/ukv_ceda_vs_era5_fit.py --fit-matched
 uv run python studies/past_weather/ukv_ceda_vs_era5_build.py --hour-starting
 uv run python studies/past_weather/ukv_ceda_vs_era5_fit.py --fit-hour-starting
 uv run python studies/past_weather/ukv_ceda_vs_era5_fit.py --fit-lead-restricted
+D=data/studies/per_study/ukv_ceda_vs_era5
+mkdir -p "$D/superseded" && mv "$D"/{intervals.parquet,report.md,decision.md} "$D/superseded/"
 uv run python studies/past_weather/ukv_ceda_vs_era5_fit.py --report-only
 uv run python studies/past_weather/ukv_ceda_vs_era5_charts.py
 npx svgo@4 --multipass --precision=1 --final-newline docs/studies/assets/ukv_ceda_vs_era5/*.svg

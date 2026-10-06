@@ -57,6 +57,7 @@ def test_a_contrast_is_clear_only_if_its_interval_excludes_zero_and_its_estimate
 
 
 def test_the_margins_are_the_frozen_values_in_points_of_capacity():
+    """A tripwire: the margins were fixed before any result, so a change here is a post hoc edit."""
     assert (build.MARGIN_WIND_PP, build.MARGIN_SOLAR_PP, build.MARGIN_STATION_SHARE) == (
         0.16,
         0.06,
@@ -462,14 +463,6 @@ def test_a_station_that_drops_out_part_way_does_not_enter_the_monthly_steps():
 # --- fit: the jobs --------------------------------------------------------------------------------
 
 
-def test_the_fit_sets_are_60_with_three_wind_farms_and_six_solar_farms():
-    wind = fit.domain_jobs(domain="wind")
-    solar = fit.domain_jobs(domain="solar")
-
-    assert fit.fit_set_count(jobs=wind, n_sites=3) + fit.fit_set_count(jobs=solar, n_sites=6) == 60
-    assert fit.fit_set_count(jobs=fit.cpu_refit_jobs(), n_sites=3) == 3
-
-
 def test_the_planned_arms_run_at_both_settings_and_the_controls_at_the_primary_setting_only():
     settings: dict[str, set[str]] = {}
     for domain in ("wind", "solar"):
@@ -502,11 +495,6 @@ def test_the_two_arms_of_every_contrast_carry_equal_columns_in_every_domain():
         for planned in fit.PLANNED_CONTRASTS:
             if planned.domain == domain.removesuffix("_keep_zero"):
                 assert widths[planned.treatment] == widths[planned.reference]
-
-
-def test_a_gpu_runs_two_fits_at_once_and_a_cpu_runs_the_shared_default():
-    assert fit.workers_for(device="cuda") == fit.GPU_WORKERS
-    assert fit.workers_for(device="cpu") > fit.GPU_WORKERS
 
 
 def test_the_measured_power_is_read_from_each_jobs_own_target_column():
@@ -1349,10 +1337,11 @@ def test_the_third_era_lines_say_which_setting_is_significant():
 def test_the_veto_lines_compare_the_margin_with_the_whole_value_of_temperature():
     records = fit.domain_records(domain="solar", losses=_hourly_losses(domain="solar"))
 
-    text = " ".join(fit.veto_lines(records=records))
+    text = " ".join(fit.veto_lines(records=records, n_farms=6))
 
     assert "could not have fired" in text
     assert "0.06 points" in text
+    assert "these 6 solar farms" in text
 
 
 def test_a_row_at_the_first_instant_of_the_published_window_is_inside_it():
@@ -1431,7 +1420,9 @@ def test_the_veto_lines_print_temperatures_value_as_a_positive_gain_against_its_
         .alias(fit.METRIC)
     )
 
-    text = " ".join(fit.veto_lines(records=fit.domain_records(domain="solar", losses=losses)))
+    text = " ".join(
+        fit.veto_lines(records=fit.domain_records(domain="solar", losses=losses), n_farms=6)
+    )
 
     assert "worth 2." in text or "worth 1.9" in text
 
