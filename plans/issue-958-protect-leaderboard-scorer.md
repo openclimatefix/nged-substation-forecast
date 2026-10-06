@@ -92,7 +92,7 @@ changes.
 
 **Q4: what is the expected row set?** (Revised after the simplicity review: the cross-series regularity half is dropped, and the reference-experiment alternative is offered as option B.) The issue says rows `(time_series_id, power_fcst_init_time,
 valid_time)` "the fold's eligible series should cover", but nothing defines the expected
-initialisation times independent of the forecast itself. Recommendation (option A), a check per
+initialisation times independent of the forecast itself. Option A (not recommended after the correctness review, see finding 1 and 3 below), a check per
 `(experiment_name, fold_id)` group in leaderboard scope that raises `MissingForecastRowsError`:
 
 - **Series coverage:** every series in the fold's `eligible_time_series` partition appears in the
@@ -114,8 +114,17 @@ canonical initialisation-time grid.
 (the XGBoost baseline) for the same fold, using an anti-join each way. It closes the gap above,
 needs no read of `eligible_time_series`, and refuses out-of-window rows as extras. It costs a
 dependency on the baseline having been materialised for the fold, and changes the scored
-population from the eligible series to the baseline's trained series. Option A follows the issue's
-wording ("the fold's eligible series"); choose B if you prefer the stronger check.
+population from the eligible series to the baseline's trained series. **Recommendation after the correctness review: option B.** Option A would refuse the existing
+XGBoost fold, because `cv_power_forecasts` builds each run's half-hourly grid only between that
+run's first and last native NWP step, so the last valid times of `val_end` (21:30 to 23:30 with
+3-hour steps) have actuals but no forecast row for any series. Option A also admits extra
+non-eligible series and short-lead-only submissions, which the "all" horizon slice pools. Option B
+inherits the baseline's own coverage, so both disappear. Under B the check is: the study's keys
+equal the reference experiment's keys (anti-join each way, ensemble members included), and the
+study contains no series outside the reference's. If you choose A instead, add "no series outside
+the eligible set", define "observed actual" from the scorer's own `actuals_lf` (never a separate
+power scan), restrict the valid times required to those inside some run's native range, and
+accept the lead-time gap.
 
 Under option A, an experiment whose `trained_time_series_ids` is smaller than the eligible set now
 fails the check. That is intended; the existing `xgboost` fold must still pass.
@@ -186,6 +195,60 @@ second re-runs `uv lock`.
 by hand: the Unix user, `setfacl` on the data folders, setgid directories with
 umask 002, the research user's own `uv` cache and credentials, tightening `/mnt/data` (mode 2777
 today), the narrow `sudo` rule naming `scripts/score_study.py`, and the truncated power copy (Q1b).
+
+## Changes from the correctness review
+
+Accepted (each verified or marked for verification at implementation):
+
+- **`score_study.py` must not trust its inputs.** `delta_store/power_forecasts.py` and
+  `forecast_metrics.py` build the overwrite predicate by f-string, so a study name containing a
+  quote could overwrite other experiments' rows. The script whitelists the study name with
+  `^[a-z0-9_-]{1,64}$`, requires the fold id to be in `leaderboard_fold_ids` (so `live` and
+  `smoke_test` are refused), checks that the file's `fold_id` column agrees, refuses to overwrite
+  an existing `study/<name>` partition unless `--replace` is given (so submissions are recorded),
+  and refuses to run if `CV_CONFIG_PATH`, `NGED_FINAL_TEST`, any `*_DATA_PATH`, or
+  `MLFLOW_TRACKING_URI` arrives in the caller's environment. The f-string predicates themselves are
+  an out-of-scope defect, reported to the maintainer rather than fixed here.
+- **Check every group before scoring any.** `metrics` runs the date guard and the row-set check
+  for all groups first, so a refusal never leaves earlier groups' rows or MLflow runs behind. The
+  test uses two groups.
+- **Put the pure checks in `ml_core/metrics.py`** (`require_complete_row_set`,
+  `require_window_within_guard`), where the import-linter contract, #1035's protected paths, and
+  Dagster-free tests all apply. `cv_assets.py` only calls them.
+- **Add `eligible_time_series` to `metrics`' `deps`** if option A is chosen. Option B reads only
+  `power_forecasts`.
+- **Promotion path.** `ml_core/mlflow_runs.py:list_promotable_runs` lists every fold run in every
+  MLflow experiment, so a `study/` fold run would reach the `promotable_model_runs` candidates. The
+  plan filters `study/` experiments there and refuses them in `promoted_model`, with tests. This
+  replaces the earlier claim that no code is needed.
+- **Study reader.** About 40 published `studies/*` scripts call `pv_sites`, `wind_sites`,
+  `solar_hourly_power`, or `wind_hourly_power`, so migrating `pv_dataset.py` and
+  `wind_product_frames.py` would silently cut their input at the cutoff and change site rosters and
+  seeded labels. The plan therefore adds `scan_power()` and migrates nothing; the PR body lists
+  every direct reader as the audit. The reader is a convenience for new studies, and the issue's
+  protection against a session is the truncated copy. This departs from the issue's "study power
+  reader truncates at the same date" and is Q5 below. #1040 makes
+  `nged_data.storage.scan_cleaned_power` the read path for power, so `scan_power()` reads the
+  cleaned table through it if #1040 has merged by implementation.
+- **Existing constructions.** A required `final_test_start` breaks `CvConfig(...)` in
+  `tests/test_jobs.py` and five places in `packages/contracts/tests/test_config_schemas.py`; the plan
+  updates them, and `_score_forecast_group`'s positional callers in `tests/test_metrics.py`.
+- **Test fixtures.** A fixture whose actuals span the whole `val_end` day, with forecasts stopping at
+  21:00 as production's do, is added; it fails an option-A check on `main`'s data shape. The MLflow
+  file-store fixtures in `tests/test_metrics.py` move to `conftest.py` so the `score_study` test
+  can use them. The ad-hoc guard test writes rows after the cutoff directly or monkeypatches
+  `cv_assets._cv_config`. Regression tests that already pass on `main` (a complete group scores, a
+  `live` group scores) are labelled as such.
+- **Docs added:** `docs/ml_experimentation/dagster-workflow.md` Step 9,
+  `docs/ml_experimentation/cross-validation-folds.md` (the new field), and
+  `docs/roadmap/auto-research.md` lines about the refusal and promotion paths, which would otherwise
+  be false.
+- **Risk to verify:** `score_study` commits to `power_forecasts` while `live_forecasts` overwrites a
+  different partition hourly; the implementer checks that delta-rs resolves the disjoint-partition
+  commits, or the script retries.
+
+**Q5 for the maintainer: accept `scan_power()` without migrating the existing readers?** Recommended
+yes, for the reproducibility reason above.
 
 ## Splitting
 
@@ -264,7 +327,7 @@ Plus the pydoclint and docs-link checks from CI, run locally, and `ls plans` emp
 
 ## Risks and open questions
 
-- Q1-Q4 above need the maintainer's decision; Q1 is the one that changes scope.
+- Q1-Q5 above need the maintainer's decision; Q1 is the one that changes scope.
 - The `import-linter` strict indirect check may fail through `contracts`; fallback stated above.
 - The row-set check reads `eligible_time_series`, which #1019 may change (cleaned power). It reads
   only the Delta table's `(fold_id, time_series_id)` columns, which `EligibleTimeSeries` fixes.
@@ -290,3 +353,8 @@ test; recording that `promotion_assets.py` cannot see `study/` groups.
   contract; the pytest cannot see imports inside a function the way a static check can. Kept.
 - **Defer the `import-linter` work entirely.** Not proposed; noted only because of the `uv.lock`
   collision with #147, which the plan already handles.
+
+**Correctness review (Opus), rejected or adjusted:** none rejected outright. Finding 14 (concurrent
+Delta commits) is kept as a verification item rather than a design change. Finding 9 is adopted
+partly: only the two pure checks move to `ml_core/metrics.py`, and `cv_assets.py` keeps the
+orchestration.
