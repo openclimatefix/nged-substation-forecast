@@ -542,12 +542,12 @@ def test_the_fifth_build_refuses_any_output_folder_but_its_own(tmp_path: Path) -
     from build_forecast_inputs import build_extra_leads
 
     assert FIFTH_OUTPUT_DIR.name == "day4_shared"
-    published = tmp_path / "per_study/nwp_forecast_comparison/original"
+    published = tmp_path / "nwp_forecast_comparison/original"
     with pytest.raises(ValueError, match="the fifth batch builds only into"):
         build_extra_leads(
             domain="solar",
             published_dir=published,
-            output_dir=tmp_path / "per_study/nwp_forecast_comparison/leads_day10",
+            output_dir=tmp_path / "nwp_forecast_comparison/leads_day10",
             gefs_window_dir=None,
             batch="fifth",
         )
@@ -557,14 +557,14 @@ def _patch_fifth_build(*, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ens: 
     """Stub every column builder of the fifth batch but the ENS one, and write both references."""
     import build_forecast_inputs as bfi
 
-    published = tmp_path / "per_study/nwp_forecast_comparison/original"
+    published = tmp_path / "nwp_forecast_comparison/original"
     published.mkdir(parents=True)
     monkeypatch.setattr(
-        bfi, "NFC_DAY4_SHARED_DIR", tmp_path / "per_study/nwp_forecast_comparison/day4_shared"
+        bfi, "NFC_DAY4_SHARED_DIR", tmp_path / "nwp_forecast_comparison/day4_shared"
     )
     keys = pl.DataFrame({"site": ["A"], "time": [datetime(2026, 3, 6, 12, tzinfo=UTC)]})
     keys.write_parquet(published / "solar_forecast_inputs.parquet")
-    wn3 = tmp_path / "per_study/nwp_forecast_comparison/wn3_extra_days"
+    wn3 = tmp_path / "nwp_forecast_comparison/wn3_extra_days"
     wn3.mkdir(parents=True)
     keys.with_columns(ens_mean_day4_ghi=pl.lit(7.0)).write_parquet(wn3 / "solar_wn3_inputs.parquet")
     monkeypatch.setattr(bfi, "_previous_runs_frame", lambda *, keys, **_: keys)
@@ -585,7 +585,7 @@ def test_the_fifth_build_stops_when_its_ens_mean_differs_from_the_wn3_folders(
     from build_forecast_inputs import build_extra_leads
 
     published = _patch_fifth_build(monkeypatch=monkeypatch, tmp_path=tmp_path, ens=8.0)
-    output = tmp_path / "per_study/nwp_forecast_comparison/day4_shared"
+    output = tmp_path / "nwp_forecast_comparison/day4_shared"
 
     with pytest.raises(ValueError, match="ens_mean_day4"):
         build_extra_leads(
@@ -604,7 +604,7 @@ def test_the_fifth_build_writes_its_inputs_when_its_ens_mean_equals_the_wn3_fold
     from build_forecast_inputs import build_extra_leads
 
     published = _patch_fifth_build(monkeypatch=monkeypatch, tmp_path=tmp_path, ens=7.0)
-    output = tmp_path / "per_study/nwp_forecast_comparison/day4_shared"
+    output = tmp_path / "nwp_forecast_comparison/day4_shared"
 
     path = build_extra_leads(
         domain="solar",
@@ -623,7 +623,7 @@ def test_the_fifth_build_accepts_a_symbolic_link_to_its_own_folder(
     from build_forecast_inputs import build_extra_leads
 
     published = _patch_fifth_build(monkeypatch=monkeypatch, tmp_path=tmp_path, ens=7.0)
-    real = tmp_path / "per_study/nwp_forecast_comparison/day4_shared"
+    real = tmp_path / "nwp_forecast_comparison/day4_shared"
     real.mkdir(parents=True)
     link = tmp_path / "old_name"
     link.symlink_to(real, target_is_directory=True)

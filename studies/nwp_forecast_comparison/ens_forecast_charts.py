@@ -38,7 +38,6 @@ from ens_forecast_horizons import (
     CALENDAR_ONLY_MONTH,
     EMULATED_DAY,
     METRIC,
-    OUTPUT_DIR,
     PERCENTAGE_POINTS,
     PLANNED,
     baseline_arm,
@@ -54,14 +53,15 @@ from studies.charts import (
     leaderboard_panel,
     wrapped,
 )
+from studies.sources import ENS_FORECAST_HORIZONS_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("ens_forecast_charts")
 
 ASSETS_DIR: Final[Path] = Path(__file__).resolve().parents[2] / "docs" / "studies" / "assets"
 
-_results_dir: Path = OUTPUT_DIR
-"""The folder every chart reads its results from: `OUTPUT_DIR` unless `--results-dir` says
-otherwise. `main` sets it once, before any chart is drawn."""
+_results_dir: Path = ENS_FORECAST_HORIZONS_DIR
+"""The folder every chart reads its results from: `ENS_FORECAST_HORIZONS_DIR` unless
+`--results-dir` says otherwise. `main` sets it once, before any chart is drawn."""
 
 DomainType = Literal["solar", "wind"]
 DOMAINS: Final[tuple[DomainType, DomainType]] = ("solar", "wind")
@@ -1570,7 +1570,7 @@ def main() -> int:
     parser.add_argument(
         "--results-dir",
         type=Path,
-        default=OUTPUT_DIR,
+        default=ENS_FORECAST_HORIZONS_DIR,
         help=(
             "The folder holding the horizons script's results. Defaults to the folder the "
             "published page's results are in; pass `ens_forecast_horizons.RESULTS_DIR` for the "

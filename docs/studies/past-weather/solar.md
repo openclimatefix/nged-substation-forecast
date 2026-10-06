@@ -1764,7 +1764,7 @@ studies/past_weather/past_solar_leaderboard.py uv run python
 studies/past_weather/past_solar_leaderboard_charts.py ```
 
 The eight-product report lands in
-`data/studies/beam_diffuse_split/past_weather_v2/solar_long/report.md`, and the longer record's in
+`data/studies/per_study/beam_diffuse_split/past_weather_v2/solar_long/report.md`, and the longer record's in
 `solar_record/report.md` beside it, with each panel's year-by-year table in `era5_by_year.parquet`.
 `weather_products.py --report-only` rebuilds a report from the saved losses without refitting, and
 neither mode overwrites an existing file. `--concurrent-fits` lowers how many XGBoost models are
@@ -1791,16 +1791,16 @@ losses without refitting, checking a fingerprint against what a fresh run would 
 
 The CERRA script `cerra_past_solar.py` reads the CERRA files under `data/studies/downloads/reanalysis/CERRA/`,
 fits every XGBoost model, and writes `report.md`, `losses.parquet`, and `losses.fingerprint` to
-`data/studies/beam_diffuse_split/past_weather_v2/cerra_past_solar/`. It refuses to overwrite an
+`data/studies/per_study/beam_diffuse_split/past_weather_v2/cerra_past_solar/`. It refuses to overwrite an
 existing output.
 
 The weather-station scripts are `station_past_solar.py`, which builds the row set, fits every arm,
 and writes `report.md` and `losses.parquet` to
-`data/studies/beam_diffuse_split/past_weather_v2/station_past_solar/`, and
+`data/studies/per_study/beam_diffuse_split/past_weather_v2/station_past_solar/`, and
 `station_past_solar_charts.py`, which draws Figures 14 to 16 from those two files and stops unless
 the saved report matches the report the current code produces. The MIDAS Open files come from
 `studies/weather_downloads/fetch_midas_open.py`. `past_solar_leaderboard.py` reads every row set's
 saved losses and writes the leaderboard report that Figures 1 and 2 come from, to
-`data/studies/beam_diffuse_split/past_weather_v2/solar_leaderboard_3/report.md`;
+`data/studies/per_study/beam_diffuse_split/past_weather_v2/solar_leaderboard_3/report.md`;
 `past_solar_leaderboard_charts.py` draws them. The two post hoc UKV rebuilds appear in the charts as
 "UKV, snapshot mean" and "UKV, both snapshots".

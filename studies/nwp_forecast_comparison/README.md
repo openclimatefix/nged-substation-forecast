@@ -49,14 +49,14 @@ ENS, and the UKV-from-CEDA blends. Tests of these scripts are in
 
 - `fetch_ens_forecast_horizons.py` extracts every ECMWF ENS member's radiation, temperature, and 10
   m and 100 m wind at each metered generator's H3 cell, at the leads the horizon study scores, from
-  the production NWP Delta table, into `data/studies/ens_forecast_horizons/ens_members.parquet`.
+  the production NWP Delta table, into `data/studies/downloads/NWP/ENS_SITE_EXTRACT/ens_members.parquet`.
 - `ens_forecast_horizons.py` scores ENS-driven power forecasts at eight horizons, for solar and
   wind, at hourly resolution on the past-weather studies' own rows: first how to upsample ENS's 3-
   and 6-hourly steps to hourly, then three ways of using the 51 members (the control member, the
   ensemble mean, and each member through the power model), four baselines that read no weather
   forecast, and two past-weather references that are not forecasts. Writes its losses, predictions,
   member-forecast summaries, intervals, leaderboard, and `report.md` to
-  `data/studies/ens_forecast_horizons/`.
+  `data/studies/per_study/ens_forecast_horizons/era_covered/`.
 - `ens_forecast_charts.py` draws the ENS horizon page's anonymised charts from
   `ens_forecast_horizons.py`'s outputs, checking each number against the report.
 - `fetch_ens_day4_supplement.py` extracts the ENS leads that the day-4 band needs and

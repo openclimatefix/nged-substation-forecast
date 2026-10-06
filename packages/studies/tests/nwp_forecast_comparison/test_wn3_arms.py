@@ -915,10 +915,10 @@ def test_a_run_missing_from_the_copy_is_not_a_hole_inside_a_band(domain: str) ->
 
 
 def test_the_day_5_fits_refuse_every_output_folder_but_their_own(tmp_path: Path) -> None:
-    published = tmp_path / "per_study/nwp_forecast_comparison/original"
+    published = tmp_path / "nwp_forecast_comparison/original"
     for name in (
-        "per_study/nwp_forecast_comparison/aifs_extra_days",
-        "per_study/nwp_forecast_comparison/leads_day10",
+        "nwp_forecast_comparison/aifs_extra_days",
+        "nwp_forecast_comparison/leads_day10",
     ):
         with pytest.raises(ValueError, match="writes only to"):
             driver.check_output_dir(output_dir=tmp_path / name, published_dir=published)
@@ -960,12 +960,12 @@ def test_a_hole_in_any_one_value_column_stops_the_build(domain: str, column: str
 
 
 def test_the_day_5_wn3_build_refuses_any_output_folder_but_its_own(tmp_path: Path) -> None:
-    published = tmp_path / "per_study/nwp_forecast_comparison/original"
+    published = tmp_path / "nwp_forecast_comparison/original"
     with pytest.raises(ValueError, match="day 5 builds only into"):
         w.build_domain(
             domain="solar",
             published_dir=published,
-            output_dir=tmp_path / "per_study/nwp_forecast_comparison/wn3_extra_days",
+            output_dir=tmp_path / "nwp_forecast_comparison/wn3_extra_days",
             weather_dir=tmp_path,
             days=(3, 5),
         )
@@ -1001,7 +1001,7 @@ def _run_driver(
         [
             "x",
             "--published-dir",
-            str(tmp_path / "per_study/nwp_forecast_comparison/original"),
+            str(tmp_path / "nwp_forecast_comparison/original"),
             "--output-dir",
             str(out),
             "--lookahead-cleared",
@@ -1047,12 +1047,12 @@ def test_the_driver_refuses_before_any_fit_when_report_md_exists(
 
 def _patch_day5_build(*, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ens: float) -> Path:
     """Stub everything `build_domain` reads but the keys, the WN3 copy and the ENS reference."""
-    published = tmp_path / "per_study/nwp_forecast_comparison/original"
+    published = tmp_path / "nwp_forecast_comparison/original"
     published.mkdir(parents=True)
     _keys(times=[datetime(2026, 3, 6, 12)]).write_parquet(
         published / "wind_forecast_inputs.parquet"
     )
-    reference = tmp_path / "per_study/nwp_forecast_comparison/leads_day10"
+    reference = tmp_path / "nwp_forecast_comparison/leads_day10"
     reference.mkdir(parents=True)
     _keys(times=[datetime(2026, 3, 6, 12)]).with_columns(
         ens_mean_day5_speed_100m=pl.lit(7.0)
@@ -1109,7 +1109,7 @@ def test_the_day_5_folder_may_be_reached_through_a_symbolic_link(tmp_path: Path)
     link.symlink_to(tmp_path / DAY5_FOLDER_NAME, target_is_directory=True)
 
     driver.check_output_dir(
-        output_dir=link, published_dir=tmp_path / "per_study/nwp_forecast_comparison/original"
+        output_dir=link, published_dir=tmp_path / "nwp_forecast_comparison/original"
     )
 
 

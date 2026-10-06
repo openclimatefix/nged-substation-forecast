@@ -675,7 +675,7 @@ uv run python studies/past_weather/blend_products.py
 uv run python studies/past_weather/blend_product_charts.py
 ```
 
-The report lands in `data/studies/beam_diffuse_split/blend_products/report.md`, beside
+The report lands in `data/studies/per_study/beam_diffuse_split/blend_products/report.md`, beside
 `reproduction.md`, the per-hour errors and out-of-fold predictions of every XGBoost model, the stack
 weights, and every interval as a table. `blend_products.py --resume` reuses the fits a crashed run
 left behind. The chart script checks each chart's numbers against the report before drawing.
@@ -690,7 +690,7 @@ uv run python studies/past_weather/blend_satellites.py
 uv run python studies/past_weather/blend_satellites_charts.py
 ```
 
-The report lands in `data/studies/beam_diffuse_split/satellite_blend/report.md`, beside
+The report lands in `data/studies/per_study/beam_diffuse_split/satellite_blend/report.md`, beside
 `reproduction.md` and `losses.parquet`. `blend_satellites.py --resume` reuses the fits a crashed run
 left behind; `--fit-missing OLD_OUTPUT_DIR` reuses a previous run's published `losses.parquet`
 (moved to a `superseded/` subfolder first) for every arm it already holds, fitting only a newly

@@ -24,6 +24,7 @@ from typing import Final
 
 import numpy as np
 import polars as pl
+from studies.arm_runner import dataset_path_for
 from studies.fractions_skill_score import fss_from, monthly_components, on_a_complete_hourly_grid
 from studies.sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
@@ -80,7 +81,7 @@ def _capped_forecasts(*, source: str, suffix: str, instrument: str) -> pl.DataFr
     losses_path = (
         STUDY_DATA_DIR / f"beam_diffuse_{stem}_{source}{suffix}" / "per_row_losses.parquet"
     )
-    dataset_path = STUDY_DATA_DIR / f"beam_diffuse_dataset_{source}{suffix}.parquet"
+    dataset_path = dataset_path_for(source=f"{source}{suffix}")
     for path in (losses_path, dataset_path):
         if not path.exists():
             msg = f"{path} missing; run the {instrument} instrument on {source} first"

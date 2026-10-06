@@ -375,12 +375,10 @@ others, with the CAMS satellite retrieval."""
 OBSERVATIONS_DOWNLOADS_DIR: Final[Path] = DOWNLOADS_DIR / "observations"
 """Measurements: weather stations, the SARAH-3 satellite retrieval, and NGED's own exports."""
 
-PER_STUDY_DIR: Final[Path] = STUDIES_DATA_DIR
+PER_STUDY_DIR: Final[Path] = STUDIES_DATA_DIR / "per_study"
 """The layer of `data/studies/` that holds one folder per study.
 
-Equal to `STUDIES_DATA_DIR` until the study folders move. Every study folder below is built from
-this constant, except the CERRA wind studies and the NWP forecast comparison, whose folders already
-sit in `STUDIES_DATA_DIR / "per_study"`.
+Every study folder below is built from this constant.
 """
 
 SCRATCH_DIR: Final[Path] = STUDIES_DATA_DIR / "_scratch"
@@ -630,15 +628,13 @@ def study_dir_for(*, study: str) -> Path:
 
 
 STUDY_DATA_DIR: Final[Path] = study_dir_for(study="beam_diffuse_split")
-"""Where everything this study builds from its inputs lives: the joined datasets, each arm's
-results, and the figures.
-"""
+"""Where everything this study builds from its inputs lives: each arm's results and the figures."""
+
+STUDY_INPUTS_DIR: Final[Path] = STUDY_DATA_DIR / "inputs"
+"""The joined `beam_diffuse_dataset_<source>.parquet` frames that `build_dataset.py` writes."""
 
 ENS_FORECAST_HORIZONS_DIR: Final[Path] = study_dir_for(study="ens_forecast_horizons")
-"""The ENS forecast-horizons study's inputs and results."""
-
-ENS_FORECAST_HORIZONS_DAY4_DIR: Final[Path] = study_dir_for(study="ens_forecast_horizons_day4")
-"""The day-4 supplement to the ENS member extract."""
+"""The ENS forecast-horizons study's results. Its member extract is in `ENS_PRODUCT_DIR`."""
 
 OPEN_METEO_ENSEMBLE_MEANS_DIR: Final[Path] = study_dir_for(study="open_meteo_ensemble_means")
 """The Open-Meteo ensemble-means study."""
@@ -655,12 +651,8 @@ ERA5_WIND_COMPARE_DIR: Final[Path] = study_dir_for(study="era5_wind_compare")
 ENS_BACKFILL_PILOT_DIR: Final[Path] = study_dir_for(study="ens_backfill_pilot")
 """The ENS backfill pilot's checkpoint files."""
 
-CERRA_WIND_STUDIES_DIR: Final[Path] = STUDIES_DATA_DIR / "per_study" / "cerra_wind"
-"""The folder of the CERRA wind studies, one subfolder per study.
-
-The first folder under the `per_study/` layer. The other study folders stay directly under
-`PER_STUDY_DIR` until they move.
-"""
+CERRA_WIND_STUDIES_DIR: Final[Path] = study_dir_for(study="cerra_wind")
+"""The folder of the CERRA wind studies, one subfolder per study."""
 
 CERRA_WIND_LEVELS_DIR: Final[Path] = CERRA_WIND_STUDIES_DIR / "levels"
 """The CERRA wind-levels study."""
@@ -674,18 +666,18 @@ CERRA_WIND_LEVELS_SHEAR_DIR: Final[Path] = CERRA_WIND_STUDIES_DIR / "shear"
 CERRA_WIND_DIRECTION_DIR: Final[Path] = CERRA_WIND_STUDIES_DIR / "direction"
 """The CERRA wind-direction study."""
 
-UKV_CEDA_BLENDS_DIR: Final[Path] = study_dir_for(study="ukv_ceda_blends")
-"""The planned run of the UKV-on-CEDA blends study."""
+UKV_CEDA_BLENDS_DIR: Final[Path] = STUDIES_DATA_DIR / "ukv_ceda_blends"
+"""The planned run of the UKV-on-CEDA blends study.
 
-UKV_CEDA_BLENDS_RUN15_DIR: Final[Path] = study_dir_for(study="ukv_ceda_blends_run15")
-"""The UKV-on-CEDA blends study's run on the 15 UTC cycle."""
-
-NFC_STUDY_DIR: Final[Path] = STUDIES_DATA_DIR / "per_study" / "nwp_forecast_comparison"
-"""The folder of the NWP forecast comparison, one subfolder per batch of fits.
-
-The second folder under the `per_study/` layer, after the CERRA wind studies. The other study
-folders stay directly under `PER_STUDY_DIR` until they move.
+Directly under `STUDIES_DATA_DIR`, not `PER_STUDY_DIR`, because the folder moves with the
+UKV-on-CEDA stores in the last step of the migration.
 """
+
+UKV_CEDA_BLENDS_RUN15_DIR: Final[Path] = STUDIES_DATA_DIR / "ukv_ceda_blends_run15"
+"""The UKV-on-CEDA blends study's run on the 15 UTC cycle. It moves with `UKV_CEDA_BLENDS_DIR`."""
+
+NFC_STUDY_DIR: Final[Path] = study_dir_for(study="nwp_forecast_comparison")
+"""The folder of the NWP forecast comparison, one subfolder per batch of fits."""
 
 NFC_DIR: Final[Path] = NFC_STUDY_DIR / "original"
 """The NWP forecast comparison's original batch, which holds the published fit."""

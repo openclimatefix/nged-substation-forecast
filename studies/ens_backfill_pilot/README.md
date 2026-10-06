@@ -31,13 +31,13 @@ uv run --with eccodes python studies/ens_backfill_pilot/check_pilot.py
 
 `--dates 2023-06-26,2023-06-28` replaces the drawn dates, `--workers` sets the number of concurrent
 connections (8 by default, at most 16), and `--members all` fetches all 51 members. The drawn dates
-are saved in `data/studies/ens_backfill_pilot/pilot_dates.json` so that a resumed run uses the same
-dates. Delete that file to draw again.
+are saved in `data/studies/per_study/ens_backfill_pilot/pilot_dates.json` so that a resumed run
+uses the same dates. Delete that file to draw again.
 
 ## Output
 
-Each checkpoint file `data/studies/ens_backfill_pilot/control/<date>.npz` holds arrays indexed by
-`(variable, member, step)`, then row, then column:
+Each checkpoint file `data/studies/per_study/ens_backfill_pilot/control/<date>.npz` holds arrays
+indexed by `(variable, member, step)`, then row, then column:
 
 - `values`: decoded `float32` values in ECMWF's units (K, Pa, m s-1, m2 s-2 for `z`, and totals
   accumulated since the forecast start for `tp` in m, and `strd` and `ssrd` in J m-2).

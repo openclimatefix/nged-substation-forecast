@@ -31,7 +31,7 @@ from studies.pv_dataset import (
     read_open_meteo_point,
     solar_hourly_power,
 )
-from studies.sources import PER_SITE_SOURCES, SOURCE_CHOICES, STUDY_DATA_DIR, SourceType
+from studies.sources import PER_SITE_SOURCES, SOURCE_CHOICES, STUDY_INPUTS_DIR, SourceType
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("build_dataset")
@@ -47,7 +47,7 @@ def output_path_for(*, dataset_name: str) -> Path:
     Returns:
         The parquet path every arm of that run reads.
     """
-    return STUDY_DATA_DIR / f"beam_diffuse_dataset_{dataset_name}.parquet"
+    return STUDY_INPUTS_DIR / f"beam_diffuse_dataset_{dataset_name}.parquet"
 
 
 def main() -> int:

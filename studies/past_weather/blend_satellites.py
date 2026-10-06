@@ -12,7 +12,7 @@ and ICON-DREAM-EU, 2021 to August 2026, with the same folds, eras, seeds, export
   arms here are refitted exactly as the record panel's `cams_global`, `sarah3_global` and
   `cams_split` arms: the same feature columns, on the same rows, at the same hyperparameters. Each
   is checked row for row against the record panel's saved losses at
-  `data/studies/beam_diffuse_split/past_weather_v2/solar_record/losses.parquet` — the same
+  `data/studies/per_study/beam_diffuse_split/past_weather_v2/solar_record/losses.parquet` — the same
   `(site, time, fold, seed)` keys and a bit-identical `signed_error_capped_mw`. The run stops before
   fitting any blend if any of the three differs.
 - **Arms.** SARAH-3 is scored on global irradiance only (its own split is a separation model's
