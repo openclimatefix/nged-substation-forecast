@@ -1425,3 +1425,65 @@ def test_the_veto_lines_print_temperatures_value_as_a_positive_gain_against_its_
     text = " ".join(fit.veto_lines(records=fit.domain_records(domain="solar", losses=losses)))
 
     assert "worth 2." in text or "worth 1.9" in text
+
+
+# --- page charts ----------------------------------------------------------------------------------
+
+
+def test_the_absolute_error_table_is_read_for_the_shown_domains_and_labelled_arms_only():
+    report = (
+        "#### wind: every arm's mean absolute error\n"
+        "| era5_wind | pooled | 7.174 | [6.823, 7.537] | 145,758 |\n"
+        "| era5_wind_cpu_refit | pooled | 7.171 | [6.819, 7.535] | 145,758 |\n"
+        "#### wind_keep_zero: every arm's mean absolute error\n"
+        "| era5_wind | pooled | 7.209 | [6.804, 7.602] | 163,839 |\n"
+        "#### solar: every arm's mean absolute error\n"
+        "| solar_ukv_ceda_temp | sensitivity | 4.903 | [4.736, 5.069] | 122,890 |"
+    )
+
+    errors = charts.absolute_errors(report=report)
+
+    assert errors.select("domain", "arm", "setting", "value", "lower", "upper").rows() == [
+        ("wind", "era5_wind", "pooled", 7.174, 6.823, 7.537),
+        ("solar", "solar_ukv_ceda_temp", "sensitivity", 4.903, 4.736, 5.069),
+    ]
+
+
+def test_a_prediction_figure_names_each_week_by_its_rule_and_carries_no_calendar_date():
+    times = pl.datetime_range(
+        datetime(2023, 1, 1, tzinfo=UTC),
+        datetime(2023, 3, 31, 23, tzinfo=UTC),
+        interval="1h",
+        time_zone="UTC",
+        eager=True,
+    )
+    rng = np.random.default_rng(0)
+    losses = pl.concat(
+        [
+            pl.DataFrame(
+                {
+                    "arm": arm,
+                    "site": "W1",
+                    "time": times,
+                    "seed": 0,
+                    "setting": "pooled",
+                    "actual_mw": 5.0 + 3.0 * np.sin(np.arange(len(times)) / 50),
+                    "prediction_mw": rng.normal(5.0, 1.0, len(times)),
+                    "effective_capacity_mw": 10.0,
+                }
+            )
+            for arm in ("a", "b")
+        ]
+    )
+
+    chart, weeks = charts.predictions_chart(losses=losses, arms={"a": "A", "b": "B"}, title="t")
+
+    labels = {
+        value
+        for dataset in chart.to_dict()["datasets"].values()
+        for row in dataset
+        for value in [row["week"]]
+    }
+    assert labels == {"Highest mean output", "Largest spread", "Lowest mean output"}
+    assert set(weeks) == {"highest mean output", "largest spread", "lowest mean output"}
+    assert not any(char.isdigit() for label in labels for char in label)

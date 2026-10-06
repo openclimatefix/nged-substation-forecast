@@ -27,6 +27,7 @@ Optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline` be
 """
 
 import argparse
+import re
 import sys
 from collections.abc import Sequence
 from datetime import datetime, timedelta
@@ -36,7 +37,7 @@ from typing import Any, Final
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
-from studies.charts import figure, interval_panel, planning
+from studies.charts import figure, interval_panel, planning, wrapped
 from ukv_ceda_station_scores import INTERVALS_NAME as STATION_INTERVALS_NAME
 from ukv_ceda_station_scores import PRIMARY_SCORE
 from ukv_ceda_station_scores import REPORT_NAME as STATION_REPORT_NAME
@@ -45,6 +46,11 @@ from ukv_ceda_vs_era5_fit import INTERVALS_NAME, PRIMARY_SETTING, REPORT_NAME, S
 
 ASSETS_DIR: Final[Path] = Path(__file__).resolve().parents[2] / "docs" / "studies" / "assets"
 """Where the published figures go."""
+
+CAPACITY_UNIT: Final[str] = "points of capacity"
+ROW_STEP_PX: Final[int] = 52
+"""A row is taller than the default, because a row label wraps onto three lines."""
+N_LEADS: Final[int] = 6
 
 FAMILY: Final[str] = "weather model"
 """The colour family of every row: each row is UKV-CEDA, a weather model, against ERA5."""
@@ -110,7 +116,11 @@ def station_rows(
 
 
 def set_b_rows(
-    *, records: Sequence[dict[str, Any]], selectors: Sequence[Selector], with_second: bool
+    *,
+    records: Sequence[dict[str, Any]],
+    selectors: Sequence[Selector],
+    with_second: bool,
+    with_errors: bool = True,
 ) -> pl.DataFrame:
     """Build the rows of a set B panel, with the second setting as a hollow marker.
 
@@ -118,9 +128,11 @@ def set_b_rows(
         records: Set B's interval records.
         selectors: Each row's label and the fields that pick its record, apart from the setting.
         with_second: Whether each row also has a record at the second setting.
+        with_errors: Whether the label carries ERA5's and UKV-CEDA's absolute errors, which only a
+            contrast of the two products has.
 
     Returns:
-        Rows for `interval_panel`, with the absolute errors in the label.
+        Rows for `interval_panel`, with the absolute errors in the label where `with_errors`.
     """
     rows = []
     for label, where in selectors:
@@ -135,7 +147,7 @@ def set_b_rows(
         )
         rows.append(
             {
-                "label": f"{label} ({text})",
+                "label": f"{label} ({text})" if with_errors else label,
                 "family": FAMILY,
                 "difference": primary["difference_pp"],
                 "lower_95": primary["lower_95_pp"],
@@ -211,7 +223,15 @@ def x_domain_for(*, rows: pl.DataFrame) -> tuple[float, float]:
     return (-bound, bound)
 
 
-def contrast_panel(*, rows: pl.DataFrame, title: str, x_title: str, planned_figure: Any) -> Any:
+def contrast_panel(
+    *,
+    rows: pl.DataFrame,
+    title: str,
+    x_title: str,
+    planned_figure: Any,
+    zero_label: str = "same as ERA5",
+    better_label: str = "better than ERA5",
+) -> Any:
     """Draw one panel of dots and intervals, with the margin band behind it.
 
     Args:
@@ -219,6 +239,8 @@ def contrast_panel(*, rows: pl.DataFrame, title: str, x_title: str, planned_figu
         title: The panel's title.
         x_title: The x axis title, naming the quantity and unit.
         planned_figure: What `planning` returns for the whole figure.
+        zero_label: What a difference of zero means.
+        better_label: What the better direction means.
 
     Returns:
         The layered panel.
@@ -228,9 +250,10 @@ def contrast_panel(*, rows: pl.DataFrame, title: str, x_title: str, planned_figu
         rows=rows.drop("margin"),
         x_domain=x_domain,
         x_title=x_title,
-        zero_label="same as ERA5",
-        better_label="better than ERA5",
+        zero_label=zero_label,
+        better_label=better_label,
         better_direction="negative",
+        row_step_px=ROW_STEP_PX,
         panel_title=title,
         family_key=False,
         condition_key=False,
@@ -272,14 +295,19 @@ def _figure(
     number: int,
     title: str,
     subtitle: Sequence[str],
+    x_title: str | None = None,
+    zero_label: str = "same as ERA5",
+    better_label: str = "better than ERA5",
 ) -> alt.VConcatChart:
     kind = planning(rows=list(panels.values()))
     drawn = [
         contrast_panel(
             rows=rows,
             title=name,
-            x_title=f"UKV-CEDA minus ERA5 error ({units[name]})",
+            x_title=x_title or f"UKV-CEDA minus ERA5 error ({units[name]})",
             planned_figure=kind,
+            zero_label=zero_label,
+            better_label=better_label,
         )
         for name, rows in panels.items()
     ]
@@ -299,21 +327,36 @@ KEY_SUBTITLE: Final[str] = (
 )
 
 
-def interval_figures(
+def _cap(text: str) -> str:
+    """Capitalise the first letter only, leaving the rest as written."""
+    return text[:1].upper() + text[1:]
+
+
+def _units(*, names: Sequence[str], unit: str) -> dict[str, str]:
+    return dict.fromkeys(names, unit)
+
+
+def _lead_selectors(*, base: dict[str, Any]) -> list[Selector]:
+    return [(f"Lead {n} h", {**base, "scope": f"lead {n} h"}) for n in range(N_LEADS)]
+
+
+FigureRows = tuple[alt.VConcatChart, list[pl.DataFrame]]
+"""A figure and the rows its panels draw, for the check against the reports."""
+
+
+def headline_figure(
     *, set_a: Sequence[dict[str, Any]], set_b: Sequence[dict[str, Any]]
-) -> dict[str, tuple[alt.VConcatChart, list[pl.DataFrame]]]:
-    """Draw Figures 1 to 4 and return the rows each draws.
+) -> FigureRows:
+    """Draw Figure 1: the four planned contrasts by window.
 
     Args:
         set_a: Set A's interval records.
         set_b: Set B's interval records.
 
     Returns:
-        Each figure by its file stem, with its panels' rows for the check against the reports.
+        The figure and its rows.
     """
-    years = sorted({r["scope"] for r in set_b if r["kind"] == "year" and r["label"] == "P3"})
-    half_years = ("October to March", "April to September")
-    headline = {
+    panels = {
         "P1: wind speed against stations": station_rows(
             records=set_a,
             selectors=_windows(
@@ -331,144 +374,516 @@ def interval_figures(
         ),
     }
     units = {
-        name: "m/s"
-        if name.startswith("P1")
-        else "K"
-        if name.startswith("P2")
-        else "points of capacity"
-        for name in headline
+        name: "m/s" if name.startswith("P1") else "K" if name.startswith("P2") else CAPACITY_UNIT
+        for name in panels
     }
-    set_a_splits = {
-        f"{variable.capitalize()}, stations": station_rows(
+    chart = _figure(
+        panels=panels,
+        units=units,
+        number=1,
+        title=(
+            "At four stations UKV-CEDA is closer than ERA5 for wind and temperature, but ERA5 "
+            "gives the lower wind-power error, and the choice does not move solar power"
+        ),
+        subtitle=[
+            KEY_SUBTITLE,
+            (
+                "A hollow triangle is the second hyperparameter setting. A dashed line has too few "
+                "months for an interval."
+            ),
+        ],
+    )
+    return chart, list(panels.values())
+
+
+def station_lead_figure(*, set_a: Sequence[dict[str, Any]]) -> FigureRows:
+    """Draw Figure 5: set A by single UKV-CEDA lead.
+
+    Args:
+        set_a: Set A's interval records.
+
+    Returns:
+        The figure and its rows.
+    """
+    panels = {
+        "Temperature by UKV-CEDA lead (post hoc)": station_rows(
+            records=set_a,
+            selectors=_lead_selectors(base={"variable": "temperature", "label": "post hoc lead"}),
+        ),
+        "Wind speed by UKV-CEDA lead (post hoc)": station_rows(
+            records=set_a,
+            selectors=_lead_selectors(base={"variable": "wind", "label": "post hoc lead"}),
+        ),
+    }
+    units = {name: "K" if name.startswith("Temp") else "m/s" for name in panels}
+    chart = _figure(
+        panels=panels,
+        units=units,
+        number=5,
+        title="UKV-CEDA's advantage at the four stations shrinks as the lead grows",
+        subtitle=[
+            KEY_SUBTITLE,
+            (
+                "A lead is the UTC hour modulo 6, so a lead is also an hour of day. All rows are "
+                "post hoc."
+            ),
+        ],
+    )
+    return chart, list(panels.values())
+
+
+def wind_lead_figure(*, set_b: Sequence[dict[str, Any]]) -> FigureRows:
+    """Draw Figure 6: P3 by lead and by window, and the matched 10 m pair.
+
+    Args:
+        set_b: Set B's interval records.
+
+    Returns:
+        The figure and its rows.
+    """
+    published = next(r["scope"] for r in set_b if r["kind"] == "published window")
+    era_scopes = {
+        r["scope"][:5]: r["scope"] for r in set_b if r["kind"] == "era" and r["label"] == "P3"
+    }
+    windows: list[Selector] = [
+        (WINDOW_LABELS[scope], {"label": "P3", "scope": scope}) for scope in WINDOW_SCOPES
+    ]
+    windows += [
+        (
+            "From 2024-08-12, the published wind page's window",
+            {"label": "P3", "scope": published},
+        ),
+        ("Era 1, 2020-01 to 2026-01", {"label": "P3", "scope": era_scopes["era 1"]}),
+        ("Era 2, 2026-02 onward", {"label": "P3", "scope": era_scopes["era 2"]}),
+    ]
+    panels = {
+        "P3 by UKV-CEDA lead (post hoc)": set_b_rows(
+            records=set_b, selectors=_lead_selectors(base={"label": "P3"}), with_second=True
+        ),
+        "P3 by window and era": set_b_rows(records=set_b, selectors=windows, with_second=True),
+        "Matched 10 m pair by lead (post hoc)": set_b_rows(
+            records=set_b,
+            selectors=[
+                ("All hours", {"label": "post hoc matched 10 m", "scope": "all"}),
+                *_lead_selectors(base={"label": "post hoc matched 10 m"}),
+            ],
+            with_second=True,
+        ),
+    }
+    chart = _figure(
+        panels=panels,
+        units=_units(names=list(panels), unit=CAPACITY_UNIT),
+        number=6,
+        title=(
+            "ERA5's wind-power advantage grows with UKV-CEDA's lead, and holds with 10 m wind alone"
+        ),
+        subtitle=[
+            KEY_SUBTITLE,
+            (
+                "Lead is also hour of day. Planned: P3 on all hours and P3's early and late "
+                "windows. "
+                "Every other row is post hoc."
+            ),
+        ],
+    )
+    return chart, list(panels.values())
+
+
+def splits_figures(
+    *, set_a: Sequence[dict[str, Any]], set_b: Sequence[dict[str, Any]]
+) -> dict[str, FigureRows]:
+    """Draw Figures 7 and 8: the station splits and the power splits.
+
+    Args:
+        set_a: Set A's interval records.
+        set_b: Set B's interval records.
+
+    Returns:
+        Each figure by its file stem.
+    """
+    years = sorted({r["scope"] for r in set_b if r["kind"] == "year" and r["label"] == "P3"})
+    half_years = ("October to March", "April to September")
+    stations = sorted({r["scope"][-2:] for r in set_a if r["scope"].startswith("station")})
+    set_a_panels = {
+        f"{_cap(variable)}, by year, season, station, and without one station": station_rows(
             records=set_a,
             selectors=[
                 *[
-                    (scope.capitalize(), {"variable": variable, "scope": scope})
+                    (_cap(scope), {"variable": variable, "scope": scope})
                     for scope in (*(f"year {y}" for y in range(2019, 2026)), *half_years)
                 ],
                 *[
                     (f"Station {s}", {"variable": variable, "scope": f"station {s}"})
-                    for s in sorted(
-                        {r["scope"][-2:] for r in set_a if r["scope"].startswith("station")}
+                    for s in stations
+                ],
+                *[
+                    (
+                        f"Without station {s} (post hoc)",
+                        {
+                            "variable": variable,
+                            "label": "post hoc leave one out",
+                            "scope": f"without station {s}",
+                        },
                     )
+                    for s in stations
                 ],
             ],
         )
         for variable in ("wind", "temperature")
     }
-    set_a_splits["Temperature by UKV-CEDA lead (P2-lead, planned)"] = station_rows(
+    set_a_panels["Temperature by UKV-CEDA lead group (P2-lead, planned)"] = station_rows(
         records=set_a,
         selectors=[
-            (scope.capitalize(), {"variable": "temperature", "label": "P2-lead", "scope": scope})
+            (_cap(scope), {"variable": "temperature", "label": "P2-lead", "scope": scope})
             for scope in ("leads 0 to 2", "leads 3 to 5")
         ],
     )
-    set_b_splits = {
+    set_a_units = {name: "m/s" if name.startswith("Wind") else "K" for name in set_a_panels}
+    set_b_panels = {
         f"{name}, XGBoost models": set_b_rows(
             records=set_b,
             selectors=[
-                (scope.capitalize(), {"label": label, "scope": scope})
-                for scope in (*years, *half_years)
+                (_cap(scope), {"label": label, "scope": scope}) for scope in (*years, *half_years)
             ],
             with_second=True,
         )
         for name, label in (("P3 wind farm power", "P3"), ("P4 solar farm power", "P4"))
     }
-    controls = {
-        f"{domain.capitalize()} controls and checks": set_b_rows(
+    farms = sorted(
+        {r["scope"] for r in set_b if r["kind"] == "site" and r["label"] == "P3 by generator"}
+    )
+    set_b_panels["P3 wind farm power by wind farm, XGBoost models"] = set_b_rows(
+        records=set_b,
+        selectors=[
+            (
+                f"Wind farm {farm.removeprefix('generator ')}",
+                {"label": "P3 by generator", "scope": farm},
+            )
+            for farm in farms
+        ],
+        with_second=True,
+    )
+    return {
+        "fig07_stations": (
+            _figure(
+                panels=set_a_panels,
+                units=set_a_units,
+                number=7,
+                title=(
+                    "UKV-CEDA is closer than ERA5 at three of four stations, and no one station "
+                    "decides the sign"
+                ),
+                subtitle=[KEY_SUBTITLE],
+            ),
+            list(set_a_panels.values()),
+        ),
+        "fig08_power_splits": (
+            _figure(
+                panels=set_b_panels,
+                units=_units(names=list(set_b_panels), unit=CAPACITY_UNIT),
+                number=8,
+                title=(
+                    "ERA5's wind-power advantage is concentrated in October to March and at one of "
+                    "three farms"
+                ),
+                subtitle=[
+                    KEY_SUBTITLE,
+                    "All rows are exploratory splits of the planned contrasts.",
+                ],
+            ),
+            list(set_b_panels.values()),
+        ),
+    }
+
+
+def controls_figure(*, set_b: Sequence[dict[str, Any]]) -> FigureRows:
+    """Draw Figure 9: the negative controls, the noise floor, and the power-hour checks.
+
+    The arm-against-its-own-shuffled-arm rows are not drawn, because their size (12 points of
+    capacity for wind) would flatten every other row. Figure 4 shows each arm's own error.
+
+    Args:
+        set_b: Set B's interval records.
+
+    Returns:
+        The figure and its rows.
+    """
+    wind_labels = {
+        "control": "Shuffled UKV-CEDA minus shuffled ERA5 (negative control)",
+        "GPU against CPU": "ERA5 arm refitted on the CPU minus fitted on the GPU",
+        "hour-ending pair": "UKV-CEDA minus ERA5, power hour ending at the label",
+        "ERA5 power-hour offset": "ERA5, hour ending at the label minus centred",
+        "UKV-CEDA power-hour offset": "UKV-CEDA, hour ending at the label minus centred",
+    }
+    panels = {
+        "Wind controls and checks": set_b_rows(
             records=set_b,
             selectors=[
-                (label.capitalize(), {"domain": domain, "label": label, "scope": "all"})
-                for label in labels
+                (text, {"domain": "wind", "label": label, "scope": "all", "kind": "all"})
+                for label, text in wind_labels.items()
             ],
             with_second=False,
-        )
-        for domain, labels in (
-            (
-                "wind",
+            with_errors=False,
+        ),
+        "Solar negative control": set_b_rows(
+            records=set_b,
+            selectors=[
                 (
-                    "control",
-                    "era5 against its shuffled arm",
-                    "UKV-CEDA against its shuffled arm",
-                    "hour-ending pair",
-                    "ERA5 power-hour offset",
-                    "UKV-CEDA power-hour offset",
-                    "GPU against CPU",
-                ),
+                    "Shuffled UKV-CEDA minus shuffled ERA5 temperature (negative control)",
+                    {"domain": "solar", "label": "control", "scope": "all", "kind": "all"},
+                )
+            ],
+            with_second=False,
+            with_errors=False,
+        ),
+    }
+    chart = _figure(
+        panels=panels,
+        units=_units(names=list(panels), unit=CAPACITY_UNIT),
+        number=9,
+        x_title="First arm minus second arm (points of capacity)",
+        zero_label="no difference",
+        better_label="first arm better",
+        title=(
+            "Shuffled UKV-CEDA and shuffled ERA5 differ by about zero, with a wind interval as "
+            "wide as the 0.16-point margin"
+        ),
+        subtitle=[
+            (
+                "Each dot is the first arm's mean absolute error minus the second's, named in the "
+                "row label, and each line is a 95% interval from resampling whole calendar "
+                "months. All rows are exploratory and have no margin."
             ),
             (
-                "solar",
-                (
-                    "control",
-                    "era5 against its shuffled arm",
-                    "UKV-CEDA against its shuffled arm",
-                ),
+                "The control shuffles each product's weather within a generator, month, and hour "
+                "of day, so the two shuffled arms should differ by about zero."
             ),
-        )
-    }
-    split_units = {
-        name: "m/s"
-        if name.startswith("Wind, st")
-        else "K"
-        if name.endswith("stations") or name.startswith("Temperature")
-        else "points of capacity"
-        for name in {**set_a_splits, **set_b_splits}
-    }
-    control_units = dict.fromkeys(controls, "points of capacity")
+        ],
+    )
+    return chart, list(panels.values())
+
+
+def interval_figures(
+    *, set_a: Sequence[dict[str, Any]], set_b: Sequence[dict[str, Any]]
+) -> dict[str, FigureRows]:
+    """Draw every interval figure and return the rows each draws.
+
+    Args:
+        set_a: Set A's interval records.
+        set_b: Set B's interval records.
+
+    Returns:
+        Each figure by its file stem, with its panels' rows for the check against the reports.
+    """
     return {
-        "ukv_vs_era5_headline": (
-            _figure(
-                panels=headline,
-                units=units,
-                number=1,
-                title="UKV-CEDA against ERA5 for wind speed and air temperature, 2019 to 2026",
-                subtitle=[
-                    KEY_SUBTITLE,
-                    (
-                        "A hollow triangle is the second hyperparameter setting. A dashed line "
-                        "has too few months for an interval."
-                    ),
-                ],
-            ),
-            list(headline.values()),
-        ),
-        "ukv_vs_era5_stations": (
-            _figure(
-                panels=set_a_splits,
-                units=split_units,
-                number=2,
-                title="UKV-CEDA against ERA5 at four stations, by year, season, station and lead",
-                subtitle=[KEY_SUBTITLE],
-            ),
-            list(set_a_splits.values()),
-        ),
-        "ukv_vs_era5_power_splits": (
-            _figure(
-                panels=set_b_splits,
-                units=split_units,
-                number=3,
-                title="UKV-CEDA against ERA5 for farm power, by year and half-year",
-                subtitle=[KEY_SUBTITLE],
-            ),
-            list(set_b_splits.values()),
-        ),
-        "ukv_vs_era5_controls": (
-            _figure(
-                panels=controls,
-                units=control_units,
-                number=4,
-                title="Shuffled weather columns and power-hour checks",
-                subtitle=[
-                    KEY_SUBTITLE,
-                    (
-                        "The control shuffles each product's weather within a generator, month, "
-                        "and hour of day, so the two shuffled arms should differ by about zero."
-                    ),
-                ],
-            ),
-            list(controls.values()),
-        ),
+        "fig01_headline": headline_figure(set_a=set_a, set_b=set_b),
+        "fig05_station_leads": station_lead_figure(set_a=set_a),
+        "fig06_wind_leads": wind_lead_figure(set_b=set_b),
+        **splits_figures(set_a=set_a, set_b=set_b),
+        "fig09_controls": controls_figure(set_b=set_b),
     }
+
+
+ABSOLUTE_ROW: Final[re.Pattern[str]] = re.compile(
+    r"^\| (\S+) \| (pooled|sensitivity) \| ([\d.]+) \| \[([\d.]+), ([\d.]+)\] \| [\d,]+ \|$"
+)
+ABSOLUTE_HEADING: Final[re.Pattern[str]] = re.compile(
+    r"^#### (\w+): every arm's mean absolute error"
+)
+SHOWN_DOMAINS: Final[dict[str, str]] = {
+    "wind": "Wind farms: as-available arms (ERA5 100 m and 10 m; UKV-CEDA 10 m and 925 hPa)",
+    "wind_matched": "Wind farms: matched 10 m arms (post hoc)",
+    "solar": "Solar farms: temperature arms",
+}
+ARM_LABELS: Final[dict[str, str]] = {
+    "era5_wind": "ERA5 wind",
+    "ukv_ceda_wind": "UKV-CEDA wind",
+    "era5_wind_shuffled": "ERA5 wind, shuffled (control)",
+    "ukv_ceda_wind_shuffled": "UKV-CEDA wind, shuffled (control)",
+    "era5_wind_10m": "ERA5 10 m wind",
+    "ukv_ceda_wind_10m": "UKV-CEDA 10 m wind",
+    "solar_era5_temp": "ERA5 temperature",
+    "solar_ukv_ceda_temp": "UKV-CEDA temperature",
+    "solar_era5_temp_shuffled": "ERA5 temperature, shuffled (control)",
+    "solar_ukv_ceda_temp_shuffled": "UKV-CEDA temperature, shuffled (control)",
+}
+
+
+def absolute_errors(*, report: str) -> pl.DataFrame:
+    """Read every arm's absolute error and interval from the set B report.
+
+    Args:
+        report: The text of `report.md`.
+
+    Returns:
+        `domain`, `arm`, `setting`, `value`, `lower`, `upper`, one row per table row of a shown
+        domain and a labelled arm.
+    """
+    rows: list[dict[str, Any]] = []
+    domain = ""
+    for line in report.splitlines():
+        heading = ABSOLUTE_HEADING.match(line)
+        if heading:
+            domain = heading.group(1)
+            continue
+        match = ABSOLUTE_ROW.match(line)
+        if match and domain in SHOWN_DOMAINS and match.group(1) in ARM_LABELS:
+            arm, setting, value, lower, upper = match.groups()
+            rows.append(
+                {
+                    "domain": domain,
+                    "arm": arm,
+                    "setting": setting,
+                    "value": float(value),
+                    "lower": float(lower),
+                    "upper": float(upper),
+                }
+            )
+    return pl.DataFrame(rows)
+
+
+def absolute_figure(*, errors: pl.DataFrame) -> alt.VConcatChart:
+    """Draw Figure 4: every arm's mean absolute error, as a dot with its 95% interval.
+
+    Args:
+        errors: `absolute_errors`'s result.
+
+    Returns:
+        The figure.
+    """
+    panels = []
+    for domain, title in SHOWN_DOMAINS.items():
+        data = errors.filter(pl.col("domain") == domain).with_columns(
+            label=pl.col("arm").replace(ARM_LABELS),
+            product=pl.when(pl.col("arm").str.contains("ukv_ceda"))
+            .then(pl.lit("UKV-CEDA"))
+            .otherwise(pl.lit("ERA5")),
+        )
+        order = list(dict.fromkeys(data.sort("arm")["label"].to_list()))
+        base = alt.Chart(data).encode(
+            y=alt.Y("label:N", sort=order, title=None, axis=alt.Axis(labelLimit=330)),
+            color=alt.Color(
+                "product:N",
+                title="",
+                scale=alt.Scale(
+                    domain=["ERA5", "UKV-CEDA"], range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]
+                ),
+            ),
+        )
+        rule = base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X(
+                "lower:Q",
+                scale=alt.Scale(zero=False),
+                title="Mean absolute error (% of capacity; smaller is better)",
+                axis=alt.Axis(tickCount=5, format=".1f"),
+            ),
+            x2="upper:Q",
+        )
+        dot = base.mark_point(filled=True, size=60).encode(x="value:Q")  # ty: ignore[unresolved-attribute]
+        panels.append(
+            alt.layer(
+                rule.transform_filter(alt.datum.setting == "pooled"),
+                dot.transform_filter(alt.datum.setting == "pooled"),
+            ).properties(
+                width=380, height=26 * len(order), title=alt.TitleParams(title, anchor="start")
+            )
+        )
+    return (
+        alt.vconcat(*panels, spacing=40)
+        .properties(
+            title=alt.TitleParams(
+                wrapped(
+                    text="Figure 4: An XGBoost model given weather that has been shuffled errs "
+                    "about 12 points more than one given the real weather",
+                    width=72,
+                ),
+                subtitle=[
+                    (
+                        "Dot: mean absolute error at the primary setting. Line: 95% interval from "
+                        "resampling whole calendar months and a fitting seed. Smaller is better. "
+                        "Rows are scored on the same hours within each panel."
+                    ),
+                ],
+                anchor="start",
+                offset=24,
+            )
+        )
+        .configure_view(stroke=None)
+        .configure_legend(orient="bottom", direction="horizontal")
+    )
+
+
+def steps_figure(*, steps: pl.DataFrame) -> alt.VConcatChart:
+    """Draw Figure 10: the monthly means of UKV-CEDA and ERA5 against the stations.
+
+    Args:
+        steps: `monthly_steps.parquet`.
+
+    Returns:
+        The figure, with the licence line in its subtitle.
+    """
+    long = steps.unpivot(
+        ["ukv_minus_era5", "ukv_minus_station", "era5_minus_station"],
+        index=["variable", "month"],
+        variable_name="series",
+        value_name="mean",
+    ).with_columns(
+        date=pl.col("month").str.to_date("%Y-%m"),
+        series=pl.col("series").replace(SERIES_LABELS),
+    )
+    panels = [
+        alt.Chart(long.filter(pl.col("variable") == variable))
+        .mark_line(strokeWidth=1)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("date:T", title="Month", axis=alt.Axis(format="%Y", tickCount="year")),
+            y=alt.Y("mean:Q", title=f"Monthly mean difference ({unit})"),
+            color=alt.Color(
+                "series:N",
+                title="",
+                scale=alt.Scale(
+                    domain=list(SERIES_LABELS.values()),
+                    range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_PURPLE],
+                ),
+            ),
+        )
+        .properties(width=520, height=110, title=title)
+        for variable, unit, title in (
+            ("wind", "m/s", "Wind speed"),
+            ("temperature", "K", "Air temperature"),
+        )
+    ]
+    return (
+        alt.vconcat(*panels, spacing=20)
+        .properties(
+            title=alt.TitleParams(
+                wrapped(
+                    text="Figure 10: No step in UKV-CEDA minus ERA5 marks a change of UKV, but "
+                    "the station series step together around August 2021",
+                    width=72,
+                ),
+                subtitle=[
+                    (
+                        "Monthly means at the stations with values in every month. Post hoc and "
+                        "exploratory: no threshold was set before the series was seen."
+                    ),
+                    (
+                        "Contains Met Office UKV data from CEDA (CC BY-NC-SA 4.0), Met Office "
+                        "(2016): NWP-UKV, Centre for Environmental Data Analysis."
+                    ),
+                ],
+                anchor="start",
+            )
+        )
+        .configure_view(stroke=None)
+        .configure_legend(orient="bottom", direction="horizontal")
+    )
+
+
+SERIES_LABELS: Final[dict[str, str]] = {
+    "ukv_minus_era5": "UKV-CEDA minus ERA5",
+    "ukv_minus_station": "UKV-CEDA minus station",
+    "era5_minus_station": "ERA5 minus station",
+}
 
 
 def pick_weeks(*, hourly: pl.DataFrame) -> dict[str, datetime]:
@@ -503,7 +918,9 @@ def pick_weeks(*, hourly: pl.DataFrame) -> dict[str, datetime]:
     }
 
 
-def predictions_chart(*, losses: pl.DataFrame, arms: dict[str, str], title: str) -> alt.Chart:
+def predictions_chart(
+    *, losses: pl.DataFrame, arms: dict[str, str], title: str
+) -> tuple[alt.FacetChart, dict[str, datetime]]:
     """Draw out-of-fold power against measured, per generator, in three chosen weeks.
 
     Args:
@@ -513,7 +930,8 @@ def predictions_chart(*, losses: pl.DataFrame, arms: dict[str, str], title: str)
         title: The chart's title.
 
     Returns:
-        The chart.
+        The chart, and the first day of each chosen week, which only the text may carry as a month
+        and year.
     """
     drawn = losses.filter(pl.col("arm").is_in(list(arms)), pl.col("setting") == PRIMARY_SETTING)
     measured = (
@@ -535,33 +953,50 @@ def predictions_chart(*, losses: pl.DataFrame, arms: dict[str, str], title: str)
     weeks = pick_weeks(hourly=pooled)
     parts = [
         long.filter(pl.col("time") >= start, pl.col("time") < start + timedelta(days=WEEK_DAYS))
-        .with_columns(week=pl.lit(f"{name}: from {start:%Y-%m-%d}"))
+        .with_columns(week=pl.lit(name.capitalize()))
         .with_columns(hours=(pl.col("time") - start).dt.total_hours())
         for name, start in weeks.items()
     ]
-    data = pl.concat(parts)
+    grid = (
+        pl.DataFrame({"hours": range(WEEK_DAYS * 24)})
+        .join(pl.DataFrame({"week": [p["week"][0] for p in parts]}), how="cross")
+        .join(long.select("site", "series").unique(), how="cross")
+    )
+    data = grid.join(
+        pl.concat(parts).select("week", "site", "series", "hours", "value"),
+        on=["week", "site", "series", "hours"],
+        how="left",
+    )
     return (
-        alt.Chart(data)
-        .mark_line(strokeWidth=1)
-        .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("hours:Q", title="Hours from the start of the week"),
-            y=alt.Y("value:Q", title="Power, share of capacity"),
-            color=alt.Color(
-                "series:N",
-                title="",
-                scale=alt.Scale(
-                    domain=["Measured", *arms.values()],
-                    range=[ocf.BLACK_1, ocf.DATA_BLUE, ocf.BRAND_ORANGE][: len(arms) + 1],
+        (
+            alt.Chart(data)
+            .mark_line(strokeWidth=1, aria=False)
+            .encode(  # ty: ignore[unresolved-attribute]
+                x=alt.X("hours:Q", title="Hours from the start of the week"),
+                y=alt.Y("value:Q", title=None),
+                color=alt.Color(
+                    "series:N",
+                    title="",
+                    scale=alt.Scale(
+                        domain=["Measured", *arms.values()],
+                        range=[ocf.BLACK_1, ocf.DATA_BLUE, ocf.BRAND_ORANGE][: len(arms) + 1],
+                    ),
                 ),
-            ),
-        )
-        .properties(width=170, height=70, title=title)
-        .facet(row=alt.Row("site:N", title=""), column=alt.Column("week:N", title=""))
+            )
+            .properties(width=150, height=60)
+            .facet(row=alt.Row("site:N", title=""), column=alt.Column("week:N", title=""))
+            .properties(title=alt.TitleParams(title, anchor="start", offset=16))
+        ),
+        weeks,
     )
 
 
+WEEKS_NAME: Final[str] = "chart_weeks.md"
+"""The report that names the month and year of each week the prediction figures draw."""
+
+
 def main() -> int:
-    """Check each figure against its report, and write the SVG files."""
+    """Check each figure against its report, and write the SVG files and the weeks report."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
     parser.add_argument("--assets-dir", type=Path, default=ASSETS_DIR)
@@ -569,31 +1004,50 @@ def main() -> int:
     directory: Path = arguments.output_dir
     set_a = pl.read_parquet(directory / STATION_INTERVALS_NAME).to_dicts()
     set_b = pl.read_parquet(directory / INTERVALS_NAME).to_dicts()
-    reports = (directory / STATION_REPORT_NAME).read_text() + (directory / REPORT_NAME).read_text()
-    arguments.assets_dir.mkdir(parents=True, exist_ok=True)
+    report = (directory / REPORT_NAME).read_text()
+    reports = (directory / STATION_REPORT_NAME).read_text() + report
+    assets: Path = arguments.assets_dir
+    assets.mkdir(parents=True, exist_ok=True)
     drawn = interval_figures(set_a=set_a, set_b=set_b)
     for rows in (rows for _, panels in drawn.values() for rows in panels):
         check_against_report(rows=rows, report=reports, name="the reports")
     for stem, (chart, _) in drawn.items():
-        chart.save(arguments.assets_dir / f"{stem}.svg")
-    for domain, arms in (
+        chart.save(assets / f"{stem}.svg")
+    absolute_figure(errors=absolute_errors(report=report)).save(
+        assets / "fig04_absolute_errors.svg"
+    )
+    steps_figure(steps=pl.read_parquet(directory / "monthly_steps.parquet")).save(
+        assets / "fig10_monthly_steps.svg"
+    )
+    lines = ["### Weeks drawn in Figures 2 and 3, chosen by rule", ""]
+    for number, (domain, arms) in enumerate(
         (
-            "wind",
-            {"era5_wind": "ERA5", "ukv_ceda_wind": "UKV-CEDA"},
+            ("wind", {"era5_wind": "ERA5", "ukv_ceda_wind": "UKV-CEDA"}),
+            (
+                "solar",
+                {
+                    "solar_era5_temp": "ERA5 temperature",
+                    "solar_ukv_ceda_temp": "UKV-CEDA temperature",
+                },
+            ),
         ),
-        (
-            "solar",
-            {"solar_era5_temp": "ERA5 temperature", "solar_ukv_ceda_temp": "UKV-CEDA temperature"},
-        ),
+        start=2,
     ):
-        losses = pl.read_parquet(directory / f"losses_{domain}.parquet")
-        chart = predictions_chart(
-            losses=losses,
+        chart, weeks = predictions_chart(
+            losses=pl.read_parquet(directory / f"losses_{domain}.parquet"),
             arms=arms,
-            title=f"Out-of-fold {domain} farm power in three weeks chosen by rule",
+            title=(
+                f"Figure {number}: Out-of-fold {domain} farm power as a share of capacity, "
+                "in three weeks chosen by rule"
+            ),
         )
-        chart.save(arguments.assets_dir / f"ukv_vs_era5_{domain}_weeks.svg")
-    sys.stdout.write(f"Wrote figures to {arguments.assets_dir}.\n")
+        chart.save(assets / f"fig0{number}_{domain}_weeks.svg")
+        lines += [f"- {domain}, {name}: {start:%B %Y}." for name, start in weeks.items()]
+    weeks_path = directory / WEEKS_NAME
+    if not weeks_path.exists():
+        weeks_path.write_text("\n".join(lines) + "\n")
+    sys.stdout.write("\n".join(lines) + "\n")
+    sys.stdout.write(f"Wrote figures to {assets}.\n")
     return 0
 
 
