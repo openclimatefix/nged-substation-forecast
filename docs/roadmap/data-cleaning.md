@@ -25,19 +25,9 @@ capacity, the leaderboard's `metrics`, and the two dashboards read only the rows
 is null, through `nged_data.storage.scan_cleaned_power`. The raw table is never modified, so
 changing a rule means re-running one asset over data already on disk.
 
-**To add a rule, write a boolean Polars expression that is true for a row to drop.** Add it as one
-more `.when(...).then(pl.lit("<reason>"))` branch of the chain in `flag_nged_power`, and add the
-reason to `contracts.power_schemas.DROP_REASONS`. The first matching branch wins. A rule keeps this
-contract: it returns every input row exactly once, never changes `time_series_id` or `time`, flags
-rather than deletes, and calls no `collect`. A rule that needs more than one series' readings, such
-as comparing a PV site with its neighbours or finding each series' first reading, can have them,
-because the function receives the whole table.
-
-**The asset reports the effect of each rule, so a rule needs no logging code.** For each drop
-reason, the asset's Dagster output metadata holds the rows and series flagged, the minimum and
-maximum flagged power, and the first and last flagged time. A rule's author gets these figures by
-choosing a distinct reason name. Output from Python's `logging` inside the function reaches only the
-step's captured stderr.
+**The `flag_nged_power` docstring says how to add a rule and what the asset reports about it.**
+Read it on the
+[API page](https://openclimatefix.github.io/nged-substation-forecast/api/nged_data/#nged_data.cleaning.flag_nged_power).
 
 **The one rule today is an example, `substation_zero`.** It flags a reading of exactly 0 from a
 `Primary`, `BSP`, or `GSP` series, because a substation almost never truly reads zero. On the V1 data

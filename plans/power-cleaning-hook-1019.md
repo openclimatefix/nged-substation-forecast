@@ -185,10 +185,13 @@ table.
   list `vacuum` returns repeats already-deleted paths on later calls, so its length is never
   reported as a count of files deleted.
 - The write commit's `custom_metadata` records a `CleaningProvenance` (a small frozen dataclass in
-  `nged_data.cleaning`, with a reader beside it):
+  `delta_store.cleaned_power_time_series`, with a reader beside it; its keys are generated from the
+  dataclass fields):
     - `raw_table_id` and `raw_version` — the raw table's Delta table id and the version the cleaning
       read. The id guards against a deleted and rebuilt raw table, whose versions restart at 0.
     - `code_hash` — `CLEANING_CODE_HASH` (below), which the skip compares.
+    - `roster_hash` — a SHA-256 of Polars' per-row hashes of the validated roster sorted by
+      `time_series_id`, which the skip compares.
     - `git_sha` — the git SHA of the code that did the cleaning, for provenance only: from
       `ml_core.repro.get_git_info`, or, when that returns `UNKNOWN` as it does in the container,
       from a non-empty `GIT_SHA` environment variable (set by `build_and_verify_image.sh`), else
@@ -220,8 +223,8 @@ The asset gets its own module rather than joining `defs/assets.py`, which holds 
       the ingest job runs hourly as a cheap retry. The ingest only commits a new raw version when
       new rows arrive: on the real V1 table all 50 commits are writes, and the ingest never runs
       optimize or vacuum. At the start of each run the asset reads the raw table's id and current
-      version and compares them, and `CLEANING_CODE_HASH`, with the provenance in the cleaned
-      table's newest `WRITE` commit. When all three match, and the run's config does not set
+      version and compares them, `CLEANING_CODE_HASH`, and the roster hash, with the provenance in the cleaned
+      table's newest `WRITE` commit. When all four match, and the run's config does not set
       `force`, it returns at once with `skipped: True` metadata, which costs reading two Delta logs.
       Otherwise, including when there is no provenance, it rebuilds. That gives about four rewrites
       a day instead of 24.
@@ -234,8 +237,7 @@ The asset gets its own module rather than joining `defs/assets.py`, which holds 
       always has untracked files) would never skip, and the container has no git repository at
       all.
     - **`force`**: a `CleanNgedPowerDataConfig(force: bool = False)` run config makes a manual run
-      rebuild regardless, for example after a hand-edited roster, which the skip test does not
-      cover (see Risks). A schedule with no `run_config` runs it with the default (the reviewer
+      rebuild regardless. A schedule with no `run_config` runs it with the default (the reviewer
       checked).
     - If the raw table does not exist yet, log and return with `n_rows: 0` metadata rather than
       raising, because an absent input degrades (inherent-stability).
@@ -456,10 +458,10 @@ V1 data to check the run time and the on-disk size after vacuum.
    0.25% of substation rows that read zero stop being scored, and training stops seeing them.
    Leaderboard rows scored before this change are not strictly comparable with rows scored after
    it. Recommendation: re-score the current champion and the baselines once this merges.
-3. **The roster is not part of the skip test.** A roster change with no new power data leaves the
-   cleaned table as it was until the next NGED delivery, at most about 6 hours later. No rule reads
-   the roster today. Recommendation: accept, and add the roster file's modification time to the
-   skip test when the first rule that reads the roster lands.
+3. **The roster is part of the skip test.** The asset records a hash of the validated roster in the
+   write's commit and compares it like the code hash, so a roster change rebuilds on the next
+   hourly run. Handled; no residual risk beyond one extra rebuild after a Polars upgrade changes
+   the row hashes.
 
 ## Review log
 

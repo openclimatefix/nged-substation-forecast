@@ -257,7 +257,7 @@ table was built from a raw table 2 or more commits (about 6 to 12 hours of NGED 
 than the current one, from a different raw table, or is absent. It is the only signal for a
 cleaning job that stopped running without failing, and it appears only in the Checks view. Fix
 the cause, then materialise `clean_nged_power_data`; set its `force` run config to rebuild even
-when nothing has changed, for example after hand-editing the roster. `vacuum_failed: True` in the
+when nothing has changed. `vacuum_failed: True` in the
 run's metadata means the new table was written and only deleting the superseded files failed, which
 also reaches Sentry tagged `degraded_asset:clean_nged_power_data`.
 

@@ -8,11 +8,12 @@ Lake time travel makes data versioning one integer per table. A run can therefor
 replayed with ``pl.scan_delta(path, version=N)`` after ``git checkout {sha}``.
 
 The one exception is observed power. The ``cleaned_power_time_series`` table is overwritten and
-vacuumed within hours, so its own versions cannot be replayed. A stage that reads it stamps the
-cleaning's provenance under ``{stage}_cleaned_power_time_series_source`` instead: the raw table's
-version that the cleaning read, and the git SHA of the cleaning code (see
-``nged_data.cleaning.cleaned_power_provenance_tag``). Replaying means re-running the cleaning over
-that raw version at that SHA.
+vacuumed within hours, so its own versions cannot be replayed, and a stage that reads it cannot use
+``provenance_tags``' ``delta_paths`` for it. Such a stage stamps the cleaning's provenance under
+``{stage}_cleaned_power_time_series_source`` instead: the raw table's id and version that the
+cleaning read, and the git SHA of the cleaning code. Replaying means re-running the cleaning over
+that raw version at that SHA, which can differ from the stage's own SHA because an unchanged
+cleaned table is not rebuilt.
 
 Every function here is deliberately **non-raising**: the git SHA, the dirty flag, and each Delta
 table's version are a record *about* a run rather than an input to that run. The surrounding
@@ -51,16 +52,14 @@ StageType = Literal["register", "train", "predict", "metrics"]
 op starts stamping."""
 
 TableNameType = Literal[
-    "power_time_series",
     "nwp_data",
     "eligible_time_series",
     "power_forecasts",
     "effective_capacity",
 ]
 """Logical names of the Delta tables whose versions get stamped — the keys of a ``delta_paths``
-mapping. ``power_time_series`` is the raw table, which only the ingest reads; stages that read the
-cleaned table stamp its provenance separately (see the module docstring). Add a new
-``TableNameType`` value when a stage starts reading (and stamping) another table."""
+mapping. Add a new ``TableNameType`` value when a stage starts reading (and stamping) another
+table."""
 
 UNKNOWN: Final[str] = "unknown"
 """Sentinel git SHA / dirty flag returned when no git repository is reachable (e.g. a container)."""

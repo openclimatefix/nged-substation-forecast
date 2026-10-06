@@ -86,8 +86,8 @@ from dagster import (
     TableSchema,
     asset_check,
 )
+from delta_store.cleaned_power_time_series import read_cleaning_provenance
 from deltalake import DeltaTable
-from nged_data.cleaning import read_cleaning_provenance
 from nged_data.storage import time_series_coverage
 
 from nged_substation_forecast._sentry import report_check_degradation, report_power_freshness
@@ -510,7 +510,8 @@ def _check_cleaned_power_keeps_up() -> AssetCheckResult:
             passed=False,
             severity=AssetCheckSeverity.WARN,
             description=(
-                "The cleaned power table is absent, or its newest write records no provenance."
+                "The cleaned power table is absent or unreadable, or its newest write records no"
+                " provenance."
                 " Materialise `clean_nged_power_data`."
             ),
             metadata={"raw_version": raw_version},

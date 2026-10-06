@@ -35,6 +35,7 @@ from dagster import (
     StaticPartitionsDefinition,
     asset,
 )
+from delta_store.cleaned_power_time_series import read_cleaning_provenance
 from delta_store.effective_capacity import write_effective_capacity
 from delta_store.eligible_time_series import write_eligible_time_series
 from delta_store.forecast_metrics import write_forecast_metrics
@@ -58,8 +59,7 @@ from ml_core.mlflow_runs import (
     get_or_create_parent_run,
     load_experiment_forecaster,
 )
-from ml_core.repro import MlflowTags, StageType, TableNameType, provenance_tags
-from nged_data.cleaning import cleaned_power_provenance_tag
+from ml_core.repro import ABSENT, MlflowTags, StageType, TableNameType, provenance_tags
 from nged_data.storage import coverage_from_power, scan_cleaned_power, time_series_coverage
 
 from nged_substation_forecast.defs._engineering_inputs import (
@@ -223,9 +223,10 @@ def _provenance_tags_with_cleaned_power(
 ) -> MlflowTags:
     """``provenance_tags`` for ``stage``, plus the cleaned power table's provenance.
 
-    The cleaned table is overwritten and vacuumed within hours, so its Delta version cannot be
-    replayed. The extra tag, ``{stage}_cleaned_power_time_series_source``, names the raw power
-    version the cleaning read and the git SHA of the cleaning code, or ``ABSENT``.
+    The extra tag, ``{stage}_cleaned_power_time_series_source``, names the raw power table and
+    version the cleaning read and the git SHA of the cleaning code, or ``ABSENT``. Why the cleaned
+    table's own Delta version is not stamped is explained in the ``ml_core.repro`` module
+    docstring.
 
     Args:
         stage: The stage prefix passed to ``provenance_tags``.
@@ -236,9 +237,17 @@ def _provenance_tags_with_cleaned_power(
         The stage-prefixed provenance tags.
     """
     tags = provenance_tags(stage, delta_paths, storage_options=settings.storage_options)
-    tags[f"{stage}_cleaned_power_time_series_source"] = cleaned_power_provenance_tag(
+    provenance = read_cleaning_provenance(
         settings.cleaned_power_time_series_data_path, settings.storage_options
     )
+    source_tag = f"{stage}_cleaned_power_time_series_source"
+    if provenance is None:
+        tags[source_tag] = ABSENT
+    else:
+        tags[source_tag] = (
+            f"raw_table_id={provenance.raw_table_id};raw_version={provenance.raw_version};"
+            f"git_sha={provenance.git_sha}"
+        )
     return tags
 
 

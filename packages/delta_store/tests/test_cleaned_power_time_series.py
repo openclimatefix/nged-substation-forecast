@@ -7,16 +7,24 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.power_schemas import CleanedPowerTimeSeries
-from delta_store.cleaned_power_time_series import VacuumError, write_cleaned_power_time_series
-from deltalake import DeltaTable
-from nged_data.cleaning import CleaningProvenance, read_cleaning_provenance
+from delta_store.cleaned_power_time_series import (
+    CleaningProvenance,
+    VacuumError,
+    read_cleaning_provenance,
+    write_cleaned_power_time_series,
+)
+from deltalake import CommitProperties, DeltaTable, write_deltalake
 
 _T0 = datetime(2025, 6, 1, tzinfo=UTC)
 
 
 def _provenance(raw_version: int) -> CleaningProvenance:
     return CleaningProvenance(
-        raw_table_id="raw-id", raw_version=raw_version, code_hash="hash", git_sha="sha"
+        raw_table_id="raw-id",
+        raw_version=raw_version,
+        code_hash="hash",
+        roster_hash="roster",
+        git_sha="sha",
     )
 
 
@@ -94,3 +102,28 @@ def test_vacuum_failure_raises_vacuum_error_after_the_write(
         write_cleaned_power_time_series(_cleaned(1), table, provenance=_provenance(1))
 
     assert pl.scan_delta(str(table)).collect().height == 2
+
+
+def test_read_cleaning_provenance_returns_the_newest_write(tmp_path: Path) -> None:
+    table = tmp_path / "cleaned"
+    for version in (1, 2):
+        write_cleaned_power_time_series(_cleaned(1), table, provenance=_provenance(version))
+
+    provenance = read_cleaning_provenance(table)
+    assert provenance is not None
+    assert provenance.raw_version == 2
+
+
+def test_read_cleaning_provenance_is_none_for_a_missing_table(tmp_path: Path) -> None:
+    assert read_cleaning_provenance(tmp_path / "missing") is None
+
+
+def test_read_cleaning_provenance_is_none_for_a_write_without_the_keys(tmp_path: Path) -> None:
+    table = tmp_path / "cleaned"
+    write_deltalake(
+        table,
+        pl.DataFrame({"a": [1]}).to_arrow(),
+        mode="overwrite",
+        commit_properties=CommitProperties(custom_metadata={"unrelated": "x"}),
+    )
+    assert read_cleaning_provenance(table) is None

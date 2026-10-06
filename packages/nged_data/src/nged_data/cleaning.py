@@ -2,26 +2,16 @@
 
 `flag_nged_power` is where cleaning rules live. The `clean_nged_power_data` Dagster asset calls it
 with the whole raw `power_time_series` table and writes the result to the
-`cleaned_power_time_series` Delta table, recording a `CleaningProvenance` in the write's commit so
-a later run can tell whether the table is already up to date.
+`cleaned_power_time_series` Delta table.
 """
 
 import hashlib
-import logging
-import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
 import patito as pt
 import polars as pl
 from contracts.power_schemas import CleanedPowerTimeSeries, PowerTimeSeries, TimeSeriesMetadata
-from contracts.typing_utils import typeddict_to_dict
-from contracts.uri import ObjectStoreOptions
-from deltalake import DeltaTable
-from ml_core.repro import ABSENT, UNKNOWN, get_git_info
-
-log = logging.getLogger(__name__)
 
 SUBSTATION_TYPES: Final[tuple[str, ...]] = ("Primary", "BSP", "GSP")
 """The `TimeSeriesMetadata.substation_type` values that mean "a substation", as opposed to a
@@ -37,126 +27,6 @@ run, whether or not the edit is committed. The rules must live in this module, o
 extended to cover every file they live in.
 """
 
-GIT_SHA_ENV_VAR: Final[str] = "GIT_SHA"
-"""Environment variable holding the git SHA of the code, set when the container image is built.
-`current_git_sha` falls back to it, because a container has no git repository to ask."""
-
-_PROVENANCE_KEY_PREFIX: Final[str] = "cleaning_"
-_HISTORY_WINDOW: Final[int] = 10
-"""How many recent Delta commits `read_cleaning_provenance` walks back through to find the newest
-`WRITE`. Every vacuum adds two commits after the write, so a small window is enough."""
-
-
-@dataclass(frozen=True)
-class CleaningProvenance:
-    """What a cleaned table was built from, recorded in the write's Delta commit.
-
-    Attributes:
-        raw_table_id: The raw table's Delta table id. It guards against a deleted and rebuilt raw
-            table, whose versions restart at 0.
-        raw_version: The raw table's Delta version that the cleaning read.
-        code_hash: `CLEANING_CODE_HASH` when the cleaning ran.
-        git_sha: The git SHA of the code that did the cleaning. For provenance only; the skip
-            compares `code_hash`.
-    """
-
-    raw_table_id: str
-    raw_version: int
-    code_hash: str
-    git_sha: str
-
-    def to_commit_metadata(self) -> dict[str, str]:
-        """Return the `custom_metadata` to record on the Delta write commit."""
-        return {
-            f"{_PROVENANCE_KEY_PREFIX}raw_table_id": self.raw_table_id,
-            f"{_PROVENANCE_KEY_PREFIX}raw_version": str(self.raw_version),
-            f"{_PROVENANCE_KEY_PREFIX}code_hash": self.code_hash,
-            f"{_PROVENANCE_KEY_PREFIX}git_sha": self.git_sha,
-        }
-
-
-def current_git_sha() -> str:
-    """Return the git SHA of the running code, for `CleaningProvenance.git_sha`.
-
-    Uses `ml_core.repro.get_git_info`, and when that returns `UNKNOWN` (as it does in a container)
-    falls back to a non-empty `GIT_SHA` environment variable, else `UNKNOWN`. The fallback lives
-    here rather than in `get_git_info` so the MLflow provenance tags of the other stages do not
-    change.
-
-    Returns:
-        A git SHA, or `UNKNOWN`.
-    """
-    sha = get_git_info()["git_sha"]
-    if sha != UNKNOWN:
-        return sha
-    return os.environ.get(GIT_SHA_ENV_VAR) or UNKNOWN
-
-
-def read_cleaning_provenance(
-    table_uri: str | Path,
-    storage_options: ObjectStoreOptions | None = None,
-) -> CleaningProvenance | None:
-    """Read the `CleaningProvenance` from the newest `WRITE` commit of the cleaned table.
-
-    A vacuum adds commits after the write, so this walks back through the table's recent history
-    to the newest `WRITE`. Never raises: a missing table, an unreadable table, no `WRITE` commit
-    in the window, or a missing key all read as "no provenance", which always means rebuild.
-
-    Args:
-        table_uri: Path or URI of the `cleaned_power_time_series` Delta table.
-        storage_options: delta-rs object-store options for a remote `table_uri`.
-
-    Returns:
-        The provenance, or `None` when there is none.
-    """
-    try:
-        options = typeddict_to_dict(storage_options) or {}
-        if not DeltaTable.is_deltatable(str(table_uri), storage_options=options):
-            return None
-        history = DeltaTable(str(table_uri), storage_options=options).history(limit=_HISTORY_WINDOW)
-        write_commit = next(
-            (commit for commit in history if commit.get("operation") == "WRITE"), None
-        )
-        if write_commit is None or f"{_PROVENANCE_KEY_PREFIX}raw_table_id" not in write_commit:
-            return None
-        return CleaningProvenance(
-            raw_table_id=str(write_commit[f"{_PROVENANCE_KEY_PREFIX}raw_table_id"]),
-            raw_version=int(write_commit[f"{_PROVENANCE_KEY_PREFIX}raw_version"]),
-            code_hash=str(write_commit[f"{_PROVENANCE_KEY_PREFIX}code_hash"]),
-            git_sha=str(write_commit[f"{_PROVENANCE_KEY_PREFIX}git_sha"]),
-        )
-    except Exception:
-        log.warning(f"Could not read cleaning provenance from {table_uri}.", exc_info=True)
-        return None
-
-
-def cleaned_power_provenance_tag(
-    table_uri: str | Path,
-    storage_options: ObjectStoreOptions | None = None,
-) -> str:
-    """Return the value an MLflow run stamps to record which cleaned power table it read.
-
-    The cleaned table's own Delta versions are vacuumed after a few hours, so a run cannot be
-    replayed with `scan_delta(version=N)`. The stamp names what the cleaning read instead:
-    replaying means re-running the cleaning over that raw version at the cleaning's git SHA, which
-    can differ from the run's own SHA because an unchanged table is not rebuilt.
-
-    Args:
-        table_uri: Path or URI of the `cleaned_power_time_series` Delta table.
-        storage_options: delta-rs object-store options for a remote `table_uri`.
-
-    Returns:
-        `"raw_table_id=<id>;raw_version=<n>;git_sha=<sha>"`, or `ABSENT` when there is no
-        provenance. Never raises.
-    """
-    provenance = read_cleaning_provenance(table_uri, storage_options)
-    if provenance is None:
-        return ABSENT
-    return (
-        f"raw_table_id={provenance.raw_table_id};raw_version={provenance.raw_version};"
-        f"git_sha={provenance.git_sha}"
-    )
-
 
 def flag_nged_power(
     power: pt.LazyFrame[PowerTimeSeries],
@@ -170,7 +40,9 @@ def flag_nged_power(
 
     **How to add a rule.** Write a boolean Polars expression that is true for a row to drop. Add it
     as one more `.when(...).then(pl.lit("<reason>"))` branch of the chain below, and add the reason
-    to `contracts.power_schemas.DROP_REASONS`. The first matching branch wins.
+    to `contracts.power_schemas.DROP_REASONS`. The first matching branch wins. A rule that needs a
+    `TimeSeriesMetadata` column other than `substation_type` adds that column to the roster
+    `select` in this function.
 
     **The contract a rule keeps.** Return every input row exactly once. Never change
     `time_series_id` or `time`. Flag rows rather than deleting them. Do not call `collect` inside
@@ -189,8 +61,8 @@ def flag_nged_power(
         metadata: The `TimeSeriesMetadata` roster.
 
     Returns:
-        Every row of `power`, in the same order, with a `drop_reason` column: null for a row that
-        passed, otherwise the name of the rule that flagged it.
+        Every row of `power`, in no guaranteed order, with a `drop_reason` column: null for a row
+        that passed, otherwise the name of the rule that flagged it.
     """
     # Join the roster columns the rules need onto the power rows. The roster is stripped of its
     # Patito model so Polars' cross-subclass join check does not reject the join.

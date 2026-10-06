@@ -1,19 +1,11 @@
 from datetime import UTC, datetime
-from pathlib import Path
 
 import patito as pt
 import polars as pl
 import pytest
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import CleanedPowerTimeSeries, PowerTimeSeries, TimeSeriesMetadata
-from deltalake import CommitProperties, DeltaTable, write_deltalake
-from nged_data import cleaning
-from nged_data.cleaning import (
-    CleaningProvenance,
-    current_git_sha,
-    flag_nged_power,
-    read_cleaning_provenance,
-)
+from nged_data.cleaning import flag_nged_power
 
 T0 = datetime(2026, 1, 1, 0, 0, tzinfo=UTC)
 T1 = datetime(2026, 1, 1, 0, 30, tzinfo=UTC)
@@ -63,11 +55,6 @@ def _flag(
     return pl.DataFrame._from_pydf(flagged._df)
 
 
-def test_substation_zero_is_flagged():
-    result = _flag([(1, T0, 0.0)], {1: "Primary"})
-    assert result["drop_reason"].to_list() == ["substation_zero"]
-
-
 @pytest.mark.parametrize("substation_type", ["Primary", "BSP", "GSP"])
 def test_substation_zero_flags_every_substation_type(substation_type: str):
     result = _flag([(1, T0, 0.0)], {1: substation_type})
@@ -89,77 +76,10 @@ def test_zero_from_series_missing_from_roster_is_not_flagged():
     assert result["drop_reason"].to_list() == ["substation_zero", None]
 
 
-def test_flag_nged_power_returns_exactly_the_input_rows_in_order():
+def test_flag_nged_power_returns_exactly_the_input_rows():
     rows = [(1, T0, 0.0), (1, T1, 2.0), (2, T0, 0.0), (3, T0, 4.0)]
     result = _flag(rows, {1: "Primary", 2: "HV Customer"})
     assert result.columns == ["time_series_id", "time", "power", "drop_reason"]
-    assert result.select("time_series_id", "time", "power").rows() == rows
-    CleanedPowerTimeSeries.validate(result)
-
-
-def _write_cleaned(path: Path, provenance: CleaningProvenance | None) -> None:
-    write_deltalake(
-        path,
-        pl.DataFrame({"a": [1]}).to_arrow(),
-        mode="overwrite",
-        commit_properties=CommitProperties(
-            custom_metadata=provenance.to_commit_metadata() if provenance else None
-        ),
-    )
-
-
-def test_read_cleaning_provenance_round_trips_after_vacuum(tmp_path: Path):
-    provenance = CleaningProvenance(
-        raw_table_id="abc", raw_version=7, code_hash="hash", git_sha="deadbeef"
-    )
-    _write_cleaned(tmp_path / "t.delta", provenance)
-    DeltaTable(tmp_path / "t.delta").vacuum(
-        retention_hours=0, dry_run=False, enforce_retention_duration=False
-    )
-    assert read_cleaning_provenance(tmp_path / "t.delta") == provenance
-
-
-def test_read_cleaning_provenance_returns_newest_write(tmp_path: Path):
-    for version in (1, 2):
-        _write_cleaned(
-            tmp_path / "t.delta",
-            CleaningProvenance(raw_table_id="abc", raw_version=version, code_hash="h", git_sha="s"),
-        )
-    provenance = read_cleaning_provenance(tmp_path / "t.delta")
-    assert provenance is not None
-    assert provenance.raw_version == 2
-
-
-def test_read_cleaning_provenance_is_none_for_missing_table(tmp_path: Path):
-    assert read_cleaning_provenance(tmp_path / "missing.delta") is None
-
-
-def test_read_cleaning_provenance_is_none_for_missing_key(tmp_path: Path):
-    _write_cleaned(tmp_path / "t.delta", None)
-    assert read_cleaning_provenance(tmp_path / "t.delta") is None
-
-
-def test_current_git_sha_prefers_git(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(cleaning, "get_git_info", lambda: {"git_sha": "abc", "git_dirty": "false"})
-    monkeypatch.setenv("GIT_SHA", "from_env")
-    assert current_git_sha() == "abc"
-
-
-def test_current_git_sha_falls_back_to_env_var(monkeypatch: pytest.MonkeyPatch):
-    unknown = {"git_sha": cleaning.UNKNOWN, "git_dirty": cleaning.UNKNOWN}
-    monkeypatch.setattr(cleaning, "get_git_info", lambda: unknown)
-    monkeypatch.setenv("GIT_SHA", "from_env")
-    assert current_git_sha() == "from_env"
-
-
-@pytest.mark.parametrize("env_value", [None, ""])
-def test_current_git_sha_is_unknown_without_git_or_env(
-    monkeypatch: pytest.MonkeyPatch, env_value: str | None
-):
-    unknown = {"git_sha": cleaning.UNKNOWN, "git_dirty": cleaning.UNKNOWN}
-    monkeypatch.setattr(cleaning, "get_git_info", lambda: unknown)
-    if env_value is None:
-        monkeypatch.delenv("GIT_SHA", raising=False)
-    else:
-        monkeypatch.setenv("GIT_SHA", env_value)
-    assert current_git_sha() == cleaning.UNKNOWN
+    # `flag_nged_power` promises no row order, so compare sorted rows.
+    assert sorted(result.select("time_series_id", "time", "power").rows()) == sorted(rows)
+    CleanedPowerTimeSeries.validate(result.sort("time_series_id", "time"))

@@ -1209,7 +1209,6 @@ source = { editable = "packages/delta_store" }
 dependencies = [
     { name = "contracts" },
     { name = "deltalake" },
-    { name = "nged-data" },
     { name = "patito" },
     { name = "polars" },
     { name = "pyarrow" },
@@ -1219,7 +1218,6 @@ dependencies = [
 requires-dist = [
     { name = "contracts", editable = "packages/contracts" },
     { name = "deltalake" },
-    { name = "nged-data", editable = "packages/nged_data" },
     { name = "patito" },
     { name = "polars", specifier = ">=1.0.0" },
     { name = "pyarrow" },
@@ -3225,8 +3223,6 @@ version = "0.2.1"
 source = { editable = "packages/nged_data" }
 dependencies = [
     { name = "contracts" },
-    { name = "deltalake" },
-    { name = "ml-core" },
     { name = "obstore" },
     { name = "patito" },
     { name = "polars" },
@@ -3236,8 +3232,6 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "contracts", editable = "packages/contracts" },
-    { name = "deltalake" },
-    { name = "ml-core", editable = "packages/ml_core" },
     { name = "obstore" },
     { name = "patito" },
     { name = "polars", specifier = ">=1.0.0" },

@@ -1250,6 +1250,7 @@ def test_definitions_resolve(env: Path) -> None:
     assert "nwp_has_no_unexpected_nulls" in check_keys
     assert "nwp_run_is_complete" in check_keys
     assert "live_forecasts_are_healthy" in check_keys
+    assert "cleaned_power_keeps_up_with_raw" in check_keys
 
     # ...and the 6-hourly scheduled job actually runs the live check: an AssetSelection includes
     # its assets' checks, so this is what makes the check evaluate on every production tick.

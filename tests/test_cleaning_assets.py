@@ -4,22 +4,22 @@ Every assertion on the cleaned table reads it back through ``pl.scan_delta``, so
 breaks Delta reads fails the test.
 """
 
+import shutil
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import patito as pt
 import polars as pl
 import pytest
+from _cleaned_power_test_data import write_roster
 from contracts.common import UTC_DATETIME_DTYPE
-from contracts.power_schemas import TimeSeriesMetadata
 from contracts.settings import Settings
 from dagster import DagsterInstance, ExecuteInProcessResult, materialize
+from delta_store.cleaned_power_time_series import read_cleaning_provenance
 from deltalake import DeltaTable
-from nged_data import cleaning
-from nged_data.cleaning import read_cleaning_provenance
 
 from nged_substation_forecast.defs import cleaning_assets
-from nged_substation_forecast.defs.cleaning_assets import clean_nged_power_data
+from nged_substation_forecast.defs.cleaning_assets import clean_nged_power_data, current_git_sha
 
 _T0 = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -46,35 +46,12 @@ def _raw_frame(rows: list[tuple[int, int, float]]) -> pl.DataFrame:
     )
 
 
-def _write_raw(
-    settings: Settings, rows: list[tuple[int, int, float]], mode: str = "append"
-) -> None:
-    _raw_frame(rows).write_delta(settings.power_time_series_data_path, mode=mode)  # ty: ignore[invalid-argument-type]
+def _write_raw(settings: Settings, rows: list[tuple[int, int, float]]) -> None:
+    _raw_frame(rows).write_delta(settings.power_time_series_data_path, mode="append")
 
 
 def _write_roster(settings: Settings, substation_types: dict[int, str]) -> None:
-    (
-        pt.DataFrame(
-            [
-                {
-                    "time_series_id": time_series_id,
-                    "time_series_name": f"Series {time_series_id}",
-                    "time_series_type": "Disaggregated Demand",
-                    "units": "MW",
-                    "licence_area": "EMids",
-                    "substation_number": time_series_id,
-                    "substation_type": substation_type,
-                    "latitude": 52.0,
-                    "longitude": -1.0,
-                    "h3_res_5": 599423199024775167,
-                }
-                for time_series_id, substation_type in substation_types.items()
-            ]
-        )
-        .set_model(TimeSeriesMetadata)
-        .cast()
-        .validate()
-    ).write_parquet(settings.metadata_path)
+    write_roster(settings.metadata_path, substation_types)
 
 
 _RAW_ROWS = [(1, 0, 5.0), (1, 1, 0.0), (1, 2, 0.0), (2, 0, 0.0), (2, 1, 3.0)]
@@ -215,6 +192,33 @@ def test_a_new_raw_commit_triggers_a_rebuild(
     assert provenance.raw_version == DeltaTable(raw_data.power_time_series_data_path).version()
 
 
+def test_a_rebuilt_raw_table_with_the_same_version_triggers_a_rebuild(
+    raw_data: Settings, dagster_instance: DagsterInstance
+) -> None:
+    _materialize(dagster_instance)
+    version = _cleaned_version(raw_data)
+    shutil.rmtree(raw_data.power_time_series_data_path)
+    _write_raw(raw_data, _RAW_ROWS)  # the same number of commits, so the same Delta version
+
+    metadata = _metadata(_materialize(dagster_instance))
+
+    assert "skipped" not in metadata
+    assert _cleaned_version(raw_data) > version
+
+
+def test_a_roster_change_with_no_new_power_triggers_a_rebuild(
+    raw_data: Settings, dagster_instance: DagsterInstance
+) -> None:
+    _materialize(dagster_instance)
+    _write_roster(raw_data, {1: "Primary", 2: "Primary"})  # series 2 is now a substation
+
+    metadata = _metadata(_materialize(dagster_instance))
+
+    assert "skipped" not in metadata
+    assert metadata["drop_reason/substation_zero/n_rows"] == 3
+    assert _cleaned(raw_data)["drop_reason"].null_count() == 2
+
+
 def test_a_different_code_hash_triggers_a_rebuild(
     raw_data: Settings, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
@@ -288,8 +292,8 @@ def test_a_failed_rebuild_is_retried_by_the_next_run(
 def test_the_recorded_git_sha_falls_back_to_the_environment_variable(
     raw_data: Settings, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
-    unknown = {"git_sha": cleaning.UNKNOWN, "git_dirty": cleaning.UNKNOWN}
-    monkeypatch.setattr(cleaning, "get_git_info", lambda: unknown)
+    unknown = {"git_sha": cleaning_assets.UNKNOWN, "git_dirty": cleaning_assets.UNKNOWN}
+    monkeypatch.setattr(cleaning_assets, "get_git_info", lambda: unknown)
     monkeypatch.setenv("GIT_SHA", "abc123")
 
     _materialize(dagster_instance)
@@ -297,3 +301,24 @@ def test_the_recorded_git_sha_falls_back_to_the_environment_variable(
     provenance = read_cleaning_provenance(raw_data.cleaned_power_time_series_data_path)
     assert provenance is not None
     assert provenance.git_sha == "abc123"
+
+
+def test_current_git_sha_prefers_git(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        cleaning_assets, "get_git_info", lambda: {"git_sha": "abc", "git_dirty": "false"}
+    )
+    monkeypatch.setenv("GIT_SHA", "from_env")
+    assert current_git_sha() == "abc"
+
+
+@pytest.mark.parametrize("env_value", [None, ""])
+def test_current_git_sha_is_unknown_without_git_or_env(
+    monkeypatch: pytest.MonkeyPatch, env_value: str | None
+) -> None:
+    unknown = {"git_sha": cleaning_assets.UNKNOWN, "git_dirty": cleaning_assets.UNKNOWN}
+    monkeypatch.setattr(cleaning_assets, "get_git_info", lambda: unknown)
+    if env_value is None:
+        monkeypatch.delenv("GIT_SHA", raising=False)
+    else:
+        monkeypatch.setenv("GIT_SHA", env_value)
+    assert current_git_sha() == cleaning_assets.UNKNOWN

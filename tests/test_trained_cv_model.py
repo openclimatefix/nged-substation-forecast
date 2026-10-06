@@ -418,6 +418,8 @@ def test_trained_cv_model_trains_and_saves_to_mlflow(
     assert fold_run.data.tags["train_end"] == "2025-06-30T23:59:59+00:00"
     assert fold_run.data.tags["n_eligible_time_series"] == "2"
     assert fold_run.data.tags["n_trained_time_series"] == "1"
+    # The test's cleaned table is a plain copy that records no provenance.
+    assert fold_run.data.tags["train_cleaned_power_time_series_source"] == "absent"
 
     # The model round-trips from MLflow, and only the in-window ts1 was trained (ts2's data is all
     # past train_end, so the inclusive-window filter excludes it).

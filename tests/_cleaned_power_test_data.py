@@ -3,7 +3,32 @@
 from pathlib import Path
 
 import polars as pl
-from contracts.power_schemas import DROP_REASONS
+from contracts.power_schemas import DROP_REASONS, TimeSeriesMetadata
+
+
+def write_roster(path: str | Path, substation_types: dict[int, str]) -> None:
+    """Write a minimal valid ``TimeSeriesMetadata`` parquet.
+
+    Args:
+        path: Where to write the parquet.
+        substation_types: The ``time_series_id`` of each series, mapped to its ``substation_type``.
+    """
+    rows = [
+        {
+            "time_series_id": time_series_id,
+            "time_series_name": f"Substation {time_series_id}",
+            "time_series_type": "Disaggregated Demand",
+            "units": "MW",
+            "licence_area": "EMids",
+            "substation_number": time_series_id,
+            "substation_type": substation_type,
+            "latitude": 52.0,
+            "longitude": -1.0,
+            "h3_res_5": 599423199024775167,
+        }
+        for time_series_id, substation_type in substation_types.items()
+    ]
+    TimeSeriesMetadata.DataFrame(rows).cast().validate().write_parquet(path)
 
 
 def write_cleaned_copy(

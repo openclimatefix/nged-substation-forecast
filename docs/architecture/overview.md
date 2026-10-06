@@ -53,9 +53,7 @@ Scale](performance.md).
       `kind` either, which Dagster reserves (`dagster/kind/*`) for naming the technology an asset
       uses. The five `production` assets — `power_time_series_and_metadata`, `clean_nged_power_data`,
       `h3_grid_weights`, `ecmwf_ens`, and `live_forecasts` — are everything the deployment runs to
-      produce forecasts. `clean_nged_power_data` copies every raw power row into the
-      `cleaned_power_time_series` Delta table with a `drop_reason` column, and every reader of
-      observed power except the ingest reads only the rows whose `drop_reason` is null.
+      produce forecasts.
       The `research` assets are everything else: the cross-validation assets, plus
       `promotable_model_runs` and `promoted_model`, which need an MLflow tracking server the
       deployment does not reach. The tag says whether the service needs an asset, not where the
