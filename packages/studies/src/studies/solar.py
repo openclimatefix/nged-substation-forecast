@@ -112,6 +112,31 @@ def cos_zenith_hour_mean(*, stamps: pl.Series, latitude: float, longitude: float
     return np.mean(samples, axis=0)
 
 
+def hourly_mean_from_snapshot(
+    *, snapshot_w_m2: np.ndarray, cos_zenith_instant: np.ndarray, cos_zenith_hour_mean: np.ndarray
+) -> np.ndarray:
+    """Turn an irradiance snapshot into a backward hourly mean, holding the clear-sky index fixed.
+
+    **Open-Meteo builds its hourly UKV irradiance this way**: the snapshot at the hour's end times
+    the mean cosine of the zenith over the hour ending at the label, over the cosine at the label.
+    A study that compares another archive of the same model with Open-Meteo's value applies the same
+    conversion to that archive's snapshot. The result is zero where the sun is at or below the
+    horizon at the label, because the ratio is undefined there.
+
+    Args:
+        snapshot_w_m2: The irradiance at the label instant, in W m⁻².
+        cos_zenith_instant: The cosine of the zenith at the label, clipped at zero.
+        cos_zenith_hour_mean: The mean cosine of the zenith over the hour ending at the label.
+
+    Returns:
+        The hourly mean, in W m⁻².
+    """
+    daylight = cos_zenith_instant > 0.0
+    safe_instant = np.where(daylight, cos_zenith_instant, 1.0)
+    ratio = np.where(daylight, cos_zenith_hour_mean / safe_instant, 0.0)
+    return snapshot_w_m2 * ratio
+
+
 def extraterrestrial_horizontal(*, stamps: pl.Series, zenith_deg: np.ndarray) -> np.ndarray:
     """Return the flux onto a horizontal plane at the top of the atmosphere.
 

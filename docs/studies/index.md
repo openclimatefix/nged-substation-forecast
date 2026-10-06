@@ -68,6 +68,15 @@ the
   archived UKV's temperature is 0.124 K closer than ERA5's, so the planned rule gives UKV, but the
   advantage falls from 0.250 K at lead 0 to 0.035 K at lead 5. At six solar farms the choice of
   temperature moves power error by no more than 0.009 points (95% interval, whole row set).
+- [Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?](past-weather/ukv-ceda-vs-openmeteo.md)
+  — at the nine metered farms over 23 months, the two archives agree closely at the start of each run
+  (a mean absolute temperature difference of 0.098 K, and Open-Meteo's wind speed about 3% lower).
+  An XGBoost model of wind power trained on CEDA's archive loses 0.441 points of capacity [+0.286,
+  +0.600] when given Open-Meteo's wind, a level bias that rescaling the speed mostly removes. CEDA's
+  larger power error over all hours (wind +0.270 points once two spans of Open-Meteo's wind are
+  dropped) is mostly its longer leads: at lead 0 the wind gap is +0.030 [-0.043, +0.122]. By the
+  plan's rule the two archives are not mixed. The page does not compare CEDA's archive with the Met
+  Office's live feed.
 
 ## Forecasts
 
