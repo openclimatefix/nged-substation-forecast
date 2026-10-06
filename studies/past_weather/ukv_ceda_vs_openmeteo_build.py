@@ -50,6 +50,12 @@ import numpy as np
 import polars as pl
 from cerra_past_solar import check_column_counts, with_covering_folds
 from studies.blending import climatology_permutation
+from studies.cross_validation import (
+    calendar_month_coverage,
+    cut_eras,
+    raise_on_uncovered_months,
+    search_fold_offsets,
+)
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.neighbouring_hours import with_neighbouring_hours
 from studies.pv_dataset import pv_sites, wind_sites
@@ -78,6 +84,8 @@ OUTPUT_DIR: Final[Path] = UKV_CEDA_VS_OPEN_METEO_DIR
 
 WIND_ROWS_NAME: Final[str] = "wind_rows.parquet"
 SOLAR_ROWS_NAME: Final[str] = "solar_rows.parquet"
+SOLAR_ERA_0_ROWS_NAME: Final[str] = "solar_rows_era0.parquet"
+"""The solar rows of era 0 alone, with folds cut inside era 0, for the planned-scope sensitivity."""
 MODEL_FREE_NAME: Final[str] = "model_free_hours.parquet"
 STAMP_NAME: Final[str] = "build.json"
 README_NAME: Final[str] = "README.md"
@@ -127,6 +135,12 @@ SHUFFLE_GROUPS: Final[tuple[str, ...]] = ("site", "month", "hour_of_day")
 """A shuffled value stays within one site, one year-month and one hour of day."""
 
 SHUFFLED_SUFFIX: Final[str] = "_shuffled"
+
+SUN_ELEVATION_BINS_DEG: Final[tuple[float, ...]] = (2.0, 5.0, 10.0, 20.0, 40.0)
+"""The upper edges of the sun-elevation bins of the irradiance ratio, in degrees."""
+
+LOW_SUN_ZENITH_DEG: Final[float] = 85.0
+"""Rows with the sun more than 5 degrees above the horizon have a zenith below this."""
 
 ARCHIVES: Final[tuple[str, str]] = ("ceda", "om")
 """The two archives, in the order a contrast reads: the treatment, then the reference."""
@@ -385,7 +399,8 @@ def read_ceda_instants(
 
     Returns:
         One row per (site, usable hour) with `lead_hours`, `ceda_temp_c`, `ceda_speed_10m_m_s`,
-        `ceda_direction_10m_deg`, `ceda_ghi_snapshot` and `ceda_ghi` (the rebuilt hourly value).
+        `ceda_direction_10m_deg`, `sun_elevation_deg` (at the label), `ceda_ghi_snapshot` and
+        `ceda_ghi` (the rebuilt hourly value).
     """
     cells = nearest_ukv_cells(ukv=ukv, points=sites)
     usable, means, leads = ukv_at(
@@ -411,6 +426,10 @@ def read_ceda_instants(
                     "ceda_temp_c": means[UKV_TEMPERATURE_VARIABLE][usable, column] - KELVIN,
                     "ceda_speed_10m_m_s": means["wind_speed_10m"][usable, column],
                     "ceda_direction_10m_deg": means["wind_direction_10m"][usable, column],
+                    "sun_elevation_deg": 90.0
+                    - zenith(
+                        stamps=kept_hours, latitude=float(latitude), longitude=float(longitude)
+                    ),
                     "ceda_ghi_snapshot": snapshot,
                     "ceda_ghi": ceda_hourly_irradiance(
                         snapshot=snapshot,
@@ -581,6 +600,55 @@ def irradiance_ratios_by_era_hour(*, frame: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def elevation_bin_label(*, upper: float, lower: float | None) -> str:
+    """Name one sun-elevation bin.
+
+    Args:
+        upper: The bin's upper edge in degrees, or infinity for the last bin.
+        lower: The bin's lower edge, or `None` for the first.
+
+    Returns:
+        A label such as `2 to 5 degrees`.
+    """
+    if lower is None:
+        return f"up to {upper:g} degrees"
+    if upper == float("inf"):
+        return f"above {lower:g} degrees"
+    return f"{lower:g} to {upper:g} degrees"
+
+
+def irradiance_ratios_by_elevation(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Return the median ratio of CEDA's rebuilt irradiance to Open-Meteo's, by sun elevation.
+
+    The 50 W/m2 cut of `irradiance_ratios_by_era_hour` leaves out the low-sun rows, where a rebuild
+    from a snapshot at the label does not reproduce Open-Meteo's value.
+
+    Args:
+        frame: `model_free_hours`'s result.
+
+    Returns:
+        One row per (era, elevation bin) with `bin`, `rebuilt_ratio` and `n`, over the lead-0 rows
+        where Open-Meteo's irradiance is above zero.
+    """
+    edges = (None, *SUN_ELEVATION_BINS_DEG)
+    uppers = (*SUN_ELEVATION_BINS_DEG, float("inf"))
+    labelled = lead_zero(frame=frame).filter(pl.col("om_ghi") > 0.0)
+    parts = [
+        labelled.filter(
+            (pl.col("sun_elevation_deg") > (lower if lower is not None else -90.0))
+            & (pl.col("sun_elevation_deg") <= upper)
+        )
+        .group_by("era_code")
+        .agg(rebuilt_ratio=(pl.col("ceda_ghi") / pl.col("om_ghi")).median(), n=pl.len())
+        .with_columns(
+            bin=pl.lit(elevation_bin_label(upper=upper, lower=lower)),
+            order=pl.lit(index, dtype=pl.Int64),
+        )
+        for index, (lower, upper) in enumerate(zip(edges, uppers, strict=True))
+    ]
+    return pl.concat(parts).sort("era_code", "order").drop("order")
+
+
 def era_1_irradiance_note(*, frame: pl.DataFrame) -> str:
     """Name the post-PS47 irradiance mismatch for the labels of the exploratory solar rows.
 
@@ -723,8 +791,50 @@ def ceda_irradiance_for(*, ceda: pl.DataFrame, frame: pl.DataFrame) -> pl.DataFr
     return frame.join(ceda.select("site", "time", "ceda_ghi"), on=["site", "time"], how="inner")
 
 
+def with_offset_removed_temperature(
+    *, frame: pl.DataFrame, model_free: pl.DataFrame
+) -> pl.DataFrame:
+    """Add Open-Meteo's temperature minus its lead-0 offset from CEDA, learned on training folds.
+
+    The offset is each site's mean of Open-Meteo's minus CEDA's temperature at the instants where
+    CEDA's lead is 0 (instants, not the two-end means of the arms), over the months of the site's
+    other folds. A row's offset therefore never reads the fold the row is scored in.
+
+    Args:
+        frame: Solar rows carrying `site`, `month`, `fold` and `om_temp`.
+        model_free: `model_free_hours`'s result.
+
+    Returns:
+        `frame` with `om_temp_offset_removed`, in `frame`'s row order.
+    """
+    offsets = (
+        lead_zero(frame=model_free)
+        .drop_nulls(["om_temp_c", "ceda_temp_c"])
+        .select("site", train_month="month", offset=pl.col("om_temp_c") - pl.col("ceda_temp_c"))
+    )
+    folds = frame.select("site", "month", "fold").unique()
+    per_fold = (
+        folds.rename({"fold": "scored_fold"})
+        .join(folds.rename({"month": "train_month", "fold": "train_fold"}), on="site")
+        .filter(pl.col("train_fold") != pl.col("scored_fold"))
+        .join(offsets, on=["site", "train_month"])
+        .group_by("site", "scored_fold")
+        .agg(offset=pl.col("offset").mean())
+        .rename({"scored_fold": "fold"})
+    )
+    return (
+        frame.join(per_fold, on=["site", "fold"], how="left", maintain_order="left")
+        .with_columns(om_temp_offset_removed=pl.col("om_temp") - pl.col("offset"))
+        .drop("offset")
+    )
+
+
 def solar_rows(
-    *, base: pl.DataFrame, open_meteo: pl.DataFrame, ceda_irradiance: pl.DataFrame
+    *,
+    base: pl.DataFrame,
+    open_meteo: pl.DataFrame,
+    ceda_irradiance: pl.DataFrame,
+    model_free: pl.DataFrame,
 ) -> pl.DataFrame:
     """Build the solar farms' fit rows: each archive's global irradiance and temperature.
 
@@ -732,11 +842,12 @@ def solar_rows(
         base: The CEDA-against-ERA5 study's solar rows in the study's months.
         open_meteo: `read_open_meteo`'s result.
         ceda_irradiance: `read_ceda_instants`'s result at the solar sites.
+        model_free: `model_free_hours`'s result, which the temperature offset is learned from.
 
     Returns:
         One row per (site, daytime hour) with the power, the geometry, both archives' irradiance
-        and temperature, `constrained`, `cap_mw`, `month`, `era_code`, `fold`, and the shuffled
-        columns.
+        and temperature, `constrained`, `cap_mw`, `month`, `era_code`, `fold`, the shuffled
+        columns, and `om_temp_offset_removed`.
     """
     _, ceda_temp = solar_columns(archive="ceda")
     om_ghi, om_temp = solar_columns(archive="om")
@@ -760,28 +871,90 @@ def solar_rows(
     complete = with_temperature.drop("om_temp_previous", "om_temp_label").drop_nulls(
         [om_ghi, om_temp]
     )
-    return _finish(
+    finished = _finish(
         frame=complete,
         shuffle_groups=[solar_columns(archive=a) for a in ARCHIVES],
     )
+    return with_offset_removed_temperature(frame=finished, model_free=model_free)
 
 
-def check_rows(*, wind: pl.DataFrame, solar: pl.DataFrame) -> None:
+def era_0_solar_rows(*, solar: pl.DataFrame, model_free: pl.DataFrame) -> pl.DataFrame:
+    """Cut the solar rows of era 0 alone, with folds cut inside era 0.
+
+    **Training and scoring on era 0 only means the irradiance construction that differs after PS47
+    cannot reach the planned solar fits.** The shuffled columns stay as built, because a shuffle
+    stays inside one site, month and hour. The offset is relearned on the new folds.
+
+    Args:
+        solar: `solar_rows`' result.
+        model_free: `model_free_hours`'s result.
+
+    Returns:
+        The rows before the PS47 month with `era_code` 0 and folds that cover every calendar month
+        occurring in more than one year.
+
+    Raises:
+        ValueError: If no rotation of the folds covers every calendar month.
+    """
+    era_0 = solar.filter(pl.col("month") < STRADDLING_MONTHS[1]).drop(
+        "fold", "era", "era_code", "om_temp_offset_removed"
+    )
+    designs = search_fold_offsets(frame=era_0, first_months=())
+    if not designs:
+        msg = "no fold rotation leaves every calendar month of era 0 with a training row"
+        raise ValueError(msg)
+    cut = cut_eras(frame=era_0, first_months=(), fold_offsets=dict(designs[0]))
+    raise_on_uncovered_months(coverage=calendar_month_coverage(frame=cut))
+    return with_offset_removed_temperature(frame=cut, model_free=model_free)
+
+
+def check_sorted_and_unique(*, frame: pl.DataFrame, name: str) -> None:
+    """Raise unless the rows are sorted by site and time and no (site, time) repeats.
+
+    Row order is part of the fit: XGBoost's row subsampling and the control shuffles both depend on
+    it, and a repeated key would duplicate a row in every arm.
+
+    Args:
+        frame: Rows carrying `site` and `time`.
+        name: The frame's name, for the message.
+
+    Raises:
+        ValueError: If the rows are out of order or a key repeats.
+    """
+    if frame.select("site", "time").is_duplicated().any():
+        msg = f"{name} holds a repeated (site, time)"
+        raise ValueError(msg)
+    if not frame.select("site", "time").equals(frame.sort("site", "time").select("site", "time")):
+        msg = f"{name} is not sorted by site and time"
+        raise ValueError(msg)
+
+
+def check_rows(
+    *, wind: pl.DataFrame, solar: pl.DataFrame, solar_era_0: pl.DataFrame | None = None
+) -> None:
     """Raise unless every arm's columns are present on every row and the widths match.
 
     Args:
         wind: The wind rows.
         solar: The solar rows.
+        solar_era_0: The solar rows of era 0 alone, checked like the solar rows when given.
     """
     check_arm_widths()
-    for frame, function in ((wind, wind_arm_columns), (solar, solar_arm_columns)):
+    checked = [("wind", wind, wind_arm_columns), ("solar", solar, solar_arm_columns)]
+    if solar_era_0 is not None:
+        checked.append(("solar era 0", solar_era_0, solar_arm_columns))
+    for name, frame, function in checked:
+        check_sorted_and_unique(frame=frame, name=name)
         columns = [
             column
             for archive in ARCHIVES
             for shuffled in (False, True)
             for column in function(archive=archive, shuffled=shuffled)
         ]
-        check_no_missing(frame=frame, columns=["power_mw", "effective_capacity_mw", *columns])
+        extra = ["om_temp_offset_removed"] if function is solar_arm_columns else []
+        check_no_missing(
+            frame=frame, columns=["power_mw", "effective_capacity_mw", *columns, *extra]
+        )
         check_no_backfill(frame=frame)
 
 
@@ -851,6 +1024,7 @@ class Frames:
 
     wind: pl.DataFrame
     solar: pl.DataFrame
+    solar_era_0: pl.DataFrame
     model_free: pl.DataFrame
     wind_loss: dict[str, float]
     solar_loss: dict[str, float]
@@ -907,10 +1081,13 @@ def build_frames(*, ukv: UkvStores, read_values: bool) -> Frames:
         read_values=read_values,
     )
     wind = wind_rows(base=wind_base, open_meteo=open_meteo)
-    solar = solar_rows(base=solar_base, open_meteo=open_meteo, ceda_irradiance=ceda_solar)
+    solar = solar_rows(
+        base=solar_base, open_meteo=open_meteo, ceda_irradiance=ceda_solar, model_free=free
+    )
     return Frames(
         wind=wind,
         solar=solar,
+        solar_era_0=era_0_solar_rows(solar=solar, model_free=free),
         model_free=free,
         wind_loss=loss_by_month(base=wind_base, kept=wind),
         solar_loss=loss_by_month(base=solar_base, kept=solar),
@@ -963,6 +1140,14 @@ def coverage_lines(*, ukv: UkvStores, frames: Frames) -> tuple[list[str], list[s
             f"- {name}: largest monthly loss to Open-Meteo gaps {max(shares.values()):.1%}.",
         ]
     lines.append(
+        f"- Solar rows of era 0 alone (planned-scope sensitivity): {frames.solar_era_0.height:,}."
+    )
+    lines += [
+        f"- Irradiance ratio, era {row['era_code']}, sun {row['bin']}: {row['rebuilt_ratio']:.3f} "
+        f"({row['n']:,} lead-0 rows)."
+        for row in irradiance_ratios_by_elevation(frame=frames.model_free).iter_rows(named=True)
+    ]
+    lines.append(
         f"- Model-free hours: {frames.model_free.height:,} rows, "
         f"{lead_zero(frame=frames.model_free).height:,} at lead 0."
     )
@@ -971,7 +1156,7 @@ def coverage_lines(*, ukv: UkvStores, frames: Frames) -> tuple[list[str], list[s
         f"{[len(wind_arm_columns(archive=a)) for a in ARCHIVES]}, solar "
         f"{[len(solar_arm_columns(archive=a)) for a in ARCHIVES]}."
     )
-    check_rows(wind=frames.wind, solar=frames.solar)
+    check_rows(wind=frames.wind, solar=frames.solar, solar_era_0=frames.solar_era_0)
     return lines, failures
 
 
@@ -986,7 +1171,8 @@ README_TEXT: Final[str] = """# UKV from CEDA against UKV from Open-Meteo, rows a
 
 Private: this folder holds per-generator values and is never published.
 
-- `wind_rows.parquet`, `solar_rows.parquet`, `model_free_hours.parquet`, `build.json`
+- `wind_rows.parquet`, `solar_rows.parquet`, `solar_rows_era0.parquet`, `model_free_hours.parquet`,
+  `build.json`
   (`ukv_ceda_vs_openmeteo_build.py`): the fit rows of each domain with every arm's columns and the
   shuffled controls, the hours both archives cover at the nine generator sites with each archive's
   temperature, 10 m wind, and global irradiance, and the hashes of the inputs.
@@ -1003,25 +1189,35 @@ Private: this folder holds per-generator values and is never published.
 """
 
 
-def write_outputs(*, output_dir: Path, ukv: UkvStores, frames: Frames) -> None:
+ROW_FILE_NAMES: Final[tuple[str, ...]] = (WIND_ROWS_NAME, SOLAR_ROWS_NAME, SOLAR_ERA_0_ROWS_NAME)
+"""The row files the fit reads, whose hashes the stamp records."""
+
+
+def write_outputs(
+    *, output_dir: Path, ukv: UkvStores, frames: Frames, guards_failed: Sequence[str] = ()
+) -> None:
     """Write the frames, the stamp and the README into a new write-once folder.
 
     Args:
         output_dir: The folder to write.
         ukv: The opened stores, for the status hashes and snapshots.
         frames: `build_frames`'s result.
+        guards_failed: The guards that failed, recorded in the stamp as `guards_passed`. The fit
+            refuses to run unless the stamp says every guard passed and the row files still hash
+            to the stamped values.
 
     Raises:
         FileExistsError: If an output already exists, before anything is written.
     """
     paths = {
         name: output_dir / name
-        for name in (WIND_ROWS_NAME, SOLAR_ROWS_NAME, MODEL_FREE_NAME, STAMP_NAME, README_NAME)
+        for name in (*ROW_FILE_NAMES, MODEL_FREE_NAME, STAMP_NAME, README_NAME)
     }
     refuse_to_overwrite(paths=paths.values())
     output_dir.mkdir(parents=True, exist_ok=True)
     frames.wind.write_parquet(paths[WIND_ROWS_NAME])
     frames.solar.write_parquet(paths[SOLAR_ROWS_NAME])
+    frames.solar_era_0.write_parquet(paths[SOLAR_ERA_0_ROWS_NAME])
     frames.model_free.write_parquet(paths[MODEL_FREE_NAME])
     ceda_stamp = json.loads((UKV_VS_ERA5_DIR / CEDA_BUILD_STAMP_NAME).read_text())
     stamp = {
@@ -1037,9 +1233,12 @@ def write_outputs(*, output_dir: Path, ukv: UkvStores, frames: Frames) -> None:
             "study": "ukv_ceda_vs_era5",
             "delta_versions": ceda_stamp["delta_versions"],
         },
+        "guards_passed": not guards_failed,
+        "row_file_hashes": {name: _file_hash(path=paths[name]) for name in ROW_FILE_NAMES},
         "rows": {
             "wind": frames.wind.height,
             "solar": frames.solar.height,
+            "solar_era_0": frames.solar_era_0.height,
             "model_free": frames.model_free.height,
         },
         "study_months": list(STUDY_MONTHS),
@@ -1097,7 +1296,7 @@ def main() -> int:
     if arguments.check_only:
         sys.stdout.write("\nAll guards passed.\n")
         return 0
-    write_outputs(output_dir=arguments.output_dir, ukv=ukv, frames=frames)
+    write_outputs(output_dir=arguments.output_dir, ukv=ukv, frames=frames, guards_failed=failures)
     sys.stdout.write(
         f"Wrote {frames.wind.height:,} wind rows, {frames.solar.height:,} solar rows and "
         f"{frames.model_free.height:,} model-free hours to {arguments.output_dir}.\n"

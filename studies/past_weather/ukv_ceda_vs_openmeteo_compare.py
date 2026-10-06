@@ -62,6 +62,7 @@ from ukv_ceda_vs_openmeteo_build import (
     OUTPUT_DIR,
     era_1_irradiance_note,
     generator_roster,
+    irradiance_ratios_by_elevation,
     irradiance_ratios_by_era_hour,
     lead_zero,
 )
@@ -431,6 +432,7 @@ def report_text(
     offsets: pl.DataFrame,
     cell_lines: Sequence[str],
     ratios: pl.DataFrame,
+    elevation_ratios: pl.DataFrame,
     era_1_note: str,
 ) -> str:
     """Render every table the page quotes from the model-free comparison.
@@ -440,6 +442,7 @@ def report_text(
         offsets: `temperature_offsets`'s result.
         cell_lines: `cell_match_lines`'s result.
         ratios: `irradiance_ratios_by_era_hour`'s result.
+        elevation_ratios: `irradiance_ratios_by_elevation`'s result.
         era_1_note: `era_1_irradiance_note`'s result, empty where every hour matches.
 
     Returns:
@@ -490,6 +493,21 @@ def report_text(
             for row in ratios.iter_rows(named=True)
         ),
         "",
+        "### By sun elevation",
+        "",
+        (
+            "The same ratio, without the 50 W/m2 cut, by the sun's elevation at the label. A "
+            "rebuild from a snapshot at the label does not reproduce Open-Meteo's value when the "
+            "sun is within a few degrees of the horizon."
+        ),
+        "",
+        "| Era | Sun elevation | Rebuilt ratio | Rows |",
+        "|---|---|---|---|",
+        *(
+            f"| {row['era_code']} | {row['bin']} | {row['rebuilt_ratio']:.3f} | {row['n']:,} |"
+            for row in elevation_ratios.iter_rows(named=True)
+        ),
+        "",
         "## Diagnostics",
         "",
         "### Cell match",
@@ -533,6 +551,7 @@ def main() -> int:
         offsets=temperature_offsets(frame=frame),
         cell_lines=cell_match_lines(ukv=open_ukv_stores(), frame=frame),
         ratios=irradiance_ratios_by_era_hour(frame=frame),
+        elevation_ratios=irradiance_ratios_by_elevation(frame=frame),
         era_1_note=era_1_irradiance_note(frame=frame),
     )
     paths[0].write_text(text)

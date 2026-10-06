@@ -88,14 +88,15 @@ Open-Meteo's values comparable with CEDA's, and a guard checks each at lead-0 ho
   Celsius from both).
 - **Irradiance.** Open-Meteo's `shortwave_radiation` is UKV's snapshot at the hour's end multiplied
   by the ratio of the hour's mean cosine of the solar zenith angle to the cosine at the hour's end
-  (computed without refraction). The median of that value over the snapshot runs from 0.52 at 05
-  UTC to 1.42 at 19 UTC on the overlap (checked). The build applies the same ratio to CEDA's
-  `shortwave_down` at the label, and does not invert Open-Meteo's value to a snapshot, because the
-  inverted `ghi_instant_w_m2` spikes after sunrise and dropping the spikes would select rows by
-  one archive's values. The build stops unless, at lead-0 hours, the median ratio of CEDA's rebuilt
-  value to Open-Meteo's lies within 0.97 to 1.03 at every hour of day in era 0 (before PS47).
-  Without the rebuild the guard fails. After PS47 the ratio does not hold, and that mismatch is a
-  reported diagnostic and not a failure (see "Changed after implementation").
+  (computed with the apparent zenith, which matches no worse than the true zenith, checked). The
+  median of that value over the snapshot runs from 0.52 at 05 UTC to 1.42 at 19 UTC on the overlap
+  (checked). The build applies the same ratio to CEDA's `shortwave_down` at the label, and does not
+  invert Open-Meteo's value to a snapshot, because the inverted `ghi_instant_w_m2` spikes after
+  sunrise and dropping the spikes would select rows by one archive's values. The build stops unless,
+  at lead-0 hours, the median ratio of CEDA's rebuilt value to Open-Meteo's lies within 0.97 to 1.03
+  at every hour of day in era 0 (before PS47). Without the rebuild the guard fails. After PS47 the
+  ratio does not hold, and that mismatch is a reported diagnostic and not a failure (see "Changed
+  after implementation").
 
 **Which lead each archive stands in for.** Open-Meteo serves each hour's freshest run analysis
 (lead 0). CEDA's 6-hourly archive is read from the freshest run at or before the hour, so its lead
@@ -153,8 +154,8 @@ runs at both hyperparameter settings, and a verdict stands only if both agree.
 | Label | Contrast | Margin |
 |---|---|---|
 | P1 (planned) | Wind power: `ceda_wind_10m` minus `om_wind_10m`, points of capacity | 0.16 |
-| P2 (planned) | Solar power on era 0: `ceda_ghi_temp` minus `om_ghi_temp` | 0.06 |
-| P3 (planned) | Transfer penalty: (trained on CEDA, scored on Open-Meteo) minus (trained on Open-Meteo, scored on Open-Meteo), read for the wind arms (all months) and for the solar arms (era 0) | 0.16 wind, 0.06 solar |
+| P2 (planned) | Solar power on era 0, fitted on both eras and on era 0 alone: `ceda_ghi_temp` minus `om_ghi_temp` | 0.06 |
+| P3 (planned) | Transfer penalty: (trained on CEDA, scored on Open-Meteo) minus (trained on Open-Meteo, scored on Open-Meteo), read for the wind arms (all months) and for the solar arms (era 0, both fits) | 0.16 wind, 0.06 solar |
 
 **P3 is read one-sided, because only a penalty is actionable.** "No penalty" means the interval's
 upper bound is below the margin. "Penalty" means the lower bound is above zero and the estimate
@@ -287,12 +288,13 @@ owns running the scripts, because every worktree shares the main checkout's `dat
 
 ## 7. Compute estimate
 
-**The fits total 54 fit-sets, plus one CPU refit.** Wind planned arms take 12 (2 arms, 2 settings, 3
-farms), solar planned arms 24 (2 arms, 2 settings, 6 farms), and shuffled controls 18 (one shuffled
-pair per type: 6 wind, 12 solar). The transfer scoring and the lead-0 reads add none. Issue #1024's
+**The fits total 78 fit-sets, plus one CPU refit.** Wind planned arms take 12 (2 arms, 2 settings, 3
+farms), solar planned arms 24 (2 arms, 2 settings, 6 farms), the era-0-only solar refit 24 (the same
+four jobs on the rows of era 0 alone, 6 farms), and shuffled controls 18 (one shuffled pair per
+type: 6 wind, 12 solar). The transfer scoring and the lead-0 reads add none. Issue #1024's
 fit-sets took 8 to 10 seconds on 6,000 to 14,000 rows, and this study has about 15,000 wind rows and
 5,000 to 8,000 daytime solar rows per farm, so plan **5 to 20 seconds per fit-set, 5 to 20 minutes
-in all**.
+in all** for the first 54 and about 5 more minutes for the era-0 refit.
 
 ## 8. The page and the docs
 
@@ -371,7 +373,8 @@ wind-direction, partial-swap, and capacity-table additions.
 **Rejected or kept.**
 
 - Widening the margins to make "interchangeable" reachable: changing a frozen margin after seeing
-  Issue #1024's intervals would be tuning to the outcome, so the plan keeps them and states the limit.
+  Issue #1024's intervals would be tuning to the outcome, so the plan keeps them and states the
+  limit.
 - Scoring the transfer in a second `out_of_fold_losses` call: it forces 18 more fits and an
   unchecked bit-identity on the GPU, so the mapping design scores every frame from one booster.
 - Dropping P3 (transfer): it adds no fit and is the only measurement of the train-on-history,
@@ -395,5 +398,31 @@ unscaled snapshot gives 1.45 and 0.74). The decision, made before any fit or res
   with the ratios read from the build.
 - **The era-0 guard stays fatal, and the era-1 mismatch is a reported diagnostic.** The model-free
   comparison reports the ratio by era and hour (`direct_irradiance_ratios.parquet`).
-- **The fit-set count stays 54**, because every solar row is still fitted and only the scored scope
-  changes. The row counts are 45,948 wind rows, and 42,544 solar rows of which 27,766 are era 0.
+- **The row counts are** 45,948 wind rows, and 42,544 solar rows of which 27,766 are era 0.
+
+**The third review (before any fit) changed five more things.**
+
+- **The planned solar fits are refitted on era 0 alone.** A model that trains on all rows and is
+  scored on era 0 has still trained on 14,778 era-1 rows whose Open-Meteo irradiance is built
+  differently, so the two archives' training sets differ in construction. The solar jobs therefore
+  run twice: once on the rows of both eras (scored on era 0), and once on the rows of era 0 alone
+  (`solar_rows_era0.parquet`, folds cut inside era 0, 24 more fit-sets, no controls). **A solar
+  verdict (P2 or P3) stands only if all four readings agree** (two fits, two settings), and
+  otherwise it is `unresolved`. The confound is a limitation on the page: if the era-1 rows degrade
+  the Open-Meteo-trained reference model, the transfer penalty moves towards `no_penalty` and the
+  contrast towards CEDA, and the era-0-trained fit is the check on that. Fit-set count: 78.
+- **The sun-elevation view of the irradiance rebuild.** Below 5 degrees of sun elevation the
+  rebuilt value does not reproduce Open-Meteo's (ratio 0.02 below 2 degrees and 0.68 from 2 to 5
+  degrees in era 0, against 1.000 above 10 degrees), and the 50 W/m2 cut of the guard hides it. The
+  build and the compare script print the ratio by elevation bin, and the solar fits add two
+  exploratory scopes, "sun above 5 degrees" and "era 0, sun above 5 degrees". The scope reads the
+  geometry and neither archive's value.
+- **The `--verified` gate checks the build.** The build stamps `guards_passed` and the hash of each
+  row file into `build.json`, and the fit refuses unless the stamp says every guard passed, each row
+  file hashes to its stamped value, and `direct_report.md` exists.
+- **The build asserts that every row frame is sorted by site and time with unique keys,** because
+  row order is part of an XGBoost fit.
+- **The partial-swap temperature offset is learned from lead-0 instants on the training folds
+  only.** It was the mean of the two-end temperature means at the hours where CEDA's lead is 0,
+  which averaged in a lead-5 instant and read the scored fold. The fit also checks every output path
+  before it writes the hardware stamp.

@@ -56,6 +56,7 @@ output exists. Only one agent may run it at a time, because every worktree share
 
 import argparse
 import concurrent.futures
+import hashlib
 import json
 import logging
 import sys
@@ -87,9 +88,11 @@ from ukv_ceda_vs_era5_fit import (
 )
 from ukv_ceda_vs_openmeteo_build import (
     LEAD_CYCLE_HOURS,
+    LOW_SUN_ZENITH_DEG,
     MARGIN_SOLAR_PP,
     MARGIN_WIND_PP,
     OUTPUT_DIR,
+    SOLAR_ERA_0_ROWS_NAME,
     SOLAR_ROWS_NAME,
     WIND_ROWS_NAME,
     check_arm_widths,
@@ -102,13 +105,38 @@ from ukv_ceda_vs_openmeteo_build import (
 from ukv_ceda_vs_openmeteo_build import (
     STAMP_NAME as BUILD_STAMP_NAME,
 )
+from ukv_ceda_vs_openmeteo_compare import REPORT_NAME as DIRECT_REPORT_NAME
 
 _LOG: Final[logging.Logger] = logging.getLogger("ukv_ceda_vs_openmeteo_fit")
 
-DomainType = Literal["wind", "solar"]
+DomainType = Literal["wind", "solar", "solar_era0"]
+"""The fitted row sets. `solar_era0` is the solar rows of era 0 alone, with its own folds."""
 
-ROW_NAMES: Final[Mapping[DomainType, str]] = {"wind": WIND_ROWS_NAME, "solar": SOLAR_ROWS_NAME}
-MARGINS_PP: Final[Mapping[DomainType, float]] = {"wind": MARGIN_WIND_PP, "solar": MARGIN_SOLAR_PP}
+BaseDomainType = Literal["wind", "solar"]
+
+
+def base_domain(*, domain: DomainType) -> BaseDomainType:
+    """Return the technology of a row set: `solar_era0` is solar.
+
+    Args:
+        domain: A fitted row set.
+
+    Returns:
+        `wind` or `solar`.
+    """
+    return "wind" if domain == "wind" else "solar"
+
+
+ROW_NAMES: Final[Mapping[DomainType, str]] = {
+    "wind": WIND_ROWS_NAME,
+    "solar": SOLAR_ROWS_NAME,
+    "solar_era0": SOLAR_ERA_0_ROWS_NAME,
+}
+MARGINS_PP: Final[Mapping[DomainType, float]] = {
+    "wind": MARGIN_WIND_PP,
+    "solar": MARGIN_SOLAR_PP,
+    "solar_era0": MARGIN_SOLAR_PP,
+}
 """The margin of each domain, in percentage points of capacity."""
 
 REPORT_NAME: Final[str] = "report.md"
@@ -143,7 +171,9 @@ def arm_names(*, domain: DomainType) -> tuple[str, str]:
         The CEDA arm, then the Open-Meteo arm.
     """
     return (
-        ("ceda_wind_10m", "om_wind_10m") if domain == "wind" else ("ceda_ghi_temp", "om_ghi_temp")
+        ("ceda_wind_10m", "om_wind_10m")
+        if base_domain(domain=domain) == "wind"
+        else ("ceda_ghi_temp", "om_ghi_temp")
     )
 
 
@@ -158,7 +188,7 @@ def arm_columns(*, domain: DomainType, archive: str, shuffled: bool = False) -> 
     Returns:
         The columns, from the build's one function per arm type.
     """
-    function = wind_arm_columns if domain == "wind" else solar_arm_columns
+    function = wind_arm_columns if base_domain(domain=domain) == "wind" else solar_arm_columns
     return function(archive=archive, shuffled=shuffled)
 
 
@@ -176,13 +206,16 @@ def ordinary_jobs(*, domain: DomainType) -> list[Job]:
         domain: `wind` or `solar`.
 
     Returns:
-        Open-Meteo's arm at both settings, then each archive's shuffled arm at the primary setting.
+        Open-Meteo's arm at both settings, then each archive's shuffled arm at the primary setting
+        (the era-0 solar sensitivity has no controls).
     """
     ceda_arm, om_arm = arm_names(domain=domain)
     jobs = [
         _job(arm=om_arm, setting=setting, columns=arm_columns(domain=domain, archive="om"))
         for setting in (PRIMARY_SETTING, SECOND_SETTING)
     ]
+    if domain == "solar_era0":
+        return jobs
     jobs += [
         _job(
             arm=f"{arm}_shuffled",
@@ -235,7 +268,9 @@ def scoring_names(*, domain: DomainType) -> tuple[str, ...]:
         CEDA's own values, Open-Meteo's values, and the exploratory partial swaps.
     """
     partial = (
-        ("om_direction",) if domain == "wind" else ("om_temp", "om_ghi", "om_temp_offset_removed")
+        ("om_direction",)
+        if base_domain(domain=domain) == "wind"
+        else ("om_temp", "om_ghi", "om_temp_offset_removed")
     )
     return (CEDA_OWN, OM_VALUES, *partial)
 
@@ -253,19 +288,6 @@ def scored_arm_name(*, arm: str, scoring: str) -> str:
     return arm if scoring == CEDA_OWN else f"{arm}_scored_on_{scoring}"
 
 
-def lead_zero_temperature_offset(*, site_rows: pl.DataFrame) -> float:
-    """Return one site's mean Open-Meteo minus CEDA temperature at the hours CEDA's lead is 0.
-
-    Args:
-        site_rows: One site's solar rows.
-
-    Returns:
-        The mean offset in degrees Celsius.
-    """
-    zero = site_rows.filter(pl.col("hour_of_day") % LEAD_CYCLE_HOURS == 0)
-    return float(np.mean((zero["om_temp"] - zero["ceda_temp"]).to_numpy()))
-
-
 def scoring_frames(*, site_rows: pl.DataFrame, domain: DomainType) -> dict[str, pl.DataFrame]:
     """Build the frames one site's CEDA-trained model is scored on.
 
@@ -278,12 +300,13 @@ def scoring_frames(*, site_rows: pl.DataFrame, domain: DomainType) -> dict[str, 
         the partial swaps. Each holds `time`, `fold` and every column of the CEDA arm.
     """
     columns = arm_columns(domain=domain, archive="ceda")
-    swapped = transfer_frame(frame=site_rows, domain=domain)
+    base = base_domain(domain=domain)
+    swapped = transfer_frame(frame=site_rows, domain=base)
     frames = {
         CEDA_OWN: site_rows.select("time", "fold", *columns),
         OM_VALUES: swapped.select("time", "fold", *columns),
     }
-    if domain == "wind":
+    if base == "wind":
         _, ceda_sin, ceda_cos = wind_columns(archive="ceda")
         frames["om_direction"] = site_rows.select("time", "fold", *columns).with_columns(
             swapped[ceda_sin].alias(ceda_sin), swapped[ceda_cos].alias(ceda_cos)
@@ -291,11 +314,10 @@ def scoring_frames(*, site_rows: pl.DataFrame, domain: DomainType) -> dict[str, 
         return frames
     ceda_ghi, ceda_temp = solar_columns(archive="ceda")
     own = site_rows.select("time", "fold", *columns)
-    offset = lead_zero_temperature_offset(site_rows=site_rows)
     frames["om_temp"] = own.with_columns(swapped[ceda_temp].alias(ceda_temp))
     frames["om_ghi"] = own.with_columns(swapped[ceda_ghi].alias(ceda_ghi))
     frames["om_temp_offset_removed"] = own.with_columns(
-        (swapped[ceda_temp] - offset).alias(ceda_temp)
+        site_rows["om_temp_offset_removed"].alias(ceda_temp)
     )
     return frames
 
@@ -531,8 +553,15 @@ PLANNED_CONTRASTS: Final[tuple[Planned, ...]] = (
     Planned("P2", "solar", "ceda_ghi_temp", "om_ghi_temp"),
     Planned("P3", "wind", "ceda_wind_10m_scored_on_om", "om_wind_10m", one_sided=True),
     Planned("P3", "solar", "ceda_ghi_temp_scored_on_om", "om_ghi_temp", one_sided=True),
+    Planned("P2", "solar_era0", "ceda_ghi_temp", "om_ghi_temp"),
+    Planned("P3", "solar_era0", "ceda_ghi_temp_scored_on_om", "om_ghi_temp", one_sided=True),
 )
-"""The planned contrasts, each at both settings."""
+"""The planned contrasts, each at both settings.
+
+The solar contrasts are fitted twice. The rows of both eras train and are scored on era 0, and the
+rows of era 0 alone train and are scored on era 0, so that the irradiance construction that differs
+after PS47 cannot bias the planned read. A solar verdict stands only if the two fits agree.
+"""
 
 EXPLORATORY_CONTRASTS: Final[Mapping[DomainType, tuple[tuple[str, str, str], ...]]] = {
     "wind": (
@@ -546,6 +575,7 @@ EXPLORATORY_CONTRASTS: Final[Mapping[DomainType, tuple[tuple[str, str, str], ...
         ),
         ("GPU against CPU", "om_wind_10m_cpu_refit", "om_wind_10m"),
     ),
+    "solar_era0": (),
     "solar": (
         ("control", "ceda_ghi_temp_shuffled", "om_ghi_temp_shuffled"),
         ("CEDA against its shuffled arm", "ceda_ghi_temp", "ceda_ghi_temp_shuffled"),
@@ -585,7 +615,11 @@ class IntervalRecord(TypedDict):
     note: str
 
 
-PLANNED_SCOPE: Final[Mapping[DomainType, str]] = {"wind": "all", "solar": "era 0"}
+PLANNED_SCOPE: Final[Mapping[DomainType, str]] = {
+    "wind": "all",
+    "solar": "era 0",
+    "solar_era0": "all",
+}
 """The scope each domain's planned contrasts are read on.
 
 Wind and temperature keep the whole overlap. Solar reads era 0 only, because Open-Meteo's hourly
@@ -594,16 +628,27 @@ not like for like in era 1. Every other solar scope is exploratory and carries t
 """
 
 
-def scopes_of(*, losses: pl.DataFrame) -> list[tuple[str, pl.Expr | None]]:
+ERA_0_SCOPES: Final[tuple[str, ...]] = ("era 0", "era 0, sun above 5 degrees")
+"""The scopes that hold no era-1 row, and so carry no era-1 note."""
+
+
+def scopes_of(
+    *, losses: pl.DataFrame, domain: DomainType = "wind"
+) -> list[tuple[str, pl.Expr | None]]:
     """List the scopes a contrast is split into, as (label, filter).
 
     Args:
-        losses: Losses carrying `time`, `month` and `site`.
+        losses: Losses carrying `time`, `month` and `site`, and for solar `solar_zenith_deg`.
+        domain: The row set. The era-0 solar sensitivity is read on all its rows only.
 
     Returns:
         All rows, each UKV era, the two half-years, the lead-0 hours (every row at which CEDA's
-        lead is 0), and each site.
+        lead is 0), and each site. Where the losses carry the solar zenith, two geometry scopes
+        follow: the hours with the sun more than 5 degrees above the horizon, in all rows and in
+        era 0. The filter reads the geometry and neither archive's value.
     """
+    if domain == "solar_era0":
+        return [("all", None)]
     winter = pl.col("time").dt.month().is_in([10, 11, 12, 1, 2, 3])
     scopes: list[tuple[str, pl.Expr | None]] = [
         ("all", None),
@@ -613,6 +658,12 @@ def scopes_of(*, losses: pl.DataFrame) -> list[tuple[str, pl.Expr | None]]:
         ("April to September", ~winter),
         ("lead 0 only", pl.col("time").dt.hour() % LEAD_CYCLE_HOURS == 0),
     ]
+    if "solar_zenith_deg" in losses.columns:
+        sunny = pl.col("solar_zenith_deg") < LOW_SUN_ZENITH_DEG
+        scopes += [
+            ("sun above 5 degrees", sunny),
+            ("era 0, sun above 5 degrees", sunny & (pl.col("month") < ERA_BOUNDARY_MONTH)),
+        ]
     scopes += [
         (f"site {site}", pl.col("site") == site)
         for site in sorted(losses["site"].unique().to_list())
@@ -716,7 +767,7 @@ def domain_records(
     """
     present = set(losses["arm"].unique().to_list())
     records: list[IntervalRecord] = []
-    for scope, condition in scopes_of(losses=losses):
+    for scope, condition in scopes_of(losses=losses, domain=domain):
         scoped = losses if condition is None else losses.filter(condition)
         for planned in PLANNED_CONTRASTS:
             if planned.domain != domain:
@@ -732,7 +783,7 @@ def domain_records(
                     treatment=planned.treatment,
                     reference=planned.reference,
                     one_sided=planned.one_sided,
-                    note=era_1_note if domain == "solar" and scope != "era 0" else "",
+                    note=(era_1_note if domain == "solar" and scope not in ERA_0_SCOPES else ""),
                 )
                 for setting in (PRIMARY_SETTING, SECOND_SETTING)
             ]
@@ -760,48 +811,79 @@ def domain_records(
 # --- The decision ---------------------------------------------------------------------------------
 
 
+DOMAIN_FITS: Final[Mapping[BaseDomainType, tuple[DomainType, ...]]] = {
+    "wind": ("wind",),
+    "solar": ("solar", "solar_era0"),
+}
+"""The row sets whose readings a verdict combines. Solar has two: the rows of both eras, and the
+rows of era 0 alone."""
+
+
 class Verdict(NamedTuple):
-    """One planned contrast's verdict across the two settings."""
+    """One planned contrast's verdict across its settings and fits."""
 
     label: str
-    domain: DomainType
+    domain: BaseDomainType
     reading: str
     primary: IntervalRecord
     second: IntervalRecord
+    sensitivity: tuple[IntervalRecord, ...] = ()
+    """The era-0-trained fit's records at both settings, for solar."""
 
 
 def verdicts(*, records: Sequence[IntervalRecord]) -> list[Verdict]:
-    """Read each planned contrast across both settings, on its domain's planned scope.
+    """Read each planned contrast across both settings and every fit, on its planned scope.
+
+    **A verdict stands only if every reading agrees.** Wind has two readings, one per setting.
+    Solar has four: the rows of both eras, and the rows of era 0 alone, each at both settings. The
+    era-0-trained fit cannot be biased by the irradiance construction that differs after PS47, and
+    the all-rows fit trains on era-1 rows built that way, so a disagreement is read as
+    `unresolved`.
 
     Args:
         records: Every interval record.
 
     Returns:
-        One verdict per planned contrast of a domain that has records, where a verdict stands
-        only if both settings agree.
+        One verdict per planned contrast of a technology that has records.
     """
     found: list[Verdict] = []
     domains = {record["domain"] for record in records}
     for planned in PLANNED_CONTRASTS:
+        if planned.domain == "solar_era0":
+            continue
         if planned.domain not in domains:
             continue
-        chosen = {
-            record["setting"]: record
-            for record in records
-            if record["scope"] == PLANNED_SCOPE[planned.domain]
-            and record["label"] == planned.label
-            and record["domain"] == planned.domain
-            and record["treatment"] == planned.treatment
-            and record["planned"]
-        }
-        primary, second = chosen[PRIMARY_SETTING], chosen[SECOND_SETTING]
+        readings: list[str] = []
+        chosen_by_domain: dict[str, dict[str, IntervalRecord]] = {}
+        for domain in DOMAIN_FITS[planned.domain]:
+            if domain not in domains:
+                continue
+            chosen = {
+                record["setting"]: record
+                for record in records
+                if record["scope"] == PLANNED_SCOPE[domain]
+                and record["label"] == planned.label
+                and record["domain"] == domain
+                and record["treatment"] == planned.treatment
+                and record["planned"]
+            }
+            chosen_by_domain[domain] = chosen
+            readings += [chosen[PRIMARY_SETTING]["reading"], chosen[SECOND_SETTING]["reading"]]
+        main = chosen_by_domain[planned.domain]
+        sensitivity = tuple(
+            record
+            for domain, chosen in chosen_by_domain.items()
+            if domain != planned.domain
+            for record in (chosen[PRIMARY_SETTING], chosen[SECOND_SETTING])
+        )
         found.append(
             Verdict(
                 label=planned.label,
                 domain=planned.domain,
-                reading=combine_settings(readings=[primary["reading"], second["reading"]]),
-                primary=primary,
-                second=second,
+                reading=combine_settings(readings=readings),
+                primary=main[PRIMARY_SETTING],
+                second=main[SECOND_SETTING],
+                sensitivity=sensitivity,
             )
         )
     return found
@@ -834,20 +916,30 @@ def decision_text(*, found: Sequence[Verdict]) -> str:
     lines = ["### Decision, by the rule fixed before any result", ""]
     for verdict in found:
         unit = f"{verdict.domain}, {verdict.label}, scope {PLANNED_SCOPE[verdict.domain]}"
+        sensitivity = "".join(
+            f"; era-0-trained {record['setting']} {record['reading']}: "
+            f"{record['difference_pp']:+.3f} "
+            f"[{record['lower_95_pp']:+.3f}, {record['upper_95_pp']:+.3f}]"
+            for record in verdict.sensitivity
+        )
         lines.append(
             f"- {unit}: {verdict.reading} (primary {verdict.primary['reading']}: "
             f"{verdict.primary['difference_pp']:+.3f} points of capacity "
             f"[{verdict.primary['lower_95_pp']:+.3f}, {verdict.primary['upper_95_pp']:+.3f}]; "
             f"second {verdict.second['reading']}: {verdict.second['difference_pp']:+.3f} "
             f"[{verdict.second['lower_95_pp']:+.3f}, {verdict.second['upper_95_pp']:+.3f}]; "
-            f"margin {verdict.primary['margin_pp']:.2f})."
+            f"margin {verdict.primary['margin_pp']:.2f}{sensitivity})."
         )
     lines += [
         "",
         (
-            "Solar contrasts are read on era 0 only. After the PS47 upgrade Open-Meteo's hourly "
-            "irradiance is built differently, so every solar scope that includes era 1 is "
-            "exploratory and carries that note."
+            "Solar contrasts are read on era 0 only, by two fits: one trained on the rows of both "
+            "eras and one trained on era 0 alone, and a verdict stands only if the two agree. "
+            "After the PS47 upgrade Open-Meteo's hourly irradiance is built differently, so the "
+            "all-rows fit trains on era-1 rows whose irradiance is not like for like. If that "
+            "biases anything it makes the Open-Meteo-trained reference model worse, which pushes "
+            "the transfer penalty towards `no_penalty` and the contrast towards CEDA. Every solar "
+            "scope that includes era 1 is exploratory and carries the era-1 note."
         ),
         "",
         "#### Training history (question 5), scoped",
@@ -951,7 +1043,7 @@ def report_text(
 
 
 def load_frames(*, directory: Path) -> dict[DomainType, pl.DataFrame]:
-    """Read the build's two row files.
+    """Read the build's three row files.
 
     Args:
         directory: The output folder.
@@ -990,6 +1082,52 @@ def dry_run_lines(*, frames: Mapping[DomainType, pl.DataFrame]) -> list[str]:
     return lines
 
 
+def check_verified(*, directory: Path) -> None:
+    """Raise unless the build passed every guard and the row files are the ones it stamped.
+
+    Args:
+        directory: The output folder.
+
+    Raises:
+        ValueError: If `build.json` is missing, says a guard failed, or holds no hash for a row
+            file; if a row file's hash differs from the stamped one; or if `direct_report.md`
+            does not exist.
+    """
+    stamp_path = directory / BUILD_STAMP_NAME
+    if not stamp_path.exists():
+        msg = f"{stamp_path} is missing: run the build first"
+        raise ValueError(msg)
+    stamp = json.loads(stamp_path.read_text())
+    if not stamp.get("guards_passed"):
+        msg = f"{stamp_path} does not say every guard passed"
+        raise ValueError(msg)
+    for name in ROW_NAMES.values():
+        stamped = stamp.get("row_file_hashes", {}).get(name)
+        actual = hashlib.sha256((directory / name).read_bytes()).hexdigest()
+        if stamped != actual:
+            msg = f"{name} does not hash to the value the build stamped"
+            raise ValueError(msg)
+    if not (directory / DIRECT_REPORT_NAME).exists():
+        msg = f"{DIRECT_REPORT_NAME} is missing: run the compare script and read its report"
+        raise ValueError(msg)
+
+
+def planned_outputs(*, directory: Path) -> list[Path]:
+    """List every file a full fit run writes, so a stale one stops the run before it starts.
+
+    Args:
+        directory: The output folder.
+
+    Returns:
+        The hardware stamp, every domain's losses and fingerprints, the CPU refit's, and the
+        three reports.
+    """
+    paths = [directory / STAMP_NAME]
+    for stem in (*(f"losses_{domain}" for domain in ROW_NAMES), CPU_REFIT_STEM):
+        paths += list(_paths(directory=directory, stem=stem))
+    return [*paths, directory / REPORT_NAME, directory / DECISION_NAME, directory / INTERVALS_NAME]
+
+
 def main() -> int:
     """Fit, or rebuild the reports from saved losses."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -1012,8 +1150,9 @@ def main() -> int:
         if not arguments.verified:
             sys.stdout.write("Refusing to fit without --verified.\n")
             return 2
+        check_verified(directory=directory)
+        refuse_to_overwrite(paths=planned_outputs(directory=directory))
         stamp_path = directory / STAMP_NAME
-        refuse_to_overwrite(paths=[stamp_path])
         stamp_path.write_text(json.dumps(hardware_stamp(device=arguments.device), indent=2))
         for domain, frame in frames.items():
             fit_domain(domain=domain, frame=frame, directory=directory, device=arguments.device)
@@ -1028,6 +1167,9 @@ def main() -> int:
         stem=CPU_REFIT_STEM, frame=frames["wind"], jobs=cpu_refit_jobs(), directory=directory
     )
     losses["wind"] = pl.concat([losses["wind"], cpu.select(losses["wind"].columns)])
+    losses["solar"] = losses["solar"].join(
+        frames["solar"].select("site", "time", "solar_zenith_deg"), on=["site", "time"], how="left"
+    )
     era_1_note = json.loads((directory / BUILD_STAMP_NAME).read_text())["era_1_irradiance_note"]
     records = [
         record
@@ -1038,7 +1180,8 @@ def main() -> int:
     job_list = [job for domain in frames for job in all_jobs(domain=domain)] + cpu_refit_jobs()
     report = report_text(records=records, losses=losses, job_list=job_list, found=found)
     paths = [directory / REPORT_NAME, directory / DECISION_NAME, directory / INTERVALS_NAME]
-    refuse_to_overwrite(paths=paths)
+    if arguments.report_only:
+        refuse_to_overwrite(paths=paths)
     paths[0].write_text(report)
     paths[1].write_text(decision_text(found=found))
     pl.DataFrame(records).write_parquet(paths[2])

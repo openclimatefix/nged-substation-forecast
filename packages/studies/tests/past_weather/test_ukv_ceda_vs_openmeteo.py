@@ -7,6 +7,8 @@ archives' control columns, a temperature taken at one instant instead of two, a 
 against the wrong margin, and a one-sided penalty read two-sided.
 """
 
+import hashlib
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
@@ -285,7 +287,7 @@ def test_the_margins_are_the_frozen_values_in_points_of_capacity():
     """A tripwire: the margins were fixed before any result, so a change here is a post hoc edit."""
     assert build.MARGIN_WIND_PP == 0.16
     assert build.MARGIN_SOLAR_PP == 0.06
-    assert fit.MARGINS_PP == {"wind": 0.16, "solar": 0.06}
+    assert fit.MARGINS_PP == {"wind": 0.16, "solar": 0.06, "solar_era0": 0.06}
 
 
 @pytest.mark.parametrize(
@@ -363,16 +365,28 @@ def test_each_arm_is_fitted_on_columns_of_its_own_archive_and_the_ceda_arm_is_sc
     )
 
 
-def test_the_dry_run_counts_the_54_planned_fit_sets():
+def test_the_dry_run_counts_the_78_planned_fit_sets():
     frames: dict[fit.DomainType, pl.DataFrame] = {
         "wind": pl.DataFrame({"site": ["W1", "W2", "W3"] * 2, "x": range(6)}),
         "solar": pl.DataFrame({"site": list("ABCDEF") * 2, "x": range(12)}),
+        "solar_era0": pl.DataFrame({"site": list("ABCDEF") * 2, "x": range(12)}),
     }
 
-    jobs = {domain: len(fit.all_jobs(domain=domain)) for domain in ("wind", "solar")}
+    jobs = {domain: len(fit.all_jobs(domain=domain)) for domain in frames}
 
-    assert jobs["wind"] * 3 + jobs["solar"] * 6 == 54
-    assert "Total 54 fit-sets" in "\n".join(fit.dry_run_lines(frames=frames))
+    # Wind and solar have 2 + 2 controls + 2 CEDA-trained jobs. The era-0 sensitivity has 2 + 2.
+    assert jobs == {"wind": 6, "solar": 6, "solar_era0": 4}
+    assert jobs["wind"] * 3 + jobs["solar"] * 6 + jobs["solar_era0"] * 6 == 78
+    assert "Total 78 fit-sets" in "\n".join(fit.dry_run_lines(frames=frames))
+
+
+def test_the_era_0_sensitivity_has_no_controls_and_reads_the_solar_arms():
+    arms = {job[0] for job in fit.all_jobs(domain="solar_era0")}
+
+    assert arms == {"om_ghi_temp", "ceda_ghi_temp"}
+    assert fit.arm_names(domain="solar_era0") == ("ceda_ghi_temp", "om_ghi_temp")
+    assert fit.scoring_names(domain="solar_era0") == fit.scoring_names(domain="solar")
+    assert fit.PLANNED_SCOPE["solar_era0"] == "all"
 
 
 def test_a_scored_arm_is_named_for_its_scoring_frame():
@@ -393,13 +407,9 @@ def _solar_site_rows() -> pl.DataFrame:
             "om_ghi": 200.0,
             "ceda_temp": 10.0,
             "om_temp": [11.0 if t.hour % 6 == 0 else 15.0 for t in times],
+            "om_temp_offset_removed": [t.hour * 0.5 for t in times],
         }
     )
-
-
-def test_the_lead_zero_temperature_offset_reads_only_the_hours_at_lead_zero():
-    # Open-Meteo is 1 K warmer at the lead-0 hours and 5 K warmer elsewhere.
-    assert fit.lead_zero_temperature_offset(site_rows=_solar_site_rows()) == pytest.approx(1.0)
 
 
 def test_each_partial_swap_replaces_only_its_own_columns_of_the_ceda_arm():
@@ -413,9 +423,10 @@ def test_each_partial_swap_replaces_only_its_own_columns_of_the_ceda_arm():
     assert frames["om_temp"]["ceda_temp"].to_list() == site_rows["om_temp"].to_list()
     assert frames["om_ghi"]["ceda_temp"].unique().to_list() == [10.0]
     assert frames["om_ghi"]["ceda_ghi"].unique().to_list() == [200.0]
-    # The offset removed is the lead-0 mean offset of 1 K, subtracted from every hour.
-    assert frames["om_temp_offset_removed"]["ceda_temp"].to_list() == pytest.approx(
-        [value - 1.0 for value in site_rows["om_temp"].to_list()]
+    # The offset-removed temperature is the build's own column, which the build learned on the
+    # training folds, so the fit adds nothing to it.
+    assert frames["om_temp_offset_removed"]["ceda_temp"].to_list() == (
+        site_rows["om_temp_offset_removed"].to_list()
     )
 
 
@@ -667,7 +678,7 @@ def test_the_solar_controls_are_read_on_the_planned_era_only():
 
 
 def test_the_solar_verdicts_read_era_0_and_the_wind_verdicts_read_all_rows():
-    assert fit.PLANNED_SCOPE == {"wind": "all", "solar": "era 0"}
+    assert fit.PLANNED_SCOPE == {"wind": "all", "solar": "era 0", "solar_era0": "all"}
     records = fit.domain_records(domain="solar", losses=_contrast_losses())
 
     found = [v for v in fit.verdicts(records=records) if v.domain == "solar"]
@@ -676,3 +687,232 @@ def test_the_solar_verdicts_read_era_0_and_the_wind_verdicts_read_all_rows():
     assert all(v.primary["scope"] == "era 0" for v in found)
     # Era 0 shows no difference, so a verdict read on all rows would not be "interchangeable".
     assert all(v.primary["difference_pp"] == pytest.approx(0.0) for v in found)
+
+
+# --- the planned solar verdict combines two fits, and the build and fit gates --------------------
+
+
+def _two_fit_records(*, era_0_trained_error: float) -> list[fit.IntervalRecord]:
+    """Interval records for the all-rows solar fit and the era-0-trained fit."""
+    all_rows = _contrast_losses()
+    era_0_only = all_rows.filter(pl.col("month") < "2026-02").with_columns(
+        pl.when(pl.col("arm") == "om_ghi_temp")
+        .then(pl.col(fit.METRIC) + era_0_trained_error)
+        .otherwise(pl.col(fit.METRIC))
+        .alias(fit.METRIC)
+    )
+    return [
+        *fit.domain_records(domain="solar", losses=all_rows),
+        *fit.domain_records(domain="solar_era0", losses=era_0_only),
+    ]
+
+
+def test_a_solar_verdict_stands_only_if_the_all_rows_and_era_0_fits_agree():
+    agree = fit.verdicts(records=_two_fit_records(era_0_trained_error=0.0))
+    disagree = fit.verdicts(records=_two_fit_records(era_0_trained_error=0.5))
+
+    assert {v.label: v.reading for v in agree}["P2"] == "interchangeable"
+    # The era-0-trained fit finds a large difference, which the all-rows fit does not, so the
+    # planned read is unresolved.
+    assert {v.label: v.reading for v in disagree}["P2"] == "unresolved"
+    sensitivity = next(v for v in disagree if v.label == "P2").sensitivity
+    assert len(sensitivity) == 2
+    assert {r["domain"] for r in sensitivity} == {"solar_era0"}
+    assert all(r["planned"] for r in sensitivity)
+
+
+def test_the_era_0_sensitivity_is_read_on_all_its_rows_only():
+    losses = _contrast_losses().filter(pl.col("month") < "2026-02")
+
+    scopes = [name for name, _ in fit.scopes_of(losses=losses, domain="solar_era0")]
+
+    assert scopes == ["all"]
+
+
+def _scope_height(*, losses: pl.DataFrame, name: str) -> int:
+    condition = dict(fit.scopes_of(losses=losses, domain="solar"))[name]
+    assert condition is not None
+    return losses.filter(condition).height
+
+
+def test_a_sun_above_5_degrees_scope_reads_the_geometry_when_the_zenith_is_there():
+    losses = _contrast_losses().with_columns(solar_zenith_deg=pl.lit(80.0))
+
+    assert _scope_height(losses=losses, name="sun above 5 degrees") == losses.height
+    assert _scope_height(losses=losses, name="era 0, sun above 5 degrees") == (
+        _scope_height(losses=losses, name="era 0")
+    )
+    low_sun = losses.with_columns(solar_zenith_deg=pl.lit(88.0))
+    assert _scope_height(losses=low_sun, name="sun above 5 degrees") == 0
+    assert "sun above 5 degrees" not in dict(fit.scopes_of(losses=_contrast_losses()))
+
+
+def _stamped_folder(tmp_path: Path, *, guards_passed: bool = True) -> Path:
+    stamp: dict[str, object] = {"guards_passed": guards_passed, "row_file_hashes": {}}
+    for name in fit.ROW_NAMES.values():
+        (tmp_path / name).write_bytes(name.encode())
+        stamp["row_file_hashes"][name] = hashlib.sha256(name.encode()).hexdigest()
+    (tmp_path / build.STAMP_NAME).write_text(json.dumps(stamp))
+    (tmp_path / "direct_report.md").write_text("report")
+    return tmp_path
+
+
+def test_the_verified_gate_passes_on_a_stamped_folder_whose_guards_passed(tmp_path: Path):
+    fit.check_verified(directory=_stamped_folder(tmp_path))
+
+
+def test_the_verified_gate_refuses_a_stamp_where_a_guard_failed(tmp_path: Path):
+    folder = _stamped_folder(tmp_path, guards_passed=False)
+
+    with pytest.raises(ValueError, match="guard"):
+        fit.check_verified(directory=folder)
+
+
+def test_the_verified_gate_refuses_a_row_file_that_no_longer_hashes_to_its_stamp(tmp_path: Path):
+    folder = _stamped_folder(tmp_path)
+    (folder / build.SOLAR_ERA_0_ROWS_NAME).write_bytes(b"edited after the build")
+
+    with pytest.raises(ValueError, match="hash"):
+        fit.check_verified(directory=folder)
+
+
+def test_the_verified_gate_refuses_without_the_compare_report(tmp_path: Path):
+    folder = _stamped_folder(tmp_path)
+    (folder / "direct_report.md").unlink()
+
+    with pytest.raises(ValueError, match="compare"):
+        fit.check_verified(directory=folder)
+
+
+def test_a_stale_output_of_any_domain_is_found_before_the_run_writes_anything(tmp_path: Path):
+    expected = {path.name for path in fit.planned_outputs(directory=tmp_path)}
+
+    for domain in fit.ROW_NAMES:
+        assert f"losses_{domain}.parquet" in expected
+        assert f"losses_{domain}.fingerprint" in expected
+    assert {
+        fit.STAMP_NAME,
+        f"{fit.CPU_REFIT_STEM}.parquet",
+        fit.REPORT_NAME,
+        fit.DECISION_NAME,
+        fit.INTERVALS_NAME,
+    } <= expected
+
+
+def test_the_rows_must_be_sorted_by_site_and_time_with_no_repeated_key():
+    times = [datetime(2025, 1, 1, h, tzinfo=UTC) for h in range(3)]
+    good = pl.DataFrame({"site": ["A", "A", "B"], "time": [times[0], times[1], times[0]]})
+
+    build.check_sorted_and_unique(frame=good, name="rows")
+    with pytest.raises(ValueError, match="not sorted"):
+        build.check_sorted_and_unique(frame=good.reverse(), name="rows")
+    with pytest.raises(ValueError, match="repeated"):
+        build.check_sorted_and_unique(
+            frame=pl.concat([good, good.head(1)]).sort("site", "time"), name="rows"
+        )
+
+
+# --- the temperature offset, the era-0 rows, and the elevation ratios -----------------------------
+
+
+def _offset_inputs() -> tuple[pl.DataFrame, pl.DataFrame]:
+    months = ["2025-03", "2025-04", "2025-05"]
+    frame = pl.DataFrame(
+        {
+            "site": "A",
+            "month": months,
+            "fold": [0, 1, 2],
+            "om_temp": [20.0, 20.0, 20.0],
+        }
+    )
+    # Open-Meteo minus CEDA is 1, 2, and 3 K at lead-0 instants of the three months, and 50 K at
+    # an instant that is not lead 0, which the offset must ignore.
+    model_free = pl.DataFrame(
+        {
+            "site": "A",
+            "month": [*months, "2025-03"],
+            "lead_hours": [0, 0, 0, 3],
+            "om_temp_c": [11.0, 12.0, 13.0, 60.0],
+            "ceda_temp_c": [10.0, 10.0, 10.0, 10.0],
+        }
+    )
+    return frame, model_free
+
+
+def test_the_temperature_offset_is_learned_on_the_other_folds_at_lead_zero_instants():
+    frame, model_free = _offset_inputs()
+
+    result = build.with_offset_removed_temperature(frame=frame, model_free=model_free)
+
+    # Fold 0 learns from months 2 and 3 (offsets 2 and 3), fold 1 from months 1 and 3, fold 2 from
+    # months 1 and 2, so a row's own month never enters its offset.
+    assert result["om_temp_offset_removed"].to_list() == pytest.approx(
+        [20.0 - 2.5, 20.0 - 2.0, 20.0 - 1.5]
+    )
+
+
+def _solar_for_era_0() -> pl.DataFrame:
+    rows = []
+    for month in build.STUDY_MONTHS:
+        year, number = (int(part) for part in month.split("-"))
+        rows += [
+            {
+                "site": "A",
+                "time": datetime(year, number, day, 12, tzinfo=UTC),
+                "month": month,
+                "om_temp": 10.0,
+                "fold": 4,
+                "era": "x",
+                "era_code": 1 if month >= "2026-02" else 0,
+                "om_temp_offset_removed": 0.0,
+            }
+            for day in range(1, 5)
+        ]
+    return pl.DataFrame(rows)
+
+
+def test_the_era_0_rows_keep_only_the_months_before_the_upgrade_with_their_own_folds():
+    solar = _solar_for_era_0()
+    months = [m for m in build.STUDY_MONTHS if m < "2026-02"]
+    model_free = pl.DataFrame(
+        {
+            "site": "A",
+            "month": months,
+            "lead_hours": 0,
+            "om_temp_c": 10.0,
+            "ceda_temp_c": 9.0,
+        }
+    )
+
+    rows = build.era_0_solar_rows(solar=solar, model_free=model_free)
+
+    assert sorted(rows["month"].unique().to_list()) == months
+    assert rows["era_code"].unique().to_list() == [0]
+    assert sorted(rows["fold"].unique().to_list()) == [0, 1, 2, 3, 4]
+    assert rows["om_temp_offset_removed"].to_list() == pytest.approx([9.0] * rows.height)
+
+
+def test_the_elevation_ratio_bins_the_sun_and_keeps_the_rows_without_a_light_cut():
+    frame = pl.DataFrame(
+        {
+            "lead_hours": 0,
+            "era_code": 0,
+            "sun_elevation_deg": [1.0, 3.0, 7.0, 15.0, 30.0, 60.0, 60.0, 2.0],
+            "om_ghi": [7.0, 10.0, 10.0, 10.0, 10.0, 10.0, 0.0, 7.0],
+            "ceda_ghi": [0.0, 7.0, 9.0, 10.0, 10.0, 10.0, 50.0, 0.0],
+        }
+    )
+
+    table = build.irradiance_ratios_by_elevation(frame=frame)
+
+    assert table["bin"].to_list() == [
+        "up to 2 degrees",
+        "2 to 5 degrees",
+        "5 to 10 degrees",
+        "10 to 20 degrees",
+        "20 to 40 degrees",
+        "above 40 degrees",
+    ]
+    assert table["rebuilt_ratio"].to_list() == pytest.approx([0.0, 0.7, 0.9, 1.0, 1.0, 1.0])
+    # The zero-irradiance row is left out, and a row exactly at an edge belongs to the lower bin.
+    assert table["n"].to_list() == [2, 1, 1, 1, 1, 1]
