@@ -634,7 +634,7 @@ STUDY_INPUTS_DIR: Final[Path] = STUDY_DATA_DIR / "inputs"
 """The joined `beam_diffuse_dataset_<source>.parquet` frames that `build_dataset.py` writes."""
 
 ENS_FORECAST_HORIZONS_DIR: Final[Path] = study_dir_for(study="ens_forecast_horizons")
-"""The ENS forecast-horizons study's results. Its input extracts are in `ENS_PRODUCT_DIR`."""
+"""The ENS forecast-horizons study's results. Its member extract is in `ENS_PRODUCT_DIR`."""
 
 OPEN_METEO_ENSEMBLE_MEANS_DIR: Final[Path] = study_dir_for(study="open_meteo_ensemble_means")
 """The Open-Meteo ensemble-means study."""

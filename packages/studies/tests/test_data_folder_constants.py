@@ -314,15 +314,8 @@ MOVED_STUDY_FOLDERS: Final[tuple[str, ...]] = (
 )
 """The study folders that wave D7 moved under `per_study/`, by their old names."""
 
-ENS_EXTRACT_FILES: Final[tuple[str, ...]] = (
-    "ens_members.parquet",
-    "ens_members_day4.parquet",
-    "solar_inputs.parquet",
-    "wind_inputs.parquet",
-    "solar_member_summary.parquet",
-    "wind_member_summary.parquet",
-)
-"""The shared ENS extract files that wave D7 moved out of `ens_forecast_horizons/`."""
+ENS_EXTRACT_FILES: Final[tuple[str, ...]] = ("ens_members.parquet", "ens_members_day4.parquet")
+"""The shared ENS extract files that wave D7 moved out of the horizons and day-4 folders."""
 
 
 @pytest.mark.skipif(
@@ -343,6 +336,7 @@ def test_the_wave_d7_files_are_in_their_new_folders_and_the_old_folders_are_link
     assert missing == []
     assert stray == []
     assert real_old_folders == []
+    assert (sources.ENS_FORECAST_HORIZONS_DIR / "solar_inputs.parquet").is_file()
     assert list(sources.STUDY_INPUTS_DIR.glob("beam_diffuse_dataset_*.parquet"))
     assert (sources.ENS_FORECAST_HORIZONS_DIR / "era_covered" / "report.md").is_file()
 
