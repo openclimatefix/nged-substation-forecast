@@ -21,7 +21,8 @@ favouring UKV-CEDA. P1 never decides. P2-lead is P2 split by UKV-CEDA lead (0 to
 5 hours), because the stations feed the Met Office's data assimilation and the assimilated reading
 has the least influence at leads 3 to 5. The early and late windows of P2 are planned too, because
 P2 decides temperature. Every other row is exploratory: the per-station rows, the years, the
-half-years, the windows of P1, and the other two scores.
+half-years, the windows of P1, the other two scores, and two post hoc sets: each single lead from 0
+to 5 hours, and each leave-one-station-out.
 
 **Rows.** A station-hour counts for a variable when the station has a reading and both products have
 a value. ERA5 wind at one station covers 2019-09 to 2023-12 only, and the other three stations cover
@@ -71,6 +72,9 @@ SCORES: Final[tuple[str, ...]] = ("bias_removed_hour", "bias_removed_month", "ra
 """The three scores, the first being the primary."""
 
 PRIMARY_SCORE: Final[str] = SCORES[0]
+
+N_LEADS: Final[int] = 6
+"""The UKV-CEDA leads, 0 to 5 hours, that a 6-hourly store serves."""
 
 LEAD_SPLITS: Final[dict[str, tuple[int, int]]] = {"leads 0 to 2": (0, 2), "leads 3 to 5": (3, 5)}
 """The UKV-CEDA lead ranges of P2-lead, as inclusive bounds in hours."""
@@ -282,6 +286,29 @@ def variable_records(*, frame: pl.DataFrame, variable: Variable) -> list[Interva
                     scope=scope,
                 )
             )
+    records += [
+        interval_record(
+            rows=rows.filter(pl.col("lead_hours") == lead),
+            variable=variable,
+            label="post hoc lead",
+            planned=False,
+            score=PRIMARY_SCORE,
+            scope=f"lead {lead} h",
+        )
+        for lead in range(N_LEADS)
+    ]
+    records += [
+        interval_record(
+            rows=rows.filter(pl.col("site") != site),
+            variable=variable,
+            label="post hoc leave one out",
+            planned=False,
+            score=PRIMARY_SCORE,
+            scope=f"without station {site}",
+        )
+        for site in sorted(rows["site"].unique().to_list())
+        if rows["site"].n_unique() > 1
+    ]
     for kind, scope, subset in scope_rows(rows=rows):
         deciding_window = variable.name == "temperature" and kind == "window"
         records.append(

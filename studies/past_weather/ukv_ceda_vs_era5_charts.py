@@ -238,7 +238,10 @@ def contrast_panel(*, rows: pl.DataFrame, title: str, x_title: str, planned_figu
         colour_by_family=True,
         value_labels=True,
     )
-    return alt.layer(margin_band(margin=float(rows["margin"][0]), x_domain=x_domain), panel)
+    margin = float(rows["margin"][0])
+    if margin != margin:  # noqa: PLR0124 - a control has no margin, so it draws no band
+        return panel
+    return alt.layer(margin_band(margin=margin, x_domain=x_domain), panel)
 
 
 def _windows(*, base: dict[str, Any], window_label: str | None = None) -> list[Selector]:

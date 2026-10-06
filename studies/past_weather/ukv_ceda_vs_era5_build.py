@@ -115,6 +115,8 @@ STORE_DIRS: Final[tuple[Path, Path, Path]] = (
 STATION_HOURS_NAME: Final[str] = "station_hours.parquet"
 WIND_ROWS_NAME: Final[str] = "wind_rows.parquet"
 WIND_KEEP_ZERO_ROWS_NAME: Final[str] = "wind_rows_keep_zero_hours.parquet"
+WIND_MATCHED_ROWS_NAME: Final[str] = "wind_rows_matched_10m.parquet"
+"""The wind rows with ERA5's 10 m direction added, for the post hoc matched-height pair."""
 SOLAR_ROWS_NAME: Final[str] = "solar_rows.parquet"
 STAMP_NAME: Final[str] = "build.json"
 README_NAME: Final[str] = "README.md"
@@ -289,9 +291,36 @@ def solar_arm_columns(*, product: str, shuffled: bool = False) -> tuple[str, ...
     )
 
 
+def matched_wind_arm_columns(*, product: str) -> tuple[str, ...]:
+    """Return a post hoc matched-height wind arm's six feature columns: the 10 m wind alone.
+
+    Both products give their 10 m speed and the sine and cosine of their 10 m direction, so the pair
+    differs in product and served lead but not in height.
+
+    Args:
+        product: `era5` or `ukv_ceda`.
+
+    Returns:
+        The three shared columns, then the 10 m speed, sine and cosine.
+
+    Raises:
+        ValueError: If the product is not one of `PRODUCTS`.
+    """
+    if product not in PRODUCTS:
+        msg = f"unknown product {product!r}"
+        raise ValueError(msg)
+    return (
+        *WIND_SHARED_FEATURES,
+        f"{product}_speed_10m",
+        f"{product}_sin_10m",
+        f"{product}_cos_10m",
+    )
+
+
 def check_arm_widths() -> None:
     """Raise unless the two arms of every contrast carry the same number of distinct columns."""
     for arms in (
+        {product: matched_wind_arm_columns(product=product) for product in PRODUCTS},
         {product: wind_arm_columns(product=product) for product in PRODUCTS},
         {product: solar_arm_columns(product=product) for product in PRODUCTS},
         {product: wind_arm_columns(product=product, shuffled=True) for product in PRODUCTS},
@@ -514,7 +543,7 @@ def era5_wind_by_cell() -> pl.DataFrame:
 
     Returns:
         `lat_q`, `lon_q` (the cell in whole quarter degrees), `time` (UTC), `speed_10m`,
-        `speed_100m` and `direction_100m` (degrees the wind blows from).
+        `speed_100m`, `direction_100m` and `direction_10m` (degrees the wind blows from).
     """
     groups = pl.read_parquet(ERA5_CELL_GROUPS_PATH)
     positions = groups.select("cell_id", "lat_q", "lon_q").unique()
@@ -534,7 +563,7 @@ def era5_wind_by_cell() -> pl.DataFrame:
             for frame in (early, late)
         ]
     )
-    speed_10m, _ = wind_from_components(u=pl.col("u10"), v=pl.col("v10"))
+    speed_10m, direction_10m = wind_from_components(u=pl.col("u10"), v=pl.col("v10"))
     speed_100m, direction_100m = wind_from_components(u=pl.col("u100"), v=pl.col("v100"))
     wind = stacked.select(
         "lat_q",
@@ -543,6 +572,7 @@ def era5_wind_by_cell() -> pl.DataFrame:
         speed_10m=speed_10m,
         speed_100m=speed_100m,
         direction_100m=direction_100m,
+        direction_10m=direction_10m,
     ).unique(subset=["lat_q", "lon_q", "time"], keep="first")
     return wind.sort("lat_q", "lon_q", "time")
 
@@ -1469,6 +1499,35 @@ Private: this folder holds per-generator and per-station values and is never pub
 """
 
 
+def with_era5_10m_direction(*, frame: pl.DataFrame, wind: pl.DataFrame) -> pl.DataFrame:
+    """Add ERA5's 10 m wind direction, as a sine and a cosine, to the wind rows.
+
+    Args:
+        frame: The wind rows, carrying `site` and `time`.
+        wind: `era5_wind_by_cell`'s result.
+
+    Returns:
+        `frame`, in its own row order, with `era5_sin_10m` and `era5_cos_10m`.
+
+    Raises:
+        ValueError: If a row has no ERA5 10 m direction.
+    """
+    direction = (
+        block_centres(kind="wind")
+        .rename({"label": "site"})
+        .join(wind, on=["lat_q", "lon_q"])
+        .select(
+            "site",
+            "time",
+            era5_sin_10m=pl.col("direction_10m").radians().sin(),
+            era5_cos_10m=pl.col("direction_10m").radians().cos(),
+        )
+    )
+    joined = frame.join(direction, on=["site", "time"], how="left", maintain_order="left")
+    check_no_missing(frame=joined, columns=["era5_sin_10m", "era5_cos_10m"])
+    return joined
+
+
 def dropped_months_text(*, dropped_months: dict[str, float]) -> str:
     """Describe the months the build dropped, and why, for the README.
 
@@ -1614,6 +1673,11 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--check-only", action="store_true", help="Coverage check; write nothing.")
     mode.add_argument("--dry-run", action="store_true", help="Build one month; write nothing.")
+    mode.add_argument(
+        "--matched-10m",
+        action="store_true",
+        help="Add the matched-height wind rows to an existing build; write one new file.",
+    )
     parser.add_argument("--dry-run-month", default="2024-06")
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
     arguments = parser.parse_args()
@@ -1628,6 +1692,18 @@ def main() -> int:
         return 0
     if arguments.dry_run:
         sys.stdout.write("\n".join(dry_run(month=arguments.dry_run_month)) + "\n")
+        return 0
+    if arguments.matched_10m:
+        path = arguments.output_dir / WIND_MATCHED_ROWS_NAME
+        refuse_to_overwrite(paths=[path])
+        rows = pl.read_parquet(arguments.output_dir / WIND_ROWS_NAME)
+        matched = with_era5_10m_direction(frame=rows, wind=era5_wind_by_cell())
+        check_no_missing(
+            frame=matched,
+            columns=[c for p in PRODUCTS for c in matched_wind_arm_columns(product=p)],
+        )
+        matched.write_parquet(path)
+        sys.stdout.write(f"Wrote {matched.height:,} matched wind rows to {path}.\n")
         return 0
 
     ukv = open_ukv_stores()

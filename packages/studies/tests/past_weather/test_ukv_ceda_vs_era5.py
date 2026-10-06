@@ -1202,3 +1202,226 @@ def test_the_monthly_steps_carry_era5_minus_station_and_a_deseasonalised_copy_of
     assert wind["ukv_minus_era5_deseasonalised"].abs().max() == pytest.approx(0.0)
     assert float(np.max(wind["ukv_minus_era5"].abs().to_numpy())) > 5.0
     assert set(verify.STEP_SERIES) <= set(steps.columns)
+
+
+# --- post hoc rows and report fixes ---------------------------------------------------------------
+
+
+def _hourly_losses(*, domain: fit.DomainType = "wind") -> pl.DataFrame:
+    """Losses with every hour of the day, across all three UKV eras and the published window."""
+    rng = np.random.default_rng(1)
+    days = [datetime(2019, 9, 20, tzinfo=UTC) + timedelta(days=45 * i) for i in range(60)]
+    times = [d + timedelta(hours=h) for d in days for h in range(24)]
+    arms = {(arm, setting) for arm, setting, *_ in fit.domain_jobs(domain=domain)}
+    rows = [
+        pl.DataFrame(
+            {
+                "arm": arm,
+                "setting": setting,
+                "site": "W1",
+                "seed": seed,
+                "time": pl.Series(times, dtype=UTC_US),
+                fit.METRIC: np.abs(rng.normal(0.08, 0.01, len(times))),
+            }
+        )
+        for arm, setting in sorted(arms)
+        for seed in (0, 1, 2)
+    ]
+    return pl.concat(rows).with_columns(month=pl.col("time").dt.strftime("%Y-%m"))
+
+
+def test_a_lead_is_the_utc_hour_modulo_six_and_the_post_hoc_scopes_are_not_planned():
+    losses = _hourly_losses()
+    records = fit.domain_records(domain="wind", losses=losses)
+
+    by_lead = {r["scope"]: r for r in records if r["kind"] == "lead" and r["setting"] == "pooled"}
+
+    assert set(by_lead) == {f"lead {n} h" for n in range(6)}
+    pair = losses.filter(
+        pl.col("setting") == "pooled", pl.col("arm") == "era5_wind", pl.col("seed") == 0
+    )
+    for lead in range(6):
+        expected = pair.filter(pl.col("time").dt.hour() % 6 == lead).height
+        assert by_lead[f"lead {lead} h"]["n_rows"] == expected
+    post_hoc = [r for r in records if r["kind"] in {"lead", "published window", "era"}]
+    assert post_hoc
+    assert all(r["post_hoc"] and not r["planned"] for r in post_hoc)
+
+
+def test_the_eras_and_the_published_window_split_at_their_stated_boundaries():
+    records = fit.domain_records(domain="wind", losses=_hourly_losses())
+
+    pooled = {r["scope"]: r for r in records if r["setting"] == "pooled" and r["label"] == "P3"}
+    losses = _hourly_losses().filter(
+        pl.col("setting") == "pooled", pl.col("arm") == "era5_wind", pl.col("seed") == 0
+    )
+
+    assert (
+        pooled["from 2024-08-12"]["n_rows"]
+        == losses.filter(pl.col("time") >= datetime(2024, 8, 12, tzinfo=UTC)).height
+    )
+    era_rows = sum(r["n_rows"] for s, r in pooled.items() if s.startswith("era "))
+    assert era_rows == losses.height
+
+
+def test_a_control_or_replication_has_no_margin_and_reads_significant_or_not():
+    records = fit.domain_records(domain="wind", losses=_hourly_losses())
+
+    controls = [r for r in records if r["label"] in {"control", "hour-ending pair"}]
+    products = [r for r in records if r["label"] == "P3" and r["kind"] == "all"]
+
+    assert controls
+    assert all(not r["product_contrast"] and np.isnan(r["margin_pp"]) for r in controls)
+    assert all(r["reading"] in {"significant", "not significant"} for r in controls)
+    assert all(r["product_contrast"] and r["margin_pp"] == 0.16 for r in products)
+
+
+def test_the_matched_height_pair_has_equal_columns_and_is_a_post_hoc_product_contrast():
+    jobs = fit.domain_jobs(domain="wind_matched")
+    widths = {len(columns) for _, _, _, columns, _, _ in jobs}
+    records = fit.domain_records(
+        domain="wind_matched", losses=_hourly_losses(domain="wind_matched")
+    )
+
+    assert widths == {6}
+    assert {arm for arm, *_ in jobs} == {"era5_wind_10m", "ukv_ceda_wind_10m"}
+    assert not any("100m" in c or "925" in c for _, _, _, columns, _, _ in jobs for c in columns)
+    assert records
+    assert all(r["post_hoc"] and not r["planned"] and r["product_contrast"] for r in records)
+
+
+def test_the_matched_pair_reads_each_products_own_10_m_columns():
+    assert build.matched_wind_arm_columns(product="era5")[3:] == (
+        "era5_speed_10m",
+        "era5_sin_10m",
+        "era5_cos_10m",
+    )
+    assert build.matched_wind_arm_columns(product="ukv_ceda")[3:] == (
+        "ukv_ceda_speed_10m",
+        "ukv_ceda_sin_10m",
+        "ukv_ceda_cos_10m",
+    )
+
+
+def test_set_a_prints_each_lead_and_each_leave_one_station_out_as_post_hoc_rows():
+    frame = pl.concat(
+        [
+            _station_frame().with_columns(
+                site=pl.lit(site),
+                station_temp_c=pl.col("station_wind_m_s"),
+                era5_temp_c=pl.col("era5_wind_m_s"),
+                ukv_temp_c=pl.col("ukv_wind_m_s"),
+            )
+            for site in ("S1", "S2", "S3")
+        ]
+    ).with_columns(lead_hours=pl.col("time").dt.hour() % 6)
+
+    records = scores.variable_records(frame=frame, variable=scores.VARIABLES[0])
+
+    leads = [r for r in records if r["label"] == "post hoc lead"]
+    leave_out = [r for r in records if r["label"] == "post hoc leave one out"]
+    assert [r["scope"] for r in leads] == [f"lead {n} h" for n in range(6)]
+    assert sum(r["n_rows"] for r in leads) == records[0]["n_rows"]
+    assert sorted(r["scope"] for r in leave_out) == [f"without station S{n}" for n in (1, 2, 3)]
+    assert all(r["n_rows"] == records[0]["n_rows"] * 2 // 3 for r in leave_out)
+    assert not any(r["planned"] for r in leads + leave_out)
+
+
+def test_the_third_era_lines_say_which_setting_is_significant():
+    records = fit.domain_records(domain="wind", losses=_hourly_losses())
+
+    lines = fit.era_lines(records=records)
+
+    assert sum("era 2" in line for line in lines) == 2
+    assert any("pooled setting" in line for line in lines)
+    assert any("sensitivity setting" in line for line in lines)
+
+
+def test_the_veto_lines_compare_the_margin_with_the_whole_value_of_temperature():
+    records = fit.domain_records(domain="solar", losses=_hourly_losses(domain="solar"))
+
+    text = " ".join(fit.veto_lines(records=records))
+
+    assert "could not have fired" in text
+    assert "0.06 points" in text
+
+
+def test_a_row_at_the_first_instant_of_the_published_window_is_inside_it():
+    losses = _hourly_losses()
+    start = datetime(2024, 8, 12, tzinfo=UTC)
+    at_start = losses.filter(pl.col("time") == losses["time"].min()).with_columns(
+        time=pl.lit(start).cast(UTC_US), month=pl.lit("2024-08")
+    )
+
+    records = fit.domain_records(domain="wind", losses=pl.concat([losses, at_start]))
+    window = next(
+        r for r in records if r["scope"] == "from 2024-08-12" and r["setting"] == "pooled"
+    )
+    inside = (
+        pl.concat([losses, at_start])
+        .filter(
+            pl.col("setting") == "pooled",
+            pl.col("arm") == "era5_wind",
+            pl.col("seed") == 0,
+            pl.col("time") >= start,
+        )
+        .height
+    )
+
+    assert window["n_rows"] == inside
+
+
+def test_a_control_whose_interval_spans_zero_reads_not_significant_and_one_off_zero_significant():
+    equal = _losses(months=8, treatment_error=0.05, reference_error=0.05)
+    apart = _losses(months=8, treatment_error=0.05, reference_error=0.09)
+
+    def reading(losses: pl.DataFrame) -> str:
+        return fit.contrast_record(
+            losses=losses,
+            domain="wind",
+            setting="pooled",
+            label="control",
+            planned=False,
+            kind="all",
+            scope="all",
+            treatment="t",
+            reference="r",
+            product_contrast=False,
+        )["reading"]
+
+    assert reading(equal) == "not significant"
+    assert reading(apart) == "significant"
+
+
+def test_the_third_era_line_names_the_product_that_the_difference_favours():
+    losses = _hourly_losses().with_columns(
+        pl.when(pl.col("arm") == "ukv_ceda_wind")
+        .then(pl.col(fit.METRIC) - 0.05)
+        .otherwise(pl.col(fit.METRIC))
+        .alias(fit.METRIC)
+    )
+
+    lines = fit.era_lines(records=fit.domain_records(domain="wind", losses=losses))
+
+    assert all("favouring UKV-CEDA" in line for line in lines if "era 2" in line)
+    worse = losses.with_columns(
+        pl.when(pl.col("arm") == "ukv_ceda_wind")
+        .then(pl.col(fit.METRIC) + 0.1)
+        .otherwise(pl.col(fit.METRIC) + 0.0)
+        .alias(fit.METRIC)
+    )
+    worse_lines = fit.era_lines(records=fit.domain_records(domain="wind", losses=worse))
+    assert all("favouring ERA5" in line for line in worse_lines if "era 2" in line)
+
+
+def test_the_veto_lines_print_temperatures_value_as_a_positive_gain_against_its_shuffled_arm():
+    losses = _hourly_losses(domain="solar").with_columns(
+        pl.when(pl.col("arm") == "solar_era5_temp")
+        .then(pl.col(fit.METRIC) - 0.02)
+        .otherwise(pl.col(fit.METRIC))
+        .alias(fit.METRIC)
+    )
+
+    text = " ".join(fit.veto_lines(records=fit.domain_records(domain="solar", losses=losses)))
+
+    assert "worth 2." in text or "worth 1.9" in text
