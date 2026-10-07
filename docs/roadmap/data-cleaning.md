@@ -17,9 +17,9 @@ the models rather than removed.
 
 **Every cleaning rule is one more branch in `nged_data.cleaning.flag_nged_power`.** The
 `clean_nged_power_data` Dagster asset calls that function with the whole raw `power_time_series`
-table and the `TimeSeriesMetadata` roster, whenever NGED has delivered new data (about four times a
-day) or a cleaning rule or the roster has changed, and writes the result over the
-`cleaned_power_time_series` Delta table. The cleaned table holds every raw row, plus a nullable
+table and the `TimeSeriesMetadata` table, whenever NGED has delivered new data (about four times a
+day) or a cleaning rule or the `TimeSeriesMetadata` table has changed. The asset writes the result
+over the `cleaned_power_time_series` Delta table. The cleaned table holds every raw row, plus a nullable
 `drop_reason` column that is null for a row that passed and otherwise names the rule that flagged
 the row. Training, cross-validation (CV) prediction, live forecasting, eligibility, effective
 capacity, the leaderboard's `metrics`, and the two dashboards read only the rows whose `drop_reason`

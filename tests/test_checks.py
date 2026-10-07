@@ -26,7 +26,7 @@ from typing import Literal
 
 import polars as pl
 import pytest
-from _cleaned_power_test_data import write_roster
+from _cleaned_power_test_data import write_metadata
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.settings import Settings
 from dagster import (
@@ -445,7 +445,7 @@ def test_power_data_is_fresh_end_to_end(env: Path, monkeypatch: pytest.MonkeyPat
             "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
         }
     ).write_delta(settings.power_time_series_data_path)
-    write_roster(settings.metadata_path, dict.fromkeys([1, 2, 99], "Primary"))
+    write_metadata(settings.metadata_path, dict.fromkeys([1, 2, 99], "Primary"))
 
     result = _run_freshness_check()
 
@@ -475,7 +475,7 @@ def test_power_data_is_fresh_all_current_passes(env: Path) -> None:
             "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
         }
     ).write_delta(settings.power_time_series_data_path)
-    write_roster(settings.metadata_path, dict.fromkeys([1, 2], "Primary"))
+    write_metadata(settings.metadata_path, dict.fromkeys([1, 2], "Primary"))
 
     result = _run_freshness_check()
     assert result.passed is True
@@ -506,7 +506,7 @@ def test_power_data_is_fresh_silences_the_configured_series(
             "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
         }
     ).write_delta(settings.power_time_series_data_path)
-    write_roster(settings.metadata_path, dict.fromkeys([1, 99], "Primary"))
+    write_metadata(settings.metadata_path, dict.fromkeys([1, 99], "Primary"))
 
     result = checks.power_data_is_fresh()
     assert isinstance(result, AssetCheckResult)
@@ -536,7 +536,7 @@ def test_power_data_is_fresh_uses_the_production_threshold(env: Path) -> None:
             "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
         }
     ).write_delta(settings.power_time_series_data_path)
-    write_roster(settings.metadata_path, dict.fromkeys([7, 8], "Primary"))
+    write_metadata(settings.metadata_path, dict.fromkeys([7, 8], "Primary"))
 
     result = checks.power_data_is_fresh()
     assert isinstance(result, AssetCheckResult)
@@ -596,7 +596,7 @@ def test_power_data_is_fresh_hands_evaluated_result_to_sentry(
             "power": pl.Series([1.0], dtype=pl.Float32),
         }
     ).write_delta(settings.power_time_series_data_path)
-    write_roster(settings.metadata_path, dict.fromkeys([1], "Primary"))
+    write_metadata(settings.metadata_path, dict.fromkeys([1], "Primary"))
 
     check_result = _run_freshness_check()
     assert len(captured) == 1
@@ -1539,7 +1539,7 @@ def _write_cleaned_built_from(settings: Settings, raw_table_id: str, raw_version
         raw_table_id=raw_table_id,
         raw_version=raw_version,
         code_hash="hash",
-        roster_hash="roster",
+        metadata_hash="metadata",
         git_sha="sha",
     )
     write_deltalake(

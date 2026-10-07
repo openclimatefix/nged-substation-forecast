@@ -248,12 +248,12 @@ after the first ingest, so the hand materialisation matters only when a slot cou
 first hourly run finishes.
 
 **Reading a failed cleaning run.** `clean_nged_power_data` rebuilds `cleaned_power_time_series` from
-the raw power table when NGED has delivered new data, a cleaning rule has changed, or the roster has
-changed, and otherwise returns at once with `skipped: True` in its metadata. When
-`clean_nged_power_data` fails, the run fails and reports to Sentry. Every reader, `live_forecasts`
-included, carries on with the last good cleaned table, and the next hourly run tries again. Read the
-traceback in the run's logs: a failing cleaning rule and a roster that no longer matches
-`TimeSeriesMetadata` both need a fix, not a re-run.
+the raw power table when NGED has delivered new data, a cleaning rule has changed, or the
+`TimeSeriesMetadata` table has changed. Otherwise the asset returns at once with `skipped: True` in
+its run metadata. When `clean_nged_power_data` fails, the run fails and reports to Sentry. Every
+reader, `live_forecasts` included, carries on with the last good cleaned table, and the next hourly
+run tries again. Read the traceback in the run's logs: a failing cleaning rule and a metadata
+parquet file that no longer matches the `TimeSeriesMetadata` contract both need a fix, not a re-run.
 
 **A cleaning job that stops running without failing shows up only in the Checks view.** The
 `cleaned_power_keeps_up_with_raw` check on `power_time_series_and_metadata` warns when the cleaned

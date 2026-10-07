@@ -562,9 +562,9 @@ def cleaned_power_keeps_up_with_raw() -> AssetCheckResult:
     2 or more raw commits behind, was built from a different raw table, is absent, or records no
     provenance. It is the only signal for a cleaning asset that silently stopped running, because
     ``power_data_is_fresh`` reads raw coverage and the Sentry failure hook fires only on a run
-    that failed. A stale or unreadable roster also stops the cleaning: ``live_forecasts`` does not
-    read the roster, but the cleaning does, so a bad roster makes the power that ``live_forecasts``
-    reads go stale while ``live_forecasts`` itself keeps succeeding.
+    that failed. A stale or unreadable ``TimeSeriesMetadata`` table also stops the cleaning:
+    ``live_forecasts`` does not read that table, but the cleaning does, so a bad table makes the
+    power that ``live_forecasts`` reads go stale while ``live_forecasts`` itself keeps succeeding.
 
     Cannot fail its own step: the whole body is guarded, so an unreadable table degrades to a
     warning rather than failing the hourly production run.

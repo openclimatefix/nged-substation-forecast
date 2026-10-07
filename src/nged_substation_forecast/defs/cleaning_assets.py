@@ -50,20 +50,20 @@ def current_git_sha() -> str:
     return os.environ.get(GIT_SHA_ENV_VAR) or UNKNOWN
 
 
-def roster_fingerprint(roster: pl.DataFrame) -> str:
-    """Return a hex digest that changes when any value in the roster changes.
+def metadata_fingerprint(metadata: pl.DataFrame) -> str:
+    """Return a hex digest that changes when any value in the `TimeSeriesMetadata` table changes.
 
-    The digest is the SHA-256 of Polars' per-row hashes (`hash_rows`, default seeds) of the roster
+    The digest is the SHA-256 of Polars' per-row hashes (`hash_rows`, default seeds) of the table
     sorted by `time_series_id`, so it does not depend on row order. The digest is stable between
     runs on one Polars version. A Polars upgrade can change it, which causes one extra rebuild.
 
     Args:
-        roster: The validated `TimeSeriesMetadata` roster.
+        metadata: The validated `TimeSeriesMetadata` table.
 
     Returns:
         A SHA-256 hex digest.
     """
-    row_hashes = roster.sort("time_series_id").hash_rows().to_list()
+    row_hashes = metadata.sort("time_series_id").hash_rows().to_list()
     return hashlib.sha256(repr(row_hashes).encode()).hexdigest()
 
 
@@ -71,8 +71,8 @@ class CleanNgedPowerDataConfig(Config):
     """Run config for the ``clean_nged_power_data`` asset."""
 
     force: bool = False
-    """Rebuild the cleaned table even when its raw table version, cleaning code and roster are
-    unchanged."""
+    """Rebuild the cleaned table even when its raw table version, cleaning code and
+    `TimeSeriesMetadata` table are unchanged."""
 
 
 def _drop_reason_metadata(cleaned: pl.DataFrame) -> dict[str, int | float | str]:
@@ -106,7 +106,7 @@ def _drop_reason_metadata(cleaned: pl.DataFrame) -> dict[str, int | float | str]
 def clean_nged_power_data(context: AssetExecutionContext, config: CleanNgedPowerDataConfig) -> None:
     """Flags NGED power readings that should not be used, writing ``cleaned_power_time_series``.
 
-    Reads the whole raw ``power_time_series`` Delta table and the ``TimeSeriesMetadata`` roster,
+    Reads the whole raw ``power_time_series`` Delta table and the ``TimeSeriesMetadata`` table,
     passes both to ``nged_data.cleaning.flag_nged_power``, and overwrites the
     ``cleaned_power_time_series`` Delta table with the result: every raw row, plus a nullable
     ``drop_reason`` column that is null for a row that passed and otherwise names the rule that
@@ -117,7 +117,7 @@ def clean_nged_power_data(context: AssetExecutionContext, config: CleanNgedPower
     Runs hourly in ``power_time_series_and_metadata_job``, straight after the ingest. NGED
     delivers about every 6 hours, so most runs skip. The asset compares four values with what the
     cleaned table's newest write commit recorded — the raw table's id, the raw table's Delta
-    version, the hash of the cleaning code, and a fingerprint of the ``TimeSeriesMetadata`` roster
+    version, the hash of the cleaning code, and a fingerprint of the ``TimeSeriesMetadata`` table
     — and returns at once with ``skipped: True`` when all four match. A failed rebuild leaves the
     old version recorded, so the next hourly run rebuilds again. The
     ``cleaned_power_keeps_up_with_raw`` check warns if rebuilds keep failing. Set the run config
@@ -151,11 +151,11 @@ def clean_nged_power_data(context: AssetExecutionContext, config: CleanNgedPower
     raw_table_id = str(raw_table.metadata().id)
 
     # allow_superfluous_columns because the parquet also carries h3_res_5 and other geo columns.
-    roster = TimeSeriesMetadata.validate(
+    metadata = TimeSeriesMetadata.validate(
         pl.read_parquet(settings.metadata_path, storage_options=options),
         allow_superfluous_columns=True,
     )
-    roster_hash = roster_fingerprint(pl.DataFrame._from_pydf(roster._df))
+    metadata_hash = metadata_fingerprint(pl.DataFrame._from_pydf(metadata._df))
 
     existing = read_cleaning_provenance(cleaned_path, storage_options)
     if (
@@ -164,7 +164,7 @@ def clean_nged_power_data(context: AssetExecutionContext, config: CleanNgedPower
         and existing.raw_table_id == raw_table_id
         and existing.raw_version == raw_version
         and existing.code_hash == CLEANING_CODE_HASH
-        and existing.roster_hash == roster_hash
+        and existing.metadata_hash == metadata_hash
     ):
         context.log.info(f"{cleaned_path} is up to date with raw version {raw_version}.")
         context.add_output_metadata({"skipped": True, "raw_version": raw_version})
@@ -175,7 +175,7 @@ def clean_nged_power_data(context: AssetExecutionContext, config: CleanNgedPower
     power = pt.LazyFrame.from_existing(
         pl.scan_delta(raw_path, version=raw_version, storage_options=options)
     ).set_model(PowerTimeSeries)
-    flagged = flag_nged_power(power=power, metadata=roster)
+    flagged = flag_nged_power(power=power, metadata=metadata)
     # Delta file order is not sorted, and `PowerTimeSeries.validate` rejects unsorted rows.
     cleaned = CleanedPowerTimeSeries.validate(
         flagged.collect(engine="streaming").sort("time_series_id", "time")
@@ -186,7 +186,7 @@ def clean_nged_power_data(context: AssetExecutionContext, config: CleanNgedPower
         raw_table_id=raw_table_id,
         raw_version=raw_version,
         code_hash=CLEANING_CODE_HASH,
-        roster_hash=roster_hash,
+        metadata_hash=metadata_hash,
         git_sha=current_git_sha(),
     )
     vacuum_failed = False

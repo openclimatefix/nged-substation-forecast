@@ -23,7 +23,7 @@ def _provenance(raw_version: int) -> CleaningProvenance:
         raw_table_id="raw-id",
         raw_version=raw_version,
         code_hash="hash",
-        roster_hash="roster",
+        metadata_hash="metadata",
         git_sha="sha",
     )
 

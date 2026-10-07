@@ -11,7 +11,7 @@ from pathlib import Path
 import patito as pt
 import polars as pl
 import pytest
-from _cleaned_power_test_data import write_roster
+from _cleaned_power_test_data import write_metadata
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.settings import Settings
 from dagster import DagsterInstance, ExecuteInProcessResult, materialize
@@ -50,8 +50,8 @@ def _write_raw(settings: Settings, rows: list[tuple[int, int, float]]) -> None:
     _raw_frame(rows).write_delta(settings.power_time_series_data_path, mode="append")
 
 
-def _write_roster(settings: Settings, substation_types: dict[int, str]) -> None:
-    write_roster(settings.metadata_path, substation_types)
+def _write_metadata(settings: Settings, substation_types: dict[int, str]) -> None:
+    write_metadata(settings.metadata_path, substation_types)
 
 
 _RAW_ROWS = [(1, 0, 5.0), (1, 1, 0.0), (1, 2, 0.0), (2, 0, 0.0), (2, 1, 3.0)]
@@ -61,7 +61,7 @@ _RAW_ROWS = [(1, 0, 5.0), (1, 1, 0.0), (1, 2, 0.0), (2, 0, 0.0), (2, 1, 3.0)]
 @pytest.fixture
 def raw_data(env: Settings) -> Settings:
     _write_raw(env, _RAW_ROWS)
-    _write_roster(env, {1: "Primary", 2: "HV Customer"})
+    _write_metadata(env, {1: "Primary", 2: "HV Customer"})
     return env
 
 
@@ -206,11 +206,11 @@ def test_a_rebuilt_raw_table_with_the_same_version_triggers_a_rebuild(
     assert _cleaned_version(raw_data) > version
 
 
-def test_a_roster_change_with_no_new_power_triggers_a_rebuild(
+def test_a_metadata_change_with_no_new_power_triggers_a_rebuild(
     raw_data: Settings, dagster_instance: DagsterInstance
 ) -> None:
     _materialize(dagster_instance)
-    _write_roster(raw_data, {1: "Primary", 2: "Primary"})  # series 2 is now a substation
+    _write_metadata(raw_data, {1: "Primary", 2: "Primary"})  # series 2 is now a substation
 
     metadata = _metadata(_materialize(dagster_instance))
 
@@ -324,14 +324,16 @@ def test_current_git_sha_is_unknown_without_git_or_env(
     assert current_git_sha() == cleaning_assets.UNKNOWN
 
 
-def test_roster_fingerprint_ignores_row_order_but_not_values() -> None:
-    roster = pl.DataFrame({"time_series_id": [1, 2, 3], "substation_type": ["a", "b", "c"]})
-    changed = roster.with_columns(substation_type=pl.Series(["a", "b", "z"]))
+def test_metadata_fingerprint_ignores_row_order_but_not_values() -> None:
+    metadata = pl.DataFrame({"time_series_id": [1, 2, 3], "substation_type": ["a", "b", "c"]})
+    changed = metadata.with_columns(substation_type=pl.Series(["a", "b", "z"]))
 
-    assert cleaning_assets.roster_fingerprint(roster) == cleaning_assets.roster_fingerprint(
-        roster.reverse()
+    assert cleaning_assets.metadata_fingerprint(metadata) == cleaning_assets.metadata_fingerprint(
+        metadata.reverse()
     )
-    assert cleaning_assets.roster_fingerprint(roster) != cleaning_assets.roster_fingerprint(changed)
+    assert cleaning_assets.metadata_fingerprint(metadata) != cleaning_assets.metadata_fingerprint(
+        changed
+    )
 
 
 def test_the_asset_cleans_exactly_the_raw_version_it_records(

@@ -38,11 +38,12 @@ class CleaningProvenance:
         raw_table_id: The raw table's Delta table id. It guards against a deleted and rebuilt raw
             table, whose versions restart at 0.
         raw_version: The raw table's Delta version that the cleaning read.
-        code_hash: The SHA-256 of the cleaning rules' source file when the cleaning ran.
-        roster_hash: A hash of the `TimeSeriesMetadata` roster that the cleaning read: the
-            SHA-256 of Polars' per-row `hash_rows` over the roster sorted by `time_series_id`. The
-            hash is stable between runs on one Polars version and changes when any roster value
-            changes. A change of Polars version can change every hash, which only causes one
+        code_hash: The hash of the cleaning rules' code when the cleaning ran, which ignores
+            docstrings and comments (`nged_data.cleaning.CLEANING_CODE_HASH`).
+        metadata_hash: A hash of the `TimeSeriesMetadata` table that the cleaning read: the
+            SHA-256 of Polars' per-row `hash_rows` over that table sorted by `time_series_id`. The
+            hash is stable between runs on one Polars version and changes when any value in the
+            table changes. A change of Polars version can change every hash, which only causes one
             extra rebuild.
         git_sha: The git SHA of the code that did the cleaning, recorded for provenance only:
             `clean_nged_power_data` skips a rebuild when the other four fields match.
@@ -51,7 +52,7 @@ class CleaningProvenance:
     raw_table_id: str
     raw_version: int
     code_hash: str
-    roster_hash: str
+    metadata_hash: str
     git_sha: str
 
     def to_commit_metadata(self) -> dict[str, str]:

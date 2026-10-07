@@ -324,6 +324,10 @@ class TimeSeriesMetadata(pt.Model):
         ),
     )
 
+    SUBSTATION_TYPES: ClassVar[tuple[str, ...]] = ("Primary", "BSP", "GSP")
+    """The `substation_type` values that mean "a substation", as opposed to a generator or a
+    battery at an `HV Customer` or `EHV Customer` connection."""
+
     substation_type: str = pt.Field(
         dtype=pl.Enum(["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"]),
         description=(

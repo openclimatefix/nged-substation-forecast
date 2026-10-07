@@ -6,7 +6,7 @@ import polars as pl
 from contracts.power_schemas import DROP_REASONS, TimeSeriesMetadata
 
 
-def write_roster(path: str | Path, substation_types: dict[int, str]) -> None:
+def write_metadata(path: str | Path, substation_types: dict[int, str]) -> None:
     """Write a minimal valid ``TimeSeriesMetadata`` parquet.
 
     Args:

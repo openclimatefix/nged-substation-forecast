@@ -258,7 +258,7 @@ def test_provenance_tags_name_the_raw_table_version_and_git_sha_the_cleaning_rec
         raw_table_id="raw-id-7",
         raw_version=7,
         code_hash="code",
-        roster_hash="roster",
+        metadata_hash="metadata",
         git_sha="cafe123",
     )
     write_cleaned_power_time_series(
