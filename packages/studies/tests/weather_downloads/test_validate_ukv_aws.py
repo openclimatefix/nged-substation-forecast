@@ -269,9 +269,67 @@ def test_ledger_findings_flag_a_ledger_that_contradicts_its_run_files(
     assert "says complete" in findings[1]
     assert "20241009" in findings[2]
     (ledger / "20241008.json").write_text(json.dumps({"absent_objects": 1, "complete": False}))
-    assert (
-        validate.ledger_findings(
-            product_dir=tmp_path, records=frame, days=days, run_days=["20241008"]
-        )
-        == []
+    clean = validate.ledger_findings(
+        product_dir=tmp_path, records=frame, days=days, run_days=["20241008"]
     )
+    assert clean == [
+        "Ledger against run files: 1 day(s) agree, and no run file lacks a ledger entry."
+    ]
+
+
+def test_a_nan_inside_a_fetched_lead_reaches_the_days_with_a_finding(
+    validate: ModuleType, pilot: ModuleType, tmp_path: Path
+) -> None:
+    import polars as pl
+
+    def day_report(*, nan_in_run_0: bool) -> str:
+        folder = tmp_path / str(nan_in_run_0)
+        folder.mkdir()
+        records = []
+        for hour in range(24):
+            path = folder / f"20241008T{hour:02d}00Z.npz"
+            _write_run(pilot=pilot, path=path, seed=hour)
+            if nan_in_run_0 and hour == 0:
+                with np.load(path) as archive:
+                    arrays = {key: archive[key] for key in archive.files}
+                arrays[TEMPERATURE][2, 0, 0] = np.nan
+                np.savez_compressed(path, allow_pickle=False, **arrays)
+            records.append(validate.summarise_run(path=path))
+        frame = pl.DataFrame(records, infer_schema_length=None)
+        return validate.build_report(records=frame, days=[dt.date(2024, 10, 8)])[0]
+
+    assert "0 of 1 days" in day_report(nan_in_run_0=False)
+    assert "1 of 1 days" in day_report(nan_in_run_0=True)
+
+
+def test_the_era_split_puts_the_level_change_day_in_the_later_era(
+    validate: ModuleType, pilot: ModuleType, tmp_path: Path
+) -> None:
+    import polars as pl
+
+    records = []
+    for name, residual in (("20260121T0000Z", 25.0), ("20260122T0000Z", 0.0)):
+        path = tmp_path / f"{name}.npz"
+        _write_run(pilot=pilot, path=path, residual=residual)
+        records.append(validate.summarise_run(path=path))
+    frame = pl.DataFrame(records, infer_schema_length=None)
+    eras = validate.radiation_by_era(records=frame)
+    by_era = dict(zip(eras["era"], eras["mean_abs_residual_w_m2"], strict=True))
+    assert by_era["before 2026-01-22"] == pytest.approx(25.0, rel=1e-3)
+    assert by_era["from 2026-01-22"] == pytest.approx(0.0, abs=1e-3)
+    profile = validate.hour_of_day_profile(records=frame)
+    assert sorted(set(profile["era"])) == ["before 2026-01-22", "from 2026-01-22"]
+
+
+def test_hour_of_day_total_averages_every_finite_cell_not_only_daylight_cells(
+    validate: ModuleType, pilot: ModuleType, tmp_path: Path
+) -> None:
+    path = tmp_path / f"{RUN}.npz"
+    _write_run(pilot=pilot, path=path)
+    with np.load(path) as archive:
+        arrays = {key: archive[key] for key in archive.files}
+    total = arrays["radiation_flux_in_shortwave_total_downward_at_surface"]
+    total[:, 0, :] = 0.0
+    np.savez_compressed(path, allow_pickle=False, **arrays)
+    record = validate.summarise_run(path=path)
+    assert record["hod_total_mean_0"] == pytest.approx(float(total[0].mean()), rel=1e-6)

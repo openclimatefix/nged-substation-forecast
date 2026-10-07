@@ -12,7 +12,7 @@ different `--label`.
   8 files) unless its `missing` list says otherwise.
 - Readability: every array of every run file loads, which catches a truncated file.
 - Timestamp convention: each variable's `time_s` equals run time plus lead times 3600 s,
-  `lead_hours` is 0 to 5, and no file carries time bounds, so every field is an instantaneous value.
+  `lead_hours` is 0 to 5, and no file carries time bounds.
 - NaN fraction and physical range per variable, with the count of values outside `PHYSICAL_RANGES`
   (which includes the non-negative shortwave components).
 - Stuck fields: a temperature or wind slice with the same value in every cell, and two runs whose
@@ -28,8 +28,8 @@ different `--label`.
 - Height levels: the files hold 33 levels before 2026-01-22 and 56 from that day, but only the four
   heights in `fetch_ukv_aws_pilot.HUB_HEIGHTS_M` are kept, so the check is that the kept heights
   are the same on every run. The report prints the mean wind speed at each height for the days
-  around `LEVEL_TRANSITION_DAYS`, which asserts nothing: weather moves a domain-wide daily mean by
-  more than a plausible step.
+  around `LEVEL_TRANSITION_DAYS`, which asserts nothing: weather moves a daily mean over the trial
+  area by more than a plausible step.
 - Ledger against run files: each committed day's `absent_objects` and `complete` must agree with
   the `missing` lists of its run files, and no run file may belong to a day without a ledger.
 - Orientation: both grid axes strictly increase (row 0 is south), and the axes are identical in
@@ -88,8 +88,8 @@ LEVEL_TRANSITION_DAYS: Final[tuple[dt.date, dt.date]] = (
     dt.date(2026, 1, 20),
     dt.date(2026, 1, 22),
 )
-"""The days either side of the PS47 change. The files hold 33 levels before the second day and 56
-from it."""
+"""The days either side of the Met Office Parallel Suite 47 change. The files hold 33 levels before
+the second day and 56 from it."""
 
 RESIDUAL_THRESHOLD_W_M2: Final[float] = 10.0
 DAYLIGHT_W_M2: Final[float] = 1.0
@@ -307,28 +307,34 @@ def radiation_by_month(*, records: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def _era_expression() -> pl.Expr:
+    """The era of a run's `day`: before or from the level-change day."""
+    change = f"{LEVEL_TRANSITION_DAYS[1]:%Y%m%d}"
+    return (
+        pl.when(pl.col("day") < change)
+        .then(pl.lit(f"before {LEVEL_TRANSITION_DAYS[1]}"))
+        .otherwise(pl.lit(f"from {LEVEL_TRANSITION_DAYS[1]}"))
+    )
+
+
 def radiation_by_era(*, records: pl.DataFrame) -> pl.DataFrame:
     """The daytime residual before and from the level-change day."""
-    change = f"{LEVEL_TRANSITION_DAYS[1]:%Y%m%d}"
-    return _radiation_summary(
-        records=records,
-        group=pl.when(pl.col("day") < change)
-        .then(pl.lit(f"before {LEVEL_TRANSITION_DAYS[1]}"))
-        .otherwise(pl.lit(f"from {LEVEL_TRANSITION_DAYS[1]}")),
-    ).rename({"group": "era"})
+    return _radiation_summary(records=records, group=_era_expression()).rename({"group": "era"})
 
 
 def hour_of_day_profile(*, records: pl.DataFrame) -> pl.DataFrame:
     """Mean total shortwave and daytime residual by valid hour of day (UTC), over runs and leads.
 
-    An instantaneous value peaks at solar noon, and a mean over the hour before its label peaks
-    half an hour later than the label's own instant, so the hour of the maximum tests the
-    instantaneous-value claim.
+    An instantaneous value peaks at solar noon. A mean over the hour before its label is centred
+    half an hour before the label, so the labelled series peaks about half an hour after solar
+    noon. The hour of the maximum therefore tests the instantaneous-value claim. The profile is
+    split by era, because the residual differs between the eras.
     """
-    readable = records.filter(pl.col("readable"))
+    readable = records.filter(pl.col("readable")).with_columns(era=_era_expression())
     long = pl.concat(
         [
             readable.select(
+                "era",
                 valid_hour=pl.col(f"hod_valid_hour_{index}"),
                 total=pl.col(f"hod_total_mean_{index}"),
                 signed=pl.col(f"hod_signed_mean_{index}"),
@@ -338,13 +344,13 @@ def hour_of_day_profile(*, records: pl.DataFrame) -> pl.DataFrame:
         ]
     )
     return (
-        long.group_by("valid_hour")
+        long.group_by("era", "valid_hour")
         .agg(
             total_w_m2=pl.col("total").mean(),
             signed_residual_w_m2=pl.col("signed").mean(),
             abs_residual_w_m2=pl.col("absolute").mean(),
         )
-        .sort("valid_hour")
+        .sort("era", "valid_hour")
     )
 
 
@@ -422,7 +428,7 @@ def ledger_findings(
         run_days: The `YYYYMMDD` day of every run file in the folder, committed or not.
 
     Returns:
-        One line per disagreement; empty when the ledger and the run files agree.
+        One line per disagreement, or one line saying that the ledger and the run files agree.
     """
     absent_by_day = dict(
         records.filter(pl.col("readable"))
@@ -445,7 +451,9 @@ def ledger_findings(
     orphans = sorted(set(run_days) - committed)
     if orphans:
         findings.append(f"Run files on {len(orphans)} day(s) with no ledger entry: {orphans}.")
-    return findings
+    return findings or [
+        f"Ledger against run files: {len(days)} day(s) agree, and no run file lacks a ledger entry."
+    ]
 
 
 def ledger_file(*, product_dir: Path, day: dt.date) -> Path:
@@ -516,10 +524,13 @@ def build_report(
         _markdown(frame=radiation_by_era(records=records)),
         "### By month\n",
         _markdown(frame=radiation_by_month(records=records)),
-        "### By valid hour of day (UTC)\n",
+        "### By valid hour of day (UTC), by era\n",
         (
             "Total shortwave is the mean over every finite cell, and the residuals are over "
-            "daytime cells.\n"
+            "daytime cells. Where the signed residual is positive while total shortwave rises and "
+            "negative while it falls, one possible reading is that total is evaluated at a "
+            "different time from direct plus diffuse. This reading is a hypothesis, and the "
+            "table does not establish a cause.\n"
         ),
         _markdown(frame=hour_of_day_profile(records=records)),
         "## Mean wind speed at the kept heights around the level change\n",

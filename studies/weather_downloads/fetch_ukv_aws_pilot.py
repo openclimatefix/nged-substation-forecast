@@ -100,7 +100,7 @@ MAX_DAYS: Final[int] = 800
 """The most days one invocation covers. The bucket holds 733 or so, so a typo is bounded."""
 DEFAULT_MAX_WIRE_GB: Final[float] = 600.0
 """Stop once this many gigabytes have been requested in one invocation. At about 0.43 MB requested
-per object, so the whole window needs about 360 GB."""
+per object, the whole window needs about 360 GB."""
 LISTING_THREADS: Final[int] = 4
 
 WORKERS: Final[int] = 8
@@ -314,10 +314,12 @@ def commit_day(*, product_dir: Path, day: dt.date, record: Mapping[str, Any]) ->
 def day_is_committed(*, product_dir: Path, day: dt.date, run_hours: Sequence[int]) -> bool:
     """Whether the ledger says the day is complete for every requested run hour.
 
-    A day with a missing run or an absent object is committed with `complete` false and is retried.
-    A day fetched for a subset of hours covers only those hours. A record without `complete` and
-    `run_hours` is a legacy record, written for all 24 hours: it counts as complete even where its
-    `absent_objects` is above 0, because a retry cannot repair a write-once run file anyway.
+    A day with a missing run or an absent object is committed with `complete` false, so every
+    invocation lists it again and fetches any run file that is still missing. A retry never fills
+    an absent object, because an existing run file is not fetched again. A day fetched for a subset
+    of hours covers only those hours. A record without `complete` and `run_hours` is a legacy
+    record, written for all 24 hours: it counts as complete even where its `absent_objects` is
+    above 0, because a retry cannot repair a write-once run file anyway.
     """
     path = ledger_path(product_dir=product_dir, day=day)
     if not path.exists():
@@ -817,11 +819,11 @@ def build_gotchas(*, attributes: Mapping[str, Mapping[str, str]]) -> list[str]:
         ),
         cell_methods_line,
         (
-            "The wind files on height levels hold more levels from some date on, and the read "
-            "raises if a kept height is missing, so every run file holds the kept heights. The "
-            "level counts and the radiation budget (total minus direct minus diffuse) by month and "
-            "by day are in the validation report that `validate_ukv_aws.py` writes. Read it "
-            "before relying on the three shortwave components."
+            "The read raises if a kept height is missing from a wind file on height levels, so "
+            "every run file holds the kept heights. The radiation budget (total minus direct "
+            "minus diffuse) by month, by era either side of 2026-01-22, and by valid hour is in "
+            "the validation report that `validate_ukv_aws.py` writes. Read it before relying on "
+            "the three shortwave components."
         ),
         packing_line,
         "The bucket is a rolling two-year window, so an early day can no longer be fetched later.",

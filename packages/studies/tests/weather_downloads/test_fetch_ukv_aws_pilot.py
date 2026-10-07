@@ -437,3 +437,19 @@ def test_a_day_whose_run_files_hold_no_gap_is_committed_complete(
     assert record["complete"] is True
     assert record["absent_objects"] == 0
     assert record["code_version"] == pilot.CODE_VERSION
+
+
+def test_a_day_with_a_run_missing_from_the_plan_is_not_committed_complete(
+    pilot: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(pilot, "PRODUCT_DIR", tmp_path)
+    monkeypatch.setattr(
+        pilot, "fetch_run", _stub_fetch_run(pilot, product_dir=tmp_path, written=[], missing_now=[])
+    )
+    arguments = _day_arguments(pilot, runs=[RUN_NAME]) | {"run_hours": [3, 4]}
+    pilot._fetch_day(**arguments)
+    day = dt.date(2026, 10, 2)
+    record = json.loads(pilot.ledger_path(product_dir=tmp_path, day=day).read_text())
+    assert record["absent_objects"] == 0
+    assert record["complete"] is False
+    assert not pilot.day_is_committed(product_dir=tmp_path, day=day, run_hours=[3, 4])
