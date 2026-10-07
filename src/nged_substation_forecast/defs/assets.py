@@ -281,7 +281,7 @@ Waiting is the right response to those because Dynamical.org publishes each 00Z 
 40 separate Icechunk commits between 08:05 and 08:20 UTC, one per worker. A run part-way through
 that window is genuinely readable and genuinely incomplete: a variable whose worker has not
 committed yet reads as null across every member and step. Fuller reasoning:
-https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-is-retried-not-failed-outright
+https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright
 
 "≥" rather than "≈" because most retries come after a download. A run absent from the catalog is
 found before it, but the other two failures are found after it, so each of those retries also pays
@@ -472,7 +472,7 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     # because a run is published as ~40 separate commits, so it can be readable and incomplete at
     # once; the ladder is on _ECMWF_ENS_MAX_RETRIES above, and the
     # upstream behaviour is at
-    # https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-is-retried-not-failed-outright
+    # https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright
     try:
         ds_lazy = open_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)
         context.log.info("Lazily opened Icechunk store.")

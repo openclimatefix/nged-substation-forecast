@@ -191,7 +191,7 @@ def raise_if_instantaneous_slices_empty(ds: xr.Dataset) -> None:
     lead-0, and `Nwp.validate` raises `NwpVariableWhollyMissing` when one is wholly missing.
 
     Reasoning and the 2026-10-02 incident:
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-is-retried-not-failed-outright>
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright>
 
     Args:
         ds: A downloaded dataset, as returned by `download_ecmwf_ens_data`.

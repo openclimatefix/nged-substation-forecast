@@ -110,8 +110,9 @@ class NwpVariableWhollyMissing(ValueError):
     `dynamical_data.ecmwf_ens.download.raise_if_instantaneous_slices_empty` finds an empty slice
     of an instantaneous variable on the raw grid and the asset retries that instead. An all-null
     `categorical_precipitation_type_surface` passes base validation, because that column is
-    nullable. The all-null column is rejected instead by `_check_variables_that_were_introduced_after_start_of_dataset`, and only for an
-    `init_time` after 2024-11-12, because the column does not exist in the runs before then. See
+    nullable. The all-null column is rejected instead by
+    `_check_variables_that_were_introduced_after_start_of_dataset`, and only for an `init_time`
+    after 2024-11-12, because the column does not exist in the runs before then. See
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
     """
 

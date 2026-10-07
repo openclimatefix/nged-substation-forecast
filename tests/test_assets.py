@@ -145,7 +145,7 @@ def _make_downloaded_ds(
     ``precipitation_surface`` the corrupt de-accumulated one, so a count that pooled the two, or
     attributed one to the other, disagrees with these tests.
     """
-    shape = (2, 1, 1, 2)  # 2 steps (one is lead-0), 1 member, 2 grid points
+    shape = (2, 1, 1, 3)  # 2 steps (one is lead-0), 1 member, 3 grid points
     dims = ("lead_time", "ensemble_member", "latitude", "longitude")
     corrupt = np.full(shape, 0.001, dtype=np.float32)
     corrupt[1, 0, 0, :n_null_grid_points] = np.nan
@@ -169,7 +169,7 @@ def _make_downloaded_ds(
             "lead_time": np.asarray([0, 6], dtype="timedelta64[h]").astype("timedelta64[ns]"),
             "ensemble_member": np.asarray([0]),
             "latitude": np.asarray([52.5], dtype=np.float32),
-            "longitude": np.asarray([-1.0, -0.75], dtype=np.float32),
+            "longitude": np.asarray([-1.0, -0.75, -0.5], dtype=np.float32),
         },
     )
 
@@ -922,8 +922,8 @@ def test_ecmwf_ens_publishes_both_null_populations(
     assert evaluation.passed  # no stored cell is null...
     assert evaluation.metadata["n_null_h3_cells"].value == 0
     assert evaluation.metadata["n_null_nwp_grid_points"].value == 1  # ...but the feed was corrupt
-    assert evaluation.metadata["n_total_nwp_grid_points"].value == 6  # 3 variables x 1 step x 2
-    assert evaluation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 6)
+    assert evaluation.metadata["n_total_nwp_grid_points"].value == 9  # 3 variables x 1 step x 3
+    assert evaluation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 9)
     assert evaluation.metadata["n_affected_nwp_slices"].value == 1
     assert evaluation.metadata["affected_nwp_variables"].value == ["precipitation_surface"]
     # The per-variable table is on this check too — the runbook sends the operator to it for the
@@ -935,8 +935,8 @@ def test_ecmwf_ens_publishes_both_null_populations(
     # The description must name both populations, or it claims the health of the one it read, and
     # must lead with the grid-point clause — the signal this check exists to surface.
     description = str(evaluation.description)
-    assert description.startswith("Raw NWP grid: 1 of 6 grid point(s) null")
-    assert "(16.6667%)" in description  # rendered as a percentage, not a bare ratio
+    assert description.startswith("Raw NWP grid: 1 of 9 grid point(s) null")
+    assert "(11.1111%)" in description  # rendered as a percentage, not a bare ratio
     assert "precipitation_surface" in description
     assert "Stored H3 cells: 0 null cell(s)" in description
     assert "Known upstream ECMWF ENS corruption" in description
@@ -945,21 +945,22 @@ def test_ecmwf_ens_publishes_both_null_populations(
     # only appearing on the runs bad enough to warn.
     (materialisation,) = result.asset_materializations_for_node("ecmwf_ens")
     assert materialisation.metadata["n_null_nwp_grid_points"].value == 1
-    assert materialisation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 6)
+    assert materialisation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 9)
 
 
 @pytest.mark.parametrize(
     ("n_nulls", "expected_passed", "expected_description", "expected_corrupt_rows"),
     [
-        (0, True, "No nulls in 36 instantaneous-variable grid points.", []),
+        (0, True, "No nulls in 54 instantaneous-variable grid points.", []),
         # Two nulls in *one* slice, so the table's two count columns hold different numbers and
-        # swapping them is visible. Both grid points of the one step, which the stubbed converter
-        # never sees.
+        # swapping them is visible. Two of the three grid points of the one step, which the stubbed
+        # converter never sees, and not all three, because a slice empty at every grid point is
+        # retried before any check runs.
         (
             2,
             False,
             (
-                "2 of 36 instantaneous-variable grid point(s) null (5.5556%) in temperature_2m, "
+                "2 of 54 instantaneous-variable grid point(s) null (3.7037%) in temperature_2m, "
                 "across 1 (variable, member, step) slice(s)."
             ),
             [
@@ -967,7 +968,7 @@ def test_ecmwf_ens_publishes_both_null_populations(
                     "variable": "temperature_2m",
                     "n_null_grid_points": 2,
                     "n_affected_slices": 1,
-                    "n_total_grid_points": 4,
+                    "n_total_grid_points": 6,
                 }
             ],
         ),
@@ -1009,10 +1010,10 @@ def test_ecmwf_ens_flags_instantaneous_nulls_the_aggregation_absorbed(
     assert evaluation.passed is expected_passed  # one null grid point is enough, unlike the other
     assert evaluation.severity == AssetCheckSeverity.WARN
     assert evaluation.metadata["n_null_nwp_grid_points"].value == n_nulls
-    # 9 instantaneous variables x 2 steps x 2 grid points — lead-0 included, unlike the other check.
+    # 9 instantaneous variables x 2 steps x 3 grid points — lead-0 included, unlike the other check.
     # Counting the de-accumulated or categorical variables too, or reading the contract's names
     # rather than the download's, moves this number.
-    assert evaluation.metadata["n_total_nwp_grid_points"].value == 36
+    assert evaluation.metadata["n_total_nwp_grid_points"].value == 54
     assert str(evaluation.description) == expected_description
 
     # The per-variable table separates one bad variable from nine, which the totals cannot.

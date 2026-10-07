@@ -189,7 +189,9 @@ _SHAPE = (3, 2, 2, 2)  # (lead_time, ensemble_member, latitude, longitude), as i
 _INSTANTANEOUS = sorted(download.ECMWF_ENS_INSTANTANEOUS_VARS)
 
 
-def _nan_where(*, lead_idx: int, member_idx: int, lat_idx: object, lon_idx: object) -> np.ndarray:
+def _nan_where(
+    *, lead_idx: int, member_idx: int, lat_idx: int | slice, lon_idx: int | slice
+) -> np.ndarray:
     values = np.ones(_SHAPE, dtype=np.float32)
     values[lead_idx, member_idx, lat_idx, lon_idx] = np.nan
     return values
