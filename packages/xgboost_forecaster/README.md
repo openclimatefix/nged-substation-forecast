@@ -11,9 +11,10 @@ relationship between weather and power. Features are passed via the `AllFeatures
 `contracts`), which joins NWP variables, power lag and rolling features, and static metadata. A
 feature is one input column offered to the model: a lag feature is the power measured a fixed
 interval before the target time, and a rolling feature is a statistic over a recent window of that
-power. `Enum` columns are encoded as each value's position in the declared list before being
-handed to XGBoost; all features are cast to `Float32`, and missing values are left as `NaN` so
-XGBoost handles them natively. ECMWF publishes ~51 members of the same weather forecast — one
+power. Before being handed to XGBoost, each `Enum` column is encoded as each value's position in
+the `Enum`'s declared list of values, so a code means the same in training and prediction. All
+features are cast to `Float32`, and missing values are left as `NaN` so XGBoost handles them
+natively. ECMWF publishes ~51 members of the same weather forecast — one
 unperturbed control member plus ~50 perturbed members — and an ensemble forecast is one power
 prediction per member.
 The model is deterministic, and an ensemble forecast still comes out of that deterministic model

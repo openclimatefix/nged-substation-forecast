@@ -18,10 +18,11 @@ from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
 def _prepare_features(df: pl.DataFrame, feature_cols: list[str]) -> pl.DataFrame:
     """Return a Float32 DataFrame containing only the feature columns.
 
-    Enum columns are encoded as each value's position in the declared list, so a code means the same
-    in every frame. Nulls are preserved as NaN, which XGBoost handles natively as missing values.
-    The Patito model is stripped from the result (zero-copy) so XGBoost sees a plain
-    ``pl.DataFrame``.
+    Enum columns are encoded as each value's position in the Enum's declared list of values, so a
+    code means the same in every frame and XGBoost treats the column as an ordinal numeric. String
+    and Categorical columns have no declared list and raise at the Float32 cast. Nulls stay null in
+    the returned frame, and XGBoost reads them as missing values. The Patito model is stripped from
+    the result (zero-copy) so XGBoost sees a plain ``pl.DataFrame``.
     """
     exprs = []
     for col in feature_cols:
