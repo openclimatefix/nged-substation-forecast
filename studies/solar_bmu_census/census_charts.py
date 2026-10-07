@@ -75,6 +75,7 @@ def choose_examples(*, census: pl.DataFrame) -> list[tuple[str, str]]:
     Pure PV: every single-site BMU whose output follows the sun. Hybrid-site solar: those BMUs
     ordered by correlation, taking the first, the middle, and the last, so the examples span the
     best to the worst fit. Storage: the storage BMU at each hybrid-site example, where it has one.
+    The rows are grouped by kind, in that order.
 
     Args:
         census: The census table.
@@ -90,13 +91,12 @@ def choose_examples(*, census: pl.DataFrame) -> list[tuple[str, str]]:
     middle = len(hybrid) // 2
     picks = sorted({0, middle, len(hybrid) - 1}) if hybrid else []
     chosen_hybrid = [hybrid[i] for i in picks]
-    examples = [(bmu_id, "pure PV") for bmu_id in pure]
-    for bmu_id in chosen_hybrid:
-        examples.append((bmu_id, "hybrid-site solar"))
-        storage = storage_bmu_at(site_bmu_id=bmu_id, census=census)
-        if storage is not None:
-            examples.append((storage, "storage"))
-    return examples
+    storage = [storage_bmu_at(site_bmu_id=bmu_id, census=census) for bmu_id in chosen_hybrid]
+    return [
+        *[(bmu_id, "pure PV") for bmu_id in pure],
+        *[(bmu_id, "hybrid-site solar") for bmu_id in chosen_hybrid],
+        *[(bmu_id, "storage") for bmu_id in storage if bmu_id is not None],
+    ]
 
 
 def week_series(*, bmu_id: str, week_start: datetime) -> pl.DataFrame:
