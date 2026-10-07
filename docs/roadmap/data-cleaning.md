@@ -40,8 +40,8 @@ loudly, and the job's Sentry failure hook reports the failure. The next hourly r
 because a failed rebuild leaves the old raw version recorded. The `cleaned_power_keeps_up_with_raw`
 asset check warns when the cleaned table is 2 or more raw commits behind.
 
-**The asset rewrites the whole cleaned table, and appending only new rows is not built.** At V1 the
-rewrite takes well under a second. At V2 (about 2,500 series) the asset will rewrite a few
+**The asset rewrites the whole cleaned table, and appending only new rows is not built.** At V1 a
+measured rewrite took 1.4 seconds. At V2 (about 2,500 series) the asset will rewrite a few
 gigabytes, and how long that rewrite takes has not been measured.
 
 ## A generator's commissioning ramp has to be cut, and one cut-off is already known

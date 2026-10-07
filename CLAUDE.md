@@ -579,8 +579,8 @@ Four main assets:
   metadata parquet
 - `clean_nged_power_data` (in `defs/cleaning_assets.py`) — runs `nged_data.cleaning.flag_nged_power`
   over the whole raw power table and overwrites the `cleaned_power_time_series` Delta table. Every
-  reader of power except the ingest reads only the unflagged rows, through
-  `nged_data.storage.scan_cleaned_power`
+  reader of power except the ingest and the `power_data_is_fresh` check reads only the unflagged
+  rows, through `nged_data.storage.scan_cleaned_power`
 - `h3_grid_weights` — computes fractional H3 cell overlap with the GB boundary for spatial NWP
   aggregation
 - `ecmwf_ens` — daily-partitioned asset that downloads ECMWF ENS NWP and writes it to Delta Lake via

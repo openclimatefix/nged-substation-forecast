@@ -38,7 +38,7 @@ class CleaningProvenance:
         raw_table_id: The raw table's Delta table id. It guards against a deleted and rebuilt raw
             table, whose versions restart at 0.
         raw_version: The raw table's Delta version that the cleaning read.
-        code_hash: The SHA-256 of the cleaning rules' source file when the cleaning ran.
+        code_hash: The SHA-256 of the cleaning rules' source files when the cleaning ran.
         metadata_hash: A hash of the `TimeSeriesMetadata` table that the cleaning read: the
             SHA-256 of Polars' per-row `hash_rows` over that table sorted by `time_series_id`. The
             hash is stable between runs on one Polars version and changes when any value in the

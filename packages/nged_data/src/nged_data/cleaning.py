@@ -9,17 +9,23 @@ import hashlib
 from pathlib import Path
 from typing import Final
 
+import contracts.power_schemas
 import patito as pt
 import polars as pl
 from contracts.power_schemas import CleanedPowerTimeSeries, PowerTimeSeries, TimeSeriesMetadata
 
-CLEANING_CODE_HASH: Final[str] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
-"""The SHA-256 of this module's own source file, computed at import.
+CLEANING_CODE_HASH: Final[str] = hashlib.sha256(
+    Path(__file__).read_bytes() + Path(contracts.power_schemas.__file__).read_bytes()
+).hexdigest()
+"""The SHA-256 of this module's source file and of `contracts/power_schemas.py`, computed at import.
+
+`power_schemas.py` is included because the `substation_zero` rule reads
+`TimeSeriesMetadata.SUBSTATION_TYPES` from it.
 
 `clean_nged_power_data` skips a rebuild only when this hash matches the one recorded in the
 cleaned table's newest write commit, so any edit to a cleaning rule forces a rebuild on the next
-run, whether or not the edit is committed. The cleaning rules must live in this module, or the hash
-must be extended to cover every file they live in.
+run, whether or not the edit is committed. Every file a cleaning rule reads its code or constants
+from must be in this hash.
 """
 
 
