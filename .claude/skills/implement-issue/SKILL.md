@@ -56,8 +56,9 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
    `mkdocs build` catches on their own (see the `mkdocs-authoring` skill).
 
 3. **Verify, all green before pushing**: `uv run ruff check .`, `uv run ruff format .`, `uv run
-   --all-packages ty check`, `uv run pytest`, plus (if docs were touched) `uv run pymarkdown scan -r
-   docs README.md CLAUDE.md packages/*/README.md` and `uv run mkdocs build --strict`.
+   --all-packages ty check`, `uv run pytest` (add `--run-studies` if the diff touches
+   `packages/studies/` or `studies/`), plus (if docs were touched) `uv run pymarkdown scan -r docs
+   README.md CLAUDE.md packages/*/README.md` and `uv run mkdocs build --strict`.
 
 4. **Commit, push, and mark the PR ready for review.** If a plan preceded this, `plan-issue` already
    opened the PR as a draft in its own step 4 — commit the implementation, push, and take it out of

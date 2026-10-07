@@ -922,7 +922,7 @@ def _report(
     Args:
         frame: This section's own row set.
         losses: Every arm's losses, at both `pooled` and `sensitivity` settings.
-        sites: The solar roster, for the geometry lines.
+        sites: The solar site list, for the geometry lines.
         job_list: Every job `jobs()` returns, for the feature-column section.
         selection: The in-memory station choice, reported only as pooled ranges.
         repairs: The reader's repair counts.

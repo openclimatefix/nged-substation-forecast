@@ -11,7 +11,9 @@ from nged_data.storage import (
     _process_file_listing,
     _ProcessedFileListing,
     _RawFileListItem,
+    coverage_from_power,
     remove_small_files_from_listing,
+    scan_cleaned_power,
     select_new_rows,
     time_series_coverage,
     upsert_metadata,
@@ -269,8 +271,10 @@ def test_upsert_metadata_returns_diff(tmp_path: Path):
     )
 
 
-def _roster(ids: list[int], name: str = "ID", **extra: object) -> pt.DataFrame[TimeSeriesMetadata]:
-    """A valid roster covering ``ids``, plus any ``extra`` columns applied to every row."""
+def _metadata_table(
+    ids: list[int], name: str = "ID", **extra: object
+) -> pt.DataFrame[TimeSeriesMetadata]:
+    """A valid metadata table covering ``ids``, plus any ``extra`` columns applied to every row."""
     rows = [
         {
             "time_series_id": i,
@@ -290,15 +294,15 @@ def _roster(ids: list[int], name: str = "ID", **extra: object) -> pt.DataFrame[T
     return pt.DataFrame(rows).set_model(TimeSeriesMetadata).cast().validate()
 
 
-def test_upsert_metadata_adds_a_new_id_when_the_stored_roster_is_thinner(tmp_path: Path):
+def test_upsert_metadata_adds_a_new_id_when_the_stored_metadata_table_is_thinner(tmp_path: Path):
     """The diff is derived by slicing the concatenated frame, so it must split back into exactly
-    the snapshot's rows and the stored roster's rows. Getting that boundary wrong loses a
-    whole time series silently: it never enters the roster, the stats claim nothing was new,
+    the snapshot's rows and the stored metadata table's rows. Getting that boundary wrong loses a
+    whole time series silently: it never enters the metadata table, the stats claim nothing was new,
     and `select_new_rows` never re-offers the file, so it never arrives at all."""
     metadata_path = tmp_path / "metadata.parquet"
-    _roster([1]).write_parquet(metadata_path)
+    _metadata_table([1]).write_parquet(metadata_path)
 
-    stats = upsert_metadata(new_metadata=_roster([1, 2]), metadata_path=str(metadata_path))
+    stats = upsert_metadata(new_metadata=_metadata_table([1, 2]), metadata_path=str(metadata_path))
 
     assert stats["metadata_n_new_TimeSeriesIDs"] == 1
     assert stats["metadata_n_updated_TimeSeriesIDs"] == 0
@@ -307,14 +311,14 @@ def test_upsert_metadata_adds_a_new_id_when_the_stored_roster_is_thinner(tmp_pat
 
 def test_upsert_metadata_merges_a_snapshot_missing_the_optional_columns(tmp_path: Path):
     """`TimeSeriesMetadata` has four `allow_missing` fields, so a snapshot can be narrower than
-    the stored roster and still validate. Merging the two must not raise: a field the snapshot
-    no longer carries is *cleared* for the series the snapshot covers, while a series the
+    the stored metadata table and still validate. Merging the two must not raise: a field the
+    snapshot no longer carries is *cleared* for the series the snapshot covers, while a series the
     snapshot omits keeps every value it already had."""
     metadata_path = tmp_path / "metadata.parquet"
-    _roster([1, 2], information="note").write_parquet(metadata_path)
+    _metadata_table([1, 2], information="note").write_parquet(metadata_path)
 
     # This run's snapshot covers id 2 only, and carries no `information` column at all.
-    snapshot = _roster([2], name="Renamed")
+    snapshot = _metadata_table([2], name="Renamed")
     assert "information" not in snapshot.columns
     upsert_metadata(new_metadata=snapshot, metadata_path=str(metadata_path))
 
@@ -326,14 +330,14 @@ def test_upsert_metadata_merges_a_snapshot_missing_the_optional_columns(tmp_path
 
 
 def test_upsert_metadata_ignores_the_stored_column_order(tmp_path: Path):
-    """`hash_rows` is column-order sensitive, so a stored roster whose columns happen to sit in a
-    different order must not be reported as wholly changed and rewritten every run."""
+    """`hash_rows` is column-order sensitive, so a stored metadata table whose columns happen to sit
+    in a different order must not be reported as wholly changed and rewritten every run."""
     metadata_path = tmp_path / "metadata.parquet"
-    roster = _roster([1, 2])
-    roster.select(sorted(roster.columns)).write_parquet(metadata_path)
+    metadata_table = _metadata_table([1, 2])
+    metadata_table.select(sorted(metadata_table.columns)).write_parquet(metadata_path)
     mtime_before = metadata_path.stat().st_mtime_ns
 
-    stats = upsert_metadata(new_metadata=roster, metadata_path=str(metadata_path))
+    stats = upsert_metadata(new_metadata=metadata_table, metadata_path=str(metadata_path))
 
     assert stats["metadata_n_new_TimeSeriesIDs"] == 0
     assert stats["metadata_n_updated_TimeSeriesIDs"] == 0
@@ -539,7 +543,10 @@ def test_remove_small_files_from_listing_keeps_one_reading_file():
     result = remove_small_files_from_listing(file_listing)
 
     assert result.height == 1
-    _ProcessedFileListing.validate(result)  # schema must survive filtering
+    _ProcessedFileListing.validate(result)
+    # An eager `filter` returns a plain frame, so the model is only still attached if the function
+    # re-attaches it.
+    assert getattr(result, "model", None) is _ProcessedFileListing
 
 
 def test_remove_small_files_from_listing_drops_genuinely_empty_file():
@@ -565,3 +572,43 @@ def test_remove_small_files_from_listing_logs_dropped_count(
         "1 out of n_files_before_filter=2" in r.message and r.levelno == logging.INFO
         for r in caplog.records
     )
+
+
+def test_scan_cleaned_power_drops_flagged_rows_and_the_drop_reason_column(tmp_path: Path):
+    delta_path = tmp_path / "cleaned.delta"
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 1, 2], dtype=pl.Int32),
+            "time": pl.Series(
+                [
+                    datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
+                    datetime(2026, 1, 1, 12, 30, tzinfo=UTC),
+                    datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
+                ]
+            ).cast(UTC_DATETIME_DTYPE),
+            "power": pl.Series([1.0, 0.0, 3.0], dtype=pl.Float32),
+            "drop_reason": pl.Series([None, "substation_zero", None], dtype=pl.String),
+        }
+    ).write_delta(delta_path)
+
+    result = scan_cleaned_power(str(delta_path)).collect().sort("time_series_id")
+
+    assert result.columns == ["time_series_id", "time", "power"]
+    assert result["time_series_id"].to_list() == [1, 2]
+    assert result["power"].to_list() == [1.0, 3.0]
+
+
+def test_coverage_from_power_matches_time_series_coverage(tmp_path: Path):
+    delta_path = tmp_path / "power.delta"
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 1], dtype=pl.Int32),
+            "time": pl.Series(
+                [datetime(2026, 1, 1, 12, 0, tzinfo=UTC), datetime(2026, 1, 1, 12, 30, tzinfo=UTC)]
+            ).cast(UTC_DATETIME_DTYPE),
+            "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
+        }
+    ).write_delta(delta_path)
+    power = pt.LazyFrame.from_existing(pl.scan_delta(str(delta_path))).set_model(PowerTimeSeries)
+
+    assert coverage_from_power(power).equals(time_series_coverage(str(delta_path)))

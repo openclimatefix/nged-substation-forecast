@@ -57,6 +57,12 @@ gets read before any Python is written or edited. Change a rule here and nowhere
     - Variables/Functions: `snake_case`
     - Classes: `PascalCase`
     - Constants: `UPPER_SNAKE_CASE`
+    - **Descriptive but long beats short but ambiguous.** A name is read far more often than it is
+      typed, so spend the extra words. Check each word in a name against the other meanings this
+      project already gives it: "grid" can mean the H3 cells, gridded weather data, or a set of
+      forecast rows; "model" can mean a weather model, an XGBoost model, or a Patito model; "run"
+      can mean an NWP run or a Dagster run. `PowerLagsPerNwpRunFeatureEngineer` is the right shape
+      of name, and `GridEngineer` is not.
 
 ## Type hints and signatures
 
@@ -305,15 +311,18 @@ These rules are all about making Polars code easy to read.
 
 ## Gotchas that fail silently
 
-Three groups of trap in this codebase produce **no error at the point of the mistake**, so each
-lives in a skill you are expected to load *before* writing the code rather than after the confusing
-failure:
+Three groups of trap in this codebase produce **no error, or a misleading one, at the point of the
+mistake**, so each lives in a skill you are expected to load *before* writing the code rather than
+after the confusing failure:
 
 - **`polars-patito-gotchas`** — Patito's model machinery colliding with Polars and delta-rs: a
   cross-model `.join()` that has to have its right-hand operand stripped, a `{column: dtype}`
   `.cast` swallowed on a model-bearing frame, `ge`/`le` doing nothing on a datetime field,
-  `.filter()` dropping the Patito subclass, and a dictionary-encoded column blocking Delta predicate
-  pushdown so a partition-filtered query reads the whole table.
+  `.filter()` on a `pt.LazyFrame` typed as returning a plain frame (and, on an eager
+  `pt.DataFrame`, actually returning one), and a
+  dictionary-encoded column blocking Delta predicate pushdown so a partition-filtered query reads
+  the whole table. It also lists the Polars 2 changes that alter a result without raising, such as
+  row order after a lazy join.
 - **`marimo-notebooks`** — leading underscores are cell-local, imports belong in `app.setup`, and
   `ruff check --fix` must never be run over a notebook.
 - **`ty-workarounds`** — a known upstream `ty` bug on Altair, where the code is correct and

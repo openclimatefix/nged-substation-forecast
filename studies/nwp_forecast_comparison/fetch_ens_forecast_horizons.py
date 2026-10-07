@@ -11,7 +11,7 @@ at 10 m.
 
 **Rows are keyed by the generator's anonymous label, and each generator reads the H3 cell it sits
 in.** The table stores each field as the area-weighted mean over an H3 resolution-5 cell, which is
-what the live service reads. Coordinates are read from the private roster at run time and never
+what the live service reads. Coordinates are read from the private site list at run time and never
 written.
 
 **Each lead band is a whole UTC day after the run's own day**, so every band covers the same hours

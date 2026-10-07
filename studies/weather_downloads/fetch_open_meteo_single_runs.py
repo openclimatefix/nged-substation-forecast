@@ -11,7 +11,7 @@ the IFS HRES horizon is 10 days.
 
 **Requests.** Each run costs two requests, one per `cell_selection` group: the six PV sites with
 `nearest` and the three wind sites with `land`, the settings the sibling per-site fetchers use. The
-sites come from the private roster at run time and stay in memory. Rows carry only the anonymised
+sites come from the private site list at run time and stay in memory. Rows carry only the anonymised
 `site` label. No coordinate, and never the API key, reaches a log line, a file, or the lineage note;
 `OPEN_METEO_TOKEN` must be exported into the environment (see `paths.open_meteo_api_key`).
 
@@ -243,8 +243,8 @@ def fetch_run_group(*, sites: pl.DataFrame, run_date: date) -> pl.DataFrame:
     """Fetch every lead of one run for one `cell_selection` group of sites, in one request.
 
     Args:
-        sites: One `cell_selection` group of the roster, carrying `site`, `latitude`, `longitude`,
-            and `cell_selection`.
+        sites: One `cell_selection` group of the site list, carrying `site`, `latitude`,
+            `longitude`, and `cell_selection`.
         run_date: The day of the 00 UTC run.
 
     Returns:
@@ -353,7 +353,7 @@ def fetch_run(*, sites: pl.DataFrame, run_date: date) -> pl.DataFrame:
     """Fetch one complete run for every site, one request per `cell_selection` group.
 
     Args:
-        sites: The roster with `cell_selection`.
+        sites: The site list with `cell_selection`.
         run_date: The day of the 00 UTC run.
 
     Returns:
@@ -444,7 +444,7 @@ def _fetch_month(
 
     Args:
         month: The month as `YYYY-MM`.
-        sites: The roster with `cell_selection`.
+        sites: The site list with `cell_selection`.
         first: The first run day wanted.
         last: The last run day wanted.
         unavailable: The run days refused by the API, mapped to a reason. Updated in place.

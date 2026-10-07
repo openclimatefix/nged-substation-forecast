@@ -244,7 +244,7 @@ def report_asset_degradation(
     """Report an asset that degraded rather than failing, as a Sentry error event.
 
     Closes the same gap as `report_check_degradation` below, for an asset:
-    ``power_time_series_and_metadata`` catches a failure of the ``TimeSeriesMetadata`` roster upsert
+    ``power_time_series_and_metadata`` catches a failure of the ``TimeSeriesMetadata`` table upsert
     so that the power write still happens (rule 1 of
     [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
 

@@ -77,7 +77,7 @@ def derive_nearest_cells(*, grid: pl.DataFrame, sites: pl.DataFrame) -> pl.DataF
     Args:
         grid: One row per cell, with `y_index`, `x_index`, `latitude` and `longitude` in degrees.
             A longitude on 0 to 360 degrees is wrapped to -180 to 180.
-        sites: The roster, with `site`, `latitude` and `longitude`.
+        sites: The site list, with `site`, `latitude` and `longitude`.
 
     Returns:
         One row per generator with `site`, `y_index`, `x_index` and `distance_km`.
@@ -95,7 +95,7 @@ def derive_nearest_nora3_cells(*, sites: pl.DataFrame) -> pl.DataFrame:
     """Find each generator's nearest NORA3 cell on the Lambert grid.
 
     Args:
-        sites: The roster, with `site`, `latitude` and `longitude`.
+        sites: The site list, with `site`, `latitude` and `longitude`.
 
     Returns:
         One row per generator with `site`, `y_index`, `x_index` and `distance_km`, the projected

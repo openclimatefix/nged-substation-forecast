@@ -1,0 +1,45 @@
+name: Studies tests
+
+# Runs the slow tests under packages/studies/tests, which the per-PR gate in ci.yml skips
+# (`--run-studies` lifts the skip). A pull request runs them only when it touches code or pages a
+# study depends on; every push to main runs them in full, so a PR that skipped them is still
+# checked before the next one starts from it.
+# https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#studies-tests
+
+on:
+  pull_request:
+    paths:
+      - "packages/studies/**"
+      - "studies/**"
+      - "docs/studies/**"
+      - ".github/workflows/studies_tests.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: studies-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  studies-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Dummy values for the required Settings fields, mirroring ci.yml.
+      NGED_S3_BUCKET_URL: "https://example.com"
+      NGED_S3_BUCKET_ACCESS_KEY: "dummy"
+      NGED_S3_BUCKET_SECRET: "dummy"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install workspace
+        run: uv sync --locked
+
+      - name: Studies tests
+        run: uv run --no-sync pytest -n auto --run-studies packages/studies

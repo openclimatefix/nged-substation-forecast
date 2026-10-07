@@ -51,8 +51,9 @@ Scale](performance.md).
       primary structural axis — spending it here would foreclose grouping the same assets by
       pipeline stage later, whereas a tag composes with any grouping chosen instead — and not a
       `kind` either, which Dagster reserves (`dagster/kind/*`) for naming the technology an asset
-      uses. The four `production` assets — `power_time_series_and_metadata`, `h3_grid_weights`,
-      `ecmwf_ens`, and `live_forecasts` — are everything the deployment runs to produce forecasts.
+      uses. The five `production` assets — `power_time_series_and_metadata`, `clean_nged_power_data`,
+      `h3_grid_weights`, `ecmwf_ens`, and `live_forecasts` — are everything the deployment runs to
+      produce forecasts.
       The `research` assets are everything else: the cross-validation assets, plus
       `promotable_model_runs` and `promoted_model`, which need an MLflow tracking server the
       deployment does not reach. The tag says whether the service needs an asset, not where the

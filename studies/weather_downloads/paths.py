@@ -4,12 +4,12 @@ One-off throwaway module for the downloads in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>, which feed the two
 past-weather studies (#809) and the forecast study (#810). Every download folder is named in
 `studies.sources`, and the box itself lives in `studies.trial_area`. Running this file derives the
-box from the private roster.
+box from the private site list.
 """
 
 import os
 
-from studies.trial_area import write_trial_area_box_from_roster
+from studies.trial_area import write_trial_area_box_from_metadata
 
 
 def open_meteo_api_key() -> str | None:
@@ -27,4 +27,4 @@ def open_meteo_api_key() -> str | None:
 
 
 if __name__ == "__main__":
-    write_trial_area_box_from_roster()
+    write_trial_area_box_from_metadata()

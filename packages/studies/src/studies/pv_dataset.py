@@ -1,4 +1,4 @@
-"""Join NGED PV power to ERA5 irradiance: the readers, rosters, filters and columns arms share.
+"""Join NGED PV power to ERA5 irradiance: the readers, site lists, filters and columns arms share.
 
 Written for the experiment in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/784>. It builds its frames
@@ -73,7 +73,7 @@ CAMS_PATH: Final[Path] = CAMS_SITE_POINTS_DIR / "beam_diffuse_cams.parquet"
 MIN_YEARS_OF_READINGS: Final[float] = 1.0
 """A series with less than this much history is dropped.
 
-The PV roster holds seven series, one of which is a single row; the threshold exists to drop that
+The PV site list holds seven series, one of which is a single row; the threshold exists to drop that
 one without naming it.
 """
 
@@ -353,7 +353,7 @@ def pv_sites() -> pl.DataFrame:
         One row per site with `time_series_id`, `site`, `latitude`, `longitude` and
         `effective_capacity_mw`.
     """
-    return _roster(time_series_type="PV", labels=SITE_LABELS, seed=LABEL_PERMUTATION_SEED)
+    return _site_list(time_series_type="PV", labels=SITE_LABELS, seed=LABEL_PERMUTATION_SEED)
 
 
 def wind_sites() -> pl.DataFrame:
@@ -363,12 +363,12 @@ def wind_sites() -> pl.DataFrame:
         One row per site with `time_series_id`, `site`, `latitude`, `longitude` and
         `effective_capacity_mw`.
     """
-    return _roster(
+    return _site_list(
         time_series_type="Wind", labels=WIND_SITE_LABELS, seed=WIND_LABEL_PERMUTATION_SEED
     )
 
 
-def _roster(*, time_series_type: str, labels: tuple[str, ...], seed: int) -> pl.DataFrame:
+def _site_list(*, time_series_type: str, labels: tuple[str, ...], seed: int) -> pl.DataFrame:
     """Return the series of one technology with enough history, labelled anonymously.
 
     Args:
@@ -418,7 +418,7 @@ def solar_hourly_power(*, sites: pl.DataFrame) -> pl.DataFrame:
     shifted here.
 
     Args:
-        sites: The site roster from `pv_sites`.
+        sites: The site list from `pv_sites`.
 
     Returns:
         One row per (site, time) with `power_mw` and `has_zero_half_hour`.
@@ -442,7 +442,7 @@ def drop_outages_and_spikes(*, power: pl.DataFrame, sites: pl.DataFrame) -> pl.D
 
     Args:
         power: Hourly power from `solar_hourly_power`.
-        sites: The site roster, for each site's effective capacity.
+        sites: The site list, for each site's effective capacity.
 
     Returns:
         `power` with the offending rows removed.
@@ -505,7 +505,7 @@ def nearest_era5_cell(*, sites: pl.DataFrame, era5: pl.DataFrame) -> pl.DataFram
     about — blunting it would bias the answer towards "no information".
 
     Args:
-        sites: The site roster.
+        sites: The site list.
         era5: The long ERA5 frame, for its grid coordinates.
 
     Returns:

@@ -6,16 +6,18 @@ rounding — plus the write helpers that apply them. Dagster assets stay thin by
 this package rather than calling ``write_deltalake`` with ad-hoc settings.
 
 One module per table — ``power_forecasts``, ``nwp``, ``power_time_series``,
-``eligible_time_series``, ``effective_capacity``, ``forecast_metrics`` — plus the shared
-precision helper in ``precision``. Only ``power_forecasts`` and ``nwp`` tune their writer
-properties, sort order, and precision policy today. Each module's tuning was chosen from
-measurements on real data, and the two modules landed on different choices. See
+``cleaned_power_time_series``, ``eligible_time_series``, ``effective_capacity``,
+``forecast_metrics`` — plus the shared precision helper in ``precision``. Only ``power_forecasts``
+and ``nwp`` tune their writer properties, sort order, and precision policy today. Each module's
+tuning was chosen from measurements on real data, and the two modules landed on different choices.
+See
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed>
-for the comparison. The other four modules exist so their writes go through ``delta_store`` like
-every other table. Those four modules carry no tuning because no one has yet measured those four
+for the comparison. The other five modules exist so their writes go through ``delta_store`` like
+every other table. Those five modules carry no tuning because no one has yet measured those five
 tables.
 """
 
+from delta_store.cleaned_power_time_series import VacuumError, write_cleaned_power_time_series
 from delta_store.effective_capacity import write_effective_capacity
 from delta_store.eligible_time_series import write_eligible_time_series
 from delta_store.forecast_metrics import write_forecast_metrics
@@ -25,7 +27,9 @@ from delta_store.power_time_series import write_power_time_series
 from delta_store.precision import round_to_significand_bits
 
 __all__ = [
+    "VacuumError",
     "round_to_significand_bits",
+    "write_cleaned_power_time_series",
     "write_effective_capacity",
     "write_eligible_time_series",
     "write_forecast_metrics",

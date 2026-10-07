@@ -406,8 +406,8 @@ def rebuild_hourly_from_windows(
         time_zone="UTC",
         eager=True,
     )
-    roster = pl.DataFrame({"site": sites})
-    step_grid = roster.join(pl.DataFrame({"time": ends}), how="cross").sort("site", "time")
+    site_list = pl.DataFrame({"site": sites})
+    step_grid = site_list.join(pl.DataFrame({"time": ends}), how="cross").sort("site", "time")
     values = (
         step_grid.join(windows.select("site", "time", column), on=["site", "time"], how="left")
         .sort("site", "time")[column]
@@ -416,7 +416,7 @@ def rebuild_hourly_from_windows(
         .reshape(len(sites), len(ends))
     )
     hour_grid = (
-        roster.join(pl.DataFrame({"time": hours}), how="cross")
+        site_list.join(pl.DataFrame({"time": hours}), how="cross")
         .sort("site", "time")
         .join(clear_sky.select("site", "time", "clear_sky_w_m2"), on=["site", "time"], how="left")
         .sort("site", "time")
@@ -1116,7 +1116,7 @@ def _report(*, built: Built, losses: pl.DataFrame, sites: pl.DataFrame, job_list
     Args:
         built: `build_rows`'s result, whose frame is this section's own row set.
         losses: Every arm's losses, at both `pooled` and `sensitivity` settings.
-        sites: The solar roster, for the geometry lines.
+        sites: The solar site list, for the geometry lines.
         job_list: Every job `jobs()` returns, for the feature-column section.
 
     Returns:

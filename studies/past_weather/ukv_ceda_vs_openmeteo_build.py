@@ -365,7 +365,7 @@ def check_no_backfill(*, frame: pl.DataFrame) -> None:
 # --- Reading CEDA ---------------------------------------------------------------------------------
 
 
-def generator_roster() -> pl.DataFrame:
+def generator_site_list() -> pl.DataFrame:
     """Return the nine generator sites with their coordinates. Private: never printed.
 
     Returns:
@@ -491,7 +491,7 @@ def model_free_hours(
         span in which Open-Meteo's 10 m speed is built differently.
     """
     ceda = read_ceda_instants(
-        ukv=ukv, sites=generator_roster(), hours=hours, read_values=read_values
+        ukv=ukv, sites=generator_site_list(), hours=hours, read_values=read_values
     )
     return (
         ceda.join(open_meteo, on=["site", "time"], how="inner")

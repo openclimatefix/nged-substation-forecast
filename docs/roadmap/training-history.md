@@ -9,11 +9,13 @@
 
 Our ECMWF ENS archive starts 2024-04-01; most trial-area power series go back to late 2019. An
 estimate of past weather ([defined
-below](#train-on-the-long-power-history-then-calibrate-per-weather-product)) covers the gap.
-The planned estimates of past weather are CAMS for irradiance and CEDA UKV for other variables,
-pending a check of UKV against ERA5 over 2019 to 2024 and of temperature for demand. ERA5 is kept
-for gap filling and as a comparison arm. The evidence and the caveats are under [Which estimate of
-past weather to train on](#which-estimate-of-past-weather-to-train-on).
+below](#train-on-the-long-power-history-then-calibrate-per-weather-product)) covers the gap. The
+version-1 plan is ERA5 as the estimate of past weather for every variable except irradiance, and
+CAMS for irradiance. CEDA UKV is not ingested. A [study of CEDA's UKV archive against
+ERA5](../studies/past-weather/ukv-ceda-vs-era5.md) found no clear advantage for CEDA's UKV in
+forecasts of wind-farm power, and found CEDA's UKV temperature closer at four weather stations that
+UKV probably assimilates. The evidence and the caveats are under [Which estimate of past weather to
+train on](#which-estimate-of-past-weather-to-train-on).
 
 Almost all the cost is in the data layer. Once the estimates of past weather and the paired residual
 statistics exist, moving between the variants below is mostly configuration — so they are
@@ -152,9 +154,9 @@ traditional approach. A study of the learning curve has to allow a null result f
 has already happened.** The sources are ERA5; CAMS, the Copernicus Atmosphere Monitoring Service's
 satellite-derived irradiance; the first time steps of numerical weather prediction (NWP) runs, such
 as the early leads of the Met Office UKV archive held by CEDA, the Centre for Environmental Data
-Analysis; weather-station observations; weather satellites; and weather inferred from the
-differentiable-physics (DP) models of wind and solar farms. Each source has errors of its own, so
-none of them is exact.
+Analysis (a source the version-1 plan does not ingest); weather-station observations; weather
+satellites; and weather inferred from the differentiable-physics (DP) models of wind and solar
+farms. Each source has errors of its own, so none of them is exact.
 
 **The design trains one weather-response model on the long power history, then fits a small product
 calibrator for each weather product on that product's short overlap with power.** The
@@ -251,11 +253,10 @@ a version built on DP models after v2.**
 
 ### Which estimate of past weather to train on
 
-**The plan is CAMS for irradiance and CEDA UKV for other variables, pending a check of UKV against
-ERA5 over 2019 to 2024 and of temperature for demand. ERA5 is kept for gap filling and as a
-comparison arm.** The same choice applies to the weather-response model and to pre-training. ERA5
-shares the ENS's IFS lineage and CAMS and UKV do not, so the shift between the training input and
-the ENS forecasts served live is likely to be larger under the plan than under ERA5. The
+**The version-1 plan is CAMS for irradiance and ERA5 for every other variable, and CEDA UKV is not
+ingested.** The same choice applies to the weather-response model and to pre-training. ERA5 shares
+the ENS's IFS lineage and CAMS does not, so the shift between the training input and the ENS
+forecasts served live is likely to be larger for irradiance than for the other variables. The
 [reconciliations](#reconciling-estimates-of-past-weather-with-ens) and the product calibrator are
 what absorb that shift.
 
@@ -266,21 +267,43 @@ XGBoost model's error given ERA5 is 9.08% of capacity and given CAMS 5.09%
 Across the study's five headline row sets, CAMS beats ERA5 by 3.7 to 4.1 points of capacity on each
 row set, an exploratory comparison.
 
-**On past wind, UKV beats ERA5 over the wind study's window, which starts in August 2024, with a
-seasonal caveat.** At three wind farms from August 2024 to September 2026, the error given UKV's T+0
-wind as Open-Meteo serves it is 0.44 points [0.24, 0.63] lower than given ERA5's wind, a planned
-comparison
+**On past wind, Open-Meteo's UKV beats ERA5 over the wind study's window, which starts in August
+2024, with a seasonal caveat.** At three wind farms from August 2024 to September 2026, the error
+given UKV's T+0 wind as Open-Meteo serves it is 0.44 points [0.24, 0.63] lower than given ERA5's
+wind, a planned comparison
 ([wind](../studies/past-weather/wind.md#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested)).
 In an exploratory seasonal split, UKV's advantage over ERA5 is not statistically significant at the
 5% level from October to March; only ICON-D2's is.
 
-**No study has compared UKV's wind with ERA5's before August 2024, which is why the plan is
-pending.** Open-Meteo's UKV wind starts in August 2024, and CEDA's archive is the first UKV source
-the studies have found that reaches back to 2019. The check of CEDA UKV against ERA5 sits under
-[#492](https://github.com/openclimatefix/nged-substation-forecast/issues/492), which measures the
-perfect-weather ceiling and compares the estimates of past weather. A study comparing CEDA UKV with
-ERA5 from 2019 to 2026 has been requested and is not yet scheduled. The temperature check is for
-the demand substations.
+**Over 2019 to 2026, CEDA's archived UKV showed no clear advantage over ERA5 for wind, and a closer
+temperature at four weather stations that moved solar-farm power forecasts by no more than 0.009
+points of capacity.** CEDA's archive is the first UKV source the studies have found that reaches
+back to 2019, and the [CEDA UKV against ERA5 study](../studies/past-weather/ukv-ceda-vs-era5.md)
+compares it with ERA5 over that span, in one area of Lincolnshire, with these results:
+
+- **Wind:** pooled over three wind farms, an XGBoost model given ERA5's 100 m and 10 m wind had a
+  lower power error than an XGBoost model given CEDA's 10 m and 925 hPa wind, by 0.125 points of
+  capacity [+0.033, +0.216]. That difference is statistically significant at the 5% level and below
+  the 0.16-point margin that the study fixed before any result as clear. Without the farm that
+  carries most of the difference, the difference is +0.079 [-0.038, +0.194], which is not
+  statistically significant (post hoc). The result concerns CEDA's 6-hourly archive, read at leads
+  of 0 to 5 hours, and says nothing about the hourly UKV archive that Open-Meteo serves.
+- **Temperature:** at four Met Office weather stations, CEDA's 1.5 m air temperature was closer to
+  the readings than ERA5's 2 m air temperature, by 0.124 K [0.113, 0.135] in mean absolute error
+  after removing each product's mean error per station, calendar month, and hour of day. UKV
+  probably assimilates those stations' readings, a 2 km cell suits a single station better than a 25
+  km cell does by itself, and the advantage falls from 0.250 K at lead 0 to 0.035 K at lead 5 (post
+  hoc). At six solar farms, the choice between the two temperatures moved an XGBoost model's power
+  error by no more than 0.009 points of capacity in either direction. The study did not test a
+  demand forecast.
+- **Cost of a CEDA history:** 5 months dropped, 357 of 10,338 runs needing other weather, a 6-hourly
+  lead pattern, three physics eras, and a non-commercial licence.
+
+**Version 1 takes temperature from ERA5 too, although the study's planned rule recommended CEDA UKV
+for past temperature.** The planned rule recommended ERA5 for past wind. The temperature
+recommendation rests on the station scores and not on any improvement in a forecast. Version 1 does
+not ingest both ERA5 and CEDA UKV, and no forecast in the study improved by as much as a planned
+margin with CEDA's temperature. The study did not test a history that mixes sources.
 
 **The best estimate of past weather may be a blend of several products rather than any one
 product.** In the [blending study](../studies/past-weather/blending.md), an XGBoost model given all
@@ -309,7 +332,7 @@ to UKV. Three caveats limit what the blending results say about training the wea
 - **The blending study's four headline comparisons are post hoc**, chosen after a first run's
   results, as the study page says.
 
-**CEDA's UKV archive carries four caveats as a training input.**
+**CEDA's UKV archive carries five caveats as a training input.**
 
 - CEDA's UKV is statistically different from the UKV the Met Office serves live. If the live
   service does not serve UKV, a weather-response model trained on CEDA's UKV never meets live UKV
@@ -320,8 +343,11 @@ to UKV. Three caveats limit what the blending results say about training the wea
 - The UKV fields fetched from CEDA so far hold 10 m wind and winds at 1000 hPa and 925 hPa, with
   no 100 m wind and no orography. Estimating hub-height wind from those levels needs orography,
   and the 1000 hPa level lies below ground in deep lows, which are the windy days.
-- CEDA's UKV archive lacks a small number of runs, and holds a few more only in part. ERA5 fills
-  those hours, which is part of ERA5's gap-filling role.
+- CEDA's UKV archive lacks a small number of runs, and holds a few more only in part. In the
+  study's window, 82 of 10,338 runs are missing, 15 are partial, and 260 were not listed on CEDA
+  when the stores were fetched.
+- The archive's catalogue record states the Creative Commons Attribution-NonCommercial-ShareAlike
+  4.0 licence. Whether training on it counts as non-commercial use is undecided.
 
 **Weather inferred from the DP models stays an estimate of past weather, with a circularity that
 bites in training and not at test time.**
@@ -372,10 +398,9 @@ pipeline.
 - **The product calibrator absorbing the weather-response model's errors**, such as demand drift.
   Keep date and calendar features out of the product calibrator, and measure the weather-response
   model's own error by fitting the same calibrator on estimate-of-past-weather inputs.
-- **An optimistic stand-in.** ECMWF ENS shares ERA5's IFS lineage, so in the ERA5 comparison arm a
-  calibrator mapping an ERA5-trained weather-response model onto ENS needs fewer months than a
-  calibrator mapping the same weather-response model onto a product from another weather-model
-  family.
+- **An optimistic stand-in.** ECMWF ENS shares ERA5's IFS lineage, so a calibrator mapping an
+  ERA5-trained weather-response model onto ENS needs fewer months than a calibrator mapping the same
+  weather-response model onto a product from another weather-model family.
 - **Season confounded with history length.** A calibrator fitted on the last 3 months before July
   sees only spring and early summer. The learning curve must be averaged over several start months.
 - **A change of feed.** Open-Meteo's ICON-EU may differ from Dynamical.org's ICON-EU.
@@ -422,10 +447,10 @@ the step is safe to ship.
   vocabulary](metrics-and-leaderboard.md#scoring-under-failure-scenarios)
   ([#437](https://github.com/openclimatefix/nged-substation-forecast/issues/437)) gain "one weather
   source absent" before that contract freezes?
-- **Which estimate of past weather, per variable.** CAMS for irradiance and CEDA's UKV early time
-  steps for the other variables is the plan, pending the checks against ERA5 described under [Which
-  estimate of past weather to train on](#which-estimate-of-past-weather-to-train-on). ERA5, weather
-  stations, weather satellites, and weather inferred from DP models are the alternatives. The best
+- **Which estimate of past weather, per variable.** CAMS for irradiance and ERA5 for the other
+  variables is the version-1 plan, with the evidence under [Which estimate of past weather to train
+  on](#which-estimate-of-past-weather-to-train-on). CEDA's UKV early time steps, weather stations,
+  weather satellites, and weather inferred from DP models are the alternatives. The best
   estimate may be a blend of several products. If it is, the weather-response model can either take
   every product's columns or take a weather-space blend (see [the blending
   caveats](#which-estimate-of-past-weather-to-train-on)).
@@ -548,9 +573,10 @@ ingests carry the connection dates needed to check.
   improvement from run-to-run variance.
 
 - ERA5 is a single frozen IFS cycle across the whole archive, so year-over-year comparison within it
-  is not contaminated by NWP system upgrades, which suits ERA5's role as the comparison arm. Our ENS
-  archive spans cycle changes, and CEDA's UKV spans the PS47 upgrade of 2026-01-21, so some apparent
-  drift in either is the weather model changing rather than the electricity network.
+  is not contaminated by NWP system upgrades, which suits ERA5's role as the estimate of past
+  weather. Our ENS archive spans cycle changes, and CEDA's UKV, were it ingested, would span the
+  PS47 upgrade of 2026-01-21, so some apparent drift in either is the weather model changing rather
+  than the electricity network.
 
 ## A staged-GRIB route fills three of the missing years without waiting for the Zarr backfill
 
@@ -594,17 +620,16 @@ Two details still worth tracking regardless of which route lands:
   in 2023-06 (18→9 km, within the staged bucket's complete-date range), and 49r1 in 2024-11. Each is
   an era boundary under the `study` skill.
 
-**The ERA5 ingest is needed whichever ENS backfill route lands.** ERA5 fills the gaps in CEDA's
-UKV archive and is the comparison arm, and capacity estimation and the [weather-abnormality
-climatology](xgboost-improvements.md#weather-abnormality-climatology-z-score-features) use ERA5.
+**The ERA5 ingest is needed whichever ENS backfill route lands.** ERA5 is the version-1 estimate of
+past weather for every variable except irradiance, and the [weather-abnormality
+climatology](xgboost-improvements.md#weather-abnormality-climatology-z-score-features) uses ERA5.
 
 ## Implementation details (deleted when this ships)
 
 Ordered, and deliberately not one PR. Steps 1–2 are the data layer; the rest are experiments.
 
 1. Ingest the estimates of past weather for 2020 to present, gap **and** overlap: CAMS for
-   irradiance and CEDA UKV for other variables, pending the checks against ERA5, with ERA5 for gap
-   filling and as a comparison arm (ERA5:
+   irradiance and ERA5 for other variables, which is the version-1 plan (ERA5:
    [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143)).
 2. Compute paired residual statistics of ENS minus each estimate of past weather on the overlap, per
    variable, per lead time, per season.
@@ -624,8 +649,8 @@ history](#a-new-weather-product-with-a-few-months-of-history)
 under `studies/`:
 
 1. Build the weather-response model at the nine metered generators, lag-free and out-of-fold over
-   month blocks, once per estimate of past weather under test (CAMS for irradiance and CEDA's UKV
-   early time steps for the other variables, with ERA5 as the comparison arm).
+   month blocks, once per estimate of past weather under test (CAMS for irradiance and ERA5 for the
+   other variables).
 2. Fit the power-space calibrator per technology, smooth in lead time, in capacity-factor units,
    censored at 0 and 1, and shrunk towards the ECMWF ENS calibrator, refitted on a rolling origin.
 3. Measure the learning curves on GEFS and ECMWF ENS, and on the blend of ECMWF ENS with AIFS-ENS,

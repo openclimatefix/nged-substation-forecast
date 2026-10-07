@@ -66,7 +66,7 @@ def wind_hourly_power(*, sites: pl.DataFrame, centred: bool = True) -> pl.DataFr
     holds the half-hours ending at T and at T + 30 min, which span T - 30 min to T + 30 min.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
         centred: Whether to centre the hour on its label; False gives the solar study's hour,
             ending at the label, for the `hour_ending` setting.
 
@@ -249,7 +249,7 @@ def joined(*, sites: pl.DataFrame, centred: bool = True) -> pl.DataFrame:
     """Join the hourly power to every product's wind on the site-hours all of them cover.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
         centred: Passed to `wind_hourly_power`.
 
     Returns:
