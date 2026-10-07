@@ -310,14 +310,26 @@ describes Breach as about 68 MW.
 **The table sums each published column over the single-site census BMUs that have a value, and the
 number of BMUs with a value is in brackets.** A project that two BMUs share is counted once in the
 TEC and REPD columns. A TEC sum is not comparable with a sum of Generation Capacity, for the
-reason in [Introduction](#introduction). The P99 of output is a measure of output and not a
-registered capacity, so the table leaves it out.
+reason in [Introduction](#introduction). The last two columns measure observed output over the 12
+months and are not registered capacities. The P99 of output is left out of the table.
 
-| Group (BMUs) | Generation Capacity (MW) | IGCPU installed (MW) | TEC (MW) | Largest MEL, 30 days (MW) | REPD installed (MW)
-|---|---|---|---|---|---|
-| All solar BMUs, hybrids included (10) | 682.9 (10) | 591.0 (8) | 733.8 (9) | 667.0 (10) | 730.6 (9)
-| BMUs at hybrid sites (9) | 633.0 (9) | 542.0 (7) | 683.8 (8) | 617.0 (9) | 680.7 (8)
-| BMU at the pure PV site (1) | 50.0 (1) | 49.0 (1) | 50.0 (1) | 50.0 (1) | 49.9 (1)
+| Group (BMUs) | Generation Capacity (MW) | IGCPU installed (MW) | TEC (MW) | Largest MEL, 30 days (MW) | REPD installed (MW) | Max of output (MW) | Highest combined output in one half-hour (MW) |
+|---|---|---|---|---|---|---|---|
+| All solar BMUs, hybrids included (10) | 682.9 (10) | 591.0 (8) | 733.8 (9) | 667.0 (10) | 730.6 (9) | 648.2 (10) | 593.5 |
+| BMUs at hybrid sites (9) | 633.0 (9) | 542.0 (7) | 683.8 (8) | 617.0 (9) | 680.7 (8) | 598.0 (9) | 543.4 |
+| BMU at the pure PV site (1) | 50.0 (1) | 49.0 (1) | 50.0 (1) | 50.0 (1) | 49.9 (1) | 50.1 (1) | 50.1 |
+
+**Max of output is a sum of separate peaks, so it overstates what a group delivered at once, and the
+highest combined output in one half-hour is the group's true peak.** Max of output adds each BMU's
+largest half-hourly output, and the BMUs' largest outputs fall in different half-hours. All 10 BMUs
+delivered 593.5 MW together in their best half-hour, against a sum of peaks of 648.2 MW. Both
+columns are observed output, not registered capacities, so neither is added to a registered-capacity
+column. A BMU's largest output can be curtailed or below its capacity, so max of output understates
+a BMU that never ran flat out: Kincraig adds 0.0 MW because it has no output. A reader who wants the
+most that a group delivered at once should take the highest combined output. A reader who wants a
+figure for each BMU should take max of output and read it as the most that BMU delivered in the 12
+months, not as its capacity. The highest combined output counts only the solar BMUs, and not the
+storage BMUs at the same sites. The aggregate BMUs have no such columns.
 
 **Of the nine BMUs at hybrid sites (eight sites), four have a storage BMU with output at their site,
 three (at two sites) have an operational battery in REPD, and two have storage planned or under

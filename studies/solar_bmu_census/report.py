@@ -144,6 +144,64 @@ def capacity_table(*, table: pl.DataFrame) -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
+def coincident_peak_mw(*, outputs: list[pl.DataFrame]) -> float:
+    """Return the highest sum of several BMUs' outputs in one half-hour, in megawatts.
+
+    The BMUs' half-hourly series are summed on their common `half_hour_end_time` index first. A BMU
+    with no row in a half-hour adds nothing to that half-hour.
+
+    Args:
+        outputs: One frame for each BMU, with columns `half_hour_end_time` and `output_mwh`.
+
+    Returns:
+        The maximum over time of the summed output in megawatts (the megawatt-hours times 2), or
+        0.0 when `outputs` holds no row.
+    """
+    if not outputs:
+        return 0.0
+    summed = (
+        pl.concat([output.select("half_hour_end_time", "output_mwh") for output in outputs])
+        .group_by("half_hour_end_time")
+        .agg(pl.col("output_mwh").sum())
+    )
+    return _as_float(summed["output_mwh"].max()) * 2
+
+
+def observed_power_table(*, table: pl.DataFrame, window_label: str) -> pl.DataFrame:
+    """Sum the BMUs' largest outputs, and find the group's highest combined output, per group.
+
+    Both columns measure observed output and are not registered capacities.
+
+    Args:
+        table: The census table's single-site rows.
+        window_label: The window's label in the file names.
+
+    Returns:
+        One row per group: the number of BMUs, the sum over the group's BMUs of each BMU's largest
+        half-hourly output (`largest_output_mw`) in MW, and the highest sum of the group's BMUs'
+        outputs in one half-hour in MW.
+    """
+    rows = []
+    for label, technology in GROUPS:
+        group = table if technology is None else table.filter(pl.col("technology") == technology)
+        outputs = [
+            pl.read_parquet(OUTPUT_DIR / f"{bmu}_{window_label}.parquet")
+            for bmu in group.sort("elexon_bmu_id")["elexon_bmu_id"]
+        ]
+        largest = [largest_output_mw(output=output) for output in outputs]
+        rows.append(
+            {
+                "group": label,
+                "bmus": group.height,
+                "max of output (MW)": round(sum(largest), 1),
+                "highest combined output in one half-hour (MW)": round(
+                    coincident_peak_mw(outputs=outputs), 1
+                ),
+            }
+        )
+    return pl.DataFrame(rows)
+
+
 def hour_centres(*, solar_ids: list[str], window_label: str) -> pl.DataFrame:
     """Return the output-weighted mean UTC hour of day, by season, over the given BMUs."""
     frames = [
@@ -1106,21 +1164,11 @@ def project_sums_table(
         storage_ids = [i for s in group["storage_bmu_ids"] for i in s.split(";") if i]
         solar_sum = _as_float(group["generation_capacity_mw"].sum())
         storage_sum = sum(capacity[i] for i in storage_ids)
-        outputs = pl.concat(
-            [
-                pl.read_parquet(OUTPUT_DIR / f"{bmu}_{window_label}.parquet").select(
-                    "half_hour_end_time", "output_mwh"
-                )
+        highest = coincident_peak_mw(
+            outputs=[
+                pl.read_parquet(OUTPUT_DIR / f"{bmu}_{window_label}.parquet")
                 for bmu in [*solar_ids, *storage_ids]
             ]
-        )
-        highest = (
-            _as_float(
-                outputs.group_by("half_hour_end_time")
-                .agg(pl.col("output_mwh").sum())["output_mwh"]
-                .max()
-            )
-            * 2
         )
         first = group.row(0, named=True)
         repd = first["repd_installed_capacity_mw"]
@@ -1293,6 +1341,13 @@ def main() -> None:
         + _md(to_inspect),
         "## Capacity values (single-site BMUs; columns are never added together)\n\n"
         + _md(capacity_table(table=single)),
+        "## Observed output of the single-site BMUs, by group (not registered capacities)\n\n"
+        "`max of output (MW)` is the sum over the group's BMUs of each BMU's largest half-hourly "
+        "output (`classify.largest_output_mw`), and the BMUs' largest outputs occur at different "
+        "times. `highest combined output in one half-hour (MW)` is the maximum over time of the "
+        "group's summed half-hourly output, so it never exceeds the first column. Neither column "
+        "is added to a registered capacity. The aggregate BMUs have no such columns.\n\n"
+        + _md(observed_power_table(table=single, window_label=window.label)),
         "## Aggregate BMUs (supplier, virtual, and other identifiers), reported apart\n\n"
         + aggregate_note,
         "## Output-weighted UTC hour of day, single-site BMUs that follow the sun\n\n"

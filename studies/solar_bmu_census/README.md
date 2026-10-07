@@ -45,6 +45,13 @@ was running in the window's first week), and without the half-hours of exactly z
 sun is clearly up. Zeros at night and negative readings stay in. The column is empty for a BMU with
 no judged output. It is never added to another column.
 
+**`report.py` prints two more measures of observed output for each group, and neither is a
+registered capacity.** `max of output (MW)` is the sum over the group's BMUs of each BMU's largest
+half-hourly output (`classify.largest_output_mw`). Because the BMUs' largest outputs fall in
+different half-hours, the sum overstates what the group delivered at once. `highest combined output
+in one half-hour (MW)` is the maximum over time of the group's summed half-hourly output
+(`report.coincident_peak_mw`). Neither is added to a registered capacity.
+
 ## The location columns
 
 **Six columns say where a BMU is, and none of them is a capacity.**
