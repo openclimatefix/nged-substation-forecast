@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import polars as pl
 import pytest
-from studies.trial_area import TrialAreaBox, load_trial_area_box, write_trial_area_box_from_roster
+from studies.trial_area import TrialAreaBox, load_trial_area_box, write_trial_area_box_from_metadata
 
 from studies import trial_area
 
@@ -23,7 +23,7 @@ def test_the_grid_covers_the_box_with_one_point_per_spacing_step():
     assert points["point_id"].to_list() == list(range(15))
 
 
-def test_the_box_written_from_a_roster_is_widened_by_the_margin_and_read_back(
+def test_the_box_written_from_a_site_list_is_widened_by_the_margin_and_read_back(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
     metadata_path = tmp_path / "metadata.parquet"
@@ -33,7 +33,7 @@ def test_the_box_written_from_a_roster_is_widened_by_the_margin_and_read_back(
         "contracts.settings.get_settings", lambda: SimpleNamespace(metadata_path=metadata_path)
     )
 
-    write_trial_area_box_from_roster(margin_deg=0.1)
+    write_trial_area_box_from_metadata(margin_deg=0.1)
     box = load_trial_area_box()
 
     assert json.loads((tmp_path / "weather" / "box.json").read_text()) == pytest.approx(

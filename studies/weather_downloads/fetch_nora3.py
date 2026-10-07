@@ -479,7 +479,7 @@ def main() -> int:
         request_description=(
             f"NORA3 hourly wind_speed and wind_direction at {heights_text}, OPeNDAP index-range "
             "slice of the grid's own x/y axes to the trial-area box (one grid cell's margin "
-            "around the NGED generator roster's own extent), whole calendar months"
+            "around the NGED list of generators' own extent), whole calendar months"
         ),
         variables=["wind_speed", "wind_direction"],
         extra={

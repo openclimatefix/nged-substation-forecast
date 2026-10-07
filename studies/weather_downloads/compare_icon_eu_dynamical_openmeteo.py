@@ -16,9 +16,9 @@ Each run costs one request per site group, two in total (six photovoltaic sites 
 own downloads used), so nine locations by four variables by 79 hours weighs nine calls.
 
 **Sites.** The nine study sites, labelled `A`-`F` and `W1`-`W3` only. Coordinates are read from the
-private roster at run time and held in memory. The nearest grid cell of the Dynamical.org store to
-each site is chosen in memory as well, and neither the coordinates nor the cell indices reach a file
-or a log line.
+private site list at run time and held in memory. The nearest grid cell of the Dynamical.org store
+to each site is chosen in memory as well, and neither the coordinates nor the cell indices reach a
+file or a log line.
 
 **Stages.** `runs` samples the runs and fetches both sides for each, checkpointing one parquet file
 per run. `stitch` answers the freshest-run question against Open-Meteo's Previous Runs API.
@@ -191,7 +191,7 @@ def _nearest_cell_indexers(*, store: xr.Dataset, sites: pl.DataFrame) -> dict[st
 
     Args:
         store: The opened store.
-        sites: The roster, carrying `site`, `latitude`, and `longitude`.
+        sites: The site list, carrying `site`, `latitude`, and `longitude`.
 
     Returns:
         Indexers for `latitude` and `longitude`, both along a `site` dimension.
@@ -325,7 +325,7 @@ def _open_meteo_blocks(
 
     Args:
         url: The customer endpoint.
-        sites: One `cell_selection` group of the roster.
+        sites: One `cell_selection` group of the site list.
         extra_query: The query string tail selecting the run or the date range, without `&`.
         variables: The hourly variables, with any `_previous_dayN` suffixes.
         model: The `models=` value.
@@ -363,7 +363,7 @@ def _single_run_frame(*, sites: pl.DataFrame, init_time: np.datetime64) -> pl.Da
     """Fetch one ICON-EU run from Open-Meteo's Single Runs API at every site.
 
     Args:
-        sites: The roster with `cell_selection`.
+        sites: The site list with `cell_selection`.
         init_time: The run to request.
 
     Returns:

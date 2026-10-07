@@ -197,7 +197,7 @@ data recency* rather than on whether the asset materialised. It flags any time s
 recent reading is more than 24 hours old, and its metadata carries a table of the late series with
 `last_seen` and `hours_late`. A warning therefore never stops forecasts being produced; it tells you
 which feed to chase. A handful of persistently-late series is usually a decommissioned or renamed
-substation rather than an outage — check the roster before escalating.
+substation rather than an outage — check the metadata table before escalating.
 
 That table is capped at 50 rows
 ([why](../architecture/production-deployment.md#warn-on-stale-power-data-with-a-dagster-asset-check)).
@@ -207,10 +207,11 @@ are looking at every late series and the two differing means the list is truncat
 appears on the live-forecast check as `n_time_series_missing` and `n_time_series_missing_listed`.
 
 Mind the order when it *is* truncated: never-reported series come first, then the most-stale ones,
-so a roster with more than 50 never-reported series fills the table and no stale series appears in
-it at all. Read `n_stale` and `n_never_reported` — never truncated — before concluding from the
-table that nothing has gone stale. All three counts, and `n_series_total` beside them, describe the
-series the check is *watching*: the silenced series below are excluded from every one of them.
+so a metadata table with more than 50 never-reported series fills the table and no stale series
+appears in it at all. Read `n_stale` and `n_never_reported` — never truncated — before concluding
+from the table that nothing has gone stale. All three counts, and `n_series_total` beside them,
+describe the series the check is *watching*: the silenced series below are excluded from every
+one of them.
 
 **Silencing a series we know is out of service.** `_SILENCED_TIME_SERIES_IDS` in
 `src/nged_substation_forecast/defs/checks.py` lists the `time_series_id`s the check ignores, so an
@@ -267,21 +268,21 @@ has changed.
 the new cleaned table was written and only deleting the superseded files failed. A vacuum failure
 also reaches Sentry tagged `degraded_asset:clean_nged_power_data`.
 
-**Reading a failed roster upsert.** `metadata_upsert_failed` in `power_time_series_and_metadata`'s
-run metadata means the `TimeSeriesMetadata` roster upsert raised and was swallowed so the power
-write could go ahead, and it also reaches Sentry tagged
-`degraded_asset:power_time_series_and_metadata`. The run **succeeds** by design: the roster is
-derived data that NGED re-delivers, and the power time series is not, so a roster fault must not
-stall the ingest until an operator intervenes. The roster is left unchanged and the next run that
-finds new files retries it, but *that run's* metadata change is lost, because the power rows have
-landed and `select_new_rows` will not offer those files again. Read the traceback in the run's logs
-— an off-contract roster after a schema change and a bug in our own code both land here, and both
-want a fix rather than a re-run.
+**Reading a failed metadata table upsert.** `metadata_upsert_failed` in
+`power_time_series_and_metadata`'s run metadata means the `TimeSeriesMetadata` table upsert raised
+and was swallowed so the power write could go ahead, and it also reaches Sentry tagged
+`degraded_asset:power_time_series_and_metadata`. The run **succeeds** by design: the metadata table
+is derived data that NGED re-delivers, and the power time series is not, so a metadata table fault
+must not stall the ingest until an operator intervenes. The metadata table is left unchanged and the
+next run that finds new files retries it, but *that run's* metadata change is lost, because the
+power rows have landed and `select_new_rows` will not offer those files again. Read the traceback in
+the run's logs — an off-contract metadata table after a schema change and a bug in our own code both
+land here, and both want a fix rather than a re-run.
 
 The 6-hourly forecasts are unaffected while this persists, however long it persists:
-`live_forecasts` locates each series from the promoted model's own frozen copy of the roster rows it
-trained against, never from the roster itself. What a stalled upsert loses is the metadata change,
-which matters at the next training run.
+`live_forecasts` locates each series from the promoted model's own frozen copy of the metadata table
+rows it trained against, never from the metadata table itself. What a stalled upsert loses is the
+metadata change, which matters at the next training run.
 
 **Reading a missing NWP control member.** A Sentry event tagged `degraded_asset:live_forecasts`
 whose message names an NWP run means that run reached us with no control-member rows

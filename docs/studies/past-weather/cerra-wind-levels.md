@@ -117,7 +117,7 @@ the CERRA time, and any hour holding a half-hour of exactly zero is dropped, fro
 so that every column set is scored on the same rows. The wind farms appear only as W1 to W3. Each
 farm reads CERRA at its nearest grid cell, and the loader stops if that cell sits on the edge of the
 downloaded crop. The 3-hourly rows mean `hour_of_day` takes only 8 values. Each farm's capacity is
-the `effective_capacity_mw` column of the roster metadata (`NGED/metadata.parquet`, last written on
+the `effective_capacity_mw` column of the metadata table (`NGED/metadata.parquet`, last written on
 5 September 2026), one 99th-percentile value per farm over its whole observed history.
 
 **Each XGBoost model is fitted per wind farm, on two shared features plus five wind columns.** The
@@ -370,7 +370,7 @@ only.** The farms share their weather, so the intervals resample months and seed
   stream boundary dates in the parts read.
 - **The four post hoc comparisons were chosen after the results were seen,** and no exploratory row
   is corrected for multiple comparisons.
-- **Each farm's capacity is one value from the roster metadata,** computed over the farm's whole
+- **Each farm's capacity is one value from the metadata table,** computed over the farm's whole
   history, including the months a fold holds out.
 
 ## Scope

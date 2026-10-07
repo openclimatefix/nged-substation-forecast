@@ -271,8 +271,10 @@ def test_upsert_metadata_returns_diff(tmp_path: Path):
     )
 
 
-def _roster(ids: list[int], name: str = "ID", **extra: object) -> pt.DataFrame[TimeSeriesMetadata]:
-    """A valid roster covering ``ids``, plus any ``extra`` columns applied to every row."""
+def _metadata_table(
+    ids: list[int], name: str = "ID", **extra: object
+) -> pt.DataFrame[TimeSeriesMetadata]:
+    """A valid metadata table covering ``ids``, plus any ``extra`` columns applied to every row."""
     rows = [
         {
             "time_series_id": i,
@@ -292,15 +294,15 @@ def _roster(ids: list[int], name: str = "ID", **extra: object) -> pt.DataFrame[T
     return pt.DataFrame(rows).set_model(TimeSeriesMetadata).cast().validate()
 
 
-def test_upsert_metadata_adds_a_new_id_when_the_stored_roster_is_thinner(tmp_path: Path):
+def test_upsert_metadata_adds_a_new_id_when_the_stored_metadata_table_is_thinner(tmp_path: Path):
     """The diff is derived by slicing the concatenated frame, so it must split back into exactly
-    the snapshot's rows and the stored roster's rows. Getting that boundary wrong loses a
-    whole time series silently: it never enters the roster, the stats claim nothing was new,
+    the snapshot's rows and the stored metadata_table's rows. Getting that boundary wrong loses a
+    whole time series silently: it never enters the metadata table, the stats claim nothing was new,
     and `select_new_rows` never re-offers the file, so it never arrives at all."""
     metadata_path = tmp_path / "metadata.parquet"
-    _roster([1]).write_parquet(metadata_path)
+    _metadata_table([1]).write_parquet(metadata_path)
 
-    stats = upsert_metadata(new_metadata=_roster([1, 2]), metadata_path=str(metadata_path))
+    stats = upsert_metadata(new_metadata=_metadata_table([1, 2]), metadata_path=str(metadata_path))
 
     assert stats["metadata_n_new_TimeSeriesIDs"] == 1
     assert stats["metadata_n_updated_TimeSeriesIDs"] == 0
@@ -309,14 +311,14 @@ def test_upsert_metadata_adds_a_new_id_when_the_stored_roster_is_thinner(tmp_pat
 
 def test_upsert_metadata_merges_a_snapshot_missing_the_optional_columns(tmp_path: Path):
     """`TimeSeriesMetadata` has four `allow_missing` fields, so a snapshot can be narrower than
-    the stored roster and still validate. Merging the two must not raise: a field the snapshot
-    no longer carries is *cleared* for the series the snapshot covers, while a series the
+    the stored metadata table and still validate. Merging the two must not raise: a field the
+    snapshot no longer carries is *cleared* for the series the snapshot covers, while a series the
     snapshot omits keeps every value it already had."""
     metadata_path = tmp_path / "metadata.parquet"
-    _roster([1, 2], information="note").write_parquet(metadata_path)
+    _metadata_table([1, 2], information="note").write_parquet(metadata_path)
 
     # This run's snapshot covers id 2 only, and carries no `information` column at all.
-    snapshot = _roster([2], name="Renamed")
+    snapshot = _metadata_table([2], name="Renamed")
     assert "information" not in snapshot.columns
     upsert_metadata(new_metadata=snapshot, metadata_path=str(metadata_path))
 
@@ -328,14 +330,14 @@ def test_upsert_metadata_merges_a_snapshot_missing_the_optional_columns(tmp_path
 
 
 def test_upsert_metadata_ignores_the_stored_column_order(tmp_path: Path):
-    """`hash_rows` is column-order sensitive, so a stored roster whose columns happen to sit in a
-    different order must not be reported as wholly changed and rewritten every run."""
+    """`hash_rows` is column-order sensitive, so a stored metadata table whose columns happen to sit
+    in a different order must not be reported as wholly changed and rewritten every run."""
     metadata_path = tmp_path / "metadata.parquet"
-    roster = _roster([1, 2])
-    roster.select(sorted(roster.columns)).write_parquet(metadata_path)
+    metadata_table = _metadata_table([1, 2])
+    metadata_table.select(sorted(metadata_table.columns)).write_parquet(metadata_path)
     mtime_before = metadata_path.stat().st_mtime_ns
 
-    stats = upsert_metadata(new_metadata=roster, metadata_path=str(metadata_path))
+    stats = upsert_metadata(new_metadata=metadata_table, metadata_path=str(metadata_path))
 
     assert stats["metadata_n_new_TimeSeriesIDs"] == 0
     assert stats["metadata_n_updated_TimeSeriesIDs"] == 0

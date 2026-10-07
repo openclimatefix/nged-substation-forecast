@@ -1,11 +1,11 @@
 # NGED JSON Data
 
 This package reads NGED's telemetry JSON files from S3 and parses them into the `PowerTimeSeries`
-and `TimeSeriesMetadata` schemas (see `contracts`). The metadata roster is the only file this
+and `TimeSeriesMetadata` schemas (see `contracts`). The metadata table is the only file this
 package owns and writes; the parsed power observations are handed back to the caller, which appends
 them to the `power_time_series` Delta table (see [Usage](#usage) below). `nged_data.storage`'s
 module docstring, below on this page, says which functions read that Delta table and which write the
-roster.
+metadata table.
 
 ## Public surface
 

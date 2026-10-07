@@ -106,7 +106,7 @@ three farms has at least 15,950 of them. A farm-hour's power is the mean of the 
 readings in the hour centred on the CERRA time, and any hour holding a half-hour of exactly zero is
 dropped, from the target alone, so that every column set is scored on the same rows. The wind farms
 appear only as W1 to W3. Each farm reads CERRA at its nearest grid cell. Each farm's capacity is the
-`effective_capacity_mw` column of the roster table used by the previous study. Each XGBoost model
+`effective_capacity_mw` column of the site list used by the previous study. Each XGBoost model
 is trained on some blocks of whole months and scored on the others, in 5 folds per farm. The 2,000
 resamples of whole calendar months, each with one of three fitting seeds, give the 95% intervals.
 Every fit ran on the CPU, with no column subsampling and no early stopping, and the study made
@@ -367,7 +367,7 @@ only.** The farms share their weather, so the intervals resample months and seed
   dates, and the study compared calendar years instead of searching for a step.
 - **The 3-hourly rows hold 8 values of `hour_of_day`,** so the XGBoost models see fewer rows than an
   hourly study would give them.
-- **Each farm's capacity is one value from the roster table** used by the previous study,
+- **Each farm's capacity is one value from the site list** used by the previous study,
   computed over the farm's whole history, including the months a fold holds out.
 - **The fits ran on the CPU.** Another device would give slightly different numbers.
 

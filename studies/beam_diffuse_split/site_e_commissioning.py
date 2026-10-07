@@ -96,7 +96,7 @@ def _day(*, text: str) -> pl.Series:
 
 
 def _subject_export_cap() -> pl.DataFrame:
-    """Read the subject site's export cap, finding its file through the label roster.
+    """Read the subject site's export cap, finding its file through the label list.
 
     The cap files are named by `time_series_id`, so the path is derived rather than written down:
     a literal identifier here would pair a public label with a generator's identifier.
@@ -134,8 +134,8 @@ def _half_hourly_gain() -> pl.DataFrame:
         .agg(pl.col("effective_capacity_mw").last())
         .collect()
     )
-    # `pv_sites` is the one roster query, so this figure cannot label a generator differently from
-    # the frames the arms are scored on.
+    # `pv_sites` is the one site list query, so this figure cannot label a generator differently
+    # from the frames the arms are scored on.
     sites = pv_sites().select("time_series_id", "site")
     power = (
         pl.scan_delta(str(REPO_DATA_DIR / "NGED" / "power_time_series.delta"))

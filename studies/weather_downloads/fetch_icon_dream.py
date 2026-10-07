@@ -29,7 +29,7 @@ model levels, referenced to height-above-ground through `HHL` in
 that belongs in `packages/studies/`, not in this download script. This script keeps the raw
 per-level values so that interpolation step has every level to work from.
 
-**Date range defaults to the metered wind roster's own coverage, not the product's full span.**
+**Date range defaults to the metered wind site list's own coverage, not the product's full span.**
 ICON-DREAM-EU runs 2010-01 to 2026-08, but NGED's metered wind generators only start 2019-09-17, so
 `main`'s `--start-year-month`/`--end-year-month` are meant to be passed as `201909`/`202609` (or
 later, once measured) rather than the product's full range — there is no metered wind to compare
@@ -269,7 +269,7 @@ def _write_docs(
         request_description=(
             f"ICON-DREAM-EU {variable}, whole-domain monthly GRIB downloaded then cropped to "
             f"{cell_indices.size} ICON grid cells inside the trial-area box (a few grid cells' "
-            f"margin around the NGED generator roster's own extent) using "
+            f"margin around the NGED list of generators' own extent) using "
             f"ICON-DREAM-EU_grid.nc; the whole-domain file is deleted immediately after "
             f"cropping. Values cast to Float32 and rounded to {NWP_SIGNIFICAND_BITS} "
             f"significand bits before writing, matching delta_store.nwp's production "

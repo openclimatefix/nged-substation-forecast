@@ -266,7 +266,7 @@ def synthetic_icon_dream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> pl.
         monkeypatch: pytest's monkeypatch fixture.
 
     Returns:
-        The one-row wind roster, `site="W1"`.
+        The one-row wind site list, `site="W1"`.
     """
     for kind, name in (
         ("ws", wind_icon_dream.WS_FILE),
@@ -339,7 +339,7 @@ def test_icon_dream_common_rows_drops_the_zero_hour_and_matches_on_time(
     its hub-level columns null instead of dropping the row.
 
     Args:
-        synthetic_icon_dream: The wind roster, with ICON-DREAM-EU parquets written.
+        synthetic_icon_dream: The wind site list, with ICON-DREAM-EU parquets written.
         monkeypatch: pytest's monkeypatch fixture.
     """
     sites = synthetic_icon_dream

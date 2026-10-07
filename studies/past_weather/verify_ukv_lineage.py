@@ -30,7 +30,7 @@ The comparison is against the `_instant` columns, never the default hourly ones.
 holds an instantaneous snapshot; Open-Meteo's default is a backward-looking hourly mean derived from
 it. Comparing the mean against the snapshot would make a faithful mirror look broken.
 
-Coordinates are read at run time from the private roster and never written: the table names
+Coordinates are read at run time from the private site list and never written: the table names
 anonymised site labels and differences in W m⁻².
 
 Run it with `uv run --with netcdf4 python
@@ -195,7 +195,7 @@ def _read_native_at_sites(
         valid_time: The instant to read.
         lead_hours: Which run's copy of that instant to read.
         flux: `ghi` or `bhi`.
-        sites: The roster, carrying `site`, `latitude`, and `longitude`.
+        sites: The site list, carrying `site`, `latitude`, and `longitude`.
 
     Returns:
         The flux in W m⁻² at each site's nearest grid cell, or `None` if the bucket has no such
@@ -255,7 +255,7 @@ def _sample_instants(
 ) -> list[SampledInstant]:
     """Choose the clearest and the broken-cloud instants from one era's served rows.
 
-    An instant qualifies only where the whole roster agrees about the sky, so that all six meters
+    An instant qualifies only where the whole site list agrees about the sky, so that all six meters
     are sampled under the condition the stratum names rather than one of them.
 
     Args:
@@ -295,7 +295,7 @@ def _sample_instants(
             _LOG.warning("no %s instant in the %s window", sky, era)
             continue
         _LOG.info(
-            "%s %s: %d instants, roster-minimum clearness %.2f to %.2f",
+            "%s %s: %d instants, minimum-over-sites clearness %.2f to %.2f",
             era,
             sky,
             candidates.height,
@@ -317,7 +317,7 @@ def _compare_one(
     Args:
         instant: The valid time and its stratum.
         served: The era's served rows.
-        sites: The roster, carrying `site`, `latitude`, and `longitude`.
+        sites: The site list, carrying `site`, `latitude`, and `longitude`.
 
     Returns:
         One record per (lead, flux) with the median and worst absolute difference across sites.

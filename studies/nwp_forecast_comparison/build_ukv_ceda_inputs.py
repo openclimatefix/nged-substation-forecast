@@ -12,8 +12,8 @@ write-once `--output-dir`. It never writes to the published folder or the store.
 (`studies.ifs_single_runs.served_lead_hours` with `run_hour=3`), from 21 to 117 hours over days 1 to
 4. Day 5 cannot be built: its lead exceeds the store's 120 hours for every hour after 03:00 UTC.
 
-**Each site reads its nearest 2 km cell.** The match uses the private roster
-(`ens_forecast_horizons.site_roster`) and `studies.grid_sampling.nearest_cells`, and no coordinate
+**Each site reads its nearest 2 km cell.** The match uses the private site list
+(`ens_forecast_horizons.site_list`) and `studies.grid_sampling.nearest_cells`, and no coordinate
 is printed or written.
 
 **The store holds hourly steps to lead 48 hours, then 51 and 54, then every third hour to 120.**
@@ -444,12 +444,12 @@ def read_cells(
     return output
 
 
-def nearest_cell_indices(*, store: StoreRead, roster: pl.DataFrame) -> dict[str, int]:
+def nearest_cell_indices(*, store: StoreRead, site_list: pl.DataFrame) -> dict[str, int]:
     """Return each site's nearest cell, as an index into the store's flat cell axis.
 
     Args:
         store: The opened store, whose private cell centres are read and never printed.
-        roster: The sites, carrying `site`, `latitude`, and `longitude`.
+        site_list: The sites, carrying `site`, `latitude`, and `longitude`.
 
     Returns:
         Each site label to its cell index.
@@ -462,7 +462,7 @@ def nearest_cell_indices(*, store: StoreRead, roster: pl.DataFrame) -> dict[str,
     cells = pl.DataFrame(
         {"cell_id": np.arange(len(latitude)), "latitude": latitude, "longitude": longitude}
     )
-    nearest = nearest_cells(sites=roster, cells=cells)
+    nearest = nearest_cells(sites=site_list, cells=cells)
     too_far = nearest.filter(pl.col("distance_km") > CELL_DISTANCE_LIMIT_KM)
     if too_far.height:
         msg = f"sites {too_far['site'].to_list()} lie outside the store's cells"
@@ -541,7 +541,7 @@ def solar_hourly(
         slots: The runs' slots.
         series: Each store variable to its array from `read_cells`, cells in `sites` order.
         sites: The site labels, in the cells' order.
-        coordinates: Each site's latitude and longitude, read from the private roster.
+        coordinates: Each site's latitude and longitude, read from the private site list.
         run_hour: The UTC hour at which every run starts.
 
     Returns:
@@ -1067,12 +1067,14 @@ def build_domain(
     """
     keys = candidates.select("site", "time")
     sites = sorted(keys["site"].unique().to_list())
-    roster = efh.site_roster(domain=domain).filter(pl.col("site").is_in(sites)).sort("site")
-    if roster["site"].to_list() != sites:
-        msg = f"{domain}: the roster lacks sites {sorted(set(sites) - set(roster['site']))}"
+    site_list = efh.site_list(domain=domain).filter(pl.col("site").is_in(sites)).sort("site")
+    if site_list["site"].to_list() != sites:
+        msg = f"{domain}: the site list lacks sites {sorted(set(sites) - set(site_list['site']))}"
         raise ValueError(msg)
-    cells = nearest_cell_indices(store=store, roster=roster)
-    coordinates = {site: (latitude, longitude) for site, latitude, longitude in roster.iter_rows()}
+    cells = nearest_cell_indices(store=store, site_list=site_list)
+    coordinates = {
+        site: (latitude, longitude) for site, latitude, longitude in site_list.iter_rows()
+    }
     slots = sorted(
         {
             int(slot)

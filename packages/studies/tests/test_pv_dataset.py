@@ -23,7 +23,7 @@ def _serve_tables(
     tmp_path: Path,
     series: dict[int, tuple[str, int, list[float]]],
 ) -> None:
-    """Point the roster readers at synthetic tables.
+    """Point the site list readers at synthetic tables.
 
     Args:
         monkeypatch: The pytest fixture, used to swap the metadata path and the Delta scan.
@@ -70,7 +70,7 @@ def _serve_tables(
     monkeypatch.setattr(pl, "scan_delta", lambda uri, **_: tables[str(uri)])
 
 
-def test_the_pv_roster_labels_the_long_enough_pv_series_with_their_latest_capacity(
+def test_the_pv_site_list_labels_the_long_enough_pv_series_with_their_latest_capacity(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
     series = {
@@ -81,32 +81,32 @@ def test_the_pv_roster_labels_the_long_enough_pv_series_with_their_latest_capaci
     series[9] = ("PV", MIN_ROWS + 1, [])  # no capacity recorded
     _serve_tables(monkeypatch=monkeypatch, tmp_path=tmp_path, series=series)
 
-    roster = pv_dataset.pv_sites()
+    site_list = pv_dataset.pv_sites()
 
-    assert roster["time_series_id"].to_list() == [1, 2, 3, 4, 5, 6]
-    assert roster["effective_capacity_mw"].to_list() == [11.0, 12.0, 13.0, 14.0, 15.0, 16.0]
+    assert site_list["time_series_id"].to_list() == [1, 2, 3, 4, 5, 6]
+    assert site_list["effective_capacity_mw"].to_list() == [11.0, 12.0, 13.0, 14.0, 15.0, 16.0]
     expected_labels = site_labels_for(
         eligible_ids=[1, 2, 3, 4, 5, 6], labels=SITE_LABELS, seed=LABEL_PERMUTATION_SEED
     )
-    assert dict(roster.select("time_series_id", "site").iter_rows()) == expected_labels
+    assert dict(site_list.select("time_series_id", "site").iter_rows()) == expected_labels
 
 
-def test_the_wind_roster_labels_only_the_wind_series_with_the_wind_seed(
+def test_the_wind_site_list_labels_only_the_wind_series_with_the_wind_seed(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
     series = {identifier: ("Wind", MIN_ROWS + 1, [3.0]) for identifier in range(1, 4)}
     series[4] = ("PV", MIN_ROWS + 1, [5.0])
     _serve_tables(monkeypatch=monkeypatch, tmp_path=tmp_path, series=series)
 
-    roster = pv_dataset.wind_sites()
+    site_list = pv_dataset.wind_sites()
 
     expected_labels = site_labels_for(
         eligible_ids=[1, 2, 3], labels=WIND_SITE_LABELS, seed=WIND_LABEL_PERMUTATION_SEED
     )
-    assert dict(roster.select("time_series_id", "site").iter_rows()) == expected_labels
+    assert dict(site_list.select("time_series_id", "site").iter_rows()) == expected_labels
 
 
-def test_hourly_power_is_period_ending_and_covers_only_the_roster(
+def test_hourly_power_is_period_ending_and_covers_only_the_site_list(
     monkeypatch: pytest.MonkeyPatch,
 ):
     half_hours = [START + timedelta(minutes=30 * step) for step in range(1, 5)]
@@ -118,9 +118,9 @@ def test_hourly_power_is_period_ending_and_covers_only_the_roster(
         }
     )
     monkeypatch.setattr(pl, "scan_delta", lambda uri, **_: power.lazy())
-    roster = pl.DataFrame({"time_series_id": [1], "site": ["A"]})
+    site_list = pl.DataFrame({"time_series_id": [1], "site": ["A"]})
 
-    hourly = pv_dataset.solar_hourly_power(sites=roster)
+    hourly = pv_dataset.solar_hourly_power(sites=site_list)
 
     assert hourly.sort("time").to_dicts() == [
         {

@@ -1,8 +1,8 @@
 """The private latitude and longitude box around the NGED trial area, held in memory only.
 
-The box comes from the private generator roster, so no bound is ever printed, logged, or committed.
-Every gridded weather download takes its extent from `load_trial_area_box`, and the past-weather
-studies that fetch their own grid read it from here as well.
+The box comes from the private list of generators, so no bound is ever printed, logged, or
+committed. Every gridded weather download takes its extent from `load_trial_area_box`, and the
+past-weather studies that fetch their own grid read it from here as well.
 """
 
 import json
@@ -62,23 +62,23 @@ def load_trial_area_box() -> TrialAreaBox:
 
     Raises:
         FileNotFoundError: If the box has not been derived yet (see
-            `write_trial_area_box_from_roster` below, run once per checkout).
+            `write_trial_area_box_from_metadata` below, run once per checkout).
     """
     path = existing_or_legacy(current=TRIAL_AREA_BOX_PATH, legacy=LEGACY_TRIAL_AREA_BOX_PATH)
     bounds = json.loads(path.read_text())
     return TrialAreaBox(**bounds)
 
 
-def write_trial_area_box_from_roster(*, margin_deg: float = 0.15) -> None:
-    """Derive the trial-area box from the private generator roster and write it to disk.
+def write_trial_area_box_from_metadata(*, margin_deg: float = 0.15) -> None:
+    """Derive the trial-area box from the private list of generators and write it to disk.
 
-    Run once per checkout (or whenever the roster changes). The box is the roster's own lat/lon
-    extent, widened by `margin_deg` on every side — a few grid cells at the 9 km-to-25 km spacing
-    of the coarser products this issue downloads. Nothing here prints or returns the bounds; they
-    are read back only through `load_trial_area_box`.
+    Run once per checkout (or whenever the site list changes). The box is the site list's own
+    lat/lon extent, widened by `margin_deg` on every side — a few grid cells at the 9 km-to-25 km
+    spacing of the coarser products this issue downloads. Nothing here prints or returns the bounds;
+    they are read back only through `load_trial_area_box`.
 
     Args:
-        margin_deg: How far to widen the roster's own bounding box on every side, in degrees.
+        margin_deg: How far to widen the site list's own bounding box on every side, in degrees.
     """
     from contracts.settings import get_settings
 

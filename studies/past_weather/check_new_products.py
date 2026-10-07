@@ -28,7 +28,7 @@ minutes early.
   divide by.
 - **Where the hour-to-hour jumps fall, in 2 m temperature.** The same second-difference method, on
   each of the four models fetched at a single site (`sources.temperature_site_b_path_for`) rather
-  than the panel's whole roster. Temperature is served around the clock, so this table needs no
+  than the panel's whole site list. Temperature is served around the clock, so this table needs no
   daylight restriction, which is why it resolves a cadence the daylight-only radiation table above
   cannot. Temperature carries its own diurnal cycle, though: a smooth afternoon warming raises the
   whole-day-median ratio from 12 to 18 UTC for every product, which can absorb a run switch that
@@ -115,7 +115,7 @@ def _with_geometry(*, frame: pl.DataFrame, sites: pl.DataFrame) -> pl.DataFrame:
 
     Args:
         frame: One product's per-site frame, with `site`, `time`, `ghi_w_m2` and `bhi_w_m2`.
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        sites: The site list, carrying `site`, `latitude` and `longitude`.
 
     Returns:
         `frame` with `solar_zenith_deg`, `extraterrestrial_horizontal_w_m2` and `clearness_index`.
@@ -153,7 +153,7 @@ def _timing_lines(
 
     Args:
         frames: Each product's per-site frame.
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        sites: The site list, carrying `site`, `latitude` and `longitude`.
 
     Returns:
         Markdown lines, ending with every failure, and the failures themselves.

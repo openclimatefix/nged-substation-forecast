@@ -228,14 +228,14 @@ def test_power_time_series_and_metadata_ingests_and_writes(
 
 
 @pytest.mark.parametrize("raised", [RuntimeError, BaseException], ids=["exception", "rust_panic"])
-def test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fails(
+def test_power_time_series_and_metadata_writes_power_when_the_metadata_upsert_fails(
     raised: type[BaseException],
     env: Path,
     monkeypatch: pytest.MonkeyPatch,
     dagster_instance: DagsterInstance,
 ) -> None:
-    """The headline property of #508: the roster is derived data NGED re-delivers, so a fault in it
-    must not stall the power stream until an operator intervenes.
+    """The headline property of #508: the metadata table is derived data NGED re-delivers,
+    so a fault in it must not stall the power stream until an operator intervenes.
 
     Also asserts the degradation is *reported*, since a step that no longer fails no longer fires
     ``sentry_capture_failure``. The ``rust_panic`` case is why the guard catches
@@ -250,7 +250,7 @@ def test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fail
     )
 
     def boom(*_: object, **__: object) -> None:
-        raise raised("roster upsert exploded")
+        raise raised("metadata table upsert exploded")
 
     monkeypatch.setattr(target=assets, name="upsert_metadata", value=boom)
     reported: list[tuple[str, BaseException]] = []
@@ -284,7 +284,7 @@ def test_power_time_series_and_metadata_re_raises_a_cancelled_run(
 ) -> None:
     """The one thing the guard must *not* swallow. Cancellation lands in the same
     ``BaseException`` net as a panic, so the handler re-raises it explicitly: a run the
-    operator cancelled has to stop, not finish green having quietly skipped the roster."""
+    operator cancelled has to stop, not finish green having quietly skipped the metadata table."""
     monkeypatch.setattr(
         target=assets.Settings,
         name="get_nged_s3_store",

@@ -75,8 +75,8 @@ ordinary jitter, while 24 hours still catches a multi-slot stall within the day.
 
 The check is attached to `power_time_series_and_metadata`, so the existing hourly schedule runs it
 every hour with no extra wiring. The check reports two kinds of lateness: a series that once
-reported but has now gone **stale**, and a roster series (present in the `TimeSeriesMetadata`
-parquet) that has **never** sent data. The count of each, plus a table of the offending
+reported but has now gone **stale**, and a series in the `TimeSeriesMetadata`
+parquet that has **never** sent data. The count of each, plus a table of the offending
 `time_series_id`s, lands in the check's Dagster metadata. That table is **capped** at 50 rows,
 because an uncapped listing writes thousands of rows into Dagster's event log every hour a
 whole-feed stall lasts. That log is durable storage — Postgres in the AWS deployment, `pg_dump`ed to
@@ -130,12 +130,12 @@ channel](../design-philosophy/inherent-stability.md#three-audiences-three-channe
 `_SILENCED_TIME_SERIES_IDS` in `defs/checks.py` names the `time_series_id`s the check ignores.
 
 **The silenced ids are removed from the check's inputs, not from its output.**
-`evaluate_power_freshness` drops them from the coverage frame and the roster before it classifies
-anything, so `n_stale`, `n_never_reported`, `n_series_total`, and the late table all describe the
-series we are still watching, with no arithmetic anywhere to get wrong. Dropping the silenced ids
-before classification also means the Sentry warning inherits the silencing without knowing silencing
-exists: `report_power_freshness` is handed the same result and returns early on a healthy result, so
-a feed whose only late series are silenced sends no event.
+`evaluate_power_freshness` drops them from the coverage frame and the metadata table before it
+classifies anything, so `n_stale`, `n_never_reported`, `n_series_total`, and the late table all
+describe the series we are still watching, with no arithmetic anywhere to get wrong. Dropping the
+silenced ids before classification also means the Sentry warning inherits the silencing without
+knowing silencing exists: `report_power_freshness` is handed the same result and returns early on a
+healthy result, so a feed whose only late series are silenced sends no event.
 
 **A returning series turns the check yellow rather than being removed automatically.** The list is
 source code shipped read-only in the container image, so the check could not edit it. A check that
@@ -210,8 +210,8 @@ Beyond that shared pattern, this check salvages more before falling back on the 
 absent `power_forecasts` or NWP table reads as empty, and an absent *or unreadable* promoted-model
 `meta.json` degrades to "population unknown", so the rest of the report survives. (A read *error* on
 either table still voids the whole report.) `power_data_is_fresh` deliberately salvages nothing —
-its only per-read fallback would be "roster unknown", which a fresh power table would then render as
-a green tick over a corrupt roster.
+its only per-read fallback would be "metadata table unknown", which a fresh power table would then
+render as a green tick over a corrupt metadata table.
 
 The check covers the slots where the asset *succeeded*. A slot whose asset raised never reaches it —
 Dagster does not run a check whose asset op failed — and that case is already loud, so nothing is
@@ -270,9 +270,9 @@ configured — so laptops and CI stay silent by default.
     covers exactly that gap: each check's catch-all sends the same exception the hook would have
     sent, tagged `asset_check` with the check's name, and `report_asset_degradation` does the same
     tagged `degraded_asset` for an *asset* that degrades rather than failing — today,
-    `power_time_series_and_metadata`'s roster upsert. Since log capture is off, either handler's
-    `ERROR` log alone would reach nobody. `power_time_series_and_metadata_job` compounds that
-    silence: it has no cron monitor of its own. Absent `report_check_degradation`, a check that
+    `power_time_series_and_metadata`'s metadata table upsert. Since log capture is off, either
+    handler's `ERROR` log alone would reach nobody. `power_time_series_and_metadata_job` compounds
+    that silence: it has no cron monitor of its own. Absent `report_check_degradation`, a check that
     cannot read its own inputs would show up only as a yellow tick in Dagster's Checks view, and
     nobody would be told.
 
@@ -399,11 +399,12 @@ its artifacts to local disk), then `COPY`'d into the image at build time. Promot
 rebuild + redeploy, which is auditable (image tags) and keeps MLflow completely out of the
 production runtime.
 
-That directory also holds `time_series_metadata.parquet`, the roster rows the model was trained
-against. Inference reads each series' H3 cell and static features from there rather than from the
-live roster, so the only data the container needs at runtime is the NWP and power Delta tables. A
-roster that is unreadable, or has lost rows, cannot fail a slot or silently drop a series from it.
-(The rejected alternative — fetching the model from MLflow at container startup — is covered in
+That directory also holds `time_series_metadata.parquet`, the metadata table rows the model was
+trained against. Inference reads each series' H3 cell and static features from there rather than
+from the live metadata table, so the only data the container needs at runtime is the NWP and power
+Delta tables. A metadata table that is unreadable, or has lost rows, cannot fail a slot or silently
+drop a series from it. (The rejected alternative — fetching the model from MLflow at container
+startup — is covered in
 [Considered but rejected designs](#fetching-the-champion-model-from-mlflow-at-container-startup).)
 
 This design also serves the operating model for after this Network Innovation Allowance (NIA)

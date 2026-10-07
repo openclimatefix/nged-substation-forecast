@@ -256,6 +256,12 @@ may not be British, and a term whose meaning is confined to one country's policy
 them a lookup for nothing. The same goes in the other direction: keep a term that is standard in the
 field even where a UK body has renamed it.
 
+**Don't write "roster".** The word is uncommon in British English, and it names nothing a reader
+can look up. Write "the `TimeSeriesMetadata` table" (or "the metadata table" once
+`TimeSeriesMetadata` has been named) for the table of series and their fields. Write "the list of
+time series" for the set of series a check expects, and "the list of sites" for the sites a study
+covers. The same goes for identifiers: `expected_ids`, not `roster_ids`.
+
 **Describe performance in performance terms, not in money metaphors.** A forecast does not "pay", an
 input does not "buy" accuracy, and a modelling choice does not "cost" anything unless real money
 changes hands. Write what actually moved: "the inputs that improve skill at short range", "adding
@@ -551,7 +557,7 @@ in
 | `contracts` | Patito data schemas (the single source of truth for all data shapes) |
 | `delta_store` | Physical storage policy for Delta tables: parquet writer properties, sort orders, significand rounding, write helpers |
 | `ml_core` | Feature engineering and `BaseForecaster` abstract class |
-| `nged_data` | Reading NGED JSON files from S3, and upserting the metadata roster to parquet. The power Delta write itself lives in `defs/assets.py` |
+| `nged_data` | Reading NGED JSON files from S3, and upserting the metadata table to parquet. The power Delta write itself lives in `defs/assets.py` |
 | `dynamical_data` | Downloading ECMWF ensemble NWP from Dynamical.org |
 | `geo` | H3 spatial indexing utilities |
 | `weather_utils` | Shared NWP query helpers used by both the dashboard and the feature pipeline (the analysis-proxy selection) |

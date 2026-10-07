@@ -95,7 +95,7 @@ def _write_power(path: str) -> None:
 def _metadata_for(
     time_series_ids: tuple[int, ...], cells: tuple[int, ...]
 ) -> pt.DataFrame[TimeSeriesMetadata]:
-    """A roster frame holding the two columns the feature pipeline reads.
+    """A metadata table holding the two columns the feature pipeline reads.
 
     ``set_model`` rather than ``validate``, as the assets' own readers do, so a partial frame is
     enough.
@@ -373,20 +373,20 @@ def _save_model_trained_on(path: Path, time_series_ids: list[int]) -> None:
     )
 
 
-def test_the_roster_cannot_thin_or_fail_a_live_slot(
+def test_the_metadata_table_cannot_thin_or_fail_a_live_slot(
     env: dict[str, str], dagster_instance: DagsterInstance, tmp_path: Path
 ) -> None:
-    """A roster fault costs the live service nothing, because it does not read the roster.
+    """A metadata table fault costs the live service nothing, because the service does not read it.
 
-    Each series' H3 cell comes from the model's own frozen copy, so a roster that has lost rows,
-    or cannot be read at all, leaves the forecast identical. Losing a row used to drop that
+    Each series' H3 cell comes from the model's own frozen copy, so a metadata table that has lost
+    rows, or cannot be read at all, leaves the forecast identical. Losing a row used to drop that
     series silently and an unreadable file used to fail the slot outright — both off the
-    degradation ladder entirely (issue #528). The *absent* roster needs no step here: the ``env``
-    fixture writes none, so every other test in this file is that case.
+    degradation ladder entirely (issue #528). The *absent* metadata table needs no step here: the
+    ``env`` fixture writes none, so every other test in this file is that case.
     """
-    roster = tmp_path / "NGED" / "metadata.parquet"
+    metadata_table = tmp_path / "NGED" / "metadata.parquet"
     # ts3 shares ts1's NWP cell, so both are genuinely forecastable to begin with.
-    _metadata_for((1, 3), (_TRAINED_CELL, _TRAINED_CELL)).write_parquet(roster)
+    _metadata_for((1, 3), (_TRAINED_CELL, _TRAINED_CELL)).write_parquet(metadata_table)
     _write_power_for(str(tmp_path / "NGED" / "power_time_series.delta"), (1, 3))
     write_cleaned_copy(tmp_path / "NGED" / "power_time_series.delta")
     _save_model_trained_on(tmp_path / "production_model", [1, 3])
@@ -395,14 +395,14 @@ def test_the_roster_cannot_thin_or_fail_a_live_slot(
     assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1, 3}
 
     # ts3's row goes.
-    _metadata_for((1,), (_TRAINED_CELL,)).write_parquet(roster)
+    _metadata_for((1,), (_TRAINED_CELL,)).write_parquet(metadata_table)
     assert _materialize(dagster_instance, "live").success
     assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1, 3}
 
     # Then the file itself becomes unreadable. Kept separate from the absent case because the
-    # repo's other roster reader guards with `object_exists` (`defs/checks.py`), a shape that
-    # tolerates absence and still raises on corruption.
-    roster.write_bytes(b"not a parquet file")
+    # repo's other metadata table reader guards with `object_exists` (`defs/checks.py`), a shape
+    # that tolerates absence and still raises on corruption.
+    metadata_table.write_bytes(b"not a parquet file")
     assert _materialize(dagster_instance, "live").success
     assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1, 3}
 

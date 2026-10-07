@@ -24,7 +24,7 @@ def sample_nearest_cell(*, field: xr.DataArray, sites: pl.DataFrame, crs: CRS) -
 
     Args:
         field: A two-dimensional field on the projected axes.
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        sites: The site list, carrying `site`, `latitude` and `longitude`.
         crs: The grid's projection.
 
     Returns:
@@ -48,7 +48,7 @@ def distance_matrix_km(*, sites: pl.DataFrame, cells: pl.DataFrame) -> np.ndarra
     """Return the great-circle distance in km from every site to every cell centre.
 
     Args:
-        sites: The roster, carrying `latitude` and `longitude` in degrees.
+        sites: The site list, carrying `latitude` and `longitude` in degrees.
         cells: One row per cell, carrying `latitude` and `longitude` in degrees.
 
     Returns:
@@ -79,7 +79,7 @@ def nearest_cells(*, sites: pl.DataFrame, cells: pl.DataFrame) -> pl.DataFrame:
     sites might fall outside the extent reads `distance_km` before trusting the result.
 
     Args:
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        sites: The site list, carrying `site`, `latitude` and `longitude`.
         cells: One row per cell, carrying `cell_id`, `latitude` and `longitude`.
 
     Returns:
@@ -113,7 +113,7 @@ def nearest_grid_indices(
     returned.
 
     Args:
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        sites: The site list, carrying `site`, `latitude` and `longitude`.
         latitudes: The grid's latitude axis, in degrees.
         longitudes: The grid's longitude axis, in degrees.
 
