@@ -145,7 +145,7 @@ def _make_downloaded_ds(
     ``precipitation_surface`` the corrupt de-accumulated one, so a count that pooled the two, or
     attributed one to the other, disagrees with these tests.
     """
-    shape = (2, 1, 1, 2)  # 2 steps (one is lead-0), 1 member, 2 grid points
+    shape = (2, 1, 1, 3)  # 2 steps (one is lead-0), 1 member, 3 grid points
     dims = ("lead_time", "ensemble_member", "latitude", "longitude")
     corrupt = np.full(shape, 0.001, dtype=np.float32)
     corrupt[1, 0, 0, :n_null_grid_points] = np.nan
@@ -169,7 +169,7 @@ def _make_downloaded_ds(
             "lead_time": np.asarray([0, 6], dtype="timedelta64[h]").astype("timedelta64[ns]"),
             "ensemble_member": np.asarray([0]),
             "latitude": np.asarray([52.5], dtype=np.float32),
-            "longitude": np.asarray([-1.0, -0.75], dtype=np.float32),
+            "longitude": np.asarray([-1.0, -0.75, -0.5], dtype=np.float32),
         },
     )
 
@@ -228,14 +228,14 @@ def test_power_time_series_and_metadata_ingests_and_writes(
 
 
 @pytest.mark.parametrize("raised", [RuntimeError, BaseException], ids=["exception", "rust_panic"])
-def test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fails(
+def test_power_time_series_and_metadata_writes_power_when_the_metadata_upsert_fails(
     raised: type[BaseException],
     env: Path,
     monkeypatch: pytest.MonkeyPatch,
     dagster_instance: DagsterInstance,
 ) -> None:
-    """The headline property of #508: the roster is derived data NGED re-delivers, so a fault in it
-    must not stall the power stream until an operator intervenes.
+    """The headline property of #508: the metadata table is derived data NGED re-delivers,
+    so a fault in it must not stall the power stream until an operator intervenes.
 
     Also asserts the degradation is *reported*, since a step that no longer fails no longer fires
     ``sentry_capture_failure``. The ``rust_panic`` case is why the guard catches
@@ -250,7 +250,7 @@ def test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fail
     )
 
     def boom(*_: object, **__: object) -> None:
-        raise raised("roster upsert exploded")
+        raise raised("metadata table upsert exploded")
 
     monkeypatch.setattr(target=assets, name="upsert_metadata", value=boom)
     reported: list[tuple[str, BaseException]] = []
@@ -284,7 +284,7 @@ def test_power_time_series_and_metadata_re_raises_a_cancelled_run(
 ) -> None:
     """The one thing the guard must *not* swallow. Cancellation lands in the same
     ``BaseException`` net as a panic, so the handler re-raises it explicitly: a run the
-    operator cancelled has to stop, not finish green having quietly skipped the roster."""
+    operator cancelled has to stop, not finish green having quietly skipped the metadata table."""
     monkeypatch.setattr(
         target=assets.Settings,
         name="get_nged_s3_store",
@@ -922,8 +922,8 @@ def test_ecmwf_ens_publishes_both_null_populations(
     assert evaluation.passed  # no stored cell is null...
     assert evaluation.metadata["n_null_h3_cells"].value == 0
     assert evaluation.metadata["n_null_nwp_grid_points"].value == 1  # ...but the feed was corrupt
-    assert evaluation.metadata["n_total_nwp_grid_points"].value == 6  # 3 variables x 1 step x 2
-    assert evaluation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 6)
+    assert evaluation.metadata["n_total_nwp_grid_points"].value == 9  # 3 variables x 1 step x 3
+    assert evaluation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 9)
     assert evaluation.metadata["n_affected_nwp_slices"].value == 1
     assert evaluation.metadata["affected_nwp_variables"].value == ["precipitation_surface"]
     # The per-variable table is on this check too — the runbook sends the operator to it for the
@@ -935,8 +935,8 @@ def test_ecmwf_ens_publishes_both_null_populations(
     # The description must name both populations, or it claims the health of the one it read, and
     # must lead with the grid-point clause — the signal this check exists to surface.
     description = str(evaluation.description)
-    assert description.startswith("Raw NWP grid: 1 of 6 grid point(s) null")
-    assert "(16.6667%)" in description  # rendered as a percentage, not a bare ratio
+    assert description.startswith("Raw NWP grid: 1 of 9 grid point(s) null")
+    assert "(11.1111%)" in description  # rendered as a percentage, not a bare ratio
     assert "precipitation_surface" in description
     assert "Stored H3 cells: 0 null cell(s)" in description
     assert "Known upstream ECMWF ENS corruption" in description
@@ -945,21 +945,22 @@ def test_ecmwf_ens_publishes_both_null_populations(
     # only appearing on the runs bad enough to warn.
     (materialisation,) = result.asset_materializations_for_node("ecmwf_ens")
     assert materialisation.metadata["n_null_nwp_grid_points"].value == 1
-    assert materialisation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 6)
+    assert materialisation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 9)
 
 
 @pytest.mark.parametrize(
     ("n_nulls", "expected_passed", "expected_description", "expected_corrupt_rows"),
     [
-        (0, True, "No nulls in 36 instantaneous-variable grid points.", []),
+        (0, True, "No nulls in 54 instantaneous-variable grid points.", []),
         # Two nulls in *one* slice, so the table's two count columns hold different numbers and
-        # swapping them is visible. Both grid points of the one step, which the stubbed converter
-        # never sees.
+        # swapping them is visible. The nulls fill two of the step's three grid points, not all
+        # three, because a slice empty at every grid point is retried before any check runs. The
+        # stubbed converter never sees these nulls.
         (
             2,
             False,
             (
-                "2 of 36 instantaneous-variable grid point(s) null (5.5556%) in temperature_2m, "
+                "2 of 54 instantaneous-variable grid point(s) null (3.7037%) in temperature_2m, "
                 "across 1 (variable, member, step) slice(s)."
             ),
             [
@@ -967,7 +968,7 @@ def test_ecmwf_ens_publishes_both_null_populations(
                     "variable": "temperature_2m",
                     "n_null_grid_points": 2,
                     "n_affected_slices": 1,
-                    "n_total_grid_points": 4,
+                    "n_total_grid_points": 6,
                 }
             ],
         ),
@@ -1009,10 +1010,10 @@ def test_ecmwf_ens_flags_instantaneous_nulls_the_aggregation_absorbed(
     assert evaluation.passed is expected_passed  # one null grid point is enough, unlike the other
     assert evaluation.severity == AssetCheckSeverity.WARN
     assert evaluation.metadata["n_null_nwp_grid_points"].value == n_nulls
-    # 9 instantaneous variables x 2 steps x 2 grid points — lead-0 included, unlike the other check.
+    # 9 instantaneous variables x 2 steps x 3 grid points — lead-0 included, unlike the other check.
     # Counting the de-accumulated or categorical variables too, or reading the contract's names
     # rather than the download's, moves this number.
-    assert evaluation.metadata["n_total_nwp_grid_points"].value == 36
+    assert evaluation.metadata["n_total_nwp_grid_points"].value == 54
     assert str(evaluation.description) == expected_description
 
     # The per-variable table separates one bad variable from nine, which the totals cannot.
@@ -1161,11 +1162,13 @@ def test_ecmwf_ens_re_raises_a_cancelled_run_without_writing(
     assert not Path(Settings().nwp_data_path).exists()
 
 
+@pytest.mark.parametrize("raising_step", ["open", "empty_slice_check"])
 def test_ecmwf_ens_retries_when_run_not_yet_available(
-    env: Path, monkeypatch: pytest.MonkeyPatch
+    env: Path, monkeypatch: pytest.MonkeyPatch, raising_step: str
 ) -> None:
     """``NwpRunNotYetAvailable`` → ``RetryRequested`` with the asset's configured retry budget,
-    so a not-yet-published run waits rather than failing outright."""
+    so a not-yet-published run waits rather than failing outright. The asset retries whether the
+    run is absent from the catalog or the downloaded run has an empty slice."""
     from dagster import RetryRequested
 
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
@@ -1173,7 +1176,19 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
     def _raise_not_available(*, nwp_init_time: datetime, h3_grid: object) -> None:
         raise NwpRunNotYetAvailable
 
-    monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=_raise_not_available)
+    if raising_step == "open":
+        monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=_raise_not_available)
+    else:
+        # The real check runs, on a downloaded run whose only slice at lead 6 h is empty at all
+        # three grid points.
+        monkeypatch.setattr(
+            target=assets, name="open_ecmwf_ens_run", value=lambda **kwargs: object()
+        )
+        monkeypatch.setattr(
+            target=assets,
+            name="download_ecmwf_ens_data",
+            value=lambda ds_lazy: _make_downloaded_ds(n_null_instantaneous_grid_points=3),
+        )
 
     # `build_asset_context()` defaults to its own `DagsterInstance.ephemeral()`
     # (<https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/>) and is
@@ -1189,6 +1204,28 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
 
     assert exc_info.value.max_retries == _ECMWF_ENS_MAX_RETRIES
     assert exc_info.value.seconds_to_wait == _ECMWF_ENS_RETRY_DELAY_SECONDS
+
+
+@pytest.mark.parametrize("error", [RuntimeError("bug"), ValueError("bad dtype")])
+def test_ecmwf_ens_fails_at_once_on_an_error_that_waiting_cannot_fix(
+    env: Path, monkeypatch: pytest.MonkeyPatch, error: Exception
+) -> None:
+    """Only the three "run not ready yet" failures retry; a structural failure or a bug of ours
+    propagates unchanged. ``ValueError`` is here because ``NwpVariableWhollyMissing`` subclasses
+    it, so a retry rule widened to ``ValueError`` would silently retry every dtype failure."""
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=lambda **kwargs: object())
+
+    def _raise(ds_lazy: object) -> None:
+        raise error
+
+    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=_raise)
+
+    with (
+        build_asset_context(partition_key="2024-05-01") as context,
+        pytest.raises(type(error), match=str(error)),
+    ):
+        ecmwf_ens(context)
 
 
 # --- definitions load ----------------------------------------------------------------------------
@@ -1218,7 +1255,12 @@ def test_definitions_resolve(env: Path) -> None:
     asset_graph = repo.asset_graph
 
     asset_keys = {key.to_user_string() for key in asset_graph.get_all_asset_keys()}
-    assert {"power_time_series_and_metadata", "h3_grid_weights", "ecmwf_ens"} <= asset_keys
+    assert {
+        "power_time_series_and_metadata",
+        "clean_nged_power_data",
+        "h3_grid_weights",
+        "ecmwf_ens",
+    } <= asset_keys
 
     for name, layer in [
         ("live_forecasts", "production"),
@@ -1231,7 +1273,7 @@ def test_definitions_resolve(env: Path) -> None:
 
     assert {
         key.to_user_string() for key in asset_graph.get(AssetKey("live_forecasts")).parent_keys
-    } == {"ecmwf_ens", "power_time_series_and_metadata"}
+    } == {"ecmwf_ens", "clean_nged_power_data"}
 
     # A broken deps=[...] string would drop this edge (the unknown key becomes an external asset).
     ecmwf_parents = {
@@ -1245,6 +1287,7 @@ def test_definitions_resolve(env: Path) -> None:
     assert "nwp_has_no_unexpected_nulls" in check_keys
     assert "nwp_run_is_complete" in check_keys
     assert "live_forecasts_are_healthy" in check_keys
+    assert "cleaned_power_keeps_up_with_raw" in check_keys
 
     # ...and the 6-hourly scheduled job actually runs the live check: an AssetSelection includes
     # its assets' checks, so this is what makes the check evaluate on every production tick.
@@ -1255,15 +1298,18 @@ def test_definitions_resolve(env: Path) -> None:
     assert live_job_checks == {"live_forecasts_are_healthy"}
 
     # A job whose AssetSelection names a missing asset resolves to an empty/wrong key set.
-    for job_name, expected_asset in [
-        ("power_time_series_and_metadata_job", "power_time_series_and_metadata"),
-        ("ecmwf_ens_job", "ecmwf_ens"),
-        ("live_forecasts_job", "live_forecasts"),
+    for job_name, expected_assets in [
+        (
+            "power_time_series_and_metadata_job",
+            {"power_time_series_and_metadata", "clean_nged_power_data"},
+        ),
+        ("ecmwf_ens_job", {"ecmwf_ens"}),
+        ("live_forecasts_job", {"live_forecasts"}),
     ]:
         selected = {
             key.to_user_string() for key in repo.get_job(job_name).asset_layer.executable_asset_keys
         }
-        assert selected == {expected_asset}
+        assert selected == expected_assets
 
     # Neither partitioned job passes `partitions_def` to `define_asset_job` — Dagster infers it from
     # the selected asset at resolution time. Assert the inferred definition equals the one the asset

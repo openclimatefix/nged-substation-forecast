@@ -14,9 +14,11 @@ from contracts.weather_schemas import Nwp
 
 
 class NwpRunNotYetAvailable(Exception):
-    """Raised when ``nwp_init_time`` is not yet in the catalog.
+    """Raised when Dynamical.org has not finished publishing the run for ``nwp_init_time``.
 
-    Dynamical.org has not yet published that run.
+    Either the run is not yet in the catalog (`open_ecmwf_ens_run`), or it is present but an
+    (ensemble member, lead time) slice of an instantaneous variable is still unwritten
+    (`raise_if_instantaneous_slices_empty`). The ``ecmwf_ens`` asset retries both.
     """
 
 
@@ -175,6 +177,43 @@ def download_ecmwf_ens_data(ds_sliced: xr.Dataset) -> xr.Dataset:
             data_arrays.update(future.result())
 
     return xr.Dataset(data_arrays)
+
+
+def raise_if_instantaneous_slices_empty(ds: xr.Dataset) -> None:
+    """Raise `NwpRunNotYetAvailable` when a run is still being published.
+
+    Dynamical.org fills a run in pieces, so a run read part-way through can have whole (ensemble
+    member, lead time) slices that are NaN at every grid point. An instantaneous variable is never
+    legitimately NaN across a whole slice, so one wholly-NaN slice means the run is unfinished.
+    Waiting is then the right response. A run whose NaN grid points are only scattered is treated as
+    finished, so it passes through to `contracts.weather_schemas.Nwp.validate`, as does any other
+    contract violation. De-accumulated variables are not checked here, because they are legitimately
+    empty at lead-0, and `Nwp.validate` raises `NwpVariableWhollyMissing` when a de-accumulated
+    variable is wholly missing. `categorical_precipitation_type_surface` is not checked either,
+    because the column is empty in runs before 2024-11-13.
+
+    Reasoning and the 2026-10-02 incident:
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright>
+
+    Args:
+        ds: A downloaded dataset, as returned by `download_ecmwf_ens_data`.
+
+    Raises:
+        NwpRunNotYetAvailable: If any instantaneous variable has a slice that is NaN at every
+            grid point. The message names each variable and its count of empty slices.
+    """
+    empty_slices = (
+        ds[sorted(ECMWF_ENS_INSTANTANEOUS_VARS)].isnull().all(dim=["latitude", "longitude"])
+    )
+    n_empty_per_variable = {
+        str(name): int(array.sum()) for name, array in empty_slices.data_vars.items()
+    }
+    unfinished = {name: n for name, n in n_empty_per_variable.items() if n > 0}
+    if unfinished:
+        raise NwpRunNotYetAvailable(
+            "Instantaneous variables with (ensemble_member, lead_time) slices that are NaN at "
+            f"every grid point, so the run is still being published: {unfinished}"
+        )
 
 
 def _calc_slice_for_lat_or_lng(

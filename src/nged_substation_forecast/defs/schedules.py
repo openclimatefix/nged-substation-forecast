@@ -12,16 +12,18 @@ from dagster import (
 
 from nged_substation_forecast._sentry import sentry_capture_failure
 
-# Define a job that targets the power_time_series_and_metadata asset
+# Define a job that targets the power_time_series_and_metadata asset and the clean_nged_power_data
+# asset that cleans its output
 power_time_series_and_metadata_job = define_asset_job(
     name="power_time_series_and_metadata_job",
-    selection=AssetSelection.assets("power_time_series_and_metadata"),
+    selection=AssetSelection.assets("power_time_series_and_metadata", "clean_nged_power_data"),
     hooks={sentry_capture_failure},
     description=(
-        "Pull the latest NGED telemetry from S3 into the power_time_series Delta table and"
-        " upsert the substation metadata parquet. Runs hourly at :55, 5 minutes before"
-        " live_forecasts_schedule ticks; see power_time_series_and_metadata_schedule for why a"
-        " missed pull still lets live_forecasts run on time."
+        "Pull the latest NGED telemetry from S3 into the power_time_series Delta table, upsert"
+        " the substation metadata parquet, then rebuild the cleaned_power_time_series Delta table"
+        " if new telemetry arrived. Runs hourly at :55, 5 minutes before live_forecasts_schedule"
+        " ticks; see power_time_series_and_metadata_schedule for why a missed pull still lets"
+        " live_forecasts run on time."
     ),
 )
 
@@ -31,16 +33,17 @@ power_time_series_and_metadata_schedule = ScheduleDefinition(
     cron_schedule="55 * * * *",
     description=(
         "Fires at :55 past every hour, 5 minutes before live_forecasts_schedule ticks at"
-        " 00/06/12/18 UTC, so this hour's telemetry has landed first. A missed or late pull does"
-        " not hold live_forecasts back: the two schedules couple through data at rest, never"
-        " through run status, so the forecast runs on time against whatever telemetry is already"
-        " on disk."
+        " 00/06/12/18 UTC, so this hour's telemetry has landed and been cleaned first. A missed"
+        " or late pull does not hold live_forecasts back: the two schedules couple through data"
+        " at rest, never through run status, so the forecast runs on time against whatever"
+        " cleaned telemetry is already on disk."
     ),
 )
 """Fires at :55 past every hour — 5 minutes *before* the top of the hour — so this hour's pull
-has landed by the time ``live_forecasts_schedule`` ticks at 00/06/12/18 UTC.
+has landed, and been cleaned by ``clean_nged_power_data``, by the time
+``live_forecasts_schedule`` ticks at 00/06/12/18 UTC.
 
-``live_forecasts`` declares ``power_time_series_and_metadata`` as a dep, but the two run as
+``live_forecasts`` declares ``clean_nged_power_data`` as a dep, but the two run as
 separate jobs on separate schedules and nothing enforces the ordering at runtime. That is
 deliberate, not a gap: the offset is an optimisation for freshness, and if it is missed —
 because this pull failed, or ran long — ``live_forecasts`` still runs on time against whatever
@@ -73,21 +76,21 @@ def ecmwf_ens_schedule(context: ScheduleEvaluationContext) -> RunRequest:
 
     10:30 UTC is a safety margin past the 00Z run's usual arrival on ECMWF's bucket and
     Dynamical.org's publication (08:05 to 08:20 UTC on a normal day), and 90 minutes before the
-    12:00 UTC ``live_forecasts`` slot.
-    ``ecmwf_ens_partitions``' ``end_offset=1`` means today's partition key already exists by this
-    point. If the run isn't usable yet — absent from the catalog, or present with
-    a weather variable still wholesale empty — ``ecmwf_ens`` retries every 30 minutes, up to 8
-    times (``NwpRunNotYetAvailable`` / ``NwpVariableWhollyMissing`` → ``RetryRequested`` in
-    ``defs/assets.py``) rather than failing outright; any other error still fails immediately.
-    Retrying is right because Dynamical.org publishes each run as roughly 40 separate commits
-    over about 15 minutes, so a run can be readable while a variable whose commit has not landed
-    yet still reads as empty — that is a run mid-publication, not a broken one. Live inference
-    (``live_forecasts``) always uses the freshest run genuinely present regardless of this
+    12:00 UTC ``live_forecasts`` slot. ``ecmwf_ens_partitions``' ``end_offset=1`` means today's
+    partition key already exists by this point. A run isn't usable yet when it is absent from the
+    catalog, when whole (member, lead time) slices of an instantaneous variable are still empty, or
+    when a de-accumulated variable is still wholly empty. ``ecmwf_ens`` then retries every 30
+    minutes, up to 8 times (``NwpRunNotYetAvailable`` / ``NwpVariableWhollyMissing`` →
+    ``RetryRequested`` in ``defs/assets.py``), rather than failing outright. Any other error still
+    fails immediately. Retrying is right because Dynamical.org publishes each run as roughly 40
+    separate commits over about 15 minutes, so a run can be readable while a variable whose commit
+    has not landed yet still reads as empty — that is a run mid-publication, not a broken one. Live
+    inference (``live_forecasts``) always uses the freshest run genuinely present regardless of this
     schedule's exact timing.
 
     Further reading:
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-is-retried-not-failed-outright>
-    — why a wholly-missing variable is retried rather than failed.
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright>
+    — why an unfinished run is retried rather than failed.
     """
     return RunRequest(partition_key=context.scheduled_execution_time.strftime("%Y-%m-%d"))
 
@@ -114,11 +117,11 @@ live_forecasts_schedule = build_schedule_from_partitioned_job(
         "Ticks at 00/06/12/18 UTC and materialises the just-completed window with"
         " availability_mode='live'. The schedule is always live; replays are manual, launched"
         " from the UI with availability_mode='replay'. The slot fires on the clock whether or"
-        " not the ingest jobs succeeded."
+        " not the ingest and cleaning steps succeeded."
     ),
 )
 """Ticks at 00/06/12/18 UTC, materialising the just-completed window with default run config
 (``availability_mode="live"``) — the schedule is always live; replays are manual, launched from
 the UI with ``availability_mode="replay"``. This slot fires on the clock regardless of whether
-the ingest jobs succeeded; see ``power_time_series_and_metadata_schedule``'s docstring above for
-why the two schedules are deliberately not ordered against each other."""
+the ingest and cleaning steps succeeded; see ``power_time_series_and_metadata_schedule``'s
+docstring above for why the two schedules are deliberately not ordered against each other."""

@@ -2654,8 +2654,9 @@ cited authors in the field, concludes that "most papers can never be replicated,
 have never been published". Flexpectation publishes the evaluation protocol, the metric definitions,
 and the code that computes the metrics, so that someone outside the project can check how the
 results were produced rather than take the results on trust. The telemetry itself is shared only
-where NGED's data policy allows. A metered generator's time series is never published with the
-generator's name or ID, because a single site's output can be commercially sensitive.
+where NGED's data policy allows. The time series of one of NGED's metered generators is never
+published with the generator's name or ID, because a single site's output can be commercially
+sensitive.
 
 **Flexpectation commits to nine practices, from correcting for ensemble size to publishing negative
 results, that let an outsider check its published numbers rather than take them on trust.** Two of

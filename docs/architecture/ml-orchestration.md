@@ -71,9 +71,9 @@ loads from there; there is no local-disk cache.
 
 ### One archive file, not a directory of files
 
-`save_to_mlflow` adds `time_series_metadata.parquet` to the model directory — the roster rows the
-model trained against, which production inference locates its series by — then packs the whole
-directory into a single `model.tar.gz` and logs that one file to the run's artifact root.
+`save_to_mlflow` adds `time_series_metadata.parquet` to the model directory — the metadata table
+rows the model trained against, which production inference locates its series by — then packs the
+whole directory into a single `model.tar.gz` and logs that one file to the run's artifact root.
 `load_from_mlflow` and the production download path
 (`ml_core.production_helpers.fetch_model_artifacts`) each unpack it into a temporary directory.
 Subclass `save`/`load` never see the archive: they stay directory-based and MLflow-free, so the
@@ -194,9 +194,8 @@ Rejecting ERA5-backed folds excludes reanalysis only as a *promotion criterion*,
 measurement. Scoring against an estimate of past weather is legitimate as a **diagnostic** — it
 decomposes total error into the weather-to-power response and the implicit hedging against forecast
 error — and lands as its own `evaluation_scope`, leaving the leaderboard folds ENS-only. The planned
-estimates of past weather are CAMS for irradiance and CEDA UKV for other variables, with ERA5 kept
-for gap filling and as a comparison arm. See [Extending the training
-history](../roadmap/training-history.md#evaluation).
+estimates of past weather are CAMS for irradiance and ERA5 for other variables. See [Extending the
+training history](../roadmap/training-history.md#evaluation).
 
 ## Two metric stores, one division of labour
 

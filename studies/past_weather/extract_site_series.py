@@ -109,7 +109,7 @@ def _sarah_cells(*, path: Path, sites: pl.DataFrame) -> pl.DataFrame:
 
     Args:
         path: Any one daily file, for the grid's axes.
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        sites: The site list, carrying `site`, `latitude` and `longitude`.
 
     Returns:
         One row per site with `site`, `lat_index`, `lon_index` and `distance_km`.
@@ -163,7 +163,7 @@ def extract_sarah(*, sites: pl.DataFrame, first: date, last: date) -> pl.DataFra
     """Return SARAH-3's hourly global and direct irradiance at each site's nearest cell.
 
     Args:
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        sites: The site list, carrying `site`, `latitude` and `longitude`.
         first: The first day to read.
         last: The last day to read.
 
@@ -198,7 +198,7 @@ def _night_voids_to_zero(*, snapshots: pl.DataFrame, sites: pl.DataFrame) -> pl.
 
     Args:
         snapshots: One row per (site, slot), not-a-number where the slot is unusable.
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        sites: The site list, carrying `site`, `latitude` and `longitude`.
 
     Returns:
         `snapshots`, with night-time gaps filled by the zero SARAH-3 stores for every other night.
@@ -277,7 +277,7 @@ def extract_icon_dream(
     """Return ICON-DREAM-EU's hourly global and direct irradiance at each site's nearest cell.
 
     Args:
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        sites: The site list, carrying `site`, `latitude` and `longitude`.
         first: The first day to keep.
         last: The last day to keep.
         cell_centres: Where the cells' centres are cached.

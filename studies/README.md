@@ -97,7 +97,7 @@ folder name themselves.
 | `observations/NGED-ANM/` | NGED's active network management setpoint exports, and the export-cap parquet derived from each | `beam_diffuse_split/anm_setpoints.py` (the exports come from NGED) |
 
 `data/studies/_private/trial_area_box.json` holds the trial-area box, derived from the private
-generator roster.
+list of generators.
 
 **Each study keeps one folder under `data/studies/per_study/`.**
 
@@ -110,6 +110,8 @@ generator roster.
 | `icon_eu_compare/`, `era5_wind_compare/` | The ICON-EU comparison of Dynamical.org with Open-Meteo, and the ERA5 wind comparison of Open-Meteo with the Climate Data Store | `weather_downloads/compare_icon_eu_dynamical_openmeteo.py`, `weather_downloads/compare_era5_wind_openmeteo_cds.py` |
 | `ens_backfill_pilot/` | The checkpoint files of the ENS backfill pilot | `ens_backfill_pilot/fetch_pilot.py` |
 | `ukv_ceda_blends/` | The UKV-on-CEDA blends study's inputs and results; `run15/` holds the inputs and results of the run on the 15 UTC cycle | `nwp_forecast_comparison/build_ukv_ceda_inputs.py`, `nwp_forecast_comparison/fit_ukv_ceda_blends.py` |
+| `ukv_ceda_vs_openmeteo/` | The study of UKV from CEDA against UKV from Open-Meteo: the built frames, the model-free comparison, the per-row losses, the reports, and `superseded/` for earlier outputs. The published page is [Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?](https://openclimatefix.github.io/nged-substation-forecast/studies/past-weather/ukv-ceda-vs-openmeteo/) | `past_weather/ukv_ceda_vs_openmeteo_build.py`, `_compare.py`, `_wind_steps.py`, `_extra_reads.py`, `_fit.py`, and `_charts.py` |
+| `solar_bmu_census/` | The solar-BMU census: `inputs/` holds the Elexon, NESO, and REPD downloads with their lineage note, `classes.parquet` and `solar_bmus.parquet` hold the classes and the census table, and `report.md` holds the numbers the page quotes. | `solar_bmu_census/fetch_sources.py`, `classify.py`, `collate.py`, `recall_check.py`, `report.py` |
 | `nwp_forecast_comparison/original/` | The published fit of the NWP forecast comparison | `nwp_forecast_comparison/nwp_forecast_comparison.py` |
 | `nwp_forecast_comparison/<batch>/` | One folder for each of the 22 later batches of fits, such as `aifs_blends`, `leads_day10`, and `product_blends`; a batch's `superseded/` folder holds its earlier outputs | the `build_*.py` and `fit_*.py` scripts of `nwp_forecast_comparison/` |
 
@@ -121,6 +123,7 @@ generator roster.
 | `past_weather/` | Which weather product best describes past sunshine and past wind, and does blending products beat the best single product? | The pages under [Past weather](https://openclimatefix.github.io/nged-substation-forecast/studies/past-weather/); the folder README maps each script to its page |
 | `nwp_forecast_comparison/` | Which forecast product, or which blend of products, gives the most accurate power forecast at the day-ahead lead the live service delivers, and at the days around it? How accurate is an ECMWF ENS-driven forecast at each horizon? Does adding the Met Office's UKV, read from the CEDA archive, to the ECMWF ENS mean lower the error? | The Forecasts pages listed on the [studies index](https://openclimatefix.github.io/nged-substation-forecast/studies/); the folder README maps each script to its page |
 | `open_meteo_ensemble_means/` | How well do Open-Meteo's ensemble-mean products for MOGREPS-UK, ICON-D2-EPS, ICON-EU-EPS, and ECMWF IFS ENS predict solar and wind power, beside CAMS and ERA5? | [How do Open-Meteo's ensemble-mean products compare for solar and wind power?](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/ensemble-means/) |
+| `solar_bmu_census/` | How many Balancing Mechanism Units in Great Britain are solar, and what does each published capacity figure give them? | [How many Balancing Mechanism Units in Great Britain are solar?](https://openclimatefix.github.io/nged-substation-forecast/studies/solar-bmu-census/) |
 | `weather_downloads/` | Which weather products can the studies download, and what does each download hold? | No page: the downloads feed the pages above, and the folder README describes each fetch script |
 | `ens_backfill_pilot/` | Can ECMWF's control-member forecasts for 2021-03-21 to 2024-03-31 be rebuilt from the GRIB files that Dynamical.org stages on Source Cooperative? | No page: `studies/ens_backfill_pilot/report.md` holds the pilot's result |
 | `era_fold_design/` | How many scored hours have a calendar month held out of every training row under the era folds, and how do planned contrasts move when the folds cover every month? | No page: `studies/era_fold_design/report.md` holds the measurement behind the plan in PR #906 |

@@ -21,8 +21,8 @@ target" and "output capture is off" — including every value-taking flag pytest
 `-k`, `-m`, `-o`, `--deselect`, …), not just the ones this file happens to name. The one gap: a
 *conftest-defined* option that takes a value is not yet known to pytest when this hook's
 `known_args_namespace` was last parsed, so its value could still be misread as a positional
-target. Harmless today — this repo's only custom option, `--run-network`, is `store_true` — but a
-future value-taking conftest option would need checking against this file.
+target. Harmless today — this repo's custom options, `--run-network` and `--run-studies`, are both
+`store_true` — but a future value-taking conftest option would need checking against this file.
 
 There's no need to also check `numprocesses`: an injected `-n auto` is prepended (`args[:0]`), so
 an explicit `-n`/`--numprocesses` anywhere else in `args` — CLI, `addopts`, `PYTEST_ADDOPTS` —

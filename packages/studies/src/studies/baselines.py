@@ -178,8 +178,8 @@ def hourly_clear_sky(*, sites: pl.DataFrame, first: datetime, last: datetime) ->
     period mean over the hour ending at its label, like the power and like ENS's radiation.
 
     Args:
-        sites: The roster, with `site`, `latitude`, and `longitude`. Coordinates are read here and
-            never written.
+        sites: The site list, with `site`, `latitude`, and `longitude`. Coordinates are read
+            here and never written.
         first: The first hour's end.
         last: The last hour's end.
 

@@ -456,7 +456,7 @@ def read_product(
 
     Args:
         spec: The product.
-        sites: The wind roster.
+        sites: The wind site list.
 
     Returns:
         The raw wind, whether it carries direction, the nearest cells' `distance_km`, the
@@ -544,7 +544,7 @@ def build_rows(*, spec: ProductSpec, sites: pl.DataFrame) -> Built:
 
     Args:
         spec: The product.
-        sites: The wind roster.
+        sites: The wind site list.
 
     Returns:
         The rows, the arms' columns, and the counts the report prints.
@@ -726,7 +726,7 @@ def _report(
         spec: The product.
         built: `build_rows`'s result.
         losses: Every arm's losses at both settings.
-        sites: The wind roster, for the geometry lines.
+        sites: The wind site list, for the geometry lines.
         job_list: Every job, for the feature-column section.
 
     Returns:

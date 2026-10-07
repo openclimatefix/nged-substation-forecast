@@ -13,7 +13,7 @@ at least `24N` hours old" predicts. **A first pass compared each site's served s
 average over the extract's 9 grid cells, and the resulting spatial-sampling noise (about 3 km/h)
 swamped the signal at N = 1.** This version instead scores, for each site and each candidate offset,
 every one of the extract's 9 grid cells against that site's own series, and keeps the cell with the
-lowest mean absolute error — no roster coordinate is read, and every offset gets exactly the same
+lowest mean absolute error — no site coordinate is read, and every offset gets exactly the same
 freedom to pick its best-fitting cell, so a real difference in lead accuracy between offsets
 survives while the noise from not knowing which cell a site truly falls in does not. Wind speed at
 100 m compares directly; shortwave radiation additionally checks, at hours divisible by 6 (the only
@@ -61,7 +61,7 @@ import numpy as np
 import polars as pl
 from studies.hourly_means import hourly_from_snapshots
 from studies.pv_dataset import (
-    pv_sites,  # the private solar roster, for coordinates read at run time
+    pv_sites,  # the private solar site list, for coordinates read at run time
 )
 from studies.sources import GFS_WINDOW_DIR, previous_runs_product_dir_for
 from studies.timestamp_checks import (
@@ -512,7 +512,7 @@ def _median_peak_minutes(
     Args:
         frame: Carrying `site`, `time` and `value_column`.
         value_column: The radiation column, in W m-2.
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        sites: The site list, carrying `site`, `latitude` and `longitude`.
         offsets_minutes: The offsets to test.
 
     Returns:
@@ -548,7 +548,7 @@ def ukv_rebuild_lines(
 
     Args:
         combined: UKV's `previous_runs/combined.parquet`.
-        sites: The solar roster, carrying `site`, `latitude` and `longitude`.
+        sites: The solar site list, carrying `site`, `latitude` and `longitude`.
 
     Returns:
         Markdown lines, and the candidate whose peak sits nearest a mean over the hour ending at the

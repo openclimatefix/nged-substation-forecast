@@ -28,9 +28,9 @@ Three files are written:
 - ``*_ensemble_mean.parquet`` — the ensemble mean of ``power_fcst`` per timestep.
 - ``*_quantiles.parquet``     — the p10 / p50 / p90 of ``power_fcst`` across members per timestep.
 
-Every file also carries ``observed_power``, left-joined from the ``power_time_series`` table so
-residuals can be computed directly. ``observed_power`` is the metered value at that
-``valid_time``, in the same MW/MVA units.
+Every file also carries ``observed_power``, left-joined from the unflagged rows of the
+``cleaned_power_time_series`` table so residuals can be computed directly. ``observed_power`` is
+the metered value at that ``valid_time``, in the same MW/MVA units.
 
 Run from a checkout where ``.env`` resolves (in a worktree, ``.env`` must be symlinked):
 
@@ -47,6 +47,8 @@ from pathlib import Path
 import polars as pl
 from contracts.settings import PROJECT_ROOT, Settings
 from contracts.typing_utils import typeddict_to_dict
+from contracts.uri import ObjectStoreOptions
+from nged_data.storage import scan_cleaned_power
 
 # Columns carried through to the full-ensemble file. The internal-only partition columns
 # experiment_name, fold_id, and ml_flow_experiment_id are intentionally dropped.
@@ -102,23 +104,23 @@ def _freshest_forecasts(
 
 
 def _observed_power(
-    power_time_series_path: str, storage_options: dict[str, str] | None
+    cleaned_power_path: str, storage_options: ObjectStoreOptions | None
 ) -> pl.LazyFrame:
-    """Scan observed metered power, deduplicated on the join key.
+    """Scan the unflagged observed metered power, deduplicated on the join key.
 
     The dedupe on ``(time_series_id, time)`` mirrors the metrics pipeline: a duplicated observation
     would double every ensemble member through the left-join. ``power`` is renamed to
     ``observed_power`` and is in the same MW/MVA units as the forecast.
 
     Args:
-        power_time_series_path: URI of the ``power_time_series`` Delta table.
-        storage_options: Object-store options for ``pl.scan_delta``.
+        cleaned_power_path: URI of the ``cleaned_power_time_series`` Delta table.
+        storage_options: Object-store options for the cleaned table.
 
     Returns:
         A lazy frame with columns ``time_series_id``, ``time``, ``observed_power``.
     """
     return (
-        pl.scan_delta(power_time_series_path, storage_options=storage_options)
+        scan_cleaned_power(cleaned_power_path, storage_options)
         .select("time_series_id", "time", "power")
         .unique(subset=["time_series_id", "time"], keep="any")
         .rename({"power": "observed_power"})
@@ -167,7 +169,9 @@ def export_forecasts(experiment_name: str, fold_id: str, output_dir: Path) -> di
     freshest = _freshest_forecasts(
         settings.power_forecasts_data_path, experiment_name, fold_id, storage_options
     )
-    observed = _observed_power(settings.power_time_series_data_path, storage_options)
+    observed = _observed_power(
+        settings.cleaned_power_time_series_data_path, settings.storage_options
+    )
     full = _with_observed(freshest, observed)
 
     per_timestep = ["time_series_id", "valid_time"]

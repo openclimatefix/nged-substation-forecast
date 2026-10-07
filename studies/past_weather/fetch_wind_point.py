@@ -16,7 +16,7 @@ product returns the same values from either choice at all three generators.
 
 **The window starts on 2024-08-12**, when Open-Meteo's own UKV downloader started. UKV's archive
 before that date carries radiation but no hub-height wind. Coordinates are read at run time from
-the private roster and sent in the query string; no coordinate and no identifier reaches the
+the private site list and sent in the query string; no coordinate and no identifier reaches the
 written frame, whose rows are keyed by the anonymous wind labels.
 
 Speeds stay in Open-Meteo's default unit, km/h. A tree is indifferent to the unit.
