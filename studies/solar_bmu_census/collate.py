@@ -11,8 +11,10 @@ merged or added to each other. Run after `fetch_sources.py` and `classify.py`:
 """
 
 import difflib
+import math
 import re
 from functools import cache
+from itertools import pairwise
 from pathlib import Path
 from typing import Any, Final, Literal, TypedDict
 
@@ -22,6 +24,7 @@ from fetch_sources import (
     OUTPUT_DIR,
     STUDY_DIR,
     fetch_bmu_reference,
+    fetch_dno_areas,
     fetch_igcpu,
     fetch_mels,
     fetch_repd,
@@ -95,31 +98,30 @@ This column measures observed output. It is not a registered capacity, so it is 
 DISPARITY_FIGURES: Final[tuple[str, ...]] = (*CAPACITY_COLUMNS, P99_COLUMN)
 """The six figures whose spread `capacity_disparity` ranks."""
 GSP_GROUP_AREAS: Final[dict[str, tuple[str, str]]] = {
-    "_A": ("Eastern England", "UKPN"),
+    "_A": ("East England", "UKPN"),
     "_B": ("East Midlands", "NGED"),
     "_C": ("London", "UKPN"),
-    "_D": ("Merseyside and North Wales", "SP Energy Networks"),
+    "_D": ("North Wales, Merseyside and Cheshire", "SP Energy Networks"),
     "_E": ("West Midlands", "NGED"),
     "_F": ("North East England", "Northern Powergrid"),
     "_G": ("North West England", "Electricity North West"),
     "_H": ("Southern England", "SSEN"),
-    "_J": ("South Eastern England", "UKPN"),
+    "_J": ("South East England", "UKPN"),
     "_K": ("South Wales", "NGED"),
-    "_L": ("South Western England", "NGED"),
+    "_L": ("South West England", "NGED"),
     "_M": ("Yorkshire", "Northern Powergrid"),
-    "_N": ("South Scotland", "SP Energy Networks"),
+    "_N": ("South and Central Scotland", "SP Energy Networks"),
     "_P": ("North Scotland", "SSEN"),
 }
 """Each Elexon grid supply point (GSP) group identifier mapped to its area name and the
 distribution network operator (DNO) that holds the licence for that area.
 
 The BMU register names its GSP group by identifier, and spells some groups' names more than one way,
-so the lookup is by identifier. The 14 GSP groups follow the 14 DNO licence areas broadly, not
-exactly. The mapping is the table at
-<https://en.wikipedia.org/wiki/Distribution_network_operator>, and NESO's note on its dataset at
-<https://neso.energy/data-portal/gis-boundaries-gb-dno-license-areas> says the groups broadly align
-with the DNO areas. UKPN is UK Power Networks, NGED is National Grid Electricity Distribution, and
-SSEN is Scottish and Southern Electricity Networks.
+so the lookup is by identifier. Elexon defines a GSP group as the part of one distributor's network
+that a set of grid supply points feeds. The mapping is the attribute table of NESO's map of the 14
+DNO licence areas (`fetch_sources.NESO_DNO_AREAS_GEOJSON`), which labels each area with its GSP
+group identifier, and the area names are NESO's. UKPN is UK Power Networks, NGED is National Grid
+Electricity Distribution, and SSEN is Scottish and Southern Electricity Networks.
 """
 TechnologyType = Literal["pure PV", "hybrid", "unknown"]
 StorageEvidenceType = Literal[
@@ -262,6 +264,87 @@ def osgb_to_lon_lat(*, easting_m: float, northing_m: float) -> tuple[float, floa
     return float(longitude), float(latitude)
 
 
+def _ring_contains(*, ring: list[list[float]], x: float, y: float) -> bool:
+    """Say whether a point is inside a closed ring, counting the edges a ray east crosses."""
+    inside = False
+    for (x1, y1), (x2, y2) in pairwise(ring):
+        if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+            inside = not inside
+    return inside
+
+
+def licence_area_at(
+    *, easting_m: float, northing_m: float, areas: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Return the properties of the licence area that contains a position, or None.
+
+    Args:
+        easting_m: Metres east, on the same grid as the GeoJSON's coordinates.
+        northing_m: Metres north.
+        areas: NESO's licence-area GeoJSON: a feature collection of `MultiPolygon` or `Polygon`
+            features. In a polygon, the first ring is the outer boundary and any later ring is a
+            hole.
+
+    Returns:
+        The feature's `properties` (for NESO's map: `Name`, `DNO`, `Area`), or None when no area
+        contains the position. A position on a boundary can fall in either neighbour.
+    """
+    for feature in areas["features"]:
+        geometry = feature["geometry"]
+        polygons = (
+            [geometry["coordinates"]] if geometry["type"] == "Polygon" else geometry["coordinates"]
+        )
+        for outer, *holes in polygons:
+            if _ring_contains(ring=outer, x=easting_m, y=northing_m) and not any(
+                _ring_contains(ring=hole, x=easting_m, y=northing_m) for hole in holes
+            ):
+                return feature["properties"]
+    return None
+
+
+def _distance_to_segment_m(*, x: float, y: float, start: list[float], end: list[float]) -> float:
+    """Return the distance from a point to the line segment from `start` to `end`."""
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    length_squared = dx * dx + dy * dy
+    along = (
+        0.0 if length_squared == 0 else ((x - start[0]) * dx + (y - start[1]) * dy) / length_squared
+    )
+    along = min(1.0, max(0.0, along))
+    return float(math.hypot(x - (start[0] + along * dx), y - (start[1] + along * dy)))
+
+
+def distance_to_other_areas_m(
+    *, easting_m: float, northing_m: float, areas: dict[str, Any], own_name: str
+) -> float:
+    """Return the distance from a position to the nearest edge of any other licence area.
+
+    Args:
+        easting_m: Metres east, on the same grid as the GeoJSON's coordinates.
+        northing_m: Metres north.
+        areas: NESO's licence-area GeoJSON, as for `licence_area_at`.
+        own_name: The `Name` of the area that contains the position, whose edges are skipped.
+
+    Returns:
+        The distance in metres, which says how far inside its own area a position sits.
+    """
+    nearest = math.inf
+    for feature in areas["features"]:
+        if feature["properties"]["Name"] == own_name:
+            continue
+        geometry = feature["geometry"]
+        polygons = (
+            [geometry["coordinates"]] if geometry["type"] == "Polygon" else geometry["coordinates"]
+        )
+        for polygon in polygons:
+            for ring in polygon:
+                for start, end in pairwise(ring):
+                    nearest = min(
+                        nearest,
+                        _distance_to_segment_m(x=easting_m, y=northing_m, start=start, end=end),
+                    )
+    return nearest
+
+
 def connection_type(*, elexon_bmu_id: str) -> str:
     """Classify a BMU's connection from its identifier prefix."""
     if elexon_bmu_id.startswith("T_"):
@@ -325,15 +408,23 @@ def _has_output(*, bmu_id: str, window_label: str) -> bool:
     return bool((output["output_mwh"].abs() >= STORAGE_OUTPUT_MWH).any())
 
 
-def _repd_position(*, repd_row: dict[str, Any] | None) -> tuple[float | None, float | None]:
-    """Return a REPD row's longitude and latitude, or None for a missing or blank position."""
+def _repd_grid_position(*, repd_row: dict[str, Any] | None) -> tuple[float, float] | None:
+    """Return a REPD row's (easting, northing) in metres, or None when it has no position."""
     if repd_row is None:
-        return None, None
+        return None
     easting = _to_float(repd_row["X-coordinate"])
     northing = _to_float(repd_row["Y-coordinate"])
     if easting is None or northing is None:
+        return None
+    return easting, northing
+
+
+def _repd_position(*, repd_row: dict[str, Any] | None) -> tuple[float | None, float | None]:
+    """Return a REPD row's longitude and latitude, or None for a missing or blank position."""
+    position = _repd_grid_position(repd_row=repd_row)
+    if position is None:
         return None, None
-    return osgb_to_lon_lat(easting_m=easting, northing_m=northing)
+    return osgb_to_lon_lat(easting_m=position[0], northing_m=position[1])
 
 
 def best_tec_rows(*, tec: pl.DataFrame) -> pl.DataFrame:
@@ -470,7 +561,8 @@ def build_table() -> pl.DataFrame:
         One row per BMU in the census (IGCPU type Solar, or output that follows the sun), with the
         BMU's five capacity figures and the P99 of its output, the matched TEC project and REPD
         reference, the BMU's technology (pure PV, hybrid, or unknown) and the evidence for
-        it, and the join methods and match scores.
+        it, the licence area (from NESO's map) that contains the matched REPD row's position and how
+        far that position is from the nearest other area, the join methods, and the match scores.
     """
     reference = {str(r["elexonBmUnit"]): r for r in fetch_bmu_reference() if r["elexonBmUnit"]}
     today, window = recorded_run()
@@ -487,6 +579,7 @@ def build_table() -> pl.DataFrame:
     repd_names, repd_battery_status = _repd_candidates(repd=repd)
     repd_rows = {str(r["Ref ID"]): r for r in repd.iter_rows(named=True)}
     reviewed = _reviewed_matches()
+    licence_areas = fetch_dno_areas()
 
     out = []
     for class_row in classes.iter_rows(named=True):
@@ -518,6 +611,16 @@ def build_table() -> pl.DataFrame:
         longitude, latitude = _repd_position(
             repd_row=repd_rows[repd_match[0]] if repd_match else None
         )
+        grid_position = _repd_grid_position(
+            repd_row=repd_rows[repd_match[0]] if repd_match else None
+        )
+        area_at_position = (
+            licence_area_at(
+                easting_m=grid_position[0], northing_m=grid_position[1], areas=licence_areas
+            )
+            if grid_position
+            else None
+        )
         out.append(
             {
                 "elexon_bmu_id": bmu_id,
@@ -536,6 +639,22 @@ def build_table() -> pl.DataFrame:
                 "connection_type": connection_type(elexon_bmu_id=bmu_id),
                 "gsp_group": ref.get("gspGroupId"),
                 "dno_area": dno_area(gsp_group_id=ref.get("gspGroupId")),
+                "position_gsp_group": area_at_position["Name"] if area_at_position else None,
+                "licence_area_by_position": dno_area(gsp_group_id=area_at_position["Name"])
+                if area_at_position
+                else None,
+                "km_to_nearest_other_area": round(
+                    distance_to_other_areas_m(
+                        easting_m=grid_position[0],
+                        northing_m=grid_position[1],
+                        areas=licence_areas,
+                        own_name=area_at_position["Name"],
+                    )
+                    / 1000,
+                    1,
+                )
+                if grid_position and area_at_position
+                else None,
                 "scope": class_row["scope"],
                 "basis": class_row["basis"],
                 "correlation": class_row["correlation"],

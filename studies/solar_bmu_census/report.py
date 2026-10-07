@@ -944,7 +944,9 @@ def dno_single_table(*, single: pl.DataFrame) -> pl.DataFrame:
     Returns:
         One row for each BMU: its identifier, name, connection type, the register's GSP group
         identifier and the area name for it, the distribution network operator (DNO) for that group,
-        its Generation Capacity in MW, and the county and region of its matched REPD row.
+        the GSP group and DNO of the NESO licence area that contains the position of its matched
+        REPD row and the distance in km from that position to the nearest other licence area, its
+        Generation Capacity in MW, and the county and region of that REPD row.
     """
     return (
         single.sort("elexon_bmu_id")
@@ -962,6 +964,9 @@ def dno_single_table(*, single: pl.DataFrame) -> pl.DataFrame:
             "gsp_group",
             "gsp_area",
             "dno_area",
+            "position_gsp_group",
+            "licence_area_by_position",
+            "km_to_nearest_other_area",
             "generation_capacity_mw",
             "repd_county",
             "repd_region",
@@ -970,21 +975,25 @@ def dno_single_table(*, single: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def dno_summary_table(*, census: pl.DataFrame, scope: str) -> pl.DataFrame:
+def dno_summary_table(
+    *, census: pl.DataFrame, scope: str, by: str = "dno_area", unplaced: str = NO_GSP_GROUP
+) -> pl.DataFrame:
     """Count a scope's census BMUs and sum their Generation Capacity for each DNO area.
 
     Args:
         census: The census table.
         scope: `single-site` or `aggregate`.
+        by: The column that names the DNO: `dno_area` (from the register's GSP group) or
+            `licence_area_by_position` (from the licence area that contains the REPD position).
+        unplaced: The label for a BMU whose `by` column is empty.
 
     Returns:
-        One row for each DNO area that holds a BMU of the scope, with `NO_GSP_GROUP` for BMUs whose
-        register row has no GSP group: the number of BMUs and the sum of their Generation Capacity
-        in MW.
+        One row for each DNO area that holds a BMU of the scope, with `unplaced` for BMUs whose
+        `by` column is empty: the number of BMUs and the sum of their Generation Capacity in MW.
     """
     return (
         census.filter(pl.col("scope") == scope)
-        .with_columns(dno_area=pl.col("dno_area").fill_null(NO_GSP_GROUP))
+        .with_columns(dno_area=pl.col(by).fill_null(unplaced))
         .group_by("dno_area")
         .agg(
             bmus=pl.len(),
@@ -995,7 +1004,7 @@ def dno_summary_table(*, census: pl.DataFrame, scope: str) -> pl.DataFrame:
 
 
 def gsp_register_table(*, census: pl.DataFrame, reference: list[dict[str, Any]]) -> pl.DataFrame:
-    """Return how often the BMU register names a GSP group, and what that says for NGED.
+    """Return how often the BMU register names a GSP group, and the BMUs in NGED's areas.
 
     Args:
         census: The census table.
@@ -1004,7 +1013,9 @@ def gsp_register_table(*, census: pl.DataFrame, reference: list[dict[str, Any]])
     Returns:
         The number of register rows of each `bmUnitType` and how many of them name a GSP group; the
         number of census BMUs that are embedded, and how many of those IGCPU types as Solar; and
-        the number of single-site and of aggregate census BMUs whose GSP group is in an NGED area.
+        the number of single-site and of aggregate census BMUs whose register GSP group is in an
+        NGED area; and the number of single-site census BMUs whose REPD position is inside an NGED
+        licence area.
     """
     rows: list[tuple[str, str]] = []
     for unit_type, label in (("T", "transmission-connected"), ("E", "embedded")):
@@ -1039,8 +1050,22 @@ def gsp_register_table(*, census: pl.DataFrame, reference: list[dict[str, Any]])
                 ].count()
             ),
         ),
-        ("Single-site census BMUs in an NGED area", str(single.filter(nged).height)),
-        ("Aggregate census BMUs in an NGED area", str(aggregates.filter(nged).height)),
+        (
+            "Single-site census BMUs whose register GSP group is in an NGED area",
+            str(single.filter(nged).height),
+        ),
+        (
+            "Single-site census BMUs whose REPD position is inside an NGED licence area",
+            str(single.filter(pl.col("licence_area_by_position") == "NGED").height),
+        ),
+        (
+            "Single-site census BMUs with a REPD position",
+            str(single["licence_area_by_position"].count()),
+        ),
+        (
+            "Aggregate census BMUs whose register GSP group is in an NGED area",
+            str(aggregates.filter(nged).height),
+        ),
         (
             "Generation Capacity of the aggregate census BMUs in an NGED area (MW)",
             f"{_as_float(aggregates.filter(nged)['generation_capacity_mw'].sum()):.1f}",
@@ -1313,13 +1338,26 @@ def main() -> None:
         "## Where each single-site census BMU connects: GSP group and DNO area\n\n"
         "A GSP group is the Elexon grid supply point group in the BMU register. `gsp_area` is the "
         "group's area name and `dno_area` the distribution network operator for that area, from "
-        "`collate.GSP_GROUP_AREAS`. `repd_county` and `repd_region` are the matched REPD row's "
-        "own fields, which are not licence areas.\n\n" + _md(dno_single_table(single=single)),
-        "## Single-site census BMUs by DNO area\n\n"
+        "`collate.GSP_GROUP_AREAS`. `position_gsp_group` and `licence_area_by_position` are the "
+        "GSP group and operator of the licence area in NESO's map that contains the position of "
+        "the matched REPD row, and `km_to_nearest_other_area` is how far inside that area the "
+        "position sits. NESO calls its boundaries approximate. `repd_county` and "
+        "`repd_region` are the matched REPD row's own fields, which are not licence "
+        "areas.\n\n" + _md(dno_single_table(single=single)),
+        "## Single-site census BMUs by DNO area, from the register's GSP group\n\n"
         + _md(dno_summary_table(census=census, scope="single-site")),
+        "## Single-site census BMUs by DNO area, from the REPD position\n\n"
+        + _md(
+            dno_summary_table(
+                census=census,
+                scope="single-site",
+                by="licence_area_by_position",
+                unplaced="no REPD position",
+            )
+        ),
         "## Aggregate census BMUs by DNO area\n\n"
         + _md(dno_summary_table(census=census, scope="aggregate")),
-        "## How often the BMU register names a GSP group, and the NGED counts\n\n"
+        "## How often the BMU register names a GSP group, and the counts in NGED's areas\n\n"
         + _md(gsp_register_table(census=census, reference=reference)),
         "## TEC and REPD values against the sum of each site's BMUs\n\n"
         "Capacities are in MW. The solar and storage sums are of Generation Capacity.\n\n"

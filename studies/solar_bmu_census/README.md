@@ -14,7 +14,7 @@ wrote.**
 
 | Script | What it does |
 |---|---|
-| `fetch_sources.py` | Downloads the BMU register, the IGCPU report (B1420), the settled half-hourly output of each BMU (dataset B1610), the National Energy System Operator's (NESO's) Transmission Entry Capacity (TEC) register, and the Renewable Energy Planning Database (REPD), and writes a lineage note and a README beside them. |
+| `fetch_sources.py` | Downloads the BMU register, the IGCPU report (B1420), the settled half-hourly output of each BMU (dataset B1610), the National Energy System Operator's (NESO's) Transmission Entry Capacity (TEC) register, the Renewable Energy Planning Database (REPD), and NESO's map of the 14 distribution network operator (DNO) licence areas, then writes a lineage note and a README beside them. |
 | `classify.py` | Correlates each BMU's output with the sun and writes `classes.parquet`. |
 | `collate.py` | Fetches each census BMU's Maximum Export Limit (MEL), joins the five capacity values and the P99 of the BMU's output onto each census BMU with the site's technology and position, and writes the census table as `solar_bmus.csv` and `solar_bmus.parquet` in the study's data folder. |
 | `recall_check.py` | Checks the census against the TEC register's photovoltaic (PV) projects. |
@@ -47,14 +47,19 @@ no judged output. It is never added to another column.
 
 ## The location columns
 
-**Four columns say where a BMU is, and none of them is a capacity.**
+**Six columns say where a BMU is, and none of them is a capacity.**
 
 - `gsp_group`: the Elexon grid supply point (GSP) group identifier in the BMU register, such as
   `_B`. The register leaves the group empty for every transmission-connected (`T_`) BMU, so the
   column is empty for the nine transmission-connected single-site census BMUs.
 - `dno_area`: the distribution network operator (DNO) whose licence area the GSP group names, from
-  `collate.GSP_GROUP_AREAS`. The 14 GSP groups follow the 14 DNO licence areas broadly, not exactly.
-  The column is empty when `gsp_group` is empty.
+  `collate.GSP_GROUP_AREAS`. The mapping is the attribute table of NESO's map of the 14 DNO licence
+  areas. The column is empty when `gsp_group` is empty.
+- `position_gsp_group` and `licence_area_by_position`: the GSP group identifier and the DNO of the
+  licence area in NESO's map that contains the position of the matched REPD row. NESO calls the
+  boundaries approximate. The columns are empty when the BMU has no REPD position.
+- `km_to_nearest_other_area`: the distance in kilometres from that position to the nearest edge of
+  any other licence area, which says how far inside its area the position sits.
 - `repd_county` and `repd_region`: the county and region fields of the matched REPD row. These are
   REPD's own fields and are not licence areas.
 

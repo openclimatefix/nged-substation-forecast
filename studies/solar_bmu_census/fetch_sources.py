@@ -34,6 +34,16 @@ NESO_TEC_PAGE: Final[str] = (
 REPD_PAGE: Final[str] = (
     "https://www.gov.uk/government/publications/renewable-energy-planning-database-monthly-extract"
 )
+NESO_DNO_AREAS_PAGE: Final[str] = (
+    "https://neso.energy/data-portal/gis-boundaries-gb-dno-license-areas"
+)
+NESO_DNO_AREAS_GEOJSON: Final[str] = (
+    "https://api.neso.energy/dataset/0e377f16-95e9-4c15-a1fc-49e06a39cfa0/resource/"
+    "1c6a7dc0-1b6c-443a-bc67-5f7125649434/download/gb-dno-license-areas-20240503-as-geojson.geojson"
+)
+"""NESO's map of the 14 distribution network operator licence areas. Each feature carries the GSP
+group identifier (`Name`), the operator (`DNO`), and the area name (`Area`), and the coordinates are
+Ordnance Survey National Grid metres (EPSG:27700)."""
 STUDY_DIR: Final[Path] = SOLAR_BMU_CENSUS_DIR
 INPUTS_DIR: Final[Path] = SOLAR_BMU_CENSUS_INPUTS_DIR
 RAW_DIR: Final[Path] = INPUTS_DIR / "raw"
@@ -208,6 +218,11 @@ def fetch_repd() -> pl.DataFrame:
     return pl.read_csv(body.encode("utf-8"), infer_schema_length=0)
 
 
+def fetch_dno_areas() -> dict[str, Any]:
+    """Return NESO's licence-area map of the 14 distribution network operators, as GeoJSON."""
+    return json.loads(cached_text(name="dno_licence_areas", url=NESO_DNO_AREAS_GEOJSON))
+
+
 def parse_b1610(*, rows: list[dict[str, Any]], window: Window) -> pl.DataFrame:
     """Turn B1610 stream rows into one row per half-hour, in the window.
 
@@ -355,6 +370,7 @@ def write_provenance(*, window: Window, bmu_count: int, today: date) -> None:
             "mels": f"{ELEXON_API}/datasets/MELS/stream",
             "tec_register": NESO_TEC_PAGE,
             "repd": REPD_PAGE,
+            "dno_licence_areas": NESO_DNO_AREAS_GEOJSON,
         },
         "run_date": today.isoformat(),
         "window_utc": [window.start.isoformat(), window.end.isoformat()],
@@ -371,9 +387,9 @@ def write_provenance(*, window: Window, bmu_count: int, today: date) -> None:
 Written by `studies/solar_bmu_census/fetch_sources.py`. Window: {window.start:%Y-%m-%d} to
 {window.end:%Y-%m-%d} (UTC, half-open).
 
-- `raw/`: each small source (BMU reference data, IGCPU, TEC register, REPD, and the Maximum Export
-  Limit of the solar BMUs, which `collate.py` fetches) as JSON with `retrieved_at_utc`,
-  `requested_url`, `final_url`, and `body`.
+- `raw/`: each small source (BMU reference data, IGCPU, TEC register, REPD, NESO's licence-area map
+  of the distribution network operators, and the Maximum Export Limit of the solar BMUs, which
+  `collate.py` fetches) as JSON with `retrieved_at_utc`, `requested_url`, `final_url`, and `body`.
 - `b1610/<BMU>_<window>.parquet`: one file per BMU, half-hourly settled output (Elexon dataset
   B1610), {len(files)} files. Columns:
 
@@ -398,6 +414,7 @@ def main() -> None:
     fetch_igcpu(today=args.today)
     fetch_tec()
     fetch_repd()
+    fetch_dno_areas()
     bmu_ids = b1610_bmu_ids(reference=reference)
     fetch_b1610(bmu_ids=bmu_ids, window=window)
     write_provenance(window=window, bmu_count=len(bmu_ids), today=args.today)

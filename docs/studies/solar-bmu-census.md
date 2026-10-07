@@ -23,10 +23,10 @@ Capacity (TEC) register, and the Renewable Energy Planning Database (REPD).
 [Introduction](#introduction) says what each capacity value measures. Across the census, the largest
 of one BMU's six values is up to 4.2 times its smallest. The factor of 4.2 is at Cleve Hill Solar 1,
 one of two BMUs at the Cleve Hill site, because TEC and REPD give one value for a whole project. The
-REPD value for Cleve Hill is also probably a direct-current (DC) rating of the solar array, so it
-exceeds even the two Cleve Hill BMUs' Generation Capacity added together. The next-largest factor
-after Cleve Hill Solar 2's 2.3 is 2.0 at Larks Green Solar, where the TEC value covers the solar BMU
-and the site's battery.
+REPD value for Cleve Hill, 373.0 MW, exceeds even the two Cleve Hill BMUs' Generation Capacity added
+together, 317.0 MW, probably because REPD gives the solar array's direct-current (DC) rating. Cleve
+Hill Solar 2 has the next-largest factor, 2.3, for the same reason as Cleve Hill Solar 1, and Larks
+Green Solar follows at 2.0, because its TEC value covers the solar BMU and the site's battery.
 
 - **To list solar BMUs, read each BMU's output and not the register, and treat the 10 single-site
   BMUs as a floor.** Add the 28 aggregate BMUs only where an application can accept BMUs that pool
@@ -49,13 +49,14 @@ and the site's battery.
 - **One BMU's five published capacity values and the P99 of its output can differ by a factor of
   4.2**, at Cleve Hill Solar 1, where the TEC and REPD values describe the whole two-BMU site
   ([Capacity](#capacity)).
-- **None of the 10 single-site BMUs can be placed in an NGED licence area from the BMU register,
-  and only one of the 10 is embedded in a distribution network**: Kincraig, which is in North
-  Scotland. The register gives no grid supply point group for any of the nine transmission-connected
-  BMUs ([Distribution network operator
-  areas](#only-one-single-site-bmu-is-embedded-in-a-distribution-network-and-it-is-not-in-ngeds-area)).
 - **Nine of the 10 single-site solar BMUs lie south of 53°N in England, and the tenth lies in
   Scotland** ([Where the BMUs are](#where-the-bmus-are)).
+- **By the BMU register, none of the 10 single-site BMUs is in a licence area of National Grid
+  Electricity Distribution (NGED), and only one is embedded in a distribution network**: Kincraig,
+  in North Scotland. The register gives no grid supply point group to the nine transmission-connected
+  BMUs. By the coordinates of their REPD rows, two of the nine, Larks Green and probably Sutton
+  Bridge, lie inside NGED's licence areas, although both connect to the transmission network and not
+  to NGED's ([Distribution network operator areas](#distribution-network-operator-areas)).
 - **At the four sites with a storage BMU, the solar BMU and the storage BMU look like two separate
   meters, with the exception of Tebworth on two days in January 2026**: a solar BMU follows the sun
   like the pure PV BMU, and a storage BMU charges at midday and discharges in the early evening
@@ -81,7 +82,7 @@ lists, and which capacity value the study takes from it.
 | IGCPU (report B1420) | Elexon, for NESO | Installed capacity of each generating unit, with a resource type such as "Solar" | Installed capacity, as NESO lists it |
 | MELS (Elexon's dataset of Maximum Export Limits) | Elexon | The Maximum Export Limit (MEL), the highest export level that each lead party submits for each BMU, which is a submitted level and not a capacity | The largest MEL in the 30 days before the run |
 | TEC register | NESO | Each project's export capacity agreed at the grid connection, with one row for each stage of the project (for example under construction, or connected), and its plant types | Connected capacity if built, agreed capacity if not |
-| REPD | Department for Energy Security and Net Zero | Each renewable project planned or built, with its technology, status, and grid position | Installed capacity of each project row; co-located storage has its own row, and a solar row's value can be a DC panel rating |
+| REPD | Department for Energy Security and Net Zero | Each renewable project planned or built, with its technology, status, and grid position | Installed capacity of each project row; co-located storage has its own row, and a solar row's value may be a DC panel rating |
 
 Choosing among the capacity values needs a list of the solar BMUs first, and a single lookup cannot
 give that list.
@@ -191,10 +192,20 @@ resemble the project's name, so the study set the match by hand (the hand mappin
 capacity, the customer's name (the company that holds the TEC agreement), the lead party, and the
 connection site. The TEC register holds one row for each stage of a project, so the study takes each
 project's most advanced row. From that row, the study uses the connected capacity if the project is
-built and the agreed capacity if the project is still under construction. Two matched projects hold
-a later stage that the register does not list as built: Cleve Hill adds 200.0 MW with an effective
-date of 2 June 2036, and the Iron Acton project (Larks Green) adds 20.6 MW with status Consents
-Approved. Neither later stage is in the TEC column.
+built and the agreed capacity if the project is still under construction. Three matched projects
+hold a later stage that the register does not list as built: Cleve Hill adds 200.0 MW with an
+effective date of 2 June 2036, the Iron Acton project (Larks Green) adds 20.6 MW with status
+Consents Approved, and the Walpole project (Sutton Bridge) adds 7.1 MW with status Scoping. None of
+the three later stages is in the TEC column.
+
+**Placing a BMU in a licence area.** The study uses two methods. The first reads the grid supply
+point (GSP) group that the BMU register gives the BMU and maps the group's identifier to a
+distribution network operator (DNO) with NESO's map of the 14 DNO licence areas
+([Distribution network operator areas](#distribution-network-operator-areas)). The second finds the
+licence area in that map that contains the position of the BMU's matched REPD row, by testing the
+position against each area's boundary, and records how far the position sits from the nearest other
+area. NESO calls its boundaries approximate, so a position within a few kilometres of a boundary is
+placed with less confidence.
 
 **Recall.** The study checks the census against the 12 built and 6 under-construction TEC projects
 that list PV, because a project that holds TEC and lists PV should have a BMU. Each project is
@@ -271,19 +282,17 @@ BMUs share one TEC project and one REPD row, so both rows show the whole site's 
 **At Breach and Larks Green, the REPD value exceeds Generation Capacity by about 17 MW and 20 MW,
 and a DC panel rating is the likely reason.** The study found no published definition of the REPD
 column "Installed Capacity (MWelec)", nor of the TEC register's columns, that says whether a value
-is an alternating-current (AC) or a direct-current (DC) rating, so the study infers the DC reading
-and has not established it. A DC panel rating would explain the gap. A value that includes the
-battery would not, because REPD lists each site's battery in a row of its own. The two REPD values
-are 67 MW and 70 MW. Breach's Maximum Export Limit is also 67 MW against 49.9 MW in TEC. [National
-Grid describes Larks Green as a 49.9 MW solar
+is an alternating-current (AC) or a direct-current (DC) rating. The study therefore infers the DC
+reading and has not established it. A value that includes the battery would not explain the gap,
+because REPD lists each site's battery in a row of its own. The two REPD values are 67 MW and 70 MW.
+Breach's Maximum Export Limit is also 67 MW against 49.9 MW in TEC. [National Grid describes Larks
+Green as a 49.9 MW solar
 farm](https://nationalgrid.com/uks-first-transmission-connected-solar-farm-goes-live), and [Solar
 Power
 Portal](https://www.solarpowerportal.co.uk/solar-projects/res-secures-asset-management-contract-for-70mw-solar-plus-storage-site)
 reports 70 MW of solar PV generation at the site. [Solar Power
 Portal](https://www.solarpowerportal.co.uk/battery-storage/octopus-acquires-68mw-breach-solar-farm-along-with-stake-in-storage-site)
-describes Breach as 68 MW. These descriptions, and the other facts in this section that come from
-operator and planning documents and not from the registers, are claims that the study checked by
-hand.
+describes Breach as about 68 MW.
 
 | BMU | Name | Site | Generation Capacity (MW) | IGCPU installed (MW) | TEC (MW) | Largest MEL, 30 days (MW) | REPD installed (MW) | P99 of output (MW) |
 |---|---|---|---|---|---|---|---|---|
@@ -304,20 +313,20 @@ TEC and REPD columns. A TEC sum is not comparable with a sum of Generation Capac
 reason in [Introduction](#introduction). The P99 of output is a measure of output and not a
 registered capacity, so the table leaves it out.
 
-| Group (BMUs) | Generation Capacity (MW) | IGCPU installed (MW) | TEC (MW) | Largest MEL, 30 days (MW) | REPD installed (MW) |
+| Group (BMUs) | Generation Capacity (MW) | IGCPU installed (MW) | TEC (MW) | Largest MEL, 30 days (MW) | REPD installed (MW)
 |---|---|---|---|---|---|
-| All solar BMUs, hybrids included (10) | 682.9 (10) | 591.0 (8) | 733.8 (9) | 667.0 (10) | 730.6 (9) |
-| BMUs at hybrid sites (9) | 633.0 (9) | 542.0 (7) | 683.8 (8) | 617.0 (9) | 680.7 (8) |
-| BMU at the pure PV site (1) | 50.0 (1) | 49.0 (1) | 50.0 (1) | 50.0 (1) | 49.9 (1) |
+| All solar BMUs, hybrids included (10) | 682.9 (10) | 591.0 (8) | 733.8 (9) | 667.0 (10) | 730.6 (9)
+| BMUs at hybrid sites (9) | 633.0 (9) | 542.0 (7) | 683.8 (8) | 617.0 (9) | 680.7 (8)
+| BMU at the pure PV site (1) | 50.0 (1) | 49.0 (1) | 50.0 (1) | 50.0 (1) | 49.9 (1)
 
 **Of the nine BMUs at hybrid sites (eight sites), four have a storage BMU with output at their site,
 three (at two sites) have an operational battery in REPD, and two have storage planned or under
 construction.** REPD records two batteries as operational: 150 MW at Cleve Hill, which REPD links to
-both Cleve Hill BMUs, and 0.66 MW at Breach. The evidence for the Cleve Hill status is doubtful.
-REPD gives the battery the same operational date as the solar array, 1 July 2025, while [Quinbrook,
-the operator](https://www.quinbrook.com/?p=1921), and [pv
-magazine](https://www.pv-magazine.com/2025/07/02/largest-uk-solar-plant-goes-online/) reported on
-that date that the battery was still under construction, and the BMU register holds no Cleve Hill
+both Cleve Hill BMUs, and 0.66 MW at Breach. REPD's operational status for the Cleve Hill battery is
+doubtful. REPD gives the battery the same operational date as the solar array, 1 July 2025.
+[Quinbrook, the project's owner](https://www.quinbrook.com/?p=1921), and [pv
+magazine](https://www.pv-magazine.com/2025/07/02/largest-uk-solar-plant-goes-online/) reported on 1
+and 2 July 2025 that the battery was still under construction. The BMU register holds no Cleve Hill
 storage BMU.
 
 **For 6 of the 9 BMUs with output, the largest output is within 1% of Generation Capacity.** The
@@ -335,20 +344,24 @@ chose them is in [Data and methods](#data-and-methods). At Cleve Hill Solar 1, R
 and TEC 350.0 MW, against 112.0 MW for Generation Capacity, IGCPU, and the largest MEL, and 88.1 MW
 for the P99 of output. At Cleve Hill Solar 2 the same two project values sit against 205.0 MW and a
 P99 of 161.1 MW. TEC and REPD each give one value for the whole Cleve Hill project, which holds both
-BMUs, so the two Cleve Hill ratios compare a project's value with a BMU's value. The two project
-values cover different plant. REPD's 373.0 MW is the solar row alone, because REPD lists the 150 MW
+BMUs, so the two Cleve Hill ratios compare a project's value with a BMU's value.
+
+**The two Cleve Hill project values cover different plant: REPD's 373.0 MW covers the solar array
+alone, probably as its DC rating, and TEC's 350.0 MW covers the grid connection that the array
+shares with the battery.** REPD's 373.0 MW is the solar row alone, because REPD lists the 150 MW
 battery in a row of its own, and Quinbrook [describes 373 MW as the array's DC
 capacity](https://www.quinbrook.com/?p=1921). The REPD value is 56.0 MW (18%) above the two BMUs'
-summed Generation Capacity of 317.0 MW, which a DC rating would explain. TEC's 350.0 MW is
-consistent with the capacity of the one grid connection that, according to the project's [Grid
-Connection
+summed Generation Capacity of 317.0 MW, which a DC rating would explain. According to the project's
+[Grid Connection
 Statement](https://nsip-documents.planninginspectorate.gov.uk/published-documents/EN010085-000208-5.4%20Grid%20Connection%20Statement.pdf),
-the solar array and the battery share: it is less than 317.0 MW of solar plus 150 MW of battery, and
-the highest sum of the two BMUs' outputs in one half-hour is 276.75 MW. At Larks Green, TEC gives
-99.4 MW and REPD 70.0 MW against 49.9 to 50.0 MW for the other four values. The Larks Green TEC
-value equals the 49.9 MW of the solar BMU plus the 49.5 MW battery that REPD lists at the site. The
-P99 of output is the lowest of the six values at all three BMUs, and at Larks Green the P99 equals
-Generation Capacity to one decimal place (49.9 MW).
+the solar array and the battery share one connection to the Cleve Hill 400 kV substation. TEC's
+350.0 MW covers that connection. TEC is less than 317.0 MW of solar plus 150 MW of battery, and
+above the highest sum of the two BMUs' outputs in one half-hour, 276.75 MW.
+
+**At Larks Green, TEC gives 99.4 MW and REPD 70.0 MW against 49.9 to 50.0 MW for the other four
+values.** The Larks Green TEC value equals the 49.9 MW of the solar BMU plus the 49.5 MW battery
+that REPD lists at the site. The P99 of output is the lowest of the six values at all three BMUs,
+and at Larks Green the P99 equals Generation Capacity to one decimal place (49.9 MW).
 
 **Figure 2 draws the five published capacity values and two measures of each BMU's own output: the
 P99 and the maximum.** The largest half-hourly output is 116.2 MW at Cleve Hill Solar 1, 181.0 MW at
@@ -368,61 +381,77 @@ position from the REPD row matched to that BMU, because the BMU register gives n
 
 ![Figure 3: Maps of the 10 single-site solar BMUs in Great Britain](assets/solar_bmu_census_map.svg)
 
-### Only one single-site BMU is embedded in a distribution network, and it is not in NGED's area
+### Distribution network operator areas
 
-**The BMU register places one of the 10 single-site BMUs in a distribution network operator (DNO)
-area: Kincraig, in North Scotland.** Elexon's BMU register gives each BMU a grid supply point (GSP)
-group, one of the 14 areas into which Elexon divides Great Britain for settlement. The 14 GSP groups
-follow the 14 DNO licence areas broadly, not exactly: the study maps each group's identifier to a
-DNO using [the table of GSP groups and DNOs on
-Wikipedia](https://en.wikipedia.org/wiki/Distribution_network_operator), which agrees with [NESO's
-note that the groups broadly align with the DNO
+**By the BMU register, one of the 10 single-site BMUs is in a distribution network operator (DNO)
+area: Kincraig, in North Scotland.** Elexon's BMU register gives a grid supply point (GSP) group to
+every embedded and supplier BMU, but to no transmission-connected BMU. None of the register's 514
+rows of type T (transmission-connected) names a group, and all 176 rows of type E (embedded) do.
+Nine of the 10 single-site BMUs are transmission-connected (`T_`), so the register gives no DNO area
+for them. Only 1 of the 38 census BMUs is embedded, which is Kincraig, and Kincraig is also the only
+embedded BMU that IGCPU types as Solar.
+
+**A GSP group is, in [Elexon's
+definition](https://bscdocscontent.elexon.co.uk/documents/market-domain-data-overview.pdf), the part
+of one distributor's network that a set of grid supply points feeds, and NESO's map of the DNO
+licence areas labels each area with its GSP group identifier.** The study maps each identifier to a
+DNO from the attribute table of [NESO's map of the 14 DNO licence
 areas](https://neso.energy/data-portal/gis-boundaries-gb-dno-license-areas). NGED holds four of the
 14 areas: East Midlands (`_B`), West Midlands (`_E`), South Wales (`_K`), and South West England
-(`_L`). None of the 10 single-site BMUs is in an NGED area according to the register, and the
-register leaves nine of the 10 unplaced.
+(`_L`).
 
-**The register names no GSP group for any transmission-connected BMU.** None of the register's 514
-rows of type T names a group, and all 176 rows of type E (embedded) do. Nine of the 10 single-site
-BMUs are transmission-connected (`T_`), so the register gives no DNO area for them. The study
-therefore cannot say from the register which licence area each of the nine lies in. The table adds
-the county and region fields of each BMU's matched REPD row. The REPD county and region fields are
-not licence areas: Larks Green (region South West) and Sutton Bridge (region East Midlands) carry
-region names that NGED's areas share, but the study does not place either BMU in NGED's area on that
-evidence. Only 1 of the 38 census BMUs is embedded, which is Kincraig, and Kincraig is also the only
-embedded BMU that IGCPU types as Solar, so no other embedded solar BMU with a Solar type exists in
-the BMU register.
+**By the coordinates of their matched REPD rows, two of the nine transmission-connected BMUs lie
+inside NGED's licence areas: Larks Green, and probably Sutton Bridge.** The study tests each REPD
+position against the boundaries in NESO's map. Larks Green is inside West Midlands (`_E`), 3.1 km
+from the South West England boundary, and so is in an NGED area whichever neighbouring boundary is
+meant. Sutton Bridge is inside East Midlands (`_B`) but 1.3 km from the East England boundary
+(`_A`), a UK Power Networks area, and NESO calls its boundaries approximate, so Sutton Bridge is
+probably in an NGED area. The other seven positions are in UK Power Networks areas (`_A` and `_J`),
+and Kincraig is in North Scotland (`_P`). Both NGED-area sites connect to the transmission network,
+at the projects that TEC lists as Iron Acton and Walpole, so neither feeds an NGED circuit. The REPD
+county and region fields are not licence areas: REPD gives Larks Green the region South West, which
+is a region that NGED's South West England area shares, although Larks Green is in the West Midlands
+area.
 
-| BMU | Name | Connection | GSP group | DNO area | Generation Capacity (MW) | REPD county, region |
-|---|---|---|---|---|---|---|
-| `E_KINCS-1` | Kincraig | Embedded | `_P`, North Scotland | SSEN | 20.6 | Grampian, Scotland |
-| `T_BLPFS-1` | Bulphan Fen Warley Green Solar | Transmission-connected | – | – | 50.216 | Essex, Eastern |
-| `T_BRCHS-1` | Breach Solar Farm | Transmission-connected | – | – | 50.0 | Cambridgeshire, Eastern |
-| `T_BURWS-1` | Beechgreen Energy Farm | Transmission-connected | – | – | 49.952 | Cambridgeshire, Eastern |
-| `T_CLVHS-1` | Cleve Hill Solar 1 | Transmission-connected | – | – | 112.0 | Kent, South East |
-| `T_CLVHS-2` | Cleve Hill Solar 2 | Transmission-connected | – | – | 205.0 | Kent, South East |
-| `T_LARKS-1` | Larks Green Solar | Transmission-connected | – | – | 49.9 | Gloucestershire, South West |
-| `T_SUTBS-1` | Sutton Bridge Solar Farm | Transmission-connected | – | – | 49.419 | Lincolnshire, East Midlands |
-| `T_TEBWS-1` | Tebworth PV Power Park | Transmission-connected | – | – | 45.928 | Bedfordshire, Eastern |
-| `T_TYLNS-1` | Tye Lane Solar | Transmission-connected | – | – | 49.9 | Suffolk, Eastern |
+| BMU | Name | Connection | GSP group in the register | DNO area from the register | Licence area at the REPD position | Generation Capacity (MW) | REPD county, region |
+|---|---|---|---|---|---|---|---|
+| `E_KINCS-1` | Kincraig | Embedded | `_P`, North Scotland | SSEN | `_P`, SSEN | 20.6 | Grampian, Scotland |
+| `T_BLPFS-1` | Bulphan Fen Warley Green Solar | Transmission-connected | – | – | `_A`, UKPN | 50.216 | Essex, Eastern |
+| `T_BRCHS-1` | Breach Solar Farm | Transmission-connected | – | – | `_A`, UKPN | 50.0 | Cambridgeshire, Eastern |
+| `T_BURWS-1` | Beechgreen Energy Farm | Transmission-connected | – | – | `_A`, UKPN | 49.952 | Cambridgeshire, Eastern |
+| `T_CLVHS-1` | Cleve Hill Solar 1 | Transmission-connected | – | – | `_J`, UKPN | 112.0 | Kent, South East |
+| `T_CLVHS-2` | Cleve Hill Solar 2 | Transmission-connected | – | – | `_J`, UKPN | 205.0 | Kent, South East |
+| `T_LARKS-1` | Larks Green Solar | Transmission-connected | – | – | `_E`, NGED | 49.9 | Gloucestershire, South West |
+| `T_SUTBS-1` | Sutton Bridge Solar Farm | Transmission-connected | – | – | `_B`, NGED | 49.419 | Lincolnshire, East Midlands |
+| `T_TEBWS-1` | Tebworth PV Power Park | Transmission-connected | – | – | `_A`, UKPN | 45.928 | Bedfordshire, Eastern |
+| `T_TYLNS-1` | Tye Lane Solar | Transmission-connected | – | – | `_A`, UKPN | 49.9 | Suffolk, Eastern |
 
-**The table counts the single-site BMUs and their Generation Capacity for each DNO area.** A dash in
-the table above means the register has no value. SSEN is Scottish and Southern Electricity
-Networks.
+A dash in the table means the register has no value. SSEN is Scottish and Southern Electricity
+Networks, and UKPN is UK Power Networks.
 
-| DNO area | BMUs | Generation Capacity (MW) |
-|---|---|---|
-| **NGED** | 0 | 0.0 |
-| SSEN | 1 | 20.6 |
-| No GSP group in the register | 9 | 662.3 |
+**By the register's GSP group, 1 single-site BMU (20.6 MW) is in SSEN's area and 9 (662.3 MW) have
+no group. By the REPD position, 2 BMUs (99.3 MW) are in NGED areas, 1 (20.6 MW) is in SSEN's area,
+and 7 (563.0 MW) are in UK Power Networks areas.**
 
-**The 28 aggregate BMUs name a GSP group, and 11 of them are in NGED's areas.** An aggregate BMU's
-group is the one in which its supplier registers it, and the study found no document that says where
-each pooled site sits, so the group says little about where any solar farm lies. The 11 aggregate
-BMUs in NGED's areas have 647.6 MW of Generation Capacity, out of 1,896.8 MW for all 28, and most
-of that capacity is not solar ([Aggregates](#aggregate-bmus)). The other 17 BMUs are in the areas of
-UK Power Networks (6 BMUs, 257.9 MW), SSEN (4, 918.7 MW), SP Energy Networks (4, 65.2 MW), Northern
-Powergrid (2, 5.3 MW), and Electricity North West (1, 2.0 MW).
+| DNO area | BMUs by register GSP group | Generation Capacity (MW) | BMUs by REPD position | Generation Capacity (MW) |
+|---|---|---|---|---|
+| NGED | 0 | 0.0 | 2 | 99.3 |
+| SSEN | 1 | 20.6 | 1 | 20.6 |
+| UKPN | 0 | 0.0 | 7 | 563.0 |
+| No GSP group in the register | 9 | 662.3 | 0 | 0.0 |
+
+**The 28 aggregate BMUs name a GSP group, and 11 of them are in NGED's areas.** A supplier BMU
+(`2__`) pools the supplier's metering systems in one GSP group, so its group does locate the pooled
+sites. The evidence is Elexon's glossary entries for [Base BM
+Unit](https://www.elexon.co.uk/bsc/glossary/base-bm-unit/) and [Additional BM
+Unit](https://www.elexon.co.uk/bsc/glossary/additional-bm-unit/), and the convention that the fourth
+character of a `2__` identifier is the group letter. The study did not read the clause of the
+Balancing and Settlement Code that defines supplier BMUs, and did not check the rules for `C__` and
+`V__` identifiers. What the study cannot say is how much of each BMU's capacity is solar. The 11
+aggregate BMUs in NGED's areas have 647.6 MW of Generation Capacity, out of 1,896.8 MW for all 28,
+and most of that capacity is not solar ([Aggregates](#aggregate-bmus)). The other 17 BMUs are in the
+areas of UK Power Networks (6 BMUs, 257.9 MW), SSEN (4, 918.7 MW), SP Energy Networks (4, 65.2 MW),
+Northern Powergrid (2, 5.3 MW), and Electricity North West (1, 2.0 MW).
 
 ### What a solar BMU looks like
 
@@ -583,17 +612,19 @@ storage BMU and cannot say where the battery is metered.
   change a technology label, a position, or a capacity sum.
 - **DC against AC is inferred, and some facts come from outside the registers.** The study found no
   published field definition for REPD's "Installed Capacity (MWelec)" or for the TEC register's
-  columns. The statements about Cleve Hill's battery, its DC rating, its grid connection, and
-  Larks Green's and Breach's descriptions come from operator and planning documents, which the
-  study checked by hand and linked where they appear.
+  columns. The statements about the status of Cleve Hill's battery, the DC rating of Cleve Hill's
+  solar array, Cleve Hill's grid connection, and the descriptions of Larks Green and Breach come
+  from operator and planning documents, which the study read by hand and linked where they appear.
 - **A TEC plant type can omit PV or be wrong.** Tebworth's customer holds a project that lists
   storage only, and the Sundon Pivoted Power row lists PV only although its customer and its BMU are
   a storage developer and a storage BMU. The recall check can therefore miss a site. A TEC project
-  with PV and storage could also hold a PV array that no BMU meters on its own. The Sundon TEC
-  value of 39.9 MW (plant type storage only) is close to the highest sum of Tebworth's two BMUs'
-  outputs in one half-hour, 39.5 MW, which suggests that the value limits the whole site's export.
-  The value also equals the Tebworth storage BMU's Generation Capacity of 39.9 MW, so the study
-  cannot tell whether the value covers the solar farm.
+  with PV and storage could also hold a PV array that no BMU meters on its own. The
+  storage-only Sundon project that Tebworth's customer holds has a TEC value of 39.9 MW, close to
+  the highest sum of Tebworth's two BMUs' outputs in one half-hour, 39.5 MW, which suggests that
+  this TEC value limits the whole site's export. At Tye Lane the combined output reached 59.1 MW
+  against a TEC value of 57.0 MW, so an output peak near TEC does not always mean that TEC caps the
+  site. The 39.9 MW also equals the Tebworth storage BMU's Generation Capacity, so the study cannot
+  tell whether the Sundon TEC value covers the solar farm.
 - **The hybrid label rests on graded evidence.** Only four sites have a storage BMU with output.
   Breach's operational battery is 0.66 MW, and two sites have storage that is not yet built. The
   Cleve Hill battery's operational status in REPD is doubtful ([Capacity](#capacity)).
@@ -609,21 +640,23 @@ storage BMU and cannot say where the battery is metered.
 - **REPD lists some sites that already generate as under construction**, so the study accepts both
   operational and under-construction REPD rows.
 - **The Maximum Export Limit comes from a window after the output window.**
-- **The distribution network operator (DNO) table covers only BMUs.** Most embedded solar has no
-  BMU, so the table says nothing about how much solar NGED's network holds ([Scope](#scope)).
+- **The distribution network operator (DNO) tables cover only BMUs.** Most embedded solar has no
+  BMU, so the tables say nothing about how much solar NGED's network holds. NESO calls its licence
+  area boundaries approximate, so a position within a few kilometres of a boundary is placed with
+  less confidence ([Distribution network operator areas](#distribution-network-operator-areas)).
 
 ## Scope
 
 **The study compares no weather products and fits no forecasting model.** The other studies on this
-site work from weather data and from the output of generators connected to the electricity network
-of National Grid Electricity Distribution (NGED). This study uses only public data and covers all of
+site work from weather data and from the output of generators connected to NGED's electricity
+network. This study uses only public data and covers all of
 Great Britain. Its numbers describe the solar BMUs registered in the Balancing Mechanism, not the
 solar generation in NGED's network.
 
 **The study does not cover solar generation that is not a BMU.** Much of the solar capacity in Great
-Britain is small generation embedded in distribution networks, with no BMU. The table of DNO areas
-therefore covers only BMUs. The study also does not cover wind or other fuels, a forecast of any
-BMU's output, or years other than September 2025 to August 2026.
+Britain is small generation embedded in distribution networks, with no BMU. The study also does not
+cover wind or other fuels, a forecast of any BMU's output, or years other than September 2025 to
+August 2026.
 
 ## Data and code availability
 
@@ -633,7 +666,9 @@ the TEC register from [NESO's data
 portal](https://www.neso.energy/data-portal/transmission-entry-capacity-tec-register), and REPD from
 [the Department for Energy Security and Net
 Zero](https://www.gov.uk/government/publications/renewable-energy-planning-database-monthly-extract).
-The two hand-made match tables are committed beside the scripts. The code is in
+NESO's [map of the 14 DNO licence
+areas](https://neso.energy/data-portal/gis-boundaries-gb-dno-license-areas) is public too. The two
+hand-made match tables are committed beside the scripts. The code is in
 [`studies/solar_bmu_census/`](https://github.com/openclimatefix/nged-substation-forecast/tree/main/studies/solar_bmu_census),
 and its tests are in `packages/studies/tests/solar_bmu_census/`.
 
