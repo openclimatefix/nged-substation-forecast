@@ -5,7 +5,13 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.common import MAX_PLAUSIBLE_DATETIME, MIN_PLAUSIBLE_DATETIME
-from contracts.power_schemas import POWER_TIMESTAMPS_CORRECTED_BEFORE, PowerTimeSeries
+from contracts.power_schemas import (
+    DROP_REASONS,
+    POWER_TIMESTAMPS_CORRECTED_BEFORE,
+    CleanedPowerTimeSeries,
+    PowerTimeSeries,
+)
+from patito.exceptions import DataFrameValidationError
 
 
 def test_power_time_series_validation():
@@ -260,3 +266,44 @@ def test_correct_late_timestamps_moves_only_the_late_readings(
     corrected = PowerTimeSeries.correct_late_timestamps(_frame([time]))
 
     assert corrected["time"].to_list() == [expected]
+
+
+def _cleaned_frame(rows: list[tuple[int, datetime, float, str | None]]) -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "time_series_id": [row[0] for row in rows],
+            "time": [row[1] for row in rows],
+            "power": [row[2] for row in rows],
+            "drop_reason": [row[3] for row in rows],
+        },
+        schema_overrides={
+            "time_series_id": pl.Int32,
+            "power": pl.Float32,
+            "drop_reason": pl.String,
+        },
+    ).cast({"time": CleanedPowerTimeSeries.dtypes["time"]})
+
+
+T0 = datetime(2026, 1, 1, 0, 0, tzinfo=UTC)
+T1 = datetime(2026, 1, 1, 0, 30, tzinfo=UTC)
+
+
+def test_cleaned_power_time_series_accepts_null_and_known_reason():
+    CleanedPowerTimeSeries.validate(
+        _cleaned_frame([(1, T0, 1.0, None), (1, T1, 0.0, DROP_REASONS[0])])
+    )
+
+
+def test_cleaned_power_time_series_rejects_unknown_reason():
+    with pytest.raises(DataFrameValidationError):
+        CleanedPowerTimeSeries.validate(_cleaned_frame([(1, T0, 1.0, "not_a_reason")]))
+
+
+def test_cleaned_power_time_series_rejects_duplicate_key():
+    with pytest.raises(ValueError, match="Duplicate"):
+        CleanedPowerTimeSeries.validate(_cleaned_frame([(1, T0, 1.0, None), (1, T0, 2.0, None)]))
+
+
+def test_cleaned_power_time_series_rejects_unsorted_rows():
+    with pytest.raises(ValueError, match="not sorted"):
+        CleanedPowerTimeSeries.validate(_cleaned_frame([(1, T1, 1.0, None), (1, T0, 2.0, None)]))

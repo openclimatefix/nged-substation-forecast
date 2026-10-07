@@ -31,12 +31,12 @@ stack runs in — bring one up first:
   plane](connecting.md).
 
 Either UI shows every asset, most of which are nothing to do with running the service. Paste
-`tag:layer=production` into the asset-selection box to cut the view down to the four that produce
-the forecasts: `power_time_series_and_metadata`, `h3_grid_weights`, `ecmwf_ens`, and
-`live_forecasts`. The promotion assets used in steps 1–2 below are deliberately *not* in that
-selection: they need MLflow, which the deployment does not reach, so you run them yourself — today
-from your laptop, as step 2 says — whichever environment serves the forecasts. `tag:layer=research`
-is the rest.
+`tag:layer=production` into the asset-selection box to cut the view down to the five assets that
+produce the forecasts: `power_time_series_and_metadata`, `clean_nged_power_data`, `h3_grid_weights`,
+`ecmwf_ens`, and `live_forecasts`. The promotion assets used in steps 1–2 below are deliberately
+*not* in that selection: they need MLflow, which the deployment does not reach, so you run them
+yourself — today from your laptop, as step 2 says — whichever environment serves the forecasts.
+`tag:layer=research` is the rest.
 
 ## Step 1 — Pick a champion model
 
@@ -98,11 +98,11 @@ model](aws.md#redeploying-a-new-champion-model).
 
 Once a model is promoted, `live_forecasts` produces a new forecast automatically every 6 hours — at
 00:00, 06:00, 12:00, and 18:00 UTC — via `live_forecasts_schedule`. `power_time_series_and_metadata`
-(a separate, hourly-scheduled job `live_forecasts` depends on but is deliberately not ordered
-against) is itself scheduled 5 minutes *before* each hour so that hour's pull has landed by the time
-`live_forecasts` ticks. That offset is an optimisation for freshness, not a precondition: if the
-pull fails or runs long, the forecast still goes out on time against whatever telemetry is already
-on disk — see [Inherent Stability → The
+and `clean_nged_power_data` run in a separate hourly job, scheduled 5 minutes *before* each hour so
+that hour's pull has landed, and been cleaned, by the time `live_forecasts` ticks. `live_forecasts`
+depends on both assets but is deliberately not ordered against their job. That offset is an
+optimisation for freshness, not a precondition: if the pull fails or runs long, the forecast still
+goes out on time against whatever telemetry is already on disk — see [Inherent Stability → The
 rules](../design-philosophy/inherent-stability.md#the-rules). This needs the Dagster daemon running
 (see [Prerequisites](#prerequisites-a-running-dagster-instance) above) to fire on time.
 
@@ -239,6 +239,33 @@ exception is also sent to Sentry tagged `asset_check:power_data_is_fresh`, so th
 without your watching the Checks view. The check degrades this way on purpose rather than raising,
 so the hourly ingest keeps running; nothing is known about staleness while it persists, so treat it
 as "unknown", not "healthy".
+
+**Before the first `live_forecasts` slot of a new deployment, materialise `clean_nged_power_data`
+once by hand.** `live_forecasts` reads the `cleaned_power_time_series` table that
+`clean_nged_power_data` writes. Until `clean_nged_power_data` has run, the cleaned table does not
+exist and the slot fails at the read. The hourly ingest job runs `clean_nged_power_data` straight
+after the first ingest, so the hand materialisation matters only when a slot could tick before that
+first hourly run finishes.
+
+**Reading a failed cleaning run.** `clean_nged_power_data` rebuilds `cleaned_power_time_series` from
+the raw power table when NGED has delivered new data, a cleaning rule has changed, or the
+`TimeSeriesMetadata` table has changed. Otherwise the asset returns at once with `skipped: True` in
+its run metadata. When `clean_nged_power_data` fails, the run fails and reports to Sentry. Every
+reader, `live_forecasts` included, carries on with the last good cleaned table, and the next hourly
+run tries again. Read the traceback in the run's logs: a failing cleaning rule and a metadata
+parquet file that no longer matches the `TimeSeriesMetadata` contract both need a fix, not a re-run.
+
+**A cleaning job that stops running without failing shows up only in the Checks view.** The
+`cleaned_power_keeps_up_with_raw` check on `power_time_series_and_metadata` warns when the cleaned
+table was built from a raw table 2 or more commits (about 6 to 12 hours of NGED deliveries) older
+than the current raw table, was built from a different raw table, or is absent. The check is the
+only signal for that failure, and sends nothing to Sentry. Fix the cause, then materialise
+`clean_nged_power_data`. Setting its `force` run config rebuilds the cleaned table even when nothing
+has changed.
+
+**Reading a failed vacuum.** `vacuum_failed: True` in `clean_nged_power_data`'s run metadata means
+the new cleaned table was written and only deleting the superseded files failed. A vacuum failure
+also reaches Sentry tagged `degraded_asset:clean_nged_power_data`.
 
 **Reading a failed roster upsert.** `metadata_upsert_failed` in `power_time_series_and_metadata`'s
 run metadata means the `TimeSeriesMetadata` roster upsert raised and was swallowed so the power

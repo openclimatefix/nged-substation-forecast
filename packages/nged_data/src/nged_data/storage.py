@@ -345,19 +345,61 @@ def time_series_coverage(
         )
         return pt.DataFrame(empty).set_model(TimeSeriesCoverage).validate()
 
+    return coverage_from_power(
+        pt.LazyFrame.from_existing(
+            pl.scan_delta(delta_path, storage_options=typeddict_to_dict(storage_options))
+        ).set_model(PowerTimeSeries)
+    )
+
+
+def coverage_from_power(power: pt.LazyFrame[PowerTimeSeries]) -> pt.DataFrame[TimeSeriesCoverage]:
+    """Return the earliest/latest observation ``time`` per ``time_series_id`` of a power frame.
+
+    The aggregation behind `time_series_coverage`, split out so a caller can compute coverage of
+    any scan of power, for example the unflagged rows of the cleaned table (`scan_cleaned_power`).
+
+    Args:
+        power: Lazy power observations; only `time_series_id` and `time` are read.
+
+    Returns:
+        One row per `time_series_id`, validated against `TimeSeriesCoverage`.
+    """
     coverage = (
-        pl.scan_delta(delta_path, storage_options=typeddict_to_dict(storage_options))
+        pl.LazyFrame._from_pyldf(power._ldf)
         .group_by("time_series_id")
         .agg(first_time=pl.min("time"), last_time=pl.max("time"))
         # Streaming engine: bounds peak memory (~7x lower than in-memory at V2 scale) so the
-        # hourly full-table aggregate stays comfortable on a small control-plane VM. See docstring.
+        # hourly full-table aggregate stays comfortable on a small control-plane VM. See
+        # `time_series_coverage`'s docstring.
         .collect(engine="streaming")
     )
     log.info(
-        f"Found on-disk coverage for {coverage.height} time_series_ids from {delta_path}."
+        f"Found on-disk coverage for {coverage.height} time_series_ids."
         f" {coverage['last_time'].min()=}. {coverage['last_time'].max()=}"
     )
     return pt.DataFrame(coverage).set_model(TimeSeriesCoverage).validate()
+
+
+def scan_cleaned_power(
+    delta_path: str,
+    storage_options: ObjectStoreOptions | None = None,
+) -> pt.LazyFrame[PowerTimeSeries]:
+    """Scan the cleaned power table, keeping only the rows that no cleaning rule flagged.
+
+    `scan_cleaned_power` is the one read path for every consumer of observed power except the ingest
+    and its freshness check, so no consumer can forget the `drop_reason` filter. The raw table stays
+    the record of what NGED delivered.
+
+    Args:
+        delta_path: Path or URI of the `cleaned_power_time_series` Delta table.
+        storage_options: delta-rs object-store options for a remote `delta_path`.
+
+    Returns:
+        A lazy frame with the three `PowerTimeSeries` columns, whose `drop_reason` was null.
+    """
+    scan = pl.scan_delta(delta_path, storage_options=typeddict_to_dict(storage_options))
+    unflagged = scan.filter(pl.col("drop_reason").is_null()).select(*PowerTimeSeries.columns)
+    return pt.LazyFrame.from_existing(unflagged).set_model(PowerTimeSeries)
 
 
 _LATE_FILE_LOOKBACK: Final[timedelta] = timedelta(days=3)

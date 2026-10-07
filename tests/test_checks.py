@@ -26,8 +26,8 @@ from typing import Literal
 
 import polars as pl
 import pytest
+from _cleaned_power_test_data import write_metadata
 from contracts.common import UTC_DATETIME_DTYPE
-from contracts.power_schemas import TimeSeriesMetadata
 from contracts.settings import Settings
 from dagster import (
     AssetCheckResult,
@@ -39,7 +39,8 @@ from dagster import (
     build_asset_check_context,
     materialize,
 )
-from deltalake import write_deltalake
+from delta_store.cleaned_power_time_series import CleaningProvenance
+from deltalake import CommitProperties, DeltaTable, write_deltalake
 
 from nged_substation_forecast import _sentry
 from nged_substation_forecast.defs import checks
@@ -416,26 +417,6 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path
 
 
-def _write_metadata_roster(path: str, ids: list[int]) -> None:
-    """Write a minimal valid ``TimeSeriesMetadata`` parquet covering ``ids``."""
-    rows = [
-        {
-            "time_series_id": i,
-            "time_series_name": f"Substation {i}",
-            "time_series_type": "Disaggregated Demand",
-            "units": "MW",
-            "licence_area": "EMids",
-            "substation_number": i,
-            "substation_type": "Primary",
-            "latitude": 52.0,
-            "longitude": -1.0,
-            "h3_res_5": 599423199024775167,
-        }
-        for i in ids
-    ]
-    TimeSeriesMetadata.DataFrame(rows).cast().validate().write_parquet(path)
-
-
 def _run_freshness_check() -> AssetCheckResult:
     """Invoke ``power_data_is_fresh`` directly, on an instance closed before we return.
 
@@ -464,7 +445,7 @@ def test_power_data_is_fresh_end_to_end(env: Path, monkeypatch: pytest.MonkeyPat
             "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
         }
     ).write_delta(settings.power_time_series_data_path)
-    _write_metadata_roster(settings.metadata_path, ids=[1, 2, 99])
+    write_metadata(settings.metadata_path, dict.fromkeys([1, 2, 99], "Primary"))
 
     result = _run_freshness_check()
 
@@ -494,7 +475,7 @@ def test_power_data_is_fresh_all_current_passes(env: Path) -> None:
             "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
         }
     ).write_delta(settings.power_time_series_data_path)
-    _write_metadata_roster(settings.metadata_path, ids=[1, 2])
+    write_metadata(settings.metadata_path, dict.fromkeys([1, 2], "Primary"))
 
     result = _run_freshness_check()
     assert result.passed is True
@@ -525,7 +506,7 @@ def test_power_data_is_fresh_silences_the_configured_series(
             "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
         }
     ).write_delta(settings.power_time_series_data_path)
-    _write_metadata_roster(settings.metadata_path, ids=[1, 99])
+    write_metadata(settings.metadata_path, dict.fromkeys([1, 99], "Primary"))
 
     result = checks.power_data_is_fresh()
     assert isinstance(result, AssetCheckResult)
@@ -555,7 +536,7 @@ def test_power_data_is_fresh_uses_the_production_threshold(env: Path) -> None:
             "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
         }
     ).write_delta(settings.power_time_series_data_path)
-    _write_metadata_roster(settings.metadata_path, ids=[7, 8])
+    write_metadata(settings.metadata_path, dict.fromkeys([7, 8], "Primary"))
 
     result = checks.power_data_is_fresh()
     assert isinstance(result, AssetCheckResult)
@@ -615,7 +596,7 @@ def test_power_data_is_fresh_hands_evaluated_result_to_sentry(
             "power": pl.Series([1.0], dtype=pl.Float32),
         }
     ).write_delta(settings.power_time_series_data_path)
-    _write_metadata_roster(settings.metadata_path, ids=[1])
+    write_metadata(settings.metadata_path, dict.fromkeys([1], "Primary"))
 
     check_result = _run_freshness_check()
     assert len(captured) == 1
@@ -1533,3 +1514,131 @@ def test_live_forecasts_are_healthy_re_raises_a_cancelled_run(
 
     with pytest.raises(DagsterExecutionInterruptedError):
         _run_live_check()
+
+
+# --- cleaned_power_keeps_up_with_raw ---------------------------------------------------------
+
+
+def _write_raw_power_commits(settings: Settings, n_commits: int) -> DeltaTable:
+    """Write ``n_commits`` appends to the raw power table, so its Delta version is n_commits - 1."""
+    for index in range(n_commits):
+        pl.DataFrame(
+            {
+                "time_series_id": pl.Series([1], dtype=pl.Int32),
+                "time": pl.Series([datetime(2026, 1, 1, tzinfo=UTC) + timedelta(hours=index)]).cast(
+                    UTC_DATETIME_DTYPE
+                ),
+                "power": pl.Series([1.0], dtype=pl.Float32),
+            }
+        ).write_delta(settings.power_time_series_data_path, mode="append")
+    return DeltaTable(settings.power_time_series_data_path)
+
+
+def _write_cleaned_built_from(settings: Settings, raw_table_id: str, raw_version: int) -> None:
+    provenance = CleaningProvenance(
+        raw_table_id=raw_table_id,
+        raw_version=raw_version,
+        code_hash="hash",
+        metadata_hash="metadata",
+        git_sha="sha",
+    )
+    write_deltalake(
+        settings.cleaned_power_time_series_data_path,
+        pl.DataFrame({"a": [1]}).to_arrow(),
+        mode="overwrite",
+        commit_properties=CommitProperties(custom_metadata=provenance.to_commit_metadata()),
+    )
+
+
+def _run_keeps_up_check() -> AssetCheckResult:
+    with DagsterInstance.ephemeral() as instance:
+        result = checks.cleaned_power_keeps_up_with_raw(
+            build_asset_check_context(instance=instance)
+        )
+    assert isinstance(result, AssetCheckResult)
+    return result
+
+
+@pytest.mark.parametrize("lag", [0, 1])
+def test_cleaned_power_keeps_up_passes_when_at_most_one_commit_behind(env: Path, lag: int) -> None:
+    settings = Settings()
+    raw = _write_raw_power_commits(settings, 4)
+    _write_cleaned_built_from(settings, str(raw.metadata().id), raw.version() - lag)
+
+    result = _run_keeps_up_check()
+
+    assert result.passed
+    assert result.metadata["n_raw_commits_behind"].value == lag
+
+
+def test_cleaned_power_keeps_up_warns_at_two_commits_behind(env: Path) -> None:
+    settings = Settings()
+    raw = _write_raw_power_commits(settings, 4)
+    _write_cleaned_built_from(settings, str(raw.metadata().id), raw.version() - 2)
+
+    result = _run_keeps_up_check()
+
+    assert not result.passed
+    assert result.severity == AssetCheckSeverity.WARN
+
+
+def test_cleaned_power_keeps_up_warns_when_the_raw_table_id_differs(env: Path) -> None:
+    settings = Settings()
+    raw = _write_raw_power_commits(settings, 2)
+    _write_cleaned_built_from(settings, "some-other-table", raw.version())
+
+    result = _run_keeps_up_check()
+
+    assert not result.passed
+    assert result.severity == AssetCheckSeverity.WARN
+
+
+def test_cleaned_power_keeps_up_passes_when_the_raw_table_is_absent(env: Path) -> None:
+    result = _run_keeps_up_check()
+
+    assert result.passed
+
+
+def test_cleaned_power_keeps_up_warns_when_the_cleaned_table_is_absent(env: Path) -> None:
+    _write_raw_power_commits(Settings(), 2)
+
+    result = _run_keeps_up_check()
+
+    assert not result.passed
+    assert result.severity == AssetCheckSeverity.WARN
+
+
+def test_cleaned_power_keeps_up_warns_when_the_cleaned_table_has_no_provenance(env: Path) -> None:
+    settings = Settings()
+    _write_raw_power_commits(settings, 2)
+    write_deltalake(
+        settings.cleaned_power_time_series_data_path,
+        pl.DataFrame({"a": [1]}).to_arrow(),
+        mode="overwrite",
+    )
+
+    result = _run_keeps_up_check()
+
+    assert not result.passed
+    assert result.severity == AssetCheckSeverity.WARN
+
+
+def test_cleaned_power_keeps_up_degrades_rather_than_raising(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reported: list[str] = []
+    monkeypatch.setattr(
+        checks, "report_check_degradation", lambda check_name, exc: reported.append(check_name)
+    )
+    _write_raw_power_commits(Settings(), 2)
+
+    def unreadable_raw_table(*args: object, **kwargs: object) -> DeltaTable:
+        raise OSError("the raw table is unreadable")
+
+    monkeypatch.setattr(checks, "DeltaTable", unreadable_raw_table)
+
+    result = _run_keeps_up_check()
+
+    assert not result.passed
+    assert result.severity == AssetCheckSeverity.WARN
+    assert reported == ["cleaned_power_keeps_up_with_raw"]

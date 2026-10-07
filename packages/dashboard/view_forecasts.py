@@ -19,6 +19,7 @@ with app.setup:
         build_view_forecast_chart,
     )
     from deltalake import DeltaTable
+    from nged_data.storage import scan_cleaned_power
     from weather_utils import select_analysis_proxy
 
 
@@ -329,7 +330,7 @@ def _(experiment_picker, fold_picker, run_picker, series_picker, settings):
     # only the chart cell, never this Delta query. The extra rows are trivial: one series and 14
     # more days.
     actuals = (
-        pl.scan_delta(settings.power_time_series_data_path, storage_options=_storage)
+        scan_cleaned_power(settings.cleaned_power_time_series_data_path, settings.storage_options)
         .filter(
             pl.col("time_series_id") == series_picker.value,
             pl.col("time").is_between(

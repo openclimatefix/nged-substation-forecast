@@ -19,6 +19,7 @@ with app.setup:
     from contracts.power_schemas import TimeSeriesMetadata
     from contracts.typing_utils import typeddict_to_dict
     from dashboard.data_source import settings_for_source, source_status_message
+    from nged_data.storage import scan_cleaned_power
     from plotting.ocf_theme import DATA_BLUE, hex_to_rgb
 
     RECENT_WINDOW: Final[timedelta] = timedelta(days=21)
@@ -117,9 +118,8 @@ def _(arrow_table):
 
 @app.cell
 def _(settings):
-    delta_df = pl.scan_delta(
-        settings.power_time_series_data_path,
-        storage_options=typeddict_to_dict(settings.storage_options),
+    delta_df = scan_cleaned_power(
+        settings.cleaned_power_time_series_data_path, settings.storage_options
     )
     return (delta_df,)
 

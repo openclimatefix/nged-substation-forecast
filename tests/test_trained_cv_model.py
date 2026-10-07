@@ -13,6 +13,7 @@ from pathlib import Path
 import mlflow
 import polars as pl
 import pytest
+from _cleaned_power_test_data import write_cleaned_copy
 from _nwp_test_data import half_hours, nwp_records, write_test_nwp
 from contracts.ml_schemas import EligibleTimeSeries
 from contracts.settings import Settings
@@ -146,6 +147,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     mlflow.set_tracking_uri(tracking_uri)
 
     _write_power(str(nged_path / "power_time_series.delta"))
+    write_cleaned_copy(nged_path / "power_time_series.delta")
     _write_nwp(str(tmp_path / "NWP"))
     _write_metadata(nged_path / "metadata.parquet")
     _write_eligible(str(tmp_path / "eligible"))
@@ -306,6 +308,7 @@ def test_power_lag_near_window_start_is_non_null_with_lookback(
     ).cast(
         {"time_series_id": pl.Int32, "time": pl.Datetime("us", "UTC"), "power": pl.Float32}
     ).write_delta(str(nged_path / "power_time_series.delta"))
+    write_cleaned_copy(nged_path / "power_time_series.delta")
     _write_metadata(nged_path / "metadata.parquet")
     write_test_nwp(
         str(tmp_path / "NWP"),
@@ -415,6 +418,8 @@ def test_trained_cv_model_trains_and_saves_to_mlflow(
     assert fold_run.data.tags["train_end"] == "2025-06-30T23:59:59+00:00"
     assert fold_run.data.tags["n_eligible_time_series"] == "2"
     assert fold_run.data.tags["n_trained_time_series"] == "1"
+    # The test's cleaned table is a plain copy that records no provenance.
+    assert fold_run.data.tags["train_cleaned_power_time_series_source"] == "absent"
 
     # The model round-trips from MLflow, and only the in-window ts1 was trained (ts2's data is all
     # past train_end, so the inclusive-window filter excludes it).

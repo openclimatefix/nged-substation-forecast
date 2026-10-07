@@ -1218,7 +1218,12 @@ def test_definitions_resolve(env: Path) -> None:
     asset_graph = repo.asset_graph
 
     asset_keys = {key.to_user_string() for key in asset_graph.get_all_asset_keys()}
-    assert {"power_time_series_and_metadata", "h3_grid_weights", "ecmwf_ens"} <= asset_keys
+    assert {
+        "power_time_series_and_metadata",
+        "clean_nged_power_data",
+        "h3_grid_weights",
+        "ecmwf_ens",
+    } <= asset_keys
 
     for name, layer in [
         ("live_forecasts", "production"),
@@ -1231,7 +1236,7 @@ def test_definitions_resolve(env: Path) -> None:
 
     assert {
         key.to_user_string() for key in asset_graph.get(AssetKey("live_forecasts")).parent_keys
-    } == {"ecmwf_ens", "power_time_series_and_metadata"}
+    } == {"ecmwf_ens", "clean_nged_power_data"}
 
     # A broken deps=[...] string would drop this edge (the unknown key becomes an external asset).
     ecmwf_parents = {
@@ -1245,6 +1250,7 @@ def test_definitions_resolve(env: Path) -> None:
     assert "nwp_has_no_unexpected_nulls" in check_keys
     assert "nwp_run_is_complete" in check_keys
     assert "live_forecasts_are_healthy" in check_keys
+    assert "cleaned_power_keeps_up_with_raw" in check_keys
 
     # ...and the 6-hourly scheduled job actually runs the live check: an AssetSelection includes
     # its assets' checks, so this is what makes the check evaluate on every production tick.
@@ -1255,15 +1261,18 @@ def test_definitions_resolve(env: Path) -> None:
     assert live_job_checks == {"live_forecasts_are_healthy"}
 
     # A job whose AssetSelection names a missing asset resolves to an empty/wrong key set.
-    for job_name, expected_asset in [
-        ("power_time_series_and_metadata_job", "power_time_series_and_metadata"),
-        ("ecmwf_ens_job", "ecmwf_ens"),
-        ("live_forecasts_job", "live_forecasts"),
+    for job_name, expected_assets in [
+        (
+            "power_time_series_and_metadata_job",
+            {"power_time_series_and_metadata", "clean_nged_power_data"},
+        ),
+        ("ecmwf_ens_job", {"ecmwf_ens"}),
+        ("live_forecasts_job", {"live_forecasts"}),
     ]:
         selected = {
             key.to_user_string() for key in repo.get_job(job_name).asset_layer.executable_asset_keys
         }
-        assert selected == {expected_asset}
+        assert selected == expected_assets
 
     # Neither partitioned job passes `partitions_def` to `define_asset_job` — Dagster infers it from
     # the selected asset at resolution time. Assert the inferred definition equals the one the asset
