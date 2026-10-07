@@ -115,14 +115,6 @@ def estimate_solar_ac_capacity_mw(
     )
 
 
-MIN_SUN_FOR_FIT: Final[float] = 0.05
-"""The least-squares fit with a measured irradiance uses only half-hours with a scaled irradiance
-above this, so that the many night-time half-hours of zero do not dominate."""
-FIT_GRID_POINTS: Final[int] = 3000
-"""The number of candidate capacities the least-squares fit tries between zero and 1.5 times the
-largest output."""
-
-
 def mean_hourly_sun(*, cams: pl.DataFrame, min_reliability: float) -> pl.DataFrame:
     """Average the CAMS irradiance over some points, and scale it to the clear-sky peak.
 
@@ -146,36 +138,6 @@ def mean_hourly_sun(*, cams: pl.DataFrame, min_reliability: float) -> pl.DataFra
     return hourly.select(hour_end_time=pl.col("time"), sun=pl.col("ghi_w_m2") / peak)
 
 
-def fit_ac_capacity_least_squares_mw(
-    *, sun: np.ndarray, output_mw: np.ndarray, dc_ac_ratio: float
-) -> float | None:
-    """Fit `a` in `min(r * a * c, a)` to output by least squares, with a measured shape `c`.
-
-    Args:
-        sun: The scaled irradiance `c` in each half-hour, including its clouds.
-        output_mw: The BMU's output in each half-hour, in megawatts.
-        dc_ac_ratio: The DC:AC ratio `r`.
-
-    Returns:
-        The capacity in megawatts that minimises the sum of squared errors over the half-hours with
-        `sun` above `MIN_SUN_FOR_FIT`, on a grid of `FIT_GRID_POINTS` values between zero and 1.5
-        times the largest output; None when no such half-hour exists or the best capacity is zero.
-    """
-    daytime = sun > MIN_SUN_FOR_FIT
-    if not daytime.any() or float(output_mw[daytime].max()) <= 0:
-        return None
-    shape, observed = sun[daytime], output_mw[daytime]
-    candidates = np.linspace(0.0, 1.5 * float(observed.max()), FIT_GRID_POINTS)
-    squared_error = np.array(
-        [
-            float(np.sum((np.minimum(dc_ac_ratio * a * shape, a) - observed) ** 2))
-            for a in candidates
-        ]
-    )
-    best = float(candidates[int(np.argmin(squared_error))])
-    return best if best > 0 else None
-
-
 def estimate_solar_ac_capacity_with_cams_mw(
     *,
     output: pl.DataFrame,
@@ -183,7 +145,7 @@ def estimate_solar_ac_capacity_with_cams_mw(
     dc_ac_ratio: float,
     hourly_sun: pl.DataFrame,
 ) -> float | None:
-    """Estimate a BMU's solar AC capacity using the regional CAMS irradiance as the shape.
+    """Estimate a BMU's solar AC capacity using CAMS irradiance as the shape.
 
     The hour's mean applies to both half-hours inside the hour. A half-hour ending at 10:30 or at
     11:00 lies in the hour that ends at 11:00, so the half-hour's end time is rounded up to the
@@ -211,7 +173,7 @@ def estimate_solar_ac_capacity_with_cams_mw(
     )
     if joined.is_empty():
         return None
-    return fit_ac_capacity_least_squares_mw(
+    return fit_ac_capacity_mw(
         sun=joined["sun"].to_numpy(),
         output_mw=joined["output_mwh"].to_numpy() * 2,
         dc_ac_ratio=dc_ac_ratio,

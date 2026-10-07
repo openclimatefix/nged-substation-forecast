@@ -65,6 +65,10 @@ Green Solar follows at 2.0, because its TEC value covers the solar BMU and the s
   census**, so the census missed no separately registered solar BMU at a built project that the
   study's by-hand matching of TEC projects to BMUs could find
   ([Recall](#how-many-solar-bmus-were-missed)).
+- **The solar part of the 28 aggregate BMUs is between 0 and a rough ceiling of 1,896.8 MW, and a
+  fitted solar-output curve puts the solar part near 1,044 MW**, from a method whose largest error
+  on the 9 single-site BMUs that follow the sun is 16%, and whose estimate would be 846.8 MW with a
+  different shape ([Capacity](#capacity)).
 - **Of the 28 aggregate BMUs, five belonging to one supplier hold 86% of the Generation Capacity**,
   and each of the five has output below zero in 77% to 95% of its half-hours
   ([Aggregates](#aggregate-bmus)).
@@ -307,111 +311,145 @@ describes Breach as about 68 MW.
 | `T_TEBWS-1` | Tebworth PV Power Park | Hybrid | 45.928 | – | – | 40.0 | – | 40.6 |
 | `T_TYLNS-1` | Tye Lane Solar | Hybrid | 49.9 | 49.0 | 57.0 | 50.0 | 49.9 | 49.5 |
 
-**The table sums each published column over the single-site census BMUs that have a value, and the
-number of BMUs with a value is in brackets.** A project that two BMUs share is counted once in the
-TEC and REPD columns. A TEC sum is not comparable with a sum of Generation Capacity, for the
-reason in [Introduction](#introduction). The last two columns measure observed output over the 12
-months and are not registered capacities. The P99 of output is left out of the table.
+**The first table sums each published column over the single-site census BMUs that have a value, and
+the number of BMUs with a value is in brackets.** A project that two BMUs share is counted once in
+the TEC and REPD columns. A TEC sum is not comparable with a sum of Generation Capacity, for the
+reason in [Introduction](#introduction). The P99 of output is a measure of output and not a
+registered capacity, so the table leaves it out. A dash in the aggregate row means the aggregate
+BMUs have no value: none matches a TEC project or an REPD row.
 
-| Group (BMUs) | Generation Capacity (MW) | IGCPU installed (MW) | TEC (MW) | Largest MEL, 30 days (MW) | REPD installed (MW) | Max of output (MW) | Highest combined output in one half-hour (MW) | Estimated solar part at DC:AC 1.4 (MW) |
-|---|---|---|---|---|---|---|---|---|
-| All solar BMUs, hybrids included (10) | 682.9 (10) | 591.0 (8) | 733.8 (9) | 667.0 (10) | 730.6 (9) | 648.2 (10) | 593.5 | – |
-| BMUs at hybrid sites (9) | 633.0 (9) | 542.0 (7) | 683.8 (8) | 617.0 (9) | 680.7 (8) | 598.0 (9) | 543.4 | – |
-| BMU at the pure PV site (1) | 50.0 (1) | 49.0 (1) | 50.0 (1) | 50.0 (1) | 49.9 (1) | 50.1 (1) | 50.1 | – |
-| Total capacity of aggregate BMUs (28) | 1,896.8 (28) | 16.0 (1) | – | 68.0 (24) | – | – | – | – |
-| All solar BMUs + hybrids + estimated solar component of aggregate BMUs (38) | 682.9 to 2,579.7 (38) | – | – | – | – | – | – | 1,529.7 (estimate) |
-| Estimated solar component of aggregate BMUs (28) | 0 to 1,896.8 (28) | – | – | – | – | – | – | 846.8 (estimate, 27 BMUs) |
+| Group (BMUs) | Generation Capacity (MW) | IGCPU installed (MW) | TEC (MW) | Largest MEL, 30 days (MW) | REPD installed (MW) |
+|---|---|---|---|---|---|
+| All single-site solar BMUs, hybrids included (10) | 682.9 (10) | 591.0 (8) | 733.8 (9) | 667.0 (10) | 730.6 (9) |
+| Single-site BMUs at hybrid sites (9) | 633.0 (9) | 542.0 (7) | 683.8 (8) | 617.0 (9) | 680.7 (8) |
+| Single-site BMU at the pure PV site (1) | 50.0 (1) | 49.0 (1) | 50.0 (1) | 50.0 (1) | 49.9 (1) |
+| Aggregate BMUs, all technologies (28) | 1,896.8 (28) | 16.0 (1) | – | 68.0 (24) | – |
 
 **An aggregate BMU's registered capacity covers every site pooled in the BMU, so the aggregate row
-is an upper bound on the solar part and not a solar figure.** A dash means the aggregate BMUs have
-no value: none matches a TEC project or an REPD row, and the study computes no observed-output
-columns for them.
+is a rough ceiling on the solar part and not a solar figure.** The ceiling is rough because two
+virtual BMUs register a Generation Capacity of 0 MW but exported up to 21.4 MW and 29.0 MW, and
+because the fitted solar part of some British Gas BMUs exceeds their Generation Capacity by up to
+14%.
 
-**The last two rows give a bound and a separate estimate, and the estimate is a model's output and
-not a registered figure.** The bound is the Generation Capacity in the row: the solar part of the
-28 aggregate BMUs is somewhere between 0 and 1,896.8 MW, and the lower end of the first bound is the
-682.9 MW of the single-site BMUs. The estimate in the last column is 846.8 MW for the aggregate
-BMUs (with 682.9 MW added in the first row). The estimate models a BMU's solar output as
-`min(r × a × c(t), a)`. Here `c(t)` is the cosine of the solar zenith at the census reference point,
-scaled so that its peak over the year is 1, `a` is the AC capacity of the solar part, and `r` is the
-DC:AC ratio, the ratio of the panels' direct-current rating to the inverters' alternating-current
-rating. Output is flat at `a` whenever `r × c(t)` exceeds 1, because inverters sized below the
-panels cap the export. Clouds only reduce output, so the study fits `a` to the upper envelope of
-output and not to its mean: the 99th percentile of output in each of nine bands of `c(t)`, by least
-squares. The study drops the half-hours that the classifier drops (the 30 days after a BMU's first
-output, and exact zeros while the sun is up).
+**The second table gives observed output over the 12 months, and neither column is a registered
+capacity.** Max of output is the sum over the group's BMUs of each BMU's largest half-hourly output.
+The highest combined output in one half-hour is the maximum over time of the group's summed output,
+and counts only the solar BMUs and not the storage BMUs at the same sites. The aggregate BMUs have
+no such columns.
+
+| Group (BMUs) | Max of output (MW) | Highest combined output in one half-hour (MW) |
+|---|---|---|
+| All single-site solar BMUs, hybrids included (10) | 648.2 (9 BMUs with output) | 593.5 |
+| Single-site BMUs at hybrid sites (9) | 598.0 (8 BMUs with output) | 543.4 |
+| Single-site BMU at the pure PV site (1) | 50.1 (1) | 50.1 |
+
+**Max of output is a sum of separate peaks, so it overstates what a group delivered at once, and the
+highest combined output in one half-hour is the group's true peak.** The BMUs' largest outputs fall
+in different half-hours. The 9 BMUs with output delivered 593.5 MW together in their best
+half-hour, against a sum of peaks of 648.2 MW. Neither column is added to a registered-capacity
+column. A BMU's largest output can be curtailed or below its capacity, so max of output understates
+a BMU that never ran flat out: Cleve Hill Solar 2's largest output is 12% below its Generation
+Capacity. Max of output can also overstate, because Cleve Hill Solar 1's largest output is 4% above
+Generation Capacity and Tebworth PV Power Park's is 11% above. A reader who wants the most that a
+group delivered at once should take the highest combined output. A reader who wants a figure for
+each BMU should take max of output and read it as the most that BMU delivered in the 12 months, not
+as its capacity.
+
+**The third table gives a bound and a separate estimate for the aggregate BMUs' solar part, and the
+estimate comes from a fitted solar-output curve and not from a register.** The bound is the
+registered capacity. The estimate is the AC capacity of a solar-output curve fitted to each BMU's
+output, at a DC:AC ratio of 1.4, with the mean CAMS irradiance of 18 grid points as the shape. The
+combined row adds the single-site BMUs' 682.9 MW of Generation Capacity to the aggregate bound, so
+its bound runs from 682.9 MW (no solar in the aggregate BMUs) to 2,579.7 MW. The combined estimate
+adds only estimates, so that registered and estimated figures are not mixed: 680.3 MW for the 9
+single-site BMUs that follow the sun, and 1,044.1 MW for 27 of the 28 aggregate BMUs. Kincraig and
+`2__ALOND001` have no output and no estimate.
+
+| Group (BMUs) | Lower bound (MW) | Upper bound (MW) | Estimate at DC:AC 1.4 (MW) |
+|---|---|---|---|
+| All single-site solar BMUs, hybrids included (10) | – | 682.9 (Generation Capacity) | 680.3 (9 BMUs that follow the sun) |
+| Aggregate BMUs, estimated solar part (28) | 0 | 1,896.8 (Generation Capacity) | 1,044.1 (27 BMUs) |
+| All 38 census BMUs, aggregate BMUs at their estimated solar part | 682.9 | 2,579.7 (Generation Capacity) | 1,724.4 (36 BMUs) |
+
+**The estimate models a BMU's solar output as `min(r × a × c(t), a)`.** Here `c(t)` is the shape,
+`a` is the AC capacity of the solar part, and `r` is the DC:AC ratio, the ratio of the panels'
+direct-current rating to the inverters' alternating-current rating. Output is flat at `a` whenever
+`r × c(t)` exceeds 1, because inverters sized below the panels cap the export. The shape is a
+measure of how bright the sky is, scaled so that its highest value over the BMU's judged half-hours
+is 1. The study tries three shapes: the cosine of the solar zenith angle at the census reference
+point, which has no cloud in it; the irradiance of the Copernicus Atmosphere Monitoring Service
+(CAMS) radiation service at the BMU's own position; and the mean CAMS irradiance of 18 grid points
+across Great Britain. The study applies each hour's CAMS value to both half-hours inside the hour.
+The hour is labelled by its end, so the half-hours ending at 10:30 and 11:00 both take the value of
+the hour that ends at 11:00.
+
+**The fit takes the upper envelope of output and not its mean, because clouds only reduce output.**
+The same fit serves all three shapes. The study divides the shape into nine bands from 0.1 to 1.0,
+takes the 99th percentile of output in each band, and finds the `a` that best matches the model to
+those percentiles by least squares. A band with fewer than 20 half-hours is left out. The study
+drops the half-hours that the classifier drops (the 30 days after a BMU's first output, and exact
+zeros while the sun is up). A fit to the mean of output instead reads low whenever the shape holds
+cloud that the output does not follow.
 
 **The DC:AC ratio of 1.4 comes from United States data, because the study found no figure for Great
-Britain.** [Lawrence Berkeley National Laboratory's Utility-Scale Solar report for
-2023](https://emp.lbl.gov/sites/default/files/utility_scale_solar_2023_edition_slides.pdf)
-(Bolinger, Seel, and others) gives a median of 1.40 for fixed-tilt projects and 1.32 for tracking
-and fixed-tilt projects together, for 1,274 ground-mounted projects above 5 MW (AC) built in the
-United States up to 2022. The ratio at the Great Britain sites that the aggregate BMUs pool is
-unknown, so the study also tries 1.2 and 1.6. The estimates are 919.8 MW at 1.2, 846.8 MW at 1.4,
-and 795.6 MW at 1.6, so the ratio moves the aggregate estimate by about 9% either way.
+Britain.** [Bolinger et al. (2023)](https://emp.lbl.gov/sites/default/files/utility_scale_solar_2023_edition_slides.pdf)
+(Bolinger, Seel, Mulvaney Kemp, Warner, Katta, and Robson, Lawrence Berkeley National Laboratory)
+report a median of 1.40 for fixed-tilt projects installed in 2022, and 1.32 for tracking and
+fixed-tilt projects installed in 2022 together. The report's sample is 1,274 ground-mounted projects
+above 5 MW (AC) in the United States. The study looked for a median DC:AC ratio for Great Britain in
+the public web pages that a search returned and found none. The ratio at the sites that the
+aggregate BMUs pool is unknown, so the study also tries 1.2 and 1.6. The aggregate estimates are
+1,124.8 MW at 1.2, 1,044.1 MW at 1.4, and 993.3 MW at 1.6, which is 8% above and 5% below the base
+case.
 
 **Applied to the 9 single-site BMUs that follow the sun, whose Generation Capacity is known, the
-method recovers 566.1 MW against 662.3 MW, with a mean absolute error of 11% and a largest error of
-27% per BMU.** The method under-reads most at Cleve Hill Solar 1 (-24%), Cleve Hill Solar 2 (-27%),
-and Sutton Bridge (-18%), and the study did not establish why. At the other six BMUs the error is
-between -7% and +5%. The test uses the same sun-following BMUs that define the census, so the test
+mean CAMS irradiance of 18 grid points recovers 680.3 MW against 662.3 MW, with a mean absolute
+error of 10% and a largest error of 16% per BMU.** The same 9 BMUs and the same fit give 637.5 MW,
+8%, and 14% for CAMS at each BMU's own position, and 566.1 MW, 11%, and 27% for the cosine. The
+table shows the error of each shape at DC:AC 1.4, beside the estimates of the headline shape at
+the three ratios. The test uses the same sun-following BMUs that define the census, so the test
 checks the method on sites that are known to be solar and says nothing about the aggregate BMUs'
 other generation.
 
-| BMU | Generation Capacity (MW) | Estimate at DC:AC 1.2 (MW) | Estimate at DC:AC 1.4 (MW) | Estimate at DC:AC 1.6 (MW) | Error at DC:AC 1.4 | Error at DC:AC 1.4, CAMS at the BMU's own point | Error at DC:AC 1.4, mean of 18 CAMS grid points |
+| BMU | Generation Capacity (MW) | Headline estimate at DC:AC 1.2 (MW) | Headline estimate at DC:AC 1.4 (MW) | Headline estimate at DC:AC 1.6 (MW) | Error, 18 grid points | Error, BMU's own point | Error, cosine |
 |---|---|---|---|---|---|---|---|
-| `T_BLPFS-1` | 50.216 | 56.6 | 52.9 | 50.6 | +5% | -18% | -14% |
-| `T_BRCHS-1` | 50.0 | 52.8 | 49.0 | 46.6 | -2% | -18% | -16% |
-| `T_BURWS-1` | 49.952 | 55.9 | 52.1 | 49.7 | +4% | -14% | -11% |
-| `T_CLVHS-1` | 112.0 | 93.1 | 85.6 | 80.8 | -24% | -42% | -38% |
-| `T_CLVHS-2` | 205.0 | 161.1 | 148.7 | 140.8 | -27% | -39% | -36% |
-| `T_LARKS-1` | 49.9 | 51.4 | 47.7 | 45.2 | -4% | -16% | -12% |
-| `T_SUTBS-1` | 49.419 | 43.2 | 40.3 | 38.5 | -18% | -46% | -44% |
-| `T_TEBWS-1` | 45.928 | 46.8 | 43.4 | 41.2 | -6% | -30% | -27% |
-| `T_TYLNS-1` | 49.9 | 50.2 | 46.4 | 43.9 | -7% | -22% | -19% |
+| `T_BLPFS-1` | 50.216 | 61.4 | 57.6 | 55.5 | +15% | +11% | +5% |
+| `T_BRCHS-1` | 50.0 | 60.0 | 56.2 | 53.9 | +12% | +6% | -2% |
+| `T_BURWS-1` | 49.952 | 61.5 | 57.7 | 55.5 | +16% | +10% | +4% |
+| `T_CLVHS-1` | 112.0 | 117.0 | 109.3 | 104.4 | -2% | -11% | -24% |
+| `T_CLVHS-2` | 205.0 | 207.0 | 193.5 | 185.3 | -6% | -14% | -27% |
+| `T_LARKS-1` | 49.9 | 59.8 | 56.0 | 53.8 | +12% | +7% | -4% |
+| `T_SUTBS-1` | 49.419 | 47.7 | 44.9 | 43.2 | -9% | -9% | -18% |
+| `T_TEBWS-1` | 45.928 | 52.5 | 49.0 | 46.9 | +7% | 0% | -6% |
+| `T_TYLNS-1` | 49.9 | 59.9 | 56.1 | 53.9 | +12% | +6% | -7% |
 
-**Two alternative shapes, built from CAMS irradiance with real cloud in it, validate worse, so the
-estimate uses the cosine of the solar zenith.** The Copernicus Atmosphere Monitoring Service (CAMS)
-radiation service gives the satellite-derived global horizontal irradiance at a point. The study
-applies each hour's value to both half-hours inside the hour (the hour is labelled by its end, so
-the half-hours ending at 10:30 and 11:00 both take the hour that ends at 11:00), divides by the
-point's highest clear-sky irradiance, and fits `a` by least squares on the half-hours with a scaled
-irradiance above 0.05. The first alternative reads CAMS at each BMU's own position, which is
-possible only for a BMU with a known position. On the 9 validation BMUs this gives 476.0 MW
-against 662.3 MW, a mean absolute error of 24% and a largest error of 44%. The second alternative
-averages 18 CAMS grid points across Great Britain, so any BMU can use it: 455.1 MW, a mean absolute
-error of 27% and a largest error of 46%. The cosine gives 566.1 MW, 11%, and 27%. Both CAMS shapes
-under-read every BMU by 11% to 46%. The study did not establish why. The CAMS shapes would need a
-different fit to be competitive, for example one that allows for the ratio between irradiance and
-power, and the study did not try one.
+**The headline shape is the mean CAMS irradiance of 18 grid points, because the shape is the best
+validated of the two shapes that an aggregate BMU can use.** An aggregate BMU has no position, so
+only the cosine and the 18-point mean apply to it. The 18-point mean has the lower mean absolute
+error (10% against 11%) and the lower largest error (16% against 27%). CAMS at each BMU's own
+position validates best of the three (8% and 14%) and applies only to a BMU with a known position.
+The headline therefore depends on the CAMS download, which is a separate download (PR #1081). The
+cosine needs no download and is the fallback: it gives 846.8 MW for the aggregate BMUs at DC:AC
+1.4 (919.8 MW at 1.2 and 795.6 MW at 1.6), so the choice between the two shapes moves the aggregate
+estimate by 23%. The 18-point mean over-reads by 12% to 16% at the five BMUs that ran flat out at
+their Generation Capacity (`T_BLPFS-1`, `T_BRCHS-1`, `T_BURWS-1`, `T_LARKS-1`, and `T_TYLNS-1`),
+where the cosine is within 7%. The study did not test a shape built from the nearest three grid
+points to a supplier BMU's region, because the register gives a GSP group and not a position for a
+supplier BMU.
 
-**The choice of shape moves the aggregate estimate by a factor of 2.7.** With the mean of the 18
-CAMS grid points as the shape, the aggregate estimate is 317.0 MW (25 of the 28 BMUs have an
-estimate) at DC:AC 1.4, and 367.7 MW and 279.6 MW at 1.2 and 1.6, against 846.8 MW with the
-cosine. The study did not test a shape built from the nearest three grid points to a supplier
-BMU's region, because the register gives a GSP group and not a position for a supplier BMU.
+**Validation against Generation Capacity partly measures curtailment or export limits.** The cosine
+under-reads most at Cleve Hill Solar 1, Cleve Hill Solar 2, and Sutton Bridge, where the P99 of
+output is 79%, 79%, and 69% of Generation Capacity. A low P99 is consistent with curtailment or an
+export limit and does not show either. The study did not establish the cause.
 
 **The aggregate estimate can be too high or too low, and the study cannot say by how much.** An
-aggregate BMU also holds generation that is not solar. Gas or wind output that happens to be high at
-midday raises the estimate, and a supplier BMU nets demand against generation, which lowers the
-estimate. The five TotalEnergies BMUs, which are imports in most half-hours, show it: the two
-largest give 141.4 MW and 11.8 MW against Generation Capacities of 912.5 MW and 100.0 MW. Two
-virtual BMUs have a Generation Capacity of 0 and an estimate of 20.2 MW and 24.0 MW, so their
-estimates come from output alone. One BMU with no output has no estimate. The estimate is
-therefore a rough size for the solar part, and the bound is the only figure that the registers
-support.
-
-**Max of output is a sum of separate peaks, so it overstates what a group delivered at once, and the
-highest combined output in one half-hour is the group's true peak.** Max of output adds each BMU's
-largest half-hourly output, and the BMUs' largest outputs fall in different half-hours. All 10 BMUs
-delivered 593.5 MW together in their best half-hour, against a sum of peaks of 648.2 MW. Both
-columns are observed output, not registered capacities, so neither is added to a registered-capacity
-column. A BMU's largest output can be curtailed or below its capacity, so max of output understates
-a BMU that never ran flat out: Kincraig adds 0.0 MW because it has no output. A reader who wants the
-most that a group delivered at once should take the highest combined output. A reader who wants a
-figure for each BMU should take max of output and read it as the most that BMU delivered in the 12
-months, not as its capacity. The highest combined output counts only the solar BMUs, and not the
-storage BMUs at the same sites. The aggregate BMUs have no such columns.
+aggregate BMU can hold generation that is not solar. Gas or wind output that is high at midday can
+raise the estimate, and a supplier BMU nets demand against generation, which can lower the
+estimate. The two BMUs whose estimate falls furthest below Generation Capacity are `2__HTGPL000`
+(169.3 MW against 912.5 MW) and `2__KTGPL000` (30.9 MW against 100.0 MW). Both are TotalEnergies
+BMUs, and their output is below zero in most half-hours, which is consistent with demand netting.
+Two virtual BMUs have a Generation Capacity of 0 and an estimate of 23.3 MW and 29.2 MW, so their
+estimates come from output alone.
 
 **Of the nine BMUs at hybrid sites (eight sites), four have a storage BMU with output at their site,
 three (at two sites) have an operational battery in REPD, and two have storage planned or under
@@ -503,9 +541,8 @@ meant. Sutton Bridge is inside East Midlands (`_B`) but 1.3 km from the East Eng
 probably in an NGED area. The other seven positions are in UK Power Networks areas (`_A` and `_J`),
 and Kincraig is in North Scotland (`_P`). Both NGED-area sites connect to the transmission network,
 at the projects that TEC lists as Iron Acton and Walpole, so neither feeds an NGED circuit. The REPD
-county and region fields are not licence areas: REPD gives Larks Green the region South West, which
-is a region that NGED's South West England area shares, although Larks Green is in the West Midlands
-area.
+county and region fields are not licence areas: REPD gives Larks Green the region South West, but
+its position lies in NGED's West Midlands licence area.
 
 | BMU | Name | Connection | GSP group in the register | DNO area from the register | Licence area at the REPD position | Generation Capacity (MW) | REPD county, region |
 |---|---|---|---|---|---|---|---|
@@ -678,11 +715,11 @@ The census cannot count solar that is not a BMU ([Scope](#scope)), and the aggre
 that the register does not name.
 
 **For the capacity of a solar BMU, Generation Capacity is the published capacity value closest to
-the BMU's largest output.** For 6 of the 9 BMUs with output, the largest output is within 1% of
-Generation Capacity. The largest MEL agrees with Generation Capacity within 0.5 MW for 6 of the 10
-BMUs, but a MEL is a level that the lead party submits, not a capacity. The recommendation rests on
-one year of output: a BMU whose largest output stays far below its Generation Capacity for a year
-would need another capacity value.
+the BMU's largest output.** The largest output is within 1% of Generation Capacity for 6 of the 9
+BMUs with output ([Capacity](#capacity)). The largest MEL agrees with Generation Capacity within 0.5
+MW for 6 of the 10 BMUs, but a MEL is a level that the lead party submits, not a capacity. The
+recommendation rests on one year of output: a BMU whose largest output stays far below its
+Generation Capacity for a year would need another capacity value.
 
 **For a comparison of a solar BMU with a solar forecast, the solar BMU's output needs two days of
 exclusions: 26 and 29 January 2026 at Tebworth PV Power Park, and 13 July 2026 at Cleve Hill.** At
@@ -734,8 +771,13 @@ storage BMU and cannot say where the battery is metered.
 - **REPD lists some sites that already generate as under construction**, so the study accepts both
   operational and under-construction REPD rows.
 - **The Maximum Export Limit comes from a window after the output window.**
-- **The estimate of the aggregate BMUs' solar part rests on a DC:AC ratio from the United States and
-  on a model that ignores demand and other generation** ([Capacity](#capacity)).
+- **The estimate of the aggregate BMUs' solar part rests on a DC:AC ratio from the United States, on
+  the CAMS download, and on a model that ignores demand and other generation**
+  ([Capacity](#capacity)).
+- **The validation target, Generation Capacity, is not a measured solar capacity.** Cleve Hill Solar
+  2's largest output is 12% below its Generation Capacity, and the P99 of output is below 90% of
+  Generation Capacity at 4 of the 9 validation BMUs (Cleve Hill Solar 1 and 2, Sutton Bridge, and
+  Tebworth PV Power Park), so the validation partly measures curtailment or export limits.
 - **The distribution network operator (DNO) tables cover only BMUs.** Most embedded solar has no
   BMU, so the tables say nothing about how much solar NGED's network holds. NESO calls its licence
   area boundaries approximate, so a position within a few kilometres of a boundary is placed with
@@ -764,10 +806,11 @@ portal](https://www.neso.energy/data-portal/transmission-entry-capacity-tec-regi
 Zero](https://www.gov.uk/government/publications/renewable-energy-planning-database-monthly-extract).
 NESO's [map of the 14 DNO licence
 areas](https://neso.energy/data-portal/gis-boundaries-gb-dno-license-areas) is public too. The
-comparison shapes for the estimate of the aggregate BMUs' solar part use CAMS irradiance from the
+estimate of the aggregate BMUs' solar part uses CAMS irradiance from the
 [Copernicus Atmosphere Data
 Store](https://ads.atmosphere.copernicus.eu/datasets/cams-solar-radiation-timeseries) at the
-single-site BMUs' public positions and at 18 grid points. The two hand-made match tables are
+single-site BMUs' public positions and at 18 grid points. The download script is in PR #1081 and
+not yet on the main branch. The two hand-made match tables are
 committed beside the scripts. The code is in
 [`studies/solar_bmu_census/`](https://github.com/openclimatefix/nged-substation-forecast/tree/main/studies/solar_bmu_census),
 and its tests are in `packages/studies/tests/solar_bmu_census/`.
@@ -786,6 +829,10 @@ uv run python studies/solar_bmu_census/collate.py
 uv run python studies/solar_bmu_census/report.py
 uv run python studies/solar_bmu_census/census_charts.py
 ```
+
+The estimate of the aggregate BMUs' solar part reads the CAMS irradiance that PR #1081's
+`studies/weather_downloads/fetch_cams_public_points.py` downloads, so run that script before
+`report.py` (the script is not yet on the main branch).
 
 `report.py` writes `report.md` to `data/studies/per_study/solar_bmu_census/`. `report.md` holds
 every number on this page, or the numbers from which a derived number is computed.

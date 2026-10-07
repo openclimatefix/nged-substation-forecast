@@ -222,10 +222,10 @@ def solar_estimate_table(
             use the cosine of the solar zenith at the census reference point as the shape.
 
     Returns:
-        One row per BMU: its Generation Capacity, its estimate in MW at each ratio in
-        `SENSITIVITY_RATIOS`, and the base-case estimate over Generation Capacity minus 1 (the
-        relative error, where the BMU's Generation Capacity is its solar capacity). A BMU with too
-        little output has no estimate.
+        One row per BMU: its Generation Capacity, its largest half-hourly output, its estimate in MW
+        at each ratio in `SENSITIVITY_RATIOS`, and the base-case estimate over Generation Capacity
+        minus 1 (the relative error, where the BMU's Generation Capacity is its solar capacity). A
+        BMU with too little output has no estimate.
     """
     rows = census.filter(pl.col("scope") == scope).sort("elexon_bmu_id")
     if only_following_the_sun:
@@ -236,6 +236,7 @@ def solar_estimate_table(
         record: dict[str, Any] = {
             "elexon_bmu_id": row["elexon_bmu_id"],
             "generation_capacity_mw": row["generation_capacity_mw"],
+            "largest_output_mw": round(largest_output_mw(output=output), 1),
         }
         hourly_sun = shape_of(row["elexon_bmu_id"])
         for ratio in SENSITIVITY_RATIOS:
@@ -1553,14 +1554,13 @@ def main() -> None:
         (
             "## How the solar AC capacity is estimated\n\n"
             "Each estimate fits `min(r * a * c, a)` to the BMU's output, where `a` is the "
-            "estimate and `c` is the shape. With the cosine of the solar zenith as `c`, `a` is "
-            "fitted to the upper envelope of output (the 99th percentile in each band of `c`). "
-            "With CAMS irradiance as `c`, `a` is fitted by least squares on the half-hours with "
-            "`c` above 0.05. A CAMS `c` is the mean irradiance over some points (one point for "
-            "the BMU's own point, the 18 grid points for the GB-wide mean), applied to both half- "
-            "hours inside the hour (the hour is labelled by its end) and divided by the highest "
-            "clear-sky irradiance of any hour. The relative error is the estimate at the base "
-            "ratio over Generation Capacity, minus 1."
+            "estimate and `c` is the shape. All three shapes get the same fit: `a` is fitted to "
+            "the upper envelope of output (the 99th percentile in each band of `c`). A CAMS "
+            "`c` is the mean irradiance over some points (one point for the BMU's own point, "
+            "the 18 grid points for the GB-wide mean), applied to both half-hours inside the "
+            "hour (the hour is labelled by its end) and divided by the highest clear-sky "
+            "irradiance of any hour. The relative error is the estimate at the base ratio "
+            "over Generation Capacity, minus 1."
         ),
         *estimate_sections,
         "## Aggregate BMUs (supplier, virtual, and other identifiers), reported apart\n\n"

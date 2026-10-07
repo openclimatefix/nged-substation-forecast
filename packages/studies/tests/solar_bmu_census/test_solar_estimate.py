@@ -109,10 +109,24 @@ def test_the_cams_fit_recovers_the_capacity_and_maps_both_half_hours_to_the_hour
     assert estimate == pytest.approx(40.0, rel=0.01)
 
 
-def test_the_least_squares_fit_is_none_without_daylight() -> None:
-    assert (
-        solar_estimate.fit_ac_capacity_least_squares_mw(
-            sun=np.zeros(5), output_mw=np.ones(5), dc_ac_ratio=1.4
-        )
-        is None
+def test_the_cams_envelope_fit_ignores_cloud_that_the_shape_does_not_hold() -> None:
+    # The shape is a smooth daytime curve. Output is the flat-topped model times a random cloud
+    # factor from 0.3 to 1, so a mean-based fit reads low and the envelope fit does not.
+    start = datetime(2026, 6, 1, tzinfo=UTC)
+    hours = 24 * 60
+    hour_ends = [start + timedelta(hours=h + 1) for h in range(hours)]
+    rng = np.random.default_rng(0)
+    sun_by_hour = np.clip(np.sin(np.pi * (np.arange(hours) % 24 - 5) / 14), 0.0, 1.0)
+    hourly_sun = pl.DataFrame({"hour_end_time": hour_ends, "sun": sun_by_hour})
+    sun = np.repeat(sun_by_hour, 2)
+    cloud = rng.uniform(0.3, 1.0, size=sun.size)
+    clear_output = np.minimum(1.4 * 50.0 * sun, 50.0)
+    half_hour_ends = [start + timedelta(minutes=30 * (i + 1)) for i in range(sun.size)]
+    output = pl.DataFrame(
+        {"half_hour_end_time": half_hour_ends, "output_mwh": clear_output * cloud / 2}
+    ).filter(pl.col("output_mwh") > 0)
+    estimate = solar_estimate.estimate_solar_ac_capacity_with_cams_mw(
+        output=output, window_start=start, dc_ac_ratio=1.4, hourly_sun=hourly_sun
     )
+    assert estimate is not None
+    assert estimate == pytest.approx(50.0, rel=0.1)

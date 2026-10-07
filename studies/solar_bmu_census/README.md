@@ -53,13 +53,15 @@ in one half-hour (MW)` is the maximum over time of the group's summed half-hourl
 (`report.coincident_peak_mw`). Neither is added to a registered capacity.
 
 **`report.py` also estimates the solar part of each BMU's AC capacity (`solar_estimate.py`).** The
-model is `min(r * a * c(t), a)`, with `a` the AC capacity, `r` the DC:AC ratio, and `c(t)` a shape.
-The base case takes the cosine of the solar zenith as `c(t)`, fits `a` to the upper envelope of
-output, and sets `r` to 1.4 (the median for fixed-tilt projects in Lawrence Berkeley National
-Laboratory's Utility-Scale Solar report for 2023). The alternative shapes are the CAMS irradiance at
-the BMU's own position and the mean CAMS irradiance of 18 grid points across Great Britain, both
-read from `solar_estimate.CAMS_PUBLIC_POINTS_PATH`, and `report.md` compares the three on the
-single-site BMUs that follow the sun.
+model is `min(r * a * c(t), a)`, with `a` the AC capacity, `r` the DC:AC ratio (1.4, the median for
+fixed-tilt projects installed in 2022 in Lawrence Berkeley National Laboratory's Utility-Scale Solar
+report for 2023), and `c(t)` a shape. All three shapes get the same fit: `a` is fitted to the 99th
+percentile of output in each band of `c(t)`. The shapes are the cosine of the solar zenith angle,
+the CAMS irradiance at the BMU's own position, and the mean CAMS irradiance of 18 grid points across
+Great Britain (the headline, because the shape validates best of the two that apply to an aggregate
+BMU). `report.md` compares the three on the single-site BMUs that follow the sun. **The CAMS shapes
+read `solar_estimate.CAMS_PUBLIC_POINTS_PATH`, which PR #1081's
+`studies/weather_downloads/fetch_cams_public_points.py` writes, so run that script first.**
 
 ## The location columns
 
