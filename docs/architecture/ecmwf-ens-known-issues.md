@@ -216,16 +216,15 @@ Two null patterns *do* fail ingest:
   structural gap. They stay non-nullable in the `Nwp` contract, so base validation rejects them.
   This is the pattern behind the 2026-07-14 run, where a whole forecast step went missing for 50 of
   51 ensemble members across every variable — reported upstream as
-  [dynamical-org/reformatters#765](https://github.com/dynamical-org/reformatters/issues/765).
-  One shape of this pattern never reaches validation, because the asset
-  [retries it](#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright): a
-  slice that is NaN at every grid point.
+  [dynamical-org/reformatters#765](https://github.com/dynamical-org/reformatters/issues/765). A
+  slice that is NaN at every grid point never reaches validation, because the asset [retries
+  it](#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright).
 
     A cell reaches this state only when *every* grid point feeding it is missing, because of the
     renormalisation described [above](#spatial-aggregation-is-where-a-grid-points-null-is-resolved).
     A blocky failure like 2026-07-14's never reaches this gate, because a slice empty at every grid
-    point is retried first. A block that covers some cells but not the whole box is caught here,
-    while a *scattered* grid-point null in an instantaneous variable is
+    point is retried first. A block that covers some cells but not the whole downloaded box is
+    caught by this gate, while a *scattered* grid-point null in an instantaneous variable is
     absorbed by the cell's other points, unless it lands on one of the 10 single-point cells, which
     have no others. That is a deliberate trade rather than an oversight: an instantaneous variable's
     nulls have only ever arrived as whole-step dropouts, and losing an entire run over one bad pixel
@@ -273,74 +272,79 @@ only ever arrived as whole-step dropouts.
 
 ### An empty slice or a wholly-missing variable is retried, not failed outright
 
-The `ecmwf_ens` asset **retries** three failures on one ladder: every 30 minutes, up to 8 times.
-All three mean "the upstream run is not ready yet", and they say it at different points:
+The `ecmwf_ens` asset **retries** three failures on one ladder: every 30 minutes, up to 8 times. All
+three mean "the upstream run is not ready yet", and the asset detects each at a different point:
 
 - **The run is not in the catalog yet.** `open_ecmwf_ens_run` raises `NwpRunNotYetAvailable` before
   any download.
 - **An instantaneous variable has a slice that is NaN at every grid point.** After the download and
   before the conversion, `raise_if_instantaneous_slices_empty` looks for any (ensemble member, lead
-  time) slice of an instantaneous variable that is empty at every grid point of the downloaded
-  box, and raises `NwpRunNotYetAvailable`, naming each variable and its count of empty slices.
-  Scattered NaN grid points do not trigger it, and neither does a NaN in a de-accumulated variable
-  or in `categorical_precipitation_type_surface`, which are legitimately empty in places.
+  time) slice of an instantaneous variable that is empty at every grid point of the downloaded box,
+  and raises `NwpRunNotYetAvailable`. The exception's message names each variable and its count of
+  empty slices. Scattered NaN grid points do not trigger the check. Neither does a NaN in a
+  de-accumulated variable or in `categorical_precipitation_type_surface`, because both can
+  legitimately be empty: a de-accumulated variable at lead-0, and the categorical variable in runs
+  before 2024-11-13.
 - **A de-accumulated variable is wholly empty.** `Nwp.validate` raises `NwpVariableWhollyMissing`
   after the conversion.
 
-The ladder gives at least 4 hours of waiting. The two failures found after the download also pay
-for it on every attempt. One attempt took 81 seconds on 2026-10-06 for the 2026-10-05 run (opening
-4 seconds, downloading 38 seconds, converting 39 seconds); an attempt that stops at the empty-slice
-check costs about 42 seconds. The ladder therefore lasts between about 4 hours 6 minutes (every
-attempt stops at that check) and about 4 hours 12 minutes (every attempt runs the full 81 seconds).
-A run with a permanent hole takes the whole ladder to fail.
+The ladder gives at least 4 hours of waiting. The two failures found after the download also repeat
+the download on every attempt. One attempt took 81 seconds on 2026-10-06 for the 2026-10-05 run
+(opening 4 seconds, downloading 38 seconds, converting 39 seconds); an attempt that stops at the
+empty-slice check takes about 42 seconds. Over its 9 attempts (the first and 8 retries), the ladder
+therefore lasts between about 4 hours 6 minutes (every attempt stops at that check) and about 4
+hours 12 minutes (every attempt runs the full 81 seconds). A run whose missing slices are never
+filled takes the whole ladder to fail.
 
-**The 2026-10-02 run is the case the empty-slice retry exists for.** At 08:30 UTC, all 50 perturbed
-members stopped after the first 43 of 85 lead times in Dynamical.org's store, while ECMWF's own run
+**The 2026-10-02 run is the case the empty-slice retry exists for.** At 08:30 UTC, Dynamical.org's
+store held only the first 43 of 85 lead times for all 50 perturbed members, while ECMWF's own run
 was still arriving. Each of the nine instantaneous variables was missing 2,100 (member, lead time)
-slices, which is 3,509,100 missing rows per variable (2,100 slices × 1,671 H3 cells).
-Dynamical.org's store was filled about 3 hours 28 minutes after the 08:30 UTC attempt. The ladder
-would have found it filled, with about 37 minutes to spare.
+slices, which is 3,509,100 missing rows of the `Nwp` table per variable (2,100 slices × 1,671 H3
+cells). Dynamical.org's store was filled at about 11:58 UTC, 3 hours 28 minutes after the 08:30 UTC
+attempt. A ladder started by that attempt would have found the store filled about 37 minutes before
+its last retry, and the scheduled 10:30 UTC run would have found the store filled on its third
+retry.
 
 Waiting is worth doing because Dynamical.org publishes each 00Z run as roughly 40 separate Icechunk
 commits between 08:05 and 08:20 UTC, one per worker. A run being written is therefore genuinely
 readable and genuinely incomplete: a variable whose worker has not committed yet reads as fill-value
-null across every member and step. For an instantaneous variable that shows as the empty slices
-above, and for a de-accumulated variable as the fatal pattern above. The
-`categorical_precipitation_type_surface` column is nullable but has its own historical invariant
-that rejects an all-null column with no retry. A *defective* run also gets republished — the
-2026-08-09 00Z run was repaired by a second sweep at 11:45 UTC, 3 hours 25 minutes after its first
-publication, and well inside the retry budget.
+null across every member and step. An unwritten instantaneous variable shows up as empty slices,
+which `raise_if_instantaneous_slices_empty` catches. An unwritten de-accumulated variable shows up
+as a wholly-empty column, which `Nwp.validate` rejects with `NwpVariableWhollyMissing`. The
+`categorical_precipitation_type_surface` column is nullable, but `Nwp.validate` rejects an all-null
+column in any run after 2024-11-12, and that rejection fails the partition at once, with no retry. A
+*defective* run also gets republished — the 2026-08-09 00Z run was repaired by a second sweep at
+11:45 UTC, 3 hours 25 minutes after its first publication, and well inside the retry budget.
 
 The partition simply stays unmaterialised if every retry is exhausted, until the upstream data is
 fixed and it is re-run.
 
 #### Why only these three failures are retried
 
-The retry covers these three failures and nothing else. Every other error fails at once, a dtype
-mismatch included, for three reasons:
+Every other error fails the partition at once, a dtype mismatch included, for three reasons:
 
 - **A structural failure does not heal.** A wrong dtype, a missing variable or dimension, or a
-  changed shape persists until we change our code or Dynamical.org changes its schema.
-  Dynamical.org rewrites a store only to repair data it published wrongly, so waiting 4 hours
-  changes nothing and only delays the alert.
+  changed shape persists until we change our code or Dynamical.org changes its schema. In the
+  incidents we have seen, Dynamical.org rewrote a store only to repair data it had published
+  wrongly, so waiting 4 hours changes nothing and only delays the failure that alerts the operator.
 - **Our own bugs look the same as upstream defects.** A unit or conversion bug of ours produces
-  out-of-range values that no code can tell apart from Dynamical.org publishing out-of-range
-  values. Retrying both for 4 hours hides our bug for that long, and a failure should name its
-  cause as early as possible (see [design principle
+  out-of-range values that our checks cannot tell apart from Dynamical.org publishing out-of-range
+  values. Retrying out-of-range values for 4 hours would hide our bug for 4 hours. A failure should
+  name its cause as early as possible (see [design principle
   16](../design-philosophy/design-principles.md#16-a-failure-names-its-own-cause-in-the-telemetry)).
-- **A retry is expensive.** Each retrying partition holds an `ECMWF` concurrency pool slot for
-  about 4 hours, so a backfill over several bad partitions multiplies that wait.
+- **A retry ties up a concurrency slot for hours.** Each retrying partition holds an `ECMWF`
+  concurrency pool slot for about 4 hours, so a backfill over several bad partitions multiplies that
+  wait.
 
 The three retried failures are the ones for which there is evidence that the data heals: the
-2026-08-09 run was republished 3 hours 25 minutes after its first publication, and the 2026-10-02
-store was filled about 3 hours 28 minutes after the 08:30 UTC attempt. Dynamical.org's maintainer
-has also said that a deployment on 2026-10-02 re-runs a failed dataset update within about 20
-minutes.
+2026-08-09 republication and the 2026-10-02 fill described above. Dynamical.org's maintainer has
+also [said](https://github.com/dynamical-org/reformatters/issues/1149#issuecomment-5980497676) that
+a change deployed on 2026-10-02 re-runs a failed dataset update within about 20 minutes.
 
-If a second kind of upstream content defect is repaired in this way, the rule could widen to
-failures about the data's content (null patterns, perhaps value ranges) while still failing at
-once on failures about its structure. The first failed attempt would then send a Sentry warning,
-so that retrying does not hide the fault.
+If Dynamical.org is seen repairing a second kind of content defect within the 4-hour ladder, the
+retry could widen to failures about the data's content (null patterns), while the asset still fails
+at once on failures about the data's structure. The first failed attempt would then send a Sentry
+warning, so that retrying does not hide the fault.
 
 ## An incomplete run (tolerated, and reported)
 

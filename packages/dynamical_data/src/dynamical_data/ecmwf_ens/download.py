@@ -16,8 +16,8 @@ from contracts.weather_schemas import Nwp
 class NwpRunNotYetAvailable(Exception):
     """Raised when Dynamical.org has not finished publishing the run for ``nwp_init_time``.
 
-    Either the run is not yet in the catalog (`open_ecmwf_ens_run`), or it is present but a
-    (member, lead time) slice of an instantaneous variable is still unwritten
+    Either the run is not yet in the catalog (`open_ecmwf_ens_run`), or it is present but an
+    (ensemble member, lead time) slice of an instantaneous variable is still unwritten
     (`raise_if_instantaneous_slices_empty`). The ``ecmwf_ens`` asset retries both.
     """
 
@@ -182,13 +182,15 @@ def download_ecmwf_ens_data(ds_sliced: xr.Dataset) -> xr.Dataset:
 def raise_if_instantaneous_slices_empty(ds: xr.Dataset) -> None:
     """Raise `NwpRunNotYetAvailable` when a run is still being published.
 
-    Dynamical.org fills a run in pieces, so a run read part-way through has whole
-    (ensemble member, lead time) slices that are NaN at every grid point. An instantaneous variable
-    is never legitimately empty there, so one empty slice means the run is unfinished, and waiting
-    is the right response. A run with only scattered NaN grid points is not unfinished, so it
-    passes through to `contracts.weather_schemas.Nwp.validate`, as does any other contract
-    violation. De-accumulated variables are not checked here: they are legitimately empty at
-    lead-0, and `Nwp.validate` raises `NwpVariableWhollyMissing` when one is wholly missing.
+    Dynamical.org fills a run in pieces, so a run read part-way through can have whole (ensemble
+    member, lead time) slices that are NaN at every grid point. An instantaneous variable is never
+    legitimately NaN across a whole slice, so one wholly-NaN slice means the run is unfinished.
+    Waiting is then the right response. A run whose NaN grid points are only scattered is treated as
+    finished, so it passes through to `contracts.weather_schemas.Nwp.validate`, as does any other
+    contract violation. De-accumulated variables are not checked here, because they are legitimately
+    empty at lead-0, and `Nwp.validate` raises `NwpVariableWhollyMissing` when a de-accumulated
+    variable is wholly missing. `categorical_precipitation_type_surface` is not checked either,
+    because the column is empty in runs before 2024-11-13.
 
     Reasoning and the 2026-10-02 incident:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright>

@@ -185,7 +185,7 @@ def test_calc_slice_raises_on_single_value_coord() -> None:
 # raise_if_instantaneous_slices_empty
 # --------------------------------------------------------------------------------------------------
 
-_SHAPE = (3, 2, 2, 2)  # (lead_time, ensemble_member, latitude, longitude), as in the factory.
+_SHAPE = (3, 2, 2, 2)  # (lead_time, ensemble_member, latitude, longitude), as in make_ens_dataset.
 
 
 def _nan_where(
@@ -200,9 +200,9 @@ def _nan_where(
 def test_empty_slice_of_an_instantaneous_variable_raises(
     make_ens_dataset: Callable[..., xr.Dataset], variable: str
 ) -> None:
-    """At lead-0 too, because instantaneous variables are never legitimately empty there.
-
-    Two slices are empty, so the count in the message differs from a bare yes or no.
+    """An empty slice raises at lead-0 too, because an instantaneous variable is never
+    legitimately empty at lead-0. Two slices are empty, so the test pins the count in the message,
+    not only whether the check raised.
     """
     values = _nan_where(lead_idx=0, member_idx=1, lat_idx=slice(None), lon_idx=slice(None))
     values[2, 0, :, :] = np.nan
@@ -215,7 +215,7 @@ def test_empty_slice_of_an_instantaneous_variable_raises(
 def test_slice_with_one_valid_grid_point_does_not_raise(
     make_ens_dataset: Callable[..., xr.Dataset],
 ) -> None:
-    """Scattered NaN, including a whole NaN row or column, is not an unfinished run."""
+    """A slice with scattered NaN grid points, even a whole NaN row or column, does not raise."""
     row_nan = _nan_where(lead_idx=1, member_idx=0, lat_idx=0, lon_idx=slice(None))
     column_nan = _nan_where(lead_idx=1, member_idx=0, lat_idx=slice(None), lon_idx=0)
     ds = make_ens_dataset(var_values={"temperature_2m": row_nan, "pressure_surface": column_nan})
@@ -230,7 +230,11 @@ def test_slice_with_one_valid_grid_point_does_not_raise(
 def test_empty_slice_of_a_variable_that_may_be_empty_does_not_raise(
     make_ens_dataset: Callable[..., xr.Dataset], variable: str
 ) -> None:
-    """De-accumulated variables are empty at lead-0, and the categorical one before 2024-11-13."""
+    """A legitimately empty slice of a variable outside the instantaneous set does not raise.
+
+    De-accumulated variables are empty at lead-0, and `categorical_precipitation_type_surface` is
+    empty in runs before 2024-11-13.
+    """
     values = _nan_where(lead_idx=0, member_idx=0, lat_idx=slice(None), lon_idx=slice(None))
     ds = make_ens_dataset(var_values={variable: values})
 

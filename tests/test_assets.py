@@ -953,9 +953,9 @@ def test_ecmwf_ens_publishes_both_null_populations(
     [
         (0, True, "No nulls in 54 instantaneous-variable grid points.", []),
         # Two nulls in *one* slice, so the table's two count columns hold different numbers and
-        # swapping them is visible. Two of the three grid points of the one step, which the stubbed
-        # converter never sees, and not all three, because a slice empty at every grid point is
-        # retried before any check runs.
+        # swapping them is visible. The nulls fill two of the step's three grid points, not all
+        # three, because a slice empty at every grid point is retried before any check runs. The
+        # stubbed converter never sees these nulls.
         (
             2,
             False,
@@ -1167,8 +1167,8 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
     env: Path, monkeypatch: pytest.MonkeyPatch, raising_step: str
 ) -> None:
     """``NwpRunNotYetAvailable`` → ``RetryRequested`` with the asset's configured retry budget,
-    so a not-yet-published run waits rather than failing outright. It does so whether the run is
-    absent from the catalog or the downloaded run has an empty slice."""
+    so a not-yet-published run waits rather than failing outright. The asset retries whether the
+    run is absent from the catalog or the downloaded run has an empty slice."""
     from dagster import RetryRequested
 
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
