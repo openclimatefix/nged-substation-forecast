@@ -480,6 +480,7 @@ merged. `UKV-CEDA`, `-part2` and `-part3` hold the 00, 06, 12, and 18 UTC runs t
 
 REANALYSIS_PRODUCT_NAMES: Final[tuple[str, ...]] = (
     "CAMS",
+    "CAMS_public_points",
     "CERRA",
     "ERA5",
     "ERA5-WIND-2019-2023",
@@ -588,6 +589,9 @@ ERA5_WIND_2019_2023_PRODUCT_DIR: Final[Path] = product_dir_for(product="ERA5-WIN
 
 CAMS_PRODUCT_DIR: Final[Path] = product_dir_for(product="CAMS")
 """The CAMS radiation service's satellite retrieval."""
+
+CAMS_PUBLIC_POINTS_DIR: Final[Path] = product_dir_for(product="CAMS_public_points")
+"""The CAMS irradiance at public points: the single-site solar BMUs and a coarse GB grid."""
 
 CAMS_SITE_POINTS_DIR: Final[Path] = site_points_dir_for(product="CAMS")
 """The CAMS irradiance at each site's coordinates."""
