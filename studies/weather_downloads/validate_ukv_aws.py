@@ -327,8 +327,8 @@ def hour_of_day_profile(*, records: pl.DataFrame) -> pl.DataFrame:
 
     An instantaneous value peaks at solar noon. A mean over the hour before its label is centred
     half an hour before the label, so the labelled series peaks about half an hour after solar
-    noon. The hour of the maximum therefore shows which of the two the total resembles. The profile is
-    split by era, because the residual differs between the eras.
+    noon. The hour of the maximum therefore shows which of the two the total resembles. The profile
+    is split by era, because the residual differs between the eras.
     """
     readable = records.filter(pl.col("readable")).with_columns(era=_era_expression())
     long = pl.concat(
