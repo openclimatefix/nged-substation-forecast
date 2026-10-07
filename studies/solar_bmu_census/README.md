@@ -14,7 +14,7 @@ wrote.**
 
 | Script | What it does |
 |---|---|
-| `fetch_sources.py` | Downloads the BMU register, the IGCPU report (B1420), the settled half-hourly output of each BMU (dataset B1610), the National Energy System Operator's (NESO's) Transmission Entry Capacity (TEC) register, and the Renewable Energy Planning Database (REPD), and writes a lineage note and a README beside them. |
+| `fetch_sources.py` | Downloads the BMU register, the IGCPU report (B1420), the settled half-hourly output of each BMU (dataset B1610), the National Energy System Operator's (NESO's) Transmission Entry Capacity (TEC) register, the Renewable Energy Planning Database (REPD), and NESO's map of the 14 distribution network operator (DNO) licence areas, then writes a lineage note and a README beside them. |
 | `classify.py` | Correlates each BMU's output with the sun and writes `classes.parquet`. |
 | `collate.py` | Fetches each census BMU's Maximum Export Limit (MEL), joins the five capacity values and the P99 of the BMU's output onto each census BMU with the site's technology and position, and writes the census table as `solar_bmus.csv` and `solar_bmus.parquet` in the study's data folder. |
 | `recall_check.py` | Checks the census against the TEC register's photovoltaic (PV) projects. |
@@ -44,6 +44,43 @@ series the classifier judges: after the 30 days that follow the BMU's first outp
 was running in the window's first week), and without the half-hours of exactly zero output while the
 sun is clearly up. Zeros at night and negative readings stay in. The column is empty for a BMU with
 no judged output. It is never added to another column.
+
+**`report.py` prints two more measures of observed output for each group, and neither is a
+registered capacity.** `max of output (MW)` is the sum over the group's BMUs of each BMU's largest
+half-hourly output (`classify.largest_output_mw`). Because the BMUs' largest outputs fall in
+different half-hours, the sum overstates what the group delivered at once. `highest combined output
+in one half-hour (MW)` is the maximum over time of the group's summed half-hourly output
+(`report.coincident_peak_mw`). Neither is added to a registered capacity.
+
+**`report.py` also estimates the solar part of each BMU's AC capacity (`solar_estimate.py`).** The
+model is `min(r * a * c(t), a)`, with `a` the AC capacity, `r` the DC:AC ratio (1.4, the median for
+fixed-tilt projects installed in 2022 in Lawrence Berkeley National Laboratory's Utility-Scale Solar
+report for 2023), and `c(t)` a shape. All three shapes get the same fit: `a` is fitted to the 99th
+percentile of output in each band of `c(t)`. The shapes are the cosine of the solar zenith angle,
+the CAMS irradiance at the BMU's own position, and the mean CAMS irradiance of 18 grid points across
+Great Britain. The aggregate estimate is a range between the cosine and the 18-point mean, because
+validation on the single-site BMUs cannot choose between them. `report.md` compares the three shapes
+on the single-site BMUs that follow the sun, and on the BMUs that ran at Generation Capacity and
+the others. **The CAMS shapes read `solar_estimate.CAMS_PUBLIC_POINTS_PATH`, which
+`studies/weather_downloads/fetch_cams_public_points.py` writes, so run that script first.**
+
+## The location columns
+
+**Six columns say where a BMU is, and none of them is a capacity.**
+
+- `gsp_group`: the Elexon grid supply point (GSP) group identifier in the BMU register, such as
+  `_B`. The register leaves the group empty for every transmission-connected (`T_`) BMU, so the
+  column is empty for the nine transmission-connected single-site census BMUs.
+- `dno_area`: the distribution network operator (DNO) whose licence area the GSP group names, from
+  `collate.GSP_GROUP_AREAS`. The mapping is the attribute table of NESO's map of the 14 DNO licence
+  areas. The column is empty when `gsp_group` is empty.
+- `position_gsp_group` and `licence_area_by_position`: the GSP group identifier and the DNO of the
+  licence area in NESO's map that contains the position of the matched REPD row. NESO calls the
+  boundaries approximate. The columns are empty when the BMU has no REPD position.
+- `km_to_nearest_other_area`: the distance in kilometres from that position to the nearest edge of
+  any other licence area, which says how far inside its area the position sits.
+- `repd_county` and `repd_region`: the county and region fields of the matched REPD row. These are
+  REPD's own fields and are not licence areas.
 
 ## Hand-made tables
 

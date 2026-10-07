@@ -103,13 +103,17 @@ class NwpVariableWhollyMissing(ValueError):
     chunks read as fill-value null until the worker writing them commits. Waiting is therefore a
     better first response than failing the partition.
 
-    The retry covers only the de-accumulated variables: an incomplete publication reaches this
+    This exception covers only the de-accumulated variables: an incomplete publication reaches this
     check only when the variables still unwritten are the de-accumulated ones. The nine
-    instantaneous variables are non-nullable, so a frame missing one of those is rejected by base
-    Patito validation first, with no retry. An all-null `categorical_precipitation_type_surface`
-    passes base validation, because that column is nullable. The all-null column is rejected
-    instead by `_check_variables_that_were_introduced_after_start_of_dataset`, and only for an
-    `init_time` after 2024-11-12, because the column does not exist in the runs before then. See
+    instantaneous variables are non-nullable, so base Patito validation rejects a frame in which one
+    of those variables is null. A slice of an instantaneous variable still empty at every grid point
+    never reaches base validation, because
+    `dynamical_data.ecmwf_ens.download.raise_if_instantaneous_slices_empty` finds the slice on the
+    raw grid first and the `ecmwf_ens` asset retries the run. An all-null
+    `categorical_precipitation_type_surface` passes base validation, because that column is
+    nullable. The all-null column is rejected instead by
+    `_check_variables_that_were_introduced_after_start_of_dataset`, and only for an `init_time`
+    after 2024-11-12, because the column does not exist in the runs before then. See
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
     """
 

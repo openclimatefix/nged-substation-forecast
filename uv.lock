@@ -5320,6 +5320,7 @@ source = { editable = "packages/studies" }
 dependencies = [
     { name = "altair" },
     { name = "contracts" },
+    { name = "nged-data" },
     { name = "numpy" },
     { name = "plotting" },
     { name = "polars" },
@@ -5340,6 +5341,7 @@ dev = [
 requires-dist = [
     { name = "altair", specifier = ">=6.0.0" },
     { name = "contracts", editable = "packages/contracts" },
+    { name = "nged-data", editable = "packages/nged_data" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "plotting", editable = "packages/plotting" },
     { name = "polars", specifier = ">=1.38.1" },
