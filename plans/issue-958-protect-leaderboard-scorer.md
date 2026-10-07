@@ -7,7 +7,7 @@ three. The issue also bundles two kinds of work: code changes in this repository
 
 **Solution.** The `metrics` asset becomes the only source of a leaderboard number and protects
 itself. It refuses a forecast that omits rows of an eligible series, and refuses a window reaching
-past `FINAL_TEST_START` unless `NGED_FINAL_TEST=1` is set. A new `scripts/score_study.py` scores a
+past `FINAL_TEST_START` unless `NGED_FINAL_TEST=1` is set. A new `scripts/forecasting/score_study.py` scores a
 study's predictions file by running the asset from `main`. The shared study power reader (issue #1082) stops at the
 same date. An `import-linter` contract keeps the scorer free of `dagster`, `mlflow`, and `studies`.
 The sysadmin steps move into a maintainer-run runbook and a separate issue.
@@ -73,7 +73,7 @@ That buys the plan, both plan reviews, and both diff reviews.
   which is the selection-bias risk #960 and the Ladder guard address, not this issue.
 - **Consequence of (b) for this issue:** the research user needs a copy of the power table
   truncated at `FINAL_TEST_START`, because Delta files cannot be hidden row by row. Writing that
-  copy is an `scripts/` job the maintainer runs (it belongs to the sysadmin issue). Layer 1
+  copy is a `scripts/maintenance/` job the maintainer runs (it belongs to the sysadmin issue). Layer 1
   in the issue, the auto-research page, and #1035 then say the same thing.
 
 **Q2: which windows does the `FINAL_TEST_START` guard cover?** Recommendation: every group except
@@ -161,7 +161,7 @@ subclasses defined next to `NoOverlappingActualsError`, whichever module holds t
   MLflow runs that have a registered model, which a `study/` group never has, so no code is needed;
   the PR body records this.
 
-**`scripts/score_study.py`** (new). Arguments: predictions parquet path, study name, fold id. It
+**`scripts/forecasting/score_study.py`** (new). Arguments: predictions parquet path, study name, fold id. It
 validates the file as `PowerForecast`, sets `experiment_name = "study/<name>"` (rejecting a name
 that already begins `study/` or contains a path separator), writes the rows to `power_forecasts`
 via `delta_store.power_forecasts.write_power_forecasts(replace_partition=...)`, then calls
@@ -184,7 +184,7 @@ second re-runs `uv lock`.
 **Sysadmin steps (not in this PR).** The follow-up issue carries a runbook page the maintainer runs
 by hand: the Unix user, `setfacl` on the data folders, setgid directories with
 umask 002, the research user's own `uv` cache and credentials, tightening `/mnt/data` (mode 2777
-today), the narrow `sudo` rule naming `scripts/score_study.py`, and the truncated power copy (Q1b).
+today), the narrow `sudo` rule naming `scripts/forecasting/score_study.py`, and the truncated power copy (Q1b).
 
 ## Changes from the correctness review
 
@@ -287,8 +287,9 @@ Written in the present tense, no history:
   row-set refusal; delete the shipped steps of "Implementation details — final-test window" and keep
   step 3 (#960's conditional reservation).
 - `docs/ml_experimentation/index.md`: the autonomous-study route and promotion path.
+- `scripts/README.md`: a line for `forecasting/score_study.py` under the existing `forecasting/` section, saying what it is for and who runs it.
 - `.claude/skills/study/SKILL.md` and the reviewer checklist: a study's leaderboard number comes only
-  from `scripts/score_study.py`, and every number on a study page traces to a `forecast_metrics`
+  from `scripts/forecasting/score_study.py`, and every number on a study page traces to a `forecast_metrics`
   row. CLAUDE.md's skills table is checked for a stale summary.
 - Aligning layer 1 in `docs/roadmap/auto-research.md` and #1035 with the Q1 outcome moves to the
   follow-up issue, because it depends on Q1.
