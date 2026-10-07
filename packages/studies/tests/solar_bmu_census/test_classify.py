@@ -326,3 +326,20 @@ def test_p99_skips_the_commissioning_month_and_the_daytime_zeros() -> None:
 def test_p99_is_none_when_the_bmu_never_generates() -> None:
     output = _frame(stamps=_midday_stamps(days=20), values=np.zeros(20))
     assert classify.p99_output_mw(output=output, window_start=START) is None
+
+
+def test_the_largest_output_doubles_the_largest_half_hour_and_keeps_the_commissioning_month() -> (
+    None
+):
+    values = np.zeros(60)
+    values[11] = 300.0
+    values[50] = 40.0
+    output = _frame(stamps=_midday_stamps(days=60), values=values)
+    assert classify.largest_output_mw(output=output) == pytest.approx(600.0)
+
+
+def test_the_largest_output_raises_on_a_file_with_no_reading() -> None:
+    with pytest.raises(ValueError, match="no reading"):
+        classify.largest_output_mw(
+            output=pl.DataFrame({"output_mwh": [None]}, schema={"output_mwh": pl.Float64})
+        )

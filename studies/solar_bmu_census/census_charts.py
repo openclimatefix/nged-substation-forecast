@@ -9,6 +9,7 @@ Transmission Entry Capacity (TEC) register, and the Renewable Energy Planning Da
 public, so the charts name each BMU and show output in megawatts on calendar dates.
 """
 
+import bisect
 import json
 import math
 from dataclasses import dataclass
@@ -19,7 +20,7 @@ from typing import Any, Final, cast
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
-from classify import SOLAR_CORRELATION_THRESHOLD
+from classify import SOLAR_CORRELATION_THRESHOLD, largest_output_mw
 from collate import P99_COLUMN, capacity_disparity
 from fetch_sources import OUTPUT_DIR, STUDY_DIR, fetch_bmu_reference, recorded_run
 from studies.charts import CONTENT_WIDTH_PX, figure
@@ -53,13 +54,37 @@ FIGURE_COLOURS: Final[dict[str, str]] = {
     "Largest MEL": ocf.DATA_GREEN,
     "REPD installed": ocf.BRAND_ORANGE,
     "P99 of output": ocf.BLACK_1,
+    "Max of output": ocf.BLACK_1,
 }
+MAX_NAME: Final[str] = "Max of output"
+"""The line at the BMU's largest half-hourly output (`classify.largest_output_mw`), which the
+figure draws beside the six values `capacity_disparity` ranks, and which takes no part in the
+ranking."""
+OUTPUT_DASHES: Final[dict[str, list[float]]] = {
+    "P99 of output": [5, 3],
+    MAX_NAME: [1, 2],
+}
+"""The dash pattern of the two lines that measure the BMU's own output: dashed for the P99 and
+dotted for the maximum. Both are dark, and each line's label names it."""
 RULE_WIDTHS: Final[tuple[float, ...]] = (6.0, 5.0, 4.0, 3.0, 2.0, 1.5)
 """Line widths from the first line drawn to the last. Lines that coincide at one height then show as
 nested stripes, each in its own colour."""
+ONLINE_FIGURES: Final[tuple[str, ...]] = ("Largest MEL", "IGCPU installed", "Generation Capacity")
+"""The values that share one text written on their line when two or more of them coincide, in the
+order the text names them. TEC, REPD, and the P99 of output always take a label in the margin."""
+ONLINE_FONT_PX: Final[int] = 10
+ONLINE_CHAR_PX: Final[float] = 5.3
+"""A generous estimate of the width of one character of the on-line text, in pixels, used to keep
+the text inside the plot and to find where the output series crosses it least."""
+ONLINE_INSET_PX: Final[int] = 4
+"""The least space between the on-line text and either end of its line."""
+ONLINE_LIFT_PX: Final[float] = 3.5
+"""How far above its line the bottom of the on-line text sits, clear of the widest stripe."""
+ONLINE_HALO_PX: Final[float] = 3.0
+"""The width of the background-coloured outline drawn behind the on-line text."""
 DISPARITY_EXAMPLES: Final[int] = 3
 DISPARITY_ROW_PX: Final[int] = 230
-LABEL_MARGIN_PX: Final[int] = 235
+LABEL_MARGIN_PX: Final[int] = 180
 """The width at the right of the plot area that the line labels and arrows occupy."""
 LABEL_PADDING_PX: Final[int] = 5
 """The space right of the label margin."""
@@ -312,6 +337,61 @@ def disparity_examples(*, census: pl.DataFrame) -> pl.DataFrame:
     return capacity_disparity(table=census).head(DISPARITY_EXAMPLES)
 
 
+def coinciding_groups(*, values: dict[str, float]) -> list[list[str]]:
+    """Group the `ONLINE_FIGURES` values that are equal at the one decimal place the figure shows.
+
+    Args:
+        values: Each figure's value in MW, by its name in `FIGURE_NAMES`. Names outside
+            `ONLINE_FIGURES` are ignored.
+
+    Returns:
+        Each group of two or more names whose values print the same to one decimal place, with the
+        names in `ONLINE_FIGURES` order. A value that coincides with no other is in no group.
+    """
+    groups: dict[str, list[str]] = {}
+    for name in ONLINE_FIGURES:
+        if name in values:
+            groups.setdefault(f"{values[name]:.1f}", []).append(name)
+    return [names for names in groups.values() if len(names) >= 2]
+
+
+def online_text(*, names: list[str], value: float) -> str:
+    """Return the text written on a line that several values share, such as "A = B = 50.0 MW"."""
+    return " = ".join([*names, f"{value:.1f} MW"])
+
+
+def online_text_start(
+    *, series: pl.DataFrame, value: float, start: datetime, end: datetime, width_days: float
+) -> datetime:
+    """Find where along its line the on-line text is crossed by the fewest output readings.
+
+    The rule: slide a window as wide as the text, one day at a time, from `start` to the last day
+    the whole text fits before `end`, and count the half-hourly readings inside the window that
+    rise above the line, into the text. The window with the fewest such readings wins, and the
+    earliest window wins a tie.
+
+    Args:
+        series: The BMU's output, with columns `time` and `megawatts`.
+        value: The line's height in MW.
+        start: The earliest time the text may start.
+        end: The latest time the text may end.
+        width_days: The text's width, in days of the x axis.
+
+    Returns:
+        The time at which the text's left edge sits.
+    """
+    above = sorted(series.filter(pl.col("megawatts") > value)["time"].to_list())
+    width = timedelta(days=width_days)
+    best, fewest = start, len(above) + 1
+    left = start
+    while left + width <= end or left == start:
+        crossing = bisect.bisect_right(above, left + width) - bisect.bisect_left(above, left)
+        if crossing < fewest:
+            best, fewest = left, crossing
+        left += timedelta(days=1)
+    return best
+
+
 def label_positions(*, values: list[float], gap: float) -> list[float]:
     """Spread label heights so that no two are closer than `gap`, keeping their order.
 
@@ -431,41 +511,67 @@ def _arrow_marks(
 
 
 def _disparity_panel(*, row: dict[str, Any], last: bool) -> alt.LayerChart:
-    """Draw one BMU's year of output with a horizontal line for each of its six figures.
+    """Draw one BMU's year of output with a line for each capacity value, its P99, and its maximum.
 
-    Each line has a label at the right-hand end of the plot, outside the plot area in the margin
-    `LABEL_MARGIN_PX`, in the line's own colour and with its value in MW, and the figure has no
-    legend. Lines with equal or close values are not combined into one label. Their labels are
+    Where two or more of the `ONLINE_FIGURES` values coincide (`coinciding_groups`), one text such
+    as "Largest MEL = IGCPU installed = 50.0 MW" sits just above their shared line, inside the plot.
+    The text is a neutral dark colour rather than each name in its own line's colour, because Data
+    Sky and Data Green text is hard to read on the cream background, and the stacked stripes of the
+    line already show each colour. A background-coloured outline behind the text keeps it legible
+    where the output series runs through it, and `online_text_start` places it where the series
+    crosses it least.
+
+    Every other value has a label at the right-hand end of the plot, outside the plot area in the
+    margin `LABEL_MARGIN_PX`, in the line's own colour and with its value in MW. Those labels are
     stacked, in value order, by `label_geometry`, which keeps every pair at least `LABEL_GAP_SHARE`
     of the y axis apart, and a thin arrow in the line's colour joins each label to the right-hand
     end of its line. The label margin lies inside the x axis domain, so that the arrows are drawn
     in the plot's own coordinates.
+
+    The lines are drawn first and the output series over them, so that the series is never hidden.
     """
     _, window = recorded_run()
     series = output_series(bmu_id=row["elexon_bmu_id"], start=window.start, end=window.end)
     daily = series.group_by_dynamic("time", every="1d").agg(pl.col("megawatts").max())
+    output_file = OUTPUT_DIR / f"{row['elexon_bmu_id']}_{window.label}.parquet"
     figures = [
-        (name, float(row[column]), column) for column, name in FIGURE_NAMES.items() if row[column]
+        *[(name, float(row[column])) for column, name in FIGURE_NAMES.items() if row[column]],
+        (
+            MAX_NAME,
+            largest_output_mw(output=pl.read_parquet(output_file)),
+        ),
     ]
-    values = [value for _, value, _ in figures]
+    groups = coinciding_groups(values=dict(figures))
+    grouped = {name for names in groups for name in names}
+    margin = [(name, value) for name, value in figures if name not in grouped]
+    margin_values = [value for _, value in margin]
     geometry = label_geometry(
-        values=values, domain_high=float(row["highest_mw"]) * 1.1, height_px=DISPARITY_ROW_PX
+        values=margin_values,
+        domain_high=max(float(row["highest_mw"]), *(value for _, value in figures)) * 1.1,
+        height_px=DISPARITY_ROW_PX,
     )
     high = geometry.domain_high
     rules = pl.DataFrame(
         {
-            "figure": [name for name, _, _ in figures],
-            "megawatts": values,
+            "figure": [name for name, _ in figures],
+            "megawatts": [value for _, value in figures],
             "start": window.start,
             "end": window.end,
+        }
+    )
+    labels = pl.DataFrame(
+        {
+            "figure": [name for name, _ in margin],
+            "time": window.end,
             "label_height": geometry.label_mw,
-            "label": [f"{name}: {value:.1f} MW" for name, value, _ in figures],
+            "label": [f"{name}: {value:.1f} MW" for name, value in margin],
         }
     )
     plot_px = CONTENT_WIDTH_PX - DISPARITY_FRAME_PX
-    days_per_px = (window.end - window.start).total_seconds() / 86400 / (plot_px - LABEL_MARGIN_PX)
+    data_px = plot_px - LABEL_MARGIN_PX
+    days_per_px = (window.end - window.start).total_seconds() / 86400 / data_px
     x_end = window.end + timedelta(days=LABEL_MARGIN_PX * days_per_px)
-    names = list(FIGURE_NAMES.values())
+    names = list(FIGURE_COLOURS)
     colour = alt.Color(
         "figure:N",
         scale=alt.Scale(domain=names, range=[FIGURE_COLOURS[name] for name in names]),
@@ -475,58 +581,62 @@ def _disparity_panel(*, row: dict[str, Any], last: bool) -> alt.LayerChart:
         f"{row['elexon_bmu_id']}  {row['display_name']}  "
         f"(highest value over lowest: {row['ratio']:.2f})"
     )
-    base = alt.Chart(series, title=alt.TitleParams(title, anchor="start", fontSize=11, offset=2))
-    half_hourly = base.mark_line(
-        strokeWidth=0.5, opacity=0.35, color=ocf.BLACK_1, aria=False
-    ).encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X(
-            "time:T",
-            axis=alt.Axis(
-                format="%b %Y",
-                values=_month_starts(start=window.start, end=window.end),
-                labels=last,
-                ticks=last,
-                title=None,
-                domain=False,
-            ),
-            scale=alt.Scale(domain=[window.start, x_end], nice=False),
-        ),
-        y=alt.Y(
-            "megawatts:Q",
-            scale=alt.Scale(domain=[0, high], nice=False),
-            axis=alt.Axis(tickCount=4, title="MW"),
-        ),
+    rule_marks = []
+    for index, (name, _) in enumerate(figures):
+        dashes = OUTPUT_DASHES.get(name)
+        rule_marks.append(
+            alt.Chart(rules.filter(pl.col("figure") == name))
+            .mark_rule(
+                strokeWidth=RULE_WIDTHS[index] if dashes is None else 1.5,
+                strokeDash=[1, 0] if dashes is None else dashes,
+                aria=False,
+            )
+            .encode(  # ty: ignore[unresolved-attribute]
+                x=alt.X(
+                    "start:T",
+                    axis=alt.Axis(
+                        labelExpr=(
+                            "[timeFormat(datum.value, '%b'), timeFormat(datum.value, '%Y')]"
+                        ),
+                        labelAlign="center",
+                        values=_month_starts(start=window.start, end=window.end),
+                        labels=last,
+                        ticks=last,
+                        title=None,
+                        domain=False,
+                    ),
+                    scale=alt.Scale(domain=[window.start, x_end], nice=False),
+                ),
+                x2="end:T",
+                y=alt.Y(
+                    "megawatts:Q",
+                    scale=alt.Scale(domain=[0, high], nice=False),
+                    axis=alt.Axis(tickCount=4, title="MW"),
+                ),
+                color=colour,
+            )
+        )
+    half_hourly = (
+        alt.Chart(series)
+        .mark_line(strokeWidth=0.5, opacity=0.35, color=ocf.BLACK_1, aria=False)
+        .encode(x="time:T", y="megawatts:Q")  # ty: ignore[unresolved-attribute]
     )
     daily_line = (
         alt.Chart(daily)
         .mark_line(strokeWidth=1, color=ocf.BLACK_1, aria=False)
         .encode(x="time:T", y="megawatts:Q")  # ty: ignore[unresolved-attribute]
     )
-    rule_marks = []
-    for index, (name, _, column) in enumerate(figures):
-        is_p99 = column == P99_COLUMN
-        rule_marks.append(
-            alt.Chart(rules.filter(pl.col("figure") == name))
-            .mark_rule(
-                strokeWidth=1.5 if is_p99 else RULE_WIDTHS[index],
-                strokeDash=[5, 3] if is_p99 else [1, 0],
-                aria=False,
-            )
-            .encode(  # ty: ignore[unresolved-attribute]
-                x="start:T", x2="end:T", y="megawatts:Q", color=colour
-            )
-        )
     arrows = _arrow_marks(
         geometry=geometry,
-        names=[name for name, _, _ in figures],
-        values=values,
+        names=[name for name, _ in margin],
+        values=margin_values,
         end=window.end,
         days_per_px=days_per_px,
         height_px=DISPARITY_ROW_PX,
         colour=colour,
     )
     texts = (
-        alt.Chart(rules.with_columns(time=pl.lit(window.end)))
+        alt.Chart(labels)
         .mark_text(
             align="left", dx=LABEL_TEXT_OFFSET_PX, fontSize=10, fontWeight="bold", aria=False
         )
@@ -536,10 +646,95 @@ def _disparity_panel(*, row: dict[str, Any], last: bool) -> alt.LayerChart:
     )
     return cast(
         alt.LayerChart,
-        alt.layer(half_hourly, daily_line, *rule_marks, *arrows, texts).properties(
-            width=plot_px, height=DISPARITY_ROW_PX
+        alt.layer(
+            *rule_marks,
+            half_hourly,
+            daily_line,
+            *arrows,
+            texts,
+            *_online_marks(
+                groups=groups,
+                values=dict(figures),
+                series=series,
+                start=window.start,
+                end=window.end,
+                days_per_px=days_per_px,
+                mw_per_px=high / DISPARITY_ROW_PX,
+            ),
+        ).properties(
+            title=alt.TitleParams(title, anchor="start", fontSize=11, offset=2),
+            width=plot_px,
+            height=DISPARITY_ROW_PX,
         ),
     )
+
+
+def _online_marks(
+    *,
+    groups: list[list[str]],
+    values: dict[str, float],
+    series: pl.DataFrame,
+    start: datetime,
+    end: datetime,
+    days_per_px: float,
+    mw_per_px: float,
+) -> list[alt.Chart]:
+    """Draw each coinciding group's text just above its line.
+
+    Three marks, from the bottom up: a background-coloured backing from the top of the widest
+    stripe to the top of the text, which hides any other line running just above the shared line
+    (such as the maximum of output) where the text sits; a background-coloured outline of the text;
+    and the text itself.
+    """
+    rows = []
+    for names in groups:
+        value = values[names[0]]
+        text = online_text(names=names, value=value)
+        inset = timedelta(days=ONLINE_INSET_PX * days_per_px)
+        width_days = len(text) * ONLINE_CHAR_PX * days_per_px
+        left = online_text_start(
+            series=series, value=value, start=start + inset, end=end - inset, width_days=width_days
+        )
+        rows.append(
+            {
+                "time": left,
+                "time_end": left + timedelta(days=width_days),
+                "megawatts": value,
+                "backing_low": value + RULE_WIDTHS[0] / 2 * mw_per_px,
+                "backing_high": value + (ONLINE_LIFT_PX + ONLINE_FONT_PX + 2) * mw_per_px,
+                "text": text,
+            }
+        )
+    if not rows:
+        return []
+    frame = pl.DataFrame(rows)
+    style: dict[str, Any] = {
+        "align": "left",
+        "baseline": "bottom",
+        "dy": -ONLINE_LIFT_PX,
+        "fontSize": ONLINE_FONT_PX,
+        "fontWeight": "bold",
+        "aria": False,
+    }
+    return [
+        alt.Chart(frame)
+        .mark_rect(color=ocf.BACKGROUND, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x="time:T", x2="time_end:T", y="backing_low:Q", y2="backing_high:Q"
+        ),
+        alt.Chart(frame)
+        .mark_text(
+            stroke=ocf.BACKGROUND,
+            strokeWidth=ONLINE_HALO_PX,
+            strokeJoin="round",
+            color=ocf.BACKGROUND,
+            **style,
+        )
+        .encode(x="time:T", y="megawatts:Q", text="text:N"),  # ty: ignore[unresolved-attribute]
+        alt.Chart(frame)
+        .mark_text(color=ocf.BLACK_1, **style)
+        .encode(x="time:T", y="megawatts:Q", text="text:N"),  # ty: ignore[unresolved-attribute]
+    ]
 
 
 def _month_starts(*, start: datetime, end: datetime) -> list[alt.DateTime]:
@@ -566,18 +761,25 @@ def disparity_figure(*, census: pl.DataFrame, number: int) -> alt.VConcatChart:
         panels=panels,
         number=number,
         title=(
-            "For the three BMUs whose six capacity values differ most, the highest value is "
-            f"{rows[-1]['ratio']:.1f} to {rows[0]['ratio']:.1f} times the lowest"
+            "For the three BMUs whose capacity values and P99 of output differ most, the highest "
+            f"is {rows[-1]['ratio']:.1f} to {rows[0]['ratio']:.1f} times the lowest"
         ),
         subtitle=[
             (
-                "Half-hourly output (faint line) and each day's largest half-hour (dark line), "
-                "in megawatts, over the 12-month study window."
+                "Half-hourly output (faint line) and each day's largest half-hour (dark line), in "
+                "MW, over the 12-month window."
             ),
             (
-                "Horizontal lines, each labelled with its value: the five published capacities, "
-                "and the dashed line, the 99th percentile of the BMU's output "
-                "(a measure of output, not a capacity)."
+                "Horizontal lines: the five published capacity values, and two measures of the "
+                "BMU's own output (P99 and maximum)."
+            ),
+            (
+                "Dashed: the 99th percentile of output. Dotted: the largest half-hour, which "
+                "played no part in choosing the BMUs."
+            ),
+            (
+                "Text on a line: the values that agree there to one decimal place. An arrow joins "
+                "each other value to its label."
             ),
             (
                 "TEC and REPD describe the whole Cleve Hill project, which holds both Cleve Hill "

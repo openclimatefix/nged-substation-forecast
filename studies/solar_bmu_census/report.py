@@ -23,6 +23,7 @@ from classify import (
     SOLAR_CORRELATION_THRESHOLD,
     analysis_series,
     drop_daytime_zeros,
+    largest_output_mw,
     sun_following_correlation,
 )
 from collate import CAPACITY_COLUMNS, DISPARITY_FIGURES, P99_COLUMN, capacity_disparity
@@ -705,7 +706,7 @@ def peak_table(*, single: pl.DataFrame, window_label: str) -> pl.DataFrame:
     rows = []
     for row in single.sort("elexon_bmu_id").iter_rows(named=True):
         output = pl.read_parquet(OUTPUT_DIR / f"{row['elexon_bmu_id']}_{window_label}.parquet")
-        peak = _as_float(output["output_mwh"].max()) * 2
+        peak = largest_output_mw(output=output)
         rows.append(
             {
                 "elexon_bmu_id": row["elexon_bmu_id"],
@@ -799,7 +800,7 @@ def summary_table(*, census: pl.DataFrame, window_label: str) -> pl.DataFrame:
     peak = 0.0
     for row in single.iter_rows(named=True):
         output = pl.read_parquet(OUTPUT_DIR / f"{row['elexon_bmu_id']}_{window_label}.parquet")
-        peak = max(peak, _as_float(output["output_mwh"].max()) * 2 / row["generation_capacity_mw"])
+        peak = max(peak, largest_output_mw(output=output) / row["generation_capacity_mw"])
     generation = float(single["generation_capacity_mw"].sum())
     mel = float(single["largest_mel_mw"].sum())
     located = single.filter(pl.col("latitude").is_not_null())
@@ -900,18 +901,28 @@ def capacities_table(*, census: pl.DataFrame, scope: str) -> pl.DataFrame:
     )
 
 
-def disparity_table(*, census: pl.DataFrame) -> pl.DataFrame:
+def disparity_table(*, census: pl.DataFrame, window_label: str) -> pl.DataFrame:
     """Return the BMUs with output ranked by the ratio of their highest to lowest capacity figure.
 
-    The rule is `collate.capacity_disparity`'s. The figures are in MW, rounded to 1 decimal place,
-    and the ratio is rounded to 2.
+    The rule is `collate.capacity_disparity`'s. A last figure, `largest_output_mw`
+    (`classify.largest_output_mw`), is the largest half-hourly output, which Figure 2 draws as a
+    line too, and which takes no part in the ranking. The figures are in MW, rounded to 1 decimal
+    place, and the ratio is rounded to 2.
     """
     ranked = capacity_disparity(table=census)
-    return ranked.with_columns(
-        pl.col([*DISPARITY_FIGURES, "lowest_mw", "highest_mw"]).round(1),
-        ratio=pl.col("ratio").round(2),
-        rank=pl.int_range(1, pl.len() + 1),
-    ).with_columns(pl.col(pl.Float64).cast(pl.String).fill_null("-"))
+    largest = [
+        largest_output_mw(output=pl.read_parquet(OUTPUT_DIR / f"{bmu_id}_{window_label}.parquet"))
+        for bmu_id in ranked["elexon_bmu_id"]
+    ]
+    return (
+        ranked.with_columns(largest_output_mw=pl.Series(largest, dtype=pl.Float64))
+        .with_columns(
+            pl.col([*DISPARITY_FIGURES, "largest_output_mw", "lowest_mw", "highest_mw"]).round(1),
+            ratio=pl.col("ratio").round(2),
+            rank=pl.int_range(1, pl.len() + 1),
+        )
+        .with_columns(pl.col(pl.Float64).cast(pl.String).fill_null("-"))
+    )
 
 
 def main() -> None:
@@ -1012,12 +1023,14 @@ def main() -> None:
         + _md(capacities_table(census=census, scope="single-site"))
         + "\n\n### Aggregate\n\n"
         + _md(capacities_table(census=census, scope="aggregate")),
-        "## The BMUs with output, ranked by highest over lowest of the six values\n\n"
+        "## The BMUs with output, ranked by highest over lowest of the five published capacity "
+        "values and the P99 of output\n\n"
         "Values at or below zero and missing values are left out of the ratio. The three BMUs "
-        "with "
-        "the largest ratio are the ones Figure 2 draws. `p99_output_mw` is the 99th percentile of "
-        "the BMU's half-hourly output, not a registered capacity.\n\n"
-        + _md(disparity_table(census=census)),
+        "with the largest ratio are the ones Figure 2 draws. `p99_output_mw` is the 99th "
+        "percentile of the BMU's half-hourly output, and `largest_output_mw` its largest "
+        "half-hourly output: two measures of the BMU's own output, not registered capacities. "
+        "`largest_output_mw` takes no part in the ratio.\n\n"
+        + _md(disparity_table(census=census, window_label=window.label)),
         "## Single-site BMUs in the gap band, or typed Solar and not following the sun\n\n"
         + _md(to_inspect),
         "## Capacity values (single-site BMUs; columns are never added together)\n\n"

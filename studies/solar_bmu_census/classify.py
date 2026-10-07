@@ -10,7 +10,7 @@ at zero below the horizon) at one central point in Great Britain. Run:
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, cast
 
 import numpy as np
 import polars as pl
@@ -222,6 +222,28 @@ def p99_output_mw(*, output: pl.DataFrame, window_start: datetime) -> float | No
         return None
     percentile = judged["output_mwh"].quantile(0.99, interpolation="linear")
     return None if percentile is None else float(percentile) * 2
+
+
+def largest_output_mw(*, output: pl.DataFrame) -> float:
+    """Return a BMU's largest half-hourly output over its whole file, in megawatts.
+
+    Unlike `p99_output_mw`, every half-hour counts, commissioning period included. The half-hourly
+    megawatt-hours are multiplied by 2 to give megawatts. Like the P99, the result is a measure of
+    the BMU's observed output, not a registered capacity.
+
+    Args:
+        output: Column `output_mwh`, with at least one row.
+
+    Returns:
+        The largest output in megawatts.
+
+    Raises:
+        ValueError: If `output` has no non-null reading.
+    """
+    largest = output["output_mwh"].max()
+    if largest is None:
+        raise ValueError("The output has no reading")
+    return float(cast(float, largest)) * 2
 
 
 def igcpu_solar_ids(*, igcpu: list[dict[str, Any]]) -> set[str]:
