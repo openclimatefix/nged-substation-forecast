@@ -56,8 +56,8 @@ def flag_nged_power(
     telemetry fault. A series missing from the `TimeSeriesMetadata` table has no `substation_type`
     and is not flagged.
 
-    **Example.** The output is the input power rows with a `drop_reason` column added. These seven
-    rows are real readings from a `Primary` substation, MARSH LANE 33 11kV S STN, after cleaning:
+    **Example.** The output holds every input power row, with a `drop_reason` column added. These
+    seven rows are real readings from a `Primary` substation, MARSH LANE 33 11kV S STN, after cleaning:
 
     ```text
     time_series_id  time (UTC)        power (MVA)  drop_reason
@@ -71,11 +71,12 @@ def flag_nged_power(
     26              2026-03-05 15:30  2.585        null
     ```
 
-    The 14:00 reading of exactly zero is flagged, and the row stays in the output. Every reader of
-    power skips the flagged row, so the zero never reaches training, cross-validation, scoring, or
-    live forecasts. The same zero from an `EHV Customer` or `HV Customer` series, such as a solar
-    farm at night, would get a null `drop_reason` and stay in. `CleanedPowerTimeSeries` in
-    `contracts.power_schemas` defines these four columns and their dtypes.
+    The 14:00 reading of exactly 0 MVA is flagged. The flagged row stays in the output. Every reader
+    of power skips the flagged row, so the zero never reaches training, cross-validation, scoring,
+    or live forecasts. A zero from an `EHV Customer` or `HV Customer` series would get a null
+    `drop_reason` and stay in, because a customer site, such as a solar farm at night, can truly
+    read zero. `CleanedPowerTimeSeries` in `contracts.power_schemas` defines these four columns and
+    their dtypes.
 
     Args:
         power: The whole raw power table.
