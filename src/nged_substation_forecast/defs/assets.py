@@ -4,7 +4,7 @@ NGED telemetry and metadata, the H3 grid weights, and the daily-partitioned ECMW
 """
 
 from abc import ABC, abstractmethod
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Final, Self
 
 import patito as pt
@@ -69,7 +69,11 @@ from nged_data.storage import (
 )
 from pydantic import BaseModel, field_validator
 
-from nged_substation_forecast._sentry import report_asset_degradation, report_check_degradation
+from nged_substation_forecast._sentry import (
+    report_asset_degradation,
+    report_asset_retry,
+    report_check_degradation,
+)
 from nged_substation_forecast.defs._tags import PRODUCTION_LAYER_TAGS
 
 _POWER_INGEST_MAX_RETRIES: Final[int] = 2
@@ -294,6 +298,22 @@ longer when the upstream fetch is slow, because an attempt then takes minutes.""
 _ECMWF_ENS_RETRY_DELAY_SECONDS: Final[int] = 1800
 """How long to wait between retries of a not-yet-published ECMWF run."""
 
+_ECMWF_ENS_MAX_RETRY_AGE: Final[timedelta] = timedelta(hours=36)
+"""A run older than this fails at once instead of retrying.
+
+Upstream is unlikely to repair a run that is days old, and each retrying partition holds an
+``ECMWF`` concurrency pool slot for about 4 hours, so a backfill over bad runs would multiply that
+wait. The limit has to exceed the age of a healthy run at its last retry, about 15 hours (the
+10:30 UTC schedule plus the 4-hour ladder). It also covers a manual re-run of the previous day's
+partition, though that re-run's ladder stops early. Reasoning:
+https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#why-only-these-three-failures-are-retried"""
+
+
+def _is_too_old_to_retry(nwp_init_time: datetime, now: datetime) -> bool:
+    """Whether a run initialised at ``nwp_init_time`` is too old to be worth retrying at ``now``."""
+    return now - nwp_init_time > _ECMWF_ENS_MAX_RETRY_AGE
+
+
 _NWP_QUALITY_CHECK_NAME: Final[str] = "nwp_has_no_unexpected_nulls"
 """Name of the per-run NWP data-quality check emitted by ``ecmwf_ens`` (see ``assess_nwp_quality``).
 
@@ -452,7 +472,11 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     is absent from the catalog, a run with whole (member, lead time) slices of an instantaneous
     variable still empty, and a run with a de-accumulated variable still wholly empty. A
     materialisation that runs for hours and then fails is therefore this asset waiting for an
-    upstream run that never arrived, not a bug.
+    upstream run that never arrived, not a bug. The first failed attempt of a run that will retry
+    sends a Sentry warning naming the partition, so the operator does not learn of it only when the
+    last retry fails. A run more than 36 hours old is not retried at all and fails at once, because
+    upstream is unlikely to repair it and a backfill would otherwise hold a concurrency pool slot
+    for about 4 hours per partition.
     """
     settings = Settings()
     storage_options = settings.storage_options
@@ -471,7 +495,8 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     # variable has a slice empty at every grid point, or a de-accumulated variable is wholly empty.
     # Every other error fails immediately. Waiting does not heal a dtype or other structural
     # failure, and a bug of ours looks like an upstream defect, so retrying either kind of error
-    # would only delay its alert by 4 hours. The reasoning and the upstream behaviour are at
+    # would only delay its alert by 4 hours. The first failed attempt warns Sentry, and a run too
+    # old to be repaired upstream fails at once. The reasoning and the upstream behaviour are at
     # https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright
     try:
         ds_lazy = open_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)
@@ -484,6 +509,14 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
 
         nwp = convert_nwp_xarray_dataset_to_polars_dataframe(ds=ds, h3_grid=h3_grid)
     except (NwpRunNotYetAvailable, NwpVariableWhollyMissing) as exc:
+        # The note puts the partition in every Sentry event for this failure: the warning below,
+        # and the run-failed event if the ladder runs out. The upstream messages name no run.
+        exc.add_note(f"ecmwf_ens partition {partition_date_str}")
+        if _is_too_old_to_retry(nwp_init_time=nwp_init_time, now=datetime.now(UTC)):
+            context.log.warning(f"ECMWF ENS run is too old to retry, failing at once: {exc}")
+            raise
+        if context.retry_number == 0:
+            report_asset_retry(asset_name="ecmwf_ens", exc=exc)
         context.log.warning(f"ECMWF ENS run not usable yet, requesting a retry: {exc}")
         raise RetryRequested(
             max_retries=_ECMWF_ENS_MAX_RETRIES, seconds_to_wait=_ECMWF_ENS_RETRY_DELAY_SECONDS

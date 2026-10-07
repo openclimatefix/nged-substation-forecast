@@ -384,6 +384,27 @@ def test_degradation_reporters_capture_the_exception_and_tag_the_name(
     # No fingerprint on a caught exception: its stack trace is what Sentry groups on, and a
     # fingerprint would instead fold unrelated faults in the same asset into one issue.
     assert "fingerprint" not in event
+    assert event["level"] == "error"
+    _assert_no_tags_leaked()
+
+
+def test_report_asset_retry_sends_a_warning_that_does_not_share_an_issue_with_a_failed_run() -> (
+    None
+):
+    """The early warning for a retrying asset is a warning-level event with its own tag.
+
+    It carries ``retrying_asset`` and not ``fault_category``, so an alert rule that routes on
+    ``fault_category:run_failed`` does not fire for it. Its fingerprint keeps Sentry's default
+    grouping and adds a marker: the run-failed event that follows an exhausted ladder has the same
+    stack trace, and without the marker the warning would open the issue that event then joins.
+    """
+    event = _build_one_event(
+        lambda: _sentry.report_asset_retry(asset_name="ecmwf_ens", exc=ValueError("boom"))
+    )
+    assert event["tags"] == {"retrying_asset": "ecmwf_ens"}
+    assert event["level"] == "warning"
+    assert event["fingerprint"] == ["{{ default }}", "retrying_asset"]
+    assert event["exception"]["values"][0]["type"] == "ValueError"
     _assert_no_tags_leaked()
 
 

@@ -183,11 +183,12 @@ production `live-forecasts` monitor. Four one-time console steps complete the se
 4. **Route error events by their `fault_category` tag.** `fault_category:run_failed` means a
    scheduled job failed, so that cycle did not run — notify whoever is on for the next business day.
    Everything else is a degradation the service kept forecasting through, and belongs in a digest
-   rather than a notification: `degraded_asset:*` (an asset carried on with reduced function) and
+   rather than a notification: `degraded_asset:*` (an asset carried on with reduced function),
    `asset_check:*` (a check could not evaluate its own inputs, so one signal is unknown rather than
-   bad). Nothing here warrants waking anyone — see [Inherent
-   stability](../design-philosophy/inherent-stability.md) for the uptime posture that makes that the
-   right call.
+   bad), and `retrying_asset:*` (a warning that an asset failed and will retry, sent on the first
+   failed attempt; if every retry fails, a `run_failed` event follows). Nothing here warrants waking
+   anyone — see [Inherent stability](../design-philosophy/inherent-stability.md) for the uptime
+   posture that makes that the right call.
 
 One handover note: the Sentry account is OCF's today, so at handover the alert routing (and possibly
 the account itself) moves to NGED — see [Handover to

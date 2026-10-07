@@ -334,17 +334,31 @@ Every other error fails the partition at once, a dtype mismatch included, for th
   16](../design-philosophy/design-principles.md#16-a-failure-names-its-own-cause-in-the-telemetry)).
 - **A retry ties up a concurrency slot for hours.** Each retrying partition holds an `ECMWF`
   concurrency pool slot for about 4 hours, so a backfill over several bad partitions multiplies that
-  wait.
+  wait. For that reason the asset also fails at once for a run more than 36 hours old, as the next
+  paragraphs explain.
 
 The three retried failures are the ones for which there is evidence that the data heals: the
 2026-08-09 republication and the 2026-10-02 fill described above. Dynamical.org's maintainer has
 also [said](https://github.com/dynamical-org/reformatters/issues/1149#issuecomment-5980497676) that
 a change deployed on 2026-10-02 re-runs a failed dataset update within about 20 minutes.
 
+**A run more than 36 hours old is not retried.** In the repairs we have seen, Dynamical.org filled
+a store within about 3.5 hours of publication, so waiting 4 hours on a run that is days old has no
+evidence behind it. The limit has to exceed the age of a healthy run at its last retry, which is
+about 15 hours (the 10:30 UTC schedule plus the 4-hour ladder). It also covers a manual re-run of
+the previous day's partition, although the ladder of such a re-run stops early. A late schedule tick
+or a backfill of an old partition therefore fails at once with the original exception.
+
+**The first failed attempt of a run that will retry sends a Sentry warning.** The warning carries
+the exception, a note naming the partition, and the `retrying_asset` tag, and it is a separate
+Sentry issue from the run-failed event that follows if every retry fails. Without it, a run that
+upstream never repairs reaches Sentry only when the last retry fails, about 4 hours later. The
+asset sends the warning from inside its own body, so it also fires for a manual run or a backfill of
+a recent partition.
+
 If Dynamical.org is seen repairing a second kind of content defect within the 4-hour ladder, the
 retry could widen to failures about the data's content (null patterns), while the asset still fails
-at once on failures about the data's structure. The first failed attempt would then send a Sentry
-warning, so that retrying does not hide the fault.
+at once on failures about the data's structure.
 
 ## An incomplete run (tolerated, and reported)
 

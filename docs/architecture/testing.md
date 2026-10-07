@@ -143,9 +143,7 @@ rows, in [Performance and Scale](performance.md#the-other-hard-ceiling-polars-32
   `pytest.raises(...) as exc_info:` block the captured traceback keeps the context referenced past
   the end of that block, so `__del__` waits on a GC pass. Enter it as a context manager instead:
   `with build_asset_context(...) as context, pytest.raises(...) as exc_info:`. Worked example:
-  `tests/test_assets.py::test_ecmwf_ens_retries_when_run_not_yet_available` — probing right after
-  that test's teardown with **no forced `gc.collect()`** found 2 open connections before the fix, 0
-  after, every time.
+  `tests/test_assets.py::test_ecmwf_ens_fails_at_once_for_a_run_too_old_to_retry`.
 - **`build_asset_check_context()` is the exception: give it `instance=`, because it cannot be
   entered.** `DirectAssetCheckExecutionContext` defines no `__enter__`, so the context-manager form
   above is a `TypeError`, and the `with` block has to hold the instance instead. Dagster builds one
