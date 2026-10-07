@@ -1,7 +1,8 @@
-"""Naive baseline forecasters that a trained model has to beat.
+"""Naive baseline forecasters that a trained forecasting model has to beat.
 
-``ManualHeuristicForecaster`` is the analogue-ensemble method that distribution network operators
-use today. See the package README for what each baseline emits.
+``ManualHeuristicForecaster`` is the analogue-ensemble method that was, until recently, the
+normal forecasting approach among distribution network operators. See the package README for what
+each baseline emits.
 """
 
 from baseline_forecasters.manual_heuristic import ManualHeuristicForecaster

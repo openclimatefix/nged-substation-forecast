@@ -291,7 +291,7 @@ def test_engineer_raises_in_single_run_mode() -> None:
 
 
 def test_power_fixture_gives_thirteen_distinct_lag_values() -> None:
-    """Guards the value checks above: equal lag values would hide a member mislabelled."""
+    """Guards the value checks above: equal lag values would hide a mislabelled member."""
     target = datetime(2025, 3, 3, 12, tzinfo=UTC)
     values = {power_at(target - timedelta(hours=hours)) for hours in _ALL_LAG_HOURS}
     assert len(values) == len(_ALL_LAG_HOURS)

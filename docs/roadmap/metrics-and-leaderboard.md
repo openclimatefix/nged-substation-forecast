@@ -293,13 +293,13 @@ yardstick here; `manual_heuristic` is the point on it.
 
 ### Implementation details — baselines (deleted when they ship)
 
-Two PRs remain to add the baselines, in order: `persistence` (PR B) and `climatology` (PR C). The
-`manual_heuristic` baseline, its `baseline_forecasters` package, and its feature engineer have
-shipped. The metrics collapse below is its own issue under the v0.3 epic, and no baseline waits on
-it. The
-`manual_heuristic_holiday_aligned` variant (described under [A faithful replica and a "simple
-upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is a later PR, out of scope
-for this arc but given its own tracked issue so it is not lost when #147 closes.
+Two PRs remain to add the baselines, in order: `persistence` (PR B) and `climatology` (PR C). PR
+A, the `manual_heuristic` baseline with its `baseline_forecasters` package and its feature engineer,
+has shipped. The metrics collapse below is its own issue under the v0.3 epic, and no baseline waits
+on the metrics collapse. The `manual_heuristic_holiday_aligned` variant (described under [A faithful
+replica and a "simple upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is a
+later PR, out of scope for this arc but given its own tracked issue so it is not lost when #147
+closes.
 `manual_heuristic_calibrated` (described under [Calibrating the manual
 heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile), and tracked in
 [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)) is a further PR, on
@@ -322,13 +322,13 @@ smoke-test fold before documenting it — the Dagster version supports mixed par
 backfill selections, but confirm the UI behaviour rather than assuming it. To re-score a *single*
 experiment without touching the rest, use the `metrics` asset's `PopulationFilter` config instead.
 
-**Data check before interpreting the manual heuristic's results.** Count the observations in the
-cleaned power table that lie at least 49 weeks before `val_start` for each eligible series.
+**Data check before interpreting the manual heuristic's results.** For each eligible series, count
+the observations in the cleaned power table that lie at least 49 weeks before `val_start`.
 Eligibility requires only `min_training_months` of history, so a series can qualify yet have no
 annual analogue, and its ensemble then holds only the weekly members.
 
 **Metrics collapse — deterministic-collapse rework in `compute_metrics`, its own issue under the
-v0.3 epic.** No baseline waits on it, and it can land before or after any of them. Implements the
+v0.3 epic.** The metrics collapse can land before or after any baseline. Implements the
 [metric-matched collapse
 decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast). Forecasters emit
 **members only**; every collapse lives in the metrics layer, so there is no per-experiment
@@ -358,17 +358,18 @@ collapse config and no designated point-forecast columns on `PowerForecast`. In
 - Tests: member sets where mean ≠ median ≠ p95, with hand-computed expected values per metric; the
   single-member ensemble (all collapses coincide; CRPS still reduces to MAE); the pinball-p50
   identity. Recompute existing expected values — never relax a test to absorb the shift.
-- **After this lands, run one `trained_cv_model++` backfill over every existing experiment
-  partition** — retrain, re-predict, and re-score everything under the new collapse. The backfill is
-  deliberately the exact "re-run everything after a pipeline fix" drill, and it doubles as the
-  empirical verification of the backfill mechanics before the recipe is written into
+- **After the metrics collapse lands, run one `trained_cv_model++` backfill over every existing
+  experiment partition** — retrain, re-predict, and re-score everything under the new collapse. The
+  backfill is deliberately the exact "re-run everything after a pipeline fix" drill, and it doubles
+  as the empirical verification of the backfill mechanics before the recipe is written into
   `docs/ml_experimentation/dagster-workflow.md`. Treat the change as a leaderboard epoch event,
-  because it shifts existing numbers.
+  because the new collapse shifts existing numbers.
 
-**PR B — `PersistenceForecaster` (seasonal-naive).** As the second caller, first extracts
-`PowerLagsPerNwpRunFeatureEngineer` and the `meta.json` save/load round-trip (config dump,
-`trained_time_series_ids`, the fully-qualified `model_class`) from `manual_heuristic.py` into shared
-modules. No `StatelessForecaster` base class until a third stateless model exists.
+**PR B — `PersistenceForecaster` (seasonal-naive).** `PersistenceForecaster` is the second
+forecaster to need `PowerLagsPerNwpRunFeatureEngineer` and the `meta.json` save/load round-trip
+(config dump, `trained_time_series_ids`, the fully-qualified `model_class`), so PR B first extracts
+both from `manual_heuristic.py` into shared modules. No `StatelessForecaster` base class until a
+third stateless model exists.
 
 - `MODEL_NAME = "persistence"`, `MODEL_VERSION = 1`. Config default
   `selected_features = {"power_lag_24h", "power_lag_48h", "power_lag_168h", "power_lag_336h"}`.
@@ -669,7 +670,7 @@ than the nominal rate for the same reason.
 baseline work ([the metrics-collapse item in the baseline
 implementation details](#implementation-details-baselines-deleted-when-they-ship)); the reasoning
 below is the durable design rationale, promoted to [the evaluation-metrics
-reference](../techniques/evaluation-metrics.md) when that PR ships.
+reference](../techniques/evaluation-metrics.md) when the metrics collapse ships.
 
 #### The problem
 
@@ -954,11 +955,10 @@ somebody has to remember to run.
 
 **The acceptance criterion is `manual_heuristic`, not a fixed error threshold.** The manual
 heuristic consumes no NWP and is indifferent to recent telemetry staleness, so it barely degrades.
-The manual heuristic is the honest bar to clear, and a far better failure criterion than any
-arbitrary staleness threshold. Concretely: at rungs 0–2 of the degradation
-ladder, every time series should still emit a forecast, and that forecast should still beat
-`manual_heuristic`. That is [T1.2,
-graceful
+The manual heuristic is therefore the honest bar to clear, and a far better failure criterion than
+any arbitrary staleness threshold. Concretely: at rungs 0–2 of the degradation ladder, every time
+series should still emit a forecast, and that forecast should still beat `manual_heuristic`. That is
+[T1.2, graceful
 degradation](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself);
 the interval-calibration counterpart, PICP within tolerance in every regime, is [T1.3, faithful
 uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).

@@ -50,8 +50,8 @@ property — and inherits the rest from this package: the feature pipeline that 
 MLflow wiring that gives its run an identity, the archive format its weights are shipped in, the
 checks that decide whether a saved model can still be served, and the scoring that puts it on the
 leaderboard. `XGBoostForecaster` in `xgboost_forecaster` and `ManualHeuristicForecaster` in
-`baseline_forecasters` are the two subclasses outside the tests today. Writing another family should
-mean writing five members, not a second pipeline.
+`baseline_forecasters` are the two subclasses outside the tests today. Writing another model family
+should mean writing five members, not a second pipeline.
 
 **The Dagster assets delegate here rather than implementing the forecasting logic themselves.** The
 cross-validation, metrics, and live-inference assets in `src/nged_substation_forecast/defs/` are

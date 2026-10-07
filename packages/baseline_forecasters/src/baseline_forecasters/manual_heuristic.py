@@ -2,8 +2,8 @@
 
 A distribution network operator forecasts a target time by reading the power observed at the same
 weekday and time of day on earlier weeks. This module expresses each of those observations as a
-power lag, so the feature pipeline that every other model uses builds them, and nulls a lag that
-would not yet have been observed when the forecast was issued.
+power lag, so the feature pipeline that every other forecaster uses builds the observations, and
+nulls a lag that would not yet have been observed when the forecast was issued.
 """
 
 import json
@@ -28,15 +28,14 @@ from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE
 class PowerLagsPerNwpRunFeatureEngineer(FeatureEngineer):
     """Engineers power lags on the forecast-run grid, reading no weather value.
 
-    The manual heuristic has to forecast the same
-    ``(power_fcst_init_time, valid_time)`` rows as every other model, so that a leaderboard compares
-    like with like. This engineer therefore reads from the numerical weather prediction (NWP) frame
-    only its four key columns other than the ensemble member: ``nwp_model_id``, ``init_time``,
-    ``h3_index``, and ``valid_time``. It deduplicates those keys and hands the key-only frame to
-    ``TabularFeatureEngineer``. With no weather column present, the tabular pipeline's upsample
-    interpolates nothing, and the half-hourly grid, the hindcast filter, and the cell join all come
-    from the tabular code. The output carries one row per series, run, and valid time, and has no
-    ``ensemble_member`` column.
+    The manual heuristic has to forecast the same ``(power_fcst_init_time, valid_time)`` rows as
+    every other forecaster, so that a leaderboard compares like with like. This engineer therefore
+    reads from the numerical weather prediction (NWP) frame only its four key columns other than the
+    ensemble member: ``nwp_model_id``, ``init_time``, ``h3_index``, and ``valid_time``. It
+    deduplicates those keys and hands the key-only frame to ``TabularFeatureEngineer``. With no
+    weather column present, the tabular pipeline's upsample interpolates nothing, and the
+    half-hourly grid, the hindcast filter, and the cell join all come from the tabular code. The
+    output carries one row per series, run, and valid time, and has no ``ensemble_member`` column.
     """
 
     def engineer(
@@ -100,9 +99,9 @@ class ManualHeuristicForecaster(BaseForecaster):
     selected power lags, shortest lag first. Under ``conf/model/manual_heuristic.yaml``, members 0
     to 5 are the weekly analogues from the last 6 weeks and members 6 to 12 are the annual
     analogues from 49 to 55 weeks back. A lag no longer than the forecast lead time is null, so
-    the member is absent for that row and keeps its index on the rows that have it. A row with no
-    member at all is dropped. ``nwp_init_time`` is null on every row, because the forecaster
-    consumes no weather.
+    the member is absent from that row. A member keeps the same index on every row that carries
+    the member. A row with no member at all is dropped. ``nwp_init_time`` is null on every row,
+    because the forecaster consumes no weather.
 
     The forecaster learns nothing. ``train`` records which series have observed power, and
     ``save`` writes ``meta.json`` alone.
@@ -175,8 +174,8 @@ class ManualHeuristicForecaster(BaseForecaster):
         The loaders already restrict ``data`` to ``trained_time_series_ids``, and the engineer emits
         one row per series, run, and valid time, so nothing is filtered or deduplicated here. A
         null lag value comes from a lag that ``_nullify_leaky_lags`` shed or from history that does
-        not reach back far enough. Its row is dropped without an error. Empty input gives an empty
-        frame.
+        not reach back far enough. The member row carrying a null lag value is dropped without an
+        error. Empty input gives an empty frame.
 
         Args:
             data: Features engineered by ``PowerLagsPerNwpRunFeatureEngineer``.
