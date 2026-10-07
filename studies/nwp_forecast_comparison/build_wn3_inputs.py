@@ -5,10 +5,10 @@ One-off throwaway script for the WN3 arms of
 
 `--read-store` opens the WN3 Icechunk repository (`--bucket`, branch `main`) read-only and copies
 the 00 UTC runs' six variables that the arms use (2 m temperature, total solar radiation, and the
-eastward and northward wind at 10 m and 100 m) over a box around the private generator roster to
+eastward and northward wind at 10 m and 100 m) over a box around the private list of generators to
 `--weather-dir/WeatherNext3/`: `trial_area.zarr` and `_grid_cells.parquet`. The box is
-the roster's extent plus `PAD_DEGREES` on every side, so every site's H3 resolution-5 hexagon lies
-inside it. It is computed at run time, is never printed, and is never written into a committed
+the site list's extent plus `PAD_DEGREES` on every side, so every site's H3 resolution-5 hexagon
+lies inside it. It is computed at run time, is never printed, and is never written into a committed
 file. A missing chunk reads as `NaN`, so the read fails if any copied variable is all `NaN`, and it
 prints each variable's `NaN` share. Every later stage reads the local copy.
 
@@ -89,7 +89,7 @@ GRID_DEGREES: Final[float] = 0.1
 """The WN3 grid's cell size, as `compute_h3_grid_weights` bins by."""
 
 PAD_DEGREES: Final[float] = 0.25
-"""How far the copied box extends beyond the roster's extent. An H3 resolution-5 hexagon reaches
+"""How far the copied box extends beyond the site list's extent. An H3 resolution-5 hexagon reaches
 about 0.13 degrees from its centre, and the 0.1 degree grid adds up to a cell more."""
 
 FIRST_INIT: Final[np.datetime64] = np.datetime64("2026-01-01T00", "h")
@@ -161,7 +161,7 @@ def _snapped_slice(*, axis: np.ndarray, low: float, high: float) -> slice:
     """Return the slice of a stored axis covering `low` to `high`, widened to whole cells."""
     inside = np.flatnonzero((axis >= low - GRID_DEGREES / 2) & (axis <= high + GRID_DEGREES / 2))
     if not inside.size:
-        msg = "no stored cell lies inside the roster's box"
+        msg = "no stored cell lies inside the site list's box"
         raise ValueError(msg)
     return slice(int(inside[0]), int(inside[-1]) + 1)
 
@@ -226,7 +226,7 @@ def log_run_provenance(
 
 
 def read_trial_area(*, bucket: str, weather_dir: Path) -> None:
-    """Copy the 00 UTC runs of the arms' six variables, over the roster's box, to local disk.
+    """Copy the 00 UTC runs of the arms' six variables, over the site list's box, to local disk.
 
     The copy is one variable at a time, so memory holds one variable's box.
 
@@ -240,7 +240,7 @@ def read_trial_area(*, bucket: str, weather_dir: Path) -> None:
     """
     target = local_dir(weather_dir=weather_dir)
     refuse_to_overwrite(paths=[target / ZARR_NAME, target / GRID_CELLS_NAME])
-    roster = pl.concat([efh.site_roster(domain="solar"), efh.site_roster(domain="wind")])
+    site_list = pl.concat([efh.site_list(domain="solar"), efh.site_list(domain="wind")])
     storage = icechunk.gcs_storage(bucket=bucket, prefix=fetch.STORE_PREFIX, from_env=True)
     session = icechunk.Repository.open(storage).readonly_session(branch=fetch.MAIN_BRANCH)
     root = zarr.open_group(session.store, mode="r")
@@ -248,13 +248,13 @@ def read_trial_area(*, bucket: str, weather_dir: Path) -> None:
     longitude = np.asarray(root.get_array(fetch.LONGITUDE)[:])
     lat_slice = _snapped_slice(
         axis=latitude,
-        low=float(roster["latitude"].to_numpy().min()) - PAD_DEGREES,
-        high=float(roster["latitude"].to_numpy().max()) + PAD_DEGREES,
+        low=float(site_list["latitude"].to_numpy().min()) - PAD_DEGREES,
+        high=float(site_list["latitude"].to_numpy().max()) + PAD_DEGREES,
     )
     lon_slice = _snapped_slice(
         axis=longitude,
-        low=float(roster["longitude"].to_numpy().min()) - PAD_DEGREES,
-        high=float(roster["longitude"].to_numpy().max()) + PAD_DEGREES,
+        low=float(site_list["longitude"].to_numpy().min()) - PAD_DEGREES,
+        high=float(site_list["longitude"].to_numpy().max()) + PAD_DEGREES,
     )
     init_hours = np.asarray(root.get_array(fetch.INIT_TIME)[:])
     written = np.asarray(root.get_array(fetch.RUN_WRITTEN)[:])

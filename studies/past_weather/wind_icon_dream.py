@@ -478,7 +478,7 @@ def icon_dream_cells(*, sites: pl.DataFrame, cell_ids: list[int]) -> pl.DataFram
     same nearest-cell code the solar study's `extract_icon_dream` uses.
 
     Args:
-        sites: The wind roster, carrying `site`, `latitude`, `longitude`.
+        sites: The wind site list, carrying `site`, `latitude`, `longitude`.
         cell_ids: The cell ids the download holds.
 
     Returns:
@@ -505,7 +505,7 @@ def icon_dream_site_frame(*, sites: pl.DataFrame) -> pl.DataFrame:
     """Return each wind generator's nearest-cell ICON-DREAM-EU wind, hourly.
 
     Args:
-        sites: The wind roster, carrying `site`, `latitude`, `longitude`.
+        sites: The wind site list, carrying `site`, `latitude`, `longitude`.
 
     Returns:
         One row per (site, time) with `speed_hub_icon_dream_eu` (level `HUB_LEVEL`, ~96 m),
@@ -642,7 +642,7 @@ def check_direction_against_era5(*, sites: pl.DataFrame) -> dict[str, float]:
     speed plays no part in this check.
 
     Args:
-        sites: The wind roster, carrying `site`, `latitude`, `longitude`.
+        sites: The wind site list, carrying `site`, `latitude`, `longitude`.
 
     Returns:
         One entry per site label, plus `"all"`, of the mean absolute angle difference in degrees.
@@ -734,7 +734,7 @@ def check_timestamp_offset(*, sites: pl.DataFrame) -> dict[int, float]:
     regardless of any shift.
 
     Args:
-        sites: The wind roster, carrying `site`, `latitude`, `longitude`.
+        sites: The wind site list, carrying `site`, `latitude`, `longitude`.
 
     Returns:
         One Pearson correlation per offset in `OFFSET_SCAN_HOURS`, pooled over every site, of
@@ -771,7 +771,7 @@ def icon_dream_common_rows(*, sites: pl.DataFrame) -> pl.DataFrame:
     """Return the pre-registered row set: `common_rows(joined(...))` inner-joined to ICON-DREAM-EU.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
 
     Returns:
         One row per common site-hour, carrying the five original products' wind, ICON-DREAM-EU's
@@ -1124,7 +1124,7 @@ def _nearest_cells(*, sites: pl.DataFrame) -> pl.DataFrame:
     """Return every generator's nearest ICON-DREAM-EU cell and its distance.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
 
     Returns:
         One row per site with `site`, `cell_id`, `distance_km`.
@@ -1138,7 +1138,7 @@ def run_checks(*, sites: pl.DataFrame, frame: pl.DataFrame) -> ChecksResult:
     """Run every pre-fit check once, before any arm is fitted.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
         frame: The common row set (`icon_dream_common_rows`'s result), for
             `other_products_direction_vs_era5`'s same-method baseline.
 
@@ -1311,7 +1311,7 @@ def _report(
     Args:
         frame: The common rows.
         losses: Every arm's losses, at every setting.
-        sites: The wind roster, for the geometry lines.
+        sites: The wind site list, for the geometry lines.
         job_list: Every job `jobs()` returns, for the feature-column section.
         checks: `run_checks`'s result, for the checks and cell-distance sections.
 

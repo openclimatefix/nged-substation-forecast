@@ -27,7 +27,7 @@ from mlflow.tracking import MlflowClient
 from xgboost_forecaster.forecaster import XGBoostForecaster
 
 from nged_substation_forecast.defs._engineering_inputs import load_engineering_inputs
-from nged_substation_forecast.defs.cv_assets import _load_roster, trained_cv_model
+from nged_substation_forecast.defs.cv_assets import _load_time_series_metadata, trained_cv_model
 
 pytestmark = pytest.mark.integration
 
@@ -163,7 +163,7 @@ def test_load_engineering_inputs_filters_ensemble_members(env: None) -> None:
     train_start = datetime(2024, 4, 1, tzinfo=UTC)
     train_end = datetime(2025, 6, 30, 23, 59, 59, tzinfo=UTC)
 
-    metadata = _load_roster(settings, [1, 2])
+    metadata = _load_time_series_metadata(settings, [1, 2])
     _, nwp_control = load_engineering_inputs(
         settings, [1, 2], metadata, train_start, train_end, ensemble_members=[0]
     )
@@ -189,7 +189,7 @@ def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
     _, nwp_ts1 = load_engineering_inputs(
         settings,
         time_series_ids=[1],
-        metadata=_load_roster(settings, [1]),
+        metadata=_load_time_series_metadata(settings, [1]),
         window_start=train_start,
         window_end=train_end,
     )
@@ -199,7 +199,7 @@ def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
     power_wide, _ = load_engineering_inputs(
         settings,
         time_series_ids=[1],
-        metadata=_load_roster(settings, [1]),
+        metadata=_load_time_series_metadata(settings, [1]),
         window_start=train_start,
         window_end=_AFTER_TRAIN_END + timedelta(days=1),
     )
@@ -209,7 +209,7 @@ def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
     _, nwp_both = load_engineering_inputs(
         settings,
         time_series_ids=[1, 2],
-        metadata=_load_roster(settings, [1, 2]),
+        metadata=_load_time_series_metadata(settings, [1, 2]),
         window_start=train_start,
         window_end=train_end,
     )
@@ -225,7 +225,7 @@ def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
     _, nwp_early_window_only = load_engineering_inputs(
         settings,
         time_series_ids=[1, 2],
-        metadata=_load_roster(settings, [1, 2]),
+        metadata=_load_time_series_metadata(settings, [1, 2]),
         window_start=_TRAIN_START,
         window_end=_TRAIN_START + timedelta(hours=13),
         init_time_start=_EARLY_INIT_TIME,
@@ -238,7 +238,7 @@ def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
     _, nwp_after_early_cluster = load_engineering_inputs(
         settings,
         time_series_ids=[1],
-        metadata=_load_roster(settings, [1]),
+        metadata=_load_time_series_metadata(settings, [1]),
         window_start=_TRAIN_START + timedelta(hours=13),
         window_end=train_end,
         init_time_start=_EARLY_INIT_TIME,
@@ -255,7 +255,7 @@ def test_load_engineering_inputs_power_lookback_widens_only_the_power_scan(env: 
     default (omitted) excludes power from before ``window_start``.
     """
     settings = Settings()
-    metadata = _load_roster(settings, [1])
+    metadata = _load_time_series_metadata(settings, [1])
     # `env` writes ts1's power and NWP at 10:00-12:00 on _IN_WINDOW, so a window starting at 11:00
     # leaves real power *and* real NWP rows in the hour before it — the NWP assertions below can
     # only pass if power_lookback leaves the NWP bound alone.
@@ -322,7 +322,7 @@ def test_power_lag_near_window_start_is_non_null_with_lookback(
     )
 
     settings = Settings()
-    metadata = _load_roster(settings, [1])
+    metadata = _load_time_series_metadata(settings, [1])
     selected_features = {"power_lag_336h"}
 
     power_no_lookback, nwp_no_lookback = load_engineering_inputs(
@@ -426,8 +426,8 @@ def test_trained_cv_model_trains_and_saves_to_mlflow(
     loaded = XGBoostForecaster.load_from_mlflow(fold_run.info.run_id)
     assert loaded.trained_time_series_ids == [1]
 
-    # The archive also carries the roster rows the model was engineered against, which is what
-    # `live_forecasts` locates its time series by instead of reading the roster.
+    # The archive also carries the metadata table rows the model was engineered against, which is
+    # what `live_forecasts` locates its time series by instead of reading the metadata table.
     model_dir = tmp_path / "promoted"
     fetch_model_artifacts(fold_run.info.run_id, model_dir)
     frozen = load_trained_metadata(model_dir)

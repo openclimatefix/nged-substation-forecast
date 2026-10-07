@@ -12,7 +12,7 @@ model is one entry there rather than a second script.
 
 Requests go to the historical-forecast endpoint, which is a different service from the `archive-api`
 endpoint `fetch_era5_open_meteo.py` uses for ERA5, with its own call-weight accounting. Coordinates
-are read at run time from the private roster and sent in the query string. **No coordinate and no
+are read at run time from the private site list and sent in the query string. **No coordinate and no
 identifier reaches the written frame**: rows are keyed by the anonymised site label
 `studies.pv_dataset.pv_sites` assigns.
 
@@ -161,7 +161,7 @@ def fetch_point_frame(
     carried past this function.
 
     Args:
-        sites: The roster, carrying `site`, `latitude`, and `longitude`.
+        sites: The site list, carrying `site`, `latitude`, and `longitude`.
         variables: Open-Meteo's names for the hourly variables to request.
         models_parameter: The value of the API's `models=` query parameter.
         first_date: First date to request, as `YYYY-MM-DD`.
@@ -234,7 +234,7 @@ def _solar_geometry(*, frame: pl.DataFrame, sites: pl.DataFrame) -> pl.DataFrame
 
     Args:
         frame: The downloaded rows, keyed by `site` and `time`.
-        sites: The roster, carrying `site`, `latitude`, and `longitude`.
+        sites: The site list, carrying `site`, `latitude`, and `longitude`.
 
     Returns:
         `frame` with `solar_zenith_deg`, `cos_zenith_instant`, `cos_zenith_hour_mean`,

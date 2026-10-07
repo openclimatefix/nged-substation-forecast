@@ -141,7 +141,7 @@ These are metered generators, whose output is commercially sensitive, so no site
 in `build_dataset.py` relabels the sites `A`–`F` under a fixed permutation before anything is
 written, and nothing downstream of it sees an identifier. `fetch_cams.py` sends each meter's
 coordinates to the Atmosphere Data Store because the service is a point service, reads them at run
-time from the private roster, and writes only the anonymised label.
+time from the private site list, and writes only the anonymised label.
 
 ## Reading the numbers
 
@@ -227,8 +227,8 @@ as well as through their own false-zero filters. `compare_sources.py` exists to 
 source difference survives a common row set.
 
 **On the reanalysis the six per-site rows are two irradiance series, not six replications.** The
-roster's six meters fall inside two ERA5 grid cells, and within each group the global irradiance is
-bit-identical, so the per-site table is two experiments run three times each against a different
+site list's six meters fall inside two ERA5 grid cells, and within each group the global irradiance
+is bit-identical, so the per-site table is two experiments run three times each against a different
 power target. The satellite source is clean here, because it retrieves at each meter's own
 coordinates. The pooled bootstrap is unaffected either way, because it resamples whole calendar
 months across all six sites at once.

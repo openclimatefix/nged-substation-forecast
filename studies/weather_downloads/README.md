@@ -11,10 +11,10 @@ the downloads only; #809 and #810 read what lands under `data/studies/downloads/
 ## The trial-area box
 
 **Every gridded product is cut to a box covering the NGED trial area, with a margin of a few grid
-cells, taken from the private generator roster.**
-`studies.trial_area.write_trial_area_box_from_roster` derives the box once from `TimeSeriesMetadata`
-and writes it to `data/studies/_private/trial_area_box.json`, a file under the gitignored `data/`
-tree that is never read outside this process's own working state.
+cells, taken from the private list of generators.**
+`studies.trial_area.write_trial_area_box_from_metadata` derives the box once from
+`TimeSeriesMetadata` and writes it to `data/studies/_private/trial_area_box.json`, a file under the
+gitignored `data/` tree that is never read outside this process's own working state.
 `studies.trial_area.load_trial_area_box` reads it back as a `TrialAreaBox`, held in memory only.
 **Generator locations must never appear in anything published**: not a request URL, not a log line,
 not a filename, not this repository's git history. Every fetch script keys its output on an integer

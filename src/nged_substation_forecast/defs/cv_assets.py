@@ -299,23 +299,23 @@ def _require_metadata_coverage(
         )
 
 
-def _load_roster(
+def _load_time_series_metadata(
     settings: Settings, time_series_ids: list[int]
 ) -> pt.DataFrame[TimeSeriesMetadata]:
-    """Read the ``TimeSeriesMetadata`` roster, filtered to ``time_series_ids``.
+    """Read the ``TimeSeriesMetadata`` table, filtered to ``time_series_ids``.
 
-    **Research callers only.** The roster is the live registry of what NGED operates, so a fault in
-    it must stop a training or scoring run rather than silently shrink its population. A fault here
-    means an off-contract file, or a roster rebuilt from a snapshot that dropped rows.
-    ``live_forecasts`` reads ``ml_core.base_forecaster.load_trained_metadata`` instead.
+    **Research callers only.** The metadata table is the live registry of what NGED operates, so a
+    fault in it must stop a training or scoring run rather than silently shrink its population. A
+    fault here means an off-contract file, or a metadata table rebuilt from a snapshot that dropped
+    rows. ``live_forecasts`` reads ``ml_core.base_forecaster.load_trained_metadata`` instead.
 
     Args:
         settings: Application settings (data paths, credentials).
         time_series_ids: The population to keep.
 
     Returns:
-        One row per series in ``time_series_ids`` that the roster covers — check the coverage with
-        ``_require_metadata_coverage``.
+        One row per series in ``time_series_ids`` that the metadata table covers — check the
+        coverage with ``_require_metadata_coverage``.
     """
     return pt.DataFrame(
         pl.read_parquet(
@@ -378,7 +378,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
             "`eligible_time_series` for this fold and confirm power coverage reaches val_end."
         )
 
-    metadata_df = _load_roster(settings, eligible_ids)
+    metadata_df = _load_time_series_metadata(settings, eligible_ids)
     _require_metadata_coverage(metadata_df, eligible_ids, population="eligible")
     power_lookback = ParsedFeatures.from_strings(config.selected_features).max_power_lag()
     power_ts, nwp_lf = load_engineering_inputs(
@@ -525,7 +525,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
 
     # Before the loop, not inside it: the metadata does not vary by init_time window, and raising
     # on a later chunk would leave the partition holding a partial fold.
-    metadata_df = _load_roster(settings, trained_ids)
+    metadata_df = _load_time_series_metadata(settings, trained_ids)
     _require_metadata_coverage(metadata_df, trained_ids, population="trained")
 
     power_lookback = ParsedFeatures.from_strings(config.selected_features).max_power_lag()

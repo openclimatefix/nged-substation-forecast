@@ -278,18 +278,18 @@ def site_cells(
     Returns:
         Each label to its `SiteCell`.
     """
-    roster = efh.site_roster(domain=domain).filter(pl.col("site").is_in(list(sites))).sort("site")
+    site_list = efh.site_list(domain=domain).filter(pl.col("site").is_in(list(sites))).sort("site")
     latitude = np.asarray(build.zarr_array(group=store.group, name="cell_latitude")[:])
     longitude = np.asarray(build.zarr_array(group=store.group, name="cell_longitude")[:])
     cells = pl.DataFrame(
         {"cell_id": np.arange(len(latitude)), "latitude": latitude, "longitude": longitude}
     )
-    nearest = nearest_cells(sites=roster, cells=cells)
+    nearest = nearest_cells(sites=site_list, cells=cells)
     return {
         site: SiteCell(cell=int(cell), latitude=float(lat), longitude=float(lon))
         for (site, cell), (_, lat, lon) in zip(
             nearest.select("site", "cell_id").iter_rows(),
-            roster.iter_rows(),
+            site_list.iter_rows(),
             strict=True,
         )
     }

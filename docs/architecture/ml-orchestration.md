@@ -71,9 +71,9 @@ loads from there; there is no local-disk cache.
 
 ### One archive file, not a directory of files
 
-`save_to_mlflow` adds `time_series_metadata.parquet` to the model directory — the roster rows the
-model trained against, which production inference locates its series by — then packs the whole
-directory into a single `model.tar.gz` and logs that one file to the run's artifact root.
+`save_to_mlflow` adds `time_series_metadata.parquet` to the model directory — the metadata table
+rows the model trained against, which production inference locates its series by — then packs the
+whole directory into a single `model.tar.gz` and logs that one file to the run's artifact root.
 `load_from_mlflow` and the production download path
 (`ml_core.production_helpers.fetch_model_artifacts`) each unpack it into a temporary directory.
 Subclass `save`/`load` never see the archive: they stay directory-based and MLflow-free, so the

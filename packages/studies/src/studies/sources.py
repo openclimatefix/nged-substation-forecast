@@ -399,14 +399,14 @@ old paths are tombstoned and no checkout names them.
 """
 
 PRIVATE_DIR: Final[Path] = STUDIES_DATA_DIR / "_private"
-"""Files derived from the private generator roster, which must never be published."""
+"""Files derived from the private list of generators, which must never be published."""
 
 TRIAL_AREA_BOX_PATH: Final[Path] = PRIVATE_DIR / "trial_area_box.json"
 """Where the trial-area box's bounds are kept.
 
 **This file is never read by anything outside this process's private working state, and its
 contents must never be logged, printed, committed, or quoted back in a report.** The bounds are
-derived from the private generator roster (`packages/contracts` `TimeSeriesMetadata`), and NGED's
+derived from the private list of generators (`packages/contracts` `TimeSeriesMetadata`), and NGED's
 generator locations must never appear in anything published — see CLAUDE.md.
 """
 

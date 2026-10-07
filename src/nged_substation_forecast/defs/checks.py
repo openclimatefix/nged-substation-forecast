@@ -58,8 +58,8 @@ The two differ in how much they salvage short of that catch-all. In
 absent *or unreadable* promoted-model ``meta.json`` degrades to "population unknown", so the rest
 of the report survives; a read *error* on either table still costs the whole report.
 ``power_data_is_fresh`` salvages nothing below the catch-all on purpose: its only per-read
-fallback would be "roster unknown", and a fresh power table would then render an unreadable
-roster as a green tick.
+fallback would be "metadata table unknown", and a fresh power table would then render an unreadable
+metadata table as a green tick.
 """
 
 import json
@@ -204,7 +204,7 @@ class PowerFreshnessResult:
 
 def evaluate_power_freshness(
     coverage: pl.DataFrame,
-    roster_ids: pl.Series | None,
+    expected_ids: pl.Series | None,
     now: datetime,
     threshold: timedelta,
     *,
@@ -219,9 +219,9 @@ def evaluate_power_freshness(
         coverage: One row per ``time_series_id`` that has data, carrying its most recent
             observation ``time`` in a ``last_time`` column (a ``TimeSeriesCoverage`` frame; any
             ``first_time`` column is ignored — freshness depends only on the latest observation).
-        roster_ids: The full set of expected ``time_series_id``s (from the ``TimeSeriesMetadata``
-            roster), used to flag ids that have *never* sent data. ``None`` when no roster is
-            available, in which case never-reported ids cannot be detected.
+        expected_ids: The full set of expected ``time_series_id``s (from the ``TimeSeriesMetadata``
+            table), used to flag ids that have *never* sent data. ``None`` when no metadata
+            table is available, in which case never-reported ids cannot be detected.
         now: Current time (UTC).
         threshold: A series is stale when ``last_time < now - threshold``.
         silenced_ids: Series we already know have stopped reporting, dropped from both inputs
@@ -251,18 +251,18 @@ def evaluate_power_freshness(
         ].sort()
     )
     coverage = coverage.filter(~pl.col("time_series_id").is_in(silenced))
-    if roster_ids is not None:
-        roster_ids = roster_ids.filter(~roster_ids.is_in(silenced))
+    if expected_ids is not None:
+        expected_ids = expected_ids.filter(~expected_ids.is_in(silenced))
 
     # Stale: has data on disk, but the newest observation predates the cutoff.
     #
-    # NOTE: this is deliberately not restricted to `roster_ids`. A series keeps being flagged stale
-    # even after NGED decommissions it, as long as old rows remain on disk — which is what we want
-    # for now: we would rather be told about a series that has gone quiet than silently stop
-    # watching it. Restricting to `roster_ids` would not silence one anyway: `upsert_metadata` never
-    # drops a series, so a retired series stays in the roster for good. Silencing one takes the
-    # explicit record of silenced ids above, which serves a retired series and a broken sensor alike
-    # — the check cannot tell them apart, and does not need to.
+    # NOTE: this is deliberately not restricted to `expected_ids`. A series keeps being flagged
+    # stale even after NGED decommissions it, as long as old rows remain on disk — which is what we
+    # want for now: we would rather be told about a series that has gone quiet than silently stop
+    # watching it. Restricting to `expected_ids` would not silence one anyway: `upsert_metadata`
+    # never drops a series, so a retired series stays in the metadata table for good. Silencing one
+    # takes the explicit record of silenced ids above, which serves a retired series and a broken
+    # sensor alike — the check cannot tell them apart, and does not need to.
     stale = coverage.filter(pl.col("last_time") < cutoff).select(
         "time_series_id",
         last_seen=pl.col("last_time"),
@@ -270,9 +270,9 @@ def evaluate_power_freshness(
         status=pl.lit("stale", dtype=status_dtype),
     )
 
-    # Never reported: in the roster, but with no rows in the Delta table at all.
-    if roster_ids is not None:
-        never_ids = roster_ids.filter(~roster_ids.is_in(coverage["time_series_id"].implode()))
+    # Never reported: in the metadata table, but with no rows in the Delta table at all.
+    if expected_ids is not None:
+        never_ids = expected_ids.filter(~expected_ids.is_in(coverage["time_series_id"].implode()))
     else:
         never_ids = pl.Series("time_series_id", [], dtype=coverage.schema["time_series_id"])
     never = pl.DataFrame({"time_series_id": never_ids}).select(
@@ -287,8 +287,8 @@ def evaluate_power_freshness(
     # "never" < "stale"; never-rows have a null `hours_late` but the status key keeps them ahead.
     late = pl.concat([never, stale]).sort(["status", "hours_late"], descending=[False, True])
 
-    if roster_ids is not None:
-        n_series_total = pl.concat([roster_ids, coverage["time_series_id"]]).n_unique()
+    if expected_ids is not None:
+        n_series_total = pl.concat([expected_ids, coverage["time_series_id"]]).n_unique()
     else:
         n_series_total = coverage.height
 
@@ -303,18 +303,18 @@ def evaluate_power_freshness(
     )
 
 
-def _read_roster_ids(
+def _read_expected_ids(
     metadata_path: str, storage_options: ObjectStoreOptions | None
 ) -> pl.Series | None:
-    """Return the expected ``time_series_id``s from the metadata roster, or ``None`` if absent."""
+    """Return the expected ``time_series_id``s from the metadata table, or ``None`` if absent."""
     if not object_exists(metadata_path, storage_options):
         return None
-    roster = (
+    metadata_table = (
         pl.scan_parquet(metadata_path, storage_options=typeddict_to_dict(storage_options))
         .select("time_series_id")
         .collect()
     )
-    return roster["time_series_id"]
+    return metadata_table["time_series_id"]
 
 
 def _late_table_metadata(late: pl.DataFrame) -> MetadataValue:
@@ -400,10 +400,10 @@ def _check_power_data_freshness() -> AssetCheckResult:
     settings = Settings()
     storage_options = settings.storage_options
     coverage = time_series_coverage(settings.power_time_series_data_path, storage_options)
-    roster_ids = _read_roster_ids(settings.metadata_path, storage_options)
+    expected_ids = _read_expected_ids(settings.metadata_path, storage_options)
     result = evaluate_power_freshness(
         coverage=coverage,
-        roster_ids=roster_ids,
+        expected_ids=expected_ids,
         now=datetime.now(UTC),
         threshold=_POWER_DATA_STALENESS_THRESHOLD,
         # Read at the call site, not defaulted into the signature, so a test can monkeypatch it.

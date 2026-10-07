@@ -3,8 +3,8 @@
 The pure ``evaluate_power_freshness`` / ``count_missed_nwp_runs`` /
 ``evaluate_live_forecast_health`` cases need neither Dagster nor Delta. Each check also has
 end-to-end tests that drive the real ``@asset_check`` — writing temp Delta tables, a metadata
-roster and a promoted-model ``meta.json`` — so the Settings plumbing, the Delta scans and the
-``AssetCheckResult`` mapping are all exercised together.
+metadata table and a promoted-model ``meta.json`` — so the Settings plumbing, the Delta scans and
+the ``AssetCheckResult`` mapping are all exercised together.
 
 One case goes further and drives ``power_data_is_fresh`` through Dagster's executor rather than
 calling it: asserting that the *run* still succeeds when the check's internals blow up is the
@@ -72,14 +72,14 @@ def _coverage(rows: dict[int, datetime]) -> pl.DataFrame:
     )
 
 
-def _roster(ids: list[int]) -> pl.Series:
+def _expected_id_series(ids: list[int]) -> pl.Series:
     return pl.Series("time_series_id", ids, dtype=pl.Int32)
 
 
 def test_all_fresh_is_healthy() -> None:
     coverage = _coverage({1: _NOW - timedelta(hours=1), 2: _NOW - timedelta(hours=23)})
     result = evaluate_power_freshness(
-        coverage=coverage, roster_ids=_roster([1, 2]), now=_NOW, threshold=_THRESHOLD
+        coverage=coverage, expected_ids=_expected_id_series([1, 2]), now=_NOW, threshold=_THRESHOLD
     )
     assert result.is_healthy
     assert result.n_late == 0
@@ -96,7 +96,10 @@ def test_stale_series_flagged_most_stale_first() -> None:
         }
     )
     result = evaluate_power_freshness(
-        coverage=coverage, roster_ids=_roster([1, 2, 3]), now=_NOW, threshold=_THRESHOLD
+        coverage=coverage,
+        expected_ids=_expected_id_series([1, 2, 3]),
+        now=_NOW,
+        threshold=_THRESHOLD,
     )
     assert not result.is_healthy
     assert result.n_stale == 2
@@ -117,7 +120,7 @@ def test_the_production_staleness_threshold_is_twenty_four_hours() -> None:
         coverage=_coverage(
             {7: _NOW - timedelta(hours=23, minutes=59), 8: _NOW - timedelta(hours=24, minutes=1)}
         ),
-        roster_ids=_roster([7, 8]),
+        expected_ids=_expected_id_series([7, 8]),
         now=_NOW,
         threshold=checks._POWER_DATA_STALENESS_THRESHOLD,
     )
@@ -132,11 +135,14 @@ def test_the_live_forecast_horizon_is_fourteen_days() -> None:
     assert timedelta(days=14) == LIVE_FORECAST_HORIZON
 
 
-def test_never_reported_ids_flagged_from_roster() -> None:
-    """A roster id with no rows in the Delta table counts as late with a null ``last_seen``."""
+def test_never_reported_ids_flagged_from_expected_ids() -> None:
+    """An expected id with no rows in the Delta table counts as late with a null ``last_seen``."""
     coverage = _coverage({1: _NOW - timedelta(hours=1)})
     result = evaluate_power_freshness(
-        coverage=coverage, roster_ids=_roster([1, 2, 3]), now=_NOW, threshold=_THRESHOLD
+        coverage=coverage,
+        expected_ids=_expected_id_series([1, 2, 3]),
+        now=_NOW,
+        threshold=_THRESHOLD,
     )
     assert not result.is_healthy
     assert result.n_stale == 0
@@ -151,27 +157,27 @@ def test_never_reported_ids_flagged_from_roster() -> None:
 def test_never_reported_sorts_before_stale() -> None:
     coverage = _coverage({1: _NOW - timedelta(hours=48)})  # stale
     result = evaluate_power_freshness(
-        coverage=coverage, roster_ids=_roster([1, 2]), now=_NOW, threshold=_THRESHOLD
+        coverage=coverage, expected_ids=_expected_id_series([1, 2]), now=_NOW, threshold=_THRESHOLD
     )
     assert result.late["status"].to_list() == ["never", "stale"]
     assert result.late["time_series_id"].to_list() == [2, 1]
 
 
-def test_no_roster_cannot_detect_never_reported() -> None:
-    """With no roster, only stale series are detectable; total is the on-disk id count."""
+def test_no_expected_ids_cannot_detect_never_reported() -> None:
+    """With no metadata table, only stale series are detectable; total is the on-disk id count."""
     coverage = _coverage({1: _NOW - timedelta(hours=48)})
     result = evaluate_power_freshness(
-        coverage=coverage, roster_ids=None, now=_NOW, threshold=_THRESHOLD
+        coverage=coverage, expected_ids=None, now=_NOW, threshold=_THRESHOLD
     )
     assert result.n_never == 0
     assert result.n_stale == 1
     assert result.n_series_total == 1
 
 
-def test_empty_table_with_roster_is_all_never() -> None:
+def test_empty_table_with_expected_ids_is_all_never() -> None:
     coverage = _coverage({})
     result = evaluate_power_freshness(
-        coverage=coverage, roster_ids=_roster([1, 2]), now=_NOW, threshold=_THRESHOLD
+        coverage=coverage, expected_ids=_expected_id_series([1, 2]), now=_NOW, threshold=_THRESHOLD
     )
     assert result.n_never == 2
     assert result.n_series_total == 2
@@ -180,7 +186,7 @@ def test_empty_table_with_roster_is_all_never() -> None:
 
 def test_result_threshold_hours_reflects_threshold() -> None:
     result = evaluate_power_freshness(
-        coverage=_coverage({}), roster_ids=None, now=_NOW, threshold=timedelta(hours=8)
+        coverage=_coverage({}), expected_ids=None, now=_NOW, threshold=timedelta(hours=8)
     )
     assert isinstance(result, PowerFreshnessResult)
     assert result.threshold_hours == 8.0
@@ -196,7 +202,7 @@ def test_late_series_table_is_capped_but_the_counts_are_not() -> None:
     result = checks._to_asset_check_result(
         evaluate_power_freshness(
             coverage=coverage,
-            roster_ids=_roster(list(range(1, n_late + 1))),
+            expected_ids=_expected_id_series(list(range(1, n_late + 1))),
             now=_NOW,
             threshold=_THRESHOLD,
         )
@@ -224,14 +230,16 @@ def test_the_table_never_holds_more_detail_than_the_sentry_event_context() -> No
 
 def test_never_reported_series_crowd_stale_ones_out_of_a_truncated_table() -> None:
     """Every never-reported series outranks every stale one, so at V2 cutover — a populated
-    roster before data flows — the table can hold no stale series at all, while the counts
+    metadata table before data flows — the table can hold no stale series at all, while the counts
     stay exact."""
     cap = checks._MAX_LATE_SERIES_IN_TABLE
     coverage = _coverage({i: _NOW - timedelta(hours=1000) for i in range(1, 11)})  # 10 very stale
-    roster = _roster(list(range(1, 11)) + list(range(100, 100 + cap + 5)))  # + cap+5 never-reported
+    expected_ids = _expected_id_series(
+        list(range(1, 11)) + list(range(100, 100 + cap + 5))
+    )  # + cap+5 never-reported
     result = checks._to_asset_check_result(
         evaluate_power_freshness(
-            coverage=coverage, roster_ids=roster, now=_NOW, threshold=_THRESHOLD
+            coverage=coverage, expected_ids=expected_ids, now=_NOW, threshold=_THRESHOLD
         )
     )
 
@@ -250,9 +258,9 @@ def test_never_reported_series_crowd_stale_ones_out_of_a_truncated_table() -> No
 def test_silenced_series_are_withheld_and_others_still_warn() -> None:
     """One fixture covering every way a silenced id can relate to the data.
 
-    7 is stale and watched, 1 is fresh and watched, 23 is stale and silenced, 33 is in the roster
-    with no data and silenced, and 404 is silenced but exists nowhere. ``n_series_total == 2`` is
-    the assertion that pins *where* the filtering happens: filtering the late frame instead of
+    7 is stale and watched, 1 is fresh and watched, 23 is stale and silenced, 33 is in the metadata
+    table with no data and silenced, and 404 is silenced but exists nowhere. ``n_series_total == 2``
+    is the assertion that pins *where* the filtering happens: filtering the late frame instead of
     the inputs would leave the silenced ids in the population and answer 4.
     """
     coverage = _coverage(
@@ -260,7 +268,7 @@ def test_silenced_series_are_withheld_and_others_still_warn() -> None:
     )
     result = evaluate_power_freshness(
         coverage=coverage,
-        roster_ids=_roster([7, 1, 23, 33]),
+        expected_ids=_expected_id_series([7, 1, 23, 33]),
         now=_NOW,
         threshold=_THRESHOLD,
         silenced_ids=(23, 33, 404),
@@ -292,7 +300,7 @@ def test_the_staleness_cutoff_is_exclusive(
     """
     result = evaluate_power_freshness(
         coverage=_coverage({7: _NOW - _THRESHOLD + last_seen_offset}),
-        roster_ids=_roster([7]),
+        expected_ids=_expected_id_series([7]),
         now=_NOW,
         threshold=_THRESHOLD,
     )
@@ -320,7 +328,7 @@ def test_a_silenced_series_that_reports_again_is_resurrected(
     coverage = _coverage({1: _NOW, 33: last_seen, 23: last_seen})
     result = evaluate_power_freshness(
         coverage=coverage,
-        roster_ids=_roster([1, 23, 33]),
+        expected_ids=_expected_id_series([1, 23, 33]),
         now=_NOW,
         threshold=_THRESHOLD,
         silenced_ids=(33, 23),
@@ -329,12 +337,12 @@ def test_a_silenced_series_that_reports_again_is_resurrected(
     assert result.is_healthy
 
 
-def test_silencing_works_without_a_roster() -> None:
-    """No roster means never-reported ids cannot be detected, but silencing still applies to the
-    coverage frame — and must not trip over the absent ``roster_ids``."""
+def test_silencing_works_without_expected_ids() -> None:
+    """No metadata table means never-reported ids cannot be detected, but silencing still applies
+    to the coverage frame — and must not trip over the absent ``expected_ids``."""
     coverage = _coverage({1: _NOW - timedelta(hours=1), 33: _NOW - timedelta(days=200)})
     result = evaluate_power_freshness(
-        coverage=coverage, roster_ids=None, now=_NOW, threshold=_THRESHOLD, silenced_ids=(33,)
+        coverage=coverage, expected_ids=None, now=_NOW, threshold=_THRESHOLD, silenced_ids=(33,)
     )
     assert result.is_healthy
     assert result.n_series_total == 1
@@ -352,7 +360,7 @@ def test_the_check_result_reports_silencing(stale_id: int | None) -> None:
     result = checks._to_asset_check_result(
         evaluate_power_freshness(
             coverage=_coverage(rows),
-            roster_ids=_roster(list(rows)),
+            expected_ids=_expected_id_series(list(rows)),
             now=_NOW,
             threshold=_THRESHOLD,
             silenced_ids=(33,),
@@ -371,7 +379,7 @@ def test_a_resurrection_fails_the_check_and_says_where_to_edit() -> None:
     result = checks._to_asset_check_result(
         evaluate_power_freshness(
             coverage=coverage,
-            roster_ids=_roster([1, 33]),
+            expected_ids=_expected_id_series([1, 33]),
             now=_NOW,
             threshold=_THRESHOLD,
             silenced_ids=(33,),
@@ -386,11 +394,11 @@ def test_a_resurrection_fails_the_check_and_says_where_to_edit() -> None:
 def test_a_deployment_with_no_data_yet_still_says_so_while_silencing() -> None:
     """The silenced list is never empty in production, so "watching nothing" must keep meaning
     "no data yet" — the state every fresh deployment starts in — rather than being read as the
-    list having swallowed the roster."""
+    list having swallowed the metadata table."""
     result = checks._to_asset_check_result(
         evaluate_power_freshness(
             coverage=_coverage({}),
-            roster_ids=None,
+            expected_ids=None,
             now=_NOW,
             threshold=_THRESHOLD,
             silenced_ids=(33,),
@@ -401,7 +409,7 @@ def test_a_deployment_with_no_data_yet_still_says_so_while_silencing() -> None:
 
 
 # ---------------------------------------------------------------------------
-# End-to-end: the real asset check against a temp Delta table + metadata roster.
+# End-to-end: the real asset check against a temp Delta table + metadata table.
 # ---------------------------------------------------------------------------
 
 
@@ -431,7 +439,7 @@ def _run_freshness_check() -> AssetCheckResult:
 
 
 def test_power_data_is_fresh_end_to_end(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """One fresh series, one stale series, one never-reported roster id → a WARN naming all late."""
+    """One fresh series, one stale series, one never-reported id → a WARN naming all late."""
     # Freeze "now" so the fresh/stale split is deterministic regardless of wall-clock.
     now = datetime.now(UTC)
     fresh_time = now - timedelta(hours=1)
@@ -547,7 +555,7 @@ def test_power_data_is_fresh_uses_the_production_threshold(env: Path) -> None:
 
 
 def test_power_data_is_fresh_no_data_yet_warns(env: Path) -> None:
-    """No Delta table and no roster → not healthy, WARN, 'no data yet'."""
+    """No Delta table and no metadata table → not healthy, WARN, 'no data yet'."""
     result = _run_freshness_check()
     assert result.passed is False
     assert result.severity == AssetCheckSeverity.WARN
@@ -585,8 +593,8 @@ def test_power_data_is_fresh_hands_evaluated_result_to_sentry(
         checks, "report_power_freshness", lambda settings, result: captured.append(result)
     )
 
-    # The check still reads coverage + roster before calling the (patched) evaluator, so a minimal
-    # Delta table and roster must exist for those reads to succeed.
+    # The check still reads coverage + metadata table before calling the (patched) evaluator, so a
+    # minimal Delta table and metadata table must exist for those reads to succeed.
     now = datetime.now(UTC)
     settings = Settings()
     pl.DataFrame(
@@ -646,14 +654,14 @@ def _never_called(check_name: str, exc: BaseException) -> None:
 
 
 def test_power_data_is_fresh_degrades_on_a_corrupt_metadata_parquet(env: Path) -> None:
-    """A half-written roster is a realistic on-disk raiser: ``metadata.parquet`` is written in
-    place, so a process killed mid-write leaves a file that exists and will not parse. The check
-    must warn rather than raise — it is one step of the hooked
+    """A half-written metadata table is a realistic on-disk raiser: ``metadata.parquet`` is
+    written in place, so a process killed mid-write leaves a file that exists and will not parse.
+    The check must warn rather than raise — it is one step of the hooked
     ``power_time_series_and_metadata_job``.
 
     ``upsert_metadata`` reads the same file first and raises, but the asset swallows that so the
-    power write survives. This pins the check's half: it has no roster to read while the fault
-    lasts.
+    power write survives. This pins the check's half: it has no metadata table to read while the
+    fault lasts.
 
     The assertion is on our own description prefix rather than on Polars' message, which is not
     ours to pin.
@@ -679,7 +687,7 @@ def test_power_data_is_fresh_never_fails_the_run(
     assets, not whether an *erroring* one fails the run. Running the check through Dagster's
     executor is the only way to assert that; ``AssetSelection.checks`` runs the check step alone,
     so no asset materialises and nothing touches S3. No fixture data is needed either: with no
-    tables on disk ``time_series_coverage`` returns an empty frame and ``_read_roster_ids``
+    tables on disk ``time_series_coverage`` returns an empty frame and ``_read_expected_ids``
     returns ``None``, so the patched evaluator is still reached.
     """
     monkeypatch.setattr(checks, "evaluate_power_freshness", _raise_inside_the_check)

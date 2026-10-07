@@ -150,7 +150,7 @@ def test_trained_time_series_ids_is_abstract() -> None:
 def _metadata_for(
     series: Sequence[int], area_wkt: bool = False
 ) -> pt.DataFrame[TimeSeriesMetadata]:
-    """A roster frame for ``series``, carrying only the columns any consumer reads.
+    """A metadata table for ``series``, carrying only the columns any consumer reads.
 
     ``set_model`` rather than ``validate``, as the assets themselves do, so a partial frame is
     enough. ``area_wkt`` adds the one column ``write_trained_metadata`` is expected to drop.
@@ -310,8 +310,8 @@ def test_the_archive_carries_the_trained_metadata_without_area_wkt(
 ) -> None:
     """Promotion must land the rows live inference locates its series by — and only those.
 
-    ``area_wkt`` is 98.5% of the roster's bytes and nothing reads it, so it must not ride along
-    into every fold's archive.
+    ``area_wkt`` is 98.5% of the metadata table's bytes and nothing reads it, so it must not ride
+    along into every fold's archive.
     """
     _FakeForecaster(
         BaseForecasterConfig(selected_features=set()), payload="located", series=[10, 20]

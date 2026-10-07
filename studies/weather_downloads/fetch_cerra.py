@@ -18,7 +18,7 @@ Two datasets: `reanalysis-cerra-single-levels` for the solar candidate
 `time_integrated_surface_direct_short_wave_radiation_flux`) and true 10 m wind
 (`10m_wind_speed`), and `reanalysis-cerra-height-levels` for wind above 10 m (`wind_speed` at
 every height in `HEIGHT_LEVELS`; that dataset has no 10 m level, only 15 m and above). The height
-band is deliberately generous — the roster's onshore wind generators span a range of hub heights,
+band is deliberately generous — the site list's onshore wind generators span a range of hub heights,
 and the cropped output is cheap regardless of how many heights are kept (see the `data-download`
 skill's sizing discussion) — so a later study has more than one vertical level to compare, the
 same choice `fetch_icon_dream.py` makes for `WS`.
@@ -440,7 +440,7 @@ def _run_variable(
             )
             + ", data_type=reanalysis (deterministic, never ensemble_members). Whole-domain "
             "NetCDF downloaded in chunks then cropped by a lat/lon mask to the trial-area box "
-            "(a few grid cells' margin around the NGED generator roster's own extent); values "
+            "(a few grid cells' margin around the extent of NGED's generators); values "
             f"cast to Float32 and rounded to {NWP_SIGNIFICAND_BITS} significand bits before "
             "writing."
         ),

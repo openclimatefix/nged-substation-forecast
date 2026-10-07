@@ -1,7 +1,7 @@
 """Listing, downloading, and parsing NGED's telemetry JSON from S3.
 
 Each file yields `TimeSeriesMetadata` describing one series and `PowerTimeSeries` power
-observations from it. The metadata is upserted here, into a Parquet roster (see
+observations from it. The metadata is upserted here, into a Parquet metadata table (see
 `upsert_metadata`). The power observations are not. This module never writes `PowerTimeSeries`
 rows to disk. It returns them to the caller, and the caller appends them to the
 `power_time_series` Delta table. `time_series_coverage` and `select_new_rows` read that same
@@ -560,11 +560,11 @@ class UpsertMetadataStats(TypedDict, total=False):
     metadata_upsert_failed: str
     """Set by the asset when the whole upsert raised, so the power write went ahead without it.
 
-    Read this field's presence as "the roster is stale, retry next hour", not as a power-ingest
-    failure — the power write is unaffected. See [Degraded input
+    Read this field's presence as "the metadata table is stale, retry next hour", not as a
+    power-ingest failure — the power write is unaffected. See [Degraded input
     data](https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#degraded-input-data-nwp-feed-down-or-telemetry-stalled),
-    under "Reading a failed roster upsert", for the operational read of this field and what a stale
-    roster costs while the failure persists.
+    under "Reading a failed metadata table upsert", for the operational read of this field and what
+    a stale metadata table costs while the failure persists.
     """
 
 
@@ -578,32 +578,32 @@ def upsert_metadata(
     If the Parquet file does not exist, it saves the new_metadata. If it exists, it merges the
     new_metadata into it and rewrites the file only if the incoming metadata differs from what is
     stored. ``new_metadata`` is a snapshot of the metadata for the series that reported this run.
-    The snapshot need not carry the same columns, or the same column order, as the stored roster.
-    Rows are matched on ``time_series_id``. A series that ``new_metadata`` covers is replaced
+    The snapshot need not carry the same columns, or the same column order, as the stored metadata
+    table. Rows are matched on ``time_series_id``. A series that ``new_metadata`` covers is replaced
     wholesale, so a field the snapshot has stopped carrying is **cleared** for that series. A series
-    that ``new_metadata`` omits keeps its last stored values indefinitely. The roster therefore
-    holds every time series we have ever seen, not only the series in the latest snapshot.
+    that ``new_metadata`` omits keeps its last stored values indefinitely. The metadata table
+    therefore holds every time series we have ever seen, not only the series in the latest snapshot.
 
     This function is not safe under concurrent callers: it assumes it is called by one thread at a
     time, and takes no lock.
 
-    The rewrite is not atomic either. `write_parquet` overwrites the roster in place, with no
-    write-to-temporary-file-and-rename. The roster therefore does not get the all-or-nothing
-    commit that Delta gives the tables around it. See [principle 10, every write is atomic and
-    idempotent](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition).
+    The rewrite is not atomic either. `write_parquet` overwrites the metadata table in place, with
+    no write-to-temporary-file-and-rename. The metadata table therefore does not get the
+    all-or-nothing commit that Delta gives the tables around it. See [principle 10, every write is
+    atomic and idempotent](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition).
     A crash or an out-of-memory kill part-way through a local write leaves a partial file.
     `pl.read_parquet` below is what rejects that partial file on the next run, before
     `TimeSeriesMetadata.validate` ever sees it. The error reads `ComputeError: parquet: File out of
     specification: The file must end with PAR1`. `validate` is the guard for the other case: a
-    roster that reads back cleanly but is off-contract, from an older writer or a hand-edit. Either
-    way the asset records `metadata_upsert_failed`, and the roster stays broken until an operator
-    acts. A corrupt file is not a missing file, so the create branch below never runs again by
-    itself.
+    metadata table that reads back cleanly but is off-contract, from an older writer or a hand-edit.
+    Either way the asset records `metadata_upsert_failed`, and the metadata table stays broken until
+    an operator acts. A corrupt file is not a missing file, so the create branch below never runs
+    again by itself.
 
     Deleting the file is not on its own a fix. `power_time_series_and_metadata` extracts metadata
     only from the files `select_new_rows` judged new. The next hourly run would therefore rebuild
-    the roster from whichever series happened to publish that hour, rather than from every series
-    NGED publishes. Nothing is permanently lost, and a rebuild is cheaper than re-reading the
+    the metadata table from whichever series happened to publish that hour, rather than from every
+    series NGED publishes. Nothing is permanently lost, and a rebuild is cheaper than re-reading the
     bucket. Every JSON file carries its own series' metadata in its top-level fields, and
     `list_timeseries_json_files` returns a `time_series_id` per key. The newest file per series is
     therefore enough — one download per time series rather than one per file NGED has ever
@@ -618,11 +618,12 @@ def upsert_metadata(
 
     Returns:
         An `UpsertMetadataStats`. `metadata_n_new_TimeSeriesIDs` counts the `time_series_id`s in
-        `new_metadata` that are new to the roster. `metadata_n_updated_TimeSeriesIDs` counts the
-        `time_series_id`s already in the roster that changed. `metadata_updated_TimeSeriesIDs` holds
-        the sorted list of changed `time_series_id`s. Both counts are zero and the id list
-        is omitted when the parquet file was up to date already. The id list is also omitted on
-        a first-ever write, when every id in `new_metadata` counts as new rather than updated.
+        `new_metadata` that are new to the metadata table. `metadata_n_updated_TimeSeriesIDs` counts
+        the `time_series_id`s already in the metadata table that changed.
+        `metadata_updated_TimeSeriesIDs` holds the sorted list of changed `time_series_id`s. Both
+        counts are zero and the id list is omitted when the parquet file was up to date already. The
+        id list is also omitted on a first-ever write, when every id in `new_metadata` counts as new
+        rather than updated.
     """
     COMPRESSION: Final[str] = "zstd"
 
@@ -649,17 +650,17 @@ def upsert_metadata(
     existing_metadata = pl.read_parquet(
         metadata_path, storage_options=typeddict_to_dict(storage_options)
     )
-    # The stored roster is outside this code's control: it can come from an older writer, a
+    # The stored metadata table is outside this code's control: it can come from an older writer, a
     # hand-edit, or a truncated upload. An off-contract file must therefore not be merged blind into
-    # the roster we write back. As with any raise from this function, the asset contains it rather
-    # than failing: it records `metadata_upsert_failed` and lets the power write proceed (see
+    # the metadata table we write back. As with any raise from this function, the asset contains it
+    # rather than failing: it records `metadata_upsert_failed` and lets the power write proceed (see
     # `defs/assets.py`).
     TimeSeriesMetadata.validate(existing_metadata)
 
-    # `how="diagonal"` because the snapshot and the stored roster can differ in both width and
-    # column order: four TimeSeriesMetadata fields are `allow_missing`. Aligning the two frames into
-    # one also makes the `hash_rows` diff below insensitive to the stored column order. Hashing the
-    # two frames separately would not be.
+    # `how="diagonal"` because the snapshot and the stored metadata table can differ in both width
+    # and column order: four TimeSeriesMetadata fields are `allow_missing`. Aligning the two frames
+    # into one also makes the `hash_rows` diff below insensitive to the stored column order. Hashing
+    # the two frames separately would not be.
     combined = pl.concat([new_metadata, existing_metadata], how="diagonal")
     new_rows = combined.head(new_metadata.height)
     stored_rows = combined.slice(new_metadata.height)
@@ -668,10 +669,10 @@ def upsert_metadata(
     # exact match in `existing_metadata`. Adapted from https://stackoverflow.com/a/79888719
     metadata_diff = new_rows.filter(~new_rows.hash_rows().is_in(stored_rows.hash_rows().implode()))
     # The first frame carrying the union of both inputs' columns: the concat adds to the snapshot's
-    # rows any `allow_missing` field only the stored roster had. All four fields are nullable, so
-    # this validate is a shape check on a frame neither validation above saw, not a guard against a
-    # known fault. Of the four validate calls in this function this is the weakest, and the first
-    # to reconsider if the validate calls get trimmed.
+    # rows any `allow_missing` field only the stored metadata table had. All four fields are
+    # nullable, so this validate is a shape check on a frame neither validation above saw, not a
+    # guard against a known fault. Of the four validate calls in this function this is the weakest,
+    # and the first to reconsider if the validate calls get trimmed.
     TimeSeriesMetadata.validate(metadata_diff)
 
     if metadata_diff.is_empty():
@@ -689,8 +690,8 @@ def upsert_metadata(
     # Merge metadata. Put new_metadata first so that unique(keep="first") keeps the new version
     merged_metadata = combined.unique(subset="time_series_id", keep="first").sort("time_series_id")
 
-    # The last gate before the stored roster is overwritten. `unique` draws rows from both sides of
-    # the concat, so no validation above has seen this row set.
+    # The last gate before the stored metadata table is overwritten. `unique` draws rows from both
+    # sides of the concat, so no validation above has seen this row set.
     TimeSeriesMetadata.validate(merged_metadata)
 
     merged_metadata.write_parquet(

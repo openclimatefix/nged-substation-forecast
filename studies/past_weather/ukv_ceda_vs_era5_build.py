@@ -872,7 +872,7 @@ def wind_rows(
     Args:
         ukv: The opened stores.
         wind: `era5_wind_by_cell`'s result.
-        sites: The wind roster with `site`, `latitude`, `longitude`, `effective_capacity_mw`.
+        sites: The wind site list with `site`, `latitude`, `longitude`, `effective_capacity_mw`.
         read_values: Whether to read UKV-CEDA values, as `ukv_at` says.
         drop_zero_hours: Whether to drop every hour holding an exactly zero half-hour. False builds
             the exploratory rows that keep them.
@@ -959,7 +959,7 @@ def solar_rows(
     Args:
         ukv: The opened stores.
         temperature: `era5_temperature_by_cell`'s result.
-        sites: The solar roster with `site`, `latitude`, `longitude`.
+        sites: The solar site list with `site`, `latitude`, `longitude`.
         read_values: Whether to read UKV-CEDA values, as `ukv_at` says.
         drop_months: The months that lose more than `MAX_MONTH_LOSS_SHARE` of their hours to
             incomplete UKV-CEDA runs, dropped from every arm.
@@ -1561,7 +1561,7 @@ def with_hour_starting_power(*, frame: pl.DataFrame, sites: pl.DataFrame) -> pl.
 
     Args:
         frame: The wind rows, carrying `site`, `time` and the centred and hour-ending power.
-        sites: The wind roster.
+        sites: The wind site list.
 
     Returns:
         `frame`, in its own row order, restricted to the rows with an hour-starting power, with
