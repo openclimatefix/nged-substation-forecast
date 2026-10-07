@@ -1,7 +1,8 @@
 """Check the census against the TEC register's PV sites: which has a BMU in the census?
 
 A transmission-connected solar site must hold Transmission Entry Capacity (TEC), so the register's
-PV rows are a short, complete list to measure recall against. A TEC row and a BMU match
+PV rows are a short list to measure recall against. The list can miss a site whose TEC plant type
+omits PV. A TEC row and a BMU match
 many-to-many, and a BMU's lead party is a trading party rather than the TEC customer, so the match
 cannot be automated. The script writes a draft mapping from TEC Project ID to BMU identifiers to the
 study folder, and reads the reviewed mapping beside it when that file exists. Run:

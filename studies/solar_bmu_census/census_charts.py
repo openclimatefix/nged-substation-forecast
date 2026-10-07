@@ -379,8 +379,8 @@ def map_figure(*, census: pl.DataFrame, number: int) -> alt.VConcatChart:
                 f"{located.height} of {single.height} single-site solar BMUs have a position, from "
                 "the Renewable Energy Planning Database row matched to each BMU."
             ),
-            "Top: Great Britain. Bottom: a zoom on the nine sites in England, named.",
-            "Blue: pure PV site. Orange: hybrid site, with storage.",
+            "Top: Great Britain. Bottom: a zoom on the nine BMUs in England, at eight sites.",
+            "Blue: pure PV site. Orange: hybrid site, with storage built or planned.",
         ],
         figure_planning=None,
     )

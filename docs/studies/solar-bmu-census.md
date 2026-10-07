@@ -1,22 +1,25 @@
-# At least 10 Balancing Mechanism Units in Great Britain are single solar sites, and 9 of them share a site with storage
+# At least 10 Balancing Mechanism Units at 9 solar sites in Great Britain, and 8 of those sites have storage built or planned
 
 **This study asks how many Balancing Mechanism Units (BMUs) in Great Britain are solar, and what
 capacity each published figure gives them.** A BMU is the unit of trade in the Balancing Mechanism,
 which the National Energy System Operator (NESO) uses to balance supply and demand. No field in the
-BMU register says which BMUs are solar: none of the 3,115 registered BMUs has a fuel type of solar,
-and 2,525 have no fuel type at all. The study therefore downloads the settled half-hourly output of
+BMU register says which BMUs are solar: none of the 3,115 rows of the BMU register has a fuel type
+of solar, and 2,525 have no fuel type at all. The study therefore downloads the settled half-hourly
+output of
 the 1,705 BMUs that are not interconnectors, over 12 months, and asks whether each BMU's output
 follows the sun.
 
 **Ten single-site BMUs are solar: nine follow the sun, and a tenth is registered as solar but has no
-output yet.** All ten have a `T_` or `E_` identifier, which the study treats as one generating site.
-Nine of the ten sit at a site that also holds storage, and one sits at a pure PV site. The study
-reports totals for all ten, for the nine hybrid sites, and for the one pure PV site. A further 28
+output yet.** All ten have a `T_` or `E_` identifier, each of which the study treats as part of one
+generating site, and Cleve Hill's two BMUs share one site. Nine of the ten BMUs sit at eight sites
+that also hold storage, built or planned (four of the sites have a storage BMU of their own), and
+one sits at a pure PV site. The study reports totals for all ten, for the nine BMUs at hybrid sites,
+and for the one BMU at the pure PV site. A further 28
 BMUs with supplier, virtual, or other identifiers also follow the sun or are registered as solar,
 but 86% of their Generation Capacity is five gas-and-power supplier BMUs that import and export
-heavily, so the study reports them apart. Seven of the 12 built PV projects in NESO's Transmission
-Entry Capacity register have a BMU in the census, and the census cannot yet say how many embedded
-solar BMUs it missed.
+heavily, so the study reports them apart. Each of the 12 built PV projects in NESO's Transmission
+Entry Capacity register maps to a BMU, and seven of the 12 map to a BMU in the census. The census
+cannot say how many embedded solar BMUs it missed.
 
 ![Figure 1: Single-site BMUs' correlation with the sun, with a gap from 0.49 to 0.83](assets/solar_bmu_census_correlation.svg)
 
@@ -26,9 +29,9 @@ solar BMUs it missed.
   Capacity sums to 682.9 MW, and the largest Maximum Export Limit that each BMU published in the 30
   days before the study sums to 667.0 MW. Two registers give a figure for a whole project, which can
   include storage.
-- **A solar BMU at a hybrid site is metered apart from its storage in nine of ten cases.** One BMU,
-  Tebworth PV Power Park, shows battery-like import on a few nights in January 2026 even though its
-  site has a storage BMU.
+- **At the four hybrid sites with a storage BMU, the solar BMU is metered apart from the storage.**
+  The exception is Tebworth PV Power Park, which imported up to 35.3 MW on two days in January 2026
+  even though its site has a storage BMU.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
@@ -40,14 +43,15 @@ solar BMUs it missed.
 - **A wide gap separates the single-site BMUs that follow the sun from the rest**, so the threshold
   is not a close call ([Figure 1](#the-census)).
 - **The ten single-site solar BMUs have 682.9 MW of Generation Capacity in all**, 50.0 MW of it at
-  the pure PV site and 633.0 MW at the nine hybrid sites ([Capacity](#capacity)).
+  the pure PV site and 633.0 MW at the nine BMUs at hybrid sites ([Capacity](#capacity)).
 - **Nine of the ten lie south of 53°N in England, and one lies in Scotland** ([Figure
   2](#where-the-bmus-are)).
-- **A solar BMU at a hybrid site looks like a pure PV BMU, and its storage is a separate BMU that
-  charges at midday and discharges in the early evening** ([Figures 3 and
+- **A solar BMU at a hybrid site looks like a pure PV BMU, and at the four sites with a storage BMU
+  the storage charges at midday and discharges in the early evening** ([Figures 3 and
   4](#what-a-solar-bmu-looks-like)).
-- **The census has a BMU for 7 of the 12 built PV projects in the Transmission Entry Capacity
-  register**, and at most 1 of the other 5 can be a solar BMU the census missed
+- **All 12 built PV projects in the Transmission Entry Capacity register map to a BMU, and 7 of them
+  to a BMU in the census**, so the census missed no separately registered solar BMU at a built
+  project
   ([Recall](#how-many-solar-bmus-were-missed)).
 - **28 aggregate BMUs also follow the sun or are registered as solar**, and their Generation
   Capacity is mostly not solar capacity ([Aggregates](#aggregate-bmus)).
@@ -86,13 +90,15 @@ model, so no contrast is planned or exploratory, and every number is a count or 
 - NESO's Transmission Entry Capacity (TEC) register, the export capacity agreed for each project at
   the grid connection; and
 - the Renewable Energy Planning Database (REPD) of the Department for Energy Security and Net Zero,
-  the installed (DC) capacity of each project, with an Ordnance Survey grid position.
+  the installed capacity of each project, with an Ordnance Survey grid position, and no stated AC or
+DC basis.
 
 **Classifying a BMU.** The classifier takes each BMU's output and drops two kinds of half-hour. It
 drops the 30 days after a BMU's first output, unless the BMU was already running in the first week
 of the window, because a site often commissions in stages. It also drops half-hours of exactly zero
-output while the sun is clearly up (the cosine of the solar zenith angle above 0.1), which is almost
-certainly a metering fault in a solar unit. Output of 0.01 megawatt-hours or less in a half-hour
+output while the sun is clearly up (the cosine of the solar zenith angle above 0.1), which in a
+solar unit is an outage, curtailment, or a metering fault and not weather. Output of 0.01
+megawatt-hours or less in a half-hour
 counts as meter noise, not generation. The classifier then computes the Pearson correlation between
 the output and the cosine of the solar zenith angle, clipped at zero below the horizon, at one point
 in central Great Britain (53°N, 1.5°W). A BMU has no coordinates, and the solar noon at the census
@@ -102,7 +108,8 @@ one with fewer than 100 positive half-hours, or a constant output, has no output
 census holds every BMU that follows the sun or has IGCPU resource type "Solar".
 
 **Single-site and aggregate BMUs.** Elexon's naming convention gives a directly connected or
-embedded BMU a `T_`, `E_`, or `M_` identifier, and the study treats such a BMU as one site. A `2_`
+embedded BMU a `T_` or `E_` identifier, and a miscellaneous BMU an `M_` identifier, and the study
+treats such a BMU as part of one site. No `M_` BMU is in the census. A `2_`
 (supplier), `V_`, or `C_` identifier does not name a single site by that convention, and the study
 did not check each, so it counts those BMUs apart.
 
@@ -119,7 +126,8 @@ so the study takes each project's most advanced row, and uses its connected capa
 its agreed capacity if still under construction.
 
 **Recall.** The study checks the census against the 12 built and 6 under-construction TEC projects
-that list PV, because a project that holds TEC and lists PV should have a BMU. Each project is
+that list PV, because a project that holds TEC and lists PV should have a BMU. A TEC plant type can
+omit PV, so the list can miss a site. Each project is
 matched by hand to its BMUs, and the check records whether any matched BMU is in the census.
 
 **Examples.** Output is shown in megawatts on calendar dates. Each kind's examples are chosen by a
@@ -166,8 +174,9 @@ REPD name a project, so Cleve Hill's two BMUs share one project name in each.
 
 **The ten single-site solar BMUs, with the five published capacity figures for each.** A dash means
 no figure was found. Cleve Hill's two BMUs share one TEC project and one REPD row, so both rows show
-the whole site's figure. REPD gives a project's installed (DC) capacity, so it can exceed the export
-figures: Breach's REPD figure is 67 MW against 49.9 MW in TEC.
+the whole site's figure. REPD states no AC or DC basis, and for some solar sites its figure is the
+panel (DC) rating, so it can exceed the export figures. Breach's REPD figure and its Maximum Export
+Limit are both 67 MW against 49.9 MW in TEC.
 
 | BMU | Name | Site | Generation Capacity (MW) | IGCPU installed (MW) | TEC (MW) | Largest MEL, 30 days (MW) | REPD installed (MW) |
 |---|---|---|---|---|---|---|---|
@@ -190,13 +199,15 @@ comparable with a sum of Generation Capacity.
 | Group (BMUs) | Generation Capacity (MW) | IGCPU installed (MW) | TEC (MW) | Largest MEL, 30 days (MW) | REPD installed (MW) |
 |---|---|---|---|---|---|
 | All solar BMUs, hybrids included (10) | 682.9 (10) | 591.0 (8) | 733.8 (9) | 667.0 (10) | 730.6 (9) |
-| Hybrid sites only (9) | 633.0 (9) | 542.0 (7) | 683.8 (8) | 617.0 (9) | 680.7 (8) |
-| Pure PV site only (1) | 50.0 (1) | 49.0 (1) | 50.0 (1) | 50.0 (1) | 49.9 (1) |
+| BMUs at hybrid sites (9) | 633.0 (9) | 542.0 (7) | 683.8 (8) | 617.0 (9) | 680.7 (8) |
+| BMU at the pure PV site (1) | 50.0 (1) | 49.0 (1) | 50.0 (1) | 50.0 (1) | 49.9 (1) |
 
-**Of the nine hybrid sites, four have a storage BMU with output, three have an operational battery
-in REPD, and two have storage planned or under construction.** The operational batteries are 150 MW
-at Cleve Hill (linked to both BMUs) and 0.66 MW at Breach. Two IGCPU figures are missing for BMUs
-that IGCPU does not list, one TEC figure is missing for the BMU with no matched TEC project, and one
+**Of the nine BMUs at hybrid sites (eight sites), four have a storage BMU with output at their site,
+three (at two sites) have an operational battery in REPD, and two have storage planned or under
+construction.** The operational batteries are 150 MW at Cleve Hill (linked to both BMUs, and
+registered as no BMU of its own) and 0.66 MW at Breach. Two IGCPU figures are missing for BMUs
+that IGCPU does not list, one TEC figure is missing because the TEC project of Tebworth's customer
+lists storage only, and one
 REPD figure is missing because the matched row lists no capacity.
 
 **Generation Capacity and the largest Maximum Export Limit agree within 0.5 MW for 6 of the 10 BMUs,
@@ -228,21 +239,26 @@ them, at Larks Green and Bulphan Fen; Cleve Hill has no storage BMU identified.
 
 **One BMU shows battery-like behaviour of its own.** Across the ten census BMUs, output falls below
 minus 5% of Generation Capacity in 23 half-hours. Twenty-two of them belong to Tebworth PV Power
-Park, which imported up to 35.3 MW (77% of its Generation Capacity) and exported in 4 half-hours
-when the sun was well below the horizon, even though its site has a storage BMU. The other half-hour
-is Cleve Hill Solar 1, at −22.4 MW. No other census BMU imports more than 5% of its capacity.
+Park, which imported up to 35.3 MW (77% of its Generation Capacity) on 26 and 29 January 2026, by
+day as well as by night, and exported in 4 half-hours when the sun was more than 3° below the
+horizon, even though its site has a storage BMU. The other half-hour is Cleve Hill Solar 1, at −22.4
+MW, while Cleve Hill Solar 2 exported 21.9 MW in the same half-hour, so the pair nets to −0.5 MW:
+probably an allocation of output between the two BMUs and not storage. No other census BMU imports
+more than 5% of its capacity.
 
 ### How many solar BMUs were missed
 
-**The census has a BMU for 7 of the 12 built PV projects in the TEC register.** Of the 10 built
-hybrid projects, 6 have a census BMU, 3 map only to BMUs outside the census (a storage unit, a
-combined-heat-and-power unit, and a wind-farm unit), and 1 has no BMU identified. Of the 2
-built pure PV projects, 1 has a census BMU and 1 maps to a storage BMU. Of the 6 under-construction
-projects, 1 has a census BMU and 5 have none. Nine of the ten census BMUs match a TEC project;
-Tebworth does not. **At most 1 of the 12 built projects can be a solar BMU that the census missed**,
-the one with no BMU identified, and the 4 projects that map to non-solar BMUs may have their PV
-array metered inside that unit. A project with no BMU identified either has no solar BMU, was missed
-by the classifier, or was missed by the hand mapping.
+**Every built PV project in the TEC register maps to a BMU, and 7 of the 12 map to a BMU in the
+census.** Of the 10 built hybrid projects, 6 have a census BMU and 4 map only to BMUs outside the
+census: two storage units, a combined-heat-and-power unit, and a wind-farm unit. Of the 2 built pure
+PV projects, 1 has a census BMU and 1 maps to a storage BMU, although its customer and its BMU
+contradict its plant type. Of the 6 under-construction projects, 1 has a census BMU and 5 have none.
+Nine of the ten census BMUs match a TEC project that lists PV. The tenth, Tebworth PV Power Park,
+has a customer that holds a TEC project listing storage only. **None of the 5 built projects that
+map outside the census has a separately registered solar BMU**, so the census missed no separately
+metered solar BMU at a built TEC project. The PV at those five may be metered inside the storage,
+combined-heat-and-power, or wind BMU, or may not be built, and the result depends on the hand
+mapping having found every BMU at each site.
 
 ### Aggregate BMUs
 
@@ -306,15 +322,21 @@ or an REPD row. The largest Maximum Export Limits sum to 68.0 MW, against a Gene
   types it Solar.
 - **Embedded recall is unmeasured.** Only one embedded BMU is in the census, and no list of embedded
   solar BMUs exists to check against.
-- **The matches to TEC and REPD rest on names and judgement.** 8 BMUs and 19 TEC projects were
+- **The matches to TEC and REPD rest on names and judgement.** 8 BMUs and 18 TEC projects were
   matched by hand, using lead party, customer, capacity, and connection site. A wrong match would
   change a technology label, a position, or a capacity sum. Both tables are committed in
   `studies/solar_bmu_census/`. A TEC project with PV and storage could hold a PV array that no BMU
   meters on its own.
+- **A TEC plant type can omit PV or be wrong.** Tebworth's customer holds a project that lists
+  storage only, and the Sundon Pivoted Power row lists PV only although its customer and its BMU are
+  a storage developer and a storage BMU. The recall check can therefore miss a site.
 - **The hybrid label rests on graded evidence.** Only four sites have a storage BMU with output.
   Breach's operational battery is 0.66 MW, and two sites have storage that is not yet built.
-- **Zero output at midday is read as a metering fault.** It could instead be curtailment. Removing
-  the zeros changes the single-site classes not at all and the aggregate count by 3 (27 against 24).
+- **The pure PV site may have storage nearby.** A storage project awaiting consent sits at the same
+  substation, and the study could not tie it to the site.
+- **Zero output at midday is read as an outage, curtailment, or a metering fault, and is removed.**
+  Removing the zeros changes the single-site classes not at all and the aggregate count by 3 (27
+  against 24).
 - **REPD lists some generating sites as under construction**, so the study accepts operational and
   under-construction rows.
 - **The Maximum Export Limit comes from a window after the output window.**

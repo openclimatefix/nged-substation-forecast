@@ -399,6 +399,63 @@ def storage_signature_table(*, single: pl.DataFrame, window_label: str) -> pl.Da
     )
 
 
+def pair_net_table(*, single: pl.DataFrame, window_label: str) -> pl.DataFrame:
+    """Return the net output of BMUs that share a TEC project, at the half-hours of large import.
+
+    A pair of BMUs at one site can swap output between them in settlement, so one BMU reads a large
+    import while the other reads an export of about the same size.
+
+    Args:
+        single: The census table's single-site rows, with `tec_project_id`.
+        window_label: The window's label in the file names.
+
+    Returns:
+        One row for each half-hour in which a BMU that shares its TEC project with another census
+        BMU is below minus 5% of its Generation Capacity: the BMU, its output, the other BMU's
+        output, and the net, all in megawatts.
+    """
+    rows = []
+    for project, group in single.filter(pl.col("tec_project_id").is_not_null()).group_by(
+        "tec_project_id"
+    ):
+        del project
+        if group.height < 2:
+            continue
+        series = {
+            row["elexon_bmu_id"]: pl.read_parquet(
+                OUTPUT_DIR / f"{row['elexon_bmu_id']}_{window_label}.parquet"
+            ).select("half_hour_end_time", megawatts=pl.col("output_mwh") * 2)
+            for row in group.iter_rows(named=True)
+        }
+        capacity = dict(zip(group["elexon_bmu_id"], group["generation_capacity_mw"], strict=True))
+        for bmu_id, own in series.items():
+            low = own.filter(pl.col("megawatts") < -STORAGE_SHARE * capacity[bmu_id])
+            for other_id, other in series.items():
+                if other_id == bmu_id:
+                    continue
+                joined = low.join(other, on="half_hour_end_time", suffix="_other")
+                rows.extend(
+                    {
+                        "elexon_bmu_id": bmu_id,
+                        "output_mw": round(row["megawatts"], 1),
+                        "other_bmu_id": other_id,
+                        "other_output_mw": round(row["megawatts_other"], 1),
+                        "net_mw": round(row["megawatts"] + row["megawatts_other"], 1),
+                    }
+                    for row in joined.iter_rows(named=True)
+                )
+    return pl.DataFrame(
+        rows,
+        schema={
+            "elexon_bmu_id": pl.String,
+            "output_mw": pl.Float64,
+            "other_bmu_id": pl.String,
+            "other_output_mw": pl.Float64,
+            "net_mw": pl.Float64,
+        },
+    )
+
+
 def summary_table(*, census: pl.DataFrame, window_label: str) -> pl.DataFrame:
     """Return the figures the page's prose quotes that no other table holds.
 
@@ -600,7 +657,10 @@ def main() -> None:
         + _md(hour_centres(solar_ids=solar_ids, window_label=window.label)),
         f"## TEC recall check (mapping: {provenance})\n\n"
         + _md(
-            recall.group_by("Project Status", "technology", "outcome").len().sort("Project Status")
+            recall.group_by("Project Status", "technology", "outcome")
+            .len()
+            .rename({"len": "TEC projects"})
+            .sort("Project Status")
         ),
         "## Classes by scope\n\n"
         + _md(scoped.group_by("scope", "behaviour").len().sort("scope", "behaviour")),
@@ -610,6 +670,8 @@ def main() -> None:
         + _md(cleaning_table(solar_ids=solar_ids, window=window)),
         f"## Census BMUs below -{STORAGE_SHARE * 100:.0f}% of Generation Capacity\n\n"
         + _md(storage_signature_table(single=single, window_label=window.label)),
+        "## BMUs that share a TEC project, at their half-hours of large import\n\n"
+        + _md(pair_net_table(single=single, window_label=window.label)),
         "## Generation Capacity against the largest Maximum Export Limit\n\n"
         + _md(mel_agreement_table(single=single)),
         "## Aggregate BMUs: the five lead parties with the most Generation Capacity\n\n"
