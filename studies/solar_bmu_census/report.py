@@ -43,6 +43,14 @@ from fetch_sources import (
     recorded_run,
 )
 from recall_check import recall_table
+from solar_estimate import (
+    DC_AC_RATIO,
+    SENSITIVITY_RATIOS,
+    estimate_solar_ac_capacity_mw,
+    estimate_solar_ac_capacity_with_cams_mw,
+    regional_hourly_sun,
+)
+from studies.pv_dataset import CAMS_PATH, MIN_CAMS_RELIABILITY
 from studies.solar import zenith
 
 CORRELATION_BANDS: Final[tuple[float, ...]] = (0.0, 0.3, 0.6, 0.8, 1.0)
@@ -191,6 +199,93 @@ def aggregate_capacity_table(*, aggregates: pl.DataFrame) -> pl.DataFrame:
             for column in CAPACITY_COLUMNS
         ]
     )
+
+
+def solar_estimate_table(
+    *,
+    census: pl.DataFrame,
+    scope: str,
+    window: Window,
+    only_following_the_sun: bool,
+    hourly_sun: pl.DataFrame | None,
+) -> pl.DataFrame:
+    """Estimate each BMU's solar AC capacity at each DC:AC ratio, beside its Generation Capacity.
+
+    Args:
+        census: The census table.
+        scope: `single-site` or `aggregate`.
+        window: The study window.
+        only_following_the_sun: Whether to keep only the BMUs whose output follows the sun.
+        hourly_sun: The regional CAMS shape from `regional_hourly_sun`, or None to use the cosine
+            of the solar zenith at the census reference point as the shape.
+
+    Returns:
+        One row per BMU: its Generation Capacity, its estimate in MW at each ratio in
+        `SENSITIVITY_RATIOS`, and the base-case estimate over Generation Capacity minus 1 (the
+        relative error, where the BMU's Generation Capacity is its solar capacity). A BMU with too
+        little output has no estimate.
+    """
+    rows = census.filter(pl.col("scope") == scope).sort("elexon_bmu_id")
+    if only_following_the_sun:
+        rows = rows.filter(pl.col("basis").str.contains("behaviour"))
+    records = []
+    for row in rows.iter_rows(named=True):
+        output = pl.read_parquet(OUTPUT_DIR / f"{row['elexon_bmu_id']}_{window.label}.parquet")
+        record: dict[str, Any] = {
+            "elexon_bmu_id": row["elexon_bmu_id"],
+            "generation_capacity_mw": row["generation_capacity_mw"],
+        }
+        for ratio in SENSITIVITY_RATIOS:
+            if hourly_sun is None:
+                estimate = estimate_solar_ac_capacity_mw(
+                    output=output, window_start=window.start, dc_ac_ratio=ratio
+                )
+            else:
+                estimate = estimate_solar_ac_capacity_with_cams_mw(
+                    output=output,
+                    window_start=window.start,
+                    dc_ac_ratio=ratio,
+                    hourly_sun=hourly_sun,
+                )
+            record[f"estimate_r{ratio}_mw"] = None if estimate is None else round(estimate, 1)
+        base = record[f"estimate_r{DC_AC_RATIO}_mw"]
+        capacity = row["generation_capacity_mw"]
+        record["error_at_base_ratio"] = (
+            None if base is None or not capacity else round(base / capacity - 1, 2)
+        )
+        records.append(record)
+    return pl.DataFrame(records, schema_overrides={"error_at_base_ratio": pl.Float64})
+
+
+def estimate_totals_table(*, estimates: pl.DataFrame) -> pl.DataFrame:
+    """Sum a `solar_estimate_table` over its BMUs that have an estimate.
+
+    Args:
+        estimates: The output of `solar_estimate_table`.
+
+    Returns:
+        One row: the number of BMUs, the number with an estimate, the sum of the Generation Capacity
+        of the BMUs with an estimate, the sum of the estimates at each ratio in
+        `SENSITIVITY_RATIOS`, the mean absolute relative error at the base ratio over the BMUs with
+        a Generation Capacity above zero, and the largest such error.
+    """
+    base = f"estimate_r{DC_AC_RATIO}_mw"
+    fitted = estimates.filter(pl.col(base).is_not_null())
+    errors = fitted.filter(pl.col("generation_capacity_mw") > 0)["error_at_base_ratio"].abs()
+    row: dict[str, Any] = {
+        "bmus": estimates.height,
+        "bmus with an estimate": fitted.height,
+        "generation_capacity_mw of those": round(
+            _as_float(fitted["generation_capacity_mw"].sum()), 1
+        ),
+    }
+    for ratio in SENSITIVITY_RATIOS:
+        row[f"sum of estimates, r={ratio} (MW)"] = round(
+            _as_float(fitted[f"estimate_r{ratio}_mw"].sum()), 1
+        )
+    row["mean absolute error at base ratio"] = round(_as_float(errors.mean()), 2)
+    row["largest absolute error at base ratio"] = round(_as_float(errors.max()), 2)
+    return pl.DataFrame([row])
 
 
 def observed_power_table(*, table: pl.DataFrame, window_label: str) -> pl.DataFrame:
@@ -1331,6 +1426,34 @@ def main() -> None:
     by_type = (
         single.group_by("connection_type", "technology").len().sort("connection_type", "technology")
     )
+    cams_sun = regional_hourly_sun(
+        cams=pl.read_parquet(CAMS_PATH), min_reliability=MIN_CAMS_RELIABILITY
+    )
+    shapes = {"cosine of the solar zenith": None, "CAMS irradiance": cams_sun}
+    estimates = {
+        (shape, scope): solar_estimate_table(
+            census=census,
+            scope=scope,
+            window=window,
+            only_following_the_sun=scope == "single-site",
+            hourly_sun=hourly_sun,
+        )
+        for shape, hourly_sun in shapes.items()
+        for scope in ("single-site", "aggregate")
+    }
+    estimate_sections = []
+    for (shape, scope), estimate_table in estimates.items():
+        what = (
+            "single-site BMUs that follow the sun (validation)"
+            if scope == "single-site"
+            else ("aggregate BMUs")
+        )
+        estimate_sections.append(
+            f"## Solar AC capacity estimate, shape = {shape}: {what}\n\n"
+            + _md(estimate_table)
+            + "\n\n### Totals\n\n"
+            + _md(estimate_totals_table(estimates=estimate_table))
+        )
     sections = [
         "# Solar-BMU census report",
         intro,
@@ -1374,6 +1497,19 @@ def main() -> None:
         "group's summed half-hourly output, so it never exceeds the first column. Neither column "
         "is added to a registered capacity. The aggregate BMUs have no such columns.\n\n"
         + _md(observed_power_table(table=single, window_label=window.label)),
+        (
+            "## How the solar AC capacity is estimated\n\n"
+            "Each estimate fits `min(r * a * c, a)` to the BMU's output, where `a` is the "
+            "estimate and `c` is the shape. With the cosine of the solar zenith as `c`, `a` is "
+            "fitted to the upper envelope of output (the 99th percentile in each band of `c`). "
+            "With CAMS irradiance as `c`, `a` is fitted by least squares on the half-hours with "
+            "`c` above 0.05. CAMS `c` is the mean over six solar farms in the NGED trial area of "
+            "the hour's global horizontal irradiance, applied to both half-hours inside the hour "
+            "(the hour is labelled by its end), divided by the highest clear-sky irradiance of "
+            "any hour. The relative error is the estimate at the base ratio over Generation "
+            "Capacity, minus 1."
+        ),
+        *estimate_sections,
         "## Aggregate BMUs (supplier, virtual, and other identifiers), reported apart\n\n"
         + aggregate_note
         + "\n\n"
