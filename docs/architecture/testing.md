@@ -269,9 +269,27 @@ would silently replace an `addopts` `-m "not network"` and re-include the networ
 applied during collection cannot be overridden that way — the gate holds whatever `-m` the caller
 passes, and even `-m network` alone stays skipped until `--run-network` is added.
 
+## Studies tests
+
+**The tests under `packages/studies/tests` are skipped unless the caller passes `--run-studies`.**
+They account for about 3 of the 3.5 minutes of a full run, so a plain `uv run pytest` leaves them
+out and finishes in under 30 seconds. The root `conftest.py` marks each of them `studies`
+automatically, by path, so a new studies test needs no decorator. The one exception is
+`test_study_boundaries.py`, which runs by default because it takes seconds and enforces the rule
+that production code never imports study code.
+
+```bash
+uv run pytest --run-studies                          # whole suite, studies tests included
+uv run pytest --run-studies packages/studies         # only the studies tests (add -n auto)
+```
+
+The gate is a collection hook for the same reason as the network gate above: a caller-supplied `-m`
+cannot override it. A run that names a path under `packages/studies/tests` still needs
+`--run-studies`, otherwise every test in it is reported as skipped.
+
 ## Continuous integration
 
-Two GitHub workflows in `.github/workflows/` run the checks described on this page:
+Three GitHub workflows in `.github/workflows/` run the checks described on this page:
 
 - **`ci.yml` — the per-PR quality gate.** Runs on every pull request and every push to `main`: `ruff
   check`, `ruff format --check`, `ty check`, the `pymarkdown scan` command from CLAUDE.md, `mkdocs
@@ -288,6 +306,10 @@ Two GitHub workflows in `.github/workflows/` run the checks described on this pa
   `Settings()` directly and locally rely on the developer's `.env`, which CI doesn't have. The `ci`
   job is a required status check on `main` (configured in a GitHub repository ruleset, not in the
   workflow file).
+- **`studies_tests.yml` — the studies tests.** Runs `pytest -n auto --run-studies packages/studies`
+  on every push to `main`, and on a pull request only when the pull request changes
+  `packages/studies/`, `studies/`, or `docs/studies/`. A pull request that touches none of those
+  paths still gets the studies tests on `main` after it merges.
 - **`nightly_network_tests.yml` — the nightly network job.** Runs *only* the network-gated tests
   (`uv run pytest --run-network -m network`) on a daily schedule, plus `workflow_dispatch` for
   on-demand runs. This is the only CI that touches the real Dynamical.org catalog, and it needs no

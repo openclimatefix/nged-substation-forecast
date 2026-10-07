@@ -1,6 +1,7 @@
 name: CI
 
 # Per-PR quality gate: lint, format, types, markdown, and the offline test suite.
+# The slow studies tests are skipped here too; studies_tests.yml runs them.
 # The network-gated tests are NOT run here — they run in nightly_network_tests.yml.
 # Design rationale (including why this is a bespoke workflow rather than OCF's reusable
 # branch_ci.yml template):

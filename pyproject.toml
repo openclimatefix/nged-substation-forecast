@@ -468,6 +468,7 @@ norecursedirs = [".venv", "venv", ".git", ".claude", "__pycache__"]
 markers = [
     "integration: tests that exercise real wiring (Dagster + file-based MLflow + temp Delta)",
     "network: hits the real Dynamical.org NWP catalog; skipped by default, `--run-network` to run",
+    "studies: slow tests under packages/studies/tests (marked automatically by the root conftest.py); skipped by default, `--run-studies` to run",
 ]
 
 [tool.pymarkdown]

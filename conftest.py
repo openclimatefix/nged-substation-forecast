@@ -3,6 +3,11 @@
 Gates the ``network``-marked tests behind an explicit ``--run-network`` flag so a plain ``uv run
 pytest`` — local dev and the per-PR CI — never touches the real Dynamical.org catalog.
 
+Likewise gates the ``studies``-marked tests behind ``--run-studies``: they take about 3 minutes of
+the 3.5-minute full suite. Every test under ``packages/studies/tests`` carries the marker
+automatically, except the import-boundary guard in ``test_study_boundaries.py``, which is cheap and
+protects the production code.
+
 Why a collection hook rather than ``-m "not network"`` in ``addopts``: pytest keeps only the
 *last* ``-m`` it sees, so any developer-supplied marker expression (e.g. ``-m "not
 integration"``) silently replaces an ``addopts`` ``-m "not network"`` and re-includes the network
@@ -14,6 +19,7 @@ of what ``-m`` the caller passes. Run the network tests with ``uv run pytest --r
 
 import os
 from collections.abc import Iterable
+from pathlib import Path
 
 import pytest
 
@@ -47,23 +53,39 @@ def pytest_configure(config: pytest.Config) -> None:
     os.environ["SENTRY_DSN"] = ""
 
 
+_STUDIES_TESTS_DIR = Path(__file__).parent / "packages" / "studies" / "tests"
+_UNGATED_STUDIES_TEST_FILE = "test_study_boundaries.py"
+
+
 def pytest_addoption(parser: pytest.Parser) -> None:
-    """Register the ``--run-network`` opt-in flag."""
+    """Register the ``--run-network`` and ``--run-studies`` opt-in flags."""
     parser.addoption(
         "--run-network",
         action="store_true",
         default=False,
         help="Run tests marked @pytest.mark.network (hit the real Dynamical.org NWP catalog).",
     )
+    parser.addoption(
+        "--run-studies",
+        action="store_true",
+        default=False,
+        help="Run the slow tests under packages/studies/tests (marked @pytest.mark.studies).",
+    )
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: Iterable[pytest.Item]) -> None:
-    """Skip every ``network``-marked test unless ``--run-network`` was passed."""
-    if config.getoption("--run-network"):
-        return
+    """Mark the studies tests, then skip each gated group unless its opt-in flag was passed."""
     skip_network = pytest.mark.skip(
         reason="hits the real Dynamical.org catalog; pass --run-network"
     )
+    skip_studies = pytest.mark.skip(reason="slow studies test; pass --run-studies")
     for item in items:
-        if "network" in item.keywords:
+        if (
+            item.path.is_relative_to(_STUDIES_TESTS_DIR)
+            and item.path.name != _UNGATED_STUDIES_TEST_FILE
+        ):
+            item.add_marker(pytest.mark.studies)
+        if "network" in item.keywords and not config.getoption("--run-network"):
             item.add_marker(skip_network)
+        if "studies" in item.keywords and not config.getoption("--run-studies"):
+            item.add_marker(skip_studies)
