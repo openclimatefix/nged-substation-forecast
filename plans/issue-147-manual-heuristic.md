@@ -260,7 +260,11 @@ says, until a third stateless model exists.
 **`_target_: baseline_forecasters.manual_heuristic.ManualHeuristicForecaster`, with `model_params`
 listing the 13 power-lag names in `selected_features` (`power_lag_168h` to `power_lag_1008h`, then
 `power_lag_8232h` to `power_lag_9240h`), `weather_source: "none"`, and `training_strategy:
-"none"`.** The header comment follows `conf/model/xgboost.yaml`'s, and adds that a variant overrides
+"none"`.** Each lag line carries a comment giving its age in weeks (`# 1 week` for
+`power_lag_168h`, up to `# 55 weeks` for `power_lag_9240h`), and a comment above each group names
+the group (weekly: the last 6 weeks; annual: 49 to 55 weeks back). The week counts are comments
+because a feature name must equal its engineered column name, `power_lag_<hours>h`, exactly. The
+header comment follows `conf/model/xgboost.yaml`'s, and adds that a variant overrides
 the whole list, and that only the power lags become members. The comment also says where a bad
 list fails: registration accepts both a weather feature and a list with no power lag, and both
 raise only when `trained_cv_model` runs.
