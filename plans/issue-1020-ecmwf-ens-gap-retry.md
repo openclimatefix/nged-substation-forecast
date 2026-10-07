@@ -22,7 +22,7 @@ Reviews: **both plan reviews and both diff reviews** (the degradation-rule trigg
 
 - The issue suggested "a dedicated exception raised before base validation". The plan puts the check on the raw downloaded grid and reuses `NwpRunNotYetAvailable`, with no new exception and no change to the `Nwp` contract.
 - The issue's "optional: use Dynamical's feed for diagnosis" item is left out. The issue says the feed's schema is undocumented, and the retry does not need it.
-- The issue's second comment lists "the recorded age of the weather on the forecast row" as part of the fix. That changes `PowerForecast` and `live_forecast_assets.py`, which this session may not edit, so this plan narrows the issue and proposes a separate issue.
+- The issue's second comment lists "the recorded age of the weather on the forecast row" as part of the fix. The stored rows already carry `nwp_init_time` and `power_fcst_init_time`, so the age is derivable and no contract change is needed (see open question 2). The plan narrows the issue by leaving any surfacing of the age out.
 
 ## Measurements
 
@@ -94,5 +94,5 @@ uv run pydoclint .   # and the docs-link checker, per the run-every-CI-step-loca
 ## Risks and open questions
 
 1. **Confirm: keep the partition unmaterialised after the retries run out?** Recommended, and consistent with the issue's third comment.
-2. **Separate issue: NWP age on the forecast row.** It changes `power_schemas.py` and `live_forecast_assets.py`. Recommendation: file it separately.
+2. **NWP age on the forecast row needs no contract change.** `PowerForecast` already carries `nwp_init_time` and `power_fcst_init_time`, and the forecaster copies both onto every row. In the stored `power_forecasts` table (checked on 2026-10-07: 1,339,807,383 rows, 0 null `nwp_init_time`), the age of the weather run is `power_fcst_init_time - nwp_init_time`, for example 18 hours, 1 day, or 1 day 6 hours for the slots of 2026-10-05 and 2026-10-06. The issue's second comment says the table has no column recording the age, which is true only of a stored age column. No separate issue is needed for the contract; what remains is whether the age should be surfaced (a documented query, or a dashboard column), which is outside this issue.
 3. **Detection is on the raw bounding box, not H3 cells.** A slice empty only over the H3 footprint but not the whole box would not be retried. No upstream mechanism known to us produces that, so the risk is theoretical.
