@@ -10,9 +10,7 @@ Sentry configuration:
   run nor the bare ``RetryRequested`` wrapper around an exhausted in-band retry.
   `report_check_degradation` and `report_asset_degradation` cover the production faults the hook
   cannot see, because they never fail a run: a check, or an asset, that caught its own exception
-  instead of raising. `report_asset_retry` is the early warning for an asset that is about to retry.
-  `report_asset_retry` sends the caught exception at *warning* level on the first failed attempt, so
-  the operator learns of the fault hours before the last retry fails.  The hook is used rather than
+  instead of raising. The hook is used rather than
   Sentry's ``LoggingIntegration`` log-to-event capture — which `init_sentry` explicitly disables —
   because Dagster logs a step failure without ``exc_info``, so the log-based path would yield a
   message-only event with no stack trace, *and* would fire for every ``ERROR`` log anywhere in the
@@ -20,6 +18,10 @@ Sentry configuration:
   error), swamping Sentry with events the design never intended to send. The hook is attached to the
   *scheduled* asset jobs only, so it covers the unattended production workload;
   manual/backfill/experiment runs are watched by the operator at the Dagster UI, not Sentry.
+  `report_asset_retry` is the early warning for an asset that is about to retry: it sends the caught
+  exception at *warning* level on the first failed attempt, so the operator learns of the fault
+  hours before the last retry fails. It is called from inside the asset, so it also fires in a
+  manual or backfill run.
 - **The missed-check-in alarm** — `send_forecast_checkin` sends a *success-only* heartbeat to a
   Sentry cron monitor after each live ``live_forecasts`` run. It is gated on
   ``Settings.sentry_monitor_forecasts`` (not the DSN), so a laptop with a DSN set for error

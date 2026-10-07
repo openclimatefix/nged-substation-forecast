@@ -322,8 +322,8 @@ absorbed, not a broken one. The check's `n_whole_null_h3_slices` metadata is the
 look: those are `(variable, ensemble_member, valid_time)` slices where the field arrived wholesale
 empty. A handful is not a fault and the run is kept regardless, but a count that climbs run after
 run is worth raising with Dynamical.org. Only a variable empty in *every* slice is rejected at
-ingest by `Nwp.validate`, and even then `ecmwf_ens` retries first — so the symptom of that case is a
-**missed run** at the end of a long-running job, not corrupt data.
+ingest by `Nwp.validate`, and even then `ecmwf_ens` retries first for a recent run — so the symptom
+of that case is a **missed run** at the end of a long-running job, not corrupt data.
 
 **This check is the only place a badly-degraded run is reported, and the run is already on disk by
 the time you read it.** Everything short of a wholly-empty variable lands, so

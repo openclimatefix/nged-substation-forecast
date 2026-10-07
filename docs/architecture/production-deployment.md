@@ -261,9 +261,10 @@ configured — so laptops and CI stay silent by default.
   log in the process into a Sentry event, including Dagster's own startup and ad-hoc-run logs.
   Breadcrumbs — the integration's default `level=INFO` — stay on, so log context still rides along
   with the events the senders below do send. The hook is attached to the three *scheduled* asset
-  jobs, so it covers the whole unattended production workload. Because log capture is off, failures
-  in a manual UI materialisation, a replay backfill, or an experiment job are watched by the
-  operator at the Dagster UI, not routed to Sentry.
+  jobs, so it covers the whole unattended production workload. Because log capture is off, the hook
+  does not report failures in a manual UI materialisation, a replay backfill, or an experiment job,
+  which the operator watches at the Dagster UI. The senders called from inside an asset, such as
+  `report_asset_retry`, still fire in those runs.
 
     One production fault the hook cannot see is an asset check that caught its own exception instead
     of failing the run — which, by design, is every one of them: the two standalone `@asset_check`s,

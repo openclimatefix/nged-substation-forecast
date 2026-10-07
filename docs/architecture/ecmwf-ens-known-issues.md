@@ -346,9 +346,9 @@ Dynamical.org filled a store within about 3.5 hours of publication, so waiting 4
 is days old has no evidence behind it. The limit has to exceed the age a run reaches by the last
 retry of its scheduled attempt, which is about 15 hours (the 10:30 UTC schedule plus the 4-hour
 ladder). The 36-hour limit also lets a manual re-run of the previous day's partition retry, although
-that re-run's ladder stops early, once the run passes 36 hours. A catch-up tick for a day the
-scheduler missed, or a backfill of an old partition, therefore fails at once with the original
-exception.
+that re-run's ladder stops early, once the run passes 36 hours. A catch-up tick that fires more
+than about 25 hours late, or a backfill of an old partition, therefore fails at once with the
+original exception.
 
 **When `ecmwf_ens` fails in a way it will retry, its first failed attempt sends a Sentry warning.**
 The warning carries the exception, a note naming the partition, and the `retrying_asset` tag. Sentry
