@@ -36,8 +36,10 @@ interface, the `meta.json` servability check) already exists.
 
 - **Changes what gets stored — yes.** New rows in the `power_forecasts` Delta table, a new
   saved-model format (`meta.json` only), and a new package.
-- **Touches the production serving path — no code on the serving path changes.** Serving a
-  baseline live is out of scope (decision 5). `predict` still degrades rather than raising on absent
+- **Touches the production serving path — no code on the serving path changes.** The package does
+  become a production dependency, installed in the live image by the Dockerfile's `uv sync
+  --no-dev`, though no serving code changes. Serving a baseline live is out of scope (decision 5).
+  `predict` still degrades rather than raising on absent
   input: it drops all-null rows and never raises on missing history.
 - **Touches a degradation rule — yes.** The manual heuristic is the T1.2 floor.
 - **Admits more than one defensible design — yes.** How to avoid the 51-member fan-out (a
@@ -72,8 +74,10 @@ re-runs `uv lock` after rebasing rather than resolving the lock file by hand.
    the engineer the NWP frame `load_engineering_inputs` returns, so the engineer can derive the run
    grid from that frame without any change in `defs/`. The rows match every other model's rows,
    missed NWP runs included, with one exception. `XGBoostForecaster` predicts every NWP row, even
-   one whose features are NaN, while the manual heuristic drops a row whose 13 lags are all null, so
-   for a series short of history the manual heuristic scores fewer rows (risk 4).
+   one whose features are NaN, while the manual heuristic drops a row whose 13 lags are all null
+   (test 3). A row loses all 13 lags only where the history reaches back to none of the 13
+   analogues, so a series with history missing at every analogue scores fewer rows under the manual
+   heuristic than under XGBoost.
 3. **The roadmap's "PR 1" (median and p95 collapse in `ml_core/metrics.py`) is not a prerequisite.**
    The baselines emit members only. Today's metrics score the per-run ensemble mean, and CRPS and
    the pinball losses already flow over the 13 members. The "median headline plus p95 row" the
@@ -134,13 +138,15 @@ two lazy steps:
    through unchanged.
 
 **The rows equal the distinct `(time_series_id, power_fcst_init_time, valid_time)` rows the tabular
-path produces from the full NWP frame, given contiguous member coverage and one NWP model.** The
+path produces from the full NWP frame, given overlapping member spans and one NWP model.** The
 grid, the hindcast filter (`valid_time > power_fcst_init_time`), and the cell join are the tabular
 code itself, so equality holds by construction. The two qualifiers come from the deduplication. The
-tabular path builds one grid per member, and the key-only frame builds one grid over the union of
-every member's valid times. The two grids differ only where one member's valid times leave a gap
-that another member's do not fill. With two NWP models, `nwp_model_id` stays a group key on both
-paths, so each model gives its own copy of every row. The manual heuristic would then emit each
+tabular path builds one grid per member, from that member's minimum to maximum `valid_time`, and
+the key-only frame builds one grid from the minimum to the maximum over every member. A gap inside
+one member's valid times is filled by that member's own grid, so the two paths diverge only where
+two members' spans of a run do not overlap: the key-only grid then covers the stretch between the
+two spans, and the per-member grids do not. With two NWP models, `nwp_model_id` stays a group key
+on both paths, so each model gives its own copy of every row. The manual heuristic would then emit each
 forecast twice and duplicate the `PowerForecast` primary key. The NWP table holds one model today.
 A feasibility script run during plan review confirmed the equality on a fixture of four runs, two
 members, and two cells: the key-only frame gave 4,449 rows, identical to the full-weather frame's
@@ -197,6 +203,9 @@ needs a check. A weather feature or a weather lag already makes the delegated pi
 `trained_cv_model`, because the key-only frame has no weather column, and a time or static feature
 is computed and ignored. The member order is the power-lag hours sorted ascending, so 0 to 5 are
 the weekly analogues and 6 to 12 the annual ones under the shipped YAML.
+Registration (`register_experiment_job`, `defs/jobs.py` around line 167) validates only
+`CONFIG_CLASS` and never calls `__init__`, so a config with no power lag registers cleanly and the
+`ValueError` surfaces at `trained_cv_model`, when the forecaster is first constructed.
 The 17,520 h lag cap needs no check here, because the feature parser's `Hours` type already rejects
 a longer lag.
 
@@ -252,8 +261,9 @@ says, until a third stateless model exists.
 listing the 13 power-lag names in `selected_features` (`power_lag_168h` to `power_lag_1008h`, then
 `power_lag_8232h` to `power_lag_9240h`), `weather_source: "none"`, and `training_strategy:
 "none"`.** The header comment follows `conf/model/xgboost.yaml`'s, and adds that a variant overrides
-the whole list, that only the power lags become members, and that a weather feature makes
-`trained_cv_model` raise.
+the whole list, and that only the power lags become members. The comment also says where a bad
+list fails: registration accepts both a weather feature and a list with no power lag, and both
+raise only when `trained_cv_model` runs.
 
 ### Root `pyproject.toml` and `uv.lock`
 
@@ -277,8 +287,11 @@ shortest) for `manual_heuristic`, and, from PR C, a quantile-sample index for `c
 
 - `tests/conftest.py`: the `register_experiment` fixture gains optional `base_model_config` and
   `config_overrides` arguments. Left unset, both keep today's XGBoost values, so existing callers
-  are unchanged. A caller-supplied `config_overrides` replaces the default overrides dict
-  wholesale rather than merging into it. The defaults send `selected_features: ["temperature_2m"]`
+  are unchanged. The fixture picks the defaults with `config_overrides is None`, not `or`, so a
+  caller passing `{}` sends no overrides at all. A caller-supplied `config_overrides` replaces the
+  whole default overrides dict, its `selected_features` entry included, rather than merging into
+  it. The existing `selected_features` argument only edits the default dict, so the fixture
+  raises `ValueError` when a caller passes both arguments. The defaults send `selected_features: ["temperature_2m"]`
   and `n_estimators: 5`. `BaseForecasterConfig` sets `extra="forbid"`, so it would reject
   `n_estimators`, and `ManualHeuristicForecaster.__init__` would reject `["temperature_2m"]` for
   holding no power lag.
@@ -304,9 +317,9 @@ not measure T1.2; #438 does, and needs this baseline first.
 trained_cv_model → cv_power_forecasts → metrics` chain as XGBoost (principle 3, one execution
 path), and draws its rows from the same forecast-run grid (principle 8, every experiment scored
 identically). The one difference in row sets is the all-null-lag rows the manual heuristic drops
-(risk 4). Principle 11 (push the work down to the query engine) is why the key-only frame is a
-lazy `select` and `unique` over the NWP scan: projection pushdown keeps the weather columns and
-`ensemble_member` out of the read.
+(departure 2, test 3). Principle 11 (push the work down to the query engine) is why the key-only
+frame is a lazy `select` and `unique` over the NWP scan: projection pushdown keeps the weather
+columns and `ensemble_member` out of the read.
 
 **One principle is traded, deliberately and visibly: the floor's row grid comes from the NWP
 archive.** `docs/design-philosophy/inherent-stability.md` says the manual heuristic "consumes no NWP
@@ -323,18 +336,23 @@ resolves.
 
 **`packages/baseline_forecasters/tests/test_manual_heuristic.py` (unit):**
 
-1. **Construction.** A forecaster built from the 13 shipped lag names stores the lag order `(168,
-   336, 504, 672, 840, 1008, 8232, 8400, 8568, 8736, 8904, 9072, 9240)`, and a config whose
+1. **Construction.** A forecaster built from the `selected_features` read out of
+   `conf/model/manual_heuristic.yaml` stores, as its lag order, the hours of those power lags
+   sorted ascending, and the test writes out the expected hours, 168·k for k in 1 to 6 and
+   168·k for k in 49 to 55, so a typo in the YAML fails it. A config whose
    `selected_features` is `["local_time_of_day_sin"]` raises `ValueError` for holding no power lag.
 2. **Shedding keeps member identity, through the real pipeline.** Synthetic power for one series
    over 56 weeks and an NWP fixture of one run, passed through
-   `ForecastRunGridFeatureEngineer.engineer` and `predict`: on every row `power_fcst` equals the lag
-   column whose rank is its `ensemble_member`, and `nwp_init_time` is null. At lead under 168 h the
-   members are 0 to 12; at lead in [168 h, 336 h) member 0 is absent and members 1 to 12 are
-   present with the values of lags 336 h to 9240 h; at lead in [336 h, 351 h] members 0 and 1 are
-   absent and the other 11 members are present. A mutation that indexes members by position after
-   dropping nulls fails this test. `PowerForecast.validate` inside `predict` already enforces the
-   `Int8` member dtype and the identity columns, so the test does not assert them.
+   `ForecastRunGridFeatureEngineer.engineer` and `predict`. The power runs to at least `init_time +
+   9 h`, the run's `power_fcst_init_time`, because lead is measured from `power_fcst_init_time`:
+   power ending at `init_time` would leave member 0 null at leads of 159 h to 168 h. Then: on every
+   row `power_fcst` equals the lag column whose rank is its `ensemble_member`, and `nwp_init_time`
+   is null. At lead under 168 h the members are 0 to 12; at lead in [168 h, 336 h) member 0 is
+   absent and members 1 to 12 are present with the values of lags 336 h to 9240 h; at lead in
+   [336 h, 351 h] members 0 and 1 are absent and the other 11 members are present. A mutation that
+   indexes members by position after dropping nulls fails this test. `PowerForecast.validate`
+   inside `predict` already enforces the `Int8` member dtype and the identity columns, so the test
+   does not assert them.
 3. **All-null rows.** A row whose 13 lags are all null is absent from the output, and the call does
    not raise.
 4. **Empty input.** A zero-row `AllFeatures` frame returns a zero-row frame that
@@ -344,8 +362,13 @@ resolves.
 6. **Save and load.** `load(save(...))` returns the same `trained_time_series_ids` and an equal
    config; a stale file placed in the directory before `save` is gone afterwards; and `meta.json`'s
    `model_class` equals `"baseline_forecasters.manual_heuristic.ManualHeuristicForecaster"`.
-7. **The engineer's rows equal the tabular path's, deduplicated across members.** The NWP fixture
-   holds two runs a day apart, members 0 and 1, and two H3 cells, one holding two series. Power
+7. **The engineer's rows equal the tabular path's, deduplicated across members.** This equality is
+   the property `ForecastRunGridFeatureEngineer` exists for. The NWP fixture holds two runs a day
+   apart with members 0 and 1, a third run with member 1 only and no member 0, and two H3 cells, one
+   holding two series. One run's earliest valid times are cut off, as `load_engineering_inputs`
+   clips a run initialised before the window. An engineer that filters to member 0 loses the third
+   run's rows, and an engineer that adds a 360 h horizon constant to `init_time` gains rows in the
+   clipped stretch, so both fail the equality. Power
    reaches back far enough that each of a few lags, among them one annual lag, is non-null on some
    rows. `ForecastRunGridFeatureEngineer().engineer` and `TabularFeatureEngineer().engineer` run on
    the same power, metadata, full-weather NWP, and lag features. The engineer's output has no
@@ -359,16 +382,23 @@ resolves.
 **`tests/test_manual_heuristic_cv.py` (integration, `pytestmark = pytest.mark.integration`):**
 
 - **Test 8: End to end through the real assets.** Register `conf/model/manual_heuristic.yaml`
-  through the extended fixture, passing the manual heuristic's own `config_overrides`. Write
-  synthetic power covering 56 weeks before a validation day to `power_time_series.delta`, and NWP
-  with members 0, 1, and 2. `load_engineering_inputs` reads power through `scan_cleaned_power`
+  through the extended fixture, passing `config_overrides={}` so the YAML's own `selected_features`
+  are used. Write synthetic power covering 56 weeks before a validation day to
+  `power_time_series.delta`. Write NWP as `tests/test_cv_power_forecasts.py:_write_nwp` does: a
+  member-0 run on a training day where power exists, plus a validation-day run with members 0, 1,
+  and 2. Without the training run, `trained_cv_model` trains no series and raises "Trained 0 of 1
+  eligible time series" (`defs/cv_assets.py` around line 405). Every NWP record sits in H3 cell
+  `599423199024775167`, the `h3_res_5` that `write_metadata` hard-codes, so the series joins to the
+  runs. Write the eligible-series table for the fold, as `_write_eligible` in the same test module
+  does. `load_engineering_inputs` reads power through `scan_cleaned_power`
   from `settings.cleaned_power_time_series_data_path`, which keeps only rows whose `drop_reason` is
   null. The test therefore calls `write_cleaned_copy(...)` from `tests/_cleaned_power_test_data.py`
   on the raw table with no `flag_where`, as `tests/test_cv_power_forecasts.py` does, so that every
-  synthetic reading reaches the forecaster. `write_metadata` in the same helper may write the
+  synthetic reading reaches the forecaster. `write_metadata` in the same helper writes the
   metadata parquet. Then materialise `trained_cv_model` and `cv_power_forecasts`. Assert that the
   `power_forecasts` rows carry `power_fcst_model_name == "manual_heuristic"`, members 0 to 12 at
-  short lead, values equal to the synthetic power at each lag, null `nwp_init_time`, and no row
+  short lead, values equal to the synthetic power at each lag, with the expected lags written out as 168·k
+  rather than read from the YAML's `selected_features`, null `nwp_init_time`, and no row
   duplicated across the three NWP members. The synthetic power must give each of the 13 lags a
   distinct value, and must give a lag one half-hour out a different value again, so a lag off by
   one half-hour fails. One choice is an integer power equal to the half-hour index since a fixed
@@ -415,6 +445,13 @@ Every page is written to describe the code as it now stands, with no "was previo
   sits at line 463, so the citation is stale as well.
 - **`packages/ml_core/README.md`.** Line 52, "`XGBoostForecaster` … is the only subclass outside the
   tests", becomes a present-tense sentence naming both subclasses.
+- **`docs/architecture/code-style.md`, the Machine Learning section.** Line 330,
+  "`XGBoostForecaster` is the only implementation so far", becomes a present-tense sentence naming
+  `XGBoostForecaster` and `ManualHeuristicForecaster`.
+- **`docs/roadmap/metrics-and-leaderboard.md`, line 997.** The sentence "The manual heuristic
+  consumes no NWP and is indifferent to recent telemetry staleness" gains the same qualifier as the
+  `inherent-stability.md` edit below: in cross-validation the manual heuristic's rows still follow
+  the NWP run grid.
 - **`docs/design-philosophy/inherent-stability.md`, "The manual heuristic is the floor".** The
   sentence saying the manual heuristic consumes no NWP data gains a qualifier: in cross-validation
   the manual heuristic's rows still follow the NWP run grid, so an NWP run missing from the archive
@@ -427,8 +464,9 @@ Run all of these green before every push:
 
 - `uv run ruff check .` and `uv run ruff format .`
 - `uv run --all-packages ty check`
-- `uv run pytest`, which collects `packages/baseline_forecasters/tests/` automatically because the
-  root project now depends on the package
+- `uv run pytest`, which collects `packages/baseline_forecasters/tests/` by recursing into the
+  repository's directories; the root project's dependency on the package only makes the test
+  module's imports resolve
 - `uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md`
 - `uv run --isolated --no-project --with pydoclint==0.9.1 pydoclint --quiet --style=google .`
 - `uv run --no-sync python scripts/lint/check_docs_links.py`
@@ -452,12 +490,13 @@ in the item it settles.
 1. **Daylight saving time — decided: ship UTC lags and document the caveat.** A lag of a multiple
    of 168 h is a whole number of weeks in UTC. Across a clock change, the analogue sits an hour away
    in local clock time from the target, whereas the operator's method matches local weekday and
-   time of day. By arithmetic, a weekly member straddles a clock change for the 6 weeks after each
-   change, which is roughly a quarter of target weeks; annual members straddle one only near the
-   changes. UTC lags keep the baseline on the audited lag machinery. Measure the share of member
-   values affected in the PR, and state the caveat in the package README. Local-clock alignment is
-   a follow-up alongside `manual_heuristic_holiday_aligned`, which needs a bespoke analogue picker
-   anyway.
+   time of day. By arithmetic, the weekly member at a lag of k weeks straddles a clock change for
+   the k weeks after each change, and the annual member at a lag of L weeks for about |52 − L|
+   weeks beside each change. Summed over the 6 weekly members and the 7 annual members, about one
+   member value in ten sits an hour away from the target in local clock time. UTC lags keep the
+   baseline on the audited lag machinery. Measure the share of member values affected in the PR,
+   and state the caveat in the package README. Local-clock alignment is a follow-up alongside
+   `manual_heuristic_holiday_aligned`, which needs a bespoke analogue picker anyway.
 2. **Metrics collapse — decided: its own issue under the v0.3 epic.** The roadmap's "PR 1" (median
    headline, `mae`/`mbe` at `metric_param="p95"`) has not landed, so `manual_heuristic`'s
    deterministic metrics score the 13-member mean until that issue ships. Neither blocks the other.
@@ -491,6 +530,11 @@ in the item it settles.
    longer than the lead is nulled. An operator issuing a forecast at time T has only the weeks
    before T, so for a far target the analogues 168 h and 336 h before the target fall after T and
    are unavailable to the operator too.
+10. **NWP-outage scenarios remove the floor's rows — open, for #438 to decide.** T1.2 and #438 will
+    score ML models under NWP-outage scenarios. The manual heuristic's CV rows follow the NWP run
+    grid, so a scenario that removes NWP runs also removes the manual-heuristic floor's rows for
+    the forecast slots those runs covered. #438 must therefore decide whether the floor is scored
+    on the clean run grid or on the degraded grid.
 
 ## Considered and rejected
 
@@ -602,6 +646,21 @@ in the item it settles.
     - the `power_schemas.py` description edit;
     - the all-null-rows and empty-input tests;
     - the `conftest.py` fixture change, over the optional alternative.
+- **Second correctness review (2026-10-07).** All seven findings were verified against the code and
+  accepted:
+    - test 7 gained a member-1-only run and a clipped run, so a member-0 filter or a 360 h horizon
+      constant fails it;
+    - test 8 writes a member-0 training-day NWP run and the eligible table, uses the H3 cell
+      `write_metadata` hard-codes, and, like test 1, hard-codes its expected lags (168·k) rather than
+      reading them from the YAML;
+    - added the `code-style.md` and roadmap line-997 docs edits;
+    - added risk 10, on NWP-outage scenarios removing the floor's rows;
+    - the shedding test's power runs to at least `init_time + 9 h`;
+    - the fixture picks its defaults with `is None` and rejects `selected_features` alongside
+      `config_overrides`;
+    - corrected where a no-power-lag config fails, how pytest collects the package, departure 2's
+      citation, risk 1's clock-change figure, and the member-span qualifier, and added the
+      production-dependency clause to the sizing.
 
 ## Outline of PRs B and C (each gets its own plan or approval)
 
