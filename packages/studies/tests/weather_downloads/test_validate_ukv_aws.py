@@ -2,7 +2,8 @@
 
 No test touches `data/`. Each is built to fail on the defect its check exists for: a truncated
 file read as fine, a constant field passed as data, a shifted timestamp, a radiation budget that
-does not close, and an unfinished day counted as committed.
+does not close, an unfinished day counted as committed, an absent object counted as data, and a
+ledger that contradicts its run files.
 """
 
 import datetime as dt
@@ -44,6 +45,7 @@ def _write_run(
     time_shift_s: int = 0,
     constant_temperature: bool = False,
     seed: int = 0,
+    absent: tuple[tuple[str, int], ...] = (),
 ) -> None:
     rng = np.random.default_rng(seed)
     run_time = int(
@@ -74,6 +76,10 @@ def _write_run(
     direct = arrays["radiation_flux_in_shortwave_direct_downward_at_surface"]
     diffuse = arrays["radiation_flux_in_shortwave_diffuse_downward_at_surface"]
     arrays["radiation_flux_in_shortwave_total_downward_at_surface"] = direct + diffuse + residual
+    for name, lead in absent:
+        arrays[name][lead] = np.nan
+        arrays[f"{name}__time_s"][lead] = pilot.NO_BOUNDS
+    arrays["missing"] = np.array(json.dumps([f"{lead}:{name}" for name, lead in absent]))
     np.savez_compressed(path, allow_pickle=False, **arrays)
 
 
@@ -157,3 +163,115 @@ def test_committed_days_ignores_unfinished_ledger_files(
     (ledger / "20241006.json").write_text("{}")
     (ledger / "20241007.json.partial").write_text("{}")
     assert validate.committed_days(product_dir=tmp_path) == [dt.date(2024, 10, 6)]
+
+
+DIRECT = "radiation_flux_in_shortwave_direct_downward_at_surface"
+TEMPERATURE = "temperature_at_screen_level"
+
+
+def test_an_absent_direct_object_does_not_make_the_residual_nan(
+    validate: ModuleType, pilot: ModuleType, tmp_path: Path
+) -> None:
+    path = tmp_path / f"{RUN}.npz"
+    _write_run(pilot=pilot, path=path, residual=25.0, absent=((DIRECT, 1),))
+    record = validate.summarise_run(path=path)
+    assert record["residual_mean"] == pytest.approx(25.0, rel=1e-3)
+    assert record["residual_signed_mean"] == pytest.approx(25.0, rel=1e-3)
+    assert record["daylight_values"] == 5 * ROWS * COLS
+
+
+def test_an_absent_lead_keeps_the_time_check_and_the_fetched_nan_count_clean(
+    validate: ModuleType, pilot: ModuleType, tmp_path: Path
+) -> None:
+    path = tmp_path / f"{RUN}.npz"
+    _write_run(pilot=pilot, path=path, absent=((TEMPERATURE, 0),))
+    record = validate.summarise_run(path=path)
+    assert record["time_ok"]
+    assert record["absent_objects"] == 1
+    assert record["objects"] == 47
+    assert record[f"{TEMPERATURE}__nan"] == ROWS * COLS
+    assert record[f"{TEMPERATURE}__nan_fetched"] == 0
+
+
+def test_a_nan_inside_a_fetched_lead_is_counted_as_fetched_nan(
+    validate: ModuleType, pilot: ModuleType, tmp_path: Path
+) -> None:
+    path = tmp_path / f"{RUN}.npz"
+    _write_run(pilot=pilot, path=path)
+    with np.load(path) as archive:
+        arrays = {key: archive[key] for key in archive.files}
+    arrays[TEMPERATURE][2, 0, 0] = np.nan
+    np.savez_compressed(path, allow_pickle=False, **arrays)
+    assert validate.summarise_run(path=path)[f"{TEMPERATURE}__nan_fetched"] == 1
+
+
+def _frame(validate: ModuleType, pilot: ModuleType, tmp_path: Path, specs: list[dict]) -> object:
+    import polars as pl
+
+    records = []
+    for index, spec in enumerate(specs):
+        path = tmp_path / f"20241008T{index:02d}00Z.npz"
+        _write_run(pilot=pilot, path=path, **spec)
+        records.append(validate.summarise_run(path=path))
+    return pl.DataFrame(records, infer_schema_length=None)
+
+
+def test_runs_with_an_absent_lead_0_temperature_are_not_duplicates(
+    validate: ModuleType, pilot: ModuleType, tmp_path: Path
+) -> None:
+    absent = {"absent": ((TEMPERATURE, 0),)}
+    frame = _frame(validate, pilot, tmp_path, [{"seed": 1, **absent}, {"seed": 2, **absent}])
+    findings = " ".join(validate.consistency_findings(records=frame))
+    assert "Duplicates: 0 of 0 runs" in findings
+    assert "absent (left out of the duplicate check): 2" in findings
+
+
+def test_two_runs_with_the_same_lead_0_temperature_are_named_as_duplicates(
+    validate: ModuleType, pilot: ModuleType, tmp_path: Path
+) -> None:
+    frame = _frame(validate, pilot, tmp_path, [{"seed": 1}, {"seed": 1}, {"seed": 2}])
+    findings = " ".join(validate.consistency_findings(records=frame))
+    assert "Duplicates: 2 of 3 runs" in findings
+    assert "20241008T0000Z, 20241008T0100Z" in findings
+
+
+def test_hour_of_day_profile_labels_each_lead_with_its_valid_hour(
+    validate: ModuleType, pilot: ModuleType, tmp_path: Path
+) -> None:
+    path = tmp_path / "20241008T2200Z.npz"
+    _write_run(pilot=pilot, path=path)
+    import polars as pl
+
+    frame = pl.DataFrame([validate.summarise_run(path=path)], infer_schema_length=None)
+    profile = validate.hour_of_day_profile(records=frame)
+    assert profile["valid_hour"].to_list() == [0, 1, 2, 3, 22, 23]
+
+
+def test_ledger_findings_flag_a_ledger_that_contradicts_its_run_files(
+    validate: ModuleType, pilot: ModuleType, tmp_path: Path
+) -> None:
+    import polars as pl
+
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    path = runs / f"{RUN}.npz"
+    _write_run(pilot=pilot, path=path, absent=((TEMPERATURE, 0),))
+    frame = pl.DataFrame([validate.summarise_run(path=path)], infer_schema_length=None)
+    ledger = tmp_path / "ledger"
+    ledger.mkdir()
+    (ledger / "20241008.json").write_text(json.dumps({"absent_objects": 0, "complete": True}))
+    days = [dt.date(2024, 10, 8)]
+    findings = validate.ledger_findings(
+        product_dir=tmp_path, records=frame, days=days, run_days=["20241008", "20241009"]
+    )
+    assert len(findings) == 3
+    assert "ledger says 0 absent objects, the run files record 1" in findings[0]
+    assert "says complete" in findings[1]
+    assert "20241009" in findings[2]
+    (ledger / "20241008.json").write_text(json.dumps({"absent_objects": 1, "complete": False}))
+    assert (
+        validate.ledger_findings(
+            product_dir=tmp_path, records=frame, days=days, run_days=["20241008"]
+        )
+        == []
+    )

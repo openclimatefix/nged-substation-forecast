@@ -2,7 +2,9 @@
 
 No test touches the network or `data/`. Each is built to fail on the bug it exists for: a packed
 or filled variable stored undecoded, an object key built with the wrong valid time, a crop
-rectangle with rows and columns swapped, and a listing that loops forever.
+rectangle with rows and columns swapped, a listing that loops forever, a retry rule that retries a
+fault or gives up on a transient error, a valid-time mapping that is not checked, an absent object
+stored as data, and a retried day recorded complete although its files hold gaps.
 """
 
 import datetime as dt
@@ -12,6 +14,7 @@ from pathlib import Path
 from types import ModuleType
 from xml.etree import ElementTree
 
+import h5py
 import numpy as np
 import pytest
 
@@ -214,3 +217,223 @@ def test_listing_does_not_retry_a_403(pilot: ModuleType, monkeypatch: pytest.Mon
     monkeypatch.setattr(pilot.requests, "get", fake_get)
     with pytest.raises(requests.HTTPError):
         pilot._list_page(prefix="p", delimiter=None, token=None)
+
+
+def _read_args(pilot: ModuleType) -> dict[str, object]:
+    axes = (np.arange(2.0), np.arange(2.0))
+    return {
+        "key": "k",
+        "run": "20261002T0300Z",
+        "lead": 1,
+        "rectangle": pilot.CropRectangle(0, 2, 0, 2),
+        "expected_axes": axes,
+    }
+
+
+@pytest.mark.parametrize("fault", [FileNotFoundError, ValueError])
+def test_read_object_does_not_retry_a_vanished_object_or_a_wrong_file(
+    pilot: ModuleType, monkeypatch: pytest.MonkeyPatch, fault: type[Exception]
+) -> None:
+    calls: list[int] = []
+
+    def fake_read(**_: object) -> object:
+        calls.append(1)
+        raise fault
+
+    monkeypatch.setattr(pilot, "_read_once", fake_read)
+    monkeypatch.setattr(pilot.time, "sleep", lambda _: None)
+    with pytest.raises(fault):
+        pilot.read_object(**_read_args(pilot))
+    assert len(calls) == 1
+
+
+def test_read_object_retries_a_transient_error_then_succeeds(
+    pilot: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    outcomes: list[object] = [OSError("reset"), TimeoutError(), "field"]
+    sleeps: list[float] = []
+
+    def fake_read(**_: object) -> object:
+        outcome = outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(pilot, "_read_once", fake_read)
+    monkeypatch.setattr(pilot.time, "sleep", sleeps.append)
+    assert pilot.read_object(**_read_args(pilot)) == "field"
+    assert sleeps == [5, 10]
+
+
+def test_read_object_gives_up_after_the_last_attempt(
+    pilot: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[int] = []
+
+    def fake_read(**_: object) -> object:
+        calls.append(1)
+        raise OSError
+
+    monkeypatch.setattr(pilot, "_read_once", fake_read)
+    monkeypatch.setattr(pilot.time, "sleep", lambda _: None)
+    with pytest.raises(OSError):  # noqa: PT011
+        pilot.read_object(**_read_args(pilot))
+    assert len(calls) == pilot.MAX_ATTEMPTS
+
+
+RUN_NAME = "20261002T0300Z"
+RUN_SECONDS = int(dt.datetime(2026, 10, 2, 3, tzinfo=dt.UTC).timestamp())
+
+
+def _time_file(
+    *, reference: int, period: int, valid: int, units: str = "seconds since 1970-01-01 00:00:00"
+) -> h5py.File:
+    dataset = h5py.File("memory", "w", driver="core", backing_store=False)
+    for name, value, unit in (
+        ("forecast_reference_time", reference, units),
+        ("forecast_period", period, "seconds"),
+        ("time", valid, units),
+    ):
+        variable = dataset.create_dataset(name, data=value)
+        variable.attrs["units"] = unit
+    return dataset
+
+
+def test_check_times_accepts_a_file_whose_times_match_its_name(pilot: ModuleType) -> None:
+    with _time_file(
+        reference=RUN_SECONDS, period=2 * 3600, valid=RUN_SECONDS + 2 * 3600
+    ) as dataset:
+        assert pilot._check_times(dataset=dataset, run=RUN_NAME, lead=2) == RUN_SECONDS + 7200
+
+
+@pytest.mark.parametrize(
+    ("reference", "period", "valid"),
+    [
+        (RUN_SECONDS + 3600, 7200, RUN_SECONDS + 7200),
+        (RUN_SECONDS, 3600, RUN_SECONDS + 7200),
+        (RUN_SECONDS, 7200, RUN_SECONDS + 3600),
+    ],
+)
+def test_check_times_rejects_each_time_that_differs_from_the_name(
+    pilot: ModuleType, reference: int, period: int, valid: int
+) -> None:
+    with (
+        _time_file(reference=reference, period=period, valid=valid) as dataset,
+        pytest.raises(ValueError, match="file says"),
+    ):
+        pilot._check_times(dataset=dataset, run=RUN_NAME, lead=2)
+
+
+def test_check_times_rejects_a_time_unit_that_is_not_seconds(pilot: ModuleType) -> None:
+    with (
+        _time_file(
+            reference=RUN_SECONDS,
+            period=7200,
+            valid=RUN_SECONDS + 7200,
+            units="hours since 1970-01-01",
+        ) as dataset,
+        pytest.raises(ValueError, match="is not in"),
+    ):
+        pilot._check_times(dataset=dataset, run=RUN_NAME, lead=2)
+
+
+def _field(pilot: ModuleType, *, value: float, lead: int) -> object:
+    return pilot.FieldRead(
+        values=np.full((2, 3), value, dtype=np.float32),
+        heights_m=None,
+        attributes={"units": "K"},
+        time_s=RUN_SECONDS + 3600 * lead,
+        time_bounds_s=None,
+        wire_bytes=10,
+    )
+
+
+def test_assemble_run_arrays_fills_an_absent_lead_with_nan_and_the_absent_marker(
+    pilot: ModuleType,
+) -> None:
+    name = pilot.SURFACE_FILES[0]
+    results = {
+        (name, lead): _field(pilot, value=280.0, lead=lead)
+        for lead in pilot.LEADS_HOURS
+        if lead != 2
+    }
+    arrays = pilot.assemble_run_arrays(
+        results=results, missing=[f"2:{name}"], axes=(np.arange(3.0), np.arange(2.0))
+    )
+    assert np.isnan(arrays[name][2]).all()
+    assert not np.isnan(arrays[name][[0, 1, 3, 4, 5]]).any()
+    assert arrays[f"{name}__time_s"].tolist() == [
+        RUN_SECONDS + 3600 * lead if lead != 2 else pilot.NO_BOUNDS for lead in pilot.LEADS_HOURS
+    ]
+    assert json.loads(str(arrays["missing"])) == [f"2:{name}"]
+    assert int(arrays["wire_bytes"]) == 50
+    assert pilot.SURFACE_FILES[1] not in arrays
+
+
+def _stub_fetch_run(
+    pilot: ModuleType, *, product_dir: Path, written: list[str], missing_now: list[str]
+) -> object:
+    def fake(*, run: str, missing: list[str], **_: object) -> tuple[Path, int]:
+        written.append(run)
+        runs_dir = product_dir / "runs"
+        runs_dir.mkdir(parents=True, exist_ok=True)
+        np.savez(runs_dir / f"{run}.npz", missing=np.array(json.dumps(missing_now or missing)))
+        return runs_dir / f"{run}.npz", 5
+
+    return fake
+
+
+def _day_arguments(pilot: ModuleType, *, runs: list[str]) -> dict[str, object]:
+    return {
+        "day": dt.date(2026, 10, 2),
+        "plan": {run: ([("k", 0, "n")], [], 1) for run in runs},
+        "run_hours": [3],
+        "rectangle": pilot.CropRectangle(0, 1, 0, 1),
+        "axes": (np.arange(1.0), np.arange(1.0)),
+        "pool": None,
+        "max_wire_bytes": 1e12,
+        "wire_total": 0,
+    }
+
+
+def test_a_retried_day_stays_incomplete_while_a_run_file_records_a_gap(
+    pilot: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(pilot, "PRODUCT_DIR", tmp_path)
+    written: list[str] = []
+    monkeypatch.setattr(
+        pilot,
+        "fetch_run",
+        _stub_fetch_run(pilot, product_dir=tmp_path, written=written, missing_now=[]),
+    )
+    (tmp_path / "runs").mkdir()
+    # A first pass left a run file with an absent object. The fresh listing now has every object.
+    np.savez(tmp_path / "runs" / f"{RUN_NAME}.npz", missing=np.array(json.dumps(["0:n"])))
+    pilot._fetch_day(**_day_arguments(pilot, runs=[RUN_NAME]))
+    assert written == []
+    record = json.loads(
+        pilot.ledger_path(product_dir=tmp_path, day=dt.date(2026, 10, 2)).read_text()
+    )
+    assert record["absent_objects"] == 1
+    assert record["complete"] is False
+    assert not pilot.day_is_committed(product_dir=tmp_path, day=dt.date(2026, 10, 2), run_hours=[3])
+
+
+def test_a_day_whose_run_files_hold_no_gap_is_committed_complete(
+    pilot: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(pilot, "PRODUCT_DIR", tmp_path)
+    written: list[str] = []
+    monkeypatch.setattr(
+        pilot,
+        "fetch_run",
+        _stub_fetch_run(pilot, product_dir=tmp_path, written=written, missing_now=[]),
+    )
+    pilot._fetch_day(**_day_arguments(pilot, runs=[RUN_NAME]))
+    assert written == [RUN_NAME]
+    record = json.loads(
+        pilot.ledger_path(product_dir=tmp_path, day=dt.date(2026, 10, 2)).read_text()
+    )
+    assert record["complete"] is True
+    assert record["absent_objects"] == 0
+    assert record["code_version"] == pilot.CODE_VERSION

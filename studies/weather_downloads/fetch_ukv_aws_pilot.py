@@ -1,4 +1,4 @@
-r"""Pilot download of the Met Office UKV from its AWS open-data bucket, cropped at read time.
+r"""Download of the Met Office UKV from its AWS open-data bucket, cropped at read time.
 
 One-off throwaway script for the comparison of the UKV that CEDA archives against the UKV that the
 Met Office serves live. The bucket `met-office-atmospheric-model-data` is public and anonymous, and
@@ -8,7 +8,8 @@ holds a rolling two-year window of the 2 km deterministic UKV
 **Layout.** Each hourly run has its own prefix `uk-deterministic-2km/<run>/`, and holds one NetCDF4
 (HDF5) file per variable per valid time: `<valid>-PT<lead>H00M-<variable>.nc`. Each file covers the
 whole 970 by 1042 grid on a Lambert azimuthal equal-area projection (not CEDA's national grid).
-Variables on height levels hold 56 levels in one file.
+Variables on height levels hold all their levels in one file: 33 in files before 2026-01-22
+and 56 from that day.
 
 **Cropping at read time.** The files are chunked 128 by 128 cells (one level per chunk) and
 zlib-compressed, so an HTTP range read fetches only the chunks that overlap the private trial-area
@@ -23,8 +24,8 @@ diffuse downward short-wave, and wind speed and direction at the hub heights in 
 for leads 0 to 5 of every requested run, one UTC day at a time. The default range is the first
 day with 24 runs to yesterday (UTC); `--start` and `--end` override it, and a range over `MAX_DAYS`
 is refused. One compressed `.npz` per run holds each variable as `(lead, [height,] row, column)`,
-decoded with the file's own `scale_factor`, `add_offset` and fill value, together with the file's
-units, cell methods, time value and time bounds. Each run is written to a `.partial` file and
+decoded with the file's own `scale_factor`, `add_offset`, and fill value, together with the file's
+units, cell methods, time value, and time bounds. Each run is written to a `.partial` file and
 renamed. After a day's runs are all on disk, `ledger/<day>.json` is written the same way, and a
 re-run skips every day that has a ledger entry and every run that has a file, so a restart costs
 at most one day. The output folder (`UKV-AWS`) is write-once and never touches `UKV-AWS_pilot`.
@@ -63,7 +64,7 @@ from pyproj import CRS, Transformer
 from studies.sources import NWP_DOWNLOADS_DIR
 from studies.trial_area import load_trial_area_box
 
-CODE_VERSION: Final[str] = "fetch_ukv_aws_pilot-2"
+CODE_VERSION: Final[str] = "fetch_ukv_aws_pilot-3"
 BUCKET_URL: Final[str] = "https://met-office-atmospheric-model-data.s3-eu-west-2.amazonaws.com"
 PREFIX: Final[str] = "uk-deterministic-2km/"
 REGISTRY_URL: Final[str] = "https://registry.opendata.aws/met-office-uk-deterministic/"
@@ -75,8 +76,8 @@ LEADS_HOURS: Final[tuple[int, ...]] = (0, 1, 2, 3, 4, 5)
 HUB_HEIGHTS_M: Final[tuple[float, ...]] = (50.0, 75.0, 100.0, 150.0)
 """The heights, in metres above ground, kept from the wind files on height levels.
 
-The 2024 files hold 33 levels and the 2026 files 56, and 125 m is in the 2026 files only, so the
-kept heights are the ones every file holds.
+Files before 2026-01-22 hold 33 levels and files from that day hold 56, and 125 m is in the later
+files only, so the kept heights are the ones every file holds.
 """
 
 SURFACE_FILES: Final[tuple[str, ...]] = (
@@ -98,7 +99,7 @@ RUNS_PER_DAY: Final[int] = 24
 MAX_DAYS: Final[int] = 800
 """The most days one invocation covers. The bucket holds 733 or so, so a typo is bounded."""
 DEFAULT_MAX_WIRE_GB: Final[float] = 600.0
-"""Stop once this many gigabytes have been requested in one invocation. The pilot measured 0.43 MB
+"""Stop once this many gigabytes have been requested in one invocation. At about 0.43 MB requested
 per object, so the whole window needs about 360 GB."""
 LISTING_THREADS: Final[int] = 4
 
@@ -192,6 +193,12 @@ def _list_page(*, prefix: str, delimiter: str | None, token: str | None) -> Elem
 def _next_token(*, page: ElementTree.Element) -> str | None:
     """Return the continuation token, `None` on the last page.
 
+    Args:
+        page: One parsed listing page.
+
+    Returns:
+        The token for the next page, or `None` if this is the last page.
+
     Raises:
         RuntimeError: If the page says it is truncated but gives no token, which would loop forever.
     """
@@ -211,6 +218,9 @@ def list_keys(*, prefix: str, until: str | None = None) -> dict[str, int]:
         prefix: The key prefix to list.
         until: If given, stop after the first page whose last key sorts after this key. S3 lists
             keys in order, so every key at or before `until` has been seen by then.
+
+    Returns:
+        Key to size in bytes.
     """
     sizes: dict[str, int] = {}
     token: str | None = None
@@ -256,6 +266,13 @@ def default_range(*, runs: Sequence[str], today: dt.date) -> tuple[dt.date, dt.d
 def day_range(*, start: dt.date, end: dt.date) -> list[dt.date]:
     """List every date from `start` to `end` inclusive.
 
+    Args:
+        start: The first date.
+        end: The last date.
+
+    Returns:
+        The dates in order.
+
     Raises:
         ValueError: If `end` is before `start`, or the range is longer than `MAX_DAYS`.
     """
@@ -297,9 +314,10 @@ def commit_day(*, product_dir: Path, day: dt.date, record: Mapping[str, Any]) ->
 def day_is_committed(*, product_dir: Path, day: dt.date, run_hours: Sequence[int]) -> bool:
     """Whether the ledger says the day is complete for every requested run hour.
 
-    A day with a missing run or absent object is committed with `complete` false and is retried. A
-    day fetched for a subset of hours covers only those hours. A record without these keys was
-    written for all 24 hours and counts as complete.
+    A day with a missing run or an absent object is committed with `complete` false and is retried.
+    A day fetched for a subset of hours covers only those hours. A record without `complete` and
+    `run_hours` is a legacy record, written for all 24 hours: it counts as complete even where its
+    `absent_objects` is above 0, because a retry cannot repair a write-once run file anyway.
     """
     path = ledger_path(product_dir=product_dir, day=day)
     if not path.exists():
@@ -421,6 +439,12 @@ def _open(*, key: str) -> Iterator[tuple[h5py.File, Any]]:
 def _check_axes(*, dataset: h5py.File) -> tuple[np.ndarray, np.ndarray]:
     """Read both axes, and check their lengths and that each is strictly monotonic.
 
+    Args:
+        dataset: The open HDF5 file.
+
+    Returns:
+        The `x` and `y` axes in metres.
+
     Raises:
         ValueError: If an axis has the wrong length or is not strictly monotonic.
     """
@@ -491,6 +515,10 @@ def _grid_crs(*, dataset: h5py.File) -> CRS:
 def load_or_make_rectangle(*, first_key: str, write: bool) -> tuple[CropRectangle, str]:
     """Read the saved rectangle, or compute it from one file's axes and save it if `write`.
 
+    Args:
+        first_key: The key of the file whose axes and projection are read.
+        write: Whether to save a newly computed rectangle to `_crop_rectangle.json`.
+
     Returns:
         The rectangle, and the grid's PROJ string (public: the whole-domain projection).
     """
@@ -512,6 +540,11 @@ def load_or_make_rectangle(*, first_key: str, write: bool) -> tuple[CropRectangl
 
 def _check_times(*, dataset: h5py.File, run: str, lead: int) -> int:
     """Check that the file's own reference time, period, and time match its name.
+
+    Args:
+        dataset: The open HDF5 file.
+        run: The run prefix the key belongs to.
+        lead: The lead in hours that the key's name states.
 
     Returns:
         The file's `time` in seconds since 1970-01-01 UTC.
@@ -680,6 +713,14 @@ def fetch_run(
     object is checked against them, so a file on a different grid raises instead of being cropped
     at the wrong place.
 
+    Args:
+        run: The run prefix, such as `20261002T0300Z`.
+        found: The `(key, lead, file name)` triples to fetch.
+        missing: The `lead:file name` entries absent from the listing.
+        rectangle: The crop rectangle.
+        axes: The cropped axes that every object is checked against.
+        pool: The process pool that reads the objects.
+
     Returns:
         The path written and the bytes requested from the bucket for this run.
     """
@@ -738,37 +779,53 @@ def _summarise_folder() -> dict[str, Any]:
     return {"runs": runs, "attributes": attributes, "missing": missing, "wire_bytes": wire_bytes}
 
 
-GOTCHAS: Final[tuple[str, ...]] = (
-    (
-        "The grid is a Lambert azimuthal equal-area grid (GRS80, latitude of origin 54.9, "
-        "longitude of origin -2.5), not CEDA's national grid."
-    ),
-    (
-        "Row 0 is the southernmost row: `projection_y_coordinate` increases with the row "
-        "index. CEDA's rows run north to south."
-    ),
-    (
-        "Every field is an instantaneous value at its valid time, shortwave included. No file"
-        " carries `cell_methods` or time bounds for any kept variable, so that rests on the "
-        "absence of bounds."
-    ),
-    (
-        "The wind files on height levels hold 33 levels in 2024 and 56 in 2026, and 125 m "
-        "exists only in 2026. The kept heights, 50, 75, 100, and 150 m, are in every file "
-        "checked."
-    ),
-    (
-        "In the two pilot days, total shortwave equalled direct plus diffuse to rounding on "
-        "2026-10-05 but not on 2024-10-08, where the daytime mean absolute residual was 8 to "
-        "42 W m-2 per run hour. Check the residual month by month before relying on the three"
-        " components in 2024."
-    ),
-    (
-        "The files hold no `scale_factor`, `add_offset` or fill value in the pilot days; the "
-        "script decodes them if present."
-    ),
-    ("The bucket is a rolling two-year window, so an early day can no longer be fetched later."),
+_PACKING_ATTRIBUTES: Final[tuple[str, ...]] = (
+    "scale_factor",
+    "add_offset",
+    "_FillValue",
+    "missing_value",
 )
+
+
+def build_gotchas(*, attributes: Mapping[str, Mapping[str, str]]) -> list[str]:
+    """The README's gotchas, with every statement about the files computed from their attributes."""
+    with_cell_methods = sorted(name for name, kept in attributes.items() if "cell_methods" in kept)
+    packed = sorted(
+        name for name, kept in attributes.items() if any(key in kept for key in _PACKING_ATTRIBUTES)
+    )
+    cell_methods_line = (
+        "No variable carries `cell_methods`, and the files carry no time bounds, so the "
+        "instantaneous reading of every field, shortwave included, rests on the absence of bounds."
+        if not with_cell_methods
+        else f"`cell_methods` is present on {', '.join(with_cell_methods)}; read it before "
+        "treating those fields as instantaneous."
+    )
+    packing_line = (
+        "No variable holds `scale_factor`, `add_offset`, or a fill value; the script decodes them "
+        "if present."
+        if not packed
+        else f"{', '.join(packed)} hold packing attributes, which the script decodes."
+    )
+    return [
+        (
+            "The grid is a Lambert azimuthal equal-area grid (GRS80, latitude of origin 54.9, "
+            "longitude of origin -2.5), not CEDA's national grid."
+        ),
+        (
+            "Row 0 is the southernmost row: `projection_y_coordinate` increases with the row "
+            "index. CEDA's rows run north to south."
+        ),
+        cell_methods_line,
+        (
+            "The wind files on height levels hold more levels from some date on, and the read "
+            "raises if a kept height is missing, so every run file holds the kept heights. The "
+            "level counts and the radiation budget (total minus direct minus diffuse) by month and "
+            "by day are in the validation report that `validate_ukv_aws.py` writes. Read it "
+            "before relying on the three shortwave components."
+        ),
+        packing_line,
+        "The bucket is a rolling two-year window, so an early day can no longer be fetched later.",
+    ]
 
 
 def write_notes(*, summary: Mapping[str, Any]) -> None:
@@ -802,7 +859,7 @@ def write_notes(*, summary: Mapping[str, Any]) -> None:
         "height_m": "Height above ground in metres of axis 1 of the height-level fields",
         "<variable>__time_s": "The file's valid time per lead, seconds since 1970-01-01 UTC",
         "<variable>__time_bounds_s": "Time bounds per lead, same unit; int64 minimum if none",
-        "<variable>__attributes": "JSON of the file's units, cell methods and packing attributes",
+        "<variable>__attributes": "JSON of the file's units, cell methods, and packing attributes",
         "missing": "JSON list of 'lead:variable' objects absent from the bucket listing",
         "wire_bytes": "Bytes requested from the bucket to build this run's file",
     }
@@ -816,7 +873,7 @@ def write_notes(*, summary: Mapping[str, Any]) -> None:
             "NaN where the file holds a fill value or where an object was absent from the listing "
             "(the run file's `missing` entry names it); a variable absent at every lead is not kept"
         ),
-        gotchas=list(GOTCHAS),
+        gotchas=build_gotchas(attributes=summary["attributes"]),
         external_docs={"AWS registry entry": REGISTRY_URL},
         lineage_filenames=["lineage.json"],
     )
@@ -844,6 +901,12 @@ def read_cropped_axes(*, key: str, rectangle: CropRectangle) -> tuple[np.ndarray
     )
 
 
+def run_files_missing(*, run: str) -> list[str]:
+    """The `lead:file name` objects that the run file on disk records as absent from the bucket."""
+    with np.load(PRODUCT_DIR / "runs" / f"{run}.npz", allow_pickle=False) as archive:
+        return json.loads(str(archive["missing"]))
+
+
 def _fetch_day(
     *,
     day: dt.date,
@@ -856,6 +919,21 @@ def _fetch_day(
     wire_total: int,
 ) -> int:
     """Fetch every run of one day that is not on disk, then commit the day to the ledger.
+
+    A run file that exists is never fetched again, so an object that was absent when the file was
+    written stays NaN in it even if the bucket has since published the object. The ledger therefore
+    counts absent objects from the `missing` entries of the run files on disk, not from the fresh
+    listing, so a day whose files hold gaps stays `complete` false.
+
+    Args:
+        day: The UTC day.
+        plan: Each run of the day with its planned objects.
+        run_hours: The run hours requested, recorded in the ledger.
+        rectangle: The crop rectangle.
+        axes: The cropped axes that every object is checked against.
+        pool: The process pool that reads the objects.
+        max_wire_bytes: Stop before a run once the invocation's requested bytes exceed this.
+        wire_total: Bytes requested by earlier days of this invocation.
 
     Returns:
         The bytes requested for this day.
@@ -871,7 +949,7 @@ def _fetch_day(
             run=run, found=found, missing=missing, rectangle=rectangle, axes=axes, pool=pool
         )
         day_bytes += run_bytes
-    absent = sum(len(missing) for _, missing, _ in plan.values())
+    absent = sum(len(run_files_missing(run=run)) for run in plan)
     commit_day(
         product_dir=PRODUCT_DIR,
         day=day,
@@ -943,7 +1021,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                     wire_total=wire_total,
                 )
                 wire_total += day_bytes
-                absent = sum(len(missing) for _, missing, _ in plan.values())
+                absent = sum(len(run_files_missing(run=run)) for run in plan)
                 print(
                     f"{day}: day {number}/{len(runs_by_day)}, {len(plan)} runs, "
                     f"{absent} absent objects, {day_bytes / 1e6:.0f} MB, "
