@@ -164,7 +164,9 @@ def remove_small_files_from_listing(
     log.info(
         f"Files retained after the size filter: {filtered.height} out of {n_files_before_filter=}"
     )
-    return filtered
+    # An eager `filter` returns a plain frame, so re-attach the Patito model the return type
+    # promises.
+    return pt.DataFrame(filtered).set_model(_ProcessedFileListing)
 
 
 class NoNewData(Exception):

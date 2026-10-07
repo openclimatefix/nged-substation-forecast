@@ -380,9 +380,12 @@ class BaseForecaster(ABC):
             self.save(model_dir)
             write_trained_metadata(
                 model_dir=model_dir,
-                time_series_metadata=time_series_metadata.filter(
-                    pl.col("time_series_id").is_in(self.trained_time_series_ids)
-                ),
+                # An eager `filter` returns a plain frame, so re-attach the Patito model.
+                time_series_metadata=pt.DataFrame(
+                    time_series_metadata.filter(
+                        pl.col("time_series_id").is_in(self.trained_time_series_ids)
+                    )
+                ).set_model(TimeSeriesMetadata),
             )
             archive_path = Path(tmp_dir) / _MLFLOW_MODEL_ARTIFACT
             _archive_model_dir(model_dir, archive_path)
