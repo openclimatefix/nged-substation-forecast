@@ -7,13 +7,12 @@ zenith angle (clipped at zero below the horizon) at one central point in Great B
 """
 
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, Final, Literal
 
 import numpy as np
 import polars as pl
 from fetch_sources import (
-    INPUTS_DIR,
     OUTPUT_DIR,
     STUDY_DIR,
     b1610_bmu_ids,
@@ -43,6 +42,17 @@ COMMISSIONING_SKIP: Final[timedelta] = timedelta(days=30)
 A site often commissions in stages over a few weeks, so its output in that month follows the sun
 badly or only partly, whatever the site is.
 """
+RUNNING_AT_START: Final[timedelta] = timedelta(days=7)
+"""A BMU whose first positive output falls this soon after the window starts was already running,
+so its first month is not a commissioning month and stays in the analysis."""
+POSITIVE_FLOOR_MWH: Final[float] = 0.01
+"""Output at or below this many megawatt-hours in a half-hour is meter noise, not generation.
+
+A unit that never generates still publishes readings of a few thousandths of a megawatt-hour.
+"""
+SINGLE_SITE_PREFIXES: Final[tuple[str, ...]] = ("T_", "E_", "M_")
+"""A BMU with one of these prefixes is one generating site. `2_` (supplier), `V_`, and `C_` BMUs
+can aggregate many sites."""
 DAYLIGHT_COS_ZENITH: Final[float] = 0.1
 """The sun is clearly up when the cosine of its zenith angle exceeds this (a zenith of about 84°).
 
@@ -65,16 +75,18 @@ class Behaviour:
     behaviour: BehaviourType
 
 
-def analysis_series(*, output: pl.DataFrame) -> pl.DataFrame:
+def analysis_series(*, output: pl.DataFrame, window_start: datetime) -> pl.DataFrame:
     """Return the half-hours the classifier judges, with the sun's height at each.
 
-    The series starts `COMMISSIONING_SKIP` after the first positive output. B1610 publishes no row
-    for a unit before it begins generating, and a site commissions in stages over its first weeks,
-    so months of silence before the first output would dilute the correlation of a unit that
-    follows the sun closely once running, and a half-built site follows it badly.
+    A BMU already running when the window opens is judged on every half-hour. Any other BMU is
+    judged from `COMMISSIONING_SKIP` after its first positive output. B1610 publishes no row for a
+    unit before it begins generating, and a site commissions in stages over its first weeks, so
+    months of silence before the first output would dilute the correlation of a unit that follows
+    the sun closely once running, and a half-built site follows it badly.
 
     Args:
         output: Columns `half_hour_end_time` (UTC) and `output_mwh`.
+        window_start: The start of the study window, in UTC.
 
     Returns:
         Columns `half_hour_end_time`, `output_mwh`, and `cos_zenith` (the cosine of the solar zenith
@@ -82,11 +94,16 @@ def analysis_series(*, output: pl.DataFrame) -> pl.DataFrame:
         when the BMU never has positive output.
     """
     ordered = output.sort("half_hour_end_time")
-    positive_times = ordered.filter(pl.col("output_mwh") > 0)["half_hour_end_time"]
+    positive_times = ordered.filter(pl.col("output_mwh") > POSITIVE_FLOOR_MWH)["half_hour_end_time"]
     if positive_times.is_empty():
         return ordered.clear().with_columns(cos_zenith=pl.lit(None, dtype=pl.Float64))
-    start = positive_times.dt.offset_by(f"{COMMISSIONING_SKIP.days}d").min()
-    series = ordered.filter(pl.col("half_hour_end_time") >= start)
+    first_positive = positive_times.min()
+    if not isinstance(first_positive, datetime):
+        raise TypeError("The half-hour end times must be datetimes")
+    if first_positive < window_start + RUNNING_AT_START:
+        series = ordered
+    else:
+        series = ordered.filter(pl.col("half_hour_end_time") >= first_positive + COMMISSIONING_SKIP)
     midpoints = series["half_hour_end_time"].dt.offset_by("-15m")
     sun = cos_zenith(
         zenith_deg=zenith(
@@ -135,22 +152,23 @@ def sun_following_correlation(*, series: pl.DataFrame) -> float | None:
     return float(np.corrcoef(values, sun)[0, 1])
 
 
-def classify_behaviour(*, output: pl.DataFrame) -> Behaviour:
+def classify_behaviour(*, output: pl.DataFrame, window_start: datetime) -> Behaviour:
     """Classify a BMU by its output alone.
 
     The rules apply in order. `no_output` comes first, because a constant series has no defined
-    correlation and a NaN would otherwise compare as greater than the threshold.
+    correlation.
 
     Args:
         output: Columns `half_hour_end_time` (UTC) and `output_mwh`.
+        window_start: The start of the study window, in UTC.
 
     Returns:
         The correlation, the number of positive half-hours after the commissioning month, and the
         class.
     """
-    series = analysis_series(output=output)
+    series = analysis_series(output=output, window_start=window_start)
     cleaned = drop_daytime_zeros(series=series)
-    positive_half_hours = int((cleaned["output_mwh"] > 0).sum())
+    positive_half_hours = int((cleaned["output_mwh"] > POSITIVE_FLOOR_MWH).sum())
     correlation = sun_following_correlation(series=cleaned)
     raw_correlation = sun_following_correlation(series=series)
     if positive_half_hours < MIN_POSITIVE_HALF_HOURS or correlation is None:
@@ -179,11 +197,11 @@ def classify_all() -> pl.DataFrame:
     that window is missing raises, because an empty frame would class it `no_output` silently.
 
     Returns:
-        Columns: `elexon_bmu_id`, `correlation` (daytime zeros removed), `raw_correlation` (not
-        removed), `positive_half_hours` (after the commissioning month), `half_hours` (in the whole
-        window), `behaviour`, `igcpu_solar`, `is_solar` (behaviour solar or IGCPU Solar), and
-        `basis`, a string saying
-        which of the two put the BMU in the census.
+        Columns: `elexon_bmu_id`, `scope` (`single-site` or `aggregate`), `correlation` (daytime
+        zeros removed), `raw_correlation` (not removed), `positive_half_hours` (in the judged
+        series), `half_hours` (in the whole window), `behaviour`, `igcpu_solar`, `is_solar`
+        (behaviour solar or IGCPU Solar), and `basis`, which says what put the BMU in the census:
+        `type and behaviour`, `type only`, `behaviour only`, or `neither`.
     """
     today, window = recorded_run()
     reference = fetch_bmu_reference()
@@ -198,12 +216,13 @@ def classify_all() -> pl.DataFrame:
             raise FileNotFoundError(f"No B1610 file for {bmu_id} in window {window.label}")
         else:
             output = _empty_output()
-        result = classify_behaviour(output=output)
+        result = classify_behaviour(output=output, window_start=window.start)
         by_type = bmu_id in igcpu_ids
         by_behaviour = result.behaviour == "solar"
         rows.append(
             {
                 "elexon_bmu_id": bmu_id,
+                "scope": "single-site" if bmu_id.startswith(SINGLE_SITE_PREFIXES) else "aggregate",
                 "correlation": result.correlation,
                 "raw_correlation": result.raw_correlation,
                 "positive_half_hours": result.positive_half_hours,
@@ -238,13 +257,12 @@ def census_basis(*, by_type: bool, by_behaviour: bool) -> str:
 
 
 def main() -> None:
-    """Classify every BMU and write `classes.parquet` and a private listing."""
+    """Classify every BMU and write `classes.parquet`."""
     classes = classify_all()
     STUDY_DIR.mkdir(parents=True, exist_ok=True)
     classes.write_parquet(STUDY_DIR / "classes.parquet")
-    classes.write_csv(STUDY_DIR / "classes.csv")
     print(classes["basis"].value_counts().sort("basis"))
-    print(f"Wrote {INPUTS_DIR.parent / 'classes.parquet'}")
+    print(f"Wrote {STUDY_DIR / 'classes.parquet'}")
 
 
 if __name__ == "__main__":

@@ -15,7 +15,6 @@ import plotting.ocf_theme as ocf
 import polars as pl
 from classify import SOLAR_CORRELATION_THRESHOLD
 from fetch_sources import OUTPUT_DIR, STUDY_DIR, fetch_bmu_reference, recorded_run
-from recall_check import REVIEWED_PATH
 from studies.charts import CONTENT_WIDTH_PX, figure
 
 ASSETS_DIR: Final[Path] = Path("docs/studies/assets")
@@ -51,40 +50,23 @@ ZOOM_HEIGHT_PX: Final[int] = 460
 ZOOM_CENTRE_LONGITUDE: Final[float] = -0.7
 ZOOM_CENTRE_LATITUDE: Final[float] = 52.1
 SCOTLAND_LATITUDE: Final[float] = 55.5
-EXAMPLE_HYBRID_COUNT: Final[int] = 3
 
 
-def storage_bmu_at(*, site_bmu_id: str, census: pl.DataFrame, solar_ids: set[str]) -> str | None:
-    """Return the storage BMU at the same site as a solar BMU, from the reviewed TEC mapping.
+def storage_bmu_at(*, site_bmu_id: str, census: pl.DataFrame) -> str | None:
+    """Return the storage BMU at the same site as a solar BMU, if it has output in both weeks.
 
     Args:
         site_bmu_id: A solar BMU.
-        census: The census table, which holds the BMU's matched TEC project.
-        solar_ids: Every BMU in the census.
+        census: The census table, whose `storage_bmu_ids` column holds the site's storage BMUs.
 
     Returns:
-        The first BMU of the same TEC project that is not in the census and has output in the
-        window, which is the site's storage unit. None if the site has none.
+        The first storage BMU of the site with output in both example weeks, or None.
     """
-    project = census.filter(pl.col("elexon_bmu_id") == site_bmu_id)["tec_project_id"][0]
-    mapping = pl.read_csv(REVIEWED_PATH, infer_schema_length=0)
-    row = (
-        mapping.filter(pl.col("project_id") == project) if project is not None else mapping.clear()
-    )
-    if row.is_empty():
-        return None
-    mapped = [bmu for bmu in str(row["bmu_ids"][0] or "").split(";") if bmu]
-    _, window = recorded_run()
-    others = [
-        bmu
-        for bmu in mapped
-        if bmu not in solar_ids
-        and pl.scan_parquet(OUTPUT_DIR / f"{bmu}_{window.label}.parquet")
-        .select(pl.len())
-        .collect()
-        .item()
-    ]
-    return others[0] if others else None
+    ids = census.filter(pl.col("elexon_bmu_id") == site_bmu_id)["storage_bmu_ids"][0] or ""
+    for bmu in [bmu for bmu in ids.split(";") if bmu]:
+        if all(week_series(bmu_id=bmu, week_start=start).height > 0 for start in WEEKS.values()):
+            return bmu
+    return None
 
 
 def choose_examples(*, census: pl.DataFrame) -> list[tuple[str, str]]:
@@ -100,19 +82,18 @@ def choose_examples(*, census: pl.DataFrame) -> list[tuple[str, str]]:
     Returns:
         `(bmu_id, kind)` pairs in the order the figure draws them.
     """
-    solar_ids = set(census["elexon_bmu_id"])
     following = census.filter(
         (pl.col("scope") == "single-site") & pl.col("basis").str.contains("behaviour")
     ).sort("correlation", descending=True)
     pure = following.filter(pl.col("technology") == "pure PV")["elexon_bmu_id"].to_list()
     hybrid = following.filter(pl.col("technology") == "hybrid")["elexon_bmu_id"].to_list()
     middle = len(hybrid) // 2
-    picks = sorted({0, middle, len(hybrid) - 1})[:EXAMPLE_HYBRID_COUNT] if hybrid else []
+    picks = sorted({0, middle, len(hybrid) - 1}) if hybrid else []
     chosen_hybrid = [hybrid[i] for i in picks]
     examples = [(bmu_id, "pure PV") for bmu_id in pure]
     for bmu_id in chosen_hybrid:
         examples.append((bmu_id, "hybrid-site solar"))
-        storage = storage_bmu_at(site_bmu_id=bmu_id, census=census, solar_ids=solar_ids)
+        storage = storage_bmu_at(site_bmu_id=bmu_id, census=census)
         if storage is not None:
             examples.append((storage, "storage"))
     return examples
@@ -200,7 +181,7 @@ def example_week_figure(
         panels=panels,
         number=number,
         title=(
-            f"Solar BMUs at hybrid sites follow the sun like pure PV BMUs in the {season} week; "
+            f"Solar BMUs at hybrid sites follow the sun like the pure PV BMU in the {season} week; "
             "storage BMUs do not"
         ),
         subtitle=[
@@ -218,7 +199,7 @@ def example_week_figure(
 def correlation_figure(*, correlations: pl.DataFrame, number: int) -> alt.VConcatChart:
     """Draw the histogram of each single-site BMU's correlation with the sun, threshold marked."""
     frame = correlations.filter(
-        pl.col("scope") == "single-site", pl.col("correlation").is_not_null()
+        pl.col("scope") == "single-site", pl.col("behaviour") != "no_output"
     ).with_columns(
         census=pl.when(pl.col("behaviour") == "solar")
         .then(pl.lit("Follows the sun"))
@@ -261,7 +242,7 @@ def correlation_figure(*, correlations: pl.DataFrame, number: int) -> alt.VConca
         title="A wide gap separates single-site BMUs whose output follows the sun from the rest",
         subtitle=[
             (
-                "One count per BMU with a T_, E_, or M_ identifier and a defined correlation: "
+                "One count per BMU with a T_, E_, or M_ identifier and enough output to judge: "
                 f"{frame.height} in all."
             ),
             f"Dashed line: the threshold of {SOLAR_CORRELATION_THRESHOLD}.",
@@ -408,7 +389,7 @@ def map_figure(*, census: pl.DataFrame, number: int) -> alt.VConcatChart:
 def main() -> None:
     """Write every chart as an SVG under `docs/studies/assets/`."""
     census = pl.read_parquet(STUDY_DIR / "solar_bmus.parquet")
-    correlations = pl.read_parquet(STUDY_DIR / "correlations.parquet")
+    correlations = pl.read_parquet(STUDY_DIR / "classes.parquet")
     examples = choose_examples(census=census)
     charts = {
         "solar_bmu_census_correlation": correlation_figure(correlations=correlations, number=1),

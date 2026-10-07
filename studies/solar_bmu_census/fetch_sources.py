@@ -186,7 +186,7 @@ def fetch_tec() -> pl.DataFrame:
         pattern=r"https://api\.neso\.energy/[^\"' <]*/tec-register[^\"' <]*\.csv",
     )
     body = cached_text(name="tec_register", url=link)
-    return pl.read_csv(body.lstrip("﻿").encode("utf-8"), infer_schema_length=0)
+    return pl.read_csv(body.lstrip(BYTE_ORDER_MARK).encode("utf-8"), infer_schema_length=0)
 
 
 def fetch_repd() -> pl.DataFrame:

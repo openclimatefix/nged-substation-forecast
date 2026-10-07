@@ -63,18 +63,15 @@ def test_connection_type_follows_the_prefix() -> None:
 
 
 def test_a_project_with_a_later_stage_keeps_its_built_row() -> None:
-    """A later stage's cumulative capacity includes capacity not yet built."""
+    """A later stage's cumulative capacity includes capacity not yet built, in either row order."""
     tec = pl.DataFrame(
         {
-            "Project ID": ["a", "a", "b"],
-            "Project Name": ["Farm", "Farm", "Other"],
-            "Plant Type": ["PV Array (Photo Voltaic/solar)"] * 3,
-            "Project Status": ["Built", "Consents Approved", "Built"],
-            "Cumulative Total Capacity (MW)": ["99.4", "120", "50"],
+            "Project ID": ["a", "a", "b", "b"],
+            "Project Name": ["Farm", "Farm", "Other", "Other"],
+            "Plant Type": ["PV Array (Photo Voltaic/solar)"] * 4,
+            "Project Status": ["Built", "Consents Approved", "Consents Approved", "Built"],
+            "Cumulative Total Capacity (MW)": ["99.4", "120", "70", "50"],
         }
     )
-    rows = collate.best_tec_rows(tec=tec)
-    assert rows.height == 2
-    assert rows.filter(pl.col("Project ID") == "a")["Cumulative Total Capacity (MW)"].to_list() == [
-        "99.4"
-    ]
+    rows = collate.best_tec_rows(tec=tec).sort("Project ID")
+    assert rows["Cumulative Total Capacity (MW)"].to_list() == ["99.4", "50"]

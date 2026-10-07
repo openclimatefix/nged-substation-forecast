@@ -30,10 +30,11 @@ The code is run in this order, and each script reads what the one before it wrot
 - `largest_mel_mw`: the largest Maximum Export Limit in the 30 days before the run, in megawatts.
 - `repd_installed_capacity_mw`: the installed capacity of the matched REPD row, in megawatts.
 
-## Private files
+## Hand-made tables
 
-**Three hand-made tables in `data/studies/_private/` name generators and are never published.** The
-BMU-to-project matches (`solar_bmu_census_site_matches_reviewed.csv`), the TEC-project-to-BMU mapping
-(`solar_bmu_census_tec_mapping_reviewed.csv`), and the list of BMUs behind each example label
-(`solar_bmu_census_examples.json`). `collate.py` and `recall_check.py` read the first two, and a
-rerun without them falls back to name matching alone.
+**Two hand-made tables sit beside the scripts, because the study matches projects to BMUs by
+judgement where names differ.** `site_matches_reviewed.csv` gives, for each census BMU whose Elexon
+name does not resemble its project's name, the matched TEC project, the matched REPD row, the
+separately registered storage BMUs at the site, and the evidence for the match.
+`tec_mapping_reviewed.csv` gives, for each TEC project that lists PV, the BMUs that belong to it, or
+none. `collate.py` reads the first and `recall_check.py` the second.

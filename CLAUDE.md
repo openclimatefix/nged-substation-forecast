@@ -491,9 +491,9 @@ ID.** A single site's output can be commercially sensitive, so NGED has asked th
 data leaves the project only anonymised. The rule covers everything outside the private data store:
 charts and examples in `docs/`, leaderboard rows, dashboards, reports, papers, and issue or PR
 bodies. Substations are not covered by this rule, and a generator's name may still appear in a
-lookup table that carries no time series. **The rule does not cover generators whose data is
-already public**, such as the Balancing Mechanism Units in Elexon's published data, which a study
-may name and show in megawatts on calendar dates.
+lookup table that carries no time series. **The rule does not cover time series taken from public
+sources**, such as the settled output of Balancing Mechanism Units in Elexon's published data, which
+a study may show with names, in megawatts, on calendar dates.
 
 **Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an adversarial
 pass by the time a human is asked to review the diff, so that human review is the last line of

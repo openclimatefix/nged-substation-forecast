@@ -517,7 +517,7 @@ contradiction is the signal.
 ## Anonymisation
 
 **Never publish the time series of one of NGED's metered generators with its name or identifier**
-(`CLAUDE.md`). **The rule does not cover generators whose data is already public.** A study that
+(`CLAUDE.md`). **The rule does not cover time series taken from public sources.** A study that
 uses only public data, such as Elexon's BMU register and settled output, NESO's TEC register, and
 the Renewable Energy Planning Database, may name the units and show output in megawatts on calendar
 dates, as the solar-BMU census does. A study that mixes the two kinds of generator anonymises the

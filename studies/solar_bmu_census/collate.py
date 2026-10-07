@@ -9,10 +9,11 @@ import difflib
 import re
 from functools import cache
 from pathlib import Path
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, TypedDict
 
 import polars as pl
 from fetch_sources import (
+    OUTPUT_DIR,
     STUDY_DIR,
     fetch_bmu_reference,
     fetch_igcpu,
@@ -40,12 +41,15 @@ REPD_BUILT_STATUSES: Final[tuple[str, ...]] = ("Operational", "Under Constructio
 A site can be generating while REPD still lists it as under construction, so a solar site that is
 operational or under construction is a candidate match, and so is a battery that shares its name.
 """
+STORAGE_OUTPUT_MWH: Final[float] = 0.1
+"""A storage BMU has output in the window if any half-hour reaches this many megawatt-hours."""
 REVIEWED_MATCHES_PATH: Final[Path] = Path(__file__).parent / "site_matches_reviewed.csv"
 """The hand-reviewed table, kept beside this script, of BMU to TEC project and REPD reference.
 
-Columns `elexon_bmu_id`, `tec_project_id`, `repd_ref_id` (either may be blank), and `note`. A row
-replaces the name match for its BMU, for the BMUs whose Elexon name does not resemble the site's
-name in either register.
+Columns `elexon_bmu_id`, `tec_project_id`, `repd_ref_id`, `storage_bmu_ids` (any may be blank), and
+`note`. A row replaces the name match for its BMU, for the BMUs whose Elexon name does not
+resemble the site's name in either register, and names the separately registered storage BMUs at
+the site.
 """
 TEC_STATUS_ORDER: Final[tuple[str, ...]] = (
     "Built",
@@ -58,9 +62,6 @@ TEC_STATUS_ORDER: Final[tuple[str, ...]] = (
 PV_PLANT_TYPE: Final[str] = "PV Array"
 NON_GENERATING_PLANT_TYPES: Final[tuple[str, ...]] = ("Demand", "Reactive Compensation")
 """TEC plant types that do not make a PV site a hybrid: its own demand and reactive plant."""
-SINGLE_SITE_PREFIXES: Final[tuple[str, ...]] = ("T_", "E_", "M_")
-"""A BMU with one of these prefixes is one generating site. `2_` (supplier), `V_`, and `C_` BMUs
-can aggregate many sites."""
 CAPACITY_COLUMNS: Final[tuple[str, ...]] = (
     "generation_capacity_mw",
     "igcpu_installed_capacity_mw",
@@ -69,6 +70,14 @@ CAPACITY_COLUMNS: Final[tuple[str, ...]] = (
     "repd_installed_capacity_mw",
 )
 TechnologyType = Literal["pure PV", "hybrid", "unknown"]
+StorageEvidenceType = Literal[
+    "storage BMU with output",
+    "operational battery in REPD",
+    "storage planned or under construction",
+    "TEC plant type lists PV only",
+    "REPD solar row, no battery row",
+    "none",
+]
 
 
 def normalise(name: str) -> str:
@@ -103,8 +112,8 @@ def best_match(*, site_name: str, candidates: dict[str, str]) -> tuple[str, floa
     for key in sorted(candidates):
         score = difflib.SequenceMatcher(None, target, normalise(candidates[key])).ratio()
         if score >= MATCH_THRESHOLD and (best is None or score > best[1]):
-            best = (key, round(score, 2))
-    return best
+            best = (key, score)
+    return None if best is None else (best[0], round(best[1], 2))
 
 
 def technology_from_tec_plant_type(*, plant_type: str) -> TechnologyType:
@@ -127,6 +136,45 @@ def technology_from_tec_plant_type(*, plant_type: str) -> TechnologyType:
         if not part.startswith(PV_PLANT_TYPE) and part not in NON_GENERATING_PLANT_TYPES
     ]
     return "hybrid" if others else "pure PV"
+
+
+def site_technology(
+    *,
+    tec_plant_type: str | None,
+    storage_bmu_with_output: bool,
+    repd_battery_status: str | None,
+    repd_solar_found: bool,
+) -> tuple[TechnologyType, StorageEvidenceType]:
+    """Say whether a site is hybrid or pure PV, on the strongest evidence of storage first.
+
+    The evidence runs from a storage BMU with output at the site, to an operational battery in
+    REPD, to storage that is planned or under construction (listed in the TEC plant type or in a
+    REPD battery row not yet operational). A site with none is pure PV when the TEC plant type
+    lists PV only, or REPD has a solar row and no battery row.
+
+    Args:
+        tec_plant_type: The matched TEC project's plant type, or None if no project matched.
+        storage_bmu_with_output: Whether a storage BMU at the site has output in the window.
+        repd_battery_status: The development status of the REPD battery at the site, or None.
+        repd_solar_found: Whether a REPD solar row matched.
+
+    Returns:
+        The technology and the evidence for it.
+    """
+    if storage_bmu_with_output:
+        return "hybrid", "storage BMU with output"
+    if repd_battery_status == "Operational":
+        return "hybrid", "operational battery in REPD"
+    tec_technology = (
+        technology_from_tec_plant_type(plant_type=tec_plant_type) if tec_plant_type else "unknown"
+    )
+    if tec_technology == "hybrid" or repd_battery_status is not None:
+        return "hybrid", "storage planned or under construction"
+    if tec_technology == "pure PV":
+        return "pure PV", "TEC plant type lists PV only"
+    if repd_solar_found:
+        return "pure PV", "REPD solar row, no battery row"
+    return "unknown", "none"
 
 
 def _to_float(value: Any) -> float | None:
@@ -174,18 +222,36 @@ def _display_name(
     A few BMUs carry their own identifier as their register name, which says nothing to a reader,
     so the matched TEC project's name, or else the matched REPD site's name, stands in.
     """
-    if site_name not in {"", bmu_id, "None"}:
+    if site_name not in {"", bmu_id}:
         return site_name
     return tec_name or repd_name or bmu_id
 
 
-def _reviewed_matches() -> dict[str, tuple[str | None, str | None]]:
+class ReviewedMatch(TypedDict):
+    """One row of the hand-reviewed matches."""
+
+    tec_project_id: str | None
+    repd_ref_id: str | None
+    storage_bmu_ids: list[str]
+
+
+def _reviewed_matches() -> dict[str, ReviewedMatch]:
     """Read the hand-reviewed BMU matches."""
     table = pl.read_csv(REVIEWED_MATCHES_PATH, infer_schema_length=0)
     return {
-        row["elexon_bmu_id"]: (row["tec_project_id"] or None, row["repd_ref_id"] or None)
+        row["elexon_bmu_id"]: ReviewedMatch(
+            tec_project_id=row["tec_project_id"] or None,
+            repd_ref_id=row["repd_ref_id"] or None,
+            storage_bmu_ids=[bmu for bmu in (row["storage_bmu_ids"] or "").split(";") if bmu],
+        )
         for row in table.iter_rows(named=True)
     }
+
+
+def _has_output(*, bmu_id: str, window_label: str) -> bool:
+    """Say whether a BMU's output reaches `STORAGE_OUTPUT_MWH` in either direction."""
+    output = pl.read_parquet(OUTPUT_DIR / f"{bmu_id}_{window_label}.parquet")
+    return bool((output["output_mwh"].abs() >= STORAGE_OUTPUT_MWH).any())
 
 
 def _repd_position(*, repd_row: dict[str, Any] | None) -> tuple[float | None, float | None]:
@@ -205,12 +271,15 @@ def best_tec_rows(*, tec: pl.DataFrame) -> pl.DataFrame:
     The register holds one row for each stage of a project, and a later stage carries a cumulative
     capacity that includes capacity not yet built. A project built at 99.4 MW with a later 20.6 MW
     increase has a second row of 120 MW, so the study takes the row at the most advanced status.
+    The `tec_mw` column is the capacity connected for a built project, and the agreed cumulative
+    capacity for one still under construction, because a built row's cumulative figure can include
+    a later increase.
 
     Args:
         tec: The TEC register with all-string columns.
 
     Returns:
-        The PV rows, one for each `Project ID`.
+        The PV rows, one for each `Project ID`, with the added column `tec_mw`.
     """
     rank = {status: index for index, status in enumerate(TEC_STATUS_ORDER)}
     return (
@@ -222,6 +291,11 @@ def best_tec_rows(*, tec: pl.DataFrame) -> pl.DataFrame:
         )
         .sort("status_rank", maintain_order=True)
         .unique(subset="Project ID", keep="first", maintain_order=True)
+        .with_columns(
+            tec_mw=pl.when(pl.col("Project Status") == "Built")
+            .then(pl.col("MW Connected").cast(pl.Float64, strict=False))
+            .otherwise(pl.col("Cumulative Total Capacity (MW)").cast(pl.Float64, strict=False))
+        )
         .drop("status_rank")
     )
 
@@ -232,15 +306,43 @@ def _tec_candidates(*, tec: pl.DataFrame) -> tuple[dict[str, str], dict[str, dic
     return {key: str(row["Project Name"]) for key, row in rows.items()}, rows
 
 
-def _repd_candidates(*, repd: pl.DataFrame) -> tuple[dict[str, str], pl.DataFrame]:
-    """Return the built solar projects' names, keyed by Ref ID, and the built batteries.
+def _repd_candidates(*, repd: pl.DataFrame) -> tuple[dict[str, str], dict[str, str]]:
+    """Return the built solar projects' names by Ref ID, and the battery status at each by Ref ID.
 
-    The battery rows are the evidence that a solar project shares its site with storage.
+    REPD links a solar row and a battery row at one site through the column `Storage Co-location
+    REPD Ref ID`, which holds the other row's Ref ID. A solar row's battery status is the best
+    status among the battery rows linked to it in either direction, with Operational the best.
+
+    Args:
+        repd: The REPD register with all-string columns.
+
+    Returns:
+        The names of the built solar projects, and the status of the battery linked to each.
     """
     built = repd.filter(pl.col("Development Status (short)").is_in(REPD_BUILT_STATUSES))
     solar = built.filter(pl.col("Technology Type") == "Solar Photovoltaics")
-    batteries = built.filter(pl.col("Technology Type") == "Battery")
-    return {str(r["Ref ID"]): str(r["Site Name"]) for r in solar.iter_rows(named=True)}, batteries
+    batteries = {
+        str(row["Ref ID"]): row
+        for row in built.filter(pl.col("Technology Type") == "Battery").iter_rows(named=True)
+    }
+    battery_status: dict[str, str] = {}
+
+    def record(solar_ref: str, battery: dict[str, Any]) -> None:
+        status = str(battery["Development Status (short)"])
+        if battery_status.get(solar_ref) != "Operational":
+            battery_status[solar_ref] = status
+
+    for battery in batteries.values():
+        linked = battery["Storage Co-location REPD Ref ID"]
+        if linked:
+            record(str(linked), battery)
+    for row in solar.iter_rows(named=True):
+        linked = row["Storage Co-location REPD Ref ID"]
+        if linked and str(linked) in batteries:
+            record(str(row["Ref ID"]), batteries[str(linked)])
+    return {
+        str(r["Ref ID"]): str(r["Site Name"]) for r in solar.iter_rows(named=True)
+    }, battery_status
 
 
 def build_table() -> pl.DataFrame:
@@ -256,7 +358,7 @@ def build_table() -> pl.DataFrame:
         match scores.
     """
     reference = {str(r["elexonBmUnit"]): r for r in fetch_bmu_reference() if r["elexonBmUnit"]}
-    today, _ = recorded_run()
+    today, window = recorded_run()
     igcpu = fetch_igcpu(today=today)
     latest_igcpu: dict[str, dict[str, Any]] = {}
     for row in sorted(igcpu, key=lambda r: str(r["publishTime"])):
@@ -267,9 +369,8 @@ def build_table() -> pl.DataFrame:
     mel = fetch_mels(bmu_ids=bmu_ids, today=today)
     tec_names, tec_rows = _tec_candidates(tec=fetch_tec())
     repd = fetch_repd()
-    repd_names, repd_batteries = _repd_candidates(repd=repd)
+    repd_names, repd_battery_status = _repd_candidates(repd=repd)
     repd_rows = {str(r["Ref ID"]): r for r in repd.iter_rows(named=True)}
-    battery_names = {normalise(str(n)) for n in repd_batteries["Site Name"].to_list()}
     reviewed = _reviewed_matches()
 
     out = []
@@ -277,23 +378,25 @@ def build_table() -> pl.DataFrame:
         bmu_id = class_row["elexon_bmu_id"]
         ref = reference.get(bmu_id, {})
         igcpu_row = latest_igcpu.get(bmu_id)
-        site_name = str(ref.get("bmUnitName") or (igcpu_row or {}).get("registeredResourceName"))
+        site_name = ref.get("bmUnitName") or (igcpu_row or {}).get("registeredResourceName") or ""
         tec_match = best_match(site_name=site_name, candidates=tec_names)
         repd_match = best_match(site_name=site_name, candidates=repd_names)
         hand = reviewed.get(bmu_id)
+        storage_ids: list[str] = []
         if hand is not None:
-            tec_match = (hand[0], 1.0) if hand[0] else tec_match
-            repd_match = (hand[1], 1.0) if hand[1] else repd_match
-        technology: TechnologyType = "unknown"
-        evidence = "none"
-        if tec_match:
-            tec_row = tec_rows[tec_match[0]]
-            technology = technology_from_tec_plant_type(plant_type=str(tec_row["Plant Type"]))
-            evidence = "TEC plant type"
-        if technology == "unknown" and repd_match:
-            has_battery = normalise(repd_rows[repd_match[0]]["Site Name"]) in battery_names
-            technology = "hybrid" if has_battery else "pure PV"
-            evidence = "REPD battery row" if has_battery else "REPD solar row, no battery row"
+            tec_match = (hand["tec_project_id"], 1.0) if hand["tec_project_id"] else tec_match
+            repd_match = (hand["repd_ref_id"], 1.0) if hand["repd_ref_id"] else repd_match
+            storage_ids = [
+                bmu
+                for bmu in hand["storage_bmu_ids"]
+                if _has_output(bmu_id=bmu, window_label=window.label)
+            ]
+        technology, evidence = site_technology(
+            tec_plant_type=str(tec_rows[tec_match[0]]["Plant Type"]) if tec_match else None,
+            storage_bmu_with_output=bool(storage_ids),
+            repd_battery_status=repd_battery_status.get(repd_match[0]) if repd_match else None,
+            repd_solar_found=repd_match is not None,
+        )
         longitude, latitude = _repd_position(
             repd_row=repd_rows[repd_match[0]] if repd_match else None
         )
@@ -310,19 +413,18 @@ def build_table() -> pl.DataFrame:
                 ),
                 "lead_party": ref.get("leadPartyName"),
                 "connection_type": connection_type(elexon_bmu_id=bmu_id),
-                "scope": "single-site" if bmu_id.startswith(SINGLE_SITE_PREFIXES) else "aggregate",
+                "scope": class_row["scope"],
                 "basis": class_row["basis"],
                 "correlation": class_row["correlation"],
                 "technology": technology,
                 "technology_evidence": evidence,
+                "storage_bmu_ids": ";".join(storage_ids),
                 "generation_capacity_mw": _to_float(ref.get("generationCapacity")),
                 "igcpu_installed_capacity_mw": igcpu_row["installedCapacity"]
                 if igcpu_row
                 else None,
                 "tec_project_id": tec_match[0] if tec_match else None,
-                "tec_mw": _to_float(tec_rows[tec_match[0]]["Cumulative Total Capacity (MW)"])
-                if tec_match
-                else None,
+                "tec_mw": tec_rows[tec_match[0]]["tec_mw"] if tec_match else None,
                 "largest_mel_mw": mel.get(bmu_id),
                 "repd_ref_id": repd_match[0] if repd_match else None,
                 "repd_installed_capacity_mw": _to_float(
