@@ -148,7 +148,8 @@ removed 2,112.
 ### Capacity
 
 **Each register names the same ten BMUs differently.** A dash means the register has no match, and
-"(identifier only)" means the BMU register gives the BMU its own identifier as its name. TEC and REPD name a project, so
+"(identifier only)" means the BMU register gives the BMU its own identifier as its name. TEC and
+REPD name a project, so
 Cleve Hill's two BMUs share one project name in each.
 
 | BMU | Elexon BMU register | IGCPU | TEC register | REPD |
