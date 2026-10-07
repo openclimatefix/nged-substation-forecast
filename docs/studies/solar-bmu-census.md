@@ -174,16 +174,15 @@ half-hours, or with constant output, has too little output to judge.
 **The census holds every BMU that follows the sun or that IGCPU types as Solar.** IGCPU types 9 BMUs
 as Solar.
 
-**Single-site and aggregate BMUs.** Elexon's naming convention gives a BMU connected directly to the
-transmission network a `T_` identifier, a BMU embedded in a distribution network an `E_` identifier,
-and a miscellaneous BMU an `M_` identifier. The study treats a BMU with any of those three prefixes
-as a single-site BMU, which is part of one site. A single-site identifier matters because the
-BMU's output and capacity then belong to one place, so the study can match the BMU to one project
-in the TEC register and REPD, give it one position on the map, and read its output as one site's.
-No `M_` BMU is in the census. Under that convention, a `2_` (supplier), `V_` (virtual), or `C_`
-identifier does not name a single site, because such a BMU can pool the output of many sites. The
-study did not check each of those BMUs for a single site, so the page counts them apart and calls
-them aggregate BMUs.
+**Single-site and aggregate BMUs.** Under Elexon's naming convention, a `T_` identifier marks a BMU
+connected directly to the transmission network, and an `E_` identifier marks a BMU embedded in a
+distribution network. The BMU register's own `bmUnitType` field agrees: it holds `T` for every `T_`
+BMU and `E` for every `E_` BMU. Such an identifier names one generating site, so the BMU's output
+and capacity belong to one place, and the study can match the BMU to one project and one position.
+The study treats a BMU with a `T_`, `E_`, or `M_` prefix as a single-site BMU. No `M_` BMU is in the
+census. A supplier (`2_`), virtual (`V_`), or `C_` identifier can pool many sites. The study did not
+check each of those BMUs for a single site, so the page counts them apart and calls them aggregate
+BMUs.
 
 **Hybrid and pure PV.** A site is hybrid if it also holds storage. The study grades the evidence of
 storage from strongest to weakest. The strongest evidence is a separately registered storage BMU
