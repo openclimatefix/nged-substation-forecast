@@ -4,20 +4,24 @@ Three independent mechanisms, all no-ops when Sentry is unconfigured, so laptops
 Sentry configuration:
 
 - **Error telemetry** — `init_sentry` initialises the SDK once per process (a no-op unless
-  ``Settings.sentry_dsn`` is set), and the `sentry_capture_failure` Dagster failure hook reports
-  the real exception (with traceback) from inside the run worker, tagged `FAULT_CATEGORY_TAG` so
-  an alert rule can tell a failed run from the degradation events below. It reports neither a
-  cancelled run nor the bare ``RetryRequested`` wrapper around an exhausted in-band retry.
+  ``Settings.sentry_dsn`` is set), and the `sentry_capture_failure` Dagster failure hook reports the
+  real exception (with traceback) from inside the run worker, tagged `FAULT_CATEGORY_TAG` so an
+  alert rule can tell a failed run from the degradation events below. It reports neither a cancelled
+  run nor the bare ``RetryRequested`` wrapper around an exhausted in-band retry.
   `report_check_degradation` and `report_asset_degradation` cover the production faults the hook
   cannot see, because they never fail a run: a check, or an asset, that caught its own exception
-  instead of raising. The hook is used rather than Sentry's ``LoggingIntegration`` log-to-event
-  capture — which `init_sentry` explicitly disables — because Dagster logs a step failure without
-  ``exc_info``, so the log-based path would yield a message-only event with no stack trace, *and*
-  would fire for every ``ERROR`` log anywhere in the process (Dagster's own startup/step logs,
-  ad-hoc materialisations, even a swallowed telemetry error), swamping Sentry with events the
-  design never intended to send. The hook is attached to the *scheduled* asset jobs only, so it
-  covers the unattended production workload; manual/backfill/experiment runs are watched by the
-  operator at the Dagster UI, not Sentry.
+  instead of raising. The hook is used rather than
+  Sentry's ``LoggingIntegration`` log-to-event capture — which `init_sentry` explicitly disables —
+  because Dagster logs a step failure without ``exc_info``, so the log-based path would yield a
+  message-only event with no stack trace, *and* would fire for every ``ERROR`` log anywhere in the
+  process (Dagster's own startup/step logs, ad-hoc materialisations, even a swallowed telemetry
+  error), swamping Sentry with events the design never intended to send. The hook is attached to the
+  *scheduled* asset jobs only, so it covers the unattended production workload;
+  manual/backfill/experiment runs are watched by the operator at the Dagster UI, not Sentry.
+  `report_asset_retry` is the early warning for an asset that is about to retry: it sends the caught
+  exception at *warning* level on the first failed attempt, so the operator learns of the fault
+  hours before the last retry fails. It is called from inside the asset, so it also fires in a
+  manual or backfill run.
 - **The missed-check-in alarm** — `send_forecast_checkin` sends a *success-only* heartbeat to a
   Sentry cron monitor after each live ``live_forecasts`` run. It is gated on
   ``Settings.sentry_monitor_forecasts`` (not the DSN), so a laptop with a DSN set for error
@@ -46,7 +50,7 @@ Further reading:
 """
 
 import logging
-from typing import TYPE_CHECKING, Final, TypedDict
+from typing import TYPE_CHECKING, Final, Literal, TypedDict
 
 import sentry_sdk
 from contracts.settings import Settings
@@ -124,11 +128,11 @@ def init_sentry(settings: Settings) -> None:
     ``event_level=None`` overrides the SDK's default integration (whose default ``event_level`` is
     ``ERROR``), so ``ERROR``-level log records no longer become Sentry events. Without this, every
     ``ERROR`` log anywhere in the process — Dagster's startup/step logs, ad-hoc materialisations,
-    even the swallowed telemetry error in `report_power_freshness` — would be shipped as an
-    event, defeating the design where *only* the four explicit senders reach Sentry: the failure
-    hook, the freshness ``capture_message``, `report_check_degradation` and
-    `report_asset_degradation`. Breadcrumbs (the integration's default ``level=INFO``) are
-    kept, so log context still rides along with the events those senders do send.
+    even the swallowed telemetry error in `report_power_freshness` — would be shipped as an event,
+    defeating the design where *only* the five explicit senders reach Sentry: the failure hook, the
+    freshness ``capture_message``, `report_check_degradation`, `report_asset_degradation`, and
+    `report_asset_retry`. Breadcrumbs (the integration's default ``level=INFO``) are kept, so log
+    context still rides along with the events those senders do send.
 
     Args:
         settings: The project settings carrying the Sentry DSN, environment, and sample rate.
@@ -152,7 +156,7 @@ def init_sentry(settings: Settings) -> None:
 FAULT_CATEGORY_TAG: Final[str] = "fault_category"
 """Tag naming what kind of fault an event reports, so an alert rule can route by urgency.
 
-Only `sentry_capture_failure` sets it — the other three senders already carry a mark of their
+Only `sentry_capture_failure` sets it — the other four senders already carry a mark of their
 own. The reasoning is on the design page linked from this module's docstring; the production alert
 rules key off this value, so treat it as a contract rather than a label."""
 
@@ -211,6 +215,7 @@ def _capture_tagged(
     exc: BaseException,
     failure_note: str,
     fingerprint: list[str] | None = None,
+    level: Literal["warning"] | None = None,
 ) -> None:
     """Send ``exc`` to Sentry, tagged ``tag=value`` on a scope forked so the tag cannot leak.
 
@@ -225,12 +230,15 @@ def _capture_tagged(
             falls back to grouping by exception type and message. A message naming the run or the
             slot then opens a fresh issue every time. Leave the fingerprint ``None`` for a
             genuinely caught exception, whose stack trace already groups the event.
+        level: Send the event at this level instead of Sentry's default of ``error``.
     """
     try:
         with sentry_sdk.new_scope() as scope:
             scope.set_tag(key=tag, value=value)
             if fingerprint is not None:
                 scope.fingerprint = fingerprint
+            if level is not None:
+                scope.set_level(level)
             sentry_sdk.capture_exception(exc)
     except Exception:
         # Telemetry is best-effort, but a genuine bug in here must still be visible, so log at ERROR
@@ -264,6 +272,36 @@ def report_asset_degradation(
         exc=exc,
         failure_note=f"Failed to report the degraded {asset_name} asset to Sentry",
         fingerprint=fingerprint,
+    )
+
+
+def report_asset_retry(asset_name: str, exc: BaseException) -> None:
+    """Warn that an asset failed in a way the asset will retry, as a Sentry warning event.
+
+    Without this warning, an asset that retries for hours reaches Sentry only when its last retry
+    fails, through `sentry_capture_failure`. Calling `report_asset_retry` on the first failed
+    attempt names the cause at once ([design principle
+    16](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#16-a-failure-names-its-own-cause-in-the-telemetry)).
+
+    The event carries the ``retrying_asset`` tag and not ``fault_category``, so an alert rule that
+    routes on ``fault_category:run_failed`` is not triggered. The event's fingerprint is Sentry's
+    default grouping plus a ``retrying_asset`` marker, so the warning does not share an issue with
+    the run-failed event that follows if every retry fails.
+
+    A no-op when Sentry is uninitialised (empty DSN), and never raises.
+
+    Args:
+        asset_name: The Dagster asset name, attached as a ``retrying_asset`` tag so events can be
+            filtered per asset. Set on an isolated scope so it cannot leak into later events.
+        exc: The exception the asset will retry on.
+    """
+    _capture_tagged(
+        tag="retrying_asset",
+        value=asset_name,
+        exc=exc,
+        failure_note=f"Failed to report the retrying {asset_name} asset to Sentry",
+        fingerprint=["{{ default }}", "retrying_asset"],
+        level="warning",
     )
 
 

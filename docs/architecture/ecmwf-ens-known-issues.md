@@ -341,10 +341,26 @@ The three retried failures are the ones for which there is evidence that the dat
 also [said](https://github.com/dynamical-org/reformatters/issues/1149#issuecomment-5980497676) that
 a change deployed on 2026-10-02 re-runs a failed dataset update within about 20 minutes.
 
+**An ECMWF run initialised more than 36 hours ago is not retried.** In the repairs we have seen,
+Dynamical.org filled a store within about 3.5 hours of publication, so waiting 4 hours on a run that
+is days old has no evidence behind it. The limit has to exceed the age a run reaches by the last
+retry of its scheduled attempt, which is about 15 hours (the 10:30 UTC schedule plus the 4-hour
+ladder). The 36-hour limit also lets a manual re-run of the previous day's partition retry, although
+that re-run's ladder stops early, once the run passes 36 hours. A catch-up tick that fires more
+than about 25 hours late, or a backfill of an old partition, therefore fails at once with the
+original exception.
+
+**When `ecmwf_ens` fails in a way it will retry, its first failed attempt sends a Sentry warning.**
+The warning carries the exception, a note naming the partition, and the `retrying_asset` tag. Sentry
+files the warning as an issue separate from the run-failed event that follows if every retry fails.
+Without the warning, an ECMWF run that upstream never repairs reaches Sentry only when the last
+retry fails, about 4 hours later. The asset sends the warning from inside its own body rather than
+through the failure hook, which is attached to the scheduled jobs only, so the warning also fires
+for a manually launched Dagster run or a backfill of a recent partition.
+
 If Dynamical.org is seen repairing a second kind of content defect within the 4-hour ladder, the
 retry could widen to failures about the data's content (null patterns), while the asset still fails
-at once on failures about the data's structure. The first failed attempt would then send a Sentry
-warning, so that retrying does not hide the fault.
+at once on failures about the data's structure.
 
 ## An incomplete run (tolerated, and reported)
 
