@@ -34,8 +34,7 @@ skips series with no overlap); `_resolve_eval_window` takes dates from the fold 
   added or edited.
 - **More than one defensible design:** fires. The row-set definition, which scopes the date guard
   covers, and the in-window power question below each admit several designs.
-- **Callers not nameable without searching:** fires for the
-  `final_test_start` field, the `study/` prefix, and the predictions-file route.
+- **Callers not nameable without searching:** fires. The required `final_test_start` field touches six `CvConfig(...)` constructions in tests, and the `study/` prefix reaches the promotion path in `ml_core/mlflow_runs.py`.
 
 That buys the plan, both plan reviews, and both diff reviews.
 
