@@ -593,8 +593,8 @@ def build_table() -> pl.DataFrame:
     repd_rows = {str(r["Ref ID"]): r for r in repd.iter_rows(named=True)}
     reviewed = _reviewed_matches()
     licence_areas = fetch_dno_areas()
-    cfd_mapping, cfd_portfolio = fetch_lccc()
-    cfd_units = single_site_cfd_bmus(mapping=cfd_mapping, portfolio=cfd_portfolio)
+    cfd_mapping, cfd_portfolio = fetch_lccc(today=today)
+    cfd_units = single_site_cfd_bmus(mapping=cfd_mapping, portfolio=cfd_portfolio, today=today)
 
     out = []
     for class_row in classes.iter_rows(named=True):

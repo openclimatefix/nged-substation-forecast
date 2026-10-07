@@ -17,6 +17,7 @@ import argparse
 import json
 import re
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -136,7 +137,12 @@ def _get(*, url: str, params: dict[str, str] | None = None) -> httpx.Response:
 
 
 def cached_text(
-    *, name: str, url: str, params: dict[str, str] | None = None, encoding: str | None = None
+    *,
+    name: str,
+    url: str,
+    params: dict[str, str] | None = None,
+    encoding: str | None = None,
+    validate: Callable[[str], None] | None = None,
 ) -> str:
     """Return the body of `url`, from `RAW_DIR/<name>.json` if it exists, else by fetching it.
 
@@ -148,6 +154,8 @@ def cached_text(
         url: The URL to fetch.
         params: Query parameters.
         encoding: The text encoding of the body, for a file whose server does not state one.
+        validate: Called with a freshly fetched body before it is cached, and raises if the body is
+            not what the request asked for, so that a bad response is never cached.
 
     Returns:
         The response body as text.
@@ -158,6 +166,8 @@ def cached_text(
     response = _get(url=url, params=params)
     if encoding is not None:
         response.encoding = encoding
+    if validate is not None:
+        validate(response.text)
     record = {
         "retrieved_at_utc": datetime.now(UTC).isoformat(),
         "requested_url": url,
@@ -237,12 +247,19 @@ def fetch_dno_areas() -> dict[str, Any]:
     return json.loads(cached_text(name="dno_licence_areas", url=NESO_DNO_AREAS_GEOJSON))
 
 
+def _check_ckan_success(body: str) -> None:
+    """Raise unless a CKAN response says `"success": true`."""
+    if json.loads(body).get("success") is not True:
+        raise RuntimeError(f"CKAN did not report success: {body[:200]}")
+
+
 def _lccc_records(*, name: str, resource_id: str) -> list[dict[str, Any]]:
     """Fetch every row of one Low Carbon Contracts Company datastore resource."""
     body = cached_text(
         name=name,
         url=LCCC_API,
         params={"resource_id": resource_id, "limit": str(LCCC_PAGE_LIMIT)},
+        validate=_check_ckan_success,
     )
     result = json.loads(body)["result"]
     records: list[dict[str, Any]] = result["records"]
@@ -251,8 +268,11 @@ def _lccc_records(*, name: str, resource_id: str) -> list[dict[str, Any]]:
     return records
 
 
-def fetch_lccc() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def fetch_lccc(*, today: date) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Fetch the Low Carbon Contracts Company's CfD-to-BM-Unit mapping and CfD portfolio.
+
+    Args:
+        today: The run date, which names the cache files.
 
     Returns:
         The mapping rows (`CFD_Id`, `BMU_Id`, `Effective_From`, `Effective_date_to`) and the
@@ -261,25 +281,51 @@ def fetch_lccc() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         others).
     """
     return (
-        _lccc_records(name="lccc_cfd_bmu_mapping", resource_id=LCCC_MAPPING_RESOURCE),
-        _lccc_records(name="lccc_cfd_portfolio", resource_id=LCCC_PORTFOLIO_RESOURCE),
+        _lccc_records(
+            name=f"lccc_cfd_bmu_mapping_{today:%Y%m%d}", resource_id=LCCC_MAPPING_RESOURCE
+        ),
+        _lccc_records(
+            name=f"lccc_cfd_portfolio_{today:%Y%m%d}", resource_id=LCCC_PORTFOLIO_RESOURCE
+        ),
     )
 
 
+def current_cfd_ids(*, mapping: list[dict[str, Any]], today: date) -> dict[str, list[str]]:
+    """Map each `C__` BM Unit to the CfD identifiers that it carries on `today`.
+
+    Args:
+        mapping: The rows of `fetch_lccc`'s mapping.
+        today: The date on which a row must be in force. A row has ended when its
+            `Effective_date_to` is non-empty and on or before `today`.
+
+    Returns:
+        Maps each `C__` BM Unit identifier with at least one current row to its CfD identifiers.
+    """
+    current: dict[str, list[str]] = {}
+    for row in mapping:
+        bmu_id = str(row["BMU_Id"])
+        ended = str(row["Effective_date_to"]).strip()
+        if bmu_id.startswith("C__") and not (ended and date.fromisoformat(ended[:10]) <= today):
+            current.setdefault(bmu_id, []).append(str(row["CFD_Id"]))
+    return current
+
+
 def single_site_cfd_bmus(
-    *, mapping: list[dict[str, Any]], portfolio: list[dict[str, Any]]
+    *, mapping: list[dict[str, Any]], portfolio: list[dict[str, Any]], today: date
 ) -> dict[str, dict[str, Any]]:
     """Find the `C__` BM Units that carry exactly one named CfD unit.
 
     A `C__` BM Unit is an Additional Supplier BM Unit that Elexon registers solely to allocate
     Contract for Difference assets. A BM Unit with one current CfD identifier, whose portfolio row
     names a unit, is one named generating site, so the census counts it as single-site. A BM Unit
-    that carries several current CfD identifiers pools several sites.
+    that carries several current CfD identifiers pools several sites. Two BM Units can carry the
+    same CfD unit.
 
     Args:
-        mapping: The rows of `fetch_lccc`'s mapping. A row with a non-empty `Effective_date_to`
-            has ended and is ignored.
+        mapping: The rows of `fetch_lccc`'s mapping. A row that has ended on or before `today` is
+            ignored.
         portfolio: The rows of `fetch_lccc`'s portfolio.
+        today: The date on which a mapping row must be in force.
 
     Returns:
         Maps each such BM Unit identifier to its `cfd_id`, `name`, `technology`, `connection`,
@@ -287,13 +333,8 @@ def single_site_cfd_bmus(
         it blank).
     """
     by_cfd = {str(row["CFD_ID"]): row for row in portfolio}
-    current: dict[str, list[str]] = {}
-    for row in mapping:
-        bmu_id = str(row["BMU_Id"])
-        if bmu_id.startswith("C__") and not row["Effective_date_to"]:
-            current.setdefault(bmu_id, []).append(str(row["CFD_Id"]))
     units: dict[str, dict[str, Any]] = {}
-    for bmu_id, cfd_ids in current.items():
+    for bmu_id, cfd_ids in current_cfd_ids(mapping=mapping, today=today).items():
         unit = by_cfd.get(cfd_ids[0]) if len(cfd_ids) == 1 else None
         if unit is None or not str(unit["Name_of_CFD_Unit"]).strip():
             continue
@@ -509,7 +550,7 @@ def main() -> None:
     fetch_tec()
     fetch_repd()
     fetch_dno_areas()
-    fetch_lccc()
+    fetch_lccc(today=args.today)
     bmu_ids = b1610_bmu_ids(reference=reference)
     fetch_b1610(bmu_ids=bmu_ids, window=window)
     write_provenance(window=window, bmu_count=len(bmu_ids), today=args.today)

@@ -140,6 +140,11 @@ NUMBER_WORDS: Final[dict[int, str]] = {
 """The count words that a figure title uses, from none to thirteen."""
 
 
+def number_word(count: int) -> str:
+    """Return the count as a capitalised word, or as a numeral past `NUMBER_WORDS`."""
+    return NUMBER_WORDS.get(count, str(count))
+
+
 def storage_bmu_at(*, site_bmu_id: str, census: pl.DataFrame) -> str | None:
     """Return the first storage BMU at a solar BMU's site that has B1610 rows in both weeks.
 
@@ -996,8 +1001,8 @@ def map_figure(*, census: pl.DataFrame, number: int) -> alt.VConcatChart:
         panels=[cast(alt.LayerChart, overview), cast(alt.LayerChart, zoom)],
         number=number,
         title=(
-            f"{NUMBER_WORDS[england.height]} single-site solar BMUs lie in England and "
-            f"{NUMBER_WORDS[scotland.height].lower()} in Scotland"
+            f"{number_word(england.height)} single-site solar BMUs lie in England and "
+            f"{number_word(scotland.height).lower()} in Scotland"
         ),
         subtitle=[
             (
@@ -1005,8 +1010,8 @@ def map_figure(*, census: pl.DataFrame, number: int) -> alt.VConcatChart:
                 "the Renewable Energy Planning Database row matched to each BMU."
             ),
             (
-                f"Top: Great Britain. Bottom: a zoom on the {NUMBER_WORDS[england.height].lower()} "
-                f"BMUs in England, at {NUMBER_WORDS[english_sites].lower()} sites."
+                f"Top: Great Britain. Bottom: a zoom on the {number_word(england.height).lower()} "
+                f"BMUs in England, at {number_word(english_sites).lower()} sites."
             ),
             "Blue: pure PV site. Orange: hybrid site, with storage built or planned.",
         ],

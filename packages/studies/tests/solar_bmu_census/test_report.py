@@ -1,8 +1,10 @@
 """Tests for the pure functions of `studies/solar_bmu_census/report.py`."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 import polars as pl
+import pytest
 import report
 
 
@@ -115,6 +117,9 @@ def test_the_aggregate_register_table_counts_what_the_register_records() -> None
         "`2__` and `V__` census BMUs whose fourth character is their GSP group letter"
     ] == ("2 of 3")
     assert values["`G` type census BMUs with a negative Demand Capacity"] == "1"
+    assert values["Register `2__` BMUs whose identifier ends 000, of type G"] == "1 of 1"
+    assert values["Register `2__` BMUs whose identifier does not end 000, of type S"] == "1 of 1"
+    assert values["`S` type aggregate census BMUs with a Demand Capacity of zero"] == "1 of 1"
 
 
 def test_the_lccc_table_counts_current_c_bmus_and_probes_the_unlisted_solar_ones() -> None:
@@ -152,10 +157,57 @@ def test_the_lccc_table_counts_current_c_bmus_and_probes_the_unlisted_solar_ones
         ],
         reference=[{"elexonBmUnit": "C__SOLAR1"}],
         census=pl.DataFrame({"elexon_bmu_id": ["C__SOLAR1"], "scope": ["single-site"]}),
+        today=date(2026, 10, 7),
         probe=probe,
+        probe_label="in the probe week",
     )
     values = dict(table.iter_rows())
     assert values["`C__` BMUs with a current CfD identifier in the mapping"] == "3"
     assert values["Of those, BMUs whose CfD unit is Solar PV"] == "2"
     assert values["`C__` BMUs in the mapping that the BMU register lists"] == "1"
-    assert seen == [["C__SOLAR2"]]
+    assert values["Positive control: C__SOLAR1 has B1610 rows in the probe week"] == "0"
+    assert seen == [["C__SOLAR2"], ["C__SOLAR1"]]
+
+
+def test_the_probe_week_starts_three_months_before_the_window_ends() -> None:
+    window = report.Window(
+        start=datetime(2025, 9, 1, tzinfo=UTC), end=datetime(2026, 9, 1, tzinfo=UTC)
+    )
+    assert report.probe_week(window=window) == (date(2026, 6, 1), date(2026, 6, 8))
+    early = report.Window(
+        start=datetime(2024, 2, 1, tzinfo=UTC), end=datetime(2025, 2, 1, tzinfo=UTC)
+    )
+    assert report.probe_week(window=early) == (date(2024, 11, 1), date(2024, 11, 8))
+
+
+def test_runs_of_low_output_days_are_found_by_the_half_hour_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Day 1 has output, days 2 and 3 are below the threshold, day 4 has output, day 5 is low.
+    # Each half-hour ends at 12:00 and so starts on the same UTC day.
+    ends = [datetime(2026, 1, d, 12, tzinfo=UTC) for d in (1, 2, 3, 4, 5)]
+    frame = pl.DataFrame({"half_hour_end_time": ends, "output_mwh": [10.0, 0.1, 0.2, 5.0, 0.0]})
+    frame.write_parquet(tmp_path / "C__X_w.parquet")
+    monkeypatch.setattr(report, "OUTPUT_DIR", tmp_path)
+    runs = report.low_output_runs_table(bmu_id="C__X", window_label="w")
+    assert runs["first_day"].to_list() == [date(2026, 1, 2), date(2026, 1, 5)]
+    assert runs["days"].to_list() == [2, 1]
+    assert runs["largest_daily_maximum_mw"].to_list() == [0.4, 0.0]
+
+
+def test_the_capped_period_table_lists_the_days_above_the_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ends = [datetime(2026, 3, d, 12, tzinfo=UTC) for d in (1, 2, 3, 4)]
+    frame = pl.DataFrame({"half_hour_end_time": ends, "output_mwh": [10.0, 12.0, 25.0, 0.1]})
+    frame.write_parquet(tmp_path / "C__X_w.parquet")
+    monkeypatch.setattr(report, "OUTPUT_DIR", tmp_path)
+    table = report.capped_period_table(
+        bmu_id="C__X", window_label="w", first=date(2026, 3, 1), last=date(2026, 3, 4), cap_mw=30.0
+    )
+    values = dict(table.iter_rows())
+    assert values["Days from 2026-03-01 to 2026-03-04"] == "4"
+    assert values["Days with a largest output below 1.5 MW"] == "1"
+    assert values["Days with a largest output above 30.0 MW"] == "2026-03-03 (50.0 MW)"
+    assert values["Highest daily maximum on the other days (MW)"] == "24.0"
+    assert values["Lowest daily maximum on the other days (MW)"] == "20.0"

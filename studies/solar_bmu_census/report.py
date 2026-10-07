@@ -9,7 +9,7 @@ Database (REPD) are public, so `report.md` names the BMUs it lists. Run after `f
 
 import json
 from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from itertools import pairwise
 from typing import Any, Final
@@ -41,6 +41,7 @@ from fetch_sources import (
     STUDY_DIR,
     Window,
     cached_text,
+    current_cfd_ids,
     fetch_bmu_reference,
     fetch_igcpu,
     fetch_lccc,
@@ -364,6 +365,39 @@ def shape_error_by_subset_table(
     return pl.DataFrame(rows)
 
 
+def shape_error_without_table(*, by_shape: dict[str, pl.DataFrame], excluded: str) -> pl.DataFrame:
+    """Give each shape's errors on all the BMUs, and on all but one, with the BMU of the largest.
+
+    Args:
+        by_shape: Maps a shape's name to its `solar_estimate_table` over the same single-site BMUs.
+        excluded: The identifier of the BMU to leave out in the second set of rows.
+
+    Returns:
+        One row per shape and set: the BMUs, the mean absolute error and the largest absolute
+        error of the estimate at the base ratio against Generation Capacity, and the BMU with the
+        largest error.
+    """
+    rows = []
+    for shape, estimates in by_shape.items():
+        for label, frame in (
+            ("all BMUs", estimates),
+            (f"without {excluded}", estimates.filter(pl.col("elexon_bmu_id") != excluded)),
+        ):
+            errors = frame.with_columns(absolute=pl.col("error_at_base_ratio").abs())
+            worst = errors.sort("absolute", descending=True).row(0, named=True)
+            rows.append(
+                {
+                    "shape": shape,
+                    "set": label,
+                    "bmus": frame.height,
+                    "mean absolute error": round(_as_float(errors["absolute"].mean()), 3),
+                    "largest absolute error": round(_as_float(worst["absolute"]), 3),
+                    "BMU with the largest error": worst["elexon_bmu_id"],
+                }
+            )
+    return pl.DataFrame(rows)
+
+
 def shape_facts_table(
     *,
     cams: pl.DataFrame,
@@ -458,6 +492,12 @@ def aggregate_register_table(
                 (f"Aggregate census BMUs `{prefix}` with register type {unit_type}", str(count))
             )
     lettered = [i for i in ids if i.startswith(("2__", "V__"))]
+    supplier = [r for r in reference if str(r["elexonBmUnit"]).startswith("2__")]
+    base = [r for r in supplier if str(r["elexonBmUnit"]).endswith("000")]
+    additional = [r for r in supplier if not str(r["elexonBmUnit"]).endswith("000")]
+    c_units = [r for r in reference if str(r["elexonBmUnit"]).startswith("C__")]
+    s_type = [i for i in ids if register[i]["bmUnitType"] == "S"]
+    zero_demand_s = [i for i in s_type if float(register[i]["demandCapacity"]) == 0]
     rows += [
         ("Aggregate census BMUs", str(len(ids))),
         (
@@ -473,6 +513,22 @@ def aggregate_register_table(
             f"{sum(register[i]['gspGroupId'] == '_' + i[3] for i in lettered)} of {len(lettered)}",
         ),
         (
+            "Register `2__` BMUs whose identifier ends 000, of type G",
+            f"{sum(r['bmUnitType'] == 'G' for r in base)} of {len(base)}",
+        ),
+        (
+            "Register `2__` BMUs whose identifier does not end 000, of type S",
+            f"{sum(r['bmUnitType'] == 'S' for r in additional)} of {len(additional)}",
+        ),
+        (
+            "Register `C__` BMUs of type S",
+            f"{sum(r['bmUnitType'] == 'S' for r in c_units)} of {len(c_units)}",
+        ),
+        (
+            "`S` type aggregate census BMUs with a Demand Capacity of zero",
+            f"{len(zero_demand_s)} of {len(s_type)}",
+        ),
+        (
             "`G` type census BMUs with a negative Demand Capacity",
             str(
                 sum(
@@ -486,29 +542,49 @@ def aggregate_register_table(
     return pl.DataFrame(rows, schema=["quantity", "value"], orient="row")
 
 
-PROBE_FROM: Final[str] = "2026-06-01T00:00Z"
-PROBE_TO: Final[str] = "2026-06-08T00:00Z"
-"""The week in which `unlisted_cfd_solar_with_output` looks for B1610 rows."""
+PROBE_DAYS: Final[int] = 7
+"""The length of the week in which `unlisted_cfd_solar_with_output` looks for B1610 rows."""
+PROBE_MONTHS_BEFORE_END: Final[int] = 3
+"""The probe week starts on the first day of the month this many months before the window's end."""
+LOW_OUTPUT_MW: Final[float] = 1.5
+"""A day whose largest half-hourly output is below this is a day of almost no output."""
 
 
-def unlisted_cfd_solar_with_output(*, bmu_ids: list[str]) -> int:
+def probe_week(*, window: Window) -> tuple[date, date]:
+    """Return the first day of the probe week and the day after its last day.
+
+    Args:
+        window: The study window.
+
+    Returns:
+        The first day of the month `PROBE_MONTHS_BEFORE_END` months before the window's end, and
+        the day `PROBE_DAYS` days later.
+    """
+    month_index = window.end.year * 12 + window.end.month - 1 - PROBE_MONTHS_BEFORE_END
+    first = date(month_index // 12, month_index % 12 + 1, 1)
+    return first, first + timedelta(days=PROBE_DAYS)
+
+
+def unlisted_cfd_solar_with_output(*, bmu_ids: list[str], first: date, after: date) -> int:
     """Count the BMUs that have B1610 rows in the probe week.
 
-    The BMU register does not list these BMUs, so the census does not download their output. One
-    request for each BMU is cached under `inputs/raw/`.
+    The BMU register does not list the BMUs that the census probes, so the census does not
+    download their output. One request for each BMU is cached under `inputs/raw/`.
 
     Args:
         bmu_ids: The BMU identifiers to probe.
+        first: The first day of the probe week.
+        after: The day after the last day of the probe week.
 
     Returns:
-        The number of BMUs with at least one B1610 row between `PROBE_FROM` and `PROBE_TO`.
+        The number of BMUs with at least one B1610 row from `first` up to `after`.
     """
     with_rows = 0
     for bmu_id in bmu_ids:
         body = cached_text(
-            name=f"b1610_probe_{bmu_id}_{PROBE_FROM[:10]}",
+            name=f"b1610_probe_{bmu_id}_{first:%Y%m%d}",
             url=f"{ELEXON_API}/datasets/B1610/stream",
-            params={"from": PROBE_FROM, "to": PROBE_TO, "bmUnit": bmu_id},
+            params={"from": f"{first}T00:00Z", "to": f"{after}T00:00Z", "bmUnit": bmu_id},
         )
         with_rows += bool(json.loads(body))
     return with_rows
@@ -520,7 +596,9 @@ def lccc_table(
     portfolio: list[dict[str, Any]],
     reference: list[dict[str, Any]],
     census: pl.DataFrame,
+    today: date,
     probe: Callable[[list[str]], int],
+    probe_label: str,
 ) -> pl.DataFrame:
     """Say what the Low Carbon Contracts Company's data holds about the `C__` BMUs.
 
@@ -529,24 +607,26 @@ def lccc_table(
         portfolio: The CfD portfolio rows.
         reference: The BMU register.
         census: The census table.
-        probe: Counts how many of the given BMU identifiers have B1610 rows in the probe week
-            (`unlisted_cfd_solar_with_output` with the identifiers as `bmu_ids`).
+        today: The run date, on which a mapping row must be in force.
+        probe: Counts how many of the given BMU identifiers have B1610 rows in the probe week.
+        probe_label: The probe week, as text for the row labels.
 
     Returns:
         Rows of `quantity` and `value`: the current `C__` BMUs in the mapping, those that carry one
-        named CfD unit, those whose CfD unit is Solar PV, those that the BMU register lists, and the
-        census BMUs that are single-site `C__` BMUs.
+        named CfD unit, those whose CfD unit is Solar PV, those that the BMU register lists, the
+        Solar PV BMUs that it does not list with their distinct CfD units and portfolio status, the
+        probe of those BMUs and a positive control (the first single-site `C__` census BMU), and the
+        `C__` census BMUs.
     """
-    current = {str(r["BMU_Id"]): [] for r in mapping if str(r["BMU_Id"]).startswith("C__")}
-    for row in mapping:
-        if str(row["BMU_Id"]).startswith("C__") and not row["Effective_date_to"]:
-            current.setdefault(str(row["BMU_Id"]), []).append(str(row["CFD_Id"]))
-    current = {bmu: cfd for bmu, cfd in current.items() if cfd}
-    units = single_site_cfd_bmus(mapping=mapping, portfolio=portfolio)
+    current = current_cfd_ids(mapping=mapping, today=today)
+    units = single_site_cfd_bmus(mapping=mapping, portfolio=portfolio, today=today)
     listed = {str(r["elexonBmUnit"]) for r in reference if r["elexonBmUnit"]}
     solar = [bmu for bmu, unit in units.items() if unit["technology"] == "Solar PV"]
     unlisted = sorted(set(solar) - listed)
+    statuses = [units[bmu]["status"] for bmu in unlisted]
+    live = sum(status.startswith("Live") for status in statuses)
     cfd_in_census = census.filter(pl.col("elexon_bmu_id").str.starts_with("C__"))
+    single_ids = cfd_in_census.filter(pl.col("scope") == "single-site")["elexon_bmu_id"].to_list()
     rows = [
         ("`C__` BMUs with a current CfD identifier in the mapping", str(len(current))),
         ("Of those, BMUs that carry one named CfD unit", str(len(units))),
@@ -557,16 +637,28 @@ def lccc_table(
             str(len(unlisted)),
         ),
         (
-            f"Of those, BMUs with B1610 rows between {PROBE_FROM[:10]} and {PROBE_TO[:10]}",
-            str(probe(unlisted)),
+            "Of those, distinct CfD units",
+            str(len({units[bmu]["cfd_id"] for bmu in unlisted})),
+        ),
+        ("Of those, BMUs whose CfD unit is live", str(live)),
+        ("Of those, BMUs whose CfD unit has not started", str(len(unlisted) - live)),
+        (f"Of those, BMUs with B1610 rows {probe_label}", str(probe(unlisted))),
+        (
+            f"Positive control: {single_ids[0]} has B1610 rows {probe_label}",
+            str(probe(single_ids[:1])),
         ),
         ("`C__` census BMUs", str(cfd_in_census.height)),
-        (
-            "Of those, single-site BMUs",
-            str(cfd_in_census.filter(pl.col("scope") == "single-site").height),
-        ),
+        ("Of those, single-site BMUs", str(len(single_ids))),
     ]
     return pl.DataFrame(rows, schema=["quantity", "value"], orient="row")
+
+
+def _half_hour_days(*, bmu_id: str, window_label: str) -> pl.DataFrame:
+    """Return a BMU's output in megawatts with the UTC day and month of each half-hour's start."""
+    start = pl.col("half_hour_end_time").dt.offset_by("-30m")
+    return pl.read_parquet(OUTPUT_DIR / f"{bmu_id}_{window_label}.parquet").select(
+        day=start.dt.date(), month=start.dt.strftime("%Y-%m"), megawatts=pl.col("output_mwh") * 2
+    )
 
 
 def monthly_largest_output_table(*, bmu_ids: list[str], window_label: str) -> pl.DataFrame:
@@ -577,21 +669,96 @@ def monthly_largest_output_table(*, bmu_ids: list[str], window_label: str) -> pl
         window_label: The window's label in the file names.
 
     Returns:
-        One row per month (`YYYY-MM`, in UTC) and one column per BMU. A month with no row in a BMU's
-        file is null.
+        One row per month (`YYYY-MM`, in UTC, of the half-hour's start) and one column per BMU. A
+        month with no row in a BMU's file is null.
     """
     table: pl.DataFrame | None = None
     for bmu_id in bmu_ids:
         monthly = (
-            pl.read_parquet(OUTPUT_DIR / f"{bmu_id}_{window_label}.parquet")
-            .with_columns(month=pl.col("half_hour_end_time").dt.strftime("%Y-%m"))
+            _half_hour_days(bmu_id=bmu_id, window_label=window_label)
             .group_by("month")
-            .agg((pl.col("output_mwh").max() * 2).round(1).alias(bmu_id))
+            .agg(pl.col("megawatts").max().round(1).alias(bmu_id))
         )
         table = (
             monthly if table is None else table.join(monthly, on="month", how="full", coalesce=True)
         )
     return pl.DataFrame() if table is None else table.sort("month")
+
+
+def low_output_runs_table(
+    *, bmu_id: str, window_label: str, threshold_mw: float = LOW_OUTPUT_MW
+) -> pl.DataFrame:
+    """List the runs of consecutive UTC days on which a BMU's largest output is below a threshold.
+
+    Args:
+        bmu_id: The BMU.
+        window_label: The window's label in the file names.
+        threshold_mw: A day counts when its largest half-hourly output is below this.
+
+    Returns:
+        One row per run: its first and last day, the number of days, and the largest daily maximum
+        in the run in megawatts. A day with no half-hour in the BMU's file is not a day.
+    """
+    daily = (
+        _half_hour_days(bmu_id=bmu_id, window_label=window_label)
+        .group_by("day")
+        .agg(maximum=pl.col("megawatts").max())
+        .sort("day")
+        .with_columns(low=pl.col("maximum") < threshold_mw)
+        .with_columns(run=(pl.col("low") != pl.col("low").shift(1, fill_value=False)).cum_sum())
+    )
+    return (
+        daily.filter(pl.col("low"))
+        .group_by("run")
+        .agg(
+            first_day=pl.col("day").min(),
+            last_day=pl.col("day").max(),
+            days=pl.len(),
+            largest_daily_maximum_mw=pl.col("maximum").max().round(1),
+        )
+        .sort("first_day")
+        .drop("run")
+    )
+
+
+def capped_period_table(
+    *, bmu_id: str, window_label: str, first: date, last: date, cap_mw: float
+) -> pl.DataFrame:
+    """Summarise a period of days in which a BMU's output looks capped.
+
+    Args:
+        bmu_id: The BMU.
+        window_label: The window's label in the file names.
+        first: The first day of the period.
+        last: The last day of the period.
+        cap_mw: A day whose largest output is above this is an exception to the cap.
+
+    Returns:
+        Rows of `quantity` and `value`: the days in the period, the days with a largest output
+        below `LOW_OUTPUT_MW`, the days above `cap_mw` with their largest output, and the highest
+        daily maximum among the remaining days.
+    """
+    daily = (
+        _half_hour_days(bmu_id=bmu_id, window_label=window_label)
+        .filter(pl.col("day").is_between(first, last))
+        .group_by("day")
+        .agg(maximum=pl.col("megawatts").max())
+        .sort("day")
+    )
+    above = daily.filter(pl.col("maximum") > cap_mw)
+    rest = daily.filter((pl.col("maximum") <= cap_mw) & (pl.col("maximum") >= LOW_OUTPUT_MW))
+    exceptions = ", ".join(f"{d} ({m:.1f} MW)" for d, m in above.iter_rows())
+    rows = [
+        (f"Days from {first} to {last}", str(daily.height)),
+        (
+            f"Days with a largest output below {LOW_OUTPUT_MW} MW",
+            str(daily.filter(pl.col("maximum") < LOW_OUTPUT_MW).height),
+        ),
+        (f"Days with a largest output above {cap_mw} MW", exceptions or "none"),
+        ("Highest daily maximum on the other days (MW)", f"{_as_float(rest['maximum'].max()):.1f}"),
+        ("Lowest daily maximum on the other days (MW)", f"{_as_float(rest['maximum'].min()):.1f}"),
+    ]
+    return pl.DataFrame(rows, schema=["quantity", "value"], orient="row")
 
 
 def observed_power_table(*, table: pl.DataFrame, window_label: str) -> pl.DataFrame:
@@ -1808,6 +1975,12 @@ def main() -> None:
         },
         single=single,
     )
+    without_litchardon = shape_error_without_table(
+        by_shape={
+            shape: table for (shape, scope), table in estimates.items() if scope == "single-site"
+        },
+        excluded="C__LSTAT020",
+    )
     facts = shape_facts_table(
         cams=cams,
         grid_sun=grid_sun,
@@ -1816,7 +1989,13 @@ def main() -> None:
         aggregate_grid=estimates[("mean of the 18 CAMS grid points", "aggregate")],
         census=census,
     )
-    lccc_mapping, lccc_portfolio = fetch_lccc()
+    lccc_mapping, lccc_portfolio = fetch_lccc(today=run_date)
+    probe_first, probe_after = probe_week(window=window)
+    cfd_ids = (
+        census.filter(pl.col("scope") == "single-site")
+        .filter(pl.col("elexon_bmu_id").str.starts_with("C__"))["elexon_bmu_id"]
+        .to_list()
+    )
     sections = [
         "# Solar-BMU census report",
         intro,
@@ -1874,6 +2053,8 @@ def main() -> None:
         *estimate_sections,
         "## Errors of each shape on the BMUs that ran at Generation Capacity and on the others\n\n"
         + _md(subset_errors),
+        "## Errors of each shape on all the BMUs, and without `C__LSTAT020`\n\n"
+        + _md(without_litchardon),
         "## Facts about the CAMS shapes and the shape choice\n\n" + _md(facts),
         "## Aggregate BMUs (supplier, virtual, and other identifiers), reported apart\n\n"
         + aggregate_note
@@ -1919,10 +2100,18 @@ def main() -> None:
         + _md(aggregate_flow_table(aggregates=aggregates, window_label=window.label)),
         "## What a single lookup gives, and what the study finds\n\n"
         + _md(register_table(census=census, today=run_date)),
-        "## Largest half-hourly output of the two `C__` census BMUs, by month (MW)\n\n"
+        "## Largest half-hourly output of the single-site `C__` census BMUs, by month (MW)\n\n"
+        + _md(monthly_largest_output_table(bmu_ids=cfd_ids, window_label=window.label)),
+        f"## Runs of days with a largest output below {LOW_OUTPUT_MW} MW, `C__LSTAT020`\n\n"
+        + _md(low_output_runs_table(bmu_id="C__LSTAT020", window_label=window.label)),
+        "## `C__LSTAT020` from 1 March to 15 May 2026\n\n"
         + _md(
-            monthly_largest_output_table(
-                bmu_ids=["C__ESTAT019", "C__LSTAT020"], window_label=window.label
+            capped_period_table(
+                bmu_id="C__LSTAT020",
+                window_label=window.label,
+                first=date(2026, 3, 1),
+                last=date(2026, 5, 15),
+                cap_mw=30.0,
             )
         ),
         "## What the BMU register records about the aggregate census BMUs\n\n"
@@ -1934,7 +2123,11 @@ def main() -> None:
                 portfolio=lccc_portfolio,
                 reference=reference,
                 census=census,
-                probe=lambda ids: unlisted_cfd_solar_with_output(bmu_ids=ids),
+                today=run_date,
+                probe=lambda ids: unlisted_cfd_solar_with_output(
+                    bmu_ids=ids, first=probe_first, after=probe_after
+                ),
+                probe_label=f"from {probe_first} up to {probe_after}",
             )
         ),
         "## Where each single-site census BMU connects: GSP group and DNO area\n\n"

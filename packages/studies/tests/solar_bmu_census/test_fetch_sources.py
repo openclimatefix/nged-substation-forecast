@@ -11,6 +11,7 @@ from typing import Any
 import fetch_sources
 import polars as pl
 
+TODAY = date(2026, 10, 7)
 WINDOW = fetch_sources.Window(
     start=datetime(2026, 6, 1, tzinfo=UTC), end=datetime(2026, 6, 3, tzinfo=UTC)
 )
@@ -131,6 +132,7 @@ def _portfolio_row(*, cfd_id: str, name: str, capacity: str = "30.000") -> dict[
 
 def test_a_c_bmu_with_one_named_cfd_unit_is_a_single_site() -> None:
     units = fetch_sources.single_site_cfd_bmus(
+        today=TODAY,
         mapping=[_mapping_row(cfd_id="AR4-X", bmu_id="C__ONE")],
         portfolio=[_portfolio_row(cfd_id="AR4-X", name="Example Solar Farm", capacity="49.900")],
     )
@@ -148,6 +150,7 @@ def test_a_c_bmu_with_one_named_cfd_unit_is_a_single_site() -> None:
 
 def test_a_c_bmu_that_carries_two_current_cfd_units_is_not_a_single_site() -> None:
     units = fetch_sources.single_site_cfd_bmus(
+        today=TODAY,
         mapping=[
             _mapping_row(cfd_id="A", bmu_id="C__POOL"),
             _mapping_row(cfd_id="B", bmu_id="C__POOL"),
@@ -159,6 +162,7 @@ def test_a_c_bmu_that_carries_two_current_cfd_units_is_not_a_single_site() -> No
 
 def test_an_ended_mapping_row_does_not_count_towards_a_single_site() -> None:
     units = fetch_sources.single_site_cfd_bmus(
+        today=TODAY,
         mapping=[
             _mapping_row(cfd_id="OLD", bmu_id="C__MOVED", ended=True),
             _mapping_row(cfd_id="NEW", bmu_id="C__MOVED"),
@@ -173,6 +177,7 @@ def test_an_ended_mapping_row_does_not_count_towards_a_single_site() -> None:
 
 def test_a_cfd_unit_without_a_name_or_a_portfolio_row_is_not_a_single_site() -> None:
     units = fetch_sources.single_site_cfd_bmus(
+        today=TODAY,
         mapping=[
             _mapping_row(cfd_id="NONAME", bmu_id="C__BLANK"),
             _mapping_row(cfd_id="MISSING", bmu_id="C__LOST"),
@@ -184,6 +189,7 @@ def test_a_cfd_unit_without_a_name_or_a_portfolio_row_is_not_a_single_site() -> 
 
 def test_only_c_bmus_are_considered() -> None:
     units = fetch_sources.single_site_cfd_bmus(
+        today=TODAY,
         mapping=[_mapping_row(cfd_id="A", bmu_id="T_WIND-1")],
         portfolio=[_portfolio_row(cfd_id="A", name="A wind farm")],
     )
@@ -192,7 +198,60 @@ def test_only_c_bmus_are_considered() -> None:
 
 def test_a_blank_contract_capacity_is_none() -> None:
     units = fetch_sources.single_site_cfd_bmus(
+        today=TODAY,
         mapping=[_mapping_row(cfd_id="A", bmu_id="C__X")],
         portfolio=[_portfolio_row(cfd_id="A", name="Named", capacity="")],
     )
     assert units["C__X"]["capacity_mw"] is None
+
+
+def test_a_mapping_row_that_ends_in_the_future_is_still_current() -> None:
+    units = fetch_sources.single_site_cfd_bmus(
+        today=TODAY,
+        mapping=[
+            {
+                "CFD_Id": "A",
+                "BMU_Id": "C__X",
+                "Effective_From": "2024-01-01",
+                "Effective_date_to": "2027-01-01 00:00:00.0000000",
+            }
+        ],
+        portfolio=[_portfolio_row(cfd_id="A", name="Named")],
+    )
+    assert "C__X" in units
+
+
+def test_a_mapping_row_that_ends_on_the_run_date_has_ended() -> None:
+    units = fetch_sources.single_site_cfd_bmus(
+        today=TODAY,
+        mapping=[
+            {
+                "CFD_Id": "A",
+                "BMU_Id": "C__X",
+                "Effective_From": "2024-01-01",
+                "Effective_date_to": "2026-10-07 00:00:00.0000000",
+            }
+        ],
+        portfolio=[_portfolio_row(cfd_id="A", name="Named")],
+    )
+    assert units == {}
+
+
+def test_two_bm_units_can_carry_the_same_named_cfd_unit() -> None:
+    units = fetch_sources.single_site_cfd_bmus(
+        today=TODAY,
+        mapping=[
+            _mapping_row(cfd_id="A", bmu_id="C__ONE"),
+            _mapping_row(cfd_id="A", bmu_id="C__TWO"),
+        ],
+        portfolio=[_portfolio_row(cfd_id="A", name="Shared")],
+    )
+    assert set(units) == {"C__ONE", "C__TWO"}
+
+
+def test_a_ckan_response_without_success_is_not_cached() -> None:
+    import pytest
+
+    with pytest.raises(RuntimeError):
+        fetch_sources._check_ckan_success('{"success": false}')
+    fetch_sources._check_ckan_success('{"success": true, "result": {}}')

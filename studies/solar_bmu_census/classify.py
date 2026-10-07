@@ -294,8 +294,10 @@ def classify_all() -> pl.DataFrame:
     reference = fetch_bmu_reference()
     igcpu_ids = igcpu_solar_ids(igcpu=fetch_igcpu(today=today))
     fetched_ids = b1610_bmu_ids(reference=reference)
-    mapping, portfolio = fetch_lccc()
-    single_site_cfd_ids = set(single_site_cfd_bmus(mapping=mapping, portfolio=portfolio))
+    mapping, portfolio = fetch_lccc(today=today)
+    single_site_cfd_ids = set(
+        single_site_cfd_bmus(mapping=mapping, portfolio=portfolio, today=today)
+    )
     rows = []
     for bmu_id in fetched_ids + sorted(igcpu_ids - set(fetched_ids)):
         path = OUTPUT_DIR / f"{bmu_id}_{window.label}.parquet"

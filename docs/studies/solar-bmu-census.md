@@ -35,15 +35,18 @@ Green Solar follows at 2.0, because its TEC value covers the solar BMU and the s
 - **To state the capacity of one solar BMU, use its Generation Capacity**, and keep the five
   published capacities and the P99 apart ([Capacity](#capacity)).
 - **To compare a solar BMU's output with a solar forecast, use the solar BMU without its site's
-  storage BMU, and drop 26 and 29 January 2026 at Tebworth PV Power Park and 13 July 2026 at Cleve
-  Hill**, when the solar BMU's meter carried flows that were not solar
-  ([Discussion](#discussion-what-to-use)).
+  storage BMU, and drop 26 and 29 January 2026 at Tebworth PV Power Park, 13 July 2026 at Cleve
+  Hill, and the days of almost no output or capped output at Litchardon Solar Farm** (24 to 25
+  February, 8 to 16 April, 16 May to 28 July, and 28 to 31 August 2026, and the capped days from 1
+  March to 15 May), when the solar BMU's meter carried flows that were not solar or its output was
+  held down ([Discussion](#discussion-what-to-use)).
 
 ## Key findings
 
 - **A wide gap in correlation of output with the sun's height, from 0.49 to 0.71, separates the 11
   single-site BMUs that follow the sun from the other single-site BMUs with output**, so the census
-  does not depend on where the threshold sits in that gap ([The census](#the-census)).
+  does not depend on where the threshold sits in that gap. The lower edge of the gap, 0.71, is
+  Litchardon Solar Farm, whose outage lowers its correlation ([The census](#the-census)).
 - **The 12 single-site solar BMUs have 776.9 MW of Generation Capacity in all**: 144.0 MW at the 3
   BMUs at pure PV sites and 633.0 MW at the 9 BMUs at hybrid sites. The parts do not add exactly to
   the total because each is rounded to one decimal place on its own ([Capacity](#capacity)).
@@ -55,7 +58,7 @@ Green Solar follows at 2.0, because its TEC value covers the solar BMU and the s
 - **By the BMU register, 2 of the 12 single-site BMUs are in a licence area of National Grid
   Electricity Distribution (NGED), and both are embedded in a distribution network**: Bishampton
   Solar PV (West Midlands) and Litchardon Solar Farm (South West England). The register gives a
-  grid supply point group to a third embedded BMU, Kincraig in North Scotland, and to none of the
+  grid supply point (GSP) group to a third embedded BMU, Kincraig in North Scotland, and to none of the
   nine transmission-connected BMUs. By the coordinates of their REPD rows, 4 of the 12 lie inside
   NGED's licence areas: the two embedded BMUs, Larks Green, and probably Sutton Bridge. Larks Green
   and Sutton Bridge connect to the transmission network and not to NGED's
@@ -75,8 +78,9 @@ Green Solar follows at 2.0, because its TEC value covers the solar BMU and the s
   fitted solar-output curves put it between 782.1 MW and 971.3 MW**, with 782.1 MW from the cosine
   of the solar zenith angle as the shape and 971.3 MW from the mean irradiance of 18 grid points of
   the Copernicus Atmosphere Monitoring Service (CAMS). On the 11 single-site BMUs, all solar-only,
-  the largest error against Generation Capacity is 33% for the cosine and 28% for the CAMS mean, and
-  validation cannot choose between the two shapes ([Capacity](#capacity)).
+  the largest error against Generation Capacity is 33% for the cosine and 28% for the CAMS mean,
+  both at Litchardon Solar Farm, and 27% and 16% without it. Validation cannot choose between the
+  two shapes ([Capacity](#capacity)).
 - **Of the 26 aggregate BMUs, five belonging to one supplier hold 90% of the Generation Capacity**,
   and each of the five has output below zero in 77% to 95% of its half-hours
   ([The aggregate BMUs in the census](#the-aggregate-bmus-in-the-census)).
@@ -149,55 +153,71 @@ counts two kinds of BMU as aggregate: supplier BMUs (identifier prefix `2__`) an
 (`V__`).** The prefixes come from [Elexon's guidance note on BM
 Units](https://bscdocs.elexon.co.uk/guidance-notes/bm-units-registration-of-balancing-mechanism-bm-units)
 (version 17.0) and not from the Balancing and Settlement Code (BSC), which is the rulebook for
-Elexon's settlement. The same note says that a `C__` BMU is an Additional Supplier BMU that is
-registered solely to allocate Contract for Difference (CfD) assets. Each of the two `C__` BMUs in
-the census turned out to be one named solar farm, so the study counts them as single-site ([Data and
-methods](#data-and-methods)).
+Elexon's settlement. The two `C__` BMUs in the census are one named solar farm each, so the study
+counts them as single-site ([Data and methods](#data-and-methods)).
 
-**Every supplier is registered with one Base BMU for each grid supply point (GSP) group, so a
-supplier BMU has exactly one GSP group and no finer location.** A GSP group is one of the 14 areas
-that Elexon uses for settlement ([Distribution network operator
-areas](#distribution-network-operator-areas)). [BSC Section
+**Every supplier is registered with one Base BMU for each GSP group, so a supplier BMU has exactly
+one GSP group and no finer location.** A GSP group is one of the 14 areas that Elexon uses for
+settlement ([Distribution network operator areas](#distribution-network-operator-areas)). [BSC
+Section
 K](https://bscdocs.elexon.co.uk/bsc/bsc-section-k-classification-and-registration-of-metering-systems-and-bm-units)
 (version 56.0) says that each supplier is automatically registered as holding one BMU for each GSP
-group (clause K3.3.1(a)), that a supplier may apply to register further BMUs and must name the GSP
-group of each (K3.3.2(b)), and that the automatically registered BMU is the Base BMU and every other
-is an Additional BMU (K3.3.5). All 26 aggregate census BMUs have a GSP group in the BMU register,
-and for every `2__` and `V__` BMU the fourth character of the identifier is the letter of that group.
+group for each of its Supplier IDs (clauses K3.3.1(a) and K3.3.11), that a supplier may apply to
+register further BMUs and must name the GSP group of each (K3.3.2(b)), and that the automatically
+registered BMU is the Base BMU and every other is an Additional BMU (K3.3.5). All 26 aggregate
+census BMUs have a GSP group in the BMU register, and for every `2__` and `V__` BMU the fourth
+character of the identifier is the letter of that group.
 
 **A Base BMU holds every metering system of the supplier's customers in the GSP group that is not in
-an Additional BMU, so the BMU nets demand against any generation behind those meters and its output
-can be negative.** Clause K3.3.8 puts all the plant and apparatus on a supplier's registered
-metering systems in a GSP group that is not assigned to an Additional BMU into the Base BMU for that
-group. The study found no field for the fuel or technology of a supplier BMU in Section K. The BMU
-register records a negative Demand Capacity for all 21 `G` type aggregate census BMUs, such as
--304.2 MW at `2__ATGPL000`, and each of the five TotalEnergies BMUs has output below zero in 77% to
-95% of its half-hours. Both facts are consistent with demand netted against generation. The register
-types 21 of the 24 supplier BMUs `G` and 3 `S`. The study infers that `G` marks a Base BMU and `S`
-an Additional BMU, and found no document that says so.
+an Additional BMU, so the BMU's settled output is the generation exported by all those metering
+systems minus the demand imported by all of them, and can be negative.** Clause K3.3.8 puts all the
+plant and apparatus on a supplier's registered metering systems in a GSP group that is not assigned
+to an Additional BMU into the Base BMU for that group. The study found no field for the fuel or
+technology of a supplier BMU in Section K. The BMU register records a negative Demand Capacity for
+all 21 `G` type aggregate census BMUs, such as -304.2 MW at `2__ATGPL000`, and each of the five
+TotalEnergies BMUs has output below zero in 77% to 95% of its half-hours. Both facts are consistent
+with demand netted against generation.
 
-**A virtual BMU is a Secondary BMU, which a Virtual Lead Party registers for assets that sit behind
-a metering boundary.** The guidance note says that a Virtual Lead Party, a Virtual Trading Party, or
-an Asset Metering Virtual Lead Party may register Secondary BMUs (identifier `V__XPPPPNNN`, where X
-is the GSP group letter) to provide balancing services or to trade in the wholesale market. A
-Secondary BMU must not contain plant in more than one GSP group (K8.1.2(e)). Modification
-[P375](https://www.elexon.co.uk/mod-proposal/p375/), implemented on 30 June 2022, made it possible
-to settle a Secondary BMU with metering behind the site boundary point, and modification
-[P415](https://www.elexon.co.uk/mod-proposal/p415/), implemented on 7 November 2024, widened access
-to the wholesale market for flexibility that Virtual Lead Parties dispatch.
+**The register's type codes `G` and `S` mark Base and Additional supplier BMUs, although no document
+that the study found states the codes.** The register types 21 of the 24 supplier BMUs in the census
+`G` and 3 `S`. The guidance note numbers a supplier's Base BMU `000` and its Additional BMUs from
+`001`. Across the whole register, every `2__` BMU whose identifier ends `000` is type `G` (548 of
+548) and every other `2__` BMU is type `S` (324 of 324). The four `C__` BMUs in the register, which
+the note calls Additional BMUs, are also type `S`. The 3 `S` type census BMUs (`2__ALOND001`,
+`2__BECOT003`, and `2__BEDGE001`) have a Demand Capacity of zero, which fits Additional BMUs that
+hold generation only.
 
-**No public source that the study found gives the technology mix of any aggregate BMU.** The study
-searched BSC Section K, where it found no fuel or technology field for supplier or secondary BMUs;
-the Elexon BMU register, whose fuel type is empty for all 26 aggregate census BMUs and has no solar
-value at all, and which [Elexon's glossary](https://www.elexon.co.uk/glossary/fuel-type) says
-reflects the primary fuel of each power station as assigned by NESO; NESO's fuel type
-categorisation; supplier disclosures of fuel mix (from TotalEnergies, British Gas, EDF, Ecotricity,
-Axpo, and Edgware, none of which gave a BMU); Ofgem's Renewables Obligation, Renewable Energy
-Guarantees of Origin, and Feed-in Tariff registers, which give a technology for each station but no
-BMU; the distribution network operators' registers of embedded capacity, which give technology,
-capacity, and substation but no BMU or supplier; and aggregators' press material. The study did not
-check commercial databases that need a login, such as Modo's BMU database, or whether Ofgem's holder
-reports for Renewable Energy Guarantees of Origin are public.
+**A virtual BMU is a Secondary BMU, which a Virtual Lead Party registers for plant that
+half-hourly supplier-volume meters or asset meters measure.** The guidance note says that a Virtual
+Lead Party, a Virtual Trading Party, or an Asset Metering Virtual Lead Party may register Secondary
+BMUs (identifier `V__XPPPPNNN`, where X is the GSP group letter) to provide balancing services or to
+trade in the wholesale market. A Secondary BMU may only contain plant that half-hourly
+supplier-volume meters measure, or whose flows an asset meter measures, and not plant that the
+transmission-level meters measure (K8.1.2(a) and (b)). It must not contain plant in more than one
+GSP group (K8.1.2(e)). Modification [P375](https://www.elexon.co.uk/mod-proposal/p375/) (implemented
+on 30 June 2022) made it possible to settle a Secondary BMU with metering behind the site boundary
+point.
+
+**No public source that the study found gives the technology mix of the sites that an aggregate
+BMU pools.** The study searched:
+
+- BSC Section K, where it found no fuel or technology field for supplier or secondary BMUs.
+- The Elexon BMU register, whose fuel type is empty for all 26 aggregate census BMUs and has no
+  solar value at all. [Elexon's glossary](https://www.elexon.co.uk/glossary/fuel-type) says that
+  NESO assigns a fuel type from the primary fuel of each power station.
+- NESO's fuel type categorisation, which is [Elexon's BMU fuel type
+  spreadsheet](https://www.elexon.co.uk/bsc/documents/data/operational-data/bmu-fuel-type/).
+- Supplier disclosures of fuel mix, from TotalEnergies, British Gas, EDF, Ecotricity, Axpo, and
+  Edgware, none of which gave a BMU.
+- Ofgem's Renewables Obligation, Renewable Energy Guarantees of Origin, and Feed-in Tariff
+  registers, which give a technology for each station but no BMU.
+- The distribution network operators' registers of embedded capacity, which give technology,
+  capacity, and substation but no BMU or supplier.
+- Aggregators' press material, including that of Flexitricity, the lead party of both virtual census
+  BMUs.
+
+The study did not check commercial databases that need a login, such as Modo's BMU database, or
+whether Ofgem's holder reports for Renewable Energy Guarantees of Origin are public.
 
 **The solar part of an aggregate BMU can therefore only be inferred from the BMU's output.** The
 study's inference is in [Capacity](#capacity), and
@@ -247,7 +267,10 @@ too little output to judge.
 **Single-site and aggregate BMUs.** A BMU is single-site when its identifier starts with `T_`
 (connected to the transmission network), `E_` (embedded in a distribution network), or `M_`, a
 prefix that the study does not interpret, or when the BMU is a `C__` BMU that the Low Carbon
-Contracts Company maps to one named Contract for Difference (CfD) unit. The BMU register's own
+Contracts Company maps to one named Contract for Difference (CfD) unit. Elexon's guidance note says
+that a `C__` BMU is an Additional Supplier BMU registered solely to allocate CfD assets, and that
+`M_` marks "other types of Primary BM Units that don't fit the above categories", so an `M_` BMU is
+not promised to be one site. The BMU register's own
 `bmUnitType` field agrees with the `T_` and `E_` prefixes: it holds `T` for every `T_` BMU and `E`
 for every `E_` BMU, and no `M_` BMU is in the census. A single-site BMU's output and capacity belong
 to one place, so the study can match the BMU to one project and one position. The other
@@ -256,19 +279,23 @@ as aggregate ([Aggregate BMUs](#aggregate-bmus)).
 
 **Which `C__` BMUs are single-site.** The Low Carbon Contracts Company's mapping of CfD units to
 BMUs holds 82 `C__` BMUs with a current CfD identifier, and each of the 82 carries exactly one named
-CfD unit. Of the 82, 63 are Solar PV, and only 4 appear in the BMU register. The two `C__` BMUs in
+CfD unit, so the rule makes every current `C__` BMU in the mapping single-site. Of the 82, 63 are
+Solar PV, and only 4 appear in the BMU register. The two `C__` BMUs in
 the census are `C__ESTAT019`, which carries Bishampton Solar PV (a maximum contract capacity of 30
 MW), and `C__LSTAT020`, which carries Litchardon Solar Farm (49.9 MW). The company's portfolio
-lists both as Solar PV and distribution-connected. The other 61 Solar PV `C__` BMUs are not in the
-BMU register, so the study does not download their output. The study asked for the B1610 rows of
-each of the 61 for the week of 1 to 7 June 2026 and found none.
+lists both as Solar PV and distribution-connected. The other 61 Solar PV `C__` BMUs, which carry 58
+CfD units because three units each map to two BMUs, are not in the BMU register, so the study does
+not download their output. The portfolio lists 40 of the 61 as live and 21 as not yet started. The
+study asked for the B1610 rows of each of the 61 for the week of 1 to 7 June 2026 and found none,
+while the same request for `C__ESTAT019` returns rows.
 
 **Hybrid and pure PV.** A site is hybrid if it also holds storage. The study grades the evidence of
 storage from strongest to weakest. The strongest evidence is a separately registered storage BMU
 with output in the window. Next is an operational battery that REPD links to the site's solar row.
 Weakest is storage that is planned or under construction, listed in the TEC plant type or in a REPD
-battery row that is not yet operational. A site with none of the three kinds of storage evidence is
-pure PV when its TEC plant type lists PV only, or when REPD has a solar row and no battery row.
+battery row that REPD links to the solar row and that is not yet operational. A site with none of
+the three kinds of storage evidence is pure PV when its TEC plant type lists PV only, or when REPD
+has a solar row and no battery row that REPD links to it.
 
 **Matching a BMU to TEC and REPD.** TEC and REPD carry no BMU identifier, so the study matches each
 BMU's name in the BMU register to a TEC or REPD project name, accepting a match with a
@@ -279,16 +306,18 @@ connection site. For the two `C__` BMUs, the match uses the name and capacity of
 finds an REPD solar row for each (Bishampton Solar Farm, 30 MW, and Litchardon Cross Solar Farm,
 49.9 MW) and no TEC row, because the TEC register lists projects that export to the transmission
 network and both sites are distribution-connected. REPD also lists an abandoned 8.8 MW battery at
-Bishampton, which the study does not count as storage. The TEC register holds one row for each stage
-of a project, so the study takes each project's most advanced row. From that row, the study uses the
-connected capacity if the project is built and the agreed capacity if the project is still under
-construction. Three matched projects hold a later stage that the register does not list as built:
-Cleve Hill adds 200.0 MW with an effective date of 2 June 2036, the Iron Acton project (Larks Green)
-adds 20.6 MW with status Consents Approved, and the Walpole project (Sutton Bridge) adds 7.1 MW with
-status Scoping. None of the three later stages is in the TEC column.
+Bishampton (Ref 11624), and a battery with planning permission 0.85 km away on the same lane (Ref
+18896, Infinis Energy Storage Limited, no capacity given). Ref 18896 is not linked to the solar row,
+so the study does not count it, and Bishampton may become a hybrid site. The TEC register holds one
+row for each stage of a project, so the study takes each project's most advanced row. From that row,
+the study uses the connected capacity if the project is built and the agreed capacity if the project
+is still under construction. Three matched projects hold a later stage that the register does not
+list as built: Cleve Hill adds 200.0 MW with an effective date of 2 June 2036, the Iron Acton
+project (Larks Green) adds 20.6 MW with status Consents Approved, and the Walpole project (Sutton
+Bridge) adds 7.1 MW with status Scoping. None of the three later stages is in the TEC column.
 
-**Placing a BMU in a licence area.** The study uses two methods. The first reads the grid supply
-point (GSP) group that the BMU register gives the BMU and maps the group's identifier to a
+**Placing a BMU in a licence area.** The study uses two methods. The first reads the GSP group
+that the BMU register gives the BMU and maps the group's identifier to a
 distribution network operator (DNO) with NESO's map of the 14 DNO licence areas
 ([Distribution network operator areas](#distribution-network-operator-areas)). The second finds the
 licence area in that map that contains the position of the BMU's matched REPD row, by testing the
@@ -334,9 +363,14 @@ are single-site BMUs and 1,012 are not. Keeping the daytime zeros leaves 10 of t
 threshold. Litchardon Solar Farm falls to 0.51, and the highest correlation among the other
 single-site BMUs is 0.38.
 
-**Litchardon Solar Farm's output is almost zero throughout June 2026, which lowers its correlation
-with the sun.** Its largest half-hourly output in June 2026 is 0.2 MW, against 25.0 MW to 49.7 MW in
-each of March, April, May, July, and August 2026. The study did not find the cause.
+**Litchardon Solar Farm's output is almost zero on 74 days from 16 May to 28 July 2026 and is held
+below 28 MW on most other days from 1 March to 15 May, which lowers its correlation with the
+sun.** Its largest half-hourly output is below 1.5 MW on every day of four runs: 24 to 25 February
+(2 days), 8 to 16 April (9 days), 16 May to 28 July (74 days), and 28 to 31 August 2026 (4 days).
+From 1 March to 15 May, the largest daily output is between 7.2 MW and 27.1 MW on the 66 days that
+are not in a run, about half the CfD capacity of 49.9 MW, except on 6 April, when it reached 49.7
+MW. The pattern is consistent with an outage and an export cap, and the study did not find the
+cause.
 
 **The census holds 38 BMUs: 12 single-site BMUs and 26 aggregate BMUs.** Of the 11 BMUs that follow
 the sun, 7 are also typed Solar in IGCPU, and 4 are found only by their output. A twelfth
@@ -518,10 +552,15 @@ aggregate BMUs pool is unknown, so the study tries 1.2 and 1.6 as well.
 **On the 11 single-site BMUs that follow the sun, the 18-point CAMS mean recovers 753.1 MW against a
 Generation Capacity of 756.3 MW, with a mean absolute error of 12% and a largest error of 28% per
 BMU.** CAMS at each BMU's own position gives 709.0 MW, a mean absolute error of 11%, and a largest
-error of 28%. The cosine gives 630.8 MW, 14%, and 33%, so the cosine's largest error exceeds 30%,
-at Litchardon Solar Farm. The test uses the same sun-following BMUs that define the census, and all
-11 are solar-only, so the test checks the method on sites that are known to be solar and says
-nothing about aggregate BMUs that mix technologies and net demand.
+error of 28%. The cosine gives 630.8 MW, 14%, and 33%, so the cosine's largest error exceeds 30%.
+The largest error of both the cosine and the 18-point mean is at Litchardon Solar Farm, whose
+Generation Capacity of 62.0 MW is a doubtful target twice over: its CfD and REPD capacity is 49.9
+MW, and its output was almost zero on 89 days and held down on 66 more. Against 49.9 MW, the cosine
+estimate of 41.3 MW is 17% below. Without Litchardon, the 10 other BMUs give a largest error of 27%
+for the cosine, 17% for CAMS at the BMU's own point, and 16% for the 18-point mean, and a mean
+absolute error of 12%, 9%, and 10%. The test uses the same sun-following BMUs that define the
+census, and all 11 are solar-only, so the test checks the method on sites that are known to be solar
+and says nothing about aggregate BMUs that mix technologies and net demand.
 
 | BMU | Generation Capacity (MW) | P99 of output, share of Generation Capacity | Error, cosine | Error, CAMS at the BMU's own point | Error, 18-point CAMS mean |
 |---|---|---|---|---|---|
@@ -568,8 +607,8 @@ BMU's GSP group area, which the register's GSP group would allow.
 under-reads most at Litchardon Solar Farm, Cleve Hill Solar 1 and 2, Bishampton Solar PV, and
 Sutton Bridge, where the P99 of output is 52%, 79%, 79%, 73%, and 69% of Generation Capacity. A low
 P99 is consistent with curtailment or an export limit and does not show either. At Litchardon the
-low P99 also reflects June 2026, when the BMU's output was almost zero. The study did not establish
-the cause.
+low P99 also reflects the outage from 16 May to 28 July 2026. The study did not establish the
+cause.
 
 **The aggregate estimate can be too high or too low, and the study cannot say by how much.** An
 aggregate BMU can hold generation that is not solar. Gas or wind output that is high at midday can
@@ -648,15 +687,14 @@ coordinates.
 
 ### Distribution network operator areas
 
-**By the BMU register, 3 of the 12 single-site BMUs are in a distribution network operator (DNO)
-area: Kincraig in North Scotland, and Bishampton Solar PV and Litchardon Solar Farm in the areas of
-NGED.** Elexon's BMU register gives a grid supply point (GSP) group to every embedded and supplier
-BMU, but to no transmission-connected BMU. None of the register's 514 rows of type T
-(transmission-connected) names a group, and all 176 rows of type E (embedded) do. Nine of the 12
-single-site BMUs are transmission-connected (`T_`), so the register gives no DNO area for them. Only
-3 of the 38 census BMUs are embedded: Kincraig, and the two `C__` BMUs, which the Low Carbon
-Contracts Company lists as distribution-connected. Kincraig is also the only embedded BMU that IGCPU
-types as Solar.
+**By the BMU register, 3 of the 12 single-site BMUs are in a DNO area: Kincraig in North Scotland,
+and Bishampton Solar PV and Litchardon Solar Farm in the areas of NGED.** Elexon's BMU register
+gives a GSP group to every embedded and supplier BMU, but to no transmission-connected BMU. None of
+the register's 514 rows of type T (transmission-connected) names a group, and all 176 rows of type E
+(embedded) do. Nine of the 12 single-site BMUs are transmission-connected (`T_`), so the register
+gives no DNO area for them. Only 3 of the 38 census BMUs are embedded: Kincraig, and the two `C__`
+BMUs, which the Low Carbon Contracts Company lists as distribution-connected. Kincraig is also the
+only embedded BMU that IGCPU types as Solar.
 
 **A GSP group is, in [Elexon's
 definition](https://bscdocscontent.elexon.co.uk/documents/market-domain-data-overview.pdf), the part
@@ -724,7 +762,8 @@ Networks (4, 65.2 MW), Northern Powergrid (2, 5.3 MW), and Electricity North Wes
 **A solar BMU at a hybrid site follows the sun like the pure PV BMUs.** In the summer week (15 to 21
 June 2026, Figure 4) two of the three pure PV BMUs and the three solar BMUs at hybrid sites rise at
 dawn, peak near midday, and fall to zero at dusk. The third pure PV BMU, Litchardon Solar Farm, has
-almost no output in that week ([The census](#the-census)). The winter week (15 to 21 December 2025,
+almost no output in that week, which lies in its outage from 16 May to 28 July 2026 ([The
+census](#the-census)). The winter week (15 to 21 December 2025,
 Figure 5) shows the same shape at a lower peak at all six sites. Figures 4 and 5 draw the storage
 BMU on the same panel as the solar BMU at two of the three hybrid examples, Larks Green and Bulphan
 Fen. The third hybrid example, Cleve Hill, has no storage BMU that the study identified, so its
@@ -852,20 +891,23 @@ The census cannot count solar that is not a BMU ([Scope](#scope)), and the aggre
 that no public source names ([Aggregate BMUs](#aggregate-bmus)).
 
 **For the capacity of a solar BMU, Generation Capacity is the published capacity value closest to
-the BMU's largest output.** The largest output is within 1% of Generation Capacity for most of the
+the BMU's largest output.** The largest output is within 1% of Generation Capacity for 6 of the 11
 BMUs with output ([Capacity](#capacity)). The largest MEL agrees with Generation Capacity within 0.5
 MW for 6 of the 10 BMUs that have one, but a MEL is a level that the lead party submits, not a
 capacity. The
 recommendation rests on one year of output: a BMU whose largest output stays far below its
 Generation Capacity for a year would need another capacity value.
 
-**For a comparison of a solar BMU with a solar forecast, the solar BMU's output needs two days of
-exclusions: 26 and 29 January 2026 at Tebworth PV Power Park, and 13 July 2026 at Cleve Hill.** At
-the four sites with a storage BMU, the storage BMU's output is a separate series, and the solar
-BMU's output is consistent with excluding the battery's flows, except at Tebworth on 26 and 29
-January 2026. At Cleve Hill the two BMUs net to -0.5 MW on 13 July 2026, so a forecast comparison
-should sum the two Cleve Hill BMUs or drop that day. At Cleve Hill and Breach the study found no
-storage BMU and cannot say where the battery is metered.
+**For a comparison of a solar BMU with a solar forecast, the solar BMU's output needs exclusions:
+26 and 29 January 2026 at Tebworth PV Power Park, 13 July 2026 at Cleve Hill, and several periods at
+Litchardon Solar Farm.** At the four sites with a storage BMU, the storage BMU's output is a
+separate series, and the solar BMU's output is consistent with excluding the battery's flows,
+except at Tebworth on 26 and 29 January 2026. At Cleve Hill the two BMUs net to -0.5 MW on 13 July
+2026, so a forecast comparison should sum the two Cleve Hill BMUs or drop that day. At Cleve Hill
+and Breach the study found no storage BMU and cannot say where the battery is metered. At
+Litchardon Solar Farm, the days with almost no output (24 to 25 February, 8 to 16 April, 16 May to
+28 July, and 28 to 31 August 2026) and the capped days from 1 March to 15 May are not days that a
+forecast from the weather would reproduce.
 
 ## Limitations
 
@@ -877,8 +919,9 @@ storage BMU and cannot say where the battery is metered.
 - **The census's recall of embedded solar BMUs is unmeasured.** Only 3 embedded BMUs are in the
   census: Kincraig and the two `C__` BMUs. The Low Carbon Contracts Company's mapping lists 61 more
   Solar PV `C__` BMUs, which the BMU register does not list, so the study does not download their
-  output. The study found no B1610 rows for them in one week of June 2026 and did not check other
-  weeks. The study found no other list of embedded solar BMUs to check the census against.
+  output. Of those 61 BMUs, the portfolio lists 40 as live. The study found no B1610 rows for any of
+  them in the week of 1 to 7 June 2026 and did not check other weeks. The study found no other list
+  of embedded solar BMUs to check the census against.
 - **The matches to TEC and REPD rest on names and judgement.** The study matched 10 BMUs and 18 TEC
   projects by hand, using lead party, customer, capacity, and connection site. A wrong match would
   change a technology label, a position, or a capacity sum.
@@ -898,6 +941,8 @@ storage BMU and cannot say where the battery is metered.
   site. The 39.9 MW also equals the Tebworth storage BMU's Generation Capacity, so the study cannot
   tell whether the Sundon TEC value covers the solar farm.
 - **The hybrid label rests on graded evidence.** Only four sites have a storage BMU with output.
+  Bishampton Solar PV is counted as pure PV although REPD lists a battery with planning permission
+  nearby that it does not link to the solar row.
   Breach's operational battery is 0.66 MW, and two sites have storage that is not yet built. The
   Cleve Hill battery's operational status in REPD is doubtful ([Capacity](#capacity)).
 - **One pure PV site may have storage nearby.** Three embedded storage BMUs carry Burwell names
@@ -923,7 +968,7 @@ storage BMU and cannot say where the battery is metered.
   below Generation Capacity, and the P99 of output is below 90% of Generation Capacity at 6 of the 11
   validation BMUs (those three, Cleve Hill Solar 1, Sutton Bridge, and Tebworth PV Power Park), so
   the validation partly measures curtailment or export limits.
-- **The distribution network operator (DNO) tables cover only BMUs.** Most embedded solar has no
+- **The DNO tables cover only BMUs.** Most embedded solar has no
   BMU, so the tables say nothing about how much solar NGED's network holds. NESO calls its licence
   area boundaries approximate, so a position within a few kilometres of a boundary is placed with
   less confidence ([Distribution network operator areas](#distribution-network-operator-areas)).

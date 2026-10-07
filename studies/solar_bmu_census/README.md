@@ -71,7 +71,7 @@ the others. **The CAMS shapes read `solar_estimate.CAMS_PUBLIC_POINTS_PATH`, whi
 - `gsp_group`: the Elexon grid supply point (GSP) group identifier in the BMU register, such as
   `_B`. The register leaves the group empty for every transmission-connected (`T_`) BMU, so the
   column is empty for the nine transmission-connected single-site census BMUs. The two `C__` census
-  BMUs have a group, because the register types them `S`.
+  BMUs have a group, as every supplier BMU in the register does.
 - `dno_area`: the distribution network operator (DNO) whose licence area the GSP group names, from
   `collate.GSP_GROUP_AREAS`. The mapping is the attribute table of NESO's map of the 14 DNO licence
   areas. The column is empty when `gsp_group` is empty.
