@@ -23,8 +23,10 @@ Capacity (TEC) register, and the Renewable Energy Planning Database (REPD).
 [Introduction](#introduction) says what each capacity value measures. Across the census, the largest
 of one BMU's six values is up to 4.2 times its smallest. The factor of 4.2 is at Cleve Hill Solar 1,
 one of two BMUs at the Cleve Hill site, because TEC and REPD give one value for a whole project. The
-next-largest factors, 2.3 at Cleve Hill Solar 2 and 2.0 at Larks Green Solar, have the same cause or
-come from a TEC value that can include the site's storage.
+REPD value for Cleve Hill is also probably a direct-current (DC) rating of the solar array, so it
+exceeds even the two Cleve Hill BMUs' Generation Capacity added together. The next-largest factor
+after Cleve Hill Solar 2's 2.3 is 2.0 at Larks Green Solar, where the TEC value covers the solar BMU
+and the site's battery.
 
 - **To list solar BMUs, read each BMU's output and not the register, and treat the 10 single-site
   BMUs as a floor.** Add the 28 aggregate BMUs only where an application can accept BMUs that pool
@@ -74,7 +76,7 @@ lists, and which capacity value the study takes from it.
 | IGCPU (report B1420) | Elexon, for NESO | Installed capacity of each generating unit, with a resource type such as "Solar" | Installed capacity, as NESO lists it |
 | MELS (Elexon's dataset of Maximum Export Limits) | Elexon | The Maximum Export Limit (MEL), the highest export level that each lead party submits for each BMU, which is a submitted level and not a capacity | The largest MEL in the 30 days before the run |
 | TEC register | NESO | Each project's export capacity agreed at the grid connection, with one row for each stage of the project (for example under construction, or connected), and its plant types | Connected capacity if built, agreed capacity if not |
-| REPD | Department for Energy Security and Net Zero | Each renewable project planned or built, with its technology, status, and grid position | Installed capacity of the project |
+| REPD | Department for Energy Security and Net Zero | Each renewable project planned or built, with its technology, status, and grid position | Installed capacity of each project row; co-located storage has its own row, and a solar row's value can be a DC panel rating |
 
 Choosing among the capacity values needs a list of the solar BMUs first, and a single lookup cannot
 give that list.
@@ -104,8 +106,11 @@ carry no BMU identifier, so each BMU has to be matched to its project by name si
 **Capacity is five different numbers, and adding a column overcounts.** TEC and REPD describe a
 project, and one project can hold two BMUs: adding the TEC column over the 10 single-site BMUs gives
 1,083.8 MW, against 733.8 MW when each project is counted once. A hybrid project's TEC value can
-also include its storage. For the 28 aggregate BMUs, adding Generation Capacity gives 1,896.8 MW, of
-which most is not solar capacity ([Aggregates](#aggregate-bmus)).
+also include its storage. Where solar and storage share one grid connection, TEC can be less than
+the two added together: at Bulphan Fen and Tye Lane, TEC is 57.0 MW, against Generation Capacity
+sums of 106.8 MW and 109.1 MW for the solar BMU plus the storage BMU. For the 28 aggregate BMUs,
+adding Generation Capacity gives 1,896.8 MW, of which most is not solar capacity
+([Aggregates](#aggregate-bmus)).
 
 **Output identifies the technology where no register does, and it needs care.** A solar BMU's output
 is zero at night and follows the sun's height by day, and the output of wind, gas, hydro, and
@@ -181,7 +186,10 @@ resemble the project's name, so the study set the match by hand (the hand mappin
 capacity, the customer's name (the company that holds the TEC agreement), the lead party, and the
 connection site. The TEC register holds one row for each stage of a project, so the study takes each
 project's most advanced row. From that row, the study uses the connected capacity if the project is
-built and the agreed capacity if the project is still under construction.
+built and the agreed capacity if the project is still under construction. Two matched projects hold
+a later stage that the register does not list as built: Cleve Hill adds 200.0 MW with an effective
+date of 2 June 2036, and the Iron Acton project (Larks Green) adds 20.6 MW with status Consents
+Approved. Neither later stage is in the TEC column.
 
 **Recall.** The study checks the census against the 12 built and 6 under-construction TEC projects
 that list PV, because a project that holds TEC and lists PV should have a BMU. Each project is
@@ -256,10 +264,21 @@ only. One REPD value is missing because the matched REPD row lists no capacity. 
 BMUs share one TEC project and one REPD row, so both rows show the whole site's value.
 
 **At Breach and Larks Green, the REPD value exceeds Generation Capacity by about 17 MW and 20 MW,
-and the study cannot tell why.** REPD does not say whether its values are alternating-current (AC)
-or direct-current (DC) ratings. A DC panel rating would explain the gap, as would a value that
-includes other plant (REPD also lists a 49.5 MW battery at Larks Green). The two REPD values are 67
-MW and 70 MW. Breach's Maximum Export Limit is also 67 MW against 49.9 MW in TEC.
+and a DC panel rating is the likely reason.** The study found no published definition of the REPD
+column "Installed Capacity (MWelec)", nor of the TEC register's columns, that says whether a value
+is an alternating-current (AC) or a direct-current (DC) rating, so the study infers the DC reading
+and has not established it. A DC panel rating would explain the gap. A value that includes the
+battery would not, because REPD lists each site's battery in a row of its own. The two REPD values
+are 67 MW and 70 MW. Breach's Maximum Export Limit is also 67 MW against 49.9 MW in TEC. [National
+Grid describes Larks Green as a 49.9 MW solar
+farm](https://nationalgrid.com/uks-first-transmission-connected-solar-farm-goes-live), and [Solar
+Power
+Portal](https://www.solarpowerportal.co.uk/solar-projects/res-secures-asset-management-contract-for-70mw-solar-plus-storage-site)
+reports 70 MW of solar PV generation at the site. [Solar Power
+Portal](https://www.solarpowerportal.co.uk/battery-storage/octopus-acquires-68mw-breach-solar-farm-along-with-stake-in-storage-site)
+describes Breach as 68 MW. These descriptions, and the other facts in this section that come from
+operator and planning documents and not from the registers, are claims that the study checked by
+hand.
 
 | BMU | Name | Site | Generation Capacity (MW) | IGCPU installed (MW) | TEC (MW) | Largest MEL, 30 days (MW) | REPD installed (MW) | P99 of output (MW) |
 |---|---|---|---|---|---|---|---|---|
@@ -288,8 +307,13 @@ registered capacity, so the table leaves it out.
 
 **Of the nine BMUs at hybrid sites (eight sites), four have a storage BMU with output at their site,
 three (at two sites) have an operational battery in REPD, and two have storage planned or under
-construction.** The operational batteries are 150 MW at Cleve Hill, which REPD links to both Cleve
-Hill BMUs, and 0.66 MW at Breach.
+construction.** REPD records two batteries as operational: 150 MW at Cleve Hill, which REPD links to
+both Cleve Hill BMUs, and 0.66 MW at Breach. The evidence for the Cleve Hill status is doubtful.
+REPD gives the battery the same operational date as the solar array, 1 July 2025, while [Quinbrook,
+the operator](https://www.quinbrook.com/?p=1921), and [pv
+magazine](https://www.pv-magazine.com/2025/07/02/largest-uk-solar-plant-goes-online/) reported on
+that date that the battery was still under construction, and the BMU register holds no Cleve Hill
+storage BMU.
 
 **For 6 of the 9 BMUs with output, the largest output is within 1% of Generation Capacity.** The
 other 3 are Cleve Hill Solar 1 (4% above), Cleve Hill Solar 2 (12% below), and Tebworth PV Power
@@ -305,10 +329,20 @@ Larks Green Solar, whose highest value is 4.24, 2.32, and 1.99 times their lowes
 chose them is in [Data and methods](#data-and-methods). At Cleve Hill Solar 1, REPD gives 373.0 MW
 and TEC 350.0 MW, against 112.0 MW for Generation Capacity, IGCPU, and the largest MEL, and 88.1 MW
 for the P99 of output. At Cleve Hill Solar 2 the same two project values sit against 205.0 MW and a
-P99 of 161.1 MW. TEC and REPD describe the whole Cleve Hill project, which holds both BMUs and a
-battery, so the two Cleve Hill ratios compare a project's value with a BMU's value. At Larks Green,
-TEC gives 99.4 MW and REPD 70.0 MW against 49.9 to 50.0 MW for the other four values. The P99 of
-output is the lowest of the six values at all three BMUs, and at Larks Green the P99 equals
+P99 of 161.1 MW. TEC and REPD each give one value for the whole Cleve Hill project, which holds both
+BMUs, so the two Cleve Hill ratios compare a project's value with a BMU's value. The two project
+values cover different plant. REPD's 373.0 MW is the solar row alone, because REPD lists the 150 MW
+battery in a row of its own, and Quinbrook [describes 373 MW as the array's DC
+capacity](https://www.quinbrook.com/?p=1921). The REPD value is 56.0 MW (18%) above the two BMUs'
+summed Generation Capacity of 317.0 MW, which a DC rating would explain. TEC's 350.0 MW is
+consistent with the capacity of the one grid connection that, according to the project's [Grid
+Connection
+Statement](https://nsip-documents.planninginspectorate.gov.uk/published-documents/EN010085-000208-5.4%20Grid%20Connection%20Statement.pdf),
+the solar array and the battery share: it is less than 317.0 MW of solar plus 150 MW of battery, and
+the highest sum of the two BMUs' outputs in one half-hour is 276.75 MW. At Larks Green, TEC gives
+99.4 MW and REPD 70.0 MW against 49.9 to 50.0 MW for the other four values. The Larks Green TEC
+value equals the 49.9 MW of the solar BMU plus the 49.5 MW battery that REPD lists at the site. The
+P99 of output is the lowest of the six values at all three BMUs, and at Larks Green the P99 equals
 Generation Capacity to one decimal place (49.9 MW).
 
 **Figure 2 draws the five published capacity values and two measures of each BMU's own output: the
@@ -486,12 +520,22 @@ storage BMU and cannot say where the battery is metered.
 - **The matches to TEC and REPD rest on names and judgement.** The study matched 8 BMUs and 18 TEC
   projects by hand, using lead party, customer, capacity, and connection site. A wrong match would
   change a technology label, a position, or a capacity sum.
+- **DC against AC is inferred, and some facts come from outside the registers.** The study found no
+  published field definition for REPD's "Installed Capacity (MWelec)" or for the TEC register's
+  columns. The statements about Cleve Hill's battery, its DC rating, its grid connection, and
+  Larks Green's and Breach's descriptions come from operator and planning documents, which the
+  study checked by hand and linked where they appear.
 - **A TEC plant type can omit PV or be wrong.** Tebworth's customer holds a project that lists
   storage only, and the Sundon Pivoted Power row lists PV only although its customer and its BMU are
   a storage developer and a storage BMU. The recall check can therefore miss a site. A TEC project
-  with PV and storage could also hold a PV array that no BMU meters on its own.
+  with PV and storage could also hold a PV array that no BMU meters on its own. The Sundon TEC
+  value of 39.9 MW (plant type storage only) is close to the highest sum of Tebworth's two BMUs'
+  outputs in one half-hour, 39.5 MW, which suggests that the value limits the whole site's export.
+  The value also equals the Tebworth storage BMU's Generation Capacity of 39.9 MW, so the study
+  cannot tell whether the value covers the solar farm.
 - **The hybrid label rests on graded evidence.** Only four sites have a storage BMU with output.
-  Breach's operational battery is 0.66 MW, and two sites have storage that is not yet built.
+  Breach's operational battery is 0.66 MW, and two sites have storage that is not yet built. The
+  Cleve Hill battery's operational status in REPD is doubtful ([Capacity](#capacity)).
 - **The pure PV site may have storage nearby.** Three embedded storage BMUs carry Burwell names
   (`E_BURWB-1`, `E_BURWB-2`, and `E_BURWB-3`). `E_BURWB-2` and `E_BURWB-3` have the same lead party,
   EDF Energy Customers Limited, as `T_BURWS-1`. A 57 MW storage project, Burwell (Tertiary), awaits
@@ -514,9 +558,8 @@ Great Britain. Its numbers describe the solar BMUs registered in the Balancing M
 solar generation in NGED's network.
 
 **The study does not cover solar generation that is not a BMU.** Much of the solar capacity in Great
-Britain is small generation embedded in distribution networks, with no BMU. The study also does not
-cover wind or other fuels, a forecast of any BMU's output, or years other than September 2025 to
-August 2026.
+Britain is small generation embedded in distribution networks, with no BMU. The study also does not cover wind or other fuels, a forecast of any
+BMU's output, or years other than September 2025 to August 2026.
 
 ## Data and code availability
 
