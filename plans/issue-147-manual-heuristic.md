@@ -16,13 +16,16 @@ comparison those issues make.
 `XGBoostForecaster`.** The 13 analogues are 13 power lags, so the existing no-lookahead lag
 machinery builds them. `predict()` unpivots the 13 lag columns into 13 `ensemble_member` rows. A
 small power-only `FeatureEngineer` subclass, `ForecastRunGridFeatureEngineer`, reads from the
-numerical weather prediction (NWP) frame only which runs exist and which cells and valid times each
-run covers. The engineer builds one row per series, run, and valid time from that list, and joins
-the power lags onto those rows through a new public NWP-free entry point in `ml_core/features/`. No
-weather value and no ensemble member is ever read, so the manual heuristic's rows come from the same
-forecast-run grid as every other model's without touching the 51 NWP members. Nothing under
-`src/nged_substation_forecast/defs/` changes. This plan details PR A only; persistence (PR B) and
-climatology (PR C) are outlined at the end and each gets its own approval.
+numerical weather prediction (NWP) frame only its four key columns other than the member:
+`nwp_model_id`, `init_time`, `h3_index`, and `valid_time`. The engineer deduplicates those keys,
+stamps every row as member 0, and hands that key-only frame to the public
+`TabularFeatureEngineer().engineer`. With no weather column present, the tabular pipeline's
+upsample interpolates nothing, and the half-hourly grid, the hindcast filter, and the cell join all
+come from the tabular code every other model uses. No weather value and no ensemble member is ever
+read, so the manual heuristic's rows come from the same forecast-run grid as every other model's
+without touching the 51 NWP members. Nothing under `src/nged_substation_forecast/defs/` and nothing
+in `ml_core` changes. This plan details PR A only; persistence (PR B) and climatology (PR C) are
+outlined at the end and each gets its own approval.
 
 ## Verdict, size and departures
 
@@ -49,18 +52,18 @@ interface, the `meta.json` servability check) already exists.
 `src/nged_substation_forecast/defs/`, `packages/contracts/src/contracts/config_schemas.py`,
 `conf/cv/`, and the new failure-scenario module in `ml_core` (#437). Reading and importing from them
 is fine (`class_target` and `import_class` come from `config_schemas`). The rest of
-`ml_core/features/` is in bounds. `uv.lock` is also edited by #958: whichever PR lands second
+`ml_core/features/` is in bounds, though PR A edits none of it. `uv.lock` is also edited by #958:
+whichever PR lands second
 re-runs `uv lock` after rebasing rather than resolving the lock file by hand.
 
 **Departures from the roadmap's "Implementation details — baselines":**
 
 1. **One PR per baseline, three PRs, manual heuristic first.** PR A is the package skeleton, the
-   shared `_meta_io` helper, `ForecastRunGridFeatureEngineer`, the public power-only entry point in
-   `ml_core/features/`, and `manual_heuristic`. PR B is `persistence`; PR C is `climatology`. The
-   roadmap orders persistence first as "the lowest-effort end-to-end probe", but persistence
-   unblocks nothing, while `manual_heuristic` is the deliverable four issues wait on.
-   `manual_heuristic_holiday_aligned` and `manual_heuristic_calibrated` (#715) stay separate
-   follow-ups.
+   shared `_meta_io` helper, `ForecastRunGridFeatureEngineer`, and `manual_heuristic`. PR B is
+   `persistence`; PR C is `climatology`. The roadmap orders persistence first as "the lowest-effort
+   end-to-end probe", but persistence unblocks nothing, while `manual_heuristic` is the deliverable
+   four issues wait on. `manual_heuristic_holiday_aligned` and `manual_heuristic_calibrated` (#715)
+   stay separate follow-ups.
 2. **No `uses_nwp_ensemble` flag on `BaseForecaster`, and no change to `cv_power_forecasts`.** The
    roadmap's "PR 2" has `cv_power_forecasts` pass `ensemble_members=[0]` when a class sets the flag
    `False`, which edits `defs/cv_assets.py`. Instead the baseline package overrides
@@ -92,8 +95,9 @@ re-runs `uv lock` after rebasing rather than resolving the lock file by hand.
 `tabular_feature_engineer._engineer_features`. That path sets `power_fcst_init_time = valid_time`,
 so every row has lead time 0, and the comment at the end of `_engineer_features` records that
 predict output built from that path always fails `PowerForecast.validate`. The path is
-training-only. The baselines therefore use neither of `_engineer_features`'s bulk paths: they build
-their own rows from the runs the NWP frame holds.
+training-only. The baselines therefore never take the NWP-absent path. They take the NWP bulk path
+instead, fed a key-only NWP frame, so each row's `power_fcst_init_time` is a real run's
+`init_time` plus the publication delay.
 
 ## What changes, file by file
 
@@ -126,51 +130,38 @@ their own rows from the runs the NWP frame holds.
 and the list of ids. No `StatelessForecaster` base class, as the roadmap says, until a third
 stateless model exists.
 
-### `packages/ml_core/src/ml_core/features/` — a public power-only entry point
-
-**A new public function, `engineer_power_features`, in `tabular_feature_engineer.py`, re-exported
-from `ml_core.features`.** The baseline package cannot reuse `_apply_post_join_features` or
-`_select_output_columns` without importing private names, so ml_core exposes the post-join half of
-the tabular pipeline for a caller that supplies its own rows. The signature is
-`engineer_power_features(*, spine, selected_features, power_time_series, time_series_metadata,
-local_timezone=DEFAULT_LOCAL_TIMEZONE) -> pt.LazyFrame[AllFeatures]`. The `spine` argument is a
-plain `pl.LazyFrame` holding `time_series_id`, `valid_time`, `power_fcst_init_time`, and
-`nwp_init_time`, one row per forecast. The function does five steps, each reusing the code
-`_engineer_features` already runs:
-
-1. Raise `ValueError` if `ParsedFeatures.from_strings(selected_features).requires_weather_data()`,
-   naming the offending features. A weather rolling mean is caught by the same check, and the
-   feature parser already forbids a power rolling mean.
-2. Rename the power frame's `time` to `valid_time` and semi-join it to the metadata, as
-   `_engineer_features` does.
-3. Left-join observed `power` onto the spine on `(time_series_id, valid_time)` as the label, and
-   join the metadata when `time_series_type` is requested.
-4. Call `_apply_post_join_features` with `observed_power_lf` set to the power frame and no NWP.
-5. Call `_select_output_columns` and wrap the result as `pt.LazyFrame[AllFeatures]`. The spine has
-   no `ensemble_member` or `nwp_lead_time_hours` column, and `AllFeatures` declares both
-   `allow_missing=True`.
-
-The module docstring's "every function the module defines is private" and the package docstring's
-public-interface list both gain the new function. The new failure-scenario module (#437) is not
-touched.
-
 ### `ForecastRunGridFeatureEngineer`
 
-**A `FeatureEngineer` subclass whose `engineer` builds one row per series, NWP run, and half-hourly
-valid time from the runs the `nwp` frame holds, then calls `engineer_power_features`.** The rows
-equal the distinct `(time_series_id, power_fcst_init_time, valid_time)` rows `TabularFeatureEngineer`
-produces from the same inputs. In bulk mode (`power_fcst_init_time is None`) `engineer` builds the
-rows in four lazy steps:
+**A `FeatureEngineer` subclass whose `engineer` strips the `nwp` frame to its keys and delegates to
+`TabularFeatureEngineer().engineer`.** In bulk mode (`power_fcst_init_time is None`) `engineer` does
+two lazy steps:
 
-1. Aggregate `nwp` by `init_time` and `h3_index` to the minimum and maximum `valid_time` of each
-   run in each cell. No weather column and no `ensemble_member` is selected.
-2. Inner-join the metadata's `(time_series_id, h3_res_5)` on `h3_index`, as
-   `_attach_containing_nwp_cell` does, so a series gets rows only for runs its own cell has.
-3. Expand each pair into the 30-minute range from the minimum to the maximum `valid_time`, as
-   `_upsample_nwp_to_half_hourly` builds its grid.
-4. Set `power_fcst_init_time = init_time + nwp_publication_delay_hours`, set `nwp_init_time` to a
-   typed null (`pl.lit(None, dtype=UTC_DATETIME_DTYPE)`), drop `init_time`, and keep only rows with
-   `valid_time > power_fcst_init_time`, the strict hindcast filter `_engineer_features` applies.
+1. Build the key-only frame `nwp.select("nwp_model_id", "init_time", "h3_index",
+   "valid_time").unique().with_columns(ensemble_member=pl.lit(0, pl.Int8))`, wrapped with
+   `set_model(Nwp)` and never validated. `_attach_containing_nwp_cell` needs `h3_index`, and
+   `_upsample_nwp_to_half_hourly` groups by every column that is neither `valid_time` nor a
+   weather variable, so the upsample's groups are `(nwp_model_id, nwp_init_time, ensemble_member,
+   time_series_id)`. With no weather column, the upsample builds the half-hourly grid from each
+   group's minimum to maximum `valid_time` and interpolates nothing.
+2. Return `TabularFeatureEngineer().engineer(...)` on that frame, passing every other argument
+   through unchanged.
+
+**The rows equal the distinct `(time_series_id, power_fcst_init_time, valid_time)` rows the tabular
+path produces from the full NWP frame, given contiguous member coverage and one NWP model.** The
+grid, the hindcast filter (`valid_time > power_fcst_init_time`), and the cell join are the tabular
+code itself, so equality holds by construction. The two qualifiers come from the deduplication. The
+tabular path builds one grid per member, and the key-only frame builds one grid over the union of
+every member's valid times. The two grids differ only where one member's valid times leave a gap
+that another member's do not fill. With two NWP models, `nwp_model_id` stays a group key on both
+paths, so each model gives its own copy of every row. The manual heuristic would then emit each
+forecast twice and duplicate the `PowerForecast` primary key. The NWP table holds one model today.
+A feasibility script run during plan review confirmed the equality on a fixture of four runs, two
+members, and two cells: the key-only frame gave 4,449 rows, identical to the full-weather frame's
+8,898 rows deduplicated across the two members, `power` and all 13 lag columns included.
+
+**The output carries `ensemble_member` 0 and the run's real `nwp_init_time`.** `predict` replaces
+both: the unpivot rebuilds `ensemble_member` from the lag rank, and `nwp_init_time` is stamped
+null. The output also carries `nwp_lead_time_hours`, which `predict` does not read.
 
 **The run grid comes from the NWP frame's own `init_time` values, so chunked prediction stays
 disjoint.** `cv_power_forecasts` walks `init_time` chunks from `val_start - MAX_NWP_LEAD` to
@@ -178,24 +169,25 @@ disjoint.** `cv_power_forecasts` walks `init_time` chunks from `val_start - MAX_
 chunk's NWP scan to that chunk's `init_time` range. A run therefore reaches exactly one chunk's
 engineer, and a run missing from the archive reaches none, as for every other model.
 
-**Each run's valid times come from the frame rather than from a horizon constant, and that is what
-makes the rows equal the tabular path's.** `load_engineering_inputs` bounds the NWP scan to
-`valid_time` in `[window_start, window_end]`, and the tabular path's rows span each run's
-surviving valid times; the power frame's wider lookback adds no rows. The engineer is not told the
-window. A run initialised before `val_start` (the chunks reach back `MAX_NWP_LEAD`, 16 days) would
-gain rows before `val_start` if the engineer read `init_time` alone and added a horizon. ECMWF ENS
-runs to 360 h (`_upsample_nwp_to_half_hourly`'s docstring), so with the 9-hour publication delay
-the longest lead is 351 h. `MAX_NWP_LEAD` is only a partition-pruning margin and plays no part in
-the rows.
+**Each run's valid times come from the frame's `valid_time` column rather than from a horizon
+constant.** `load_engineering_inputs` bounds the NWP scan to `valid_time` in `[window_start,
+window_end]`, and the engineer is not told the window. Keeping `valid_time` in the key-only frame
+carries that clipping through. A run initialised before `val_start` (the chunks reach back
+`MAX_NWP_LEAD`, 16 days) would gain rows before `val_start` if the engineer read `init_time` alone
+and added a horizon.
 
 **Single-run mode raises `NotImplementedError`.** When `power_fcst_init_time` is given, `engineer`
-raises with a message saying that baselines are R&D-only and not served live (decision 5). The only
-single-run caller is `live_forecasts`, which serves only a promoted model, so reaching this branch
-means a baseline was promoted by mistake, which is our own bug.
+raises with a message saying that baselines are R&D-only and not served live (decision 5). The
+raise is still worth its two lines, because delegating would not fail: the key-only frame carries
+member 0, so `live_forecasts`' filter on a non-null `ensemble_member` keeps the rows. The
+forecast would instead be silently degraded, because `live_forecasts` reads only 15 days of power
+(`LIVE_POWER_HISTORY`), so every annual analogue is null. The only single-run caller is
+`live_forecasts`, which serves only a promoted model, so reaching this branch means a baseline was
+promoted by mistake, which is our own bug. A promote-time refusal in `ml_core/production_helpers.py`
+would catch the mistake earlier, and is an optional later hardening outside this PR.
 
 The class docstring says that the forecaster consumes no weather, and that the NWP frame is read
-only for which runs exist and which cells and valid times each run covers. `weather_source: "none"`
-is therefore literally true.
+only for its run, cell, and valid-time keys. `weather_source: "none"` is therefore literally true.
 
 ### `ManualHeuristicForecaster(BaseForecaster)`
 
@@ -232,7 +224,7 @@ joins may still run (risk 7).
    power input to `trained_time_series_ids`, and `ForecastRunGridFeatureEngineer` emits one row per
    series, run, and valid time, so `predict` filters nothing.
 2. Unpivot the lag columns, indexed by `time_series_id`, `valid_time`, and `power_fcst_init_time`.
-   The input's null `nwp_init_time` is not carried.
+   The input's `ensemble_member`, `nwp_init_time`, and `nwp_lead_time_hours` are not carried.
 3. Map each lag column name to its member index — its rank in the sorted lag order `__init__`
    stored — with `replace_strict(..., return_dtype=pl.Int8)`. Ranking by lag means a member keeps
    its meaning as `_nullify_leaky_lags` sheds the short weekly lags with lead time: past 168 h of
@@ -306,12 +298,10 @@ reading the power cleaning flags counts as missing history too. Every reader of 
 flagged reading, so the analogue that reading would have supplied is null, and that member is shed
 even where the series' history is long enough. The one cleaning rule today, `substation_zero` in
 `nged_data/cleaning.py`, flags every reading of exactly 0 from a `Primary`, `BSP`, or `GSP`
-series. The
-log line gives a total, not the series at fault; the pre-read data check below names the series
-short of history. Nothing raises except a contract violation (`PowerForecast.validate`), a
-non-power-lag feature at construction, a weather feature passed to `engineer_power_features`, or a
-single-run call to `ForecastRunGridFeatureEngineer`, all of which are our own bugs. No asset check
-is added.
+series. The log line gives a total, not the series at fault; the pre-read data check below names
+the series short of history. Nothing raises except a contract violation (`PowerForecast.validate`),
+a non-power-lag feature at construction, or a single-run call to `ForecastRunGridFeatureEngineer`,
+all of which are our own bugs. No asset check is added.
 
 **The change delivers the measuring instrument for T1.2.** T1.2 asks that every series still emits a
 forecast at rungs 0 to 2 of the degradation ladder and still beats `manual_heuristic`. This PR does
@@ -321,9 +311,9 @@ not measure T1.2; #438 does, and needs this baseline first.
 trained_cv_model → cv_power_forecasts → metrics` chain as XGBoost (principle 3, one execution
 path), and draws its rows from the same forecast-run grid (principle 8, every experiment scored
 identically). The one difference in row sets is the all-null-lag rows the manual heuristic drops
-(risk 4). Principle 11 (push the work down to the query engine) is why the run grid is a lazy
-aggregate over the NWP scan: projection pushdown keeps the weather columns out of the read
-(risk 6).
+(risk 4). Principle 11 (push the work down to the query engine) is why the key-only frame is a
+lazy `select` and `unique` over the NWP scan: projection pushdown keeps the weather columns and
+`ensemble_member` out of the read (risk 6).
 
 **One principle is traded, deliberately and visibly: the floor's row grid comes from the NWP
 archive.** `docs/design-philosophy/inherent-stability.md` says the manual heuristic "consumes no NWP
@@ -367,32 +357,41 @@ resolves.
 
 **`packages/baseline_forecasters/tests/test_feature_engineer.py` (unit):**
 
-- **Test 8: The rows equal the tabular path's.** A fixture NWP table holding members 0 and 1, two
-  H3 cells (one holding two series), two runs a day apart, and a run initialised before the window
-  so the scan's `valid_time` bound clips its first days. `ForecastRunGridFeatureEngineer.engineer`
-  and `TabularFeatureEngineer().engineer` run on the same power, metadata, NWP, and 13 lag features.
-  The distinct `(time_series_id, power_fcst_init_time, valid_time)` rows are equal, and the `power`
-  and 13 lag columns are equal row for row once the tabular output is deduplicated across members.
-  A spine that ignores the cell join, the valid-time bounds, or the strict hindcast filter fails
-  this test.
-- **Test 9: No weather column and no member is read.** The NWP fixture holds only `init_time`,
-  `h3_index`, and `valid_time`, wrapped with `set_model(Nwp)` and never validated. `engineer`
-  collects without error, so any reference to a weather column or to `ensemble_member` would raise
-  `ColumnNotFoundError`. The output's `nwp_init_time` is null on every row.
+- **Test 8: The rows equal the tabular path's and a hand-built grid.** The NWP fixture follows
+  ECMWF ENS's shape: runs initialised at midnight, native steps every 3 hours out to 144 h and every
+  6 hours beyond. The fixture holds members 0 and 1, two H3 cells (one holding two series), and four
+  runs: one initialised before the window so the scan's `valid_time` bound clips its first days, one
+  clipped at the window end, one a day after that, and one whose horizon stops short of 360 h.
+  Power reaches back about 14 months before the window, at least 9,240 h plus the longest lead, so
+  every one of the 13 lags is non-null on some rows. `ForecastRunGridFeatureEngineer.engineer` and
+  `TabularFeatureEngineer().engineer` run on the same power, metadata, full-weather NWP, and 13 lag
+  features. The test asserts three properties:
+    - the engineer's output has no duplicate `(time_series_id, power_fcst_init_time, valid_time)`
+      row;
+    - those rows, with `power` and the 13 lag columns, equal the tabular output deduplicated across
+      members;
+    - those rows equal a grid the test builds itself with `pl.datetime_range`, from each run's known
+      first and last surviving valid time at a 30-minute step, keeping only valid times later than
+      `init_time` plus 9 hours.
+
+  The equality with the tabular path catches an engineer that drops `h3_index` or `valid_time`
+  from the key-only frame or skips `unique`. The hand-built grid catches a regression in the grid
+  the engineer inherits, which the equality cannot see because both sides share the code: a skipped
+  30-minute expansion, `>=` in place of `>` in the hindcast filter, a grid missing each run's
+  closing step, or a grid starting at `init_time` rather than at the first clipped valid time.
+- **Test 9: No weather column and no member is read.** The NWP fixture holds only `nwp_model_id`,
+  `init_time`, `h3_index`, and `valid_time`, wrapped with `set_model(Nwp)` and never validated.
+  `engineer` collects without error, so any reference to a weather column or to the input's
+  `ensemble_member` would raise `ColumnNotFoundError`. The output's `ensemble_member` is 0 on every
+  row, and its `nwp_init_time` equals the run's `init_time`.
 - **Test 10: Two runs a day apart give separate rows.** Two runs whose horizons overlap give each
   overlapping `valid_time` once per `power_fcst_init_time`, the two `power_fcst_init_time` values
   are the two `init_time` values plus 9 hours, and through `predict` each set of rows sheds members
   by its own lead.
 
-**`packages/ml_core/tests/test_feature_engineer.py` (extended):**
-
-- **Test 11: The power-only entry point rejects weather.** `engineer_power_features` with
-  `temperature_2m` or `temperature_2m_lag_24h` in `selected_features` raises `ValueError` naming the
-  feature.
-
 **`tests/test_manual_heuristic_cv.py` (integration, `pytestmark = pytest.mark.integration`):**
 
-- **Test 12: End to end through the real assets.** Register `conf/model/manual_heuristic.yaml`
+- **Test 11: End to end through the real assets.** Register `conf/model/manual_heuristic.yaml`
   through the extended fixture, passing the manual heuristic's own `config_overrides`. Write
   synthetic power covering 56 weeks before a validation day to `power_time_series.delta`, and NWP
   with members 0, 1, and 2. `load_engineering_inputs` reads power through `scan_cleaned_power`
@@ -412,7 +411,7 @@ resolves.
 
 **`tests/test_jobs.py` (extended):**
 
-- **Test 13: Registration.** `_resolve_forecaster_config` on `conf/model/manual_heuristic.yaml` with
+- **Test 12: Registration.** `_resolve_forecaster_config` on `conf/model/manual_heuristic.yaml` with
   no overrides returns `BaseForecasterConfig` with the 13 power-lag features.
 
 ## Docs to update
@@ -423,17 +422,17 @@ Every page is written to describe the code as it now stands, with no "was previo
   PR list to manual heuristic, persistence, climatology. Replace the "PR 2" item's
   `uses_nwp_ensemble` text with the `ForecastRunGridFeatureEngineer` design, and keep its
   `ensemble_member` overload bullet. The replacement text says that each baseline overrides
-  `BaseForecaster.feature_engineer` with an engineer that reads from the NWP frame only which runs
-  exist and which cells and valid times each run covers. The engineer builds the `(time_series_id,
-  power_fcst_init_time, valid_time)` rows of that run grid and joins the power lags onto them
-  through `ml_core.features.engineer_power_features`. No weather value and no ensemble member is
-  read, so `weather_source: "none"` is literally true. The NWP archive's list of runs is what keeps
-  every leaderboard row, baseline or ML, on the same forecast-run grid, so a missed run removes its
-  rows for every model. Delete the `uses_nwp_ensemble = False` line and the member-0 wording from
-  the persistence, manual heuristic, and climatology items. Replace "PR 1" with a note that the
-  metrics collapse is its own issue under the v0.3 epic. Delete the `manual_heuristic` item's
-  details at ship time, with the summary moving to the PR body. Correct the `UInt8 → Int8` sentence
-  in the persistence item. The section and its 🚧 banner stay until PR C ships.
+  `BaseForecaster.feature_engineer` with an engineer that reads from the NWP frame only the
+  `nwp_model_id`, `init_time`, `h3_index`, and `valid_time` keys. The engineer deduplicates those
+  keys, stamps them as member 0, and passes the key-only frame to `TabularFeatureEngineer`, so the
+  baseline's rows come from the tabular pipeline's own run grid. No weather value and no ensemble
+  member is read, so `weather_source: "none"` is literally true. The NWP archive's list of runs is
+  what keeps every leaderboard row, baseline or ML, on the same forecast-run grid, so a missed run
+  removes its rows for every model. Delete the `uses_nwp_ensemble = False` line and the member-0
+  wording from the persistence, manual heuristic, and climatology items. Replace "PR 1" with a note
+  that the metrics collapse is its own issue under the v0.3 epic. Delete the `manual_heuristic`
+  item's details at ship time, with the summary moving to the PR body. Correct the `UInt8 → Int8`
+  sentence in the persistence item. The section and its 🚧 banner stay until PR C ships.
 - **`docs/ml_experimentation/model-configuration.md`.** The sentence "The only one today is
   `conf/model/xgboost.yaml`" becomes a list of the two YAML files, noting that `manual_heuristic`
   lists its 13 power-lag features explicitly.
@@ -456,8 +455,7 @@ Every page is written to describe the code as it now stands, with no "was previo
   docstring mention it cites, "e.g. persistence baselines" in `PowerForecast.nwp_init_time`, now
   sits at line 463, so the citation is stale as well.
 - **`packages/ml_core/README.md`.** Line 52, "`XGBoostForecaster` … is the only subclass outside the
-  tests", becomes a present-tense sentence naming both subclasses. The `features` bullet at line 115
-  gains `engineer_power_features`.
+  tests", becomes a present-tense sentence naming both subclasses.
 - **`docs/design-philosophy/inherent-stability.md`, "The manual heuristic is the floor".** The
   sentence saying the manual heuristic consumes no NWP data gains a qualifier: in cross-validation
   the manual heuristic's rows still follow the NWP run grid, so an NWP run missing from the archive
@@ -482,7 +480,7 @@ Run all of these green before every push:
 
 **Before relying on the engineer, measure what reading the run grid costs on the real NWP Delta
 table.** For one 14-day `_PREDICT_INIT_CHUNK` with no member filter, as `cv_power_forecasts` loads
-it, collect the step-1 aggregate of `ForecastRunGridFeatureEngineer` on its own. Record the wall
+it, collect the key-only frame of `ForecastRunGridFeatureEngineer`'s step 1 on its own. Record the wall
 time and the rows decoded, and record both in the PR body. The fallback if the read is slow is in
 risk 6.
 
@@ -524,16 +522,15 @@ in the item it settles.
 5. **Serving the manual heuristic live — decided: out of scope; the baselines are R&D baselines for
    now.** The live path, `live_forecasts`, reads the cleaned power table and does not serve
    baselines.
-6. **Reading the run grid might be slow on the real NWP table.** Projection pushdown keeps every
-   weather column out of the read, but the scan's own filters in `load_engineering_inputs` test
-   `valid_time` and `h3_index` on every row. Polars is therefore expected to decode those two
-   columns in all 51 members' row groups of every partition, because `delta_store.nwp` writes one
-   row group per member, so each row group's statistics on either column span the whole run and
-   prune nothing. The measurement under Verification
-   commands settles whether the read is fast enough. *Fallback if the read is slow:* filter the NWP
-   frame to the control member (`ensemble_member == 0`) inside the step-1 aggregate, so row-group
-   statistics skip 50 of the 51 row groups. The drawback is that a run missing its control member
-   would then lose its rows for the manual heuristic while keeping them for XGBoost.
+6. **Reading the run grid is unlikely to be slow, but is measured anyway.** The key-only frame
+   reads `init_time`, `h3_index`, and `valid_time` (and `nwp_model_id`), a subset of the columns
+   every existing experiment already decodes, across all 51 members, when `cv_power_forecasts`
+   loads NWP for XGBoost. The one extra cost is the `unique` over 51 members' keys. The
+   measurement under Verification commands records the wall time. *Fallback if the read proves
+   slow:* filter the NWP frame to the control member (`ensemble_member == 0`) before the `select`,
+   so row-group statistics skip 50 of the 51 row groups, because `delta_store.nwp` writes one row
+   group per member. The drawback is that a run missing its control member would then lose its
+   rows for the manual heuristic while keeping them for XGBoost.
 7. **Training engineers 13 lag columns only to read the population — decided: keep `train()`
    collecting the population.** `train` needs only the ids with non-null power, but
    `trained_cv_model` hands it the full engineered frame. Accept the extra time and record the
@@ -551,9 +548,17 @@ in the item it settles.
 ## Considered and rejected
 
 - **`ControlMemberFeatureEngineer`, a `TabularFeatureEngineer` subclass filtering NWP to member
-  0:** rejected because the manual heuristic reads no weather, so the upsample and weather join it
-  kept were wasted work, and its rows depended on the control member's presence. A member-0 filter
-  on the run-grid read is the fallback in risk 6.
+  0:** rejected because the manual heuristic reads no weather, so decoding and interpolating member
+  0's weather columns was wasted work, and its rows depended on the control member's presence. A
+  member-0 filter on the key-only read is the fallback in risk 6.
+- **A hand-built run grid joined to the power lags through a new public `ml_core` entry point,
+  `engineer_power_features`:** rejected because it is more code, and because its rows only equal
+  the tabular path's if four steps re-implemented from `_attach_containing_nwp_cell`,
+  `_upsample_nwp_to_half_hourly`, and the hindcast filter stay in step with the originals. The
+  design needed a new public function in `ml_core`, its docstring and README edits, a test that it
+  rejects weather features, and a weather check duplicating the one in
+  `ManualHeuristicForecaster.__init__`. The key-only frame gets the same rows from the tabular code
+  itself, so equality holds by construction.
 - **Deriving the run grid from `init_time` alone and a 360 h horizon constant:** rejected because
   `load_engineering_inputs` clips the NWP frame to the window's valid times and the engineer is not
   told the window. A run initialised before `val_start` would gain rows before `val_start` that no
@@ -611,6 +616,16 @@ in the item it settles.
   reaching the scan. Added tests 8 to 11 and the run-grid read measurement, with the member-0
   filter as its fallback in risk 6. Recorded the maintainer's answers to open questions 1 to 9 as
   decisions, and deleted the live-serving follow-up from risk 5.
+
+- **Simplicity review of `ForecastRunGridFeatureEngineer` (2026-10-07).** Replaced the hand-built
+  run grid and the public `engineer_power_features` entry point with a key-only NWP frame passed to
+  `TabularFeatureEngineer().engineer`. A scratch script confirmed the key-only frame gives the same
+  rows, `power` and the 13 lags included, as a full-weather frame deduplicated across members.
+  Deleted the `ml_core` function, its docstring and README edits, its weather-rejection test, and
+  its weather check. Kept the single-run `NotImplementedError`, because delegating would serve a
+  silently degraded forecast rather than fail. Qualified the row equality with "given contiguous
+  member coverage and one NWP model". Gave test 8 an ECMWF-shaped fixture and a hand-built expected
+  grid, and softened risk 6.
 
 ## Outline of PRs B and C (each gets its own plan or approval)
 
