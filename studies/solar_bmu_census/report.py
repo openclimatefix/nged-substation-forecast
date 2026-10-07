@@ -10,7 +10,7 @@ Database (REPD) are public, so `report.md` names the BMUs it lists. Run after `f
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from itertools import pairwise
-from typing import Final
+from typing import Any, Final
 
 import numpy as np
 import polars as pl
@@ -32,6 +32,7 @@ from fetch_sources import (
     Window,
     fetch_bmu_reference,
     fetch_igcpu,
+    fetch_tec,
     recorded_run,
 )
 from recall_check import recall_table
@@ -288,6 +289,125 @@ def aggregate_lead_party_table(*, aggregates: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def outside_census_table(*, recall: pl.DataFrame, reference: list[dict[str, Any]]) -> pl.DataFrame:
+    """List the built TEC projects whose mapped BMUs are all outside the census.
+
+    Args:
+        recall: `recall_check.recall_table`'s table, with `Project Name` and `bmu_ids`.
+        reference: The BMU register's rows.
+
+    Returns:
+        One row for each project with the outcome `BMU identified, not in census` at the status
+        Built: its name, plant type, each mapped BMU's register name, and each mapped BMU's register
+        fuel type. The study reads the technology of each BMU from the name and fuel type by hand.
+    """
+    by_id = {str(row["elexonBmUnit"]): row for row in reference}
+    rows = []
+    for row in recall.filter(
+        (pl.col("Project Status") == "Built")
+        & (pl.col("outcome") == "BMU identified, not in census")
+    ).iter_rows(named=True):
+        ids = [bmu for bmu in row["bmu_ids"].split(";") if bmu]
+        rows.append(
+            {
+                "project": row["Project Name"],
+                "plant_type": row["Plant Type"],
+                "bmu_ids": row["bmu_ids"],
+                "register_names": "; ".join(str(by_id[bmu]["bmUnitName"]) for bmu in ids),
+                "register_fuel_types": "; ".join(str(by_id[bmu]["fuelType"]) for bmu in ids),
+            }
+        )
+    return pl.DataFrame(
+        rows,
+        schema={
+            "project": pl.String,
+            "plant_type": pl.String,
+            "bmu_ids": pl.String,
+            "register_names": pl.String,
+            "register_fuel_types": pl.String,
+        },
+    ).sort("project")
+
+
+def burwell_table(*, reference: list[dict[str, Any]], tec: pl.DataFrame) -> pl.DataFrame:
+    """List the storage BMUs and storage-only TEC projects that carry a Burwell name.
+
+    Args:
+        reference: The BMU register's rows.
+        tec: The TEC register.
+
+    Returns:
+        One row for each BMU whose identifier contains `BURW`, with its name and lead party, and
+        one row for each TEC project at a Burwell connection site that lists storage only, with
+        its customer, status, and capacity.
+    """
+    rows = [
+        {
+            "kind": "BMU",
+            "identifier_or_project": str(row["elexonBmUnit"]),
+            "name": str(row["bmUnitName"]),
+            "party": str(row["leadPartyName"]),
+            "status_or_site": "",
+            "capacity_mw": str(row["generationCapacity"]),
+        }
+        for row in reference
+        if row["elexonBmUnit"] and "BURW" in str(row["elexonBmUnit"])
+    ]
+    storage = tec.filter(
+        pl.col("Connection Site").str.contains("(?i)burwell")
+        & (pl.col("Plant Type") == "Energy Storage System")
+        & (pl.col("Project Status") != "Built")
+    )
+    rows.extend(
+        {
+            "kind": "TEC project",
+            "identifier_or_project": str(row["Project Name"]),
+            "name": str(row["Plant Type"]),
+            "party": str(row["Customer Name"]),
+            "status_or_site": f"{row['Project Status']}, {row['Connection Site']}",
+            "capacity_mw": str(row["Cumulative Total Capacity (MW)"]),
+        }
+        for row in storage.iter_rows(named=True)
+    )
+    return pl.DataFrame(rows).sort("kind", "identifier_or_project")
+
+
+def aggregate_flow_table(*, aggregates: pl.DataFrame, window_label: str) -> pl.DataFrame:
+    """Return how often each top lead party's aggregate BMU imports and exports.
+
+    Args:
+        aggregates: The census table's aggregate rows.
+        window_label: The window's label in the file names.
+
+    Returns:
+        One row for each aggregate BMU of the lead party with the most aggregate Generation
+        Capacity: the BMU, the share of its half-hours with output below zero (import) and above
+        zero (export), and its lowest and highest output in megawatts.
+    """
+    top = aggregate_lead_party_table(aggregates=aggregates)["lead_party"][0]
+    rows = []
+    for row in (
+        aggregates.filter(pl.col("lead_party") == top).sort("elexon_bmu_id").iter_rows(named=True)
+    ):
+        megawatts = (
+            pl.read_parquet(OUTPUT_DIR / f"{row['elexon_bmu_id']}_{window_label}.parquet")[
+                "output_mwh"
+            ]
+            * 2
+        )
+        rows.append(
+            {
+                "elexon_bmu_id": row["elexon_bmu_id"],
+                "lead_party": top,
+                "share_of_half_hours_below_zero": round(_as_float((megawatts < 0).mean()), 2),
+                "share_of_half_hours_above_zero": round(_as_float((megawatts > 0).mean()), 2),
+                "lowest_mw": round(_as_float(megawatts.min()), 1),
+                "highest_mw": round(_as_float(megawatts.max()), 1),
+            }
+        )
+    return pl.DataFrame(rows)
+
+
 def storage_pattern_table(*, single: pl.DataFrame, window_label: str) -> pl.DataFrame:
     """Return the mean output of each census site's storage BMU around midday and in the evening.
 
@@ -314,16 +434,16 @@ def storage_pattern_table(*, single: pl.DataFrame, window_label: str) -> pl.Data
             rows.append(
                 {
                     "elexon_bmu_id": bmu_id,
-                    "mean_mw_at_13_utc": round(_hour_mean(hourly, 13), 1),
-                    "mean_mw_at_18_utc": round(_hour_mean(hourly, 18), 1),
+                    "mean_mw_13_to_14_utc": round(_hour_mean(hourly, 13), 1),
+                    "mean_mw_18_to_19_utc": round(_hour_mean(hourly, 18), 1),
                 }
             )
     return pl.DataFrame(
         rows,
         schema={
             "elexon_bmu_id": pl.String,
-            "mean_mw_at_13_utc": pl.Float64,
-            "mean_mw_at_18_utc": pl.Float64,
+            "mean_mw_13_to_14_utc": pl.Float64,
+            "mean_mw_18_to_19_utc": pl.Float64,
         },
     )
 
@@ -391,8 +511,8 @@ def metering_table(*, single: pl.DataFrame, window: Window) -> pl.DataFrame:
                     ),
                     "storage_lowest_mw": round(_as_float(storage_mw.min()), 1),
                     "storage_highest_mw": round(_as_float(storage_mw.max()), 1),
-                    "storage_mean_mw_at_13_utc": round(_hour_mean(hourly, 13), 1),
-                    "storage_mean_mw_at_18_utc": round(_hour_mean(hourly, 18), 1),
+                    "storage_mean_mw_13_to_14_utc": round(_hour_mean(hourly, 13), 1),
+                    "storage_mean_mw_18_to_19_utc": round(_hour_mean(hourly, 18), 1),
                     "storage_share_of_half_hours_below_zero": round(
                         _as_float((storage_mw < 0).mean()), 2
                     ),
@@ -604,7 +724,10 @@ def register_table(*, census: pl.DataFrame, today: date) -> pl.DataFrame:
         today: The run date, which fixes the IGCPU fetch.
 
     Returns:
-        The number of rows in the BMU register; the number of rows with no fuel type, with fuel
+        The number of rows in the BMU register; the number of rows for interconnectors, the number
+        of other rows with no BMU identifier, the number of other rows that repeat an identifier,
+        and the number of BMUs left, which is the number whose B1610 output the study downloads;
+        the number of rows with no fuel type, with fuel
         type OTHER, and with fuel type solar; the number of BMUs IGCPU types as Solar and as
         "Generation"; the number of single-site census BMUs whose register name does not say solar
         or PV; and the TEC and REPD capacities summed naively over the single-site census BMUs, a
@@ -612,6 +735,9 @@ def register_table(*, census: pl.DataFrame, today: date) -> pl.DataFrame:
     """
     reference = fetch_bmu_reference()
     fuels = [row["fuelType"] for row in reference]
+    interconnector_rows = [row for row in reference if row["interconnectorId"] is not None]
+    other_rows = [row for row in reference if row["interconnectorId"] is None]
+    identified = [str(row["elexonBmUnit"]) for row in other_rows if row["elexonBmUnit"]]
     igcpu = fetch_igcpu(today=today)
     types: dict[str, set[str]] = {}
     for row in igcpu:
@@ -624,6 +750,10 @@ def register_table(*, census: pl.DataFrame, today: date) -> pl.DataFrame:
     )
     rows = [
         ("Rows in the BMU register", str(len(reference))),
+        ("Rows that belong to interconnectors", str(len(interconnector_rows))),
+        ("Other rows with no BMU identifier", str(len(other_rows) - len(identified))),
+        ("Other rows that repeat a BMU identifier", str(len(identified) - len(set(identified)))),
+        ("BMUs whose output the study downloads", str(len(set(identified)))),
         ("Rows with no fuel type", str(sum(fuel is None for fuel in fuels))),
         ("Rows with fuel type OTHER", str(sum(fuel == "OTHER" for fuel in fuels))),
         ("BMUs that IGCPU types as Solar", str(len(types.get("Solar", set())))),
@@ -801,7 +931,8 @@ def main() -> None:
     solar_ids = single.filter(pl.col("basis").str.contains("behaviour"))["elexon_bmu_id"].to_list()
     recall, provenance = recall_table(census_ids=set(census["elexon_bmu_id"]))
 
-    names = {str(r["elexonBmUnit"]): str(r["bmUnitName"]) for r in fetch_bmu_reference()}
+    reference = fetch_bmu_reference()
+    names = {str(r["elexonBmUnit"]): str(r["bmUnitName"]) for r in reference}
     listing = (
         single.select(
             "elexon_bmu_id",
@@ -881,15 +1012,15 @@ def main() -> None:
         + _md(capacities_table(census=census, scope="single-site"))
         + "\n\n### Aggregate\n\n"
         + _md(capacities_table(census=census, scope="aggregate")),
-        "## The BMUs with output, ranked by highest over lowest of the six figures\n\n"
-        "Figures at or below zero and missing figures are left out of the ratio. The three BMUs "
+        "## The BMUs with output, ranked by highest over lowest of the six values\n\n"
+        "Values at or below zero and missing values are left out of the ratio. The three BMUs "
         "with "
         "the largest ratio are the ones Figure 2 draws. `p99_output_mw` is the 99th percentile of "
         "the BMU's half-hourly output, not a registered capacity.\n\n"
         + _md(disparity_table(census=census)),
         "## Single-site BMUs in the gap band, or typed Solar and not following the sun\n\n"
         + _md(to_inspect),
-        "## Capacity figures (single-site BMUs; columns are never added together)\n\n"
+        "## Capacity values (single-site BMUs; columns are never added together)\n\n"
         + _md(capacity_table(table=single)),
         "## Aggregate BMUs (supplier, virtual, and other identifiers), reported apart\n\n"
         + aggregate_note,
@@ -909,7 +1040,11 @@ def main() -> None:
         "## What the cleaning rules remove, BMUs that follow the sun\n\n"
         + _md(cleaning_table(solar_ids=solar_ids, window=window)),
         f"## Census BMUs below -{STORAGE_SHARE * 100:.0f}% of Generation Capacity\n\n"
-        + _md(storage_signature_table(single=single, window_label=window.label)),
+        f"Night means a solar zenith angle above {NIGHT_ZENITH_DEGREES:.0f} degrees (the sun more "
+        f"than {NIGHT_ZENITH_DEGREES - 90:.0f} degrees below the horizon) at "
+        f"{REFERENCE_LATITUDE}N, {abs(REFERENCE_LONGITUDE)}W, and `night_export_half_hours` counts "
+        f"half-hours at night with output above {STORAGE_SHARE * 100:.0f}% of Generation "
+        "Capacity.\n\n" + _md(storage_signature_table(single=single, window_label=window.label)),
         "## BMUs that share a TEC project, at their half-hours of large import\n\n"
         + _md(pair_net_table(single=single, window_label=window.label)),
         "## Generation Capacity against the largest Maximum Export Limit\n\n"
@@ -920,11 +1055,18 @@ def main() -> None:
         + _md(storage_pattern_table(single=single, window_label=window.label)),
         "## How the hybrid sites with a storage BMU are metered: solar BMU against storage BMU\n\n"
         + _md(metering_table(single=single, window=window)),
+        "## Built TEC projects whose mapped BMUs are all outside the census\n\n"
+        "The technology of each BMU is read by hand from its register name and fuel type.\n\n"
+        + _md(outside_census_table(recall=recall, reference=reference)),
+        "## Burwell: storage BMUs and storage-only TEC projects\n\n"
+        + _md(burwell_table(reference=reference, tec=fetch_tec())),
+        "## The largest aggregate lead party's BMUs: import and export\n\n"
+        + _md(aggregate_flow_table(aggregates=aggregates, window_label=window.label)),
         "## What a single lookup gives, and what the study finds\n\n"
         + _md(register_table(census=census, today=run_date)),
         "## Largest output of each census BMU\n\n"
         + _md(peak_table(single=single, window_label=window.label)),
-        "## Figures the page quotes\n\n"
+        "## Numbers the page quotes\n\n"
         + _md(summary_table(census=census, window_label=window.label)),
         "## Data checks on the downloaded B1610 files\n\n"
         + _md(data_checks(window_label=window.label, expected_half_hours=expected)),

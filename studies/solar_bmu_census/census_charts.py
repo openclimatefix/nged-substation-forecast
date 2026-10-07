@@ -356,7 +356,7 @@ def _disparity_panel(*, row: dict[str, Any], last: bool) -> alt.LayerChart:
     )
     title = (
         f"{row['elexon_bmu_id']}  {row['display_name']}  "
-        f"(highest figure over lowest: {row['ratio']:.2f})"
+        f"(highest value over lowest: {row['ratio']:.2f})"
     )
     base = alt.Chart(series, title=alt.TitleParams(title, anchor="start", fontSize=11, offset=2))
     half_hourly = base.mark_line(
@@ -421,7 +421,7 @@ def disparity_figure(*, census: pl.DataFrame, number: int) -> alt.VConcatChart:
         panels=panels,
         number=number,
         title=(
-            "For the three BMUs whose six figures differ most, the highest figure is "
+            "For the three BMUs whose six capacity values differ most, the highest value is "
             f"{rows[-1]['ratio']:.1f} to {rows[0]['ratio']:.1f} times the lowest"
         ),
         subtitle=[
@@ -430,7 +430,7 @@ def disparity_figure(*, census: pl.DataFrame, number: int) -> alt.VConcatChart:
                 "in megawatts, over the 12-month study window."
             ),
             (
-                "Horizontal lines, each labelled with its figure: the five published capacities, "
+                "Horizontal lines, each labelled with its value: the five published capacities, "
                 "and the dashed line, the 99th percentile of the BMU's output "
                 "(a measure of output, not a capacity)."
             ),
