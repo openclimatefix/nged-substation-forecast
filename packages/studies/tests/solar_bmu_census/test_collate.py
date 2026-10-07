@@ -218,3 +218,80 @@ def test_best_tec_rows_ranks_statuses_and_picks_the_capacity_column() -> None:
         {"Project ID": "odd", "Project Status": "Built", "tec_mw": 40.0},
         {"Project ID": "uc", "Project Status": "Under Construction/Commissioning", "tec_mw": 20.62},
     ]
+
+
+def _census(*, rows: list[dict[str, object]]) -> pl.DataFrame:
+    columns = [*collate.DISPARITY_FIGURES, "elexon_bmu_id", "display_name", "scope", "basis"]
+    return pl.DataFrame(
+        [{column: row.get(column) for column in columns} for row in rows],
+        schema={
+            **dict.fromkeys(collate.DISPARITY_FIGURES, pl.Float64),
+            "elexon_bmu_id": pl.String,
+            "display_name": pl.String,
+            "scope": pl.String,
+            "basis": pl.String,
+        },
+    )
+
+
+def test_capacity_disparity_ranks_by_highest_over_lowest_of_the_figures_that_exist() -> None:
+    census = _census(
+        rows=[
+            {
+                "elexon_bmu_id": "T_A",
+                "scope": "single-site",
+                "basis": "behaviour only",
+                "generation_capacity_mw": 50.0,
+                "tec_mw": 100.0,
+                "p99_output_mw": 40.0,
+            },
+            {
+                "elexon_bmu_id": "T_B",
+                "scope": "single-site",
+                "basis": "type and behaviour",
+                "generation_capacity_mw": 10.0,
+                "largest_mel_mw": 0.0,  # a zero is left out of the ratio
+                "repd_installed_capacity_mw": 40.0,
+            },
+            {
+                "elexon_bmu_id": "T_ONE_FIGURE",
+                "scope": "single-site",
+                "basis": "behaviour only",
+                "tec_mw": 90.0,
+            },
+            {
+                "elexon_bmu_id": "T_TYPE_ONLY",
+                "scope": "single-site",
+                "basis": "type only",
+                "generation_capacity_mw": 1.0,
+                "tec_mw": 900.0,
+            },
+            {
+                "elexon_bmu_id": "2__AGG",
+                "scope": "aggregate",
+                "basis": "behaviour only",
+                "generation_capacity_mw": 1.0,
+                "tec_mw": 900.0,
+            },
+        ]
+    )
+    ranked = collate.capacity_disparity(table=census)
+    assert ranked["elexon_bmu_id"].to_list() == ["T_B", "T_A"]
+    assert ranked["ratio"].to_list() == [4.0, 2.5]
+    assert ranked["lowest_mw"].to_list() == [10.0, 40.0]
+    assert ranked["highest_mw"].to_list() == [40.0, 100.0]
+
+
+def test_capacity_disparity_breaks_a_tie_by_identifier() -> None:
+    rows: list[dict[str, object]] = [
+        {
+            "elexon_bmu_id": bmu,
+            "scope": "single-site",
+            "basis": "behaviour only",
+            "generation_capacity_mw": 10.0,
+            "tec_mw": 20.0,
+        }
+        for bmu in ("T_B", "T_A")
+    ]
+    ranked = collate.capacity_disparity(table=_census(rows=rows))
+    assert ranked["elexon_bmu_id"].to_list() == ["T_A", "T_B"]

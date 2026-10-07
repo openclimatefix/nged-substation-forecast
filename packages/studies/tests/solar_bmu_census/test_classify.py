@@ -297,3 +297,32 @@ def test_drop_daytime_zeros_on_literal_rows() -> None:
 def test_correlation_is_none_when_the_sun_never_varies() -> None:
     series = pl.DataFrame({"output_mwh": [1.0, 2.0, 3.0], "cos_zenith": [0.0, 0.0, 0.0]})
     assert classify.sun_following_correlation(series=series) is None
+
+
+def _midday_stamps(*, days: int) -> pl.Series:
+    """Return one half-hour end time at 12:15 UTC on each of `days` days, when the sun is up."""
+    return pl.Series(
+        "half_hour_end_time",
+        [START + timedelta(days=day, hours=12, minutes=15) for day in range(days)],
+    ).dt.cast_time_unit("us")
+
+
+def test_p99_skips_the_commissioning_month_and_the_daytime_zeros() -> None:
+    """Days 0 to 9 are zero, day 10 is the first output, and days 10 to 39 are the skipped month.
+
+    Days 40 to 139 then hold the readings 1 to 100 MWh, and days 140 to 289 hold daytime zeros.
+    Keeping the commissioning month adds readings of 500 and 1000 MWh, and keeping the zeros pulls
+    the percentile down to 97.5 MWh.
+    """
+    values = np.zeros(290)
+    values[10] = 1000.0
+    values[11:40] = 500.0
+    values[40:140] = np.arange(1.0, 101.0)
+    output = _frame(stamps=_midday_stamps(days=290), values=values)
+    p99 = classify.p99_output_mw(output=output, window_start=START)
+    assert p99 == pytest.approx(198.02, abs=1e-6)  # 99.01 MWh at 2 half-hours per hour
+
+
+def test_p99_is_none_when_the_bmu_never_generates() -> None:
+    output = _frame(stamps=_midday_stamps(days=20), values=np.zeros(20))
+    assert classify.p99_output_mw(output=output, window_start=START) is None

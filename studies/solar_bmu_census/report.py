@@ -24,7 +24,7 @@ from classify import (
     analysis_series,
     drop_daytime_zeros,
 )
-from collate import CAPACITY_COLUMNS
+from collate import CAPACITY_COLUMNS, DISPARITY_FIGURES, P99_COLUMN, capacity_disparity
 from fetch_sources import (
     OUTPUT_DIR,
     STUDY_DIR,
@@ -103,7 +103,9 @@ def capacity_table(*, table: pl.DataFrame) -> pl.DataFrame:
     """Sum each capacity column, for all solar BMUs and for each technology group.
 
     A TEC project or a REPD row that several BMUs match is summed once, because its figure is for
-    the site and not for each BMU. Columns are never added to each other.
+    the site and not for each BMU. Columns are never added to each other. The last column,
+    `p99_output_mw`, measures each BMU's observed output and is not a registered capacity, so its
+    sum is only the total of the BMUs' own 99th percentiles.
 
     Args:
         table: The census table's single-site rows.
@@ -115,7 +117,7 @@ def capacity_table(*, table: pl.DataFrame) -> pl.DataFrame:
     rows = []
     for label, technology in GROUPS:
         group = table if technology is None else table.filter(pl.col("technology") == technology)
-        for column in CAPACITY_COLUMNS:
+        for column in DISPARITY_FIGURES:
             if column == "tec_mw":
                 values = group.filter(pl.col(column).is_not_null()).unique("tec_project_id")
             elif column == "repd_installed_capacity_mw":
@@ -667,7 +669,8 @@ def names_table(*, census: pl.DataFrame, scope: str) -> pl.DataFrame:
 def capacities_table(*, census: pl.DataFrame, scope: str) -> pl.DataFrame:
     """List the census BMUs of one scope with their technology, correlation, and capacities.
 
-    The capacities are the figure each register gives the BMU, in MW.
+    The capacities are the figure each register gives the BMU, in MW. The last capacity column,
+    `p99_output_mw`, is the 99th percentile of the BMU's own output, not a registered capacity.
     """
     return (
         census.filter(pl.col("scope") == scope)
@@ -675,11 +678,28 @@ def capacities_table(*, census: pl.DataFrame, scope: str) -> pl.DataFrame:
             "elexon_bmu_id",
             "technology",
             *CAPACITY_COLUMNS,
+            pl.col(P99_COLUMN).round(1),
             correlation=pl.col("correlation").round(2),
         )
         .sort("elexon_bmu_id")
-        .with_columns(pl.col([*CAPACITY_COLUMNS, "correlation"]).cast(pl.String).fill_null("-"))
+        .with_columns(
+            pl.col([*CAPACITY_COLUMNS, P99_COLUMN, "correlation"]).cast(pl.String).fill_null("-")
+        )
     )
+
+
+def disparity_table(*, census: pl.DataFrame) -> pl.DataFrame:
+    """Return the BMUs with output ranked by the ratio of their highest to lowest capacity figure.
+
+    The rule is `collate.capacity_disparity`'s. The figures are in MW, rounded to 1 decimal place,
+    and the ratio is rounded to 2.
+    """
+    ranked = capacity_disparity(table=census)
+    return ranked.with_columns(
+        pl.col([*DISPARITY_FIGURES, "lowest_mw", "highest_mw"]).round(1),
+        ratio=pl.col("ratio").round(2),
+        rank=pl.int_range(1, pl.len() + 1),
+    ).with_columns(pl.col(pl.Float64).cast(pl.String).fill_null("-"))
 
 
 def main() -> None:
@@ -713,6 +733,7 @@ def main() -> None:
             "basis",
             "correlation",
             *CAPACITY_COLUMNS,
+            pl.col(P99_COLUMN).round(1),
             "tec_status",
             "tec_connected_mw",
         )
@@ -778,6 +799,12 @@ def main() -> None:
         + _md(capacities_table(census=census, scope="single-site"))
         + "\n\n### Aggregate\n\n"
         + _md(capacities_table(census=census, scope="aggregate")),
+        "## The BMUs with output, ranked by highest over lowest of the six capacity figures\n\n"
+        "Figures at or below zero and missing figures are left out of the ratio. The three BMUs "
+        "with "
+        "the largest ratio are the ones Figure 5 draws. `p99_output_mw` is the 99th percentile of "
+        "the BMU's half-hourly output, not a registered capacity.\n\n"
+        + _md(disparity_table(census=census)),
         "## Single-site BMUs in the gap band, or typed Solar and not following the sun\n\n"
         + _md(to_inspect),
         "## Capacity figures (single-site BMUs; columns are never added together)\n\n"

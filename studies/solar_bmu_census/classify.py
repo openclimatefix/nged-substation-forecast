@@ -201,6 +201,29 @@ def classify_behaviour(*, output: pl.DataFrame, window_start: datetime) -> Behav
     )
 
 
+def p99_output_mw(*, output: pl.DataFrame, window_start: datetime) -> float | None:
+    """Return the 99th percentile of a BMU's half-hourly output, in megawatts.
+
+    The percentile is taken over the series the classifier judges: the half-hours from
+    `analysis_series` (so after the commissioning period) with `drop_daytime_zeros` applied (so
+    without the exact zeros while the sun is up). Zeros at night, and negative readings, stay in.
+    The percentile is linear-interpolated, and the half-hourly megawatt-hours are multiplied by 2 to
+    give megawatts. The result is a measure of the BMU's observed output, not a registered capacity.
+
+    Args:
+        output: Columns `half_hour_end_time` (UTC) and `output_mwh`.
+        window_start: The start of the study window, in UTC.
+
+    Returns:
+        The 99th percentile in megawatts, or None when no half-hour is judged.
+    """
+    judged = drop_daytime_zeros(series=analysis_series(output=output, window_start=window_start))
+    if judged.is_empty():
+        return None
+    percentile = judged["output_mwh"].quantile(0.99, interpolation="linear")
+    return None if percentile is None else float(percentile) * 2
+
+
 def igcpu_solar_ids(*, igcpu: list[dict[str, Any]]) -> set[str]:
     """Return the BMU identifiers that IGCPU registers with resource type "Solar"."""
     return {str(row["bmUnit"]) for row in igcpu if row["psrType"] == "Solar" and row["bmUnit"]}
@@ -237,7 +260,7 @@ def classify_all() -> pl.DataFrame:
         elif bmu_id in fetched_ids:
             raise FileNotFoundError(f"No B1610 file for {bmu_id} in window {window.label}")
         else:
-            output = _empty_output()
+            output = empty_output()
         result = classify_behaviour(output=output, window_start=window.start)
         by_type = bmu_id in igcpu_ids
         by_behaviour = result.behaviour == "solar"
@@ -260,7 +283,7 @@ def classify_all() -> pl.DataFrame:
     )
 
 
-def _empty_output() -> pl.DataFrame:
+def empty_output() -> pl.DataFrame:
     """Return the output frame of an IGCPU-typed BMU that B1610 has no file for."""
     return pl.DataFrame(
         schema={"half_hour_end_time": pl.Datetime("us", "UTC"), "output_mwh": pl.Float64}
