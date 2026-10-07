@@ -61,8 +61,10 @@ A metered generator's time series and results are never published with the gener
 Issue: [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147)
 
 `ManualHeuristicForecaster` is the first baseline in the codebase. Its leaderboard rows answer the
-question this project exists to answer: **do we beat the manual heuristic?** The persistence and
-climatology baselines, still to come, give XGBoost's NMAE numbers two further points of reference.
+question this project exists to answer: **do we beat the manual heuristic?** The climatology
+baseline, built next, gives XGBoost's numbers a further point of reference. The persistence baseline
+is deferred to the v0.9 nice-to-haves epic
+([#361](https://github.com/openclimatefix/nged-substation-forecast/issues/361)).
 
 **Every comparison against a baseline publishes the fraction of series that beat it alongside the
 average error, never the average alone** — see [Publishing results that others can compare
@@ -138,8 +140,9 @@ built on the manual heuristic:
   bank-holiday Monday behaves like a Sunday). Moveable feasts align holiday-to-holiday
   (Easter→Easter) rather than by fixed week offset. This no longer rides the pure lag machinery —
   the analogue offset is conditional on the calendar — so it needs a bespoke picker plus a GB
-  bank-holiday calendar (the pure-Python `holidays` package), and ships as an immediate follow-up
-  PR.
+  bank-holiday calendar (the pure-Python `holidays` package). It is deferred to the v0.9
+  nice-to-haves epic and tracked in
+  [#1088](https://github.com/openclimatefix/nged-substation-forecast/issues/1088).
 
 A third variant, `manual_heuristic_calibrated`, corrects the analogues after selection rather than
 changing which analogues are selected, and has [its own section
@@ -292,13 +295,17 @@ yardstick here; `manual_heuristic` is the point on it.
 
 ### Implementation details — baselines (deleted when they ship)
 
-Two PRs remain to add the baselines, in order: `persistence` (PR B) and `climatology` (PR C). PR
+One PR is next: `climatology` (PR C), tracked in
+[#1086](https://github.com/openclimatefix/nged-substation-forecast/issues/1086). The `persistence`
+baseline (PR B) is deferred to the v0.9 nice-to-haves epic
+([#361](https://github.com/openclimatefix/nged-substation-forecast/issues/361)) and tracked in
+[#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087). PR
 A, the `manual_heuristic` baseline with its `baseline_forecasters` package and its feature engineer,
 has shipped. The metrics collapse below is its own issue under the v0.3 epic, and no baseline waits
 on the metrics collapse. The `manual_heuristic_holiday_aligned` variant (described under [A faithful
-replica and a "simple upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is a
-later PR, out of scope for this arc but given its own tracked issue so it is not lost when #147
-closes.
+replica and a "simple upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is
+deferred to the v0.9 epic and tracked in
+[#1088](https://github.com/openclimatefix/nged-substation-forecast/issues/1088).
 `manual_heuristic_calibrated` (described under [Calibrating the manual
 heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile), and tracked in
 [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)) is a further PR, on
@@ -364,10 +371,13 @@ collapse config and no designated point-forecast columns on `PowerForecast`. In
   `docs/ml_experimentation/dagster-workflow.md`. Treat the change as a leaderboard epoch event,
   because the new collapse shifts existing numbers.
 
-**PR B — `PersistenceForecaster` (seasonal-naive).** `PersistenceForecaster` is the second
-forecaster to need `PowerLagsPerNwpRunFeatureEngineer` and the `meta.json` save/load round-trip
-(config dump, `trained_time_series_ids`, the fully-qualified `model_class`), so PR B first extracts
-both from `manual_heuristic.py` into shared modules. No `StatelessForecaster` base class until a
+**PR B — `PersistenceForecaster` (seasonal-naive).** This PR is deferred to the v0.9 epic and
+tracked in [#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087).
+`PersistenceForecaster` is the second forecaster to need `PowerLagsPerNwpRunFeatureEngineer`, so PR B
+first extracts that engineer from `manual_heuristic.py` into a shared module. The `meta.json`
+save/load round-trip (config dump, `trained_time_series_ids`, the fully-qualified `model_class`)
+becomes a shared helper in whichever of `persistence` and `climatology` lands second, and
+`climatology` lands first, so PR B extracts it. No `StatelessForecaster` base class until a
 third stateless model exists.
 
 - `MODEL_NAME = "persistence"`, `MODEL_VERSION = 1`. Config default
@@ -405,7 +415,9 @@ only skill floor the NWP ensemble must clear at long horizons.
   `(time_series_id, month, half-hour-of-day, is_weekend)` cell, store the empirical quantiles of
   that cell's power samples. Cell keys derive from **local** (Europe/London) time computed inside
   the forecaster from `valid_time`, aligning with the demand rhythm (and matching the `local_*` time
-  features). `save()` writes the lookup as one parquet + `meta.json`.
+  features). `save()` writes the lookup as one parquet + `meta.json`. The shared
+  save/load helper is extracted by whichever of `persistence` and `climatology` lands second, so
+  PR C neither waits for it nor builds it.
 - **Member emission — equiprobable levels, not the delivery levels.** Emit members at *equiprobable*
   quantile levels `(i − 0.5)/m`, **not** at the tail-heavy `DELIVERY_QUANTILES` levels. Fair CRPS
   and the per-run empirical delivery quantiles the metrics layer derives from members treat members
@@ -436,9 +448,13 @@ only skill floor the NWP ensemble must clear at long horizons.
   quantiles); `save`/`load` round-trip; an integration smoke fold; CRPS flows over the members.
 - Ship-time triage: unblocks
   [#354](https://github.com/openclimatefix/nged-substation-forecast/issues/354) (the dashboard
-  climatology reference band). As the last 🚧 baseline item, delete the whole "Implementation details
-  — baselines" section (summary → PR body), close #147, and update the status banner plus the
-  milestone section in [`docs/roadmap/index.md`](index.md) if the arc changed.
+  climatology reference band). As the last 🚧 baseline item that this arc builds, delete the whole
+  "Implementation details — baselines" section (summary → PR body), close #147, and update the
+  status banner plus the milestone section in [`docs/roadmap/index.md`](index.md) if the arc
+  changed. Before deleting the section, copy the PR B item into the body of
+  [#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087), because the
+  persistence design text exists only there. The `manual_heuristic_holiday_aligned` design text sits
+  outside the deleted section and stays on this page.
 
 **The recipe.** No open questions remain. Full write-up in [the manual heuristic
 forecast](../background/manual-heuristic-forecast.md); the implementation spec:
@@ -452,10 +468,12 @@ forecast](../background/manual-heuristic-forecast.md); the implementation spec:
   scaling. (So the holiday-aligned variant measures how much calendar awareness adds, rather than
   reimplementing a step the analogue method already takes.)
 
-**Cross-cutting.** (1) **Issue hygiene:** create one tracked sub-issue per PR under epic
-[#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6) / #147 following the
-`github-issue-pr-workflow` skill's issue-creation rules (labels, Type, OCF project fields, sub-issue
-ordering), *including* one for `manual_heuristic_holiday_aligned` so it survives #147 closing. (2)
+**Cross-cutting.** (1) **Issue tracking:** PR C is tracked in
+[#1086](https://github.com/openclimatefix/nged-substation-forecast/issues/1086), PR B in
+[#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087), and
+`manual_heuristic_holiday_aligned` in
+[#1088](https://github.com/openclimatefix/nged-substation-forecast/issues/1088), so the two deferred
+items survive #147 closing. (2)
 
 **Re-run recipe:** add a short "Re-running CV for an experiment" subsection to
 `docs/ml_experimentation/dagster-workflow.md` describing the `trained_cv_model++` backfill, written
