@@ -23,7 +23,6 @@ Trigger 4 fired when the issue was sized, so all four reviews are planned. The f
 - **The candidate set is every BMU with B1610 rows, not only the null-fuel ones.** Reason: classification is cheap (1,705 BMUs for 12 months download in about 10 minutes), and the second plan review found 36 sun-following BMUs outside the `T_`, `E_`, `M_` prefixes that a narrower filter would drop.
 - **The recall estimate comes from the TEC register, not a hand-labelled sample or REPD.** Reason: see "What the first plan review changed" below.
 - **The deliverable is a README and `report.md`, not a docs page.** See open question 1.
-- **The recall estimate comes from the TEC register, not from a labelled sample or REPD.** See "What the first plan review changed".
 
 ## What changes, file by file
 
