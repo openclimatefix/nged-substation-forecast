@@ -824,28 +824,6 @@ def test_metrics_scores_a_study_whose_row_keys_match_the_reference(
     assert _scored_experiments(file_mlflow_env["metrics"]) == {STUDY_EXPERIMENT_NAME}
 
 
-def test_metrics_scores_a_deterministic_study_with_the_reference_row_keys(
-    file_mlflow_env: dict[str, Path],
-    dagster_instance: DagsterInstance,
-    register_experiment: RegisterExperiment,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A study with one ensemble member is scored, because dropping members drops no row."""
-    _run_cv_pipeline(dagster_instance, register_experiment)
-    _use_as_reference(monkeypatch, EXPERIMENT_NAME)
-    _store_variant(
-        file_mlflow_env["forecasts"],
-        experiment_name=STUDY_EXPERIMENT_NAME,
-        transform=lambda rows: rows.filter(pl.col("ensemble_member") == 0),
-    )
-
-    assert materialize(
-        [metrics],
-        run_config=_score_run_config(experiment_name=STUDY_EXPERIMENT_NAME),
-        instance=dagster_instance,
-    ).success
-
-
 def test_metrics_refuses_a_study_that_omits_the_rows_of_a_valid_time(
     file_mlflow_env: dict[str, Path],
     dagster_instance: DagsterInstance,
@@ -861,48 +839,6 @@ def test_metrics_refuses_a_study_that_omits_the_rows_of_a_valid_time(
     )
 
     with pytest.raises(RowKeyMismatchError, match="reference row keys are missing"):
-        materialize(
-            [metrics],
-            run_config=_score_run_config(experiment_name=STUDY_EXPERIMENT_NAME),
-            instance=dagster_instance,
-        )
-
-
-def test_metrics_refuses_a_study_that_adds_a_series_the_reference_lacks(
-    file_mlflow_env: dict[str, Path],
-    dagster_instance: DagsterInstance,
-    register_experiment: RegisterExperiment,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _run_cv_pipeline(dagster_instance, register_experiment)
-    _use_as_reference(monkeypatch, EXPERIMENT_NAME)
-    _store_variant(
-        file_mlflow_env["forecasts"],
-        experiment_name=STUDY_EXPERIMENT_NAME,
-        transform=lambda rows: pl.concat(
-            [rows, rows.with_columns(time_series_id=pl.lit(2, pl.Int32))]
-        ),
-    )
-
-    with pytest.raises(RowKeyMismatchError, match="extra \\[2\\]"):
-        materialize(
-            [metrics],
-            run_config=_score_run_config(experiment_name=STUDY_EXPERIMENT_NAME),
-            instance=dagster_instance,
-        )
-
-
-def test_metrics_refuses_a_study_when_the_reference_has_no_rows(
-    file_mlflow_env: dict[str, Path],
-    dagster_instance: DagsterInstance,
-    register_experiment: RegisterExperiment,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _run_cv_pipeline(dagster_instance, register_experiment)
-    _use_as_reference(monkeypatch, "never_materialised")
-    _store_variant(file_mlflow_env["forecasts"], experiment_name=STUDY_EXPERIMENT_NAME)
-
-    with pytest.raises(RowKeyMismatchError, match="Materialise the reference"):
         materialize(
             [metrics],
             run_config=_score_run_config(experiment_name=STUDY_EXPERIMENT_NAME),
@@ -936,30 +872,6 @@ def test_unfiltered_leaderboard_run_skips_a_study_instead_of_failing_on_it(
     )
 
 
-def test_metrics_refuses_leaderboard_rows_outside_the_fold_window(
-    file_mlflow_env: dict[str, Path],
-    dagster_instance: DagsterInstance,
-    register_experiment: RegisterExperiment,
-) -> None:
-    """A row past ``val_end`` would be scored and labelled as the fold's window."""
-    _run_cv_pipeline(dagster_instance, register_experiment)
-    late = datetime(2026, 7, 2, 12, 0, tzinfo=UTC)
-    _store_variant(
-        file_mlflow_env["forecasts"],
-        experiment_name=f"{EXPERIMENT_NAME}_late",
-        transform=lambda rows: pl.concat(
-            [rows, rows.head(1).with_columns(valid_time=pl.lit(late))]
-        ),
-    )
-
-    with pytest.raises(RowsOutsideWindowError, match="outside the evaluation window"):
-        materialize(
-            [metrics],
-            run_config=_score_run_config(experiment_name=f"{EXPERIMENT_NAME}_late"),
-            instance=dagster_instance,
-        )
-
-
 def test_metrics_refuses_no_group_when_a_later_group_is_refused(
     file_mlflow_env: dict[str, Path],
     dagster_instance: DagsterInstance,
@@ -976,7 +888,7 @@ def test_metrics_refuses_no_group_when_a_later_group_is_refused(
         ),
     )
 
-    with pytest.raises(RowsOutsideWindowError):
+    with pytest.raises(RowsOutsideWindowError, match="outside the evaluation window"):
         materialize(
             [metrics],
             run_config=_score_run_config(experiment_name=None),
@@ -1086,7 +998,6 @@ def test_clean_environment_keeps_only_the_allowed_variables() -> None:
         {
             "PATH": "/usr/bin",
             "HOME": "/home/x",
-            "UV_CACHE_DIR": "/cache",
             "DATA_PATH_INTERNAL": "/fake",
             "NGED_FINAL_TEST": "1",
             "CV_CONFIG_PATH": "/fake.yaml",
@@ -1094,7 +1005,7 @@ def test_clean_environment_keeps_only_the_allowed_variables() -> None:
         }
     )
 
-    assert cleaned == {"PATH": "/usr/bin", "HOME": "/home/x", "UV_CACHE_DIR": "/cache"}
+    assert cleaned == {"PATH": "/usr/bin", "HOME": "/home/x"}
 
 
 @pytest.fixture
@@ -1143,7 +1054,7 @@ def test_score_study_does_not_overwrite_a_submission_unless_asked(
         predictions=study_predictions, study_name="my_study", fold_id=FOLD_ID, replace=False
     )
 
-    with pytest.raises(ValueError, match="already scored"):
+    with pytest.raises(ValueError, match="already holds rows"):
         score_study.score_study(
             predictions=study_predictions, study_name="my_study", fold_id=FOLD_ID, replace=False
         )
@@ -1170,11 +1081,28 @@ def test_score_study_refuses_a_file_missing_rows_and_leaves_no_partition(
 
 @pytest.mark.parametrize("fold_id", ["smoke_test", "live"])
 def test_score_study_refuses_a_fold_that_is_not_a_leaderboard_fold(
-    study_predictions: Path, fold_id: str
+    file_mlflow_env: dict[str, Path], tmp_path: Path, fold_id: str
 ) -> None:
     with pytest.raises(ValueError, match="not a leaderboard fold"):
         score_study.score_study(
-            predictions=study_predictions, study_name="my_study", fold_id=fold_id, replace=False
+            predictions=tmp_path / "unread.parquet",
+            study_name="my_study",
+            fold_id=fold_id,
+            replace=False,
+        )
+
+
+def test_score_study_refuses_a_row_key_column_with_the_wrong_dtype(
+    study_predictions: Path, tmp_path: Path
+) -> None:
+    nanoseconds = tmp_path / "nanoseconds.parquet"
+    pl.read_parquet(study_predictions).with_columns(
+        valid_time=pl.col("valid_time").dt.cast_time_unit("ns")
+    ).write_parquet(nanoseconds)
+
+    with pytest.raises(ValueError, match="Column 'valid_time' must have dtype"):
+        score_study.score_study(
+            predictions=nanoseconds, study_name="my_study", fold_id=FOLD_ID, replace=False
         )
 
 

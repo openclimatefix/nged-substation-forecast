@@ -2,9 +2,7 @@
 
 A study's leaderboard number comes only from this script. The script takes a predictions file and
 nothing else: no code, no actuals, no scoring options. It runs `metrics` in leaderboard scope on the
-file's rows, stored in `power_forecasts` under the experiment name `study/<study name>`, so an
-autonomous research session can run the script but cannot change what the script executes when the
-session works in its own worktree and the script runs from the `main` checkout.
+file's rows, stored in `power_forecasts` under the experiment name `study/<study name>`.
 
 Before anything is written, the script refuses a file whose row keys
 `(time_series_id, power_fcst_init_time, valid_time)` differ from the CV config's
@@ -13,10 +11,14 @@ Before anything is written, the script refuses a file whose row keys
 leaderboard number.
 
 The script also refuses to trust its environment. `Settings` reads `DATA_PATH_INTERNAL`,
-`METADATA_PATH`, `CV_CONFIG_PATH`, `MLFLOW_TRACKING_URI`, and `NGED_FINAL_TEST` from the
-environment, and any of them could repoint the actuals or switch off the final-test date guard.
-The script therefore re-executes itself with an environment holding only `ALLOWED_ENVIRONMENT`
-and the `UV_*` variables. The paths and credentials come from the `.env` file of the checkout.
+`METADATA_PATH`, `CV_CONFIG_PATH`, and `MLFLOW_TRACKING_URI` from the environment, and the `metrics`
+asset reads `NGED_FINAL_TEST`. Any of them could repoint the actuals or switch off the final-test
+date guard. The script therefore re-executes itself with an environment holding only
+`ALLOWED_ENVIRONMENT`. The paths and credentials come from the `.env` file of the checkout.
+
+The script runs the code of whichever checkout its interpreter belongs to. An autonomous research
+session therefore cannot change what the script executes only when the maintainer's `sudo` rule
+runs the `main` checkout's interpreter on the `main` checkout's copy of the script.
 
     uv run python scripts/forecasting/score_study.py \
         predictions.parquet my_study mid_2025_to_mid_2026
@@ -29,7 +31,7 @@ import argparse
 import os
 import re
 import sys
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Final
 
@@ -41,7 +43,7 @@ from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
 from dagster import DagsterInstance, RunConfig, materialize
 from delta_store.power_forecasts import write_power_forecasts
-from ml_core.metrics import require_same_row_keys
+from ml_core.metrics import ROW_KEY_COLUMNS, require_same_row_keys
 
 from nged_substation_forecast.defs.cv_assets import MetricsConfig, PopulationFilter, metrics
 
@@ -52,10 +54,8 @@ The Delta writers build their overwrite predicate from the experiment name by st
 a name containing a quote could overwrite other experiments' rows.
 """
 
-ALLOWED_ENVIRONMENT: Final[frozenset[str]] = frozenset(
-    {"PATH", "HOME", "LANG", "LC_ALL", "VIRTUAL_ENV"}
-)
-"""The environment variables the script keeps, beside every variable starting with `UV_`."""
+ALLOWED_ENVIRONMENT: Final[frozenset[str]] = frozenset({"PATH", "HOME", "LANG", "LC_ALL"})
+"""The environment variables the script keeps."""
 
 CLEAN_ENVIRONMENT_MARKER: Final[str] = "NGED_SCORE_STUDY_CLEAN_ENVIRONMENT"
 """Set to `1` in the re-executed process, so the process re-executes once only."""
@@ -75,13 +75,9 @@ def clean_environment(environment: Mapping[str, str]) -> dict[str, str]:
         environment: The caller's environment.
 
     Returns:
-        The variables named in `ALLOWED_ENVIRONMENT`, and every variable starting with `UV_`.
+        The variables named in `ALLOWED_ENVIRONMENT`.
     """
-    return {
-        name: value
-        for name, value in environment.items()
-        if name in ALLOWED_ENVIRONMENT or name.startswith("UV_")
-    }
+    return {name: value for name, value in environment.items() if name in ALLOWED_ENVIRONMENT}
 
 
 def validate_study_name(study_name: str) -> str:
@@ -117,9 +113,17 @@ def _open_predictions(*, predictions: Path, experiment_name: str, fold_id: str) 
         A lazy scan whose `experiment_name` is `experiment_name`.
 
     Raises:
-        ValueError: If the file has a `fold_id` column holding any value except `fold_id`.
+        ValueError: If the file lacks a row-key column, a row-key column has a different dtype
+            from `PowerForecast`'s, or a `fold_id` column holds any value except `fold_id`.
     """
     scan = pl.scan_parquet(predictions)
+    schema = scan.collect_schema()
+    for column in ROW_KEY_COLUMNS:
+        expected = PowerForecast.dtypes[column]
+        if column not in schema or schema[column] != expected:
+            raise ValueError(
+                f"Column {column!r} must have dtype {expected}; the file has {schema.get(column)}."
+            )
     if "fold_id" in scan.collect_schema().names():
         fold_ids = scan.select("fold_id").unique().collect(engine="streaming")["fold_id"].to_list()
         if fold_ids != [fold_id]:
@@ -127,10 +131,22 @@ def _open_predictions(*, predictions: Path, experiment_name: str, fold_id: str) 
     return scan.with_columns(experiment_name=pl.lit(experiment_name), fold_id=pl.lit(fold_id))
 
 
-def _partition_has_rows(*, forecasts: pl.LazyFrame, experiment_name: str) -> bool:
-    """Return whether `power_forecasts` already holds rows for the experiment."""
-    existing = forecasts.filter(pl.col("experiment_name") == experiment_name).head(1)
-    return existing.collect(engine="streaming").height > 0
+def _partition_has_rows(*, forecasts: pl.LazyFrame, experiment_name: str, fold_id: str) -> bool:
+    """Return whether `power_forecasts` already holds rows for the experiment and fold."""
+    existing = PopulationFilter(experiment_name=experiment_name, fold_id=fold_id).apply(forecasts)
+    return existing.head(1).collect(engine="streaming").height > 0
+
+
+def _validated_batches(study: pl.LazyFrame) -> Iterator[pt.DataFrame[PowerForecast]]:
+    """Yield the study's rows one batch of series at a time, each validated as `PowerForecast`."""
+    series_ids = sorted(
+        study.select("time_series_id").unique().collect(engine="streaming")["time_series_id"]
+    )
+    for start in range(0, len(series_ids), SERIES_BATCH_SIZE):
+        batch_ids = series_ids[start : start + SERIES_BATCH_SIZE]
+        yield PowerForecast.validate(
+            study.filter(pl.col("time_series_id").is_in(batch_ids)).collect(engine="streaming")
+        )
 
 
 def _write_in_batches(
@@ -138,21 +154,17 @@ def _write_in_batches(
 ) -> None:
     """Write the study's rows to `power_forecasts` one batch of series at a time.
 
-    The first batch replaces the `(experiment_name, fold_id)` partition and the rest append to it,
+    A first pass validates every batch, so a malformed row leaves no partial partition behind. The
+    first batch then replaces the `(experiment_name, fold_id)` partition and the rest append to it,
     as `cv_power_forecasts` does, so peak memory is one batch.
     """
-    series_ids = sorted(
-        study.select("time_series_id").unique().collect(engine="streaming")["time_series_id"]
-    )
-    for start in range(0, len(series_ids), SERIES_BATCH_SIZE):
-        batch_ids = series_ids[start : start + SERIES_BATCH_SIZE]
-        batch = PowerForecast.validate(
-            study.filter(pl.col("time_series_id").is_in(batch_ids)).collect(engine="streaming")
-        )
+    for _ in _validated_batches(study):
+        pass
+    for index, batch in enumerate(_validated_batches(study)):
         write_power_forecasts(
             forecasts=batch,
             table_uri=settings.power_forecasts_data_path,
-            replace_partition=(experiment_name, fold_id) if start == 0 else None,
+            replace_partition=(experiment_name, fold_id) if index == 0 else None,
             storage_options=settings.storage_options,
         )
 
@@ -188,6 +200,13 @@ def score_study(*, predictions: Path, study_name: str, fold_id: str, replace: bo
             storage_options=typeddict_to_dict(settings.storage_options),
         )
     ).set_model(PowerForecast)
+    if not replace and _partition_has_rows(
+        forecasts=forecasts, experiment_name=experiment_name, fold_id=fold_id
+    ):
+        raise ValueError(
+            f"{experiment_name} already holds rows for {fold_id}; pass --replace to overwrite them."
+        )
+
     require_same_row_keys(
         study=study,
         reference=PopulationFilter(
@@ -197,9 +216,6 @@ def score_study(*, predictions: Path, study_name: str, fold_id: str, replace: bo
         reference_label=cv_config.reference_experiment_name,
         series_batch_size=SERIES_BATCH_SIZE,
     )
-    if not replace and _partition_has_rows(forecasts=forecasts, experiment_name=experiment_name):
-        raise ValueError(f"{experiment_name} is already scored; pass --replace to overwrite it.")
-
     _write_in_batches(
         study=study, settings=settings, experiment_name=experiment_name, fold_id=fold_id
     )

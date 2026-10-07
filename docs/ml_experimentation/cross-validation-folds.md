@@ -202,18 +202,19 @@ not a sample size.
 **The `metrics` asset is the only source of a leaderboard number, so it checks its input before it
 scores anything.** Three refusals protect the number against an experiment, or an autonomous study,
 that could otherwise raise its own score. Each refusal raises, because the metrics asset is research
-code that fails fast. Every group is checked before any group is scored, so a refusal leaves no
-rows or MLflow runs behind.
+code that fails fast. Every group is checked before any group is scored, so a refusal leaves no rows
+or MLflow runs behind.
 
 - **The final-test date guard.** `conf/cv/default.yaml` holds `final_test_start`, which must be
   later than the end of every leaderboard fold. The asset refuses a window that reaches that date
   unless the maintainer's shell sets `NGED_FINAL_TEST=1`; forecasts stored under `fold_id="live"`
   are exempt, because they forecast the future. The date is a guard and not a sealed test year: the
   observations after it are a few months, not an independent year, and the fold-hygiene section of
-  the [leaderboard roadmap](../roadmap/metrics-and-leaderboard.md#fold-hygiene-selection-bias-and-a-final-test-window)
+  the [leaderboard
+  roadmap](../roadmap/metrics-and-leaderboard.md#fold-hygiene-selection-bias-and-a-final-test-window)
   records why a sealed year is still undecided.
 - **Rows inside the fold window.** In leaderboard scope, every forecast row's `valid_time` must lie
-  between the fold's `val_start` and `val_end`. Without this check, rows after `final_test_start`
+  between the fold's `val_start` and `val_end`. Without this check, rows outside the fold's window
   would be scored and labelled as the fold's window.
 - **The reference row keys, for a study.** An experiment whose name starts with `study/` holds a
   forecast submitted through `scripts/forecasting/score_study.py`. Its rows must have exactly the

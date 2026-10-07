@@ -137,8 +137,9 @@ def require_valid_times_within_window(
 
     ``compute_metrics`` joins forecasts to actuals on ``(time_series_id, valid_time)`` and never
     filters to the window, so a forecast file carrying extra rows would be scored and then labelled
-    as the fold's window. Without this check the ``final_test_start`` guard could never fire for a
-    leaderboard fold, because a leaderboard window ends before ``final_test_start``.
+    as the fold's window. In leaderboard scope this check, not the ``final_test_start`` guard, keeps
+    rows past ``val_end`` out of the score, because a leaderboard window ends before
+    ``final_test_start``.
 
     Args:
         valid_time_min: Earliest ``valid_time`` in the group.

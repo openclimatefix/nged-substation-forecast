@@ -213,26 +213,3 @@ def list_promotable_runs() -> list[PromotableRun]:
         key=lambda run: run.last_finished_at or datetime.min.replace(tzinfo=UTC),
         reverse=True,
     )
-
-
-def require_run_is_not_a_study(run_id: str) -> None:
-    """Refuse a run that belongs to a ``study/`` experiment.
-
-    A study's fold run exists so that its scores reach the leaderboard chart, and it holds no saved
-    model. ``promoted_model`` calls this before it replaces the production model directory, so a
-    study's run id can never start a promotion. The caller is responsible for setting the tracking
-    URI (``mlflow.set_tracking_uri``) beforehand.
-
-    Args:
-        run_id: The MLflow run id to check.
-
-    Raises:
-        ValueError: If the run's experiment name starts with ``STUDY_EXPERIMENT_PREFIX``.
-    """
-    client = MlflowClient()
-    experiment_name = client.get_experiment(client.get_run(run_id).info.experiment_id).name
-    if experiment_name.startswith(STUDY_EXPERIMENT_PREFIX):
-        raise ValueError(
-            f"Run {run_id} belongs to the study experiment {experiment_name!r}, which holds no "
-            "model that can be promoted."
-        )

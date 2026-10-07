@@ -11,7 +11,6 @@ from ml_core.mlflow_runs import (
     get_or_create_fold_run,
     get_or_create_parent_run,
     list_promotable_runs,
-    require_run_is_not_a_study,
 )
 from mlflow.entities import Run
 from mlflow.tracking import MlflowClient
@@ -158,18 +157,3 @@ def test_list_promotable_runs_omits_study_experiments(mlflow_tracking: None) -> 
     runs = list_promotable_runs()
 
     assert [run.run_id for run in runs] == [reviewed_fold]
-
-
-def test_require_run_is_not_a_study_refuses_a_study_run(mlflow_tracking: None) -> None:
-    study = get_or_create_experiment("study/some_study")
-    study_fold = get_or_create_fold_run(study, get_or_create_parent_run(study), "2022")
-
-    with pytest.raises(ValueError, match="study experiment"):
-        require_run_is_not_a_study(study_fold)
-
-
-def test_require_run_is_not_a_study_accepts_a_reviewed_run(mlflow_tracking: None) -> None:
-    reviewed = get_or_create_experiment("reviewed_experiment")
-    reviewed_fold = get_or_create_fold_run(reviewed, get_or_create_parent_run(reviewed), "2022")
-
-    require_run_is_not_a_study(reviewed_fold)

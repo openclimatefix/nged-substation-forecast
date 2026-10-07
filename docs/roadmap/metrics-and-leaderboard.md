@@ -571,7 +571,7 @@ TS-Arena pattern instead.
 `metrics` asset refuses to score a window reaching that date unless the maintainer's shell sets
 `NGED_FINAL_TEST=1`, and `studies.power.scan_power` stops at the same date. The date alone does not
 reserve an independent final-test year or show that its observations were never used for training.
-What it buys ahead of Dynamical.org's backfill is protection against an experiment, especially an
+Ahead of Dynamical.org's backfill, the date protects against an experiment, especially an
 unsupervised autonomous research session, scoring on later data without the maintainer's say-so. The
 other refusals of the `metrics` asset, and the `study/` experiment prefix, are described in [What the
 `metrics` asset refuses to

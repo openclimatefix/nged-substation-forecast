@@ -130,9 +130,9 @@ production.
 `studies/` and reviewed by no one before it runs, so it is not held to production standards. For
 autonomous studies the rule becomes two narrower rules. All research has one scoring path: every
 leaderboard number, from a reviewed experiment or from a study, is produced by the `metrics` asset,
-and a study's predictions reach that asset only through `scripts/forecasting/score_study.py`. And
-reviewed research has one execution path to production: a study finding reaches production only as a
-written specification and a reviewed re-implementation, never as merged study code.
+and a study's predictions reach that asset only through `scripts/forecasting/score_study.py`.
+Research has one execution path to production: a study finding reaches production only as a written
+specification and a reviewed re-implementation, never as merged study code.
 
 *Without it:* research code is rewritten for production, the two implementations drift apart, and
 the deployed model no longer does what the winning experiment measured. And it takes *longer* to get

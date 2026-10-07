@@ -1,5 +1,6 @@
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import polars as pl
 import pytest
@@ -121,13 +122,10 @@ def test_scan_power_stops_before_midnight_on_final_test_start(
         schema_overrides={"time": pl.Datetime("us", "UTC"), "drop_reason": pl.String},
     ).write_delta(delta_path)
     monkeypatch.setattr(power, "CLEANED_POWER_DELTA_URI", str(delta_path))
+    monkeypatch.setattr(
+        power, "load_cv_config", lambda _path: SimpleNamespace(final_test_start=date(2026, 7, 1))
+    )
 
-    kept = power.scan_power(final_test_start=date(2026, 7, 1)).collect()
+    kept = power.scan_power().collect()
 
     assert kept["power"].to_list() == [1.0]
-
-
-def test_scan_power_reads_its_default_cutoff_from_the_cv_config():
-    # The default cutoff is the date in conf/cv/default.yaml, which scan_power loads from the
-    # repository root rather than hard-coding.
-    assert power.load_cv_config(power.CV_CONFIG_PATH).final_test_start == date(2026, 7, 1)

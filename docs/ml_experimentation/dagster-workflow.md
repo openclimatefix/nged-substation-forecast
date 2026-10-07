@@ -262,10 +262,8 @@ run config dialog before launching.
    scope dates its evaluation window from the CV config's leaderboard folds and has none for those
    rows. To score live output or a dev fold, run the asset with `evaluation_scope="ad_hoc"`, which
    takes the window from the forecast rows themselves.
-3. Checks every group before scoring any, and raises on a refusal: a window reaching
-   `final_test_start` without `NGED_FINAL_TEST=1` (live rows are exempt), a leaderboard-scope row
-   whose `valid_time` lies outside the fold's window, and a `study/` experiment whose row keys
-   differ from the CV config's reference experiment. See [What the `metrics` asset refuses to
+3. Before scoring any matched group, checks every group and raises on a refusal; see [What the
+   `metrics` asset refuses to
    score](cross-validation-folds.md#what-the-metrics-asset-refuses-to-score). An unfiltered run
    skips `study/` experiments, naming them in the `skipped_study_experiments` metadata.
 4. Discovers the matching `(experiment_name, fold_id)` groups, then scores each group in batches of

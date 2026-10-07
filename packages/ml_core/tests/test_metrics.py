@@ -1016,18 +1016,24 @@ def test_require_same_row_keys_accepts_the_reference_keys_with_a_different_membe
     _check_row_keys(study=_row_key_frame(series={1: _TIMES, 2: _TIMES}), reference=reference)
 
 
-def test_require_same_row_keys_refuses_an_omitted_series() -> None:
-    reference = _row_key_frame(series={1: _TIMES, 2: _TIMES})
-
-    with pytest.raises(RowKeyMismatchError, match=r"missing \[2\], extra \[\]"):
-        _check_row_keys(study=_row_key_frame(series={1: _TIMES}), reference=reference)
-
-
-def test_require_same_row_keys_refuses_an_added_series() -> None:
-    reference = _row_key_frame(series={1: _TIMES})
-
-    with pytest.raises(RowKeyMismatchError, match=r"missing \[\], extra \[2\]"):
-        _check_row_keys(study=_row_key_frame(series={1: _TIMES, 2: _TIMES}), reference=reference)
+@pytest.mark.parametrize(
+    ("study_series", "reference_series", "message"),
+    [
+        ({1: _TIMES}, {1: _TIMES, 2: _TIMES}, r"missing \[2\], extra \[\]"),
+        ({1: _TIMES, 2: _TIMES}, {1: _TIMES}, r"missing \[\], extra \[2\]"),
+    ],
+    ids=["omitted_series", "added_series"],
+)
+def test_require_same_row_keys_refuses_a_different_set_of_series(
+    study_series: dict[int, list[datetime]],
+    reference_series: dict[int, list[datetime]],
+    message: str,
+) -> None:
+    with pytest.raises(RowKeyMismatchError, match=message):
+        _check_row_keys(
+            study=_row_key_frame(series=study_series),
+            reference=_row_key_frame(series=reference_series),
+        )
 
 
 def test_require_same_row_keys_refuses_an_omitted_row_in_a_later_batch() -> None:

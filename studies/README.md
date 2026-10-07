@@ -1,9 +1,9 @@
 # Studies
 
-**Code in this directory is held to a lower standard than the rest of the repository, and it is
-kept anyway because the findings it produced are cited elsewhere.** A study answers a question once.
-The answer goes into `docs/`, and a reader who doubts the answer needs the code that produced it, so
-the code stays where they can find and re-run it.
+**Code in this directory is held to a lower standard than the rest of the repository, and it is kept
+anyway because the findings it produced are cited elsewhere.** A study answers a question once. The
+answer goes into `docs/`, and a reader who doubts the answer needs the code that produced it, so the
+code stays where they can find and re-run it.
 
 **"Study" rather than "experiment", because `experiment` already names a column.** `PowerForecast`
 carries `experiment_name` and `ml_flow_experiment_id`, and the forecasts Delta table is partitioned
@@ -57,8 +57,8 @@ takes a file of `PowerForecast` rows, a study name, and a leaderboard fold. It s
 scope. Before the script writes anything, it refuses a file whose row keys differ from the row keys
 of the reference experiment that `conf/cv/default.yaml` names for the same fold, so a study cannot
 raise its score by omitting hard rows. The `metrics` asset repeats the check when it scores. Every
-number on a study page must trace to a `forecast_metrics` row. The `study/` prefix lets the
-leaderboard chart show or hide studies, and keeps them out of the promotion candidates.
+number on a study page must trace to a `forecast_metrics` row. The `study/` prefix keeps studies out
+of the promotion candidates and lets a reader filter them from the leaderboard.
 
 **A study reads observed power through `studies.power.scan_power`.** The function returns cleaned
 power before `final_test_start` in `conf/cv/default.yaml`, the date from which the `metrics` asset
@@ -69,7 +69,7 @@ refuses to score unless the maintainer sets `NGED_FINAL_TEST=1`.
 - **Nothing here is imported by production code.** No study touches a Patito contract or enters the
   Dagster asset graph, and nothing in `src/` or `packages/` imports one. A study that needs to do
   any of that has stopped being a study. The one route from a study to a leaderboard is
-  `scripts/forecasting/score_study.py`, described below.
+  `scripts/forecasting/score_study.py`, described above.
 - **Each folder holds the scripts of one family of pages, and its README maps every script to the
   page it feeds.** A script runs with only its own folder on `sys.path`: it never reaches into
   another folder, and code that two folders share is in `packages/studies/src/studies/`.
@@ -113,8 +113,8 @@ folder name themselves.
 | `observations/SARAH-3/` | The SARAH-3 satellite retrieval, ordered by hand from CM SAF; `site_points/` holds the frame at each site | `past_weather/extract_site_series.py` |
 | `observations/NGED-ANM/` | NGED's active network management setpoint exports, and the export-cap parquet derived from each | `beam_diffuse_split/anm_setpoints.py` (the exports come from NGED) |
 
-`data/studies/_private/trial_area_box.json` holds the trial-area box, derived from the private
-list of generators.
+`data/studies/_private/trial_area_box.json` holds the trial-area box, derived from the private list
+of generators.
 
 **Each study keeps one folder under `data/studies/per_study/`.**
 

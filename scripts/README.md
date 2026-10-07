@@ -97,11 +97,11 @@ alone. `score_study.py` is run whenever a study hands over a predictions file to
   read can skip the rest of the partition. A one-off migration: the script measures before writing,
   skips a partition that is already aligned, and therefore resumes cleanly after an interruption.
 
-- `score_study.py` — stores a study's predictions file in `power_forecasts` under the experiment name
-  `study/<study name>` and scores it with the `metrics` asset in leaderboard scope. The script
+- `score_study.py` — stores a study's predictions file in `power_forecasts` under the experiment
+  name `study/<study name>` and scores it with the `metrics` asset in leaderboard scope. The script
   refuses a file whose row keys differ from the reference experiment's, and runs with a cleared
-  environment, so a study's leaderboard number can come from nothing else. Run from the `main`
-  checkout as the maintainer's user.
+  environment, so a shell variable cannot repoint the actuals or lift the final-test date guard. Run
+  from the `main` checkout as the maintainer's user.
 
 ## `maintenance/` — looking after the workstation
 

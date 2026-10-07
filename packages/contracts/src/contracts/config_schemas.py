@@ -18,8 +18,8 @@ STUDY_EXPERIMENT_PREFIX: Final[str] = "study/"
 
 ``score_study.py`` is ``scripts/forecasting/score_study.py``.
 
-The prefix keeps a study's rows out of the promotion path and lets the leaderboard chart show or
-hide them. No reviewed experiment may use the prefix.
+The prefix keeps a study's rows out of the promotion path and lets a reader filter them from the
+leaderboard. No reviewed experiment may use the prefix.
 """
 
 
