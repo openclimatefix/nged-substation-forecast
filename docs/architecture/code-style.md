@@ -305,14 +305,15 @@ These rules are all about making Polars code easy to read.
 
 ## Gotchas that fail silently
 
-Three groups of trap in this codebase produce **no error at the point of the mistake**, so each
-lives in a skill you are expected to load *before* writing the code rather than after the confusing
-failure:
+Three groups of trap in this codebase produce **no error, or a misleading one, at the point of the
+mistake**, so each lives in a skill you are expected to load *before* writing the code rather than
+after the confusing failure:
 
 - **`polars-patito-gotchas`** — Patito's model machinery colliding with Polars and delta-rs: a
   cross-model `.join()` that has to have its right-hand operand stripped, a `{column: dtype}`
   `.cast` swallowed on a model-bearing frame, `ge`/`le` doing nothing on a datetime field,
-  `.filter()` typed as returning a plain frame (and, on an eager frame, returning one), and a
+  `.filter()` on a `pt.LazyFrame` typed as returning a plain frame (and, on an eager
+  `pt.DataFrame`, actually returning one), and a
   dictionary-encoded column blocking Delta predicate pushdown so a partition-filtered query reads
   the whole table. It also lists the Polars 2 changes that alter a result without raising, such as
   row order after a lazy join.
