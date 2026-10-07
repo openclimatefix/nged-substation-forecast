@@ -1,12 +1,16 @@
 """Download the sources of the solar-BMU census into `data/studies/per_study/solar_bmu_census/`.
 
-Run: `uv run python studies/solar_bmu_census/fetch_sources.py`. Every request is cached under
-`inputs/` with its retrieval time, so a rerun on the same window makes no network call, and a
-crash costs one request. Half-hourly output (Elexon dataset B1610) is saved one parquet file per
-BMU, written atomically. The study's window is the 12 complete calendar months that end at least
-two weeks before the run, because B1610 lags real time by about a week. The window and the run date
-are written to `lineage.json`, and every later script reads them from there. The Maximum Export
-Limit is fetched by `collate.py` (through `fetch_mels`), for the solar BMUs only.
+A BMU is a Balancing Mechanism Unit, IGCPU is the Installed Generation Capacity per Unit report, and
+NESO is the National Energy System Operator. Run:
+`uv run python studies/solar_bmu_census/fetch_sources.py`.
+
+Every request is cached under `inputs/` with its retrieval time, so a rerun on the same window sends
+no HTTP request. A crash loses at most the one request in flight. Half-hourly output (Elexon dataset
+B1610) is saved as one parquet file per BMU, written atomically. The study's window is the 12
+complete calendar months that end at least `LAG_MARGIN_DAYS` (14 days) before the run, because
+B1610 lags real time by about 7 days. The window and the run date are written to `lineage.json`, and
+every later script reads them from there. The Maximum Export Limit is fetched by `collate.py`
+(through `fetch_mels`), for the solar BMUs only.
 """
 
 import argparse
@@ -38,7 +42,8 @@ OUTPUT_DIR: Final[Path] = INPUTS_DIR / "b1610"
 IGCPU_MAX_WINDOW_DAYS: Final[int] = 700
 """The IGCPU endpoint rejects a publish-time window longer than 731 days."""
 IGCPU_WINDOWS: Final[int] = 4
-"""Four 700-day windows reach back to 2019, and the register holds nothing before 2023."""
+"""Four 700-day windows reach back to 2019. IGCPU holds no publication before 2023, so four windows
+fetch every publication."""
 MEL_WINDOW_DAYS: Final[int] = 30
 LAG_MARGIN_DAYS: Final[int] = 14
 FETCH_THREADS: Final[int] = 4
@@ -111,8 +116,8 @@ def cached_text(
 ) -> str:
     """Return the body of `url`, from `RAW_DIR/<name>.json` if it exists, else by fetching it.
 
-    The cache file holds the retrieval time, the URL, and the raw body, so a reader can tell when
-    the data was fetched.
+    The cache file holds the retrieval time, the requested URL, the final URL after redirects, and
+    the raw body, so a reader can tell when the data was fetched.
 
     Args:
         name: The cache file's stem. It must change whenever the requested window changes.
@@ -208,8 +213,8 @@ def parse_b1610(*, rows: list[dict[str, Any]], window: Window) -> pl.DataFrame:
 
     `halfHourEndTime` carries no zone marker, and Elexon states it in UTC, so it is parsed as UTC. A
     request's window includes both ends, so rows are cut to `(start, end]`. The stream returns one
-    row per half-hour, already the latest settlement run, and rows are deduplicated on the half-hour
-    end time only as a guard.
+    row per half-hour, and each row already holds the latest settlement run. Rows are deduplicated
+    on the half-hour end time as a guard only.
 
     Args:
         rows: The decoded JSON rows of one BMU.
@@ -243,7 +248,7 @@ def parse_b1610(*, rows: list[dict[str, Any]], window: Window) -> pl.DataFrame:
 def _fetch_one_bmu(*, bmu_id: str, window: Window) -> int:
     """Fetch one BMU's B1610 output into `OUTPUT_DIR`, unless cached, and return its row count.
 
-    Returns 0 for a file already on disk, so a resumed run counts only the rows it fetched.
+    Returns 0 for a file already on disk.
     """
     path = OUTPUT_DIR / f"{bmu_id}_{window.label}.parquet"
     if path.exists():
@@ -297,7 +302,7 @@ def fetch_mels(*, bmu_ids: list[str], today: date) -> dict[str, float | None]:
     """Return the largest Maximum Export Limit in the last 30 days for each BMU, in MW.
 
     Uses `datasets/MELS/stream`, because `balancing/physical/all` takes one settlement period per
-    request and `datasets/MELS` is limited to one hour.
+    request and `datasets/MELS` is limited to 1 hour per request.
     """
     end = datetime(year=today.year, month=today.month, day=today.day, tzinfo=UTC)
     start = end - timedelta(days=MEL_WINDOW_DAYS)
@@ -324,8 +329,11 @@ def fetch_mels(*, bmu_ids: list[str], today: date) -> dict[str, float | None]:
 def recorded_run() -> tuple[date, Window]:
     """Return the run date and window that `fetch_sources.py` recorded in `lineage.json`.
 
-    Every later script reads them here, so a script run on a later day or in a later month still
-    reads the files the fetch wrote.
+    Every later script reads the run date and window from `lineage.json`, so a script run on a later
+    day or in a later month still reads the files the fetch wrote.
+
+    Returns:
+        The run date, and the half-open UTC window of the B1610 download.
 
     Raises:
         FileNotFoundError: If the fetch has not been run.

@@ -1,11 +1,13 @@
-"""Check the census against the TEC register's PV sites: which has a BMU in the census?
+"""Check which photovoltaic (PV) sites in the TEC register have a BMU in the census.
 
-A transmission-connected solar site must hold Transmission Entry Capacity (TEC), so the register's
-PV rows are a short list to measure recall against. The list can miss a site whose TEC plant type
-omits PV. A TEC row and a BMU match
-many-to-many, and a BMU's lead party is a trading party rather than the TEC customer, so the match
-cannot be automated. The script writes a draft mapping from TEC Project ID to BMU identifiers to the
-study folder, and reads the reviewed mapping beside it when that file exists. Run:
+TEC is Transmission Entry Capacity, and a BMU is a Balancing Mechanism Unit. A
+transmission-connected solar site must hold TEC, so the register's PV rows are a short list to
+measure recall against. The list can miss a site whose TEC plant type omits PV. A TEC row and a BMU
+match many-to-many. A BMU's lead party is a trading party rather than the TEC customer. A match by
+name therefore needs a hand check. The script reads the reviewed mapping,
+`tec_mapping_reviewed.csv`, kept beside the script. When that file does not exist, the script drafts
+a mapping from TEC Project ID to BMU identifiers by name and writes the draft to
+`tec_mapping_draft.csv` in the study's data folder. Run:
 `uv run python studies/solar_bmu_census/recall_check.py`.
 """
 
@@ -26,7 +28,9 @@ OutcomeType = Literal["no BMU identified", "BMU identified, not in census", "cen
 def tec_solar_rows(*, tec: pl.DataFrame) -> pl.DataFrame:
     """Return the TEC projects to check: those that list PV and are built or under construction.
 
-    One row for each project, at its most advanced status. Earlier stages have no BMU yet.
+    The function returns one row for each project, at the project's most advanced status. A project
+    whose most advanced status is consented, awaiting consents, or scoping has no BMU yet, so the
+    function leaves the project out.
     """
     return best_tec_rows(tec=tec).filter(pl.col("Project Status").is_in(RECALL_STATUSES))
 
@@ -60,7 +64,10 @@ def draft_mapping(*, tec_rows: pl.DataFrame, reference: list[dict[str, Any]]) ->
 def load_mapping(
     *, tec_rows: pl.DataFrame, reference: list[dict[str, Any]]
 ) -> tuple[pl.DataFrame, str]:
-    """Return the mapping to use and its provenance: the reviewed file, else a fresh draft."""
+    """Return the mapping to use and its provenance: the reviewed file, else a fresh draft.
+
+    The function also writes the fresh draft to `DRAFT_PATH`.
+    """
     if REVIEWED_PATH.exists():
         return pl.read_csv(REVIEWED_PATH, infer_schema_length=0), "reviewed by hand"
     draft = draft_mapping(tec_rows=tec_rows, reference=reference)
@@ -78,7 +85,7 @@ def outcome_for(*, bmu_ids: str, solar_ids: set[str]) -> OutcomeType:
     Returns:
         `no BMU identified` when the row maps to no BMU, `BMU identified, not in census` when it
         maps only to BMUs outside the census, and `census BMU identified` when any mapped BMU is in
-        it.
+        the census.
     """
     mapped = [part for part in (bmu_ids or "").split(";") if part]
     if not mapped:

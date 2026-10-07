@@ -1,8 +1,12 @@
 """Put every published capacity figure for each solar BMU side by side, one row per BMU.
 
-The figures mean different things and are never merged or added across columns. Run after
-`fetch_sources.py` and `classify.py`: `uv run python studies/solar_bmu_census/collate.py`. The
-table is written beside the other study outputs.
+A BMU is a Balancing Mechanism Unit. Each figure answers a different question: the generation
+capacity the lead party declared, the installed capacity in the Installed Generation Capacity per
+Unit (IGCPU) report, the project's Transmission Entry Capacity (TEC), the largest Maximum Export
+Limit, and the installed capacity in the Renewable Energy Planning Database (REPD). The figures are
+never merged or added across columns. Run after `fetch_sources.py` and `classify.py`:
+`uv run python studies/solar_bmu_census/collate.py`. The table is written as `solar_bmus.csv` and
+`solar_bmus.parquet` in the study's data folder, beside `classes.parquet`.
 """
 
 import difflib
@@ -27,7 +31,8 @@ from pyproj import Transformer
 MATCH_THRESHOLD: Final[float] = 0.85
 """The lowest name-similarity ratio at which a site name counts as a match.
 
-At 0.8 a REPD row for a different farm with a one-letter-different name matched; at 0.85 it did not.
+At 0.8 a REPD row for a different farm with a one-letter-different name matched; at 0.85 that REPD
+row did not match.
 """
 MIN_SUBSTRING_NOISE_LENGTH: Final[int] = 4
 NOISE_WORDS: Final[frozenset[str]] = frozenset(
@@ -39,17 +44,23 @@ REPD_BUILT_STATUSES: Final[tuple[str, ...]] = ("Operational", "Under Constructio
 """REPD statuses that count as a site that exists.
 
 A site can be generating while REPD still lists it as under construction, so a solar site that is
-operational or under construction is a candidate match, and so is a battery that shares its name.
+operational or under construction is a candidate match. A battery at the site is found through
+REPD's `Storage Co-location REPD Ref ID` column, not by name, and only a battery with one of these
+statuses counts.
 """
 STORAGE_OUTPUT_MWH: Final[float] = 0.1
-"""A storage BMU has output in the window if any half-hour reaches this many megawatt-hours."""
+"""A storage BMU has output in the window if any half-hour reaches this many megawatt-hours.
+
+The output can be in either direction, charging or discharging.
+"""
 REVIEWED_MATCHES_PATH: Final[Path] = Path(__file__).parent / "site_matches_reviewed.csv"
 """The hand-reviewed table, kept beside this script, of BMU to TEC project and REPD reference.
 
 Columns `elexon_bmu_id`, `tec_project_id`, `repd_ref_id`, `storage_bmu_ids` (any may be blank), and
-`note`. A row replaces the name match for its BMU, for the BMUs whose Elexon name does not
-resemble the site's name in either register, and names the separately registered storage BMUs at
-the site.
+`note`. The table has a row for each BMU whose Elexon name resembles the site's name in neither the
+TEC register nor REPD. A non-blank `tec_project_id` replaces that BMU's TEC name match, and a
+non-blank `repd_ref_id` replaces its REPD name match. `storage_bmu_ids` names the separately
+registered storage BMUs at the site.
 """
 TEC_STATUS_ORDER: Final[tuple[str, ...]] = (
     "Built",
@@ -58,7 +69,11 @@ TEC_STATUS_ORDER: Final[tuple[str, ...]] = (
     "Awaiting Consents",
     "Scoping",
 )
-"""TEC project statuses from the most to the least advanced, which picks one row per project."""
+"""TEC project statuses from the most to the least advanced.
+
+`best_tec_rows` keeps each project's row at the status earliest in this tuple, and a status not
+listed ranks last.
+"""
 PV_PLANT_TYPE: Final[str] = "PV Array"
 NON_GENERATING_PLANT_TYPES: Final[tuple[str, ...]] = ("Demand", "Reactive Compensation")
 """TEC plant types that do not make a PV site a hybrid: its own demand and reactive plant."""
@@ -83,8 +98,9 @@ StorageEvidenceType = Literal[
 def normalise(name: str) -> str:
     """Lower-case a site name and drop punctuation, spaces, and generic words.
 
-    Whole generic words are dropped first. Long generic words are then also dropped inside a longer
-    token, so "Energyfarm" and "Energy Farm" normalise alike.
+    Whole generic words are dropped first. Generic words of at least `MIN_SUBSTRING_NOISE_LENGTH`
+    letters are then also dropped inside a longer token, so "Energyfarm" and "Energy Farm"
+    normalise alike.
     """
     words = [word for word in re.findall(r"[a-z0-9]+", name.lower()) if word not in NOISE_WORDS]
     joined = "".join(words)
@@ -102,8 +118,10 @@ def best_match(*, site_name: str, candidates: dict[str, str]) -> tuple[str, floa
         candidates: Maps a key (a project identifier) to that candidate's name.
 
     Returns:
-        The best candidate at or above `MATCH_THRESHOLD`, or None when no candidate reaches it. A
-        tie goes to the key that sorts first, so the result does not depend on dict order.
+        The key and the similarity ratio (rounded to 2 decimal places) of the best candidate at or
+        above `MATCH_THRESHOLD`. None when no candidate reaches the threshold, or when `site_name`
+        is made only of generic words and normalises to nothing. A tie goes to the key that sorts
+        first, so the result does not depend on dict order.
     """
     target = normalise(site_name)
     if not target:
@@ -117,15 +135,16 @@ def best_match(*, site_name: str, candidates: dict[str, str]) -> tuple[str, floa
 
 
 def technology_from_tec_plant_type(*, plant_type: str) -> TechnologyType:
-    """Say whether a TEC `Plant Type` string describes a pure PV site or a hybrid.
+    """Say whether a TEC `Plant Type` string describes a pure photovoltaic (PV) site or a hybrid.
 
     Args:
         plant_type: The register's semicolon-separated technologies, such as
             `Energy Storage System;PV Array (Photo Voltaic/solar)`.
 
     Returns:
-        `hybrid` if the site lists any generating or storage technology besides PV, `pure PV` if
-        PV is the only one, and `unknown` if PV is not listed at all.
+        `hybrid` if the site lists any technology other than PV, demand, or reactive compensation;
+        `pure PV` if PV is the only technology listed besides demand and reactive compensation; and
+        `unknown` if PV is not listed at all.
     """
     parts = [part.strip() for part in plant_type.split(";") if part.strip()]
     if not any(part.startswith(PV_PLANT_TYPE) for part in parts):
@@ -149,8 +168,9 @@ def site_technology(
 
     The evidence runs from a storage BMU with output at the site, to an operational battery in
     REPD, to storage that is planned or under construction (listed in the TEC plant type or in a
-    REPD battery row not yet operational). A site with none is pure PV when the TEC plant type
-    lists PV only, or REPD has a solar row and no battery row.
+    REPD battery row not yet operational). A site with no evidence of storage is pure PV when the
+    TEC plant type lists PV only, or REPD has a solar row and no battery row; otherwise the
+    technology is unknown.
 
     Args:
         tec_plant_type: The matched TEC project's plant type, or None if no project matched.
@@ -268,12 +288,13 @@ def _repd_position(*, repd_row: dict[str, Any] | None) -> tuple[float | None, fl
 def best_tec_rows(*, tec: pl.DataFrame) -> pl.DataFrame:
     """Return one row for each TEC project that lists PV: the row at its most advanced status.
 
-    The register holds one row for each stage of a project, and a later stage carries a cumulative
+    The register holds one row for each stage of a project. A later stage carries a cumulative
     capacity that includes capacity not yet built. A project built at 99.4 MW with a later 20.6 MW
     increase has a second row of 120 MW, so the study takes the row at the most advanced status.
-    The `tec_mw` column is the capacity connected for a built project, and the agreed cumulative
-    capacity for one still under construction, because a built row's cumulative figure can include
-    a later increase.
+    The `tec_mw` column is the capacity connected for a project whose most advanced status is
+    Built. For a project at any other status (under construction, consented, awaiting consents, or
+    scoping), `tec_mw` is the agreed cumulative capacity, because a built row's cumulative figure
+    can include a later increase.
 
     Args:
         tec: The TEC register with all-string columns.
@@ -309,7 +330,9 @@ def _tec_candidates(*, tec: pl.DataFrame) -> tuple[dict[str, str], dict[str, dic
 def _repd_candidates(
     *, repd: pl.DataFrame
 ) -> tuple[dict[str, str], dict[str, tuple[str, float | None]]]:
-    """Return the built solar projects' names by Ref ID, and the linked battery at each.
+    """Return the solar projects' names by Ref ID, and the linked battery at each.
+
+    The solar projects are those whose status is in `REPD_BUILT_STATUSES`.
 
     REPD links a solar row and a battery row at one site through the column `Storage Co-location
     REPD Ref ID`, which holds the other row's Ref ID. A solar row's battery status is the best
@@ -319,7 +342,7 @@ def _repd_candidates(
         repd: The REPD register with all-string columns.
 
     Returns:
-        The names of the built solar projects, and for each the status and capacity in megawatts
+        The names of the solar projects, and for each the status and capacity in megawatts
         of the battery linked to it.
     """
     built = repd.filter(pl.col("Development Status (short)").is_in(REPD_BUILT_STATUSES))

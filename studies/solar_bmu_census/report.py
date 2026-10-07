@@ -1,11 +1,13 @@
-"""Print every number the solar-BMU census page quotes into `report.md`.
+"""Write every number the solar-BMU census page quotes to `report.md`, and print the report.
 
-The BMU register, B1610, IGCPU, TEC, and REPD are public, so `report.md` names the BMUs it lists.
-Run after `fetch_sources.py`, `classify.py`, `collate.py`, and
-`recall_check.py`: `uv run python studies/solar_bmu_census/report.py`.
+The Balancing Mechanism Unit (BMU) register, B1610, the Installed Generation Capacity per Unit
+(IGCPU) report, the Transmission Entry Capacity (TEC) register, and the Renewable Energy Planning
+Database (REPD) are public, so `report.md` names the BMUs it lists. Run after `fetch_sources.py`,
+`classify.py`, `collate.py`, and `recall_check.py`:
+`uv run python studies/solar_bmu_census/report.py`.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from itertools import pairwise
 from typing import Final
@@ -23,12 +25,22 @@ from classify import (
     drop_daytime_zeros,
 )
 from collate import CAPACITY_COLUMNS
-from fetch_sources import OUTPUT_DIR, STUDY_DIR, Window, fetch_bmu_reference, recorded_run
+from fetch_sources import (
+    OUTPUT_DIR,
+    STUDY_DIR,
+    Window,
+    fetch_bmu_reference,
+    fetch_igcpu,
+    recorded_run,
+)
 from recall_check import recall_table
 from studies.solar import zenith
 
 CORRELATION_BANDS: Final[tuple[float, ...]] = (0.0, 0.3, 0.6, 0.8, 1.0)
-"""Edges of the correlation bands, `[lower, upper)`. A correlation of 1.0 is its own band."""
+"""Edges of the correlation bands, `[lower, upper)`.
+
+A correlation of 1.0 is its own band, and a correlation below 0.0 falls in the band `below 0.0`.
+"""
 SEASONS: Final[dict[str, tuple[int, ...]]] = {
     "April to September": (4, 5, 6, 7, 8, 9),
     "November to February": (11, 12, 1, 2),
@@ -38,7 +50,11 @@ AGGREGATE_LEAD_PARTIES: Final[int] = 5
 NIGHT_ZENITH_DEGREES: Final[float] = 93.0
 """Above this zenith angle the sun is well below the horizon, so a solar unit has no output."""
 STORAGE_SHARE: Final[float] = 0.05
-"""Output below minus this share of capacity is large enough to be a battery charging."""
+"""Output below minus this share of Generation Capacity is large enough to be a battery charging.
+
+Export above this share while the sun is below `NIGHT_ZENITH_DEGREES` is large enough to be a
+battery discharging.
+"""
 GROUPS: Final[tuple[tuple[str, str | None], ...]] = (
     ("All solar BMUs, hybrids included", None),
     ("Hybrid BMUs only", "hybrid"),
@@ -58,6 +74,12 @@ def _md(frame: pl.DataFrame) -> str:
 
 def _as_float(value: object) -> float:
     """Return a Polars aggregate as a float, treating a missing value as zero.
+
+    Args:
+        value: A Polars aggregate, which is None for an empty column.
+
+    Returns:
+        The value as a float, or 0.0 when the value is None.
 
     Raises:
         TypeError: If the value is not a number.
@@ -87,8 +109,8 @@ def capacity_table(*, table: pl.DataFrame) -> pl.DataFrame:
         table: The census table's single-site rows.
 
     Returns:
-        One row per group and capacity column: the number of BMUs, the number of those with a
-        value, and the sum in MW.
+        One row per group and capacity column: the number of BMUs, the number of BMUs with a value,
+        and the sum in MW.
     """
     rows = []
     for label, technology in GROUPS:
@@ -144,8 +166,9 @@ def hour_centres(*, solar_ids: list[str], window_label: str) -> pl.DataFrame:
 def data_checks(*, window_label: str, expected_half_hours: int) -> pl.DataFrame:
     """Check every downloaded B1610 file, and return one row per check.
 
-    The checks are the `data-validation` skill's: duplicate half-hours, nulls and NaNs, the span of
-    the timestamps, and the number of rows against the half-hours the window holds.
+    The checks are a subset of the `data-validation` skill's: files with no rows, duplicate
+    half-hours, nulls and NaNs, the span of the timestamps, and files with more rows than the window
+    holds.
     """
     file_count = len(list(OUTPUT_DIR.glob(f"*_{window_label}.parquet")))
     lazy = pl.scan_parquet(OUTPUT_DIR / f"*_{window_label}.parquet", include_file_paths="file")
@@ -185,9 +208,9 @@ def gap_table(*, classes: pl.DataFrame) -> pl.DataFrame:
         classes: The `classes.parquet` rows of every BMU.
 
     Returns:
-        For the single-site BMUs, the lowest correlation among BMUs classed solar and the highest
-        among those classed not solar, with and without the daytime zeros removed; and for each
-        scope, the number of BMUs classed solar by behaviour with the daytime zeros removed and
+        For the single-site BMUs: the lowest correlation among BMUs classed solar and the highest
+        among BMUs classed not solar, with and without the daytime zeros removed. For each scope:
+        the number of BMUs classed solar by behaviour with the daytime zeros removed, and with them
         kept.
     """
 
@@ -271,8 +294,8 @@ def storage_pattern_table(*, single: pl.DataFrame, window_label: str) -> pl.Data
         window_label: The window's label in the file names.
 
     Returns:
-        One row for each storage BMU: its identifier and its mean output in megawatts at 13:00 and
-        at 18:00 UTC over the window.
+        One row for each storage BMU: its identifier and its mean output in megawatts over the hour
+        from 13:00 to 14:00 UTC and over the hour from 18:00 to 19:00 UTC, across the window.
     """
     rows = []
     for ids in single["storage_bmu_ids"].to_list():
@@ -309,15 +332,17 @@ def _hour_mean(hourly: pl.DataFrame, hour: int) -> float:
 
 
 def cleaning_table(*, solar_ids: list[str], window: Window) -> pl.DataFrame:
-    """Return how much of each solar BMU's output the two cleaning rules remove, in total.
+    """Return how many half-hours the two cleaning rules remove from the solar BMUs' output.
 
     Args:
         solar_ids: The single-site BMUs that follow the sun.
         window: The study window.
 
     Returns:
-        The share of all their half-hours before the commissioning month, in the commissioning
-        month, and removed as daytime zeros, over all of the BMUs together.
+        Four counts of half-hours, summed over the BMUs in `solar_ids`: the half-hours in their
+        files, the half-hours left out as the commissioning period or earlier (one combined count),
+        the half-hours removed as daytime zeros, and the half-hours judged. The counts are numbers
+        of half-hours, not shares.
     """
     total = commissioning = analysed = dropped = 0
     for bmu_id in solar_ids:
@@ -356,8 +381,8 @@ def storage_signature_table(*, single: pl.DataFrame, window_label: str) -> pl.Da
     Returns:
         One row for each BMU with at least one half-hour of import below minus 5% of capacity, or of
         export above 5% of capacity while the sun is more than 3 degrees below the horizon: its
-        identifier, name, the two counts, the lowest output in megawatts, and the lowest output as
-        a share of capacity.
+        identifier, name, the UTC dates of those half-hours, the two counts, the lowest output in
+        megawatts, and the lowest output as a share of capacity.
     """
     rows = []
     for row in single.iter_rows(named=True):
@@ -487,13 +512,50 @@ def peak_table(*, single: pl.DataFrame, window_label: str) -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
-def register_table() -> pl.DataFrame:
-    """Return the size of the BMU register and what its fuel-type field holds."""
+def register_table(*, census: pl.DataFrame, today: date) -> pl.DataFrame:
+    """Return what a single lookup of the registers would give, set beside what the study finds.
+
+    Args:
+        census: The census table.
+        today: The run date, which fixes the IGCPU fetch.
+
+    Returns:
+        The number of rows in the BMU register; the number of rows with no fuel type, with fuel
+        type OTHER, and with fuel type solar; the number of BMUs IGCPU types as Solar and as
+        "Generation"; the number of single-site census BMUs whose register name does not say solar
+        or PV; and the TEC and REPD capacities summed naively over the single-site census BMUs, a
+        shared project counted once per BMU.
+    """
     reference = fetch_bmu_reference()
     fuels = [row["fuelType"] for row in reference]
+    igcpu = fetch_igcpu(today=today)
+    types: dict[str, set[str]] = {}
+    for row in igcpu:
+        if row["bmUnit"]:
+            types.setdefault(str(row["psrType"]), set()).add(str(row["bmUnit"]))
+    single = census.filter(pl.col("scope") == "single-site")
+    unhinted = single.filter(
+        ~pl.col("site_name").str.contains("(?i)solar|\\bPV\\b")
+        | (pl.col("site_name") == pl.col("elexon_bmu_id"))
+    )
     rows = [
         ("Rows in the BMU register", str(len(reference))),
         ("Rows with no fuel type", str(sum(fuel is None for fuel in fuels))),
+        ("Rows with fuel type OTHER", str(sum(fuel == "OTHER" for fuel in fuels))),
+        ("BMUs that IGCPU types as Solar", str(len(types.get("Solar", set())))),
+        ('BMUs that IGCPU types as "Generation"', str(len(types.get("Generation", set())))),
+        (
+            "Single-site census BMUs whose register name does not say solar or PV",
+            str(unhinted.height),
+        ),
+        (
+            "TEC added over the single-site census BMUs, shared projects counted for each (MW)",
+            f"{_as_float(single['tec_mw'].sum()):.1f}",
+        ),
+        (
+            "REPD added over the single-site census BMUs, shared rows counted for each (MW)",
+            f"{_as_float(single['repd_installed_capacity_mw'].sum()):.1f}",
+        ),
         (
             "Rows with a fuel type of solar",
             str(sum(str(fuel).lower() == "solar" for fuel in fuels)),
@@ -512,7 +574,8 @@ def summary_table(*, census: pl.DataFrame, window_label: str) -> pl.DataFrame:
     Returns:
         The correlation range of the single-site BMUs that follow the sun, the correlation range
         of the aggregates, the largest output as a share of Generation Capacity, the gap between
-        the Generation Capacity and Maximum Export Limit sums, and counts of positions by region.
+        the Generation Capacity and Maximum Export Limit sums, the longitude span of the positions
+        and the solar-noon difference across that span, and counts of positions by region.
     """
     single = census.filter(pl.col("scope") == "single-site")
     followers = single.filter(pl.col("basis").str.contains("behaviour"))
@@ -584,7 +647,7 @@ def names_table(*, census: pl.DataFrame, scope: str) -> pl.DataFrame:
 
     Returns:
         One row for each BMU: its identifier, its name in the BMU register, in IGCPU, in the TEC
-        register, and in REPD, with a dash where the register has no match.
+        register, and in REPD, and its lead party, with a dash where a register has no match.
     """
     return (
         census.filter(pl.col("scope") == scope)
@@ -602,7 +665,10 @@ def names_table(*, census: pl.DataFrame, scope: str) -> pl.DataFrame:
 
 
 def capacities_table(*, census: pl.DataFrame, scope: str) -> pl.DataFrame:
-    """List the census BMUs of one scope with the capacity each register gives them, in MW."""
+    """List the census BMUs of one scope with their technology, correlation, and capacities.
+
+    The capacities are the figure each register gives the BMU, in MW.
+    """
     return (
         census.filter(pl.col("scope") == scope)
         .select(
@@ -619,7 +685,7 @@ def capacities_table(*, census: pl.DataFrame, scope: str) -> pl.DataFrame:
 def main() -> None:
     """Write `report.md`."""
     today = datetime.now(UTC)
-    _, window = recorded_run()
+    run_date, window = recorded_run()
     classes = pl.read_parquet(STUDY_DIR / "classes.parquet")
     census = pl.read_parquet(STUDY_DIR / "solar_bmus.parquet")
     single = census.filter(pl.col("scope") == "single-site")
@@ -743,7 +809,8 @@ def main() -> None:
         + _md(aggregate_lead_party_table(aggregates=aggregates)),
         "## Storage BMUs at the census sites: mean output by hour of day\n\n"
         + _md(storage_pattern_table(single=single, window_label=window.label)),
-        "## The BMU register\n\n" + _md(register_table()),
+        "## What a single lookup gives, and what the study finds\n\n"
+        + _md(register_table(census=census, today=run_date)),
         "## Largest output of each census BMU\n\n"
         + _md(peak_table(single=single, window_label=window.label)),
         "## Figures the page quotes\n\n"

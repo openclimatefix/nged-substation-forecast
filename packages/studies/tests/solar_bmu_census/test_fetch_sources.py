@@ -1,8 +1,8 @@
 """Tests for the pure functions of `studies/solar_bmu_census/fetch_sources.py`.
 
-Each test fails on the bug it exists for: a half-hour time read as local rather than UTC, a window
-that keeps both its ends and so duplicates a chunk boundary, and a window that ends inside the
-period B1610 has not yet published.
+Each test fails on the bug it exists for. Among those bugs are a half-hour time read as local rather
+than UTC, a window that keeps both its ends and so duplicates a chunk boundary, and a window that
+ends inside the period B1610 has not yet published.
 """
 
 from datetime import UTC, date, datetime

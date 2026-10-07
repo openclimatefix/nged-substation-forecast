@@ -1,8 +1,9 @@
 """Draw the census page's charts: the correlation histogram, the map, and the example weeks.
 
-Run after `report.py`: `uv run python studies/solar_bmu_census/census_charts.py`. The BMU register,
-B1610, IGCPU, TEC, and REPD are public, so the charts name each BMU and show output in megawatts on
-calendar dates.
+Run after `report.py`: `uv run python studies/solar_bmu_census/census_charts.py`. The Balancing
+Mechanism Unit (BMU) register, B1610, the Installed Generation Capacity per Unit (IGCPU) report, the
+Transmission Entry Capacity (TEC) register, and the Renewable Energy Planning Database (REPD) are
+public, so the charts name each BMU and show output in megawatts on calendar dates.
 """
 
 import json
@@ -40,10 +41,13 @@ TECHNOLOGY_COLOURS: Final[dict[str, str]] = {
 ROW_HEIGHT_PX: Final[int] = 72
 MAP_HEIGHT_PX: Final[int] = 600
 LABEL_CELL_DEGREES: Final[float] = 0.05
-"""Points within this many degrees share one label on the map, so labels do not overprint."""
+"""Points that round to the same grid cell share one label on the map, so labels do not overprint.
+
+The cell is this many degrees wide in longitude and in latitude.
+"""
 LABEL_STEP_PX: Final[int] = 11
 LABEL_RIGHT_ALIGN_LONGITUDE: Final[float] = 0.3
-"""Labels of points east of this longitude sit left of their dot, so they stay on the page."""
+"""Labels of points east of this longitude sit left of their dot, so the labels stay on the page."""
 OVERVIEW_SCALE: Final[int] = 2200
 ZOOM_SCALE: Final[int] = 8500
 ZOOM_HEIGHT_PX: Final[int] = 460
@@ -53,14 +57,14 @@ SCOTLAND_LATITUDE: Final[float] = 55.5
 
 
 def storage_bmu_at(*, site_bmu_id: str, census: pl.DataFrame) -> str | None:
-    """Return the storage BMU at the same site as a solar BMU, if it has output in both weeks.
+    """Return the first storage BMU at a solar BMU's site that has B1610 rows in both weeks.
 
     Args:
         site_bmu_id: A solar BMU.
         census: The census table, whose `storage_bmu_ids` column holds the site's storage BMUs.
 
     Returns:
-        The first storage BMU of the site with output in both example weeks, or None.
+        The first storage BMU of the site whose B1610 file has rows in both example weeks, or None.
     """
     ids = census.filter(pl.col("elexon_bmu_id") == site_bmu_id)["storage_bmu_ids"][0] or ""
     for bmu in [bmu for bmu in ids.split(";") if bmu]:
@@ -72,7 +76,8 @@ def storage_bmu_at(*, site_bmu_id: str, census: pl.DataFrame) -> str | None:
 def choose_examples(*, census: pl.DataFrame) -> list[tuple[str, str]]:
     """Choose the example BMUs by rule, and return each with its kind.
 
-    Pure PV: every single-site BMU whose output follows the sun. Hybrid-site solar: those BMUs
+    Pure PV: every single-site, pure PV BMU whose output follows the sun, in descending order of
+    correlation. Hybrid-site solar: the single-site hybrid BMUs whose output follows the sun,
     ordered by correlation, taking the first, the middle, and the last, so the examples span the
     best to the worst fit. Storage: the storage BMU at each hybrid-site example, where it has one.
     The rows are grouped by kind, in that order.
@@ -108,6 +113,9 @@ def week_series(*, bmu_id: str, week_start: datetime) -> pl.DataFrame:
 
     Returns:
         Columns `time` (the half-hour's midpoint, UTC) and `megawatts`.
+
+    Raises:
+        ValueError: If the week lies outside the study window.
     """
     _, window = recorded_run()
     if not (window.start <= week_start and week_start + timedelta(days=7) <= window.end):
@@ -197,7 +205,10 @@ def example_week_figure(
 
 
 def correlation_figure(*, correlations: pl.DataFrame, number: int) -> alt.VConcatChart:
-    """Draw the histogram of each single-site BMU's correlation with the sun, threshold marked."""
+    """Draw the histogram of each single-site BMU's correlation with the sun, for BMUs with output.
+
+    The threshold is marked as a dashed line.
+    """
     frame = correlations.filter(
         pl.col("scope") == "single-site", pl.col("behaviour") != "no_output"
     ).with_columns(
@@ -252,15 +263,18 @@ def correlation_figure(*, correlations: pl.DataFrame, number: int) -> alt.VConca
 
 
 def map_labels(*, located: pl.DataFrame) -> pl.DataFrame:
-    """Return one label for each group of nearby points, stacked so that labels do not overprint.
+    """Return one label for each group of nearby points, shifted alternately up and down.
+
+    The alternate shifts stop neighbouring labels from overprinting.
 
     Args:
         located: The census BMUs that have a position, with `display_name`, `longitude`, and
             `latitude`.
 
     Returns:
-        Columns `longitude`, `latitude`, `label` (the group's names, joined), and `offset` (the
-        vertical shift in pixels).
+        Columns `longitude`, `latitude`, `label` (the group's names, joined with " and "), `offset`
+        (the vertical shift in pixels, alternating between two values so neighbouring labels do not
+        overprint), and `align` (`left` or `right`, set by `LABEL_RIGHT_ALIGN_LONGITUDE`).
     """
     grouped = (
         located.with_columns(
@@ -314,15 +328,18 @@ def _points(*, located: pl.DataFrame, shown: list[str], legend: bool) -> alt.Cha
 
 
 def map_figure(*, census: pl.DataFrame, number: int) -> alt.VConcatChart:
-    """Draw two maps of the census BMUs: Great Britain, and a zoom on the nine in England.
+    """Draw two maps of the single-site census BMUs that have a position: Great Britain, and a zoom.
+
+    The zoom shows the BMUs in England.
 
     Args:
         census: The census table.
         number: The figure's number on the page.
 
     Returns:
-        The figure. Only the zoom carries labels, because the nine English sites lie too close
-        together for labels on the whole-country map.
+        The figure. On the whole-country map only the BMUs north of `SCOTLAND_LATITUDE` carry
+        labels, because the BMUs in England lie too close together to label at that scale. The zoom
+        labels every BMU in England.
     """
     single = census.filter(pl.col("scope") == "single-site")
     located = single.filter(pl.col("longitude").is_not_null())

@@ -1,8 +1,8 @@
 """Tests for the pure functions of `studies/solar_bmu_census/collate.py`.
 
-Each test fails on the bug it exists for: a generic word that stops two spellings of one site name
-matching, a threshold loose enough to match a different farm, a hybrid read as pure PV, and a grid
-position read as degrees.
+Each test fails on the bug it exists for. Among those bugs are a generic word that stops two
+spellings of one site name matching, a threshold loose enough to match a different farm, a hybrid
+read as pure PV, and a grid position read as degrees.
 """
 
 import collate

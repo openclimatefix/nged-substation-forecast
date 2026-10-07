@@ -1,9 +1,9 @@
 """Tests for the classifier of `studies/solar_bmu_census/classify.py`.
 
-Every series is synthetic, so no test needs `data/`. Each test fails on the bug it exists for:
-months of silence before commissioning that dilute the correlation, a commissioning month that is
-not left out, a unit already running at the start that loses its first month, meter noise read as
-generation, and a rule that ignores the sign of the output.
+Every series is synthetic, so no test needs `data/`. Each test fails on the bug it exists for.
+Among those bugs are months of zero output before commissioning that dilute the correlation, a
+commissioning month that is not left out, a unit already running at the start that loses its first
+month, meter noise read as generation, and a rule that ignores the sign of the output.
 """
 
 from datetime import UTC, datetime, timedelta

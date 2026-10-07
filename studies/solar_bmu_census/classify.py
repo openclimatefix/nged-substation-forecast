@@ -1,8 +1,10 @@
 """Classify each BMU as solar, not solar, or without output, from its settled half-hourly output.
 
-No Elexon field says which BMUs are solar, so the census asks whether a BMU's output follows the
-sun. The feature is the Pearson correlation between half-hourly output and the cosine of the solar
-zenith angle (clipped at zero below the horizon) at one central point in Great Britain. Run:
+No Elexon field identifies every solar Balancing Mechanism Unit (BMU). The BMU register's fuel type
+never says solar, and the Installed Generation Capacity per Unit (IGCPU) report types only some
+solar BMUs as Solar, so the census also asks whether a BMU's output follows the sun. The feature is
+the Pearson correlation between half-hourly output and the cosine of the solar zenith angle (clipped
+at zero below the horizon) at one central point in Great Britain. Run:
 `uv run python studies/solar_bmu_census/classify.py`.
 """
 
@@ -26,29 +28,37 @@ REFERENCE_LATITUDE: Final[float] = 53.0
 REFERENCE_LONGITUDE: Final[float] = -1.5
 """A point near the middle of Great Britain.
 
-A BMU has no coordinates, and across Great Britain the solar noon moves by about 16 minutes with
-longitude, which is small beside the half-hour resolution of the output.
+A BMU has no coordinates, so one point stands in for every BMU. Across Great Britain, solar noon
+moves by about 16 minutes with longitude. A 16-minute shift is small beside the half-hour
+resolution of the output.
 """
 SOLAR_CORRELATION_THRESHOLD: Final[float] = 0.6
 """The correlation above which a BMU's output counts as following the sun.
 
-Among single-site BMUs (`T_`, `E_`, `M_`) with enough output to judge, the correlations of the
-BMUs that follow the sun and those that do not are separated by a wide gap, which the census
-page's first figure shows. The threshold sits inside that gap. Aggregate BMUs have no such gap.
+Among single-site BMUs (`T_`, `E_`, `M_`) with at least `MIN_POSITIVE_HALF_HOURS` positive
+half-hours, a wide gap separates the correlations of the BMUs that follow the sun from the
+correlations of the BMUs that do not. The census page's first figure shows the gap. The threshold
+sits inside the gap. Aggregate BMUs show no gap between the two groups.
 """
 COMMISSIONING_SKIP: Final[timedelta] = timedelta(days=30)
-"""How long after its first positive output a BMU is left out of the analysis.
+"""How long after a BMU's first positive output the BMU's half-hours are left out of the analysis.
 
-A site often commissions in stages over a few weeks, so its output in that month follows the sun
-badly or only partly, whatever the site is.
+The exception is a BMU that was already running when the window opened (see `RUNNING_AT_START`). A
+site often commissions in stages over a few weeks, so its output in those 30 days follows the sun
+badly or only partly, whatever the site's technology.
 """
 RUNNING_AT_START: Final[timedelta] = timedelta(days=7)
-"""A BMU whose first positive output falls this soon after the window starts was already running,
-so its first month is not a commissioning month and stays in the analysis."""
+"""How soon after the window starts a BMU's first positive output must fall for the BMU to count as
+already running.
+
+The first month of an already-running BMU is not a commissioning month, so the month stays in the
+analysis.
+"""
 POSITIVE_FLOOR_MWH: Final[float] = 0.01
 """Output at or below this many megawatt-hours in a half-hour is meter noise, not generation.
 
-A unit that never generates still publishes readings of a few thousandths of a megawatt-hour.
+BMUs that never generated in the window were seen to publish readings of a few thousandths of a
+megawatt-hour.
 """
 SINGLE_SITE_PREFIXES: Final[tuple[str, ...]] = ("T_", "E_", "M_")
 """A BMU with one of these prefixes is one generating site. `2_` (supplier), `V_`, and `C_` BMUs
@@ -56,11 +66,15 @@ can aggregate many sites."""
 DAYLIGHT_COS_ZENITH: Final[float] = 0.1
 """The sun is clearly up when the cosine of its zenith angle exceeds this (a zenith of about 84°).
 
-At the one reference point, a smaller value is twilight, where zero output is not a fault and the
-sun may be down at one end of the country and up at the other.
+At the one reference point, a smaller cosine is twilight, where zero output is not a fault. In
+twilight the sun may also be down at one end of the country and up at the other.
 """
 MIN_POSITIVE_HALF_HOURS: Final[int] = 100
-"""Fewer positive half-hours than this in the window leaves too little output to judge."""
+"""Fewer positive half-hours than this leaves too little output to judge.
+
+The count is taken over the judged series, after the commissioning period and the daytime zeros are
+removed, and a BMU below it is classed `no_output`.
+"""
 
 BehaviourType = Literal["solar", "no_output", "not_solar"]
 
@@ -79,10 +93,10 @@ def analysis_series(*, output: pl.DataFrame, window_start: datetime) -> pl.DataF
     """Return the half-hours the classifier judges, with the sun's height at each.
 
     A BMU already running when the window opens is judged on every half-hour. Any other BMU is
-    judged from `COMMISSIONING_SKIP` after its first positive output. B1610 publishes no row for a
-    unit before it begins generating, and a site commissions in stages over its first weeks, so
-    months of silence before the first output would dilute the correlation of a unit that follows
-    the sun closely once running, and a half-built site follows it badly.
+    judged from `COMMISSIONING_SKIP` after its first positive output. A BMU can publish months of
+    zero or near-zero readings before it first generates. Those readings would dilute the
+    correlation of a BMU that follows the sun closely once running. A site also commissions in
+    stages over its first weeks, and a half-built site follows the sun badly.
 
     Args:
         output: Columns `half_hour_end_time` (UTC) and `output_mwh`.
@@ -91,7 +105,7 @@ def analysis_series(*, output: pl.DataFrame, window_start: datetime) -> pl.DataF
     Returns:
         Columns `half_hour_end_time`, `output_mwh`, and `cos_zenith` (the cosine of the solar zenith
         at the half-hour's midpoint, zero below the horizon), sorted by time. The frame is empty
-        when the BMU never has positive output.
+        when the BMU's output never exceeds `POSITIVE_FLOOR_MWH`.
     """
     ordered = output.sort("half_hour_end_time")
     positive_times = ordered.filter(pl.col("output_mwh") > POSITIVE_FLOOR_MWH)["half_hour_end_time"]
@@ -116,9 +130,9 @@ def analysis_series(*, output: pl.DataFrame, window_start: datetime) -> pl.DataF
 def drop_daytime_zeros(*, series: pl.DataFrame) -> pl.DataFrame:
     """Remove the half-hours with exactly zero output while the sun is clearly up.
 
-    A solar BMU does not output exactly zero at midday, so such a reading is a metering fault. A
-    wind or gas unit's daytime zeros are real, so removing them leaves that unit's output
-    positive by day and zero by night, which raises its correlation with the sun. The census
+    A solar BMU does not output exactly zero at midday, so an exact zero at midday is a metering
+    fault. A wind or gas unit's daytime zeros are real. Removing them leaves that unit's output
+    positive by day and zero by night, which raises the unit's correlation with the sun. The census
     therefore reports the correlation with and without this step.
 
     Args:
@@ -155,16 +169,18 @@ def sun_following_correlation(*, series: pl.DataFrame) -> float | None:
 def classify_behaviour(*, output: pl.DataFrame, window_start: datetime) -> Behaviour:
     """Classify a BMU by its output alone.
 
-    The rules apply in order. `no_output` comes first, because a constant series has no defined
-    correlation.
+    The rules apply in order. A BMU is `no_output` when the BMU has fewer than
+    `MIN_POSITIVE_HALF_HOURS` positive half-hours or an undefined correlation. Otherwise the BMU is
+    `solar` when its correlation exceeds `SOLAR_CORRELATION_THRESHOLD`, and `not_solar` when it does
+    not. `no_output` comes first, because a constant series has no defined correlation.
 
     Args:
         output: Columns `half_hour_end_time` (UTC) and `output_mwh`.
         window_start: The start of the study window, in UTC.
 
     Returns:
-        The correlation, the number of positive half-hours after the commissioning month, and the
-        class.
+        The correlation with daytime zeros removed, the correlation with them kept
+        (`raw_correlation`), the number of positive half-hours in the judged series, and the class.
     """
     series = analysis_series(output=output, window_start=window_start)
     cleaned = drop_daytime_zeros(series=series)
@@ -191,17 +207,23 @@ def igcpu_solar_ids(*, igcpu: list[dict[str, Any]]) -> set[str]:
 
 
 def classify_all() -> pl.DataFrame:
-    """Classify every non-interconnector BMU, and return one row per BMU.
+    """Classify every BMU, and return one row per BMU.
 
-    The window and the run date come from `fetch_sources.py`'s `lineage.json`. A BMU whose file for
-    that window is missing raises, because an empty frame would class it `no_output` silently.
+    The BMUs are the non-interconnector BMUs in the reference data, and every BMU that IGCPU types
+    as Solar that the reference data lacks. The window and the run date come from
+    `fetch_sources.py`'s `lineage.json`. The function raises for a fetched BMU with no file for that
+    window, because an empty frame would class the BMU `no_output` silently.
 
     Returns:
         Columns: `elexon_bmu_id`, `scope` (`single-site` or `aggregate`), `correlation` (daytime
         zeros removed), `raw_correlation` (not removed), `positive_half_hours` (in the judged
-        series), `half_hours` (in the whole window), `behaviour`, `igcpu_solar`, `is_solar`
-        (behaviour solar or IGCPU Solar), and `basis`, which says what put the BMU in the census:
-        `type and behaviour`, `type only`, `behaviour only`, or `neither`.
+        series), `half_hours` (the rows in the BMU's B1610 file, which has no row for a half-hour
+        that B1610 did not publish), `behaviour`, `igcpu_solar`, `is_solar` (behaviour solar or
+        IGCPU Solar), and `basis`, which says what put the BMU in the census: `type and behaviour`,
+        `type only`, `behaviour only`, or `neither`.
+
+    Raises:
+        FileNotFoundError: If a BMU in the reference data has no B1610 file for the window.
     """
     today, window = recorded_run()
     reference = fetch_bmu_reference()
