@@ -3,8 +3,9 @@
 A BMU is a Balancing Mechanism Unit. Each figure answers a different question: the generation
 capacity the lead party declared, the installed capacity in the Installed Generation Capacity per
 Unit (IGCPU) report, the project's Transmission Entry Capacity (TEC), the largest Maximum Export
-Limit, and the installed capacity in the Renewable Energy Planning Database (REPD). The figures are
-never merged or added across columns. Run after `fetch_sources.py` and `classify.py`:
+Limit, and the installed capacity in the Renewable Energy Planning Database (REPD). A sixth column,
+`p99_output_mw`, is the 99th percentile of the BMU's own half-hourly output. The columns are never
+merged or added to each other. Run after `fetch_sources.py` and `classify.py`:
 `uv run python studies/solar_bmu_census/collate.py`. The table is written as `solar_bmus.csv` and
 `solar_bmus.parquet` in the study's data folder, beside `classes.parquet`.
 """
@@ -16,6 +17,7 @@ from pathlib import Path
 from typing import Any, Final, Literal, TypedDict
 
 import polars as pl
+from classify import empty_output, p99_output_mw
 from fetch_sources import (
     OUTPUT_DIR,
     STUDY_DIR,
@@ -84,6 +86,14 @@ CAPACITY_COLUMNS: Final[tuple[str, ...]] = (
     "largest_mel_mw",
     "repd_installed_capacity_mw",
 )
+P99_COLUMN: Final[str] = "p99_output_mw"
+"""The 99th percentile of the BMU's own half-hourly output, in MW (`classify.p99_output_mw`).
+
+This column measures observed output. It is not a registered capacity, so it is not in
+`CAPACITY_COLUMNS` and is never added to another column.
+"""
+DISPARITY_FIGURES: Final[tuple[str, ...]] = (*CAPACITY_COLUMNS, P99_COLUMN)
+"""The six figures whose spread `capacity_disparity` ranks."""
 TechnologyType = Literal["pure PV", "hybrid", "unknown"]
 StorageEvidenceType = Literal[
     "storage BMU with output",
@@ -373,6 +383,42 @@ def _repd_candidates(
     }, battery_status
 
 
+def capacity_disparity(*, table: pl.DataFrame) -> pl.DataFrame:
+    """Rank the BMUs with output by how far apart their six capacity figures are.
+
+    The rule: for each single-site BMU whose output follows the sun, take the figures in
+    `DISPARITY_FIGURES` that exist and are above zero (a missing figure, and a Maximum Export Limit
+    of zero, are left out), and divide the largest by the smallest. A BMU with fewer than two such
+    figures is left out.
+
+    Args:
+        table: The census table, with `scope`, `basis`, and the `DISPARITY_FIGURES` columns.
+
+    Returns:
+        One row for each ranked BMU, `elexon_bmu_id`, `display_name`, the six figures, `lowest_mw`,
+        `highest_mw`, and `ratio` (highest over lowest), sorted by `ratio`, largest first, then by
+        `elexon_bmu_id`.
+    """
+    followers = table.filter(
+        (pl.col("scope") == "single-site") & pl.col("basis").str.contains("behaviour")
+    )
+    figures = pl.concat_list(
+        [pl.when(pl.col(name) > 0).then(pl.col(name)) for name in DISPARITY_FIGURES]
+    ).list.drop_nulls()
+    return (
+        followers.with_columns(figures=figures)
+        .filter(pl.col("figures").list.len() >= 2)
+        .with_columns(
+            lowest_mw=pl.col("figures").list.min(), highest_mw=pl.col("figures").list.max()
+        )
+        .with_columns(ratio=pl.col("highest_mw") / pl.col("lowest_mw"))
+        .select(
+            "elexon_bmu_id", "display_name", *DISPARITY_FIGURES, "lowest_mw", "highest_mw", "ratio"
+        )
+        .sort(["ratio", "elexon_bmu_id"], descending=[True, False])
+    )
+
+
 def build_table() -> pl.DataFrame:
     """Build the one-row-per-solar-BMU table of capacity figures.
 
@@ -381,9 +427,9 @@ def build_table() -> pl.DataFrame:
 
     Returns:
         One row per BMU in the census (IGCPU type Solar, or output that follows the sun), with the
-        BMU's five capacity figures, the matched TEC project and REPD reference, the BMU's
-        technology (pure PV, hybrid, or unknown) and the evidence for it, and the join methods and
-        match scores.
+        BMU's five capacity figures and the P99 of its output, the matched TEC project and REPD
+        reference, the BMU's technology (pure PV, hybrid, or unknown) and the evidence for
+        it, and the join methods and match scores.
     """
     reference = {str(r["elexonBmUnit"]): r for r in fetch_bmu_reference() if r["elexonBmUnit"]}
     today, window = recorded_run()
@@ -404,6 +450,8 @@ def build_table() -> pl.DataFrame:
     out = []
     for class_row in classes.iter_rows(named=True):
         bmu_id = class_row["elexon_bmu_id"]
+        output_path = OUTPUT_DIR / f"{bmu_id}_{window.label}.parquet"
+        output = pl.read_parquet(output_path) if output_path.exists() else empty_output()
         ref = reference.get(bmu_id, {})
         igcpu_row = latest_igcpu.get(bmu_id)
         site_name = ref.get("bmUnitName") or (igcpu_row or {}).get("registeredResourceName") or ""
@@ -470,6 +518,7 @@ def build_table() -> pl.DataFrame:
                 )
                 if repd_match
                 else None,
+                P99_COLUMN: p99_output_mw(output=output, window_start=window.start),
                 "longitude": longitude,
                 "latitude": latitude,
                 "join_method": "igcpu and MEL: BMU id; tec and repd: "
@@ -490,6 +539,7 @@ def build_table() -> pl.DataFrame:
             "repd_battery_mw": pl.Float64,
             "repd_installed_capacity_mw": pl.Float64,
             "generation_capacity_mw": pl.Float64,
+            P99_COLUMN: pl.Float64,
             "longitude": pl.Float64,
             "latitude": pl.Float64,
         },

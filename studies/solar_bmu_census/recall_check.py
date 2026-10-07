@@ -98,7 +98,7 @@ def recall_table(*, census_ids: set[str]) -> tuple[pl.DataFrame, str]:
     """Return one row per checked TEC row with its technology and outcome, and the provenance."""
     tec_rows = tec_solar_rows(tec=fetch_tec())
     mapping, provenance = load_mapping(tec_rows=tec_rows, reference=fetch_bmu_reference())
-    joined = tec_rows.select("Project ID", "Project Status", "Plant Type").join(
+    joined = tec_rows.select("Project ID", "Project Name", "Project Status", "Plant Type").join(
         mapping.select(pl.col("project_id").alias("Project ID"), "bmu_ids"),
         on="Project ID",
         how="left",

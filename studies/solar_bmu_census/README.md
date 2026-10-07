@@ -4,8 +4,8 @@
 solar?](https://openclimatefix.github.io/nged-substation-forecast/studies/solar-bmu-census/).** The
 study finds the Balancing Mechanism Units (BMUs) whose settled output follows the sun or that the
 Installed Generation Capacity per Unit report (IGCPU) types as Solar, and sets the five published
-capacity figures for them side by side. Every script's module docstring gives the command that runs
-it.
+capacity values for them side by side, with the 99th percentile of each BMU's own output. Every
+script's module docstring gives the command that runs it.
 
 **A script imports only from this folder, from `studies.*`, and from the other reviewed packages.**
 
@@ -16,10 +16,10 @@ wrote.**
 |---|---|
 | `fetch_sources.py` | Downloads the BMU register, the IGCPU report (B1420), the settled half-hourly output of each BMU (dataset B1610), the National Energy System Operator's (NESO's) Transmission Entry Capacity (TEC) register, and the Renewable Energy Planning Database (REPD), and writes a lineage note and a README beside them. |
 | `classify.py` | Correlates each BMU's output with the sun and writes `classes.parquet`. |
-| `collate.py` | Fetches each census BMU's Maximum Export Limit (MEL), joins the five capacity figures onto each census BMU with the site's technology and position, and writes the census table as `solar_bmus.csv` and `solar_bmus.parquet` in the study's data folder. |
+| `collate.py` | Fetches each census BMU's Maximum Export Limit (MEL), joins the five capacity values and the P99 of the BMU's output onto each census BMU with the site's technology and position, and writes the census table as `solar_bmus.csv` and `solar_bmus.parquet` in the study's data folder. |
 | `recall_check.py` | Checks the census against the TEC register's photovoltaic (PV) projects. |
 | `report.py` | Writes every number the page quotes to `report.md` and prints the report. |
-| `census_charts.py` | Draws the page's four figures. |
+| `census_charts.py` | Draws the page's five figures. |
 
 The tests for `fetch_sources.py`, `classify.py`, and `collate.py` are in
 `packages/studies/tests/solar_bmu_census/`.
@@ -32,10 +32,18 @@ The tests for `fetch_sources.py`, `classify.py`, and `collate.py` are in
   the BMU's lead party.
 - `igcpu_installed_capacity_mw`: the installed capacity of the unit in IGCPU, in megawatts.
 - `tec_mw`: the matched TEC project's connected capacity if built, or its agreed cumulative capacity
-  at any other status, at its most advanced status, in megawatts. A hybrid project's figure
+  at any other status, at its most advanced status, in megawatts. A hybrid project's value
   includes its storage.
 - `largest_mel_mw`: the largest Maximum Export Limit in the 30 days before the run, in megawatts.
 - `repd_installed_capacity_mw`: the installed capacity of the matched REPD row, in megawatts.
+
+**A sixth column, `p99_output_mw`, measures the BMU's own output and is not a registered
+capacity.** It is the 99th percentile (linear interpolation) of the BMU's half-hourly settled output
+in megawatts (the megawatt-hours in each half-hour, times 2). The percentile is taken over the
+series the classifier judges: after the 30 days that follow the BMU's first output (unless the BMU
+was running in the window's first week), and without the half-hours of exactly zero output while the
+sun is clearly up. Zeros at night and negative readings stay in. The column is empty for a BMU with
+no judged output. It is never added to another column.
 
 ## Hand-made tables
 

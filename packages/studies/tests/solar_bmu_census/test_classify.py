@@ -12,6 +12,7 @@ from typing import Final
 import classify
 import numpy as np
 import polars as pl
+import pytest
 from studies.solar import cos_zenith, zenith
 
 START: Final[datetime] = datetime(2026, 1, 1, tzinfo=UTC)
@@ -195,3 +196,133 @@ def test_igcpu_solar_ids_keeps_only_solar_rows_with_a_bmu() -> None:
         {"psrType": "Wind Onshore", "bmUnit": "T_B"},
     ]
     assert classify.igcpu_solar_ids(igcpu=rows) == {"T_A"}
+
+
+def test_cos_zenith_at_a_literal_midsummer_noon_and_midnight() -> None:
+    """The reference point and the 15-minute midpoint offset, checked against literal times."""
+    stamps = pl.Series(
+        "half_hour_end_time",
+        [datetime(2026, 6, 21, 0, 15, tzinfo=UTC), datetime(2026, 6, 21, 12, 15, tzinfo=UTC)],
+    ).dt.cast_time_unit("us")
+    series = classify.analysis_series(
+        output=_frame(stamps=stamps, values=np.array([1.0, 1.0])),
+        window_start=datetime(2026, 6, 21, tzinfo=UTC),
+    )
+    midnight, noon = series["cos_zenith"].to_list()
+    assert 0.86 < noon < 0.88  # a zenith of 53.0 - 23.4 = 29.6 degrees at 53 N
+    assert midnight == 0.0
+
+
+@pytest.mark.parametrize(("noise_scale", "expected"), [(8.0, "solar"), (11.0, "not_solar")])
+def test_the_solar_threshold_sits_at_a_correlation_of_0_6(
+    noise_scale: float, expected: str
+) -> None:
+    stamps = _stamps()
+    noise = np.random.default_rng(3).normal(0, noise_scale, len(stamps))
+    values = np.clip(25.0 * _sun(stamps=stamps) + noise, 0.5, None)
+    result = _classify(stamps=stamps, values=values)
+    assert result.correlation is not None
+    assert 0.5 < result.correlation < 0.7
+    assert result.behaviour == expected
+
+
+@pytest.mark.parametrize(("positive", "expected"), [(99, "no_output"), (100, "solar")])
+def test_one_hundred_positive_half_hours_is_enough(positive: int, expected: str) -> None:
+    stamps = _stamps(days=30)
+    sun = _sun(stamps=stamps)
+    values = np.where(sun > 0, 25.0 * sun, -0.05)
+    last = np.flatnonzero(values > 0)[positive - 1] + 1  # end the series at the Nth positive
+    result = _classify(stamps=stamps[:last], values=values[:last])
+    assert result.positive_half_hours == positive
+    assert result.behaviour == expected
+
+
+def test_readings_of_0_008_mwh_are_noise_and_of_0_3_mwh_are_generation() -> None:
+    stamps = _stamps(days=30)
+    sun = _sun(stamps=stamps)
+    values = np.where(sun > 0.1, 0.3, np.where(sun > 0, 0.008, -0.05))
+    result = _classify(stamps=stamps, values=values)
+    assert result.positive_half_hours == int((sun > 0.1).sum())
+
+
+def test_the_commissioning_skip_is_thirty_days_from_the_first_output() -> None:
+    stamps = _stamps(days=120)
+    values = np.zeros(len(stamps))
+    values[20 * HALF_HOURS_PER_DAY :] = 1.0
+    series = classify.analysis_series(
+        output=_frame(stamps=stamps, values=values), window_start=START
+    )
+    assert series["half_hour_end_time"][0] == stamps[20 * HALF_HOURS_PER_DAY] + timedelta(days=30)
+
+
+def test_a_first_output_seven_days_in_counts_as_commissioning() -> None:
+    stamps = _stamps(days=60)
+    values = np.zeros(len(stamps))
+    first = 7 * HALF_HOURS_PER_DAY - 1
+    values[first:] = 1.0
+    assert stamps[first] == START + timedelta(days=7)
+    series = classify.analysis_series(
+        output=_frame(stamps=stamps, values=values), window_start=START
+    )
+    assert series["half_hour_end_time"][0] == START + timedelta(days=37)
+
+
+def test_a_unit_judged_on_two_months_can_be_solar() -> None:
+    stamps = _stamps(days=60)
+    assert _classify(stamps=stamps, values=_solar_like(stamps=stamps)).behaviour == "solar"
+
+
+def test_noise_half_hours_do_not_count_towards_the_minimum() -> None:
+    stamps = _stamps(days=30)
+    values = np.full(len(stamps), 0.005)
+    values[:150] = 5.0
+    assert _classify(stamps=stamps, values=values).positive_half_hours == 150
+
+
+def test_drop_daytime_zeros_on_literal_rows() -> None:
+    series = pl.DataFrame(
+        {
+            "output_mwh": [0.0, -0.05, 0.0, 0.0, 0.0],
+            "cos_zenith": [0.5, 0.5, 0.1, 0.05, 0.3],
+        }
+    )
+    kept = classify.drop_daytime_zeros(series=series)
+    assert kept.to_dicts() == [
+        {"output_mwh": -0.05, "cos_zenith": 0.5},
+        {"output_mwh": 0.0, "cos_zenith": 0.1},
+        {"output_mwh": 0.0, "cos_zenith": 0.05},
+    ]
+
+
+def test_correlation_is_none_when_the_sun_never_varies() -> None:
+    series = pl.DataFrame({"output_mwh": [1.0, 2.0, 3.0], "cos_zenith": [0.0, 0.0, 0.0]})
+    assert classify.sun_following_correlation(series=series) is None
+
+
+def _midday_stamps(*, days: int) -> pl.Series:
+    """Return one half-hour end time at 12:15 UTC on each of `days` days, when the sun is up."""
+    return pl.Series(
+        "half_hour_end_time",
+        [START + timedelta(days=day, hours=12, minutes=15) for day in range(days)],
+    ).dt.cast_time_unit("us")
+
+
+def test_p99_skips_the_commissioning_month_and_the_daytime_zeros() -> None:
+    """Days 0 to 9 are zero, day 10 is the first output, and days 10 to 39 are the skipped month.
+
+    Days 40 to 139 then hold the readings 1 to 100 MWh, and days 140 to 289 hold daytime zeros.
+    Keeping the commissioning month adds readings of 500 and 1000 MWh, and keeping the zeros pulls
+    the percentile down to 97.5 MWh.
+    """
+    values = np.zeros(290)
+    values[10] = 1000.0
+    values[11:40] = 500.0
+    values[40:140] = np.arange(1.0, 101.0)
+    output = _frame(stamps=_midday_stamps(days=290), values=values)
+    p99 = classify.p99_output_mw(output=output, window_start=START)
+    assert p99 == pytest.approx(198.02, abs=1e-6)  # 99.01 MWh at 2 half-hours per hour
+
+
+def test_p99_is_none_when_the_bmu_never_generates() -> None:
+    output = _frame(stamps=_midday_stamps(days=20), values=np.zeros(20))
+    assert classify.p99_output_mw(output=output, window_start=START) is None

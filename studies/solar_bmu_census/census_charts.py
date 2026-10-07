@@ -1,4 +1,7 @@
-"""Draw the census page's charts: the correlation histogram, the map, and the example weeks.
+"""Draw the census page's five charts.
+
+They are the correlation histogram, the map, the summer and winter example weeks, and the capacity
+figures.
 
 Run after `report.py`: `uv run python studies/solar_bmu_census/census_charts.py`. The Balancing
 Mechanism Unit (BMU) register, B1610, the Installed Generation Capacity per Unit (IGCPU) report, the
@@ -7,14 +10,16 @@ public, so the charts name each BMU and show output in megawatts on calendar dat
 """
 
 import json
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Final, cast
+from typing import Any, Final, cast
 
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from classify import SOLAR_CORRELATION_THRESHOLD
+from collate import P99_COLUMN, capacity_disparity
 from fetch_sources import OUTPUT_DIR, STUDY_DIR, fetch_bmu_reference, recorded_run
 from studies.charts import CONTENT_WIDTH_PX, figure
 
@@ -28,19 +33,44 @@ WEEKS: Final[dict[str, datetime]] = {
 }
 """The Monday that starts the week containing each solstice, fixed by the calendar and not chosen by
 how the output looks."""
-KIND_COLOURS: Final[dict[str, str]] = {
-    "pure PV": ocf.DATA_BLUE,
-    "hybrid-site solar": ocf.BRAND_ORANGE,
-    "storage": ocf.DATA_PURPLE,
+SERIES_COLOURS: Final[dict[str, str]] = {
+    "Solar BMU": ocf.BRAND_ORANGE,
+    "Storage BMU": ocf.DATA_BLUE,
 }
+FIGURE_NAMES: Final[dict[str, str]] = {
+    "generation_capacity_mw": "Generation Capacity",
+    "igcpu_installed_capacity_mw": "IGCPU installed",
+    "tec_mw": "TEC",
+    "largest_mel_mw": "Largest MEL",
+    "repd_installed_capacity_mw": "REPD installed",
+    P99_COLUMN: "P99 of output",
+}
+FIGURE_COLOURS: Final[dict[str, str]] = {
+    "Generation Capacity": ocf.DATA_BLUE,
+    "IGCPU installed": ocf.DATA_SKY,
+    "TEC": ocf.DATA_PURPLE,
+    "Largest MEL": ocf.DATA_GREEN,
+    "REPD installed": ocf.BRAND_ORANGE,
+    "P99 of output": ocf.BLACK_1,
+}
+RULE_WIDTHS: Final[tuple[float, ...]] = (6.0, 5.0, 4.0, 3.0, 2.0, 1.5)
+"""Line widths from the first line drawn to the last. Lines that coincide at one height then show as
+nested stripes, each in its own colour."""
+DISPARITY_EXAMPLES: Final[int] = 3
+DISPARITY_ROW_PX: Final[int] = 230
+LABEL_MARGIN_PX: Final[int] = 250
+LABEL_PADDING_PX: Final[int] = 40
+"""The room right of the plot for the line labels, which Vega leaves out of the figure's width."""
+LABEL_GAP_SHARE: Final[float] = 0.09
+"""The least gap between two labels, as a share of the y axis."""
 TECHNOLOGY_COLOURS: Final[dict[str, str]] = {
     "pure PV": ocf.DATA_BLUE,
     "hybrid": ocf.BRAND_ORANGE,
     "unknown": ocf.GREY_3,
 }
-ROW_HEIGHT_PX: Final[int] = 72
+ROW_HEIGHT_PX: Final[int] = 115
 MAP_HEIGHT_PX: Final[int] = 600
-LABEL_CELL_DEGREES: Final[float] = 0.05
+LABEL_CELL_DEGREES: Final[float] = 0.1
 """Points that round to the same grid cell share one label on the map, so labels do not overprint.
 
 The cell is this many degrees wide in longitude and in latitude.
@@ -73,20 +103,28 @@ def storage_bmu_at(*, site_bmu_id: str, census: pl.DataFrame) -> str | None:
     return None
 
 
-def choose_examples(*, census: pl.DataFrame) -> list[tuple[str, str]]:
-    """Choose the example BMUs by rule, and return each with its kind.
+@dataclass(frozen=True)
+class Example:
+    """One example site: its solar BMU, the site's kind, and its storage BMU if the site has one."""
+
+    solar_bmu_id: str
+    kind: str
+    storage_bmu_id: str | None
+
+
+def choose_examples(*, census: pl.DataFrame) -> list[Example]:
+    """Choose the example sites by rule, pure PV first and hybrids after.
 
     Pure PV: every single-site, pure PV BMU whose output follows the sun, in descending order of
-    correlation. Hybrid-site solar: the single-site hybrid BMUs whose output follows the sun,
-    ordered by correlation, taking the first, the middle, and the last, so the examples span the
-    best to the worst fit. Storage: the storage BMU at each hybrid-site example, where it has one.
-    The rows are grouped by kind, in that order.
+    correlation. Hybrid: the single-site hybrid BMUs whose output follows the sun, ordered by
+    correlation, taking the first, the middle, and the last, so the examples span the best to the
+    worst fit. Each hybrid example carries the storage BMU at its site, where it has one.
 
     Args:
         census: The census table.
 
     Returns:
-        `(bmu_id, kind)` pairs in the order the figure draws them.
+        The examples in the order the figure draws them.
     """
     following = census.filter(
         (pl.col("scope") == "single-site") & pl.col("basis").str.contains("behaviour")
@@ -95,52 +133,73 @@ def choose_examples(*, census: pl.DataFrame) -> list[tuple[str, str]]:
     hybrid = following.filter(pl.col("technology") == "hybrid")["elexon_bmu_id"].to_list()
     middle = len(hybrid) // 2
     picks = sorted({0, middle, len(hybrid) - 1}) if hybrid else []
-    chosen_hybrid = [hybrid[i] for i in picks]
-    storage = [storage_bmu_at(site_bmu_id=bmu_id, census=census) for bmu_id in chosen_hybrid]
     return [
-        *[(bmu_id, "pure PV") for bmu_id in pure],
-        *[(bmu_id, "hybrid-site solar") for bmu_id in chosen_hybrid],
-        *[(bmu_id, "storage") for bmu_id in storage if bmu_id is not None],
+        *[Example(bmu_id, "pure PV", None) for bmu_id in pure],
+        *[
+            Example(bmu_id, "hybrid", storage_bmu_at(site_bmu_id=bmu_id, census=census))
+            for bmu_id in (hybrid[i] for i in picks)
+        ],
     ]
 
 
-def week_series(*, bmu_id: str, week_start: datetime) -> pl.DataFrame:
-    """Return a BMU's output over one week, in megawatts.
+def output_series(*, bmu_id: str, start: datetime, end: datetime) -> pl.DataFrame:
+    """Return a BMU's output from `start` up to `end`, in megawatts.
 
     Args:
         bmu_id: The BMU.
-        week_start: Midnight UTC at the start of the week.
+        start: Midnight UTC at the start of the period.
+        end: Midnight UTC at the end of the period, which is not included.
 
     Returns:
         Columns `time` (the half-hour's midpoint, UTC) and `megawatts`.
 
     Raises:
-        ValueError: If the week lies outside the study window.
+        ValueError: If the period lies outside the study window.
     """
     _, window = recorded_run()
-    if not (window.start <= week_start and week_start + timedelta(days=7) <= window.end):
-        raise ValueError("The example week lies outside the study window")
+    if not (window.start <= start and end <= window.end):
+        raise ValueError("The period lies outside the study window")
     output = pl.read_parquet(OUTPUT_DIR / f"{bmu_id}_{window.label}.parquet")
     midpoint = pl.col("half_hour_end_time").dt.offset_by("-15m")
     return (
-        output.filter(midpoint >= week_start, midpoint < week_start + timedelta(days=7))
+        output.filter(midpoint >= start, midpoint < end)
         .select(time=midpoint, megawatts=pl.col("output_mwh") * 2)
         .sort("time")
     )
 
 
+def week_series(*, bmu_id: str, week_start: datetime) -> pl.DataFrame:
+    """Return a BMU's output over one week, in megawatts (see `output_series`)."""
+    return output_series(bmu_id=bmu_id, start=week_start, end=week_start + timedelta(days=7))
+
+
+def week_domain(*, capacity_mw: float, megawatts: pl.Series) -> tuple[float, float]:
+    """Return the y-axis limits of a week panel: the data and the capacity, with room to see zero.
+
+    The upper limit is 10% above the larger of the Generation Capacity and the largest output, and
+    the lower limit is 10% below the lowest output when that is negative (a battery charging) and
+    5% of the upper limit below zero otherwise.
+    """
+    high = max(capacity_mw, _as_float(megawatts.max())) * 1.1
+    lowest = min(0.0, _as_float(megawatts.min()))
+    return (lowest * 1.1 if lowest < 0 else -0.05 * high), high
+
+
+def _as_float(value: object) -> float:
+    """Return a Polars aggregate as a float."""
+    if not isinstance(value, int | float):
+        raise TypeError(f"Expected a number, got {type(value).__name__}")
+    return float(value)
+
+
 def _week_panel(
-    *, series: pl.DataFrame, title: str, kind: str, capacity_mw: float, last: bool
+    *, series: pl.DataFrame, title: str, domain: tuple[float, float], last: bool
 ) -> alt.LayerChart:
-    """Draw one BMU's week as a line in the colour of its kind, titled with its name."""
-    low, high = (
-        (-capacity_mw * 1.1, capacity_mw * 1.1)
-        if kind == "storage"
-        else (-capacity_mw * 0.2, capacity_mw * 1.1)
-    )
-    line = (
+    """Draw a site's week: its solar and storage BMUs as lines, with a rule at zero MW."""
+    names = list(SERIES_COLOURS)
+    lines = (
         alt.Chart(series, title=alt.TitleParams(title, anchor="start", fontSize=11, offset=2))
-        .mark_line(color=KIND_COLOURS[kind], strokeWidth=1.5)
+        .mark_line(strokeWidth=1.5)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "time:T",
@@ -154,36 +213,62 @@ def _week_panel(
             ),
             y=alt.Y(
                 "megawatts:Q",
-                scale=alt.Scale(domain=[low, high], nice=False),
-                axis=alt.Axis(tickCount=3, title="MW"),
+                scale=alt.Scale(domain=list(domain), nice=False),
+                axis=alt.Axis(tickCount=4, title="MW"),
+            ),
+            color=alt.Color(
+                "series:N",
+                scale=alt.Scale(domain=names, range=[SERIES_COLOURS[name] for name in names]),
+                legend=None,
             ),
         )
         .properties(width=CONTENT_WIDTH_PX - 90, height=ROW_HEIGHT_PX)
     )
-    return cast(alt.LayerChart, alt.layer(line))
+    zero = (
+        alt.Chart(pl.DataFrame({"zero": [0.0]}))
+        .mark_rule(color=ocf.BLACK_1, strokeWidth=0.8, aria=False)
+        .encode(y="zero:Q")  # ty: ignore[unresolved-attribute]
+    )
+    return cast(alt.LayerChart, alt.layer(zero, lines))
 
 
 def example_week_figure(
-    *, census: pl.DataFrame, examples: list[tuple[str, str]], season: str, number: int
+    *, census: pl.DataFrame, examples: list[Example], season: str, number: int
 ) -> alt.VConcatChart:
-    """Draw the example BMUs' output over one week, one row for each example."""
+    """Draw the example sites' output over one week, one row for each site."""
     reference = {str(r["elexonBmUnit"]): r for r in fetch_bmu_reference() if r["elexonBmUnit"]}
     display = dict(zip(census["elexon_bmu_id"], census["display_name"], strict=True))
+    start = WEEKS[season]
     panels = []
-    for index, (bmu_id, kind) in enumerate(examples):
-        row = reference[bmu_id]
+    for index, example in enumerate(examples):
+        row = reference[example.solar_bmu_id]
         capacity = float(row["generationCapacity"])
-        name = display.get(bmu_id) or str(row["bmUnitName"])
+        name = display.get(example.solar_bmu_id) or str(row["bmUnitName"])
+        parts = [
+            week_series(bmu_id=example.solar_bmu_id, week_start=start).with_columns(
+                series=pl.lit("Solar BMU")
+            )
+        ]
+        storage_note = ""
+        if example.storage_bmu_id is not None:
+            parts.append(
+                week_series(bmu_id=example.storage_bmu_id, week_start=start).with_columns(
+                    series=pl.lit("Storage BMU")
+                )
+            )
+            storage_note = f"; storage BMU {example.storage_bmu_id}"
+        series = pl.concat(parts)
         panels.append(
             _week_panel(
-                series=week_series(bmu_id=bmu_id, week_start=WEEKS[season]),
-                title=f"{bmu_id}  {name}  ({kind}, Generation Capacity {capacity:g} MW)",
-                kind=kind,
-                capacity_mw=capacity,
+                series=series,
+                title=(
+                    f"{example.solar_bmu_id}  {name}  ({example.kind} site, Generation Capacity "
+                    f"{capacity:g} MW{storage_note})"
+                ),
+                domain=week_domain(capacity_mw=capacity, megawatts=series["megawatts"]),
                 last=index == len(examples) - 1,
             )
         )
-    start = WEEKS[season]
     end = start + timedelta(days=6)
     return figure(
         panels=panels,
@@ -195,13 +280,168 @@ def example_week_figure(
         subtitle=[
             (
                 f"Half-hourly output, 00:00 UTC on {start:%-d %B %Y} to 23:30 UTC on "
-                f"{end:%-d %B %Y}, in megawatts."
+                f"{end:%-d %B %Y}, in megawatts. Each row is one site, pure PV first."
             ),
-            "Blue: pure PV. Orange: solar BMU at a hybrid site. Purple: storage BMU at that site.",
-            "Examples span the best to the worst fit to the sun; the page's methods give the rule.",
+            (
+                "Orange: solar BMU. Blue: storage BMU at the same site (negative when charging). "
+                "The black line marks zero MW."
+            ),
+            (
+                "The three hybrid examples have the highest, median, and lowest correlation "
+                "with the sun of the eight hybrid solar BMUs that follow it."
+            ),
         ],
         figure_planning=None,
     )
+
+
+def disparity_examples(*, census: pl.DataFrame) -> pl.DataFrame:
+    """Return the three BMUs with the most disparate capacity figures, by `capacity_disparity`."""
+    return capacity_disparity(table=census).head(DISPARITY_EXAMPLES)
+
+
+def label_positions(*, values: list[float], gap: float) -> list[float]:
+    """Spread label heights so that no two are closer than `gap`, keeping their order.
+
+    Args:
+        values: The heights the labels belong at, in any order.
+        gap: The least distance between two label heights, in the same unit.
+
+    Returns:
+        The label heights in the order of `values`: each height is its value, or the height above
+        the label just below if that value would sit closer than `gap`.
+    """
+    order = sorted(range(len(values)), key=lambda i: values[i])
+    placed = [0.0] * len(values)
+    previous: float | None = None
+    for index in order:
+        height = values[index] if previous is None else max(values[index], previous + gap)
+        placed[index] = height
+        previous = height
+    return placed
+
+
+def _disparity_panel(*, row: dict[str, Any], last: bool) -> alt.LayerChart:
+    """Draw one BMU's year of output with a horizontal line for each of its six figures.
+
+    Each line has a label at the right-hand end of the plot, outside the plot area in the margin
+    `LABEL_MARGIN_PX`, in the line's own colour and with its value in MW, and the figure has no
+    legend. Lines with equal or close values are not combined into one label. Their labels are
+    stacked, in value order, by `label_positions`, which keeps every pair at least `LABEL_GAP_SHARE`
+    of the y axis apart, and each label has a square in the line's colour beside it.
+    """
+    _, window = recorded_run()
+    series = output_series(bmu_id=row["elexon_bmu_id"], start=window.start, end=window.end)
+    daily = series.group_by_dynamic("time", every="1d").agg(pl.col("megawatts").max())
+    figures = [
+        (name, float(row[column]), column) for column, name in FIGURE_NAMES.items() if row[column]
+    ]
+    high = float(row["highest_mw"]) * 1.1
+    gap = high * LABEL_GAP_SHARE
+    heights = label_positions(values=[value for _, value, _ in figures], gap=gap)
+    high = max(high, max(heights) + gap)
+    rules = pl.DataFrame(
+        {
+            "figure": [name for name, _, _ in figures],
+            "megawatts": [value for _, value, _ in figures],
+            "label_height": heights,
+            "label": [f"{name}: {value:.1f} MW" for name, value, _ in figures],
+        }
+    )
+    names = list(FIGURE_NAMES.values())
+    colour = alt.Color(
+        "figure:N",
+        scale=alt.Scale(domain=names, range=[FIGURE_COLOURS[name] for name in names]),
+        legend=None,
+    )
+    title = (
+        f"{row['elexon_bmu_id']}  {row['display_name']}  "
+        f"(highest value over lowest: {row['ratio']:.2f})"
+    )
+    base = alt.Chart(series, title=alt.TitleParams(title, anchor="start", fontSize=11, offset=2))
+    half_hourly = base.mark_line(
+        strokeWidth=0.5, opacity=0.35, color=ocf.BLACK_1, aria=False
+    ).encode(  # ty: ignore[unresolved-attribute]
+        x=alt.X(
+            "time:T",
+            axis=alt.Axis(format="%b %Y", tickCount="month", labels=last, ticks=last, title=None),
+            scale=alt.Scale(domain=[window.start, window.end]),
+        ),
+        y=alt.Y(
+            "megawatts:Q",
+            scale=alt.Scale(domain=[0, high], nice=False),
+            axis=alt.Axis(tickCount=4, title="MW"),
+        ),
+    )
+    daily_line = (
+        alt.Chart(daily)
+        .mark_line(strokeWidth=1, color=ocf.BLACK_1, aria=False)
+        .encode(x="time:T", y="megawatts:Q")  # ty: ignore[unresolved-attribute]
+    )
+    rule_marks = []
+    for index, (name, _, column) in enumerate(figures):
+        is_p99 = column == P99_COLUMN
+        rule_marks.append(
+            alt.Chart(rules.filter(pl.col("figure") == name))
+            .mark_rule(
+                strokeWidth=1.5 if is_p99 else RULE_WIDTHS[index],
+                strokeDash=[5, 3] if is_p99 else [1, 0],
+                aria=False,
+            )
+            .encode(y="megawatts:Q", color=colour)  # ty: ignore[unresolved-attribute]
+        )
+    squares = (
+        alt.Chart(rules.with_columns(time=pl.lit(window.end)))
+        .mark_square(size=60, dx=8, aria=False)
+        .encode(x="time:T", y="label_height:Q", color=colour)  # ty: ignore[unresolved-attribute]
+    )
+    texts = (
+        alt.Chart(rules.with_columns(time=pl.lit(window.end)))
+        .mark_text(align="left", dx=16, fontSize=10, fontWeight="bold", aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x="time:T", y="label_height:Q", text="label:N", color=colour
+        )
+    )
+    return cast(
+        alt.LayerChart,
+        alt.layer(half_hourly, daily_line, *rule_marks, squares, texts).properties(
+            width=CONTENT_WIDTH_PX - 60 - LABEL_MARGIN_PX, height=DISPARITY_ROW_PX
+        ),
+    )
+
+
+def disparity_figure(*, census: pl.DataFrame, number: int) -> alt.VConcatChart:
+    """Draw the year of output of the three BMUs whose capacity figures differ the most."""
+    chosen = disparity_examples(census=census)
+    rows = chosen.to_dicts()
+    panels = [
+        _disparity_panel(row=row, last=index == len(rows) - 1) for index, row in enumerate(rows)
+    ]
+    chart = figure(
+        panels=panels,
+        number=number,
+        title=(
+            "For the three BMUs whose six capacity values differ most, the highest value is "
+            f"{rows[-1]['ratio']:.1f} to {rows[0]['ratio']:.1f} times the lowest"
+        ),
+        subtitle=[
+            (
+                "Half-hourly output (faint line) and each day's largest half-hour (dark line), "
+                "in megawatts, over the 12-month study window."
+            ),
+            (
+                "Horizontal lines, each labelled with its value: the five published capacities, "
+                "and the dashed line, the 99th percentile of the BMU's output "
+                "(a measure of output, not a capacity)."
+            ),
+            (
+                "TEC and REPD describe the whole Cleve Hill project, which holds both Cleve Hill "
+                "BMUs and a battery."
+            ),
+        ],
+        figure_planning=None,
+    )
+    return chart.properties(padding={"left": 5, "top": 5, "right": LABEL_PADDING_PX, "bottom": 5})
 
 
 def correlation_figure(*, correlations: pl.DataFrame, number: int) -> alt.VConcatChart:
@@ -410,13 +650,14 @@ def main() -> None:
     examples = choose_examples(census=census)
     charts = {
         "solar_bmu_census_correlation": correlation_figure(correlations=correlations, number=1),
-        "solar_bmu_census_map": map_figure(census=census, number=2),
+        "solar_bmu_census_map": map_figure(census=census, number=3),
         "solar_bmu_census_summer_week": example_week_figure(
-            census=census, examples=examples, season="summer", number=3
+            census=census, examples=examples, season="summer", number=4
         ),
         "solar_bmu_census_winter_week": example_week_figure(
-            census=census, examples=examples, season="winter", number=4
+            census=census, examples=examples, season="winter", number=5
         ),
+        "solar_bmu_census_capacity_figures": disparity_figure(census=census, number=2),
     }
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     for name, chart in charts.items():
