@@ -1161,19 +1161,34 @@ def test_ecmwf_ens_re_raises_a_cancelled_run_without_writing(
     assert not Path(Settings().nwp_data_path).exists()
 
 
+@pytest.mark.parametrize("raising_step", ["open", "empty_slice_check"])
 def test_ecmwf_ens_retries_when_run_not_yet_available(
-    env: Path, monkeypatch: pytest.MonkeyPatch
+    env: Path, monkeypatch: pytest.MonkeyPatch, raising_step: str
 ) -> None:
     """``NwpRunNotYetAvailable`` → ``RetryRequested`` with the asset's configured retry budget,
-    so a not-yet-published run waits rather than failing outright."""
+    so a not-yet-published run waits rather than failing outright. It does so whether the run is
+    absent from the catalog or the downloaded run has an empty slice."""
     from dagster import RetryRequested
 
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
 
-    def _raise_not_available(*, nwp_init_time: datetime, h3_grid: object) -> None:
+    def _raise_not_available(*args: object, **kwargs: object) -> None:
         raise NwpRunNotYetAvailable
 
-    monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=_raise_not_available)
+    if raising_step == "open":
+        monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=_raise_not_available)
+    else:
+        monkeypatch.setattr(
+            target=assets, name="open_ecmwf_ens_run", value=lambda **kwargs: object()
+        )
+        monkeypatch.setattr(
+            target=assets, name="download_ecmwf_ens_data", value=lambda ds_lazy: object()
+        )
+        monkeypatch.setattr(
+            target=assets,
+            name="raise_if_instantaneous_slices_empty",
+            value=_raise_not_available,
+        )
 
     # `build_asset_context()` defaults to its own `DagsterInstance.ephemeral()`
     # (<https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/>) and is

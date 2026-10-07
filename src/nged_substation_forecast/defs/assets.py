@@ -49,6 +49,7 @@ from dynamical_data.ecmwf_ens.download import (
     NwpRunNotYetAvailable,
     download_ecmwf_ens_data,
     open_ecmwf_ens_run,
+    raise_if_instantaneous_slices_empty,
 )
 from dynamical_data.ecmwf_ens.upstream_nulls import (
     UpstreamNullRate,
@@ -270,21 +271,23 @@ its 00Z run has actually landed, matching Dynamical's publication lag; shared wi
 _ECMWF_ENS_MAX_RETRIES: Final[int] = 8
 """Retries × ``_ECMWF_ENS_RETRY_DELAY_SECONDS`` ≥ 4h of coverage past the 10:30 UTC schedule
 (``ecmwf_ens_schedule``), comfortably past Dynamical's typical publication time — and past the
-3h25m a measured republication took. Applies to ``NwpRunNotYetAvailable`` and
-``NwpVariableWhollyMissing``, the two ways an upstream run says "not ready yet"; a genuine bug
-fails immediately instead of retrying for hours.
+3h25m a measured republication took, and past the 3h28m after an 08:30 UTC attempt that Dynamical's
+store took to fill on 2026-10-02. Applies to ``NwpRunNotYetAvailable`` (the run is absent from the
+catalog, or an instantaneous variable has a slice that is empty at every grid point) and
+``NwpVariableWhollyMissing`` (a de-accumulated variable is wholly empty), the ways an upstream run
+says "not ready yet"; a genuine bug fails immediately instead of retrying for hours.
 
-Waiting is the right response to those two because Dynamical.org publishes each 00Z run as roughly
+Waiting is the right response to those because Dynamical.org publishes each 00Z run as roughly
 40 separate Icechunk commits between 08:05 and 08:20 UTC, one per worker. A run part-way through
 that window is genuinely readable and genuinely incomplete: a variable whose worker has not
 committed yet reads as null across every member and step. Fuller reasoning:
 https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-is-retried-not-failed-outright
 
-"≥" rather than "≈" because only ``NwpRunNotYetAvailable`` is raised before the download.
-``NwpVariableWhollyMissing`` comes from validation *after* it, so each of those retries also pays
-for a full re-download (22.5s at best, minutes when the upstream fetch is slow) and re-takes the
-``ECMWF`` concurrency pool slot. That is the price of not discarding the partition, and the
-elapsed window is wider than the delays alone imply."""
+"≥" rather than "≈" because most retries come after a download. A run absent from the catalog is
+found before it, but the other two failures are found after it, so each of those retries also pays
+for a re-download and re-takes the ``ECMWF`` concurrency pool slot. One attempt measured 81s on
+2026-10-06 (open 4s, download 38s, convert 39s), and an attempt that stops at the empty-slice check
+costs about 42s, so the elapsed window is about 4h12m. Minutes when the upstream fetch is slow."""
 
 _ECMWF_ENS_RETRY_DELAY_SECONDS: Final[int] = 1800
 """How long to wait between retries of a not-yet-published ECMWF run."""
@@ -355,7 +358,8 @@ _NWP_INSTANTANEOUS_CHECK_DESCRIPTION: Final[str] = (
     "aggregation renormalises each H3 cell over the grid points that supplied a value and so "
     "absorbs scattered nulls before they reach one. That absorption is also why this check counts "
     "the raw grid: a null that does reach a cell never gets here, since `Nwp.validate` rejects "
-    "the run first. See "
+    "the run first, and a slice that is empty at every grid point is retried before the "
+    "conversion, so it never gets here either. See "
     "https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/."
 )
 """Standing explanation shown in the Dagster UI's Checks view."""
@@ -441,10 +445,12 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     steps a whole run carries, and names the members and lead times that are absent. All three
     warn rather than block, so a degraded run is still written and still forecast from.
 
-    A run Dynamical.org has not published yet is retried up to 8 times, 30 minutes apart,
-    covering more than 4 hours past the 10:30 UTC schedule. A materialisation that runs for hours
-    and then fails is therefore this asset waiting for an upstream run that never arrived, not a
-    bug.
+    A run Dynamical.org has not finished publishing is retried up to 8 times, 30 minutes apart,
+    covering more than 4 hours past the 10:30 UTC schedule. That covers a run that is absent from
+    the catalog, a run with whole (member, lead time) slices of an instantaneous variable still
+    empty, and a run with a de-accumulated variable still wholly empty. A materialisation that runs
+    for hours and then fails is therefore this asset waiting for an upstream run that never
+    arrived, not a bug.
     """
     settings = Settings()
     storage_options = settings.storage_options
@@ -458,11 +464,13 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         )
     ).set_model(H3GridWeights)
 
-    # Download and convert. Both retryable failures mean "the upstream run is not ready yet", they
-    # just say it at different points: the run is absent from the catalog, or it is present but a
-    # weather variable is still wholesale empty. Every other error still fails immediately. Both
-    # are worth waiting out because a run is published as ~40 separate commits, so it can be
-    # readable and incomplete at once; the ladder is on _ECMWF_ENS_MAX_RETRIES above, and the
+    # Download and convert. All three retryable failures mean "the upstream run is not ready yet",
+    # they just say it at different points: the run is absent from the catalog, an instantaneous
+    # variable has a slice that is empty at every grid point (checked on the raw download, before
+    # the conversion), or a de-accumulated variable is still wholesale empty (found by
+    # `Nwp.validate`). Every other error still fails immediately. All are worth waiting out
+    # because a run is published as ~40 separate commits, so it can be readable and incomplete at
+    # once; the ladder is on _ECMWF_ENS_MAX_RETRIES above, and the
     # upstream behaviour is at
     # https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-is-retried-not-failed-outright
     try:
@@ -471,6 +479,8 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
 
         ds = download_ecmwf_ens_data(ds_lazy)
         context.log.info("Downloaded Icechunk data.")
+
+        raise_if_instantaneous_slices_empty(ds)
 
         nwp = convert_nwp_xarray_dataset_to_polars_dataframe(ds=ds, h3_grid=h3_grid)
     except (NwpRunNotYetAvailable, NwpVariableWhollyMissing) as exc:

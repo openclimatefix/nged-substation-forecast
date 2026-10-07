@@ -78,8 +78,9 @@ def ecmwf_ens_schedule(context: ScheduleEvaluationContext) -> RunRequest:
     Dynamical.org's publication (08:05 to 08:20 UTC on a normal day), and 90 minutes before the
     12:00 UTC ``live_forecasts`` slot.
     ``ecmwf_ens_partitions``' ``end_offset=1`` means today's partition key already exists by this
-    point. If the run isn't usable yet — absent from the catalog, or present with
-    a weather variable still wholesale empty — ``ecmwf_ens`` retries every 30 minutes, up to 8
+    point. If the run isn't usable yet — absent from the catalog, present with whole
+    (member, lead time) slices of an instantaneous variable still empty, or present with a
+    de-accumulated variable still wholesale empty — ``ecmwf_ens`` retries every 30 minutes, up to 8
     times (``NwpRunNotYetAvailable`` / ``NwpVariableWhollyMissing`` → ``RetryRequested`` in
     ``defs/assets.py``) rather than failing outright; any other error still fails immediately.
     Retrying is right because Dynamical.org publishes each run as roughly 40 separate commits
