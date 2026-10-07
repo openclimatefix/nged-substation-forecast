@@ -289,27 +289,23 @@ cannot override it. A run that names a path under `packages/studies/tests` still
 
 ## Continuous integration
 
-Three GitHub workflows in `.github/workflows/` run the checks described on this page:
+Two GitHub workflows in `.github/workflows/` run the checks described on this page:
 
 - **`ci.yml` — the per-PR quality gate.** Runs on every pull request and every push to `main`: `ruff
   check`, `ruff format --check`, `ty check`, the `pymarkdown scan` command from CLAUDE.md, `mkdocs
   build --strict`, `check_docs_links.py` (see below), and the offline test suite (plain `uv run
-  pytest` — the network gate above keeps CI off the network). The job installs with `uv sync
-  --locked --all-packages`: `--all-packages` because `ty` type-checks the source of every workspace
-  member, including leaf packages that a plain sync would omit, and `--locked` so the build fails
-  loudly when `uv.lock` is stale. Every subsequent step passes `uv run --no-sync`, because a bare
-  `uv run` re-syncs to the root environment and would silently uninstall those extra workspace
-  members. The job also sets dummy values for the three required `NGED_S3_*` `Settings` fields, a
-  `Settings` object being what carries the S3 credentials and bucket names that production reads
-  from the environment; NGED is National Grid Electricity Distribution, the network operator whose
-  telemetry this project forecasts. Most tests monkeypatch those fields, but a few construct
-  `Settings()` directly and locally rely on the developer's `.env`, which CI doesn't have. The `ci`
-  job is a required status check on `main` (configured in a GitHub repository ruleset, not in the
-  workflow file).
-- **`studies_tests.yml` — the studies tests.** Runs `pytest -n auto --run-studies packages/studies`
-  on every push to `main`, and on a pull request only when the pull request changes
-  `packages/studies/`, `studies/`, or `docs/studies/`. A pull request that touches none of those
-  paths still gets the studies tests on `main` after it merges.
+  pytest` — the network gate above keeps CI off the network, and the studies gate skips the slow
+  studies tests). The job installs with `uv sync --locked --all-packages`: `--all-packages` because
+  `ty` type-checks the source of every workspace member, including leaf packages that a plain sync
+  would omit, and `--locked` so the build fails loudly when `uv.lock` is stale. Every subsequent
+  step passes `uv run --no-sync`, because a bare `uv run` re-syncs to the root environment and would
+  silently uninstall those extra workspace members. The job also sets dummy values for the three
+  required `NGED_S3_*` `Settings` fields, a `Settings` object being what carries the S3 credentials
+  and bucket names that production reads from the environment; NGED is National Grid Electricity
+  Distribution, the network operator whose telemetry this project forecasts. Most tests monkeypatch
+  those fields, but a few construct `Settings()` directly and locally rely on the developer's
+  `.env`, which CI doesn't have. The `ci` job is a required status check on `main` (configured in a
+  GitHub repository ruleset, not in the workflow file).
 - **`nightly_network_tests.yml` — the nightly network job.** Runs *only* the network-gated tests
   (`uv run pytest --run-network -m network`) on a daily schedule, plus `workflow_dispatch` for
   on-demand runs. This is the only CI that touches the real Dynamical.org catalog, and it needs no
