@@ -138,7 +138,7 @@ class LiveForecastsConfig(Config):
             # live_forecasts_are_healthy's missed-run check would already have alarmed.
             partition_mapping=TimeWindowPartitionMapping(start_offset=-16, end_offset=0),
         ),
-        "power_time_series_and_metadata",
+        "clean_nged_power_data",
         # `promoted_model` is deliberately NOT a dep. The model reaches
         # `Settings.production_model_path` out-of-band, by a different mechanism per environment:
         # the `promoted_model` asset (an MLflow fetch) when running on a laptop, and the Docker
@@ -178,10 +178,15 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     feature engineering stamped with this partition's ``power_fcst_init_time``.
 
     Each series' location comes from the model's own frozen metadata copy
-    (``load_trained_metadata``), never from the ``TimeSeriesMetadata`` roster, so a roster that
-    is unreadable or has lost rows can neither fail a slot nor silently drop a series from it.
+    (``load_trained_metadata``), never from the ``TimeSeriesMetadata`` table, so a metadata table
+    that is unreadable or has lost rows can neither fail a slot nor silently drop a series from it.
     The H3 cells the NWP scan is pruned to are therefore the cells the model trained against
-    rather than whatever the roster says today.
+    rather than whatever the metadata table says today.
+
+    Observed power comes from the unflagged rows of the ``cleaned_power_time_series`` Delta table
+    that ``clean_nged_power_data`` writes. When the cleaning fails, the slot carries on with the
+    last good cleaned table, and ``cleaned_power_keeps_up_with_raw`` warns. Before the cleaning has
+    ever run, the table does not exist and the slot fails reading it.
 
     NWP availability is resolved via ``config.availability_mode``: the scheduled tick always uses
     ``"live"`` (freshest run actually present, no modelled delay); manual backfills of past

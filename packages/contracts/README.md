@@ -29,12 +29,15 @@ bringing in the entire ML stack.
 
 ## Key data contracts
 
-The five schemas below are the ones most callers touch. The package defines four more —
-`EffectiveCapacity`, `Metrics`, `EligibleTimeSeries`, and `H3GridWeights` — for nine in all.
+The five schemas below are the ones most callers touch. The package defines five more —
+`CleanedPowerTimeSeries`, `EffectiveCapacity`, `Metrics`, `EligibleTimeSeries`, and
+`H3GridWeights` — for ten in all.
 
 - **`PowerTimeSeries`**: Half-hourly power observations in MW (megawatts) or MVA (megavolt-amperes)
   per `time_series_id`, as received from National Grid Electricity Distribution (NGED), the
   distribution network operator whose network this project forecasts.
+  `CleanedPowerTimeSeries` adds a nullable `drop_reason`, which names the cleaning rule that flagged
+  the row (one of `DROP_REASONS`) and is null for a row that passed.
 - **`TimeSeriesMetadata`**: Substation and customer meter metadata, including lat/lon, H3 index (the
   identifier of one cell of the H3 hexagonal grid the weather is aggregated onto), `substation_type`
   (`Primary`, `BSP`, `GSP`, `EHV Customer`, or `HV Customer` — the field's own description expands

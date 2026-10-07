@@ -19,7 +19,8 @@ find an earlier start: `lineage.json` records the first date served on the day o
 PV sites with `nearest`, the three wind sites with `land`, as `fetch_open_meteo_single_runs.py`
 does) and all 16 series (8 variables and their spreads). Open-Meteo weights a request by roughly
 sites x ceil(series / 10) x ceil(days / 14), so one window costs `sites x 2` calls. The sites come
-from the private roster at run time and stay in memory. Rows carry only the anonymised `site` label.
+from the private site list at run time and stay in memory. Rows carry only the anonymised `site`
+label.
 No coordinate, and never the API key, reaches a log line, a file, or the lineage note;
 `OPEN_METEO_TOKEN` must be exported into the environment (see `paths.open_meteo_api_key`).
 
@@ -207,8 +208,8 @@ def fetch_window_group(
 
     Args:
         product: The ensemble-mean model to request.
-        sites: One `cell_selection` group of the roster, carrying `site`, `latitude`, `longitude`,
-            and `cell_selection`.
+        sites: One `cell_selection` group of the site list, carrying `site`, `latitude`,
+            `longitude`, and `cell_selection`.
         start: The first date of the window.
         end: The last date of the window, inclusive.
 
@@ -253,7 +254,7 @@ def _fetch_window(
 
     Args:
         product: The ensemble-mean model to request.
-        sites: The roster with `cell_selection`.
+        sites: The site list with `cell_selection`.
         start: The first date of the window.
         end: The last date of the window, inclusive.
 
@@ -291,7 +292,7 @@ def _fetch_product(
 
     Args:
         product: The ensemble-mean model to fetch.
-        sites: The roster with `cell_selection`.
+        sites: The site list with `cell_selection`.
         last: The last date wanted, inclusive.
         max_windows: How many missing windows to fetch, or `None` for all.
 

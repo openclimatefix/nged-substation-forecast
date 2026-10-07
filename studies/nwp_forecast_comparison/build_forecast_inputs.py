@@ -64,7 +64,7 @@ sensitivity, built only when day 1 is built. Every AIFS arm and ENS arm also car
 era.
 
 Every output row carries only the anonymised `site` label; no generator name, id or coordinate is
-read from the private roster in this script, except inside `studies.grid_sampling` (GEFS's and
+read from the private site list in this script, except inside `studies.grid_sampling` (GEFS's and
 AIFS's nearest-cell match) and the H3 cell lookup of `aifs_site_weights`, which never print what
 they read.
 
@@ -879,8 +879,8 @@ def _gefs_cell_selection(
         uses). No coordinate is read outside `studies.grid_sampling`, and none is returned.
     """
     cells = grid_cells.with_columns(cell_id=pl.col("lat_index") * 10 + pl.col("lon_index"))
-    roster = efh.site_roster(domain=domain).filter(pl.col("site").is_in(sites))
-    nearest = nearest_cells(sites=roster, cells=cells)
+    site_list = efh.site_list(domain=domain).filter(pl.col("site").is_in(sites))
+    nearest = nearest_cells(sites=site_list, cells=cells)
     return dict(zip(nearest["site"].to_list(), nearest["cell_id"].to_list(), strict=True))
 
 
@@ -1958,10 +1958,10 @@ def aifs_site_weights(
                 "weight": pl.Float64,
             },
         )
-    roster = efh.site_roster(domain=domain).filter(pl.col("site").is_in(sites))
+    site_list = efh.site_list(domain=domain).filter(pl.col("site").is_in(sites))
     site_cells = {
         site: h3.latlng_to_cell(latitude, longitude, H3_RESOLUTION)
-        for site, latitude, longitude in roster.iter_rows()
+        for site, latitude, longitude in site_list.iter_rows()
     }
     return _h3_crop_weights(site_cells=site_cells, grid_cells=grid_cells, grid_degrees=grid_degrees)
 

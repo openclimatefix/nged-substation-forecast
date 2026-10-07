@@ -6,18 +6,26 @@ fold and the non-leaderboard ``smoke_test`` fold in ``conf/cv/default.yaml``. Th
 fold-specific eligibility logic is unit-tested in ``packages/ml_core/tests/test_cv_helpers.py``.
 """
 
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
 import patito as pt
 import polars as pl
 import pytest
+from _cleaned_power_test_data import write_cleaned_copy
 from contracts.ml_schemas import EligibleTimeSeries
-from contracts.power_schemas import TimeSeriesMetadata
+from contracts.power_schemas import CleanedPowerTimeSeries, TimeSeriesMetadata
+from contracts.settings import Settings
 from dagster import materialize
+from delta_store.cleaned_power_time_series import (
+    CleaningProvenance,
+    write_cleaned_power_time_series,
+)
 from deltalake import write_deltalake
 
 from nged_substation_forecast.defs.cv_assets import (
+    _provenance_tags_with_cleaned_power,
     _time_series_ids_missing_metadata,
     effective_capacity,
     eligible_time_series,
@@ -90,6 +98,7 @@ def cv_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     monkeypatch.setenv("EFFECTIVE_CAPACITY_DATA_PATH", str(effective_capacity_path))
 
     _write_synthetic_power(str(nged_path / "power_time_series.delta"))
+    write_cleaned_copy(nged_path / "power_time_series.delta")
     return {"eligible": str(eligible_path), "effective_capacity": str(effective_capacity_path)}
 
 
@@ -104,6 +113,28 @@ def _read_eligible(eligible_path: str, fold_id: str) -> list[int]:
 def test_eligible_time_series_materialises_per_fold_population(cv_paths: dict[str, str]) -> None:
     assert materialize([eligible_time_series], partition_key=FOLD_ID).success
     assert _read_eligible(cv_paths["eligible"], FOLD_ID) == [1]
+
+
+def test_eligible_time_series_ignores_flagged_rows(cv_paths: dict[str, str]) -> None:
+    """Series 1 is the only series eligible for the fold; flagging its rows empties the fold."""
+    nged_path = Path(cv_paths["eligible"]).parent / "NGED"
+    write_cleaned_copy(
+        nged_path / "power_time_series.delta", flag_where=pl.col("time_series_id") == 1
+    )
+
+    assert materialize([eligible_time_series], partition_key=FOLD_ID).success
+
+    assert _read_eligible(cv_paths["eligible"], FOLD_ID) == []
+
+
+def test_eligible_time_series_is_empty_when_the_cleaned_table_is_absent(
+    cv_paths: dict[str, str],
+) -> None:
+    shutil.rmtree(Path(cv_paths["eligible"]).parent / "NGED" / "cleaned_power_time_series.delta")
+
+    assert materialize([eligible_time_series], partition_key=FOLD_ID).success
+
+    assert _read_eligible(cv_paths["eligible"], FOLD_ID) == []
 
 
 def test_eligible_time_series_is_idempotent(cv_paths: dict[str, str]) -> None:
@@ -171,6 +202,18 @@ def test_effective_capacity_materialises_one_row_per_series(cv_paths: dict[str, 
     assert capacity.filter(pl.col("time_series_id") == 1)["time"][0] == _utc(2026, 7, 1)
 
 
+def test_effective_capacity_ignores_flagged_rows(cv_paths: dict[str, str]) -> None:
+    nged_path = Path(cv_paths["eligible"]).parent / "NGED"
+    write_cleaned_copy(
+        nged_path / "power_time_series.delta", flag_where=pl.col("time_series_id") == 1
+    )
+
+    assert materialize([effective_capacity]).success
+
+    capacity = pl.read_delta(cv_paths["effective_capacity"]).sort("time_series_id")
+    assert capacity["time_series_id"].to_list() == [2, 3, 4]
+
+
 def test_effective_capacity_is_idempotent(cv_paths: dict[str, str]) -> None:
     """Re-materialising overwrites the whole table rather than appending duplicate rows."""
     assert materialize([effective_capacity]).success
@@ -193,3 +236,37 @@ def test_time_series_ids_missing_metadata_names_the_gap() -> None:
     """Sorted, and reports only the requested ids — extra metadata rows are not a gap."""
     assert _time_series_ids_missing_metadata(_metadata([1, 4]), [4, 1, 3, 2]) == [2, 3]
     assert _time_series_ids_missing_metadata(_metadata([1, 2, 3]), [1, 2]) == []
+
+
+def test_provenance_tags_name_the_raw_table_version_and_git_sha_the_cleaning_recorded(
+    cv_paths: dict[str, str],
+) -> None:
+    settings = Settings()
+    cleaned = (
+        CleanedPowerTimeSeries.DataFrame(
+            {
+                "time_series_id": [1],
+                "time": [_utc(2025, 1, 1)],
+                "power": [1.0],
+                "drop_reason": [None],
+            }
+        )
+        .cast()
+        .validate()
+    )
+    provenance = CleaningProvenance(
+        raw_table_id="raw-id-7",
+        raw_version=7,
+        code_hash="code",
+        metadata_hash="metadata",
+        git_sha="cafe123",
+    )
+    write_cleaned_power_time_series(
+        cleaned, settings.cleaned_power_time_series_data_path, provenance=provenance
+    )
+
+    tags = _provenance_tags_with_cleaned_power("train", settings, {})
+
+    assert tags["train_cleaned_power_time_series_source"] == (
+        "raw_table_id=raw-id-7;raw_version=7;git_sha=cafe123"
+    )

@@ -7,6 +7,7 @@ from nged_substation_forecast._sentry import init_sentry
 from nged_substation_forecast.defs import (
     assets,
     checks,
+    cleaning_assets,
     cv_assets,
     jobs,
     live_forecast_assets,
@@ -14,7 +15,9 @@ from nged_substation_forecast.defs import (
     schedules,
 )
 
-all_assets = load_assets_from_modules([assets, cv_assets, live_forecast_assets, promotion_assets])
+all_assets = load_assets_from_modules(
+    [assets, cleaning_assets, cv_assets, live_forecast_assets, promotion_assets]
+)
 
 # Initialise Sentry once per process. This module is imported by every Dagster process — the
 # daemon, the webserver, and each run worker — so error telemetry and the live_forecasts
@@ -23,7 +26,11 @@ init_sentry(get_settings())
 
 defs = Definitions(
     assets=all_assets,
-    asset_checks=[checks.power_data_is_fresh, checks.live_forecasts_are_healthy],
+    asset_checks=[
+        checks.power_data_is_fresh,
+        checks.cleaned_power_keeps_up_with_raw,
+        checks.live_forecasts_are_healthy,
+    ],
     jobs=[jobs.register_experiment_job],
     schedules=[
         schedules.power_time_series_and_metadata_schedule,

@@ -13,7 +13,7 @@ def test_reproduces_the_published_labels():
     assert site_labels_for(eligible_ids=list(PUBLISHED_LABELS)) == PUBLISHED_LABELS
 
 
-def test_a_roster_of_the_wrong_size_raises():
+def test_a_site_list_of_the_wrong_size_raises():
     with pytest.raises(ValueError, match="eligible generators to label"):
         site_labels_for(eligible_ids=[*PUBLISHED_LABELS, 99])
 

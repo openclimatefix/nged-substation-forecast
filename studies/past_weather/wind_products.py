@@ -359,13 +359,13 @@ def _row_set_lines(*, losses: pl.DataFrame, wind: pl.DataFrame) -> list[str]:
     return lines
 
 
-def _report(*, frame: pl.DataFrame, losses: pl.DataFrame, sites_roster: pl.DataFrame) -> str:
+def _report(*, frame: pl.DataFrame, losses: pl.DataFrame, site_list: pl.DataFrame) -> str:
     """Assemble the markdown report.
 
     Args:
         frame: The common rows.
         losses: Every arm's losses, at every setting.
-        sites_roster: The wind roster, for the distances.
+        site_list: The wind site list, for the distances.
 
     Returns:
         The report.
@@ -479,7 +479,7 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame, sites_roster: pl.DataF
     ]
     lines += ["", *_row_set_lines(losses=losses, wind=wind)]
     lines += ["", *_step_ratio_lines()]
-    lines += ["", *geometry_lines(sites=sites_roster, noun="wind farms")]
+    lines += ["", *geometry_lines(sites=site_list, noun="wind farms")]
     return "\n".join(lines) + "\n"
 
 
@@ -587,7 +587,7 @@ def main() -> int:
     losses = pl.concat(parts)
     losses.write_parquet(path)
 
-    report = _report(frame=frame, losses=losses, sites_roster=sites)
+    report = _report(frame=frame, losses=losses, site_list=sites)
     (output_dir / "report.md").write_text(report)
     sys.stdout.write(report)
     return 0

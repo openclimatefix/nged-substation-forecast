@@ -7,7 +7,9 @@ import numpy as np
 import patito as pt
 import polars as pl
 import pytest
+from contracts.ml_schemas import AllFeatures
 from xgboost_forecaster import XGBoostConfig, XGBoostForecaster
+from xgboost_forecaster.forecaster import _prepare_features
 
 _UTC = pl.Datetime("us", "UTC")
 _BASE_TIME = datetime(2024, 1, 1, tzinfo=UTC)
@@ -262,3 +264,14 @@ def test_training_skips_requested_id_absent_from_data() -> None:
     forecaster = XGBoostForecaster(_make_config())
     forecaster.train(lf, [1, 2, 777])  # 777 has no rows
     assert forecaster.trained_time_series_ids == [1, 2]
+
+
+def test_prepare_features_encodes_enum_as_declared_position() -> None:
+    """An Enum code is the value's declared position, whatever the row order or missing days."""
+    weekdays = pl.Series(
+        "local_day_of_week",
+        ["Thursday", "Friday", "Sunday", "Monday", None],
+        dtype=AllFeatures.dtypes["local_day_of_week"],
+    )
+    encoded = _prepare_features(pl.DataFrame([weekdays]), ["local_day_of_week"])
+    assert encoded["local_day_of_week"].to_list() == [3.0, 4.0, 6.0, 0.0, None]

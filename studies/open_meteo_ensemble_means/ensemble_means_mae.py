@@ -64,7 +64,7 @@ against the reference (CAMS irradiance in W/m2, ERA5 wind speed in km/h) on the 
 downloads, which end on 2026-09-10 and 2026-09-11, extended by the refreshed downloads that start on
 2026-08-20. Where the two overlap the refreshed download is used, and the report counts the overlap
 rows on which the values differ. Only anonymised site labels (`A` to `F`, `W1` to `W3`) reach any
-output; the site roster's coordinates and identifiers stay inside `build_dataset`.
+output; the site list's coordinates and identifiers stay inside `build_dataset`.
 
 Run it with `uv run python studies/open_meteo_ensemble_means/ensemble_means_mae.py`. It writes to a
 new folder, `data/studies/per_study/open_meteo_ensemble_means/`, and refuses to overwrite: to
@@ -83,7 +83,7 @@ from typing import Final, Literal
 
 import polars as pl
 
-# The underscore-named helpers below are the roster, power and geometry code the earlier studies
+# The underscore-named helpers below are the site list, power and geometry code the earlier studies
 # use, and reusing them keeps every convention identical. Importing private names is a one-off here.
 from studies.arm_runner import Job, run_all
 from studies.cross_validation import (

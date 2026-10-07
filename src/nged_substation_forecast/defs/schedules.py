@@ -12,16 +12,18 @@ from dagster import (
 
 from nged_substation_forecast._sentry import sentry_capture_failure
 
-# Define a job that targets the power_time_series_and_metadata asset
+# Define a job that targets the power_time_series_and_metadata asset and the clean_nged_power_data
+# asset that cleans its output
 power_time_series_and_metadata_job = define_asset_job(
     name="power_time_series_and_metadata_job",
-    selection=AssetSelection.assets("power_time_series_and_metadata"),
+    selection=AssetSelection.assets("power_time_series_and_metadata", "clean_nged_power_data"),
     hooks={sentry_capture_failure},
     description=(
-        "Pull the latest NGED telemetry from S3 into the power_time_series Delta table and"
-        " upsert the substation metadata parquet. Runs hourly at :55, 5 minutes before"
-        " live_forecasts_schedule ticks; see power_time_series_and_metadata_schedule for why a"
-        " missed pull still lets live_forecasts run on time."
+        "Pull the latest NGED telemetry from S3 into the power_time_series Delta table, upsert"
+        " the substation metadata parquet, then rebuild the cleaned_power_time_series Delta table"
+        " if new telemetry arrived. Runs hourly at :55, 5 minutes before live_forecasts_schedule"
+        " ticks; see power_time_series_and_metadata_schedule for why a missed pull still lets"
+        " live_forecasts run on time."
     ),
 )
 
@@ -31,16 +33,17 @@ power_time_series_and_metadata_schedule = ScheduleDefinition(
     cron_schedule="55 * * * *",
     description=(
         "Fires at :55 past every hour, 5 minutes before live_forecasts_schedule ticks at"
-        " 00/06/12/18 UTC, so this hour's telemetry has landed first. A missed or late pull does"
-        " not hold live_forecasts back: the two schedules couple through data at rest, never"
-        " through run status, so the forecast runs on time against whatever telemetry is already"
-        " on disk."
+        " 00/06/12/18 UTC, so this hour's telemetry has landed and been cleaned first. A missed"
+        " or late pull does not hold live_forecasts back: the two schedules couple through data"
+        " at rest, never through run status, so the forecast runs on time against whatever"
+        " cleaned telemetry is already on disk."
     ),
 )
 """Fires at :55 past every hour — 5 minutes *before* the top of the hour — so this hour's pull
-has landed by the time ``live_forecasts_schedule`` ticks at 00/06/12/18 UTC.
+has landed, and been cleaned by ``clean_nged_power_data``, by the time
+``live_forecasts_schedule`` ticks at 00/06/12/18 UTC.
 
-``live_forecasts`` declares ``power_time_series_and_metadata`` as a dep, but the two run as
+``live_forecasts`` declares ``clean_nged_power_data`` as a dep, but the two run as
 separate jobs on separate schedules and nothing enforces the ordering at runtime. That is
 deliberate, not a gap: the offset is an optimisation for freshness, and if it is missed —
 because this pull failed, or ran long — ``live_forecasts`` still runs on time against whatever
@@ -114,11 +117,11 @@ live_forecasts_schedule = build_schedule_from_partitioned_job(
         "Ticks at 00/06/12/18 UTC and materialises the just-completed window with"
         " availability_mode='live'. The schedule is always live; replays are manual, launched"
         " from the UI with availability_mode='replay'. The slot fires on the clock whether or"
-        " not the ingest jobs succeeded."
+        " not the ingest and cleaning steps succeeded."
     ),
 )
 """Ticks at 00/06/12/18 UTC, materialising the just-completed window with default run config
 (``availability_mode="live"``) — the schedule is always live; replays are manual, launched from
 the UI with ``availability_mode="replay"``. This slot fires on the clock regardless of whether
-the ingest jobs succeeded; see ``power_time_series_and_metadata_schedule``'s docstring above for
-why the two schedules are deliberately not ordered against each other."""
+the ingest and cleaning steps succeeded; see ``power_time_series_and_metadata_schedule``'s
+docstring above for why the two schedules are deliberately not ordered against each other."""

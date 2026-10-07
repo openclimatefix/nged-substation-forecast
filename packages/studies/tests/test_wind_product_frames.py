@@ -7,7 +7,7 @@ from studies import pv_dataset, wind_product_frames
 
 
 def _serve_half_hours(*, monkeypatch: pytest.MonkeyPatch) -> pl.DataFrame:
-    """Serve one generator's four half-hours from 00:30, and return its roster."""
+    """Serve one generator's four half-hours from 00:30, and return its site list."""
     start = datetime(2025, 5, 1, tzinfo=UTC)
     power = pl.DataFrame(
         {
@@ -25,11 +25,11 @@ def test_wind_hours_are_centred_where_solar_hours_end_at_their_label(
 ):
     # Swapping the two hourly-power functions is a silent error: both return the same columns, and
     # every stamp differs by 30 minutes.
-    roster = _serve_half_hours(monkeypatch=monkeypatch)
+    site_list = _serve_half_hours(monkeypatch=monkeypatch)
     start = datetime(2025, 5, 1, tzinfo=UTC)
 
-    wind = wind_product_frames.wind_hourly_power(sites=roster)
-    solar = pv_dataset.solar_hourly_power(sites=roster)
+    wind = wind_product_frames.wind_hourly_power(sites=site_list)
+    solar = pv_dataset.solar_hourly_power(sites=site_list)
 
     assert wind.select("time", "power_mw").rows() == [(start + timedelta(hours=1), 5.0)]
     assert solar.select("time", "power_mw").rows() == [
@@ -39,10 +39,10 @@ def test_wind_hours_are_centred_where_solar_hours_end_at_their_label(
 
 
 def test_hour_ending_wind_power_matches_the_solar_convention(monkeypatch: pytest.MonkeyPatch):
-    roster = _serve_half_hours(monkeypatch=monkeypatch)
+    site_list = _serve_half_hours(monkeypatch=monkeypatch)
 
-    wind = wind_product_frames.wind_hourly_power(sites=roster, centred=False)
-    solar = pv_dataset.solar_hourly_power(sites=roster)
+    wind = wind_product_frames.wind_hourly_power(sites=site_list, centred=False)
+    solar = pv_dataset.solar_hourly_power(sites=site_list)
 
     assert wind.equals(solar)
 
