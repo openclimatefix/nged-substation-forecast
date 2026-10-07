@@ -59,6 +59,12 @@ to. Every function in it carries tests, and each test must be able to fail on th
 catch; run a mutation pass (the `implement-issue` skill, step 7) whenever the package changes. When
 two studies need the same code, move that code into the package with tests.
 
+**A plain `uv run pytest` skips the `packages/studies` tests, so run them with `--run-studies`.**
+Use `uv run pytest --run-studies -n auto packages/studies` for only those tests, which take about 3
+minutes. Run them before pushing any change to `packages/studies/` or `studies/`, for faster
+feedback than the `studies_tests.yml` workflow gives. `test_study_boundaries.py` is the one
+exception and always runs.
+
 **Import rules: a study script imports only from its own folder, from `studies.*`
 (`packages/studies`), and from the other reviewed packages in `packages/*`.** The rule for
 production code is the other half: `src/` and every package under `packages/` except

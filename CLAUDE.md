@@ -17,7 +17,8 @@ uv run ty check                # type checking
 uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md  # markdown lint
 
 # Testing
-uv run pytest                                # all tests
+uv run pytest                                # all tests except the slow studies tests
+uv run pytest --run-studies                  # all tests, studies tests included
 uv run pytest path/to/test_foo.py::test_bar  # single test
 
 # Run Dagster UI
