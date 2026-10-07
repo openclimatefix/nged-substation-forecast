@@ -98,8 +98,9 @@ def write_trained_metadata(model_dir: Path, time_series_metadata: pl.DataFrame) 
             ``_UNPERSISTED_METADATA_COLUMN`` — the ``area_wkt`` polygon text — is dropped, for the
             size reason given on that constant. Every other column is kept.
     """
-    # `pl.exclude` rather than `drop`: Patito overrides `DataFrame.drop` with a signature that takes
-    # no `strict=False`. The column is `allow_missing`, so the column may not be there to drop.
+    # `pl.exclude` rather than `drop`: a caller may pass a `pt.DataFrame`, whose `drop` override
+    # takes no `strict=False`. The column is `allow_missing`, so the column may not be there to
+    # drop.
     time_series_metadata.select(pl.exclude(_UNPERSISTED_METADATA_COLUMN)).write_parquet(
         model_dir / TRAINED_METADATA_FILENAME
     )

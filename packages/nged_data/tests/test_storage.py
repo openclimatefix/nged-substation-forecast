@@ -542,7 +542,7 @@ def test_remove_small_files_from_listing_keeps_one_reading_file():
     _ProcessedFileListing.validate(result)
     # An eager `filter` returns a plain frame, so the model is only still attached if the function
     # re-attaches it.
-    assert result.model is _ProcessedFileListing
+    assert getattr(result, "model", None) is _ProcessedFileListing
 
 
 def test_remove_small_files_from_listing_drops_genuinely_empty_file():
