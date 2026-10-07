@@ -358,30 +358,38 @@ between -7% and +5%. The test uses the same sun-following BMUs that define the c
 checks the method on sites that are known to be solar and says nothing about the aggregate BMUs'
 other generation.
 
-| BMU | Generation Capacity (MW) | Estimate at DC:AC 1.2 (MW) | Estimate at DC:AC 1.4 (MW) | Estimate at DC:AC 1.6 (MW) | Error at DC:AC 1.4 | Error at DC:AC 1.4 with CAMS irradiance as the shape |
-|---|---|---|---|---|---|---|
-| `T_BLPFS-1` | 50.216 | 56.6 | 52.9 | 50.6 | +5% | -18% |
-| `T_BRCHS-1` | 50.0 | 52.8 | 49.0 | 46.6 | -2% | -19% |
-| `T_BURWS-1` | 49.952 | 55.9 | 52.1 | 49.7 | +4% | -14% |
-| `T_CLVHS-1` | 112.0 | 93.1 | 85.6 | 80.8 | -24% | -41% |
-| `T_CLVHS-2` | 205.0 | 161.1 | 148.7 | 140.8 | -27% | -39% |
-| `T_LARKS-1` | 49.9 | 51.4 | 47.7 | 45.2 | -4% | -19% |
-| `T_SUTBS-1` | 49.419 | 43.2 | 40.3 | 38.5 | -18% | -46% |
-| `T_TEBWS-1` | 45.928 | 46.8 | 43.4 | 41.2 | -6% | -31% |
-| `T_TYLNS-1` | 49.9 | 50.2 | 46.4 | 43.9 | -7% | -23% |
+| BMU | Generation Capacity (MW) | Estimate at DC:AC 1.2 (MW) | Estimate at DC:AC 1.4 (MW) | Estimate at DC:AC 1.6 (MW) | Error at DC:AC 1.4 | Error at DC:AC 1.4, CAMS at the BMU's own point | Error at DC:AC 1.4, mean of 18 CAMS grid points |
+|---|---|---|---|---|---|---|---|
+| `T_BLPFS-1` | 50.216 | 56.6 | 52.9 | 50.6 | +5% | -18% | -14% |
+| `T_BRCHS-1` | 50.0 | 52.8 | 49.0 | 46.6 | -2% | -18% | -16% |
+| `T_BURWS-1` | 49.952 | 55.9 | 52.1 | 49.7 | +4% | -14% | -11% |
+| `T_CLVHS-1` | 112.0 | 93.1 | 85.6 | 80.8 | -24% | -42% | -38% |
+| `T_CLVHS-2` | 205.0 | 161.1 | 148.7 | 140.8 | -27% | -39% | -36% |
+| `T_LARKS-1` | 49.9 | 51.4 | 47.7 | 45.2 | -4% | -16% | -12% |
+| `T_SUTBS-1` | 49.419 | 43.2 | 40.3 | 38.5 | -18% | -46% | -44% |
+| `T_TEBWS-1` | 45.928 | 46.8 | 43.4 | 41.2 | -6% | -30% | -27% |
+| `T_TYLNS-1` | 49.9 | 50.2 | 46.4 | 43.9 | -7% | -22% | -19% |
 
-**Using the CAMS irradiance as the shape validates worse, so the estimate uses the cosine of the
-solar zenith.** The alternative shape is the satellite-derived global horizontal irradiance of the
-CAMS radiation service, averaged over six solar farms in the NGED trial area, so it carries real
-cloud. The study applies each hour's mean to both half-hours inside the hour (the hour is labelled
-by its end, so the half-hours ending at 10:30 and 11:00 both take the hour that ends at 11:00),
-divides by the highest clear-sky irradiance of any hour, and fits `a` by least squares on the
-half-hours with a scaled irradiance above 0.05. On the 9 validation BMUs this shape gives 453.5 MW
-against 662.3 MW, a mean absolute error of 28% and a largest error of 46%, against 11% and 27% for
-the cosine. The six farms sit in one region, and the study did not test whether their cloud
-differs from the cloud at the BMUs. With CAMS as the shape the aggregate estimate is 301.9 MW
-(25 of the 28 BMUs have an estimate), against 846.8 MW with the cosine, so the choice of method
-moves the aggregate estimate by a factor of 2.8.
+**Two alternative shapes, built from CAMS irradiance with real cloud in it, validate worse, so the
+estimate uses the cosine of the solar zenith.** The Copernicus Atmosphere Monitoring Service (CAMS)
+radiation service gives the satellite-derived global horizontal irradiance at a point. The study
+applies each hour's value to both half-hours inside the hour (the hour is labelled by its end, so
+the half-hours ending at 10:30 and 11:00 both take the hour that ends at 11:00), divides by the
+point's highest clear-sky irradiance, and fits `a` by least squares on the half-hours with a scaled
+irradiance above 0.05. The first alternative reads CAMS at each BMU's own position, which is
+possible only for a BMU with a known position. On the 9 validation BMUs this gives 476.0 MW
+against 662.3 MW, a mean absolute error of 24% and a largest error of 44%. The second alternative
+averages 18 CAMS grid points across Great Britain, so any BMU can use it: 455.1 MW, a mean absolute
+error of 27% and a largest error of 46%. The cosine gives 566.1 MW, 11%, and 27%. Both CAMS shapes
+under-read every BMU by 11% to 46%. The study did not establish why. The CAMS shapes would need a
+different fit to be competitive, for example one that allows for the ratio between irradiance and
+power, and the study did not try one.
+
+**The choice of shape moves the aggregate estimate by a factor of 2.7.** With the mean of the 18
+CAMS grid points as the shape, the aggregate estimate is 317.0 MW (25 of the 28 BMUs have an
+estimate) at DC:AC 1.4, and 367.7 MW and 279.6 MW at 1.2 and 1.6, against 846.8 MW with the
+cosine. The study did not test a shape built from the nearest three grid points to a supplier
+BMU's region, because the register gives a GSP group and not a position for a supplier BMU.
 
 **The aggregate estimate can be too high or too low, and the study cannot say by how much.** An
 aggregate BMU also holds generation that is not solar. Gas or wind output that happens to be high at
@@ -755,8 +763,12 @@ portal](https://www.neso.energy/data-portal/transmission-entry-capacity-tec-regi
 [the Department for Energy Security and Net
 Zero](https://www.gov.uk/government/publications/renewable-energy-planning-database-monthly-extract).
 NESO's [map of the 14 DNO licence
-areas](https://neso.energy/data-portal/gis-boundaries-gb-dno-license-areas) is public too. The two
-hand-made match tables are committed beside the scripts. The code is in
+areas](https://neso.energy/data-portal/gis-boundaries-gb-dno-license-areas) is public too. The
+comparison shapes for the estimate of the aggregate BMUs' solar part use CAMS irradiance from the
+[Copernicus Atmosphere Data
+Store](https://ads.atmosphere.copernicus.eu/datasets/cams-solar-radiation-timeseries) at the
+single-site BMUs' public positions and at 18 grid points. The two hand-made match tables are
+committed beside the scripts. The code is in
 [`studies/solar_bmu_census/`](https://github.com/openclimatefix/nged-substation-forecast/tree/main/studies/solar_bmu_census),
 and its tests are in `packages/studies/tests/solar_bmu_census/`.
 

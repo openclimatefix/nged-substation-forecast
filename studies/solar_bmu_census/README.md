@@ -56,9 +56,10 @@ in one half-hour (MW)` is the maximum over time of the group's summed half-hourl
 model is `min(r * a * c(t), a)`, with `a` the AC capacity, `r` the DC:AC ratio, and `c(t)` a shape.
 The base case takes the cosine of the solar zenith as `c(t)`, fits `a` to the upper envelope of
 output, and sets `r` to 1.4 (the median for fixed-tilt projects in Lawrence Berkeley National
-Laboratory's Utility-Scale Solar report for 2023). The alternative shape is the mean CAMS
-irradiance of six solar farms in the NGED trial area, read through `studies.pv_dataset.CAMS_PATH`,
-and `report.md` compares the two on the single-site BMUs that follow the sun.
+Laboratory's Utility-Scale Solar report for 2023). The alternative shapes are the CAMS irradiance at
+the BMU's own position and the mean CAMS irradiance of 18 grid points across Great Britain, both
+read from `solar_estimate.CAMS_PUBLIC_POINTS_PATH`, and `report.md` compares the three on the
+single-site BMUs that follow the sun.
 
 ## The location columns
 

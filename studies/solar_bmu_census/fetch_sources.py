@@ -372,9 +372,9 @@ def write_provenance(*, window: Window, bmu_count: int, today: date) -> None:
             "repd": REPD_PAGE,
             "dno_licence_areas": NESO_DNO_AREAS_GEOJSON,
             "cams_irradiance_for_the_solar_estimate": (
-                "studies.pv_dataset.CAMS_PATH, read by report.py and not fetched here: hourly "
-                "global horizontal irradiance of the CAMS radiation service, averaged over six "
-                "solar farms in the NGED trial area"
+                "solar_estimate.CAMS_PUBLIC_POINTS_PATH, read by report.py and not fetched here: "
+                "hourly global horizontal irradiance of the CAMS radiation service at the "
+                "single-site solar BMUs' positions and at 18 grid points across Great Britain"
             ),
         },
         "run_date": today.isoformat(),

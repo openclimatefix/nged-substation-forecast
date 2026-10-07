@@ -70,7 +70,7 @@ def test_the_estimate_from_a_year_of_synthetic_output_is_near_its_capacity() -> 
     assert estimate == pytest.approx(60.0, rel=0.03)
 
 
-def test_the_regional_sun_averages_reliable_sites_and_scales_to_the_clear_sky_peak() -> None:
+def test_the_mean_sun_averages_reliable_points_and_scales_to_the_clear_sky_peak() -> None:
     noon = datetime(2026, 6, 21, 12, tzinfo=UTC)
     cams = pl.DataFrame(
         {
@@ -88,7 +88,7 @@ def test_the_regional_sun_averages_reliable_sites_and_scales_to_the_clear_sky_pe
             "reliability": [1.0, 1.0, 0.5, 1.0, 1.0, 1.0],
         }
     )
-    result = solar_estimate.regional_hourly_sun(cams=cams, min_reliability=0.9)
+    result = solar_estimate.mean_hourly_sun(cams=cams, min_reliability=0.9)
     # At noon site C is dropped: mean ghi 500, mean clear sky 800, which is the peak.
     assert result["sun"].to_list() == pytest.approx([500.0 / 800.0, 200.0 / 800.0])
 

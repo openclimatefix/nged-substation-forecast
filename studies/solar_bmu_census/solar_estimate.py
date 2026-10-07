@@ -15,12 +15,22 @@ give an estimate that is too high, and the estimate of a BMU with a large load c
 
 from datetime import datetime
 from itertools import pairwise
+from pathlib import Path
 from typing import Final
 
 import numpy as np
 import polars as pl
 from classify import analysis_series, drop_daytime_zeros
+from studies.sources import REANALYSIS_DOWNLOADS_DIR
 
+CAMS_PUBLIC_POINTS_PATH: Final[Path] = (
+    REANALYSIS_DOWNLOADS_DIR / "CAMS_public_points" / "cams_public_points.parquet"
+)
+"""Hourly CAMS irradiance at the single-site solar BMUs' positions and at 18 grid points. Columns:
+`point_id`, `bmu_ids`, `latitude`, `longitude`, `time`, `ghi_w_m2`, `clear_sky_ghi_w_m2`, and
+`reliability`. A point named `gb_NN` is a grid point and has no `bmu_ids`."""
+MIN_CAMS_RELIABILITY: Final[float] = 0.9
+"""Point-hours that CAMS flags below this fraction of reliable inputs are dropped."""
 DC_AC_RATIO: Final[float] = 1.4
 """The DC:AC ratio `r` of the base case.
 
@@ -113,18 +123,18 @@ FIT_GRID_POINTS: Final[int] = 3000
 largest output."""
 
 
-def regional_hourly_sun(*, cams: pl.DataFrame, min_reliability: float) -> pl.DataFrame:
-    """Average the CAMS irradiance over the sites, and scale it to the clear-sky peak.
+def mean_hourly_sun(*, cams: pl.DataFrame, min_reliability: float) -> pl.DataFrame:
+    """Average the CAMS irradiance over some points, and scale it to the clear-sky peak.
 
     Args:
-        cams: Columns `site`, `time` (UTC, the end of the hour), `ghi_w_m2`, `clear_sky_ghi_w_m2`,
-            and `reliability`.
-        min_reliability: Site-hours flagged below this fraction are dropped before averaging.
+        cams: Columns `time` (UTC, the end of the hour), `ghi_w_m2`, `clear_sky_ghi_w_m2`, and
+            `reliability`, for one point or for several.
+        min_reliability: Point-hours flagged below this fraction are dropped before averaging.
 
     Returns:
-        Columns `hour_end_time` and `sun`: the mean of the reliable sites' irradiance in each hour,
-        divided by the highest clear-sky irradiance that any hour's mean reaches. An hour with no
-        reliable site is absent.
+        Columns `hour_end_time` and `sun`: the mean of the reliable points' irradiance in each hour,
+        divided by the highest mean clear-sky irradiance of any hour. An hour with no reliable
+        point is absent.
     """
     hourly = (
         cams.filter(pl.col("reliability") >= min_reliability)
@@ -183,7 +193,7 @@ def estimate_solar_ac_capacity_with_cams_mw(
         output: Columns `half_hour_end_time` (UTC) and `output_mwh`.
         window_start: The start of the study window, in UTC.
         dc_ac_ratio: The DC:AC ratio `r`.
-        hourly_sun: `regional_hourly_sun`'s output.
+        hourly_sun: `mean_hourly_sun`'s output.
 
     Returns:
         The estimate, or None when the BMU has too little output to fit.
