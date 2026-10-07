@@ -64,12 +64,10 @@ def flag_nged_power(
         Every row of `power`, in no guaranteed order, with a `drop_reason` column: null for a row
         that passed, otherwise the name of the rule that flagged it.
     """
-    # Join the `TimeSeriesMetadata` columns the cleaning rules need onto the power rows. Both frames
-    # are stripped of their Patito models so Polars' cross-subclass join check does not reject the
-    # join.
-    metadata_columns = (
-        pl.DataFrame._from_pydf(metadata._df).select("time_series_id", "substation_type").lazy()
-    )
+    # Join the `TimeSeriesMetadata` columns the cleaning rules need onto the power rows. An eager
+    # `select` returns a plain Polars frame. The power frame is stripped of its `PowerTimeSeries`
+    # model, which would otherwise carry through the join to a frame with different columns.
+    metadata_columns = metadata.select("time_series_id", "substation_type").lazy()
     joined = pl.LazyFrame._from_pyldf(power._ldf).join(
         metadata_columns, on="time_series_id", how="left"
     )

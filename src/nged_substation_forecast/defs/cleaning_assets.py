@@ -155,7 +155,7 @@ def clean_nged_power_data(context: AssetExecutionContext, config: CleanNgedPower
         pl.read_parquet(settings.metadata_path, storage_options=options),
         allow_superfluous_columns=True,
     )
-    metadata_hash = metadata_fingerprint(pl.DataFrame._from_pydf(metadata._df))
+    metadata_hash = metadata_fingerprint(metadata)
 
     existing = read_cleaning_provenance(cleaned_path, storage_options)
     if (
