@@ -89,7 +89,9 @@ at the same time-of-day on the same weekday — 6 from the last 6 weeks, 7 from 
 reads them as an ensemble.
 
 Two of its properties set our floor. It **consumes no numerical weather prediction (NWP) data**, so
-an NWP outage does not degrade it at all — which makes an NWP outage the hard test for us. And it
+an NWP outage does not degrade it at all — which makes an NWP outage the hard test for us. (In
+cross-validation the manual heuristic's rows still follow the NWP run grid, so an NWP run missing
+from the archive removes that run's rows.) And it
 **survives a power-data outage**, because the 49–55-week-old analogues are indifferent to recent
 staleness. The manual heuristic already embodies this philosophy, which is why it is the right
 baseline to measure ourselves against, and it gives a far better failure criterion than any

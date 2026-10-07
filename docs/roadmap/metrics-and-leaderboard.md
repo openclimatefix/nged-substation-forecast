@@ -60,8 +60,8 @@ A metered generator's time series and results are never published with the gener
 
 Issue: [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147)
 
-No naive baseline exists anywhere in the codebase (only docstring mentions, e.g.
-`contracts/power_schemas.py:242`). Until the leaderboard carries naive rows, XGBoost's NMAE numbers
+Only one naive baseline exists in the codebase, `ManualHeuristicForecaster`. Until the leaderboard
+carries the other naive rows, XGBoost's NMAE numbers
 aren't interpretable — and, more to the point, we can't answer the question this project exists to
 answer: **do we beat the manual heuristic?**
 
@@ -260,7 +260,8 @@ is therefore how we measure the cross-over, not a number we can already assert. 
 the leaderboard while adding no skill over either bookend, and without these rows nobody would know.
 
 Side benefit: several more `BaseForecaster` implementations pressure-test the abstraction (the docs
-promise the interface is model-agnostic; today only `XGBoostForecaster` exercises it).
+promise the interface is model-agnostic; today `XGBoostForecaster` and `ManualHeuristicForecaster`
+exercise it).
 
 **How much the choice of reference moves the answer has been measured, and it argues for reading a
 win over either bookend as the optimistic end of the range.** [Nguyen and Müsgens
@@ -292,13 +293,15 @@ yardstick here; `manual_heuristic` is the point on it.
 
 ### Implementation details — baselines (deleted when they ship)
 
-Five PRs, in order. PRs 1–2 are shared-framework groundwork (no baseline yet); PRs 3–5 add one
-baseline each. The `manual_heuristic_holiday_aligned` variant (described under [A faithful replica
-and a "simple upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is a later
-sixth PR, out of scope for this arc but given its own tracked issue so it is not lost when #147
-closes. `manual_heuristic_calibrated` (described under [Calibrating the manual
+Three PRs add the baselines, in order: `manual_heuristic` (PR A), `persistence` (PR B), and
+`climatology` (PR C). PR A also carries the shared package and the shared feature engineer. The
+metrics collapse below is its own issue under the v0.3 epic, and no baseline waits on it. The
+`manual_heuristic_holiday_aligned` variant (described under [A faithful replica and a "simple
+upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is a later PR, out of scope
+for this arc but given its own tracked issue so it is not lost when #147 closes.
+`manual_heuristic_calibrated` (described under [Calibrating the manual
 heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile), and tracked in
-[#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)) is a seventh PR, on
+[#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)) is a further PR, on
 the same footing: out of scope here, tracked separately, and buildable as soon as `manual_heuristic`
 itself ships.
 
@@ -318,9 +321,11 @@ smoke-test fold before documenting it — the Dagster version supports mixed par
 backfill selections, but confirm the UI behaviour rather than assuming it. To re-score a *single*
 experiment without touching the rest, use the `metrics` asset's `PopulationFilter` config instead.
 
-**PR 1 — deterministic-collapse rework in `compute_metrics`.** Implements the [metric-matched
-collapse decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast). Forecasters
-emit **members only**; every collapse lives in the metrics layer, so there is no per-experiment
+**Metrics collapse — deterministic-collapse rework in `compute_metrics`, its own issue under the
+v0.3 epic.** No baseline waits on it, and it can land before or after any of them. Implements the
+[metric-matched collapse
+decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast). Forecasters emit
+**members only**; every collapse lives in the metrics layer, so there is no per-experiment
 collapse config and no designated point-forecast columns on `PowerForecast`. In
 `packages/ml_core/src/ml_core/metrics.py`:
 
@@ -347,78 +352,41 @@ collapse config and no designated point-forecast columns on `PowerForecast`. In
 - Tests: member sets where mean ≠ median ≠ p95, with hand-computed expected values per metric; the
   single-member ensemble (all collapses coincide; CRPS still reduces to MAE); the pinball-p50
   identity. Recompute existing expected values — never relax a test to absorb the shift.
-- No standalone re-score needed: the one backfill after PR 2 (below) covers it.
+- **After this lands, run one `trained_cv_model++` backfill over every existing experiment
+  partition** — retrain, re-predict, and re-score everything under the new collapse. The backfill is
+  deliberately the exact "re-run everything after a pipeline fix" drill, and it doubles as the
+  empirical verification of the backfill mechanics before the recipe is written into
+  `docs/ml_experimentation/dagster-workflow.md`. Treat the change as a leaderboard epoch event,
+  because it shifts existing numbers.
 
-**PR 2 — CV predict-path framework: `uses_nwp_ensemble`, `ensemble_member` docs.** Two changes to
-the shared rails, none baseline-specific.
+**Shared framework (lands in PR A) — the forecast-run-grid feature engineer and the
+`ensemble_member` docs.** Two changes to the shared rails, none baseline-specific.
 
-- **`uses_nwp_ensemble: ClassVar[bool] = True` on `BaseForecaster`.** `cv_power_forecasts` passes
-  `ensemble_members=[0]` to `load_engineering_inputs` when a class sets it `False`. Semantics to
-  document: `True` → the forecaster consumes the NWP member axis (output members = NWP members);
-  `False` → the forecaster does **not fan out across NWP members** — it either passes member 0
-  through (persistence) or synthesises its own member axis (`manual_heuristic`: 13 analogues;
-  `climatology`: quantile-derived members). This is model-family identity, like `MODEL_NAME`, so a
-  `ClassVar` is correct. The class is resolved from the experiment's `forecaster_target` MLflow tag
-  *before* inputs are loaded, so the flag is available in time. Document alongside it that
-  `weather_source: "none"` does **not** mean "no NWP input": in bulk mode the control-member NWP
-  scan defines the shared `(init_time, valid_time)` forecast-run grid, which is what keeps every
-  leaderboard row — baseline or ML — scored on the identical grid.
-- **Document the `ensemble_member` overload** on `PowerForecast` and `AllFeatures`: an NWP-member
-  index for NWP-consuming models, a historical-analogue index for `manual_heuristic`, a
-  quantile-sample index for `climatology`. Nobody may assume `ensemble_member ⇒ NWP`.
-- Tests: a dummy `uses_nwp_ensemble = False` forecaster exercising the member-0 path; the leak test
-  unchanged.
-- **After PRs 1 + 2 land back-to-back, run one `trained_cv_model++` backfill over every existing
-  experiment partition** — retrain, re-predict, and re-score everything under the new collapse. The
-  backfill is deliberately the exact "re-run everything after a pipeline fix" drill, and it doubles
-  as the empirical verification of the backfill mechanics before the recipe is written into
-  `docs/ml_experimentation/dagster-workflow.md`. Treat both PRs as a single leaderboard epoch event,
-  since each shifts existing numbers.
+- **Each baseline overrides `BaseForecaster.feature_engineer` with
+  `PowerLagsPerNwpRunFeatureEngineer`.** The engineer reads from the NWP frame only the
+  `nwp_model_id`, `init_time`, `h3_index`, and `valid_time` keys. It deduplicates those keys and
+  passes the key-only frame to `TabularFeatureEngineer`, so the baseline's rows come from the
+  tabular pipeline's own run grid. No weather value and no ensemble member is read, so
+  `weather_source: "none"` is literally true, and nothing in `defs/` changes. The NWP archive's list
+  of runs is what keeps every leaderboard row, baseline or ML, on the same forecast-run grid, so a
+  run missing from the archive removes its rows for every model.
+- **Document the `ensemble_member` overload** on `PowerForecast`: an NWP-member index for
+  NWP-consuming models, a historical-analogue index for `manual_heuristic`, a quantile-sample index
+  for `climatology`. Nobody may assume `ensemble_member ⇒ NWP`.
+- Tests: the engineer's rows equal the tabular path's rows, deduplicated across members.
 
-**PR 3 — package skeleton + `PersistenceForecaster` (seasonal-naive; the lowest-effort end-to-end
-probe).** Ships the package and proves the PR-2 framework on the simplest model.
+**PR A — `ManualHeuristicForecaster` (`manual_heuristic`; the deliverable).** The faithful replica.
 
-- Shared helper `_meta_io.py`: the `meta.json` save/load round-trip (config dump,
-  `trained_time_series_ids`, the fully-qualified `model_class`). No `StatelessForecaster` base class
-  until a third stateless model exists.
-- `MODEL_NAME = "persistence"`, `MODEL_VERSION = 1`, `uses_nwp_ensemble = False`. Config default
-  `selected_features = {"power_lag_24h", "power_lag_48h", "power_lag_168h", "power_lag_336h"}`.
-- `train()` records the sorted `trained_time_series_ids` (the requested ids present in the data,
-  mirroring XGBoost's "no usable rows → not trained" semantics). `predict()` = `pl.coalesce` of the
-  lag columns in ascending-lag order — `_nullify_leaky_lags` nulls any lag with `lead ≥ lag_hours`
-  (so the 24 h lag survives all intraday leads), and coalesce then selects the shortest *non-leaky*
-  lag per row: same-time-yesterday for day-1, last-week for day 2–7, two-weeks-ago beyond. Zero
-  lookahead risk because it rides the audited pipeline. Output keeps the spine's `ensemble_member`
-  (= 0 only, given member-0 inputs), cast UInt8 → Int8 via an *expression* cast, following
-  `XGBoostForecaster._build_part` (an expression cast is correct whatever Patito does to the
-  frame's Patito model). Rows where all lags are null are dropped, the count logged, and the
-  per-series dropped/coverage counts recorded in asset metadata.
-- `conf/model/persistence.yaml`: `weather_source: "none"`, `training_strategy: "none"`.
-- Tests: unit (shortest-non-leaky selection on a hand-built `AllFeatures` fixture; all-null-row
-  dropping; `save`/`load` round-trip freezing ids) plus an integration smoke fold via the
-  `tests/test_trained_cv_model.py` fixture pattern.
-- Register (`smoke_test` → `full_cv`), materialise the chain, sanity-check: NMAE worse than XGBoost
-  overall but plausibly competitive intraday; single-member CRPS = MAE; spread-skill 0; PICP /
-  interval width degenerate (expected and ignorable for a deterministic baseline).
-- **Coverage caveat:** persistence's longest lag is 336 h, so leads in `[336 h, ~360 h]` drop out
-  and its `all` / `extended_range` aggregates cover a shorter lead population than other models'.
-  Fair CRPS is size-comparable so nothing is *wrong*, but state the caveat where the sanity numbers
-  are read, backed by the per-series coverage counts in asset metadata.
-
-**PR 4 — `ManualHeuristicForecaster` (`manual_heuristic`; the deliverable).** The faithful replica,
-landing on a now-proven rail.
-
-- `MODEL_NAME = "manual_heuristic"`, `MODEL_VERSION = 1`, `uses_nwp_ensemble = False`,
-  `weather_source: "none"`. Config `n_weekly_analogues = 6` and `annual_week_span = (49, 55)` drive
-  the 13 analogue lags (weekly `168h × {1..6}`; annual `168h × {49..55}` = 8232…9240 h — all within
-  the feature parser's 17 520 h cap), with `selected_features` derived from them so a variant needs
-  only one override.
+- `MODEL_NAME = "manual_heuristic"`, `MODEL_VERSION = 1`,
+  `weather_source: "none"`. `conf/model/manual_heuristic.yaml` lists the 13 analogue lags in
+  `selected_features` (weekly `168h × {1..6}`; annual `168h × {49..55}` = 8232…9240 h — all within
+  the feature parser's 17 520 h cap), so a variant that moves the annual window overrides the whole
+  list.
 - `predict()` unpivots the 13 analogue-lag columns into `ensemble_member` rows (member index =
   analogue index; Int8 holds 0–12). Members nulled by `_nullify_leaky_lags` (as lead time grows, the
   short weekly members shed first) or by insufficient history are dropped; rows where *all* members
-  are null are dropped with the count logged and per-series surviving-member counts recorded in
-  asset metadata. No point forecast is emitted — PR 1's metrics layer produces the median headline
-  and the p95 / p50 labelled rows.
+  are null are dropped. No point forecast is emitted — the metrics-collapse issue's metrics layer
+  produces the median headline and the p95 / p50 labelled rows.
 - The 55-week annual lags need a non-zero `power_lookback` on `load_engineering_inputs`, which the
   function already takes.
 - **Data check before interpreting results:** `val_start − 55 weeks` ≈ mid-2024. Confirm which
@@ -436,10 +404,39 @@ landing on a now-proven rail.
 - Ship-time triage: delete this item's details (summary → PR body); cross-link the [manual heuristic
   forecast](../background/manual-heuristic-forecast.md) background page.
 
-**PR 5 — `ClimatologyForecaster` (`climatology`; the pure probabilistic reference).** The calendar-
+**PR B — `PersistenceForecaster` (seasonal-naive).** As the second caller, first extracts
+`PowerLagsPerNwpRunFeatureEngineer` and the `meta.json` save/load round-trip (config dump,
+`trained_time_series_ids`, the fully-qualified `model_class`) from `manual_heuristic.py` into shared
+modules. No `StatelessForecaster` base class until a third stateless model exists.
+
+- `MODEL_NAME = "persistence"`, `MODEL_VERSION = 1`. Config default
+  `selected_features = {"power_lag_24h", "power_lag_48h", "power_lag_168h", "power_lag_336h"}`.
+- `train()` records the sorted `trained_time_series_ids` (the requested ids present in the data,
+  mirroring XGBoost's "no usable rows → not trained" semantics). `predict()` = `pl.coalesce` of the
+  lag columns in ascending-lag order — `_nullify_leaky_lags` nulls any lag with `lead ≥ lag_hours`
+  (so the 24 h lag survives all intraday leads), and coalesce then selects the shortest *non-leaky*
+  lag per row: same-time-yesterday for day-1, last-week for day 2–7, two-weeks-ago beyond. Zero
+  lookahead risk because it rides the audited pipeline. Output is one member, index 0, built
+  as an `Int8` expression (`Nwp.ensemble_member` and `AllFeatures.ensemble_member` are both `Int8`),
+  with `nwp_init_time` null. The identity columns follow `XGBoostForecaster._build_part`. Rows where
+  all lags are null are dropped, the count logged, and the per-series dropped/coverage counts
+  recorded in asset metadata.
+- `conf/model/persistence.yaml`: `weather_source: "none"`, `training_strategy: "none"`.
+- Tests: unit (shortest-non-leaky selection on a hand-built `AllFeatures` fixture; all-null-row
+  dropping; `save`/`load` round-trip freezing ids) plus an integration smoke fold via the
+  `tests/test_trained_cv_model.py` fixture pattern.
+- Register (`smoke_test` → `full_cv`), materialise the chain, sanity-check: NMAE worse than XGBoost
+  overall but plausibly competitive intraday; single-member CRPS = MAE; spread-skill 0; PICP /
+  interval width degenerate (expected and ignorable for a deterministic baseline).
+- **Coverage caveat:** persistence's longest lag is 336 h, so leads in `[336 h, ~360 h]` drop out
+  and its `all` / `extended_range` aggregates cover a shorter lead population than other models'.
+  Fair CRPS is size-comparable so nothing is *wrong*, but state the caveat where the sanity numbers
+  are read, backed by the per-series coverage counts in asset metadata.
+
+**PR C — `ClimatologyForecaster` (`climatology`; the pure probabilistic reference).** The calendar-
 only skill floor the NWP ensemble must clear at long horizons.
 
-- `MODEL_NAME = "climatology"`, `MODEL_VERSION = 1`, `uses_nwp_ensemble = False`.
+- `MODEL_NAME = "climatology"`, `MODEL_VERSION = 1`.
 - `train()`: from the features frame take `(time_series_id, valid_time, power)` and **dedupe on
   `(time_series_id, valid_time)` first** — bulk-mode `AllFeatures` repeats each target row once per
   covering `(nwp_init_time, ensemble_member)` (~15× at a 15-day horizon), so without the dedupe the
@@ -489,7 +486,7 @@ forecast](../background/manual-heuristic-forecast.md); the implementation spec:
 - **Annual analogues:** the **7** weeks spanning **49–55 weeks back**, same weekday & time.
 - **Deterministic value:** the operator picks the percentile that matches the company's risk
   appetite; we score the conservative **95th percentile** of all 13 analogue values, reported
-  alongside the metric-matched **median** headline (PR 1).
+  alongside the metric-matched **median** headline (the metrics-collapse issue).
 - **No further processing:** no weighting, no holiday handling, no anomaly rejection, no load-growth
   scaling. (So the holiday-aligned variant measures how much calendar awareness adds, rather than
   reimplementing a step the analogue method already takes.)
@@ -708,9 +705,9 @@ than the nominal rate for the same reason.
 ### Which ensemble collapse defines the deterministic point forecast? 🚧
 
 **Decided: metric-matched collapse, uniform across every model.** Implemented as part of the
-baseline work ([PR 1 in the baseline implementation
-details](#implementation-details-baselines-deleted-when-they-ship)); the reasoning below is the
-durable design rationale, promoted to [the evaluation-metrics
+baseline work ([the metrics-collapse item in the baseline
+implementation details](#implementation-details-baselines-deleted-when-they-ship)); the reasoning
+below is the durable design rationale, promoted to [the evaluation-metrics
 reference](../techniques/evaluation-metrics.md) when that PR ships.
 
 #### The problem
@@ -995,10 +992,12 @@ degradation behaviour is a first-class property of every experiment instead of a
 somebody has to remember to run.
 
 **The acceptance criterion is `manual_heuristic`, not a fixed error threshold.** The manual
-heuristic consumes no NWP and is indifferent to recent telemetry staleness, so it barely degrades —
-which makes it the honest bar to clear, and a far better failure criterion than any arbitrary
-staleness threshold. Concretely: at rungs 0–2 of the degradation ladder, every time series should
-still emit a forecast, and that forecast should still beat `manual_heuristic`. That is [T1.2,
+heuristic consumes no NWP and is indifferent to recent telemetry staleness, so it barely degrades.
+In cross-validation its rows still follow the NWP run grid, so an NWP run missing from the archive
+removes that run's rows. The manual heuristic is the honest bar to clear, and a far better failure
+criterion than any arbitrary staleness threshold. Concretely: at rungs 0–2 of the degradation
+ladder, every time series should still emit a forecast, and that forecast should still beat
+`manual_heuristic`. That is [T1.2,
 graceful
 degradation](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself);
 the interval-calibration counterpart, PICP within tolerance in every regime, is [T1.3, faithful

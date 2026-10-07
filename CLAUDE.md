@@ -565,6 +565,7 @@ in
 | `geo` | H3 spatial indexing utilities |
 | `weather_utils` | Shared NWP query helpers used by both the dashboard and the feature pipeline (the analysis-proxy selection) |
 | `xgboost_forecaster` | Concrete `BaseForecaster` implementation using XGBoost |
+| `baseline_forecasters` | Naive baseline `BaseForecaster` implementations the trained models must beat, starting with `manual_heuristic` |
 | `plotting` | The OCF-brand Altair theme and shared plotting helpers |
 | `studies` | The tested machinery the one-off studies under `studies/` call: solar geometry, served-column checks, power aggregation, anonymisation, the Fractions Skill Score, the data paths, and the common rows the past-weather studies share. Study scripts import only their own folder, `studies.*`, and the other reviewed packages, and nothing in `src/` or any other package imports `studies` (see "Import rules for studies") |
 | `dashboard` | Marimo web apps for visualisation (`view_forecasts.py`, `map_and_timeseries.py`) plus their shared helpers in `src/dashboard/` |
