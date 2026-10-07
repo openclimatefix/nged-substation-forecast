@@ -177,8 +177,11 @@ as Solar.
 **Single-site and aggregate BMUs.** Elexon's naming convention gives a BMU connected directly to the
 transmission network a `T_` identifier, a BMU embedded in a distribution network an `E_` identifier,
 and a miscellaneous BMU an `M_` identifier. The study treats a BMU with any of those three prefixes
-as a single-site BMU, which is part of one site. No `M_` BMU is in the census. Under that
-convention, a `2_` (supplier), `V_` (virtual), or `C_` identifier does not name a single site. The
+as a single-site BMU, which is part of one site. A single-site identifier matters because the
+BMU's output and capacity then belong to one place, so the study can match the BMU to one project
+in the TEC register and REPD, give it one position on the map, and read its output as one site's.
+No `M_` BMU is in the census. Under that convention, a `2_` (supplier), `V_` (virtual), or `C_`
+identifier does not name a single site, because such a BMU can pool the output of many sites. The
 study did not check each of those BMUs for a single site, so the page counts them apart and calls
 them aggregate BMUs.
 
