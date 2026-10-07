@@ -462,6 +462,42 @@ def summary_table(*, census: pl.DataFrame, window_label: str) -> pl.DataFrame:
     return pl.DataFrame(rows, schema=["quantity", "value"], orient="row", strict=False)
 
 
+def names_table(*, census: pl.DataFrame, scope: str) -> pl.DataFrame:
+    """List the census BMUs of one scope with the name each register gives them.
+
+    Args:
+        census: The census table.
+        scope: `single-site` or `aggregate`.
+
+    Returns:
+        One row for each BMU: its identifier, its name in the BMU register, in IGCPU, in the TEC
+        register, and in REPD, with a dash where the register has no match.
+    """
+    return (
+        census.filter(pl.col("scope") == scope)
+        .select(
+            "elexon_bmu_id",
+            elexon_name=pl.col("site_name"),
+            igcpu_name=pl.col("igcpu_name"),
+            tec_project=pl.col("tec_name"),
+            repd_site=pl.col("repd_name"),
+            lead_party=pl.col("lead_party"),
+        )
+        .fill_null("-")
+        .sort("elexon_bmu_id")
+    )
+
+
+def capacities_table(*, census: pl.DataFrame, scope: str) -> pl.DataFrame:
+    """List the census BMUs of one scope with the capacity each register gives them, in MW."""
+    return (
+        census.filter(pl.col("scope") == scope)
+        .select("elexon_bmu_id", "technology", *CAPACITY_COLUMNS)
+        .sort("elexon_bmu_id")
+        .with_columns(pl.col(CAPACITY_COLUMNS).cast(pl.String).fill_null("-"))
+    )
+
+
 def main() -> None:
     """Write `report.md`."""
     today = datetime.now(UTC)
@@ -524,7 +560,8 @@ def main() -> None:
     )
     aggregate_note = (
         f"{aggregates.height} BMUs; sum of Generation Capacity "
-        f"{aggregates['generation_capacity_mw'].sum():.1f} MW."
+        f"{aggregates['generation_capacity_mw'].sum():.1f} MW; sum of largest Maximum Export Limit "
+        f"{aggregates['largest_mel_mw'].sum():.1f} MW."
     )
     by_type = (
         single.group_by("connection_type", "technology").len().sort("connection_type", "technology")
@@ -543,6 +580,16 @@ def main() -> None:
         "## Technology evidence\n\n"
         + _md(single.group_by("technology", "technology_evidence").len().sort("technology")),
         "## The single-site census BMUs\n\n" + _md(listing),
+        "## All census BMUs: the name each register gives them\n\n"
+        "### Single-site\n\n"
+        + _md(names_table(census=census, scope="single-site"))
+        + "\n\n### Aggregate\n\n"
+        + _md(names_table(census=census, scope="aggregate")),
+        "## All census BMUs: the capacity each register gives them (MW)\n\n"
+        "### Single-site\n\n"
+        + _md(capacities_table(census=census, scope="single-site"))
+        + "\n\n### Aggregate\n\n"
+        + _md(capacities_table(census=census, scope="aggregate")),
         "## Single-site BMUs in the gap band, or typed Solar and not following the sun\n\n"
         + _md(to_inspect),
         "## Capacity figures (single-site BMUs; columns are never added together)\n\n"
