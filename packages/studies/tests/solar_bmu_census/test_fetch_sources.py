@@ -78,3 +78,32 @@ def test_interconnectors_and_unregistered_units_are_not_fetched() -> None:
         {"elexonBmUnit": None, "interconnectorId": None},
     ]
     assert fetch_sources.b1610_bmu_ids(reference=reference) == ["T_A"]
+
+
+def test_the_lag_margin_is_fourteen_days() -> None:
+    assert fetch_sources.study_window(today=date(2026, 10, 10)).end == datetime(
+        2026, 9, 1, tzinfo=UTC
+    )
+    assert fetch_sources.study_window(today=date(2026, 10, 15)).end == datetime(
+        2026, 10, 1, tzinfo=UTC
+    )
+
+
+def test_parse_b1610_sorts_rows_given_out_of_order() -> None:
+    frame = fetch_sources.parse_b1610(
+        rows=[
+            _row(end_time="2026-06-01T13:00:00", quantity=2.0),
+            _row(end_time="2026-06-01T12:00:00", quantity=1.0),
+        ],
+        window=WINDOW,
+    )
+    assert frame["output_mwh"].to_list() == [1.0, 2.0]
+
+
+def test_a_bmu_listed_twice_is_fetched_once() -> None:
+    reference = [
+        {"elexonBmUnit": "T_B", "interconnectorId": None},
+        {"elexonBmUnit": "T_A", "interconnectorId": None},
+        {"elexonBmUnit": "T_B", "interconnectorId": None},
+    ]
+    assert fetch_sources.b1610_bmu_ids(reference=reference) == ["T_A", "T_B"]

@@ -7,6 +7,9 @@ read as pure PV, and a grid position read as degrees.
 
 import collate
 import polars as pl
+import pytest
+
+PV = "PV Array (Photo Voltaic/solar)"
 
 
 def test_a_spelling_without_a_space_still_matches() -> None:
@@ -127,3 +130,91 @@ def test_storage_evidence_is_graded_from_the_strongest_first() -> None:
         "pure PV",
         "REPD solar row, no battery row",
     )
+
+
+def test_a_near_spelling_at_0_95_matches_and_the_score_is_rounded() -> None:
+    match = collate.best_match(
+        site_name="Longfield Solar", candidates={"k": "Long Field 2 Solar Farm"}
+    )
+    assert match == ("k", 0.95)
+
+
+def test_a_tie_goes_to_the_key_that_sorts_first() -> None:
+    match = collate.best_match(
+        site_name="Larks Green", candidates={"b": "Larks Green", "a": "Larks Green"}
+    )
+    assert match == ("a", 1.0)
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("Upvale Farm", "upvale"),
+        ("Hillphotovoltaics", "hill"),
+        ("Foo PV Ltd", "foo"),
+        ("Beech Green", "beechgreen"),
+    ],
+)
+def test_normalise_on_literal_names(name: str, expected: str) -> None:
+    assert collate.normalise(name) == expected
+
+
+def test_pv_with_reactive_compensation_is_pure_pv() -> None:
+    plant_type = "Reactive Compensation;PV Array (Photo Voltaic/solar)"
+    assert collate.technology_from_tec_plant_type(plant_type=plant_type) == "pure PV"
+
+
+def test_display_name_falls_back_to_the_tec_name_then_the_repd_name() -> None:
+    def name(*, site_name: str, tec_name: str | None) -> str:
+        return collate._display_name(
+            site_name=site_name, bmu_id="T_X", tec_name=tec_name, repd_name="Repd"
+        )
+
+    assert name(site_name="Real", tec_name="Tec") == "Real"
+    assert name(site_name="T_X", tec_name="Tec") == "Tec"
+    assert name(site_name="", tec_name=None) == "Repd"
+
+
+def test_a_connection_type_prefix_needs_its_underscore() -> None:
+    assert collate.connection_type(elexon_bmu_id="TX-1") == "other"
+    assert collate.connection_type(elexon_bmu_id="EX-1") == "other"
+
+
+def test_best_tec_rows_ranks_statuses_and_picks_the_capacity_column() -> None:
+    tec = pl.DataFrame(
+        {
+            "Project ID": ["built", "built", "uc", "uc", "ca", "ca", "odd", "odd", "wind"],
+            "Project Name": ["B", "B", "U", "U", "C", "C", "O", "O", "W"],
+            "Plant Type": [PV] * 8 + ["Wind Onshore"],
+            "Project Status": [
+                "Under Construction/Commissioning",
+                "Built",
+                "Under Construction/Commissioning",
+                "Scoping",
+                "Awaiting Consents",
+                "Consents Approved",
+                "Withdrawn",
+                "Built",
+                "Built",
+            ],
+            "MW Connected": ["0", "350", "0", "0", "0", "0", "0", "40", "10"],
+            "Cumulative Total Capacity (MW)": [
+                "600",
+                "550",
+                "20.62",
+                "57",
+                "8",
+                "9",
+                "1",
+                "40",
+                "10",
+            ],
+        }
+    )
+    rows = collate.best_tec_rows(tec=tec).sort("Project ID")
+    assert rows.select("Project ID", "Project Status", "tec_mw").to_dicts() == [
+        {"Project ID": "built", "Project Status": "Built", "tec_mw": 350.0},
+        {"Project ID": "ca", "Project Status": "Consents Approved", "tec_mw": 9.0},
+        {"Project ID": "odd", "Project Status": "Built", "tec_mw": 40.0},
+        {"Project ID": "uc", "Project Status": "Under Construction/Commissioning", "tec_mw": 20.62},
+    ]
