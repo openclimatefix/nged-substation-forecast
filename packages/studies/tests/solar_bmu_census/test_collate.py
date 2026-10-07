@@ -175,6 +175,17 @@ def test_display_name_falls_back_to_the_tec_name_then_the_repd_name() -> None:
     assert name(site_name="", tec_name=None) == "Repd"
 
 
+def test_a_cfd_unit_s_connection_sets_the_connection_of_a_c_bmu() -> None:
+    assert (
+        collate.connection_type(elexon_bmu_id="C__X", cfd_connection="Distribution") == "embedded"
+    )
+    assert (
+        collate.connection_type(elexon_bmu_id="C__X", cfd_connection="Transmission")
+        == "transmission-connected"
+    )
+    assert collate.connection_type(elexon_bmu_id="C__X", cfd_connection=None) == "other"
+
+
 def test_a_connection_type_prefix_needs_its_underscore() -> None:
     assert collate.connection_type(elexon_bmu_id="TX-1") == "other"
     assert collate.connection_type(elexon_bmu_id="EX-1") == "other"

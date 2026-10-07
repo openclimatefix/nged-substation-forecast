@@ -20,7 +20,9 @@ from fetch_sources import (
     b1610_bmu_ids,
     fetch_bmu_reference,
     fetch_igcpu,
+    fetch_lccc,
     recorded_run,
+    single_site_cfd_bmus,
 )
 from studies.solar import cos_zenith, zenith
 
@@ -61,8 +63,9 @@ BMUs that never generated in the window were seen to publish readings of a few t
 megawatt-hour.
 """
 SINGLE_SITE_PREFIXES: Final[tuple[str, ...]] = ("T_", "E_", "M_")
-"""A BMU with one of these prefixes is one generating site. `2__` (supplier), `V__`, and `C__` BMUs
-can aggregate many sites."""
+"""A BMU with one of these prefixes is one generating site. `2__` (supplier) and `V__` (virtual)
+BMUs can aggregate many sites. A `C__` BMU is one site only when the Low Carbon Contracts Company
+maps it to one named Contract for Difference unit (see `scope_of`)."""
 DAYLIGHT_COS_ZENITH: Final[float] = 0.1
 """The sun is clearly up when the cosine of its zenith angle exceeds this (a zenith of about 84°).
 
@@ -87,6 +90,23 @@ class Behaviour:
     raw_correlation: float | None
     positive_half_hours: int
     behaviour: BehaviourType
+
+
+def scope_of(*, bmu_id: str, single_site_cfd_ids: set[str]) -> str:
+    """Say whether a BMU is one generating site (`single-site`) or can pool many (`aggregate`).
+
+    Args:
+        bmu_id: The BMU's Elexon identifier.
+        single_site_cfd_ids: The `C__` BMU identifiers that carry one named CfD unit, from
+            `fetch_sources.single_site_cfd_bmus`.
+
+    Returns:
+        `single-site` for a `T_`, `E_`, or `M_` BMU and for a `C__` BMU in `single_site_cfd_ids`,
+        and `aggregate` for every other BMU.
+    """
+    if bmu_id.startswith(SINGLE_SITE_PREFIXES) or bmu_id in single_site_cfd_ids:
+        return "single-site"
+    return "aggregate"
 
 
 def analysis_series(*, output: pl.DataFrame, window_start: datetime) -> pl.DataFrame:
@@ -274,6 +294,10 @@ def classify_all() -> pl.DataFrame:
     reference = fetch_bmu_reference()
     igcpu_ids = igcpu_solar_ids(igcpu=fetch_igcpu(today=today))
     fetched_ids = b1610_bmu_ids(reference=reference)
+    mapping, portfolio = fetch_lccc(today=today)
+    single_site_cfd_ids = set(
+        single_site_cfd_bmus(mapping=mapping, portfolio=portfolio, today=today)
+    )
     rows = []
     for bmu_id in fetched_ids + sorted(igcpu_ids - set(fetched_ids)):
         path = OUTPUT_DIR / f"{bmu_id}_{window.label}.parquet"
@@ -289,7 +313,7 @@ def classify_all() -> pl.DataFrame:
         rows.append(
             {
                 "elexon_bmu_id": bmu_id,
-                "scope": "single-site" if bmu_id.startswith(SINGLE_SITE_PREFIXES) else "aggregate",
+                "scope": scope_of(bmu_id=bmu_id, single_site_cfd_ids=single_site_cfd_ids),
                 "correlation": result.correlation,
                 "raw_correlation": result.raw_correlation,
                 "positive_half_hours": result.positive_half_hours,
