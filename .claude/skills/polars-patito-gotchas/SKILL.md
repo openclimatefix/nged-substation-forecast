@@ -48,17 +48,33 @@ dtypes. The result usually only surfaces later as a confusing `validate()` dtype
 
 The trap fires only when the Patito model is still attached, and which operations detach it is not
 guessable. Which operations detach it differs between eager and lazy frames. Measured on patito
-0.8.6 with Polars 2.0.0 (Polars 1.44.2 gives identical results):
+0.8.6 with Polars 2.0.0 (Polars 1.44.2 gives the same results except for `gather_every`):
 
-- **An eager `pt.DataFrame` keeps the model only through `head`, `drop`, `with_row_index`, and
-  iterating a `group_by`.** Every other operation returns a plain `pl.DataFrame`: `filter`,
-  `select`, `with_columns`, `sort`, `unique`, `rename`, `join`, `unpivot`,
-  `group_by(...).agg(...)`, `pl.concat([...])`, and `.as_polars()`. A dict-`.cast` after one of
-  those is plain Polars and fine.
-- **A lazy `pt.LazyFrame` drops the model only through `group_by(...).agg(...)` and
-  `pl.concat([...])`.** Every other operation keeps it, including `.filter()`, `.select()`,
-  `.with_columns()`, `.sort()`, `.head()`, `.unique()`, `.drop()`, `.rename()`, `.join()`,
-  `.with_row_index()`, and `.unpivot()`. A dict-`.cast` after any of those is swallowed.
+- **An eager `pt.DataFrame` keeps the Patito model through some operations and drops it through
+  others, and the method name does not tell you which.** A method that Polars implements directly
+  on the underlying frame keeps the model. A method that Polars runs as a lazy query and collects
+  internally drops it, unless Patito overrides the method, as it does `drop` and `cast`. Which
+  route a method takes can change between Polars releases. Measured, the eager frame keeps the
+  model through `head`, `tail`, `slice`, `limit`, `clone`, `sample`, `rechunk`, `drop`,
+  `with_row_index`, `partition_by`, `vstack`, `hstack`, `extend`, `insert_column`,
+  `replace_column`, `to_dummies`, `transpose`, `null_count`, `map_rows`, indexing with a slice, a
+  list of row positions, or a list of column names, iterating a `group_by`, `.cast()`, and
+  `.lazy().collect()`, and on Polars 2.0.0 (not 1.44.2) through `gather_every`. It drops the model,
+  returning a plain `pl.DataFrame`, through `filter`, `select`, `with_columns`, `sort`, `unique`,
+  `rename`, `join`, `unpivot`, `reverse`, `drop_nulls`, `fill_null(value)`, `fill_nan`, `shift`,
+  `top_k`, `bottom_k`, `explode`, `interpolate`, `update`, `group_by(...).agg(...)`,
+  `pl.concat([...])`, and `.as_polars()`. Measure any method not named here before relying on
+  either behaviour. A dict-`.cast` after a dropping operation applies, as on a plain Polars frame.
+  A dict-`.cast` after a keeping operation is swallowed.
+- **A lazy `pt.LazyFrame` keeps the Patito model through most operations and drops it through
+  `group_by(...).agg(...)`, `rolling(...).agg(...)`, `group_by_dynamic(...).agg(...)`,
+  `pl.concat([...])` (vertical or horizontal), and `.sql(...)`.** It keeps the model through
+  `.filter()`, `.select()`, `.with_columns()`, `.sort()`, `.unique()`, `.rename()`, `.join()`,
+  `.unpivot()`, `.explode()`, `.head()`, `.tail()`, `.slice()`, `.limit()`, `.clone()`,
+  `.gather_every()`, `.reverse()`, `.cache()`, `.drop()`, `.with_row_index()`, `.drop_nulls()`,
+  `.fill_null(value)`, `.fill_nan()`, `.shift()`, `.top_k()`, `.cast()`, and `.collect()`. Measure
+  any method not named here before relying on either behaviour. A dict-`.cast` after a keeping
+  operation is swallowed.
 
 Since Polars 1.44, the eager loss is a Patito defect
 ([Patito issue 167](https://github.com/JakobGM/patito/issues/167)). The lost model also means that a
@@ -68,7 +84,7 @@ Patito method such as `.validate()`, called on the result of an eager `filter`, 
 `.collect()` is the one to watch, because it reads as the boundary back into plain Polars and is
 not. `pt.LazyFrame(...).set_model(S).collect().cast({"a": pl.Int8})` leaves `a` as `Int64` — no
 error, no warning — where the same call on a plain frame gives `Int8`. The same swallowing happens
-after an eager `head`, `drop`, or `with_row_index`.
+after any eager operation that keeps the model, such as `head`, `drop`, or `with_row_index`.
 
 Workaround: strip the Patito model before a `{column: dtype}` cast (mirrors the join gotcha above):
 
