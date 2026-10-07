@@ -23,6 +23,7 @@ from studies.cross_validation import (
     crps,
     cut_eras,
     fit_one_fold,
+    fit_one_fold_scoring_many,
     out_of_fold_losses,
     raise_on_uncovered_months,
     rotate_folds,
@@ -397,6 +398,194 @@ def test_a_real_fit_is_reproducible_for_a_seed():
     )
 
     assert first.tolist() == second.tolist()
+
+
+# --- Scoring one fitted model on several frames of feature values ---------------------------------
+
+FEW_ROUNDS: Final[HyperParameters] = HyperParameters(
+    **{**PRIMARY_HYPER_PARAMETERS, "num_boost_round": 5, "min_child_weight": 1.0}
+)
+
+
+def _scoring_frame(*, site_rows: pl.DataFrame, shift: float) -> pl.DataFrame:
+    """The site's times with `x` moved by `shift`, standing in for another source's values."""
+    return site_rows.select("time", x=pl.col("x") + shift)
+
+
+def _losses_on(site_rows: pl.DataFrame, scoring: dict[str, pl.DataFrame] | None) -> pl.DataFrame:
+    return out_of_fold_losses(
+        site_rows=site_rows,
+        features=["x"],
+        target="power_mw",
+        hyper_parameters=FEW_ROUNDS,
+        with_quantiles=False,
+        scoring_site_rows=scoring,
+    )
+
+
+def test_a_scoring_frame_is_predicted_by_the_same_fit_as_the_training_frame():
+    site_rows = _site_rows()
+    train = site_rows.filter((pl.col("fold") != 0) & ~pl.col("constrained"))
+    test = site_rows.filter(pl.col("fold") == 0)
+
+    many = fit_one_fold_scoring_many(
+        train=train,
+        tests={"own": test, "shifted": test.with_columns(x=pl.col("x") + 500.0)},
+        features=["x"],
+        target="power_mw",
+        hyper_parameters=FEW_ROUNDS,
+        seed=0,
+        with_quantiles=False,
+    )
+    single, _ = fit_one_fold(
+        train=train,
+        test=test.with_columns(x=pl.col("x") + 500.0),
+        features=["x"],
+        target="power_mw",
+        hyper_parameters=FEW_ROUNDS,
+        seed=0,
+        with_quantiles=False,
+    )
+
+    assert many["shifted"][0].tolist() == single.tolist()
+    assert many["own"][0].tolist() != many["shifted"][0].tolist()
+
+
+def test_the_own_frame_scored_through_the_mapping_equals_the_ordinary_losses():
+    site_rows = _site_rows()
+
+    ordinary = _losses_on(site_rows, None)
+    mapped = _losses_on(site_rows, {"own": site_rows.select("time", "x")})
+
+    assert "scoring_archive" not in ordinary.columns
+    assert mapped.drop("scoring_archive").equals(ordinary)
+
+
+def test_a_shifted_scoring_frame_changes_its_losses_and_leaves_the_own_frame_alone():
+    site_rows = _site_rows()
+    ordinary = _losses_on(site_rows, None)
+
+    mapped = _losses_on(
+        site_rows,
+        {
+            "own": site_rows.select("time", "x"),
+            "shifted": _scoring_frame(site_rows=site_rows, shift=50.0),
+        },
+    )
+
+    own = mapped.filter(pl.col("scoring_archive") == "own").drop("scoring_archive")
+    shifted = mapped.filter(pl.col("scoring_archive") == "shifted")
+    assert own.equals(ordinary)
+    assert shifted["signed_error_mw"].to_list() != own["signed_error_mw"].to_list()
+
+
+def test_a_scoring_frame_in_another_row_order_gives_the_same_losses_per_time():
+    site_rows = _site_rows()
+    shifted = _scoring_frame(site_rows=site_rows, shift=3.0)
+
+    in_order = _losses_on(site_rows, {"a": shifted})
+    reversed_order = _losses_on(site_rows, {"a": shifted.reverse()})
+
+    key = ["time", "seed"]
+    assert in_order.sort(key).equals(reversed_order.sort(key))
+
+
+def test_the_target_capacity_and_constraint_of_a_scoring_frame_are_ignored():
+    site_rows = _site_rows()
+    shifted = _scoring_frame(site_rows=site_rows, shift=3.0)
+    tampered = shifted.with_columns(
+        power_mw=pl.lit(99.0),
+        effective_capacity_mw=pl.lit(1.0),
+        constrained=pl.lit(value=True),
+    )
+
+    assert _losses_on(site_rows, {"a": shifted}).equals(_losses_on(site_rows, {"a": tampered}))
+
+
+def test_a_scoring_frame_with_other_times_or_a_repeated_time_raises():
+    site_rows = _site_rows()
+    shifted = _scoring_frame(site_rows=site_rows, shift=1.0)
+
+    with pytest.raises(ValueError, match="other times"):
+        _losses_on(site_rows, {"a": shifted.with_columns(time=pl.col("time") + timedelta(hours=1))})
+    with pytest.raises(ValueError, match="repeats"):
+        _losses_on(site_rows, {"a": pl.concat([shifted, shifted.head(1)])})
+
+
+def test_a_scoring_frame_with_a_different_fold_raises():
+    site_rows = _site_rows()
+    shifted = _scoring_frame(site_rows=site_rows, shift=1.0).with_columns(
+        fold=site_rows["fold"] + 1
+    )
+
+    with pytest.raises(ValueError, match="folds"):
+        _losses_on(site_rows, {"a": shifted})
+
+
+def test_a_scoring_frame_missing_a_feature_column_raises():
+    site_rows = _site_rows()
+
+    with pytest.raises(ValueError, match="lacks"):
+        _losses_on(site_rows, {"a": site_rows.select("time")})
+
+
+def test_constrained_rows_never_train_the_model_that_scores_the_frames(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    site_rows = _site_rows()
+    seen: list[pl.DataFrame] = []
+    real = cross_validation.fit_one_fold_scoring_many
+
+    def record(**kwargs: object) -> object:
+        seen.append(kwargs["train"])  # ty: ignore[invalid-argument-type]
+        return real(**kwargs)  # ty: ignore[invalid-argument-type]
+
+    monkeypatch.setattr(cross_validation, "fit_one_fold_scoring_many", record)
+
+    _losses_on(site_rows, {"a": _scoring_frame(site_rows=site_rows, shift=1.0)})
+
+    assert seen
+    for train in seen:
+        assert not train["constrained"].any()
+
+
+def test_each_scoring_frame_gets_the_quantile_predictions_of_its_own_values():
+    site_rows = _site_rows()
+    train = site_rows.filter((pl.col("fold") != 0) & ~pl.col("constrained"))
+    test = site_rows.filter(pl.col("fold") == 0)
+
+    many = fit_one_fold_scoring_many(
+        train=train,
+        tests={"own": test, "shifted": test.with_columns(x=pl.col("x") + 500.0)},
+        features=["x"],
+        target="power_mw",
+        hyper_parameters=FEW_ROUNDS,
+        seed=0,
+        with_quantiles=True,
+    )
+    _, shifted_quantiles = fit_one_fold(
+        train=train,
+        test=test.with_columns(x=pl.col("x") + 500.0),
+        features=["x"],
+        target="power_mw",
+        hyper_parameters=FEW_ROUNDS,
+        seed=0,
+        with_quantiles=True,
+    )
+
+    assert many["shifted"][1] is not None
+    assert many["own"][1] is not None
+    assert many["shifted"][1].tolist() == shifted_quantiles.tolist()  # ty: ignore[unresolved-attribute]
+    assert many["own"][1].tolist() != many["shifted"][1].tolist()
+
+
+def test_a_fold_with_nothing_to_train_on_is_skipped_when_scoring_several_frames():
+    # Every row outside fold 0 is constrained, so fold 0 has no training rows at all.
+    site_rows = _site_rows().with_columns(constrained=pl.col("fold") != 0)
+
+    losses = _losses_on(site_rows, {"a": _scoring_frame(site_rows=site_rows, shift=1.0)})
+
+    assert 0 not in losses["fold"].to_list()
 
 
 # Two sites with unequal eras. Both start their second era in July 2025. Site A has six months

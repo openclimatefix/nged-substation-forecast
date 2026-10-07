@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import polars as pl
 import pytest
-from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, HyperParameters
+from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, DeviceType, HyperParameters
 from studies.sources import STUDY_INPUTS_DIR
 
 from studies import arm_runner
@@ -32,6 +32,7 @@ def test_run_all_fits_every_job_on_each_sites_own_rows_with_the_jobs_own_setting
         target: str,
         hyper_parameters: HyperParameters,
         with_quantiles: bool,
+        device: str,
     ) -> pl.DataFrame:
         return pl.DataFrame(
             {
@@ -62,3 +63,26 @@ def test_run_all_fits_every_job_on_each_sites_own_rows_with_the_jobs_own_setting
             ("arm_two", "sensitivity", "synthetic", "x,y", 3, True),
         )
     )
+
+
+@pytest.mark.parametrize("device", ["cpu", "cuda"])
+def test_run_all_fits_every_job_on_the_device_it_was_given(
+    monkeypatch: pytest.MonkeyPatch, device: DeviceType
+):
+    devices: list[str] = []
+
+    def fake_losses(*, site_rows: pl.DataFrame, device: str, **_: object) -> pl.DataFrame:
+        devices.append(device)
+        return pl.DataFrame({"site": [site_rows["site"][0]]})
+
+    monkeypatch.setattr(arm_runner, "out_of_fold_losses", fake_losses)
+    job: arm_runner.Job = ("arm", "primary", "power", ("x",), PRIMARY_HYPER_PARAMETERS, False)
+
+    arm_runner.run_all(
+        dataset=pl.DataFrame({"site": ["A", "B"]}),
+        jobs=[job],
+        max_workers=1,
+        device=device,
+    )
+
+    assert devices == [device, device]

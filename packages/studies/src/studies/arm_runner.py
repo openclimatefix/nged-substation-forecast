@@ -14,7 +14,7 @@ from typing import Final
 
 import polars as pl
 
-from studies.cross_validation import HyperParameters, out_of_fold_losses
+from studies.cross_validation import DeviceType, HyperParameters, out_of_fold_losses
 from studies.fractions_skill_score import MONTH_FORMAT
 from studies.sources import STUDY_INPUTS_DIR
 
@@ -60,7 +60,11 @@ Job = tuple[str, str, str, tuple[str, ...], HyperParameters, bool]
 
 
 def run_all(
-    *, dataset: pl.DataFrame, jobs: list[Job], max_workers: int = MAX_CONCURRENT_FITS
+    *,
+    dataset: pl.DataFrame,
+    jobs: list[Job],
+    max_workers: int = MAX_CONCURRENT_FITS,
+    device: DeviceType = "cpu",
 ) -> pl.DataFrame:
     """Run every (arm, site) job concurrently and concatenate the losses.
 
@@ -72,6 +76,7 @@ def run_all(
         jobs: The fits to run.
         max_workers: How many (arm, site) fits run at once, each on `THREADS_PER_FIT` cores.
             Lower it to share the machine with another run.
+        device: XGBoost's device for every fit, `"cpu"` or `"cuda"`.
 
     Returns:
         Every job's losses, stacked, labelled with the arm, the setting and the target.
@@ -89,6 +94,7 @@ def run_all(
                     target=target,
                     hyper_parameters=hyper_parameters,
                     with_quantiles=with_quantiles,
+                    device=device,
                 )
                 futures[future] = (setting_name, arm, target, site)
         for done, future in enumerate(concurrent.futures.as_completed(futures), start=1):

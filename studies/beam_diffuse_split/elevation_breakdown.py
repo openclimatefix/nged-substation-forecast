@@ -30,6 +30,14 @@ PERCENTAGE_POINTS: Final[float] = 100.0
 ELEVATION_BAND_EDGES_DEGREES: Final[tuple[float, ...]] = (0.0, 10.0, 20.0, 30.0, 90.0)
 """The solar elevation bands the contrast is reported in, in degrees."""
 
+ELEVATION_BAND_LABELS: Final[tuple[str, ...]] = (
+    "(-inf, 10]",
+    "(10, 20]",
+    "(20, 30]",
+    "(30, inf]",
+)
+"""One label per band: the first and last bands are open-ended, and each upper edge is inclusive."""
+
 CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "xgboost": ("C_era5_split", "B_erbs"),
     "physics": ("P_C_source_split", "P_B_erbs"),
@@ -47,8 +55,10 @@ def _banded_losses(*, instrument: str, source: str) -> pl.DataFrame:
         "site", "time", "solar_elevation_deg"
     )
     return losses.join(elevation, on=["site", "time"], how="inner").with_columns(
-        band=pl.col("solar_elevation_deg").cut(
-            breaks=list(ELEVATION_BAND_EDGES_DEGREES[1:-1]), labels=None
+        band=pl.col("solar_elevation_deg").bin_intervals(
+            list(ELEVATION_BAND_EDGES_DEGREES[1:-1]),
+            labels=ELEVATION_BAND_LABELS,
+            right_closed=True,
         )
     )
 

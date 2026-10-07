@@ -59,6 +59,24 @@ the
   predictions. An XGBoost model given CAMS's split plus SARAH-3's global irradiance, the two
   satellite retrievals the past-solar study compared, beats CAMS's split with its neighbouring hours
   by 0.18 points and plain CAMS's split by 0.20 points, on a longer row set from January 2021.
+- [Does CEDA's UKV or ERA5 describe past wind and temperature
+  better?](past-weather/ukv-ceda-vs-era5.md) — at three wind farms, an XGBoost model given ERA5's
+  wind has a power error 0.125 percentage points of capacity lower than an XGBoost model given the
+  6-hourly UKV archive from CEDA. The difference is statistically significant and below the planned
+  0.16-point margin, so the planned rule gives ERA5. The gap grows with the archive's lead, and the
+  gap does not shrink when both XGBoost models read 10 m wind alone. At four Met Office stations the
+  archived UKV's temperature is 0.124 K closer than ERA5's, so the planned rule gives UKV, but the
+  advantage falls from 0.250 K at lead 0 to 0.035 K at lead 5. At six solar farms the choice of
+  temperature moves power error by no more than 0.009 points (95% interval, whole row set).
+- [Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?](past-weather/ukv-ceda-vs-openmeteo.md)
+  — at the nine metered farms over 23 months, the two archives agree closely at the start of each run
+  (a mean absolute temperature difference of 0.098 K, and Open-Meteo's wind speed about 3% lower).
+  An XGBoost model of wind power trained on CEDA's archive loses 0.441 points of capacity [+0.286,
+  +0.600] when given Open-Meteo's wind, a level bias that rescaling the speed mostly removes. CEDA's
+  larger power error over all hours (wind +0.270 points once two spans of Open-Meteo's wind are
+  dropped) is mostly its longer leads: at lead 0 the wind gap is +0.030 [-0.043, +0.122]. By the
+  plan's rule the two archives are not mixed. The page does not compare CEDA's archive with the Met
+  Office's live feed.
 
 ## Forecasts
 
