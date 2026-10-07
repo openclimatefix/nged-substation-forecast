@@ -73,14 +73,18 @@ for why an average can hide a model getting worse at a substantial minority of s
 
 ### The headline baseline — `manual_heuristic`
 
-`manual_heuristic` is a faithful reproduction of the [manual heuristic
+`manual_heuristic` reproduces the [manual heuristic
 forecast](../background/manual-heuristic-forecast.md) — the analogue-ensemble method that, until
 recently, was the normal approach to substation forecasting among distribution network operators,
 with no weather model and no ML. In brief (full description and the operator's-eye view are in the
 background page): for each target half-hour it takes the observed power at the **same weekday &
-time-of-day** from the **last 6 weeks** and from **49–55 weeks back** — **13 analogues**. An
-operator reads the plotted analogues by eye. If a single number is needed, the operator picks the
-percentile that matches the company's risk appetite. We score the conservative 95th percentile.
+time-of-day** from the **last 6 weeks** and from **49–55 weeks back** — **13 analogues**. The
+analogue lags are fixed numbers of UTC hours, so across a clock change an analogue sits an hour off
+local clock time (the `baseline_forecasters` package README gives the share of affected
+analogues). An operator reads the plotted analogues by eye. If a single number is needed, the operator picks the
+percentile that matches the company's risk appetite. We will score the conservative 95th percentile, once the [metrics
+collapse](https://github.com/openclimatefix/nged-substation-forecast/issues/1077)
+lands.
 
 **Reproducing the manual heuristic matters because the manual heuristic is *the bar we have to clear
 to justify the project*.** "XGBoost beats persistence" is the least we must do; "XGBoost beats the
