@@ -61,7 +61,7 @@ BMUs that never generated in the window were seen to publish readings of a few t
 megawatt-hour.
 """
 SINGLE_SITE_PREFIXES: Final[tuple[str, ...]] = ("T_", "E_", "M_")
-"""A BMU with one of these prefixes is one generating site. `2_` (supplier), `V_`, and `C_` BMUs
+"""A BMU with one of these prefixes is one generating site. `2__` (supplier), `V__`, and `C__` BMUs
 can aggregate many sites."""
 DAYLIGHT_COS_ZENITH: Final[float] = 0.1
 """The sun is clearly up when the cosine of its zenith angle exceeds this (a zenith of about 84°).

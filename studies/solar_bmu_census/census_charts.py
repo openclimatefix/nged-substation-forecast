@@ -35,7 +35,7 @@ WEEKS: Final[dict[str, datetime]] = {
 how the output looks."""
 SERIES_COLOURS: Final[dict[str, str]] = {
     "Solar BMU": ocf.BRAND_ORANGE,
-    "Storage BMU": ocf.DATA_PURPLE,
+    "Storage BMU": ocf.DATA_BLUE,
 }
 FIGURE_NAMES: Final[dict[str, str]] = {
     "generation_capacity_mw": "Generation Capacity",
@@ -57,7 +57,7 @@ RULE_WIDTHS: Final[tuple[float, ...]] = (6.0, 5.0, 4.0, 3.0, 2.0, 1.5)
 """Line widths from the first line drawn to the last. Lines that coincide at one height then show as
 nested stripes, each in its own colour."""
 DISPARITY_EXAMPLES: Final[int] = 3
-DISPARITY_ROW_PX: Final[int] = 150
+DISPARITY_ROW_PX: Final[int] = 230
 LABEL_MARGIN_PX: Final[int] = 250
 LABEL_PADDING_PX: Final[int] = 40
 """The room right of the plot for the line labels, which Vega leaves out of the figure's width."""
@@ -68,9 +68,9 @@ TECHNOLOGY_COLOURS: Final[dict[str, str]] = {
     "hybrid": ocf.BRAND_ORANGE,
     "unknown": ocf.GREY_3,
 }
-ROW_HEIGHT_PX: Final[int] = 72
+ROW_HEIGHT_PX: Final[int] = 115
 MAP_HEIGHT_PX: Final[int] = 600
-LABEL_CELL_DEGREES: Final[float] = 0.05
+LABEL_CELL_DEGREES: Final[float] = 0.1
 """Points that round to the same grid cell share one label on the map, so labels do not overprint.
 
 The cell is this many degrees wide in longitude and in latitude.
@@ -283,10 +283,13 @@ def example_week_figure(
                 f"{end:%-d %B %Y}, in megawatts. Each row is one site, pure PV first."
             ),
             (
-                "Orange: solar BMU. Purple: storage BMU at the same site (negative when charging). "
+                "Orange: solar BMU. Blue: storage BMU at the same site (negative when charging). "
                 "The black line marks zero MW."
             ),
-            "Examples span the best to the worst fit to the sun; the page's methods give the rule.",
+            (
+                "The three hybrid examples have the highest, median, and lowest correlation "
+                "with the sun of the eight hybrid solar BMUs that follow it."
+            ),
         ],
         figure_planning=None,
     )
@@ -319,7 +322,14 @@ def label_positions(*, values: list[float], gap: float) -> list[float]:
 
 
 def _disparity_panel(*, row: dict[str, Any], last: bool) -> alt.LayerChart:
-    """Draw one BMU's year of output with a horizontal line for each of its six figures."""
+    """Draw one BMU's year of output with a horizontal line for each of its six figures.
+
+    Each line has a label at the right-hand end of the plot, outside the plot area in the margin
+    `LABEL_MARGIN_PX`, in the line's own colour and with its value in MW, and the figure has no
+    legend. Lines with equal or close values are not combined into one label. Their labels are
+    stacked, in value order, by `label_positions`, which keeps every pair at least `LABEL_GAP_SHARE`
+    of the y axis apart, and each label has a square in the line's colour beside it.
+    """
     _, window = recorded_run()
     series = output_series(bmu_id=row["elexon_bmu_id"], start=window.start, end=window.end)
     daily = series.group_by_dynamic("time", every="1d").agg(pl.col("megawatts").max())
@@ -387,8 +397,10 @@ def _disparity_panel(*, row: dict[str, Any], last: bool) -> alt.LayerChart:
     )
     texts = (
         alt.Chart(rules.with_columns(time=pl.lit(window.end)))
-        .mark_text(align="left", dx=16, fontSize=10, color=ocf.BLACK_1, aria=False)
-        .encode(x="time:T", y="label_height:Q", text="label:N")  # ty: ignore[unresolved-attribute]
+        .mark_text(align="left", dx=16, fontSize=10, fontWeight="bold", aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x="time:T", y="label_height:Q", text="label:N", color=colour
+        )
     )
     return cast(
         alt.LayerChart,
@@ -409,7 +421,7 @@ def disparity_figure(*, census: pl.DataFrame, number: int) -> alt.VConcatChart:
         panels=panels,
         number=number,
         title=(
-            "For the three BMUs whose capacity figures differ most, the highest figure is "
+            "For the three BMUs whose six figures differ most, the highest figure is "
             f"{rows[-1]['ratio']:.1f} to {rows[0]['ratio']:.1f} times the lowest"
         ),
         subtitle=[
@@ -422,7 +434,10 @@ def disparity_figure(*, census: pl.DataFrame, number: int) -> alt.VConcatChart:
                 "and the dashed line, the 99th percentile of the BMU's output "
                 "(a measure of output, not a capacity)."
             ),
-            "The three BMUs with the largest highest-to-lowest ratio of the six figures.",
+            (
+                "TEC and REPD describe the whole Cleve Hill project, which holds both Cleve Hill "
+                "BMUs and a battery."
+            ),
         ],
         figure_planning=None,
     )
@@ -635,14 +650,14 @@ def main() -> None:
     examples = choose_examples(census=census)
     charts = {
         "solar_bmu_census_correlation": correlation_figure(correlations=correlations, number=1),
-        "solar_bmu_census_map": map_figure(census=census, number=2),
+        "solar_bmu_census_map": map_figure(census=census, number=3),
         "solar_bmu_census_summer_week": example_week_figure(
-            census=census, examples=examples, season="summer", number=3
+            census=census, examples=examples, season="summer", number=4
         ),
         "solar_bmu_census_winter_week": example_week_figure(
-            census=census, examples=examples, season="winter", number=4
+            census=census, examples=examples, season="winter", number=5
         ),
-        "solar_bmu_census_capacity_figures": disparity_figure(census=census, number=5),
+        "solar_bmu_census_capacity_figures": disparity_figure(census=census, number=2),
     }
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     for name, chart in charts.items():

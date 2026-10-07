@@ -23,6 +23,7 @@ from classify import (
     SOLAR_CORRELATION_THRESHOLD,
     analysis_series,
     drop_daytime_zeros,
+    sun_following_correlation,
 )
 from collate import CAPACITY_COLUMNS, DISPARITY_FIGURES, P99_COLUMN, capacity_disparity
 from fetch_sources import (
@@ -103,9 +104,8 @@ def capacity_table(*, table: pl.DataFrame) -> pl.DataFrame:
     """Sum each capacity column, for all solar BMUs and for each technology group.
 
     A TEC project or a REPD row that several BMUs match is summed once, because its figure is for
-    the site and not for each BMU. Columns are never added to each other. The last column,
-    `p99_output_mw`, measures each BMU's observed output and is not a registered capacity, so its
-    sum is only the total of the BMUs' own 99th percentiles.
+    the site and not for each BMU. Columns are never added to each other. The BMUs' P99 of output
+    is not a registered capacity, so the table leaves it out.
 
     Args:
         table: The census table's single-site rows.
@@ -117,7 +117,7 @@ def capacity_table(*, table: pl.DataFrame) -> pl.DataFrame:
     rows = []
     for label, technology in GROUPS:
         group = table if technology is None else table.filter(pl.col("technology") == technology)
-        for column in DISPARITY_FIGURES:
+        for column in CAPACITY_COLUMNS:
             if column == "tec_mw":
                 values = group.filter(pl.col(column).is_not_null()).unique("tec_project_id")
             elif column == "repd_installed_capacity_mw":
@@ -333,7 +333,7 @@ def _hour_mean(hourly: pl.DataFrame, hour: int) -> float:
     return _as_float(hourly.filter(pl.col("hour") == hour)["megawatts"].item())
 
 
-def metering_table(*, single: pl.DataFrame, window_label: str) -> pl.DataFrame:
+def metering_table(*, single: pl.DataFrame, window: Window) -> pl.DataFrame:
     """Compare each solar BMU that has a storage BMU with that storage BMU, in megawatts.
 
     The comparison tests whether the solar BMU's output is consistent with metering only a solar
@@ -341,25 +341,26 @@ def metering_table(*, single: pl.DataFrame, window_label: str) -> pl.DataFrame:
 
     Args:
         single: The census table's single-site rows, with `storage_bmu_ids`.
-        window_label: The window's label in the file names.
+        window: The study window.
 
     Returns:
         One row for each solar BMU and storage BMU pair at a census site: the solar BMU's
         correlation with the sun, its lowest output, and the number of its half-hours below minus 5%
-        of its Generation Capacity; and the storage BMU's lowest and highest output, its mean output
-        from 13:00 to 14:00 UTC and from 18:00 to 19:00 UTC, and the shares of its half-hours below
-        zero and above zero. The means are over the whole window.
+        of its Generation Capacity; the storage BMU's lowest and highest output, its mean output
+        from 13:00 to 14:00 UTC and from 18:00 to 19:00 UTC, the shares of its half-hours below
+        zero and above zero, and its own correlation with the sun; the highest sum of the two
+        BMUs' outputs in one half-hour, beside the site's TEC figure; and how many of the solar
+        BMU's half-hours below minus 5% of Generation Capacity have a storage output of exactly
+        zero. The means are over the whole window.
     """
     rows = []
     for solar in single.filter(pl.col("storage_bmu_ids") != "").iter_rows(named=True):
-        solar_mw = (
-            pl.read_parquet(OUTPUT_DIR / f"{solar['elexon_bmu_id']}_{window_label}.parquet")[
-                "output_mwh"
-            ]
-            * 2
+        solar_output = pl.read_parquet(
+            OUTPUT_DIR / f"{solar['elexon_bmu_id']}_{window.label}.parquet"
         )
+        solar_mw = solar_output["output_mwh"] * 2
         for storage_id in [bmu for bmu in solar["storage_bmu_ids"].split(";") if bmu]:
-            output = pl.read_parquet(OUTPUT_DIR / f"{storage_id}_{window_label}.parquet")
+            output = pl.read_parquet(OUTPUT_DIR / f"{storage_id}_{window.label}.parquet")
             hourly = (
                 output.with_columns(
                     hour=pl.col("half_hour_end_time").dt.offset_by("-15m").dt.hour(),
@@ -369,6 +370,16 @@ def metering_table(*, single: pl.DataFrame, window_label: str) -> pl.DataFrame:
                 .agg(pl.col("megawatts").mean())
             )
             storage_mw = output["output_mwh"] * 2
+            both = solar_output.select("half_hour_end_time", solar_mwh=pl.col("output_mwh")).join(
+                output.select("half_hour_end_time", storage_mwh=pl.col("output_mwh")),
+                on="half_hour_end_time",
+            )
+            solar_imports = both.filter(
+                pl.col("solar_mwh") * 2 < -STORAGE_SHARE * solar["generation_capacity_mw"]
+            )
+            storage_correlation = sun_following_correlation(
+                series=analysis_series(output=output, window_start=window.start)
+            )
             rows.append(
                 {
                     "solar_bmu": solar["elexon_bmu_id"],
@@ -387,6 +398,17 @@ def metering_table(*, single: pl.DataFrame, window_label: str) -> pl.DataFrame:
                     ),
                     "storage_share_of_half_hours_above_zero": round(
                         _as_float((storage_mw > 0).mean()), 2
+                    ),
+                    "storage_correlation_with_sun": (
+                        None if storage_correlation is None else round(storage_correlation, 2)
+                    ),
+                    "highest_solar_plus_storage_mw": round(
+                        _as_float((both["solar_mwh"] + both["storage_mwh"]).max()) * 2, 1
+                    ),
+                    "site_tec_mw": solar["tec_mw"],
+                    "storage_exactly_zero_at_solar_imports": (
+                        f"{int((solar_imports['storage_mwh'] == 0).sum())} "
+                        f"of {solar_imports.height}"
                     ),
                 }
             )
@@ -859,10 +881,10 @@ def main() -> None:
         + _md(capacities_table(census=census, scope="single-site"))
         + "\n\n### Aggregate\n\n"
         + _md(capacities_table(census=census, scope="aggregate")),
-        "## The BMUs with output, ranked by highest over lowest of the six capacity figures\n\n"
+        "## The BMUs with output, ranked by highest over lowest of the six figures\n\n"
         "Figures at or below zero and missing figures are left out of the ratio. The three BMUs "
         "with "
-        "the largest ratio are the ones Figure 5 draws. `p99_output_mw` is the 99th percentile of "
+        "the largest ratio are the ones Figure 2 draws. `p99_output_mw` is the 99th percentile of "
         "the BMU's half-hourly output, not a registered capacity.\n\n"
         + _md(disparity_table(census=census)),
         "## Single-site BMUs in the gap band, or typed Solar and not following the sun\n\n"
@@ -897,7 +919,7 @@ def main() -> None:
         "## Storage BMUs at the census sites: mean output by hour of day\n\n"
         + _md(storage_pattern_table(single=single, window_label=window.label)),
         "## How the hybrid sites with a storage BMU are metered: solar BMU against storage BMU\n\n"
-        + _md(metering_table(single=single, window_label=window.label)),
+        + _md(metering_table(single=single, window=window)),
         "## What a single lookup gives, and what the study finds\n\n"
         + _md(register_table(census=census, today=run_date)),
         "## Largest output of each census BMU\n\n"
