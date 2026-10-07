@@ -57,6 +57,12 @@ gets read before any Python is written or edited. Change a rule here and nowhere
     - Variables/Functions: `snake_case`
     - Classes: `PascalCase`
     - Constants: `UPPER_SNAKE_CASE`
+    - **Descriptive but long beats short but ambiguous.** A name is read far more often than it is
+      typed, so spend the extra words. Check each word in a name against the other meanings this
+      project already gives it: "grid" can mean the H3 cells, gridded weather data, or a set of
+      forecast rows; "model" can mean a weather model, an XGBoost model, or a Patito model; "run"
+      can mean an NWP run or a Dagster run. `PowerLagsPerNwpRunFeatureEngineer` is the right shape
+      of name, and `GridEngineer` is not.
 
 ## Type hints and signatures
 
