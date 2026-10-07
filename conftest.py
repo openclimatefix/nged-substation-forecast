@@ -10,10 +10,14 @@ tests. A skip applied during collection cannot be defeated that way — the gate
 of what ``-m`` the caller passes. Run the network tests with ``uv run pytest --run-network`` (add
 ``-m network`` to run *only* them). See
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/>.
+
+``--run-studies`` gates the tests under ``packages/studies/tests`` the same way, selecting them by
+path, except ``test_study_boundaries.py``, which always runs.
 """
 
 import os
 from collections.abc import Iterable
+from pathlib import Path
 
 import pytest
 
@@ -47,23 +51,40 @@ def pytest_configure(config: pytest.Config) -> None:
     os.environ["SENTRY_DSN"] = ""
 
 
+_STUDIES_TESTS_DIR = Path(__file__).parent / "packages" / "studies" / "tests"
+_UNGATED_STUDIES_TEST_FILE = "test_study_boundaries.py"
+
+
 def pytest_addoption(parser: pytest.Parser) -> None:
-    """Register the ``--run-network`` opt-in flag."""
+    """Register the ``--run-network`` and ``--run-studies`` opt-in flags."""
     parser.addoption(
         "--run-network",
         action="store_true",
         default=False,
         help="Run tests marked @pytest.mark.network (hit the real Dynamical.org NWP catalog).",
     )
+    parser.addoption(
+        "--run-studies",
+        action="store_true",
+        default=False,
+        help="Run the slow tests under packages/studies/tests.",
+    )
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: Iterable[pytest.Item]) -> None:
-    """Skip every ``network``-marked test unless ``--run-network`` was passed."""
-    if config.getoption("--run-network"):
-        return
+    """Skip each gated group of tests unless its opt-in flag was passed."""
     skip_network = pytest.mark.skip(
         reason="hits the real Dynamical.org catalog; pass --run-network"
     )
+    skip_studies = pytest.mark.skip(reason="slow studies test; pass --run-studies")
     for item in items:
-        if "network" in item.keywords:
+        if "network" in item.keywords and not config.getoption("--run-network"):
             item.add_marker(skip_network)
+        # A path check, not a `studies` keyword: the `packages/studies` directory node is itself
+        # a keyword of every test beneath it, including the ungated one.
+        if (
+            item.path.is_relative_to(_STUDIES_TESTS_DIR)
+            and item.path.name != _UNGATED_STUDIES_TEST_FILE
+            and not config.getoption("--run-studies")
+        ):
+            item.add_marker(skip_studies)
