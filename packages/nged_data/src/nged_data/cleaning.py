@@ -5,7 +5,6 @@ with the whole raw `power_time_series` table and writes the result to the
 `cleaned_power_time_series` Delta table.
 """
 
-import ast
 import hashlib
 from pathlib import Path
 from typing import Final
@@ -14,45 +13,13 @@ import patito as pt
 import polars as pl
 from contracts.power_schemas import CleanedPowerTimeSeries, PowerTimeSeries, TimeSeriesMetadata
 
-
-def hash_code_ignoring_docs(source: str) -> str:
-    """Return the SHA-256 of a Python module's syntax tree, with docstrings and comments removed.
-
-    The syntax tree carries no comments, line numbers or formatting, and this function deletes every
-    statement that is a bare string literal (a docstring), so editing any of those leaves the hash
-    unchanged. Upgrading Python can change the hash, because each Python version may print its
-    syntax tree differently; the cost is one extra rebuild.
-
-    Args:
-        source: The module's Python source code.
-
-    Returns:
-        The hex digest.
-    """
-    tree = ast.parse(source)
-    for node in ast.walk(tree):
-        body = getattr(node, "body", None)
-        if isinstance(body, list):
-            node.body = [  # ty: ignore[unresolved-attribute]
-                statement
-                for statement in body
-                if not (
-                    isinstance(statement, ast.Expr)
-                    and isinstance(statement.value, ast.Constant)
-                    and isinstance(statement.value.value, str)
-                )
-            ]
-    return hashlib.sha256(ast.dump(tree).encode()).hexdigest()
-
-
-CLEANING_CODE_HASH: Final[str] = hash_code_ignoring_docs(Path(__file__).read_text())
-"""The hash of this module's code, computed at import by `hash_code_ignoring_docs`.
+CLEANING_CODE_HASH: Final[str] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+"""The SHA-256 of this module's own source file, computed at import.
 
 `clean_nged_power_data` skips a rebuild only when this hash matches the one recorded in the
 cleaned table's newest write commit, so any edit to a cleaning rule forces a rebuild on the next
-run, whether or not the edit is committed. An edit to a docstring or a comment does not. The
-cleaning rules must live in this module, or the hash must be extended to cover every file they
-live in.
+run, whether or not the edit is committed. The cleaning rules must live in this module, or the hash
+must be extended to cover every file they live in.
 """
 
 

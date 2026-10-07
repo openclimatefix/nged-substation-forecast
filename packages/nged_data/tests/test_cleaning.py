@@ -5,7 +5,7 @@ import polars as pl
 import pytest
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import CleanedPowerTimeSeries, PowerTimeSeries, TimeSeriesMetadata
-from nged_data.cleaning import flag_nged_power, hash_code_ignoring_docs
+from nged_data.cleaning import flag_nged_power
 
 T0 = datetime(2026, 1, 1, 0, 0, tzinfo=UTC)
 T1 = datetime(2026, 1, 1, 0, 30, tzinfo=UTC)
@@ -83,28 +83,3 @@ def test_flag_nged_power_returns_exactly_the_input_rows():
     # `flag_nged_power` promises no row order, so compare sorted rows.
     assert sorted(result.select("time_series_id", "time", "power").rows()) == sorted(rows)
     CleanedPowerTimeSeries.validate(result.sort("time_series_id", "time"))
-
-
-_CODE = '''"""Module docstring."""
-
-
-def rule(x):
-    """Function docstring."""
-    return x == 0  # a comment
-'''
-
-
-def test_hash_code_ignoring_docs_ignores_docstrings_comments_and_formatting() -> None:
-    edited_docs = '''"""A rewritten module docstring."""
-
-def rule(x):
-    """A rewritten function docstring, over
-    two lines."""
-    # A new comment.
-    return (x == 0)
-'''
-    assert hash_code_ignoring_docs(_CODE) == hash_code_ignoring_docs(edited_docs)
-
-
-def test_hash_code_ignoring_docs_changes_when_the_code_changes() -> None:
-    assert hash_code_ignoring_docs(_CODE) != hash_code_ignoring_docs(_CODE.replace("== 0", "< 0"))
