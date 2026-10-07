@@ -295,3 +295,121 @@ def test_capacity_disparity_breaks_a_tie_by_identifier() -> None:
     ]
     ranked = collate.capacity_disparity(table=_census(rows=rows))
     assert ranked["elexon_bmu_id"].to_list() == ["T_A", "T_B"]
+
+
+def test_the_gsp_groups_map_to_the_dno_licence_areas_in_neso_s_geojson() -> None:
+    """The expected values are the `Name`, `DNO`, and `Area` of NESO's licence-area GeoJSON.
+
+    The file is `gb-dno-license-areas-20240503-as-geojson.geojson`, at
+    <https://neso.energy/data-portal/gis-boundaries-gb-dno-license-areas>. The literals below were
+    read from its 14 features, so a mapping edited in `collate.py` alone fails this test.
+    """
+    assert {group: area for group, (_, area) in collate.GSP_GROUP_AREAS.items()} == {
+        "_A": "UKPN",
+        "_B": "NGED",
+        "_C": "UKPN",
+        "_D": "SP Energy Networks",
+        "_E": "NGED",
+        "_F": "Northern Powergrid",
+        "_G": "Electricity North West",
+        "_H": "SSEN",
+        "_J": "UKPN",
+        "_K": "NGED",
+        "_L": "NGED",
+        "_M": "Northern Powergrid",
+        "_N": "SP Energy Networks",
+        "_P": "SSEN",
+    }
+
+
+def test_the_gsp_group_area_names_are_those_of_neso_s_geojson() -> None:
+    assert {group: area for group, (area, _) in collate.GSP_GROUP_AREAS.items()} == {
+        "_A": "East England",
+        "_B": "East Midlands",
+        "_C": "London",
+        "_D": "North Wales, Merseyside and Cheshire",
+        "_E": "West Midlands",
+        "_F": "North East England",
+        "_G": "North West England",
+        "_H": "Southern England",
+        "_J": "South East England",
+        "_K": "South Wales",
+        "_L": "South West England",
+        "_M": "Yorkshire",
+        "_N": "South and Central Scotland",
+        "_P": "North Scotland",
+    }
+
+
+def _square(*, west: float, south: float, east: float, north: float) -> list[list[float]]:
+    return [[west, south], [east, south], [east, north], [west, north], [west, south]]
+
+
+LICENCE_AREAS = {
+    "features": [
+        {
+            "properties": {"Name": "_X"},
+            "geometry": {
+                "type": "MultiPolygon",
+                "coordinates": [
+                    [
+                        _square(west=0, south=0, east=10, north=10),
+                        _square(west=4, south=4, east=6, north=6),
+                    ],
+                    [_square(west=20, south=0, east=30, north=10)],
+                ],
+            },
+        },
+        {
+            "properties": {"Name": "_Y"},
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [_square(west=10.5, south=0, east=15, north=10)],
+            },
+        },
+    ]
+}
+
+
+@pytest.mark.parametrize(
+    ("easting", "northing", "expected"),
+    [
+        (2, 2, "_X"),
+        (25, 5, "_X"),
+        (12, 5, "_Y"),
+        (5, 5, None),
+        (10.2, 5, None),
+        (-1, 5, None),
+        (2, 11, None),
+    ],
+)
+def test_a_position_is_in_the_licence_area_that_contains_it(
+    easting: float, northing: float, expected: str | None
+) -> None:
+    found = collate.licence_area_at(easting_m=easting, northing_m=northing, areas=LICENCE_AREAS)
+    assert (found["Name"] if found else None) == expected
+
+
+def test_the_distance_to_other_areas_skips_the_areas_own_edges() -> None:
+    # (9, 5) is 1 m from _X's east edge, which is skipped, and 1.5 m from _Y's west edge.
+    assert collate.distance_to_other_areas_m(
+        easting_m=9, northing_m=5, areas=LICENCE_AREAS, own_name="_X"
+    ) == pytest.approx(1.5)
+    # (12, 5) is 2 m from _X's east edge, and 1.5 m from _Y's own west edge, which is skipped.
+    assert collate.distance_to_other_areas_m(
+        easting_m=12, northing_m=5, areas=LICENCE_AREAS, own_name="_Y"
+    ) == pytest.approx(2.0)
+
+
+def test_the_distance_to_an_area_past_the_end_of_an_edge_is_to_the_edges_end_point() -> None:
+    # (10.2, 12) lies above _X's top edge, which ends at the corner (10, 10), so the distance is
+    # to that corner: hypot(0.2, 2).
+    assert collate.distance_to_other_areas_m(
+        easting_m=10.2, northing_m=12, areas=LICENCE_AREAS, own_name="_Z"
+    ) == pytest.approx(2.00998, abs=1e-4)
+
+
+def test_dno_area_is_empty_for_a_missing_or_unknown_gsp_group() -> None:
+    assert collate.dno_area(gsp_group_id="_L") == "NGED"
+    assert collate.dno_area(gsp_group_id=None) is None
+    assert collate.dno_area(gsp_group_id="_Z") is None

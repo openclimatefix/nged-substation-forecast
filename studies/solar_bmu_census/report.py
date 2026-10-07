@@ -7,6 +7,7 @@ Database (REPD) are public, so `report.md` names the BMUs it lists. Run after `f
 `uv run python studies/solar_bmu_census/report.py`.
 """
 
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from itertools import pairwise
@@ -26,7 +27,13 @@ from classify import (
     largest_output_mw,
     sun_following_correlation,
 )
-from collate import CAPACITY_COLUMNS, DISPARITY_FIGURES, P99_COLUMN, capacity_disparity
+from collate import (
+    CAPACITY_COLUMNS,
+    DISPARITY_FIGURES,
+    GSP_GROUP_AREAS,
+    P99_COLUMN,
+    capacity_disparity,
+)
 from fetch_sources import (
     OUTPUT_DIR,
     STUDY_DIR,
@@ -37,6 +44,15 @@ from fetch_sources import (
     recorded_run,
 )
 from recall_check import recall_table
+from solar_estimate import (
+    CAMS_PUBLIC_POINTS_PATH,
+    DC_AC_RATIO,
+    MIN_CAMS_RELIABILITY,
+    SENSITIVITY_RATIOS,
+    estimate_solar_ac_capacity_mw,
+    estimate_solar_ac_capacity_with_cams_mw,
+    mean_hourly_sun,
+)
 from studies.solar import zenith
 
 CORRELATION_BANDS: Final[tuple[float, ...]] = (0.0, 0.3, 0.6, 0.8, 1.0)
@@ -135,6 +151,313 @@ def capacity_table(*, table: pl.DataFrame) -> pl.DataFrame:
                     "sum (MW)": round(float(values[column].sum()), 1) if values.height else 0.0,
                 }
             )
+    return pl.DataFrame(rows)
+
+
+def coincident_peak_mw(*, outputs: list[pl.DataFrame]) -> float:
+    """Return the highest sum of several BMUs' outputs in one half-hour, in megawatts.
+
+    The BMUs' half-hourly series are summed on their common `half_hour_end_time` index first. A BMU
+    with no row in a half-hour adds nothing to that half-hour.
+
+    Args:
+        outputs: One frame for each BMU, with columns `half_hour_end_time` and `output_mwh`.
+
+    Returns:
+        The maximum over time of the summed output in megawatts (the megawatt-hours times 2), or
+        0.0 when `outputs` holds no row.
+    """
+    if not outputs:
+        return 0.0
+    summed = (
+        pl.concat([output.select("half_hour_end_time", "output_mwh") for output in outputs])
+        .group_by("half_hour_end_time")
+        .agg(pl.col("output_mwh").sum())
+    )
+    return _as_float(summed["output_mwh"].max()) * 2
+
+
+def aggregate_capacity_table(*, aggregates: pl.DataFrame) -> pl.DataFrame:
+    """Sum each capacity column over all the aggregate BMUs.
+
+    An aggregate BMU pools many sites, so each sum is an upper bound on the solar part and not a
+    solar figure. The aggregate BMUs have no TEC project or REPD row, so those columns are empty.
+
+    Args:
+        aggregates: The census table's aggregate rows.
+
+    Returns:
+        One row per capacity column: the number of aggregate BMUs, the number with a value, and the
+        sum in MW (0.0 when no BMU has a value).
+    """
+    return pl.DataFrame(
+        [
+            {
+                "capacity column": column,
+                "bmus": aggregates.height,
+                "bmus with a value": aggregates.filter(pl.col(column).is_not_null()).height,
+                "sum (MW)": round(_as_float(aggregates[column].sum()), 1),
+            }
+            for column in CAPACITY_COLUMNS
+        ]
+    )
+
+
+def solar_estimate_table(
+    *,
+    census: pl.DataFrame,
+    scope: str,
+    window: Window,
+    only_following_the_sun: bool,
+    shape_of: Callable[[str], pl.DataFrame | None],
+) -> pl.DataFrame:
+    """Estimate each BMU's solar AC capacity at each DC:AC ratio, beside its Generation Capacity.
+
+    Args:
+        census: The census table.
+        scope: `single-site` or `aggregate`.
+        window: The study window.
+        only_following_the_sun: Whether to keep only the BMUs whose output follows the sun.
+        shape_of: Maps a BMU identifier to its CAMS shape from `mean_hourly_sun`, or to None to
+            use the cosine of the solar zenith at the census reference point as the shape.
+
+    Returns:
+        One row per BMU: its Generation Capacity, its largest half-hourly output, its estimate in MW
+        at each ratio in `SENSITIVITY_RATIOS`, and the base-case estimate over Generation Capacity
+        minus 1 (the relative error, where the BMU's Generation Capacity is its solar capacity). A
+        BMU with too little output has no estimate.
+    """
+    rows = census.filter(pl.col("scope") == scope).sort("elexon_bmu_id")
+    if only_following_the_sun:
+        rows = rows.filter(pl.col("basis").str.contains("behaviour"))
+    records = []
+    for row in rows.iter_rows(named=True):
+        output = pl.read_parquet(OUTPUT_DIR / f"{row['elexon_bmu_id']}_{window.label}.parquet")
+        record: dict[str, Any] = {
+            "elexon_bmu_id": row["elexon_bmu_id"],
+            "generation_capacity_mw": row["generation_capacity_mw"],
+            "largest_output_mw": round(largest_output_mw(output=output), 1),
+        }
+        hourly_sun = shape_of(row["elexon_bmu_id"])
+        for ratio in SENSITIVITY_RATIOS:
+            if hourly_sun is None:
+                estimate = estimate_solar_ac_capacity_mw(
+                    output=output, window_start=window.start, dc_ac_ratio=ratio
+                )
+            else:
+                estimate = estimate_solar_ac_capacity_with_cams_mw(
+                    output=output,
+                    window_start=window.start,
+                    dc_ac_ratio=ratio,
+                    hourly_sun=hourly_sun,
+                )
+            record[f"estimate_r{ratio}_mw"] = None if estimate is None else round(estimate, 1)
+        base = record[f"estimate_r{DC_AC_RATIO}_mw"]
+        capacity = row["generation_capacity_mw"]
+        record["error_at_base_ratio"] = (
+            None if base is None or not capacity else round(base / capacity - 1, 2)
+        )
+        records.append(record)
+    return pl.DataFrame(records, schema_overrides={"error_at_base_ratio": pl.Float64})
+
+
+def estimate_totals_table(*, estimates: pl.DataFrame) -> pl.DataFrame:
+    """Sum a `solar_estimate_table` over its BMUs that have an estimate.
+
+    Args:
+        estimates: The output of `solar_estimate_table`.
+
+    Returns:
+        One row: the number of BMUs, the number with an estimate, the sum of the Generation Capacity
+        of the BMUs with an estimate, the sum of the estimates at each ratio in
+        `SENSITIVITY_RATIOS`, the mean absolute relative error at the base ratio over the BMUs with
+        a Generation Capacity above zero, and the largest such error.
+    """
+    base = f"estimate_r{DC_AC_RATIO}_mw"
+    fitted = estimates.filter(pl.col(base).is_not_null())
+    errors = fitted.filter(pl.col("generation_capacity_mw") > 0)["error_at_base_ratio"].abs()
+    row: dict[str, Any] = {
+        "bmus": estimates.height,
+        "bmus with an estimate": fitted.height,
+        "generation_capacity_mw of those": round(
+            _as_float(fitted["generation_capacity_mw"].sum()), 1
+        ),
+    }
+    for ratio in SENSITIVITY_RATIOS:
+        row[f"sum of estimates, r={ratio} (MW)"] = round(
+            _as_float(fitted[f"estimate_r{ratio}_mw"].sum()), 1
+        )
+    row["mean absolute error at base ratio"] = round(_as_float(errors.mean()), 2)
+    row["largest absolute error at base ratio"] = round(_as_float(errors.max()), 2)
+    return pl.DataFrame([row])
+
+
+def shape_comparison_table(*, by_shape: dict[str, pl.DataFrame]) -> pl.DataFrame:
+    """Set the base-ratio estimate and error of each shape side by side, for the same BMUs.
+
+    Args:
+        by_shape: Maps a shape's name to its `solar_estimate_table` over the same BMUs.
+
+    Returns:
+        One row per BMU: its Generation Capacity, then for each shape the estimate at the base
+        ratio in MW and the error against Generation Capacity.
+    """
+    first = next(iter(by_shape.values()))
+    table = first.select("elexon_bmu_id", "generation_capacity_mw")
+    for shape, estimates in by_shape.items():
+        table = table.join(
+            estimates.select(
+                "elexon_bmu_id",
+                pl.col(f"estimate_r{DC_AC_RATIO}_mw").alias(f"{shape}: estimate (MW)"),
+                pl.col("error_at_base_ratio").alias(f"{shape}: error"),
+            ),
+            on="elexon_bmu_id",
+            how="left",
+        )
+    return table
+
+
+P99_SHARE_TRUSTWORTHY: Final[float] = 0.98
+"""A BMU whose P99 of output is at least this share of Generation Capacity ran at its Generation
+Capacity, so Generation Capacity is a trustworthy target for the validation."""
+
+
+def shape_error_by_subset_table(
+    *, by_shape: dict[str, pl.DataFrame], single: pl.DataFrame
+) -> pl.DataFrame:
+    """Give each shape's errors on the BMUs that ran at Generation Capacity and on the others.
+
+    Args:
+        by_shape: Maps a shape's name to its `solar_estimate_table` over the same single-site BMUs.
+        single: The census table's single-site rows, for the P99 of output.
+
+    Returns:
+        One row per shape and subset: the BMUs in the subset, the mean absolute error and the
+        largest absolute error of the estimate at the base ratio against Generation Capacity. The
+        subset `P99 within 2% of Generation Capacity` holds BMUs whose P99 of output is at least
+        `P99_SHARE_TRUSTWORTHY` of Generation Capacity.
+    """
+    share = single.select(
+        "elexon_bmu_id",
+        ran_at_capacity=pl.col(P99_COLUMN)
+        >= P99_SHARE_TRUSTWORTHY * pl.col("generation_capacity_mw"),
+    )
+    rows = []
+    for shape, estimates in by_shape.items():
+        joined = estimates.join(share, on="elexon_bmu_id")
+        for ran, label in ((True, "P99 within 2% of Generation Capacity"), (False, "other BMUs")):
+            errors = joined.filter(pl.col("ran_at_capacity") == ran)["error_at_base_ratio"].abs()
+            rows.append(
+                {
+                    "shape": shape,
+                    "subset": label,
+                    "bmus": errors.len(),
+                    "mean absolute error": round(_as_float(errors.mean()), 3),
+                    "largest absolute error": round(_as_float(errors.max()), 3),
+                }
+            )
+    return pl.DataFrame(rows)
+
+
+def shape_facts_table(
+    *,
+    cams: pl.DataFrame,
+    grid_sun: pl.DataFrame,
+    single_cosine: pl.DataFrame,
+    single_grid: pl.DataFrame,
+    aggregate_grid: pl.DataFrame,
+    census: pl.DataFrame,
+) -> pl.DataFrame:
+    """Return the facts about the CAMS shape and the shape choice that the page quotes.
+
+    Args:
+        cams: The CAMS public-points frame.
+        grid_sun: The 18-point mean shape from `mean_hourly_sun`.
+        single_cosine: The cosine shape's `solar_estimate_table` for the single-site BMUs.
+        single_grid: The 18-point mean's `solar_estimate_table` for the single-site BMUs.
+        aggregate_grid: The 18-point mean's `solar_estimate_table` for the aggregate BMUs.
+        census: The census table, for each aggregate BMU's lead party.
+
+    Returns:
+        Rows of `quantity` and `value`.
+    """
+    base = f"estimate_r{DC_AC_RATIO}_mw"
+    dropped = cams.filter(pl.col("reliability") < MIN_CAMS_RELIABILITY)
+    ratio = (
+        single_grid.select("elexon_bmu_id", grid=pl.col(base))
+        .join(single_cosine.select("elexon_bmu_id", cosine=pl.col(base)), on="elexon_bmu_id")
+        .select(ratio=pl.col("grid") / pl.col("cosine"))["ratio"]
+    )
+    total_energies = aggregate_grid.join(
+        census.select("elexon_bmu_id", "lead_party"), on="elexon_bmu_id"
+    ).filter(pl.col("lead_party").str.contains("TotalEnergies"))
+    return pl.DataFrame(
+        [
+            ("CAMS point-hours below the reliability threshold", str(dropped.height)),
+            ("CAMS point-hours in all", str(cams.height)),
+            (
+                "Of the dropped point-hours, those with clear-sky irradiance of zero",
+                str(dropped.filter(pl.col("clear_sky_ghi_w_m2") <= 0).height),
+            ),
+            (
+                "Median clear-sky irradiance of the dropped point-hours (W/m2)",
+                f"{_as_float(dropped['clear_sky_ghi_w_m2'].median()):.1f}",
+            ),
+            ("Highest value of the 18-point mean shape", f"{_as_float(grid_sun['sun'].max()):.3f}"),
+            (
+                "18-point mean estimate over cosine estimate, single-site BMUs: lowest",
+                f"{_as_float(ratio.min()):.3f}",
+            ),
+            (
+                "18-point mean estimate over cosine estimate, single-site BMUs: highest",
+                f"{_as_float(ratio.max()):.3f}",
+            ),
+            (
+                "TotalEnergies BMUs with an estimate",
+                str(total_energies.filter(pl.col(base).is_not_null()).height),
+            ),
+            (
+                "Sum of the TotalEnergies BMUs' 18-point mean estimates (MW)",
+                f"{_as_float(total_energies[base].sum()):.1f}",
+            ),
+        ],
+        schema=["quantity", "value"],
+        orient="row",
+    )
+
+
+def observed_power_table(*, table: pl.DataFrame, window_label: str) -> pl.DataFrame:
+    """Sum the BMUs' largest outputs, and find the group's highest combined output, per group.
+
+    Both columns measure observed output and are not registered capacities.
+
+    Args:
+        table: The census table's single-site rows.
+        window_label: The window's label in the file names.
+
+    Returns:
+        One row per group: the number of BMUs, the sum over the group's BMUs of each BMU's largest
+        half-hourly output (`largest_output_mw`) in MW, and the highest sum of the group's BMUs'
+        outputs in one half-hour in MW.
+    """
+    rows = []
+    for label, technology in GROUPS:
+        group = table if technology is None else table.filter(pl.col("technology") == technology)
+        outputs = [
+            pl.read_parquet(OUTPUT_DIR / f"{bmu}_{window_label}.parquet")
+            for bmu in group.sort("elexon_bmu_id")["elexon_bmu_id"]
+        ]
+        largest = [largest_output_mw(output=output) for output in outputs]
+        rows.append(
+            {
+                "group": label,
+                "bmus": group.height,
+                "max of output (MW)": round(sum(largest), 1),
+                "highest combined output in one half-hour (MW)": round(
+                    coincident_peak_mw(outputs=outputs), 1
+                ),
+            }
+        )
     return pl.DataFrame(rows)
 
 
@@ -925,6 +1248,248 @@ def disparity_table(*, census: pl.DataFrame, window_label: str) -> pl.DataFrame:
     )
 
 
+NO_GSP_GROUP: Final[str] = "no GSP group in the register"
+"""The label for a BMU whose register row leaves the grid supply point (GSP) group empty."""
+
+
+def dno_single_table(*, single: pl.DataFrame) -> pl.DataFrame:
+    """List each single-site census BMU with the GSP group and distribution network operator.
+
+    Args:
+        single: The census table's single-site rows.
+
+    Returns:
+        One row for each BMU: its identifier, name, connection type, the register's GSP group
+        identifier and the area name for it, the distribution network operator (DNO) for that group,
+        the GSP group and DNO of the NESO licence area that contains the position of its matched
+        REPD row and the distance in km from that position to the nearest other licence area, its
+        Generation Capacity in MW, and the county and region of that REPD row.
+    """
+    return (
+        single.sort("elexon_bmu_id")
+        .with_columns(
+            gsp_area=pl.col("gsp_group").replace_strict(
+                {group: area for group, (area, _) in GSP_GROUP_AREAS.items()},
+                default=None,
+                return_dtype=pl.String,
+            )
+        )
+        .select(
+            "elexon_bmu_id",
+            "display_name",
+            "connection_type",
+            "gsp_group",
+            "gsp_area",
+            "dno_area",
+            "position_gsp_group",
+            "licence_area_by_position",
+            "km_to_nearest_other_area",
+            "generation_capacity_mw",
+            "repd_county",
+            "repd_region",
+        )
+        .with_columns(pl.all().cast(pl.String).fill_null("-"))
+    )
+
+
+def dno_summary_table(
+    *, census: pl.DataFrame, scope: str, by: str = "dno_area", unplaced: str = NO_GSP_GROUP
+) -> pl.DataFrame:
+    """Count a scope's census BMUs and sum their Generation Capacity for each DNO area.
+
+    Args:
+        census: The census table.
+        scope: `single-site` or `aggregate`.
+        by: The column that names the DNO: `dno_area` (from the register's GSP group) or
+            `licence_area_by_position` (from the licence area that contains the REPD position).
+        unplaced: The label for a BMU whose `by` column is empty.
+
+    Returns:
+        One row for each DNO area that holds a BMU of the scope, with `unplaced` for BMUs whose
+        `by` column is empty: the number of BMUs and the sum of their Generation Capacity in MW.
+    """
+    return (
+        census.filter(pl.col("scope") == scope)
+        .with_columns(dno_area=pl.col(by).fill_null(unplaced))
+        .group_by("dno_area")
+        .agg(
+            bmus=pl.len(),
+            generation_capacity_mw=pl.col("generation_capacity_mw").sum().round(1),
+        )
+        .sort("dno_area")
+    )
+
+
+def gsp_register_table(*, census: pl.DataFrame, reference: list[dict[str, Any]]) -> pl.DataFrame:
+    """Return how often the BMU register names a GSP group, and the BMUs in NGED's areas.
+
+    Args:
+        census: The census table.
+        reference: The BMU register.
+
+    Returns:
+        The number of register rows of each `bmUnitType` and how many of them name a GSP group; the
+        number of census BMUs that are embedded, and how many of those IGCPU types as Solar; and
+        the number of single-site and of aggregate census BMUs whose register GSP group is in an
+        NGED area; and the number of single-site census BMUs whose REPD position is inside an NGED
+        licence area.
+    """
+    rows: list[tuple[str, str]] = []
+    for unit_type, label in (("T", "transmission-connected"), ("E", "embedded")):
+        of_type = [r for r in reference if r["bmUnitType"] == unit_type]
+        rows.append((f"Register rows of type {unit_type} ({label})", str(len(of_type))))
+        rows.append(
+            (
+                f"Register rows of type {unit_type} that name a GSP group",
+                str(sum(r["gspGroupId"] is not None for r in of_type)),
+            )
+        )
+    embedded = census.filter(pl.col("connection_type") == "embedded")
+    single = census.filter(pl.col("scope") == "single-site")
+    aggregates = census.filter(pl.col("scope") == "aggregate")
+    nged = pl.col("dno_area") == "NGED"
+    rows += [
+        ("Census BMUs that are embedded (E_)", str(embedded.height)),
+        (
+            "Embedded census BMUs that IGCPU types as Solar",
+            str(embedded.filter(pl.col("igcpu_installed_capacity_mw").is_not_null()).height),
+        ),
+        ("Single-site census BMUs that name a GSP group", str(single["gsp_group"].count())),
+        (
+            "Single-site census BMUs that are transmission-connected (T_)",
+            str(single.filter(pl.col("connection_type") == "transmission-connected").height),
+        ),
+        (
+            "Transmission-connected single-site census BMUs that name a GSP group",
+            str(
+                single.filter(pl.col("connection_type") == "transmission-connected")[
+                    "gsp_group"
+                ].count()
+            ),
+        ),
+        (
+            "Single-site census BMUs whose register GSP group is in an NGED area",
+            str(single.filter(nged).height),
+        ),
+        (
+            "Single-site census BMUs whose REPD position is inside an NGED licence area",
+            str(single.filter(pl.col("licence_area_by_position") == "NGED").height),
+        ),
+        (
+            "Single-site census BMUs with a REPD position",
+            str(single["licence_area_by_position"].count()),
+        ),
+        (
+            "Aggregate census BMUs whose register GSP group is in an NGED area",
+            str(aggregates.filter(nged).height),
+        ),
+        (
+            "Generation Capacity of the aggregate census BMUs in an NGED area (MW)",
+            f"{_as_float(aggregates.filter(nged)['generation_capacity_mw'].sum()):.1f}",
+        ),
+        (
+            "Generation Capacity of all aggregate census BMUs (MW)",
+            f"{_as_float(aggregates['generation_capacity_mw'].sum()):.1f}",
+        ),
+    ]
+    return pl.DataFrame(rows, schema=["quantity", "value"], orient="row")
+
+
+def project_sums_table(
+    *, single: pl.DataFrame, reference: list[dict[str, Any]], window_label: str
+) -> pl.DataFrame:
+    """Set each site's TEC and REPD values beside the sum of the site's BMUs.
+
+    TEC and REPD give one value for a project, so a site's BMUs are summed before the comparison.
+
+    Args:
+        single: The census table's single-site rows.
+        reference: The BMU register, for the Generation Capacity of the storage BMUs.
+        window_label: The window's label in the file names.
+
+    Returns:
+        One row for each site (a TEC project, or a BMU with none): its solar and storage BMUs; the
+        sums of their Generation Capacity in MW; TEC and REPD values; REPD's battery capacity; the
+        REPD value minus the solar sum, in MW and as a share of the solar sum; the solar sum plus
+        REPD's battery capacity; and the highest sum of the BMUs' outputs in one half-hour.
+    """
+    capacity = {str(r["elexonBmUnit"]): float(r["generationCapacity"] or 0) for r in reference}
+    rows = []
+    keyed = single.with_columns(site=pl.coalesce("tec_project_id", "elexon_bmu_id")).sort(
+        "elexon_bmu_id"
+    )
+    for _, group in keyed.group_by("site", maintain_order=True):
+        solar_ids = group["elexon_bmu_id"].to_list()
+        storage_ids = [i for s in group["storage_bmu_ids"] for i in s.split(";") if i]
+        solar_sum = _as_float(group["generation_capacity_mw"].sum())
+        storage_sum = sum(capacity[i] for i in storage_ids)
+        highest = coincident_peak_mw(
+            outputs=[
+                pl.read_parquet(OUTPUT_DIR / f"{bmu}_{window_label}.parquet")
+                for bmu in [*solar_ids, *storage_ids]
+            ]
+        )
+        first = group.row(0, named=True)
+        repd = first["repd_installed_capacity_mw"]
+        battery = first["repd_battery_mw"]
+        rows.append(
+            {
+                "site": ", ".join(solar_ids),
+                "solar_bmus_generation_capacity_mw": round(solar_sum, 3),
+                "storage_bmus": ", ".join(storage_ids),
+                "storage_bmus_generation_capacity_mw": round(storage_sum, 3),
+                "solar_plus_storage_bmus_mw": round(solar_sum + storage_sum, 3),
+                "tec_mw": first["tec_mw"],
+                "repd_mw": repd,
+                "repd_battery_mw": battery,
+                "repd_minus_solar_sum_mw": None if repd is None else round(repd - solar_sum, 3),
+                "repd_minus_solar_sum_share": (
+                    None if repd is None else round((repd - solar_sum) / solar_sum, 3)
+                ),
+                "solar_sum_plus_repd_battery_mw": (
+                    None if battery is None else round(solar_sum + battery, 3)
+                ),
+                "highest_output_of_all_bmus_mw": round(highest, 2),
+            }
+        )
+    return pl.DataFrame(rows).with_columns(pl.all().cast(pl.String).fill_null("-"))
+
+
+def tec_stage_table(*, single: pl.DataFrame, tec: pl.DataFrame) -> pl.DataFrame:
+    """List every TEC register row of the projects that single-site census BMUs match, and Sundon.
+
+    The Sundon project is the one TEC project that Tebworth's customer holds. No census BMU matches
+    it, because its plant type lists storage only.
+
+    Args:
+        single: The census table's single-site rows, with `tec_project_id`.
+        tec: The TEC register with all-string columns.
+
+    Returns:
+        The register's rows for those projects, with the connected capacity, the increase, the
+        cumulative capacity and the date the increase takes effect, so that a stage not yet built
+        shows beside the stage that is.
+    """
+    return (
+        tec.filter(
+            pl.col("Project ID").is_in(single["tec_project_id"].drop_nulls().to_list())
+            | (pl.col("Project Name") == "Sundon")
+        )
+        .select(
+            "Project Name",
+            "Project ID",
+            "Project Status",
+            "MW Connected",
+            "MW Increase / Decrease",
+            "Cumulative Total Capacity (MW)",
+            "MW Effective From",
+            "Plant Type",
+        )
+        .sort("Project Name", "Project Status")
+        .with_columns(pl.all().fill_null("-"))
+    )
+
+
 def main() -> None:
     """Write `report.md`."""
     today = datetime.now(UTC)
@@ -999,6 +1564,73 @@ def main() -> None:
     by_type = (
         single.group_by("connection_type", "technology").len().sort("connection_type", "technology")
     )
+    cams = pl.read_parquet(CAMS_PUBLIC_POINTS_PATH)
+    grid_sun = mean_hourly_sun(
+        cams=cams.filter(pl.col("point_id").str.starts_with("gb_")),
+        min_reliability=MIN_CAMS_RELIABILITY,
+    )
+    own_sun = {
+        bmu: mean_hourly_sun(
+            cams=cams.filter(pl.col("bmu_ids").list.contains(bmu)),
+            min_reliability=MIN_CAMS_RELIABILITY,
+        )
+        for bmu in single["elexon_bmu_id"]
+    }
+    shape_functions: dict[str, Callable[[str], pl.DataFrame | None]] = {
+        "cosine of the solar zenith": lambda bmu: None,
+        "CAMS at the BMU's own point": lambda bmu: own_sun[bmu],
+        "mean of the 18 CAMS grid points": lambda bmu: grid_sun,
+    }
+    estimates = {
+        (shape, scope): solar_estimate_table(
+            census=census,
+            scope=scope,
+            window=window,
+            only_following_the_sun=scope == "single-site",
+            shape_of=shape_of,
+        )
+        for shape, shape_of in shape_functions.items()
+        for scope in ("single-site", "aggregate")
+        if not (scope == "aggregate" and shape == "CAMS at the BMU's own point")
+    }
+    estimate_sections = [
+        "## Solar AC capacity estimate: the single-site BMUs that follow the sun, three shapes\n\n"
+        + _md(
+            shape_comparison_table(
+                by_shape={
+                    shape: table
+                    for (shape, scope), table in estimates.items()
+                    if scope == "single-site"
+                }
+            )
+        )
+    ]
+    for (shape, scope), estimate_table in estimates.items():
+        what = (
+            "single-site BMUs that follow the sun (validation)"
+            if scope == "single-site"
+            else ("aggregate BMUs")
+        )
+        estimate_sections.append(
+            f"## Solar AC capacity estimate, shape = {shape}: {what}\n\n"
+            + _md(estimate_table)
+            + "\n\n### Totals\n\n"
+            + _md(estimate_totals_table(estimates=estimate_table))
+        )
+    subset_errors = shape_error_by_subset_table(
+        by_shape={
+            shape: table for (shape, scope), table in estimates.items() if scope == "single-site"
+        },
+        single=single,
+    )
+    facts = shape_facts_table(
+        cams=cams,
+        grid_sun=grid_sun,
+        single_cosine=estimates[("cosine of the solar zenith", "single-site")],
+        single_grid=estimates[("mean of the 18 CAMS grid points", "single-site")],
+        aggregate_grid=estimates[("mean of the 18 CAMS grid points", "aggregate")],
+        census=census,
+    )
     sections = [
         "# Solar-BMU census report",
         intro,
@@ -1035,8 +1667,32 @@ def main() -> None:
         + _md(to_inspect),
         "## Capacity values (single-site BMUs; columns are never added together)\n\n"
         + _md(capacity_table(table=single)),
+        "## Observed output of the single-site BMUs, by group (not registered capacities)\n\n"
+        "`max of output (MW)` is the sum over the group's BMUs of each BMU's largest half-hourly "
+        "output (`classify.largest_output_mw`), and the BMUs' largest outputs occur at different "
+        "times. `highest combined output in one half-hour (MW)` is the maximum over time of the "
+        "group's summed half-hourly output, so it never exceeds the first column. Neither column "
+        "is added to a registered capacity. The aggregate BMUs have no such columns.\n\n"
+        + _md(observed_power_table(table=single, window_label=window.label)),
+        (
+            "## How the solar AC capacity is estimated\n\n"
+            "Each estimate fits `min(r * a * c, a)` to the BMU's output, where `a` is the "
+            "estimate and `c` is the shape. All three shapes get the same fit: `a` is fitted to "
+            "the upper envelope of output (the 99th percentile in each band of `c`). A CAMS "
+            "`c` is the mean irradiance over some points (one point for the BMU's own point, "
+            "the 18 grid points for the GB-wide mean), applied to both half-hours inside the "
+            "hour (the hour is labelled by its end) and divided by the highest clear-sky "
+            "irradiance of any hour. The relative error is the estimate at the base ratio "
+            "over Generation Capacity, minus 1."
+        ),
+        *estimate_sections,
+        "## Errors of each shape on the BMUs that ran at Generation Capacity and on the others\n\n"
+        + _md(subset_errors),
+        "## Facts about the CAMS shapes and the shape choice\n\n" + _md(facts),
         "## Aggregate BMUs (supplier, virtual, and other identifiers), reported apart\n\n"
-        + aggregate_note,
+        + aggregate_note
+        + "\n\n"
+        + _md(aggregate_capacity_table(aggregates=aggregates)),
         "## Output-weighted UTC hour of day, single-site BMUs that follow the sun\n\n"
         + _md(hour_centres(solar_ids=solar_ids, window_label=window.label)),
         f"## TEC recall check (mapping: {provenance})\n\n"
@@ -1077,6 +1733,35 @@ def main() -> None:
         + _md(aggregate_flow_table(aggregates=aggregates, window_label=window.label)),
         "## What a single lookup gives, and what the study finds\n\n"
         + _md(register_table(census=census, today=run_date)),
+        "## Where each single-site census BMU connects: GSP group and DNO area\n\n"
+        "A GSP group is the Elexon grid supply point group in the BMU register. `gsp_area` is the "
+        "group's area name and `dno_area` the distribution network operator for that area, from "
+        "`collate.GSP_GROUP_AREAS`. `position_gsp_group` and `licence_area_by_position` are the "
+        "GSP group and operator of the licence area in NESO's map that contains the position of "
+        "the matched REPD row, and `km_to_nearest_other_area` is how far inside that area the "
+        "position sits. NESO calls its boundaries approximate. `repd_county` and "
+        "`repd_region` are the matched REPD row's own fields, which are not licence "
+        "areas.\n\n" + _md(dno_single_table(single=single)),
+        "## Single-site census BMUs by DNO area, from the register's GSP group\n\n"
+        + _md(dno_summary_table(census=census, scope="single-site")),
+        "## Single-site census BMUs by DNO area, from the REPD position\n\n"
+        + _md(
+            dno_summary_table(
+                census=census,
+                scope="single-site",
+                by="licence_area_by_position",
+                unplaced="no REPD position",
+            )
+        ),
+        "## Aggregate census BMUs by DNO area\n\n"
+        + _md(dno_summary_table(census=census, scope="aggregate")),
+        "## How often the BMU register names a GSP group, and the counts in NGED's areas\n\n"
+        + _md(gsp_register_table(census=census, reference=reference)),
+        "## TEC and REPD values against the sum of each site's BMUs\n\n"
+        "Capacities are in MW. The solar and storage sums are of Generation Capacity.\n\n"
+        + _md(project_sums_table(single=single, reference=reference, window_label=window.label)),
+        "## TEC register rows of the matched projects, one for each stage\n\n"
+        + _md(tec_stage_table(single=single, tec=fetch_tec())),
         "## Largest output of each census BMU\n\n"
         + _md(peak_table(single=single, window_label=window.label)),
         "## Numbers the page quotes\n\n"
