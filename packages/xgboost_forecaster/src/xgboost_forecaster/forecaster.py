@@ -18,16 +18,16 @@ from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
 def _prepare_features(df: pl.DataFrame, feature_cols: list[str]) -> pl.DataFrame:
     """Return a Float32 DataFrame containing only the feature columns.
 
-    String, Categorical, and Enum columns are encoded as integer codes before casting, so XGBoost
-    treats them as ordinal numerics. Nulls are preserved as NaN, which XGBoost handles natively
-    as missing values. The Patito model is stripped from the result (zero-copy) so XGBoost sees a
-    plain ``pl.DataFrame``.
+    Enum columns are encoded as each value's position in the declared list, so a code means the same
+    in every frame. Other non-numeric dtypes (String, Categorical) fail the Float32 cast. Nulls
+    are preserved as NaN, which XGBoost handles natively as missing values. The Patito model is
+    stripped from the result (zero-copy) so XGBoost sees a plain ``pl.DataFrame``.
     """
     exprs = []
     for col in feature_cols:
         dtype = df[col].dtype
-        if dtype in (pl.String, pl.Categorical) or isinstance(dtype, pl.Enum):
-            exprs.append(pl.col(col).cast(pl.Categorical).to_physical().cast(pl.Float32).alias(col))
+        if isinstance(dtype, pl.Enum):
+            exprs.append(pl.col(col).to_physical().cast(pl.Float32).alias(col))
         else:
             exprs.append(pl.col(col).cast(pl.Float32).alias(col))
     return pl.DataFrame._from_pydf(df.select(exprs)._df)
@@ -78,7 +78,7 @@ class XGBoostForecaster(BaseForecaster):
     """
 
     MODEL_NAME = "xgboost"
-    MODEL_VERSION = 1
+    MODEL_VERSION = 2
     CONFIG_CLASS: ClassVar[type[XGBoostConfig]] = XGBoostConfig
 
     model_params: XGBoostConfig  # narrows the base class annotation for type checkers

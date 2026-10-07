@@ -97,7 +97,7 @@ DST). Electricity demand follows human behaviour, which tracks local time not UT
 | `local_time_of_year_cos` | Cosine of fraction of year (see `local_time_of_year_sin`) |
 | `local_day_of_week_sin` | Sine of day-of-week (7 day period) |
 | `local_day_of_week_cos` | Cosine of day-of-week (7 day period) |
-| `local_day_of_week` | Day-of-week name as a categorical (`Monday`–`Sunday`) |
+| `local_day_of_week` | Day-of-week name (`Monday`–`Sunday`); XGBoost receives its position in that list, 0 to 6 |
 | `local_utc_offset_minutes` | UTC offset in minutes (0 or 60 for GB; 330 for India's +5:30) |
 
 ### Static derived features
@@ -118,7 +118,7 @@ the model learn horizon-dependent biases).
 | `nwp_lead_time_hours` | Hours between `nwp_init_time` and `valid_time` |
 | `ensemble_member` | ECMWF ensemble member index (0–50) |
 | `time_series_id` | Substation identifier (integer) |
-| `time_series_type` | Asset category, e.g. `PV`, `Wind`, `Disaggregated Demand` (categorical string) |
+| `time_series_type` | Asset category, e.g. `PV`, `Wind`, `Disaggregated Demand` (an `Enum`; XGBoost receives its position in the declared list) |
 | `power_fcst_init_time` | When the forecast was issued |
 | `nwp_init_time` | When the NWP model ran |
 
