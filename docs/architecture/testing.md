@@ -69,11 +69,11 @@ rows, in [Performance and Scale](performance.md#the-other-hard-ceiling-polars-32
   is shared across more than one test module *within a single package*, put it in a package-level
   `tests/conftest.py`. `packages/dynamical_data/tests/conftest.py` is the example: it builds
   synthetic Xarray datasets that two test modules share. The only repo-root `conftest.py` holds
-  cross-package pytest plumbing, not fixtures — the network-test and studies-test gates below, Sentry data source name
-  (DSN) neutralisation, and the `OMP_NUM_THREADS`/`POLARS_MAX_THREADS` caps described in [Running
-  the suite in parallel](#running-the-suite-in-parallel). Production code reports its errors to
-  Sentry, and the DSN is the address those reports go to, so the root `conftest.py` blanks it and a
-  test run sends Sentry nothing.
+  cross-package pytest plumbing, not fixtures — the network-test and studies-test gates below,
+  Sentry data source name (DSN) neutralisation, and the `OMP_NUM_THREADS`/`POLARS_MAX_THREADS` caps
+  described in [Running the suite in parallel](#running-the-suite-in-parallel). Production code
+  reports its errors to Sentry, and the DSN is the address those reports go to, so the root
+  `conftest.py` blanks it and a test run sends Sentry nothing.
 - **A factory shared *across* packages goes in the root `tests/` directory, not in any one package's
   `tests/`.** The root `pyproject.toml` sets `pythonpath = ["tests"]` for the whole `uv run pytest`
   session. Every module placed at the top level of `tests/` is therefore importable by bare name
@@ -289,7 +289,8 @@ cannot override it. A run that names a path under `packages/studies/tests` still
 
 ## Continuous integration
 
-Two GitHub workflows in `.github/workflows/` run the checks described on this page, except the studies tests:
+Two GitHub workflows in `.github/workflows/` run the checks described on this page, except the
+studies tests:
 
 - **`ci.yml` — the per-PR quality gate.** Runs on every pull request and every push to `main`: `ruff
   check`, `ruff format --check`, `ty check`, the `pymarkdown scan` command from CLAUDE.md, `mkdocs
