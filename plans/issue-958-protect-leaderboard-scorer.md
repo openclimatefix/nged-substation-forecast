@@ -54,7 +54,7 @@ That buys the plan, both plan reviews, and both diff reviews.
 
 ## Decisions for the maintainer
 
-**Q1: in-window power (the issue's last comment). Option (a) or (b)?** My recommendation is (b).
+**Q1: in-window power (the issue's last comment). Decided by the maintainer: option (b).** Options (a) and (c) are kept below as the alternatives considered. Under (b) the truncated copy is built by the follow-up sysadmin issue.
 
 - **(a) Staging harness.** A maintainer-user harness stages, per initialisation time, only the power
   observed before it, and runs the worker's code as the research user against the staged copy.
@@ -71,6 +71,22 @@ That buys the plan, both plan reviews, and both diff reviews.
   enforces the property (a) tries to enforce physically, and it also catches a worker that hard-codes
   validation actuals. The remaining cost is that a worker can fit to validation actuals it can see,
   which is the selection-bias risk #960 and the Ladder guard address, not this issue.
+- **(c) One Delta table, partitioned at the cutoff.** The power tables gain a derived partition
+  column, such as `after_cutoff` (true or false), so the rows after `FINAL_TEST_START` sit in their
+  own directory, and an ACL denies the research user that directory. Code running as the maintainer
+  sees the one normal table. Delta has no setting that splits files at a date, so the partition
+  column is the only mechanism. What happens to the manifest: `_delta_log/` stays one shared log
+  that the research user must read, and it lists every data file, including the denied ones, with
+  row counts and per-column minimum and maximum values. That leaks the post-cutoff row counts and
+  the range of `power` per file; setting the table's statistics columns to skip `power` removes
+  most of the range leak. A scan that filters `after_cutoff = false` prunes the denied directory
+  and works; an unfiltered scan fails with a permission error, which fails closed but is opaque, so
+  `scan_power()` would apply the filter. Costs: partitioning an existing table is a one-off rewrite,
+  moving `FINAL_TEST_START` rewrites it again (and #960 has not settled the date), the writer in
+  `defs/assets.py` (issue #1020's territory) and the cleaning asset must derive the column on every
+  write, and the cleaned table needs the same layout because studies now read it. Buys: no copy to
+  refresh and no second table. Not chosen now because it edits out-of-bounds files and is
+  expensive to redo when the date moves; it is the better end state if the cutoff proves stable.
 - **Consequence of (b) for this issue:** the research user needs a copy of the power table
   truncated at `FINAL_TEST_START`, because Delta files cannot be hidden row by row. Writing that
   copy is a `scripts/maintenance/` job the maintainer runs (it belongs to the sysadmin issue). Layer 1
