@@ -267,8 +267,9 @@ design, so a null at lead-0 means what a null at any other step means.
 What it cannot see is a null that reached a stored cell, because `Nwp.validate` rejects that run
 before any check runs. That covers a block that empties a cell without emptying the whole box, where
 every grid point of the cell goes at once, and also a scattered null that happens to land on one of
-the 10 single-point cells. So a run that lands with this check red is telling you about absorbed scatter — a pattern this project has never
-yet seen in an instantaneous variable, whose nulls have only ever arrived as whole-step dropouts.
+the 10 single-point cells. So a run that lands with this check red is telling you about absorbed
+scatter — a pattern this project has never yet seen in an instantaneous variable, whose nulls have
+only ever arrived as whole-step dropouts.
 
 ### An empty slice or a wholly-missing variable is retried, not failed outright
 
