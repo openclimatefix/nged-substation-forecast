@@ -87,9 +87,7 @@ def _archive_model_dir(model_dir: Path, archive_path: Path) -> None:
             tar.add(item, arcname=item.name)
 
 
-def write_trained_metadata(
-    model_dir: Path, time_series_metadata: pt.DataFrame[TimeSeriesMetadata]
-) -> None:
+def write_trained_metadata(model_dir: Path, time_series_metadata: pl.DataFrame) -> None:
     """Write a model's frozen ``TimeSeriesMetadata`` copy into its saved directory.
 
     Call this *after* a subclass's ``save``, which clears the directory first.

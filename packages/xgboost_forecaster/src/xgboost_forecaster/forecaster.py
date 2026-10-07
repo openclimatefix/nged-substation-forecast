@@ -20,8 +20,9 @@ def _prepare_features(df: pl.DataFrame, feature_cols: list[str]) -> pl.DataFrame
 
     String, Categorical, and Enum columns are encoded as integer codes before casting, so XGBoost
     treats them as ordinal numerics. Nulls are preserved as NaN, which XGBoost handles natively
-    as missing values. The Patito model is stripped from the result (zero-copy) so XGBoost sees a
-    plain ``pl.DataFrame``.
+    as missing values. The result is a plain ``pl.DataFrame``: an eager ``select`` already returns
+    one, and the ``_from_pydf`` re-wrap keeps it plain if Patito starts keeping the model through
+    ``select`` again (Patito issue 167).
     """
     exprs = []
     for col in feature_cols:
