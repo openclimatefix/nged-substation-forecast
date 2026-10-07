@@ -11,7 +11,7 @@ from _power_test_data import power_at
 from baseline_forecasters import ManualHeuristicForecaster
 from baseline_forecasters.manual_heuristic import PowerLagsPerNwpRunFeatureEngineer
 from contracts.ml_schemas import AllFeatures
-from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import Nwp
 from ml_core.base_forecaster import BaseForecasterConfig
 from ml_core.features import TabularFeatureEngineer
@@ -99,6 +99,10 @@ def test_construction_orders_the_yaml_lags_by_hours_and_rejects_no_power_lag() -
     assert forecaster._lag_hours == _ALL_LAG_HOURS
     with pytest.raises(ValueError, match="at least one power lag"):
         ManualHeuristicForecaster(BaseForecasterConfig(selected_features={"local_time_of_day_sin"}))
+    with pytest.raises(ValueError, match="at least one power lag"):
+        ManualHeuristicForecaster(
+            BaseForecasterConfig(selected_features={"temperature_2m_lag_24h"})
+        )
 
 
 def test_shedding_keeps_member_identity_through_the_real_pipeline() -> None:
@@ -138,6 +142,11 @@ def test_shedding_keeps_member_identity_through_the_real_pipeline() -> None:
     for band, (rows, expected_members) in members_by_band.items():
         assert rows.height > 0, band
         assert set(rows["ensemble_member"].to_list()) == expected_members, band
+    # Per row, a member is present exactly when its lag is longer than the row's lead time.
+    per_row = forecast.group_by("valid_time", "lead_hours").agg(pl.col("ensemble_member"))
+    for row in per_row.iter_rows(named=True):
+        expected = {m for m, lag in enumerate(_ALL_LAG_HOURS) if lag > row["lead_hours"]}
+        assert set(row["ensemble_member"]) == expected, row["lead_hours"]
 
 
 def test_predict_drops_a_row_whose_lags_are_all_null() -> None:
@@ -179,22 +188,23 @@ def test_predict_on_empty_input_returns_a_valid_empty_frame() -> None:
     ).predict(_lag_frame([], columns))
 
     assert forecast.height == 0
+    PowerForecast.validate(forecast)
 
 
 def test_train_records_requested_series_with_observed_power() -> None:
     frame = pl.DataFrame(
         {
-            "time_series_id": pl.Series([1, 1, 2, 3], dtype=pl.Int32),
-            "power": pl.Series([1.0, None, None, 4.0], dtype=pl.Float32),
+            "time_series_id": pl.Series([5, 1, 1, 2, 3], dtype=pl.Int32),
+            "power": pl.Series([6.0, 1.0, None, None, 4.0], dtype=pl.Float32),
         }
     )
     forecaster = ManualHeuristicForecaster(
         BaseForecasterConfig(selected_features={"power_lag_168h"})
     )
 
-    forecaster.train(pt.LazyFrame.from_existing(frame.lazy()).set_model(AllFeatures), [1, 2])
+    forecaster.train(pt.LazyFrame.from_existing(frame.lazy()).set_model(AllFeatures), [5, 1, 2])
 
-    assert forecaster.trained_time_series_ids == [1]
+    assert forecaster.trained_time_series_ids == [1, 5]
 
 
 def test_save_then_load_round_trips_and_replaces_the_directory(tmp_path: Path) -> None:
@@ -278,3 +288,10 @@ def test_engineer_raises_in_single_run_mode() -> None:
             nwp=_nwp([(init_time, (0,), timedelta(0))], [_CELL_A]),
             power_fcst_init_time=init_time,
         )
+
+
+def test_power_fixture_gives_thirteen_distinct_lag_values() -> None:
+    """Guards the value checks above: equal lag values would hide a member mislabelled."""
+    target = datetime(2025, 3, 3, 12, tzinfo=UTC)
+    values = {power_at(target - timedelta(hours=hours)) for hours in _ALL_LAG_HOURS}
+    assert len(values) == len(_ALL_LAG_HOURS)

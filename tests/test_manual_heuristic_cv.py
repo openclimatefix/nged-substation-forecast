@@ -115,6 +115,9 @@ def test_manual_heuristic_emits_the_thirteen_lagged_powers_as_members(
     forecasts = pl.read_delta(forecasts_path)
 
     assert forecasts["nwp_init_time"].is_null().all()
+    assert forecasts["fold_id"].unique().to_list() == [FOLD_ID]
+    assert forecasts["experiment_name"].unique().to_list() == [EXPERIMENT_NAME]
+    assert forecasts["power_fcst_model_name"].unique().to_list() == ["manual_heuristic"]
     # One row per valid time and member: the three NWP members are not repeated.
     valid_times = half_hours(_VAL_DAY).to_list()
     assert forecasts.height == len(valid_times) * len(_WEEKLY_AND_ANNUAL_LAG_HOURS)
