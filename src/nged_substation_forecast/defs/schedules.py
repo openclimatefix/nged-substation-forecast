@@ -82,12 +82,12 @@ def ecmwf_ens_schedule(context: ScheduleEvaluationContext) -> RunRequest:
     when a de-accumulated variable is still wholly empty. ``ecmwf_ens`` then retries every 30
     minutes, up to 8 times (``NwpRunNotYetAvailable`` / ``NwpVariableWhollyMissing`` →
     ``RetryRequested`` in ``defs/assets.py``), rather than failing outright. Any other error still
-    fails immediately, and so does any failure of a run more than 36 hours old, which a catch-up
-    tick for a missed day or a backfill can request. Retrying is right because Dynamical.org
-    publishes each run as roughly 40 separate commits over about 15 minutes, so a run can be
-    readable while a variable whose commit has not landed yet still reads as empty — that is a run
-    mid-publication, not a broken one. Live inference (``live_forecasts``) always uses the freshest
-    run genuinely present regardless of this schedule's exact timing.
+    fails immediately, Any error also fails immediately for a run initialised more than 36 hours
+    ago, as a catch-up tick for a missed day or a backfill can request. Retrying is right because
+    Dynamical.org publishes each run as roughly 40 separate commits over about 15 minutes, so a run
+    can be readable while a variable whose commit has not landed yet still reads as empty — that is
+    a run mid-publication, not a broken one. Live inference (``live_forecasts``) always uses the
+    freshest run genuinely present regardless of this schedule's exact timing.
 
     Further reading:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright>

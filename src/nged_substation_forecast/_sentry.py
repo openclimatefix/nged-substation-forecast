@@ -10,14 +10,14 @@ Sentry configuration:
   run nor the bare ``RetryRequested`` wrapper around an exhausted in-band retry.
   `report_check_degradation` and `report_asset_degradation` cover the production faults the hook
   cannot see, because they never fail a run: a check, or an asset, that caught its own exception
-  instead of raising. `report_asset_retry` is the early warning for an asset that is about to retry:
-  it sends the caught exception at *warning* level on the first failed attempt, so the operator is
-  not told only when the last retry fails hours later.  The hook is used rather than Sentry's
-  ``LoggingIntegration`` log-to-event capture — which `init_sentry` explicitly disables — because
-  Dagster logs a step failure without ``exc_info``, so the log-based path would yield a message-only
-  event with no stack trace, *and* would fire for every ``ERROR`` log anywhere in the process
-  (Dagster's own startup/step logs, ad-hoc materialisations, even a swallowed telemetry error),
-  swamping Sentry with events the design never intended to send. The hook is attached to the
+  instead of raising. `report_asset_retry` is the early warning for an asset that is about to retry.
+  `report_asset_retry` sends the caught exception at *warning* level on the first failed attempt, so
+  the operator learns of the fault hours before the last retry fails.  The hook is used rather than
+  Sentry's ``LoggingIntegration`` log-to-event capture — which `init_sentry` explicitly disables —
+  because Dagster logs a step failure without ``exc_info``, so the log-based path would yield a
+  message-only event with no stack trace, *and* would fire for every ``ERROR`` log anywhere in the
+  process (Dagster's own startup/step logs, ad-hoc materialisations, even a swallowed telemetry
+  error), swamping Sentry with events the design never intended to send. The hook is attached to the
   *scheduled* asset jobs only, so it covers the unattended production workload;
   manual/backfill/experiment runs are watched by the operator at the Dagster UI, not Sentry.
 - **The missed-check-in alarm** — `send_forecast_checkin` sends a *success-only* heartbeat to a
@@ -128,7 +128,7 @@ def init_sentry(settings: Settings) -> None:
     ``ERROR`` log anywhere in the process — Dagster's startup/step logs, ad-hoc materialisations,
     even the swallowed telemetry error in `report_power_freshness` — would be shipped as an event,
     defeating the design where *only* the five explicit senders reach Sentry: the failure hook, the
-    freshness ``capture_message``, `report_check_degradation`, `report_asset_degradation` and
+    freshness ``capture_message``, `report_check_degradation`, `report_asset_degradation`, and
     `report_asset_retry`. Breadcrumbs (the integration's default ``level=INFO``) are kept, so log
     context still rides along with the events those senders do send.
 
@@ -274,17 +274,17 @@ def report_asset_degradation(
 
 
 def report_asset_retry(asset_name: str, exc: BaseException) -> None:
-    """Warn that an asset failed in a way it will retry, as a Sentry warning event.
+    """Warn that an asset failed in a way the asset will retry, as a Sentry warning event.
 
-    Without this, an asset that retries for hours reaches Sentry only when its last retry fails,
-    through `sentry_capture_failure`. Calling this on the first failed attempt names the cause at
-    once ([design principle
+    Without this warning, an asset that retries for hours reaches Sentry only when its last retry
+    fails, through `sentry_capture_failure`. Calling `report_asset_retry` on the first failed
+    attempt names the cause at once ([design principle
     16](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#16-a-failure-names-its-own-cause-in-the-telemetry)).
 
     The event carries the ``retrying_asset`` tag and not ``fault_category``, so an alert rule that
-    routes on ``fault_category:run_failed`` is not triggered. Its fingerprint is Sentry's default
-    grouping plus a marker, so the warning does not share an issue with the run-failed event that
-    follows if every retry fails.
+    routes on ``fault_category:run_failed`` is not triggered. The event's fingerprint is Sentry's
+    default grouping plus a ``retrying_asset`` marker, so the warning does not share an issue with
+    the run-failed event that follows if every retry fails.
 
     A no-op when Sentry is uninitialised (empty DSN), and never raises.
 

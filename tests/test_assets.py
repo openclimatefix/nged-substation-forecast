@@ -1160,10 +1160,10 @@ def _materialize_expecting_retries(
 ) -> list[RetryRequested]:
     """Materialise ``ecmwf_ens`` until its retries run out, and return each retry it requested.
 
-    Goes through ``materialize`` because a young partition reads ``context.retry_number``, which
-    raises ``AttributeError`` under direct invocation. The wait between retries is set to 0 in
-    each request, after the request is recorded, so the recorded ``seconds_to_wait`` is the
-    asset's real one.
+    Goes through ``materialize`` because a partition young enough to retry reads
+    ``context.retry_number``, and ``context.retry_number`` raises ``AttributeError`` under direct
+    invocation. The wait between retries is set to 0 in each request, after the request is recorded,
+    so the recorded ``seconds_to_wait`` is the value the asset requested.
     """
     requests: list[RetryRequested] = []
     requested_kwargs: list[dict[str, Any]] = []
@@ -1228,10 +1228,11 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
 def test_ecmwf_ens_warns_sentry_once_on_the_first_failed_attempt(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
-    """A run that will retry sends one Sentry warning, on the first attempt and no later one.
+    """A partition that will be retried sends one Sentry warning, on the first attempt and on no
+    later attempt.
 
-    The download count recorded when the warning is sent pins that it was the first attempt: a
-    warning sent on the last attempt would also be sent exactly once.
+    The download count recorded when the warning is sent pins that the warning came from the first
+    attempt: a warning sent on the last attempt would also be sent exactly once.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     downloads = 0
@@ -1267,8 +1268,9 @@ def test_ecmwf_ens_warns_sentry_once_on_the_first_failed_attempt(
 def test_ecmwf_ens_fails_at_once_for_a_run_too_old_to_retry(
     env: Path, monkeypatch: pytest.MonkeyPatch, error: Exception
 ) -> None:
-    """A run more than 36 hours old re-raises its own exception, names the partition on it, and
-    neither retries nor warns Sentry. It fails on ``main``, which requests a retry."""
+    """For a run more than 36 hours old, ``ecmwf_ens`` re-raises the original exception with the
+    partition noted on it, and neither retries nor warns Sentry. This test fails on ``main``, where
+    the asset requests a retry instead."""
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     warned: list[object] = []
 

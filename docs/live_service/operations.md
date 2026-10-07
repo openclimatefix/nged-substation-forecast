@@ -185,7 +185,7 @@ Stability](../design-philosophy/inherent-stability.md). None of the situations b
 emergency; all are next-business-day fixes.
 
 **What a Sentry event's tags tell you first.** `fault_category:run_failed` means a scheduled job
-failed outright, so that cycle did not run; an event without it is a degradation the service kept
+failed outright, so that cycle did not run. An event without that tag is a degradation the service kept
 forecasting through, or a `retrying_asset` warning that an asset failed and will retry. The full
 routing is in [Setting up Sentry telemetry](sentry.md#turn-it-on-in-production). Two things send
 nothing at all: a transient failure reading NGED's bucket, which `power_time_series_and_metadata`

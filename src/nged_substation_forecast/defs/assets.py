@@ -299,13 +299,14 @@ _ECMWF_ENS_RETRY_DELAY_SECONDS: Final[int] = 1800
 """How long to wait between retries of a not-yet-published ECMWF run."""
 
 _ECMWF_ENS_MAX_RETRY_AGE: Final[timedelta] = timedelta(hours=36)
-"""A run older than this fails at once instead of retrying.
+"""An ECMWF run initialised longer ago than this limit fails at once instead of retrying.
 
-Upstream is unlikely to repair a run that is days old, and each retrying partition holds an
+Dynamical.org is unlikely to repair a run that is days old. Each retrying partition holds an
 ``ECMWF`` concurrency pool slot for about 4 hours, so a backfill over bad runs would multiply that
-wait. The limit has to exceed the age of a healthy run at its last retry, about 15 hours (the
-10:30 UTC schedule plus the 4-hour ladder). It also covers a manual re-run of the previous day's
-partition, though that re-run's ladder stops early. Reasoning:
+4-hour wait. The limit has to exceed the age a run reaches by the last retry of its scheduled
+attempt, about 15 hours (the 10:30 UTC schedule plus the 4-hour ladder). The limit also lets a
+manual re-run of the previous day's partition retry, though that re-run's ladder stops early, once
+the run passes 36 hours. Reasoning:
 https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#why-only-these-three-failures-are-retried"""
 
 
@@ -472,11 +473,11 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     is absent from the catalog, a run with whole (member, lead time) slices of an instantaneous
     variable still empty, and a run with a de-accumulated variable still wholly empty. A
     materialisation that runs for hours and then fails is therefore this asset waiting for an
-    upstream run that never arrived, not a bug. The first failed attempt of a run that will retry
-    sends a Sentry warning naming the partition, so the operator does not learn of it only when the
-    last retry fails. A run more than 36 hours old is not retried at all and fails at once, because
-    upstream is unlikely to repair it and a backfill would otherwise hold a concurrency pool slot
-    for about 4 hours per partition.
+    upstream run that never arrived, not a bug. The first failed attempt that the asset will retry
+    sends a Sentry warning naming the partition, so the operator learns of the fault hours before
+    the last retry fails. A run initialised more than 36 hours ago is not retried at all and fails
+    at once, because Dynamical.org is unlikely to repair an old run, and a backfill would otherwise
+    hold a concurrency pool slot for about 4 hours per partition.
     """
     settings = Settings()
     storage_options = settings.storage_options
@@ -509,7 +510,8 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         nwp = convert_nwp_xarray_dataset_to_polars_dataframe(ds=ds, h3_grid=h3_grid)
     except (NwpRunNotYetAvailable, NwpVariableWhollyMissing) as exc:
         # The note puts the partition in every Sentry event for this failure: the warning below,
-        # and the run-failed event if the ladder runs out. The upstream messages name no run.
+        # and the run-failed event if the ladder runs out. The two exceptions' own messages do not
+        # name the partition.
         exc.add_note(f"ecmwf_ens partition {partition_date_str}")
         if _is_too_old_to_retry(nwp_init_time=nwp_init_time, now=datetime.now(UTC)):
             context.log.warning(f"ECMWF ENS run is too old to retry, failing at once: {exc}")
