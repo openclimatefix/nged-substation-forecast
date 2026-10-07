@@ -41,3 +41,22 @@ def test_a_bmu_without_a_row_in_a_half_hour_adds_nothing_to_that_half_hour() -> 
 
 def test_the_coincident_peak_of_no_series_is_zero() -> None:
     assert report.coincident_peak_mw(outputs=[]) == 0.0
+
+
+def test_the_aggregate_capacity_sums_count_only_bmus_with_a_value() -> None:
+    aggregates = pl.DataFrame(
+        {
+            "generation_capacity_mw": [10.0, 5.0],
+            "igcpu_installed_capacity_mw": [16.0, None],
+            "tec_mw": [None, None],
+            "largest_mel_mw": [0.0, 3.0],
+            "repd_installed_capacity_mw": [None, None],
+        }
+    )
+    table = report.aggregate_capacity_table(aggregates=aggregates)
+    rows = {row["capacity column"]: row for row in table.iter_rows(named=True)}
+    assert rows["generation_capacity_mw"]["sum (MW)"] == 15.0
+    assert rows["igcpu_installed_capacity_mw"]["bmus with a value"] == 1
+    assert rows["igcpu_installed_capacity_mw"]["sum (MW)"] == 16.0
+    assert rows["tec_mw"]["bmus with a value"] == 0
+    assert rows["largest_mel_mw"]["bmus with a value"] == 2

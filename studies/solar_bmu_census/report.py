@@ -167,6 +167,32 @@ def coincident_peak_mw(*, outputs: list[pl.DataFrame]) -> float:
     return _as_float(summed["output_mwh"].max()) * 2
 
 
+def aggregate_capacity_table(*, aggregates: pl.DataFrame) -> pl.DataFrame:
+    """Sum each capacity column over all the aggregate BMUs.
+
+    An aggregate BMU pools many sites, so each sum is an upper bound on the solar part and not a
+    solar figure. The aggregate BMUs have no TEC project or REPD row, so those columns are empty.
+
+    Args:
+        aggregates: The census table's aggregate rows.
+
+    Returns:
+        One row per capacity column: the number of aggregate BMUs, the number with a value, and the
+        sum in MW (0.0 when no BMU has a value).
+    """
+    return pl.DataFrame(
+        [
+            {
+                "capacity column": column,
+                "bmus": aggregates.height,
+                "bmus with a value": aggregates.filter(pl.col(column).is_not_null()).height,
+                "sum (MW)": round(_as_float(aggregates[column].sum()), 1),
+            }
+            for column in CAPACITY_COLUMNS
+        ]
+    )
+
+
 def observed_power_table(*, table: pl.DataFrame, window_label: str) -> pl.DataFrame:
     """Sum the BMUs' largest outputs, and find the group's highest combined output, per group.
 
@@ -1349,7 +1375,9 @@ def main() -> None:
         "is added to a registered capacity. The aggregate BMUs have no such columns.\n\n"
         + _md(observed_power_table(table=single, window_label=window.label)),
         "## Aggregate BMUs (supplier, virtual, and other identifiers), reported apart\n\n"
-        + aggregate_note,
+        + aggregate_note
+        + "\n\n"
+        + _md(aggregate_capacity_table(aggregates=aggregates)),
         "## Output-weighted UTC hour of day, single-site BMUs that follow the sun\n\n"
         + _md(hour_centres(solar_ids=solar_ids, window_label=window.label)),
         f"## TEC recall check (mapping: {provenance})\n\n"

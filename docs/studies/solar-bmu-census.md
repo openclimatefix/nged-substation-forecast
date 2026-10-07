@@ -318,6 +318,12 @@ months and are not registered capacities. The P99 of output is left out of the t
 | All solar BMUs, hybrids included (10) | 682.9 (10) | 591.0 (8) | 733.8 (9) | 667.0 (10) | 730.6 (9) | 648.2 (10) | 593.5 |
 | BMUs at hybrid sites (9) | 633.0 (9) | 542.0 (7) | 683.8 (8) | 617.0 (9) | 680.7 (8) | 598.0 (9) | 543.4 |
 | BMU at the pure PV site (1) | 50.0 (1) | 49.0 (1) | 50.0 (1) | 50.0 (1) | 49.9 (1) | 50.1 (1) | 50.1 |
+| Total capacity of aggregate BMUs (28) | 1,896.8 (28) | 16.0 (1) | – | 68.0 (24) | – | – | – |
+
+**An aggregate BMU's registered capacity covers every site pooled in the BMU, so the aggregate row
+is an upper bound on the solar part and not a solar figure.** A dash means the aggregate BMUs have
+no value: none matches a TEC project or an REPD row, and the study computes no observed-output
+columns for them.
 
 **Max of output is a sum of separate peaks, so it overstates what a group delivered at once, and the
 highest combined output in one half-hour is the group's true peak.** Max of output adds each BMU's
