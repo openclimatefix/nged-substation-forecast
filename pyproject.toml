@@ -388,6 +388,7 @@ extra-paths = [
     "studies/nwp_forecast_comparison",
     "studies/open_meteo_ensemble_means",
     "studies/past_weather",
+    "studies/solar_bmu_census",
     "studies/weather_downloads",
     "packages/studies/tests/past_weather",
 ]
@@ -435,6 +436,7 @@ pythonpath = [
     "studies/nwp_forecast_comparison",
     "studies/open_meteo_ensemble_means",
     "studies/past_weather",
+    "studies/solar_bmu_census",
     "studies/weather_downloads",
     "packages/studies/tests/past_weather",
 ]

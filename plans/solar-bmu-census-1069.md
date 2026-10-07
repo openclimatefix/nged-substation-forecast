@@ -83,6 +83,20 @@ uv run python studies/solar_bmu_census/report.py
 
 Plus, per the `data-validation` skill, on the first downloaded chunk and again at the end: gaps in each BMU's half-hourly series, duplicate `(bmUnit, halfHourEndTime)` keys, and the lag of the latest row.
 
+## What changed during implementation
+
+These changes followed the maintainer's instructions during the build, or were forced by the data.
+
+- **The deliverable is a docs page**, not only a README and `report.md` (open question 1 answered). The page needs the two Opus scientific-validity reviews the `study` skill requires.
+- **Hybrid sites are reported apart from pure PV sites.** The census, the capacity sums, and the counts are given for all BMUs, for hybrid sites only, and for pure PV sites only. A hybrid site is read from the TEC plant type, else from a REPD battery row. The solar BMU at a hybrid site is metered apart from its storage, so the study adds the storage BMU to the example figures where one has output.
+- **The classifier also drops the 30 days after first output and exact zeros while the sun is clearly up.** Both rules come from the maintainer. Daytime zeros could inflate the correlation of an intermittent non-solar unit, so the classifier computes the correlation with and without them, and the report shows both give the same nine solar single-site BMUs.
+- **Single-site and aggregate BMUs are counted apart** (open question 2): 10 single-site BMUs, and 28 aggregates.
+- **The BMUs are named, and output is shown in megawatts on calendar dates.** The maintainer decided the anonymisation rule covers NGED's private generators only, and all data here is public. `CLAUDE.md`, the `study` and `dataviz` skills, and `studies.anonymise` state that scope. The two hand-made match tables are committed beside the scripts.
+- **The figures include a map**, from the REPD position of each BMU's matched row, and example weeks.
+- **A TEC project has one row for each stage.** The study takes the row at the most advanced status, because a later stage's cumulative capacity includes capacity not yet built.
+- **REPD rows under construction count as built**, because sites generate while REPD still lists them so.
+- **The tests are in `packages/studies/tests/solar_bmu_census/`**, with `pyproject.toml` path entries, so the PR stops at review (open question 6).
+
 ## What the first plan review changed
 
 The reviewer tested the plan's premise on the live API (one month of B1610 for all 230 pool BMUs and for 369 BMUs with other fuel types, 2025 and 2026) and found the plan over-built for a result of about 10 BMUs. Accepted, each verified or re-derived:

@@ -30,6 +30,12 @@ climates, so a result may not hold elsewhere.
   active network management against each other and against the telemetry, and finds the setpoint
   history the one to build on.
 
+- [How many Balancing Mechanism Units in Great Britain are solar?](solar-bmu-census.md) — a census
+  of the BMUs whose settled output follows the sun, found because no field in the BMU register says
+  which units are solar. The study finds 10 single-site solar BMUs, 8 of them at sites that also
+  hold storage, reports 28 aggregate BMUs apart, and sets the five published capacity figures
+  side by side.
+
 ## Past weather
 
 **Three studies score how well each weather product describes weather that has already happened.**

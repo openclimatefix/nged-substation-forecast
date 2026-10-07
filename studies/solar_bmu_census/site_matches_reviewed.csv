@@ -1,0 +1,8 @@
+elexon_bmu_id,tec_project_id,repd_ref_id,note
+T_BURWS-1,a0l4L0000005ixnQAA,7630,TEC name matches; REPD Burwell Solar Farm 49.9 MW under construction at the Burwell substation
+T_BRCHS-1,a0l4L0000005ixlQAA,8479,BMU name is its identifier; Breach Solar Farm TEC 49.9 MW at Burwell; REPD Breach Farm solar 67 MW matches the 67 MW largest MEL
+T_BLPFS-1,a0l4L0000005iplQAA,8026,IGCPU installed capacity 57 MW equals TEC Warley (tertiary) 57 MW; REPD Bulphan Fen solar 49.9 MW with battery row
+T_TEBWS-1,,8894,REPD Tebworth solar farm with a battery row; TEC Sundon Pivoted Power is a candidate not accepted
+T_TYLNS-1,,9610,REPD Tye Lane solar farm 49.9 MW with an operational battery row
+E_KINCS-1,a0l4L0000005iUaQAI,11177,TEC Kincraig Energy Centre 20.62 MW storage and PV; REPD Kincraig solar farm and battery 21 MW
+T_LARKS-1,a0l4L0000005iodQAA,,"TEC Iron Acton PV and storage 99.4 MW equals Larks Green solar 49.9 MW plus its 49.5 MW battery in REPD; the name match to REPD is kept"

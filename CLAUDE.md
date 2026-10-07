@@ -55,7 +55,7 @@ one, the mistake is already written.
 |---|---|
 | `code-style` | writing or editing **any** Python in this repo |
 | `polars-patito-gotchas` | writing Polars/Patito code that joins, casts, filters a `pt.LazyFrame`, declares a Patito field, reads/writes Delta, or relies on row order after a lazy join |
-| `dataviz` | drawing any chart in this repository — this project's OCF-brand palette, chart sizing, SVG export, and generator anonymisation, on top of the bundled `dataviz` skill's general method |
+| `dataviz` | drawing any chart in this repository — this project's OCF-brand palette, chart sizing, SVG export, and the anonymisation of NGED's generators, on top of the bundled `dataviz` skill's general method |
 | `mkdocs-authoring` | editing markdown MkDocs renders — `docs/`, READMEs, `SKILL.md`, docstrings — especially nested lists, list items with code blocks, or wrapped links |
 | `marimo-notebooks` | creating or editing a Marimo notebook (`packages/dashboard/*.py`, `packages/notebooks/*.py`) |
 | `ty-workarounds` | acting on a `ty` error in Altair chart code, or adding any `# ty: ignore` |
@@ -486,12 +486,14 @@ fault. Widening a field to `| None` or relaxing a range to make a failing `valid
 the defect in the one place the rest of the system trusts. Reasoning and the rest of the rule:
 [`packages/contracts/README.md`](packages/contracts/README.md).
 
-**Never publish a metered generator's time series with the generator's name or ID.** A single site's
-output can be commercially sensitive, so NGED has asked that generator data leaves the project only
-anonymised. The rule covers everything outside the private data store: charts and examples in
-`docs/`, leaderboard rows, dashboards, reports, papers, and issue or PR bodies. Substations are not
-covered by this rule, and a generator's name may still appear in a lookup table that carries no time
-series.
+**Never publish the time series of one of NGED's metered generators with the generator's name or
+ID.** A single site's output can be commercially sensitive, so NGED has asked that its generator
+data leaves the project only anonymised. The rule covers everything outside the private data store:
+charts and examples in `docs/`, leaderboard rows, dashboards, reports, papers, and issue or PR
+bodies. Substations are not covered by this rule, and a generator's name may still appear in a
+lookup table that carries no time series. **The rule does not cover generators whose data is
+already public**, such as the Balancing Mechanism Units in Elexon's published data, which a study
+may name and show in megawatts on calendar dates.
 
 **Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an adversarial
 pass by the time a human is asked to review the diff, so that human review is the last line of

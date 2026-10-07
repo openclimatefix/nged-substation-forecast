@@ -1,0 +1,20 @@
+project_id,project_name,project_status,plant_type,bmu_ids,note
+a0l4L0000005iTtQAI,Almondell Lodge BESS & Solar Development,Built,Energy Storage System,,"no BMU identified by name, capacity, or lead party"
+a0l4L0000005ixnQAA,Beechgreen Energyfarm,Built,PV Array (Photo Voltaic/solar),T_BURWS-1,name and capacity
+a0l4L0000005iXhQAI,Bilbo Farm,Under Construction/Commissioning,Energy Storage System;PV Array (Photo Voltaic/solar),,"no BMU identified by name, capacity, or lead party"
+a0l4L0000005iy5QAA,Bramford (Tertiary),Built,Energy Storage System;PV Array (Photo Voltaic/solar),,"no BMU identified by name, capacity, or lead party"
+a0l4L0000005ilOQAQ,Bramley (tertiary),Under Construction/Commissioning,Energy Storage System;PV Array (Photo Voltaic/solar),,"no BMU identified by name, capacity, or lead party"
+a0l4L0000005ixlQAA,Breach Solar Farm,Built,Energy Storage System;PV Array (Photo Voltaic/solar),T_BRCHS-1,TEC Breach Solar Farm 49.9 MW at Burwell; BMU lead party Burwell 11 Solar; REPD 67 MW matches MEL
+a0l4L0000005iwHQAQ,Cleve Hill Solar Park,Built,Demand;Energy Storage System;PV Array (Photo Voltaic/solar),T_CLVHS-1;T_CLVHS-2,name
+a0l4L0000005iadQAA,Coventry,Built,Energy Storage System;PV Array (Photo Voltaic/solar),T_COVNB-1,"Pivot Power Coventry 50.4 MW, TEC 49.9 MW at Coventry; storage BMU"
+a0l4L0000005iodQAA,Iron Acton,Built,Energy Storage System;PV Array (Photo Voltaic/solar),T_LARKS-1;T_IRNAB-1,99.4 MW = 49.9 solar + 49.5 battery; Iron Acton Green lead party; storage BMU T_IRNAB-1
+a0l4L0000005irEQAQ,JG Pears,Built,CHP (Combined Heat and Power);Energy Storage System;PV Array (Photo Voltaic/solar);Wind Onshore,T_JGPR-1,High Marnham JGPEARS 13 MW; combined-heat-and-power site
+a0l4L0000005iU3QAI,Keithick Estate,Under Construction/Commissioning,Energy Storage System;PV Array (Photo Voltaic/solar),,"no BMU identified by name, capacity, or lead party"
+a0l4L0000005iUaQAI,Kincraig Energy Centre,Under Construction/Commissioning,Energy Storage System;PV Array (Photo Voltaic/solar),E_KINCS-1,name; capacity 20.6 MW
+a0l4L0000005ifXQAQ,Sundon Pivoted Power,Built,PV Array (Photo Voltaic/solar),,"no BMU identified by name, capacity, or lead party"
+a0l4L0000005iebQAA,Thornton Facility,Built,Energy Storage System;PV Array (Photo Voltaic/solar),,"no BMU identified by name, capacity, or lead party"
+a0l4L0000005ifgQAA,Walpole,Built,Energy Storage System;PV Array (Photo Voltaic/solar),,"no BMU identified by name, capacity, or lead party"
+a0l4L0000005iplQAA,Warley (tertiary),Built,Energy Storage System;PV Array (Photo Voltaic/solar),T_BLPFS-1;T_BLPFB-1,IGCPU 57 MW equals TEC; solar and storage BMUs share lead party
+a0l4L0000005iYCQAY,West Burton,Under Construction/Commissioning,Energy Storage System;PV Array (Photo Voltaic/solar),T_WBURB-41;T_WBURB-43,West Burton B Battery units
+a0l4L0000005imfQAA,Whitelee Extension,Built,Energy Storage System;Hydrogen;PV Array (Photo Voltaic/solar);Wind Onshore,T_WHILW-2;T_WHLWB-1,Whitelee Extension 206 MW is the TEC connected capacity; wind-farm BMU and battery
+a0l4L0000005ieLQAQ,Worset PV & BESS Park,Under Construction/Commissioning,Energy Storage System;PV Array (Photo Voltaic/solar),,"no BMU identified by name, capacity, or lead party"
