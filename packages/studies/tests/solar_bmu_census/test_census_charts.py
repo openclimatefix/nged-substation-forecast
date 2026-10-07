@@ -42,6 +42,34 @@ def test_the_six_figures_of_cleve_hill_solar_1_get_labels_that_never_overlap() -
     assert all(height >= value for height, value in zip(heights, sorted(values), strict=True))
 
 
+def test_an_arrow_ends_at_the_pixel_height_of_its_value() -> None:
+    geometry = census_charts.label_geometry(values=[25.0, 75.0], domain_high=100.0, height_px=200.0)
+    assert geometry.domain_high == pytest.approx(100.0)
+    assert geometry.line_y_px == pytest.approx([150.0, 50.0])
+    assert geometry.label_y_px == pytest.approx([150.0, 50.0])
+
+
+def test_labels_in_the_same_order_as_values_keep_arrows_from_crossing() -> None:
+    values = [112.0, 112.0, 350.0, 112.0, 373.0, 88.1, 90.0]
+    geometry = census_charts.label_geometry(values=values, domain_high=410.0, height_px=230.0)
+    order = sorted(range(len(values)), key=lambda i: values[i])
+    labels = [geometry.label_y_px[i] for i in order]
+    lines = [geometry.line_y_px[i] for i in order]
+    assert labels == sorted(labels, reverse=True)
+    assert lines == sorted(lines, reverse=True)
+    gap_px = 230.0 * census_charts.LABEL_GAP_SHARE * 410.0 / geometry.domain_high
+    assert all(a - b >= gap_px - 1e-9 for a, b in pairwise(labels))
+
+
+def test_stacked_labels_raise_the_axis_so_the_top_label_stays_inside_the_plot() -> None:
+    geometry = census_charts.label_geometry(
+        values=[90.0, 91.0, 92.0], domain_high=100.0, height_px=100.0
+    )
+    assert geometry.domain_high > 100.0
+    assert min(geometry.label_y_px) > 0
+    assert geometry.label_y_px[0] > geometry.label_y_px[2]
+
+
 def _census_row(
     bmu_id: str,
     *,
