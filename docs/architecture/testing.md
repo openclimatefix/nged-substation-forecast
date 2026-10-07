@@ -12,7 +12,7 @@ rows, in [Performance and Scale](performance.md#the-other-hard-ceiling-polars-32
 - **Test tooling is declared once, at the workspace root.** `pytest`, `moto`, and `numpy` live in
   the root `pyproject.toml` `[dependency-groups] dev`, and every workspace package inherits them. A
   package that gains a `tests/` directory does **not** re-declare `pytest` in its own
-  `pyproject.toml` — we run the whole suite from the repo root with `uv run pytest`, against the
+  `pyproject.toml` — we run the suite from the repo root with `uv run pytest`, against the
   root environment. (`packages/geo` declares its own `pytest`/`pytest-cov`; treat that as a
   historical exception, not the pattern to copy.)
 - **Discovery is automatic.** The only pytest configuration is the root `[tool.pytest.ini_options]`
@@ -37,7 +37,7 @@ rows, in [Performance and Scale](performance.md#the-other-hard-ceiling-polars-32
     Write it with `test "$(...)"` rather than as a pipeline into `grep -q`. `grep -c` exits 1 when
     it counts zero matches, so under `set -o pipefail` — which is what GitHub Actions gives every
     `run:` step — a pipeline form exits non-zero exactly when the check passes.
-- **Run the whole suite with plain `uv run pytest`, never `--all-packages`.** `uv run pytest`
+- **Run the suite with plain `uv run pytest`, never `--all-packages`.** `uv run pytest`
   executes against the root environment, which holds exactly the packages reachable from the root's
   dependencies and dev group — i.e. every package that has tests, by the rule above.
   `--all-packages` additionally installs workspace members that have no tests (`notebooks`) and each
@@ -69,7 +69,7 @@ rows, in [Performance and Scale](performance.md#the-other-hard-ceiling-polars-32
   is shared across more than one test module *within a single package*, put it in a package-level
   `tests/conftest.py`. `packages/dynamical_data/tests/conftest.py` is the example: it builds
   synthetic Xarray datasets that two test modules share. The only repo-root `conftest.py` holds
-  cross-package pytest plumbing, not fixtures — the network-test gate below, Sentry data source name
+  cross-package pytest plumbing, not fixtures — the network-test and studies-test gates below, Sentry data source name
   (DSN) neutralisation, and the `OMP_NUM_THREADS`/`POLARS_MAX_THREADS` caps described in [Running
   the suite in parallel](#running-the-suite-in-parallel). Production code reports its errors to
   Sentry, and the DSN is the address those reports go to, so the root `conftest.py` blanks it and a
@@ -272,15 +272,15 @@ passes, and even `-m network` alone stays skipped until `--run-network` is added
 ## Studies tests
 
 **The tests under `packages/studies/tests` are skipped unless the caller passes `--run-studies`.**
-They account for about 3 of the 3.5 minutes of a full run, so a plain `uv run pytest` leaves them
-out and finishes in under 30 seconds. The root `conftest.py` marks each of them `studies`
-automatically, by path, so a new studies test needs no decorator. The one exception is
-`test_study_boundaries.py`, which runs by default because it takes seconds and enforces the rule
-that production code never imports study code.
+On a 12-core workstation they account for about 3 of a full run's 3.5 minutes, so a plain `uv run
+pytest` leaves them out and finishes in about 30 seconds. The root `conftest.py` selects them by
+path, so a new studies test needs no decorator. The one exception is `test_study_boundaries.py`,
+which runs by default because it takes about 3 seconds and enforces the import rules listed above
+for studies and production code.
 
 ```bash
 uv run pytest --run-studies                          # whole suite, studies tests included
-uv run pytest --run-studies packages/studies         # only the studies tests (add -n auto)
+uv run pytest --run-studies -n auto packages/studies  # only the studies tests (a named path turns off the automatic -n auto)
 ```
 
 The gate is a collection hook for the same reason as the network gate above: a caller-supplied `-m`
@@ -289,7 +289,7 @@ cannot override it. A run that names a path under `packages/studies/tests` still
 
 ## Continuous integration
 
-Two GitHub workflows in `.github/workflows/` run the checks described on this page:
+Two GitHub workflows in `.github/workflows/` run the checks described on this page, except the studies tests:
 
 - **`ci.yml` — the per-PR quality gate.** Runs on every pull request and every push to `main`: `ruff
   check`, `ruff format --check`, `ty check`, the `pymarkdown scan` command from CLAUDE.md, `mkdocs
@@ -306,6 +306,8 @@ Two GitHub workflows in `.github/workflows/` run the checks described on this pa
   those fields, but a few construct `Settings()` directly and locally rely on the developer's
   `.env`, which CI doesn't have. The `ci` job is a required status check on `main` (configured in a
   GitHub repository ruleset, not in the workflow file).
+- **No workflow runs the studies tests.** Run `uv run pytest --run-studies` before merging a pull
+  request that touches `packages/studies/` or `studies/`.
 - **`nightly_network_tests.yml` — the nightly network job.** Runs *only* the network-gated tests
   (`uv run pytest --run-network -m network`) on a daily schedule, plus `workflow_dispatch` for
   on-demand runs. This is the only CI that touches the real Dynamical.org catalog, and it needs no

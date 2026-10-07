@@ -3,11 +3,6 @@
 Gates the ``network``-marked tests behind an explicit ``--run-network`` flag so a plain ``uv run
 pytest`` — local dev and the per-PR CI — never touches the real Dynamical.org catalog.
 
-Likewise gates the ``studies``-marked tests behind ``--run-studies``: they take about 3 minutes of
-the 3.5-minute full suite. Every test under ``packages/studies/tests`` carries the marker
-automatically, except the import-boundary guard in ``test_study_boundaries.py``, which is cheap and
-protects the production code.
-
 Why a collection hook rather than ``-m "not network"`` in ``addopts``: pytest keeps only the
 *last* ``-m`` it sees, so any developer-supplied marker expression (e.g. ``-m "not
 integration"``) silently replaces an ``addopts`` ``-m "not network"`` and re-includes the network
@@ -15,6 +10,9 @@ tests. A skip applied during collection cannot be defeated that way — the gate
 of what ``-m`` the caller passes. Run the network tests with ``uv run pytest --run-network`` (add
 ``-m network`` to run *only* them). See
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/>.
+
+``--run-studies`` gates the tests under ``packages/studies/tests`` the same way, selecting them by
+path, except ``test_study_boundaries.py``, which always runs.
 """
 
 import os
@@ -69,23 +67,24 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--run-studies",
         action="store_true",
         default=False,
-        help="Run the slow tests under packages/studies/tests (marked @pytest.mark.studies).",
+        help="Run the slow tests under packages/studies/tests.",
     )
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: Iterable[pytest.Item]) -> None:
-    """Mark the studies tests, then skip each gated group unless its opt-in flag was passed."""
+    """Skip each gated group of tests unless its opt-in flag was passed."""
     skip_network = pytest.mark.skip(
         reason="hits the real Dynamical.org catalog; pass --run-network"
     )
     skip_studies = pytest.mark.skip(reason="slow studies test; pass --run-studies")
     for item in items:
+        if "network" in item.keywords and not config.getoption("--run-network"):
+            item.add_marker(skip_network)
+        # A path check, not a `studies` keyword: the `packages/studies` directory node is itself
+        # a keyword of every test beneath it, including the ungated one.
         if (
             item.path.is_relative_to(_STUDIES_TESTS_DIR)
             and item.path.name != _UNGATED_STUDIES_TEST_FILE
+            and not config.getoption("--run-studies")
         ):
-            item.add_marker(pytest.mark.studies)
-        if "network" in item.keywords and not config.getoption("--run-network"):
-            item.add_marker(skip_network)
-        if "studies" in item.keywords and not config.getoption("--run-studies"):
             item.add_marker(skip_studies)
