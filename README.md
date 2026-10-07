@@ -69,7 +69,8 @@ above yourself before committing, for faster feedback than waiting on the commit
 
 ### Testing
 
-- **Run all tests**: `uv run pytest`
+- **Run the tests (studies tests skipped)**: `uv run pytest`
+- **Include the studies tests**: `uv run pytest --run-studies`
 - **Run tests with coverage**: `uv run pytest --cov`
 
 ### Development
