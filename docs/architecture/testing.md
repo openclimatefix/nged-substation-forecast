@@ -289,8 +289,7 @@ cannot override it. A run that names a path under `packages/studies/tests` still
 
 ## Continuous integration
 
-Two GitHub workflows in `.github/workflows/` run the checks described on this page, except the
-studies tests:
+Three GitHub workflows in `.github/workflows/` run the checks described on this page:
 
 - **`ci.yml` — the per-PR quality gate.** Runs on every pull request and every push to `main`: `ruff
   check`, `ruff format --check`, `ty check`, the `pymarkdown scan` command from CLAUDE.md, `mkdocs
@@ -307,8 +306,9 @@ studies tests:
   those fields, but a few construct `Settings()` directly and locally rely on the developer's
   `.env`, which CI doesn't have. The `ci` job is a required status check on `main` (configured in a
   GitHub repository ruleset, not in the workflow file).
-- **No workflow runs the studies tests.** Run `uv run pytest --run-studies` before merging a pull
-  request that touches `packages/studies/` or `studies/`.
+- **`studies_tests.yml` — the studies tests.** Runs `pytest -n auto --run-studies packages/studies`
+  on every push to `main`, and on a pull request only when the pull request changes
+  `packages/studies/`, `studies/`, or `docs/studies/`.
 - **`nightly_network_tests.yml` — the nightly network job.** Runs *only* the network-gated tests
   (`uv run pytest --run-network -m network`) on a daily schedule, plus `workflow_dispatch` for
   on-demand runs. This is the only CI that touches the real Dynamical.org catalog, and it needs no
