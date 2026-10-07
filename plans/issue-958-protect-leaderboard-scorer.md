@@ -92,13 +92,13 @@ That buys the plan, both plan reviews, and both diff reviews.
   copy is a `scripts/maintenance/` job the maintainer runs (it belongs to the sysadmin issue). Layer 1
   in the issue, the auto-research page, and #1035 then say the same thing.
 
-**Q2: which windows does the `FINAL_TEST_START` guard cover?** Recommendation: every group except
+**Q2: which windows does the `FINAL_TEST_START` guard cover? Decided: as recommended.** every group except
 `fold_id == "live"`. Without the exception, scoring live output past the cutoff would need
 `NGED_FINAL_TEST=1`, which breaks the ad-hoc production-monitoring route; live rows are forecasts
 of the future, not a held-out set. The guard applies to both `leaderboard` and `ad_hoc` scopes,
 because `ad_hoc` is the route for deliberate final-test scoring and must still demand the variable.
 
-**Q3: the cutoff date.** Recommendation: `2026-07-01`, the day after the only leaderboard fold's
+**Q3: the cutoff date. Decided: as recommended.** `2026-07-01`, the day after the only leaderboard fold's
 `val_end` (`2026-06-30`). `CvConfig` validates that `final_test_start` is later than every
 leaderboard fold's `val_end`. **#960 has not decided the final-test design, so the field is a
 guard, not a sealed test year:** the data after the cutoff is about three months, not an
@@ -108,7 +108,7 @@ changes.
 
 **Q4: what is the expected row set?** (Revised after the simplicity review: the cross-series regularity half is dropped, and the reference-experiment alternative is offered as option B.) The issue says rows `(time_series_id, power_fcst_init_time,
 valid_time)` "the fold's eligible series should cover", but nothing defines the expected
-initialisation times independent of the forecast itself. Option A (not recommended after the correctness review, see finding 1 and 3 below), a check per
+initialisation times independent of the forecast itself. Option A (rejected by the maintainer after the correctness review, findings 1 and 3), a check per
 `(experiment_name, fold_id)` group in leaderboard scope that raises `MissingForecastRowsError`:
 
 - **Series coverage:** every series in the fold's `eligible_time_series` partition appears in the
@@ -130,7 +130,7 @@ canonical initialisation-time grid.
 (the XGBoost baseline) for the same fold, using an anti-join each way. It closes the gap above,
 needs no read of `eligible_time_series`, and refuses out-of-window rows as extras. It costs a
 dependency on the baseline having been materialised for the fold, and changes the scored
-population from the eligible series to the baseline's trained series. **Recommendation after the correctness review: option B.** Option A would refuse the existing
+population from the eligible series to the baseline's trained series. **Decided by the maintainer: option B.** Option A would refuse the existing
 XGBoost fold, because `cv_power_forecasts` builds each run's half-hourly grid only between that
 run's first and last native NWP step, so the last valid times of `val_end` (21:30 to 23:30 with
 3-hour steps) have actuals but no forecast row for any series. Option A also admits extra
@@ -142,8 +142,7 @@ the eligible set", define "observed actual" from the scorer's own `actuals_lf` (
 power scan), restrict the valid times required to those inside some run's native range, and
 accept the lead-time gap.
 
-Under option A, an experiment whose `trained_time_series_ids` is smaller than the eligible set now
-fails the check. That is intended; the existing `xgboost` fold must still pass.
+**What option B means in code (decided).** The check applies to groups whose `experiment_name` starts with `study/`; reviewed experiments are not checked, because their code is reviewed. A new `reference_experiment_name` field on `CvConfig` names the reference (the XGBoost baseline; the implementer reads its exact name from `scripts/forecasting/run_baseline_experiment.py`). For each series batch the check anti-joins the study's keys `(time_series_id, power_fcst_init_time, valid_time, ensemble_member)` against the reference experiment's keys for the same fold, in both directions, and also compares the two series sets up front. Batching by series, as scoring already does, bounds memory; one fold is about 364M rows. A missing reference partition raises with a message naming the experiment to materialise.
 
 ## What changes, file by file
 
@@ -164,14 +163,12 @@ touched). PR #1040 (#1019) has merged: `metrics` now reads actuals through `scan
   check below. It is
   called in `_score_forecast_group` before any scoring or write, so a refused window leaves no
   `forecast_metrics` rows or MLflow runs. R&D, so it raises.
-- New `_require_complete_row_set(group_scan, eligible_ids, actuals_lf, window)` per Q4 option A
-  (series coverage plus rows inside `[val_start, val_end]`), called in
-  `_score_forecast_group` for `leaderboard` scope only, before the batched scoring. It streams
-  distinct `(time_series_id, valid_time)` and per-series pair counts rather than collecting rows.
-  `ad_hoc` scope is exempt because it has no eligible population. Failures use `ValueError`
-subclasses defined next to `NoOverlappingActualsError`, whichever module holds that.
-- `metrics` reads the fold's `eligible_time_series` partition (read-only; the table is written by
-  an out-of-bounds asset, which this issue does not change) and passes the ids down.
+- New pure function `require_same_row_keys` in `ml_core/metrics.py` (option B above), called from
+  `_score_forecast_group` for `study/` groups before the batched scoring, and called by
+  `score_study.py` before it writes, so a rejected file leaves no partition behind. Plus a
+  leaderboard-scope check, for every group, that each row's `valid_time` lies in
+  `[val_start, val_end]`. `ad_hoc` scope is exempt because it has no fold. Failures use `ValueError`
+  subclasses defined next to `NoOverlappingActualsError`, whichever module holds that.
 - Rows with `experiment_name` starting `study/` are written to `forecast_metrics` and logged under
   their prefixed name; nothing else changes. `promotion_assets.py` reads `experiment_name` only from
   MLflow runs that have a registered model, which a `study/` group never has, so no code is needed;
@@ -221,8 +218,8 @@ Accepted (each verified or marked for verification at implementation):
 - **Put the pure checks in `ml_core/metrics.py`** (`require_complete_row_set`,
   `require_window_within_guard`), where the import-linter contract, #1035's protected paths, and
   Dagster-free tests all apply. `cv_assets.py` only calls them.
-- **Add `eligible_time_series` to `metrics`' `deps`** if option A is chosen. Option B reads only
-  `power_forecasts`.
+- **No new asset dependency.** Option B reads only `power_forecasts`, so `metrics`' `deps` and its
+  read of `eligible_time_series` are unchanged.
 - **Promotion path.** `ml_core/mlflow_runs.py:list_promotable_runs` lists every fold run in every
   MLflow experiment, so a `study/` fold run would reach the `promotable_model_runs` candidates. The
   plan filters `study/` experiments there and refuses them in `promoted_model`, with tests. This
@@ -245,7 +242,7 @@ Accepted (each verified or marked for verification at implementation):
   different partition hourly; the implementer checks that delta-rs resolves the disjoint-partition
   commits, or the script retries.
 
-**Q5 for the maintainer: should `scan_power()` also truncate at the cutoff?** Truncating means a re-run of a published study loses about 3 months of power (2026-07-01 to October), which can change site lists, seeded anonymised labels, and numbers. Recommended yes: a reader that studies can read past the cutoff is no guard. Published pages keep the numbers they were computed with.
+**Q5: should `scan_power()` also truncate at the cutoff? Decided: yes, as recommended.** Truncating means a re-run of a published study loses about 3 months of power (2026-07-01 to October), which can change site lists, seeded anonymised labels, and numbers. Recommended yes: a reader that studies can read past the cutoff is no guard. Published pages keep the numbers they were computed with.
 
 ## Splitting
 
@@ -271,9 +268,12 @@ research"; the doc edits state this.
 
 Each assertion fails on `main` today.
 
-- `tests/test_metrics.py` (or `test_cv_assets.py`, wherever `metrics` is already exercised):
-  a leaderboard-scope group missing one eligible series raises `MissingForecastRowsError`; on `main`
-  it scores what it has. A group missing a subset of one series' valid times raises. A complete group still scores.
+- `tests/test_metrics.py` (or `test_cv_assets.py`, wherever `metrics` is already exercised): a
+  `study/` group missing one series of the reference experiment raises `MissingForecastRowsError`;
+  a group missing a subset of one series' keys raises; a group with an extra series or extra keys
+  raises; a group identical to the reference scores. On `main` the first three score what they are
+  given. A fixture whose reference forecasts stop at 21:00 on the last day shows that the check
+  does not demand rows the reference lacks.
 - An ad-hoc group whose observed `valid_time` maximum is at or after `final_test_start` raises
   without `NGED_FINAL_TEST=1` and scores with it (`monkeypatch.setenv`). The `fold_id == "live"` ad-hoc group scores with the variable unset.
   A refused window writes no `forecast_metrics` rows.
@@ -284,7 +284,7 @@ Each assertion fails on `main` today.
 - A leaderboard-scope group with a row whose `valid_time` is past `val_end` raises; on `main` it
   scores. This is the test that proves the guard is not vacuous.
 - `tests/test_score_study.py`: with a moto-free local Delta, `score_study` rejects a predictions
-  file with a missing eligible series, writes `study/<name>` rows into `forecast_metrics` for a
+  file with a missing reference series, leaving no partition, writes `study/<name>` rows into `forecast_metrics` for a
   complete file, and refuses a name beginning `study/`.
 - Import linter: CI runs the real contract. No test of `import-linter` itself is written; the
   mutation-testing review adds `import mlflow` to `ml_core.metrics` once and confirms
@@ -325,7 +325,7 @@ Plus `uv run pytest --run-studies -n auto packages/studies` (a plain `pytest` sk
 
 ## Risks and open questions
 
-- Q1-Q5 above need the maintainer's decision; Q1 is the one that changes scope.
+- Q1 to Q5 are decided (see above). No decision is open.
 - The `import-linter` strict indirect check may fail through `contracts`; fallback stated above.
 - The row-set check reads `eligible_time_series`, which #1019 may change (cleaned power). It reads
   only the Delta table's `(fold_id, time_series_id)` columns, which `EligibleTimeSeries` fixes.
