@@ -9,7 +9,7 @@ raises.
 
 **The solution.** For an `Enum` column, call `to_physical()` directly, so each code is the value's
 position in the declared list. Every other dtype falls through to the existing `cast(pl.Float32)`,
-which already raises on a `String` or `Categorical` column. No feature uses either dtype today.
+which already raises on a `String` or `Categorical` column (`InvalidOperationError` for `String`, `ComputeError` for `Categorical`). No feature uses either dtype today.
 
 ## Verdict, size and departures
 
@@ -35,7 +35,7 @@ which already raises on a `String` or `Categorical` column. No feature uses eith
 
 - `packages/xgboost_forecaster/src/xgboost_forecaster/forecaster.py`, `_prepare_features`: the
   condition becomes `isinstance(dtype, pl.Enum)` and the expression
-  `pl.col(col).to_physical().cast(pl.Float32)`. Nulls stay null and become NaN, as today. The
+  `pl.col(col).to_physical().cast(pl.Float32)`. Nulls stay null in the frame and become NaN at the `DMatrix` boundary, as today. The
   docstring says `Enum` codes are declared positions and other non-numeric dtypes fail the cast.
 - `packages/xgboost_forecaster/tests/test_forecaster.py`: the new test below.
 
@@ -51,12 +51,13 @@ which already raises on a `String` or `Categorical` column. No feature uses eith
 ## Tests
 
 One test in `test_forecaster.py`, calling `_prepare_features` directly on a frame typed
-`pl.Enum([Monday..Sunday])` with rows `[Thursday, Friday, Sunday, Monday, null]`. It asserts
-`[3.0, 4.0, 6.0, 0.0, NaN]`. On `main` the codes are `[0, 1, 2, 3, NaN]`, so the test fails there. One
+the dtype `AllFeatures.dtypes["local_day_of_week"]` with rows `[Thursday, Friday, Sunday, Monday, null]`. It asserts
+`[3.0, 4.0, 6.0, 0.0, None]` via `to_list()`. On `main` the codes are `[0, 1, 2, 3, None]`, so the test fails there. One
 frame covers row-order dependence, declared positions, skipped weekdays, and null handling.
 
 ## Docs to update
 
+- `docs/ml_experimentation/model-configuration.md` line 121 calls `time_series_type` a "categorical string" and is also wrong now: reword it the same way.
 - `docs/ml_experimentation/model-configuration.md` line 100 says `local_day_of_week` is "a
   categorical". Reword to say XGBoost receives its position in the declared Monday-to-Sunday list
   (0 to 6).
@@ -79,6 +80,7 @@ Also run pydoclint and the docs-link checker, as CI does.
   encoding. Recommendation: do not re-score in this PR. After merge, re-score one fold to size the
   effect, as the issue suggests, as its own piece of work.
 - **Raise versus support for `String`.** Recommendation: neither; rely on the existing cast.
+- **Bump `XGBoostForecaster.MODEL_VERSION` from 1 to 2?** Without a bump, forecast and leaderboard rows from the old and new encodings both read `xgboost` version 1, and the follow-up re-scoring cannot tell them apart. Recommendation: bump, since the base-class docstring names a bump as the deliberate marker of an implementation change. Check that no test or doc pins the value 1.
 - **Saved models.** Existing saved models keep the old learned mapping and now see the correct
   codes. Recommendation: retrain, with no migration path.
 
@@ -90,3 +92,12 @@ Also run pydoclint and the docs-link checker, as CI does.
 - **Accepted:** drop the `String` raise test with the raise.
 - **Rejected:** downsize to medium with one diff review. The serving-path trigger fires, and the
   sizing rule makes any firing trigger complex however small the diff.
+
+## Correctness review: findings and triage
+
+- **Accepted:** the null assertion must use `to_list()` with `None` (NaN never equals NaN); reworded above.
+- **Accepted:** take the `Enum` dtype from `AllFeatures` rather than hand-writing a third copy of the weekday list.
+- **Accepted:** the `Categorical` error does not name the column in its message, so the plan no longer claims it does.
+- **Accepted:** `model-configuration.md` line 121 also needs rewording.
+- **Raised as an open question:** whether to bump `MODEL_VERSION`.
+- **No defect found:** the plan's account of `main`, the failing values on `main`, the absence of other callers, and `local_day_of_week` arriving as `Enum` in production.
