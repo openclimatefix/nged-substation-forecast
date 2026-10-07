@@ -52,7 +52,9 @@ def _flag(
     rows: list[tuple[int, datetime, float]], substation_types: dict[int, str]
 ) -> pl.DataFrame:
     flagged = flag_nged_power(_power(rows), _metadata(substation_types)).collect()
-    return pl.DataFrame._from_pydf(flagged._df)
+    # `flag_nged_power` promises no row order (Polars 2 runs a lazy join on the streaming engine),
+    # so sort before the tests compare `drop_reason` lists.
+    return pl.DataFrame._from_pydf(flagged._df).sort("time_series_id", "time")
 
 
 @pytest.mark.parametrize("substation_type", ["Primary", "BSP", "GSP"])
