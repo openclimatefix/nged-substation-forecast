@@ -81,10 +81,10 @@ background page): for each target half-hour it takes the observed power at the *
 time-of-day** from the **last 6 weeks** and from **49–55 weeks back** — **13 analogues**. The
 analogue lags are fixed numbers of UTC hours, so across a clock change an analogue sits an hour off
 local clock time (the `baseline_forecasters` package README gives the share of affected
-analogues). An operator reads the plotted analogues by eye. If a single number is needed, the operator picks the
-percentile that matches the company's risk appetite. We will score the conservative 95th percentile, once the [metrics
-collapse](https://github.com/openclimatefix/nged-substation-forecast/issues/1077)
-lands.
+analogues). An operator reads the plotted analogues by eye. If a single number is needed, the
+operator picks the percentile that matches the company's risk appetite. We will score the
+conservative 95th percentile, once the [metrics
+collapse](https://github.com/openclimatefix/nged-substation-forecast/issues/1077) lands.
 
 **Reproducing the manual heuristic matters because the manual heuristic is *the bar we have to clear
 to justify the project*.** "XGBoost beats persistence" is the least we must do; "XGBoost beats the
