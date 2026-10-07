@@ -30,6 +30,7 @@ import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
 from studies.export_cap import CAP_FILE_PREFIX
+from studies.power import scan_power
 from studies.pv_dataset import pv_sites
 from studies.sources import ANM_DATA_DIR, REPO_DATA_DIR, STUDY_DATA_DIR
 
@@ -138,7 +139,7 @@ def _half_hourly_gain() -> pl.DataFrame:
     # from the frames the arms are scored on.
     sites = pv_sites().select("time_series_id", "site")
     power = (
-        pl.scan_delta(str(REPO_DATA_DIR / "NGED" / "power_time_series.delta"))
+        scan_power()
         .filter(pl.col("time_series_id").is_in(sites["time_series_id"].to_list()))
         .select("time_series_id", "time", "power")
         .collect()

@@ -62,11 +62,9 @@ def _serve_tables(
         },
         orient="row",
     )
-    tables = {
-        pv_dataset.POWER_DELTA_URI: power.lazy(),
-        pv_dataset.CAPACITY_DELTA_URI: capacity.lazy(),
-    }
+    tables = {pv_dataset.CAPACITY_DELTA_URI: capacity.lazy()}
     monkeypatch.setattr(pv_dataset, "METADATA_PATH", metadata_path)
+    monkeypatch.setattr(pv_dataset, "scan_power", power.lazy)
     monkeypatch.setattr(pl, "scan_delta", lambda uri, **_: tables[str(uri)])
 
 
@@ -117,7 +115,7 @@ def test_hourly_power_is_period_ending_and_covers_only_the_site_list(
             "power": [2.0, 4.0, 0.0, 6.0, 9.0, 9.0, 9.0, 9.0],
         }
     )
-    monkeypatch.setattr(pl, "scan_delta", lambda uri, **_: power.lazy())
+    monkeypatch.setattr(pv_dataset, "scan_power", power.lazy)
     site_list = pl.DataFrame({"time_series_id": [1], "site": ["A"]})
 
     hourly = pv_dataset.solar_hourly_power(sites=site_list)
