@@ -333,6 +333,66 @@ def _hour_mean(hourly: pl.DataFrame, hour: int) -> float:
     return _as_float(hourly.filter(pl.col("hour") == hour)["megawatts"].item())
 
 
+def metering_table(*, single: pl.DataFrame, window_label: str) -> pl.DataFrame:
+    """Compare each solar BMU that has a storage BMU with that storage BMU, in megawatts.
+
+    The comparison tests whether the solar BMU's output is consistent with metering only a solar
+    farm, and the storage BMU's output with metering only a battery.
+
+    Args:
+        single: The census table's single-site rows, with `storage_bmu_ids`.
+        window_label: The window's label in the file names.
+
+    Returns:
+        One row for each solar BMU and storage BMU pair at a census site: the solar BMU's
+        correlation with the sun, its lowest output, and the number of its half-hours below minus 5%
+        of its Generation Capacity; and the storage BMU's lowest and highest output, its mean output
+        from 13:00 to 14:00 UTC and from 18:00 to 19:00 UTC, and the shares of its half-hours below
+        zero and above zero. The means are over the whole window.
+    """
+    rows = []
+    for solar in single.filter(pl.col("storage_bmu_ids") != "").iter_rows(named=True):
+        solar_mw = (
+            pl.read_parquet(OUTPUT_DIR / f"{solar['elexon_bmu_id']}_{window_label}.parquet")[
+                "output_mwh"
+            ]
+            * 2
+        )
+        for storage_id in [bmu for bmu in solar["storage_bmu_ids"].split(";") if bmu]:
+            output = pl.read_parquet(OUTPUT_DIR / f"{storage_id}_{window_label}.parquet")
+            hourly = (
+                output.with_columns(
+                    hour=pl.col("half_hour_end_time").dt.offset_by("-15m").dt.hour(),
+                    megawatts=pl.col("output_mwh") * 2,
+                )
+                .group_by("hour")
+                .agg(pl.col("megawatts").mean())
+            )
+            storage_mw = output["output_mwh"] * 2
+            rows.append(
+                {
+                    "solar_bmu": solar["elexon_bmu_id"],
+                    "storage_bmu": storage_id,
+                    "solar_correlation": round(float(solar["correlation"]), 2),
+                    "solar_lowest_mw": round(_as_float(solar_mw.min()), 1),
+                    "solar_half_hours_below_minus_5_percent": int(
+                        (solar_mw < -STORAGE_SHARE * solar["generation_capacity_mw"]).sum()
+                    ),
+                    "storage_lowest_mw": round(_as_float(storage_mw.min()), 1),
+                    "storage_highest_mw": round(_as_float(storage_mw.max()), 1),
+                    "storage_mean_mw_at_13_utc": round(_hour_mean(hourly, 13), 1),
+                    "storage_mean_mw_at_18_utc": round(_hour_mean(hourly, 18), 1),
+                    "storage_share_of_half_hours_below_zero": round(
+                        _as_float((storage_mw < 0).mean()), 2
+                    ),
+                    "storage_share_of_half_hours_above_zero": round(
+                        _as_float((storage_mw > 0).mean()), 2
+                    ),
+                }
+            )
+    return pl.DataFrame(rows)
+
+
 def cleaning_table(*, solar_ids: list[str], window: Window) -> pl.DataFrame:
     """Return how many half-hours the two cleaning rules remove from the solar BMUs' output.
 
@@ -836,6 +896,8 @@ def main() -> None:
         + _md(aggregate_lead_party_table(aggregates=aggregates)),
         "## Storage BMUs at the census sites: mean output by hour of day\n\n"
         + _md(storage_pattern_table(single=single, window_label=window.label)),
+        "## How the hybrid sites with a storage BMU are metered: solar BMU against storage BMU\n\n"
+        + _md(metering_table(single=single, window_label=window.label)),
         "## What a single lookup gives, and what the study finds\n\n"
         + _md(register_table(census=census, today=run_date)),
         "## Largest output of each census BMU\n\n"
