@@ -9,6 +9,7 @@ resolution-markers = [
 
 [manifest]
 members = [
+    "baseline-forecasters",
     "contracts",
     "dashboard",
     "delta-store",
@@ -435,6 +436,25 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/29/13/232505664e8e2a0c7a2eb0c505cfade9d715538f89a5d62bc4c272968f62/backrefs-8.0-py312-none-any.whl", hash = "sha256:87f0fae8c5f207fe9f4b2887efc71d42f4900ac78faa1af08d675ef303692dc5", size = 398084, upload-time = "2026-07-26T19:54:19.954Z" },
     { url = "https://files.pythonhosted.org/packages/8a/69/47a3dc20abc4fa5486655fde681bd55e63211b46c886d8c02223d6468431/backrefs-8.0-py313-none-any.whl", hash = "sha256:601ce68ca12385dbda06ce264406b4c4210cf5b79fd0fd627592365c92f29a88", size = 400040, upload-time = "2026-07-26T19:54:21.194Z" },
     { url = "https://files.pythonhosted.org/packages/1c/cf/e5f9b68a5b0e939a2fb933a66c20180d0c9241bf8927f7a47fa48c1675e9/backrefs-8.0-py314-none-any.whl", hash = "sha256:9ec96efa080938be92323e8e730e57718c9c88eb15ad70bbef4e1766df591408", size = 411903, upload-time = "2026-07-26T19:54:23.221Z" },
+]
+
+[[package]]
+name = "baseline-forecasters"
+version = "0.2.1"
+source = { editable = "packages/baseline_forecasters" }
+dependencies = [
+    { name = "contracts" },
+    { name = "ml-core" },
+    { name = "patito" },
+    { name = "polars" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "contracts", editable = "packages/contracts" },
+    { name = "ml-core", editable = "packages/ml_core" },
+    { name = "patito" },
+    { name = "polars", specifier = ">=1.0.0" },
 ]
 
 [[package]]
@@ -3373,6 +3393,7 @@ name = "nged-substation-forecast"
 version = "0.2.1"
 source = { editable = "." }
 dependencies = [
+    { name = "baseline-forecasters" },
     { name = "contracts" },
     { name = "dagster" },
     { name = "dagster-aws" },
@@ -3421,6 +3442,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "baseline-forecasters", editable = "packages/baseline_forecasters" },
     { name = "contracts", editable = "packages/contracts" },
     { name = "dagster", specifier = ">=1.12.11" },
     { name = "dagster-aws", specifier = ">=0.28.11" },
@@ -5298,6 +5320,7 @@ source = { editable = "packages/studies" }
 dependencies = [
     { name = "altair" },
     { name = "contracts" },
+    { name = "nged-data" },
     { name = "numpy" },
     { name = "plotting" },
     { name = "polars" },
@@ -5318,6 +5341,7 @@ dev = [
 requires-dist = [
     { name = "altair", specifier = ">=6.0.0" },
     { name = "contracts", editable = "packages/contracts" },
+    { name = "nged-data", editable = "packages/nged_data" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "plotting", editable = "packages/plotting" },
     { name = "polars", specifier = ">=1.38.1" },

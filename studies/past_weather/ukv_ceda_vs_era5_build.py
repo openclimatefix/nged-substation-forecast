@@ -61,10 +61,10 @@ from studies.grid_sampling import distance_matrix_km, nearest_cells
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.midas import read_hourly_weather, read_station_metadata
 from studies.neighbouring_hours import with_neighbouring_hours
+from studies.power import CLEANED_POWER_DELTA_URI
 from studies.pv_dataset import (
     CAPACITY_DELTA_URI,
     OPEN_METEO_PATH,
-    POWER_DELTA_URI,
     nearest_era5_cell,
     pv_sites,
     read_era5,
@@ -1649,7 +1649,7 @@ def write_outputs(
         snapshot_ids=list(ukv.snapshot_ids),
         input_hashes={path.name: _file_hash(path=path) for path in INPUT_FILES},
         delta_versions={
-            "power_time_series": DeltaTable(POWER_DELTA_URI).version(),
+            "cleaned_power_time_series": DeltaTable(CLEANED_POWER_DELTA_URI).version(),
             "effective_capacity": DeltaTable(CAPACITY_DELTA_URI).version(),
         },
         rows={

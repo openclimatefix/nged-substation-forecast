@@ -22,7 +22,7 @@ import xarray as xr
 from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
-from contracts.weather_schemas import Nwp, NwpQualityReport
+from contracts.weather_schemas import Nwp, NwpQualityReport, NwpVariableWhollyMissing
 from dagster import (
     AssetCheckEvaluation,
     AssetCheckResult,
@@ -145,7 +145,7 @@ def _make_downloaded_ds(
     ``precipitation_surface`` the corrupt de-accumulated one, so a count that pooled the two, or
     attributed one to the other, disagrees with these tests.
     """
-    shape = (2, 1, 1, 2)  # 2 steps (one is lead-0), 1 member, 2 grid points
+    shape = (2, 1, 1, 3)  # 2 steps (one is lead-0), 1 member, 3 grid points
     dims = ("lead_time", "ensemble_member", "latitude", "longitude")
     corrupt = np.full(shape, 0.001, dtype=np.float32)
     corrupt[1, 0, 0, :n_null_grid_points] = np.nan
@@ -169,7 +169,7 @@ def _make_downloaded_ds(
             "lead_time": np.asarray([0, 6], dtype="timedelta64[h]").astype("timedelta64[ns]"),
             "ensemble_member": np.asarray([0]),
             "latitude": np.asarray([52.5], dtype=np.float32),
-            "longitude": np.asarray([-1.0, -0.75], dtype=np.float32),
+            "longitude": np.asarray([-1.0, -0.75, -0.5], dtype=np.float32),
         },
     )
 
@@ -730,7 +730,7 @@ def test_ecmwf_ens_reports_whole_null_slices_in_its_quality_check(
 
 
 def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
-    env: Path, monkeypatch: pytest.MonkeyPatch
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
     """``NwpVariableWhollyMissing`` → ``RetryRequested``, not a failed partition.
 
@@ -742,8 +742,6 @@ def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
     past where ``main``'s ``try`` block ended. It fails on ``main``, where the exception escaped
     as a hard failure.
     """
-    from dagster import RetryRequested
-
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
     # A run whose radiation column carries no weather at all, exactly as the converter would hand
@@ -756,30 +754,20 @@ def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
     def _convert_via_real_validation(ds: object, h3_grid: object) -> pt.DataFrame[Nwp]:
         return Nwp.validate(wholly_missing)
 
-    # `object` cannot be inlined in place of this stub: the real function is called with
-    # keyword arguments, which `object()` rejects.
-    monkeypatch.setattr(
-        target=assets,
-        name="open_ecmwf_ens_run",
-        value=lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
-    )
-    monkeypatch.setattr(
-        target=assets, name="download_ecmwf_ens_data", value=lambda ds: _make_downloaded_ds()
-    )
+    _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
     monkeypatch.setattr(
         target=assets,
         name="convert_nwp_xarray_dataset_to_polars_dataframe",
         value=_convert_via_real_validation,
     )
 
-    with (
-        build_asset_context(partition_key="2024-12-01") as context,
-        pytest.raises(RetryRequested) as exc_info,
-    ):
-        ecmwf_ens(context)
+    requests = _materialize_expecting_retries(
+        monkeypatch=monkeypatch, instance=dagster_instance, partition_key=_today_key()
+    )
 
-    assert exc_info.value.max_retries == _ECMWF_ENS_MAX_RETRIES
-    assert exc_info.value.seconds_to_wait == _ECMWF_ENS_RETRY_DELAY_SECONDS
+    assert [type(request.__cause__) for request in requests] == [NwpVariableWhollyMissing] * (
+        _ECMWF_ENS_MAX_RETRIES + 1
+    )
     # Validation runs before the Delta write, so a retry leaves no partial partition behind.
     assert not Path(Settings().nwp_data_path).exists()
 
@@ -922,8 +910,8 @@ def test_ecmwf_ens_publishes_both_null_populations(
     assert evaluation.passed  # no stored cell is null...
     assert evaluation.metadata["n_null_h3_cells"].value == 0
     assert evaluation.metadata["n_null_nwp_grid_points"].value == 1  # ...but the feed was corrupt
-    assert evaluation.metadata["n_total_nwp_grid_points"].value == 6  # 3 variables x 1 step x 2
-    assert evaluation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 6)
+    assert evaluation.metadata["n_total_nwp_grid_points"].value == 9  # 3 variables x 1 step x 3
+    assert evaluation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 9)
     assert evaluation.metadata["n_affected_nwp_slices"].value == 1
     assert evaluation.metadata["affected_nwp_variables"].value == ["precipitation_surface"]
     # The per-variable table is on this check too — the runbook sends the operator to it for the
@@ -935,8 +923,8 @@ def test_ecmwf_ens_publishes_both_null_populations(
     # The description must name both populations, or it claims the health of the one it read, and
     # must lead with the grid-point clause — the signal this check exists to surface.
     description = str(evaluation.description)
-    assert description.startswith("Raw NWP grid: 1 of 6 grid point(s) null")
-    assert "(16.6667%)" in description  # rendered as a percentage, not a bare ratio
+    assert description.startswith("Raw NWP grid: 1 of 9 grid point(s) null")
+    assert "(11.1111%)" in description  # rendered as a percentage, not a bare ratio
     assert "precipitation_surface" in description
     assert "Stored H3 cells: 0 null cell(s)" in description
     assert "Known upstream ECMWF ENS corruption" in description
@@ -945,21 +933,22 @@ def test_ecmwf_ens_publishes_both_null_populations(
     # only appearing on the runs bad enough to warn.
     (materialisation,) = result.asset_materializations_for_node("ecmwf_ens")
     assert materialisation.metadata["n_null_nwp_grid_points"].value == 1
-    assert materialisation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 6)
+    assert materialisation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 9)
 
 
 @pytest.mark.parametrize(
     ("n_nulls", "expected_passed", "expected_description", "expected_corrupt_rows"),
     [
-        (0, True, "No nulls in 36 instantaneous-variable grid points.", []),
+        (0, True, "No nulls in 54 instantaneous-variable grid points.", []),
         # Two nulls in *one* slice, so the table's two count columns hold different numbers and
-        # swapping them is visible. Both grid points of the one step, which the stubbed converter
-        # never sees.
+        # swapping them is visible. The nulls fill two of the step's three grid points, not all
+        # three, because a slice empty at every grid point is retried before any check runs. The
+        # stubbed converter never sees these nulls.
         (
             2,
             False,
             (
-                "2 of 36 instantaneous-variable grid point(s) null (5.5556%) in temperature_2m, "
+                "2 of 54 instantaneous-variable grid point(s) null (3.7037%) in temperature_2m, "
                 "across 1 (variable, member, step) slice(s)."
             ),
             [
@@ -967,7 +956,7 @@ def test_ecmwf_ens_publishes_both_null_populations(
                     "variable": "temperature_2m",
                     "n_null_grid_points": 2,
                     "n_affected_slices": 1,
-                    "n_total_grid_points": 4,
+                    "n_total_grid_points": 6,
                 }
             ],
         ),
@@ -1009,10 +998,10 @@ def test_ecmwf_ens_flags_instantaneous_nulls_the_aggregation_absorbed(
     assert evaluation.passed is expected_passed  # one null grid point is enough, unlike the other
     assert evaluation.severity == AssetCheckSeverity.WARN
     assert evaluation.metadata["n_null_nwp_grid_points"].value == n_nulls
-    # 9 instantaneous variables x 2 steps x 2 grid points — lead-0 included, unlike the other check.
+    # 9 instantaneous variables x 2 steps x 3 grid points — lead-0 included, unlike the other check.
     # Counting the de-accumulated or categorical variables too, or reading the contract's names
     # rather than the download's, moves this number.
-    assert evaluation.metadata["n_total_nwp_grid_points"].value == 36
+    assert evaluation.metadata["n_total_nwp_grid_points"].value == 54
     assert str(evaluation.description) == expected_description
 
     # The per-variable table separates one bad variable from nine, which the totals cannot.
@@ -1161,19 +1150,138 @@ def test_ecmwf_ens_re_raises_a_cancelled_run_without_writing(
     assert not Path(Settings().nwp_data_path).exists()
 
 
+def _today_key() -> str:
+    """Today's partition key: always 0 to 24 hours old, so well inside the retry age limit."""
+    return datetime.now(UTC).date().isoformat()
+
+
+def _materialize_expecting_retries(
+    monkeypatch: pytest.MonkeyPatch, instance: DagsterInstance, partition_key: str
+) -> list[RetryRequested]:
+    """Materialise ``ecmwf_ens`` until its retries run out, and return each retry it requested.
+
+    Goes through ``materialize`` because a partition young enough to retry reads
+    ``context.retry_number``, and ``context.retry_number`` raises ``AttributeError`` under direct
+    invocation. The wait between retries is set to 0 in each request, after the request is recorded,
+    so the recorded ``seconds_to_wait`` is the value the asset requested.
+    """
+    requests: list[RetryRequested] = []
+    requested_kwargs: list[dict[str, Any]] = []
+
+    class _RecordingRetryRequested(RetryRequested):
+        def __init__(self, **kwargs: Any) -> None:
+            super().__init__(**{**kwargs, "seconds_to_wait": 0})
+            requested_kwargs.append(kwargs)
+            requests.append(self)
+
+    monkeypatch.setattr(target=assets, name="RetryRequested", value=_RecordingRetryRequested)
+    result = materialize(
+        [ecmwf_ens], partition_key=partition_key, instance=instance, raise_on_error=False
+    )
+    assert not result.success
+    for kwargs in requested_kwargs:
+        assert kwargs == {
+            "max_retries": _ECMWF_ENS_MAX_RETRIES,
+            "seconds_to_wait": _ECMWF_ENS_RETRY_DELAY_SECONDS,
+        }
+    return requests
+
+
+@pytest.mark.parametrize("raising_step", ["open", "empty_slice_check"])
 def test_ecmwf_ens_retries_when_run_not_yet_available(
-    env: Path, monkeypatch: pytest.MonkeyPatch
+    env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    dagster_instance: DagsterInstance,
+    raising_step: str,
 ) -> None:
     """``NwpRunNotYetAvailable`` → ``RetryRequested`` with the asset's configured retry budget,
-    so a not-yet-published run waits rather than failing outright."""
-    from dagster import RetryRequested
-
+    so a not-yet-published run waits rather than failing outright. The asset retries whether the
+    run is absent from the catalog or the downloaded run has an empty slice."""
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
 
     def _raise_not_available(*, nwp_init_time: datetime, h3_grid: object) -> None:
         raise NwpRunNotYetAvailable
 
-    monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=_raise_not_available)
+    if raising_step == "open":
+        monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=_raise_not_available)
+    else:
+        # The real check runs, on a downloaded run whose only slice at lead 6 h is empty at all
+        # three grid points.
+        monkeypatch.setattr(
+            target=assets, name="open_ecmwf_ens_run", value=lambda **kwargs: object()
+        )
+        monkeypatch.setattr(
+            target=assets,
+            name="download_ecmwf_ens_data",
+            value=lambda ds_lazy: _make_downloaded_ds(n_null_instantaneous_grid_points=3),
+        )
+
+    requests = _materialize_expecting_retries(
+        monkeypatch=monkeypatch, instance=dagster_instance, partition_key=_today_key()
+    )
+
+    assert [type(request.__cause__) for request in requests] == [NwpRunNotYetAvailable] * (
+        _ECMWF_ENS_MAX_RETRIES + 1
+    )
+
+
+def test_ecmwf_ens_warns_sentry_once_on_the_first_failed_attempt(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """A partition that will be retried sends one Sentry warning, on the first attempt and on no
+    later attempt.
+
+    The download count recorded when the warning is sent pins that the warning came from the first
+    attempt: a warning sent on the last attempt would also be sent exactly once.
+    """
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    downloads = 0
+    warnings: list[tuple[str, BaseException, int]] = []
+
+    def _fail_to_download(ds_lazy: object) -> None:
+        nonlocal downloads
+        downloads += 1
+        raise NwpRunNotYetAvailable("not ready")
+
+    def _record_warning(asset_name: str, exc: BaseException) -> None:
+        warnings.append((asset_name, exc, downloads))
+
+    monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=lambda **kwargs: object())
+    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=_fail_to_download)
+    monkeypatch.setattr(target=assets, name="report_asset_retry", value=_record_warning)
+
+    partition_key = _today_key()
+    _materialize_expecting_retries(
+        monkeypatch=monkeypatch, instance=dagster_instance, partition_key=partition_key
+    )
+
+    assert downloads == _ECMWF_ENS_MAX_RETRIES + 1
+    ((asset_name, exc, downloads_when_warned),) = warnings
+    assert asset_name == "ecmwf_ens"
+    assert downloads_when_warned == 1
+    assert f"partition {partition_key}" in "".join(exc.__notes__)
+
+
+@pytest.mark.parametrize(
+    "error", [NwpRunNotYetAvailable("not ready"), NwpVariableWhollyMissing("empty column")]
+)
+def test_ecmwf_ens_fails_at_once_for_a_run_too_old_to_retry(
+    env: Path, monkeypatch: pytest.MonkeyPatch, error: Exception
+) -> None:
+    """For a run more than 36 hours old, ``ecmwf_ens`` re-raises the original exception with the
+    partition noted on it, and neither retries nor warns Sentry. This test fails on ``main``, where
+    the asset requests a retry instead."""
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    warned: list[object] = []
+
+    def _raise(ds_lazy: object) -> None:
+        raise error
+
+    monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=lambda **kwargs: object())
+    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=_raise)
+    monkeypatch.setattr(
+        target=assets, name="report_asset_retry", value=lambda **kw: warned.append(kw)
+    )
 
     # `build_asset_context()` defaults to its own `DagsterInstance.ephemeral()`
     # (<https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/>) and is
@@ -1183,12 +1291,45 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
     # traceback captured by `pytest.raises` delays past this test — see the fixture's docstring.
     with (
         build_asset_context(partition_key="2024-05-01") as context,
-        pytest.raises(RetryRequested) as exc_info,
+        pytest.raises(type(error)) as exc_info,
     ):
         ecmwf_ens(context)
 
-    assert exc_info.value.max_retries == _ECMWF_ENS_MAX_RETRIES
-    assert exc_info.value.seconds_to_wait == _ECMWF_ENS_RETRY_DELAY_SECONDS
+    assert exc_info.value is error
+    assert "partition 2024-05-01" in "".join(error.__notes__)
+    assert warned == []
+
+
+def test_is_too_old_to_retry_is_exact_at_36_hours() -> None:
+    init_time = datetime(2026, 10, 1, tzinfo=UTC)
+    assert not assets._is_too_old_to_retry(
+        nwp_init_time=init_time, now=init_time + timedelta(hours=36)
+    )
+    assert assets._is_too_old_to_retry(
+        nwp_init_time=init_time, now=init_time + timedelta(hours=36, seconds=1)
+    )
+
+
+@pytest.mark.parametrize("error", [RuntimeError("bug"), ValueError("bad dtype")])
+def test_ecmwf_ens_fails_at_once_on_an_error_that_waiting_cannot_fix(
+    env: Path, monkeypatch: pytest.MonkeyPatch, error: Exception
+) -> None:
+    """Only the three "run not ready yet" failures retry; a structural failure or a bug of ours
+    propagates unchanged. ``ValueError`` is here because ``NwpVariableWhollyMissing`` subclasses
+    it, so a retry rule widened to ``ValueError`` would silently retry every dtype failure."""
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=lambda **kwargs: object())
+
+    def _raise(ds_lazy: object) -> None:
+        raise error
+
+    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=_raise)
+
+    with (
+        build_asset_context(partition_key=_today_key()) as context,
+        pytest.raises(type(error), match=str(error)),
+    ):
+        ecmwf_ens(context)
 
 
 # --- definitions load ----------------------------------------------------------------------------

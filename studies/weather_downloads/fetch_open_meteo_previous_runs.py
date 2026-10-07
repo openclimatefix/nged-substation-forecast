@@ -66,6 +66,7 @@ from studies.anonymise import (
     WIND_SITE_LABELS,
     site_labels_for,
 )
+from studies.power import scan_power
 from studies.solar import cos_zenith_hour_mean, extraterrestrial_horizontal, zenith
 from studies.sources import REPO_DATA_DIR, previous_runs_product_dir_for
 
@@ -130,7 +131,6 @@ def _last_date() -> str:
     return (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
 
 
-POWER_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "NGED" / "power_time_series.delta")
 METADATA_PATH: Final[Path] = REPO_DATA_DIR / "NGED" / "metadata.parquet"
 CAPACITY_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "effective_capacity")
 MIN_YEARS_OF_READINGS: Final[float] = 1.0
@@ -153,12 +153,7 @@ def _site_list(*, time_series_type: str, labels: tuple[str, ...], seed: int) -> 
         One row per site with `site`, `latitude`, and `longitude`.
     """
     metadata = pl.read_parquet(METADATA_PATH).filter(pl.col("time_series_type") == time_series_type)
-    row_counts = (
-        pl.scan_delta(POWER_DELTA_URI)
-        .group_by("time_series_id")
-        .agg(pl.len().alias("n_rows"))
-        .collect()
-    )
+    row_counts = scan_power().group_by("time_series_id").agg(pl.len().alias("n_rows")).collect()
     min_rows = int(MIN_YEARS_OF_READINGS * 365.25 * 48)
     sites = (
         metadata.select("time_series_id", "latitude", "longitude")

@@ -16,6 +16,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
+    "baseline_forecasters",
     "contracts",
     "dagster>=1.12.11",
     "dagster-aws>=0.28.11",
@@ -97,6 +98,7 @@ constraint-dependencies = ["antlr4-python3-runtime>=4.13"]
 members = ["packages/*"]
 
 [tool.uv.sources]
+baseline_forecasters = { workspace = true }
 nged_data = { workspace = true }
 contracts = { workspace = true }
 delta_store = { workspace = true }

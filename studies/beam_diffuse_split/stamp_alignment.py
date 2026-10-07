@@ -30,6 +30,8 @@ correctly stamped feed reads about +15 minutes on the two geometric measurements
 names the end of the half-hour it averages, and 0 on the correlation. The `before` side should read
 about +45 and −30. A `before` side reading +15 and 0 instead means NGED has republished the early
 readings with corrected stamps, and the ingest is now shifting rows that need no shift.
+`scan_power` drops the rows the cleaning rules flag, so a cleaning rule keyed on solar position
+would bias these measurements.
 
 Run it with `uv run python studies/beam_diffuse_split/stamp_alignment.py`.
 """
@@ -42,11 +44,10 @@ import numpy as np
 import polars as pl
 import pvlib
 from contracts.power_schemas import POWER_TIMESTAMPS_CORRECTED_BEFORE
-from studies.pv_dataset import CAMS_PATH, REPO_DATA_DIR, pv_sites
+from studies.power import scan_power
+from studies.pv_dataset import CAMS_PATH, pv_sites
 
 _LOG: Final[logging.Logger] = logging.getLogger("stamp_alignment")
-
-POWER_DELTA: Final[str] = str(REPO_DATA_DIR / "NGED" / "power_time_series.delta")
 
 MINUTES_PER_HOUR: Final[int] = 60
 
@@ -113,7 +114,7 @@ def _power_for(*, time_series_id: int) -> pl.DataFrame:
     """Read one meter's half-hourly power as NGED stamped it, labelled with its era and minute."""
     repaired_before = POWER_TIMESTAMPS_CORRECTED_BEFORE - timedelta(minutes=30)
     return (
-        pl.scan_delta(POWER_DELTA)
+        scan_power()
         .filter(pl.col("time_series_id") == time_series_id)
         .select("time", "power")
         .collect()

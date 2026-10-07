@@ -442,8 +442,10 @@ class PowerForecast(pt.Model):
     ensemble_member: int = pt.Field(
         dtype=pl.Int8,
         description=(
-            "Ensemble member index. Member 0 is the control numerical weather prediction (NWP)"
-            " ensemble member."
+            "Ensemble member index. For a forecaster that consumes an NWP ensemble, the index is"
+            " the numerical weather prediction (NWP) ensemble member, and member 0 is the control"
+            " member. For `manual_heuristic`, the index is a historical analogue: the rank of"
+            " the power lag that supplied the value, with 0 the shortest lag."
         ),
     )
 
