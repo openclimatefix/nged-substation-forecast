@@ -62,13 +62,13 @@ by hand.
    `False`, which edits `defs/cv_assets.py`. Instead the baseline package overrides
    `BaseForecaster.feature_engineer` — the documented composition extension point — with a
    `ControlMemberFeatureEngineer` that filters the NWP frame to `ensemble_member == 0` before
-   delegating to `TabularFeatureEngineer`. `trained_cv_model` already passes `ensemble_members=[0]`,
-   so only prediction changes behaviour. The bulk-mode NWP scan still defines the shared
-   `(nwp_init_time, valid_time)` forecast-run grid that both models' rows are drawn from. The two
-   row sets are not identical, though. `XGBoostForecaster` predicts every NWP row, even one whose
-   features are NaN, while the manual heuristic drops a row whose 13 lags are all null, so for a
-   series short of history the manual heuristic scores fewer rows (risk 4). Whether the member-0
-   predicate reaches the Delta scan is not tested (risk 6).
+   delegating to `TabularFeatureEngineer`. `trained_cv_model` already passes `ensemble_members=[0]`
+   (`defs/cv_assets.py:390`), so only prediction changes behaviour. The bulk-mode NWP scan still
+   defines the shared `(nwp_init_time, valid_time)` forecast-run grid that both models' rows are
+   drawn from. The two row sets are not identical, though. `XGBoostForecaster` predicts every NWP
+   row, even one whose features are NaN, while the manual heuristic drops a row whose 13 lags are
+   all null, so for a series short of history the manual heuristic scores fewer rows (risk 4).
+   Whether the member-0 predicate reaches the Delta scan is not tested (risk 6).
 3. **The roadmap's "PR 1" (median and p95 collapse in `ml_core/metrics.py`) is not a prerequisite.**
    The baselines emit members only. Today's metrics score the per-run ensemble mean, and CRPS and
    the pinball losses already flow over the 13 members. The "median headline plus p95 row" the
@@ -240,7 +240,12 @@ shortest) for `manual_heuristic`, and, from PR C, a quantile-sample index for `c
 
 **The code runs in the R&D asset chain today, and is written to production rules because a baseline
 could be promoted.** `predict` never raises on absent input: missing history sheds members, a row
-with no members is dropped and counted in one log line, and empty input gives empty output. The
+with no members is dropped and counted in one log line, and empty input gives empty output. A
+reading the power cleaning flags counts as missing history too. Every reader of power skips a
+flagged reading, so the analogue that reading would have supplied is null, and that member is shed
+even where the series' history is long enough. The one cleaning rule today, `substation_zero` in
+`nged_data/cleaning.py`, flags every reading of exactly 0 from a `Primary`, `BSP`, or `GSP`
+series. The
 log line gives a total, not the series at fault; the pre-read data check below names the series
 short of history. Nothing raises except a contract violation (`PowerForecast.validate`) or a
 non-power-lag feature at construction, both of which are our own bugs. No asset check is added.
@@ -307,16 +312,21 @@ resolves.
 
 - **Test 9: End to end through the real assets.** Register `conf/model/manual_heuristic.yaml`
   through the extended fixture, passing the manual heuristic's own `config_overrides`. Write
-  synthetic power covering 56 weeks before a validation day and NWP with members 0, 1, and 2, then
-  materialise `trained_cv_model` and `cv_power_forecasts`. Assert that the `power_forecasts` rows
-  carry `power_fcst_model_name == "manual_heuristic"`, members 0 to 12 at short lead, values equal
-  to the synthetic power at each lag, null `nwp_init_time`, and no row duplicated across the three
-  NWP members. The synthetic power must give each of the 13 lags a distinct value, and must give a
-  lag one half-hour out a different value again, so a lag off by one half-hour fails. One choice is
-  an integer power equal to the half-hour index since a fixed epoch, taken modulo 1999 and shifted
-  by −999. The 13 lags are 336 k half-hours for distinct k up to 55, and 1999 is prime, so the 13
-  values are distinct. Every value is an integer within ±999 MW, which stays plausible and which
-  13-bit significand rounding stores exactly.
+  synthetic power covering 56 weeks before a validation day to `power_time_series.delta`, and NWP
+  with members 0, 1, and 2. `load_engineering_inputs` reads power through `scan_cleaned_power`
+  from `settings.cleaned_power_time_series_data_path`, which keeps only rows whose `drop_reason` is
+  null. The test therefore calls `write_cleaned_copy(...)` from `tests/_cleaned_power_test_data.py`
+  on the raw table with no `flag_where`, as `tests/test_cv_power_forecasts.py` does, so that every
+  synthetic reading reaches the forecaster. `write_metadata` in the same helper may write the
+  metadata parquet. Then materialise `trained_cv_model` and `cv_power_forecasts`. Assert that the
+  `power_forecasts` rows carry `power_fcst_model_name == "manual_heuristic"`, members 0 to 12 at
+  short lead, values equal to the synthetic power at each lag, null `nwp_init_time`, and no row
+  duplicated across the three NWP members. The synthetic power must give each of the 13 lags a
+  distinct value, and must give a lag one half-hour out a different value again, so a lag off by
+  one half-hour fails. One choice is an integer power equal to the half-hour index since a fixed
+  epoch, taken modulo 1999 and shifted by −999. The 13 lags are 336 k half-hours for distinct k up
+  to 55, and 1999 is prime, so the 13 values are distinct. Every value is an integer within ±999
+  MW, which stays plausible and which 13-bit significand rounding stores exactly.
 
 **`tests/test_jobs.py` (extended):**
 
@@ -339,12 +349,19 @@ Every page is written to describe the code as it now stands, with no "was previo
   lists its 13 power-lag features explicitly.
 - **`packages/baseline_forecasters/README.md`, `docs/api/baseline_forecasters/index.md`, and the
   `mkdocs.yml` "API reference" nav.** The README states what each baseline emits, the
-  `ensemble_member` overload, why the member-0 feature engineer exists, and the daylight-saving
-  caveat. The API page follows `docs/api/xgboost_forecaster/index.md`.
+  `ensemble_member` overload, why the member-0 feature engineer exists, the daylight-saving
+  caveat, and the cleaning caveat. The cleaning caveat is that every reader of power skips a
+  reading the power cleaning flags, so the analogue that reading would have supplied is null and
+  that member is shed even where the series' history is long enough. The one cleaning rule today,
+  `substation_zero` in `nged_data/cleaning.py`, flags every reading of exactly 0 from a `Primary`,
+  `BSP`, or `GSP` series. The API page follows `docs/api/xgboost_forecaster/index.md`.
 - **`docs/roadmap/metrics-and-leaderboard.md`, two other sentences that this PR makes false.** Line
   63, "No naive baseline exists anywhere in the codebase", and line 263, "today only
   `XGBoostForecaster` exercises it", are each rewritten in the present tense to name
-  `ManualHeuristicForecaster` as well.
+  `ManualHeuristicForecaster` as well. The line-63 sentence's parenthesis, "only docstring
+  mentions, e.g. `contracts/power_schemas.py:242`", is dropped with the claim it supports. The
+  docstring mention it cites, "e.g. persistence baselines" in `PowerForecast.nwp_init_time`, now
+  sits at line 463, so the citation is stale as well.
 - **`packages/ml_core/README.md`, line 52.** "`XGBoostForecaster` … is the only subclass outside the
   tests" becomes a present-tense sentence naming both subclasses.
 - **`docs/design-philosophy/inherent-stability.md`, "The manual heuristic is the floor".** The
@@ -370,9 +387,11 @@ Run all of these green before every push:
 - `uv lock --check` after rebasing on whichever of this PR and #958 lands first
 
 **Before reading any result, run the data check the roadmap asks for.** Count, per eligible series,
-the observations at least 49 weeks before `val_start`. A series eligible under
-`min_training_months` can still lack the annual analogues and degrade silently to a weekly-only
-ensemble of at most 6 members.
+the unflagged observations at least 49 weeks before `val_start`, read with `scan_cleaned_power` on
+the `cleaned_power_time_series` table rather than from the raw power table. Eligibility and the
+analogues both come from the cleaned table, so a count over the raw table would include readings
+the forecaster never sees. A series eligible under `min_training_months` can still lack the annual
+analogues and degrade silently to a weekly-only ensemble of at most 6 members.
 
 ## Risks and open questions
 
@@ -392,9 +411,13 @@ ensemble of at most 6 members.
 3. **Sub-issues.** The roadmap asks for one tracked sub-issue per PR under #147, plus one for
    `manual_heuristic_holiday_aligned`. *Recommendation:* create them after this plan is approved,
    following the `github-issue-pr-workflow` skill.
-4. **Series with less than 55 weeks of history** degrade silently to fewer members.
-   *Recommendation:* the data check above names them before any number is read; `predict`'s log
-   line gives only the total of rows that lost every member.
+4. **Series with less than 55 weeks of history** degrade silently to fewer members. A series with
+   enough history can shed members too: every reader of power skips a reading the power cleaning
+   flags, so the analogue that reading would have supplied is null and that member is shed. The
+   one cleaning rule today, `substation_zero` in `nged_data/cleaning.py`, flags every reading of
+   exactly 0 from a `Primary`, `BSP`, or `GSP` series. *Recommendation:* the data check above
+   names the series short of history before any number is read; `predict`'s log line gives only
+   the total of rows that lost every member.
 5. **The floor is not yet servable live, and its CV rows depend on the NWP archive.** Two pieces of
    `defs/live_forecast_assets.py` stand in the way of promoting `manual_heuristic`.
    `LIVE_POWER_HISTORY` is 15 days (360 h), and `live_forecasts` passes no `power_lookback` to
@@ -403,7 +426,11 @@ ensemble of at most 6 members.
    covered, lag 504 h appears only at lead of 144 h or more, and lag 672 h only at lead of 312 h or
    more. Lags 840 h and 1008 h and all 7 annual lags never appear within the 14-day live horizon.
    The live path also drops rows whose `ensemble_member` is null, so an NWP outage would leave the
-   manual heuristic emitting nothing. *Recommendation:* no change here, because no baseline is
+   manual heuristic emitting nothing. The live lags read the unflagged rows of the
+   `cleaned_power_time_series` table, as the CV lags do. The `live_forecasts` docstring records
+   that before `clean_nged_power_data` has ever run, the cleaned table does not exist and the slot
+   fails reading it, so the manual heuristic emits no live forecast until the cleaning has run
+   once. *Recommendation:* no change here, because no baseline is
    promoted by this work. Open a follow-up issue for both before anyone promotes a baseline, stating
    the per-lag coverage above, and have #438 score the manual heuristic on the clean grid under
    every failure scenario.
@@ -465,6 +492,17 @@ ensemble of at most 6 members.
     - corrected risk 5's live lag coverage;
     - corrected which reader uses each `meta.json` key;
     - added open question 9 on shedding members with lead.
+- **Main merged in (2026-10-07).** Main added power cleaning: every reader of observed power,
+  `load_engineering_inputs` included, now reads the unflagged rows of the
+  `cleaned_power_time_series` table through `scan_cleaned_power`. The plan changed in six places:
+    - test 9 writes the cleaned table with `write_cleaned_copy` after writing the raw power;
+    - the design-philosophy check, risk 4, and the package README's caveats say that a reading the
+      cleaning flags sheds the member it would have supplied;
+    - the pre-read data check counts unflagged observations from the cleaned table;
+    - the line-63 roadmap rewrite drops the stale `power_schemas.py:242` citation;
+    - risk 5 says the live lags read the cleaned table, and that live forecasts fail until the
+      cleaning has run once;
+    - departure 2 cites `ensemble_members=[0]` at `defs/cv_assets.py:390`.
 
 ## Outline of PRs B and C (each gets its own plan or approval)
 
