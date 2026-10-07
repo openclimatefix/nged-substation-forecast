@@ -51,7 +51,7 @@ def dagster_instance() -> Iterator[DagsterInstance]:
 
 
 @pytest.fixture
-def register_experiment() -> Callable[[DagsterInstance, str], None]:
+def register_experiment() -> Callable[..., None]:
     """Return a callable that registers a full-CV experiment for its leaderboard fold.
 
     Every CV integration test in this suite (``trained_cv_model``, ``cv_power_forecasts``,
@@ -60,23 +60,34 @@ def register_experiment() -> Callable[[DagsterInstance, str], None]:
     that returns a callable, rather than a plain module-level function, so every caller reaches
     it the same way — pytest injection — with no ``from conftest import ...`` (see the module
     docstring for why that import is ambiguous).
+
+    The callable registers ``conf/model/xgboost.yaml`` with ``selected_features`` of
+    ``["temperature_2m"]`` and ``n_estimators`` of 5 unless told otherwise. ``selected_features``
+    edits only the ``selected_features`` entry of those default overrides. ``base_model_config``
+    names another model YAML. ``config_overrides`` replaces the whole default overrides dict,
+    ``selected_features`` included, so a caller passing ``{}`` sends no overrides at all.
     """
 
     def _register(
         instance: DagsterInstance,
         experiment_name: str,
         selected_features: list[str] | None = None,
+        *,
+        base_model_config: str = "conf/model/xgboost.yaml",
+        config_overrides: dict[str, Any] | None = None,
     ) -> None:
+        overrides = (
+            {"selected_features": selected_features or ["temperature_2m"], "n_estimators": 5}
+            if config_overrides is None
+            else config_overrides
+        )
         result = register_experiment_job.execute_in_process(
             run_config=RunConfig(
                 ops={
                     "register_experiment": RegisterExperimentConfig(
                         experiment_name=experiment_name,
-                        base_model_config="conf/model/xgboost.yaml",
-                        config_overrides={
-                            "selected_features": selected_features or ["temperature_2m"],
-                            "n_estimators": 5,
-                        },
+                        base_model_config=base_model_config,
+                        config_overrides=overrides,
                         run_mode="full_cv",
                     )
                 }

@@ -226,23 +226,24 @@ the difference has to be legible in the event itself.
 |---|---|---|---|---|
 | **Something broke** | `error` | an exception | our code, or something it depends on, could not do its job | `sentry_capture_failure`, `report_asset_degradation`, `report_check_degradation` |
 | **Something degraded** | `warning` | a message and its context | nothing threw; an input is late, stale or thin, and the forecast carried on | `report_power_freshness` |
+| **Something will be retried** | `warning` | an exception | an asset failed in a way the asset retries, so the run has not failed yet | `report_asset_retry` |
 
-The exception is the dividing line, and it is exact rather than a convention: an error event always
-carries an exception, a warning event never does. **But an error event does not mean the run died.**
-Only `sentry_capture_failure` reports a failed run; `report_asset_degradation` and
-`report_check_degradation` fire precisely because their caller caught the exception and carried on,
-as the mechanisms below describe. Nor are those two cases exclusive: where a degradation sender is
-called from inside an asset that still has a Delta write ahead of it, a later failure puts a
-degradation event and a run-failure event on the same run. The `fault_category:run_failed` tag is
-what separates them, which is why the routing below — and [Operating the live
-service](../live_service/operations.md) — triages on that tag rather than on the level. **Read the
-tag, never the level**, whenever the question is whether to tell a human now.
+An error event always carries an exception. A warning event carries an exception only when the
+warning comes from `report_asset_retry`, and every such warning carries the `retrying_asset` tag.
+**But an error event does not mean the run died.** Only `sentry_capture_failure` reports a failed
+run; `report_asset_degradation` and `report_check_degradation` fire precisely because their caller
+caught the exception and carried on, as the mechanisms below describe. Nor are those two cases
+exclusive: where a degradation sender is called from inside an asset that still has a Delta write
+ahead of it, a later failure puts a degradation event and a run-failure event on the same run. The
+`fault_category:run_failed` tag is what separates them, which is why the routing below — and
+[Operating the live service](../live_service/operations.md) — triages on that tag rather than on the
+level. **Read the tag, never the level**, whenever the question is whether to tell a human now.
 
 **Both kinds must be delivered.** A late NWP run is not our fault and does not stop the forecast,
 and we still have to hear about it, because only a human can ask Dynamical.org what happened;
 silence is reserved for a healthy service, not for a degraded service. That even-handedness is [rule
 4](../design-philosophy/inherent-stability.md#the-rules), and the two sides of the rule are unevenly
-built: every sender but one covers the broke side, and the degraded side has only
+built: three of the five senders cover the broke side, and the degraded side has only
 `report_power_freshness`, which is why most of the degradation our checks detect is invisible from
 outside Dagster ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)).
 
@@ -260,9 +261,10 @@ configured — so laptops and CI stay silent by default.
   log in the process into a Sentry event, including Dagster's own startup and ad-hoc-run logs.
   Breadcrumbs — the integration's default `level=INFO` — stay on, so log context still rides along
   with the events the senders below do send. The hook is attached to the three *scheduled* asset
-  jobs, so it covers the whole unattended production workload. Because log capture is off, failures
-  in a manual UI materialisation, a replay backfill, or an experiment job are watched by the
-  operator at the Dagster UI, not routed to Sentry.
+  jobs, so it covers the whole unattended production workload. Because log capture is off, the hook
+  does not report failures in a manual UI materialisation, a replay backfill, or an experiment job,
+  which the operator watches at the Dagster UI. The senders called from inside an asset, such as
+  `report_asset_retry`, still fire in those runs.
 
     One production fault the hook cannot see is an asset check that caught its own exception instead
     of failing the run — which, by design, is every one of them: the two standalone `@asset_check`s,
@@ -276,11 +278,15 @@ configured — so laptops and CI stay silent by default.
     cannot read its own inputs would show up only as a yellow tick in Dagster's Checks view, and
     nobody would be told.
 
+    `report_asset_retry` is the early warning for an asset that is about to retry. `ecmwf_ens` sends
+    the warning on the first failed attempt, tagged `retrying_asset`, so an ECMWF run that upstream
+    never repairs does not stay silent until the last retry fails about 4 hours later.
+
     Those tags are what an alert rule routes on, and the failure hook is the one sender that would
     otherwise arrive with nothing to route on — so it tags `fault_category:run_failed`. That tag is
     a *positive* marker on the one class worth telling a human about, rather than a rule phrased as
     "error level, and neither degradation tag is set", which is correct today and misclassifies
-    silently the day a fifth sender is added.
+    silently the day a sixth sender is added.
 
     **What deliberately never becomes an event.** A transient failure reading NGED's bucket is
     retried in-band by `power_time_series_and_metadata` — twice, seconds apart — because nothing is

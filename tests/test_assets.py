@@ -22,7 +22,7 @@ import xarray as xr
 from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
-from contracts.weather_schemas import Nwp, NwpQualityReport
+from contracts.weather_schemas import Nwp, NwpQualityReport, NwpVariableWhollyMissing
 from dagster import (
     AssetCheckEvaluation,
     AssetCheckResult,
@@ -730,7 +730,7 @@ def test_ecmwf_ens_reports_whole_null_slices_in_its_quality_check(
 
 
 def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
-    env: Path, monkeypatch: pytest.MonkeyPatch
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
     """``NwpVariableWhollyMissing`` → ``RetryRequested``, not a failed partition.
 
@@ -742,8 +742,6 @@ def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
     past where ``main``'s ``try`` block ended. It fails on ``main``, where the exception escaped
     as a hard failure.
     """
-    from dagster import RetryRequested
-
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
     # A run whose radiation column carries no weather at all, exactly as the converter would hand
@@ -756,30 +754,20 @@ def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
     def _convert_via_real_validation(ds: object, h3_grid: object) -> pt.DataFrame[Nwp]:
         return Nwp.validate(wholly_missing)
 
-    # `object` cannot be inlined in place of this stub: the real function is called with
-    # keyword arguments, which `object()` rejects.
-    monkeypatch.setattr(
-        target=assets,
-        name="open_ecmwf_ens_run",
-        value=lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
-    )
-    monkeypatch.setattr(
-        target=assets, name="download_ecmwf_ens_data", value=lambda ds: _make_downloaded_ds()
-    )
+    _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
     monkeypatch.setattr(
         target=assets,
         name="convert_nwp_xarray_dataset_to_polars_dataframe",
         value=_convert_via_real_validation,
     )
 
-    with (
-        build_asset_context(partition_key="2024-12-01") as context,
-        pytest.raises(RetryRequested) as exc_info,
-    ):
-        ecmwf_ens(context)
+    requests = _materialize_expecting_retries(
+        monkeypatch=monkeypatch, instance=dagster_instance, partition_key=_today_key()
+    )
 
-    assert exc_info.value.max_retries == _ECMWF_ENS_MAX_RETRIES
-    assert exc_info.value.seconds_to_wait == _ECMWF_ENS_RETRY_DELAY_SECONDS
+    assert [type(request.__cause__) for request in requests] == [NwpVariableWhollyMissing] * (
+        _ECMWF_ENS_MAX_RETRIES + 1
+    )
     # Validation runs before the Delta write, so a retry leaves no partial partition behind.
     assert not Path(Settings().nwp_data_path).exists()
 
@@ -1162,15 +1150,53 @@ def test_ecmwf_ens_re_raises_a_cancelled_run_without_writing(
     assert not Path(Settings().nwp_data_path).exists()
 
 
+def _today_key() -> str:
+    """Today's partition key: always 0 to 24 hours old, so well inside the retry age limit."""
+    return datetime.now(UTC).date().isoformat()
+
+
+def _materialize_expecting_retries(
+    monkeypatch: pytest.MonkeyPatch, instance: DagsterInstance, partition_key: str
+) -> list[RetryRequested]:
+    """Materialise ``ecmwf_ens`` until its retries run out, and return each retry it requested.
+
+    Goes through ``materialize`` because a partition young enough to retry reads
+    ``context.retry_number``, and ``context.retry_number`` raises ``AttributeError`` under direct
+    invocation. The wait between retries is set to 0 in each request, after the request is recorded,
+    so the recorded ``seconds_to_wait`` is the value the asset requested.
+    """
+    requests: list[RetryRequested] = []
+    requested_kwargs: list[dict[str, Any]] = []
+
+    class _RecordingRetryRequested(RetryRequested):
+        def __init__(self, **kwargs: Any) -> None:
+            super().__init__(**{**kwargs, "seconds_to_wait": 0})
+            requested_kwargs.append(kwargs)
+            requests.append(self)
+
+    monkeypatch.setattr(target=assets, name="RetryRequested", value=_RecordingRetryRequested)
+    result = materialize(
+        [ecmwf_ens], partition_key=partition_key, instance=instance, raise_on_error=False
+    )
+    assert not result.success
+    for kwargs in requested_kwargs:
+        assert kwargs == {
+            "max_retries": _ECMWF_ENS_MAX_RETRIES,
+            "seconds_to_wait": _ECMWF_ENS_RETRY_DELAY_SECONDS,
+        }
+    return requests
+
+
 @pytest.mark.parametrize("raising_step", ["open", "empty_slice_check"])
 def test_ecmwf_ens_retries_when_run_not_yet_available(
-    env: Path, monkeypatch: pytest.MonkeyPatch, raising_step: str
+    env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    dagster_instance: DagsterInstance,
+    raising_step: str,
 ) -> None:
     """``NwpRunNotYetAvailable`` → ``RetryRequested`` with the asset's configured retry budget,
     so a not-yet-published run waits rather than failing outright. The asset retries whether the
     run is absent from the catalog or the downloaded run has an empty slice."""
-    from dagster import RetryRequested
-
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
 
     def _raise_not_available(*, nwp_init_time: datetime, h3_grid: object) -> None:
@@ -1190,6 +1216,73 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
             value=lambda ds_lazy: _make_downloaded_ds(n_null_instantaneous_grid_points=3),
         )
 
+    requests = _materialize_expecting_retries(
+        monkeypatch=monkeypatch, instance=dagster_instance, partition_key=_today_key()
+    )
+
+    assert [type(request.__cause__) for request in requests] == [NwpRunNotYetAvailable] * (
+        _ECMWF_ENS_MAX_RETRIES + 1
+    )
+
+
+def test_ecmwf_ens_warns_sentry_once_on_the_first_failed_attempt(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """A partition that will be retried sends one Sentry warning, on the first attempt and on no
+    later attempt.
+
+    The download count recorded when the warning is sent pins that the warning came from the first
+    attempt: a warning sent on the last attempt would also be sent exactly once.
+    """
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    downloads = 0
+    warnings: list[tuple[str, BaseException, int]] = []
+
+    def _fail_to_download(ds_lazy: object) -> None:
+        nonlocal downloads
+        downloads += 1
+        raise NwpRunNotYetAvailable("not ready")
+
+    def _record_warning(asset_name: str, exc: BaseException) -> None:
+        warnings.append((asset_name, exc, downloads))
+
+    monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=lambda **kwargs: object())
+    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=_fail_to_download)
+    monkeypatch.setattr(target=assets, name="report_asset_retry", value=_record_warning)
+
+    partition_key = _today_key()
+    _materialize_expecting_retries(
+        monkeypatch=monkeypatch, instance=dagster_instance, partition_key=partition_key
+    )
+
+    assert downloads == _ECMWF_ENS_MAX_RETRIES + 1
+    ((asset_name, exc, downloads_when_warned),) = warnings
+    assert asset_name == "ecmwf_ens"
+    assert downloads_when_warned == 1
+    assert f"partition {partition_key}" in "".join(exc.__notes__)
+
+
+@pytest.mark.parametrize(
+    "error", [NwpRunNotYetAvailable("not ready"), NwpVariableWhollyMissing("empty column")]
+)
+def test_ecmwf_ens_fails_at_once_for_a_run_too_old_to_retry(
+    env: Path, monkeypatch: pytest.MonkeyPatch, error: Exception
+) -> None:
+    """For a run more than 36 hours old, ``ecmwf_ens`` re-raises the original exception with the
+    partition noted on it, and neither retries nor warns Sentry. This test fails on ``main``, where
+    the asset requests a retry instead."""
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    warned: list[object] = []
+
+    def _raise(ds_lazy: object) -> None:
+        raise error
+
+    monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=lambda **kwargs: object())
+    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=_raise)
+    monkeypatch.setattr(
+        target=assets, name="report_asset_retry", value=lambda **kw: warned.append(kw)
+    )
+
     # `build_asset_context()` defaults to its own `DagsterInstance.ephemeral()`
     # (<https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/>) and is
     # used as a context manager here for the same reason
@@ -1198,12 +1291,23 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
     # traceback captured by `pytest.raises` delays past this test — see the fixture's docstring.
     with (
         build_asset_context(partition_key="2024-05-01") as context,
-        pytest.raises(RetryRequested) as exc_info,
+        pytest.raises(type(error)) as exc_info,
     ):
         ecmwf_ens(context)
 
-    assert exc_info.value.max_retries == _ECMWF_ENS_MAX_RETRIES
-    assert exc_info.value.seconds_to_wait == _ECMWF_ENS_RETRY_DELAY_SECONDS
+    assert exc_info.value is error
+    assert "partition 2024-05-01" in "".join(error.__notes__)
+    assert warned == []
+
+
+def test_is_too_old_to_retry_is_exact_at_36_hours() -> None:
+    init_time = datetime(2026, 10, 1, tzinfo=UTC)
+    assert not assets._is_too_old_to_retry(
+        nwp_init_time=init_time, now=init_time + timedelta(hours=36)
+    )
+    assert assets._is_too_old_to_retry(
+        nwp_init_time=init_time, now=init_time + timedelta(hours=36, seconds=1)
+    )
 
 
 @pytest.mark.parametrize("error", [RuntimeError("bug"), ValueError("bad dtype")])
@@ -1222,7 +1326,7 @@ def test_ecmwf_ens_fails_at_once_on_an_error_that_waiting_cannot_fix(
     monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=_raise)
 
     with (
-        build_asset_context(partition_key="2024-05-01") as context,
+        build_asset_context(partition_key=_today_key()) as context,
         pytest.raises(type(error), match=str(error)),
     ):
         ecmwf_ens(context)

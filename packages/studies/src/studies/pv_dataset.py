@@ -45,7 +45,7 @@ from studies.anonymise import (
     site_labels_for,
 )
 from studies.era5_grid import PUBLISHED_LAST_DATE
-from studies.power import hourly_from_half_hourly
+from studies.power import hourly_from_half_hourly, scan_power
 from studies.solar import azimuth, extraterrestrial_horizontal, zenith
 from studies.sources import (
     CAMS_SITE_POINTS_DIR,
@@ -63,7 +63,6 @@ from studies.sources import (
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
 ERA5_DIR: Final[Path] = ERA5_PRODUCT_DIR / "beam_diffuse"
-POWER_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "NGED" / "power_time_series.delta")
 METADATA_PATH: Final[Path] = REPO_DATA_DIR / "NGED" / "metadata.parquet"
 CAPACITY_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "effective_capacity")
 OPEN_METEO_PATH: Final[Path] = ERA5_SITE_POINTS_DIR / "beam_diffuse_open_meteo.parquet"
@@ -381,12 +380,7 @@ def _site_list(*, time_series_type: str, labels: tuple[str, ...], seed: int) -> 
         `effective_capacity_mw`.
     """
     metadata = pl.read_parquet(METADATA_PATH).filter(pl.col("time_series_type") == time_series_type)
-    row_counts = (
-        pl.scan_delta(POWER_DELTA_URI)
-        .group_by("time_series_id")
-        .agg(pl.len().alias("n_rows"))
-        .collect()
-    )
+    row_counts = scan_power().group_by("time_series_id").agg(pl.len().alias("n_rows")).collect()
     capacity = (
         pl.scan_delta(CAPACITY_DELTA_URI)
         .sort("time")
@@ -424,7 +418,7 @@ def solar_hourly_power(*, sites: pl.DataFrame) -> pl.DataFrame:
         One row per (site, time) with `power_mw` and `has_zero_half_hour`.
     """
     half_hourly = (
-        pl.scan_delta(POWER_DELTA_URI)
+        scan_power()
         .filter(pl.col("time_series_id").is_in(sites["time_series_id"].to_list()))
         .collect()
         .join(sites.select("time_series_id", "site"), on="time_series_id")
