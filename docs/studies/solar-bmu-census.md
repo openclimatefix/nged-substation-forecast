@@ -5,21 +5,32 @@ capacity each published figure gives them.** A BMU is the unit of trade in the B
 which the National Energy System Operator (NESO) uses to balance supply and demand. No field in the
 BMU register says which BMUs are solar: none of the 3,115 rows of the BMU register has a fuel type
 of solar, and 2,525 have no fuel type at all. The study therefore downloads the settled half-hourly
-output of
-the 1,705 BMUs that are not interconnectors, over 12 months, and asks whether each BMU's output
-follows the sun.
+output of the 1,705 BMUs that are not interconnectors, over 12 months, and asks whether each BMU's
+output follows the sun.
 
 **Ten single-site BMUs are solar: nine follow the sun, and a tenth is registered as solar but has no
 output yet.** All ten have a `T_` or `E_` identifier, each of which the study treats as part of one
 generating site, and Cleve Hill's two BMUs share one site. Nine of the ten BMUs sit at eight sites
 that also hold storage, built or planned (four of the sites have a storage BMU of their own), and
 one sits at a pure PV site. The study reports totals for all ten, for the nine BMUs at hybrid sites,
-and for the one BMU at the pure PV site. A further 28
-BMUs with supplier, virtual, or other identifiers also follow the sun or are registered as solar,
-but 86% of their Generation Capacity is five gas-and-power supplier BMUs that import and export
-heavily, so the study reports them apart. Each of the 12 built PV projects in NESO's Transmission
-Entry Capacity register maps to a BMU, and seven of the 12 map to a BMU in the census. The census
-cannot say how many embedded solar BMUs it missed.
+and for the one BMU at the pure PV site. A further 28 BMUs with supplier, virtual, or other
+identifiers also follow the sun or are registered as solar, but 86% of their Generation Capacity is
+five gas-and-power supplier BMUs that import and export heavily, so the study reports them apart.
+Each of the 12 built PV projects in NESO's Transmission Entry Capacity register maps to a BMU, and
+seven of the 12 map to a BMU in the census. The census cannot say how many embedded solar BMUs it
+missed.
+
+**The study reads six public sources, and each gives a different kind of capacity.** The table says
+who publishes each source, what it lists, and which capacity figure the study takes from it.
+
+| Source | Published by | What it lists | Capacity figure the study takes |
+|---|---|---|---|
+| BMU register (`reference/bmunits/all`) | Elexon, which settles the Balancing Mechanism | Every registered BMU, with its identifier, name, lead party, and fuel type | Generation Capacity, which the lead party declares |
+| B1610 | Elexon | Each BMU's settled output in each half-hour | None. The study uses the output itself |
+| IGCPU (report B1420) | Elexon, for NESO | Installed capacity of each generating unit, with a resource type such as "Solar" | Installed capacity, as NESO lists it |
+| MELS | Elexon | The Maximum Export Limit that each lead party submits for each BMU | The largest limit in the 30 days before the run |
+| TEC register | NESO | Each project's export capacity agreed at the grid connection, by stage, with its plant types | Connected capacity if built, agreed capacity if not |
+| REPD | Department for Energy Security and Net Zero | Each renewable project planned or built, with its technology, status, and grid position | Installed capacity of the project |
 
 ![Figure 1: Single-site BMUs' correlation with the sun, with a gap from 0.49 to 0.83](assets/solar_bmu_census_correlation.svg)
 
@@ -51,8 +62,7 @@ cannot say how many embedded solar BMUs it missed.
   4](#what-a-solar-bmu-looks-like)).
 - **All 12 built PV projects in the Transmission Entry Capacity register map to a BMU, and 7 of them
   to a BMU in the census**, so the census missed no separately registered solar BMU at a built
-  project
-  ([Recall](#how-many-solar-bmus-were-missed)).
+  project ([Recall](#how-many-solar-bmus-were-missed)).
 - **28 aggregate BMUs also follow the sun or are registered as solar**, and their Generation
   Capacity is mostly not solar capacity ([Aggregates](#aggregate-bmus)).
 
@@ -76,42 +86,31 @@ nothing about NGED's trial area.
 solar BMUs exist, and with what recall. The study runs no significance test and fits no forecasting
 model, so no contrast is planned or exploratory, and every number is a count or a sum.
 
-**Sources.** All six sources are public and were fetched live on 7 October 2026:
-
-- the Elexon BMU register (`reference/bmunits/all`), which gives each BMU's identifier, name, lead
-  party, and declared Generation Capacity;
-- Elexon dataset B1610, the settled output of each BMU in each half-hour, in megawatt-hours, for 1
-  September 2025 to 31 August 2026 (the 12 complete months that end at least two weeks before the
-  run, because B1610 lags by about a week);
-- Elexon report B1420 (dataset IGCPU), the installed capacity that NESO lists for a unit, with a
-  resource type that is "Solar" for 9 BMUs;
-- Elexon dataset MELS, the Maximum Export Limit that each BMU's lead party submitted, for the 30
-  days from 7 September to 7 October 2026, which falls after the output window;
-- NESO's Transmission Entry Capacity (TEC) register, the export capacity agreed for each project at
-  the grid connection; and
-- the Renewable Energy Planning Database (REPD) of the Department for Energy Security and Net Zero,
-  the installed capacity of each project, with an Ordnance Survey grid position, and no stated AC or
-DC basis.
+**Windows and dates.** The B1610 window is 1 September 2025 to 31 August 2026, the 12 complete
+months that end at least two weeks before the run, because B1610 lags by about a week. IGCPU types 9
+BMUs as "Solar". The MELS window is the 30 days from 7 September to 7 October 2026, which falls
+after the output window. The TEC register is the release dated 5 October 2026, and REPD is the Q2
+2026 release. All six sources were fetched live on 7 October 2026.
 
 **Classifying a BMU.** The classifier takes each BMU's output and drops two kinds of half-hour. It
 drops the 30 days after a BMU's first output, unless the BMU was already running in the first week
 of the window, because a site often commissions in stages. It also drops half-hours of exactly zero
 output while the sun is clearly up (the cosine of the solar zenith angle above 0.1), which in a
 solar unit is an outage, curtailment, or a metering fault and not weather. Output of 0.01
-megawatt-hours or less in a half-hour
-counts as meter noise, not generation. The classifier then computes the Pearson correlation between
-the output and the cosine of the solar zenith angle, clipped at zero below the horizon, at one point
-in central Great Britain (53°N, 1.5°W). A BMU has no coordinates, and the solar noon at the census
-sites, which span longitude 2.5°W to 1.1°E, differs by about 14 minutes, which is small beside half
-an hour. A BMU with a correlation above 0.6 and at least 100 positive half-hours follows the sun;
-one with fewer than 100 positive half-hours, or a constant output, has no output to judge. The
-census holds every BMU that follows the sun or has IGCPU resource type "Solar".
+megawatt-hours or less in a half-hour counts as meter noise, not generation. The classifier then
+computes the Pearson correlation between the output and the cosine of the solar zenith angle,
+clipped at zero below the horizon, at one point in central Great Britain (53°N, 1.5°W). A BMU has no
+coordinates, and the solar noon at the census sites, which span longitude 2.5°W to 1.1°E, differs by
+about 14 minutes, which is small beside half an hour. A BMU with a correlation above 0.6 and at
+least 100 positive half-hours follows the sun; one with fewer than 100 positive half-hours, or a
+constant output, has no output to judge. The census holds every BMU that follows the sun or has
+IGCPU resource type "Solar".
 
 **Single-site and aggregate BMUs.** Elexon's naming convention gives a directly connected or
 embedded BMU a `T_` or `E_` identifier, and a miscellaneous BMU an `M_` identifier, and the study
-treats such a BMU as part of one site. No `M_` BMU is in the census. A `2_`
-(supplier), `V_`, or `C_` identifier does not name a single site by that convention, and the study
-did not check each, so it counts those BMUs apart.
+treats such a BMU as part of one site. No `M_` BMU is in the census. A `2_` (supplier), `V_`, or
+`C_` identifier does not name a single site by that convention, and the study did not check each, so
+it counts those BMUs apart.
 
 **Hybrid and pure PV.** A site is hybrid if it also holds storage, and the study grades the evidence
 from strongest to weakest. A separately registered storage BMU with output in the window is the
@@ -127,8 +126,8 @@ its agreed capacity if still under construction.
 
 **Recall.** The study checks the census against the 12 built and 6 under-construction TEC projects
 that list PV, because a project that holds TEC and lists PV should have a BMU. A TEC plant type can
-omit PV, so the list can miss a site. Each project is
-matched by hand to its BMUs, and the check records whether any matched BMU is in the census.
+omit PV, so the list can miss a site. Each project is matched by hand to its BMUs, and the check
+records whether any matched BMU is in the census.
 
 **Examples.** Output is shown in megawatts on calendar dates. Each kind's examples are chosen by a
 rule fixed before the plots were drawn: every pure PV BMU, and for solar BMUs at hybrid sites the
@@ -205,10 +204,9 @@ comparable with a sum of Generation Capacity.
 **Of the nine BMUs at hybrid sites (eight sites), four have a storage BMU with output at their site,
 three (at two sites) have an operational battery in REPD, and two have storage planned or under
 construction.** The operational batteries are 150 MW at Cleve Hill (linked to both BMUs, and
-registered as no BMU of its own) and 0.66 MW at Breach. Two IGCPU figures are missing for BMUs
-that IGCPU does not list, one TEC figure is missing because the TEC project of Tebworth's customer
-lists storage only, and one
-REPD figure is missing because the matched row lists no capacity.
+registered as no BMU of its own) and 0.66 MW at Breach. Two IGCPU figures are missing for BMUs that
+IGCPU does not list, one TEC figure is missing because the TEC project of Tebworth's customer lists
+storage only, and one REPD figure is missing because the matched row lists no capacity.
 
 **Generation Capacity and the largest Maximum Export Limit agree within 0.5 MW for 6 of the 10 BMUs,
 and differ by up to 20.6 MW for the rest.** The sums differ by only 2.3%, but that is because errors
