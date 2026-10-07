@@ -44,8 +44,9 @@ come from a TEC value that can include the site's storage.
 - **The 10 single-site solar BMUs have 682.9 MW of Generation Capacity in all**: 50.0 MW at the pure
   PV site and 633.0 MW at the 9 BMUs at hybrid sites. The parts do not add exactly to the total
   because each is rounded to one decimal place on its own ([Capacity](#capacity)).
-- **One BMU's six capacity values can differ by a factor of 4.2**, at Cleve Hill Solar 1, where the
-  TEC and REPD values describe the whole two-BMU site ([Capacity](#capacity)).
+- **One BMU's five published capacity values and the P99 of its output can differ by a factor of
+  4.2**, at Cleve Hill Solar 1, where the TEC and REPD values describe the whole two-BMU site
+  ([Capacity](#capacity)).
 - **Nine of the 10 single-site solar BMUs lie south of 53°N in England, and the tenth lies in
   Scotland** ([Where the BMUs are](#where-the-bmus-are)).
 - **At the four sites with a storage BMU, the solar BMU and the storage BMU look like two separate
@@ -206,8 +207,9 @@ solar BMU. The weeks are those containing the solstices: 15 to 21 June 2026 and 
 **Figure 2's BMUs.** Each single-site BMU whose output follows the sun is ranked by its highest
 capacity value divided by its lowest, taking the values that exist and are above zero among
 Generation Capacity, IGCPU installed capacity, TEC, the largest MEL, REPD installed capacity, and
-the P99 of output. The three BMUs with the largest ratio are drawn. The ranking is in `report.md`,
-the file that `report.py` writes with every number on this page.
+the P99 of output. The three BMUs with the largest ratio are drawn. Figure 2 also draws each BMU's
+largest half-hourly output, which takes no part in the ranking. The ranking is in `report.md`, the
+file that `report.py` writes with every number on this page.
 
 ## Results
 
@@ -309,7 +311,15 @@ TEC gives 99.4 MW and REPD 70.0 MW against 49.9 to 50.0 MW for the other four va
 output is the lowest of the six values at all three BMUs, and at Larks Green the P99 equals
 Generation Capacity to one decimal place (49.9 MW).
 
-![Figure 2: Six capacity values against a year of output at three BMUs](assets/solar_bmu_census_capacity_figures.svg)
+**Figure 2 draws the five published capacity values and two measures of each BMU's own output: the
+P99 and the maximum.** The largest half-hourly output is 116.2 MW at Cleve Hill Solar 1, 181.0 MW at
+Cleve Hill Solar 2, and 50.1 MW at Larks Green. Like the P99, the maximum measures what the BMU
+generated rather than a capacity, and the maximum took no part in choosing the three BMUs. Where
+values agree to one decimal place, one text on their shared line names them all, such as "Largest
+MEL = IGCPU installed = Generation Capacity = 112.0 MW". Every other value has a label in the
+right-hand margin, joined to its line by an arrow.
+
+![Figure 2: Capacity values, P99, and maximum, as lines over a year of output at three BMUs](assets/solar_bmu_census_capacity_figures.svg)
 
 ### Where the BMUs are
 
