@@ -77,6 +77,7 @@ from studies.cross_validation import (
     UKV_UPGRADE_MONTH,
     HyperParameters,
 )
+from studies.power import CLEANED_POWER_DELTA_URI
 from studies.product_frames import (
     CONTRAST_HEADER,
     METRIC,
@@ -96,7 +97,6 @@ from studies.product_frames import (
     solar_frame,
     wind_frame,
 )
-from studies.pv_dataset import POWER_DELTA_URI
 from studies.sources import STUDY_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
@@ -1431,12 +1431,12 @@ def _gap_lines(*, losses: pl.DataFrame, domain: Domain) -> list[str]:
 
 
 def _power_version() -> int:
-    """Return the power Delta table's current version, which every power read here sees.
+    """Return the cleaned power Delta table's current version, which every power read here sees.
 
     Returns:
         The version.
     """
-    return DeltaTable(POWER_DELTA_URI).version()
+    return DeltaTable(CLEANED_POWER_DELTA_URI).version()
 
 
 class _Outputs(TypedDict):

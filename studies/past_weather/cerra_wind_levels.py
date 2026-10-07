@@ -93,8 +93,8 @@ from studies.cross_validation import (
     raise_on_uncovered_months,
 )
 from studies.guards import check_no_missing, refuse_to_overwrite
-from studies.power import hourly_from_half_hourly
-from studies.pv_dataset import POWER_DELTA_URI, wind_sites
+from studies.power import hourly_from_half_hourly, scan_power
+from studies.pv_dataset import wind_sites
 from studies.reanalysis_wind import (
     derive_nearest_cells,
     join_centred_power,
@@ -443,7 +443,7 @@ def read_half_hourly_power(*, sites: pl.DataFrame) -> pl.DataFrame:
         One row per (site, time) with `power_mw`, at the timestamps the power table holds.
     """
     return (
-        pl.scan_delta(POWER_DELTA_URI)
+        scan_power()
         .filter(pl.col("time_series_id").is_in(sites["time_series_id"].to_list()))
         .collect()
         .join(sites.select("time_series_id", "site"), on="time_series_id")

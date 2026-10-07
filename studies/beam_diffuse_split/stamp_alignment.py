@@ -42,11 +42,11 @@ import numpy as np
 import polars as pl
 import pvlib
 from contracts.power_schemas import POWER_TIMESTAMPS_CORRECTED_BEFORE
-from studies.pv_dataset import CAMS_PATH, REPO_DATA_DIR, pv_sites
+from studies.power import scan_power
+from studies.pv_dataset import CAMS_PATH, pv_sites
 
 _LOG: Final[logging.Logger] = logging.getLogger("stamp_alignment")
 
-POWER_DELTA: Final[str] = str(REPO_DATA_DIR / "NGED" / "power_time_series.delta")
 
 MINUTES_PER_HOUR: Final[int] = 60
 
@@ -113,7 +113,7 @@ def _power_for(*, time_series_id: int) -> pl.DataFrame:
     """Read one meter's half-hourly power as NGED stamped it, labelled with its era and minute."""
     repaired_before = POWER_TIMESTAMPS_CORRECTED_BEFORE - timedelta(minutes=30)
     return (
-        pl.scan_delta(POWER_DELTA)
+        scan_power()
         .filter(pl.col("time_series_id") == time_series_id)
         .select("time", "power")
         .collect()

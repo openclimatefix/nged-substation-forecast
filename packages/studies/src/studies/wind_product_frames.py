@@ -18,8 +18,7 @@ from studies.arm_runner import Job
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SENSITIVITY_HYPER_PARAMETERS
 from studies.era5_grid import suffixed
 from studies.neighbouring_hours import with_neighbouring_hours
-from studies.power import hourly_from_half_hourly
-from studies.pv_dataset import POWER_DELTA_URI
+from studies.power import hourly_from_half_hourly, scan_power
 from studies.solar_product_frames import UPGRADE_DAY
 from studies.sources import HISTORICAL_FORECAST_URL, site_points_dir_for
 
@@ -74,7 +73,7 @@ def wind_hourly_power(*, sites: pl.DataFrame, centred: bool = True) -> pl.DataFr
         One row per (site, time) with `power_mw` and `has_zero_half_hour`.
     """
     half_hourly = (
-        pl.scan_delta(POWER_DELTA_URI)
+        scan_power()
         .filter(pl.col("time_series_id").is_in(sites["time_series_id"].to_list()))
         .collect()
         .join(sites.select("time_series_id", "site"), on="time_series_id")

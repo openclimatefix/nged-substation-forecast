@@ -21,6 +21,7 @@ in `.claude/skills/study/SKILL.md` ("Where a study's pieces live").
 """
 
 import ast
+import re
 from pathlib import Path
 from typing import Final
 
@@ -357,3 +358,20 @@ def test_production_code_importing_studies_or_a_script_is_reported(tmp_path: Pat
         "src/app/c.py": ["studies"],
         "tests/test_x.py": ["studies"],
     }
+
+
+RAW_POWER_TABLE_NAME: Final[re.Pattern[str]] = re.compile(r"(?<!cleaned_)power_time_series\.delta")
+"""The raw power table's folder name, which the cleaned table's folder name ends with."""
+
+
+def test_no_study_names_the_raw_power_table():
+    # `studies.power.scan_power` is the one reader of observed power. A study that names the raw
+    # table instead reads rows the leaderboard scorer never sees.
+    studies_package = REPO_ROOT / "packages" / "studies" / "src"
+    scripts = [*studies_package.rglob("*.py"), *(REPO_ROOT / "studies").rglob("*.py")]
+    offenders = [
+        script.relative_to(REPO_ROOT).as_posix()
+        for script in scripts
+        if RAW_POWER_TABLE_NAME.search(script.read_text())
+    ]
+    assert offenders == []

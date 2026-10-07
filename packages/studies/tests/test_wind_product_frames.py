@@ -16,7 +16,8 @@ def _serve_half_hours(*, monkeypatch: pytest.MonkeyPatch) -> pl.DataFrame:
             "power": [2.0, 4.0, 6.0, 8.0],
         }
     )
-    monkeypatch.setattr(pl, "scan_delta", lambda uri, **_: power.lazy())
+    monkeypatch.setattr(wind_product_frames, "scan_power", power.lazy)
+    monkeypatch.setattr(pv_dataset, "scan_power", power.lazy)
     return pl.DataFrame({"time_series_id": [1], "site": ["W1"]})
 
 

@@ -1,9 +1,12 @@
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import polars as pl
 import pytest
 from contracts.power_schemas import POWER_TIMESTAMPS_CORRECTED_BEFORE
-from studies.power import hourly_from_half_hourly
+from studies.power import hourly_from_half_hourly, scan_power
+
+from studies import power
 
 
 def _half_hourly(stamps: list[datetime], powers: list[float]) -> pl.DataFrame:
@@ -74,3 +77,27 @@ def test_has_zero_half_hour_flags_an_exact_zero(powers: list[float], expected: b
     hourly = hourly_from_half_hourly(half_hourly=_half_hourly(stamps, powers))
 
     assert hourly["has_zero_half_hour"].to_list() == [expected]
+
+
+def test_scan_power_returns_only_the_rows_no_cleaning_rule_flagged(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    delta_path = tmp_path / "cleaned_power_time_series.delta"
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 1], dtype=pl.Int32),
+            "time": [
+                datetime(2026, 1, 1, 0, 30, tzinfo=UTC),
+                datetime(2026, 1, 1, 1, 0, tzinfo=UTC),
+            ],
+            "power": pl.Series([1.0, 0.0], dtype=pl.Float32),
+            "drop_reason": [None, "substation_zero"],
+        },
+        schema_overrides={"time": pl.Datetime("us", "UTC")},
+    ).write_delta(delta_path)
+    monkeypatch.setattr(power, "CLEANED_POWER_DELTA_URI", str(delta_path))
+
+    kept = scan_power().collect()
+
+    assert kept.columns == ["time_series_id", "time", "power"]
+    assert kept["power"].to_list() == [1.0]
