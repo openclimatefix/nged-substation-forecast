@@ -87,7 +87,9 @@ def _archive_model_dir(model_dir: Path, archive_path: Path) -> None:
             tar.add(item, arcname=item.name)
 
 
-def write_trained_metadata(model_dir: Path, time_series_metadata: pl.DataFrame) -> None:
+def write_trained_metadata(
+    model_dir: Path, time_series_metadata: pt.DataFrame[TimeSeriesMetadata]
+) -> None:
     """Write a model's frozen ``TimeSeriesMetadata`` copy into its saved directory.
 
     Call this *after* a subclass's ``save``, which clears the directory first.
@@ -98,9 +100,8 @@ def write_trained_metadata(model_dir: Path, time_series_metadata: pl.DataFrame) 
             ``_UNPERSISTED_METADATA_COLUMN`` — the ``area_wkt`` polygon text — is dropped, for the
             size reason given on that constant. Every other column is kept.
     """
-    # `pl.exclude` rather than `drop`: a caller may pass a `pt.DataFrame`, whose `drop` override
-    # takes no `strict=False`. The column is `allow_missing`, so the column may not be there to
-    # drop.
+    # `pl.exclude` rather than `drop`: Patito overrides `DataFrame.drop` with a signature that takes
+    # no `strict=False`. The column is `allow_missing`, so the column may not be there to drop.
     time_series_metadata.select(pl.exclude(_UNPERSISTED_METADATA_COLUMN)).write_parquet(
         model_dir / TRAINED_METADATA_FILENAME
     )
@@ -379,9 +380,12 @@ class BaseForecaster(ABC):
             self.save(model_dir)
             write_trained_metadata(
                 model_dir=model_dir,
-                time_series_metadata=time_series_metadata.filter(
-                    pl.col("time_series_id").is_in(self.trained_time_series_ids)
-                ),
+                # An eager `filter` returns a plain frame, so re-attach the Patito model.
+                time_series_metadata=pt.DataFrame(
+                    time_series_metadata.filter(
+                        pl.col("time_series_id").is_in(self.trained_time_series_ids)
+                    )
+                ).set_model(TimeSeriesMetadata),
             )
             archive_path = Path(tmp_dir) / _MLFLOW_MODEL_ARTIFACT
             _archive_model_dir(model_dir, archive_path)
