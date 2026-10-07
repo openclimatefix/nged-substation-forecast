@@ -171,17 +171,19 @@ and a `PopulationFilter` pinned to that experiment and fold, following
 is safe from `main`: the sysadmin step (separate issue) runs it as the maintainer's user from the
 `main` checkout.
 
-**`packages/studies/src/studies/power.py`** (extend) adds `scan_power()`, returning the power
-Delta as a lazy frame filtered to `time < FINAL_TEST_START` (read from the CV config). Migrate the
-two direct readers inside `packages/studies`: `pv_dataset.py` and `wind_product_frames.py`. The
-issue's audit is a list in the PR body of the other direct `scan_delta` readers on the power table
-under `studies/` (`weather_downloads/fetch_open_meteo_previous_runs.py`,
-`past_weather/cerra_wind_levels.py`, `beam_diffuse_split/stamp_alignment.py`,
-`beam_diffuse_split/site_e_commissioning.py`; rechecked at implementation). Those published scripts
-are left alone, because migrating them would silently cut their input at the cutoff and could
-change reproduced results or a download range. No bypass-scan test is added. The reader guards only
-callers that route through it, not the data; against an autonomous session the protection is the
-truncated copy under Q1(b).
+**`packages/studies/src/studies/power.py`** (extend) adds `scan_power()`, which reads the cleaned
+power table through `nged_data.storage.scan_cleaned_power` and filters it to
+`time < FINAL_TEST_START` (read from the CV config). **Decided by the maintainer: every study reads
+cleaned power.** The plan therefore migrates every direct reader of the power table to
+`scan_power()`: `pv_dataset.py` and `wind_product_frames.py` in `packages/studies`, and the
+`studies/` scripts `weather_downloads/fetch_open_meteo_previous_runs.py`,
+`past_weather/cerra_wind_levels.py`, `beam_diffuse_split/stamp_alignment.py`, and
+`beam_diffuse_split/site_e_commissioning.py` (list rechecked at implementation). A new test scans
+`packages/studies/src` and `studies/` and fails on a `scan_delta` or `read_delta` call on the raw
+power table outside `power.py`, so a new study cannot bypass the reader unnoticed. The reader guards
+only callers that route through it, not the data; against an autonomous session the protection is
+the truncated copy under Q1(b). Published study pages are not re-run in this PR. A later re-run of
+one reads cleaned power truncated at the cutoff, and its numbers can change; see Q5.
 
 **`pyproject.toml`, `uv.lock`, `.github/workflows/ci.yml`, `.pre-commit-config.yaml`.** Add
 `import-linter` to the dev group and a `[tool.importlinter]` block with one `forbidden` contract:
@@ -222,15 +224,9 @@ Accepted (each verified or marked for verification at implementation):
   plan filters `study/` experiments there and refuses them in `promoted_model`, with tests. This
   replaces the earlier claim that no code is needed.
 - **Study reader.** About 40 published `studies/*` scripts call `pv_sites`, `wind_sites`,
-  `solar_hourly_power`, or `wind_hourly_power`, so migrating `pv_dataset.py` and
-  `wind_product_frames.py` would silently cut their input at the cutoff and change site lists and
-  seeded labels. The plan therefore adds `scan_power()` and migrates nothing; the PR body lists
-  every direct reader as the audit. The reader is a convenience for new studies, and the issue's
-  protection against a session is the truncated copy. This departs from the issue's "study power
-  reader truncates at the same date" and is Q5 below. #1040 makes
-  `nged_data.storage.scan_cleaned_power` the read path for power, so `scan_power()` reads the
-  cleaned table through it, because the scorer now scores against cleaned power. Whether new
-  studies should read cleaned or raw power is part of Q5; the existing readers stay on raw power.
+  `solar_hourly_power`, or `wind_hourly_power`. Migrating the two package readers changes the input
+  of every later re-run of those scripts in two ways: the data is cleaned, and it stops at the
+  cutoff. The cleaning is the maintainer's decision; the truncation is Q5.
 - **Existing constructions.** A required `final_test_start` breaks `CvConfig(...)` in
   `tests/test_jobs.py` and five places in `packages/contracts/tests/test_config_schemas.py`; the plan
   updates them, and `_score_forecast_group`'s positional callers in `tests/test_metrics.py`.
@@ -248,8 +244,12 @@ Accepted (each verified or marked for verification at implementation):
   different partition hourly; the implementer checks that delta-rs resolves the disjoint-partition
   commits, or the script retries.
 
-**Q5 for the maintainer: accept `scan_power()` without migrating the existing readers?** Recommended
-yes, for the reproducibility reason above.
+**Q5 for the maintainer: should the migrated readers also truncate at the cutoff?** The cleaned
+power is decided. Truncating means a re-run of a published study loses about 3 months of power
+(2026-07-01 to October), which can change site lists, seeded anonymised labels, and the study's
+numbers. Recommended yes: a reader that studies can read past the cutoff is no guard, and the
+alternative, a `scan_power(until_cutoff=False)` escape, is the bypass. Published pages keep the
+numbers they were computed with.
 
 ## Splitting
 
