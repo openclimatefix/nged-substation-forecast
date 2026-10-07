@@ -130,7 +130,7 @@ channel](../design-philosophy/inherent-stability.md#three-audiences-three-channe
 `_SILENCED_TIME_SERIES_IDS` in `defs/checks.py` names the `time_series_id`s the check ignores.
 
 **The silenced ids are removed from the check's inputs, not from its output.**
-`evaluate_power_freshness` drops them from the coverage frame and the metadata table before it
+`evaluate_power_freshness` drops them from the coverage frame and from the expected ids before it
 classifies anything, so `n_stale`, `n_never_reported`, `n_series_total`, and the late table all
 describe the series we are still watching, with no arithmetic anywhere to get wrong. Dropping the
 silenced ids before classification also means the Sentry warning inherits the silencing without

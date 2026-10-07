@@ -590,8 +590,7 @@ def upsert_metadata(
     The rewrite is not atomic either. `write_parquet` overwrites the metadata table in place, with
     no write-to-temporary-file-and-rename. The metadata table therefore does not get the
     all-or-nothing commit that Delta gives the tables around it. See [principle 10, every write is
-    atomic and
-    idempotent](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition).
+    atomic and idempotent](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition).
     A crash or an out-of-memory kill part-way through a local write leaves a partial file.
     `pl.read_parquet` below is what rejects that partial file on the next run, before
     `TimeSeriesMetadata.validate` ever sees it. The error reads `ComputeError: parquet: File out of

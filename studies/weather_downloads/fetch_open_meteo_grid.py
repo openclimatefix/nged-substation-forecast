@@ -314,8 +314,7 @@ def _write_docs_for_model(
             f"{model.label}, models={model.models_parameter}, "
             f"hourly={','.join(model.hourly_variables)}, "
             f"{n_points} grid points at {GRID_SPACING_DEG} degree spacing inside the "
-            f"trial-area box (a few grid cells' margin around the NGED list of generators' own "
-            f"extent)"
+            f"trial-area box (a few grid cells' margin around the extent of NGED's generators)"
         ),
         variables=list(model.hourly_variables),
         extra={

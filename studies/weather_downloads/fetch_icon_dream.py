@@ -269,7 +269,7 @@ def _write_docs(
         request_description=(
             f"ICON-DREAM-EU {variable}, whole-domain monthly GRIB downloaded then cropped to "
             f"{cell_indices.size} ICON grid cells inside the trial-area box (a few grid cells' "
-            f"margin around the NGED list of generators' own extent) using "
+            f"margin around the extent of NGED's generators) using "
             f"ICON-DREAM-EU_grid.nc; the whole-domain file is deleted immediately after "
             f"cropping. Values cast to Float32 and rounded to {NWP_SIGNIFICAND_BITS} "
             f"significand bits before writing, matching delta_store.nwp's production "

@@ -207,11 +207,10 @@ are looking at every late series and the two differing means the list is truncat
 appears on the live-forecast check as `n_time_series_missing` and `n_time_series_missing_listed`.
 
 Mind the order when it *is* truncated: never-reported series come first, then the most-stale ones,
-so a metadata table with more than 50 never-reported series fills the table and no stale series
-appears in it at all. Read `n_stale` and `n_never_reported` — never truncated — before concluding
-from the table that nothing has gone stale. All three counts, and `n_series_total` beside them,
-describe the series the check is *watching*: the silenced series below are excluded from every
-one of them.
+so more than 50 never-reported series fill the table and no stale series appear in it at all.
+Read `n_stale` and `n_never_reported` — never truncated — before concluding from the table that
+nothing has gone stale. All three counts, and `n_series_total` beside them, describe the series the
+check is *watching*: the silenced series below are excluded from every one of them.
 
 **Silencing a series we know is out of service.** `_SILENCED_TIME_SERIES_IDS` in
 `src/nged_substation_forecast/defs/checks.py` lists the `time_series_id`s the check ignores, so an

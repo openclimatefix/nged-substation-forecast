@@ -220,7 +220,7 @@ def evaluate_power_freshness(
             observation ``time`` in a ``last_time`` column (a ``TimeSeriesCoverage`` frame; any
             ``first_time`` column is ignored — freshness depends only on the latest observation).
         expected_ids: The full set of expected ``time_series_id``s (from the ``TimeSeriesMetadata``
-            metadata table), used to flag ids that have *never* sent data. ``None`` when no metadata
+            table), used to flag ids that have *never* sent data. ``None`` when no metadata
             table is available, in which case never-reported ids cannot be detected.
         now: Current time (UTC).
         threshold: A series is stale when ``last_time < now - threshold``.

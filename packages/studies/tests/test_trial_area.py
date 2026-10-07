@@ -23,7 +23,7 @@ def test_the_grid_covers_the_box_with_one_point_per_spacing_step():
     assert points["point_id"].to_list() == list(range(15))
 
 
-def test_the_box_written_from_a_site_list_is_widened_by_the_margin_and_read_back(
+def test_the_box_written_from_the_metadata_table_is_widened_by_the_margin_and_read_back(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
     metadata_path = tmp_path / "metadata.parquet"

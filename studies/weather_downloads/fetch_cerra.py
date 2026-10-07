@@ -440,7 +440,7 @@ def _run_variable(
             )
             + ", data_type=reanalysis (deterministic, never ensemble_members). Whole-domain "
             "NetCDF downloaded in chunks then cropped by a lat/lon mask to the trial-area box "
-            "(a few grid cells' margin around the NGED list of generators' own extent); values "
+            "(a few grid cells' margin around the extent of NGED's generators); values "
             f"cast to Float32 and rounded to {NWP_SIGNIFICAND_BITS} significand bits before "
             "writing."
         ),

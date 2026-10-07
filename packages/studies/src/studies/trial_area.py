@@ -70,15 +70,16 @@ def load_trial_area_box() -> TrialAreaBox:
 
 
 def write_trial_area_box_from_metadata(*, margin_deg: float = 0.15) -> None:
-    """Derive the trial-area box from the private list of generators and write it to disk.
+    """Derive the trial-area box from the private `TimeSeriesMetadata` table and write it to disk.
 
-    Run once per checkout (or whenever the site list changes). The box is the site list's own
-    lat/lon extent, widened by `margin_deg` on every side — a few grid cells at the 9 km-to-25 km
-    spacing of the coarser products this issue downloads. Nothing here prints or returns the bounds;
-    they are read back only through `load_trial_area_box`.
+    Run once per checkout (or whenever the metadata table changes). The box is the metadata
+    table's own lat/lon extent, widened by `margin_deg` on every side — a few grid cells at the
+    9 km-to-25 km spacing of the coarser products this issue downloads. Nothing here prints or
+    returns the bounds; they are read back only through `load_trial_area_box`.
 
     Args:
-        margin_deg: How far to widen the site list's own bounding box on every side, in degrees.
+        margin_deg: How far to widen the metadata table's own bounding box on every side, in
+            degrees.
     """
     from contracts.settings import get_settings
 

@@ -376,7 +376,8 @@ def _save_model_trained_on(path: Path, time_series_ids: list[int]) -> None:
 def test_the_metadata_table_cannot_thin_or_fail_a_live_slot(
     env: dict[str, str], dagster_instance: DagsterInstance, tmp_path: Path
 ) -> None:
-    """A metadata table fault costs the live service nothing, because the service does not read it.
+    """A metadata table fault costs the live service nothing, because the service does not read the
+    metadata table.
 
     Each series' H3 cell comes from the model's own frozen copy, so a metadata table that has lost
     rows, or cannot be read at all, leaves the forecast identical. Losing a row used to drop that

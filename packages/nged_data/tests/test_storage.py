@@ -296,7 +296,7 @@ def _metadata_table(
 
 def test_upsert_metadata_adds_a_new_id_when_the_stored_metadata_table_is_thinner(tmp_path: Path):
     """The diff is derived by slicing the concatenated frame, so it must split back into exactly
-    the snapshot's rows and the stored metadata_table's rows. Getting that boundary wrong loses a
+    the snapshot's rows and the stored metadata table's rows. Getting that boundary wrong loses a
     whole time series silently: it never enters the metadata table, the stats claim nothing was new,
     and `select_new_rows` never re-offers the file, so it never arrives at all."""
     metadata_path = tmp_path / "metadata.parquet"
