@@ -77,10 +77,10 @@ infrastructure steps around those two scripts stay in the AWS console.
 
 ## `forecasting/` — ad-hoc experiment and maintenance runs
 
-None of these three scripts is on a schedule. `run_baseline_experiment.py` and
+None of these four scripts is on a schedule. `run_baseline_experiment.py` and
 `export_baseline_forecasts.py` are run in sequence when the weather-and-calendar-only baseline is
 rebuilt. `rewrite_nwp_row_groups.py` is a migration that is run once per Delta table and then left
-alone.
+alone. `score_study.py` is run whenever a study hands over a predictions file to be scored.
 
 - `run_baseline_experiment.py` — runs the weather-and-calendar-only baseline experiment end to end
   in one process, in five steps: register the experiment, train the model on one cross-validation
@@ -96,6 +96,12 @@ alone.
   Delta table whose Parquet row groups span more than one ensemble member, so that a single-member
   read can skip the rest of the partition. A one-off migration: the script measures before writing,
   skips a partition that is already aligned, and therefore resumes cleanly after an interruption.
+
+- `score_study.py` — stores a study's predictions file in `power_forecasts` under the experiment name
+  `study/<study name>` and scores it with the `metrics` asset in leaderboard scope. The script
+  refuses a file whose row keys differ from the reference experiment's, and runs with a cleared
+  environment, so a study's leaderboard number can come from nothing else. Run from the `main`
+  checkout as the maintainer's user.
 
 ## `maintenance/` — looking after the workstation
 

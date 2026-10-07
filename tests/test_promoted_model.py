@@ -206,6 +206,34 @@ def test_promoted_model_refuses_a_model_with_an_unparseable_feature(
     assert json.loads((model_dir / "meta.json").read_text()) == champion_meta
 
 
+def test_promoted_model_refuses_a_study_run_and_keeps_the_champion(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
+    champion_run_id = _save_trained_model_to_mlflow("study_refusal_champion", n_estimators=5)
+    assert materialize(
+        [promoted_model],
+        run_config=RunConfig(
+            ops={"promoted_model": PromotedModelConfig(mlflow_run_id=champion_run_id)}
+        ),
+        instance=dagster_instance,
+    ).success
+    model_dir = Path(env["production_model_path"])
+    champion_meta = json.loads((model_dir / "meta.json").read_text())
+
+    study_run_id = _save_trained_model_to_mlflow("study/some_study", n_estimators=5)
+
+    with pytest.raises(ValueError, match="study experiment"):
+        materialize(
+            [promoted_model],
+            run_config=RunConfig(
+                ops={"promoted_model": PromotedModelConfig(mlflow_run_id=study_run_id)}
+            ),
+            instance=dagster_instance,
+        )
+
+    assert json.loads((model_dir / "meta.json").read_text()) == champion_meta
+
+
 def test_promotable_model_runs_lists_fold_run_candidates(
     env: dict[str, str], dagster_instance: DagsterInstance
 ) -> None:

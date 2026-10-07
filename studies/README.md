@@ -48,11 +48,28 @@ existing.
 **A study that produced nothing worth citing does not belong here.** Delete it, or leave it on a
 branch. The directory is not an attic.
 
+## A study's leaderboard number comes only from `score_study.py`
+
+**A study that reports a forecast skill number hands a predictions file to
+`scripts/forecasting/score_study.py`, and the `metrics` asset produces the number.** The script
+takes a file of `PowerForecast` rows, a study name, and a leaderboard fold. It stores the rows in
+`power_forecasts` under the experiment name `study/<study name>`, and scores them in leaderboard
+scope. Before the script writes anything, it refuses a file whose row keys differ from the row keys
+of the reference experiment that `conf/cv/default.yaml` names for the same fold, so a study cannot
+raise its score by omitting hard rows. The `metrics` asset repeats the check when it scores. Every
+number on a study page must trace to a `forecast_metrics` row. The `study/` prefix lets the
+leaderboard chart show or hide studies, and keeps them out of the promotion candidates.
+
+**A study reads observed power through `studies.power.scan_power`.** The function returns cleaned
+power before `final_test_start` in `conf/cv/default.yaml`, the date from which the `metrics` asset
+refuses to score unless the maintainer sets `NGED_FINAL_TEST=1`.
+
 ## What to expect when reading one
 
 - **Nothing here is imported by production code.** No study touches a Patito contract or enters the
   Dagster asset graph, and nothing in `src/` or `packages/` imports one. A study that needs to do
-  any of that has stopped being a study.
+  any of that has stopped being a study. The one route from a study to a leaderboard is
+  `scripts/forecasting/score_study.py`, described below.
 - **Each folder holds the scripts of one family of pages, and its README maps every script to the
   page it feeds.** A script runs with only its own folder on `sys.path`: it never reaches into
   another folder, and code that two folders share is in `packages/studies/src/studies/`.

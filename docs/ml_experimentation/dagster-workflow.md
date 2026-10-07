@@ -262,7 +262,13 @@ run config dialog before launching.
    scope dates its evaluation window from the CV config's leaderboard folds and has none for those
    rows. To score live output or a dev fold, run the asset with `evaluation_scope="ad_hoc"`, which
    takes the window from the forecast rows themselves.
-3. Discovers the matching `(experiment_name, fold_id)` groups, then scores each group in batches of
+3. Checks every group before scoring any, and raises on a refusal: a window reaching
+   `final_test_start` without `NGED_FINAL_TEST=1` (live rows are exempt), a leaderboard-scope row
+   whose `valid_time` lies outside the fold's window, and a `study/` experiment whose row keys
+   differ from the CV config's reference experiment. See [What the `metrics` asset refuses to
+   score](cross-validation-folds.md#what-the-metrics-asset-refuses-to-score). An unfiltered run
+   skips `study/` experiments, naming them in the `skipped_study_experiments` metadata.
+4. Discovers the matching `(experiment_name, fold_id)` groups, then scores each group in batches of
    four `time_series_id` values at a time — peak memory is one batch, never a whole fold or the
    entire matched population. See [The other hard ceiling: Polars' 32-bit row
    index](../architecture/performance.md#the-other-hard-ceiling-polars-32-bit-row-index) for why
@@ -277,7 +283,7 @@ run config dialog before launching.
    `computed_at`, and the MLflow fold run id (leaderboard scope only). c. Writes to
    `forecast_metrics` Delta, partitioned by `(experiment_name, fold_id)` with an idempotent
    overwrite predicate — safe to re-run without duplicating rows.
-4. For `evaluation_scope="leaderboard"`: builds an aggregate metric dict and logs it to the fold's
+5. For `evaluation_scope="leaderboard"`: builds an aggregate metric dict and logs it to the fold's
    MLflow child run, then averages across folds and logs the mean to the parent run. The key token
    is `{metric_name}` for scalar metrics and `{metric_name}_{metric_param}` for parametric metrics,
    in three families: overall (`rmse__all`, `crps__all`), per type (`rmse__disaggregated_demand`),

@@ -8,12 +8,12 @@ the logic stays fast to unit-test and the assets stay readable.
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Final
+from typing import Final, NamedTuple
 
 import mlflow
 import patito as pt
 import polars as pl
-from contracts.config_schemas import load_cv_config
+from contracts.config_schemas import STUDY_EXPERIMENT_PREFIX, load_cv_config
 from contracts.ml_schemas import EligibleTimeSeries, EvalScopeType, Metrics
 from contracts.power_schemas import (
     EffectiveCapacity,
@@ -52,6 +52,9 @@ from ml_core.metrics import (
     compute_effective_capacity,
     compute_metrics,
     enrich_metrics_rows,
+    require_same_row_keys,
+    require_valid_times_within_window,
+    require_window_within_guard,
 )
 from ml_core.mlflow_runs import (
     get_or_create_experiment,
@@ -699,12 +702,45 @@ class MetricsConfig(Config):
     """
 
 
+FINAL_TEST_ENV_VAR: Final[str] = "NGED_FINAL_TEST"
+"""The environment variable that lets ``metrics`` score a window reaching ``final_test_start``.
+
+Only the maintainer's own shell sets it to ``"1"``; an experiment or a study never does.
+"""
+
+
+class _EvalWindow(NamedTuple):
+    """The inclusive evaluation window of one metrics group, and the label stamped on its rows."""
+
+    start: datetime
+    end: datetime
+    label: str
+
+
+def _final_test_enabled() -> bool:
+    """Return whether the maintainer's environment allows scoring past ``final_test_start``."""
+    return os.environ.get(FINAL_TEST_ENV_VAR) == "1"
+
+
+def _valid_time_extent(group_scan: pl.LazyFrame) -> tuple[datetime, datetime]:
+    """Return the earliest and latest ``valid_time`` of a forecast group, by a streaming scan."""
+    bounds = group_scan.select(
+        valid_time_min=pl.col("valid_time").min(), valid_time_max=pl.col("valid_time").max()
+    ).collect(engine="streaming")
+    valid_time_min = bounds["valid_time_min"][0]
+    valid_time_max = bounds["valid_time_max"][0]
+    # groups is derived from a non-empty forecast scan, so min/max are always non-null datetimes.
+    assert isinstance(valid_time_min, datetime)
+    assert isinstance(valid_time_max, datetime)
+    return valid_time_min, valid_time_max
+
+
 def _resolve_eval_window(
     evaluation_scope: EvalScopeType,
     fold_id: str,
     group_scan: pl.LazyFrame,
-) -> tuple[datetime, datetime, str]:
-    """Return ``(window_start, window_end, window_label)`` for a metrics group.
+) -> _EvalWindow:
+    """Return the evaluation window of a metrics group.
 
     For ``"leaderboard"`` scope the bounds come from the fold config; for ``"ad_hoc"``
     they are the observed ``valid_time`` extent of the forecast group.
@@ -718,25 +754,85 @@ def _resolve_eval_window(
             ``"ad_hoc"`` branch — the group is never materialised here.
 
     Returns:
-        ``(window_start, window_end, window_label)`` — the inclusive evaluation window bounds
-        and a human-readable label (``fold_id`` for leaderboard; ``"ad_hoc"`` otherwise).
+        The inclusive window bounds and a human-readable label (``fold_id`` for leaderboard;
+        ``"ad_hoc"`` otherwise).
     """
     if evaluation_scope == "leaderboard":
         fold = _cv_config.get_fold(fold_id)
-        return (
-            date_to_utc_datetime(fold.val_start),
-            date_to_utc_datetime(fold.val_end, end_of_day=True),
-            fold_id,
+        return _EvalWindow(
+            start=date_to_utc_datetime(fold.val_start),
+            end=date_to_utc_datetime(fold.val_end, end_of_day=True),
+            label=fold_id,
         )
-    bounds = group_scan.select(
-        window_start=pl.col("valid_time").min(), window_end=pl.col("valid_time").max()
-    ).collect(engine="streaming")
-    window_start = bounds["window_start"][0]
-    window_end = bounds["window_end"][0]
-    # groups is derived from a non-empty forecast scan, so min/max are always non-null datetimes.
-    assert isinstance(window_start, datetime)
-    assert isinstance(window_end, datetime)
-    return window_start, window_end, "ad_hoc"
+    valid_time_min, valid_time_max = _valid_time_extent(group_scan)
+    return _EvalWindow(start=valid_time_min, end=valid_time_max, label="ad_hoc")
+
+
+def _validate_group(
+    *,
+    exp_name: str,
+    fold_id: str,
+    group_scan: pl.LazyFrame,
+    scan: pt.LazyFrame[PowerForecast],
+    population_filter: PopulationFilter,
+    evaluation_scope: EvalScopeType,
+) -> _EvalWindow:
+    """Refuse a group the scorer must not score, and return its evaluation window.
+
+    Runs for every group before any group is scored, so a refusal on a later group never leaves
+    an earlier group's ``forecast_metrics`` rows or MLflow runs behind.
+
+    Three checks, each raising. The final-test date guard applies to every scope. In leaderboard
+    scope every row's ``valid_time`` must also lie inside the fold's window. A ``study/``
+    experiment in leaderboard scope must additionally carry exactly the reference experiment's row
+    keys for the fold, so it cannot abstain on hard rows.
+
+    Args:
+        exp_name: Experiment name of the group.
+        fold_id: Fold identifier of the group.
+        group_scan: Lazy scan of this group's forecast rows.
+        scan: Typed lazy scan of the whole ``power_forecasts`` table, from which the reference
+            experiment's rows are read.
+        population_filter: The run's population filter; its ``valid_time`` bounds apply to the
+            reference rows as well, so the two sides cover the same window.
+        evaluation_scope: ``"leaderboard"`` or ``"ad_hoc"``.
+
+    Returns:
+        The group's evaluation window.
+    """
+    window = _resolve_eval_window(evaluation_scope, fold_id, group_scan)
+    require_window_within_guard(
+        window_end=window.end,
+        final_test_start=_cv_config.final_test_start,
+        fold_id=fold_id,
+        final_test_enabled=_final_test_enabled(),
+    )
+    if evaluation_scope != "leaderboard":
+        return window
+    valid_time_min, valid_time_max = _valid_time_extent(group_scan)
+    group_label = f"{exp_name}, {fold_id}"
+    require_valid_times_within_window(
+        valid_time_min=valid_time_min,
+        valid_time_max=valid_time_max,
+        window_start=window.start,
+        window_end=window.end,
+        group_label=group_label,
+    )
+    if exp_name.startswith(STUDY_EXPERIMENT_PREFIX):
+        reference = PopulationFilter(
+            experiment_name=_cv_config.reference_experiment_name,
+            fold_id=fold_id,
+            valid_time_min=population_filter.valid_time_min,
+            valid_time_max=population_filter.valid_time_max,
+        ).apply(scan)
+        require_same_row_keys(
+            study=group_scan,
+            reference=reference,
+            group_label=group_label,
+            reference_label=_cv_config.reference_experiment_name,
+            series_batch_size=_METRICS_SERIES_BATCH_SIZE,
+        )
+    return window
 
 
 _METRICS_SERIES_BATCH_SIZE: Final[int] = 4
@@ -813,6 +909,7 @@ def _score_forecast_group(
     actuals_lf: pt.LazyFrame[PowerTimeSeries],
     metadata_df: pt.DataFrame[TimeSeriesMetadata],
     capacity_df: pt.DataFrame[EffectiveCapacity],
+    window: _EvalWindow,
     evaluation_scope: EvalScopeType,
     metrics_path: str,
     now: datetime,
@@ -846,6 +943,7 @@ def _score_forecast_group(
         metadata_df: Substation metadata used to join ``time_series_type`` onto each metric row.
         capacity_df: Per-series effective capacity used as the NMAE denominator inside
             ``compute_metrics()``; must cover every scored series.
+        window: The group's evaluation window, from ``_validate_group``; stamped on every row.
         evaluation_scope: ``"leaderboard"`` logs per-fold metrics to MLflow; ``"ad_hoc"``
             skips MLflow entirely.
         metrics_path: Local path or remote URI of the ``forecast_metrics`` Delta table.
@@ -886,9 +984,6 @@ def _score_forecast_group(
         )
     per_series_metrics = Metrics.validate(pl.concat(batch_metrics), allow_superfluous_columns=True)
 
-    window_start, window_end, window_label = _resolve_eval_window(
-        evaluation_scope, fold_id, group_scan
-    )
     mlflow_run_id: str | None = None
     if evaluation_scope == "leaderboard":
         experiment_id = get_or_create_experiment(exp_name)
@@ -899,9 +994,9 @@ def _score_forecast_group(
         per_series_metrics,
         exp_name,
         evaluation_scope,
-        window_start,
-        window_end,
-        window_label,
+        window.start,
+        window.end,
+        window.label,
         now,
         mlflow_run_id,
     )
@@ -951,6 +1046,18 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     and has none for them. Use ``evaluation_scope="ad_hoc"`` to score live or dev-fold rows: it
     takes the window from the rows themselves.
 
+    Every group is checked before any group is scored, and each check raises. A window that reaches
+    ``final_test_start`` in the CV config is refused unless ``NGED_FINAL_TEST=1`` is set in the
+    environment of the maintainer's shell; live rows are exempt. In leaderboard scope, every row's
+    ``valid_time`` must lie inside the fold's window.
+
+    Experiments whose name starts with ``study/`` hold forecasts submitted through
+    ``scripts/forecasting/score_study.py``. In leaderboard scope each must carry exactly the row
+    keys ``(time_series_id, power_fcst_init_time, valid_time)`` of the CV config's
+    ``reference_experiment_name`` for the same fold, so a study cannot abstain on hard rows. An
+    unfiltered run skips study experiments, naming them in the ``skipped_study_experiments`` output
+    metadata; a run whose population filter names a study's ``experiment_name`` scores it.
+
     Args:
         context: Dagster execution context; used for logging and ``add_output_metadata``.
         config: Population filter and evaluation scope for this materialisation. Defaults to
@@ -994,6 +1101,21 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     # window to be scored against; skip them rather than fail the whole run on the first one. Ad-hoc
     # scope takes its window from the rows themselves and is the supported way to score live output
     # or dev folds.
+    # `study/` experiments hold forecasts submitted through scripts/forecasting/score_study.py, each
+    # checked against the reference experiment when it is scored. An unfiltered run skips them: a
+    # study goes stale when the reference is re-materialised, and one stale study must not stop the
+    # reviewed experiments being scored. A run that names a study's `experiment_name` scores it.
+    skipped_study_experiments: list[str] = []
+    if config.population_filter.experiment_name is None:
+        skipped_study_experiments = sorted(
+            {exp for exp, _ in groups if exp.startswith(STUDY_EXPERIMENT_PREFIX)}
+        )
+        if skipped_study_experiments:
+            context.log.warning(
+                f"Skipping {skipped_study_experiments} — study experiments are scored only when "
+                "the population filter names their experiment_name."
+            )
+            groups = [group for group in groups if group[0] not in skipped_study_experiments]
     skipped_fold_ids: list[str] = []
     if config.evaluation_scope == "leaderboard":
         configured_fold_ids = set(_cv_config.leaderboard_fold_ids)
@@ -1010,9 +1132,28 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     if not groups:
         context.log.warning("No forecasts matched the population filter — nothing to score.")
         context.add_output_metadata(
-            {"n_rows_written": 0, "n_groups": 0, "skipped_fold_ids": str(skipped_fold_ids)}
+            {
+                "n_rows_written": 0,
+                "n_groups": 0,
+                "skipped_fold_ids": str(skipped_fold_ids),
+                "skipped_study_experiments": str(skipped_study_experiments),
+            }
         )
         return
+
+    # Refuse every group the scorer must not score before scoring any, so a refusal never leaves an
+    # earlier group's rows or MLflow runs behind.
+    windows = {
+        (exp_name, fold_id): _validate_group(
+            exp_name=exp_name,
+            fold_id=fold_id,
+            group_scan=_group_scan(pruned_scan, exp_name, fold_id),
+            scan=scan,
+            population_filter=config.population_filter,
+            evaluation_scope=config.evaluation_scope,
+        )
+        for exp_name, fold_id in groups
+    }
 
     actuals_lf = scan_cleaned_power(settings.cleaned_power_time_series_data_path, storage_options)
     # allow_superfluous_columns because the parquet also carries h3_res_5 and other geo columns.
@@ -1062,6 +1203,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             actuals_lf,
             metadata_df,
             capacity_df,
+            windows[(exp_name, fold_id)],
             config.evaluation_scope,
             settings.forecast_metrics_data_path,
             now,
@@ -1090,5 +1232,6 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             "evaluation_scope": config.evaluation_scope,
             "groups": str(groups),
             "skipped_fold_ids": str(skipped_fold_ids),
+            "skipped_study_experiments": str(skipped_study_experiments),
         }
     )

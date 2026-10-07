@@ -74,6 +74,7 @@ dev = [
     # Pinned below 1.2.3: that release and later pull in `properdocs` as a transitive dependency,
     # which prints an unsolicited warning urging a switch away from MkDocs on every build.
     "mkdocs-redirects>=1.1.0,<1.2.3",
+    "import-linter>=2.15",
 ]
 
 [project.urls]
@@ -526,3 +527,18 @@ plugins.md051.enabled = false
 # asterisk inconsistencies in prose, so the finding list can't be trusted without a per-instance
 # check the math would make risky to automate. Revisit once upstream is math-aware.
 plugins.md049.enabled = false
+
+[tool.importlinter]
+# `ml_core.metrics` and `ml_core.cv_helpers` are the scorer's pure core. They may not import the
+# orchestrator (`dagster`), the experiment tracker (`mlflow`), or the autonomous-study code
+# (`studies`), so a session that edits the studies cannot change what the scorer executes, and the
+# scorer stays unit-testable without a Dagster or MLflow instance. The root packages below include
+# the external packages so that the contract can name them.
+root_packages = ["ml_core", "dagster", "mlflow", "studies"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "The scorer's pure core imports neither Dagster, MLflow, nor the study code"
+type = "forbidden"
+source_modules = ["ml_core.metrics", "ml_core.cv_helpers"]
+forbidden_modules = ["dagster", "mlflow", "studies"]

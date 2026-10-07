@@ -27,7 +27,7 @@ from datetime import UTC, datetime
 from typing import Final, cast
 
 import mlflow
-from contracts.config_schemas import import_class
+from contracts.config_schemas import STUDY_EXPERIMENT_PREFIX, import_class
 from mlflow.tracking import MlflowClient
 
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
@@ -182,8 +182,10 @@ def list_promotable_runs() -> list[PromotableRun]:
     launchpad rather than retyped from memory. The launchpad is the form in Dagster's user
     interface where an asset's run-time configuration is entered before that asset is
     materialised. The champion is still picked by eye off the MLflow leaderboard;
-    ``list_promotable_runs`` only lists the candidates. The caller is responsible for setting the
-    tracking URI (``mlflow.set_tracking_uri``) beforehand.
+    ``list_promotable_runs`` only lists the candidates. Experiments whose name starts with
+    ``STUDY_EXPERIMENT_PREFIX`` are left out: a study's scored forecasts are never a candidate.
+    The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``)
+    beforehand.
     """
     client = MlflowClient()
     runs = [
@@ -198,6 +200,7 @@ def list_promotable_runs() -> list[PromotableRun]:
             ),
         )
         for experiment in client.search_experiments()
+        if not experiment.name.startswith(STUDY_EXPERIMENT_PREFIX)
         for run in client.search_runs(
             experiment_ids=[experiment.experiment_id],
             filter_string="tags.cv_role = 'fold'",
@@ -210,3 +213,26 @@ def list_promotable_runs() -> list[PromotableRun]:
         key=lambda run: run.last_finished_at or datetime.min.replace(tzinfo=UTC),
         reverse=True,
     )
+
+
+def require_run_is_not_a_study(run_id: str) -> None:
+    """Refuse a run that belongs to a ``study/`` experiment.
+
+    A study's fold run exists so that its scores reach the leaderboard chart, and it holds no saved
+    model. ``promoted_model`` calls this before it replaces the production model directory, so a
+    study's run id can never start a promotion. The caller is responsible for setting the tracking
+    URI (``mlflow.set_tracking_uri``) beforehand.
+
+    Args:
+        run_id: The MLflow run id to check.
+
+    Raises:
+        ValueError: If the run's experiment name starts with ``STUDY_EXPERIMENT_PREFIX``.
+    """
+    client = MlflowClient()
+    experiment_name = client.get_experiment(client.get_run(run_id).info.experiment_id).name
+    if experiment_name.startswith(STUDY_EXPERIMENT_PREFIX):
+        raise ValueError(
+            f"Run {run_id} belongs to the study experiment {experiment_name!r}, which holds no "
+            "model that can be promoted."
+        )

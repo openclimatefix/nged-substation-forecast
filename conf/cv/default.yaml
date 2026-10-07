@@ -35,3 +35,11 @@ folds:
 # Default minimum months of observations before val_start for a time series to be eligible.
 # A fold may override this with its own `min_training_months`.
 min_training_months: 6
+
+# The metrics asset refuses to score a window reaching this date unless NGED_FINAL_TEST=1 is set, and
+# the study power reader stops here. It is a guard, not a sealed test year: the data after it is a
+# few months, not an independent year. It must be later than every leaderboard fold's val_end.
+final_test_start: "2026-07-01"
+
+# The experiment whose forecast row keys every `study/` experiment must match before it is scored.
+reference_experiment_name: "xgboost_no_power_lags"

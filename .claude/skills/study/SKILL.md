@@ -75,6 +75,16 @@ so it loses its leading underscore on the way. A script never mutates `sys.path`
 another script by path. No two scripts under `studies/` share a basename, because every study folder
 is on pytest's path. `packages/studies/tests/test_study_boundaries.py` enforces all of this.
 
+**A study's leaderboard number comes only from `scripts/forecasting/score_study.py`.** Run the script
+on the study's predictions file (a parquet file of `PowerForecast` rows) and quote the number from
+the `forecast_metrics` row it writes under the experiment name `study/<study name>`. Never compute a
+skill number with the study's own scoring code, and never edit the scorer files
+(`packages/ml_core/src/ml_core/metrics.py`, `cv_helpers.py`, `conf/cv/`) in a study. The script
+refuses a file whose row keys differ from the reference experiment's for the fold, so the file must
+cover the reference's initialisation times. Read observed power through `studies.power.scan_power`,
+which stops at `final_test_start`; the `metrics` asset refuses to score past that date without the
+maintainer's `NGED_FINAL_TEST=1`.
+
 **A study script is not unit-tested as a whole, so its check is its own output.** Every table the
 page quotes is printed by a committed script into a `report.md`, never transcribed by hand, and
 every number on the page is checked against that report. A number from a diagnostic run during
@@ -510,7 +520,8 @@ with the page's chart renders:
   page.
 - **The evidence:** a reviewer who checks every number, every "beats", every "best", every causal
   "because", and every chart title against the report and the saved losses, computing what the
-  report does not print.
+  report does not print. Where the page quotes a forecast skill number, the reviewer also checks that
+  the number traces to a `forecast_metrics` row written by `scripts/forecasting/score_study.py`.
 
 The personas earn their place. On the two weather-product pages, the builder reviewers found that
 ICON global's wind steps look like an artefact of how the archive serves its grid cells rather than

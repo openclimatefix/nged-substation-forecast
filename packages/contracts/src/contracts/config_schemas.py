@@ -6,11 +6,21 @@ A ``_target_`` string is the key a YAML config file uses to name the Python clas
 import importlib
 from datetime import date
 from pathlib import Path
+from typing import Final, Self
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from contracts.power_schemas import FoldId
+
+STUDY_EXPERIMENT_PREFIX: Final[str] = "study/"
+"""The prefix on the ``experiment_name`` of every forecast that ``score_study.py`` scores.
+
+``score_study.py`` is ``scripts/forecasting/score_study.py``.
+
+The prefix keeps a study's rows out of the promotion path and lets the leaderboard chart show or
+hide them. No reviewed experiment may use the prefix.
+"""
 
 
 def class_target(obj: type | object) -> str:
@@ -124,10 +134,38 @@ class CvConfig(BaseModel):
     min_training_months controls which time series are eligible for each fold. A time series is
     included only if it has at least min_training_months months of data before val_start, and
     data through val_end.
+
+    ``final_test_start`` is a guard, not a sealed test year. The ``metrics`` asset refuses to score
+    a window reaching this date unless ``NGED_FINAL_TEST=1`` is set in the environment, and the
+    study power reader stops here. The data after the date is a few months, not an independent
+    year, and nothing claims otherwise. The date must be later than every leaderboard fold's
+    ``val_end``.
+
+    ``reference_experiment_name`` names the experiment whose forecast row keys a study's forecasts
+    must match exactly before the ``metrics`` asset scores them. It must not carry the study
+    prefix, because a study cannot be its own reference.
     """
 
     folds: list[CvFoldConfig]
     min_training_months: int = Field(default=6, ge=1)
+    final_test_start: date
+    reference_experiment_name: str
+
+    @model_validator(mode="after")
+    def _check_guard_and_reference(self) -> Self:
+        """Reject a cutoff inside a leaderboard fold, and a reference that is a study."""
+        for fold in self.folds:
+            if fold.leaderboard and fold.val_end >= self.final_test_start:
+                raise ValueError(
+                    f"final_test_start={self.final_test_start} must be later than the val_end "
+                    f"({fold.val_end}) of leaderboard fold {fold.fold_id!r}."
+                )
+        if self.reference_experiment_name.startswith(STUDY_EXPERIMENT_PREFIX):
+            raise ValueError(
+                f"reference_experiment_name={self.reference_experiment_name!r} must not start with "
+                f"{STUDY_EXPERIMENT_PREFIX!r}."
+            )
+        return self
 
     @property
     def fold_ids(self) -> list[str]:

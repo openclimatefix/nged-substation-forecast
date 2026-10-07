@@ -11,15 +11,19 @@ Tests at two tiers:
    separate Dagster process — uses a fresh MlflowClient connection to resolve runs by tag.
 """
 
+import importlib.util
 import os
 import socket
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from types import ModuleType
+from typing import Final
 
 import mlflow
 import patito as pt
@@ -35,6 +39,11 @@ from contracts.power_schemas import (
 )
 from dagster import DagsterInstance, RunConfig, materialize
 from deltalake import write_deltalake
+from ml_core.metrics import (
+    FinalTestWindowError,
+    RowKeyMismatchError,
+    RowsOutsideWindowError,
+)
 from mlflow.tracking import MlflowClient
 
 from nged_substation_forecast.defs.cv_assets import (
@@ -477,6 +486,7 @@ def test_score_forecast_group_per_series_batches(
         actuals,
         metadata_df,
         capacity_df,
+        cv_assets._resolve_eval_window("ad_hoc", "2025", group.lazy()),
         "ad_hoc",
         str(metrics_path),
         datetime.now(UTC),
@@ -736,6 +746,450 @@ def test_metrics_ad_hoc_scores_fold_ids_the_cv_config_does_not_define(
 
     fm = pl.read_delta(str(file_mlflow_env["metrics"]))
     assert set(fm["fold_id"].unique().to_list()) == {FOLD_ID, "live"}
+
+
+# ---------------------------------------------------------------------------
+# Scorer protections: the final-test date guard, the fold-window row check, and the study row keys
+# ---------------------------------------------------------------------------
+
+STUDY_EXPERIMENT_NAME = "study/some_study"
+
+
+def _store_variant(
+    forecasts_path: Path,
+    *,
+    experiment_name: str,
+    transform: Callable[[pl.DataFrame], pl.DataFrame] = lambda rows: rows,
+) -> None:
+    """Copy the pipeline's forecasts under another experiment name, after ``transform``."""
+    rows = (
+        pl.read_delta(str(forecasts_path))
+        .filter(pl.col("experiment_name") == EXPERIMENT_NAME)
+        .with_columns(experiment_name=pl.lit(experiment_name))
+    )
+    write_deltalake(
+        table_or_uri=str(forecasts_path),
+        data=transform(rows).to_arrow(),
+        mode="append",
+        partition_by=["experiment_name", "fold_id"],
+    )
+
+
+def _use_as_reference(monkeypatch: pytest.MonkeyPatch, experiment_name: str) -> None:
+    """Make ``experiment_name`` the experiment whose row keys a study must match."""
+    from nged_substation_forecast.defs import cv_assets
+
+    monkeypatch.setattr(
+        cv_assets,
+        "_cv_config",
+        cv_assets._cv_config.model_copy(update={"reference_experiment_name": experiment_name}),
+    )
+
+
+def _score_run_config(
+    *, experiment_name: str | None, fold_id: str | None = FOLD_ID, scope: str = "leaderboard"
+) -> RunConfig:
+    return RunConfig(
+        ops={
+            "metrics": MetricsConfig(
+                population_filter=PopulationFilter(
+                    experiment_name=experiment_name, fold_id=fold_id
+                ),
+                evaluation_scope=scope,
+            )
+        }
+    )
+
+
+def _scored_experiments(metrics_path: Path) -> set[str]:
+    return set(pl.read_delta(str(metrics_path))["experiment_name"].unique().to_list())
+
+
+def test_metrics_scores_a_study_whose_row_keys_match_the_reference(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    _use_as_reference(monkeypatch, EXPERIMENT_NAME)
+    _store_variant(file_mlflow_env["forecasts"], experiment_name=STUDY_EXPERIMENT_NAME)
+
+    assert materialize(
+        [metrics],
+        run_config=_score_run_config(experiment_name=STUDY_EXPERIMENT_NAME),
+        instance=dagster_instance,
+    ).success
+
+    assert _scored_experiments(file_mlflow_env["metrics"]) == {STUDY_EXPERIMENT_NAME}
+
+
+def test_metrics_scores_a_deterministic_study_with_the_reference_row_keys(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A study with one ensemble member is scored, because dropping members drops no row."""
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    _use_as_reference(monkeypatch, EXPERIMENT_NAME)
+    _store_variant(
+        file_mlflow_env["forecasts"],
+        experiment_name=STUDY_EXPERIMENT_NAME,
+        transform=lambda rows: rows.filter(pl.col("ensemble_member") == 0),
+    )
+
+    assert materialize(
+        [metrics],
+        run_config=_score_run_config(experiment_name=STUDY_EXPERIMENT_NAME),
+        instance=dagster_instance,
+    ).success
+
+
+def test_metrics_refuses_a_study_that_omits_the_rows_of_a_valid_time(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    _use_as_reference(monkeypatch, EXPERIMENT_NAME)
+    _store_variant(
+        file_mlflow_env["forecasts"],
+        experiment_name=STUDY_EXPERIMENT_NAME,
+        transform=lambda rows: rows.filter(pl.col("valid_time") != rows["valid_time"].min()),
+    )
+
+    with pytest.raises(RowKeyMismatchError, match="reference row keys are missing"):
+        materialize(
+            [metrics],
+            run_config=_score_run_config(experiment_name=STUDY_EXPERIMENT_NAME),
+            instance=dagster_instance,
+        )
+
+
+def test_metrics_refuses_a_study_that_adds_a_series_the_reference_lacks(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    _use_as_reference(monkeypatch, EXPERIMENT_NAME)
+    _store_variant(
+        file_mlflow_env["forecasts"],
+        experiment_name=STUDY_EXPERIMENT_NAME,
+        transform=lambda rows: pl.concat(
+            [rows, rows.with_columns(time_series_id=pl.lit(2, pl.Int32))]
+        ),
+    )
+
+    with pytest.raises(RowKeyMismatchError, match="extra \\[2\\]"):
+        materialize(
+            [metrics],
+            run_config=_score_run_config(experiment_name=STUDY_EXPERIMENT_NAME),
+            instance=dagster_instance,
+        )
+
+
+def test_metrics_refuses_a_study_when_the_reference_has_no_rows(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    _use_as_reference(monkeypatch, "never_materialised")
+    _store_variant(file_mlflow_env["forecasts"], experiment_name=STUDY_EXPERIMENT_NAME)
+
+    with pytest.raises(RowKeyMismatchError, match="Materialise the reference"):
+        materialize(
+            [metrics],
+            run_config=_score_run_config(experiment_name=STUDY_EXPERIMENT_NAME),
+            instance=dagster_instance,
+        )
+
+
+def test_unfiltered_leaderboard_run_skips_a_study_instead_of_failing_on_it(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A stale study (its reference was re-materialised) must not stop reviewed experiments."""
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    _use_as_reference(monkeypatch, "never_materialised")
+    _store_variant(file_mlflow_env["forecasts"], experiment_name=STUDY_EXPERIMENT_NAME)
+
+    result = materialize(
+        [metrics],
+        run_config=RunConfig(ops={"metrics": MetricsConfig(evaluation_scope="leaderboard")}),
+        instance=dagster_instance,
+    )
+
+    assert result.success
+    assert _scored_experiments(file_mlflow_env["metrics"]) == {EXPERIMENT_NAME}
+    (materialisation,) = result.asset_materializations_for_node("metrics")
+    assert (
+        materialisation.metadata["skipped_study_experiments"].value
+        == f"['{STUDY_EXPERIMENT_NAME}']"
+    )
+
+
+def test_metrics_refuses_leaderboard_rows_outside_the_fold_window(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+) -> None:
+    """A row past ``val_end`` would be scored and labelled as the fold's window."""
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    late = datetime(2026, 7, 2, 12, 0, tzinfo=UTC)
+    _store_variant(
+        file_mlflow_env["forecasts"],
+        experiment_name=f"{EXPERIMENT_NAME}_late",
+        transform=lambda rows: pl.concat(
+            [rows, rows.head(1).with_columns(valid_time=pl.lit(late))]
+        ),
+    )
+
+    with pytest.raises(RowsOutsideWindowError, match="outside the evaluation window"):
+        materialize(
+            [metrics],
+            run_config=_score_run_config(experiment_name=f"{EXPERIMENT_NAME}_late"),
+            instance=dagster_instance,
+        )
+
+
+def test_metrics_refuses_no_group_when_a_later_group_is_refused(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+) -> None:
+    """Every group is checked before any is scored, so a refusal leaves no metrics behind."""
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    late = datetime(2026, 7, 2, 12, 0, tzinfo=UTC)
+    _store_variant(
+        file_mlflow_env["forecasts"],
+        experiment_name=f"{EXPERIMENT_NAME}_late",
+        transform=lambda rows: pl.concat(
+            [rows, rows.head(1).with_columns(valid_time=pl.lit(late))]
+        ),
+    )
+
+    with pytest.raises(RowsOutsideWindowError):
+        materialize(
+            [metrics],
+            run_config=_score_run_config(experiment_name=None),
+            instance=dagster_instance,
+        )
+
+    assert not file_mlflow_env["metrics"].exists()
+    experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
+    assert experiment is not None
+    for run in MlflowClient().search_runs(experiment_ids=[experiment.experiment_id]):
+        assert "rmse__all" not in run.data.metrics
+
+
+def test_metrics_refuses_an_ad_hoc_window_reaching_final_test_start(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from nged_substation_forecast.defs import cv_assets
+
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    monkeypatch.setattr(
+        cv_assets,
+        "_cv_config",
+        cv_assets._cv_config.model_copy(update={"final_test_start": date(2025, 8, 1)}),
+    )
+    monkeypatch.delenv("NGED_FINAL_TEST", raising=False)
+
+    with pytest.raises(FinalTestWindowError, match="NGED_FINAL_TEST=1"):
+        materialize(
+            [metrics],
+            run_config=_score_run_config(experiment_name=EXPERIMENT_NAME, scope="ad_hoc"),
+            instance=dagster_instance,
+        )
+    assert not file_mlflow_env["metrics"].exists()
+
+    monkeypatch.setenv("NGED_FINAL_TEST", "1")
+    assert materialize(
+        [metrics],
+        run_config=_score_run_config(experiment_name=EXPERIMENT_NAME, scope="ad_hoc"),
+        instance=dagster_instance,
+    ).success
+
+
+def test_metrics_scores_live_rows_past_final_test_start_without_the_variable(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from nged_substation_forecast.defs import cv_assets
+
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    _append_live_fold_rows(str(file_mlflow_env["forecasts"]))
+    monkeypatch.setattr(
+        cv_assets,
+        "_cv_config",
+        cv_assets._cv_config.model_copy(update={"final_test_start": date(2025, 8, 1)}),
+    )
+    monkeypatch.delenv("NGED_FINAL_TEST", raising=False)
+
+    assert materialize(
+        [metrics],
+        run_config=_score_run_config(
+            experiment_name=EXPERIMENT_NAME, fold_id="live", scope="ad_hoc"
+        ),
+        instance=dagster_instance,
+    ).success
+
+
+# ---------------------------------------------------------------------------
+# scripts/forecasting/score_study.py
+# ---------------------------------------------------------------------------
+
+SCORE_STUDY_PATH: Final[Path] = (
+    Path(__file__).parent.parent / "scripts" / "forecasting" / "score_study.py"
+)
+"""The script under test, imported by path because `scripts/` is not an importable package."""
+
+
+def _load_score_study() -> ModuleType:
+    spec = importlib.util.spec_from_file_location("score_study", SCORE_STUDY_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["score_study"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+score_study = _load_score_study()
+
+
+@pytest.mark.parametrize("name", ["", "Upper", "has space", "quote'", "study/x", "a" * 65, "a/b"])
+def test_validate_study_name_refuses_a_name_outside_the_pattern(name: str) -> None:
+    with pytest.raises(ValueError, match="Study name"):
+        score_study.validate_study_name(name)
+
+
+def test_validate_study_name_accepts_letters_digits_underscores_and_hyphens() -> None:
+    assert score_study.validate_study_name("my-study_2") == "my-study_2"
+
+
+def test_clean_environment_keeps_only_the_allowed_variables() -> None:
+    cleaned = score_study.clean_environment(
+        {
+            "PATH": "/usr/bin",
+            "HOME": "/home/x",
+            "UV_CACHE_DIR": "/cache",
+            "DATA_PATH_INTERNAL": "/fake",
+            "NGED_FINAL_TEST": "1",
+            "CV_CONFIG_PATH": "/fake.yaml",
+            "MLFLOW_TRACKING_URI": "http://fake",
+        }
+    )
+
+    assert cleaned == {"PATH": "/usr/bin", "HOME": "/home/x", "UV_CACHE_DIR": "/cache"}
+
+
+@pytest.fixture
+def study_predictions(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> Path:
+    """A predictions file equal to the pipeline's rows, which are the reference."""
+    from nged_substation_forecast.defs import cv_assets
+
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    cv_config_path = tmp_path / "cv.yaml"
+    cv_config_path.write_text(
+        cv_assets._cv_config.model_copy(
+            update={"reference_experiment_name": EXPERIMENT_NAME}
+        ).model_dump_json()
+    )
+    monkeypatch.setenv("CV_CONFIG_PATH", str(cv_config_path))
+    _use_as_reference(monkeypatch, EXPERIMENT_NAME)
+    predictions = tmp_path / "predictions.parquet"
+    pl.read_delta(str(file_mlflow_env["forecasts"])).drop("experiment_name").write_parquet(
+        predictions
+    )
+    return predictions
+
+
+def test_score_study_stores_and_scores_a_matching_file(
+    file_mlflow_env: dict[str, Path], study_predictions: Path
+) -> None:
+    score_study.score_study(
+        predictions=study_predictions, study_name="my_study", fold_id=FOLD_ID, replace=False
+    )
+
+    assert "study/my_study" in _scored_experiments(file_mlflow_env["metrics"])
+    stored = pl.read_delta(str(file_mlflow_env["forecasts"]))
+    assert "study/my_study" in set(stored["experiment_name"].unique().to_list())
+
+
+def test_score_study_does_not_overwrite_a_submission_unless_asked(
+    study_predictions: Path,
+) -> None:
+    score_study.score_study(
+        predictions=study_predictions, study_name="my_study", fold_id=FOLD_ID, replace=False
+    )
+
+    with pytest.raises(ValueError, match="already scored"):
+        score_study.score_study(
+            predictions=study_predictions, study_name="my_study", fold_id=FOLD_ID, replace=False
+        )
+    score_study.score_study(
+        predictions=study_predictions, study_name="my_study", fold_id=FOLD_ID, replace=True
+    )
+
+
+def test_score_study_refuses_a_file_missing_rows_and_leaves_no_partition(
+    file_mlflow_env: dict[str, Path], study_predictions: Path, tmp_path: Path
+) -> None:
+    thinned = tmp_path / "thinned.parquet"
+    rows = pl.read_parquet(study_predictions)
+    rows.filter(pl.col("valid_time") != rows["valid_time"].min()).write_parquet(thinned)
+
+    with pytest.raises(RowKeyMismatchError):
+        score_study.score_study(
+            predictions=thinned, study_name="my_study", fold_id=FOLD_ID, replace=False
+        )
+
+    stored = pl.read_delta(str(file_mlflow_env["forecasts"]))
+    assert "study/my_study" not in set(stored["experiment_name"].unique().to_list())
+
+
+@pytest.mark.parametrize("fold_id", ["smoke_test", "live"])
+def test_score_study_refuses_a_fold_that_is_not_a_leaderboard_fold(
+    study_predictions: Path, fold_id: str
+) -> None:
+    with pytest.raises(ValueError, match="not a leaderboard fold"):
+        score_study.score_study(
+            predictions=study_predictions, study_name="my_study", fold_id=fold_id, replace=False
+        )
+
+
+def test_score_study_refuses_a_file_whose_fold_id_disagrees(
+    study_predictions: Path, tmp_path: Path
+) -> None:
+    other_fold = tmp_path / "other_fold.parquet"
+    pl.read_parquet(study_predictions).with_columns(fold_id=pl.lit("smoke_test")).write_parquet(
+        other_fold
+    )
+
+    with pytest.raises(ValueError, match="fold_id values"):
+        score_study.score_study(
+            predictions=other_fold, study_name="my_study", fold_id=FOLD_ID, replace=False
+        )
 
 
 # ---------------------------------------------------------------------------

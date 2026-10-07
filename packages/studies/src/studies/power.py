@@ -1,10 +1,14 @@
 """Put half-hourly power readings onto an hourly grid, on the period-ending convention."""
 
+from datetime import UTC, date, datetime, time
+from pathlib import Path
 from typing import Final
 
 import patito as pt
 import polars as pl
+from contracts.config_schemas import load_cv_config
 from contracts.power_schemas import PowerTimeSeries
+from contracts.settings import PROJECT_ROOT
 from nged_data.storage import scan_cleaned_power
 
 from studies.sources import REPO_DATA_DIR
@@ -14,20 +18,37 @@ CLEANED_POWER_DELTA_URI: Final[str] = str(
 )
 """The cleaned power Delta table under `REPO_DATA_DIR`."""
 
+CV_CONFIG_PATH: Final[Path] = PROJECT_ROOT / "conf" / "cv" / "default.yaml"
+"""The CV config that holds `final_test_start`, the date `scan_power` stops at."""
+
 HALF_HOURS_PER_HOUR: Final[int] = 2
 """How many half-hourly readings a complete hour is built from."""
 
 
-def scan_power() -> pt.LazyFrame[PowerTimeSeries]:
-    """Scan the half-hourly power of every series, without the rows the cleaning rules flagged.
+def scan_power(*, final_test_start: date | None = None) -> pt.LazyFrame[PowerTimeSeries]:
+    """Scan the cleaned half-hourly power of every series, before `final_test_start`.
 
     `scan_power` is the one way a study reads observed power, so a study and the leaderboard scorer
-    rest on the same observations. `scan_power` applies no date cutoff.
+    rest on the same observations. The cutoff is a guard, not a sealed test year: it stops a study
+    reading the observations that the `metrics` asset refuses to score without the maintainer's
+    say-so. A study that bypasses `scan_power` bypasses the guard, which is why a test fails on any
+    study that names the raw power table.
+
+    Args:
+        final_test_start: First date to leave out. `None` reads `final_test_start` from the CV
+            config at `CV_CONFIG_PATH`.
 
     Returns:
-        A lazy frame with the `time_series_id`, `time`, and `power` columns of `PowerTimeSeries`.
+        A lazy frame with the `time_series_id`, `time`, and `power` columns of `PowerTimeSeries`,
+        holding only rows whose `time` is before midnight UTC on `final_test_start`.
     """
-    return scan_cleaned_power(delta_path=CLEANED_POWER_DELTA_URI)
+    if final_test_start is None:
+        final_test_start = load_cv_config(CV_CONFIG_PATH).final_test_start
+    cutoff = datetime.combine(final_test_start, time.min, tzinfo=UTC)
+    before_cutoff = scan_cleaned_power(delta_path=CLEANED_POWER_DELTA_URI).filter(
+        pl.col("time") < cutoff
+    )
+    return pt.LazyFrame.from_existing(before_cutoff).set_model(PowerTimeSeries)
 
 
 def hourly_from_half_hourly(*, half_hourly: pl.DataFrame) -> pl.DataFrame:

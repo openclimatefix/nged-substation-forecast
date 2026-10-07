@@ -74,3 +74,13 @@ single command too. A fast promotion route is worth no more than a slow route if
 fast route enough to use it. The speed comes from the protocol rather than from haste, a distinction
 [Karpathy (2019)](https://karpathy.github.io/2019/04/25/recipe/) puts bluntly: "a 'fast and furious'
 approach to training neural networks does not work and only leads to suffering".
+
+**An autonomous study takes the same scoring path and a different route to production.** A study is
+code that an agent writes under `studies/` and that no one reviews before it runs, so it is not on
+the production pipeline. Its predictions file is scored by `scripts/forecasting/score_study.py`,
+which stores the rows under a `study/`-prefixed experiment name and runs the same `metrics` asset
+as every reviewed experiment. The `metrics` asset refuses a study whose row keys differ from the
+reference experiment's (see [What the `metrics` asset refuses to
+score](cross-validation-folds.md#what-the-metrics-asset-refuses-to-score)). A `study/` run is never
+a promotion candidate. A finding reaches production only as a written specification and a reviewed
+re-implementation on the pipeline, never as merged study code.

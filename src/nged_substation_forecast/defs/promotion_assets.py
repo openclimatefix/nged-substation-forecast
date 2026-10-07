@@ -12,7 +12,7 @@ from dagster import (
     TableRecord,
     asset,
 )
-from ml_core.mlflow_runs import list_promotable_runs
+from ml_core.mlflow_runs import list_promotable_runs, require_run_is_not_a_study
 from ml_core.production_helpers import fetch_model_artifacts
 
 from nged_substation_forecast.defs._tags import RESEARCH_LAYER_TAGS
@@ -71,6 +71,8 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
     which replaces the directory atomically), then reads back ``meta.json`` to report provenance.
     ``live_forecasts`` reads this directory with a plain disk load — never MLflow.
 
+    Promotion refuses a run from a ``study/`` experiment, which holds no model.
+
     Promotion refuses a model whose saved config this code cannot rebuild — a feature name it
     cannot parse, or a ``model_params`` key it no longer declares — and refuses it before the
     directory is replaced, so the previous champion stays in place and keeps serving.
@@ -89,6 +91,7 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
     production_model_path = Path(settings.production_model_path)
+    require_run_is_not_a_study(config.mlflow_run_id)
     fetch_model_artifacts(config.mlflow_run_id, production_model_path)
 
     meta = json.loads((production_model_path / "meta.json").read_text())
