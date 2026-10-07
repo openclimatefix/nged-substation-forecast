@@ -19,9 +19,9 @@ def _prepare_features(df: pl.DataFrame, feature_cols: list[str]) -> pl.DataFrame
     """Return a Float32 DataFrame containing only the feature columns.
 
     Enum columns are encoded as each value's position in the declared list, so a code means the same
-    in every frame. Other non-numeric dtypes (String, Categorical) fail the Float32 cast. Nulls
-    are preserved as NaN, which XGBoost handles natively as missing values. The Patito model is
-    stripped from the result (zero-copy) so XGBoost sees a plain ``pl.DataFrame``.
+    in every frame. Nulls are preserved as NaN, which XGBoost handles natively as missing values.
+    The Patito model is stripped from the result (zero-copy) so XGBoost sees a plain
+    ``pl.DataFrame``.
     """
     exprs = []
     for col in feature_cols:

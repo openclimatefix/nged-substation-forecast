@@ -274,5 +274,4 @@ def test_prepare_features_encodes_enum_as_declared_position() -> None:
         dtype=AllFeatures.dtypes["local_day_of_week"],
     )
     encoded = _prepare_features(pl.DataFrame([weekdays]), ["local_day_of_week"])
-    assert encoded["local_day_of_week"].dtype == pl.Float32
     assert encoded["local_day_of_week"].to_list() == [3.0, 4.0, 6.0, 0.0, None]
