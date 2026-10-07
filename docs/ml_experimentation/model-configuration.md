@@ -7,9 +7,7 @@ How to set hyperparameters and choose features for a forecasting experiment.
 ## Config files
 
 Each model family has a base YAML in `conf/model/`. Two exist today: `conf/model/xgboost.yaml` and
-`conf/model/manual_heuristic.yaml`. The manual heuristic's file lists its 13 power-lag features
-explicitly in `selected_features`, so a variant that moves the annual window overrides the whole
-list. Each file has two required top-level keys:
+`conf/model/manual_heuristic.yaml`. Each file has two required top-level keys:
 
 ```yaml
 # Identifies the BaseForecaster subclass to instantiate.

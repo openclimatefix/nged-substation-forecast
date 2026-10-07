@@ -445,8 +445,7 @@ class PowerForecast(pt.Model):
             "Ensemble member index. For a model that consumes an NWP ensemble, the index is the"
             " numerical weather prediction (NWP) ensemble member, and member 0 is the control"
             " member. For `manual_heuristic`, the index is a historical analogue: the rank of"
-            " the power lag that supplied the value, with 0 the shortest lag. For `climatology`,"
-            " the index is a quantile sample. The index therefore does not imply NWP."
+            " the power lag that supplied the value, with 0 the shortest lag."
         ),
     )
 

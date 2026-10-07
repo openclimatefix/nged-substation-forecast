@@ -21,28 +21,22 @@ from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMe
 from contracts.weather_schemas import Nwp
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
 from ml_core.features import NWP_PUBLICATION_DELAY_HOURS, FeatureEngineer, TabularFeatureEngineer
-from ml_core.features._parsed_features import LagFeature, ParsedFeatures
+from ml_core.features._parsed_features import ParsedFeatures
 from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE
 
 
 class PowerLagsPerNwpRunFeatureEngineer(FeatureEngineer):
     """Engineers power lags on the forecast-run grid, reading no weather value.
 
-    The manual heuristic consumes no weather. It still has to forecast the same
+    The manual heuristic has to forecast the same
     ``(power_fcst_init_time, valid_time)`` rows as every other model, so that a leaderboard compares
     like with like. This engineer therefore reads from the numerical weather prediction (NWP) frame
     only its four key columns other than the ensemble member: ``nwp_model_id``, ``init_time``,
     ``h3_index``, and ``valid_time``. It deduplicates those keys and hands the key-only frame to
     ``TabularFeatureEngineer``. With no weather column present, the tabular pipeline's upsample
     interpolates nothing, and the half-hourly grid, the hindcast filter, and the cell join all come
-    from the tabular code. No weather value and no ensemble member is read, so the output carries
-    one row per series, run, and valid time, and has no ``ensemble_member`` column.
-
-    The rows equal the tabular pipeline's rows for the full NWP frame, deduplicated across members,
-    when the members' valid-time spans of a run overlap and the frame holds one NWP model. With two
-    NWP models, each model would give its own copy of every row.
-
-    Only bulk mode is supported. Baselines are research baselines and are not served live.
+    from the tabular code. The output carries one row per series, run, and valid time, and has no
+    ``ensemble_member`` column.
     """
 
     def engineer(
@@ -68,17 +62,16 @@ class PowerLagsPerNwpRunFeatureEngineer(FeatureEngineer):
             nwp_init_time: Must be ``None`` in bulk mode.
             nwp_publication_delay_hours: Hours after a run's ``init_time`` before the run is
                 usable, which sets each row's ``power_fcst_init_time``.
-            local_timezone: IANA zone the local-time features are computed in. No baseline feature
-                uses it.
+            local_timezone: IANA zone the local-time features are computed in.
 
         Returns:
             A lazy ``AllFeatures`` frame with one row per ``(time_series_id, power_fcst_init_time,
             valid_time)``, carrying ``power`` and one column per requested power lag.
 
         Raises:
-            NotImplementedError: ``power_fcst_init_time`` is given. Single-run mode is what the live
-                service calls, and baselines are not served live. Delegating would fail later with
-                a ``ColumnNotFoundError`` that names neither the baseline nor the cause.
+            NotImplementedError: ``power_fcst_init_time`` is given. Delegating would not raise in
+                this engineer, but ``predict`` would then fail on the ``PowerForecast``
+                ``valid_time`` constraint, and ``live_forecasts`` would fail on ``ensemble_member``.
         """
         if power_fcst_init_time is not None:
             raise NotImplementedError(
@@ -135,7 +128,7 @@ class ManualHeuristicForecaster(BaseForecaster):
         power_lags = [
             lag
             for lag in ParsedFeatures.from_strings(model_params.selected_features).lags
-            if isinstance(lag, LagFeature) and lag.base_col == "power"
+            if lag.base_col == "power"
         ]
         if not power_lags:
             raise ValueError(
@@ -169,7 +162,7 @@ class ManualHeuristicForecaster(BaseForecaster):
             .collect(engine="streaming")
         )
         self._trained_ids = sorted(
-            int(time_series_id)
+            time_series_id
             for time_series_id in observed["time_series_id"].to_list()
             if time_series_id in requested
         )
@@ -193,7 +186,6 @@ class ManualHeuristicForecaster(BaseForecaster):
             One row per ``(time_series_id, power_fcst_init_time, valid_time, ensemble_member)``.
         """
         config = self.model_params
-        # Strip the Patito model so no later step can hit the dict-cast trap.
         features = data.collect(engine="streaming").as_polars()
         members = (
             features.unpivot(
@@ -240,5 +232,5 @@ class ManualHeuristicForecaster(BaseForecaster):
         """Reconstruct a ManualHeuristicForecaster from the ``meta.json`` that ``save`` wrote."""
         meta = json.loads((path / "meta.json").read_text())
         instance = cls(cls.CONFIG_CLASS.model_validate(meta["model_params"]))
-        instance._trained_ids = sorted(int(ts_id) for ts_id in meta["trained_time_series_ids"])
+        instance._trained_ids = meta["trained_time_series_ids"]
         return instance

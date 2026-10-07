@@ -1,14 +1,11 @@
 # Manual heuristic forecaster configuration.
 #
 # The top-level _target_ identifies the BaseForecaster subclass to instantiate; model_params are
-# validated by that class's CONFIG_CLASS, as in conf/model/xgboost.yaml. A registered experiment's
-# config_overrides replace whole values under model_params, so a variant that moves the annual
-# window overrides the whole selected_features list.
+# validated by that class's CONFIG_CLASS, as in conf/model/xgboost.yaml.
 #
-# Only the power lags become ensemble members, ranked shortest lag first. A feature name must equal
-# its engineered column name, power_lag_<hours>h, so each line's age in weeks is a comment. The
-# forecaster reads no weather. Registration accepts a weather feature and a list with no power
-# lag, and both raise only when trained_cv_model runs.
+# Only the power lags become ensemble members, ranked shortest lag first. The forecaster
+# reads no weather. Registration accepts a weather feature and a list with no power lag, and both
+# raise only when trained_cv_model runs.
 
 _target_: baseline_forecasters.manual_heuristic.ManualHeuristicForecaster
 

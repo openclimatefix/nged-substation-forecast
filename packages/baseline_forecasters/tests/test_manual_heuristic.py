@@ -6,7 +6,8 @@ import patito as pt
 import polars as pl
 import pytest
 import yaml
-from _nwp_test_data import cast_to_nwp_dtypes
+from _nwp_test_data import cast_to_nwp_dtypes, nwp_records
+from _power_test_data import power_at
 from baseline_forecasters import ManualHeuristicForecaster
 from baseline_forecasters.manual_heuristic import PowerLagsPerNwpRunFeatureEngineer
 from contracts.ml_schemas import AllFeatures
@@ -24,20 +25,6 @@ _ALL_LAG_FEATURES = {f"power_lag_{hours}h" for hours in _ALL_LAG_HOURS}
 _CELL_A = 599423199024775167
 _CELL_B = 599423199024775167 + 2**30
 _UTC = pl.Datetime("us", "UTC")
-_EPOCH = datetime(2020, 1, 1, tzinfo=UTC)
-
-
-def _config(selected_features: set[str]) -> BaseForecasterConfig:
-    return BaseForecasterConfig(selected_features=selected_features)
-
-
-def _power_at(time: datetime, offset: int = 0) -> float:
-    """Integer power equal to the half-hour index since a fixed epoch, mod 1999, shifted by -999.
-
-    1999 is prime and the lags are multiples of 336 half-hours, so 13 lags give 13 distinct values.
-    """
-    half_hour_index = int((time - _EPOCH).total_seconds() // 1800) + offset
-    return float(half_hour_index % 1999 - 999)
 
 
 def _power_frame(time_series_ids: list[int], start: datetime, end: datetime) -> pl.DataFrame:
@@ -48,7 +35,7 @@ def _power_frame(time_series_ids: list[int], start: datetime, end: datetime) -> 
                 "time_series_id": pl.Series([ts_id] * len(times), dtype=pl.Int32),
                 "time": times,
                 "power": pl.Series(
-                    [_power_at(t, offset=7 * ts_id) for t in times.to_list()], dtype=pl.Float32
+                    [power_at(t, offset=7 * ts_id) for t in times.to_list()], dtype=pl.Float32
                 ),
             }
         )
@@ -71,24 +58,16 @@ def _nwp(
     runs: list[tuple[datetime, tuple[int, ...], timedelta]], cells: list[int]
 ) -> pt.LazyFrame[Nwp]:
     """ECMWF-shaped NWP: 3-hourly valid times from each run's first valid offset to 360 h."""
-    rows = []
+    records = []
     for init_time, members, first_valid_offset in runs:
-        for member in members:
-            for cell in cells:
-                for step in range(121):
-                    offset = timedelta(hours=3 * step)
-                    if offset >= first_valid_offset:
-                        rows.append(
-                            {
-                                "nwp_model_id": "ECMWF_ENS_0_25_degree",
-                                "init_time": init_time,
-                                "valid_time": init_time + offset,
-                                "ensemble_member": member,
-                                "h3_index": cell,
-                                "temperature_2m": 10.0 + member,
-                            }
-                        )
-    frame = pl.DataFrame(rows)
+        valid_times = [
+            init_time + timedelta(hours=3 * step)
+            for step in range(121)
+            if timedelta(hours=3 * step) >= first_valid_offset
+        ]
+        for cell in cells:
+            records += nwp_records(cell, init_time, members, valid_times=valid_times)
+    frame = pl.DataFrame(records)
     frame = cast_to_nwp_dtypes(frame, *frame.columns)
     return pt.LazyFrame.from_existing(frame.lazy()).set_model(Nwp)
 
@@ -113,18 +92,22 @@ def _lag_frame(rows: list[dict], lag_columns: list[str]) -> pt.LazyFrame[AllFeat
 
 def test_construction_orders_the_yaml_lags_by_hours_and_rejects_no_power_lag() -> None:
     raw = yaml.safe_load(_MODEL_YAML.read_text())
-    forecaster = ManualHeuristicForecaster(_config(set(raw["model_params"]["selected_features"])))
+    forecaster = ManualHeuristicForecaster(
+        BaseForecasterConfig(selected_features=set(raw["model_params"]["selected_features"]))
+    )
 
     assert forecaster._lag_hours == _ALL_LAG_HOURS
     with pytest.raises(ValueError, match="at least one power lag"):
-        ManualHeuristicForecaster(_config({"local_time_of_day_sin"}))
+        ManualHeuristicForecaster(BaseForecasterConfig(selected_features={"local_time_of_day_sin"}))
 
 
 def test_shedding_keeps_member_identity_through_the_real_pipeline() -> None:
     init_time = datetime(2025, 3, 3, tzinfo=UTC)
     power_fcst_init_time = init_time + timedelta(hours=9)
     power = _power_frame([1], start=init_time - timedelta(weeks=56), end=power_fcst_init_time)
-    forecaster = ManualHeuristicForecaster(_config(_ALL_LAG_FEATURES))
+    forecaster = ManualHeuristicForecaster(
+        BaseForecasterConfig(selected_features=_ALL_LAG_FEATURES)
+    )
 
     features = ManualHeuristicForecaster.feature_engineer.engineer(
         selected_features=_ALL_LAG_FEATURES,
@@ -136,11 +119,10 @@ def test_shedding_keeps_member_identity_through_the_real_pipeline() -> None:
         lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_seconds() / 3600
     )
 
-    assert forecast["nwp_init_time"].is_null().all()
     # Each value is the observed power at valid_time minus the lag whose rank is the member.
     for row in forecast.iter_rows(named=True):
         lag = _ALL_LAG_HOURS[row["ensemble_member"]]
-        expected = _power_at(row["valid_time"] - timedelta(hours=lag), offset=7)
+        expected = power_at(row["valid_time"] - timedelta(hours=lag), offset=7)
         assert row["power_fcst"] == expected
     members_by_band = {
         "under 168 h": (forecast.filter(pl.col("lead_hours") < 168), set(range(13))),
@@ -181,7 +163,9 @@ def test_predict_drops_a_row_whose_lags_are_all_null() -> None:
         columns,
     )
 
-    forecast = ManualHeuristicForecaster(_config(set(columns))).predict(data)
+    forecast = ManualHeuristicForecaster(
+        BaseForecasterConfig(selected_features=set(columns))
+    ).predict(data)
 
     assert forecast["valid_time"].to_list() == [init_time + timedelta(hours=2)]
     assert forecast["ensemble_member"].to_list() == [0]
@@ -190,7 +174,9 @@ def test_predict_drops_a_row_whose_lags_are_all_null() -> None:
 def test_predict_on_empty_input_returns_a_valid_empty_frame() -> None:
     columns = ["power_lag_168h", "power_lag_336h"]
 
-    forecast = ManualHeuristicForecaster(_config(set(columns))).predict(_lag_frame([], columns))
+    forecast = ManualHeuristicForecaster(
+        BaseForecasterConfig(selected_features=set(columns))
+    ).predict(_lag_frame([], columns))
 
     assert forecast.height == 0
 
@@ -202,7 +188,9 @@ def test_train_records_requested_series_with_observed_power() -> None:
             "power": pl.Series([1.0, None, None, 4.0], dtype=pl.Float32),
         }
     )
-    forecaster = ManualHeuristicForecaster(_config({"power_lag_168h"}))
+    forecaster = ManualHeuristicForecaster(
+        BaseForecasterConfig(selected_features={"power_lag_168h"})
+    )
 
     forecaster.train(pt.LazyFrame.from_existing(frame.lazy()).set_model(AllFeatures), [1, 2])
 

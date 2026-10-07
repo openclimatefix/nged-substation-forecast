@@ -2,8 +2,7 @@
 
 This package holds the naive baselines that a trained model has to beat. A baseline subclasses
 `BaseForecaster` and rides the same cross-validation chain as `XGBoostForecaster`, so the
-leaderboard scores it the same way. This package does not own the feature pipeline, which stays in
-`ml_core`, nor the XGBoost model, which stays in `xgboost_forecaster`.
+leaderboard scores it the same way.
 
 ## What each baseline emits
 
@@ -32,7 +31,7 @@ the manual heuristic, as it does for every other model.
 would not yet have been observed when the forecast was issued, so the feature pipeline nulls it. The
 weekly group holds 6 members below 168 h of lead, 5 members at leads in [168 h, 336 h), and 4
 members from 336 h. An operator issuing a forecast at time T has only the weeks before T, so the
-operator loses the same analogues. A member keeps its index as others shed.
+operator loses the same analogues.
 
 **A series short of history, or with flagged readings, has fewer members.** A series with less than
 55 weeks of history has no annual analogue for the earliest forecasts. Every reader of power skips a
@@ -43,8 +42,3 @@ that member is shed. A row with no member left is dropped.
 lag of a multiple of 168 h is a whole number of weeks in UTC. Across a clock change, the analogue
 sits an hour away from the target in local clock time, whereas the operator's method matches local
 weekday and time of day. About one member value in ten is affected.
-
-## Not served live
-
-**The baselines are research baselines.** `PowerLagsPerNwpRunFeatureEngineer.engineer` raises
-`NotImplementedError` in single-run mode, which is the mode the live service uses.

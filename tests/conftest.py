@@ -65,9 +65,7 @@ def register_experiment() -> Callable[..., None]:
     ``["temperature_2m"]`` and ``n_estimators`` of 5 unless told otherwise. ``selected_features``
     edits only the ``selected_features`` entry of those default overrides. ``base_model_config``
     names another model YAML. ``config_overrides`` replaces the whole default overrides dict,
-    ``selected_features`` included, so a caller passing ``{}`` sends no overrides at all. Passing
-    both ``selected_features`` and ``config_overrides`` raises ``ValueError``, because the
-    ``selected_features`` argument would have nothing to edit.
+    ``selected_features`` included, so a caller passing ``{}`` sends no overrides at all.
     """
 
     def _register(
@@ -78,11 +76,6 @@ def register_experiment() -> Callable[..., None]:
         base_model_config: str = "conf/model/xgboost.yaml",
         config_overrides: dict[str, Any] | None = None,
     ) -> None:
-        if config_overrides is not None and selected_features is not None:
-            raise ValueError(
-                "Pass either selected_features or config_overrides, not both: config_overrides "
-                "replaces the default overrides that selected_features would edit."
-            )
         overrides = (
             {"selected_features": selected_features or ["temperature_2m"], "n_estimators": 5}
             if config_overrides is None
