@@ -70,8 +70,60 @@ def test_a_project_with_a_later_stage_keeps_its_built_row() -> None:
             "Project Name": ["Farm", "Farm", "Other", "Other"],
             "Plant Type": ["PV Array (Photo Voltaic/solar)"] * 4,
             "Project Status": ["Built", "Consents Approved", "Consents Approved", "Built"],
+            "MW Connected": ["99.4", "0", "0", "50"],
             "Cumulative Total Capacity (MW)": ["99.4", "120", "70", "50"],
         }
     )
     rows = collate.best_tec_rows(tec=tec).sort("Project ID")
-    assert rows["Cumulative Total Capacity (MW)"].to_list() == ["99.4", "50"]
+    assert rows["tec_mw"].to_list() == [99.4, 50.0]
+
+
+def test_a_built_project_uses_its_connected_capacity_and_an_unbuilt_one_its_agreed_capacity() -> (
+    None
+):
+    """A built row's cumulative figure can include a later increase, such as 200 MW due in 2036."""
+    tec = pl.DataFrame(
+        {
+            "Project ID": ["built", "unbuilt"],
+            "Project Name": ["Built", "Unbuilt"],
+            "Plant Type": ["PV Array (Photo Voltaic/solar)"] * 2,
+            "Project Status": ["Built", "Under Construction/Commissioning"],
+            "MW Connected": ["350", "0"],
+            "Cumulative Total Capacity (MW)": ["550", "20.62"],
+        }
+    )
+    rows = collate.best_tec_rows(tec=tec).sort("Project ID")
+    assert rows["tec_mw"].to_list() == [350.0, 20.62]
+
+
+def test_storage_evidence_is_graded_from_the_strongest_first() -> None:
+    plant_type = "Energy Storage System;PV Array (Photo Voltaic/solar)"
+
+    def evidence(*, bmu: bool, battery: str | None, plant: str | None) -> tuple[str, str]:
+        return collate.site_technology(
+            tec_plant_type=plant,
+            storage_bmu_with_output=bmu,
+            repd_battery_status=battery,
+            repd_solar_found=True,
+        )
+
+    assert evidence(bmu=True, battery="Operational", plant=plant_type) == (
+        "hybrid",
+        "storage BMU with output",
+    )
+    assert (
+        evidence(bmu=False, battery="Operational", plant=None)[1] == "operational battery in REPD"
+    )
+    assert evidence(bmu=False, battery="Under Construction", plant=None) == (
+        "hybrid",
+        "storage planned or under construction",
+    )
+    assert evidence(bmu=False, battery=None, plant=plant_type)[0] == "hybrid"
+    assert evidence(bmu=False, battery=None, plant="PV Array (Photo Voltaic/solar)") == (
+        "pure PV",
+        "TEC plant type lists PV only",
+    )
+    assert evidence(bmu=False, battery=None, plant=None) == (
+        "pure PV",
+        "REPD solar row, no battery row",
+    )
