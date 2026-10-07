@@ -11,13 +11,12 @@ with app.setup:
     import geoarrow.pyarrow as geo_pyarrow
     import lonboard
     import marimo as mo
-    import patito as pt
     import plotting.ocf_theme  # noqa: F401 — registers OCF Altair theme as side effect
     import polars as pl
     import pyarrow
     from anywidget import AnyWidget
     from contracts.common import UTC_DATETIME_DTYPE
-    from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+    from contracts.power_schemas import TimeSeriesMetadata
     from contracts.typing_utils import typeddict_to_dict
     from dashboard.data_source import settings_for_source, source_status_message
     from plotting.ocf_theme import DATA_BLUE, hex_to_rgb
@@ -159,12 +158,9 @@ def _(delta_df, df, layer_widget, map):
 
             # `anchor - RECENT_WINDOW` is a plain Python datetime, so the filter stays a single
             # comparison against a literal, which Delta and Parquet can push down to the scan.
-            filtered_demand = cast(
-                pt.DataFrame[PowerTimeSeries],
-                series_lf.filter(
-                    pl.col("time") > pl.lit(anchor - RECENT_WINDOW).cast(UTC_DATETIME_DTYPE)
-                ).collect(),
-            )
+            filtered_demand = series_lf.filter(
+                pl.col("time") > pl.lit(anchor - RECENT_WINDOW).cast(UTC_DATETIME_DTYPE)
+            ).collect()
         except Exception as e:  # noqa: BLE001 — surface any read failure in the pane, never crash.
             right_pane = mo.md(f"{e}")
         else:

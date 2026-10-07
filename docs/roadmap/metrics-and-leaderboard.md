@@ -390,8 +390,8 @@ probe).** Ships the package and proves the PR-2 framework on the simplest model.
   lag per row: same-time-yesterday for day-1, last-week for day 2–7, two-weeks-ago beyond. Zero
   lookahead risk because it rides the audited pipeline. Output keeps the spine's `ensemble_member`
   (= 0 only, given member-0 inputs), cast UInt8 → Int8 via an *expression* cast, following
-  `XGBoostForecaster._build_part` (a dict-`.cast({...})` on the concat-of-group-by frames would hit
-  the Patito cast trap). Rows where all lags are null are dropped, the count logged, and the
+  `XGBoostForecaster._build_part` (an expression cast is correct whatever Patito does to the
+  frame's Patito model). Rows where all lags are null are dropped, the count logged, and the
   per-series dropped/coverage counts recorded in asset metadata.
 - `conf/model/persistence.yaml`: `weather_source: "none"`, `training_strategy: "none"`.
 - Tests: unit (shortest-non-leaky selection on a hand-built `AllFeatures` fixture; all-null-row

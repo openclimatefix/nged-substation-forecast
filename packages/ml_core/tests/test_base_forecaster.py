@@ -16,6 +16,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Self
 
+import ml_core.base_forecaster
 import mlflow
 import patito as pt
 import polars as pl
@@ -323,6 +324,28 @@ def test_the_archive_carries_the_trained_metadata_without_area_wkt(
     assert metadata["time_series_id"].to_list() == [10, 20]
     assert "h3_res_5" in metadata.columns
     assert "area_wkt" not in metadata.columns
+
+
+def test_save_to_mlflow_hands_over_metadata_that_still_carries_its_patito_model(
+    saved_run: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``write_trained_metadata`` is annotated to take a ``TimeSeriesMetadata`` frame.
+
+    The rows reach it through an eager ``filter``, which returns a plain frame, so the model is
+    only attached if ``save_to_mlflow`` re-attaches it.
+    """
+    received_models: list[object] = []
+    original = ml_core.base_forecaster.write_trained_metadata
+
+    def spy(*, model_dir: Path, time_series_metadata: pt.DataFrame[TimeSeriesMetadata]) -> None:
+        received_models.append(getattr(time_series_metadata, "model", None))
+        original(model_dir=model_dir, time_series_metadata=time_series_metadata)
+
+    monkeypatch.setattr(ml_core.base_forecaster, "write_trained_metadata", spy)
+
+    _save(saved_run, "re-saved", series=[10, 20])
+
+    assert received_models == [TimeSeriesMetadata]
 
 
 def test_load_trained_metadata_says_what_to_do_about_a_directory_without_it(
