@@ -57,7 +57,8 @@ def flag_nged_power(
     and is not flagged.
 
     **Example.** The output holds every input power row, with a `drop_reason` column added. These
-    seven rows are real readings from a `Primary` substation, MARSH LANE 33 11kV S STN, after cleaning:
+    seven rows are real readings from a `Primary` substation, MARSH LANE 33 11kV S STN, after
+    cleaning:
 
     ```text
     time_series_id  time (UTC)        power (MVA)  drop_reason
