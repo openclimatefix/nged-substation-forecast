@@ -1,4 +1,4 @@
-"""The one mapping from a metered generator's identifier to the label a study may publish."""
+"""The one mapping from an NGED metered generator's identifier to the label a study may publish."""
 
 from collections.abc import Sequence
 from typing import Final
