@@ -48,8 +48,8 @@ weather-product studies have been run. `--resume` reuses the per-arm fits a prev
 `fits/`. `--report-only` rebuilds `report.md` from `losses.parquet`, `stack_weights.parquet` and
 `intervals.parquet` already on disk, fitting nothing; move the current `report.md` to a
 `superseded/` subfolder first, since this overwrites it. `--report-only` needs `--power-version`,
-the power Delta table version the fits on disk read, which the replaced report prints: the table
-may have gained versions since, so its current version is not the one the results rest on.
+the cleaned power Delta table version the fits on disk read, which the replaced report prints:
+the table may have gained versions since, so its current version is not the one the results rest on.
 """
 
 import argparse
@@ -1594,7 +1594,7 @@ def _report(
         reproduction_lines: The reproduction check's rendered lines, from `_reproduction_lines` or
             re-read from a previous run's `reproduction.md`.
         records: Every interval.
-        power_version: The power Delta table's version.
+        power_version: The cleaned power Delta table's version.
 
     Returns:
         The report.
@@ -1606,7 +1606,7 @@ def _report(
         for name, frame in frames.items()
     ]
     lines += [
-        f"- Power Delta table version {power_version}.",
+        f"- Cleaned power Delta table version {power_version}.",
         (
             f"- Synthetic product noise, standard deviation as a fraction of capacity: solar "
             f"{SOLAR.synthetic_noise}, wind {WIND.synthetic_noise}."
@@ -1804,8 +1804,8 @@ def main() -> int:
         "--power-version",
         type=int,
         help=(
-            "With --report-only, the power Delta table version the fits on disk read, as the "
-            "replaced report prints it."
+            "With --report-only, the cleaned power Delta table version the fits on disk read, "
+            "as the replaced report prints it."
         ),
     )
     arguments = parser.parse_args()

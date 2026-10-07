@@ -12,7 +12,7 @@ from studies.sources import REPO_DATA_DIR
 CLEANED_POWER_DELTA_URI: Final[str] = str(
     REPO_DATA_DIR / "NGED" / "cleaned_power_time_series.delta"
 )
-"""The `cleaned_power_time_series` Delta table that every study reads power from."""
+"""The cleaned power Delta table under `REPO_DATA_DIR`."""
 
 HALF_HOURS_PER_HOUR: Final[int] = 2
 """How many half-hourly readings a complete hour is built from."""
@@ -22,10 +22,10 @@ def scan_power() -> pt.LazyFrame[PowerTimeSeries]:
     """Scan the half-hourly power of every series, without the rows the cleaning rules flagged.
 
     `scan_power` is the one way a study reads observed power, so a study and the leaderboard scorer
-    rest on the same observations. It applies no date cutoff.
+    rest on the same observations. `scan_power` applies no date cutoff.
 
     Returns:
-        A lazy frame with the `time_series_id`, `time` and `power` columns of `PowerTimeSeries`.
+        A lazy frame with the `time_series_id`, `time`, and `power` columns of `PowerTimeSeries`.
     """
     return scan_cleaned_power(delta_path=CLEANED_POWER_DELTA_URI)
 

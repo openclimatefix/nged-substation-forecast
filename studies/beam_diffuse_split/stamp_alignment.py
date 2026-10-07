@@ -30,6 +30,8 @@ correctly stamped feed reads about +15 minutes on the two geometric measurements
 names the end of the half-hour it averages, and 0 on the correlation. The `before` side should read
 about +45 and −30. A `before` side reading +15 and 0 instead means NGED has republished the early
 readings with corrected stamps, and the ingest is now shifting rows that need no shift.
+`scan_power` drops the rows the cleaning rules flag, so a cleaning rule keyed on solar position
+would bias these measurements.
 
 Run it with `uv run python studies/beam_diffuse_split/stamp_alignment.py`.
 """
@@ -46,7 +48,6 @@ from studies.power import scan_power
 from studies.pv_dataset import CAMS_PATH, pv_sites
 
 _LOG: Final[logging.Logger] = logging.getLogger("stamp_alignment")
-
 
 MINUTES_PER_HOUR: Final[int] = 60
 

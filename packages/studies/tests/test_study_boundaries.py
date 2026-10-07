@@ -360,8 +360,9 @@ def test_production_code_importing_studies_or_a_script_is_reported(tmp_path: Pat
     }
 
 
-RAW_POWER_TABLE_NAME: Final[re.Pattern[str]] = re.compile(r"(?<!cleaned_)power_time_series\.delta")
-"""The raw power table's folder name, which the cleaned table's folder name ends with."""
+RAW_POWER_TABLE_NAME: Final[re.Pattern[str]] = re.compile(r"(?<!\w)power_time_series")
+"""Any name or path beginning `power_time_series`, which the raw table's folder name and its
+`Settings` attribute both do."""
 
 
 def test_no_study_names_the_raw_power_table():

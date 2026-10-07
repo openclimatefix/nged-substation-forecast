@@ -4,7 +4,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 from contracts.power_schemas import POWER_TIMESTAMPS_CORRECTED_BEFORE
-from studies.power import hourly_from_half_hourly, scan_power
+from studies.power import hourly_from_half_hourly
 
 from studies import power
 
@@ -97,7 +97,7 @@ def test_scan_power_returns_only_the_rows_no_cleaning_rule_flagged(
     ).write_delta(delta_path)
     monkeypatch.setattr(power, "CLEANED_POWER_DELTA_URI", str(delta_path))
 
-    kept = scan_power().collect()
+    kept = power.scan_power().collect()
 
     assert kept.columns == ["time_series_id", "time", "power"]
     assert kept["power"].to_list() == [1.0]

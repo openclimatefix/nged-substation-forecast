@@ -53,8 +53,9 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 - `served_column_checks` — two assertions about a downloaded irradiance column: that the hourly
   value is a backward mean over the hour ending at its label, and that a published direct fraction
   carries information a separation model applied to the total would not.
-- `power` — the half-hourly-to-hourly aggregation, on the period-ending convention
-  `contracts.PowerTimeSeries` states.
+- `power` — `scan_power`, the one reader of observed power (the cleaned table, so a study needs
+  `clean_nged_power_data` materialised locally), and the half-hourly-to-hourly aggregation, on the
+  period-ending convention `contracts.PowerTimeSeries` states.
 - `midas` — reading the Met Office's MIDAS Open station files (hourly global irradiance in W m⁻²,
   named hourly-weather columns, and the station coordinates, held in memory only), repairing the
   three defects those files carry, and choosing each site's `k` nearest stations that cover enough of
