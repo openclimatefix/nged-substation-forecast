@@ -1676,8 +1676,10 @@ def _ramp_disagreement_lines(*, losses: pl.DataFrame, frame: pl.DataFrame) -> li
         )
     )
     ramp_band = per_row.with_columns(
-        pl.col("ramp").qcut(
-            RAMP_QUANTILE_BANDS, labels=[str(i) for i in range(RAMP_QUANTILE_BANDS)]
+        pl.col("ramp").bin_quantiles(
+            RAMP_QUANTILE_BANDS,
+            labels=[str(i) for i in range(RAMP_QUANTILE_BANDS)],
+            right_closed=True,
         )
     )
     ramp_gain = ramp_band.group_by("ramp").agg(pl.col("gain").mean()).sort("ramp")
@@ -1702,8 +1704,10 @@ def _ramp_disagreement_lines(*, losses: pl.DataFrame, frame: pl.DataFrame) -> li
         reference=reference,
     )
     disagreement_band = per_row.with_columns(
-        pl.col("disagreement").qcut(
-            RAMP_QUANTILE_BANDS, labels=[str(i) for i in range(RAMP_QUANTILE_BANDS)]
+        pl.col("disagreement").bin_quantiles(
+            RAMP_QUANTILE_BANDS,
+            labels=[str(i) for i in range(RAMP_QUANTILE_BANDS)],
+            right_closed=True,
         )
     )
     disagreement_gain = (

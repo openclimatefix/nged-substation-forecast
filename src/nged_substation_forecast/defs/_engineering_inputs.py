@@ -12,8 +12,8 @@ import patito as pt
 import polars as pl
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
-from contracts.typing_utils import typeddict_to_dict
 from contracts.weather_schemas import Nwp
+from nged_data.storage import scan_cleaned_power
 
 MAX_NWP_LEAD: Final[timedelta] = timedelta(days=16)
 """Upper bound on an NWP run's forecast horizon, used to prune the ``init_time``-partitioned scan.
@@ -90,7 +90,8 @@ def load_engineering_inputs(
         settings: Application settings (data paths, credentials).
         time_series_ids: IDs to include; power is filtered to this population.
         metadata: The metadata for those series, whose ``h3_res_5`` decides which NWP cells are
-            scanned. R&D passes the roster; production passes the promoted model's frozen copy.
+            scanned. R&D passes the metadata table; production passes the promoted model's frozen
+            copy.
         window_start: Inclusive start of the time window for power observations and NWP
             ``valid_time``.
         window_end: Inclusive end of the time window for power observations and NWP
@@ -122,8 +123,10 @@ def load_engineering_inputs(
     if init_time_end is None:
         init_time_end = window_end
     storage_options = settings.storage_options
-    power_lf = pl.scan_delta(
-        settings.power_time_series_data_path, storage_options=typeddict_to_dict(storage_options)
+    # The cleaned table's unflagged rows. `.filter` is typed as a plain `pl.LazyFrame`, so the
+    # result is re-wrapped below to satisfy the return annotation.
+    power_lf = scan_cleaned_power(
+        settings.cleaned_power_time_series_data_path, storage_options
     ).filter(
         pl.col("time_series_id").is_in(time_series_ids),
         pl.col("time") >= window_start - power_lookback,

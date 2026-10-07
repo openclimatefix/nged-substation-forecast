@@ -6,7 +6,7 @@ FILES = ["beam_diffuse_wind_products/losses.parquet","past_weather_v2/ens_hres_p
 for name in FILES:
     p = ROOT / name
     f = pl.scan_parquet(p).select("site","time","fold").unique().collect()
-    f = f.unique(subset=["site","time"], keep="first")
+    f = f.sort("site", "time", "fold").unique(subset=["site","time"], keep="first")
     r = f.with_columns(cm=pl.col("time").dt.month(), yr=pl.col("time").dt.year())
     tot = r.group_by("site","cm").agg(n_tot=pl.len(), n_years=pl.col("yr").n_unique())
     cells = r.group_by("site","fold","cm").agg(n=pl.len()).join(tot, on=["site","cm"])

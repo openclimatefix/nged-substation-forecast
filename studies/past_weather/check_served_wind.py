@@ -14,7 +14,7 @@ speed; the ratio of the two shows how.
 **When each ICON product's 80 m wind starts in the archive.**
 
 The script sends each generator's coordinates to Open-Meteo, read at run time from the private
-roster, and writes only the anonymous labels. Run it with
+site list, and writes only the anonymous labels. Run it with
 `uv run python studies/past_weather/check_served_wind.py`; it writes
 `served_wind_checks.md` beside the wind study's report.
 """
@@ -53,7 +53,7 @@ def _cell_lines(*, sites: pl.DataFrame) -> list[str]:
     """Compare ICON global's nearest cell with its nearest land cell, per step period.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
 
     Returns:
         Markdown lines.
@@ -103,7 +103,7 @@ def _height_lines(*, sites: pl.DataFrame) -> list[str]:
     """Report each ICON product's served 100 m speed over its 120 m speed.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
 
     Returns:
         Markdown lines.
@@ -134,7 +134,7 @@ def _archive_start_lines(*, sites: pl.DataFrame) -> list[str]:
     """Report the first hour each ICON product's 80 m wind is served at every generator.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
 
     Returns:
         Markdown lines.

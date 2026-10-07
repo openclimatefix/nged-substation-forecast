@@ -772,7 +772,7 @@ def _support_lines(*, sites: pl.DataFrame) -> list[str]:
     latitude wide, at the generators' mean latitude.
 
     Args:
-        sites: The solar roster, with `latitude` and `longitude`.
+        sites: The solar site list, with `latitude` and `longitude`.
 
     Returns:
         Markdown lines.
@@ -918,7 +918,7 @@ def _report(
     Args:
         frame: This section's own row set.
         losses: Every arm's losses, at both `pooled` and `sensitivity` settings.
-        sites: The solar roster, for the geometry lines.
+        sites: The solar site list, for the geometry lines.
         job_list: Every job `jobs()` returns, for the feature-column section.
 
     Returns:

@@ -14,6 +14,7 @@ from pathlib import Path
 import patito as pt
 import polars as pl
 import pytest
+from _cleaned_power_test_data import write_cleaned_copy
 from _nwp_test_data import nwp_records, write_test_nwp
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
@@ -94,7 +95,7 @@ def _write_power(path: str) -> None:
 def _metadata_for(
     time_series_ids: tuple[int, ...], cells: tuple[int, ...]
 ) -> pt.DataFrame[TimeSeriesMetadata]:
-    """A roster frame holding the two columns the feature pipeline reads.
+    """A metadata table holding the two columns the feature pipeline reads.
 
     ``set_model`` rather than ``validate``, as the assets' own readers do, so a partial frame is
     enough.
@@ -148,6 +149,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     monkeypatch.setenv("PRODUCTION_MODEL_PATH", str(production_model_path))
 
     _write_power(str(nged_path / "power_time_series.delta"))
+    write_cleaned_copy(nged_path / "power_time_series.delta")
     _write_nwp(str(tmp_path / "NWP"))
     _save_promoted_model(production_model_path)
 
@@ -371,35 +373,37 @@ def _save_model_trained_on(path: Path, time_series_ids: list[int]) -> None:
     )
 
 
-def test_the_roster_cannot_thin_or_fail_a_live_slot(
+def test_the_metadata_table_cannot_thin_or_fail_a_live_slot(
     env: dict[str, str], dagster_instance: DagsterInstance, tmp_path: Path
 ) -> None:
-    """A roster fault costs the live service nothing, because it does not read the roster.
+    """A metadata table fault costs the live service nothing, because the service does not read the
+    metadata table.
 
-    Each series' H3 cell comes from the model's own frozen copy, so a roster that has lost rows,
-    or cannot be read at all, leaves the forecast identical. Losing a row used to drop that
+    Each series' H3 cell comes from the model's own frozen copy, so a metadata table that has lost
+    rows, or cannot be read at all, leaves the forecast identical. Losing a row used to drop that
     series silently and an unreadable file used to fail the slot outright — both off the
-    degradation ladder entirely (issue #528). The *absent* roster needs no step here: the ``env``
-    fixture writes none, so every other test in this file is that case.
+    degradation ladder entirely (issue #528). The *absent* metadata table needs no step here: the
+    ``env`` fixture writes none, so every other test in this file is that case.
     """
-    roster = tmp_path / "NGED" / "metadata.parquet"
+    metadata_table = tmp_path / "NGED" / "metadata.parquet"
     # ts3 shares ts1's NWP cell, so both are genuinely forecastable to begin with.
-    _metadata_for((1, 3), (_TRAINED_CELL, _TRAINED_CELL)).write_parquet(roster)
+    _metadata_for((1, 3), (_TRAINED_CELL, _TRAINED_CELL)).write_parquet(metadata_table)
     _write_power_for(str(tmp_path / "NGED" / "power_time_series.delta"), (1, 3))
+    write_cleaned_copy(tmp_path / "NGED" / "power_time_series.delta")
     _save_model_trained_on(tmp_path / "production_model", [1, 3])
 
     assert _materialize(dagster_instance, "live").success
     assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1, 3}
 
     # ts3's row goes.
-    _metadata_for((1,), (_TRAINED_CELL,)).write_parquet(roster)
+    _metadata_for((1,), (_TRAINED_CELL,)).write_parquet(metadata_table)
     assert _materialize(dagster_instance, "live").success
     assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1, 3}
 
     # Then the file itself becomes unreadable. Kept separate from the absent case because the
-    # repo's other roster reader guards with `object_exists` (`defs/checks.py`), a shape that
-    # tolerates absence and still raises on corruption.
-    roster.write_bytes(b"not a parquet file")
+    # repo's other metadata table reader guards with `object_exists` (`defs/checks.py`), a shape
+    # that tolerates absence and still raises on corruption.
+    metadata_table.write_bytes(b"not a parquet file")
     assert _materialize(dagster_instance, "live").success
     assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1, 3}
 
@@ -449,6 +453,41 @@ def _save_model_trained_on_power_lag(path: Path) -> None:
     )
 
 
+def test_live_forecasts_read_only_unflagged_power(
+    env: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    dagster_instance: DagsterInstance,
+    tmp_path: Path,
+) -> None:
+    """Flagged rows of the cleaned table never reach the live power frame.
+
+    Spies on ``build_live_power_frame`` rather than comparing forecasts, because the fixture
+    model's weather-only features forecast identically with or without observed power.
+    """
+    seen: list[pl.DataFrame] = []
+    real_build = live_forecast_assets.build_live_power_frame
+
+    def _spy_build(
+        observed_power: pt.LazyFrame[PowerTimeSeries], *args: object, **kwargs: object
+    ) -> pt.LazyFrame[PowerTimeSeries]:
+        seen.append(observed_power.collect())
+        return real_build(observed_power, *args, **kwargs)  # ty: ignore[invalid-argument-type]
+
+    monkeypatch.setattr(live_forecast_assets, "build_live_power_frame", _spy_build)
+    write_cleaned_copy(
+        tmp_path / "NGED" / "power_time_series.delta",
+        flag_where=(pl.col("time_series_id") == 1)
+        & (pl.col("time") < _POWER_FCST_INIT_TIME - timedelta(minutes=45)),
+    )
+
+    assert _materialize(dagster_instance, "live").success
+
+    (observed,) = seen
+    # `_write_power` writes two rows for the trained series 1; the earlier one is flagged.
+    assert observed["time"].to_list() == [_POWER_FCST_INIT_TIME - timedelta(minutes=30)]
+    assert set(observed.columns) == {"time_series_id", "time", "power"}
+
+
 def test_live_power_history_covers_the_longest_selected_power_lag(
     env: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
@@ -481,6 +520,7 @@ def test_live_power_history_covers_the_longest_selected_power_lag(
     monkeypatch.setattr(XGBoostForecaster, "predict", _spy_predict)
 
     _write_power_with_long_history(str(tmp_path / "NGED" / "power_time_series.delta"))
+    write_cleaned_copy(tmp_path / "NGED" / "power_time_series.delta")
     _save_model_trained_on_power_lag(tmp_path / "production_model")
 
     assert _materialize(dagster_instance, "live").success
@@ -577,6 +617,7 @@ def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
     monkeypatch.setenv("SENTRY_ENVIRONMENT", "test-env")
 
     _write_power_for(str(nged_path / "power_time_series.delta"), (1,))
+    write_cleaned_copy(nged_path / "power_time_series.delta")
     records = nwp_records(
         _TRAINED_CELL,
         nwp_init,

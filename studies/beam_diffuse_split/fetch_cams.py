@@ -10,7 +10,7 @@ could still read as no information at ERA5's resolution. The CAMS radiation serv
 from Meteosat at around 5 km and publishes the global, beam and diffuse horizontal irradiances from
 that one retrieval, which is the same three-field structure the arms already consume.
 
-Requests are made at each meter's own coordinates, read at run time from the private roster. **No
+Requests are made at each meter's own coordinates, read at run time from the private site list. **No
 coordinate and no identifier reaches the written frame**: rows are keyed by the anonymised site
 label `studies.pv_dataset.pv_sites` assigns, and the downloaded CSVs stay in the git-ignored data
 directory.

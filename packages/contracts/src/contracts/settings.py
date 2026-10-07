@@ -287,6 +287,10 @@ class Settings(BaseSettings):
     """Delta table of forecast evaluation metrics."""
     power_time_series_data_path: str = ""
     """Delta table of half-hourly power observations (under nged_data_path)."""
+    cleaned_power_time_series_data_path: str = ""
+    """Delta table of `CleanedPowerTimeSeries` (under nged_data_path): every raw power row plus a
+    `drop_reason` column. Written by the `clean_nged_power_data` asset and read by every
+    consumer of observed power except the ingest."""
     metadata_path: str = ""
     """Parquet file of per-series substation metadata (under nged_data_path)."""
     eligible_time_series_data_path: str = Field(
@@ -397,6 +401,10 @@ class Settings(BaseSettings):
         # Derived from nged_data_path (itself derived above).
         self.power_time_series_data_path = self.power_time_series_data_path or uri_join(
             self.nged_data_path, "power_time_series.delta"
+        )
+        self.cleaned_power_time_series_data_path = (
+            self.cleaned_power_time_series_data_path
+            or uri_join(self.nged_data_path, "cleaned_power_time_series.delta")
         )
         self.metadata_path = self.metadata_path or uri_join(self.nged_data_path, "metadata.parquet")
         # Always-local artifacts.

@@ -183,12 +183,12 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
         {"n_implausible_power_rows_dropped": downloaded.n_implausible_power_rows_dropped}
     )
 
-    # Save TimeSeriesMetadata. A roster failure must not stop the power write below: the roster is
-    # data NGED re-delivers every run, and the power series is not, so a roster fault must never
-    # stall the hourly ingest. The only cost is this run's metadata change, lost until the next
-    # successful upsert — and `live_forecasts` reads the promoted model's own frozen roster copy,
-    # not this one, so inference is unaffected. What that costs in full:
-    # https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/
+    # Save TimeSeriesMetadata. A metadata table failure must not stop the power write below: the
+    # metadata table is data NGED re-delivers every run, and the power series is not, so a metadata
+    # table fault must never stall the hourly ingest. The only cost is this run's metadata change,
+    # lost until the next successful upsert — and `live_forecasts` reads the promoted model's own
+    # frozen copy of the metadata table, not this one, so inference is unaffected. What that costs
+    # in full: https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/
     try:
         upsert_metadata_stats = upsert_metadata(
             new_metadata=new_metadata, metadata_path=metadata_path, storage_options=storage_options
@@ -198,7 +198,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
         # `checks.py::power_data_is_fresh` for why `BaseException` and what it costs in tests.
         if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
             raise  # A cancelled run must cancel.
-        context.log.exception(f"Could not upsert the TimeSeriesMetadata roster at {metadata_path}")
+        context.log.exception(f"Could not upsert the TimeSeriesMetadata table at {metadata_path}")
         report_asset_degradation(asset_name="power_time_series_and_metadata", exc=exc)
         upsert_metadata_stats = UpsertMetadataStats(metadata_upsert_failed=repr(exc))
 

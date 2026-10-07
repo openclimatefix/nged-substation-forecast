@@ -1,0 +1,9 @@
+elexon_bmu_id,tec_project_id,repd_ref_id,storage_bmu_ids,note
+T_BURWS-1,a0l4L0000005ixnQAA,7630,,TEC name matches; REPD Burwell Solar Farm 49.9 MW under construction at the Burwell substation
+T_BRCHS-1,a0l4L0000005ixlQAA,8479,,BMU name is its identifier; Breach Solar Farm TEC 49.9 MW at Burwell; REPD Breach Farm solar 67 MW matches the 67 MW largest MEL
+T_BLPFS-1,a0l4L0000005iplQAA,8026,T_BLPFB-1,"IGCPU installed capacity 57 MW equals TEC Warley (tertiary) 57 MW, customer Warley Green Limited; REPD Bulphan Fen solar 49.9 MW with a battery row; storage BMU T_BLPFB-1 shares the lead party"
+T_TEBWS-1,,8894,T_TEBWB-1,"REPD Tebworth solar farm with a battery row; storage BMU T_TEBWB-1 Tebworth BESS Power Park; TEC project Sundon (a0l4L0000005invQAA, customer SUNDON GREEN LIMITED, the lead party of this BMU, 39.9 MW built) lists storage only, so it supplies no TEC capacity for the solar BMU; TEC Sundon Pivoted Power, customer Pivoted Power LLP, is not accepted"
+T_TYLNS-1,a0l4L0000005iy5QAA,9610,T_TYLNB-1,"TEC Bramford (Tertiary) customer DAMSONGREEN ENERGYFARM LIMITED is the lead party of this BMU, 57 MW equals IGCPU of the storage BMU T_TYLNB-1; REPD Tye Lane solar farm 49.9 MW with an operational battery row"
+E_KINCS-1,a0l4L0000005iUaQAI,11177,,TEC Kincraig Energy Centre 20.62 MW storage and PV; REPD Kincraig solar farm and battery 21 MW
+T_LARKS-1,a0l4L0000005iodQAA,8051,T_LARKB-1,TEC Iron Acton PV and storage 99.4 MW equals Larks Green solar plus battery capacity; customer Iron Acton Green Limited is the solar BMU's lead party; REPD Larks Green Solar Farm 70 MW; storage BMU T_LARKB-1 Larks Green Battery Storage
+T_SUTBS-1,a0l4L0000005ifgQAA,16008,,"REPD Sutton Bridge Solar Farm 49.9 MW; REPD lists a Walpole battery under the Sutton Bridge Solar Farm name, so the TEC Walpole project (Walpole 400kV, customer HOLLYGREEN ENERGYFARM LIMITED, storage and PV 49.9 MW) is matched"

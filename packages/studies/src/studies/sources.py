@@ -399,14 +399,14 @@ old paths are tombstoned and no checkout names them.
 """
 
 PRIVATE_DIR: Final[Path] = STUDIES_DATA_DIR / "_private"
-"""Files derived from the private generator roster, which must never be published."""
+"""Files derived from the private list of generators, which must never be published."""
 
 TRIAL_AREA_BOX_PATH: Final[Path] = PRIVATE_DIR / "trial_area_box.json"
 """Where the trial-area box's bounds are kept.
 
 **This file is never read by anything outside this process's private working state, and its
 contents must never be logged, printed, committed, or quoted back in a report.** The bounds are
-derived from the private generator roster (`packages/contracts` `TimeSeriesMetadata`), and NGED's
+derived from the private list of generators (`packages/contracts` `TimeSeriesMetadata`), and NGED's
 generator locations must never appear in anything published — see CLAUDE.md.
 """
 
@@ -720,6 +720,12 @@ UKV_VS_ERA5_DIR: Final[Path] = study_dir_for(study="ukv_ceda_vs_era5")
 
 UKV_CEDA_VS_OPEN_METEO_DIR: Final[Path] = study_dir_for(study="ukv_ceda_vs_openmeteo")
 """The study of whether UKV from CEDA or UKV from Open-Meteo gives the same forecasts."""
+
+SOLAR_BMU_CENSUS_DIR: Final[Path] = study_dir_for(study="solar_bmu_census")
+"""The solar-BMU census: the classes, the census table, and `report.md`."""
+
+SOLAR_BMU_CENSUS_INPUTS_DIR: Final[Path] = SOLAR_BMU_CENSUS_DIR / "inputs"
+"""The census's downloads from Elexon, NESO, and the Renewable Energy Planning Database."""
 
 NFC_STUDY_DIR: Final[Path] = study_dir_for(study="nwp_forecast_comparison")
 """The folder of the NWP forecast comparison, one subfolder per batch of fits."""

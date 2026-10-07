@@ -1,4 +1,4 @@
-"""The one mapping from a metered generator's identifier to the label a study may publish."""
+"""The one mapping from an NGED metered generator's identifier to the label a study may publish."""
 
 from collections.abc import Sequence
 from typing import Final
@@ -16,8 +16,8 @@ carry a `time_series_id`, a site name, or a coordinate.
 LABEL_PERMUTATION_SEED: Final[int] = 784
 """Seeds the shuffle that assigns `SITE_LABELS` to identifiers.
 
-**What protects the mapping is that the roster is private, not that the labels are shuffled.** The
-value is load-bearing only for consistency: it fixes which generator is called `A`, and the
+**What protects the mapping is that the site list is private, not that the labels are shuffled.**
+The value is load-bearing only for consistency: it fixes which generator is called `A`, and the
 published write-up refers to the sites by these labels. Changing the seed, the generator, or
 `SITE_LABELS`' order silently relabels every site and orphans every label already in print.
 """
@@ -49,7 +49,7 @@ def site_labels_for(
     is the only thing it can get wrong, and that argument is visible at the call site.
 
     Args:
-        eligible_ids: Every generator in the roster. Order is irrelevant — the identifiers are
+        eligible_ids: Every generator in the site list. Order is irrelevant — the identifiers are
             sorted here — but membership is not.
         labels: The labels to shuffle: `SITE_LABELS` for the solar generators, or
             `WIND_SITE_LABELS` for the wind generators.
@@ -59,14 +59,14 @@ def site_labels_for(
         One entry per identifier, mapping it to its label.
 
     Raises:
-        ValueError: If the roster does not hold exactly `len(labels)` generators, which means the
+        ValueError: If the site list does not hold exactly `len(labels)` generators, which means the
             caller's selection has drifted from the one the labels were drawn against.
     """
     if len(set(eligible_ids)) != len(labels):
         msg = (
             f"expected {len(labels)} eligible generators to label, got "
             f"{len(set(eligible_ids))}. The labels are a shuffle over a fixed-length list, so a "
-            "roster of a different size cannot be labelled without relabelling the rest."
+            "site list of a different size cannot be labelled without relabelling the rest."
         )
         raise ValueError(msg)
     shuffled = np.random.default_rng(seed).permutation(list(labels))

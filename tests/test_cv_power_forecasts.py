@@ -16,6 +16,7 @@ import numpy as np
 import polars as pl
 import pyarrow.parquet as pq
 import pytest
+from _cleaned_power_test_data import write_cleaned_copy
 from _nwp_test_data import half_hours, nwp_records, write_test_nwp
 from contracts.ml_schemas import EligibleTimeSeries
 from dagster import DagsterInstance, materialize
@@ -103,6 +104,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     mlflow.set_tracking_uri(tracking_uri)
 
     _write_power(str(nged_path / "power_time_series.delta"))
+    write_cleaned_copy(nged_path / "power_time_series.delta")
     _write_nwp(str(tmp_path / "NWP"))
     _write_metadata(nged_path / "metadata.parquet")
     _write_eligible(str(tmp_path / "eligible"))

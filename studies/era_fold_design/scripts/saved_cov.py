@@ -14,7 +14,7 @@ for p in sorted(ROOT.rglob("*.parquet")):
     f = pl.scan_parquet(p).select("site", "time", "fold").unique().collect()
     if f.select(pl.struct("site", "time").is_duplicated().any()).item():
         note = "(site,time) in >1 fold"
-        f = f.unique(subset=["site", "time"], keep="first")
+        f = f.sort("site", "time", "fold").unique(subset=["site", "time"], keep="first")
     else:
         note = ""
     r = f.with_columns(cm=pl.col("time").dt.month(), yr=pl.col("time").dt.year())

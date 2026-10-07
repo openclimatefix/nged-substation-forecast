@@ -98,9 +98,9 @@ def log_surviving_runs(*, extract_band: pl.DataFrame, supplement: pl.DataFrame) 
         extract_band: The extract's rows at the day-4 band's leads, for every site.
         supplement: The rows about to be written.
     """
-    for domain, roster in (("solar", pv_sites()), ("wind", wind_sites())):
+    for domain, site_list in (("solar", pv_sites()), ("wind", wind_sites())):
         members = pl.concat([extract_band, supplement.select(extract_band.columns)]).filter(
-            pl.col("site").is_in(roster["site"])
+            pl.col("site").is_in(site_list["site"])
         )
         steps = efh.band_steps(members=members, day=DAY, domain=domain, ensemble_size=ENSEMBLE_SIZE)
         kept = steps.keys.select("site", "init_time").unique().height

@@ -5,7 +5,7 @@ One-off throwaway script for the wind-products study in
 `fetch_ens_point.py` (issue #784), which pulls irradiance for the six solar meters. This script
 reads the same ENS Delta table and reuses `fetch_ens_point.py`'s `NWP_ROOT`, `H3_RESOLUTION`,
 `HORIZONS`, `_cell_for_each_meter`, `_wanted_leads`, and `_labelled_by_horizon` rather than
-duplicating them: only the site roster (wind meters, not solar), the columns read, and the output
+duplicating them: only the site list (wind meters, not solar), the columns read, and the output
 path differ. A shared module was not worth the extra indirection for two scripts.
 
 **Wind speed and direction are instantaneous, unlike ENS's radiation.** The [NWP variable

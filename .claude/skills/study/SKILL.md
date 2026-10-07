@@ -256,7 +256,7 @@ listing from an old date gives a confident wrong answer.
 
 **Keep each gridded weather product over a box around the NGED trial area, and keep the whole UK
 only for a small product.** The box takes a margin of a few grid cells. The box's bounds come
-from the private generator roster and are never published. A small product is one whose UK extent
+from the private list of generators and are never published. A small product is one whose UK extent
 comes to no more than about 20 GB, such as the Met Office's MIDAS Open station data. Issue #841
 sets out the rule and the products the rule covers.
 
@@ -516,13 +516,17 @@ contradiction is the signal.
 
 ## Anonymisation
 
-**Never publish a metered generator's time series with its name or identifier** (`CLAUDE.md`). In a
-study:
+**Never publish the time series of one of NGED's metered generators with its name or identifier**
+(`CLAUDE.md`). **The rule does not cover time series taken from public sources.** A study that
+uses only public data, such as Elexon's BMU register and settled output, NESO's TEC register, and
+the Renewable Energy Planning Database, may name the units and show output in megawatts on calendar
+dates, as the solar-BMU census does. A study that mixes the two kinds of generator anonymises the
+NGED ones. In a study of NGED's generators:
 
 - Relabel generators with `studies.anonymise.site_labels_for` before anything is written: A to F for
   solar, W1 to W3 for wind, each under its fixed permutation seed. The seed is not a secret; the
-  roster being private is what protects the mapping.
-- The labels belong to a fixed roster, and `site_labels_for` raises on a different count. A study
+  site list being private is what protects the mapping.
+- The labels belong to a fixed site list, and `site_labels_for` raises on a different count. A study
   with a different set of generators needs its own label tuple and seed, and never reuses A to F or
   W1 to W3 for other generators.
 - Never write an identifier, name, or coordinate into a chart, a page, a report, a commit message, a
@@ -532,7 +536,7 @@ study:
   in one product's served wind, can be matched against public archives at nearby grid cells. Plot
   such a series without its generator label.
 - A script that has to send coordinates to a point service reads them at run time from the private
-  roster, and writes only the label.
+  site list, and writes only the label.
 
 ## GitHub hygiene
 

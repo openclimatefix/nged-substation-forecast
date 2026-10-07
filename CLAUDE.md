@@ -54,8 +54,8 @@ one, the mistake is already written.
 | Skill | Load it before… |
 |---|---|
 | `code-style` | writing or editing **any** Python in this repo |
-| `polars-patito-gotchas` | writing Polars/Patito code that joins, casts, filters a `pt.LazyFrame`, declares a Patito field, or reads/writes Delta |
-| `dataviz` | drawing any chart in this repository — this project's OCF-brand palette, chart sizing, SVG export, and generator anonymisation, on top of the bundled `dataviz` skill's general method |
+| `polars-patito-gotchas` | writing Polars/Patito code that joins, casts, filters a `pt.LazyFrame`, declares a Patito field, reads/writes Delta, or relies on row order after a lazy join |
+| `dataviz` | drawing any chart in this repository — this project's OCF-brand palette, chart sizing, SVG export, and the anonymisation of NGED's generators, on top of the bundled `dataviz` skill's general method |
 | `mkdocs-authoring` | editing markdown MkDocs renders — `docs/`, READMEs, `SKILL.md`, docstrings — especially nested lists, list items with code blocks, or wrapped links |
 | `marimo-notebooks` | creating or editing a Marimo notebook (`packages/dashboard/*.py`, `packages/notebooks/*.py`) |
 | `ty-workarounds` | acting on a `ty` error in Altair chart code, or adding any `# ty: ignore` |
@@ -255,6 +255,12 @@ has to recognise it in a dataset's column headings, and then drop it. The reader
 may not be British, and a term whose meaning is confined to one country's policy documents costs
 them a lookup for nothing. The same goes in the other direction: keep a term that is standard in the
 field even where a UK body has renamed it.
+
+**Don't write "roster".** The word is uncommon in British English, and in this repository it stood
+for three different objects. Write "the `TimeSeriesMetadata` table" (or "the metadata table" once
+`TimeSeriesMetadata` has been named) for the table of series and their fields, "the expected time
+series" (identifier `expected_ids`) for the set of series a check expects, and "the site list" for
+the sites a study covers.
 
 **Describe performance in performance terms, not in money metaphors.** A forecast does not "pay", an
 input does not "buy" accuracy, and a modelling choice does not "cost" anything unless real money
@@ -486,12 +492,14 @@ fault. Widening a field to `| None` or relaxing a range to make a failing `valid
 the defect in the one place the rest of the system trusts. Reasoning and the rest of the rule:
 [`packages/contracts/README.md`](packages/contracts/README.md).
 
-**Never publish a metered generator's time series with the generator's name or ID.** A single site's
-output can be commercially sensitive, so NGED has asked that generator data leaves the project only
-anonymised. The rule covers everything outside the private data store: charts and examples in
-`docs/`, leaderboard rows, dashboards, reports, papers, and issue or PR bodies. Substations are not
-covered by this rule, and a generator's name may still appear in a lookup table that carries no time
-series.
+**Never publish the time series of one of NGED's metered generators with the generator's name or
+ID.** A single site's output can be commercially sensitive, so NGED has asked that its generator
+data leaves the project only anonymised. The rule covers everything outside the private data store:
+charts and examples in `docs/`, leaderboard rows, dashboards, reports, papers, and issue or PR
+bodies. Substations are not covered by this rule, and a generator's name may still appear in a
+lookup table that carries no time series. **The rule does not cover time series taken from public
+sources**, such as the settled output of Balancing Mechanism Units in Elexon's published data, which
+a study may show with names, in megawatts, on calendar dates.
 
 **Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an adversarial
 pass by the time a human is asked to review the diff, so that human review is the last line of
@@ -551,7 +559,7 @@ in
 | `contracts` | Patito data schemas (the single source of truth for all data shapes) |
 | `delta_store` | Physical storage policy for Delta tables: parquet writer properties, sort orders, significand rounding, write helpers |
 | `ml_core` | Feature engineering and `BaseForecaster` abstract class |
-| `nged_data` | Reading NGED JSON files from S3, and upserting the metadata roster to parquet. The power Delta write itself lives in `defs/assets.py` |
+| `nged_data` | Reading NGED JSON files from S3, and upserting the metadata table to parquet. The power Delta write itself lives in `defs/assets.py` |
 | `dynamical_data` | Downloading ECMWF ensemble NWP from Dynamical.org |
 | `geo` | H3 spatial indexing utilities |
 | `weather_utils` | Shared NWP query helpers used by both the dashboard and the feature pipeline (the analysis-proxy selection) |
@@ -573,10 +581,14 @@ study folders need moves into `packages/studies/src/studies/` with its tests.
 
 ### Dagster Assets (`src/nged_substation_forecast/defs/assets.py`)
 
-Three main assets:
+Four main assets:
 
 - `power_time_series_and_metadata` — pulls NGED telemetry from S3, appends to Delta Lake, upserts
   metadata parquet
+- `clean_nged_power_data` (in `defs/cleaning_assets.py`) — runs `nged_data.cleaning.flag_nged_power`
+  over the whole raw power table and overwrites the `cleaned_power_time_series` Delta table. Every
+  reader of power except the ingest and the `power_data_is_fresh` check reads only the unflagged
+  rows, through `nged_data.storage.scan_cleaned_power`
 - `h3_grid_weights` — computes fractional H3 cell overlap with the GB boundary for spatial NWP
   aggregation
 - `ecmwf_ens` — daily-partitioned asset that downloads ECMWF ENS NWP and writes it to Delta Lake via
@@ -587,6 +599,8 @@ Three main assets:
 All tabular data flowing through the system is validated with **Patito** models. Key schemas:
 
 - `PowerTimeSeries` — half-hourly power observations (MW/MVA) per `time_series_id`
+- `CleanedPowerTimeSeries` — `PowerTimeSeries` plus a nullable `drop_reason` naming the cleaning
+  rule that flagged the row
 - `TimeSeriesMetadata` — substation metadata including lat/lon, H3 index, substation type
 - `Nwp` — NWP weather data in physical-unit `Float32`, on disk and in memory alike (rounded to a
   13-bit significand at write time by `delta_store.nwp`)

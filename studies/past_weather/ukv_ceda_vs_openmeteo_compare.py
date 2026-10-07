@@ -61,7 +61,7 @@ from ukv_ceda_vs_openmeteo_build import (
     MODEL_FREE_NAME,
     OUTPUT_DIR,
     era_1_irradiance_note,
-    generator_roster,
+    generator_site_list,
     irradiance_ratios_by_elevation,
     irradiance_ratios_by_era_hour,
     lead_zero,
@@ -402,11 +402,11 @@ def cell_match_lines(*, ukv: UkvStores, frame: pl.DataFrame) -> list[str]:
             "longitude": ukv.longitude,
         }
     )
-    roster = generator_roster()
-    distance = distance_matrix_km(sites=roster, cells=cells)
+    site_list = generator_site_list()
+    distance = distance_matrix_km(sites=site_list, cells=cells)
     zero = lead_zero(frame=frame)
     wins: dict[str, list[float]] = {"air temperature": [], "10 m wind speed": []}
-    for index, site in enumerate(roster["site"]):
+    for index, site in enumerate(site_list["site"]):
         nearest = np.argsort(distance[index])[:NEIGHBOURHOOD_CELLS]
         rows = zero.filter(pl.col("site") == site).drop_nulls(["om_temp_c", "om_speed_10m_m_s"])
         if rows.is_empty():

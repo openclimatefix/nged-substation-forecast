@@ -38,6 +38,10 @@ def test_paths_derive_from_data_root():
     assert settings.nwp_data_path == "/srv/data/NWP"
     assert settings.nged_data_path == "/srv/data/NGED"
     assert settings.power_time_series_data_path == "/srv/data/NGED/power_time_series.delta"
+    assert (
+        settings.cleaned_power_time_series_data_path
+        == "/srv/data/NGED/cleaned_power_time_series.delta"
+    )
     assert settings.metadata_path == "/srv/data/NGED/metadata.parquet"
     assert settings.h3_grid_weights_path == "/srv/data/h3_grid_weights.parquet"
 

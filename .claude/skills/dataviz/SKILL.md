@@ -4,11 +4,11 @@ description: >-
   This project's own charting rules, on top of the bundled `dataviz` skill's general method, for any
   chart drawn in this repository — a study page, a dashboard, a notebook, or anywhere else: the
   OCF-brand palette (`plotting.ocf_theme`), colour before shape, sizing a chart to a docs page's text
-  column, exporting and optimising SVG, and the extra care a metered generator's time series needs so
-  it cannot be re-identified. Load before drawing any chart in this repository, whether or not the
-  chart is for a study. Load the bundled `dataviz` skill too: this skill supplements it and does not
-  repeat its form heuristic, its six accessibility checks, its palette-validation script, or its
-  interaction rules.
+  column, exporting and optimising SVG, and the extra care an NGED metered generator's time series
+  needs so it cannot be re-identified. Load before drawing any chart in this repository, whether or
+  not the chart is for a study. Load the bundled `dataviz` skill too: this skill supplements it and
+  does not repeat its form heuristic, its six accessibility checks, its palette-validation script,
+  or its interaction rules.
 ---
 
 # Charting in this repository
@@ -73,9 +73,13 @@ subtitle, axis titles, and legend alone:
   months");
 - the scope: which generators, which region, and which period.
 
-## Anonymising a metered generator's time series
+## Anonymising an NGED metered generator's time series
 
-**Put no calendar dates on the axis of a metered generator's time series.** Even a handful of
+**The rules in this section cover NGED's private generators only.** A chart of public data, such as
+the settled output of the Balancing Mechanism Units in Elexon's published data, may name each unit
+and show megawatts on calendar dates.
+
+**Put no calendar dates on the axis of an NGED metered generator's time series.** Even a handful of
 generators can be matched against publicly available generation data once an hourly series sits on
 known dates, which identifies the generator behind its anonymised label. Count the days of the week
 on the axis (days 1 to 7), and give each plotted period's month and year in the surrounding text,
