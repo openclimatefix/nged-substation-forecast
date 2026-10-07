@@ -60,10 +60,9 @@ A metered generator's time series and results are never published with the gener
 
 Issue: [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147)
 
-Only one naive baseline exists in the codebase, `ManualHeuristicForecaster`. Until the leaderboard
-carries the other naive rows, XGBoost's NMAE numbers
-aren't interpretable — and, more to the point, we can't answer the question this project exists to
-answer: **do we beat the manual heuristic?**
+`ManualHeuristicForecaster` is the first baseline in the codebase. Its leaderboard rows answer the
+question this project exists to answer: **do we beat the manual heuristic?** The persistence and
+climatology baselines, still to come, give XGBoost's NMAE numbers two further points of reference.
 
 **Every comparison against a baseline publishes the fraction of series that beat it alongside the
 average error, never the average alone** — see [Publishing results that others can compare
