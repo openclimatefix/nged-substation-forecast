@@ -50,24 +50,31 @@ The trap fires only when the Patito model is still attached, and which operation
 guessable. Which operations detach it differs between eager and lazy frames. Measured on patito
 0.8.6 with Polars 2.0.0 (Polars 1.44.2 gives the same results except for `gather_every`):
 
-- **An eager `pt.DataFrame` keeps the model through some operations and drops it through others,
-  and no rule predicts which.** It keeps the model through `head`, `tail`, `slice`, `limit`,
-  `clone`, `sample`, `rechunk`, `drop`, `with_row_index`, `partition_by`, `vstack`, `hstack`,
-  `to_dummies`, indexing with a slice or a list, iterating a `group_by`, `.cast()`, and
-  `.lazy().collect()`, and on Polars 2.0.0 (not 1.44.2) through `gather_every`. It drops the
-  model, returning a plain `pl.DataFrame`, through `filter`, `select`, `with_columns`, `sort`,
-  `unique`, `rename`, `join`, `unpivot`, `reverse`, `drop_nulls`, `fill_null(value)`, `fill_nan`,
-  `shift`, `top_k`, `bottom_k`, `explode`, `interpolate`, `update`, `group_by(...).agg(...)`,
+- **An eager `pt.DataFrame` keeps the Patito model through some operations and drops it through
+  others, and the method name does not tell you which.** A method that Polars implements directly
+  on the underlying frame keeps the model. A method that Polars runs as a lazy query and collects
+  internally drops it, unless Patito overrides the method, as it does `drop` and `cast`. Which
+  route a method takes can change between Polars releases. Measured, the eager frame keeps the
+  model through `head`, `tail`, `slice`, `limit`, `clone`, `sample`, `rechunk`, `drop`,
+  `with_row_index`, `partition_by`, `vstack`, `hstack`, `extend`, `insert_column`,
+  `replace_column`, `to_dummies`, `transpose`, `null_count`, `map_rows`, indexing with a slice, a
+  list of row positions, or a list of column names, iterating a `group_by`, `.cast()`, and
+  `.lazy().collect()`, and on Polars 2.0.0 (not 1.44.2) through `gather_every`. It drops the model,
+  returning a plain `pl.DataFrame`, through `filter`, `select`, `with_columns`, `sort`, `unique`,
+  `rename`, `join`, `unpivot`, `reverse`, `drop_nulls`, `fill_null(value)`, `fill_nan`, `shift`,
+  `top_k`, `bottom_k`, `explode`, `interpolate`, `update`, `group_by(...).agg(...)`,
   `pl.concat([...])`, and `.as_polars()`. Measure any method not named here before relying on
-  either behaviour. A dict-`.cast` after a dropping operation is plain Polars and fine, and after a
-  keeping operation it is swallowed.
-- **Among the lazy operations measured, a `pt.LazyFrame` drops the model only through
-  `group_by(...).agg(...)` and `pl.concat([...])`.** It keeps the model through `.filter()`,
-  `.select()`, `.with_columns()`, `.sort()`, `.unique()`, `.rename()`, `.join()`, `.unpivot()`,
-  `.explode()`, `.head()`, `.tail()`, `.slice()`, `.limit()`, `.clone()`, `.gather_every()`,
-  `.reverse()`, `.cache()`, `.drop()`, `.with_row_index()`, `.drop_nulls()`, `.fill_null(value)`,
-  `.fill_nan()`, `.shift()`, `.top_k()`, `.cast()`, and `.collect()`. A dict-`.cast` after any of
-  those is swallowed.
+  either behaviour. A dict-`.cast` after a dropping operation applies, as on a plain Polars frame.
+  A dict-`.cast` after a keeping operation is swallowed.
+- **A lazy `pt.LazyFrame` keeps the Patito model through most operations and drops it through
+  `group_by(...).agg(...)`, `rolling(...).agg(...)`, `group_by_dynamic(...).agg(...)`,
+  `pl.concat([...])` (vertical or horizontal), and `.sql(...)`.** It keeps the model through
+  `.filter()`, `.select()`, `.with_columns()`, `.sort()`, `.unique()`, `.rename()`, `.join()`,
+  `.unpivot()`, `.explode()`, `.head()`, `.tail()`, `.slice()`, `.limit()`, `.clone()`,
+  `.gather_every()`, `.reverse()`, `.cache()`, `.drop()`, `.with_row_index()`, `.drop_nulls()`,
+  `.fill_null(value)`, `.fill_nan()`, `.shift()`, `.top_k()`, `.cast()`, and `.collect()`. Measure
+  any method not named here before relying on either behaviour. A dict-`.cast` after a keeping
+  operation is swallowed.
 
 Since Polars 1.44, the eager loss is a Patito defect
 ([Patito issue 167](https://github.com/JakobGM/patito/issues/167)). The lost model also means that a
