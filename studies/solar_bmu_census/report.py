@@ -7,6 +7,7 @@ Database (REPD) are public, so `report.md` names the BMUs it lists. Run after `f
 `uv run python studies/solar_bmu_census/report.py`.
 """
 
+import json
 from collections.abc import Callable
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -35,13 +36,17 @@ from collate import (
     capacity_disparity,
 )
 from fetch_sources import (
+    ELEXON_API,
     OUTPUT_DIR,
     STUDY_DIR,
     Window,
+    cached_text,
     fetch_bmu_reference,
     fetch_igcpu,
+    fetch_lccc,
     fetch_tec,
     recorded_run,
+    single_site_cfd_bmus,
 )
 from recall_check import recall_table
 from solar_estimate import (
@@ -426,6 +431,169 @@ def shape_facts_table(
     )
 
 
+def aggregate_register_table(
+    *, aggregates: pl.DataFrame, reference: list[dict[str, Any]]
+) -> pl.DataFrame:
+    """Say what the BMU register records about the aggregate census BMUs.
+
+    Args:
+        aggregates: The census table's aggregate rows.
+        reference: The BMU register.
+
+    Returns:
+        Rows of `quantity` and `value`: the number of aggregate BMUs by identifier prefix and
+        register `bmUnitType`, how many have a fuel type, how many have a GSP group, how many `2__`
+        and `V__` BMUs carry the GSP group letter of their GSP group in the fourth character of the
+        identifier, and how many of the `G` type have a negative Demand Capacity.
+    """
+    register = {str(r["elexonBmUnit"]): r for r in reference if r["elexonBmUnit"]}
+    rows: list[tuple[str, str]] = []
+    ids = aggregates["elexon_bmu_id"].to_list()
+    for prefix in ("2__", "C__", "V__"):
+        for unit_type in sorted({register[i]["bmUnitType"] for i in ids if i.startswith(prefix)}):
+            count = sum(
+                1 for i in ids if i.startswith(prefix) and register[i]["bmUnitType"] == unit_type
+            )
+            rows.append(
+                (f"Aggregate census BMUs `{prefix}` with register type {unit_type}", str(count))
+            )
+    lettered = [i for i in ids if i.startswith(("2__", "V__"))]
+    rows += [
+        ("Aggregate census BMUs", str(len(ids))),
+        (
+            "Aggregate census BMUs with a fuel type in the register",
+            str(sum(register[i]["fuelType"] is not None for i in ids)),
+        ),
+        (
+            "Aggregate census BMUs with a GSP group in the register",
+            str(sum(register[i]["gspGroupId"] is not None for i in ids)),
+        ),
+        (
+            "`2__` and `V__` census BMUs whose fourth character is their GSP group letter",
+            f"{sum(register[i]['gspGroupId'] == '_' + i[3] for i in lettered)} of {len(lettered)}",
+        ),
+        (
+            "`G` type census BMUs with a negative Demand Capacity",
+            str(
+                sum(
+                    float(register[i]["demandCapacity"]) < 0
+                    for i in ids
+                    if register[i]["bmUnitType"] == "G"
+                )
+            ),
+        ),
+    ]
+    return pl.DataFrame(rows, schema=["quantity", "value"], orient="row")
+
+
+PROBE_FROM: Final[str] = "2026-06-01T00:00Z"
+PROBE_TO: Final[str] = "2026-06-08T00:00Z"
+"""The week in which `unlisted_cfd_solar_with_output` looks for B1610 rows."""
+
+
+def unlisted_cfd_solar_with_output(*, bmu_ids: list[str]) -> int:
+    """Count the BMUs that have B1610 rows in the probe week.
+
+    The BMU register does not list these BMUs, so the census does not download their output. One
+    request for each BMU is cached under `inputs/raw/`.
+
+    Args:
+        bmu_ids: The BMU identifiers to probe.
+
+    Returns:
+        The number of BMUs with at least one B1610 row between `PROBE_FROM` and `PROBE_TO`.
+    """
+    with_rows = 0
+    for bmu_id in bmu_ids:
+        body = cached_text(
+            name=f"b1610_probe_{bmu_id}_{PROBE_FROM[:10]}",
+            url=f"{ELEXON_API}/datasets/B1610/stream",
+            params={"from": PROBE_FROM, "to": PROBE_TO, "bmUnit": bmu_id},
+        )
+        with_rows += bool(json.loads(body))
+    return with_rows
+
+
+def lccc_table(
+    *,
+    mapping: list[dict[str, Any]],
+    portfolio: list[dict[str, Any]],
+    reference: list[dict[str, Any]],
+    census: pl.DataFrame,
+    probe: Callable[[list[str]], int],
+) -> pl.DataFrame:
+    """Say what the Low Carbon Contracts Company's data holds about the `C__` BMUs.
+
+    Args:
+        mapping: The CfD-to-BM-Unit mapping rows.
+        portfolio: The CfD portfolio rows.
+        reference: The BMU register.
+        census: The census table.
+        probe: Counts how many of the given BMU identifiers have B1610 rows in the probe week
+            (`unlisted_cfd_solar_with_output` with the identifiers as `bmu_ids`).
+
+    Returns:
+        Rows of `quantity` and `value`: the current `C__` BMUs in the mapping, those that carry one
+        named CfD unit, those whose CfD unit is Solar PV, those that the BMU register lists, and the
+        census BMUs that are single-site `C__` BMUs.
+    """
+    current = {str(r["BMU_Id"]): [] for r in mapping if str(r["BMU_Id"]).startswith("C__")}
+    for row in mapping:
+        if str(row["BMU_Id"]).startswith("C__") and not row["Effective_date_to"]:
+            current.setdefault(str(row["BMU_Id"]), []).append(str(row["CFD_Id"]))
+    current = {bmu: cfd for bmu, cfd in current.items() if cfd}
+    units = single_site_cfd_bmus(mapping=mapping, portfolio=portfolio)
+    listed = {str(r["elexonBmUnit"]) for r in reference if r["elexonBmUnit"]}
+    solar = [bmu for bmu, unit in units.items() if unit["technology"] == "Solar PV"]
+    unlisted = sorted(set(solar) - listed)
+    cfd_in_census = census.filter(pl.col("elexon_bmu_id").str.starts_with("C__"))
+    rows = [
+        ("`C__` BMUs with a current CfD identifier in the mapping", str(len(current))),
+        ("Of those, BMUs that carry one named CfD unit", str(len(units))),
+        ("Of those, BMUs whose CfD unit is Solar PV", str(len(solar))),
+        ("`C__` BMUs in the mapping that the BMU register lists", str(len(set(current) & listed))),
+        (
+            "Of the Solar PV BMUs in the mapping, those that the BMU register does not list",
+            str(len(unlisted)),
+        ),
+        (
+            f"Of those, BMUs with B1610 rows between {PROBE_FROM[:10]} and {PROBE_TO[:10]}",
+            str(probe(unlisted)),
+        ),
+        ("`C__` census BMUs", str(cfd_in_census.height)),
+        (
+            "Of those, single-site BMUs",
+            str(cfd_in_census.filter(pl.col("scope") == "single-site").height),
+        ),
+    ]
+    return pl.DataFrame(rows, schema=["quantity", "value"], orient="row")
+
+
+def monthly_largest_output_table(*, bmu_ids: list[str], window_label: str) -> pl.DataFrame:
+    """Give each BMU's largest half-hourly output in each calendar month, in megawatts.
+
+    Args:
+        bmu_ids: The BMUs to list.
+        window_label: The window's label in the file names.
+
+    Returns:
+        One row per month (`YYYY-MM`, in UTC) and one column per BMU. A month with no row in a BMU's
+        file is null.
+    """
+    table: pl.DataFrame | None = None
+    for bmu_id in bmu_ids:
+        monthly = (
+            pl.read_parquet(OUTPUT_DIR / f"{bmu_id}_{window_label}.parquet")
+            .with_columns(month=pl.col("half_hour_end_time").dt.strftime("%Y-%m"))
+            .group_by("month")
+            .agg((pl.col("output_mwh").max() * 2).round(1).alias(bmu_id))
+        )
+        table = (
+            monthly if table is None else table.join(monthly, on="month", how="full", coalesce=True)
+        )
+    return pl.DataFrame() if table is None else table.sort("month")
+
+
 def observed_power_table(*, table: pl.DataFrame, window_label: str) -> pl.DataFrame:
     """Sum the BMUs' largest outputs, and find the group's highest combined output, per group.
 
@@ -583,13 +751,15 @@ def mel_agreement_table(*, single: pl.DataFrame) -> pl.DataFrame:
         single: The census table's single-site rows.
 
     Returns:
-        The number of BMUs whose two figures agree within 0.5 MW, the largest gap in megawatts,
-        and the sum of the absolute gaps as a share of the Generation Capacity sum.
+        The number of BMUs with a largest MEL, the number whose two figures agree within 0.5 MW,
+        the largest gap in megawatts, and the sum of the absolute gaps as a share of the Generation
+        Capacity sum. Only the BMUs with a largest MEL count (the `C__` BMUs have none).
     """
     gap = (pl.col("largest_mel_mw") - pl.col("generation_capacity_mw")).abs()
-    frame = single.with_columns(gap=gap)
+    frame = single.filter(pl.col("largest_mel_mw").is_not_null()).with_columns(gap=gap)
     total = _as_float(frame["generation_capacity_mw"].sum())
     rows = [
+        ("BMUs with a largest MEL", str(frame.height)),
         ("BMUs within 0.5 MW", str(frame.filter(pl.col("gap") <= MEL_AGREEMENT_MW).height)),
         ("Largest gap (MW)", f"{_as_float(frame['gap'].max()):.1f}"),
         (
@@ -1068,9 +1238,14 @@ def register_table(*, census: pl.DataFrame, today: date) -> pl.DataFrame:
         if row["bmUnit"]:
             types.setdefault(str(row["psrType"]), set()).add(str(row["bmUnit"]))
     single = census.filter(pl.col("scope") == "single-site")
-    unhinted = single.filter(
-        ~pl.col("site_name").str.contains("(?i)solar|\\bPV\\b")
-        | (pl.col("site_name") == pl.col("elexon_bmu_id"))
+    register_names = {str(r["elexonBmUnit"]): str(r["bmUnitName"]) for r in reference}
+    unhinted = single.with_columns(
+        register_name=pl.col("elexon_bmu_id").replace_strict(
+            register_names, default="", return_dtype=pl.String
+        )
+    ).filter(
+        ~pl.col("register_name").str.contains("(?i)solar|\\bPV\\b")
+        | (pl.col("register_name") == pl.col("elexon_bmu_id"))
     )
     rows = [
         ("Rows in the BMU register", str(len(reference))),
@@ -1124,8 +1299,13 @@ def summary_table(*, census: pl.DataFrame, window_label: str) -> pl.DataFrame:
     for row in single.iter_rows(named=True):
         output = pl.read_parquet(OUTPUT_DIR / f"{row['elexon_bmu_id']}_{window_label}.parquet")
         peak = max(peak, largest_output_mw(output=output) / row["generation_capacity_mw"])
-    generation = float(single["generation_capacity_mw"].sum())
-    mel = float(single["largest_mel_mw"].sum())
+    with_mel = single.filter(pl.col("largest_mel_mw").is_not_null())
+    generation = float(with_mel["generation_capacity_mw"].sum())
+    mel = float(with_mel["largest_mel_mw"].sum())
+    mel_label = (
+        f"Generation Capacity sum minus largest-MEL sum, % of Generation Capacity, "
+        f"over the {with_mel.height} BMUs with a MEL"
+    )
     located = single.filter(pl.col("latitude").is_not_null())
     longitude_max = _as_float(located["longitude"].max())
     longitude_span = longitude_max - _as_float(located["longitude"].min())
@@ -1148,7 +1328,7 @@ def summary_table(*, census: pl.DataFrame, window_label: str) -> pl.DataFrame:
         ),
         ("Largest output of a census BMU, share of its Generation Capacity", f"{peak:.2f}"),
         (
-            "Generation Capacity sum minus largest-MEL sum, % of Generation Capacity",
+            mel_label,
             f"{(generation - mel) / generation * 100:.1f}",
         ),
         (
@@ -1185,18 +1365,23 @@ def names_table(*, census: pl.DataFrame, scope: str) -> pl.DataFrame:
 
     Returns:
         One row for each BMU: its identifier, its name in the BMU register, in IGCPU, in the TEC
-        register, and in REPD, and its lead party, with a dash where a register has no match.
+        register, and in REPD, the name and maximum contract capacity of its CfD unit in the Low
+        Carbon Contracts Company's data, and its lead party, with a dash where a register has no
+        match.
     """
     return (
         census.filter(pl.col("scope") == scope)
         .select(
             "elexon_bmu_id",
-            elexon_name=pl.col("site_name"),
+            elexon_name=pl.col("register_name"),
             igcpu_name=pl.col("igcpu_name"),
             tec_project=pl.col("tec_name"),
             repd_site=pl.col("repd_name"),
+            lccc_cfd_unit=pl.col("cfd_unit_name"),
+            lccc_max_contract_capacity_mw=pl.col("lccc_contract_capacity_mw"),
             lead_party=pl.col("lead_party"),
         )
+        .with_columns(pl.col("lccc_max_contract_capacity_mw").cast(pl.String))
         .fill_null("-")
         .sort("elexon_bmu_id")
     )
@@ -1349,7 +1534,7 @@ def gsp_register_table(*, census: pl.DataFrame, reference: list[dict[str, Any]])
     aggregates = census.filter(pl.col("scope") == "aggregate")
     nged = pl.col("dno_area") == "NGED"
     rows += [
-        ("Census BMUs that are embedded (E_)", str(embedded.height)),
+        ("Census BMUs that are embedded", str(embedded.height)),
         (
             "Embedded census BMUs that IGCPU types as Solar",
             str(embedded.filter(pl.col("igcpu_installed_capacity_mw").is_not_null()).height),
@@ -1631,6 +1816,7 @@ def main() -> None:
         aggregate_grid=estimates[("mean of the 18 CAMS grid points", "aggregate")],
         census=census,
     )
+    lccc_mapping, lccc_portfolio = fetch_lccc()
     sections = [
         "# Solar-BMU census report",
         intro,
@@ -1733,6 +1919,24 @@ def main() -> None:
         + _md(aggregate_flow_table(aggregates=aggregates, window_label=window.label)),
         "## What a single lookup gives, and what the study finds\n\n"
         + _md(register_table(census=census, today=run_date)),
+        "## Largest half-hourly output of the two `C__` census BMUs, by month (MW)\n\n"
+        + _md(
+            monthly_largest_output_table(
+                bmu_ids=["C__ESTAT019", "C__LSTAT020"], window_label=window.label
+            )
+        ),
+        "## What the BMU register records about the aggregate census BMUs\n\n"
+        + _md(aggregate_register_table(aggregates=aggregates, reference=reference)),
+        "## What the Low Carbon Contracts Company's data says about the `C__` BMUs\n\n"
+        + _md(
+            lccc_table(
+                mapping=lccc_mapping,
+                portfolio=lccc_portfolio,
+                reference=reference,
+                census=census,
+                probe=lambda ids: unlisted_cfd_solar_with_output(bmu_ids=ids),
+            )
+        ),
         "## Where each single-site census BMU connects: GSP group and DNO area\n\n"
         "A GSP group is the Elexon grid supply point group in the BMU register. `gsp_area` is the "
         "group's area name and `dno_area` the distribution network operator for that area, from "

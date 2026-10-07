@@ -343,3 +343,16 @@ def test_the_largest_output_raises_on_a_file_with_no_reading() -> None:
         classify.largest_output_mw(
             output=pl.DataFrame({"output_mwh": [None]}, schema={"output_mwh": pl.Float64})
         )
+
+
+def test_a_c_bmu_is_single_site_only_when_it_carries_one_named_cfd_unit() -> None:
+    assert classify.scope_of(bmu_id="C__ONE", single_site_cfd_ids={"C__ONE"}) == "single-site"
+    assert classify.scope_of(bmu_id="C__POOL", single_site_cfd_ids={"C__ONE"}) == "aggregate"
+
+
+def test_scope_follows_the_prefix_for_the_other_bmus() -> None:
+    assert classify.scope_of(bmu_id="T_X", single_site_cfd_ids=set()) == "single-site"
+    assert classify.scope_of(bmu_id="E_X", single_site_cfd_ids=set()) == "single-site"
+    assert classify.scope_of(bmu_id="2__X", single_site_cfd_ids=set()) == "aggregate"
+    assert classify.scope_of(bmu_id="V__X", single_site_cfd_ids=set()) == "aggregate"
+    assert classify.scope_of(bmu_id="C__X", single_site_cfd_ids=set()) == "aggregate"

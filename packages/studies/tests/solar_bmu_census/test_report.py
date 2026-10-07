@@ -83,3 +83,79 @@ def test_shape_errors_split_by_whether_the_bmu_ran_at_generation_capacity() -> N
         0.2,
     )
     assert (other["bmus"], other["mean absolute error"]) == (1, 0.3)
+
+
+def _register_row(
+    *, bmu_id: str, unit_type: str, gsp: str | None, demand: str
+) -> dict[str, object]:
+    return {
+        "elexonBmUnit": bmu_id,
+        "bmUnitType": unit_type,
+        "fuelType": None,
+        "gspGroupId": gsp,
+        "demandCapacity": demand,
+    }
+
+
+def test_the_aggregate_register_table_counts_what_the_register_records() -> None:
+    reference = [
+        _register_row(bmu_id="2__ABGAS000", unit_type="G", gsp="_A", demand="-3.0"),
+        _register_row(bmu_id="2__BBGAS001", unit_type="S", gsp="_B", demand="0.0"),
+        _register_row(bmu_id="V__CFLEX001", unit_type="V", gsp="_D", demand="0.0"),
+    ]
+    aggregates = pl.DataFrame({"elexon_bmu_id": ["2__ABGAS000", "2__BBGAS001", "V__CFLEX001"]})
+    table = report.aggregate_register_table(aggregates=aggregates, reference=reference)
+    values = dict(table.iter_rows())
+    assert values["Aggregate census BMUs `2__` with register type G"] == "1"
+    assert values["Aggregate census BMUs `2__` with register type S"] == "1"
+    assert values["Aggregate census BMUs `V__` with register type V"] == "1"
+    assert values["Aggregate census BMUs with a fuel type in the register"] == "0"
+    # The V__ BMU's fourth character is C, but its GSP group is _D.
+    assert values[
+        "`2__` and `V__` census BMUs whose fourth character is their GSP group letter"
+    ] == ("2 of 3")
+    assert values["`G` type census BMUs with a negative Demand Capacity"] == "1"
+
+
+def test_the_lccc_table_counts_current_c_bmus_and_probes_the_unlisted_solar_ones() -> None:
+    def mapping_row(cfd: str, bmu: str, ended: str = "") -> dict[str, object]:
+        return {"CFD_Id": cfd, "BMU_Id": bmu, "Effective_date_to": ended}
+
+    def unit(cfd: str, technology: str) -> dict[str, object]:
+        return {
+            "CFD_ID": cfd,
+            "Name_of_CFD_Unit": f"Unit {cfd}",
+            "Technology_Type": technology,
+            "Transmission_or_Distribution_connection": "Distribution",
+            "Status": "Live",
+            "Maximum_Contract_Capacity_MW": "10",
+        }
+
+    seen: list[list[str]] = []
+
+    def probe(ids: list[str]) -> int:
+        seen.append(ids)
+        return 0
+
+    table = report.lccc_table(
+        mapping=[
+            mapping_row("A", "C__SOLAR1"),
+            mapping_row("B", "C__SOLAR2"),
+            mapping_row("C", "C__WIND01"),
+            mapping_row("D", "C__OLD", ended="2025-01-01"),
+        ],
+        portfolio=[
+            unit("A", "Solar PV"),
+            unit("B", "Solar PV"),
+            unit("C", "Onshore Wind"),
+            unit("D", "Solar PV"),
+        ],
+        reference=[{"elexonBmUnit": "C__SOLAR1"}],
+        census=pl.DataFrame({"elexon_bmu_id": ["C__SOLAR1"], "scope": ["single-site"]}),
+        probe=probe,
+    )
+    values = dict(table.iter_rows())
+    assert values["`C__` BMUs with a current CfD identifier in the mapping"] == "3"
+    assert values["Of those, BMUs whose CfD unit is Solar PV"] == "2"
+    assert values["`C__` BMUs in the mapping that the BMU register lists"] == "1"
+    assert seen == [["C__SOLAR2"]]

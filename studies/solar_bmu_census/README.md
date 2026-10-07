@@ -14,15 +14,15 @@ wrote.**
 
 | Script | What it does |
 |---|---|
-| `fetch_sources.py` | Downloads the BMU register, the IGCPU report (B1420), the settled half-hourly output of each BMU (dataset B1610), the National Energy System Operator's (NESO's) Transmission Entry Capacity (TEC) register, the Renewable Energy Planning Database (REPD), and NESO's map of the 14 distribution network operator (DNO) licence areas, then writes a lineage note and a README beside them. |
-| `classify.py` | Correlates each BMU's output with the sun and writes `classes.parquet`. |
+| `fetch_sources.py` | Downloads the BMU register, the IGCPU report (B1420), the settled half-hourly output of each BMU (dataset B1610), the National Energy System Operator's (NESO's) Transmission Entry Capacity (TEC) register, the Renewable Energy Planning Database (REPD), NESO's map of the 14 distribution network operator (DNO) licence areas, and the Low Carbon Contracts Company's mapping of Contract for Difference (CfD) units to BMUs and its CfD portfolio, then writes a lineage note and a README beside them. |
+| `classify.py` | Correlates each BMU's output with the sun, decides whether each BMU is single-site (a `T_`, `E_`, or `M_` identifier, or a `C__` BMU that carries one named CfD unit) or aggregate, and writes `classes.parquet`. |
 | `collate.py` | Fetches each census BMU's Maximum Export Limit (MEL), joins the five capacity values and the P99 of the BMU's output onto each census BMU with the site's technology and position, and writes the census table as `solar_bmus.csv` and `solar_bmus.parquet` in the study's data folder. |
 | `recall_check.py` | Checks the census against the TEC register's photovoltaic (PV) projects. |
 | `report.py` | Writes every number the page quotes to `report.md` and prints the report. |
 | `census_charts.py` | Draws the page's five figures. |
 
-The tests for `fetch_sources.py`, `classify.py`, and `collate.py` are in
-`packages/studies/tests/solar_bmu_census/`.
+The tests for `fetch_sources.py`, `classify.py`, `collate.py`, `solar_estimate.py`, and `report.py`
+are in `packages/studies/tests/solar_bmu_census/`.
 
 ## The capacity columns
 
@@ -70,7 +70,8 @@ the others. **The CAMS shapes read `solar_estimate.CAMS_PUBLIC_POINTS_PATH`, whi
 
 - `gsp_group`: the Elexon grid supply point (GSP) group identifier in the BMU register, such as
   `_B`. The register leaves the group empty for every transmission-connected (`T_`) BMU, so the
-  column is empty for the nine transmission-connected single-site census BMUs.
+  column is empty for the nine transmission-connected single-site census BMUs. The two `C__` census
+  BMUs have a group, because the register types them `S`.
 - `dno_area`: the distribution network operator (DNO) whose licence area the GSP group names, from
   `collate.GSP_GROUP_AREAS`. The mapping is the attribute table of NESO's map of the 14 DNO licence
   areas. The column is empty when `gsp_group` is empty.
@@ -82,12 +83,21 @@ the others. **The CAMS shapes read `solar_estimate.CAMS_PUBLIC_POINTS_PATH`, whi
 - `repd_county` and `repd_region`: the county and region fields of the matched REPD row. These are
   REPD's own fields and are not licence areas.
 
+## The Contract for Difference columns
+
+**Four columns come from the Low Carbon Contracts Company's data and are filled only for a `C__` BMU
+that carries one named Contract for Difference (CfD) unit.** `cfd_id` is the CfD identifier,
+`cfd_unit_name` the unit's name, `lccc_technology` its technology, and `lccc_contract_capacity_mw`
+its maximum contract capacity in megawatts. The maximum contract capacity is not one of the five
+published capacity columns, and the study never adds it to them. `register_name` is the BMU's name
+in the BMU register, because `site_name` is the CfD unit's name for a `C__` BMU.
+
 ## Hand-made tables
 
 **Two hand-made tables sit beside the scripts, because the study matches projects to BMUs by
 judgement where names differ.** `site_matches_reviewed.csv` gives, for each census BMU whose Elexon
-name does not resemble its project's name, the matched TEC project, the matched REPD row, the
-separately registered storage BMUs at the site, and the evidence for the match.
-`tec_mapping_reviewed.csv` gives, for each TEC project that lists PV, the BMUs that belong to it, or
-none. `collate.py` reads `site_matches_reviewed.csv`, and `recall_check.py` reads
+name does not resemble its project's name (the two `C__` BMUs included), the matched TEC project,
+the matched REPD row, the separately registered storage BMUs at the site, and the evidence for the
+match. `tec_mapping_reviewed.csv` gives, for each TEC project that lists PV, the BMUs that belong to
+it, or none. `collate.py` reads `site_matches_reviewed.csv`, and `recall_check.py` reads
 `tec_mapping_reviewed.csv`.

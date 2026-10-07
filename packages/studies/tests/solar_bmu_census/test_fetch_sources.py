@@ -107,3 +107,92 @@ def test_a_bmu_listed_twice_is_fetched_once() -> None:
         {"elexonBmUnit": "T_B", "interconnectorId": None},
     ]
     assert fetch_sources.b1610_bmu_ids(reference=reference) == ["T_A", "T_B"]
+
+
+def _mapping_row(*, cfd_id: str, bmu_id: str, ended: bool = False) -> dict[str, Any]:
+    return {
+        "CFD_Id": cfd_id,
+        "BMU_Id": bmu_id,
+        "Effective_From": "2024-12-18 00:00:00.0000000",
+        "Effective_date_to": "2025-01-01 00:00:00.0000000" if ended else "",
+    }
+
+
+def _portfolio_row(*, cfd_id: str, name: str, capacity: str = "30.000") -> dict[str, Any]:
+    return {
+        "CFD_ID": cfd_id,
+        "Name_of_CFD_Unit": name,
+        "Technology_Type": "Solar PV",
+        "Transmission_or_Distribution_connection": "Distribution",
+        "Status": "Live (Post-FIC)",
+        "Maximum_Contract_Capacity_MW": capacity,
+    }
+
+
+def test_a_c_bmu_with_one_named_cfd_unit_is_a_single_site() -> None:
+    units = fetch_sources.single_site_cfd_bmus(
+        mapping=[_mapping_row(cfd_id="AR4-X", bmu_id="C__ONE")],
+        portfolio=[_portfolio_row(cfd_id="AR4-X", name="Example Solar Farm", capacity="49.900")],
+    )
+    assert units == {
+        "C__ONE": {
+            "cfd_id": "AR4-X",
+            "name": "Example Solar Farm",
+            "technology": "Solar PV",
+            "connection": "Distribution",
+            "status": "Live (Post-FIC)",
+            "capacity_mw": 49.9,
+        }
+    }
+
+
+def test_a_c_bmu_that_carries_two_current_cfd_units_is_not_a_single_site() -> None:
+    units = fetch_sources.single_site_cfd_bmus(
+        mapping=[
+            _mapping_row(cfd_id="A", bmu_id="C__POOL"),
+            _mapping_row(cfd_id="B", bmu_id="C__POOL"),
+        ],
+        portfolio=[_portfolio_row(cfd_id="A", name="One"), _portfolio_row(cfd_id="B", name="Two")],
+    )
+    assert units == {}
+
+
+def test_an_ended_mapping_row_does_not_count_towards_a_single_site() -> None:
+    units = fetch_sources.single_site_cfd_bmus(
+        mapping=[
+            _mapping_row(cfd_id="OLD", bmu_id="C__MOVED", ended=True),
+            _mapping_row(cfd_id="NEW", bmu_id="C__MOVED"),
+        ],
+        portfolio=[
+            _portfolio_row(cfd_id="OLD", name="Old"),
+            _portfolio_row(cfd_id="NEW", name="New"),
+        ],
+    )
+    assert units["C__MOVED"]["cfd_id"] == "NEW"
+
+
+def test_a_cfd_unit_without_a_name_or_a_portfolio_row_is_not_a_single_site() -> None:
+    units = fetch_sources.single_site_cfd_bmus(
+        mapping=[
+            _mapping_row(cfd_id="NONAME", bmu_id="C__BLANK"),
+            _mapping_row(cfd_id="MISSING", bmu_id="C__LOST"),
+        ],
+        portfolio=[_portfolio_row(cfd_id="NONAME", name="  ")],
+    )
+    assert units == {}
+
+
+def test_only_c_bmus_are_considered() -> None:
+    units = fetch_sources.single_site_cfd_bmus(
+        mapping=[_mapping_row(cfd_id="A", bmu_id="T_WIND-1")],
+        portfolio=[_portfolio_row(cfd_id="A", name="A wind farm")],
+    )
+    assert units == {}
+
+
+def test_a_blank_contract_capacity_is_none() -> None:
+    units = fetch_sources.single_site_cfd_bmus(
+        mapping=[_mapping_row(cfd_id="A", bmu_id="C__X")],
+        portfolio=[_portfolio_row(cfd_id="A", name="Named", capacity="")],
+    )
+    assert units["C__X"]["capacity_mw"] is None

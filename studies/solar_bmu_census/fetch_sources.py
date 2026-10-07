@@ -44,6 +44,20 @@ NESO_DNO_AREAS_GEOJSON: Final[str] = (
 """NESO's map of the 14 distribution network operator licence areas. Each feature carries the GSP
 group identifier (`Name`), the operator (`DNO`), and the area name (`Area`), and the coordinates are
 Ordnance Survey National Grid metres (EPSG:27700)."""
+LCCC_API: Final[str] = "https://dp.lowcarboncontracts.uk/api/3/action/datastore_search"
+LCCC_MAPPING_PAGE: Final[str] = "https://dp.lowcarboncontracts.uk/dataset/cfd-to-bm-unit-mapping"
+LCCC_PORTFOLIO_PAGE: Final[str] = (
+    "https://dp.lowcarboncontracts.uk/dataset/cfd-contract-portfolio-status"
+)
+LCCC_MAPPING_RESOURCE: Final[str] = "c16f141d-2db9-4160-ade1-d0d19d224dc9"
+"""The Low Carbon Contracts Company's datastore resource for the CfD-to-BM-Unit mapping, which has
+one row for each Contract for Difference (CfD) identifier and the BM Unit that carries it."""
+LCCC_PORTFOLIO_RESOURCE: Final[str] = "fdaf09d2-8cff-4799-a5b0-1c59444e492b"
+"""The datastore resource for the CfD Contract Portfolio Status, which has one row for each CfD
+unit with its name, technology, connection type, status, and maximum contract capacity."""
+LCCC_PAGE_LIMIT: Final[int] = 5000
+"""The rows requested from a datastore resource. A response with fewer rows than the resource's
+total raises, so a resource that outgrows the limit fails loudly."""
 STUDY_DIR: Final[Path] = SOLAR_BMU_CENSUS_DIR
 INPUTS_DIR: Final[Path] = SOLAR_BMU_CENSUS_INPUTS_DIR
 RAW_DIR: Final[Path] = INPUTS_DIR / "raw"
@@ -223,6 +237,78 @@ def fetch_dno_areas() -> dict[str, Any]:
     return json.loads(cached_text(name="dno_licence_areas", url=NESO_DNO_AREAS_GEOJSON))
 
 
+def _lccc_records(*, name: str, resource_id: str) -> list[dict[str, Any]]:
+    """Fetch every row of one Low Carbon Contracts Company datastore resource."""
+    body = cached_text(
+        name=name,
+        url=LCCC_API,
+        params={"resource_id": resource_id, "limit": str(LCCC_PAGE_LIMIT)},
+    )
+    result = json.loads(body)["result"]
+    records: list[dict[str, Any]] = result["records"]
+    if len(records) != result["total"]:
+        raise RuntimeError(f"{name}: got {len(records)} of {result['total']} rows")
+    return records
+
+
+def fetch_lccc() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Fetch the Low Carbon Contracts Company's CfD-to-BM-Unit mapping and CfD portfolio.
+
+    Returns:
+        The mapping rows (`CFD_Id`, `BMU_Id`, `Effective_From`, `Effective_date_to`) and the
+        portfolio rows (`CFD_ID`, `Name_of_CFD_Unit`, `Technology_Type`,
+        `Transmission_or_Distribution_connection`, `Status`, `Maximum_Contract_Capacity_MW`, and
+        others).
+    """
+    return (
+        _lccc_records(name="lccc_cfd_bmu_mapping", resource_id=LCCC_MAPPING_RESOURCE),
+        _lccc_records(name="lccc_cfd_portfolio", resource_id=LCCC_PORTFOLIO_RESOURCE),
+    )
+
+
+def single_site_cfd_bmus(
+    *, mapping: list[dict[str, Any]], portfolio: list[dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    """Find the `C__` BM Units that carry exactly one named CfD unit.
+
+    A `C__` BM Unit is an Additional Supplier BM Unit that Elexon registers solely to allocate
+    Contract for Difference assets. A BM Unit with one current CfD identifier, whose portfolio row
+    names a unit, is one named generating site, so the census counts it as single-site. A BM Unit
+    that carries several current CfD identifiers pools several sites.
+
+    Args:
+        mapping: The rows of `fetch_lccc`'s mapping. A row with a non-empty `Effective_date_to`
+            has ended and is ignored.
+        portfolio: The rows of `fetch_lccc`'s portfolio.
+
+    Returns:
+        Maps each such BM Unit identifier to its `cfd_id`, `name`, `technology`, `connection`,
+        `status`, and `capacity_mw` (the maximum contract capacity, None when the portfolio leaves
+        it blank).
+    """
+    by_cfd = {str(row["CFD_ID"]): row for row in portfolio}
+    current: dict[str, list[str]] = {}
+    for row in mapping:
+        bmu_id = str(row["BMU_Id"])
+        if bmu_id.startswith("C__") and not row["Effective_date_to"]:
+            current.setdefault(bmu_id, []).append(str(row["CFD_Id"]))
+    units: dict[str, dict[str, Any]] = {}
+    for bmu_id, cfd_ids in current.items():
+        unit = by_cfd.get(cfd_ids[0]) if len(cfd_ids) == 1 else None
+        if unit is None or not str(unit["Name_of_CFD_Unit"]).strip():
+            continue
+        capacity = str(unit["Maximum_Contract_Capacity_MW"]).strip()
+        units[bmu_id] = {
+            "cfd_id": cfd_ids[0],
+            "name": str(unit["Name_of_CFD_Unit"]).strip(),
+            "technology": str(unit["Technology_Type"]),
+            "connection": str(unit["Transmission_or_Distribution_connection"]),
+            "status": str(unit["Status"]),
+            "capacity_mw": float(capacity) if capacity else None,
+        }
+    return units
+
+
 def parse_b1610(*, rows: list[dict[str, Any]], window: Window) -> pl.DataFrame:
     """Turn B1610 stream rows into one row per half-hour, in the window.
 
@@ -371,6 +457,8 @@ def write_provenance(*, window: Window, bmu_count: int, today: date) -> None:
             "tec_register": NESO_TEC_PAGE,
             "repd": REPD_PAGE,
             "dno_licence_areas": NESO_DNO_AREAS_GEOJSON,
+            "lccc_cfd_bmu_mapping": LCCC_MAPPING_PAGE,
+            "lccc_cfd_portfolio": LCCC_PORTFOLIO_PAGE,
             "cams_irradiance_for_the_solar_estimate": (
                 "solar_estimate.CAMS_PUBLIC_POINTS_PATH, read by report.py and not fetched here: "
                 "hourly global horizontal irradiance of the CAMS radiation service at the "
@@ -393,8 +481,9 @@ Written by `studies/solar_bmu_census/fetch_sources.py`. Window: {window.start:%Y
 {window.end:%Y-%m-%d} (UTC, half-open).
 
 - `raw/`: each small source (BMU reference data, IGCPU, TEC register, REPD, NESO's licence-area map
-  of the distribution network operators, and the Maximum Export Limit of the solar BMUs, which
-  `collate.py` fetches) as JSON with `retrieved_at_utc`, `requested_url`, `final_url`, and `body`.
+  of the distribution network operators, the Low Carbon Contracts Company's CfD-to-BM-Unit mapping
+  and CfD portfolio, and the Maximum Export Limit of the solar BMUs, which `collate.py` fetches) as
+  JSON with `retrieved_at_utc`, `requested_url`, `final_url`, and `body`.
 - `b1610/<BMU>_<window>.parquet`: one file per BMU, half-hourly settled output (Elexon dataset
   B1610), {len(files)} files. Columns:
 
@@ -420,6 +509,7 @@ def main() -> None:
     fetch_tec()
     fetch_repd()
     fetch_dno_areas()
+    fetch_lccc()
     bmu_ids = b1610_bmu_ids(reference=reference)
     fetch_b1610(bmu_ids=bmu_ids, window=window)
     write_provenance(window=window, bmu_count=len(bmu_ids), today=args.today)
