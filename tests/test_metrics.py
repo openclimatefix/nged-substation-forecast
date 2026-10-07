@@ -37,6 +37,7 @@ from contracts.power_schemas import (
     PowerForecast,
     TimeSeriesMetadata,
 )
+from contracts.settings import Settings
 from dagster import DagsterInstance, RunConfig, materialize
 from deltalake import write_deltalake
 from ml_core.metrics import (
@@ -926,6 +927,14 @@ def test_metrics_refuses_an_ad_hoc_window_reaching_final_test_start(
         )
     assert not file_mlflow_env["metrics"].exists()
 
+    monkeypatch.setenv("NGED_FINAL_TEST", "0")
+    with pytest.raises(FinalTestWindowError):
+        materialize(
+            [metrics],
+            run_config=_score_run_config(experiment_name=EXPERIMENT_NAME, scope="ad_hoc"),
+            instance=dagster_instance,
+        )
+
     monkeypatch.setenv("NGED_FINAL_TEST", "1")
     assert materialize(
         [metrics],
@@ -1036,15 +1045,66 @@ def study_predictions(
 
 
 def test_score_study_stores_and_scores_a_matching_file(
-    file_mlflow_env: dict[str, Path], study_predictions: Path
+    file_mlflow_env: dict[str, Path], study_predictions: Path, tmp_path: Path
 ) -> None:
+    named = tmp_path / "named.parquet"
+    pl.read_parquet(study_predictions).with_columns(
+        experiment_name=pl.lit(EXPERIMENT_NAME)
+    ).write_parquet(named)
+
     score_study.score_study(
-        predictions=study_predictions, study_name="my_study", fold_id=FOLD_ID, replace=False
+        predictions=named, study_name="my_study", fold_id=FOLD_ID, replace=False
     )
 
-    assert "study/my_study" in _scored_experiments(file_mlflow_env["metrics"])
+    scored = pl.read_delta(str(file_mlflow_env["metrics"])).filter(
+        pl.col("experiment_name") == "study/my_study"
+    )
+    assert scored["evaluation_scope"].unique().to_list() == ["leaderboard"]
+    stored = pl.read_delta(str(file_mlflow_env["forecasts"])).filter(
+        pl.col("experiment_name") == "study/my_study"
+    )
+    assert stored.height == pl.read_parquet(study_predictions).height
+
+
+def test_score_study_stores_every_batch_of_series(
+    file_mlflow_env: dict[str, Path], study_predictions: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(score_study, "SERIES_BATCH_SIZE", 1)
+    rows = pl.scan_parquet(study_predictions).with_columns(experiment_name=pl.lit("study/x"))
+    two_series = pl.concat([rows, rows.with_columns(time_series_id=pl.lit(2, pl.Int32))])
+
+    score_study._write_in_batches(
+        study=two_series,
+        settings=Settings(),
+        experiment_name="study/x",
+        fold_id=FOLD_ID,
+    )
+
+    stored = pl.read_delta(str(file_mlflow_env["forecasts"])).filter(
+        pl.col("experiment_name") == "study/x"
+    )
+    assert sorted(stored["time_series_id"].unique().to_list()) == [1, 2]
+
+
+def test_score_study_writes_nothing_when_a_later_batch_is_invalid(
+    file_mlflow_env: dict[str, Path], study_predictions: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(score_study, "SERIES_BATCH_SIZE", 1)
+    rows = pl.scan_parquet(study_predictions).with_columns(experiment_name=pl.lit("study/x"))
+    invalid = rows.with_columns(
+        time_series_id=pl.lit(2, pl.Int32), power_fcst_init_time=pl.col("valid_time")
+    )
+
+    with pytest.raises(Exception, match="valid_time"):
+        score_study._write_in_batches(
+            study=pl.concat([rows, invalid]),
+            settings=Settings(),
+            experiment_name="study/x",
+            fold_id=FOLD_ID,
+        )
+
     stored = pl.read_delta(str(file_mlflow_env["forecasts"]))
-    assert "study/my_study" in set(stored["experiment_name"].unique().to_list())
+    assert "study/x" not in set(stored["experiment_name"].unique().to_list())
 
 
 def test_score_study_does_not_overwrite_a_submission_unless_asked(
@@ -1104,6 +1164,60 @@ def test_score_study_refuses_a_row_key_column_with_the_wrong_dtype(
         score_study.score_study(
             predictions=nanoseconds, study_name="my_study", fold_id=FOLD_ID, replace=False
         )
+
+
+def test_score_study_refuses_a_file_mixing_in_another_fold(
+    study_predictions: Path, tmp_path: Path
+) -> None:
+    rows = pl.read_parquet(study_predictions)
+    mixed = tmp_path / "mixed.parquet"
+    pl.concat(
+        [
+            rows.with_columns(fold_id=pl.lit(FOLD_ID)),
+            rows.head(1).with_columns(fold_id=pl.lit("smoke_test")),
+        ]
+    ).write_parquet(mixed)
+
+    with pytest.raises(ValueError, match="fold_id values"):
+        score_study.score_study(
+            predictions=mixed, study_name="my_study", fold_id=FOLD_ID, replace=False
+        )
+
+
+def test_score_study_submission_to_one_fold_does_not_block_another_fold(
+    file_mlflow_env: dict[str, Path], study_predictions: Path
+) -> None:
+    other_fold_rows = (
+        pl.read_delta(str(file_mlflow_env["forecasts"]))
+        .head(1)
+        .with_columns(experiment_name=pl.lit("study/my_study"), fold_id=pl.lit("smoke_test"))
+    )
+    other_fold_rows.write_delta(str(file_mlflow_env["forecasts"]), mode="append")
+
+    score_study.score_study(
+        predictions=study_predictions, study_name="my_study", fold_id=FOLD_ID, replace=False
+    )
+
+
+def test_score_study_main_re_executes_with_the_cleaned_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executed: list[dict[str, str]] = []
+
+    def record_execve(_path: str, _argv: list[str], environment: dict[str, str]) -> None:
+        executed.append(environment)
+        raise SystemExit
+
+    monkeypatch.setattr(score_study.os, "execve", record_execve)
+    monkeypatch.setenv("NGED_FINAL_TEST", "1")
+    monkeypatch.setenv("PATH", "/usr/bin")
+    monkeypatch.delenv(score_study.CLEAN_ENVIRONMENT_MARKER, raising=False)
+
+    with pytest.raises(SystemExit):
+        score_study.main()
+
+    assert "NGED_FINAL_TEST" not in executed[0]
+    assert executed[0][score_study.CLEAN_ENVIRONMENT_MARKER] == "1"
 
 
 def test_score_study_refuses_a_file_whose_fold_id_disagrees(

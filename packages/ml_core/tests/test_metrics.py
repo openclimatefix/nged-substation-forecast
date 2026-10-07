@@ -1057,3 +1057,27 @@ def test_require_same_row_keys_refuses_a_reference_with_no_rows() -> None:
 
     with pytest.raises(RowKeyMismatchError, match="Materialise the reference"):
         _check_row_keys(study=_row_key_frame(series={1: _TIMES}), reference=reference)
+
+
+def test_require_same_row_keys_refuses_a_study_that_drops_a_longer_lead_time() -> None:
+    reference = _row_key_frame(series={1: _TIMES}).with_columns(
+        power_fcst_init_time=pl.col("valid_time") - timedelta(hours=6)
+    )
+    reference = pl.concat([reference, _row_key_frame(series={1: _TIMES})])
+
+    with pytest.raises(RowKeyMismatchError, match="reference row keys are missing"):
+        _check_row_keys(study=_row_key_frame(series={1: _TIMES}), reference=reference)
+
+
+def test_require_same_row_keys_checks_every_series_in_a_batch() -> None:
+    reference = _row_key_frame(series={1: _TIMES, 2: _TIMES})
+    study = _row_key_frame(series={1: _TIMES, 2: _TIMES[:-1]})
+
+    with pytest.raises(RowKeyMismatchError, match=r"series \[1, 2\]"):
+        require_same_row_keys(
+            study=study,
+            reference=reference,
+            group_label="study/x, fold",
+            reference_label="reference",
+            series_batch_size=2,
+        )

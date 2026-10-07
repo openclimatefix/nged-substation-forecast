@@ -220,7 +220,7 @@ def score_study(*, predictions: Path, study_name: str, fold_id: str, replace: bo
         study=study, settings=settings, experiment_name=experiment_name, fold_id=fold_id
     )
     with DagsterInstance.ephemeral() as instance:
-        result = materialize(
+        materialize(
             [metrics],
             run_config=RunConfig(
                 ops={
@@ -234,8 +234,6 @@ def score_study(*, predictions: Path, study_name: str, fold_id: str, replace: bo
             ),
             instance=instance,
         )
-    if not result.success:
-        raise RuntimeError(f"The metrics asset failed for {experiment_name}.")
 
 
 def main() -> None:
