@@ -8,7 +8,7 @@ three. The issue also bundles two kinds of work: code changes in this repository
 **Solution.** The `metrics` asset becomes the only source of a leaderboard number and protects
 itself. It refuses a forecast that omits rows of an eligible series, and refuses a window reaching
 past `FINAL_TEST_START` unless `NGED_FINAL_TEST=1` is set. A new `scripts/score_study.py` scores a
-study's predictions file by running the asset from `main`. A shared study power reader stops at the
+study's predictions file by running the asset from `main`. The shared study power reader (issue #1082) stops at the
 same date. An `import-linter` contract keeps the scorer free of `dagster`, `mlflow`, and `studies`.
 The sysadmin steps move into a maintainer-run runbook and a separate issue.
 
@@ -18,7 +18,8 @@ The sysadmin steps move into a maintainer-run runbook and a separate issue.
 `main`: `metrics` scores whatever rows it is given (`_score_forecast_group` joins to actuals and
 skips series with no overlap); `_resolve_eval_window` takes dates from the fold config; no
 `FINAL_TEST_START` exists; `packages/studies` has no shared power reader (`pv_dataset.py`,
-`wind_product_frames.py`, and several `studies/*` scripts call `pl.scan_delta` directly); no
+`wind_product_frames.py`, and several `studies/*` scripts call `pl.scan_delta` directly), which
+[issue #1082 (Make every study read cleaned power through one reader)](https://github.com/openclimatefix/nged-substation-forecast/issues/1082) adds first; no
 `import-linter` anywhere in `pyproject.toml`, CI, or `uv.lock`. PR #1028 has merged, so
 `packages/studies` is editable. #960 is open and has not decided the final-test design.
 
@@ -33,8 +34,8 @@ skips series with no overlap); `_resolve_eval_window` takes dates from the fold 
   added or edited.
 - **More than one defensible design:** fires. The row-set definition, which scopes the date guard
   covers, and the in-window power question below each admit several designs.
-- **Callers not nameable without searching:** fires for the `pv_dataset` / `wind_product_frames`
-  reader migration and the `studies/*` direct readers.
+- **Callers not nameable without searching:** fires for the
+  `final_test_start` field, the `study/` prefix, and the predictions-file route.
 
 That buys the plan, both plan reviews, and both diff reviews.
 
@@ -49,7 +50,7 @@ That buys the plan, both plan reviews, and both diff reviews.
    (comment of 2026-10-05). Both stay out; each is a one-file follow-up if wanted.
 3. **Split the sysadmin steps into their own issue** (see "Splitting").
 4. **Add a check on the scored rows' `valid_time`.** The issue's guard tests the configured window, which in leaderboard scope is always `val_end` and so can never fire.
-5. **Migrate only the two `packages/studies` readers**, and list the other direct readers in the PR body instead of editing published study scripts.
+5. **Split the study-reader migration into [issue #1082 (Make every study read cleaned power through one reader)](https://github.com/openclimatefix/nged-substation-forecast/issues/1082)**, a separate PR that reads cleaned power with no cutoff. This plan keeps only the cutoff.
 6. **Move the runbook page and the layer-1 doc alignment into the follow-up issue**, because both depend on Q1.
 
 ## Decisions for the maintainer
@@ -171,19 +172,7 @@ and a `PopulationFilter` pinned to that experiment and fold, following
 is safe from `main`: the sysadmin step (separate issue) runs it as the maintainer's user from the
 `main` checkout.
 
-**`packages/studies/src/studies/power.py`** (extend) adds `scan_power()`, which reads the cleaned
-power table through `nged_data.storage.scan_cleaned_power` and filters it to
-`time < FINAL_TEST_START` (read from the CV config). **Decided by the maintainer: every study reads
-cleaned power.** The plan therefore migrates every direct reader of the power table to
-`scan_power()`: `pv_dataset.py` and `wind_product_frames.py` in `packages/studies`, and the
-`studies/` scripts `weather_downloads/fetch_open_meteo_previous_runs.py`,
-`past_weather/cerra_wind_levels.py`, `beam_diffuse_split/stamp_alignment.py`, and
-`beam_diffuse_split/site_e_commissioning.py` (list rechecked at implementation). A new test scans
-`packages/studies/src` and `studies/` and fails on a `scan_delta` or `read_delta` call on the raw
-power table outside `power.py`, so a new study cannot bypass the reader unnoticed. The reader guards
-only callers that route through it, not the data; against an autonomous session the protection is
-the truncated copy under Q1(b). Published study pages are not re-run in this PR. A later re-run of
-one reads cleaned power truncated at the cutoff, and its numbers can change; see Q5.
+**`packages/studies/src/studies/power.py`** (after issue #1082 merges) adds the cutoff to `scan_power()`: one filter, `time < FINAL_TEST_START`, with the date read from the CV config. If this plan is implemented first, `scan_power()` does not exist yet and #1082 comes first. Q5 is the only open question: whether the reader truncates at all.
 
 **`pyproject.toml`, `uv.lock`, `.github/workflows/ci.yml`, `.pre-commit-config.yaml`.** Add
 `import-linter` to the dev group and a `[tool.importlinter]` block with one `forbidden` contract:
@@ -223,10 +212,7 @@ Accepted (each verified or marked for verification at implementation):
   MLflow experiment, so a `study/` fold run would reach the `promotable_model_runs` candidates. The
   plan filters `study/` experiments there and refuses them in `promoted_model`, with tests. This
   replaces the earlier claim that no code is needed.
-- **Study reader.** About 40 published `studies/*` scripts call `pv_sites`, `wind_sites`,
-  `solar_hourly_power`, or `wind_hourly_power`. Migrating the two package readers changes the input
-  of every later re-run of those scripts in two ways: the data is cleaned, and it stops at the
-  cutoff. The cleaning is the maintainer's decision; the truncation is Q5.
+- **Study reader.** Moved to issue #1082. The cutoff in `scan_power()` changes the input of every later re-run of a published study, which is Q5.
 - **Existing constructions.** A required `final_test_start` breaks `CvConfig(...)` in
   `tests/test_jobs.py` and five places in `packages/contracts/tests/test_config_schemas.py`; the plan
   updates them, and `_score_forecast_group`'s positional callers in `tests/test_metrics.py`.
@@ -244,12 +230,7 @@ Accepted (each verified or marked for verification at implementation):
   different partition hourly; the implementer checks that delta-rs resolves the disjoint-partition
   commits, or the script retries.
 
-**Q5 for the maintainer: should the migrated readers also truncate at the cutoff?** The cleaned
-power is decided. Truncating means a re-run of a published study loses about 3 months of power
-(2026-07-01 to October), which can change site lists, seeded anonymised labels, and the study's
-numbers. Recommended yes: a reader that studies can read past the cutoff is no guard, and the
-alternative, a `scan_power(until_cutoff=False)` escape, is the bypass. Published pages keep the
-numbers they were computed with.
+**Q5 for the maintainer: should `scan_power()` also truncate at the cutoff?** Truncating means a re-run of a published study loses about 3 months of power (2026-07-01 to October), which can change site lists, seeded anonymised labels, and numbers. Recommended yes: a reader that studies can read past the cutoff is no guard. Published pages keep the numbers they were computed with.
 
 ## Splitting
 
