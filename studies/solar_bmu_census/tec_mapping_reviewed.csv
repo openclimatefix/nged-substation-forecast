@@ -1,5 +1,4 @@
 project_id,project_name,project_status,plant_type,bmu_ids,note
-a0l4L0000005iTtQAI,Almondell Lodge BESS & Solar Development,Built,Energy Storage System,,"no BMU identified by name, capacity, or lead party"
 a0l4L0000005ixnQAA,Beechgreen Energyfarm,Built,PV Array (Photo Voltaic/solar),T_BURWS-1,name and capacity
 a0l4L0000005iXhQAI,Bilbo Farm,Under Construction/Commissioning,Energy Storage System;PV Array (Photo Voltaic/solar),,"no BMU identified by name, capacity, or lead party"
 a0l4L0000005iy5QAA,Bramford (Tertiary),Built,Energy Storage System;PV Array (Photo Voltaic/solar),T_TYLNS-1;T_TYLNB-1,customer DAMSONGREEN ENERGYFARM LIMITED is the lead party of T_TYLNS-1; IGCPU of T_TYLNB-1 is 57 MW

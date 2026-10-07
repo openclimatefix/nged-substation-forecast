@@ -14,10 +14,10 @@ which merges so that the measurement can be audited and re-run. What the project
 answer, which is why each page states its numbers, the checks the result survived, and the limits on
 how far it generalises.
 
-**Every study here uses only Flexpectation's own data, and its purpose is to inform Flexpectation's
-choices.** Each study scores its weather products or methods only at the generators in
-Flexpectation's trial area in Lincolnshire. No study here compares results across many regions or
-climates, so a result may not hold elsewhere.
+**Every study here but the solar-BMU census uses only Flexpectation's own data, and its purpose is
+to inform Flexpectation's choices.** Each study scores its weather products or methods only at the
+generators in Flexpectation's trial area in Lincolnshire. No study here compares results across many
+regions or climates, so a result may not hold elsewhere.
 
 - [Does a weather product's beam/diffuse split help a PV forecast?](beam-diffuse-split.md) — on a 5
   km satellite retrieval the published direct-beam field cuts photovoltaic (PV) power error by 1.8%
@@ -32,9 +32,9 @@ climates, so a result may not hold elsewhere.
 
 - [How many Balancing Mechanism Units in Great Britain are solar?](solar-bmu-census.md) — a census
   of the BMUs whose settled output follows the sun, found because no field in the BMU register says
-  which units are solar. The study finds 10 single-site solar BMUs, 8 of them at sites that also
-  hold storage, reports 28 aggregate BMUs apart, and sets the five published capacity figures
-  side by side.
+  which units are solar. The study finds 10 single-site solar BMUs at 9 sites, 8 of those sites with
+  storage built or planned, reports 28 aggregate BMUs apart, and sets the five published capacity
+  figures side by side.
 
 ## Past weather
 

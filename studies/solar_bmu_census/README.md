@@ -25,8 +25,9 @@ The code is run in this order, and each script reads what the one before it wrot
 - `generation_capacity_mw`: the Generation Capacity in the BMU register, in megawatts, declared by
   the BMU's lead party.
 - `igcpu_installed_capacity_mw`: the installed capacity of the unit in IGCPU, in megawatts.
-- `tec_mw`: the cumulative total capacity of the matched TEC project at its most advanced status,
-  in megawatts. A hybrid project's figure includes its storage.
+- `tec_mw`: the matched TEC project's connected capacity if built, or its agreed cumulative capacity
+  if under construction, at its most advanced status, in megawatts. A hybrid project's figure
+  includes its storage.
 - `largest_mel_mw`: the largest Maximum Export Limit in the 30 days before the run, in megawatts.
 - `repd_installed_capacity_mw`: the installed capacity of the matched REPD row, in megawatts.
 

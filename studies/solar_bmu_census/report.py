@@ -373,13 +373,18 @@ def storage_signature_table(*, single: pl.DataFrame, window_label: str) -> pl.Da
             )
             > NIGHT_ZENITH_DEGREES
         )
-        exports_at_night = int(((megawatts.to_numpy() > STORAGE_SHARE * capacity) & night).sum())
+        values = megawatts.to_numpy()
+        night_export = (values > STORAGE_SHARE * capacity) & night
+        exports_at_night = int(night_export.sum())
         if below or exports_at_night:
+            events = (values < -STORAGE_SHARE * capacity) | night_export
+            dates = sorted({f"{t:%Y-%m-%d}" for t in output["half_hour_end_time"].filter(events)})
             lowest = _as_float(megawatts.min())
             rows.append(
                 {
                     "elexon_bmu_id": row["elexon_bmu_id"],
                     "site_name": row["display_name"],
+                    "dates_utc": ", ".join(dates),
                     "half_hours_below": below,
                     "night_export_half_hours": exports_at_night,
                     "lowest_mw": round(lowest, 1),
@@ -391,6 +396,7 @@ def storage_signature_table(*, single: pl.DataFrame, window_label: str) -> pl.Da
         schema={
             "elexon_bmu_id": pl.String,
             "site_name": pl.String,
+            "dates_utc": pl.String,
             "half_hours_below": pl.Int64,
             "night_export_half_hours": pl.Int64,
             "lowest_mw": pl.Float64,
@@ -456,6 +462,46 @@ def pair_net_table(*, single: pl.DataFrame, window_label: str) -> pl.DataFrame:
     )
 
 
+def peak_table(*, single: pl.DataFrame, window_label: str) -> pl.DataFrame:
+    """Return each census BMU's largest output as a share of its Generation Capacity.
+
+    Args:
+        single: The census table's single-site rows.
+        window_label: The window's label in the file names.
+
+    Returns:
+        One row for each BMU: its largest output in megawatts and that output divided by its
+        Generation Capacity.
+    """
+    rows = []
+    for row in single.sort("elexon_bmu_id").iter_rows(named=True):
+        output = pl.read_parquet(OUTPUT_DIR / f"{row['elexon_bmu_id']}_{window_label}.parquet")
+        peak = _as_float(output["output_mwh"].max()) * 2
+        rows.append(
+            {
+                "elexon_bmu_id": row["elexon_bmu_id"],
+                "largest_output_mw": round(peak, 1),
+                "share_of_generation_capacity": round(peak / row["generation_capacity_mw"], 2),
+            }
+        )
+    return pl.DataFrame(rows)
+
+
+def register_table() -> pl.DataFrame:
+    """Return the size of the BMU register and what its fuel-type field holds."""
+    reference = fetch_bmu_reference()
+    fuels = [row["fuelType"] for row in reference]
+    rows = [
+        ("Rows in the BMU register", str(len(reference))),
+        ("Rows with no fuel type", str(sum(fuel is None for fuel in fuels))),
+        (
+            "Rows with a fuel type of solar",
+            str(sum(str(fuel).lower() == "solar" for fuel in fuels)),
+        ),
+    ]
+    return pl.DataFrame(rows, schema=["quantity", "value"], orient="row", strict=False)
+
+
 def summary_table(*, census: pl.DataFrame, window_label: str) -> pl.DataFrame:
     """Return the figures the page's prose quotes that no other table holds.
 
@@ -480,6 +526,8 @@ def summary_table(*, census: pl.DataFrame, window_label: str) -> pl.DataFrame:
     generation = float(single["generation_capacity_mw"].sum())
     mel = float(single["largest_mel_mw"].sum())
     located = single.filter(pl.col("latitude").is_not_null())
+    longitude_max = _as_float(located["longitude"].max())
+    longitude_span = longitude_max - _as_float(located["longitude"].min())
     rows = [
         (
             "Single-site BMUs that follow the sun: lowest correlation",
@@ -501,6 +549,14 @@ def summary_table(*, census: pl.DataFrame, window_label: str) -> pl.DataFrame:
         (
             "Generation Capacity sum minus largest-MEL sum, % of Generation Capacity",
             f"{(generation - mel) / generation * 100:.1f}",
+        ),
+        (
+            "Longitude span of the census positions (degrees)",
+            f"{_as_float(located['longitude'].min()):.1f} to {longitude_max:.1f}",
+        ),
+        (
+            "Solar-noon difference over that span (minutes)",
+            f"{longitude_span * 4:.0f}",
         ),
         ("Single-site BMUs with a position", str(located.height)),
         (
@@ -549,9 +605,14 @@ def capacities_table(*, census: pl.DataFrame, scope: str) -> pl.DataFrame:
     """List the census BMUs of one scope with the capacity each register gives them, in MW."""
     return (
         census.filter(pl.col("scope") == scope)
-        .select("elexon_bmu_id", "technology", *CAPACITY_COLUMNS)
+        .select(
+            "elexon_bmu_id",
+            "technology",
+            *CAPACITY_COLUMNS,
+            correlation=pl.col("correlation").round(2),
+        )
         .sort("elexon_bmu_id")
-        .with_columns(pl.col(CAPACITY_COLUMNS).cast(pl.String).fill_null("-"))
+        .with_columns(pl.col([*CAPACITY_COLUMNS, "correlation"]).cast(pl.String).fill_null("-"))
     )
 
 
@@ -581,9 +642,13 @@ def main() -> None:
             "connection_type",
             "technology",
             "technology_evidence",
+            "repd_battery_status",
+            "repd_battery_mw",
             "basis",
             "correlation",
             *CAPACITY_COLUMNS,
+            "tec_status",
+            "tec_connected_mw",
         )
         .with_columns(pl.col("correlation").round(2))
         .sort("elexon_bmu_id")
@@ -678,6 +743,9 @@ def main() -> None:
         + _md(aggregate_lead_party_table(aggregates=aggregates)),
         "## Storage BMUs at the census sites: mean output by hour of day\n\n"
         + _md(storage_pattern_table(single=single, window_label=window.label)),
+        "## The BMU register\n\n" + _md(register_table()),
+        "## Largest output of each census BMU\n\n"
+        + _md(peak_table(single=single, window_label=window.label)),
         "## Figures the page quotes\n\n"
         + _md(summary_table(census=census, window_label=window.label)),
         "## Data checks on the downloaded B1610 files\n\n"

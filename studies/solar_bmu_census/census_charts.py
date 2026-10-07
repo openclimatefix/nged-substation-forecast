@@ -211,7 +211,7 @@ def correlation_figure(*, correlations: pl.DataFrame, number: int) -> alt.VConca
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "correlation:Q",
-                bin=alt.Bin(extent=[-0.4, 1.0], step=0.05),
+                bin=alt.Bin(extent=[-0.45, 1.0], step=0.05),
                 title="Correlation of half-hourly output with the cosine of the solar zenith",
             ),
             y=alt.Y(

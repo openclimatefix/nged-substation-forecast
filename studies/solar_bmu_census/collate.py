@@ -306,8 +306,10 @@ def _tec_candidates(*, tec: pl.DataFrame) -> tuple[dict[str, str], dict[str, dic
     return {key: str(row["Project Name"]) for key, row in rows.items()}, rows
 
 
-def _repd_candidates(*, repd: pl.DataFrame) -> tuple[dict[str, str], dict[str, str]]:
-    """Return the built solar projects' names by Ref ID, and the battery status at each by Ref ID.
+def _repd_candidates(
+    *, repd: pl.DataFrame
+) -> tuple[dict[str, str], dict[str, tuple[str, float | None]]]:
+    """Return the built solar projects' names by Ref ID, and the linked battery at each.
 
     REPD links a solar row and a battery row at one site through the column `Storage Co-location
     REPD Ref ID`, which holds the other row's Ref ID. A solar row's battery status is the best
@@ -317,7 +319,8 @@ def _repd_candidates(*, repd: pl.DataFrame) -> tuple[dict[str, str], dict[str, s
         repd: The REPD register with all-string columns.
 
     Returns:
-        The names of the built solar projects, and the status of the battery linked to each.
+        The names of the built solar projects, and for each the status and capacity in megawatts
+        of the battery linked to it.
     """
     built = repd.filter(pl.col("Development Status (short)").is_in(REPD_BUILT_STATUSES))
     solar = built.filter(pl.col("Technology Type") == "Solar Photovoltaics")
@@ -325,12 +328,14 @@ def _repd_candidates(*, repd: pl.DataFrame) -> tuple[dict[str, str], dict[str, s
         str(row["Ref ID"]): row
         for row in built.filter(pl.col("Technology Type") == "Battery").iter_rows(named=True)
     }
-    battery_status: dict[str, str] = {}
+    battery_status: dict[str, tuple[str, float | None]] = {}
 
     def record(solar_ref: str, battery: dict[str, Any]) -> None:
         status = str(battery["Development Status (short)"])
-        if battery_status.get(solar_ref) != "Operational":
-            battery_status[solar_ref] = status
+        current = battery_status.get(solar_ref)
+        if current is None or current[0] != "Operational":
+            capacity = _to_float(battery["Installed Capacity (MWelec)"])
+            battery_status[solar_ref] = (status, capacity)
 
     for battery in batteries.values():
         linked = battery["Storage Co-location REPD Ref ID"]
@@ -391,10 +396,11 @@ def build_table() -> pl.DataFrame:
                 for bmu in hand["storage_bmu_ids"]
                 if _has_output(bmu_id=bmu, window_label=window.label)
             ]
+        battery = repd_battery_status.get(repd_match[0]) if repd_match else None
         technology, evidence = site_technology(
             tec_plant_type=str(tec_rows[tec_match[0]]["Plant Type"]) if tec_match else None,
             storage_bmu_with_output=bool(storage_ids),
-            repd_battery_status=repd_battery_status.get(repd_match[0]) if repd_match else None,
+            repd_battery_status=battery[0] if battery else None,
             repd_solar_found=repd_match is not None,
         )
         longitude, latitude = _repd_position(
@@ -421,6 +427,8 @@ def build_table() -> pl.DataFrame:
                 "correlation": class_row["correlation"],
                 "technology": technology,
                 "technology_evidence": evidence,
+                "repd_battery_status": battery[0] if battery else None,
+                "repd_battery_mw": battery[1] if battery else None,
                 "storage_bmu_ids": ";".join(storage_ids),
                 "generation_capacity_mw": _to_float(ref.get("generationCapacity")),
                 "igcpu_installed_capacity_mw": igcpu_row["installedCapacity"]
@@ -428,6 +436,10 @@ def build_table() -> pl.DataFrame:
                 else None,
                 "tec_project_id": tec_match[0] if tec_match else None,
                 "tec_mw": tec_rows[tec_match[0]]["tec_mw"] if tec_match else None,
+                "tec_status": tec_rows[tec_match[0]]["Project Status"] if tec_match else None,
+                "tec_connected_mw": _to_float(tec_rows[tec_match[0]]["MW Connected"])
+                if tec_match
+                else None,
                 "largest_mel_mw": mel.get(bmu_id),
                 "repd_ref_id": repd_match[0] if repd_match else None,
                 "repd_installed_capacity_mw": _to_float(
@@ -451,6 +463,8 @@ def build_table() -> pl.DataFrame:
             "igcpu_installed_capacity_mw": pl.Float64,
             "largest_mel_mw": pl.Float64,
             "tec_mw": pl.Float64,
+            "tec_connected_mw": pl.Float64,
+            "repd_battery_mw": pl.Float64,
             "repd_installed_capacity_mw": pl.Float64,
             "generation_capacity_mw": pl.Float64,
             "longitude": pl.Float64,
