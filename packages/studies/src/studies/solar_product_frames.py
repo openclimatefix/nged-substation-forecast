@@ -240,7 +240,7 @@ def without_sunrise_spikes(*, frame: pl.DataFrame, sites: pl.DataFrame) -> pl.Da
 
     Args:
         frame: Rows carrying `site`, `time`, and `ghi_instant_ukv`, one row per (site, time).
-        sites: The roster, carrying `site`, `latitude`, and `longitude`.
+        sites: The site list, carrying `site`, `latitude`, and `longitude`.
 
     Returns:
         `frame`, with every row whose `ghi_instant_ukv` exceeds `MAX_INSTANT_OVER_TOA` times the

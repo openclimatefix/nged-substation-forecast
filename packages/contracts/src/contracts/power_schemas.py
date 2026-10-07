@@ -1,7 +1,7 @@
 """Contracts for NGED's power telemetry and for the forecasts we make from it.
 
 The half-hourly ``PowerTimeSeries`` observations as they arrive from NGED, the
-``TimeSeriesMetadata`` roster describing each series, the ``PowerForecast`` schema every model
+``TimeSeriesMetadata`` table describing each series, the ``PowerForecast`` schema every model
 emits, and the ``EffectiveCapacity`` estimate the metrics pipeline divides the mean absolute
 error by, to express that error as a fraction of the series' capacity.
 """

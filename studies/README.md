@@ -97,7 +97,7 @@ folder name themselves.
 | `observations/NGED-ANM/` | NGED's active network management setpoint exports, and the export-cap parquet derived from each | `beam_diffuse_split/anm_setpoints.py` (the exports come from NGED) |
 
 `data/studies/_private/trial_area_box.json` holds the trial-area box, derived from the private
-generator roster.
+list of generators.
 
 **Each study keeps one folder under `data/studies/per_study/`.**
 

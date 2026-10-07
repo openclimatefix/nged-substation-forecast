@@ -25,11 +25,11 @@ linked from the sections below go deeper.
   MLflow's ranked comparison of those runs' scores. **Promoting** a model means choosing one run's
   saved model to be the model the live service forecasts with, and `promotion.json` records that
   choice.
-- **The roster** is the `TimeSeriesMetadata` table of every time series this project forecasts, one
-  row per `time_series_id`, carrying that series' location and its static attributes. **H3** is a
-  hexagonal grid covering the globe at numbered resolutions. Gridded weather is stored one row per
-  resolution-5 cell, and each roster row records the resolution-5 cell its series sits in, so the
-  weather table and the roster join on that cell.
+- **The metadata table** is the `TimeSeriesMetadata` table of every time series this project
+  forecasts, one row per `time_series_id`, carrying that series' location and its static attributes.
+  **H3** is a hexagonal grid covering the globe at numbered resolutions. Gridded weather is stored
+  one row per resolution-5 cell, and each metadata table row records the resolution-5 cell its
+  series sits in, so the weather table and the metadata table join on that cell.
 - **A numerical weather prediction (NWP) run** is one execution of a weather model, initialised at
   `nwp_init_time` and predicting many future `valid_time`s. Each run carries several **ensemble
   members** — alternative weather futures for the same times — of which **member 0 is the control
@@ -62,13 +62,13 @@ without a Dagster instance, an MLflow server, or an object store. The assets hol
 **Every neighbouring package owns a piece of the data; `ml_core` owns what is done with that data.**
 `contracts` owns what every frame means, and `ml_core` consumes those Patito schemas without
 declaring any of its own. `delta_store` owns how a table is physically written, and `ml_core` writes
-no Delta table at all. The files `ml_core` does write are a saved model's frozen roster copy, the
-gzipped tar archive that model ships in, and the `promotion.json` recording which run was promoted.
-`nged_data` and `dynamical_data` own the ingest of observed power and of gridded weather, and
-`ml_core` starts from whatever those two packages landed. `geo` owns H3 indexing, and
-`weather_utils` owns the analysis-proxy query the weather-lag join is built on. What is left —
-turning power, weather, and metadata into a model-ready frame, and turning a model's output into a
-leaderboard row — is this package.
+no Delta table at all. The files `ml_core` does write are a saved model's frozen copy of the
+metadata table, the gzipped tar archive that model ships in, and the `promotion.json` recording
+which run was promoted. `nged_data` and `dynamical_data` own the ingest of observed power and of
+gridded weather, and `ml_core` starts from whatever those two packages landed. `geo` owns H3
+indexing, and `weather_utils` owns the analysis-proxy query the weather-lag join is built on. What
+is left — turning power, weather, and metadata into a model-ready frame, and turning a model's
+output into a leaderboard row — is this package.
 
 ## Two invariants span the whole package
 

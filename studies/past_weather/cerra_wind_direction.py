@@ -633,7 +633,7 @@ def build_rows(
         wind: `read_cerra_wind`'s frame.
         direction: `read_cerra_direction`'s frame for `heights`.
         half_hourly: `read_half_hourly_power`'s frame.
-        sites: The wind roster, with `site` and `effective_capacity_mw`.
+        sites: The wind site list, with `site` and `effective_capacity_mw`.
         heights: The heights whose direction is present.
 
     Returns:

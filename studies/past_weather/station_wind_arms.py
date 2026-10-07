@@ -501,7 +501,7 @@ def window_rows(*, sites: pl.DataFrame) -> pl.DataFrame:
     """Return the page's rows restricted to the window, before the station rule.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
 
     Returns:
         The page's `common_rows(joined(...))` between `WINDOW_START` and `WINDOW_END_EXCLUSIVE`.
@@ -517,7 +517,7 @@ def choose_stations(
     """Choose the nearest eligible station (k=1) and the three nearest (k=3) for each farm.
 
     Args:
-        sites: The wind roster with `site`, `latitude` and `longitude`.
+        sites: The wind site list with `site`, `latitude` and `longitude`.
         window: The page's rows in the window, the hours the coverage rule is scored on.
         observed: `station_observations`'s output.
 

@@ -437,7 +437,7 @@ def read_half_hourly_power(*, sites: pl.DataFrame) -> pl.DataFrame:
     """Read each wind farm's half-hourly power.
 
     Args:
-        sites: The wind roster, with `time_series_id` and `site`.
+        sites: The wind site list, with `time_series_id` and `site`.
 
     Returns:
         One row per (site, time) with `power_mw`, at the timestamps the power table holds.
@@ -455,7 +455,7 @@ def read_wind(*, sites: pl.DataFrame) -> pl.DataFrame:
     """Read CERRA's five wind speeds at each wind farm's nearest cell.
 
     Args:
-        sites: The wind roster, with `site`, `latitude` and `longitude`.
+        sites: The wind site list, with `site`, `latitude` and `longitude`.
 
     Returns:
         The frame `studies.reanalysis_wind.read_cerra_wind` returns. The loader stops the run if a
@@ -591,7 +591,7 @@ def _joined_rows(
     Args:
         wind: `read_wind`'s frame.
         half_hourly: `read_half_hourly_power`'s frame.
-        sites: The wind roster, with `site` and `effective_capacity_mw`.
+        sites: The wind site list, with `site` and `effective_capacity_mw`.
         shift: The power hour's offset in half-hours.
 
     Returns:
@@ -628,7 +628,7 @@ def build_rows(
     Args:
         wind: `read_wind`'s frame.
         half_hourly: `read_half_hourly_power`'s frame.
-        sites: The wind roster, with `site` and `effective_capacity_mw`.
+        sites: The wind site list, with `site` and `effective_capacity_mw`.
         shift: The power hour's offset in half-hours; `CENTRED_SHIFT` for the main row set.
         shared_keys: If given, only the (site, time) rows it holds are kept, before folds are cut.
         with_controls: Whether to add the two controls' columns, the shuffled levels and the
@@ -707,7 +707,7 @@ def power_hour_scan(
     Args:
         wind: `read_wind`'s frame.
         half_hourly: `read_half_hourly_power`'s frame.
-        sites: The wind roster.
+        sites: The wind site list.
 
     Returns:
         One row per offset with `shift`, `n_rows`, `mae_pp` (the mean absolute error as a

@@ -38,8 +38,8 @@ def dataset() -> pl.DataFrame:
 
 
 @pytest.fixture
-def one_site_roster(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    """Serve a roster where generator 7 is site A, and return the cap directory."""
+def one_site_list(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """Serve a site list where generator 7 is site A, and return the cap directory."""
     monkeypatch.setattr(export_cap, "ANM_DATA_DIR", tmp_path)
     monkeypatch.setattr(
         export_cap, "pv_sites", lambda: pl.DataFrame({"time_series_id": [7], "site": ["A"]})
@@ -48,7 +48,7 @@ def one_site_roster(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 
 
 def test_an_hour_is_constrained_when_any_of_its_half_hours_is_below_the_limit(
-    one_site_roster: Path, dataset: pl.DataFrame
+    one_site_list: Path, dataset: pl.DataFrame
 ):
     # Hour ending 01:00: both half-hours at the limit. Hour ending 02:00: one half-hour at the limit
     # and one at 2 MW. Hour ending 03:00: 4 MW then 2 MW. Hour ending 04:00: a cap a hair below the
@@ -63,7 +63,7 @@ def test_an_hour_is_constrained_when_any_of_its_half_hours_is_below_the_limit(
         (LIMIT_MW - 0.0005, LIMIT_MW - 0.0005),
         (LIMIT_MW, LIMIT_MW),
     ]
-    _write_cap(directory=one_site_roster, time_series_id=7, caps=caps)
+    _write_cap(directory=one_site_list, time_series_id=7, caps=caps)
 
     result = export_cap.with_export_cap(dataset=dataset).sort("site", "time")
 
@@ -75,12 +75,12 @@ def test_an_hour_is_constrained_when_any_of_its_half_hours_is_below_the_limit(
 
 
 def test_readings_before_the_scheme_went_live_are_discarded(
-    one_site_roster: Path, dataset: pl.DataFrame
+    one_site_list: Path, dataset: pl.DataFrame
 ):
     # The first two half-hours sit below the limit, so the scheme is not live yet; they must not
     # flag the hour ending at 01:00 as constrained.
     caps = [(1.0, 1.0), (1.0, 1.0), (LIMIT_MW, LIMIT_MW), (LIMIT_MW, LIMIT_MW)]
-    _write_cap(directory=one_site_roster, time_series_id=7, caps=caps)
+    _write_cap(directory=one_site_list, time_series_id=7, caps=caps)
 
     result = export_cap.with_export_cap(dataset=dataset).sort("site", "time")
 
@@ -88,10 +88,10 @@ def test_readings_before_the_scheme_went_live_are_discarded(
     assert result["constrained"].to_list() == [False] * dataset.height
 
 
-def test_a_cap_file_for_a_generator_outside_the_roster_is_skipped(
-    one_site_roster: Path, dataset: pl.DataFrame
+def test_a_cap_file_for_a_generator_outside_the_site_list_is_skipped(
+    one_site_list: Path, dataset: pl.DataFrame
 ):
-    _write_cap(directory=one_site_roster, time_series_id=99, caps=[(LIMIT_MW, LIMIT_MW)] * 2)
+    _write_cap(directory=one_site_list, time_series_id=99, caps=[(LIMIT_MW, LIMIT_MW)] * 2)
 
     result = export_cap.with_export_cap(dataset=dataset)
 
@@ -100,7 +100,7 @@ def test_a_cap_file_for_a_generator_outside_the_roster_is_skipped(
 
 
 def test_with_no_cap_files_every_row_reads_as_unconstrained(
-    one_site_roster: Path, dataset: pl.DataFrame
+    one_site_list: Path, dataset: pl.DataFrame
 ):
     result = export_cap.with_export_cap(dataset=dataset)
 

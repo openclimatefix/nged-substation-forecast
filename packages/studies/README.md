@@ -88,7 +88,7 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
   family, and the parser that reads a study report's contrast tables.
 - `sources` — the names of the irradiance sources, the registry of Open-Meteo models the downloads
   can fetch, and the paths under `data/studies/` that every study builds from.
-- `pv_dataset` — the readers, rosters, outage and false-zero filters, solar-geometry columns, and
+- `pv_dataset` — the readers, site lists, outage and false-zero filters, solar-geometry columns, and
   separation-model columns that join NGED PV power to a weather source. The command that builds and
   writes one frame is `studies/beam_diffuse_split/build_dataset.py`.
 - `arm_runner` — fitting every (arm, site) job concurrently and concatenating the per-row losses,

@@ -12,13 +12,13 @@ model runs side by side: `<variable>` is the freshest run covering that hour (le
 earlier predicted for that same hour. That is exactly the lead-time axis the forecast study needs
 and the Historical Forecast archives do not carry.
 
-**Sites, not the trial-area grid.** This script builds the same anonymised meter roster as
-`studies.pv_dataset.pv_sites` and `wind_sites` (`_roster` below is a deliberate duplicate — see
+**Sites, not the trial-area grid.** This script builds the same anonymised meter list as
+`studies.pv_dataset.pv_sites` and `wind_sites` (`_site_list` below is a deliberate duplicate — see
 its own docstring for why) and follows the same request/response shape as
 `studies/past_weather/fetch_open_meteo_point.py`, rather than the trial-area grid
 `fetch_open_meteo_grid.py` uses: a forecast study scores a specific generator's forecast, not a
 grid cell's. No coordinate or `time_series_id` reaches the written frame or any log line — rows
-are keyed by the anonymised `site` label the roster assigns, exactly as the sibling per-site
+are keyed by the anonymised `site` label the site list assigns, exactly as the sibling per-site
 scripts do.
 
 **Every model's own `models=` identifier for this API was read from the Previous Runs docs page
@@ -134,14 +134,14 @@ POWER_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "NGED" / "power_time_series.de
 METADATA_PATH: Final[Path] = REPO_DATA_DIR / "NGED" / "metadata.parquet"
 CAPACITY_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "effective_capacity")
 MIN_YEARS_OF_READINGS: Final[float] = 1.0
-"""Match `studies.pv_dataset`'s constants of the same name. The roster reader below
-(`_roster`/`_pv_sites`/`_wind_sites`) duplicates that module's functions of the same name and omits
-the effective capacity. The anonymisation itself — the label permutation and the minimum-history
-filter — is not duplicated: both copies call the shared `studies.anonymise.site_labels_for`, so the
-labelling cannot drift between the two copies."""
+"""Match `studies.pv_dataset`'s constants of the same name. The site list reader below
+(`_site_list`/`_pv_sites`/`_wind_sites`) duplicates that module's functions of the same name and
+omits the effective capacity. The anonymisation itself — the label permutation and the
+minimum-history filter — is not duplicated: both copies call the shared
+`studies.anonymise.site_labels_for`, so the labelling cannot drift between the two copies."""
 
 
-def _roster(*, time_series_type: str, labels: tuple[str, ...], seed: int) -> pl.DataFrame:
+def _site_list(*, time_series_type: str, labels: tuple[str, ...], seed: int) -> pl.DataFrame:
     """Return the series of one technology with enough history, labelled anonymously.
 
     Args:
@@ -176,12 +176,12 @@ def _roster(*, time_series_type: str, labels: tuple[str, ...], seed: int) -> pl.
 
 def _pv_sites() -> pl.DataFrame:
     """Return the usable PV sites, labelled `A`-`F`, carrying `site`, `latitude`, `longitude`."""
-    return _roster(time_series_type="PV", labels=SITE_LABELS, seed=LABEL_PERMUTATION_SEED)
+    return _site_list(time_series_type="PV", labels=SITE_LABELS, seed=LABEL_PERMUTATION_SEED)
 
 
 def _wind_sites() -> pl.DataFrame:
     """Return the usable wind sites, labelled `W1`-`W3`, carrying `site`/`latitude`/`longitude`."""
-    return _roster(
+    return _site_list(
         time_series_type="Wind", labels=WIND_SITE_LABELS, seed=WIND_LABEL_PERMUTATION_SEED
     )
 
@@ -336,7 +336,7 @@ def fetch_previous_runs_frame(
     lead every model serves once its archive has started) to be non-null somewhere.
 
     Args:
-        sites: The roster, carrying `site`, `latitude`, and `longitude`.
+        sites: The site list, carrying `site`, `latitude`, and `longitude`.
         models_parameter: The value of the API's `models=` query parameter.
         start_date: First date to request, as `YYYY-MM-DD`.
         end_date: Last date to request, as `YYYY-MM-DD`.
@@ -425,7 +425,7 @@ def _first_year_with_data(*, models_parameter: str, sites: pl.DataFrame) -> int:
 
     Args:
         models_parameter: The value of the API's `models=` query parameter.
-        sites: The roster to probe with.
+        sites: The site list to probe with.
 
     Returns:
         The first year (as an int) with a non-null `shortwave_radiation` reading.
@@ -466,7 +466,7 @@ def _fetch_model_checkpointed(
 
     Args:
         model: The registry entry to fetch.
-        sites: The roster (solar and wind sites combined) to request.
+        sites: The site list (solar and wind sites combined) to request.
         output_dir: `<product folder of model.output_dir>/previous_runs/`.
 
     Returns:
@@ -578,7 +578,7 @@ def _check_timestamp_convention(*, frame: pl.DataFrame, sites: pl.DataFrame) -> 
 
     Args:
         frame: The combined frame, carrying `site`, `time`, `shortwave_radiation`.
-        sites: The roster, carrying `site`, `latitude`, `longitude`.
+        sites: The site list, carrying `site`, `latitude`, `longitude`.
 
     Returns:
         `corr_at_label`, `corr_shifted_30min_earlier`, `corr_shifted_30min_later`, and

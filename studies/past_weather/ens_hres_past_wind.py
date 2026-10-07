@@ -563,7 +563,7 @@ def hres_frame(*, sites: pl.DataFrame) -> pl.DataFrame:
     cosine, as `wind_product_frames.joined` does for every other product.
 
     Args:
-        sites: The wind roster, carrying `site`.
+        sites: The wind site list, carrying `site`.
 
     Returns:
         One row per (site, time) with `speed_hub_hres`, `direction_sin_hres`, `direction_cos_hres`
@@ -656,7 +656,7 @@ def joined_row_set(*, sites: pl.DataFrame) -> tuple[pl.DataFrame, list[tuple[str
     """Return the row set with ENS and HRES joined, raising if a join loses a row.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
 
     Returns:
         The row set carrying every product's columns, without eras or folds, and the row count
@@ -739,7 +739,7 @@ def _nearest_grid_points(*, sites: pl.DataFrame, points: pl.DataFrame) -> dict[s
     """Rank the grid points by distance from each farm, nearest first, keeping the nearest few.
 
     Args:
-        sites: The wind roster, carrying `site`, `latitude`, `longitude`.
+        sites: The wind site list, carrying `site`, `latitude`, `longitude`.
         points: The grid, carrying `point_id`, `latitude`, `longitude`.
 
     Returns:
@@ -762,7 +762,7 @@ def hres_grid_check(*, sites: pl.DataFrame) -> dict[str, float]:
     the exact match is not always the nearest grid point.
 
     Args:
-        sites: The wind roster, carrying `site`, `latitude`, `longitude`.
+        sites: The wind site list, carrying `site`, `latitude`, `longitude`.
 
     Returns:
         The pooled statistics: `max_rank` (1 is nearest), `n_hours`, and the largest hourly
@@ -845,7 +845,7 @@ def _hourly_changes(*, previous: pl.DataFrame, variable: str) -> pl.DataFrame:
     """Return each row's absolute change from the previous hour, for consecutive hours only.
 
     Args:
-        previous: The Previous Runs rows of the wind roster, sorted by `site` and `time`.
+        previous: The Previous Runs rows of the wind site list, sorted by `site` and `time`.
         variable: The column whose change is measured.
 
     Returns:
@@ -868,10 +868,10 @@ def _hourly_changes(*, previous: pl.DataFrame, variable: str) -> pl.DataFrame:
 
 
 def _previous_runs_rows(*, sites: pl.DataFrame) -> pl.DataFrame:
-    """Return the Previous Runs file's rows for the wind roster from `ROW_SET_START`, sorted.
+    """Return the Previous Runs file's rows for the wind site list from `ROW_SET_START`, sorted.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
 
     Returns:
         The rows, sorted by `site` and `time`.
@@ -892,7 +892,7 @@ def hres_lead_table(*, sites: pl.DataFrame) -> pl.DataFrame:
     speed's own daily cycle makes some hours change more than others.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
 
     Returns:
         One row per (variable, period, hour) with `ratio`: that hour's mean absolute change over
@@ -926,7 +926,7 @@ def previous_day_evidence(*, sites: pl.DataFrame) -> PreviousDayEvidence:
     the source did not serve is null.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
 
     Returns:
         The number of `_previous_day*` columns; how many cells they hold before and from
@@ -1086,7 +1086,7 @@ def run_checks(
     """Run every pre-fit check once, before any arm is fitted.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
         frame: The row set with eras and folds, carrying `power_mw`.
         counts: `joined_row_set`'s row counts.
 
@@ -2274,7 +2274,7 @@ def long_row_frame(*, sites: pl.DataFrame) -> pl.DataFrame:
     row set. Both ENS combinations used by the long-row-set arms are joined.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
 
     Returns:
         One row per (site, time), sorted, with time features and every product's columns.
@@ -2753,7 +2753,7 @@ def _report(
     Args:
         frame: The row set with eras and folds.
         losses: Every arm's losses, at every setting.
-        sites: The wind roster, for the geometry lines.
+        sites: The wind site list, for the geometry lines.
         job_list: Every job `jobs()` returns.
         checks: `run_checks`'s result.
         fingerprint: `_fingerprint`'s digest.
@@ -3060,7 +3060,7 @@ def _extra_fits(*, sites: pl.DataFrame, timed_rows: pl.DataFrame, fit: bool) -> 
     fingerprint are never read or written here.
 
     Args:
-        sites: The wind roster.
+        sites: The wind site list.
         timed_rows: The main row set with time features, before eras and folds.
         fit: Whether to fit and write the losses; otherwise they are read if present.
 

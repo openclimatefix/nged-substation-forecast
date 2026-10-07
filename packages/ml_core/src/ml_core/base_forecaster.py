@@ -39,10 +39,10 @@ TRAINED_METADATA_FILENAME: Final[str] = "time_series_metadata.parquet"
 """Name of the file holding the ``TimeSeriesMetadata`` rows a saved model carries.
 
 The file holds one row per series in the model's trained population. Production inference reads each
-series' location from that file, never from the ``TimeSeriesMetadata`` roster. An unreadable or
-thinned roster therefore cannot fail a live slot, and cannot silently drop a series from a slot.
-Being the model's own frozen copy of what it trained against also keeps a series' H3 cell and static
-feature values identical between training and serving. See
+series' location from that file, never from the ``TimeSeriesMetadata`` table. An unreadable or
+thinned metadata table therefore cannot fail a live slot, and cannot silently drop a series from a
+slot. Being the model's own frozen copy of what it trained against also keeps a series' H3 cell and
+static feature values identical between training and serving. See
 <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
 
 Logging the frozen metadata copy as a second MLflow artifact rather than putting the copy in the
@@ -52,7 +52,7 @@ model directory would reopen the merge problem ``_MLFLOW_MODEL_ARTIFACT`` docume
 _UNPERSISTED_METADATA_COLUMN: Final[str] = "area_wkt"
 """The one ``TimeSeriesMetadata`` column ``write_trained_metadata`` drops.
 
-Measured on the V1 metadata roster (33 rows, 14 columns): the frame is 129,916 bytes in memory and
+Measured on the V1 metadata table (33 rows, 14 columns): the frame is 129,916 bytes in memory and
 ``area_wkt`` holds 127,635 of those bytes — 98.2%, against 2,281 bytes for the other 13 columns put
 together. Nothing in the feature pipeline reads the well-known-text polygon ``area_wkt`` carries. At
 V2 scale (~2,500 series) that polygon text would put megabytes into every fold's archive. The column
@@ -96,7 +96,7 @@ def write_trained_metadata(
 
     Args:
         model_dir: The directory a subclass's ``save`` just wrote.
-        time_series_metadata: The roster rows the model was engineered against.
+        time_series_metadata: The metadata table rows the model was engineered against.
             ``_UNPERSISTED_METADATA_COLUMN`` — the ``area_wkt`` polygon text — is dropped, for the
             size reason given on that constant. Every other column is kept.
     """
@@ -113,8 +113,8 @@ def load_trained_metadata(model_dir: Path) -> pt.DataFrame[TimeSeriesMetadata]:
     Patito offers two ways to put a schema on a frame: ``validate`` checks every row against the
     schema and raises on a violation, while ``set_model`` attaches the schema without checking.
     This function uses ``set_model``, matching how the cross-validation, training, and metrics
-    assets read the roster itself. ``load_trained_metadata`` reads back what was written, so
-    re-checking those rows would only reject rosters the rest of the system already accepts.
+    assets read the metadata table itself. ``load_trained_metadata`` reads back what was written, so
+    re-checking those rows would only reject metadata tables the rest of the system already accepts.
 
     Args:
         model_dir: A directory written by ``save_to_mlflow`` (via ``write_trained_metadata``) and
@@ -365,8 +365,8 @@ class BaseForecaster(ABC):
 
         Args:
             run_id: The MLflow run to attach the artifact to.
-            time_series_metadata: The roster rows this model was engineered against. Required,
-                because a model uploaded without them cannot be promoted — see
+            time_series_metadata: The metadata table rows this model was engineered against.
+                Required, because a model uploaded without them cannot be promoted — see
                 ``TRAINED_METADATA_FILENAME``. Narrowed to ``trained_time_series_ids`` before the
                 rows are written. Callers engineer over a wider population than they end up
                 training, because an eligible series with no usable power gets no model. Every

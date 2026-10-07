@@ -461,7 +461,7 @@ def geometry_lines(*, sites: pl.DataFrame, noun: str) -> list[str]:
     Only distances and counts are printed, never a coordinate.
 
     Args:
-        sites: The roster, with `latitude` and `longitude`.
+        sites: The site list, with `latitude` and `longitude`.
         noun: What the generators are called in the heading, such as `solar farms`.
 
     Returns:

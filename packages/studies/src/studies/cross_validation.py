@@ -26,9 +26,9 @@ N_FOLDS: Final[int] = 5
 
 Blocks are contiguous rather than random because neighbouring hours share a weather system, so a
 random split would put near-copies of a test row in the training set. They are cut inside each
-site's own span rather than across the whole roster's, because the roster's span is seven years and
-the newest site has two and a half: global blocks would leave that site with three empty test folds
-and train the remaining two on its own future.
+site's own span rather than across the whole site list's, because the site list's span is seven
+years and the newest site has two and a half: global blocks would leave that site with three empty
+test folds and train the remaining two on its own future.
 """
 
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2)

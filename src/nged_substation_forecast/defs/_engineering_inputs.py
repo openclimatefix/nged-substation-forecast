@@ -90,7 +90,8 @@ def load_engineering_inputs(
         settings: Application settings (data paths, credentials).
         time_series_ids: IDs to include; power is filtered to this population.
         metadata: The metadata for those series, whose ``h3_res_5`` decides which NWP cells are
-            scanned. R&D passes the roster; production passes the promoted model's frozen copy.
+            scanned. R&D passes the metadata table; production passes the promoted model's frozen
+            copy.
         window_start: Inclusive start of the time window for power observations and NWP
             ``valid_time``.
         window_end: Inclusive end of the time window for power observations and NWP
