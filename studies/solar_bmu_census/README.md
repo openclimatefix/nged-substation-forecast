@@ -58,8 +58,10 @@ fixed-tilt projects installed in 2022 in Lawrence Berkeley National Laboratory's
 report for 2023), and `c(t)` a shape. All three shapes get the same fit: `a` is fitted to the 99th
 percentile of output in each band of `c(t)`. The shapes are the cosine of the solar zenith angle,
 the CAMS irradiance at the BMU's own position, and the mean CAMS irradiance of 18 grid points across
-Great Britain (the headline, because the shape validates best of the two that apply to an aggregate
-BMU). `report.md` compares the three on the single-site BMUs that follow the sun. **The CAMS shapes
+Great Britain. The aggregate estimate is a range between the cosine and the 18-point mean, because
+validation on the single-site BMUs cannot choose between them. `report.md` compares the three shapes
+on the single-site BMUs that follow the sun, and on the BMUs that ran at Generation Capacity and
+the others. **The CAMS shapes
 read `solar_estimate.CAMS_PUBLIC_POINTS_PATH`, which PR #1081's
 `studies/weather_downloads/fetch_cams_public_points.py` writes, so run that script first.**
 

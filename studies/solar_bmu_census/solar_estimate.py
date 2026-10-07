@@ -3,9 +3,11 @@
 A Balancing Mechanism Unit (BMU) that pools many sites registers one capacity for all of them, and
 no source splits that capacity by technology. This module fits the AC capacity `a` of a solar
 component to the BMU's half-hourly output, under a model of solar output that is flat at the top:
-`output(t) = min(r * a * c(t), a)`. Here `c(t)` is the cosine of the solar zenith at the census
-reference point, scaled so that its peak over the window is 1, and `r` is the DC:AC ratio. Output
-is flat at `a` whenever `r * c(t)` exceeds 1, because the inverters cannot export more than `a`.
+`output(t) = min(r * a * c(t), a)`. Here `c(t)` is a shape that says how bright the sky is, and
+`r` is the DC:AC ratio. The shape is the cosine of the solar zenith at the census reference point
+(scaled so that its peak over the BMU's judged half-hours is 1) or a CAMS irradiance (divided by the
+highest clear-sky irradiance of any hour in the CAMS record). Output is flat at `a` whenever
+`r * c(t)` exceeds 1, because the inverters cannot export more than `a`.
 
 Clouds only reduce output, so the fit uses the upper envelope of output and not its mean: a high
 quantile of output within each band of `c(t)`. The estimate is an upper bound only if the BMU's

@@ -60,3 +60,26 @@ def test_the_aggregate_capacity_sums_count_only_bmus_with_a_value() -> None:
     assert rows["igcpu_installed_capacity_mw"]["sum (MW)"] == 16.0
     assert rows["tec_mw"]["bmus with a value"] == 0
     assert rows["largest_mel_mw"]["bmus with a value"] == 2
+
+
+def test_shape_errors_split_by_whether_the_bmu_ran_at_generation_capacity() -> None:
+    single = pl.DataFrame(
+        {
+            "elexon_bmu_id": ["A", "B", "C"],
+            "generation_capacity_mw": [100.0, 100.0, 100.0],
+            "p99_output_mw": [99.0, 98.0, 70.0],
+        }
+    )
+    shape = pl.DataFrame(
+        {"elexon_bmu_id": ["A", "B", "C"], "error_at_base_ratio": [0.10, -0.20, 0.30]}
+    )
+    table = report.shape_error_by_subset_table(by_shape={"s": shape}, single=single)
+    rows = {row["subset"]: row for row in table.iter_rows(named=True)}
+    ran = rows["P99 within 2% of Generation Capacity"]
+    other = rows["other BMUs"]
+    assert (ran["bmus"], ran["mean absolute error"], ran["largest absolute error"]) == (
+        2,
+        0.15,
+        0.2,
+    )
+    assert (other["bmus"], other["mean absolute error"]) == (1, 0.3)

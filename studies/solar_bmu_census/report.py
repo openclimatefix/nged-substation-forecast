@@ -317,6 +317,115 @@ def shape_comparison_table(*, by_shape: dict[str, pl.DataFrame]) -> pl.DataFrame
     return table
 
 
+P99_SHARE_TRUSTWORTHY: Final[float] = 0.98
+"""A BMU whose P99 of output is at least this share of Generation Capacity ran at its Generation
+Capacity, so Generation Capacity is a trustworthy target for the validation."""
+
+
+def shape_error_by_subset_table(
+    *, by_shape: dict[str, pl.DataFrame], single: pl.DataFrame
+) -> pl.DataFrame:
+    """Give each shape's errors on the BMUs that ran at Generation Capacity and on the others.
+
+    Args:
+        by_shape: Maps a shape's name to its `solar_estimate_table` over the same single-site BMUs.
+        single: The census table's single-site rows, for the P99 of output.
+
+    Returns:
+        One row per shape and subset: the BMUs in the subset, the mean absolute error and the
+        largest absolute error of the estimate at the base ratio against Generation Capacity. The
+        subset `P99 within 2% of Generation Capacity` holds BMUs whose P99 of output is at least
+        `P99_SHARE_TRUSTWORTHY` of Generation Capacity.
+    """
+    share = single.select(
+        "elexon_bmu_id",
+        ran_at_capacity=pl.col(P99_COLUMN)
+        >= P99_SHARE_TRUSTWORTHY * pl.col("generation_capacity_mw"),
+    )
+    rows = []
+    for shape, estimates in by_shape.items():
+        joined = estimates.join(share, on="elexon_bmu_id")
+        for ran, label in ((True, "P99 within 2% of Generation Capacity"), (False, "other BMUs")):
+            errors = joined.filter(pl.col("ran_at_capacity") == ran)["error_at_base_ratio"].abs()
+            rows.append(
+                {
+                    "shape": shape,
+                    "subset": label,
+                    "bmus": errors.len(),
+                    "mean absolute error": round(_as_float(errors.mean()), 3),
+                    "largest absolute error": round(_as_float(errors.max()), 3),
+                }
+            )
+    return pl.DataFrame(rows)
+
+
+def shape_facts_table(
+    *,
+    cams: pl.DataFrame,
+    grid_sun: pl.DataFrame,
+    single_cosine: pl.DataFrame,
+    single_grid: pl.DataFrame,
+    aggregate_grid: pl.DataFrame,
+    census: pl.DataFrame,
+) -> pl.DataFrame:
+    """Return the facts about the CAMS shape and the shape choice that the page quotes.
+
+    Args:
+        cams: The CAMS public-points frame.
+        grid_sun: The 18-point mean shape from `mean_hourly_sun`.
+        single_cosine: The cosine shape's `solar_estimate_table` for the single-site BMUs.
+        single_grid: The 18-point mean's `solar_estimate_table` for the single-site BMUs.
+        aggregate_grid: The 18-point mean's `solar_estimate_table` for the aggregate BMUs.
+        census: The census table, for each aggregate BMU's lead party.
+
+    Returns:
+        Rows of `quantity` and `value`.
+    """
+    base = f"estimate_r{DC_AC_RATIO}_mw"
+    dropped = cams.filter(pl.col("reliability") < MIN_CAMS_RELIABILITY)
+    ratio = (
+        single_grid.select("elexon_bmu_id", grid=pl.col(base))
+        .join(single_cosine.select("elexon_bmu_id", cosine=pl.col(base)), on="elexon_bmu_id")
+        .select(ratio=pl.col("grid") / pl.col("cosine"))["ratio"]
+    )
+    total_energies = aggregate_grid.join(
+        census.select("elexon_bmu_id", "lead_party"), on="elexon_bmu_id"
+    ).filter(pl.col("lead_party").str.contains("TotalEnergies"))
+    return pl.DataFrame(
+        [
+            ("CAMS point-hours below the reliability threshold", str(dropped.height)),
+            ("CAMS point-hours in all", str(cams.height)),
+            (
+                "Of the dropped point-hours, those with clear-sky irradiance of zero",
+                str(dropped.filter(pl.col("clear_sky_ghi_w_m2") <= 0).height),
+            ),
+            (
+                "Median clear-sky irradiance of the dropped point-hours (W/m2)",
+                f"{_as_float(dropped['clear_sky_ghi_w_m2'].median()):.1f}",
+            ),
+            ("Highest value of the 18-point mean shape", f"{_as_float(grid_sun['sun'].max()):.3f}"),
+            (
+                "18-point mean estimate over cosine estimate, single-site BMUs: lowest",
+                f"{_as_float(ratio.min()):.3f}",
+            ),
+            (
+                "18-point mean estimate over cosine estimate, single-site BMUs: highest",
+                f"{_as_float(ratio.max()):.3f}",
+            ),
+            (
+                "TotalEnergies BMUs with an estimate",
+                str(total_energies.filter(pl.col(base).is_not_null()).height),
+            ),
+            (
+                "Sum of the TotalEnergies BMUs' 18-point mean estimates (MW)",
+                f"{_as_float(total_energies[base].sum()):.1f}",
+            ),
+        ],
+        schema=["quantity", "value"],
+        orient="row",
+    )
+
+
 def observed_power_table(*, table: pl.DataFrame, window_label: str) -> pl.DataFrame:
     """Sum the BMUs' largest outputs, and find the group's highest combined output, per group.
 
@@ -1508,6 +1617,20 @@ def main() -> None:
             + "\n\n### Totals\n\n"
             + _md(estimate_totals_table(estimates=estimate_table))
         )
+    subset_errors = shape_error_by_subset_table(
+        by_shape={
+            shape: table for (shape, scope), table in estimates.items() if scope == "single-site"
+        },
+        single=single,
+    )
+    facts = shape_facts_table(
+        cams=cams,
+        grid_sun=grid_sun,
+        single_cosine=estimates[("cosine of the solar zenith", "single-site")],
+        single_grid=estimates[("mean of the 18 CAMS grid points", "single-site")],
+        aggregate_grid=estimates[("mean of the 18 CAMS grid points", "aggregate")],
+        census=census,
+    )
     sections = [
         "# Solar-BMU census report",
         intro,
@@ -1563,6 +1686,9 @@ def main() -> None:
             "over Generation Capacity, minus 1."
         ),
         *estimate_sections,
+        "## Errors of each shape on the BMUs that ran at Generation Capacity and on the others\n\n"
+        + _md(subset_errors),
+        "## Facts about the CAMS shapes and the shape choice\n\n" + _md(facts),
         "## Aggregate BMUs (supplier, virtual, and other identifiers), reported apart\n\n"
         + aggregate_note
         + "\n\n"
