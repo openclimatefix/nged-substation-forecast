@@ -495,8 +495,7 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     # variable has a slice empty at every grid point, or a de-accumulated variable is wholly empty.
     # Every other error fails immediately. Waiting does not heal a dtype or other structural
     # failure, and a bug of ours looks like an upstream defect, so retrying either kind of error
-    # would only delay its alert by 4 hours. The first failed attempt warns Sentry, and a run too
-    # old to be repaired upstream fails at once. The reasoning and the upstream behaviour are at
+    # would only delay its alert by 4 hours. The reasoning and the upstream behaviour are at
     # https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright
     try:
         ds_lazy = open_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)

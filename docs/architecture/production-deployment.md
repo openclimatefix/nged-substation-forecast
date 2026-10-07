@@ -228,10 +228,9 @@ the difference has to be legible in the event itself.
 | **Something degraded** | `warning` | a message and its context | nothing threw; an input is late, stale or thin, and the forecast carried on | `report_power_freshness` |
 | **Something will be retried** | `warning` | an exception | an asset failed in a way it retries, so nothing has broken yet | `report_asset_retry` |
 
-The exception is the dividing line, and it is exact rather than a convention: an error event always
-carries an exception, and a warning event carries one only from `report_asset_retry`, which the
-`retrying_asset` tag identifies. **But an error event does not mean the run died.**
-Only `sentry_capture_failure` reports a failed run; `report_asset_degradation` and
+An error event always carries an exception. A warning event carries one only when it comes from
+`report_asset_retry`, which the `retrying_asset` tag identifies. **But an error event does not mean
+the run died.** Only `sentry_capture_failure` reports a failed run; `report_asset_degradation` and
 `report_check_degradation` fire precisely because their caller caught the exception and carried on,
 as the mechanisms below describe. Nor are those two cases exclusive: where a degradation sender is
 called from inside an asset that still has a Delta write ahead of it, a later failure puts a
@@ -272,14 +271,15 @@ configured — so laptops and CI stay silent by default.
     covers exactly that gap: each check's catch-all sends the same exception the hook would have
     sent, tagged `asset_check` with the check's name, and `report_asset_degradation` does the same
     tagged `degraded_asset` for an *asset* that degrades rather than failing — today,
-    `power_time_series_and_metadata`'s metadata table upsert. `report_asset_retry` is the early
-    warning for an asset that is about to retry: `ecmwf_ens` sends it on the first failed attempt,
-    tagged `retrying_asset`, so a run that upstream never repairs does not stay silent until the
-    last retry fails about 4 hours later. Since log capture is off, either
+    `power_time_series_and_metadata`'s metadata table upsert. Since log capture is off, either
     handler's `ERROR` log alone would reach nobody. `power_time_series_and_metadata_job` compounds
     that silence: it has no cron monitor of its own. Absent `report_check_degradation`, a check that
     cannot read its own inputs would show up only as a yellow tick in Dagster's Checks view, and
     nobody would be told.
+
+    `report_asset_retry` is the early warning for an asset that is about to retry. `ecmwf_ens`
+    sends it on the first failed attempt, tagged `retrying_asset`, so a run that upstream never
+    repairs does not stay silent until the last retry fails about 4 hours later.
 
     Those tags are what an alert rule routes on, and the failure hook is the one sender that would
     otherwise arrive with nothing to route on — so it tags `fault_category:run_failed`. That tag is

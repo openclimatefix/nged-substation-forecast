@@ -743,7 +743,7 @@ def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
     as a hard failure.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
-    init_time = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
     # A run whose radiation column carries no weather at all, exactly as the converter would hand
     # it over: `_make_nwp` gives each row its own (member, valid_time), so nulling every row empties
     # the column across every slice beyond lead-0.
@@ -1249,15 +1249,16 @@ def test_ecmwf_ens_warns_sentry_once_on_the_first_failed_attempt(
     monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=_fail_to_download)
     monkeypatch.setattr(target=assets, name="report_asset_retry", value=_record_warning)
 
+    partition_key = _today_key()
     _materialize_expecting_retries(
-        monkeypatch=monkeypatch, instance=dagster_instance, partition_key=_today_key()
+        monkeypatch=monkeypatch, instance=dagster_instance, partition_key=partition_key
     )
 
     assert downloads == _ECMWF_ENS_MAX_RETRIES + 1
     ((asset_name, exc, downloads_when_warned),) = warnings
     assert asset_name == "ecmwf_ens"
     assert downloads_when_warned == 1
-    assert f"partition {_today_key()}" in "".join(exc.__notes__)
+    assert f"partition {partition_key}" in "".join(exc.__notes__)
 
 
 @pytest.mark.parametrize(

@@ -176,19 +176,20 @@ production `live-forecasts` monitor. Four one-time console steps complete the se
    it to fire on *regressions*.** The freshness warning is a one-way event: when NGED's feed
    recovers, the code simply stops sending, so the Sentry issue's "last seen" timestamp stops
    advancing but the issue stays open until someone resolves it. Resolve it once you've confirmed
-   recovery. Firing on regressions (plus a short project-level auto-resolve window) means a *new*
-   stall after a recovery re-pages instead of silently appending to the old, unresolved issue. This
-   warning is a richer per-series breadcrumb layered on top of the missed-check-in alarm, which
-   remains the primary two-directional signal.
-4. **Route error events by their `fault_category` tag.** `fault_category:run_failed` means a
-   scheduled job failed, so that cycle did not run — notify whoever is on for the next business day.
-   Everything else is a degradation the service kept forecasting through, and belongs in a digest
-   rather than a notification: `degraded_asset:*` (an asset carried on with reduced function),
-   `asset_check:*` (a check could not evaluate its own inputs, so one signal is unknown rather than
-   bad), and `retrying_asset:*` (a warning that an asset failed and will retry, sent on the first
-   failed attempt; if every retry fails, a `run_failed` event follows). Nothing here warrants waking
-   anyone — see [Inherent stability](../design-philosophy/inherent-stability.md) for the uptime
-   posture that makes that the right call.
+   recovery. Match the rule on the freshness event's fingerprint or message, not on `level:warning`
+   alone, because `retrying_asset:*` events are warnings too. Firing on regressions (plus a short
+   project-level auto-resolve window) means a *new* stall after a recovery re-pages instead of
+   silently appending to the old, unresolved issue. This warning is a richer per-series breadcrumb
+   layered on top of the missed-check-in alarm, which remains the primary two-directional signal.
+4. **Route events by their tags.** `fault_category:run_failed` means a scheduled job failed, so that
+   cycle did not run — notify whoever is on for the next business day. Everything else is a
+   degradation the service kept forecasting through, and belongs in a digest rather than a
+   notification: `degraded_asset:*` (an asset carried on with reduced function), `asset_check:*` (a
+   check could not evaluate its own inputs, so one signal is unknown rather than bad), and
+   `retrying_asset:*` (a warning that an asset failed and will retry, sent on the first failed
+   attempt; if every retry fails, a `run_failed` event follows). Nothing here warrants waking anyone
+   — see [Inherent stability](../design-philosophy/inherent-stability.md) for the uptime posture
+   that makes that the right call.
 
 One handover note: the Sentry account is OCF's today, so at handover the alert routing (and possibly
 the account itself) moves to NGED — see [Handover to
