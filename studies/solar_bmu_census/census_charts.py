@@ -10,6 +10,7 @@ public, so the charts name each BMU and show output in megawatts on calendar dat
 """
 
 import json
+import math
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -58,11 +59,22 @@ RULE_WIDTHS: Final[tuple[float, ...]] = (6.0, 5.0, 4.0, 3.0, 2.0, 1.5)
 nested stripes, each in its own colour."""
 DISPARITY_EXAMPLES: Final[int] = 3
 DISPARITY_ROW_PX: Final[int] = 230
-LABEL_MARGIN_PX: Final[int] = 250
-LABEL_PADDING_PX: Final[int] = 40
-"""The room right of the plot for the line labels, which Vega leaves out of the figure's width."""
+LABEL_MARGIN_PX: Final[int] = 235
+"""The width at the right of the plot area that the line labels and arrows occupy."""
+LABEL_PADDING_PX: Final[int] = 5
+"""The space right of the label margin."""
+DISPARITY_FRAME_PX: Final[int] = 110
+"""The width of the y axis, its title, and the figure's padding, which the plot area excludes."""
 LABEL_GAP_SHARE: Final[float] = 0.09
 """The least gap between two labels, as a share of the y axis."""
+LABEL_TEXT_OFFSET_PX: Final[int] = 16
+"""How far right of the plot's data area each label's first letter starts."""
+ARROW_GAP_PX: Final[int] = 4
+"""The space between an arrow's tail and its label's first letter."""
+ARROW_HEAD_BACK_PX: Final[float] = 3.0
+"""How far behind the arrow's tip the centre of its triangular head sits."""
+ARROW_HEAD_SIZE: Final[int] = 28
+"""The area of the arrow head, in square pixels."""
 TECHNOLOGY_COLOURS: Final[dict[str, str]] = {
     "pure PV": ocf.DATA_BLUE,
     "hybrid": ocf.BRAND_ORANGE,
@@ -321,14 +333,113 @@ def label_positions(*, values: list[float], gap: float) -> list[float]:
     return placed
 
 
+@dataclass(frozen=True)
+class LabelGeometry:
+    """Where each line's label and arrow lie in one panel, in the order of the lines' values.
+
+    Attributes:
+        domain_high: The top of the y axis, in MW, raised if the labels stacked above the data.
+        label_mw: The height each label's text is centred at, in MW.
+        label_y_px: The same heights, in pixels down from the top of the plot.
+        line_y_px: Each line's own height in pixels down from the top of the plot, which is where
+            its arrow ends.
+    """
+
+    domain_high: float
+    label_mw: list[float]
+    label_y_px: list[float]
+    line_y_px: list[float]
+
+
+def label_geometry(*, values: list[float], domain_high: float, height_px: float) -> LabelGeometry:
+    """Place the labels beside the plot, and the pixel heights their arrows join.
+
+    Args:
+        values: Each line's height in MW, in any order.
+        domain_high: The top of the y axis in MW before the labels are placed.
+        height_px: The plot's height in pixels.
+
+    Returns:
+        Positions in the order of `values`. The labels keep the order of the values and sit at
+        least `LABEL_GAP_SHARE` of the axis apart, so no two arrows cross.
+    """
+    gap = domain_high * LABEL_GAP_SHARE
+    heights = label_positions(values=values, gap=gap)
+    high = max(domain_high, max(heights) + gap)
+
+    def pixels(megawatts: float) -> float:
+        return (1 - megawatts / high) * height_px
+
+    return LabelGeometry(
+        domain_high=high,
+        label_mw=heights,
+        label_y_px=[pixels(height) for height in heights],
+        line_y_px=[pixels(value) for value in values],
+    )
+
+
+def _arrow_marks(
+    *,
+    geometry: LabelGeometry,
+    names: list[str],
+    values: list[float],
+    end: datetime,
+    days_per_px: float,
+    height_px: float,
+    colour: alt.Color,
+) -> list[alt.Chart]:
+    """Draw one thin arrow per line, from just left of its label to the right end of the line."""
+    tail_px = LABEL_TEXT_OFFSET_PX - ARROW_GAP_PX
+    shaft = []
+    heads = []
+    for name, value, label_mw, label_px, line_px in zip(
+        names, values, geometry.label_mw, geometry.label_y_px, geometry.line_y_px, strict=True
+    ):
+        shaft.append(
+            {
+                "figure": name,
+                "px": 0,
+                "time": end + timedelta(days=tail_px * days_per_px),
+                "mw": label_mw,
+            }
+        )
+        shaft.append({"figure": name, "px": 1, "time": end, "mw": value})
+        # The marker's angle is clockwise from "up"; the arrow points left and down the page.
+        run, drop = -float(tail_px), line_px - label_px
+        length = math.hypot(run, drop)
+        back = ARROW_HEAD_BACK_PX / length
+        heads.append(
+            {
+                "figure": name,
+                "time": end - timedelta(days=run * back * days_per_px),
+                "mw": value + drop * back * geometry.domain_high / height_px,
+                "angle": math.degrees(math.atan2(run, -drop)),
+            }
+        )
+    return [
+        alt.Chart(pl.DataFrame(shaft))
+        .mark_line(strokeWidth=1, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x="time:T", y="mw:Q", detail="figure:N", order="px:Q", color=colour
+        ),
+        alt.Chart(pl.DataFrame(heads))
+        .mark_point(shape="triangle", filled=True, size=ARROW_HEAD_SIZE, opacity=1, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x="time:T", y="mw:Q", angle=alt.Angle("angle:Q", scale=None), color=colour
+        ),
+    ]
+
+
 def _disparity_panel(*, row: dict[str, Any], last: bool) -> alt.LayerChart:
     """Draw one BMU's year of output with a horizontal line for each of its six figures.
 
     Each line has a label at the right-hand end of the plot, outside the plot area in the margin
     `LABEL_MARGIN_PX`, in the line's own colour and with its value in MW, and the figure has no
     legend. Lines with equal or close values are not combined into one label. Their labels are
-    stacked, in value order, by `label_positions`, which keeps every pair at least `LABEL_GAP_SHARE`
-    of the y axis apart, and each label has a square in the line's colour beside it.
+    stacked, in value order, by `label_geometry`, which keeps every pair at least `LABEL_GAP_SHARE`
+    of the y axis apart, and a thin arrow in the line's colour joins each label to the right-hand
+    end of its line. The label margin lies inside the x axis domain, so that the arrows are drawn
+    in the plot's own coordinates.
     """
     _, window = recorded_run()
     series = output_series(bmu_id=row["elexon_bmu_id"], start=window.start, end=window.end)
@@ -336,18 +447,24 @@ def _disparity_panel(*, row: dict[str, Any], last: bool) -> alt.LayerChart:
     figures = [
         (name, float(row[column]), column) for column, name in FIGURE_NAMES.items() if row[column]
     ]
-    high = float(row["highest_mw"]) * 1.1
-    gap = high * LABEL_GAP_SHARE
-    heights = label_positions(values=[value for _, value, _ in figures], gap=gap)
-    high = max(high, max(heights) + gap)
+    values = [value for _, value, _ in figures]
+    geometry = label_geometry(
+        values=values, domain_high=float(row["highest_mw"]) * 1.1, height_px=DISPARITY_ROW_PX
+    )
+    high = geometry.domain_high
     rules = pl.DataFrame(
         {
             "figure": [name for name, _, _ in figures],
-            "megawatts": [value for _, value, _ in figures],
-            "label_height": heights,
+            "megawatts": values,
+            "start": window.start,
+            "end": window.end,
+            "label_height": geometry.label_mw,
             "label": [f"{name}: {value:.1f} MW" for name, value, _ in figures],
         }
     )
+    plot_px = CONTENT_WIDTH_PX - DISPARITY_FRAME_PX
+    days_per_px = (window.end - window.start).total_seconds() / 86400 / (plot_px - LABEL_MARGIN_PX)
+    x_end = window.end + timedelta(days=LABEL_MARGIN_PX * days_per_px)
     names = list(FIGURE_NAMES.values())
     colour = alt.Color(
         "figure:N",
@@ -364,8 +481,15 @@ def _disparity_panel(*, row: dict[str, Any], last: bool) -> alt.LayerChart:
     ).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "time:T",
-            axis=alt.Axis(format="%b %Y", tickCount="month", labels=last, ticks=last, title=None),
-            scale=alt.Scale(domain=[window.start, window.end]),
+            axis=alt.Axis(
+                format="%b %Y",
+                values=_month_starts(start=window.start, end=window.end),
+                labels=last,
+                ticks=last,
+                title=None,
+                domain=False,
+            ),
+            scale=alt.Scale(domain=[window.start, x_end], nice=False),
         ),
         y=alt.Y(
             "megawatts:Q",
@@ -388,26 +512,47 @@ def _disparity_panel(*, row: dict[str, Any], last: bool) -> alt.LayerChart:
                 strokeDash=[5, 3] if is_p99 else [1, 0],
                 aria=False,
             )
-            .encode(y="megawatts:Q", color=colour)  # ty: ignore[unresolved-attribute]
+            .encode(  # ty: ignore[unresolved-attribute]
+                x="start:T", x2="end:T", y="megawatts:Q", color=colour
+            )
         )
-    squares = (
-        alt.Chart(rules.with_columns(time=pl.lit(window.end)))
-        .mark_square(size=60, dx=8, aria=False)
-        .encode(x="time:T", y="label_height:Q", color=colour)  # ty: ignore[unresolved-attribute]
+    arrows = _arrow_marks(
+        geometry=geometry,
+        names=[name for name, _, _ in figures],
+        values=values,
+        end=window.end,
+        days_per_px=days_per_px,
+        height_px=DISPARITY_ROW_PX,
+        colour=colour,
     )
     texts = (
         alt.Chart(rules.with_columns(time=pl.lit(window.end)))
-        .mark_text(align="left", dx=16, fontSize=10, fontWeight="bold", aria=False)
+        .mark_text(
+            align="left", dx=LABEL_TEXT_OFFSET_PX, fontSize=10, fontWeight="bold", aria=False
+        )
         .encode(  # ty: ignore[unresolved-attribute]
             x="time:T", y="label_height:Q", text="label:N", color=colour
         )
     )
     return cast(
         alt.LayerChart,
-        alt.layer(half_hourly, daily_line, *rule_marks, squares, texts).properties(
-            width=CONTENT_WIDTH_PX - 60 - LABEL_MARGIN_PX, height=DISPARITY_ROW_PX
+        alt.layer(half_hourly, daily_line, *rule_marks, *arrows, texts).properties(
+            width=plot_px, height=DISPARITY_ROW_PX
         ),
     )
+
+
+def _month_starts(*, start: datetime, end: datetime) -> list[alt.DateTime]:
+    """Return the first day of each month from the one after `start` to `end`, as axis ticks."""
+    months = []
+    year, month = start.year, start.month
+    while True:
+        month += 1
+        if month > 12:
+            year, month = year + 1, 1
+        if datetime(year, month, 1, tzinfo=UTC) > end:
+            return months
+        months.append(alt.DateTime(year=year, month=month, date=1))
 
 
 def disparity_figure(*, census: pl.DataFrame, number: int) -> alt.VConcatChart:
