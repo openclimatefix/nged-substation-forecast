@@ -397,8 +397,8 @@ resolves.
   synthetic reading reaches the forecaster. `write_metadata` in the same helper writes the
   metadata parquet. Then materialise `trained_cv_model` and `cv_power_forecasts`. Assert that the
   `power_forecasts` rows carry `power_fcst_model_name == "manual_heuristic"`, members 0 to 12 at
-  short lead, values equal to the synthetic power at each lag, with the expected lags written out as 168·k
-  rather than read from the YAML's `selected_features`, null `nwp_init_time`, and no row
+  short lead, values equal to the synthetic power at each lag, with the expected lags written out
+  as 168·k rather than read from the YAML's `selected_features`, null `nwp_init_time`, and no row
   duplicated across the three NWP members. The synthetic power must give each of the 13 lags a
   distinct value, and must give a lag one half-hour out a different value again, so a lag off by
   one half-hour fails. One choice is an integer power equal to the half-hour index since a fixed
