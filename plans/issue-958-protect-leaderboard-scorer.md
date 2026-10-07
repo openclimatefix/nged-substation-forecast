@@ -6,7 +6,7 @@ three. The issue also bundles two kinds of work: code changes in this repository
 (Unix user, ACLs, a `sudo` rule) that only the maintainer can run.
 
 **Solution.** The `metrics` asset becomes the only source of a leaderboard number and protects
-itself. It refuses a forecast that omits rows of an eligible series, and refuses a window reaching
+itself. For study forecasts it refuses any row-key set that differs from a reference experiment's, and it refuses a window reaching
 past `FINAL_TEST_START` unless `NGED_FINAL_TEST=1` is set. A new `scripts/forecasting/score_study.py` scores a
 study's predictions file by running the asset from `main`. The shared study power reader (issue #1082) stops at the
 same date. An `import-linter` contract keeps the scorer free of `dagster`, `mlflow`, and `studies`.
@@ -327,10 +327,8 @@ Plus `uv run pytest --run-studies -n auto packages/studies` (a plain `pytest` sk
 
 - Q1 to Q5 are decided (see above). No decision is open.
 - The `import-linter` strict indirect check may fail through `contracts`; fallback stated above.
-- The row-set check reads `eligible_time_series`, which #1019 may change (cleaned power). It reads
-  only the Delta table's `(fold_id, time_series_id)` columns, which `EligibleTimeSeries` fixes.
-- A stale `eligible_time_series` partition (not re-materialised after a change to the metadata table) makes the
-  check refuse correct forecasts. This is the intended fail-fast, and the error names the fold.
+- The row-set check depends on the reference experiment having been materialised for the fold. A missing reference partition raises with a message naming the experiment. The reference experiment's own forecasts are trusted: a reviewed experiment, produced by the maintainer.
+- Concurrent Delta commits: `score_study.py` writes `study/` partitions of `power_forecasts` while `live_forecasts` overwrites the `live` partition hourly. The implementer verifies that delta-rs resolves the disjoint-partition commits, or the script retries.
 
 ## Review log
 
