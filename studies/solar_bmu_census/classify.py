@@ -13,7 +13,7 @@ from typing import Any, Final, Literal
 import numpy as np
 import polars as pl
 from fetch_sources import (
-    DOWNLOADS_DIR,
+    INPUTS_DIR,
     OUTPUT_DIR,
     STUDY_DIR,
     b1610_bmu_ids,
@@ -244,7 +244,7 @@ def main() -> None:
     classes.write_parquet(STUDY_DIR / "classes.parquet")
     classes.write_csv(STUDY_DIR / "classes.csv")
     print(classes["basis"].value_counts().sort("basis"))
-    print(f"Wrote {DOWNLOADS_DIR.parent / 'classes.parquet'}")
+    print(f"Wrote {INPUTS_DIR.parent / 'classes.parquet'}")
 
 
 if __name__ == "__main__":

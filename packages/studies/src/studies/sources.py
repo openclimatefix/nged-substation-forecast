@@ -721,6 +721,12 @@ UKV_VS_ERA5_DIR: Final[Path] = study_dir_for(study="ukv_ceda_vs_era5")
 UKV_CEDA_VS_OPEN_METEO_DIR: Final[Path] = study_dir_for(study="ukv_ceda_vs_openmeteo")
 """The study of whether UKV from CEDA or UKV from Open-Meteo gives the same forecasts."""
 
+SOLAR_BMU_CENSUS_DIR: Final[Path] = study_dir_for(study="solar_bmu_census")
+"""The solar-BMU census: the classes, the census table, and `report.md`."""
+
+SOLAR_BMU_CENSUS_INPUTS_DIR: Final[Path] = SOLAR_BMU_CENSUS_DIR / "inputs"
+"""The census's downloads from Elexon, NESO, and the Renewable Energy Planning Database."""
+
 NFC_STUDY_DIR: Final[Path] = study_dir_for(study="nwp_forecast_comparison")
 """The folder of the NWP forecast comparison, one subfolder per batch of fits."""
 

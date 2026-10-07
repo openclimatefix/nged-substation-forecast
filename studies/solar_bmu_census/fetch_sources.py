@@ -1,7 +1,7 @@
 """Download the sources of the solar-BMU census into `data/studies/per_study/solar_bmu_census/`.
 
 Run: `uv run python studies/solar_bmu_census/fetch_sources.py`. Every request is cached under
-`downloads/` with its retrieval time, so a rerun on the same window makes no network call, and a
+`inputs/` with its retrieval time, so a rerun on the same window makes no network call, and a
 crash costs one request. Half-hourly output (Elexon dataset B1610) is saved one parquet file per
 BMU, written atomically. The study's window is the 12 complete calendar months that end at least
 two weeks before the run, because B1610 lags real time by about a week. The window and the run date
@@ -21,7 +21,7 @@ from typing import Any, Final
 
 import httpx
 import polars as pl
-from studies.sources import PER_STUDY_DIR
+from studies.sources import SOLAR_BMU_CENSUS_DIR, SOLAR_BMU_CENSUS_INPUTS_DIR
 
 ELEXON_API: Final[str] = "https://data.elexon.co.uk/bmrs/api/v1"
 NESO_TEC_PAGE: Final[str] = (
@@ -30,10 +30,10 @@ NESO_TEC_PAGE: Final[str] = (
 REPD_PAGE: Final[str] = (
     "https://www.gov.uk/government/publications/renewable-energy-planning-database-monthly-extract"
 )
-STUDY_DIR: Final[Path] = PER_STUDY_DIR / "solar_bmu_census"
-DOWNLOADS_DIR: Final[Path] = STUDY_DIR / "downloads"
-RAW_DIR: Final[Path] = DOWNLOADS_DIR / "raw"
-OUTPUT_DIR: Final[Path] = DOWNLOADS_DIR / "b1610"
+STUDY_DIR: Final[Path] = SOLAR_BMU_CENSUS_DIR
+INPUTS_DIR: Final[Path] = SOLAR_BMU_CENSUS_INPUTS_DIR
+RAW_DIR: Final[Path] = INPUTS_DIR / "raw"
+OUTPUT_DIR: Final[Path] = INPUTS_DIR / "b1610"
 """One parquet file per BMU: its half-hourly settled output over the window."""
 IGCPU_MAX_WINDOW_DAYS: Final[int] = 700
 """The IGCPU endpoint rejects a publish-time window longer than 731 days."""
@@ -330,13 +330,13 @@ def recorded_run() -> tuple[date, Window]:
     Raises:
         FileNotFoundError: If the fetch has not been run.
     """
-    lineage = json.loads((DOWNLOADS_DIR / "lineage.json").read_text(encoding="utf-8"))
+    lineage = json.loads((INPUTS_DIR / "lineage.json").read_text(encoding="utf-8"))
     start, end = (datetime.fromisoformat(stamp) for stamp in lineage["window_utc"])
     return date.fromisoformat(lineage["run_date"]), Window(start=start, end=end)
 
 
 def write_provenance(*, window: Window, bmu_count: int, today: date) -> None:
-    """Write `lineage.json` and a `README.md` for the downloads, computed from what is on disk."""
+    """Write `lineage.json` and a `README.md` for the inputs, computed from what is on disk."""
     files = sorted(OUTPUT_DIR.glob(f"*_{window.label}.parquet"))
     sample = pl.read_parquet(files[0]) if files else pl.DataFrame()
     lineage = {
@@ -355,10 +355,10 @@ def write_provenance(*, window: Window, bmu_count: int, today: date) -> None:
         "written_at_utc": datetime.now(UTC).isoformat(),
         "per_request_retrieval_times": "each file in raw/ carries `retrieved_at_utc`",
     }
-    (DOWNLOADS_DIR / "lineage.json").write_text(json.dumps(lineage, indent=2), encoding="utf-8")
+    (INPUTS_DIR / "lineage.json").write_text(json.dumps(lineage, indent=2), encoding="utf-8")
     columns = "\n".join(f"- `{name}`: `{dtype}`" for name, dtype in sample.schema.items())
-    (DOWNLOADS_DIR / "README.md").write_text(
-        f"""# Solar-BMU census downloads
+    (INPUTS_DIR / "README.md").write_text(
+        f"""# Solar-BMU census inputs
 
 Written by `studies/solar_bmu_census/fetch_sources.py`. Window: {window.start:%Y-%m-%d} to
 {window.end:%Y-%m-%d} (UTC, half-open).
