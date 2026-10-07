@@ -23,7 +23,7 @@ different `--label`.
 - Internal consistency: total shortwave minus direct minus diffuse, where total exceeds 1 W m-2
   and all three values are finite. The report gives the signed and the absolute mean residual by
   month, split at the level-change day `LEVEL_TRANSITION_DAYS[1]`, and by valid hour of day. The
-  hour-of-day profile of total shortwave tests the instantaneous-value claim directly. The
+  hour-of-day profile of total shortwave shows at which valid hour the total peaks. The
   residual is checked by month and era, and no day is flagged for it.
 - Height levels: the files hold 33 levels before 2026-01-22 and 56 from that day, but only the four
   heights in `fetch_ukv_aws_pilot.HUB_HEIGHTS_M` are kept, so the check is that the kept heights
@@ -327,7 +327,7 @@ def hour_of_day_profile(*, records: pl.DataFrame) -> pl.DataFrame:
 
     An instantaneous value peaks at solar noon. A mean over the hour before its label is centred
     half an hour before the label, so the labelled series peaks about half an hour after solar
-    noon. The hour of the maximum therefore tests the instantaneous-value claim. The profile is
+    noon. The hour of the maximum therefore shows which of the two the total resembles. The profile is
     split by era, because the residual differs between the eras.
     """
     readable = records.filter(pl.col("readable")).with_columns(era=_era_expression())
