@@ -450,8 +450,8 @@ the aggregate BMUs pool is unknown, so the study also tries 1.2 and 1.6.
 | Cosine | 919.8 | 846.8 | 795.6 |
 | 18-point CAMS mean | 1,124.8 | 1,044.1 | 993.3 |
 
-**The cosine needs no download, and the 18-point mean needs the CAMS download, which PR #1081
-adds.** CAMS at each BMU's own position
+**The cosine needs no download, and the 18-point mean needs the CAMS download, which
+`studies/weather_downloads/fetch_cams_public_points.py` makes.** CAMS at each BMU's own position
 applies only to a BMU with a known position, so the study does not use the position-based shape for
 the aggregate BMUs. The study did not test a shape built from the grid points inside each supplier
 BMU's GSP group area, which the register's GSP group would allow.
@@ -830,9 +830,9 @@ NESO's [map of the 14 DNO licence
 areas](https://neso.energy/data-portal/gis-boundaries-gb-dno-license-areas) is public too. The
 estimate of the aggregate BMUs' solar part uses CAMS irradiance from the [Copernicus Atmosphere Data
 Store](https://ads.atmosphere.copernicus.eu/datasets/cams-solar-radiation-timeseries) at the
-single-site BMUs' public positions and at 18 grid points. The download script is in PR #1081 and not
-yet on the main branch. The two hand-made match tables are committed beside the scripts. The code is
-in
+single-site BMUs' public positions and at 18 grid points. The download script is
+`studies/weather_downloads/fetch_cams_public_points.py`. The two hand-made match tables are
+committed beside the scripts. The code is in
 [`studies/solar_bmu_census/`](https://github.com/openclimatefix/nged-substation-forecast/tree/main/studies/solar_bmu_census),
 and its tests are in `packages/studies/tests/solar_bmu_census/`.
 
@@ -847,13 +847,15 @@ and its tests are in `packages/studies/tests/solar_bmu_census/`.
 uv run python studies/solar_bmu_census/fetch_sources.py
 uv run python studies/solar_bmu_census/classify.py
 uv run python studies/solar_bmu_census/collate.py
+uv run --with cdsapi python studies/weather_downloads/fetch_cams_public_points.py
 uv run python studies/solar_bmu_census/report.py
 uv run python studies/solar_bmu_census/census_charts.py
 ```
 
-The estimate of the aggregate BMUs' solar part reads the CAMS irradiance that PR #1081's
+The estimate of the aggregate BMUs' solar part reads the CAMS irradiance that
 `studies/weather_downloads/fetch_cams_public_points.py` downloads, so run that script before
-`report.py` (the script is not yet on the main branch).
+`report.py`. The script needs an Atmosphere Data Store key in `~/.cdsapirc`, and its `--dry-run`
+flag lists the requests without making any.
 
 `report.py` writes `report.md` to `data/studies/per_study/solar_bmu_census/`. `report.md` holds
 every number on this page, or the numbers from which a derived number is computed.

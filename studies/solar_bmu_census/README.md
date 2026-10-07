@@ -61,8 +61,7 @@ the CAMS irradiance at the BMU's own position, and the mean CAMS irradiance of 1
 Great Britain. The aggregate estimate is a range between the cosine and the 18-point mean, because
 validation on the single-site BMUs cannot choose between them. `report.md` compares the three shapes
 on the single-site BMUs that follow the sun, and on the BMUs that ran at Generation Capacity and
-the others. **The CAMS shapes
-read `solar_estimate.CAMS_PUBLIC_POINTS_PATH`, which PR #1081's
+the others. **The CAMS shapes read `solar_estimate.CAMS_PUBLIC_POINTS_PATH`, which
 `studies/weather_downloads/fetch_cams_public_points.py` writes, so run that script first.**
 
 ## The location columns
