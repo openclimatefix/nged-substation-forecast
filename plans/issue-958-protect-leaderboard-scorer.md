@@ -138,7 +138,7 @@ exceeds every leaderboard fold's `val_end`. Docstring says "guard", not "test ye
 **`src/nged_substation_forecast/defs/cv_assets.py`** (only `metrics`, `MetricsConfig`,
 `_resolve_eval_window`, `_score_forecast_group`, and new helpers; the out-of-bounds assets
 `eligible_time_series`, `effective_capacity`, `trained_cv_model`, `cv_power_forecasts` are not
-touched). PR #1040 (open, #1019) edits other parts of this file; expect a rebase, nothing else.
+touched). PR #1040 (#1019) has merged: `metrics` now reads actuals through `scan_cleaned_power` and depends on `clean_nged_power_data`. The row-set check uses that same `actuals_lf`.
 
 - `_resolve_eval_window` returns the window as today. A new `_require_window_within_guard(window_end,
   fold_id, final_test_start)` raises when `window_end >= final_test_start` and
@@ -223,13 +223,14 @@ Accepted (each verified or marked for verification at implementation):
   replaces the earlier claim that no code is needed.
 - **Study reader.** About 40 published `studies/*` scripts call `pv_sites`, `wind_sites`,
   `solar_hourly_power`, or `wind_hourly_power`, so migrating `pv_dataset.py` and
-  `wind_product_frames.py` would silently cut their input at the cutoff and change site rosters and
+  `wind_product_frames.py` would silently cut their input at the cutoff and change site lists and
   seeded labels. The plan therefore adds `scan_power()` and migrates nothing; the PR body lists
   every direct reader as the audit. The reader is a convenience for new studies, and the issue's
   protection against a session is the truncated copy. This departs from the issue's "study power
   reader truncates at the same date" and is Q5 below. #1040 makes
   `nged_data.storage.scan_cleaned_power` the read path for power, so `scan_power()` reads the
-  cleaned table through it if #1040 has merged by implementation.
+  cleaned table through it, because the scorer now scores against cleaned power. Whether new
+  studies should read cleaned or raw power is part of Q5; the existing readers stay on raw power.
 - **Existing constructions.** A required `final_test_start` breaks `CvConfig(...)` in
   `tests/test_jobs.py` and five places in `packages/contracts/tests/test_config_schemas.py`; the plan
   updates them, and `_score_forecast_group`'s positional callers in `tests/test_metrics.py`.
@@ -323,7 +324,7 @@ uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
 uv run mkdocs build --strict
 ```
 
-Plus the pydoclint and docs-link checks from CI, run locally, and `ls plans` empty before ship.
+Plus `uv run pytest --run-studies -n auto packages/studies` (a plain `pytest` skips those tests; main now gates them behind that flag and a `studies_tests.yml` workflow), plus the pydoclint and docs-link checks from CI, run locally, and `ls plans` empty before ship.
 
 ## Risks and open questions
 
@@ -331,7 +332,7 @@ Plus the pydoclint and docs-link checks from CI, run locally, and `ls plans` emp
 - The `import-linter` strict indirect check may fail through `contracts`; fallback stated above.
 - The row-set check reads `eligible_time_series`, which #1019 may change (cleaned power). It reads
   only the Delta table's `(fold_id, time_series_id)` columns, which `EligibleTimeSeries` fixes.
-- A stale `eligible_time_series` partition (not re-materialised after a roster change) makes the
+- A stale `eligible_time_series` partition (not re-materialised after a change to the metadata table) makes the
   check refuse correct forecasts. This is the intended fail-fast, and the error names the fold.
 
 ## Review log
@@ -358,3 +359,12 @@ test; recording that `promotion_assets.py` cannot see `study/` groups.
 Delta commits) is kept as a verification item rather than a design change. Finding 9 is adopted
 partly: only the two pure checks move to `ml_core/metrics.py`, and `cv_assets.py` keeps the
 orchestration.
+
+## Main merged after the plan was written (2026-10-07)
+
+Checked against `origin/main`: the plan's design is unchanged. Updated facts: #1040 has merged
+(see `cv_assets.py` above); `pv_dataset.py` and `wind_product_frames.py` still read raw power with
+`scan_delta`, so the reader decision stands; there is still no `import-linter` in `pyproject.toml`;
+`uv.lock` changed heavily, so the lock is re-resolved at implementation; the studies tests now run
+behind `--run-studies`; the repository renamed "roster" to "site list" and "metadata table", and
+this plan follows.
