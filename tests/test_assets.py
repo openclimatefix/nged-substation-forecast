@@ -1206,6 +1206,28 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
     assert exc_info.value.seconds_to_wait == _ECMWF_ENS_RETRY_DELAY_SECONDS
 
 
+@pytest.mark.parametrize("error", [RuntimeError("bug"), ValueError("bad dtype")])
+def test_ecmwf_ens_fails_at_once_on_an_error_that_waiting_cannot_fix(
+    env: Path, monkeypatch: pytest.MonkeyPatch, error: Exception
+) -> None:
+    """Only the three "run not ready yet" failures retry; a structural failure or a bug of ours
+    propagates unchanged. ``ValueError`` is here because ``NwpVariableWhollyMissing`` subclasses
+    it, so a retry rule widened to ``ValueError`` would silently retry every dtype failure."""
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=lambda **kwargs: object())
+
+    def _raise(ds_lazy: object) -> None:
+        raise error
+
+    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=_raise)
+
+    with (
+        build_asset_context(partition_key="2024-05-01") as context,
+        pytest.raises(type(error), match=str(error)),
+    ):
+        ecmwf_ens(context)
+
+
 # --- definitions load ----------------------------------------------------------------------------
 
 

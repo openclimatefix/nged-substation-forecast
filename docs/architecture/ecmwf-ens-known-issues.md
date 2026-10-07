@@ -311,9 +311,36 @@ that rejects an all-null column with no retry. A *defective* run also gets repub
 2026-08-09 00Z run was repaired by a second sweep at 11:45 UTC, 3 hours 25 minutes after its first
 publication, and well inside the retry budget.
 
-The retry stays deliberately narrow: it covers these three failures and nothing else, so a genuine
-bug still fails immediately rather than retrying for 4 hours. The partition simply stays
-unmaterialised if every retry is exhausted, until the upstream data is fixed and it is re-run.
+The partition simply stays unmaterialised if every retry is exhausted, until the upstream data is
+fixed and it is re-run.
+
+#### Why only these three failures are retried
+
+The retry covers these three failures and nothing else. Every other error fails at once, a dtype
+mismatch included, for three reasons:
+
+- **A structural failure does not heal.** A wrong dtype, a missing variable or dimension, or a
+  changed shape persists until we change our code or Dynamical.org changes its schema.
+  Dynamical.org rewrites a store only to repair data it published wrongly, so waiting 4 hours
+  changes nothing and only delays the alert.
+- **Our own bugs look the same as upstream defects.** A unit or conversion bug of ours produces
+  out-of-range values that no code can tell apart from Dynamical.org publishing out-of-range
+  values. Retrying both for 4 hours hides our bug for that long, and a failure should name its
+  cause as early as possible (see [design principle
+  16](../design-philosophy/design-principles.md#16-a-failure-names-its-own-cause-in-the-telemetry)).
+- **A retry is expensive.** Each retrying partition holds an `ECMWF` concurrency pool slot for
+  about 4 hours, so a backfill over several bad partitions multiplies that wait.
+
+The three retried failures are the ones for which there is evidence that the data heals: the
+2026-08-09 run was republished 3 hours 25 minutes after its first publication, and the 2026-10-02
+store was filled about 3 hours 28 minutes after the 08:30 UTC attempt. Dynamical.org's maintainer
+has also said that a deployment on 2026-10-02 re-runs a failed dataset update within about 20
+minutes.
+
+If a second kind of upstream content defect is repaired in this way, the rule could widen to
+failures about the data's content (null patterns, perhaps value ranges) while still failing at
+once on failures about its structure. The first failed attempt would then send a Sentry warning,
+so that retrying does not hide the fault.
 
 ## An incomplete run (tolerated, and reported)
 

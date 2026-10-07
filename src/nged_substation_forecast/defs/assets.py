@@ -466,8 +466,10 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     ).set_model(H3GridWeights)
 
     # Download and convert. Three failures mean "the upstream run is not ready yet" and are
-    # retried on the ladder in _ECMWF_ENS_MAX_RETRIES; every other error fails immediately. The
-    # upstream behaviour is at
+    # retried on the ladder in _ECMWF_ENS_MAX_RETRIES; every other error fails immediately. A dtype
+    # or other structural failure does not heal by waiting, and a bug of ours looks like an upstream
+    # defect, so retrying either would only hide it for 4 hours. The reasoning and the upstream
+    # behaviour are at
     # https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright
     try:
         ds_lazy = open_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)
