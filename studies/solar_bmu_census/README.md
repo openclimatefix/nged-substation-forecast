@@ -45,6 +45,19 @@ was running in the window's first week), and without the half-hours of exactly z
 sun is clearly up. Zeros at night and negative readings stay in. The column is empty for a BMU with
 no judged output. It is never added to another column.
 
+## The location columns
+
+**Four columns say where a BMU is, and none of them is a capacity.**
+
+- `gsp_group`: the Elexon grid supply point (GSP) group identifier in the BMU register, such as
+  `_B`. The register leaves the group empty for every transmission-connected (`T_`) BMU, so the
+  column is empty for the nine transmission-connected single-site census BMUs.
+- `dno_area`: the distribution network operator (DNO) whose licence area the GSP group names, from
+  `collate.GSP_GROUP_AREAS`. The 14 GSP groups follow the 14 DNO licence areas broadly, not exactly.
+  The column is empty when `gsp_group` is empty.
+- `repd_county` and `repd_region`: the county and region fields of the matched REPD row. These are
+  REPD's own fields and are not licence areas.
+
 ## Hand-made tables
 
 **Two hand-made tables sit beside the scripts, because the study matches projects to BMUs by

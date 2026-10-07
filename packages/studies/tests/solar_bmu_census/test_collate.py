@@ -295,3 +295,28 @@ def test_capacity_disparity_breaks_a_tie_by_identifier() -> None:
     ]
     ranked = collate.capacity_disparity(table=_census(rows=rows))
     assert ranked["elexon_bmu_id"].to_list() == ["T_A", "T_B"]
+
+
+def test_the_gsp_groups_map_to_the_published_dno_licence_areas() -> None:
+    assert {group: area for group, (_, area) in collate.GSP_GROUP_AREAS.items()} == {
+        "_A": "UKPN",
+        "_B": "NGED",
+        "_C": "UKPN",
+        "_D": "SP Energy Networks",
+        "_E": "NGED",
+        "_F": "Northern Powergrid",
+        "_G": "Electricity North West",
+        "_H": "SSEN",
+        "_J": "UKPN",
+        "_K": "NGED",
+        "_L": "NGED",
+        "_M": "Northern Powergrid",
+        "_N": "SP Energy Networks",
+        "_P": "SSEN",
+    }
+
+
+def test_dno_area_is_empty_for_a_missing_or_unknown_gsp_group() -> None:
+    assert collate.dno_area(gsp_group_id="_L") == "NGED"
+    assert collate.dno_area(gsp_group_id=None) is None
+    assert collate.dno_area(gsp_group_id="_Z") is None

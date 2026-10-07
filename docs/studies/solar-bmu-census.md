@@ -49,6 +49,11 @@ and the site's battery.
 - **One BMU's five published capacity values and the P99 of its output can differ by a factor of
   4.2**, at Cleve Hill Solar 1, where the TEC and REPD values describe the whole two-BMU site
   ([Capacity](#capacity)).
+- **None of the 10 single-site BMUs can be placed in an NGED licence area from the BMU register,
+  and only one of the 10 is embedded in a distribution network**: Kincraig, which is in North
+  Scotland. The register gives no grid supply point group for any of the nine transmission-connected
+  BMUs ([Distribution network operator
+  areas](#only-one-single-site-bmu-is-embedded-in-a-distribution-network-and-it-is-not-in-ngeds-area)).
 - **Nine of the 10 single-site solar BMUs lie south of 53°N in England, and the tenth lies in
   Scotland** ([Where the BMUs are](#where-the-bmus-are)).
 - **At the four sites with a storage BMU, the solar BMU and the storage BMU look like two separate
@@ -363,6 +368,62 @@ position from the REPD row matched to that BMU, because the BMU register gives n
 
 ![Figure 3: Maps of the 10 single-site solar BMUs in Great Britain](assets/solar_bmu_census_map.svg)
 
+### Only one single-site BMU is embedded in a distribution network, and it is not in NGED's area
+
+**The BMU register places one of the 10 single-site BMUs in a distribution network operator (DNO)
+area: Kincraig, in North Scotland.** Elexon's BMU register gives each BMU a grid supply point (GSP)
+group, one of the 14 areas into which Elexon divides Great Britain for settlement. The 14 GSP groups
+follow the 14 DNO licence areas broadly, not exactly: the study maps each group's identifier to a
+DNO using [the table of GSP groups and DNOs on
+Wikipedia](https://en.wikipedia.org/wiki/Distribution_network_operator), which agrees with [NESO's
+note that the groups broadly align with the DNO
+areas](https://neso.energy/data-portal/gis-boundaries-gb-dno-license-areas). NGED holds four of the
+14 areas: East Midlands (`_B`), West Midlands (`_E`), South Wales (`_K`), and South West England
+(`_L`). None of the 10 single-site BMUs is in an NGED area according to the register, and the
+register leaves nine of the 10 unplaced.
+
+**The register names no GSP group for any transmission-connected BMU.** None of the register's 514
+rows of type T names a group, and all 176 rows of type E (embedded) do. Nine of the 10 single-site
+BMUs are transmission-connected (`T_`), so the register gives no DNO area for them. The study
+therefore cannot say from the register which licence area each of the nine lies in. The table adds
+the county and region fields of each BMU's matched REPD row. The REPD county and region fields are
+not licence areas: Larks Green (region South West) and Sutton Bridge (region East Midlands) carry
+region names that NGED's areas share, but the study does not place either BMU in NGED's area on that
+evidence. Only 1 of the 38 census BMUs is embedded, which is Kincraig, and Kincraig is also the only
+embedded BMU that IGCPU types as Solar, so no other embedded solar BMU with a Solar type exists in
+the BMU register.
+
+| BMU | Name | Connection | GSP group | DNO area | Generation Capacity (MW) | REPD county, region |
+|---|---|---|---|---|---|---|
+| `E_KINCS-1` | Kincraig | Embedded | `_P`, North Scotland | SSEN | 20.6 | Grampian, Scotland |
+| `T_BLPFS-1` | Bulphan Fen Warley Green Solar | Transmission-connected | – | – | 50.216 | Essex, Eastern |
+| `T_BRCHS-1` | Breach Solar Farm | Transmission-connected | – | – | 50.0 | Cambridgeshire, Eastern |
+| `T_BURWS-1` | Beechgreen Energy Farm | Transmission-connected | – | – | 49.952 | Cambridgeshire, Eastern |
+| `T_CLVHS-1` | Cleve Hill Solar 1 | Transmission-connected | – | – | 112.0 | Kent, South East |
+| `T_CLVHS-2` | Cleve Hill Solar 2 | Transmission-connected | – | – | 205.0 | Kent, South East |
+| `T_LARKS-1` | Larks Green Solar | Transmission-connected | – | – | 49.9 | Gloucestershire, South West |
+| `T_SUTBS-1` | Sutton Bridge Solar Farm | Transmission-connected | – | – | 49.419 | Lincolnshire, East Midlands |
+| `T_TEBWS-1` | Tebworth PV Power Park | Transmission-connected | – | – | 45.928 | Bedfordshire, Eastern |
+| `T_TYLNS-1` | Tye Lane Solar | Transmission-connected | – | – | 49.9 | Suffolk, Eastern |
+
+**The table counts the single-site BMUs and their Generation Capacity for each DNO area.** A dash in
+the table above means the register has no value. SSEN is Scottish and Southern Electricity
+Networks.
+
+| DNO area | BMUs | Generation Capacity (MW) |
+|---|---|---|
+| **NGED** | 0 | 0.0 |
+| SSEN | 1 | 20.6 |
+| No GSP group in the register | 9 | 662.3 |
+
+**The 28 aggregate BMUs name a GSP group, and 11 of them are in NGED's areas.** An aggregate BMU's
+group is the one in which its supplier registers it, and the study found no document that says where
+each pooled site sits, so the group says little about where any solar farm lies. The 11 aggregate
+BMUs in NGED's areas have 647.6 MW of Generation Capacity, out of 1,896.8 MW for all 28, and most
+of that capacity is not solar ([Aggregates](#aggregate-bmus)). The other 17 BMUs are in the areas of
+UK Power Networks (6 BMUs, 257.9 MW), SSEN (4, 918.7 MW), SP Energy Networks (4, 65.2 MW), Northern
+Powergrid (2, 5.3 MW), and Electricity North West (1, 2.0 MW).
+
 ### What a solar BMU looks like
 
 **A solar BMU at a hybrid site follows the sun like the pure PV BMU.** In the summer week (15 to 21
@@ -548,6 +609,8 @@ storage BMU and cannot say where the battery is metered.
 - **REPD lists some sites that already generate as under construction**, so the study accepts both
   operational and under-construction REPD rows.
 - **The Maximum Export Limit comes from a window after the output window.**
+- **The distribution network operator (DNO) table covers only BMUs.** Most embedded solar has no
+  BMU, so the table says nothing about how much solar NGED's network holds ([Scope](#scope)).
 
 ## Scope
 
@@ -558,7 +621,8 @@ Great Britain. Its numbers describe the solar BMUs registered in the Balancing M
 solar generation in NGED's network.
 
 **The study does not cover solar generation that is not a BMU.** Much of the solar capacity in Great
-Britain is small generation embedded in distribution networks, with no BMU. The study also does not cover wind or other fuels, a forecast of any
+Britain is small generation embedded in distribution networks, with no BMU. The table of DNO areas
+therefore covers only BMUs. The study also does not cover wind or other fuels, a forecast of any
 BMU's output, or years other than September 2025 to August 2026.
 
 ## Data and code availability

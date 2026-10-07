@@ -26,7 +26,13 @@ from classify import (
     largest_output_mw,
     sun_following_correlation,
 )
-from collate import CAPACITY_COLUMNS, DISPARITY_FIGURES, P99_COLUMN, capacity_disparity
+from collate import (
+    CAPACITY_COLUMNS,
+    DISPARITY_FIGURES,
+    GSP_GROUP_AREAS,
+    P99_COLUMN,
+    capacity_disparity,
+)
 from fetch_sources import (
     OUTPUT_DIR,
     STUDY_DIR,
@@ -925,6 +931,233 @@ def disparity_table(*, census: pl.DataFrame, window_label: str) -> pl.DataFrame:
     )
 
 
+NO_GSP_GROUP: Final[str] = "no GSP group in the register"
+"""The label for a BMU whose register row leaves the grid supply point (GSP) group empty."""
+
+
+def dno_single_table(*, single: pl.DataFrame) -> pl.DataFrame:
+    """List each single-site census BMU with the GSP group and distribution network operator.
+
+    Args:
+        single: The census table's single-site rows.
+
+    Returns:
+        One row for each BMU: its identifier, name, connection type, the register's GSP group
+        identifier and the area name for it, the distribution network operator (DNO) for that group,
+        its Generation Capacity in MW, and the county and region of its matched REPD row.
+    """
+    return (
+        single.sort("elexon_bmu_id")
+        .with_columns(
+            gsp_area=pl.col("gsp_group").replace_strict(
+                {group: area for group, (area, _) in GSP_GROUP_AREAS.items()},
+                default=None,
+                return_dtype=pl.String,
+            )
+        )
+        .select(
+            "elexon_bmu_id",
+            "display_name",
+            "connection_type",
+            "gsp_group",
+            "gsp_area",
+            "dno_area",
+            "generation_capacity_mw",
+            "repd_county",
+            "repd_region",
+        )
+        .with_columns(pl.all().cast(pl.String).fill_null("-"))
+    )
+
+
+def dno_summary_table(*, census: pl.DataFrame, scope: str) -> pl.DataFrame:
+    """Count a scope's census BMUs and sum their Generation Capacity for each DNO area.
+
+    Args:
+        census: The census table.
+        scope: `single-site` or `aggregate`.
+
+    Returns:
+        One row for each DNO area that holds a BMU of the scope, with `NO_GSP_GROUP` for BMUs whose
+        register row has no GSP group: the number of BMUs and the sum of their Generation Capacity
+        in MW.
+    """
+    return (
+        census.filter(pl.col("scope") == scope)
+        .with_columns(dno_area=pl.col("dno_area").fill_null(NO_GSP_GROUP))
+        .group_by("dno_area")
+        .agg(
+            bmus=pl.len(),
+            generation_capacity_mw=pl.col("generation_capacity_mw").sum().round(1),
+        )
+        .sort("dno_area")
+    )
+
+
+def gsp_register_table(*, census: pl.DataFrame, reference: list[dict[str, Any]]) -> pl.DataFrame:
+    """Return how often the BMU register names a GSP group, and what that says for NGED.
+
+    Args:
+        census: The census table.
+        reference: The BMU register.
+
+    Returns:
+        The number of register rows of each `bmUnitType` and how many of them name a GSP group; the
+        number of census BMUs that are embedded, and how many of those IGCPU types as Solar; and
+        the number of single-site and of aggregate census BMUs whose GSP group is in an NGED area.
+    """
+    rows: list[tuple[str, str]] = []
+    for unit_type, label in (("T", "transmission-connected"), ("E", "embedded")):
+        of_type = [r for r in reference if r["bmUnitType"] == unit_type]
+        rows.append((f"Register rows of type {unit_type} ({label})", str(len(of_type))))
+        rows.append(
+            (
+                f"Register rows of type {unit_type} that name a GSP group",
+                str(sum(r["gspGroupId"] is not None for r in of_type)),
+            )
+        )
+    embedded = census.filter(pl.col("connection_type") == "embedded")
+    single = census.filter(pl.col("scope") == "single-site")
+    aggregates = census.filter(pl.col("scope") == "aggregate")
+    nged = pl.col("dno_area") == "NGED"
+    rows += [
+        ("Census BMUs that are embedded (E_)", str(embedded.height)),
+        (
+            "Embedded census BMUs that IGCPU types as Solar",
+            str(embedded.filter(pl.col("igcpu_installed_capacity_mw").is_not_null()).height),
+        ),
+        ("Single-site census BMUs that name a GSP group", str(single["gsp_group"].count())),
+        (
+            "Single-site census BMUs that are transmission-connected (T_)",
+            str(single.filter(pl.col("connection_type") == "transmission-connected").height),
+        ),
+        (
+            "Transmission-connected single-site census BMUs that name a GSP group",
+            str(
+                single.filter(pl.col("connection_type") == "transmission-connected")[
+                    "gsp_group"
+                ].count()
+            ),
+        ),
+        ("Single-site census BMUs in an NGED area", str(single.filter(nged).height)),
+        ("Aggregate census BMUs in an NGED area", str(aggregates.filter(nged).height)),
+        (
+            "Generation Capacity of the aggregate census BMUs in an NGED area (MW)",
+            f"{_as_float(aggregates.filter(nged)['generation_capacity_mw'].sum()):.1f}",
+        ),
+        (
+            "Generation Capacity of all aggregate census BMUs (MW)",
+            f"{_as_float(aggregates['generation_capacity_mw'].sum()):.1f}",
+        ),
+    ]
+    return pl.DataFrame(rows, schema=["quantity", "value"], orient="row")
+
+
+def project_sums_table(
+    *, single: pl.DataFrame, reference: list[dict[str, Any]], window_label: str
+) -> pl.DataFrame:
+    """Set each site's TEC and REPD values beside the sum of the site's BMUs.
+
+    TEC and REPD give one value for a project, so a site's BMUs are summed before the comparison.
+
+    Args:
+        single: The census table's single-site rows.
+        reference: The BMU register, for the Generation Capacity of the storage BMUs.
+        window_label: The window's label in the file names.
+
+    Returns:
+        One row for each site (a TEC project, or a BMU with none): its solar and storage BMUs; the
+        sums of their Generation Capacity in MW; TEC and REPD values; REPD's battery capacity; the
+        REPD value minus the solar sum, in MW and as a share of the solar sum; the solar sum plus
+        REPD's battery capacity; and the highest sum of the BMUs' outputs in one half-hour.
+    """
+    capacity = {str(r["elexonBmUnit"]): float(r["generationCapacity"] or 0) for r in reference}
+    rows = []
+    keyed = single.with_columns(site=pl.coalesce("tec_project_id", "elexon_bmu_id")).sort(
+        "elexon_bmu_id"
+    )
+    for _, group in keyed.group_by("site", maintain_order=True):
+        solar_ids = group["elexon_bmu_id"].to_list()
+        storage_ids = [i for s in group["storage_bmu_ids"] for i in s.split(";") if i]
+        solar_sum = _as_float(group["generation_capacity_mw"].sum())
+        storage_sum = sum(capacity[i] for i in storage_ids)
+        outputs = pl.concat(
+            [
+                pl.read_parquet(OUTPUT_DIR / f"{bmu}_{window_label}.parquet").select(
+                    "half_hour_end_time", "output_mwh"
+                )
+                for bmu in [*solar_ids, *storage_ids]
+            ]
+        )
+        highest = (
+            _as_float(
+                outputs.group_by("half_hour_end_time")
+                .agg(pl.col("output_mwh").sum())["output_mwh"]
+                .max()
+            )
+            * 2
+        )
+        first = group.row(0, named=True)
+        repd = first["repd_installed_capacity_mw"]
+        battery = first["repd_battery_mw"]
+        rows.append(
+            {
+                "site": ", ".join(solar_ids),
+                "solar_bmus_generation_capacity_mw": round(solar_sum, 3),
+                "storage_bmus": ", ".join(storage_ids),
+                "storage_bmus_generation_capacity_mw": round(storage_sum, 3),
+                "solar_plus_storage_bmus_mw": round(solar_sum + storage_sum, 3),
+                "tec_mw": first["tec_mw"],
+                "repd_mw": repd,
+                "repd_battery_mw": battery,
+                "repd_minus_solar_sum_mw": None if repd is None else round(repd - solar_sum, 3),
+                "repd_minus_solar_sum_share": (
+                    None if repd is None else round((repd - solar_sum) / solar_sum, 3)
+                ),
+                "solar_sum_plus_repd_battery_mw": (
+                    None if battery is None else round(solar_sum + battery, 3)
+                ),
+                "highest_output_of_all_bmus_mw": round(highest, 2),
+            }
+        )
+    return pl.DataFrame(rows).with_columns(pl.all().cast(pl.String).fill_null("-"))
+
+
+def tec_stage_table(*, single: pl.DataFrame, tec: pl.DataFrame) -> pl.DataFrame:
+    """List every TEC register row of the projects that single-site census BMUs match, and Sundon.
+
+    The Sundon project is the one TEC project that Tebworth's customer holds. No census BMU matches
+    it, because its plant type lists storage only.
+
+    Args:
+        single: The census table's single-site rows, with `tec_project_id`.
+        tec: The TEC register with all-string columns.
+
+    Returns:
+        The register's rows for those projects, with the connected capacity, the increase, the
+        cumulative capacity and the date the increase takes effect, so that a stage not yet built
+        shows beside the stage that is.
+    """
+    return (
+        tec.filter(
+            pl.col("Project ID").is_in(single["tec_project_id"].drop_nulls().to_list())
+            | (pl.col("Project Name") == "Sundon")
+        )
+        .select(
+            "Project Name",
+            "Project ID",
+            "Project Status",
+            "MW Connected",
+            "MW Increase / Decrease",
+            "Cumulative Total Capacity (MW)",
+            "MW Effective From",
+            "Plant Type",
+        )
+        .sort("Project Name", "Project Status")
+        .with_columns(pl.all().fill_null("-"))
+    )
+
+
 def main() -> None:
     """Write `report.md`."""
     today = datetime.now(UTC)
@@ -1077,6 +1310,22 @@ def main() -> None:
         + _md(aggregate_flow_table(aggregates=aggregates, window_label=window.label)),
         "## What a single lookup gives, and what the study finds\n\n"
         + _md(register_table(census=census, today=run_date)),
+        "## Where each single-site census BMU connects: GSP group and DNO area\n\n"
+        "A GSP group is the Elexon grid supply point group in the BMU register. `gsp_area` is the "
+        "group's area name and `dno_area` the distribution network operator for that area, from "
+        "`collate.GSP_GROUP_AREAS`. `repd_county` and `repd_region` are the matched REPD row's "
+        "own fields, which are not licence areas.\n\n" + _md(dno_single_table(single=single)),
+        "## Single-site census BMUs by DNO area\n\n"
+        + _md(dno_summary_table(census=census, scope="single-site")),
+        "## Aggregate census BMUs by DNO area\n\n"
+        + _md(dno_summary_table(census=census, scope="aggregate")),
+        "## How often the BMU register names a GSP group, and the NGED counts\n\n"
+        + _md(gsp_register_table(census=census, reference=reference)),
+        "## TEC and REPD values against the sum of each site's BMUs\n\n"
+        "Capacities are in MW. The solar and storage sums are of Generation Capacity.\n\n"
+        + _md(project_sums_table(single=single, reference=reference, window_label=window.label)),
+        "## TEC register rows of the matched projects, one for each stage\n\n"
+        + _md(tec_stage_table(single=single, tec=fetch_tec())),
         "## Largest output of each census BMU\n\n"
         + _md(peak_table(single=single, window_label=window.label)),
         "## Numbers the page quotes\n\n"

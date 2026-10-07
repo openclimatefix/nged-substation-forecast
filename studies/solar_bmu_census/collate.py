@@ -94,6 +94,33 @@ This column measures observed output. It is not a registered capacity, so it is 
 """
 DISPARITY_FIGURES: Final[tuple[str, ...]] = (*CAPACITY_COLUMNS, P99_COLUMN)
 """The six figures whose spread `capacity_disparity` ranks."""
+GSP_GROUP_AREAS: Final[dict[str, tuple[str, str]]] = {
+    "_A": ("Eastern England", "UKPN"),
+    "_B": ("East Midlands", "NGED"),
+    "_C": ("London", "UKPN"),
+    "_D": ("Merseyside and North Wales", "SP Energy Networks"),
+    "_E": ("West Midlands", "NGED"),
+    "_F": ("North East England", "Northern Powergrid"),
+    "_G": ("North West England", "Electricity North West"),
+    "_H": ("Southern England", "SSEN"),
+    "_J": ("South Eastern England", "UKPN"),
+    "_K": ("South Wales", "NGED"),
+    "_L": ("South Western England", "NGED"),
+    "_M": ("Yorkshire", "Northern Powergrid"),
+    "_N": ("South Scotland", "SP Energy Networks"),
+    "_P": ("North Scotland", "SSEN"),
+}
+"""Each Elexon grid supply point (GSP) group identifier mapped to its area name and the
+distribution network operator (DNO) that holds the licence for that area.
+
+The BMU register names its GSP group by identifier, and spells some groups' names more than one way,
+so the lookup is by identifier. The 14 GSP groups follow the 14 DNO licence areas broadly, not
+exactly. The mapping is the table at
+<https://en.wikipedia.org/wiki/Distribution_network_operator>, and NESO's note on its dataset at
+<https://neso.energy/data-portal/gis-boundaries-gb-dno-license-areas> says the groups broadly align
+with the DNO areas. UKPN is UK Power Networks, NGED is National Grid Electricity Distribution, and
+SSEN is Scottish and Southern Electricity Networks.
+"""
 TechnologyType = Literal["pure PV", "hybrid", "unknown"]
 StorageEvidenceType = Literal[
     "storage BMU with output",
@@ -242,6 +269,20 @@ def connection_type(*, elexon_bmu_id: str) -> str:
     if elexon_bmu_id.startswith("E_"):
         return "embedded"
     return "other"
+
+
+def dno_area(*, gsp_group_id: str | None) -> str | None:
+    """Return the distribution network operator whose licence area a GSP group names.
+
+    Args:
+        gsp_group_id: The BMU register's GSP group identifier, such as `_B`, or None when the
+            register leaves the group empty.
+
+    Returns:
+        The operator's short name, or None when the identifier is empty or not one of the 14 groups.
+    """
+    area = GSP_GROUP_AREAS.get(gsp_group_id or "")
+    return area[1] if area else None
 
 
 def _display_name(
@@ -493,6 +534,8 @@ def build_table() -> pl.DataFrame:
                 "repd_name": repd_names.get(repd_match[0]) if repd_match else None,
                 "lead_party": ref.get("leadPartyName"),
                 "connection_type": connection_type(elexon_bmu_id=bmu_id),
+                "gsp_group": ref.get("gspGroupId"),
+                "dno_area": dno_area(gsp_group_id=ref.get("gspGroupId")),
                 "scope": class_row["scope"],
                 "basis": class_row["basis"],
                 "correlation": class_row["correlation"],
@@ -519,6 +562,8 @@ def build_table() -> pl.DataFrame:
                 if repd_match
                 else None,
                 P99_COLUMN: p99_output_mw(output=output, window_start=window.start),
+                "repd_county": repd_rows[repd_match[0]]["County"] if repd_match else None,
+                "repd_region": repd_rows[repd_match[0]]["Region"] if repd_match else None,
                 "longitude": longitude,
                 "latitude": latitude,
                 "join_method": "igcpu and MEL: BMU id; tec and repd: "
