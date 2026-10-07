@@ -223,8 +223,9 @@ Two null patterns *do* fail ingest:
 
     A cell reaches this state only when *every* grid point feeding it is missing, because of the
     renormalisation described [above](#spatial-aggregation-is-where-a-grid-points-null-is-resolved).
-    A blocky failure like 2026-07-14's is caught exactly as before — the whole grid is gone, so
-    every cell is empty — while a *scattered* grid-point null in an instantaneous variable is
+    A blocky failure like 2026-07-14's never reaches this gate, because a slice empty at every grid
+    point is retried first. A block that covers some cells but not the whole box is caught here,
+    while a *scattered* grid-point null in an instantaneous variable is
     absorbed by the cell's other points, unless it lands on one of the 10 single-point cells, which
     have no others. That is a deliberate trade rather than an oversight: an instantaneous variable's
     nulls have only ever arrived as whole-step dropouts, and losing an entire run over one bad pixel
@@ -264,9 +265,9 @@ Unlike the de-accumulated count, this one includes **lead-0**: these variables a
 design, so a null at lead-0 means what a null at any other step means.
 
 What it cannot see is a null that reached a stored cell, because `Nwp.validate` rejects that run
-before any check runs. That covers a blocky failure, where every grid point of a cell goes at once,
-and also a scattered null that happens to land on one of the 10 single-point cells. So a run that
-lands with this check red is telling you about absorbed scatter — a pattern this project has never
+before any check runs. That covers a block that empties a cell without emptying the whole box, where
+every grid point of the cell goes at once, and also a scattered null that happens to land on one of
+the 10 single-point cells. So a run that lands with this check red is telling you about absorbed scatter — a pattern this project has never
 yet seen in an instantaneous variable, whose nulls have only ever arrived as whole-step dropouts.
 
 ### An empty slice or a wholly-missing variable is retried, not failed outright
@@ -282,23 +283,22 @@ All three mean "the upstream run is not ready yet", and they say it at different
   box, and raises `NwpRunNotYetAvailable`, naming each variable and its count of empty slices.
   Scattered NaN grid points do not trigger it, and neither does a NaN in a de-accumulated variable
   or in `categorical_precipitation_type_surface`, which are legitimately empty in places.
-  A contract violation, such as a wrong dtype or an out-of-range value, never makes a slice empty
-  at every grid point, so it still fails at once in `Nwp.validate`.
 - **A de-accumulated variable is wholly empty.** `Nwp.validate` raises `NwpVariableWhollyMissing`
   after the conversion.
 
 The ladder gives at least 4 hours of waiting. The two failures found after the download also pay
 for it on every attempt. One attempt took 81 seconds on 2026-10-06 for the 2026-10-05 run (opening
 4 seconds, downloading 38 seconds, converting 39 seconds); an attempt that stops at the empty-slice
-check costs about 42 seconds, so the ladder lasts about 4 hours 12 minutes.
+check costs about 42 seconds. The ladder therefore lasts between about 4 hours 6 minutes (every
+attempt stops at that check) and about 4 hours 12 minutes (every attempt runs the full 81 seconds).
+A run with a permanent hole takes the whole ladder to fail.
 
 **The 2026-10-02 run is the case the empty-slice retry exists for.** At 08:30 UTC, all 50 perturbed
 members stopped after the first 43 of 85 lead times in Dynamical.org's store, while ECMWF's own run
 was still arriving. Each of the nine instantaneous variables was missing 2,100 (member, lead time)
 slices, which is 3,509,100 missing rows per variable (2,100 slices × 1,671 H3 cells).
 Dynamical.org's store was filled about 3 hours 28 minutes after the 08:30 UTC attempt. The ladder
-would have found it filled, with about 37 minutes to spare. The cause of the 2026-10-01 failure is
-not established.
+would have found it filled, with about 37 minutes to spare.
 
 Waiting is worth doing because Dynamical.org publishes each 00Z run as roughly 40 separate Icechunk
 commits between 08:05 and 08:20 UTC, one per worker. A run being written is therefore genuinely
@@ -306,7 +306,7 @@ readable and genuinely incomplete: a variable whose worker has not committed yet
 null across every member and step. For an instantaneous variable that shows as the empty slices
 above, and for a de-accumulated variable as the fatal pattern above. The
 `categorical_precipitation_type_surface` column is nullable but has its own historical invariant
-that rejects an all-null column. A *defective* run also gets republished — the
+that rejects an all-null column with no retry. A *defective* run also gets republished — the
 2026-08-09 00Z run was repaired by a second sweep at 11:45 UTC, 3 hours 25 minutes after its first
 publication, and well inside the retry budget.
 

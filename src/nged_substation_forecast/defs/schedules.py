@@ -91,7 +91,7 @@ def ecmwf_ens_schedule(context: ScheduleEvaluationContext) -> RunRequest:
 
     Further reading:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright>
-    — why a wholly-missing variable is retried rather than failed.
+    — why an unfinished run is retried rather than failed.
     """
     return RunRequest(partition_key=context.scheduled_execution_time.strftime("%Y-%m-%d"))
 

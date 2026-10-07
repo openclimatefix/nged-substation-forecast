@@ -105,10 +105,10 @@ class NwpVariableWhollyMissing(ValueError):
 
     This exception covers only the de-accumulated variables: an incomplete publication reaches
     this check only when the variables still unwritten are the de-accumulated ones. The nine
-    instantaneous variables are non-nullable, so a frame missing one of those would be rejected by
-    base Patito validation first. An incomplete publication never gets that far, because
-    `dynamical_data.ecmwf_ens.download.raise_if_instantaneous_slices_empty` finds an empty slice
-    of an instantaneous variable on the raw grid and the asset retries that instead. An all-null
+    instantaneous variables are non-nullable, so base Patito validation rejects a frame missing one
+    of those. An incomplete publication of an instantaneous variable never reaches that point,
+    because `dynamical_data.ecmwf_ens.download.raise_if_instantaneous_slices_empty` finds the empty
+    slice on the raw grid and the asset retries that instead. An all-null
     `categorical_precipitation_type_surface` passes base validation, because that column is
     nullable. The all-null column is rejected instead by
     `_check_variables_that_were_introduced_after_start_of_dataset`, and only for an `init_time`

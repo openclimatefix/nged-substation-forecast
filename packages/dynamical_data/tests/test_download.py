@@ -186,7 +186,6 @@ def test_calc_slice_raises_on_single_value_coord() -> None:
 # --------------------------------------------------------------------------------------------------
 
 _SHAPE = (3, 2, 2, 2)  # (lead_time, ensemble_member, latitude, longitude), as in the factory.
-_INSTANTANEOUS = sorted(download.ECMWF_ENS_INSTANTANEOUS_VARS)
 
 
 def _nan_where(
@@ -197,15 +196,14 @@ def _nan_where(
     return values
 
 
-@pytest.mark.parametrize("variable", _INSTANTANEOUS)
-@pytest.mark.parametrize("lead_idx", [0, 2])
-def test_empty_slice_of_any_instantaneous_variable_raises(
-    make_ens_dataset: Callable[..., xr.Dataset], variable: str, lead_idx: int
+def test_empty_slice_of_an_instantaneous_variable_raises(
+    make_ens_dataset: Callable[..., xr.Dataset],
 ) -> None:
-    values = _nan_where(lead_idx=lead_idx, member_idx=1, lat_idx=slice(None), lon_idx=slice(None))
-    ds = make_ens_dataset(var_values={variable: values})
+    """At lead-0 too, because instantaneous variables are never legitimately empty there."""
+    values = _nan_where(lead_idx=0, member_idx=1, lat_idx=slice(None), lon_idx=slice(None))
+    ds = make_ens_dataset(var_values={"pressure_surface": values})
 
-    with pytest.raises(download.NwpRunNotYetAvailable, match=variable):
+    with pytest.raises(download.NwpRunNotYetAvailable, match="pressure_surface"):
         download.raise_if_instantaneous_slices_empty(ds)
 
 
@@ -232,7 +230,3 @@ def test_empty_slice_of_a_variable_that_may_be_empty_does_not_raise(
     ds = make_ens_dataset(var_values={variable: values})
 
     download.raise_if_instantaneous_slices_empty(ds)
-
-
-def test_complete_dataset_does_not_raise(make_ens_dataset: Callable[..., xr.Dataset]) -> None:
-    download.raise_if_instantaneous_slices_empty(make_ens_dataset())

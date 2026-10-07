@@ -287,7 +287,8 @@ https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens
 found before it, but the other two failures are found after it, so each of those retries also pays
 for a re-download and re-takes the ``ECMWF`` concurrency pool slot. One attempt measured 81s on
 2026-10-06 (open 4s, download 38s, convert 39s), and an attempt that stops at the empty-slice check
-costs about 42s, so the elapsed window is about 4h12m. Minutes when the upstream fetch is slow."""
+costs about 42s, so the elapsed window is between about 4h6m and 4h12m. An attempt takes minutes
+when the upstream fetch is slow."""
 
 _ECMWF_ENS_RETRY_DELAY_SECONDS: Final[int] = 1800
 """How long to wait between retries of a not-yet-published ECMWF run."""
@@ -464,13 +465,8 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         )
     ).set_model(H3GridWeights)
 
-    # Download and convert. All three retryable failures mean "the upstream run is not ready yet",
-    # they just say it at different points: the run is absent from the catalog, an instantaneous
-    # variable has a slice that is empty at every grid point (checked on the raw download, before
-    # the conversion), or a de-accumulated variable is still wholesale empty (found by
-    # `Nwp.validate`). Every other error still fails immediately. All are worth waiting out
-    # because a run is published as ~40 separate commits, so it can be readable and incomplete at
-    # once; the ladder is on _ECMWF_ENS_MAX_RETRIES above, and the
+    # Download and convert. Three failures mean "the upstream run is not ready yet" and are
+    # retried on the ladder in _ECMWF_ENS_MAX_RETRIES; every other error fails immediately. The
     # upstream behaviour is at
     # https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright
     try:

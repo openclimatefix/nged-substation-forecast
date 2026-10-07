@@ -1173,22 +1173,21 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
 
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
 
-    def _raise_not_available(*args: object, **kwargs: object) -> None:
+    def _raise_not_available(*, nwp_init_time: datetime, h3_grid: object) -> None:
         raise NwpRunNotYetAvailable
 
     if raising_step == "open":
         monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=_raise_not_available)
     else:
+        # The real check runs, on a downloaded run whose only slice at lead 6 h is empty at all
+        # three grid points.
         monkeypatch.setattr(
             target=assets, name="open_ecmwf_ens_run", value=lambda **kwargs: object()
         )
         monkeypatch.setattr(
-            target=assets, name="download_ecmwf_ens_data", value=lambda ds_lazy: object()
-        )
-        monkeypatch.setattr(
             target=assets,
-            name="raise_if_instantaneous_slices_empty",
-            value=_raise_not_available,
+            name="download_ecmwf_ens_data",
+            value=lambda ds_lazy: _make_downloaded_ds(n_null_instantaneous_grid_points=3),
         )
 
     # `build_asset_context()` defaults to its own `DagsterInstance.ephemeral()`
