@@ -21,8 +21,12 @@ def _prepare_features(df: pl.DataFrame, feature_cols: list[str]) -> pl.DataFrame
     Enum columns are encoded as each value's position in the Enum's declared list of values, so a
     code means the same in every frame and XGBoost treats the column as an ordinal numeric. String
     and Categorical columns have no declared list and raise at the Float32 cast. Nulls stay null in
-    the returned frame, and XGBoost reads them as missing values. The Patito model is stripped from
-    the result (zero-copy) so XGBoost sees a plain ``pl.DataFrame``.
+    the returned frame, and XGBoost reads them as missing values. The result is a plain
+    ``pl.DataFrame``. XGBoost recognises a Polars frame by its exact class name, so a Patito
+    subclass makes ``QuantileDMatrix`` raise and makes ``DMatrix`` lose the feature names that
+    ``Booster.predict`` checks. An eager ``select`` already returns a plain frame ([Patito issue
+    167](https://github.com/JakobGM/patito/issues/167)); the ``_from_pydf`` re-wrap keeps the
+    result plain if Patito fixes that.
     """
     exprs = []
     for col in feature_cols:
