@@ -333,7 +333,8 @@ after the confusing failure:
 - **Every forecasting model subclasses `BaseForecaster`** (`packages/ml_core`), which fixes `train`
   / `predict` / `save` / `load` and carries a `feature_engineer` strategy object. A model that needs
   a different view of the data supplies a different `FeatureEngineer` rather than changing the
-  shared feature pipeline. `XGBoostForecaster` is the only implementation so far.
+  shared feature pipeline. `XGBoostForecaster` and `ManualHeuristicForecaster` are the
+  implementations so far.
 - **Use MLflow for experiment tracking.**
 - **Choosing an optimisation tool: convex estimation subproblems → CVXPY; learning shapes, or
   anything needing posteriors → PyTorch.** "Non-convex" comes in grades, and the grade decides the
