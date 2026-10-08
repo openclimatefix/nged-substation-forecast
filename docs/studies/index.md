@@ -40,6 +40,12 @@ regions or climates, so a result may not hold elsewhere.
   — a physical solar plant fitted to four-hour changes in output recovers the solar part of synthetic
   aggregates of real BMUs beside wind and gas, and finds solar in the supplier BMUs.
 
+- [Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?](battery-pv-separation.md)
+  — on synthetic aggregates of a real solar BMU and a real battery BMU, a joint model of solar and a
+  battery with a state-of-charge limit has a solar error of 14.8% of the solar part's 99th-percentile
+  output, against 27.2% for a solar-only fit. With a demand-like part added the model overshoots the
+  solar capacity, and on the 25 real aggregate BMUs its 1.1 to 1.2 GW is not validated.
+
 ## Past weather
 
 **Three studies score how well each weather product describes weather that has already happened.**

@@ -1470,6 +1470,7 @@ def figure(
     figure_planning: PlanningType | None,
     post_hoc: bool = False,
     planning_note: str | None = None,
+    label: str = "Figure",
 ) -> alt.VConcatChart:
     """Stack panels, one above the other, under a "Figure N:" caption.
 
@@ -1490,6 +1491,8 @@ def figure(
         planning_note: A line that replaces the `PLANNING_NOTES` or `POST_HOC_PLANNING_NOTE` line
             whenever the figure has one, for a figure whose planned rows need a definition of their
             own.
+        label: The word before the number in the caption, for a figure that a page numbers apart
+            from its main sequence.
 
     Returns:
         The figure.
@@ -1504,7 +1507,7 @@ def figure(
         else PLANNING_NOTES[figure_planning]
     )
     caption = alt.TitleParams(
-        wrapped(text=f"Figure {number}: {title}", width=_TITLE_CHARACTERS),
+        wrapped(text=f"{label} {number}: {title}", width=_TITLE_CHARACTERS),
         subtitle=[
             line
             for text in (
