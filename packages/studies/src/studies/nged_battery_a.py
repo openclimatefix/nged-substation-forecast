@@ -59,6 +59,24 @@ def _battery_row() -> dict[str, object]:
     return hits.row(0, named=True)
 
 
+def battery_a_site() -> dict[str, object]:
+    """Return NGED battery A's name, position and unit, for matching it against public registers.
+
+    The caller must keep every value out of anything printed, logged, or written. A script reports
+    only whether a match was found.
+
+    Returns:
+        The keys `name`, `latitude`, `longitude`, and `units` of the series' metadata row.
+    """
+    row = _battery_row()
+    return {
+        "name": str(row["time_series_name"]),
+        "latitude": float(row["latitude"]),  # ty: ignore[invalid-argument-type]
+        "longitude": float(row["longitude"]),  # ty: ignore[invalid-argument-type]
+        "units": str(row["units"]),
+    }
+
+
 def battery_a_units() -> str:
     """Return the series' unit, `MW` or `MVA`."""
     return str(_battery_row()["units"])
