@@ -515,7 +515,8 @@ class FitResult:
             there is no covariance.
         null_log_evidence: The log marginal likelihood of the model with no battery, from the same
             tempered likelihood. `log_evidence - null_log_evidence` is the log Bayes factor.
-        best_start: For each group and lane, the start with the lowest loss; shape (groups, lanes).
+        best_start: For each group and lane, the start with the lowest untempered loss; shape
+            (groups, lanes).
     """
 
     theta: np.ndarray
@@ -787,6 +788,10 @@ class Estimator:
         )
         shape = (groups, lanes, n_starts)
         loss_np = loss.reshape(shape).cpu().numpy()
+        # Starts are compared on the untempered loss, because each start has its own tempering.
+        comparable = (
+            0.5 * n_equations * torch.log(rss) - self._prior(theta=theta, scale=scale)
+        ).reshape(shape)
         return FitResult(
             theta=theta.reshape(*shape, -1).cpu().numpy(),
             covariance=covariance.reshape(*shape, layout.n_parameters, layout.n_parameters)
@@ -799,7 +804,7 @@ class Estimator:
             at_bound=at_bound.reshape(shape).cpu().numpy(),
             log_evidence=log_evidence.reshape(shape).cpu().numpy(),
             null_log_evidence=null_log_evidence.reshape(shape).cpu().numpy(),
-            best_start=loss_np.argmin(axis=2),
+            best_start=comparable.argmin(dim=2).cpu().numpy(),
         )
 
     @torch.no_grad()

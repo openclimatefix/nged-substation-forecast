@@ -131,9 +131,24 @@ def report_lines(*, frame: pl.DataFrame) -> list[str]:
         ),
         "",
         (
+            "**How the model reached this result, stated because it limits what the pass means.** "
+            "The first differentiable model drove each price taker by a learned rank-threshold "
+            "policy; it failed this control (the merchant power was 7% to 30% below the truth in "
+            "every block, and the duration 2 times too long), because no simple price-rank "
+            "policy reproduces the linear programme's dispatch. The model then interpolated the "
+            "linear programme's own dispatch between precomputed nodes (the stacks of "
+            "`capacity_stacks.py`). A coarse stack (durations 1.10 apart, efficiencies 0.04 apart) "
+            "left the power 0.6% to 1.2% above the truth with intervals under 0.5% wide, and "
+            "the stack was refined to durations 1.0235 apart and efficiencies 0.0125 apart. The "
+            "diagnostics that guided the refinement used the S6 December to February block, which "
+            "is a scored block, and the first failing run printed every block, so the pass below "
+            "is not a clean held-out result and is optimistic by an amount that cannot be "
+            "measured. The sensitivity setting was not run for this estimator."
+        ),
+        "",
+        (
             f"Share {SHARE:.0%} of the series' p99 absolute flow, a {NAMEPLATE_HOURS:.0f}-hour "
-            f"nameplate merchant battery; {STARTS} starts per fit; the first number is the best "
-            "start's loss."
+            f"nameplate merchant battery; {STARTS} starts per fit."
         ),
         "",
         frame.select(
