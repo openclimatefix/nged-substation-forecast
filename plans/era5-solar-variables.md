@@ -1,6 +1,8 @@
 # Plan: which ERA5 variables help explain how much sunlight reaches a solar farm?
 
-Status: draft for maintainer review. No issue exists yet; no code has been written; nothing has been
+Status: draft. The maintainer has answered the open questions (recorded at the end). The plan still
+needs its two agentic reviews and the maintainer's sign-off. A `Spike` issue under the studies epic
+is created after that, with this plan as its body. No code has been written and nothing has been
 downloaded.
 
 ## Question
@@ -13,6 +15,39 @@ curtailment in the way. The scientific question behind both is which ERA5 variab
 information about how much sunlight gets through the atmosphere that ERA5's own downward
 short-wave radiation (`ssrd`) does not.
 
+## Why ERA5 at all, when the aim is an IFS-driven forecast
+
+**The study's ultimate aim is to choose which ECMWF IFS variables to feed a solar power forecast.**
+ERA5 is the stand-in because it is the only archive that carries all the candidate variables for
+2019-09 to 2026-09. The Data DOWNLOAD COORDINATOR checked what IFS products we can get:
+
+- **16 of the 34 candidate variables** are in the free ECMWF feed (open data, and the Dynamical.org
+  archive built from it): `ssrd`, `strd`, `t2m`, `d2m`, `u10`, `v10`, `sp`, `tp`, `tcc`, `tcwv`,
+  `skt`, `sd`, `sf`, `asn`, `mucape` (not `cape`), and the gust field (`10fg`, not `i10fg`).
+- **6 more** are on Open-Meteo's 9 km IFS (`lcc`, `mcc`, `hcc`, `blh`, `cin`, `fdir`; whether the
+  cloud layers and `fdir` are native or derived is unverified).
+- **12 are only in the full MARS archive:** `ssrdc`, `cdir`, `tclw`, `tciw`, `tcslw`, `cbh`, `tcrw`,
+  `tcsw`, `tco3`, `uvb`, `fal`, `deg0l`. They are "worth asking ECMWF for", not candidate features.
+- **Archive depth is short:** Open-Meteo's `ecmwf_ifs` starts 2024-03-14, Dynamical.org ENS
+  2024-04-01, and the Source Cooperative backfill covers about 2021-03 to 2024-03 (14 surface fields,
+  no `fdir`).
+
+**ERA5 is therefore an upper-bound screen, not the training source.** ERA5 runs a frozen 2016 model
+(IFS cycle 41r2) with hourly fields from short forecasts, so its cloud and radiation are better than
+an IFS forecast's at day 1 to 14 leads. A variable that helps ERA5 may add only noise at day 3. The
+page reports each result against the variable's IFS availability (free feed, Open-Meteo, MARS-only),
+so the reader sees which winners are usable. Confirming any winning rung on matched-lead IFS
+forecasts is a follow-up study, outside this plan.
+
+**Aerosol makes ERA5 and the IFS differ in clear-sky irradiance.** Per the Opus aerosol review, the
+operational IFS uses a fixed monthly aerosol climatology and not prognostic aerosol: the CAMS
+interim-reanalysis climatology (2003 to 2013, 3° grid) since cycle 43r3, revised again in cycle 50r1
+(operational 12 May 2026; the note does not say which climatology). ERA5 uses the older Tegen et al.
+(1997) climatology, with a CMIP5 sulphate trend. Neither model sees an individual dust or smoke event.
+CAMS satellite irradiance (Heliosat-4: McClear for clear sky, McCloud for cloud extinction) does use
+CAMS aerosol analyses and forecasts every 3 hours. The ERA5-versus-IFS climatology mismatch is a
+second reason to train the production forecast on IFS forecasts, whatever this study finds.
+
 ## Arms: a ladder of variable groups, each adding one physical idea
 
 The ladder comes from the Opus variable review (the brief and its report are in
@@ -21,27 +56,30 @@ rungs below it.
 
 | Rung | Adds | ERA5 variables (derived features in brackets) |
 |---|---|---|
-| G0 minimal | the "normal" set | `ssrd`, `t2m` (plus solar geometry, see below) |
+| G0 minimal | the "normal" set | `ssrd`, `t2m`, plus top-of-atmosphere flux and solar geometry from `studies.pv_dataset.add_solar_geometry` (a midpoint-zenith estimate of the top-of-atmosphere flux, close to but not identical with ERA5's hour-integrated `tisr`), and the clearness index `ssrd / extraterrestrial_horizontal_w_m2` |
 | G1 cloud amount | total cloud | `tcc` |
 | G2 cloud layers | low, medium, high cloud | `lcc`, `mcc`, `hcc` |
-| G3 clear-sky normalisation | how bright the sky would be without cloud | `ssrdc`, `tisr` (clearness index, clear-sky index) |
-| G4 cloud optical thickness | water and ice in the cloud | `tclw`, `tciw`, `tcslw`, `cbh` (optical-depth proxy, liquid fraction) |
-| G5 beam and diffuse | direct beam against scattered light | `fdir`, `cdir` (beam share, DNI, DHI, plane-of-array irradiance) |
-| G6 panel temperature | convective cooling and thermal radiation | `u10`, `v10`, `strd` (wind speed, Faiman module temperature) |
-| G7 humidity and haze | moisture in the air column | `d2m`, `tcwv`, `blh` (relative humidity) |
-| G8 snow and albedo | snow on the panel, ground reflection | `sd`, `sf`, `asn`, `fal` (snow-on-panel flag) |
-| G9 everything plausible | the remaining variables | `tp`, `tcrw`, `tcsw`, `cape`, `cin`, `skt`, `tco3`, `uvb`, `i10fg`, `sp`, `deg0l` |
+| G3 clear-sky normalisation | how bright the sky would be without cloud | `ssrdc` (clear-sky index `ssrd / ssrdc`) |
+| G4 cloud optical thickness | water and ice in the cloud | `tclw`, `tciw`, `tcslw`, `cbh` |
+| G5 beam and diffuse | direct beam against scattered light | `fdir`, `cdir` |
+| G6 panel temperature | convective cooling and thermal radiation | `u10`, `v10`, `strd` |
+| G7 humidity and haze | moisture in the air column | `d2m`, `tcwv`, `blh` |
+| G8 snow and albedo | snow on the panel, ground reflection | `sd`, `sf`, `asn`, `fal` |
+| G9 everything plausible | the remaining ERA5 variables | `tp`, `tcrw`, `tcsw`, `cape`, `cin`, `skt`, `tco3`, `uvb`, `i10fg`, `sp`, `deg0l` |
+| G10 aerosol (not ERA5) | event-level aerosol, which neither ERA5 nor the IFS carries | CAMS EAC4 total aerosol optical depth at 550 nm and dust optical depth at 550 nm |
 
 **`ceil` and `hcct` are not ERA5 variables.** The CDS download form (checked 2026-10-08) lists
 neither. `cbh` is the nearest available field to a ceiling, and no ERA5 field gives a convective
 cloud-top height, so G4 and G9 cover what the maintainer's list wanted as far as ERA5 can.
 
-**Aerosol is the biggest gap in ERA5 for this question.** ERA5 has no aerosol optical depth, and
-(from the Opus reviewer's memory, to be verified before the page says it) its radiation scheme uses a
-monthly aerosol climatology. CAMS satellite irradiance uses CAMS aerosols. Any ERA5-versus-CAMS gap
-that survives all ten rungs is therefore a candidate for aerosol, and the page says so as a
-hypothesis, not a finding. An optional exploratory extra (see "Open questions") adds CAMS EAC4
-aerosol optical depth as an eleventh rung.
+**Aerosol is the biggest gap in ERA5 for this question.** ERA5 has no aerosol optical depth, and its
+radiation scheme uses a climatology (see "Why ERA5 at all"). CAMS satellite irradiance uses CAMS
+aerosols. G10 tests this directly: it adds CAMS EAC4 total and dust aerosol optical depth at 550 nm,
+which are not ERA5 fields. The expected sign is a gain on the CAMS target (CAMS sees aerosol, ERA5
+cannot) and a small gain on the PV target (aerosol optical depth over Great Britain is usually low,
+about 0.1 to 0.2, from the reviewer's memory). Any ERA5-versus-CAMS gap that survives G10 is not
+explained by aerosol. **G10 is exploratory, and only useful in production if the forecast also
+receives CAMS forecast aerosol, a second live feed.** EAC4 ends in 2025, so G10 is compared with a G9 arm refitted on exactly the G10 rows, with folds cut on that shorter span, and no second CAMS product is spliced in. EAC4 is 3-hourly at 0.75°: the aerosol join interpolates linearly in time to labels H−1 and H, takes the mean of the two, and reads the EAC4 cell nearest each farm. About 4 MB in total.
 
 **Every rung is a nested superset, so the number of feature columns differs between rungs.** XGBoost
 runs with `colsample_bytree=1` so a wider rung gets no free win from column subsampling. Two controls
@@ -58,49 +96,77 @@ runs with `colsample_bytree=1` so a wider rung gets no free win from column subs
    curtailment and no panel, so the contrast between the two targets separates "the atmosphere" from
    "the panel".
 
+**Gains from aerosol, `tcwv`, and `tco3` on the CAMS target are partly by construction.** McClear
+computes CAMS GHI from CAMS aerosol, water vapour, and ozone, which come from the same
+IFS-based assimilation family as ERA5's fields. Conclusions about those variables rest on the PV
+target. Which CAMS aerosol product McClear uses (EAC4 or the operational analysis) is unverified.
+
 ## Rows, folds, and metric
 
-- **Rows:** the daylight hours (top-of-atmosphere flux above a threshold set in the script) on which
-  the PV target and the CAMS target both exist, and no ERA5 variable is missing. Every rung scores
-  exactly the same rows; the filters read the target and the clock only, never an ERA5 variable.
+- **Rows:** the daylight hours (top-of-atmosphere flux above a threshold in W m⁻², fixed in the
+  script before any fit and stated on the page) on which the PV target and the CAMS target both
+  exist, within the download span. Rows are set by the targets, the clock, and the span only, never by
+  an ERA5 value. The build raises if any ERA5 value other than `cbh` and `cin` is missing on those
+  rows. ERA5 sets `cbh` (and probably `cin`) missing where there is no cloud, so those two keep NaN,
+  which XGBoost treats as missing, and each goes through its own `hourly_from_snapshots` call (the
+  hourly value is NaN unless both snapshots exist). The first fetched chunk reports each variable's
+  share of NaN, split by `tcc` below and above 0.05.
+- **ERA5 release:** the span ends at the last month that is final ERA5 (`expver` 0001) in every file.
+  ERA5T months (`expver` 0005) can be replaced by ECMWF. The fetch records `expver` per hour, and the
+  build raises if `expver` differs between variables for one hour.
+- **Snow censoring:** dropping hours that hold a zero half-hour also drops fully snow-covered panels, which read exactly zero. G8's PV result and the snow days in the surprises figure are therefore biased towards no effect. The page states this beside G8, and an exploratory G8 arm keeps zero hours where `sd > 0`.
 - **PV cleaning:** reuse `studies.power`, `studies.export_cap`, and `studies.commissioning`, as the
   past-weather solar page does. Hours holding a zero half-hour are dropped, from the power table, for
   both targets.
 - **Folds:** contiguous blocks of whole months (`studies.cross_validation.assign_folds`). No UKV era
   split is needed, because every input is ERA5. Recent ERA5 months can be the preliminary ERA5T
   release; the build records which months are ERA5T.
-- **Metric:** mean absolute error as a percentage of capacity (PV) and as a clearness-index error and
-  in W m⁻² (CAMS). Each farm's error is normalised by its own capacity before any mean or difference.
+- **Clearness index:** it is unstable at low sun, so the daylight threshold above also bounds it. The CAMS target's clearness index uses the hour-integrated top-of-atmosphere value that the CAMS files carry, and W m⁻² is reported beside it.
+- **Metric:** mean absolute error is the main metric: as a percentage of capacity (PV), and as a
+  clearness-index error and in W m⁻² (CAMS). Pearson correlation between out-of-fold prediction and
+  measured value, pooled over each fold's rows, is reported beside it for every rung (exploratory),
+  with intervals from the same month-resampling. Each farm's error is normalised by its own capacity before any mean or difference.
 - **Intervals:** `studies.bootstrap.bootstrap_difference`, 2,000 resamples of whole calendar months,
   paired across rungs, one of the three fitting seeds per resample. The page explains once what the
   test covers and what it does not.
-- **Hour convention:** `ssrd`, `ssrdc`, `fdir`, `cdir`, `strd`, `tisr`, and the other accumulations
+- **Hour convention table:** every ladder variable is classed once as an accumulation (`ssrd`, `ssrdc`, `fdir`, `cdir`, `strd`, `tp`, `sf`, `uvb`) or as instantaneous (every other variable). A test checks each variable has exactly one class. The fetch checks the hour-of-day profile of the mean absolute hour-to-hour change for steps at two families of seams: cloud and cloud-water fields (from the 06 and 18 UTC forecasts) at 06/07 and 18/19 UTC, and analysed fields (`t2m`, `d2m`, `u10`, `v10`, `sp`, `skt`, `tcwv`, `sd`) at the 4D-Var window boundaries of 09 and 21 UTC.
+- **Hour convention:** `ssrd`, `ssrdc`, `fdir`, `cdir`, `strd`, and the other accumulations
   are means over the hour ending at the label, the same as the PV and CAMS stamps. Instantaneous
   fields (clouds, water columns, `t2m`, `d2m`, `sd`, `blh`, `cape`) are averaged over labels H−1 and
-  H so the hour matches. A sensitivity run uses the label-H value only.
-- **Second hyperparameter setting** (`SENSITIVITY_HYPER_PARAMETERS`) on every planned contrast and
-  any result near the 5% line.
-- **GPU** (`device="cuda"`) if `nvidia-smi` shows one, with one published rung refit on CPU to report
-  the device noise floor.
+  H so the hour matches, using `studies.hourly_means.hourly_from_snapshots(slot_offsets_minutes=(-60, 0))`.
+- **Pairing guard:** before each contrast the code raises unless both arms hold the identical set of (site, time, seed) rows, because `paired_differences` inner-joins silently. Every arm runs on the same device, recorded in the losses table.
+- **Second hyperparameter setting** (`SENSITIVITY_HYPER_PARAMETERS`) on every planned contrast, with the two verdicts combined by `combine_setting_verdicts`.
+- **GPU** (`device="cuda"`) if `nvidia-smi` shows one, with the device stated on the page. No CPU
+  refit is run for a noise floor.
 
 ## Planned contrasts (written before any result exists)
 
-Each is run on both targets, so there are six planned contrasts:
+Each is run on both targets, so there are eight planned contrasts:
 
-1. **P1:** G1 (adds `tcc`) minus G0. Does total cloud help at all beyond `ssrd` and `t2m`?
-2. **P2:** G2 minus G0. Do the three cloud layers help beyond the minimal set?
-3. **P3:** G9 (everything) minus G2. Does anything beyond the cloud covers help? This is the
-   maintainer's headline question.
+1. **P0:** G9 (everything) minus G0. The study question. It equals P2 plus P3.
+2. **P1:** G1 (adds `tcc`) minus G0. Does total cloud help at all beyond `ssrd` and `t2m`?
+3. **P2:** G2 minus G0. Do the three cloud layers help beyond the minimal set?
+4. **P3:** G9 minus G2. Does anything beyond the cloud covers help? This is the maintainer's headline
+   question.
+
+**Planned verdicts use a Bonferroni-adjusted level.** With eight planned contrasts, the family-wise
+level of 5% becomes 0.625% per contrast (a 99.375% interval, `bootstrap_difference_at_level`). Every
+interval is also shown at 95%, labelled exploratory. The page states each planned result as "rules
+out a gain larger than X" using the upper bound, with a smallest effect of interest fixed before any
+result (see "Decisions needed").
 
 Every other number is exploratory: each rung against G0, each rung against the one below it, the
-drop-one-group runs, the per-farm numbers, and the sensitivity runs. The page labels them so and does
-not correct for multiple comparisons.
+drop-one-group runs, the per-farm numbers, and the regime and season splits. The page labels them so
+and does not correct them for multiple comparisons.
 
 ## Controls
 
-- **Negative control:** G9's columns with each added column shuffled across rows within its calendar
-  month, so the column count and each column's distribution match G9 and no information is added. A
-  contrast of this arm against G2 shows how large a difference the pipeline produces from nothing.
+- **Negative control:** G9's added columns permuted by `studies.blending.climatology_permutation`
+  over site, calendar month, and hour of day, so the column count and each column's distribution
+  match G9. The permutation removes the hour-to-hour information and keeps each month's mean at each
+  hour, which is month-level weather information, so the control is not strictly information-free.
+  All G3 to G9 columns are passed as one column group, so their joint distribution survives. A contrast of this arm against G2 shows how large a
+  difference the pipeline produces from nothing.
 - **Positive control:** G2 plus CAMS GHI itself as an input on the PV target. This is the known
   good answer: a column that must help. If the pipeline cannot see this gain, a null for G9 is not
   evidence of no effect. (This arm is not run on the CAMS target, where it would be the target.)
@@ -122,29 +188,32 @@ The page is mostly figures, in the order below. Each has a bolded one-sentence l
 sentences of support. Every chart is anonymised: farms are A to F, outputs are normalised by
 capacity, and no coordinate appears.
 
-1. **Headline (top of page).** The ladder: mean absolute error per rung for the PV target and the
-   CAMS target, with 95% intervals, G0 at the top, and below it the three planned contrasts.
-2. **What the variables look like.** Three days at a farm, chosen by a stated rule (the clearest,
+1. **Headline (top of page).** The planned contrasts P0 to P3 on both targets, at the adjusted level,
+   with the smallest effect of interest marked.
+2. **The leaderboard.** Every rung's own mean absolute error with a 95% interval on the PV target and
+   the CAMS target, best first, G0 and the two controls included. A second panel shows Pearson
+   correlation for every rung.
+3. **What the variables look like.** Three days at a farm, chosen by a stated rule (the clearest,
    the most variable, the dullest): stacked small multiples of `ssrd`, `ssrdc`, CAMS GHI, PV output,
    the cloud covers, `tclw` and `tciw`, `cbh`, and `fdir`. The time axis is shared.
-3. **Cloud covers against a cloud index.** CAMS clearness index (or the PV capacity factor against
-   clear-sky) plotted against `tcc`, and against `lcc`, `mcc`, and `hcc`. Shows how much of the
-   scatter the layers explain.
-4. **Where ERA5's `ssrd` misses CAMS.** ERA5 minus CAMS GHI as a time series for the same days, then
-   binned against each candidate variable (`tclw`, `tciw`, `cbh`, `tcwv`, `d2m`, `blh`, `sd`). The
-   panel for each variable shows whether the residual moves with it. This is the scientific
-   question, shown before any model.
-5. **Cloud water against optical thickness.** `tclw + tciw` (and the optical-depth proxy) against
-   CAMS clearness index, coloured by low-cloud cover.
-6. **The XGBoost models work.** Out-of-fold PV against measured for the three stated-rule weeks at
+4. **Cloud covers against a cloud index.** CAMS clearness index (or the PV capacity factor against
+   clear-sky) plotted against `tcc`, and against `lcc`, `mcc`, and `hcc`.
+5. **Where ERA5's `ssrd` misses CAMS.** ERA5 minus CAMS GHI as a time series for the same days, then
+   binned against each candidate variable (`tclw`, `tciw`, `cbh`, `tcwv`, `d2m`, `blh`, `sd`). This
+   is the scientific question, shown before any model.
+6. **Cloud water against optical thickness.** `tclw + tciw` against CAMS clearness index, coloured
+   by low-cloud cover.
+7. **The XGBoost models work.** Out-of-fold PV against measured for the three stated-rule weeks at
    every farm, G0 against G9, and each rung's error per farm.
-7. **The ladder rung by rung.** Each rung's step change in error (PV and CAMS) with intervals.
-8. **Drop-one-group.** Error added when each group is removed from G9.
-9. **Where the gain comes from.** Error by clear-sky-index bin, season, and hour of day for G0
-   against G9, so the page shows whether gains are in broken cloud, fog, snow, or low sun.
-10. **The controls.** The negative-control and positive-control contrasts beside the planned ones.
-11. **Surprises.** The worst 20 days for G0 and what G9 changed on them (snow and fog days
-    especially), anonymised by farm label.
+8. **Weather regimes.** The difference in error between G9 and G0, and between each of G1 and G2 and
+   G0, split by regime: clear sky, broken cloud, and overcast. Regimes are set from the CAMS
+   clear-sky index with thresholds fixed before any result, and a second panel splits by the ERA5
+   cloud cover `tcc` for readers who want an ERA5-only definition. Exploratory.
+9. **Seasons.** The same differences by season (winter, spring, summer, autumn), and for the
+   clear-sky, broken-cloud, and overcast regimes within each season. Exploratory.
+10. **Drop-one-group.** Error added when each group is removed from G9.
+11. **Hour of day and snow.** Error by hour of day for G0 against G9, and the worst 20 days for G0
+    with what G9 changed on them, anonymised by farm label.
 
 ## Data and code
 
@@ -161,20 +230,32 @@ capacity, and no coordinate appears.
     - **Tier 1 (needed for G1 to G7):** `tcc`, `lcc`, `mcc`, `hcc`, `ssrdc`, `cdir`, `tclw`, `tciw`,
       `tcslw`, `cbh`, `u10`, `v10`, `strd`, `d2m`, `tcwv`, `blh`. About 19 hours.
     - **Tier 2 (needed for G8 and G9):** `sd`, `sf`, `asn`, `fal`, `tp`, `tcrw`, `tcsw`, `cape`,
-      `cin`, `skt`, `tco3`, `uvb`, `i10fg`, `sp`, `deg0l`. About 18 hours. `tisr` is computed, not
-      downloaded.
+      `cin`, `skt`, `tco3`, `uvb`, `i10fg`, `sp`, `deg0l`. About 18 hours. `tisr` is not downloaded: the top-of-atmosphere flux comes from `add_solar_geometry`.
+- **Tier 3 (not ERA5, from the Atmosphere Data Store):** CAMS EAC4 total and dust aerosol optical
+  depth at 550 nm, 3-hourly, 2019-09 to the end of EAC4 (the Atmosphere Data Store lists August 2025; the fetch sets the end month from the listing). A few MB and a handful of requests. The ADS account is separate from the
+  CDS account; the CAMS irradiance download already used it.
 - **The fetch is the `data-download` skill's job:** resumable, one pilot month first, with the
   `data-validation` checklist on the first chunk and again after the last. The fetch script also
   checks the hour-of-day profile of every accumulation for a step at the 07 and 19 UTC seams, where
   ERA5's accumulations change forecast run.
 - **Code:** `studies/era5_solar_variables/` for the scripts (`fetch_era5_variables.py`,
   `build_dataset.py`, `fit_ladder.py`, `report.py`, charts), and anything a second study might use
-  (derived-feature functions such as clearness index, Faiman module temperature, and relative
-  humidity) goes into `packages/studies/src/studies/` with tests. The page goes under Studies >
+  (the clearness-index and aerosol-join functions) goes into `packages/studies/src/studies/` with tests. The page goes under Studies >
   Past weather, as `docs/studies/past-weather/era5-solar-variables.md`.
 - **Order of work:** issue (type `Spike`), then fetch script review, pilot month, tier 1 fetch, build
   and first report, first Opus science review, tier 2 fetch and full report, charts and draft page,
   second Opus science review, diff review, prose review and persona reviews, merge.
+
+## Tests for the new `packages/studies` functions
+
+- **Clearness index:** zero top-of-atmosphere flux gives null, not infinity, and rows below the
+  threshold are excluded.
+- **Accumulation to power:** 3600 J m⁻² over the hour is exactly 1 W m⁻².
+- **Variable classification table:** every ladder variable has exactly one class.
+- **Ladder:** each rung is a strict superset of the rung below, and G9 is the union.
+- **Aerosol join:** a linear ramp in 3-hourly values gives the analytic hour-ending mean, and a
+  3-hour shift of the input fails the test.
+- **Pairing guard:** a contrast between arms with different row sets raises.
 
 ## The five complexity triggers (for sizing)
 
@@ -189,16 +270,53 @@ capacity, and no coordinate appears.
 Size: complex, as every study is. The study skill's process applies in full, with two Opus science
 reviews, because the page will carry numbers.
 
-## Open questions for the maintainer
+## Decisions the maintainer has made
 
-1. **Download span.** Default: 2019-09 to 2026-09 for all variables, matching the existing ERA5 and
-   CAMS records. If the PV record is much shorter, the span could be cut to the PV record plus a
-   margin, saving up to several hours of queue time. I have not yet checked each farm's PV start
-   date.
-2. **CAMS target definition.** Default: clearness index, with W m⁻² reported beside it. Alternative:
-   W m⁻² only.
-3. **Aerosol rung.** Include CAMS EAC4 aerosol optical depth as an optional eleventh rung? It is not
-   ERA5, so it is outside the question as asked. Default: leave it out, and say on the page that
-   aerosol is the main gap ERA5 cannot fill.
-4. **GitHub issue.** Create a `Spike` issue under the past-weather epic before work starts? Default:
-   yes, once the plan is agreed.
+1. **Download span:** 2019-09 to 2026-09 for every variable. The experiments are expected to show
+   little signal, so the study wants as much data as it can get.
+2. **CAMS target:** the clearness index, with W m⁻² reported beside it.
+3. **Aerosol:** include CAMS EAC4 aerosol optical depth as the eleventh rung (G10).
+4. **GitHub issue:** a `Spike` issue under the studies epic, with the full plan as its body, created
+   after the maintainer signs off and the plan has had its two agentic reviews.
+
+## Review 1 (simplicity) triage
+
+Accepted: `tisr` already in G0 through `add_solar_geometry`, so it is not downloaded and G3 keeps
+`ssrdc` only; derived features cut to the clearness index; grouped permutation importance cut; the
+label-H sensitivity run cut; the CPU noise-floor refit cut (also the maintainer's instruction); the
+2026 aerosol splice cut; the negative control reuses `climatology_permutation`; the headline absorbs
+the step-change and controls figures; the hour averaging names `hourly_from_snapshots`.
+
+Rejected, with the reason:
+
+- **Collapse the ladder to four rungs.** The maintainer asked for the ladder (minimal, then total
+  cloud, then cloud layers, then more), so the intermediate rungs stay as exploratory rows.
+- **Make the CAMS target exploratory.** The maintainer asked for both targets.
+- **Cut `fdir` and the beam/diffuse features.** `fdir` is available from Open-Meteo's IFS and stays as
+  a plain input in G5. The derived DNI, DHI, and plane-of-array features are cut under the derived-
+  feature item above.
+
+Left for the maintainer to decide: **cut the 12 MARS-only variables** (`ssrdc`, `cdir`, `tclw`, `tciw`,
+`tcslw`, `cbh`, `tcrw`, `tcsw`, `tco3`, `uvb`, `fal`, `deg0l`), which removes G4 and shortens the CDS
+queue by about 13 hours? The reviewer recommends the cut because the study's aim is IFS features.
+The maintainer's request named `tclw`, `tciw`, `tcslw`, and `cbh` as variables to try.
+
+## Decisions needed from the maintainer
+
+1. **Cut the 12 MARS-only variables?** (see the review 1 triage above.)
+2. **Smallest effect of interest** for the planned contrasts. Proposal: 0.1 percentage points of
+   capacity on the PV target, and 0.01 on the clearness index on the CAMS target. The past-weather
+   solar page's contrasts between products are mostly larger than this.
+3. **Daylight threshold.** Proposal: top-of-atmosphere horizontal flux above 50 W m⁻².
+
+## Review 2 (correctness and testability) triage
+
+Accepted, all as text changes to this plan: the row-set rules for `cbh` and `cin`; the `expver`
+release rule; the G10 refit on its own rows and the EAC4 end month; the shared-input caveat for the
+CAMS target; the snow censoring; the clearness-index threshold and CAMS top-of-atmosphere source;
+the smallest effect of interest and the Bonferroni level; P0; the hour-convention table and the two
+seam families; the negative-control wording and single column group; the EAC4 interpolation with its
+test; the pairing guard; the second-setting verdict rule; one device. Unverified claims the reviewer
+flagged (the Tegen climatology for ERA5, the 12 May 2026 date for IFS cycle 50r1, Heliosat-4's
+3-hourly aerosol, the 0.1 to 0.2 aerosol optical depth, the IFS availability lists) are labelled
+unverified in the issue and checked before the page states them.
