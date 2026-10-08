@@ -162,7 +162,7 @@ def _local_hour(*, grid: pl.Series) -> np.ndarray:
 
 
 def demand_term(*, clear_sky_index: np.ndarray, grid: pl.Series, swing_mw: float) -> np.ndarray:
-    """Return a demand that rises on dull days: minus `swing_mw` * (1 - index) * a daytime bump.
+    """Return a demand that rises on dull days: swing_mw times (1 - index) times a daytime bump.
 
     Args:
         clear_sky_index: All-sky over clear-sky irradiance on the window grid, 1 where unknown.
