@@ -17,7 +17,7 @@ An hour is kept when all of these hold:
 - no half-hour of the output reads exactly zero, because a zero is a meter dropout or a snow-covered
   panel and the two cannot be told apart (`--keep-zero-hours-with-snow` keeps the ones where
   ERA5 reports snow on the ground, for the exploratory snow arm);
-- the hour is before the commissioning ramp's end and within the span in which every ERA5 file
+- the hour is after the commissioning ramp's end and within the span in which every ERA5 file
   is final ERA5 (`expver` 0001) in every hour.
 
 **The build raises if any ERA5 variable other than `cbh` and `cin` is missing on a kept row.**
@@ -30,9 +30,18 @@ snapshot, and is averaged over the labels one hour earlier and at the label, thr
 `hourly_from_snapshots`, with `cbh` and `cin` each in a call of their own so that a missing snapshot
 makes only that variable's hour missing.
 
-Run it with `uv run python studies/era5_solar_variables/era5_ladder_build_dataset.py`, adding
-`--through-rung g2` to build from only the variables downloaded so far. No coordinate appears in
-the output.
+**The snow variant also restores the hours the outage filter removed where ERA5 reports snow.**
+`drop_outages_and_spikes` drops every run of 24 or more zero hours, and the zero night on either
+side of a day of snow-covered panels joins the day to a run that long. The variant restores those
+hours where `sd` is above zero, so that the exploratory snow arm sees whole snow days.
+
+**The aerosol columns are added to the full build whenever `eac4_aod.parquet` exists**, because the
+aerosol view needs them and the build refuses to overwrite its output. `--no-aerosol` leaves them
+out.
+
+Run it with `uv run --with netcdf4 python
+studies/era5_solar_variables/era5_ladder_build_dataset.py`, adding `--through-rung g2` to build
+from only the variables downloaded so far. No coordinate appears in the output.
 """
 
 import argparse
@@ -65,6 +74,7 @@ from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.hourly_means import KEY_COLUMN, hourly_from_snapshots
 from studies.pv_dataset import (
     CAMS_PATH,
+    IMPLAUSIBLE_CAPACITY_MULTIPLE,
     add_solar_geometry,
     drop_outages_and_spikes,
     nearest_era5_cell,
@@ -220,7 +230,7 @@ def snapshot_hourly(*, tables: dict[str, pl.DataFrame], names: Sequence[str]) ->
 
     Returns:
         One row per (latitude, longitude, time) holding the hourly means that exist. A variable
-        with no value in an hour is absent from the hour's row after the caller's left join.
+        with no value in an hour is null in the hour's row.
     """
 
     def keyed(*, columns: Sequence[str]) -> pl.DataFrame:
@@ -271,7 +281,9 @@ def era5_columns(*, through_rung: RungType) -> tuple[pl.DataFrame, datetime | No
 
     Returns:
         The wide table with one row per (time, latitude, longitude) and one column per variable,
-        the raw downloaded tables (for the missing-value report), and the end of the final span.
+        and the start of the first month that is not final ERA5 in every downloaded file. A build
+        with no downloaded variable reads the total cloud cover's releases, because the held copy
+        carries no `expver`.
     """
     held = (
         read_era5(source="cds")
@@ -282,7 +294,7 @@ def era5_columns(*, through_rung: RungType) -> tuple[pl.DataFrame, datetime | No
     names = downloaded_variables(through_rung=through_rung)
     tables = {name: read_downloaded(variable=name) for name in names}
     raise_if_releases_differ(tables=tables)
-    end = span_end(tables=tables)
+    end = span_end(tables=tables or {"tcc": read_downloaded(variable="tcc")})
 
     snapshot_names = [name for name in names if name in INSTANTANEOUS_VARIABLES]
     accumulation_names = [name for name in names if name in ACCUMULATED_VARIABLES]
@@ -437,6 +449,33 @@ def missing_value_shares(*, rows: pl.DataFrame, names: Sequence[str]) -> str:
     return "\n".join(lines)
 
 
+def restore_outage_hours(
+    *, raw_power: pl.DataFrame, kept_power: pl.DataFrame, sites: pl.DataFrame
+) -> pl.DataFrame:
+    """Put back the hours the outage filter removed, apart from meter spikes.
+
+    The snow variant keeps a removed hour only if ERA5 then reports snow, and applies that test
+    after the ERA5 join, in the zero rule. An hour above the spike limit stays removed.
+
+    Args:
+        raw_power: Hourly power before `drop_outages_and_spikes`.
+        kept_power: Hourly power after it.
+        sites: The site list, for each site's capacity.
+
+    Returns:
+        `kept_power` and the removed hours that are not spikes, sorted by site and time.
+    """
+    removed = (
+        raw_power.join(kept_power.select("site", "time"), on=["site", "time"], how="anti")
+        .join(sites.select("site", "effective_capacity_mw"), on="site")
+        .filter(
+            pl.col("power_mw") <= IMPLAUSIBLE_CAPACITY_MULTIPLE * pl.col("effective_capacity_mw")
+        )
+        .select(kept_power.columns)
+    )
+    return pl.concat([kept_power, removed]).sort("site", "time")
+
+
 def build(
     *, through_rung: RungType, keep_zero_hours_with_snow: bool, with_aerosol: bool
 ) -> tuple[pl.DataFrame, str]:
@@ -466,7 +505,10 @@ def build(
         sites_with_cells.select(*NEAREST_CELL_COLUMNS).n_unique(),
     )
 
-    power = drop_outages_and_spikes(power=solar_hourly_power(sites=sites), sites=sites)
+    raw_power = solar_hourly_power(sites=sites)
+    power = drop_outages_and_spikes(power=raw_power, sites=sites)
+    if keep_zero_hours_with_snow:
+        power = restore_outage_hours(raw_power=raw_power, kept_power=power, sites=sites)
     joined = (
         power.join(sites_with_cells.drop("time_series_id"), on=["site", "effective_capacity_mw"])
         .join(
@@ -491,6 +533,9 @@ def build(
     if keep_zero_hours_with_snow:
         zero_rule = zero_rule | (pl.col("sd") > 0.0)
     kept = drop_commissioning_ramp(dataset=daylight.filter(zero_rule))
+    if kept.select("site", "time").is_duplicated().any():
+        msg = "the kept rows hold a duplicate (site, time)"
+        raise ValueError(msg)
     if with_aerosol:
         kept = kept.join(
             aerosol_columns(labels=kept.select("site", "time"), sites=sites),
@@ -590,7 +635,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--through-rung", choices=RUNGS, default=RUNGS[-1])
     parser.add_argument("--keep-zero-hours-with-snow", action="store_true")
-    parser.add_argument("--with-aerosol", action="store_true")
+    parser.add_argument("--no-aerosol", action="store_true")
     arguments = parser.parse_args()
     variant = "snow_zero_hours" if arguments.keep_zero_hours_with_snow else "main"
     frame_path = dataset_path(through_rung=arguments.through_rung, variant=variant)
@@ -600,7 +645,9 @@ def main() -> int:
     frame, checks = build(
         through_rung=arguments.through_rung,
         keep_zero_hours_with_snow=arguments.keep_zero_hours_with_snow,
-        with_aerosol=arguments.with_aerosol,
+        with_aerosol=not arguments.no_aerosol
+        and arguments.through_rung == RUNGS[-1]
+        and EAC4_PATH.exists(),
     )
     frame.write_parquet(frame_path)
     report_path.write_text(checks)

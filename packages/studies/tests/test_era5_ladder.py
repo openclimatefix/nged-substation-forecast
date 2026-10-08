@@ -42,6 +42,10 @@ def test_every_ladder_variable_has_exactly_one_hour_class():
 
     assert sorted(ACCUMULATED_VARIABLES + INSTANTANEOUS_VARIABLES) == sorted(laddered)
     assert not set(ACCUMULATED_VARIABLES) & set(INSTANTANEOUS_VARIABLES)
+    # ECMWF's documentation: these eight are totals over the hour ending at the label.
+    assert set(ACCUMULATED_VARIABLES) == {
+        "ssrd", "ssrdc", "fdir", "cdir", "strd", "tp", "sf", "uvb",
+    }  # fmt: skip
 
 
 def test_the_ladder_holds_the_34_variables_of_the_plan_once_each():
@@ -107,14 +111,23 @@ def test_the_negative_control_has_as_many_columns_as_g9_and_permutes_only_later_
 
 
 def test_an_hours_accumulation_becomes_its_mean_rate():
-    frame = pl.DataFrame({"ssrd": [3600.0, 7200.0], "tp": [0.001, 0.0], "cape": [1.0, 2.0]})
+    frame = pl.DataFrame(
+        {
+            "ssrd": [3600.0, 7200.0],
+            "uvb": [3600.0, 0.0],
+            "tp": [0.001, 0.0],
+            "sf": [0.002, 0.0],
+        }
+    )
 
     converted = frame.select(
-        accumulation_to_hourly_rate(variable="ssrd"), accumulation_to_hourly_rate(variable="tp")
+        accumulation_to_hourly_rate(variable=name) for name in ("ssrd", "uvb", "tp", "sf")
     )
 
     assert converted["ssrd"].to_list() == [1.0, 2.0]
+    assert converted["uvb"].to_list() == [1.0, 0.0]
     assert converted["tp"].to_list() == pytest.approx([1.0, 0.0])
+    assert converted["sf"].to_list() == pytest.approx([2.0, 0.0])
 
 
 def test_an_instantaneous_variable_is_not_converted_as_an_accumulation():
@@ -290,7 +303,7 @@ def test_an_hour_beyond_the_last_analysis_time_is_missing():
     assert result["aod550"].is_null().to_list() == [False, True, True]
 
 
-def test_the_result_has_one_row_per_label_in_label_order():
+def test_the_result_is_sorted_by_site_and_time():
     aerosol = _aerosol_ramp(site="A", per_hour=0.01, start_value=0.1)
     labels = _labels(site="A", hours=[9, 5, 7])
 

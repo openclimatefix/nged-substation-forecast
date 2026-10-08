@@ -680,6 +680,15 @@ STUDY_DATA_DIR: Final[Path] = study_dir_for(study="beam_diffuse_split")
 STUDY_INPUTS_DIR: Final[Path] = STUDY_DATA_DIR / "inputs"
 """The joined `beam_diffuse_dataset_<source>.parquet` frames that `build_dataset.py` writes."""
 
+ERA5_LADDER_DIR: Final[Path] = study_dir_for(study="era5_solar_variables")
+"""The ERA5 variable ladder study's folder."""
+
+ERA5_LADDER_INPUTS_DIR: Final[Path] = ERA5_LADDER_DIR / "inputs"
+"""The joined hourly frames and their checks that `era5_ladder_build_dataset.py` writes."""
+
+ERA5_LADDER_RESULTS_DIR: Final[Path] = ERA5_LADDER_DIR / "results"
+"""The ladder study's out-of-fold losses, report, and interval tables."""
+
 ENS_FORECAST_HORIZONS_DIR: Final[Path] = study_dir_for(study="ens_forecast_horizons")
 """The ENS forecast-horizons study's results. Its member extract is in `ENS_PRODUCT_DIR`."""
 

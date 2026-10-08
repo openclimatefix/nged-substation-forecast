@@ -182,7 +182,8 @@ Each of the four contrasts below is run on both targets, so there are eight plan
 **Planned verdicts use a Bonferroni-adjusted level.** With eight planned contrasts, the family-wise
 level of 5% becomes 0.625% per contrast (a 99.375% interval, `bootstrap_difference_at_level`). Every
 interval is also shown at 95%, labelled exploratory. The page states each planned result as "rules
-out a gain larger than X" using the upper bound, with a smallest effect of interest fixed before any
+out a gain larger than X" using the lower bound of the error difference (treatment minus
+reference, so a negative difference is a gain), with a smallest effect of interest fixed before any
 result (0.1 percentage points of capacity for PV, 0.01 for the clearness index).
 
 **Every other number is exploratory:** each rung against G0, each rung against the one below it, the

@@ -3,15 +3,20 @@
 One-off throwaway script for the study planned in
 <https://github.com/openclimatefix/nged-substation-forecast/pull/1097>. It reads the per-row losses
 that `era5_ladder_fit.py` saved and refits nothing. It writes `report.md` and four tables
-(`leaderboard.parquet`, `contrasts.parquet`, `splits.parquet`, `build_notes.md`), which the chart
-script and the page read, into `data/studies/per_study/era5_solar_variables/results/`. Every number
-on the page comes from `report.md`.
+(`leaderboard.parquet`, `contrasts.parquet`, `splits.parquet`, `worst_days.parquet`) into
+`data/studies/per_study/era5_solar_variables/results/`, each name ending in the variant and the
+highest rung, so a report on a partial build, the full build, and the snow variant never overwrite
+one another. The chart script reads the tables. Every number on the page comes from `report.md`, and
+the split tables it prints are the same numbers as `splits.parquet`.
 
 **Planned contrasts are those the plan named before any result existed**: P0 (every ERA5 variable
 against the minimal set), P1 (total cloud), P2 (the three cloud layers), and P3 (anything beyond the
 cloud layers), each on both targets. Each is reported at the Bonferroni-adjusted level for the
 family of eight, at 95%, and at the second hyperparameter setting, and its verdict stands only if
 both settings agree. Every other contrast is exploratory.
+
+**The adjusted intervals rest on 2,000 resamples**, so each tail of a 99.375% interval is set by
+about 6 of them, and a bound can move by Monte Carlo noise. The page says so.
 
 **The correlation** is the Pearson correlation of the out-of-fold prediction with the measured
 value, over all rows, as a fraction of each farm's capacity, with an interval from the same
@@ -29,7 +34,6 @@ import logging
 import sys
 from collections.abc import Sequence
 from itertools import pairwise
-from pathlib import Path
 from typing import Final
 
 import numpy as np
@@ -46,7 +50,6 @@ from era5_ladder_arms import (
     PLANNED_CONTRASTS,
     POSITIVE_CONTROL_ARM,
     PRIMARY_SETTING,
-    RESULTS_DIR,
     SENSITIVITY_SETTING,
     SIGNED_ERROR,
     SMALLEST_EFFECT,
@@ -58,6 +61,7 @@ from era5_ladder_arms import (
     arms_path,
     checks_path,
     dataset_path,
+    report_paths,
     results_path,
 )
 from studies.bootstrap import (
@@ -94,15 +98,10 @@ WORST_DAY_COUNT: Final[int] = 20
 SPLIT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (("g1", "g0"), ("g2", "g0"), ("g9", "g0"))
 """The (treatment, reference) contrasts the regime and season splits show."""
 
-REPORT_PATH: Final[Path] = RESULTS_DIR / "report.md"
-LEADERBOARD_PATH: Final[Path] = RESULTS_DIR / "leaderboard.parquet"
-CONTRASTS_PATH: Final[Path] = RESULTS_DIR / "contrasts.parquet"
-SPLITS_PATH: Final[Path] = RESULTS_DIR / "splits.parquet"
-WORST_DAYS_PATH: Final[Path] = RESULTS_DIR / "worst_days.parquet"
-
 NO_GAIN_BEYOND_EFFECT: Final[str] = "rules out a gain larger than the smallest effect"
 GAIN_NOT_EXCLUDED: Final[str] = "does not rule out a gain larger than the smallest effect"
 IMPROVES: Final[str] = "improves"
+IMPROVES_BY_LESS_THAN_EFFECT: Final[str] = "improves, by less than the smallest effect"
 WORSENS: Final[str] = "worsens"
 UNRESOLVED: Final[str] = "unresolved"
 
@@ -118,12 +117,14 @@ def contrast_verdict(*, lower: float, upper: float, smallest_effect: float) -> s
         smallest_effect: The smallest improvement worth acting on, in the same unit.
 
     Returns:
-        `improves` if the interval is below zero, `worsens` if it is above zero, otherwise
-        `rules out a gain larger than the smallest effect` if the lower bound is above minus the
-        smallest effect, and otherwise `does not rule out a gain larger than the smallest effect`.
+        `improves` if the interval is below zero and reaches past the smallest effect, and
+        `improves, by less than the smallest effect` if it is below zero and does not. `worsens`
+        if it is above zero. Otherwise `rules out a gain larger than the smallest effect` if the
+        lower bound is above minus the smallest effect, and `does not rule out a gain larger than
+        the smallest effect` if it is not.
     """
     if upper < 0.0:
-        return IMPROVES
+        return IMPROVES_BY_LESS_THAN_EFFECT if lower > -smallest_effect else IMPROVES
     if lower > 0.0:
         return WORSENS
     if lower > -smallest_effect:
@@ -138,15 +139,34 @@ def is_near_line(*, lower: float, upper: float) -> bool:
 
 
 def read_losses(*, key: FitKey) -> pl.DataFrame:
-    """Read one fit's losses, adding the error in W m⁻² for the CAMS target.
+    """Read one fit's per-row losses, and the extra sensitivity-setting fit's if it exists.
 
     Args:
-        key: Which fit.
+        key: Which fit. The extra fit shares its variant, rung, and target, and holds arms at the
+            sensitivity setting that the main fit did not.
 
     Returns:
         The per-row losses.
+
+    Raises:
+        ValueError: If the two files hold the same arm at the same setting.
     """
-    return pl.read_parquet(results_path(key=key))
+    losses = pl.read_parquet(results_path(key=key))
+    if key.view != "ladder":
+        return losses
+    extra_path = results_path(key=key._replace(view="ladder_extra"))
+    if not extra_path.exists():
+        return losses
+    extra = pl.read_parquet(extra_path)
+    pairs = (
+        extra.select("arm", "setting")
+        .unique()
+        .join(losses.select("arm", "setting").unique(), on=["arm", "setting"])
+    )
+    if not pairs.is_empty():
+        msg = f"the extra fit repeats arms already fitted: {pairs.to_dicts()}"
+        raise ValueError(msg)
+    return pl.concat([losses, extra])
 
 
 def with_watts(*, losses: pl.DataFrame, dataset: pl.DataFrame) -> pl.DataFrame:
@@ -451,27 +471,28 @@ def planned_verdicts(*, contrasts: pl.DataFrame) -> pl.DataFrame:
     Returns:
         One row per planned contrast with both settings' verdicts and the combined verdict.
     """
+    if "planned" not in contrasts.columns:
+        return pl.DataFrame()
     rows: list[dict[str, object]] = []
     planned = contrasts.filter(pl.col("planned"))
     for (target, label), group in planned.group_by("target", "label", maintain_order=True):
         by_setting = {row["setting"]: row for row in group.to_dicts()}
         primary = by_setting[PRIMARY_SETTING]
         second = by_setting.get(SENSITIVITY_SETTING)
-        combined = (
-            combine_setting_verdicts(
-                primary=primary["verdict_adjusted"],
-                sensitivity=second["verdict_adjusted"],
-                unresolved=UNRESOLVED,
-            )
-            if second is not None
-            else "second setting missing"
+        if second is None:
+            msg = f"planned contrast {label} on the {target} target has no sensitivity-setting run"
+            raise ValueError(msg)
+        combined = combine_setting_verdicts(
+            primary=primary["verdict_adjusted"],
+            sensitivity=second["verdict_adjusted"],
+            unresolved=UNRESOLVED,
         )
         rows.append(
             {
                 "target": target,
                 "label": label,
                 "primary": primary["verdict_adjusted"],
-                "sensitivity": None if second is None else second["verdict_adjusted"],
+                "sensitivity": second["verdict_adjusted"],
                 "combined": combined,
             }
         )
@@ -506,7 +527,8 @@ def split_rows(
     if "regime_era5" in in_setting.columns:
         groupings.append(("regime_era5", ("regime_era5",)))
     for split, columns in groupings:
-        for key, subset in in_setting.group_by(*columns, maintain_order=True):
+        known = in_setting.filter(pl.all_horizontal(pl.col(name).is_not_null() for name in columns))
+        for key, subset in known.group_by(*columns, maintain_order=True):
             group = " / ".join(str(part) for part in key)
             for treatment, reference in contrasts:
                 rows.append(
@@ -737,6 +759,29 @@ def render_worst_days(*, worst: pl.DataFrame) -> str:
     return table(rows=rows, header=["target", "farm", "month", "g0 error", "g9 error", *context])
 
 
+def near_line_without_second_setting(*, contrasts: pl.DataFrame) -> pl.DataFrame:
+    """List the exploratory contrasts near the 5% line that have no second-setting run.
+
+    Args:
+        contrasts: The contrast table.
+
+    Returns:
+        The (target, treatment, reference) of each such contrast at the primary setting.
+    """
+    if "near_line" not in contrasts.columns:
+        return pl.DataFrame()
+    second = contrasts.filter(pl.col("setting") == SENSITIVITY_SETTING).select(
+        "target", "treatment", "reference"
+    )
+    return (
+        contrasts.filter(
+            (pl.col("setting") == PRIMARY_SETTING) & pl.col("near_line") & ~pl.col("planned")
+        )
+        .select("target", "treatment", "reference")
+        .join(second, on=["target", "treatment", "reference"], how="anti")
+    )
+
+
 def render_report(
     *,
     variant: str,
@@ -773,6 +818,23 @@ def render_report(
             for arm, columns in info["arms"].items()  # ty: ignore[unresolved-attribute]
         )
         parts.append("")
+    near = near_line_without_second_setting(contrasts=contrasts)
+    if not near.is_empty():
+        arms_to_add = sorted({*near["treatment"].to_list(), *near["reference"].to_list()})
+        parts += [
+            "## Exploratory contrasts near the 5% line with no second-setting run",
+            "",
+            *(
+                f"- {row['target']}: {row['treatment']} minus {row['reference']}"
+                for row in near.iter_rows(named=True)
+            ),
+            "",
+            (
+                "Fit the second setting with `era5_ladder_fit.py --view extra_sensitivity "
+                f"--sensitivity-arms {' '.join(arms_to_add)}`, then re-run the report."
+            ),
+            "",
+        ]
     parts += ["## Planned verdicts, both settings combined", ""]
     parts.append(
         table(
@@ -825,9 +887,8 @@ def main() -> int:
     arguments = parser.parse_args()
     through_rung: RungType = arguments.through_rung
     variant: str = arguments.variant
-    refuse_to_overwrite(
-        paths=[REPORT_PATH, LEADERBOARD_PATH, CONTRASTS_PATH, SPLITS_PATH, WORST_DAYS_PATH]
-    )
+    paths = report_paths(variant=variant, through_rung=through_rung)
+    refuse_to_overwrite(paths=list(paths))
 
     dataset = pl.read_parquet(dataset_path(through_rung=through_rung, variant=variant))
     boards: dict[TargetType, pl.DataFrame] = {}
@@ -867,13 +928,13 @@ def main() -> int:
     contrasts = pl.concat(contrast_frames, how="diagonal")
     verdicts = planned_verdicts(contrasts=contrasts)
     leaderboard_table = pl.concat(list(boards.values()), how="diagonal")
-    leaderboard_table.write_parquet(LEADERBOARD_PATH)
-    contrasts.write_parquet(CONTRASTS_PATH)
+    leaderboard_table.write_parquet(paths.leaderboard)
+    contrasts.write_parquet(paths.contrasts)
     if split_frames:
-        pl.concat(split_frames, how="diagonal").write_parquet(SPLITS_PATH)
+        pl.concat(split_frames, how="diagonal").write_parquet(paths.splits)
     worst = pl.concat(worst_frames, how="diagonal") if worst_frames else pl.DataFrame()
     if not worst.is_empty():
-        worst.write_parquet(WORST_DAYS_PATH)
+        worst.write_parquet(paths.worst_days)
     report = render_report(
         variant=variant,
         through_rung=through_rung,
@@ -884,8 +945,8 @@ def main() -> int:
         build_notes=checks_path(through_rung=through_rung, variant=variant).read_text(),
         worst=worst,
     )
-    REPORT_PATH.write_text(report)
-    _LOG.info("wrote %s", REPORT_PATH)
+    paths.report.write_text(report)
+    _LOG.info("wrote %s", paths.report)
     return 0
 
 

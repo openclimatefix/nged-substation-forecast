@@ -7,23 +7,24 @@ issue, and the answer, not the code, is what gets kept.
 **The question: if an XGBoost model is given every ERA5 variable that could plausibly matter, does it
 predict the output of NGED's six solar farms better than an XGBoost model given the minimal ERA5
 set?** The same question is asked of a second target, CAMS satellite clearness index at the same
-farms. The minimal set is ERA5's downward solar radiation (`ssrd`) and 2 m temperature (`t2m`). The
-decision it feeds is which ECMWF IFS variables to use in a solar power forecast, and whether it is
-worth fetching the variables that only ECMWF's full archive (MARS) serves.
+farms. The minimal set is ERA5's downward solar radiation (`ssrd`) and 2 m temperature (`t2m`), with
+solar geometry and the clearness index. The decision the study feeds is which ECMWF IFS variables to
+use in a solar power forecast, and whether it is worth fetching the variables that only ECMWF's full
+archive (MARS) serves.
 
-**ERA5 is an upper-bound screen.** It was produced by a frozen 2016 version of the IFS and its fields
-come from short forecasts, so a variable that helps an XGBoost model trained on ERA5 may add only
-noise to a model fed day-3 IFS forecasts. The plan explains why, and what follow-up the result
-calls for.
+**ERA5 is an upper-bound screen.** ERA5 was produced by a frozen 2016 version of the IFS and its
+fields come from short forecasts, so a variable that helps an XGBoost model trained on ERA5 may add
+only noise to an XGBoost model fed day-3 IFS forecasts. The plan explains why, and what follow-up the
+result calls for.
 
 ## The scripts, in the order they run
 
 | Script | What it does |
 |---|---|
 | `era5_ladder_arms.py` | The arms, targets, planned contrasts, and paths that every other script imports |
-| `era5_ladder_build_dataset.py` | Joins output, CAMS, and every downloaded ERA5 variable into one hourly frame per farm; `--through-rung g2` builds from the variables downloaded so far, and `--keep-zero-hours-with-snow` builds the snow variant |
-| `era5_ladder_fit.py` | Fits every arm out of fold for both targets; `--aerosol` adds the EAC4 aerosol view |
-| `era5_ladder_report.py` | Reads the saved losses and writes `report.md` and the interval tables |
+| `era5_ladder_build_dataset.py` | Joins output, CAMS, and every downloaded ERA5 variable into one hourly frame holding all six farms. Run it with `uv run --with netcdf4`. `--through-rung g2` builds from the variables downloaded so far, `--keep-zero-hours-with-snow` builds the snow variant, and the full build adds the EAC4 aerosol columns whenever the aerosol download exists |
+| `era5_ladder_fit.py` | Fits every arm out of fold for both targets. `--view aerosol` fits the aerosol view, and `--view extra_sensitivity --sensitivity-arms ...` adds the second hyperparameter setting for arms whose contrasts lie near the 5% line |
+| `era5_ladder_report.py` | Reads the saved losses and writes `report.md` and the interval tables, each named for the variant and the highest rung |
 | `era5_ladder_charts.py` | Draws the page's figures into `docs/studies/assets/` |
 
 The ERA5 variables come from `studies/weather_downloads/fetch_era5_solar_variables.py`, and the
@@ -43,8 +44,8 @@ aerosol from `fetch_cams_eac4_aod.py`. The tested machinery is `studies.era5_lad
 - **`g10` and `g9_aerosol_rows`** are `g9` with and without CAMS EAC4 aerosol optical depth, on the
   rows that EAC4 covers, with the folds cut again on that span.
 
-Every arm is scored on exactly the same rows, and `era5_ladder_fit.py` raises if two arms of one fit
-hold different rows.
+Every arm of one fit is scored on exactly the same rows, and `era5_ladder_fit.py` raises if two arms
+of one fit hold different rows. The aerosol view has its own rows, which EAC4 covers.
 
 ## What each output holds
 
@@ -56,7 +57,7 @@ Everything is under `data/studies/per_study/era5_solar_variables/`.
 | `inputs/checks_<variant>_through_<rung>.md` | Row counts, the final-ERA5 span, and each missing-under-clear-sky variable's missing share |
 | `results/losses_<variant>_through_<rung>_<target>_<view>.parquet` | One row per (arm, setting, farm, time, seed) with the losses. The prediction is the measured target plus `signed_error_capped_mw` |
 | `results/arms_<...>.json` | Each arm's columns, the device, the settings, and the row count |
-| `results/report.md`, `leaderboard.parquet`, `contrasts.parquet`, `splits.parquet`, `worst_days.parquet` | The numbers the page quotes, and the tables the charts read |
+| `results/report_<variant>_through_<rung>.md`, and the `leaderboard`, `contrasts`, `splits`, and `worst_days` parquet files named in the same way | The numbers the page quotes, and the tables the charts read |
 
 A re-run refuses to overwrite a result. Move the old one into a `superseded/` folder first.
 

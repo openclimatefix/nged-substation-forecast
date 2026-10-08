@@ -23,15 +23,12 @@ from studies.era5_ladder import (
     negative_control_features,
     rung_features,
 )
-from studies.sources import study_dir_for
+from studies.sources import ERA5_LADDER_INPUTS_DIR, ERA5_LADDER_RESULTS_DIR
 
-STUDY_DIR: Final[Path] = study_dir_for(study="era5_solar_variables")
-"""Where the study's datasets and results live, under `data/studies/per_study/`."""
-
-INPUTS_DIR: Final[Path] = STUDY_DIR / "inputs"
+INPUTS_DIR: Final[Path] = ERA5_LADDER_INPUTS_DIR
 """The built frames and their checks."""
 
-RESULTS_DIR: Final[Path] = STUDY_DIR / "results"
+RESULTS_DIR: Final[Path] = ERA5_LADDER_RESULTS_DIR
 """The out-of-fold losses, the arms' column lists, the report, and the interval tables."""
 
 TargetType = Literal["pv", "cams"]
@@ -43,8 +40,13 @@ TARGETS: Final[tuple[TargetType, ...]] = ("pv", "cams")
 TARGET_COLUMNS: Final[dict[TargetType, str]] = {"pv": "power_mw", "cams": "cams_clearness_index"}
 """The column each target's XGBoost models predict."""
 
-ViewType = Literal["ladder", "aerosol_rows"]
-"""Which rows a fit used: every kept row, or only the rows that EAC4 aerosol covers."""
+ViewType = Literal["ladder", "ladder_extra", "aerosol_rows"]
+"""Which fit a losses file holds.
+
+`ladder` is every arm on every kept row, `ladder_extra` is further arms fitted at the second
+hyperparameter setting only (arms near the 5% line), and `aerosol_rows` is the aerosol rung and its
+reference on the rows that EAC4 aerosol covers.
+"""
 
 METRIC: Final[str] = "absolute_error_capped_fraction_of_capacity"
 """The loss column the study ranks on.
@@ -117,22 +119,22 @@ DROP_PREFIX: Final[str] = "drop_"
 """The prefix of a drop-one-group arm's name, followed by the dropped rung."""
 
 ARM_LABELS: Final[dict[str, str]] = {
-    "g0": "G0 minimal: ssrd, t2m",
+    "g0": "G0 minimal (ssrd, t2m)",
     "g1": "G1 + total cloud",
-    "g2": "G2 + low, medium, high cloud",
+    "g2": "G2 + cloud layers",
     "g3": "G3 + clear-sky irradiance",
-    "g4": "G4 + cloud water and base",
+    "g4": "G4 + cloud water, base",
     "g5": "G5 + direct beam",
-    "g6": "G6 + wind and thermal radiation",
-    "g7": "G7 + humidity and haze",
-    "g8": "G8 + snow and albedo",
-    "g9": "G9 + every other ERA5 variable",
-    "g10": "G10 + CAMS aerosol (not ERA5)",
-    "g9_aerosol_rows": "G9 on the aerosol rows",
-    NEGATIVE_CONTROL_ARM: "Negative control: G2 + permuted G3 to G9",
-    POSITIVE_CONTROL_ARM: "Positive control: G2 + CAMS irradiance",
-    KNOWN_ANSWER_ARM: "ssrd and sun position only",
-    **{f"{DROP_PREFIX}{rung}": f"G9 without {rung.upper()}'s variables" for rung in RUNGS[1:]},
+    "g6": "G6 + wind, thermal radiation",
+    "g7": "G7 + humidity, haze",
+    "g8": "G8 + snow, albedo",
+    "g9": "G9 + all other ERA5",
+    "g10": "G10 + CAMS aerosol",
+    "g9_aerosol_rows": "G9 on aerosol rows",
+    NEGATIVE_CONTROL_ARM: "Negative control",
+    POSITIVE_CONTROL_ARM: "Positive control (+ CAMS)",
+    KNOWN_ANSWER_ARM: "ssrd and sun only",
+    **{f"{DROP_PREFIX}{rung}": f"G9 without {rung.upper()}" for rung in RUNGS[1:]},
 }
 """The words each arm carries on a chart and in the report."""
 
@@ -177,6 +179,55 @@ def checks_path(*, through_rung: RungType, variant: str) -> Path:
     return INPUTS_DIR / f"checks_{variant}_through_{through_rung}.md"
 
 
+def report_path(*, name: str, variant: str, through_rung: RungType) -> Path:
+    """Return where one of the report's outputs is written, keyed by variant and rung.
+
+    Args:
+        name: The output's name and extension, such as `report.md` or `contrasts.parquet`.
+        variant: `main` or `snow_zero_hours`.
+        through_rung: The highest rung the report covers.
+
+    Returns:
+        The path, so that a report on a partial build, the full build, and the snow variant never
+        overwrite or feed one another.
+    """
+    stem, _, extension = name.rpartition(".")
+    return RESULTS_DIR / f"{stem}_{variant}_through_{through_rung}.{extension}"
+
+
+class ReportPaths(NamedTuple):
+    """Where the report script writes its outputs for one variant and rung.
+
+    Attributes:
+        report: The markdown report.
+        leaderboard: Each arm's error and correlation.
+        contrasts: Every contrast with its intervals.
+        splits: The regime, season, farm, and hour-of-day splits.
+        worst_days: The minimal arm's worst farm-days.
+    """
+
+    report: Path
+    leaderboard: Path
+    contrasts: Path
+    splits: Path
+    worst_days: Path
+
+
+def report_paths(*, variant: str, through_rung: RungType) -> ReportPaths:
+    """Return the report's output paths, keyed by variant and rung."""
+    return ReportPaths(
+        report=report_path(name="report.md", variant=variant, through_rung=through_rung),
+        leaderboard=report_path(
+            name="leaderboard.parquet", variant=variant, through_rung=through_rung
+        ),
+        contrasts=report_path(name="contrasts.parquet", variant=variant, through_rung=through_rung),
+        splits=report_path(name="splits.parquet", variant=variant, through_rung=through_rung),
+        worst_days=report_path(
+            name="worst_days.parquet", variant=variant, through_rung=through_rung
+        ),
+    )
+
+
 def results_path(*, key: FitKey) -> Path:
     """Return where one fit's per-row losses are written."""
     stem = f"{key.variant}_through_{key.through_rung}_{key.target}_{key.view}"
@@ -211,7 +262,8 @@ def arm_features(*, target: TargetType, through_rung: RungType) -> dict[str, tup
         for rung in RUNGS[1:]:
             arms[f"{DROP_PREFIX}{rung}"] = drop_one_group_features(dropped=rung)
     if target == "pv":
-        arms[POSITIVE_CONTROL_ARM] = (*rung_features(rung="g2"), "cams_ghi_w_m2")
+        if RUNGS.index(through_rung) >= RUNGS.index("g2"):
+            arms[POSITIVE_CONTROL_ARM] = (*rung_features(rung="g2"), "cams_ghi_w_m2")
     else:
         arms[KNOWN_ANSWER_ARM] = (*SHARED_FEATURES, "ssrd")
     return arms

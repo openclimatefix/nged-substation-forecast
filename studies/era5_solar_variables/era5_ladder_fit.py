@@ -9,7 +9,7 @@ every arm's columns, the device, and the hyperparameter settings, under
 
 **Every arm is scored on exactly the same rows.** The script raises if two arms of one fit hold
 different (farm, time, seed) rows, and it raises if an arm is shown a column that is missing on any
-row, except `cbh` and `cin`, whose missing values are kept as values.
+row, except `cbh`, `cin`, and the two derived indices, whose missing values are kept as values.
 
 **The two targets share their folds and rows.** The output target is each farm's output in MW,
 scored as a fraction of the farm's capacity. The CAMS target is CAMS clearness index, with the
@@ -20,6 +20,11 @@ and left out of its training.
 **The hyperparameter settings.** Every arm is fitted at `PRIMARY_HYPER_PARAMETERS`. The arms of the
 planned contrasts are also fitted at `SENSITIVITY_HYPER_PARAMETERS`; `--sensitivity-arms` adds more.
 Column subsampling is off, so an arm with more columns has no advantage from the count.
+
+**`--view` chooses what is fitted.** `ladder` (the default) fits the arms on every kept row.
+`aerosol` fits the aerosol view, and `both` fits the two. `extra_sensitivity` fits the arms named by
+`--sensitivity-arms` at the second setting only, for contrasts that turn out to lie near the 5%
+line; the report joins those losses to the ladder's.
 
 **The aerosol view refits `g9` and `g10` on the rows that EAC4 covers**, with the folds cut again on
 that shorter span, because the two arms must be scored on the same rows.
@@ -179,7 +184,11 @@ def target_view(*, frame: pl.DataFrame, target: TargetType) -> pl.DataFrame:
 
 
 def jobs_for(
-    *, arms: dict[str, tuple[str, ...]], target: TargetType, sensitivity_arms: Sequence[str]
+    *,
+    arms: dict[str, tuple[str, ...]],
+    target: TargetType,
+    sensitivity_arms: Sequence[str],
+    sensitivity_only: bool = False,
 ) -> list[Job]:
     """Return the fits to run: every arm at the primary setting, and some at the second.
 
@@ -187,14 +196,15 @@ def jobs_for(
         arms: Each arm's name and columns.
         target: The target the fits predict.
         sensitivity_arms: The arms also fitted at the sensitivity setting.
+        sensitivity_only: Fit every arm at the sensitivity setting alone.
 
     Returns:
         One job per (arm, setting).
     """
     jobs: list[Job] = []
     for name, features in arms.items():
-        settings = [PRIMARY_SETTING]
-        if name in sensitivity_arms:
+        settings = [] if sensitivity_only else [PRIMARY_SETTING]
+        if sensitivity_only or name in sensitivity_arms:
             settings.append(SENSITIVITY_SETTING)
         jobs.extend(
             (name, setting, TARGET_COLUMNS[target], features, SETTINGS[setting], False)
@@ -232,6 +242,7 @@ def fit_one_view(
     sensitivity_arms: Sequence[str],
     device: DeviceType,
     max_workers: int,
+    sensitivity_only: bool = False,
 ) -> pl.DataFrame:
     """Fit every arm of one view for one target and check that the arms share their rows.
 
@@ -242,6 +253,7 @@ def fit_one_view(
         sensitivity_arms: The arms also fitted at the sensitivity setting.
         device: XGBoost's device.
         max_workers: How many (arm, farm) fits run at once.
+        sensitivity_only: Fit every arm at the sensitivity setting alone.
 
     Returns:
         The stacked per-row losses of every arm.
@@ -250,7 +262,12 @@ def fit_one_view(
     view = target_view(frame=frame, target=target)
     losses = run_all(
         dataset=view,
-        jobs=jobs_for(arms=arms, target=target, sensitivity_arms=sensitivity_arms),
+        jobs=jobs_for(
+            arms=arms,
+            target=target,
+            sensitivity_arms=sensitivity_arms,
+            sensitivity_only=sensitivity_only,
+        ),
         max_workers=max_workers,
         device=device,
     )
@@ -325,6 +342,46 @@ def run_ladder_view(
         _LOG.info("%s target: wrote %d loss rows", target, losses.height)
 
 
+def run_extra_sensitivity_view(
+    *,
+    frame: pl.DataFrame,
+    variant: str,
+    through_rung: RungType,
+    arm_names: Sequence[str],
+    device: DeviceType,
+    max_workers: int,
+) -> None:
+    """Fit the named arms at the sensitivity setting alone, for the report to join to the ladder.
+
+    Args:
+        frame: The kept rows with folds and permuted columns.
+        variant: `main` or `snow_zero_hours`.
+        through_rung: The highest rung the frame holds.
+        arm_names: The arms to fit.
+        device: XGBoost's device.
+        max_workers: How many (arm, farm) fits run at once.
+    """
+    for target in TARGETS:
+        arms = {
+            name: features
+            for name, features in arm_features(target=target, through_rung=through_rung).items()
+            if name in arm_names
+        }
+        key = FitKey(variant=variant, through_rung=through_rung, target=target, view="ladder_extra")
+        refuse_to_overwrite(paths=[results_path(key=key), arms_path(key=key)])
+        losses = fit_one_view(
+            frame=frame,
+            arms=arms,
+            target=target,
+            sensitivity_arms=arm_names,
+            device=device,
+            max_workers=max_workers,
+            sensitivity_only=True,
+        )
+        losses.write_parquet(results_path(key=key))
+        write_arms(arms=arms, key=key, device=device, rows=frame.height)
+
+
 def run_aerosol_view(
     *,
     frame: pl.DataFrame,
@@ -372,7 +429,12 @@ def main() -> int:
     parser.add_argument("--variant", choices=("main", "snow_zero_hours"), default="main")
     parser.add_argument("--arms", nargs="*", default=None, help="Fit only these arms.")
     parser.add_argument("--sensitivity-arms", nargs="*", default=list(SENSITIVITY_ARMS))
-    parser.add_argument("--aerosol", action="store_true", help="Also run the aerosol view.")
+    parser.add_argument(
+        "--view",
+        choices=("ladder", "aerosol", "both", "extra_sensitivity"),
+        default="ladder",
+        help="What to fit.",
+    )
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
     parser.add_argument("--max-workers", type=int, default=DEFAULT_WORKERS)
     parser.add_argument("--ignore-load", action="store_true")
@@ -393,16 +455,32 @@ def main() -> int:
     frame = assign_folds(dataset=frame, by=("site",))
     _LOG.info("%d rows, %d farms", frame.height, frame["site"].n_unique())
 
-    run_ladder_view(
-        frame=frame,
-        variant=arguments.variant,
-        through_rung=arguments.through_rung,
-        only_arms=only_arms,
-        sensitivity_arms=arguments.sensitivity_arms,
-        device=device,
-        max_workers=arguments.max_workers,
-    )
-    if arguments.aerosol:
+    if arguments.view in ("aerosol", "both"):
+        absent = [name for name in AEROSOL_COLUMNS if name not in frame.columns]
+        if absent:
+            msg = f"the frame lacks {absent}; rebuild it once eac4_aod.parquet exists"
+            raise ValueError(msg)
+    if arguments.view == "extra_sensitivity":
+        run_extra_sensitivity_view(
+            frame=frame,
+            variant=arguments.variant,
+            through_rung=arguments.through_rung,
+            arm_names=arguments.sensitivity_arms,
+            device=device,
+            max_workers=arguments.max_workers,
+        )
+        return 0
+    if arguments.view in ("ladder", "both"):
+        run_ladder_view(
+            frame=frame,
+            variant=arguments.variant,
+            through_rung=arguments.through_rung,
+            only_arms=only_arms,
+            sensitivity_arms=arguments.sensitivity_arms,
+            device=device,
+            max_workers=arguments.max_workers,
+        )
+    if arguments.view in ("aerosol", "both"):
         run_aerosol_view(
             frame=frame,
             variant=arguments.variant,
