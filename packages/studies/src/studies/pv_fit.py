@@ -320,6 +320,105 @@ def fit_plant_to_changes(
     )
 
 
+@dataclass(frozen=True)
+class RegressorFitResult:
+    """A plant fitted together with some free linear regressors.
+
+    Attributes:
+        fit: The fitted plant and the loss.
+        coefficients: One signed coefficient per regressor column, in megawatts per unit of the
+            regressor.
+    """
+
+    fit: FitResult
+    coefficients: np.ndarray
+
+
+def fit_plant_to_changes_with_regressors(
+    *,
+    sky: SunAndSky,
+    output_mw: np.ndarray,
+    regressors: np.ndarray,
+    orientation: OrientationType,
+    ac_guess_mw: float,
+    lag_half_hours: int,
+    ratio_bounds: tuple[float, float] = DC_AC_RATIO_BOUNDS,
+) -> RegressorFitResult | None:
+    """Fit a plant plus linear regressors to the change in an aggregate's output.
+
+    The fitted output is the plant's power plus `regressors @ coefficients`. The fit is
+    `fit_plant_to_changes` (same pairs, same soft-L1 loss, same starting orientations) with the
+    coefficients as extra free parameters. They start at zero and have no bounds or priors. With
+    no regressor columns the fit is `fit_plant_to_changes` without priors.
+
+    Args:
+        sky: The sun and sky, one entry per half-hour.
+        output_mw: The aggregate's output at the same half-hours. NaN marks a missing half-hour.
+        regressors: An array with one row per half-hour of `sky` and one column per regressor. It
+            must be finite wherever a pair of half-hours is used.
+        orientation: `free`, `fixed`, or `tracker`, as for `fit_plant`.
+        ac_guess_mw: A starting AC capacity. The fit may move the capacity within a factor of five.
+        lag_half_hours: The lag of the differences.
+        ratio_bounds: The lowest and highest DC:AC ratio the fit may take.
+
+    Returns:
+        The fit, or None when fewer than 500 pairs are usable.
+
+    Raises:
+        ValueError: If `regressors` has the wrong number of rows, or a non-finite value at a used
+            half-hour.
+    """
+    if regressors.ndim != 2 or regressors.shape[0] != len(output_mw):
+        raise ValueError(
+            f"regressors must have shape ({len(output_mw)}, K), not {regressors.shape}"
+        )
+    later = lagged_pairs(sky=sky, output_mw=output_mw, lag_half_hours=lag_half_hours)
+    if later.size < 500 or ac_guess_mw <= 0:
+        return None
+    regressor_changes = regressors[later] - regressors[later - lag_half_hours]
+    if not np.isfinite(regressor_changes).all():
+        raise ValueError("regressors are not finite at every half-hour of a used pair")
+    measured_change = output_mw[later] - output_mw[later - lag_half_hours]
+    n_plant = len(_starts(orientation=orientation, ac_guess_mw=ac_guess_mw)[0])
+    n_regressors = regressors.shape[1]
+
+    def residuals(theta: np.ndarray) -> np.ndarray:
+        plant = _unpack(theta=theta[:n_plant], orientation=orientation)
+        poa = plane_of_array_w_m2(
+            sky=sky,
+            tilt_deg=plant.tilt_deg,
+            azimuth_deg=plant.azimuth_deg,
+            tracker=plant.tracker,
+        )
+        power = _smooth_min(power=plant.dc_capacity_mw * poa / 1000.0, limit=plant.ac_capacity_mw)
+        plant_change = power[later] - power[later - lag_half_hours]
+        return plant_change + regressor_changes @ theta[n_plant:] - measured_change
+
+    low, high = _bounds(orientation=orientation, ac_guess_mw=ac_guess_mw, ratio_bounds=ratio_bounds)
+    low = np.concatenate([low, np.full(n_regressors, -np.inf)])
+    high = np.concatenate([high, np.full(n_regressors, np.inf)])
+    starts = [
+        np.concatenate([start, np.zeros(n_regressors)])
+        for start in _starts(orientation=orientation, ac_guess_mw=ac_guess_mw)
+    ]
+    best = _best_start(
+        residuals=residuals,
+        starts=starts,
+        bounds=(low, high),
+        f_scale=ROBUST_SCALE_SHARE * ac_guess_mw,
+    )
+    if best is None:
+        return None
+    return RegressorFitResult(
+        fit=FitResult(
+            parameters=_unpack(theta=best[1][:n_plant], orientation=orientation),
+            loss=best[0] / later.size,
+            half_hours_fitted=int(later.size),
+        ),
+        coefficients=best[1][n_plant:],
+    )
+
+
 def lagged_pairs(*, sky: SunAndSky, output_mw: np.ndarray, lag_half_hours: int) -> np.ndarray:
     """Return the indices `i` whose output change from `i - lag_half_hours` the fit uses.
 

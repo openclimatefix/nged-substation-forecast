@@ -734,6 +734,15 @@ SOLAR_BMU_CENSUS_INPUTS_DIR: Final[Path] = SOLAR_BMU_CENSUS_DIR / "inputs"
 SOLAR_BMU_DISAGGREGATION_DIR: Final[Path] = study_dir_for(study="solar_disaggregation")
 """The study of separating solar output from aggregate BMUs: fits, saved series, and `report.md`."""
 
+BATTERY_PV_SEPARATION_DIR: Final[Path] = study_dir_for(study="battery_pv_separation")
+"""The study of separating batteries from solar: the BMU list, saved series, and `report.md`."""
+
+NGED_BATTERY_A_FIGURES_DIR: Final[Path] = BATTERY_PV_SEPARATION_DIR / "nged_battery_a_figures"
+"""Where the private NGED battery case study writes its figures: outside `docs/`, unpublished."""
+
+MARKET_DOWNLOADS_DIR: Final[Path] = DOWNLOADS_DIR / "market"
+"""Public GB electricity-market downloads: day-ahead and system prices, the EPEX index, carbon."""
+
 NFC_STUDY_DIR: Final[Path] = study_dir_for(study="nwp_forecast_comparison")
 """The folder of the NWP forecast comparison, one subfolder per batch of fits."""
 
