@@ -56,24 +56,17 @@ stay unverified until the study checks them.
 
 | Signal | Role | Batteries it schedules | What must be obtained |
 |---|---|---|---|
-| Fixed tariff window edges: Intelligent Octopus Go cheap 23:30 to 05:30, Octopus Go 00:30 to 05:30, Octopus Flux cheap 02:00 to 05:00 with high export 16:00 to 19:00 | Estimator template | Domestic fleets, which step together at the window minute | Nothing; the times are constants (window times as published on the tariff pages, unverified for 2019 to 2020) |
+| Fixed tariff window edges: Intelligent Octopus Go cheap 23:30 to 05:30, Octopus Go 00:30 to 05:30, Octopus Flux cheap 02:00 to 05:00 with high export 16:00 to 19:00 | Estimator template | Domestic fleets, which step together at the window minute | Nothing; the times are constants (window times as published on the tariff pages) |
 | Octopus Agile half-hourly import price, East Midlands region | Estimator template | Domestic batteries on Agile, moving together within a region | A download from Octopus's REST API (below) |
-| N2EX day-ahead price | Estimator template | Merchant batteries connected to the distribution network | Already on disk for September 2025 onwards; 2019 to 2020 needs a download |
+| N2EX day-ahead price | Estimator template | Merchant batteries connected to the distribution network | Already on disk for September 2025 to August 2026 |
 | Distribution-charge red band, weekdays 16:00 to 19:00 | Estimator template | Commercial and industrial batteries behind the meter, which avoid importing in the red band | Nothing; a constant. The band for NGED's East Midlands licence area is unverified, and the study checks it in NGED's published charging statement before the first run |
-| Demand Flexibility Service event half-hours | Control and explanation only | Enrolled homes and sites, on tens of event days a year | NESO's utilisation report, by grid supply point (a download) |
-| Grid frequency, including the 49.7 Hz static-response trigger | Explanation only | Batteries holding frequency response | Already on disk (Elexon, 15-second values) |
 
-**Frequency stays out of the estimator because the half-hourly mean barely moves.** In the Elexon
-download for September 2025 to September 2026, the half-hourly mean frequency has a standard
-deviation of 0.058 Hz. After 188 half-hours with samples at or below 45 Hz are dropped as faulty
-readings, the minimum fell below 49.7 Hz in 6 half-hours on 4 days. A fleet answering the static
-trigger therefore acts a handful of times a year, which no estimator can size; the study reports
-the aggregate's change in those half-hours as an explanation, and does not claim it as evidence.
-Whether static response is still procured from domestic batteries in 2026 is unverified.
-
-**Demand Flexibility Service events stay out of the estimator because they are rare and the
-response is not a battery's alone.** The study checks, as an exploratory control, whether the
-fitted battery's output steps in the event half-hours.
+**Grid frequency and Demand Flexibility Service events are left out of the study altogether.** In
+the Elexon download for September 2025 to September 2026, the half-hourly minimum frequency fell
+below the 49.7 Hz static-response trigger in 6 half-hours on 4 days, after faulty readings are
+dropped, and Demand Flexibility Service events fall on tens of days a year. Neither signal acts
+often enough to size a battery, so neither would change a conclusion, and leaving both out removes
+a download, a simulated fleet, and a figure.
 
 **Electric-vehicle chargers on the same tariffs step at the same window edges.** A charge edge alone
 therefore cannot separate a battery fleet from an electric-vehicle fleet. Every battery template is
@@ -82,17 +75,18 @@ efficiency. The estimator also carries a charge-only nuisance template at each w
 electric-vehicle step is not credited to a battery. A battery is credited only where the matching
 discharge is found.
 
-**Downloads.** Three small downloads are needed, each free, with no account, no key, no cost, and
-no licence acceptance, according to the research note. The fetch script records each provider's
-terms page at fetch time, and stops for the maintainer if the terms turn out to require acceptance:
+**Downloads.** One small download is needed: Octopus Agile import rates for the East Midlands region
+(region letter B in Octopus's tariff codes; all 8 primaries metered in MW are in NGED's East
+Midlands licence area), for every Agile product version covering September 2025 to August 2026,
+through the public `standard-unit-rates` endpoint: about 17,500 values in a few dozen requests. The
+endpoint needs no account, key, or payment. The fetch script records the terms page at fetch time
+and stops for the maintainer if the terms require accepting a licence. If the download stops, the
+Agile template is dropped and the domestic fleet uses the three fixed-window tariffs only.
 
-- Octopus Agile import rates for the East Midlands region (region letter B in Octopus's tariff
-  codes, unverified), for every Agile product version covering September 2019 to August 2020 and
-  September 2025 to August 2026, through the `standard-unit-rates` endpoint: about 35,000 values
-  in a few dozen requests.
-- N2EX day-ahead prices for September 2019 to August 2020, from the same NESO dataset the prior
-  study used.
-- NESO's Demand Flexibility Service utilisation report, for the study year.
+**The study year is September 2025 to August 2026 only.** The N2EX prices on disk, the B1610
+battery outputs, and `window_half_hours` all cover that year. An earlier era was considered for the
+primary screen and cut: only 4 of the 8 primaries metered in MW have data from 2019, and the era
+needs a second N2EX download and a second time grid.
 
 ## The estimator: a template posterior
 
@@ -100,55 +94,72 @@ terms page at fetch time, and stops for the maintainer if the terms turn out to 
 
 **The template posterior.** Within a 3-month block, the aggregate is modelled as
 
-    y(t) = calendar baseline + fleet-curve solar + sum over battery classes of a_c * template_c(t; theta) + noise
+```text
+y(t) = calendar baseline + fleet-curve solar - sum over classes c of a_c * template_c(t; d_c) + noise
+```
 
 where `a_c >= 0` is the power of battery class `c` in MW, and `template_c` is a one-megawatt
-schedule simulated from that class's signal. The three battery classes are:
+schedule, positive for export, simulated from that class's signal for a duration `d_c` in hours.
+The three battery classes are:
 
 - **Merchant**: `studies.battery_dispatch.lp_schedule` on the N2EX day-ahead price.
-- **Domestic fleet**: a mixture of the four tariff templates (Intelligent Octopus Go, Octopus Go,
-  Flux, and Agile), weighted by membership shares. Each template charges from its window start
-  at full power until full and discharges across the evening (16:00 to 23:30) until empty, except
-  Flux, which discharges from 16:00 to 19:00; the Agile template is a daily price-taker on the Agile
-  import price. The fleet's spread of durations softens the edges.
+- **Domestic fleet**: one template per tariff (Intelligent Octopus Go, Octopus Go, Flux, and
+  Agile), each with its own non-negative power, so the tariff membership shares are absorbed into
+  the linear powers and need no prior of their own. All four share one duration. Each template
+  charges from its window start at full power until full and discharges across the evening (16:00
+  to 23:30) until empty, except Flux, which discharges from 16:00 to 19:00; the Agile template is a
+  price-taker on each 23:00-to-23:00 Agile delivery day, whose prices are published the afternoon
+  before. Each template is the mean over a fixed log-normal spread of durations (standard deviation
+  0.25 in natural log), which softens the end of the charge.
 - **Commercial and industrial**: discharge across the weekday red band, recharge overnight.
 
-The baseline (`studies.pv_separation.baseline_design`, daily flexibility within a block) and the
-four fleet curves (`studies.pv_separation.solar_basis`) enter linearly, as do the class powers
-`a_c`, so for fixed physical parameters `theta` the model is linear-Gaussian. The charge-only
-nuisance templates enter the same way.
+The baseline (`studies.pv_separation.baseline_design`, `flexibility="daily"` within a block) and
+the four fleet curves (`studies.pv_separation.solar_basis`) enter linearly, as do the class powers
+and the charge-only nuisance templates, so for a fixed set of durations the model is
+linear-Gaussian.
 
-**Priors on the physical parameters `theta`** (the values come from the prior study and the
-research note, and the domestic durations are unverified):
+**Only the three class durations are inferred; every other physical parameter is fixed.** The
+efficiency, the state-of-charge limits, and the cycle cap change a template's shape far less
+than the duration does, and each would add a dimension to the inference without answering the
+question. They are fixed at the values below, and the second setting moves them.
 
-| Parameter | Prior |
+| Parameter | Value or prior |
 |---|---|
-| One-way efficiency | Beta, centred on 0.93 (round trip about 0.87), 95% between 0.89 and 0.96; the prior study fitted 0.92 to 0.94 |
+| One-way efficiency | Fixed at 0.93 (round trip about 0.87); the prior study fitted 0.92 to 0.94 |
+| State-of-charge limits | Fixed at 5% and 95% |
+| Cycles a day, merchant and Agile | Capped at 1 (`lp_schedule`'s `cycles_per_day_cap`, which stands in for a throughput cost; `lp_schedule` has no cost argument) |
 | Duration (MWh per MW), merchant | Log-normal, median 2 hours, 95% between 1 and 4 hours |
-| Duration, domestic fleet | Log-normal, median 2 hours, 95% between 1.2 and 3.5 hours, for products of 5 to 13.5 kWh at 3 to 5 kW |
+| Duration, domestic fleet | Log-normal, median 2 hours, 95% between 1.2 and 3.5 hours, for products of 5 to 13.5 kWh at 3 to 5 kW (unverified) |
 | Duration, commercial and industrial | Log-normal, median 1.5 hours, 95% between 1 and 3 hours |
-| State-of-charge limits | Lower uniform on 0% to 10%, upper uniform on 90% to 100% |
-| Throughput or degradation cost, merchant and Agile | Uniform on £0 to £20 per MWh |
-| Spread of durations within a domestic fleet | Log-normal spread with standard deviation uniform on 0 to 0.4 (natural log) |
-| Tariff membership shares | Dirichlet(1, 1, 1, 1) over the four tariffs |
-| Class power `a_c` | Half-normal with scale 20% of the aggregate's p99 |
+| Each class or tariff power | Half-normal with scale 20% of the aggregate's p99 |
 
-**Inference: importance sampling over `theta`, exact integration over the linear terms.** The
-templates do not depend on the aggregate, so a library of 4,000 prior draws of `theta`, with each
-draw's templates, is simulated once and shared by every sum. For each sum and draw, the baseline,
-solar, and nuisance coefficients are integrated out analytically under a wide Gaussian prior, and
-the class powers are sampled from their truncated Gaussian conditional (Gibbs sampling with
-`scipy.stats.truncnorm`). The draw's weight is its marginal likelihood. The noise is serially
-correlated, so the residual is prewhitened with a fitted first-order autoregression before the
-likelihood is evaluated. MWh is the posterior of `a_c * duration_c`. All of this is numpy and
-scipy; a draw costs a few small matrix updates, so 4,000 draws per sum run overnight on 4 workers.
-The run reports the effective sample size of every posterior; where it falls below 200, the
-fallback fixes the state-of-charge limits and the throughput cost at their prior medians and
-re-runs, and the report records the fallback.
+**Inference: an exact grid over the three durations, exact integration over the linear terms.** Each
+duration takes 8 log-spaced grid values from 0.5 to 6 hours, weighted by its log-normal prior, so
+the posterior is a sum over 512 duration combinations and needs no sampling over the durations. The
+templates do not depend on the aggregate, so each block's 48 template columns (8 durations for the
+merchant class, 8 for commercial and industrial, and 8 times four tariff columns for the domestic
+class) and their projections off the baseline and solar columns are computed once and shared by
+every sum in that block. For each sum and combination, the baseline, solar, and nuisance
+coefficients are integrated out analytically under a wide Gaussian prior. The class powers have a
+half-normal prior, so the combination's evidence is the unconstrained Gaussian evidence times the
+posterior probability of the positive orthant over the prior's
+(`scipy.stats.multivariate_normal.cdf`, at most 6 dimensions). The class powers are then sampled
+from their truncated Gaussian conditional (Gibbs sampling with `scipy.stats.truncnorm`) for the
+combinations holding 99% of the posterior mass. The noise is serially correlated, so the residual is
+prewhitened with a first-order autoregression fitted to the scored aggregate's own residual from the
+highest-evidence combination, iterated twice; the noise parameters carry no truth, so estimating
+them from the scored sum is not leakage. MWh is the posterior of `a_c * duration_c`. All of this is
+numpy and scipy, and no posterior can collapse onto a few importance weights.
 
 **The detection statistic** is the log Bayes factor of the model with batteries against the model
-with none. The threshold is the 95th percentile of the statistic over battery-free training blocks,
-so its nominal false-alarm rate is 5%.
+with none. The threshold is the 95th percentile of the statistic over the blocks of the other demand
+series with no added battery, so its nominal false-alarm rate is 5%.
+
+**No real primary is known to be battery-free, so the threshold detects an added battery, not a
+battery.** Each primary may already hold domestic and commercial batteries, which is the question
+itself. In rungs 1 to 3 the threshold therefore answers "is there a battery beyond what the series
+already holds", which is what the known-answer sums test. The rung 5 screen cannot use that
+threshold to claim a primary holds a battery, and uses a within-series placebo instead (rung 5).
 
 **The comparator: the step tail.** Fit the same baseline and solar by least squares, take the
 residual's half-hour changes `dr`, and compute `P_step = max(0, (q99.5(|dr|) - 2.81 * sigma) / 2)`,
@@ -164,77 +175,103 @@ batteries only.
 ## Definitions
 
 - **Aggregate**: `y(t) = demand(t) + solar_flow(t) - battery(t)`, positive for import, battery
-  positive for export, on the half-hour grid of `battery_synthetic.window_half_hours`, UTC.
-- **Battery share**: the battery's or fleet's power as a percentage of the battery-free
-  aggregate's p99 absolute flow. Shares run 0, 0.5, 1, 2, 5, 10, 20, and 40%, so a fleet of about
+  positive for export, on the half-hour grid of `battery_synthetic.window_half_hours` (September
+  2025 to August 2026, UTC). That grid is redefined in `capacity_inputs.py`, because a study script
+  may not import another study's folder.
+- **Battery share**: the battery's or fleet's power as a percentage of the demand series' p99
+  absolute flow. Shares run 0, 0.5, 1, 2, 5, 10, 20, and 40%, so a fleet of about
   ten 5 kW home batteries on a 10 MW primary sits at the 0.5% end.
 - **Noise unit**: `sigma_step`, the robust standard deviation of the half-hour changes of the
-  battery-free aggregate's residual. Sizes are reported as `P / sigma_step` as well as shares, so
-  NGED can apply the result to any primary from that primary's own noise.
-- **Power error**: `log2(P_hat / P)` with `P_hat` the posterior median.
+  demand series' residual with no added battery. Sizes are reported as `P / sigma_step` as well as
+  shares, so NGED can apply the result to any primary from that primary's own noise.
+- **Power error**: `|P_hat - P| / P`, with `P_hat` the posterior median, for scoring the contrasts.
+  The step tail returns exactly 0 for a small battery, so a log error would be minus infinity there.
+  Charts show `log2(P_hat / P)` with `P_hat` floored at 1% of `P`, and say so. **Energy error** is
+  the same with MWh.
 - **Blocks**: every fit is per 3-month block (September to November, December to February, March to
   May, June to August).
 
 ## Planned contrasts (fixed before any result)
 
-- **C1, false alarms.** On held-out battery-free blocks of the study year, the log Bayes factor at its
-  5% threshold flags at most 5% of blocks.
+- **C1, false alarms.** On the 44 blocks (11 demand series, 4 blocks each) with no added battery,
+  each scored against the threshold built from the other 10 series, the log Bayes factor flags a
+  share of blocks not significantly above 5%: a one-sided exact binomial test of the flag count
+  against 5% does not reject at the 5% level. The count and its Clopper-Pearson interval are
+  reported.
 - **C2, calibration.** On the simulated known-answer sums (rungs 1 and 2), the 90% credible interval
-  for power holds the truth in at least 80% of sums, and the 50% interval in 40% to 60%. The same
-  coverages are reported for energy.
-- **C3, posterior against step tail.** At shares of 5% and above, the posterior median's absolute
-  power error is smaller than the step tail's (paired difference).
-- **C4, energy separately from power.** For simulated batteries of 1 and 4 hours at shares of 10%
-  and above, the posterior median energy is closer to the truth than the rule `2 hours * P_hat`.
-  The ratio of the posterior width of the duration to its prior width is reported beside C4, because
-  a ratio near 1 means the aggregate taught the estimator nothing about duration.
-- **C5, fleets of real batteries.** On sums of several public batteries, the posterior median power
-  is closer to the fleet's coincident peak (the p99 of the summed output) than to the sum of the
-  registered powers.
+  for power holds the truth in at least 80% of sums, and the 50% interval in 40% to 60%, judged on
+  the point coverage. The same coverages are reported for energy.
+- **C3, posterior against step tail.** At shares of 5% and above in rung 1, the mean of the paired
+  difference in power error (posterior median minus step tail) is below zero, with its 95%
+  cluster-bootstrap interval excluding zero.
+- **C4, energy separately from power.** For rung 1 batteries of 1 and 4 hours at shares of 10% and
+  above, the mean of the paired difference in energy error (posterior median minus the rule
+  `2 hours * P_hat`) is below zero, with its 95% interval excluding zero. The ratio of the posterior
+  width of the duration to its prior width is reported beside C4, because a ratio near 1 means the
+  aggregate taught the estimator nothing about duration.
+- **C5, fleets of real batteries.** On rung 3's fleets of public batteries, the mean of the paired
+  difference in `|log2(P_hat / peak)| - |log2(P_hat / registered sum)|` is below zero, with its 95%
+  interval excluding zero, where the peak is the fleet's coincident peak (the p99 of the summed
+  output) and the registered sum is the sum of the registered generation capacities.
 
 Every other number is exploratory, and anything added after the first results is post hoc.
 
-**Folds.** The null threshold, the autoregression, and any calibration for a scored block come only
-from other demand series in other 3-month blocks, so no block's weather leaks into its own
-calibration. **Intervals** on errors, coverages, and rates resample whole demand series and whole
-batteries (a two-level cluster bootstrap, 2,000 resamples), as the prior study's rungs 4 to 6
-resampled whole aggregates. A per-block posterior is not a per-month score, so the month-resampled
-default does not apply, and the page says why. Rates also carry Clopper-Pearson intervals with the
-count of blocks beside them. **Second setting**: every planned contrast is re-run with priors twice
-as wide on every duration and on efficiency, so a verdict that rests on the priors shows.
+**Folds.** The detection threshold for a scored block comes only from the other demand series, so
+no series' own noise sets its own threshold. The noise parameters of a sum are estimated from that
+sum, because they carry no truth. **Intervals** on errors, coverages, and rates resample whole
+demand series and whole batteries (a two-level cluster bootstrap, 2,000 resamples), as the prior
+study's rungs 4 to 6 resampled whole aggregates. A per-block posterior is not a per-month score, so
+the month-resampled default does not apply, and the page says why. Rates also carry Clopper-Pearson
+intervals with the count of blocks beside them. **Second setting**: every planned contrast is
+re-run with the duration priors' log-standard-deviations doubled, the one-way efficiency fixed at
+0.89, and the state-of-charge limits at 0% and 100%, so a verdict that rests on those choices shows.
 
 **Controls.** The positive control is a simulated 2-hour merchant battery at a 40% share on the
 calendar replica of a demand half; the 90% interval must hold `P` and `E`, and the posterior median
 must lie within 10% of each. If the positive control fails, nothing else is scored. The negative
-controls are the battery-free blocks; tariff templates shifted one hour early, which a real
-window-edge signal should beat; and Agile prices from 7 days earlier.
+controls are the blocks with no added battery; tariff templates shifted one hour early, which a
+real window-edge signal should beat; and Agile prices from 7 days earlier.
+
+**The simulated truth is never drawn from the estimator's own template family.** Rung 1's merchant
+batteries are dispatched by `lp_schedule` with the one-way efficiency drawn uniformly from 0.88 to
+0.95, the state-of-charge limits from 0% to 10% and 90% to 100%, a cap of 1 or 2 cycles a day, and
+durations of 1, 2, and 4 hours, which lie near but not on the estimator's grid values, while the
+estimator keeps its fixed values. A calibration that holds only when the truth is a template would
+otherwise pass C2 for free.
 
 ## The ladder (five rungs)
 
 **Rung 1: a simulated battery with an exact answer.** Merchant schedules from `lp_schedule` on the
 N2EX price, with durations of 1, 2, and 4 hours, subtracted from each demand half at every share.
-Demand halves: the 8 NGED primaries metered in MW, the 3 public demand-like BMUs of rung 7c
-(`DEMAND_BMUS`), and the calendar replica of each. A solar arm adds a 25% share of rung 4's solar
-sets at the 5% and 20% battery shares. This rung holds the positive control and answers C1 to C4.
+Demand halves: the 8 NGED primaries metered in MW and the 3 public demand-like BMUs of rung 7c
+(`DEMAND_BMUS` in `battery_rung7c_known_answer.py`), 11 series in all. Calendar replicas are used
+for the positive control only: a replica is a monthly mean with almost no noise, so scoring it
+beside real demand would flatter every detection rate. No solar arm is added: the primaries already
+carry their own embedded solar, and the model carries the four solar columns. This rung holds the
+positive control and answers C1, C3, and C4, and C2 for merchant batteries. Rung 1 is
+11 series x 4 blocks x 3 durations x 7 shares = 924 sums, plus the 44 blocks with no added
+battery.
 
 **Rung 2: a fleet of small batteries that move as one (simulated).** No ground truth exists for any
 real domestic fleet, so this rung is simulated, and the page says so in its first sentence. Each
 fleet is built home by home: a number of homes, a 3 to 5 kW battery per home with a duration drawn
-from the domestic prior, and a tariff for each home drawn from known membership shares. A second
-fleet answers the 49.7 Hz trigger at the 6 real trigger half-hours as well as following its tariff.
-The simulation's truth is exact; its realism is not checked against any real fleet, so rung 2 shows
-what the estimator can recover if domestic batteries behave as the templates assume. The
+from the domestic prior, and a tariff for each home drawn from known membership shares. Fleet sizes
+run over the same shares as rung 1, on the same 11 series and 4 blocks, with one fleet draw per
+share. The simulation's truth is exact; its realism is not checked against any real fleet, so rung 2
+shows what the estimator can recover if domestic batteries behave as the templates assume. The
 simulator draws its parameters from distributions centred away from the priors' medians, so a fleet
 the priors describe badly is part of the test. This rung answers C2 and C4 for fleets and gives the
 detection curve for domestic sizes.
 
 **Rung 3: real public batteries, alone and in fleets.** The four batteries of the prior study, four
 of the smallest `battery_hint` BMUs in the census list with at least 95% of half-hours present, and
-fleets of 2, 4, and 8 of the 149 `battery_hint` BMUs (fixed seed, 10 draws per size), added to the
-demand halves at shares of 2% to 40%. Power truth is the registered generation capacity, with the
-metered p99 beside it. No public energy capacity exists, so the energy reference is the prior
-study's 3-month-block fit (`battery_rung3.smallest_capacity`) applied to the battery's own metered
-output. This rung answers C5, and tests whether real dispatch leaves the calibration of C2 intact.
+fleets of 2, 4, and 8 of the 101 `battery_hint` BMUs in `bmu_list.csv` (all 101 have B1610 output on
+disk; fixed seed, 5 draws per size), added to the demand halves at shares of 5%, 10%, 20%, and 40%.
+That is 23 batteries or fleets x 11 series x 4 blocks x 4 shares = 4,048 sums. Power truth is the
+registered generation capacity, with the metered p99 beside it. No public energy capacity exists, so
+the energy reference is the prior study's 3-month-block fit (`smallest_capacity`, moved from
+`battery_rung3.py`) applied to the battery's own metered output. This rung answers C5, and tests
+whether real dispatch leaves the calibration of C2 intact.
 
 **Rung 4: NGED battery A inside a BSP flow (a real known answer).** A pre-plan check found that NGED
 battery A's half-hour changes correlate with one bulk supply point's (BSP's) raw flow (correlation
@@ -247,9 +284,14 @@ NGED battery A subtracted to find the multiple at which the detector flags it. T
 evidence of connection, not a network-topology record, and the page says so. Exploratory, one site.
 
 **Rung 5: the screen of the 8 NGED primaries metered in MW, reported per primary.** Each primary,
-labelled S1 to S8, gets its detection statistic against the held-out threshold and the posterior of
-each battery class's MW and MWh, for the study year and for September 2019 to August 2020, when
-fewer distribution-connected batteries existed. NGED's Embedded Capacity Register (August 2026,
+labelled S1 to S8, gets the posterior of each battery class's MW and MWh for the study year. The
+threshold of rungs 1 to 3 is built from the other primaries, which may hold batteries too, so the
+screen's evidence is a within-series placebo instead: each primary's log Bayes factor for the real
+templates is ranked against its log Bayes factors for 12 placebo template sets on the same primary
+(tariff windows shifted by -3, -2, -1, +1, +2, and +3 hours, and N2EX and Agile prices taken from 6
+other weeks). A real battery class should beat every placebo; a primary whose real templates rank
+first of 13 is reported as showing evidence, and the page states that 1 in 13 would rank first by
+chance. NGED's Embedded Capacity Register (August 2026,
 on disk) gives a partial answer key for connected storage of 50 kW and above: 2 of the 8 primaries
 have a connected storage entry. The register lists no storage capacity in MWh and no duration for
 any of its storage rows, so it can check presence and MW size class, never MWh. Below 50 kW the
@@ -257,13 +299,23 @@ register is silent, so a domestic fleet is never in it. The page reports, per pr
 register lists connected storage, and never prints a generator's name or registered capacity, nor
 pairs a primary's posterior with a register entry's capacity.
 
-**NGED's primary series already have metered generation subtracted.** A battery that NGED meters
+**NGED's primary series are labelled "Disaggregated Demand", read by the plan as demand with
+metered generation subtracted.** The inputs step checks NGED's definition of that label before the
+first run, because a series with estimated embedded generation added back would change what the
+solar columns and the battery templates mean. A battery that NGED meters
 may therefore be absent from a primary's flow already, and what remains is the unmetered battery
 the question asks about. Primaries metered in MVA are out of scope, because MVA has no sign.
 
 **Each rung is reported only on the evidence below it.** If the positive control fails, nothing is
 scored. If rung 1 finds nothing at a 40% share on real demand, rungs 2 to 5 are reported as a
 demonstration that the method fails.
+
+**Compute budget.** Each block's template columns and projections are computed once, so a sum costs
+48 inner products and 512 small evidence evaluations, each with an orthant probability of at most
+6 dimensions (`multivariate_normal.cdf` with `maxpts` capped, since scipy's default is a million
+points per dimension). Rungs 1 to 3 hold about 5,300 sums (924, 308, and 4,048), each run at both
+settings, so the budget of about 2 hours on 4 workers allows about 2.7 seconds per sum. One sum's
+timing decides whether that fits; if not, the cut order in the work breakdown applies.
 
 ## What counts as "not identifiable", and what it would mean for NGED
 
@@ -313,54 +365,61 @@ normalised by its p99 with days numbered 1 to 7 and no dates.
 | 6 | One week of a public demand-like BMU with and without a public battery subtracted, in MW, with the battery beneath | Data | A known battery is visible by eye when large and invisible when small. |
 | 7 | NGED battery A's output beneath its BSP's flow, both normalised by p99, with the flow after NGED battery A is added back | Data, rung 4 | A real battery of a few percent of a BSP flow is hard to see by eye. |
 | 8 | A simulated domestic fleet's output for three nights, home by home and summed, beside the templates | Data, rung 2 | A fleet on one tariff steps at the window minute, and a spread of durations blurs the end of the charge. |
-| 9 | The half-hours with frequency below 49.7 Hz, with the aggregate's change in each | Data | The static trigger fires a handful of times a year, too seldom to size a fleet. |
-| 10 | The positive control: posterior of MW and of MWh, with the truth marked | 1 | The estimator recovers an easy battery, so later failures belong to the data, not to the code. |
-| 11 | Posterior of MW against MWh for three rung 1 sums (40%, 10%, and 2% shares), truth marked | 1 | Large batteries give tight posteriors around the truth, and small ones give posteriors no narrower than the prior. |
-| 12 | Posterior median against truth for power and energy, log axes, coloured by share, with 90% intervals | 1, 2 | Estimates track the truth above a size and scatter below it. |
-| 13 | Coverage of the 50% and 90% intervals for power and energy, by rung and share, against the nominal lines (C2) | 1, 2, 3 | The intervals mean what they say, or the figure shows where they are too narrow. |
-| 14 | The battery-free null distribution of the log Bayes factor with the threshold, and the false-alarm rate per null source (C1) | 1 | The detector flags about 5% of battery-free blocks, as designed. |
-| 15 | Paired contrasts C3 and C4 with intervals, and the duration's posterior width over its prior width | 1, 2 | The posterior beats the step statistic, and MWh is or is not learned beyond the prior. |
-| 16 | Detection probability against fleet size for the simulated domestic fleet, with the 1-hour-shifted templates as a negative control | 2 | A fleet is found from its window edge, and the shifted window finds nothing. |
-| 17 | Real public batteries: posterior against registered power and against the energy reference, beside the simulated batteries at the same shares | 3 | Real dispatch is harder to size than a simulated schedule, by the amount shown. |
-| 18 | Fleets of real batteries: posterior median against coincident peak and against the sum of registered powers (C5) | 3 | A fleet is seen as its coincident peak. |
-| 19 | NGED battery A in its BSP: the log Bayes factor and the MW posterior against the multiple of NGED battery A (0 to 11), with the threshold | 4 | A real battery of this share is or is not detected, and the multiple at which detection starts. |
-| 20 | The primary screen: each primary's log Bayes factor against the threshold and its MW posterior per battery class, for both eras, with the register's storage presence marked | 5 | Which primaries show evidence of a battery, and how that agrees with the register. |
+| 9 | The positive control: posterior of MW and of MWh, with the truth marked | 1 | The estimator recovers an easy battery, so later failures belong to the data, not to the code. |
+| 10 | Posterior of MW against MWh for three rung 1 sums (40%, 10%, and 2% shares), truth marked | 1 | Large batteries give tight posteriors around the truth, and small ones give posteriors no narrower than the prior. |
+| 11 | Posterior median against truth for power and energy, log axes, coloured by share, with 90% intervals | 1, 2 | Estimates track the truth above a size and scatter below it. |
+| 12 | Coverage of the 50% and 90% intervals for power and energy, by rung and share, against the nominal lines (C2) | 1, 2, 3 | The intervals mean what they say, or the figure shows where they are too narrow. |
+| 13 | The distribution of the log Bayes factor over the blocks with no added battery, with the threshold, and the false-alarm rate per series (C1) | 1 | The detector flags about 5% of blocks with no added battery, as designed. |
+| 14 | Paired contrasts C3 and C4 with intervals, and the duration's posterior width over its prior width | 1, 2 | The posterior beats the step statistic, and MWh is or is not learned beyond the prior. |
+| 15 | Detection probability against fleet size for the simulated domestic fleet, with the 1-hour-shifted templates as a negative control | 2 | A fleet is found from its window edge, and the shifted window finds nothing. |
+| 16 | Real public batteries: posterior against registered power and against the energy reference, beside the simulated batteries at the same shares | 3 | Real dispatch is harder to size than a simulated schedule, by the amount shown. |
+| 17 | Fleets of real batteries: posterior median against coincident peak and against the sum of registered powers (C5) | 3 | A fleet is seen as its coincident peak. |
+| 18 | NGED battery A in its BSP: the log Bayes factor and the MW posterior against the multiple of NGED battery A (0 to 11), with the threshold | 4 | A real battery of this share is or is not detected, and the multiple at which detection starts. |
+| 19 | The primary screen: each primary's log Bayes factor for the real templates beside its 12 placebo template sets, and its MW posterior per battery class, with the register's storage presence marked | 5 | Which primaries show evidence of a battery beyond the placebos, and how that agrees with the register. |
 
 ## Work breakdown for a Sonnet agent
 
 Run with `OMP_NUM_THREADS=2` and at most 4 workers. Every script gets a fresh code review before its
 first run. Results go to `data/studies/per_study/unmetered_battery_capacity/`.
 
-1. **Branch** from `main` after the battery-pv-separation pull request merges, or from that branch.
-2. **Downloads** `studies/market_downloads/fetch_agile_and_dfs.py`, following the `data-download`
-   skill: Agile, the earlier N2EX year, and the Demand Flexibility Service report. Run the
-   `data-validation` checklist on each. Check the red band and the Agile region letter, and record
-   both in the report.
-3. **Move and add code in `packages/studies/`, with tests.** New module `studies/battery_templates.py`:
-   the tariff, Agile, red-band, and charge-only templates, and the home-by-home fleet simulator. New
-   module `studies/template_posterior.py`: prewhitening, the linear-Gaussian marginal likelihood, the
-   truncated Gibbs step, importance weights, effective sample size, and the log Bayes factor. Move
-   `calendar_replica` (from `battery_rung7.py`) and `smallest_capacity` with `cell_energy_path`
-   (from `battery_rung3.py`) into `studies/battery_capacity.py`, repoint the prior study's imports,
-   and re-run `battery_rung3.py` to show its outputs unchanged bit for bit.
-4. **Inputs** `studies/unmetered_battery_capacity/capacity_inputs.py`: the 8 primaries metered in MW,
-   the BSP flow (found by the correlation check, recomputed in code), and NGED battery A, read by
-   metadata filter; the register's per-primary storage presence; data-validation checks into
-   `report_inputs.md`. Nothing that identifies a generator is written.
-5. **Template library** `capacity_templates.py`: 4,000 prior draws and their templates per block,
-   saved. Time one sum's posterior; if rungs 1 to 3 would take more than 8 hours, cut in this order
-   and record the cut: drop the solar arm to the 20% share; cut fleet draws from 10 to 5; cut the
-   library to 2,000 draws.
+1. **Branch**: work on `unmetered-battery-capacity`, which already holds the merged
+   battery-pv-separation code (pull request 1100).
+2. **Download** `studies/market_downloads/fetch_agile.py`, following the `data-download` skill. Run
+   the `data-validation` checklist on it. Check the red band in NGED's East Midlands charging
+   statement, and record it in the report.
+3. **Move and add code in `packages/studies/`, with tests.** New module
+   `studies/battery_templates.py`: the tariff, Agile, red-band, and charge-only templates, and the
+   home-by-home fleet simulator. New module `studies/template_posterior.py`: prewhitening, the
+   linear-Gaussian marginal likelihood with the orthant correction, the evidence over the duration
+   grid, the truncated Gibbs step, and the log Bayes factor. Move `calendar_replica` (from
+   `battery_rung7.py`, taking the half-hour grid as an argument, because `window_half_hours` lives
+   in the study folder) and `smallest_capacity` with `cell_energy_path` (from `battery_rung3.py`)
+   into `studies/battery_capacity.py`. Repoint every caller: `battery_rung3.py`, `battery_rung7.py`,
+   `nged_battery_a_rungs.py`, and `nged_battery_a_charts.py`. Re-run `battery_rung3.py` and
+   `nged_battery_a_rungs.py` to show their outputs unchanged bit for bit. The duplicate
+   `calendar_replica` in `studies/solar_disaggregation/stage3b_real_controls.py` is out of scope and
+   stays.
+4. **Inputs** `studies/unmetered_battery_capacity/capacity_inputs.py`: the 8 primaries metered in
+   MW, the BSP flow (found by the correlation check, recomputed in code), and NGED battery A, read
+   by metadata filter; the register's per-primary storage presence, read from `literature/NGED/NGED
+   ECR AUG 2026.xlsx` in the main checkout (neither `fastexcel` nor `openpyxl` is installed, so add
+   one to the `studies` package's dependencies, or convert the sheet to CSV once and record how);
+   NGED's definition of "Disaggregated Demand"; data-validation checks into `report_inputs.md`.
+   Nothing that identifies a generator is written.
+5. **Templates** `capacity_templates.py`: every block's 48 template columns, for both settings,
+   saved. Time one sum's posterior; if rungs 1 to 3 would take more than 2 hours, cut in this order
+   and record the cut: rung 3's fleet draws from 5 to 3; rung 3's 5% share; the duration grid from 8
+   to 6 values.
 6. **Positive control**, then **nulls and thresholds** (`capacity_nulls.py`).
-7. **Rungs 1 to 5**, one script each, saving every posterior's draws and weights so a chart needs no
-   refit.
-8. **Report** `capacity_report.py`: every table the page quotes, C1 to C5 at both prior settings,
-   coverage, effective sample sizes, and the controls.
+7. **Rungs 1 to 5**, one script each, saving every posterior's grid weights and power draws so a
+   chart needs no refit.
+8. **Report** `capacity_report.py`: every table the page quotes, C1 to C5 at both settings,
+   coverage, and the controls.
 9. **First Opus science review**, triage, re-run what it asks. **Charts and page**
    (`docs/studies/unmetered-battery-capacity.md`, beside the battery page in `mkdocs.yml`), then the
-   **second Opus science review**, the diff reviews, the mutation pass, and the prose, persona
-   (an NGED planning engineer, a home-battery optimiser developer, a sceptical Bayesian
-   statistician), and evidence reviews.
+   **second Opus science review**, the diff reviews, the mutation pass, and the prose, persona (an
+   NGED planning engineer, a home-battery optimiser developer, a sceptical Bayesian statistician),
+   and evidence reviews.
 
 ## Tests (each would fail on `main` today)
 
@@ -372,9 +431,10 @@ first run. Results go to `data/studies/per_study/unmetered_battery_capacity/`.
 - Marginal likelihood: matches a brute-force numerical integral on a 3-column problem.
 - Truncated Gibbs step: never returns a negative power, and recovers a known posterior mean on a
   conjugate case.
-- Importance sampling: on a simulated sum whose `theta` is one of the library's draws, the posterior
-  mass concentrates on that draw's neighbourhood; effective sample size equals the draw count when
-  every weight is equal.
+- Orthant correction: with one power column, the corrected evidence matches a brute-force integral
+  over the half-normal prior.
+- Duration grid: on a noise-free sum built from a grid template, the posterior puts most of its
+  mass on that template's duration.
 - Moved functions: pinned by a fixture before the move, with unequal values across half-hours.
 
 ## Design-philosophy check
@@ -395,6 +455,35 @@ uv run mkdocs build --strict
 ```
 
 Plus `pydoclint` and the docs-link checker, as CI runs them.
+
+## What the plan review changed
+
+One reviewer ran both lenses, simplicity then correctness, and edited the plan in place.
+
+- **Cut**: the grid-frequency signal, the fleet answering the 49.7 Hz trigger, and its figure; the
+  Demand Flexibility Service download and control; the September 2019 to August 2020 era, with its
+  N2EX download (only 4 of the 8 primaries have data that early); rung 1's solar arm and its
+  calendar-replica halves; and rung 3's 2% share and half its fleet draws.
+- **Replaced**: importance sampling over 4,000 prior draws of about a dozen parameters with an exact
+  512-point grid over the three durations. With some 4,400 half-hours per block the likelihood is
+  sharp enough that a few importance weights would carry the whole posterior, and the planned
+  fallback still left about eight dimensions. Tariff membership shares became per-tariff linear
+  powers, and efficiency, state-of-charge limits, and the cycle cap are fixed, moved only by the
+  second setting.
+- **Corrected**: the battery sign in the model; the count of `battery_hint` BMUs (101, not 149); the
+  throughput-cost parameter, which `lp_schedule` does not have; the noise parameters, which now
+  come from the scored sum rather than from other series; a power error that was minus infinity
+  whenever the step tail returns 0; pass rules for C1, C3, C4, and C5, which had none; simulated
+  truths drawn from the estimator's own template family, which would pass C2 for free; the rung 5
+  screen, whose threshold assumed the other primaries hold no battery, now a within-series placebo;
+  the callers of the moved functions; and the import of `window_half_hours`, which crosses a study
+  boundary.
+
+**Left risky.** The first-order autoregression may not whiten half-hourly demand residuals, in
+which case C2 fails and the page reports coverage instead of intervals. Whether NGED's
+"Disaggregated Demand" has embedded generation added back is unchecked. The register needs an Excel
+reader that is not installed. The compute budget rests on an orthant probability costing a few
+milliseconds, which the first timed sum must confirm.
 
 ## Open questions for the maintainer
 
