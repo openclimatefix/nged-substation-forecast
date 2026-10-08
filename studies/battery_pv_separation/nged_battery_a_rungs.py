@@ -32,7 +32,7 @@ from battery_rung3 import (
     fit_efficiency,
     smallest_capacity,
 )
-from nged_battery_a import ALIAS, battery_a_frame
+from studies.nged_battery_a import ALIAS, battery_a_frame
 
 PERCENT: Final[float] = 100.0
 
