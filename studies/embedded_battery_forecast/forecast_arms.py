@@ -53,7 +53,12 @@ def recipes(*, battery: Battery, issue: IssueType) -> dict[str, ArmSpec]:
     names = TESTBED_GATE_CLOSURE_ARMS if battery.has_fpn else NGED_BATTERY_A_GATE_CLOSURE_ARMS
     chosen = {name: GATE_CLOSURE_ARMS[name] for name in names}
     if battery.has_fpn and battery.lead_party is not None:
-        chosen["neighbour_fpn_same_party"] = GATE_CLOSURE_ARMS["neighbour_fpn_same_party"]
+        for name in (
+            "neighbour_fpn_same_party",
+            "neighbour_fpn_without_largest_party",
+            "neighbour_fpn_without_largest_party_shuffled",
+        ):
+            chosen[name] = GATE_CLOSURE_ARMS[name]
     return chosen
 
 

@@ -73,6 +73,8 @@ NeighbourSlotType = Literal[
     "same_party",
     "all_testbed",
     "all_testbed_shuffled",
+    "without_largest_party",
+    "without_largest_party_shuffled",
 ]
 NEIGHBOUR_SETS: Final[tuple[str, ...]] = (
     "different_party",
@@ -142,6 +144,13 @@ GATE_CLOSURE_ARMS: Final[dict[str, ArmSpec]] = {
 }
 """The arms at `ID-1h`. `fleet_fpn` and its shuffled twin are rung B2's arms for NGED battery A."""
 
+
+GATE_CLOSURE_ARMS["neighbour_fpn_without_largest_party"] = ArmSpec(
+    price_source="actual", own_slot="filler", neighbour_slot="without_largest_party"
+)
+GATE_CLOSURE_ARMS["neighbour_fpn_without_largest_party_shuffled"] = ArmSpec(
+    price_source="actual", own_slot="filler", neighbour_slot="without_largest_party_shuffled"
+)
 
 TESTBED_GATE_CLOSURE_ARMS: Final[tuple[str, ...]] = (
     "no_neighbour",
@@ -423,7 +432,7 @@ def shuffled_time(*, grid: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def _slot_columns(*, stats: pl.DataFrame, prefix: str, shuffle: pl.DataFrame) -> pl.DataFrame:
+def slot_columns(*, stats: pl.DataFrame, prefix: str, shuffle: pl.DataFrame) -> pl.DataFrame:
     """Return a neighbour set's three slots at `t`, at the shuffled time, and at `t` less a week."""
     slots = {
         "mean": "neighbour_mean_fraction",
@@ -555,7 +564,7 @@ def _with_fpn_columns(
     for name, ids in sets.items():
         stats = neighbour_statistics(fpn=pn, neighbours=ids, p99_mw=p99)
         frame = frame.join(
-            _slot_columns(stats=stats, prefix=name, shuffle=shuffle), on="time", how="left"
+            slot_columns(stats=stats, prefix=name, shuffle=shuffle), on="time", how="left"
         )
     return frame
 
