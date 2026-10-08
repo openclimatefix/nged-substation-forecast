@@ -619,10 +619,11 @@ ECR (in `literature/NGED/`) and, conditionally, the MCS statistics.
 5. **Input frames.** `forecast_inputs.py` builds, per battery and issue time, the target, the price
    sources, the as-of wind forecast, the own FPN
    (`downloads/market/elexon_pn/elexon_pn_half_hourly.parquet`), the neighbour statistics, and
-   own-output lags. Inputs: B1610 under `per_study/solar_bmu_census/inputs/b1610/` (column `half_hour_end_time`, so shift to the
-   period start before joining), the market downloads, the lead parties from the BMU register, and
-   NGED battery A from the private store. Print each arm's column list, each target's neighbour
-   list, and the testbed count (expected 35) into the report.
+   own-output lags. Inputs: B1610 under `per_study/solar_bmu_census/inputs/b1610/` (column
+   `half_hour_end_time`, so shift to the period start before joining), the market downloads, the
+   lead parties from the BMU register, and NGED battery A from the private store. Print
+   each arm's column list, each target's neighbour list, and the testbed count (expected 35) into
+   the report.
 6. **Rung A0**, then stop if the positive control fails.
 7. **Price model** (`forecast_price_model.py`), with its error relative to `naive` in the report.
 8. **Part A, rungs A1 to A5** (`forecast_bmus.py`).
