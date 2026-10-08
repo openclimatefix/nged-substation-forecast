@@ -684,6 +684,48 @@ of 100 to 500 m, [Cheynet et al. (2025)](https://doi.org/10.5194/wes-10-733-2025
 3 km Norwegian hindcast NORA3 similar offshore, and NORA3 better than ERA5 at two coastal sites and
 one complex-terrain site in Norway.
 
+### Five traps when ERA5 hourly fields are model inputs
+
+**ERA5's hourly fields can drop rows, mix releases, or inflate a ratio unless the build handles five
+traps.** The traps come from ECMWF's documentation of ERA5 and from the checks written for the [ERA5
+solar-variables study](https://github.com/openclimatefix/nged-substation-forecast/issues/1098). Each
+trap changes which rows a model sees or what a column means, and none raises an error.
+
+**Cloud base height and convective inhibition are missing wherever the model has no cloud, so
+dropping rows with a missing value drops every clear-sky hour.** ECMWF's documentation says a
+missing value is assigned to convective inhibition "where there is no cloud base". Cloud base height
+probably behaves the same way, which the study's first download chunk is checked against. A build
+should keep both fields as missing, which XGBoost treats as a value of its own, and should drop rows
+by the target and the clock only.
+
+**ERA5 hours from the last few months are preliminary ERA5T data that ECMWF can replace.** ERA5T
+marks its hours with `expver` 0005, and final ERA5 uses `expver` 0001 (see the ERA5 row of the
+[weather-data table](#weather-data) for the roughly 2-to-3-month wait). Two downloads of different
+variables can therefore cover the same hour with different releases. A build should record `expver`
+for every hour, end the span at the last month that is final in every file, and raise if `expver`
+differs between variables for one hour.
+
+**Dividing ERA5 irradiance by the top-of-atmosphere flux gives an unstable clearness index at low
+sun.** ERA5's `tisr` is the flux integrated over the hour, whereas a zenith angle taken at the
+hour's midpoint is a different quantity near sunrise and sunset. The ratio of the two is large and
+noisy in those hours, so a mean absolute error of the clearness index is dominated by dawn and dusk.
+A build should fix a daylight threshold in W m⁻² before any model is fitted, and should take the
+top-of-atmosphere value from one source for both numerator and denominator.
+
+**A model trained to predict CAMS irradiance gains partly by construction from ERA5's aerosol,
+water-vapour, and ozone fields.** CAMS computes clear-sky irradiance from CAMS aerosol, total column
+water vapour, and ozone, which come from the same IFS-based assimilation family as ERA5's fields
+(see the CAMS paragraph above). A gain from `tcwv`, `tco3`, or CAMS aerosol optical depth on a CAMS
+target therefore measures a shared input as well as the atmosphere. Conclusions about those fields
+should rest on a target measured at a solar farm. The CAMS reanalysis EAC4, which supplies aerosol
+optical depth, ends in August 2025 on the Atmosphere Data Store, so a model fitted on it needs a
+baseline refitted on exactly the same rows, with folds cut on that shorter span.
+
+**A solar-farm target that drops zero-output hours also drops the hours when snow covers the
+panels.** A fully covered panel reads exactly zero, so removing hours that hold a zero half-hour
+biases any test of ERA5's snow fields (`sd`, `sf`, `asn`) towards no effect. A study should say so
+beside the result, and can keep zero hours where snow depth is positive in an exploratory run.
+
 ### CAMS: use the point API, not the gridded product
 
 **Two CAMS products exist, and only the point time-series product is current.** The [gridded
