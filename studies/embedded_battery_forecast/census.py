@@ -22,6 +22,7 @@ import polars as pl
 from studies.name_matching import NOISE_WORDS, best_match
 from studies.sources import (
     BATTERY_PV_SEPARATION_DIR,
+    EMBEDDED_BATTERY_FORECAST_DIR,
     MARKET_DOWNLOADS_DIR,
     SOLAR_BMU_CENSUS_INPUTS_DIR,
 )
@@ -99,7 +100,7 @@ BMU_CLASSES: Final[tuple[BmuClassType, ...]] = (
 STORAGE_PATTERN: Final[str] = "(?i)stor"
 """Matches an ECR energy source or technology that names storage."""
 
-CENSUS_DIR: Final[Path] = BATTERY_PV_SEPARATION_DIR.parent / "embedded_battery_forecast"
+CENSUS_DIR: Final[Path] = EMBEDDED_BATTERY_FORECAST_DIR
 """Where the census writes its tables and `census_report.md`."""
 
 REPD_PATH: Final[Path] = SOLAR_BMU_CENSUS_INPUTS_DIR / "raw" / "repd_register.json"

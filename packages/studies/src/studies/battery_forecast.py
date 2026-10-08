@@ -83,6 +83,9 @@ def day_type(*, day: date, non_working_dates: frozenset[date]) -> DayType:
 def issue_time_for(*, target_start: datetime, issue: IssueType) -> datetime:
     """Return when a forecast of one half-hour is issued.
 
+    The target day is the UTC day, which is the `delivery_date` of the N2EX day-ahead file: that
+    file's README places its hourly grid on UTC.
+
     Args:
         target_start: The start of the target half-hour, UTC.
         issue: The issue type.
@@ -149,6 +152,7 @@ def asof_at_issue_time(
         right_on="publish_time",
         by="time",
         strategy="backward",
+        check_sortedness=False,
     )
     return joined.sort("_row").drop("_row")
 

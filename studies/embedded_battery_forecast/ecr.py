@@ -94,6 +94,13 @@ def _column_index(*, reference: str) -> int:
 def _sheet_part(*, archive: zipfile.ZipFile, sheet_name: str) -> str:
     """Return the path inside the workbook archive of the sheet with the given name.
 
+    Args:
+        archive: The open workbook.
+        sheet_name: The sheet's name.
+
+    Returns:
+        The path of the sheet's XML part, such as `xl/worksheets/sheet3.xml`.
+
     Raises:
         KeyError: If the workbook has no sheet of that name.
     """

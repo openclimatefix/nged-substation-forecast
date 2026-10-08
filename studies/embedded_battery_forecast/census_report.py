@@ -602,7 +602,22 @@ def main() -> None:
             "NESO "
             "auction table names the participant, not the site."
         ),
-        "- No dataset used here counts domestic batteries; the ECR starts at 50 kW.",
+        (
+            "- No dataset used here counts domestic batteries; the ECR starts at 50 kW. The MCS "
+            "domestic battery statistics are UK-wide totals with no "
+            "licence-area breakdown, so they are not downloaded."
+        ),
+        (
+            "- The ECR copy on disk is the August 2026 workbook. NGED's portal now lists the same "
+            "month as a CSV, and nobody has compared the two files' rows. The portal marks the "
+            "data as `Shared`, not open, so this report carries counts and bands only."
+        ),
+        (
+            "- Size classes: the 100 MW and 50 MW edges are the Grid Code's Large and Medium power "
+            "station thresholds for England and Wales, and 10 MW is the generation-licence "
+            "exemption limit. The 1 MW edge is the ECR's own split into two sheets, and sits below "
+            "any obligation to be a BMU."
+        ),
         "",
     ]
     (census.CENSUS_DIR / "census_report.md").write_text("\n".join(lines))
