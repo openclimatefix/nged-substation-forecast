@@ -1,6 +1,6 @@
 r"""Download GB system-wide market series and bid-offer prices for 2025-09-01 to 2026-09-30.
 
-Written for the battery-versus-solar-PV study (PR 1094). Run every default source, or name some:
+Written for the battery-versus-solar-PV study. Run every default source, or name some:
 
     uv run python studies/market_downloads/fetch_system_series.py
     uv run python studies/market_downloads/fetch_system_series.py --sources elexon_frequency
@@ -8,20 +8,22 @@ Written for the battery-versus-solar-PV study (PR 1094). Run every default sourc
         --first-pair-only --bmu-list data/studies/per_study/battery_pv_separation/bmu_list.csv
 
 Each source gets a folder under `data/studies/downloads/market/` holding one tidy parquet (or two,
-for frequency), a `README.md` and a `lineage.json` written from the values the script measured, and
-a `_day_cache/` of per-chunk parquet files. Each chunk is written the moment it arrives, so a crash
-costs one chunk and a re-run fetches only the missing chunks. Requests are keyless, use 4 threads,
-and back off exponentially on HTTP 429 and 5xx. Pass `--start`, `--end` (inclusive) and
-`--output-root` for a small test run.
+for frequency); a `README.md` and a `lineage.json`, both written from the values the script
+measured; and a `_day_cache/` of per-chunk parquet files. Each chunk is written the moment it
+arrives, so a crash loses at most one chunk and a re-run fetches only the missing chunks. Requests
+are keyless, use 4 threads, and back off exponentially on HTTP 429 and 5xx. Pass `--start`, `--end`
+(inclusive), and `--output-root` for a small test run.
 
-- `elexon_bod`: the bid-offer prices every listed BMU submitted (Elexon dataset BOD), one request
-  for each calendar month and batch of BMUs. `--first-pair-only` keeps pairs 1 and -1 only.
+- `elexon_bod`: the bid-offer prices every listed Balancing Mechanism Unit (BMU) submitted (Elexon
+  dataset BOD), one request for each calendar month and batch of BMUs. Each BMU submits numbered
+  bid-offer pairs; `--first-pair-only` keeps pairs 1 and -1, the offer and bid nearest the physical
+  notification.
 - `elexon_frequency`: system frequency every 15 seconds, one request for each UTC day. Writes the
   raw values as Float32 and a half-hourly summary (mean, minimum, maximum, standard deviation,
   count).
-- `neso_frequency`: NESO's one-second frequency CSV, one file for each month. Writes the
-  half-hourly summary only and never the raw seconds. Not run by default, because the Elexon series
-  covers the same grid frequency.
+- `neso_frequency`: the National Energy System Operator's (NESO) one-second frequency CSV, one file
+  for each month. Writes the half-hourly summary only and never the raw seconds. Not run by default,
+  because the Elexon series covers the same grid frequency.
 - `elexon_demand_outturn`: initial national demand outturn (INDO) and initial transmission system
   demand outturn (ITSDO), which one Elexon endpoint serves together.
 - `elexon_fuelhh`: half-hourly generation by fuel type.
@@ -187,7 +189,8 @@ def day_chunks(*, start: date, end: date) -> list[str]:
     return [f"{day}_{day + timedelta(days=1)}" for day in days_between(start=start, end=end)]
 
 
-# The generic Elexon series: BMRS datasets with no BMU filter
+# The generic Elexon series: Balancing Mechanism Reporting Service (BMRS) datasets with no BMU
+# filter
 
 
 def publish_params(*, first: date, after: date, extra: QueryParams) -> QueryParams:
@@ -217,7 +220,7 @@ def period_time_params(*, first: date, after: date, extra: QueryParams) -> Query
 
 @dataclass(frozen=True)
 class SeriesSpec:
-    """Everything the generic fetcher needs to download and describe one Elexon series."""
+    """The endpoint, query parameters, chunking, columns, and README text of one Elexon series."""
 
     name: str
     title: str
@@ -268,8 +271,7 @@ SERIES: Final[dict[str, SeriesSpec]] = {
                 pl.Float64,
                 (
                     "Initial national demand outturn (INDO), MW. Excludes station load, "
-                    "pumping and "
-                    "interconnector exports."
+                    "pumping, and interconnector exports."
                 ),
             ),
             Col(
@@ -278,8 +280,7 @@ SERIES: Final[dict[str, SeriesSpec]] = {
                 pl.Float64,
                 (
                     "Initial transmission system demand outturn (ITSDO), MW. Includes "
-                    "station load, "
-                    "pumping and interconnector exports."
+                    "station load, pumping, and interconnector exports."
                 ),
             ),
         ),
@@ -486,7 +487,7 @@ SERIES: Final[dict[str, SeriesSpec]] = {
         ),
         gotchas=(
             (
-                "These adjustments feed the system buy and sell prices; the field glosses are "
+                "These adjustments feed the system buy and sell prices. The field glosses are "
                 "paraphrased from the field names and have not been checked against Elexon's "
                 "definitions."
             ),
@@ -525,7 +526,7 @@ SERIES: Final[dict[str, SeriesSpec]] = {
             "`party_id` holds a party name in the rows sampled, not a short code.",
             (
                 "A period with no actions can still carry one placeholder row whose party, "
-                "asset, tender and service fields are null."
+                "asset, tender, and service fields are null."
             ),
         ),
         add_time=True,
@@ -671,7 +672,8 @@ def run_series(
             "first": [day.isoformat() for day in missing_days[:50]],
         }
     summary = _summary_text(rows=frame.height, checks=checks)
-    request = f"{spec.url} for {start} to {end}, {len(keys)} chunks"
+    chunk_kind = "daily" if spec.chunks is day_chunks else "monthly"
+    request = f"{spec.url} for {start} to {end}, {len(keys)} {chunk_kind} chunks"
     write_lineage(
         product_dir=output_dir,
         note={
@@ -863,7 +865,7 @@ def run_bod(
     )
     write_readme(
         product_dir=output_dir,
-        title="Elexon bid-offer prices (BOD), for the listed BMUs",
+        title="Elexon bid-offer prices (BOD), for the listed balancing mechanism units (BMUs)",
         source_page="https://bmrs.elexon.co.uk/bid-offer-data",
         script_path=SCRIPT_PATH,
         attribution=ELEXON_ATTRIBUTION,
@@ -891,15 +893,14 @@ def run_bod(
         ),
         gotchas=[
             (
-                "Each BMU submits a few pairs per period; most periods repeat the previous "
-                "period's "
-                "prices, so the table is long but compresses well."
+                "Each BMU submits a few pairs per period. Most periods repeat the previous "
+                "period's prices, so the table is long but compresses well."
             ),
             (
                 "Prices of 99999 and -99999, and values near 9999 such as -9999, are placeholders, "
-                "not prices. They appear on the outer pairs and also on pairs 1 and -1 for some "
-                "BMUs. A value just inside the threshold, such as -9979, is not flagged. "
-                "Filter on `price_is_placeholder` before any average."
+                "not prices. The placeholders appear on the outer pairs and also on pairs 1 and "
+                "-1 for some BMUs. A value just inside the threshold, such as -9979, is not "
+                "flagged. Filter on `price_is_placeholder` before any average."
             ),
             "A BMU only has rows for periods in which it submitted prices.",
         ],
@@ -1044,6 +1045,7 @@ def _write_frequency_docs(
     raw_name: str,
     summary_name: str,
     sample_text: str,
+    raw_never_stored: bool = False,
     extra_gotchas: Sequence[str] = (),
 ) -> None:
     write_lineage(
@@ -1060,12 +1062,18 @@ def _write_frequency_docs(
             "chunks_not_published": sorted(outcome["not_published"]),
         },
     )
-    raw_text = (
-        f"`{raw_name}` holds every {sample_text} value as Float32."
-        if store_raw
-        else f"The raw {sample_text} values are not stored because the cache exceeds "
-        f"{RAW_FREQUENCY_MAX_BYTES} bytes."
-    )
+    if raw_never_stored:
+        raw_text = f"The {sample_text} values are summarised during download and never stored."
+    elif store_raw:
+        raw_text = (
+            f"`{raw_name}` holds every {sample_text} value as Float32, in {raw_rows} rows with "
+            "columns `time` and `frequency_hz`."
+        )
+    else:
+        raw_text = (
+            f"The {raw_rows} raw {sample_text} values are not stored because the cache exceeds "
+            f"{RAW_FREQUENCY_MAX_BYTES / 1e9:g} GB."
+        )
     write_readme(
         product_dir=output_dir,
         title=title,
@@ -1076,15 +1084,15 @@ def _write_frequency_docs(
         licence=licence,
         timestamp_convention=(
             "`time` is UTC. In the summary it is the start of a half-hour window that includes "
-            "its first instant and excludes its last, so it lines up with a UTC half-hour, not "
-            "with a settlement period on a clock-change day."
+            "its first instant and excludes its last. The summary carries no settlement date or "
+            "period number, so on a clock-change day match it to settlement periods by `time`."
         ),
         columns=FREQUENCY_SUMMARY_COLUMNS,
         row_summary=(
             f"- `{summary_name}`: {coverage['distinct_rows']} of {coverage['expected_rows']} "
             f"half-hours have a sample; {coverage['missing_count']} are missing. "
             f"{short} half-hours have fewer than {expected_samples} samples.\n"
-            f"- {raw_text} It has {raw_rows} rows with columns `time` and `frequency_hz`."
+            f"- {raw_text}"
         ),
         gotchas=[
             *extra_gotchas,
@@ -1166,13 +1174,14 @@ def run_neso_frequency(*, root: Path, start: date, end: date, threads: int) -> N
         raw_name="",
         summary_name="neso_frequency.parquet",
         sample_text="one-second",
+        raw_never_stored=True,
         extra_gotchas=(
             (
-                "The CSV's `dtm` column carries no time zone. Compared with Elexon's 15-second "
-                "values over 96 half-hours of 30 and 31 March 2026 (British Summer Time), the "
-                "half-hourly means differed by 0.9 millihertz on average if `dtm` is read as "
-                "UTC and by about 58 millihertz if shifted by one hour, so the script reads "
-                "`dtm` as UTC."
+                "The CSV's `dtm` column carries no time zone, and the script reads it as UTC. "
+                "Over 96 half-hours of 30 and 31 March 2026 (British Summer Time), the "
+                "half-hourly means differed from Elexon's 15-second values by 0.9 millihertz on "
+                "average with `dtm` read as UTC, against about 58 millihertz with `dtm` shifted "
+                "by one hour."
             ),
         ),
     )

@@ -1,6 +1,6 @@
 r"""Download the Elexon physical notifications of the study's BMUs for 2025-09-01 to 2026-09-30.
 
-Written for the battery-versus-solar-PV study (PR 1094). A BMU is a Balancing Mechanism Unit. Three
+Written for the battery-versus-solar-PV study. A BMU is a Balancing Mechanism Unit. Three
 datasets are downloaded for the BMUs in `--bmu-list` (default: the 113-BMU list of the study):
 
 - `elexon_pn`: Physical Notifications (PN), the output a BMU tells the system operator it will
@@ -20,10 +20,10 @@ publishes them: a start time, an end time, and the level at each end, joined by 
 integrating that piecewise-linear profile over each UTC half-hour window. See each folder's
 `README.md` for the method.
 
-Requests are one UTC day for one hash batch of BMUs, cached as
-`_day_cache/batch_<hash>/<day>.parquet`, so that a re-run resumes and removing one BMU from the list
-refetches only that BMU's batch. Requests are keyless, use 4 threads, and back off exponentially on
-HTTP 429 and 5xx.
+BMUs are split into 16 batches by a hash of each identifier. Each request covers one UTC day for
+one batch, and is cached as `_day_cache/batch_<hash>/<day>.parquet`. A re-run therefore resumes,
+and removing one BMU from the list refetches only that BMU's batch. Requests are keyless, use 4
+threads, and back off exponentially on HTTP 429 and 5xx.
 """
 
 import argparse
@@ -76,19 +76,25 @@ UTC_TIME: Final[pl.Datetime] = pl.Datetime(time_unit="us", time_zone="UTC")
 DATASETS: Final[dict[str, dict[str, str]]] = {
     "elexon_pn": {
         "dataset": "PN",
-        "title": "Elexon Physical Notifications (PN), for the listed BMUs",
+        "title": (
+            "Elexon Physical Notifications (PN), for the listed balancing mechanism units (BMUs)"
+        ),
         "page": "https://bmrs.elexon.co.uk/physical-notifications",
         "meaning": "the output the BMU notified it would deliver (positive is export)",
     },
     "elexon_mels": {
         "dataset": "MELS",
-        "title": "Elexon Maximum Export Limit (MELS), for the listed BMUs",
+        "title": (
+            "Elexon Maximum Export Limit (MELS), for the listed balancing mechanism units (BMUs)"
+        ),
         "page": "https://bmrs.elexon.co.uk/maximum-export-limit",
         "meaning": "the most the BMU notified it could export",
     },
     "elexon_mils": {
         "dataset": "MILS",
-        "title": "Elexon Maximum Import Limit (MILS), for the listed BMUs",
+        "title": (
+            "Elexon Maximum Import Limit (MILS), for the listed balancing mechanism units (BMUs)"
+        ),
         "page": "https://bmrs.elexon.co.uk/maximum-import-limit",
         "meaning": "the most the BMU notified it could import (zero or negative)",
     },
@@ -164,9 +170,9 @@ def parse_points(*, rows: list[dict[str, Any]], day: date) -> pl.DataFrame:
     """Turn one UTC day of PN, MELS, or MILS rows into a table of points.
 
     Elexon answers a request for a day with every point that touches the day, including the points
-    that end exactly at its start and the ones that start exactly at its end. Each point is kept in
-    the day its `timeFrom` falls in, so a point is cached once. If two rows share a BMU and
-    `timeFrom` (MELS and MILS notifications can be revised), the one with the highest notification
+    that end exactly at its start and the points that start exactly at its end. Each point is kept
+    in the day its `timeFrom` falls in, so a point is cached once. If two rows share a BMU and
+    `timeFrom` (MELS and MILS notifications can be revised), the row with the highest notification
     sequence wins.
 
     Args:
@@ -245,9 +251,9 @@ def half_hourly_means(*, points: pl.DataFrame, period_starts: pl.DataFrame) -> p
     point that crosses a window boundary is split at the boundary, and the level at the cut is
     found by linear interpolation. The area of each piece is its duration times the mean of its
     two end levels. A window's mean is the summed area divided by the summed duration of the pieces
-    in it, so a window only partly covered by points is the mean over the covered part, and
-    `covered_seconds` says how much that was. A point with `time_to <= time_from` has no duration
-    and adds nothing.
+    in it. A window the points cover only in part therefore gets the mean over the covered part,
+    and `covered_seconds` records how long that part is. A point with `time_to <= time_from` has no
+    duration and adds nothing.
 
     Args:
         points: Points with the `POINT_SCHEMA` columns.
@@ -336,9 +342,9 @@ def empty_chunks(*, cache_dir: Path, keys: Sequence[str]) -> list[str]:
 def check_no_empty_month(*, label: str, empty: Sequence[str], keys: Sequence[str]) -> None:
     """Raise if every requested day of any calendar month is an empty chunk.
 
-    Elexon answers HTTP 200 with an empty list for data it has not published, so one empty day
-    can be real (a BMU switched off), but a whole month of empty days for a batch means the batch
-    was not published or the request was wrong.
+    Elexon answers HTTP 200 with an empty list for data it has not published. One empty day can be
+    genuine, because a BMU may be switched off. A whole month of empty days for a batch means the
+    batch was not published or the request was wrong.
 
     Args:
         label: Names the dataset and batch in the error message.
@@ -431,7 +437,7 @@ def run_dataset(
 def quality_summary(
     *, means: pl.DataFrame, bmu_ids: Sequence[str], start: date, end: date
 ) -> dict[str, Any]:
-    """Measure how much of the window the half-hourly means cover.
+    """Measure how much of the half-hour windows from `start` to `end` the half-hourly means cover.
 
     Args:
         means: The half-hourly table.
@@ -441,7 +447,7 @@ def quality_summary(
 
     Returns:
         The BMUs with no rows, how many windows have a partial or an over-full cover, the windows no
-        BMU covers, and the rows each BMU has against the windows in the window.
+        BMU covers, and the rows each BMU has against the half-hour windows from `start` to `end`.
     """
     expected = expected_half_hour_starts(start=start, end=end)
     per_bmu = means.group_by("bmu_id").agg(rows=pl.len())
@@ -489,10 +495,10 @@ def write_notifications_readme(
             "to `time_to` the level moves in a straight line from `level_from_mw` to "
             "`level_to_mw`. `time_from` is the instant the point starts, not a settlement "
             f"period start. `{name}_half_hourly.parquet` has one row per BMU and UTC half-hour "
-            "window; `time` is the start of the window, which equals the start of a settlement "
+            "window. `time` is the start of the window, which equals the start of a settlement "
             "period (settlement periods start on the hour and half hour in UTC). `settlement_date` "
-            "and `settlement_period` are the Elexon period that window is: period 1 starts at "
-            "00:00 UK local time. The window is by UTC day, "
+            "and `settlement_period` name the Elexon settlement period the window falls in: period "
+            "1 starts at 00:00 UK local time. The download covers whole UTC days, "
             f"{start} to {end}, and a point is kept in the UTC day its `time_from` falls in."
         ),
         columns={
@@ -518,7 +524,8 @@ def write_notifications_readme(
             f"- Points written: {points.height}, half-hourly rows: {half_hourly_rows}; "
             f"{quality['bmus_with_rows']} of the {bmu_count} BMUs requested have rows; BMUs "
             f"without rows: {quality['bmus_without_rows']}.\n"
-            f"- Windows per BMU in the window: {quality['windows_per_bmu_expected']}. Rows per "
+            f"- Half-hour windows per BMU from {start} to {end}: "
+            f"{quality['windows_per_bmu_expected']}. Rows per "
             f"BMU (min, median, max): {quality['rows_per_bmu_min_median_max']}.\n"
             f"- Rows with `covered_seconds` below 1800: {quality['windows_partly_covered']}; "
             f"above 1800: {quality['windows_covered_more_than_once']}.\n"
@@ -540,8 +547,8 @@ def write_notifications_readme(
                 "not say what was known at a given earlier time."
             ),
             (
-                "A BMU that did not exist, or was not required to notify, on a day has no points "
-                "that day. Absence is not zero."
+                "On a day when a BMU did not exist, or was not required to notify, the BMU has no "
+                "points. Absence is not zero."
             ),
             (
                 "The BMU list is the CSV passed with `--bmu-list`; `lineage.json` lists the BMUs "

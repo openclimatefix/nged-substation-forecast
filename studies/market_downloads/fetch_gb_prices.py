@@ -1,23 +1,23 @@
 """Download four GB electricity price and carbon-intensity series for 2025-09-01 to 2026-09-30.
 
-Written for the battery-versus-solar-PV study (PR 1094). Run all four sources, or name some:
+Written for the battery-versus-solar-PV study. Run all four sources, or name some:
 
     uv run python studies/market_downloads/fetch_gb_prices.py
     uv run python studies/market_downloads/fetch_gb_prices.py --sources carbon_intensity
 
-Each source gets a folder under `data/studies/downloads/market/` holding one tidy parquet, a
-`README.md` and a `lineage.json` that the script writes from the values it measured, and a
-`_day_cache/` of per-chunk parquet files. Each chunk is written the moment it arrives, so a crash
-costs one chunk and a re-run fetches only the chunks that are missing. Requests are keyless, use 4
-threads, and back off exponentially on HTTP 429 and 5xx.
+Each source gets a folder under `data/studies/downloads/market/` holding one tidy parquet file, a
+`README.md`, a `lineage.json`, and a `_day_cache/` folder of per-chunk parquet files. The script
+writes `README.md` and `lineage.json` from the values it measured. Each chunk is written the moment
+it arrives, so a crash loses at most one chunk and a re-run fetches only the chunks that are
+missing. Requests are keyless, use four threads, and back off exponentially on HTTP 429 and 5xx.
 
 - `neso_n2ex_day_ahead`: the hourly N2EX day-ahead auction price, from the National Energy System
   Operator's (NESO) CKAN datastore. One request.
 - `elexon_system_prices`: the imbalance settlement prices (Elexon dataset DISEBSP), one request for
   each settlement day.
 - `elexon_mid_apx`: the Market Index Data from the `APXMIDP` provider only (the `N2EXMIDP` provider
-  publishes zeros), one request for each UTC day. This is the EPEX short-term half-hourly index, not
-  the day-ahead auction price.
+  publishes zeros), one request for each UTC day. The `APXMIDP` index is the EPEX short-term
+  half-hourly index, not the day-ahead auction price.
 - `carbon_intensity`: the national half-hourly carbon intensity, 14 days for each request.
 
 Pass `--start` and `--end` (inclusive) and `--output-root` for a small test run.
@@ -65,8 +65,11 @@ SOURCE_NAMES: Final[tuple[str, ...]] = (
     "carbon_intensity",
     "neso_n2ex_day_ahead",
 )
-"""The sources in run order. The N2EX source runs last because its clock check reads the Elexon
-APX table."""
+"""The sources in run order.
+
+The N2EX source runs last because the script checks the N2EX clock against the Elexon APX table,
+which must already be written.
+"""
 CLOCK_LAGS_HOURS: Final[tuple[int, ...]] = (-1, 0, 1)
 N2EX_RESOURCE: Final[str] = "4f27eea5-7038-4f73-9740-e3e4ad47c26a"
 N2EX_DUMP_URL: Final[str] = f"https://api.neso.energy/datastore/dump/{N2EX_RESOURCE}"
@@ -124,9 +127,9 @@ def _utc(*, column: str, fmt: str) -> pl.Expr:
 def parse_n2ex(*, csv_text: str, start: date, end: date) -> pl.DataFrame:
     """Turn the N2EX datastore dump into one row for each hour in `start..end`.
 
-    The dump has `Date`, `Delivery Period` (`HH:MM - HH:MM`), and `Price`. NESO's clock-change days
-    have 24 rows, so the grid is read as UTC: `time` is the date plus the first hour of the delivery
-    period, in UTC.
+    The dump has `Date`, `Delivery Period` (`HH:MM - HH:MM`), and `Price`. The dump has 24 rows on
+    each clock-change day, so the grid is read as UTC: `time` is the date plus the first hour of the
+    delivery period, in UTC.
 
     Args:
         csv_text: The CSV body.
@@ -167,8 +170,8 @@ def apx_lag_correlations(*, n2ex: pl.DataFrame, apx: pl.DataFrame) -> dict[str, 
     """Correlate hourly N2EX prices with the hourly mean of the half-hourly APX index at each lag.
 
     A lag of `k` hours pairs the N2EX price for hour `t` with the APX mean for hour `t + k`. If the
-    N2EX grid is UTC, the correlation peaks at lag 0. If the grid were UK clock time, it would peak
-    at one hour during summer time.
+    N2EX grid is UTC, the correlation peaks at lag 0. If the grid were UK clock time, the
+    correlation would peak at lag -1 during summer time.
 
     Args:
         n2ex: The output of `parse_n2ex`.
@@ -364,7 +367,8 @@ def _row_summary(*, name: str, gaps: dict[str, Any], expectation: str) -> str:
         f"- Expected timestamps with no row: {gaps['missing_count']}. Rows outside the expected "
         f"timestamps: {gaps['unexpected_count']}.\n"
         f"- First missing timestamps (UTC): {listed}.\n"
-        f"- `{name}.parquet` is built from `_day_cache/`, so a missing chunk there is a gap here."
+        f"- `{name}.parquet` is built from `_day_cache/`, so a chunk missing from `_day_cache/` is "
+        f"a gap in `{name}.parquet`."
     )
 
 
@@ -438,7 +442,11 @@ def fetch_n2ex(*, root: Path, start: date, end: date) -> None:
         clock_verdict = (
             f"The correlation between N2EX and the hourly mean of the Elexon APX index over the "
             f"window is highest at lag {best} h ({correlations}). "
-            + ("That places the N2EX grid on UTC." if best == 0 else "The grid is NOT UTC.")
+            + (
+                "A peak at lag 0 places the N2EX grid on UTC."
+                if best == 0
+                else "The N2EX grid is therefore NOT on UTC."
+            )
         )
     else:
         clock_verdict = (
@@ -461,7 +469,7 @@ def fetch_n2ex(*, root: Path, start: date, end: date) -> None:
         extra={"hour_mapping_check": hour_check},
         expectation=f"24 for each of {(end - start).days + 1} days",
         readme={
-            "title": "NESO N2EX day-ahead price, hourly",
+            "title": "National Energy System Operator (NESO) N2EX day-ahead price, hourly",
             "source_page": N2EX_PAGE,
             "attribution": None,
             "licence": (
@@ -473,7 +481,7 @@ def fetch_n2ex(*, root: Path, start: date, end: date) -> None:
                 "hour of the `Delivery Period` column. The source labels hours `HH:MM - HH:MM`. "
                 "The source has 24 rows on both clock-change days "
                 f"({clock_rows or 'none in this window'}), so the grid is read as UTC rather than "
-                "UK clock time. Check done by this script: "
+                "UK clock time. This script checked the hours: "
                 f"{hour_check['days_without_24_rows']} days have a row count other than 24, and "
                 f"the hourly series is {series_state}. "
                 f"{clock_verdict}"
@@ -493,7 +501,7 @@ def fetch_n2ex(*, root: Path, start: date, end: date) -> None:
                 "The source dump covers 2021 to the present. This table is cut to the window.",
                 (
                     f"{hour_check['hours_priced_exactly_zero']} hours in the window are priced "
-                    "exactly 0.0. They are real prices, not missing values."
+                    "exactly 0.0. Those zero prices are real prices, not missing values."
                 ),
             ],
         },
@@ -567,7 +575,10 @@ def fetch_system_prices(*, root: Path, start: date, end: date, threads: int) -> 
                 "price_derivation_code": "Elexon's code for how the price was derived",
             },
             "gotchas": [
-                "SSP and SBP are both kept. Check whether they differ before using only one.",
+                (
+                    "SSP and SBP are both kept. Check whether the two prices differ before using "
+                    "only SSP or only SBP."
+                ),
                 (
                     "Elexon revises these values in later settlement runs. The table holds what "
                     "the API returned on the retrieval date in `lineage.json`."
@@ -633,7 +644,8 @@ def fetch_mid(*, root: Path, start: date, end: date, threads: int) -> None:
                 "`time` is the UTC start of the settlement period (Elexon's `startTime`). The "
                 "window is by UTC day, so every UTC day has 48 rows. `settlement_date` and "
                 "`settlement_period` are Elexon's own (period 1 starts at 00:00 UK local time). "
-                f"Pairs whose `time` differs from the UTC start computed from them: {mismatches}."
+                "Settlement date and period pairs whose `time` differs from the UTC start "
+                f"computed from them: {mismatches}."
             ),
             "columns": {
                 "time": "Start of the half-hour, UTC",
@@ -723,7 +735,10 @@ def fetch_carbon(*, root: Path, start: date, end: date, threads: int) -> None:
                 "index": "The API's band: very low, low, moderate, high, or very high",
             },
             "gotchas": [
-                "National values only. The API's regional values are not downloaded.",
+                (
+                    "The table holds national values only. The API's regional values are not "
+                    "downloaded."
+                ),
                 f"Rows with a null actual value: {null_actual}.",
             ],
         },

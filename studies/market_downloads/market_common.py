@@ -1,7 +1,7 @@
 """Shared machinery for the GB electricity price and dispatch download scripts.
 
-Written for the battery-versus-solar-PV study (PR 1094). `fetch_gb_prices.py` and
-`fetch_bmu_dispatch.py` both import it. It holds the HTTP client with retry and backoff, the
+Written for the battery-versus-solar-PV study. `fetch_gb_prices.py` and `fetch_bmu_dispatch.py`
+both import this module. The module holds the HTTP client with retry and backoff, the
 resumable per-chunk cache, the Elexon settlement-period arithmetic, the expected-row-count and gap
 helpers, and the `README.md` and `lineage.json` writers.
 
@@ -23,7 +23,11 @@ import httpx
 import polars as pl
 
 WINDOW_START: Final[date] = date(2025, 9, 1)
-"""First day of the study window (a UTC day for streams, a settlement date for settlement data)."""
+"""First day of the study window.
+
+The day is a UTC day for the sources requested by UTC time range, and a settlement date for the
+sources requested by settlement date.
+"""
 
 WINDOW_END: Final[date] = date(2026, 9, 30)
 """Last day of the study window, inclusive."""
@@ -33,8 +37,9 @@ ELEXON_ATTRIBUTION: Final[str] = (
     "Contains BMRS data © Elexon Limited copyright and database right 2026"
 )
 ELEXON_LICENCE: Final[str] = (
-    "Elexon's BMRS terms require the attribution line above. The wording is taken from the Elexon "
-    "Insights Solution documentation and has not been independently verified."
+    "The terms of Elexon's Balancing Mechanism Reporting Service (BMRS) require the attribution "
+    "line above. The wording is taken from the Elexon Insights Solution documentation and has "
+    "not been independently verified."
 )
 
 FETCH_THREADS: Final[int] = 4
@@ -46,10 +51,16 @@ NOT_FOUND: Final[int] = 404
 SETTLEMENT_PERIOD: Final[timedelta] = timedelta(minutes=30)
 LONDON: Final[ZoneInfo] = ZoneInfo("Europe/London")
 MAX_LISTED_GAPS: Final[int] = 50
-"""The longest list of missing timestamps written into `lineage.json`; the count is always exact."""
+"""The most missing timestamps listed in `lineage.json`.
+
+The missing count itself is always exact.
+"""
 
 QueryParams = list[tuple[str, str | float | None]]
-"""Query parameters as a list of pairs, because Elexon repeats `bmUnit=` once per unit."""
+"""Query parameters as a list of pairs.
+
+The list form is needed because an Elexon query repeats `bmUnit=` once for each BMU.
+"""
 
 
 def days_between(*, start: date, end: date) -> list[date]:
@@ -151,7 +162,7 @@ class IncompleteChunkError(Exception):
     """Raised by a fetcher when the source returned fewer rows than the chunk must hold.
 
     Elexon answers HTTP 200 with an empty `data` list for a date it has not published yet, so a
-    short chunk means the source is not ready, and it must not be cached as done.
+    short chunk means the source is not ready yet. A short chunk must not be cached as done.
     """
 
 
@@ -173,10 +184,10 @@ def period_time_mismatches(*, frame: pl.DataFrame) -> int:
 
 
 def get_response(*, url: str, params: QueryParams | None = None) -> httpx.Response:
-    """GET `url`, retrying a transient failure with exponential backoff, and raise on the last.
+    """GET `url`, retrying a transient failure with exponential backoff.
 
     HTTP 429, every 5xx status, and network errors are retried. Any other 4xx status is final
-    because a repeat request cannot succeed.
+    because a repeat request cannot succeed. The last failure is raised if every attempt fails.
     """
     for attempt in range(HTTP_RETRIES):
         try:
@@ -239,10 +250,10 @@ def fetch_missing_chunks(
     """Fetch every chunk that is not already cached, writing each to disk as soon as it arrives.
 
     A chunk is one file, `cache_dir/<key>.parquet`. A file already on disk is skipped, so a re-run
-    after a crash fetches only what is missing. A chunk that answers HTTP 404, or that its fetcher
-    rejects with `IncompleteChunkError`, is recorded as not published and left uncached, but only
-    if every later key is also not published: a gap in the middle of the window raises. Any other
-    failure aborts the run.
+    after a crash fetches only what is missing. A chunk whose request returns HTTP 404, or whose
+    fetcher raises `IncompleteChunkError`, is recorded as not published and left uncached. Every
+    such chunk must sit at the end of the window: a not-published chunk followed by a published one
+    raises `RuntimeError`. Any other failure aborts the run.
 
     Args:
         cache_dir: The folder of cached chunks.

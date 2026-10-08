@@ -1,6 +1,6 @@
 """Download NESO's Enduring Auction Capability (EAC) results for 2025-09-01 to 2026-09-30.
 
-Written for the battery-versus-solar-PV study (PR 1094). The EAC is the National Energy System
+Written for the battery-versus-solar-PV study. The EAC is the National Energy System
 Operator's (NESO) day-ahead auction for frequency response and reserve. Run all three sources, or
 name some:
 
@@ -16,16 +16,17 @@ name some:
   resources afterwards, so this source reads from both.
 - `neso_eac_unit_to_bmu`: a table that links each auction unit in the two sources above to
   candidate Balancing Mechanism Units (BMUs) in Elexon's register, and a table that says which of
-  the study's BMUs have an auction unit. It reads the two parquet files above, so it runs last.
+  the study's BMUs have an auction unit. The mapping reads the two parquet files above, so the
+  script runs it last.
 
-Each result source gets a folder under `data/studies/downloads/market/` holding one tidy parquet, a
-`README.md` and a `lineage.json` that the script writes from the values it measured, and a
+Each result source gets a folder under `data/studies/downloads/market/` holding one tidy parquet; a
+`README.md` and a `lineage.json`, both written from the values the script measured; and a
 `_day_cache/` of per-chunk parquet files. Each chunk is written the moment it arrives, so a crash
-costs one chunk and a re-run fetches only the chunks that are missing. Requests are keyless, use 4
-threads, and back off exponentially on HTTP 429 and 5xx.
+loses at most one chunk and a re-run fetches only the chunks that are missing. Requests are
+keyless, use 4 threads, and back off exponentially on HTTP 429 and 5xx.
 
-Pass `--start` and `--end` (inclusive) and `--output-root` for a small test run. The mapping reads
-the BMU register from `--bmu-reference` and the study's BMUs from `--bmu-list`.
+Pass `--start`, `--end` (both inclusive), and `--output-root` for a small test run. The mapping
+reads the BMU register from `--bmu-reference` and the study's BMUs from `--bmu-list`.
 """
 
 import argparse
@@ -71,8 +72,8 @@ SQL_URL: Final[str] = "https://api.neso.energy/api/3/action/datastore_search_sql
 EAC_PAGE: Final[str] = "https://www.neso.energy/data-portal/eac-auction-results"
 EAC_BR_PAGE: Final[str] = "https://www.neso.energy/data-portal/eac-br-auction-results"
 NESO_LICENCE: Final[str] = (
-    "NESO Open Data Licence, as shown on the dataset's CKAN page. The licence text has not been "
-    "independently checked."
+    "NESO Open Data Licence, as shown on the dataset's page on NESO's CKAN data portal. The "
+    "licence text has not been independently checked."
 )
 NESO_ATTRIBUTION: Final[str] = "Supplied by the National Energy System Operator (NESO) Open Data"
 """A plain-words credit. The licence page was not read for required wording."""
@@ -84,7 +85,7 @@ SPARSE_PRODUCTS: Final[frozenset[str]] = frozenset({"NBR", "NSR"})
 """Negative Balancing Reserve and negative Slow Reserve clear only in a few periods, so a period
 with no row is normal and the gap check skips them."""
 EFA_PRODUCTS: Final[frozenset[str]] = frozenset({"DCH", "DCL", "DMH", "DML", "DRH", "DRL"})
-"""The products delivered in the six four-hour Electricity Forward Agreement (EFA) blocks."""
+"""The products delivered in the six 4-hour Electricity Forward Agreement (EFA) blocks."""
 EFA_LOCAL_START_HOURS: Final[tuple[int, ...]] = (3, 7, 11, 15, 19, 23)
 """UK clock hours at which an EFA block starts: block 1 runs 23:00 to 03:00."""
 UTC_TIME: Final[pl.Datetime] = pl.Datetime(time_unit="us", time_zone="UTC")
@@ -124,8 +125,8 @@ RESPONSE_RESERVE_RESOURCES: Final[tuple[EacResource, ...]] = (
     ),
 )
 """The two resources that hold the window's response and reserve results, including Balancing
-Reserve from 2025-10-29 23:00 UTC. The brief's resource `07f0dd8b-...` ("Daily Results By Unit")
-holds only the last two delivery days, so it cannot supply a historical window."""
+Reserve from 2025-10-29 23:00 UTC. NESO's "Daily Results By Unit" resource (`07f0dd8b-...`) holds
+only the last two delivery days, so it cannot supply a historical window."""
 
 SOURCE_RESOURCES: Final[dict[str, tuple[tuple[EacResource, bool], ...]]] = {
     "neso_eac_response_reserve": tuple((r, False) for r in RESPONSE_RESERVE_RESOURCES),
@@ -320,11 +321,11 @@ def fetch_result_day(*, source: str, key: str) -> pl.DataFrame:
 
 
 def product_gaps(*, frame: pl.DataFrame, start: date, end: date) -> dict[str, dict[str, Any]]:
-    """Compare each product's delivery starts with the grid the product should fill.
+    """Compare each product's delivery starts with the time grid the product should fill.
 
-    A product is expected on every grid point between its first and last delivery start in the
-    table. The grid is the EFA block starts for the six response products and every half-hour for
-    the rest. Sparse products (`SPARSE_PRODUCTS`) are skipped.
+    A product is expected on every point of its time grid between its first and last delivery start
+    in the table. The time grid is the EFA block starts for the six response products and every
+    half-hour for the rest. Sparse products (`SPARSE_PRODUCTS`) are skipped.
 
     Args:
         frame: The result table.
@@ -454,9 +455,9 @@ def _result_readme(
     )
     return {
         "title": (
-            "NESO EAC Balancing Reserve results by unit"
+            "NESO Enduring Auction Capability (EAC) Balancing Reserve results by unit"
             if balancing
-            else "NESO EAC response and reserve results by unit"
+            else "NESO Enduring Auction Capability (EAC) response and reserve results by unit"
         ),
         "source_page": EAC_BR_PAGE if balancing else EAC_PAGE,
         "attribution": NESO_ATTRIBUTION,
@@ -464,12 +465,12 @@ def _result_readme(
         "timestamp_convention": (
             "`time` is the UTC start of the delivery period (NESO's `deliveryStart`) and "
             "`time_end` is its end. NESO states that these values are in UTC. The Dynamic "
-            "Containment, Moderation, and Regulation products are delivered in four-hour blocks "
-            "that start at 23:00, 03:00, 07:00, 11:00, 15:00, and 19:00 UK clock time, which is "
-            "22:00 UTC and so on in summer; every block start in the table lies on that grid (see "
-            "the gap counts below). Quick Reserve, Slow Reserve, and Balancing Reserve are "
-            f"half-hourly. Delivery lengths seen: {length_text}. The window is by UTC day of "
-            "`time`, so a UTC day can hold part of two EFA days."
+            "Containment, Moderation, and Regulation products are delivered in 4-hour Electricity "
+            "Forward Agreement (EFA) blocks that start at 23:00, 03:00, 07:00, 11:00, 15:00, and "
+            "19:00 UK clock time, which is 22:00 UTC and so on in summer. The gap counts below "
+            "say how many block starts fall off that time grid. Quick Reserve, Slow Reserve, and "
+            f"Balancing Reserve are half-hourly. Delivery lengths seen: {length_text}. The window "
+            "is by UTC day of `time`, so a UTC day can hold part of two EFA days."
         ),
         "columns": {
             "time": "Start of the delivery period, UTC",
@@ -495,9 +496,11 @@ def _result_readme(
         },
         "row_summary": (
             f"- Rows written: {frame.height}, for {frame['auction_unit'].n_unique()} auction "
-            "units.\n- Delivery starts compared with the grid each product should fill, between "
-            "its first and last start in the table (`NBR` and `NSR` are skipped because they "
-            "clear in few periods):\n" + _gap_summary(gaps=gaps) + "\n- `lineage.json` holds the "
+            "units.\n- Delivery starts compared with the time grid each product should fill, "
+            "between its first and last start in the table (`NBR` and `NSR` are skipped because "
+            "they clear in few periods):\n"
+            + _gap_summary(gaps=gaps)
+            + "\n- `lineage.json` holds the "
             "same counts with the first missing starts."
         ),
         "gotchas": [
@@ -508,11 +511,11 @@ def _result_readme(
             (
                 "The price is per MW of capacity per hour, not per MWh of energy. A row's revenue "
                 "is `executed_quantity_mw * clearing_price * hours`, where `hours` is "
-                "`time_end - time` in hours. Do not assume four: the blocks on the eve of a "
+                "`time_end - time` in hours. Do not assume 4 hours: the blocks on the eve of a "
                 "clock change last 3 or 5 hours (see the delivery lengths above)."
             ),
             (
-                "The resource named in the study brief (`07f0dd8b-...`, 'Daily Results By Unit') "
+                "NESO's 'Daily Results By Unit' resource (`07f0dd8b-...`) "
                 "holds only the most recent two delivery days. The history comes from the "
                 "'Results By Unit' resources listed in `lineage.json`."
             ),
@@ -522,7 +525,8 @@ def _result_readme(
                 + (
                     "This source joins both parts."
                     if balancing
-                    else "This source drops those rows; they are in `neso_eac_balancing_reserve/`."
+                    else "This source drops those rows; the Balancing Reserve rows are in "
+                    "`neso_eac_balancing_reserve/`."
                 )
             ),
             (
@@ -659,7 +663,7 @@ def candidates_for_unit(*, unit: str, index: BmuIndex) -> list[tuple[str, str, f
 
 
 def describe_units(*, results: list[pl.DataFrame]) -> pl.DataFrame:
-    """Return one row for each auction unit with its participant, technology, services and rows.
+    """Return one row for each auction unit with its participant, technology, services, and rows.
 
     A unit with more than one participant or technology label keeps the one on most rows.
     """
@@ -885,12 +889,15 @@ def _mapping_readme(
     methods = "; ".join(f"`{method}`: {count}" for method, count in method_counts.items())
     verdicts = ", ".join(f"{count} {verdict}" for verdict, count in verdict_counts.items())
     return {
-        "title": "NESO EAC auction unit to BMU mapping",
+        "title": (
+            "NESO Enduring Auction Capability (EAC) auction unit to balancing mechanism unit "
+            "(BMU) mapping"
+        ),
         "source_page": EAC_PAGE,
         "attribution": None,
         "licence": (
             "Derived from the NESO EAC results and Elexon's BMU register. This table is a "
-            "guess made by this script, not a published reference."
+            "heuristic match computed by this script, not a published reference."
         ),
         "timestamp_convention": "No time columns. The table is not dated.",
         "columns": {
@@ -946,7 +953,7 @@ def _mapping_readme(
             (
                 "An auction unit can bundle several assets, and one site can have several BMUs. "
                 "The table links identifiers, not asset-to-asset ownership, so the volumes of a "
-                "matched unit may cover more or less than the BMU."
+                "matched unit may cover more or less than the BMU's output."
             ),
             (
                 f"Units with `match_method` `none` have no identifier match in Elexon's register: "

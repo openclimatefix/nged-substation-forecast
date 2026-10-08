@@ -1,7 +1,8 @@
-"""Download the Elexon balancing-mechanism dispatch of storage BMUs for 2025-09-01 to 2026-09-30.
+"""Download the balancing-mechanism dispatch of storage Balancing Mechanism Units (BMUs).
 
-Written for the battery-versus-solar-PV study (PR 1094). A BMU is a Balancing Mechanism Unit. Run in
-two phases, so that a person can review the BMU list between them:
+The window is 2025-09-01 to 2026-09-30, and the data comes from Elexon. Written for the
+battery-versus-solar-PV study. Run in two phases, so that a person can review the BMU list between
+them:
 
     uv run python studies/market_downloads/fetch_bmu_dispatch.py --phase reference
     uv run python studies/market_downloads/fetch_bmu_dispatch.py --phase dispatch
@@ -9,9 +10,10 @@ two phases, so that a person can review the BMU list between them:
 **Phase `reference`** downloads Elexon's register of every BMU into
 `elexon_bmu_reference/bmu_reference.parquet` and writes `elexon_bmu_reference/bmu_candidates.csv`: a
 list of candidate storage BMUs for a person to hand-check. The candidates are every pumped-storage
-BMU, every BMU with fuel type `OTHER` (those with a battery-like name, lead party, or identifier
-pattern such as `T_LKSDB-1` are marked as hints, the rest are `other_fuel_unhinted`), and every BMU
-with no fuel type that has such a hint. The list leans towards including too many. The script
+BMU, every BMU with fuel type `OTHER`, every BMU with no fuel type whose name, lead party, or
+identifier looks like a battery's (such as `T_LKSDB-1`), and the two BMUs the study names. An
+`OTHER` BMU with such a hint is classed `battery_hint`. Every other `OTHER` BMU is classed
+`other_fuel_unhinted`. The list leans towards including too many. The script
 never overwrites an existing `bmu_candidates.csv`, because a person may have edited it; pass
 `--overwrite-candidates` to replace it.
 
@@ -21,15 +23,16 @@ for each BMU in it, three tables:
 - `elexon_boav`: accepted bid and offer volumes (BOAV) for each settlement period, one request for
   each settlement day, side, and batch of BMUs.
 - `elexon_ebocf`: indicative cashflows from accepted bids and offers (EBOCF), requested the same
-  way. The price is `total_cashflow_gbp / total_volume`, which the consumer derives.
+  way. The table holds no price. A user of the table derives the price as `total_cashflow_gbp`
+  divided by `total_volume_accepted_mwh` in `elexon_boav`.
 - `elexon_boalf`: the acceptance levels (BOALF), one request for each calendar month and batch of
   BMUs.
 
 Each table is cached one chunk at a time in `_day_cache/batch_<hash>/`. BMUs are grouped into
-batches by a hash of each identifier, and the folder is named by the hash of the batch's own BMUs,
-so a re-run resumes and removing one BMU from the list refetches only that BMU's batch. Pass
-`--start`, `--end`, and `--output-root` for a small test run. Requests are keyless, use 4 threads,
-and back off exponentially on HTTP 429 and 5xx.
+batches by a hash of each identifier, and each batch's folder is named by a hash of that batch's
+BMUs. A re-run therefore resumes where it stopped, and removing one BMU from the list refetches only
+that BMU's batch. Pass `--start`, `--end`, and `--output-root` for a small test run. Requests are
+keyless, use four threads, and back off exponentially on HTTP 429 and 5xx.
 """
 
 import argparse
@@ -68,11 +71,15 @@ BOALF_URL: Final[str] = f"{ELEXON_API}/datasets/BOALF/stream"
 DATA_STATUS_URL: Final[str] = f"{ELEXON_API}/data-status"
 SIDES: Final[tuple[str, ...]] = ("bid", "offer")
 BATCH_COUNT: Final[int] = 16
-"""BMUs are split into this many batches by a hash of each identifier, so that adding or deleting a
-BMU changes the cache key of one batch only. A batch of 16 or fewer 12-character identifiers makes a
-URL of about 400 bytes."""
+"""BMUs are split into this many batches by a hash of each identifier.
+
+Adding or deleting a BMU therefore changes the cache key of one batch only. Each batch holds about
+one sixteenth of the list. A batch of 16 identifiers of 12 characters each makes a URL of about 500
+bytes.
+"""
 MAX_URL_LENGTH: Final[int] = 4000
-"""A batch whose URL would be longer than this raises instead of being sent."""
+"""A batch whose URL would be longer than `MAX_URL_LENGTH` bytes raises `ValueError` instead of
+being sent."""
 DATA_STATUS_DAYS: Final[int] = 30
 """The data-status endpoint rejects a settlement-date range of more than 31 days."""
 PAIR_COUNT: Final[int] = 6
@@ -80,7 +87,8 @@ ALWAYS_INCLUDE: Final[tuple[str, ...]] = ("T_LKSDB-1", "E_DOLLB-1")
 """Two storage BMUs the study names, included in the candidate list whatever the reference says."""
 BATTERY_KEYWORDS: Final[tuple[str, ...]] = ("STORAGE", "BATTERY", "BESS")
 BATTERY_ID_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[TE]_[A-Z0-9]+B-\d+$")
-"""A BMU identifier ending in `B-<n>`, such as `T_LKSDB-1`, the convention for battery sites."""
+"""A BMU identifier ending in `B-<n>`, such as `T_LKSDB-1`, a naming pattern many battery sites
+follow."""
 KNOWN_SOURCE_GAPS: Final[dict[str, list[tuple[str, int]]]] = {
     "BOAV": [("2025-10-14", 20), ("2025-10-14", 21), ("2026-01-18", 26), ("2026-06-23", 8)],
     "EBOCF": [("2025-10-14", 20), ("2025-10-14", 21), ("2026-01-18", 26), ("2026-06-23", 8)],
@@ -92,8 +100,8 @@ KNOWN_SOURCE_GAPS: Final[dict[str, list[tuple[str, int]]]] = {
         ("2025-11-23", 29),
     ],
 }
-"""Periods the research found missing at the source, as `(settlement date, period)`. The script
-reports which of them it still finds missing; it never fails on them."""
+"""Periods found missing at the source before this script was written, as `(settlement date,
+period)`. The script reports which of them it still finds missing; it never fails on them."""
 
 UTC_TIME: Final[pl.Datetime] = pl.Datetime(time_unit="us", time_zone="UTC")
 ISO_SECONDS: Final[str] = "%Y-%m-%dT%H:%M:%SZ"
@@ -240,9 +248,11 @@ def build_candidates(
             matches.
 
     Returns:
-        One row for each candidate, with `candidate_class` (`pumped_storage`,
-        `battery_hint`, `other_fuel_unhinted`, or `named_by_study`), `battery_hint` (whether any
-        hint rule matched), `hint_reason`, and identifying columns, sorted by BMU identifier.
+        One row for each candidate, sorted by BMU identifier, with `candidate_class`
+        (`pumped_storage`, `battery_hint`, `other_fuel_unhinted`, or `named_by_study`),
+        `battery_hint` (whether any hint rule matched, or the BMU is named by the study),
+        `hint_reason`, and seven columns copied from the register: fuel type, name, lead party,
+        BMU type, generation and demand capacity, and Grid Supply Point (GSP) group name.
     """
     rows = []
     seen = set()
@@ -344,7 +354,10 @@ def run_reference_phase(*, root: Path, overwrite_candidates: bool) -> None:
             "The register has no time column. It is the register on the retrieval date."
         ),
         columns={
-            "elexon_bmu_id": "Elexon BMU identifier, the key used by BOAV, EBOCF, and BOALF",
+            "elexon_bmu_id": (
+                "Elexon Balancing Mechanism Unit (BMU) identifier, the key used by the accepted "
+                "volumes (BOAV), indicative cashflows (EBOCF), and acceptance levels (BOALF)"
+            ),
             "national_grid_bmu_id": "National Grid's BMU identifier",
             "fuel_type": "Elexon fuel type, for example PS, OTHER, WIND; null for most BMUs",
             "lead_party_name": "Name of the BMU's lead party",
@@ -352,15 +365,21 @@ def run_reference_phase(*, root: Path, overwrite_candidates: bool) -> None:
             "bmu_type": "Elexon BMU type letter (T transmission, E embedded, and others)",
             "demand_capacity_mw": "Registered demand capacity, MW",
             "generation_capacity_mw": "Registered generation capacity, MW",
-            "other_columns": "The remaining columns follow Elexon's register field names",
+            "other_columns": (
+                "The remaining nine columns, `eic`, `lead_party_id`, `fpn_flag`, "
+                "`production_or_consumption_flag`, `transmission_loss_factor`, "
+                "`credit_qualifying_status`, `gsp_group_id`, `gsp_group_name`, and "
+                "`interconnector_id`, follow Elexon's register field names"
+            ),
         },
         row_summary=(
             f"- `bmu_reference.parquet`: {reference.height} BMUs.\n"
             f"- `bmu_candidates.csv`: {candidates.height} candidate storage BMUs ({class_lines}).\n"
             "- `bmu_candidates.csv` columns: `candidate_class` says which rule included the BMU "
             "(`pumped_storage`, `battery_hint`, `other_fuel_unhinted`, or `named_by_study`), "
-            "`battery_hint` is true if a name or identifier rule matched, and `hint_reason` says "
-            "which. A person reviews this file and deletes the rows that are not storage."
+            "`battery_hint` is true if a name or identifier rule matched or the BMU is named by "
+            "the study, and `hint_reason` says which rule matched. A person reviews this file "
+            "and deletes the rows that are not storage."
         ),
         gotchas=[
             (
@@ -635,13 +654,13 @@ def source_gaps(*, status: pl.DataFrame, dataset: str, start: date, end: date) -
 
 def _gap_text(*, gaps: dict[str, Any]) -> str:
     return (
-        f"- Settlement periods with no data point at the source (Elexon data-status): "
-        f"{len(gaps['periods_with_no_data_point'])}: "
-        f"{', '.join(gaps['periods_with_no_data_point']) or 'none'}.\n"
-        f"- Of the gaps the research found inside this window, still missing: "
-        f"{', '.join(gaps['known_gaps_still_missing']) or 'none'}; now present: "
-        f"{', '.join(gaps['known_gaps_now_present']) or 'none'}.\n"
-        f"- Missing and not on the research list: "
+        "- Settlement periods with no data point at the source, according to Elexon's "
+        f"data-status endpoint: {len(gaps['periods_with_no_data_point'])} "
+        f"({', '.join(gaps['periods_with_no_data_point']) or 'none'}).\n"
+        "- Known source gaps (`KNOWN_SOURCE_GAPS` in the script) inside this window, still "
+        f"missing: {', '.join(gaps['known_gaps_still_missing']) or 'none'}. Known source gaps now "
+        f"present: {', '.join(gaps['known_gaps_now_present']) or 'none'}.\n"
+        "- Periods missing at the source and not among the known source gaps: "
         f"{', '.join(gaps['missing_not_in_known_list']) or 'none'}."
     )
 
@@ -796,14 +815,17 @@ def _write_dispatch_readme(
         "the period numbers are Elexon's own, with period 1 starting at 00:00 UK local time."
     )
     columns = {
-        "bmu_id": "Elexon BMU identifier",
+        "bmu_id": "Elexon Balancing Mechanism Unit (BMU) identifier",
         **(
             {
                 "time": "Start of the settlement period, UTC",
                 "settlement_date": "Elexon settlement date (UK local day)",
                 "settlement_period": "Elexon settlement period within the date, from 1",
                 "side": "`bid` (the BMU was paid to reduce output) or `offer` (to increase it)",
-                "created_time": "When Elexon created this row (a settlement run), UTC",
+                "created_time": (
+                    "When Elexon created the row, which marks the settlement run that produced "
+                    "it, UTC"
+                ),
             }
             if settlement
             else {
@@ -834,8 +856,9 @@ def _write_dispatch_readme(
     if name == "elexon_ebocf":
         columns |= {
             "total_cashflow_gbp": (
-                "Total indicative cashflow in the period, GBP. The price is this divided by the "
-                "accepted volume in `elexon_boav`, which the consumer derives"
+                "Total indicative cashflow in the period, GBP. The table holds no price. A user "
+                "of the table derives the price as `total_cashflow_gbp` divided by "
+                "`total_volume_accepted_mwh` in `elexon_boav`"
             ),
             "pair_cashflow_neg1..pos6": "Cashflow in bid-offer pairs -1..-6 and 1..6, GBP",
         }
@@ -858,7 +881,7 @@ def _write_dispatch_readme(
         gotchas=[
             (
                 "The BMU list is `elexon_bmu_reference/bmu_candidates.csv`, or the copy passed "
-                "with `--bmu-list`; `lineage.json` lists the BMUs requested. Each "
+                "with `--bmu-list`. `lineage.json` lists the BMUs requested. Each "
                 "batch of BMUs is cached separately, so removing a BMU refetches one batch."
             ),
             (
