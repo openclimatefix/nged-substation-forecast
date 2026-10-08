@@ -954,7 +954,7 @@ def predictions_for_days(
         "day_label",
         "hour_of_day",
         series=pl.lit("Measured"),
-        value=pl.col("power_mw") / pl.col("effective_capacity_mw") * 100.0,
+        value=(pl.col("power_mw") / pl.col("effective_capacity_mw") * 100.0).cast(pl.Float64),
     )
     predicted = [
         losses.filter(
@@ -966,9 +966,11 @@ def predictions_for_days(
             "day_label",
             "hour_of_day",
             series=pl.lit(ARM_LABELS[arm]),
-            value=(pl.col("power_mw") + pl.col(SIGNED_ERROR))
-            / pl.col("effective_capacity_mw")
-            * 100.0,
+            value=(
+                (pl.col("power_mw") + pl.col(SIGNED_ERROR))
+                / pl.col("effective_capacity_mw")
+                * 100.0
+            ).cast(pl.Float64),
         )
         for arm in ("g0", "g9")
     ]
