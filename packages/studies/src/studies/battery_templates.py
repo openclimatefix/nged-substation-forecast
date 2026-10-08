@@ -233,6 +233,47 @@ def window_template(
     return power
 
 
+def window_coverage(
+    *, half_hour_end_time: pl.Series, window: TariffWindow
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return the share of each half-hour inside a window's charge and discharge intervals.
+
+    Args:
+        half_hour_end_time: The UTC end time of each half-hour of the grid.
+        window: The tariff window.
+
+    Returns:
+        The charge coverage and the discharge coverage, each between 0 and 1 at every half-hour of
+        the grid. A weekday-only window covers nothing on a Saturday or Sunday.
+    """
+    grid_start = _grid_start(half_hour_end_time=half_hour_end_time)
+    dates = [
+        d
+        for d in _local_dates(half_hour_end_time=half_hour_end_time, grid_start=grid_start)
+        if not window.weekdays_only or d.isoweekday() <= 5
+    ]
+    coverage = []
+    for start_hour, end_hour in (
+        (window.charge_start_hour, window.charge_end_hour),
+        (window.discharge_start_hour, window.discharge_end_hour),
+    ):
+        starts = np.array(
+            [
+                _local_instant_hours(local_date=d, hour=start_hour, grid_start=grid_start)
+                for d in dates
+            ]
+        )
+        covered = np.zeros(len(half_hour_end_time))
+        _add_intervals(
+            power=covered,
+            starts_h=starts,
+            lengths_h=np.full(len(dates), end_hour - start_hour),
+            sign=1.0,
+        )
+        coverage.append(covered)
+    return coverage[0], coverage[1]
+
+
 def charge_only_template(
     *, half_hour_end_time: pl.Series, window: TariffWindow, charge_hours: float
 ) -> np.ndarray:
@@ -332,6 +373,46 @@ def merchant_template(
     )
 
 
+def agile_days(
+    *, half_hour_end_time: pl.Series, agile_prices: pl.DataFrame
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return the Agile prices of each 23:00-to-23:00 delivery day and each slot's grid position.
+
+    Args:
+        half_hour_end_time: The UTC end time of each half-hour of the grid.
+        agile_prices: Columns `time` (the half-hour start, UTC) and `price_inc_vat_p_per_kwh`.
+
+    Returns:
+        The prices, shape (delivery days, 48), NaN where a slot is missing or does not exist, and
+        the grid index of each slot (-1 where the slot does not exist).
+    """
+    grid_start = _grid_start(half_hour_end_time=half_hour_end_time)
+    price_by_start = dict(
+        zip(
+            agile_prices["time"].dt.epoch("s").to_list(),
+            agile_prices["price_inc_vat_p_per_kwh"].to_list(),
+            strict=True,
+        )
+    )
+    dates = _local_dates(half_hour_end_time=half_hour_end_time, grid_start=grid_start)
+    # Each delivery day starts at 23:00 UK local time on the evening before its date.
+    day_starts = [
+        (datetime.combine(d, time.min, tzinfo=LOCAL_TIME_ZONE) - timedelta(hours=1)).astimezone(UTC)
+        for d in dates
+    ]
+    day_prices = np.full((len(dates), HALF_HOURS_PER_DAY), np.nan)
+    slot_grid_index = np.full((len(dates), HALF_HOURS_PER_DAY), -1)
+    for row, day_start in enumerate(day_starts):
+        next_start = day_starts[row + 1] if row + 1 < len(day_starts) else None
+        for slot in range(HALF_HOURS_PER_DAY):
+            slot_start = day_start + timedelta(minutes=30 * slot)
+            if next_start is not None and slot_start >= next_start:
+                continue
+            day_prices[row, slot] = price_by_start.get(int(slot_start.timestamp()), np.nan)
+            slot_grid_index[row, slot] = round((slot_start - grid_start).total_seconds() / 1800.0)
+    return day_prices, slot_grid_index
+
+
 def agile_template(
     *,
     half_hour_end_time: pl.Series,
@@ -356,31 +437,10 @@ def agile_template(
     Returns:
         The per-unit power at each half-hour of the grid.
     """
-    grid_start = _grid_start(half_hour_end_time=half_hour_end_time)
-    n_grid = len(half_hour_end_time)
-    price_by_start = dict(
-        zip(
-            agile_prices["time"].dt.epoch("s").to_list(),
-            agile_prices["price_inc_vat_p_per_kwh"].to_list(),
-            strict=True,
-        )
+    day_prices, slot_grid_index = agile_days(
+        half_hour_end_time=half_hour_end_time, agile_prices=agile_prices
     )
-    dates = _local_dates(half_hour_end_time=half_hour_end_time, grid_start=grid_start)
-    # Each delivery day starts at 23:00 UK local time on the evening before its date.
-    day_starts = [
-        (datetime.combine(d, time.min, tzinfo=LOCAL_TIME_ZONE) - timedelta(hours=1)).astimezone(UTC)
-        for d in dates
-    ]
-    day_prices = np.full((len(dates), HALF_HOURS_PER_DAY), np.nan)
-    slot_grid_index = np.full((len(dates), HALF_HOURS_PER_DAY), -1)
-    for row, day_start in enumerate(day_starts):
-        next_start = day_starts[row + 1] if row + 1 < len(day_starts) else None
-        for slot in range(HALF_HOURS_PER_DAY):
-            slot_start = day_start + timedelta(minutes=30 * slot)
-            if next_start is not None and slot_start >= next_start:
-                continue
-            day_prices[row, slot] = price_by_start.get(int(slot_start.timestamp()), np.nan)
-            slot_grid_index[row, slot] = round((slot_start - grid_start).total_seconds() / 1800.0)
+    n_grid = len(half_hour_end_time)
     schedule = merchant_template(
         day_ahead_prices=day_prices.ravel(),
         duration_hours=duration_hours,
