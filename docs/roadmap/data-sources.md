@@ -1341,7 +1341,8 @@ Known ahead of delivery:
   unit has said it will be turned up or down. They share the gate-closure horizon above.
 - **National demand and wind forecasts**: Elexon's national demand forecast (`NDF`) and transmission
   system demand forecast (`TSDF`), the `WINDFOR` wind forecast, and the day-ahead wind and solar
-  generation forecast (`DGWS`, from Elexon's `/datasets/DGWS` endpoint). These describe the conditions that drive the price, and not the price itself.
+  generation forecast (`DGWS`, from Elexon's `/datasets/DGWS` endpoint). These describe the
+  conditions that drive the price, and not the price itself.
 - **The carbon intensity forecast** from the Carbon Intensity API is documented as reaching up to 2
   days ahead, and a request for the 48-hour window returned 97 half-hourly values.
 
