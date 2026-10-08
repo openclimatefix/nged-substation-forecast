@@ -95,6 +95,7 @@ folder name themselves.
 | `observations/MIDAS-OPEN/` | The Met Office's MIDAS Open station observations | `weather_downloads/fetch_midas_open.py` |
 | `observations/SARAH-3/` | The SARAH-3 satellite retrieval, ordered by hand from CM SAF; `site_points/` holds the frame at each site | `past_weather/extract_site_series.py` |
 | `observations/NGED-ANM/` | NGED's active network management setpoint exports, and the export-cap parquet derived from each | `beam_diffuse_split/anm_setpoints.py` (the exports come from NGED) |
+| `market/<source>/` | GB electricity prices (NESO N2EX day-ahead, Elexon system prices, Elexon APX market index), the national Carbon Intensity series, the Elexon BMU register with its storage-candidate list, and the bid-offer acceptance volumes, cashflows, and levels of the listed BMUs; each folder holds a `README.md` and a `lineage.json` | `market_downloads/fetch_gb_prices.py`, `market_downloads/fetch_bmu_dispatch.py` |
 
 `data/studies/_private/trial_area_box.json` holds the trial-area box, derived from the private
 list of generators.

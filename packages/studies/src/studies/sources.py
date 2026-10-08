@@ -375,6 +375,14 @@ others, with the CAMS satellite retrieval."""
 OBSERVATIONS_DOWNLOADS_DIR: Final[Path] = DOWNLOADS_DIR / "observations"
 """Measurements: weather stations, the SARAH-3 satellite retrieval, and NGED's own exports."""
 
+MARKET_DOWNLOADS_DIR: Final[Path] = DOWNLOADS_DIR / "market"
+"""Electricity prices, the carbon intensity of the grid, and balancing-market dispatch for
+individual balancing mechanism units, one folder per source.
+
+Each folder holds a tidy parquet per table, a `README.md`, a `lineage.json`, and a `_day_cache/`
+of the per-day chunks that let a re-run of the download resume.
+"""
+
 PER_STUDY_DIR: Final[Path] = STUDIES_DATA_DIR / "per_study"
 """The layer of `data/studies/` that holds one folder per study.
 
