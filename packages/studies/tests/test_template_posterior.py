@@ -12,6 +12,7 @@ from studies.template_posterior import (
     prewhiten,
     project_out_free,
     sample_truncated_gaussian,
+    tempering_from_residual,
 )
 
 from studies import template_posterior
@@ -286,3 +287,66 @@ def test_a_battery_in_correlated_noise_gives_a_large_bayes_factor_and_a_good_int
     low, high = np.quantile(powers[:, 0], [0.05, 0.95])
     assert powers.min() >= 0.0
     assert low < 3.0 < high
+
+
+def _same_time_yesterday_noise(*, n_days: int, rng: np.random.Generator) -> np.ndarray:
+    """Noise that repeats from the same half-hour of the previous day: `e_t = 0.7 e_{t-48} + w_t`.
+
+    A first-order filter on the previous half-hour cannot remove this.
+    """
+    noise = rng.standard_normal(n_days * 48)
+    for t in range(48, len(noise)):
+        noise[t] += 0.7 * noise[t - 48]
+    return noise
+
+
+def test_white_residual_leaves_the_likelihood_untempered() -> None:
+    residual = np.random.default_rng(0).standard_normal(4000)
+
+    assert tempering_from_residual(residual=residual, rho=0.0) > 0.7
+
+
+def test_a_residual_that_repeats_daily_tempers_the_likelihood_to_a_small_fraction() -> None:
+    rng = np.random.default_rng(1)
+    residual = _same_time_yesterday_noise(n_days=90, rng=rng)
+
+    assert tempering_from_residual(residual=residual, rho=0.0) < 0.4
+
+
+def test_tempering_ignores_missing_half_hours_and_never_exceeds_one() -> None:
+    residual = np.random.default_rng(2).standard_normal(1000)
+    residual[100:130] = np.nan
+
+    value = tempering_from_residual(residual=residual, rho=0.5)
+
+    assert 0.0 < value <= 1.0
+
+
+def test_noise_that_repeats_daily_widens_the_power_interval_when_tempering_is_on() -> None:
+    n_days = 40
+    templates = _boxcar_columns(n_days=n_days, widths=(4,))
+    rng = np.random.default_rng(3)
+    target = 10.0 - 2.0 * templates[:, 0] + _same_time_yesterday_noise(n_days=n_days, rng=rng)
+    grid = ComboGrid(combos=np.array([[0]]), log_prior=np.array([0.0]), axes=(1,))
+
+    def interval_width(*, temper: bool) -> tuple[float, float]:
+        posterior = fit_aggregate(
+            free=np.ones((len(target), 1)),
+            candidates=-templates,
+            target=target,
+            valid=np.ones(len(target), bool),
+            grid=grid,
+            power_prior_scale=4.0,
+            rng=np.random.default_rng(4),
+            temper=temper,
+        )
+        _, powers = posterior_draws(posterior=posterior, n_draws=400, rng=np.random.default_rng(5))
+        low, high = np.quantile(powers[:, 0], [0.05, 0.95])
+        return float(high - low), posterior.tempering
+
+    narrow, untempered = interval_width(temper=False)
+    wide, tempered = interval_width(temper=True)
+
+    assert untempered == 1.0
+    assert tempered < 0.8
+    assert wide > 1.15 * narrow

@@ -12,7 +12,10 @@ efficiencies. The posterior is a sum over combinations: within a combination the
 linear-Gaussian, so `beta` is integrated out exactly, and the powers' integral over the positive
 orthant is a multivariate-normal orthant probability. The noise is serially correlated, so the
 columns and the aggregate are prewhitened with a first-order autoregression whose coefficient and
-variance are estimated from the scored aggregate's own residual.
+variance are estimated from the scored aggregate's own residual. A first-order filter leaves the
+residual's daily repetition in place, so the likelihood is also tempered: it is raised to the power
+`1 / tau`, where `tau` is the integrated autocorrelation time of the filtered residual over one
+week, which widens every interval to what the effective number of independent half-hours supports.
 
 Log Bayes factor of the model with batteries against the model with none:
 
@@ -49,6 +52,9 @@ no-battery model carries the same free columns."""
 SIGMA2_FLOOR_RATIO: Final[float] = 1e-8
 """The noise variance never falls below this fraction of the aggregate's variance, so that an
 aggregate that is exactly zero for long stretches does not give a singular fit."""
+AUTOCORRELATION_LAGS: Final[int] = 336
+"""The lags, in half-hours (one week), over which the filtered residual's autocorrelation counts
+against the effective sample size."""
 GIBBS_BURN_IN_SWEEPS: Final[int] = 60
 POSTERIOR_MASS_SAMPLED: Final[float] = 0.99
 
@@ -289,6 +295,50 @@ def evaluate_combinations(
     )
 
 
+def sample_truncated_gaussians(
+    *,
+    mean: np.ndarray,
+    cov: np.ndarray,
+    rng: np.random.Generator,
+    burn_in: int = GIBBS_BURN_IN_SWEEPS,
+) -> np.ndarray:
+    """Draw one sample from each of many Gaussians truncated to the positive orthant, by Gibbs.
+
+    Each draw is its own chain, started at its mean clipped to be positive and run for `burn_in`
+    sweeps over the coordinates, so the draws are independent of one another. All chains advance
+    together, so a sweep costs one vectorised call per coordinate however many chains there are.
+
+    Args:
+        mean: The mean of each draw's untruncated Gaussian, shape (n_draws, p).
+        cov: Its covariance, shape (n_draws, p, p).
+        rng: The random generator.
+        burn_in: The sweeps each chain runs.
+
+    Returns:
+        Shape (n_draws, p), every entry non-negative.
+    """
+    p = mean.shape[1]
+    precision = np.linalg.inv(cov)
+    diagonal = np.einsum("nii->ni", precision)
+    sd_conditional = 1.0 / np.sqrt(diagonal)
+    sd_marginal = np.sqrt(np.einsum("nii->ni", cov))
+    x = np.maximum(mean, 1e-9 * sd_marginal)
+    for _ in range(burn_in):
+        for i in range(p):
+            shift = np.einsum("nj,nj->n", precision[:, i, :], x - mean) - diagonal[:, i] * (
+                x[:, i] - mean[:, i]
+            )
+            centre = mean[:, i] - shift / diagonal[:, i]
+            x[:, i] = truncnorm.rvs(
+                a=(0.0 - centre) / sd_conditional[:, i],
+                b=np.inf,
+                loc=centre,
+                scale=sd_conditional[:, i],
+                random_state=rng,
+            )
+    return x
+
+
 def sample_truncated_gaussian(
     *,
     mean: np.ndarray,
@@ -297,10 +347,7 @@ def sample_truncated_gaussian(
     rng: np.random.Generator,
     burn_in: int = GIBBS_BURN_IN_SWEEPS,
 ) -> np.ndarray:
-    """Draw from a Gaussian truncated to the positive orthant, by Gibbs sampling.
-
-    Each draw is its own chain, started at the mean clipped to be positive and run for `burn_in`
-    sweeps over the coordinates, so the draws are independent of one another.
+    """Draw from one Gaussian truncated to the positive orthant, by Gibbs sampling.
 
     Args:
         mean: The mean of the untruncated Gaussian, shape (p,).
@@ -312,23 +359,12 @@ def sample_truncated_gaussian(
     Returns:
         Shape (n_draws, p), every entry non-negative.
     """
-    p = len(mean)
-    precision = np.linalg.inv(cov)
-    sd_conditional = 1.0 / np.sqrt(np.diag(precision))
-    x = np.tile(np.maximum(mean, 1e-9 * np.sqrt(np.diag(cov))), (n_draws, 1))
-    for _ in range(burn_in):
-        for i in range(p):
-            others = [j for j in range(p) if j != i]
-            shift = (x[:, others] - mean[others]) @ precision[i, others]
-            centre = mean[i] - shift / precision[i, i]
-            x[:, i] = truncnorm.rvs(
-                a=(0.0 - centre) / sd_conditional[i],
-                b=np.inf,
-                loc=centre,
-                scale=sd_conditional[i],
-                random_state=rng,
-            )
-    return x
+    return sample_truncated_gaussians(
+        mean=np.tile(mean, (n_draws, 1)),
+        cov=np.tile(cov, (n_draws, 1, 1)),
+        rng=rng,
+        burn_in=burn_in,
+    )
 
 
 @dataclass(frozen=True)
@@ -340,7 +376,8 @@ class SumPosterior:
         log_posterior: Shape (combinations,): normalised log posterior weights, `LOG_FLOOR` where
             pruned.
         rho: The autoregressive coefficient used.
-        sigma2: The filtered noise variance used.
+        sigma2: The filtered noise variance used, before tempering.
+        tempering: The power `1 / tau` the likelihood was raised to, in `(0, 1]`.
         log_bayes_factor: Batteries against none.
         best_combination: The combination of highest posterior weight.
     """
@@ -349,6 +386,7 @@ class SumPosterior:
     log_posterior: np.ndarray
     rho: float
     sigma2: float
+    tempering: float
     log_bayes_factor: float
     best_combination: int
 
@@ -394,6 +432,37 @@ def estimate_noise(
     return rho, float((innovations**2).sum() / degrees)
 
 
+def tempering_from_residual(
+    *, residual: np.ndarray, rho: float, max_lag: int = AUTOCORRELATION_LAGS
+) -> float:
+    """Return the power `1 / tau` that tempers the likelihood, from the residual's autocorrelation.
+
+    The filtered residual (the innovations) is `r_t - rho * r_{t-1}` where both half-hours are
+    finite. Its autocorrelations `rho_k` at lags 1 to `max_lag` give the integrated
+    autocorrelation time `tau = 1 + 2 * sum_k (1 - k / (max_lag + 1)) * rho_k`, floored at 1.
+
+    Args:
+        residual: The unfiltered residual, NaN where invalid.
+        rho: The autoregressive coefficient of the filter.
+        max_lag: The most lags counted.
+
+    Returns:
+        `1 / tau`, at most 1.
+    """
+    innovation = residual[1:] - rho * residual[:-1]
+    finite = np.isfinite(innovation)
+    if not finite.any():
+        return 1.0
+    innovation = np.where(finite, innovation - innovation[finite].mean(), 0.0)
+    energy = float(innovation @ innovation)
+    if energy == 0.0:
+        return 1.0
+    lags = np.arange(1, min(max_lag, len(innovation) - 1) + 1)
+    correlation = np.array([innovation[k:] @ innovation[:-k] for k in lags]) / energy
+    tau = 1.0 + 2.0 * float(((1.0 - lags / (max_lag + 1)) * correlation).sum())
+    return 1.0 / max(tau, 1.0)
+
+
 def fit_aggregate(
     *,
     free: np.ndarray,
@@ -405,6 +474,7 @@ def fit_aggregate(
     rng: np.random.Generator,
     noise_iterations: int = 2,
     maxpts: int = MAX_ORTHANT_POINTS,
+    temper: bool = True,
 ) -> SumPosterior:
     """Fit one aggregate: estimate the noise, then compute the posterior over the combinations.
 
@@ -424,6 +494,7 @@ def fit_aggregate(
         rng: The random generator.
         noise_iterations: How many times the noise is re-estimated.
         maxpts: The most integrand evaluations per orthant probability.
+        temper: Whether to temper the likelihood by the residual's autocorrelation time.
 
     Returns:
         The posterior.
@@ -432,6 +503,7 @@ def fit_aggregate(
     tau = FREE_PRIOR_SD_OVER_SIGNAL_SD * max(free_sd, 1e-12)
     sigma2_floor = max(SIGMA2_FLOOR_RATIO * free_sd**2, 1e-24)
     rho = 0.0
+    tempering = 1.0
     n_parameters = free.shape[1] + grid.combos.shape[1]
     start = prewhiten(free=free, candidates=candidates, target=target, valid=valid, rho=0.0)
     ols = np.linalg.lstsq(start.free_gram, start.free_target, rcond=None)[0]
@@ -449,7 +521,7 @@ def fit_aggregate(
         evaluation = evaluate_combinations(
             projected=projected,
             grid=grid,
-            sigma2=sigma2,
+            sigma2=sigma2 / tempering,
             power_prior_scale=power_prior_scale,
             rng=rng,
             maxpts=maxpts,
@@ -473,6 +545,8 @@ def fit_aggregate(
             residual=residual, n_parameters=n_parameters, effective_rows=system.effective_rows
         )
         sigma2 = max(sigma2, sigma2_floor)
+        if temper:
+            tempering = tempering_from_residual(residual=residual, rho=rho)
     assert evaluation is not None
     kept = ~evaluation.pruned
     log_posterior = np.full(len(kept), LOG_FLOOR)
@@ -482,6 +556,7 @@ def fit_aggregate(
         log_posterior=log_posterior,
         rho=rho,
         sigma2=sigma2,
+        tempering=tempering,
         log_bayes_factor=evaluation.log_bayes_factor,
         best_combination=int(np.argmax(log_posterior)),
     )
@@ -510,18 +585,10 @@ def posterior_draws(
     keep = order[: int(np.searchsorted(cumulative, POSTERIOR_MASS_SAMPLED)) + 1]
     probabilities = weights[keep] / weights[keep].sum()
     counts = rng.multinomial(n_draws, probabilities)
-    combos = []
-    powers = []
-    for combination, count in zip(keep, counts, strict=True):
-        if count == 0:
-            continue
-        powers.append(
-            sample_truncated_gaussian(
-                mean=posterior.evaluation.mean[combination],
-                cov=posterior.evaluation.cov[combination],
-                n_draws=int(count),
-                rng=rng,
-            )
-        )
-        combos.append(np.full(int(count), combination))
-    return np.concatenate(combos), np.vstack(powers)
+    combos = np.repeat(keep, counts)
+    powers = sample_truncated_gaussians(
+        mean=posterior.evaluation.mean[combos],
+        cov=posterior.evaluation.cov[combos],
+        rng=rng,
+    )
+    return combos, powers

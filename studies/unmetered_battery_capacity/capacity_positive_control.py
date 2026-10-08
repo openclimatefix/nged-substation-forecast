@@ -11,11 +11,16 @@ duration 2.2 hours, a one-way efficiency of sqrt(0.88), limits of 5% and 95%, a 
 day), so a failure there is a code fault. The *off-grid* truth is the plan's: its physical
 parameters are drawn off the grid, so it measures what the grid's coarseness costs.
 
-Pass rule, per block, setting, and truth: the 90% credible interval for the merchant power holds the
-true power, the interval for the merchant energy holds the true usable energy, and each posterior
-median lies within 10% of its truth. If any block fails, nothing else is scored.
+Pass rule (the plan's "Plan changes after the positive control failed", fixed before the re-run).
+Tuning used S6 September to November and S2 (all blocks) only. The scored blocks are S6 December to
+February, March to May, and June to August, in the standard setting. The control passes if, with
+the off-grid truth, the 90% credible interval holds both the merchant power and the merchant
+energy in at least 2 of the 3 scored blocks, and, with the on-grid truth, the posterior medians of
+both lie within 1% of the truth in all 3. The sensitivity setting is reported and does not enter
+the pass rule. If the control fails, nothing else is scored.
 
-The demand series is the primary with the fewest missing half-hours, a rule fixed before the run.
+The scored demand series is the primary with the fewest missing half-hours, a rule fixed before
+the first run.
 
 Run: `OMP_NUM_THREADS=2 uv run python \
 studies/unmetered_battery_capacity/capacity_positive_control.py`
@@ -36,9 +41,11 @@ from capacity_inputs import (
 )
 from capacity_templates import (
     DURATIONS_HOURS,
+    MERCHANT_CYCLE_CAPS,
     ROUND_TRIP_EFFICIENCIES,
     SETTING_NAMES,
     SettingNameType,
+    candidate_names,
     combo_grid,
     fit_block,
     load_templates,
@@ -54,10 +61,15 @@ SHARE: Final[float] = 0.40
 NAMEPLATE_HOURS: Final[float] = 2.0
 N_DRAWS: Final[int] = 1000
 SEED: Final[int] = 20261008
-MEDIAN_TOLERANCE: Final[float] = 0.10
+ON_GRID_MEDIAN_TOLERANCE: Final[float] = 0.01
+SCORED_BLOCKS: Final[tuple[int, ...]] = (1, 2, 3)
+TUNING_SERIES: Final[str] = "S2"
+MIN_BLOCKS_HOLDING_TRUTH: Final[int] = 2
 
 
-def simulated_battery(*, truth: TruthType, rng: np.random.Generator) -> tuple[np.ndarray, float]:
+def simulated_battery(
+    *, truth: TruthType, rng: np.random.Generator
+) -> tuple[np.ndarray, float, dict[str, float]]:
     """Return a unit battery's export-positive schedule and its usable duration.
 
     Args:
@@ -65,8 +77,8 @@ def simulated_battery(*, truth: TruthType, rng: np.random.Generator) -> tuple[np
         rng: Draws the off-grid physical parameters.
 
     Returns:
-        The one-megawatt schedule on the window grid, and the usable duration in hours at full
-        power.
+        The one-megawatt schedule on the window grid, the usable duration in hours at full power,
+        and the physical parameters drawn (`soc_min`, `soc_max`, `round_trip`, `cycles_cap`).
     """
     if truth == "on_grid":
         soc_min, soc_max, eta_one_way, cap = 0.05, 0.95, float(np.sqrt(0.88)), 1.0
@@ -84,15 +96,27 @@ def simulated_battery(*, truth: TruthType, rng: np.random.Generator) -> tuple[np
         soc_max=soc_max,
         cycles_per_day_cap=cap,
     )
-    return schedule, (soc_max - soc_min) * nameplate
+    parameters = {
+        "soc_min": soc_min,
+        "soc_max": soc_max,
+        "round_trip": eta_one_way**2,
+        "cycles_cap": cap,
+    }
+    return schedule, (soc_max - soc_min) * nameplate, parameters
 
 
 def run_setting(
-    *, setting: SettingNameType, truth: TruthType, y_true: np.ndarray, replica: np.ndarray
+    *,
+    series: str,
+    setting: SettingNameType,
+    truth: TruthType,
+    y_true: np.ndarray,
+    replica: np.ndarray,
 ) -> list[dict]:
     """Fit the positive control in every block under one setting and truth.
 
     Args:
+        series: The demand series' label.
         setting: The setting.
         truth: Whether the simulated battery is on or off the estimator's grid.
         y_true: The real series, for the share's scale.
@@ -102,7 +126,7 @@ def run_setting(
         One row per block.
     """
     rng = np.random.default_rng(SEED)
-    unit, usable_hours = simulated_battery(truth=truth, rng=rng)
+    unit, usable_hours, drawn = simulated_battery(truth=truth, rng=rng)
     power = SHARE * float(np.nanquantile(np.abs(y_true), 0.99))
     aggregate = replica - power * unit
     candidates, nuisance = load_templates(setting=setting)
@@ -127,6 +151,8 @@ def run_setting(
         merchant_energy = merchant_power * np.array(DURATIONS_HOURS)[merchant_duration_index]
         true_energy = power * usable_hours
         row = {
+            "series": series,
+            "role": "scored" if series != TUNING_SERIES and block in SCORED_BLOCKS else "tuning",
             "setting": setting,
             "truth": truth,
             "block": name,
@@ -137,6 +163,9 @@ def run_setting(
             "combinations": len(grid.log_prior),
             "log_bayes_factor": posterior.log_bayes_factor,
             "rho": posterior.rho,
+            "tempering": posterior.tempering,
+            **{f"truth_{k}": v for k, v in drawn.items()},
+            "truth_usable_hours": usable_hours,
             "sigma_mw": float(np.sqrt(posterior.sigma2)),
             "other_classes_median_mw": float(np.median(powers[:, 1:].sum(axis=1))),
         }
@@ -153,14 +182,12 @@ def run_setting(
                 f"{label}_q95": q95,
                 f"{label}_in_90": bool(q05 <= true_value <= q95),
                 f"{label}_median_error": float(q50 / true_value - 1.0),
-                f"{label}_pass": bool(
-                    q05 <= true_value <= q95 and abs(q50 / true_value - 1.0) <= MEDIAN_TOLERANCE
-                ),
             }
         rows.append(row)
         print(
-            f"{setting} {truth} {name}: fit {fit_seconds:.1f} s, P {row['power_median']:.2f} vs "
-            f"{power:.2f}, E {row['energy_median']:.2f} vs {true_energy:.2f}, "
+            f"{series} {setting} {truth} {name}: fit {fit_seconds:.1f} s, "
+            f"P {row['power_median']:.2f} vs {power:.2f}, "
+            f"E {row['energy_median']:.2f} vs {true_energy:.2f}, "
             f"BF {posterior.log_bayes_factor:.1f}",
             flush=True,
         )
@@ -186,7 +213,8 @@ def single_factor_rows(*, y_true: np.ndarray, replica: np.ndarray) -> list[dict]
 
     Returns:
         One row per variant: the ratio of the merchant power's posterior median to the truth, the
-        90% interval as ratios, and the grid duration and efficiency the posterior chose.
+        90% interval as ratios, and the grid duration, cycle cap, and efficiency the posterior
+        chose most often.
     """
     candidates, nuisance = load_templates(setting="standard")
     grid = combo_grid(setting="standard")
@@ -225,7 +253,8 @@ def single_factor_rows(*, y_true: np.ndarray, replica: np.ndarray) -> list[dict]
                 "modal_merchant_duration_hours": DURATIONS_HOURS[
                     int(np.bincount(axes[0]).argmax())
                 ],
-                "modal_efficiency": ROUND_TRIP_EFFICIENCIES[int(np.bincount(axes[3]).argmax())],
+                "modal_merchant_cycle_cap": MERCHANT_CYCLE_CAPS[int(np.bincount(axes[1]).argmax())],
+                "modal_efficiency": ROUND_TRIP_EFFICIENCIES[int(np.bincount(axes[4]).argmax())],
             }
         )
     return rows
@@ -267,8 +296,8 @@ def compute_budget(*, seconds_per_sum: float) -> list[str]:
     Returns:
         Report lines.
     """
-    sums = {"rung 1": 924, "rung 2": 308, "rung 3 (5 fleet draws)": 4048}
-    cut_sums = {"rung 1": 924, "rung 2": 308, "rung 3 (3 fleet draws)": 2992}
+    sums = {"rung 1": 756, "rung 2": 252, "rung 3 (5 fleet draws)": 3312}
+    cut_sums = {"rung 1": 756, "rung 2": 252, "rung 3 (3 fleet draws)": 2448}
     lines = []
     for label, counts in (("planned", sums), ("after cut 1", cut_sums)):
         total = sum(counts.values()) * 2
@@ -280,30 +309,61 @@ def compute_budget(*, seconds_per_sum: float) -> list[str]:
     return lines
 
 
+def verdicts(*, frame: pl.DataFrame) -> dict[str, bool]:
+    """Apply the pass rule to the scored rows of S6 in the standard setting.
+
+    Args:
+        frame: The rows of `run_setting`, for every series, setting, and truth.
+
+    Returns:
+        `intervals` (the off-grid truth's 90% intervals hold both the power and the energy in at
+        least `MIN_BLOCKS_HOLDING_TRUTH` scored blocks), `medians` (the on-grid truth's medians are
+        within `ON_GRID_MEDIAN_TOLERANCE` in every scored block), and `passed` (both).
+    """
+    scored = frame.filter((pl.col("role") == "scored") & (pl.col("setting") == "standard"))
+    off = scored.filter(pl.col("truth") == "off_grid")
+    on = scored.filter(pl.col("truth") == "on_grid")
+    holding = int((off["power_in_90"] & off["energy_in_90"]).sum())
+    intervals = holding >= MIN_BLOCKS_HOLDING_TRUTH
+    medians = bool(
+        (on["power_median_error"].abs() <= ON_GRID_MEDIAN_TOLERANCE).all()
+        and (on["energy_median_error"].abs() <= ON_GRID_MEDIAN_TOLERANCE).all()
+    )
+    return {"intervals": intervals, "medians": medians, "passed": intervals and medians}
+
+
 def main() -> None:
     """Run the positive control under both settings and write the report."""
     nged = nged_series()
     missing = {k: int(np.isnan(v).sum()) for k, v in nged.items() if k.startswith("S")}
     label = min(missing, key=missing.__getitem__)
+    rows = []
+    for series, settings in ((label, SETTING_NAMES), (TUNING_SERIES, ("standard",))):
+        y_true = nged[series]
+        replica = calendar_replica(output=y_true, half_hour_end_time=window_half_hours())
+        for setting in settings:
+            for truth in TRUTHS:
+                rows += run_setting(
+                    series=series, setting=setting, truth=truth, y_true=y_true, replica=replica
+                )
     y_true = nged[label]
     replica = calendar_replica(output=y_true, half_hour_end_time=window_half_hours())
-    rows = []
-    for setting in SETTING_NAMES:
-        for truth in TRUTHS:
-            rows += run_setting(setting=setting, truth=truth, y_true=y_true, replica=replica)
     timing = real_block_timing()
     frame = pl.DataFrame(rows)
     frame.write_parquet(OUTPUT_DIR / "positive_control_draws.parquet")
-
-    def passes(truth: str, setting: str) -> bool:
-        part = frame.filter((pl.col("truth") == truth) & (pl.col("setting") == setting))
-        return bool(part["power_pass"].all() and part["energy_pass"].all())
-
-    passed = passes("off_grid", "standard")
+    result = verdicts(frame=frame)
+    scored_off = frame.filter(
+        (pl.col("role") == "scored")
+        & (pl.col("setting") == "standard")
+        & (pl.col("truth") == "off_grid")
+    )
     lines = [
         "# Positive control",
         "",
-        f"Demand series: {label} (fewest missing half-hours of the 8 primaries: {missing[label]}).",
+        (
+            f"Scored series: {label} (fewest missing half-hours of the 8 primaries: "
+            f"{missing[label]}). Tuning series: {TUNING_SERIES}, and {label} September to November."
+        ),
         (
             f"Share {SHARE:.0%} of the series' p99 absolute flow, a {NAMEPLATE_HOURS:.0f}-hour "
             "nameplate merchant battery on the N2EX price; the battery's physical parameters are "
@@ -311,19 +371,23 @@ def main() -> None:
         ),
         "",
         (
-            f"**Plan's positive control (off-grid truth, standard setting): "
-            f"{'PASS' if passed else 'FAIL'}.** On-grid truth, standard setting (a code check): "
-            f"{'PASS' if passes('on_grid', 'standard') else 'FAIL'}. The off-grid truth under the "
-            f"sensitivity setting: {'PASS' if passes('off_grid', 'sensitivity') else 'FAIL'}. The "
-            "on-grid truth is built from the standard setting's limits and cap, which the "
-            "sensitivity setting's templates differ from by design, so it is not a check there."
+            f"**Pass rule (standard setting, scored blocks only): "
+            f"{'PASS' if result['passed'] else 'FAIL'}.** "
+            f"Off-grid truth, 90% intervals hold both power and energy in "
+            f"{int((scored_off['power_in_90'] & scored_off['energy_in_90']).sum())} of "
+            f"{scored_off.height} scored blocks (at least {MIN_BLOCKS_HOLDING_TRUTH} required): "
+            f"{'pass' if result['intervals'] else 'fail'}. On-grid truth, medians within "
+            f"{ON_GRID_MEDIAN_TOLERANCE:.0%} in every scored block: "
+            f"{'pass' if result['medians'] else 'fail'}. The sensitivity setting is reported and "
+            "does not enter the pass rule."
         ),
         "",
         frame.select(
-            "setting", "truth", "block", "true_power_mw", "power_q05", "power_median", "power_q95",
-            "power_in_90", "power_median_error", "true_energy_mwh", "energy_q05",
-            "energy_median", "energy_q95", "energy_in_90", "energy_median_error",
-            "other_classes_median_mw", "log_bayes_factor", "rho", "sigma_mw",
+            "series", "role", "setting", "truth", "block", "true_power_mw", "power_q05",
+            "power_median", "power_q95", "power_in_90", "power_median_error", "true_energy_mwh",
+            "energy_q05", "energy_median", "energy_q95", "energy_in_90", "energy_median_error",
+            "other_classes_median_mw", "log_bayes_factor", "rho", "tempering", "sigma_mw",
+            "truth_usable_hours", "truth_soc_min", "truth_soc_max", "truth_round_trip", "truth_cycles_cap",
         ).write_csv(separator="|"),
         "## Which off-grid parameter costs the power estimate (block Sep-Nov, standard setting)",
         "",
@@ -332,19 +396,21 @@ def main() -> None:
         "",
         (
             f"Grid: {len(combo_grid(setting='standard').log_prior)} combinations of 6 power "
-            f"columns ({len(DURATIONS_HOURS)} x {len(DURATIONS_HOURS)} x {len(DURATIONS_HOURS)} "
-            f"durations x {len(ROUND_TRIP_EFFICIENCIES)} efficiencies), 144 candidate columns."
+            f"columns, {len(candidate_names())} candidate columns."
         ),
         f"One real sum (a primary in one block, no added battery): {timing}.",
         "The positive control's fits prune most combinations and are faster:",
         "",
         frame.select(
-            "setting", "truth", "block", "fit_seconds", "orthant_evaluations", "combinations"
+            "series", "setting", "truth", "block", "fit_seconds", "orthant_evaluations",
+            "combinations",
         ).write_csv(separator="|"),
     ]  # fmt: skip
     lines += ["", *compute_budget(seconds_per_sum=timing["seconds"])]
     (OUTPUT_DIR / "report_positive_control.md").write_text("\n".join(lines))
     print("\n".join(lines))
+    if not result["passed"]:
+        print("POSITIVE CONTROL FAILED: do not continue to the rungs.")
 
 
 if __name__ == "__main__":

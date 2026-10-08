@@ -551,6 +551,19 @@ earlier section of this plan, this section governs.
    the report is the finding. If it passes only loosely, the study is reframed as "identifiable to
    plus or minus X% given the template family".
 
+**Outcome of the re-run: the positive control still fails, and the study stops before the rungs.**
+With the off-grid truth in the standard setting, the 90% interval held both the power and the energy
+in 0 of the 3 scored blocks (the rule needs 2). The on-grid truth passed (medians within 1% in all 3
+scored blocks), so the code is sound. The posterior median power was 8 to 10% below the truth in
+each scored block, and the 90% intervals were about plus or minus 1% wide. The tempering factor was
+1.0 in every fit, because the monthly baseline removes the calendar replica's daily shape and the
+filtered residual that remains is close to white: the error is a bias from a duration that lies
+between grid values (1.97 hours against grid values of 1.45 and 2.2 hours), not unmodelled noise, so
+no widening of the likelihood could cover it. The cycle cap on the grid did remove the earlier 21%
+loss from a cap of 2 cycles a day. A fit of one sum now takes 7.1 seconds, and rungs 1 to 3 would
+take 4.4 hours on 4 workers, over the 2-hour budget, so the 8-point merchant duration grid was not
+tried.
+
 ## Open questions for the maintainer
 
 None. The maintainer has settled the priors, the per-primary publication, the size range, the MVA

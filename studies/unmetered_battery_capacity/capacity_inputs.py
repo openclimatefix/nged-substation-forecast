@@ -9,7 +9,7 @@ Sign convention: an aggregate `y` is positive for import. A battery exports when
 it enters the model as `- a * template`.
 
 Nothing that identifies a generator is printed, logged, or written: NGED's primaries are labelled
-S1 to S8, the three public generators D1 to D3, and the pieces of NGED's network that are not
+S1 to S8, and the pieces of NGED's network that are not
 primaries are labelled BSP1, BSP2, GSP1, and GSP2. NGED battery A is found by a search of series
 names, and only aggregates over it are reported.
 
@@ -45,10 +45,12 @@ MINUTES_PER_HALF_HOUR: Final[int] = 30
 BLOCK_MONTHS: Final[tuple[tuple[int, ...], ...]] = ((9, 10, 11), (12, 1, 2), (3, 4, 5), (6, 7, 8))
 """The calendar months of each block."""
 BLOCK_NAMES: Final[tuple[str, ...]] = ("Sep-Nov", "Dec-Feb", "Mar-May", "Jun-Aug")
-DEMAND_BMUS: Final[tuple[str, ...]] = ("2__BEDGE001", "V__NFLEX003", "2__ABGAS000")
-"""Three public aggregate BMUs that carry no cloud signal, used as demand-like series (they are the
-three that rung 7c of the battery-pv-separation study used). Their output is export-positive, so
-the aggregate takes its negative."""
+DEMAND_LABELS: Final[tuple[str, ...]] = (
+    "S1", "S2", "S3", "S5", "S6", "S7", "S8", "BSP2", "GSP1"
+)  # fmt: skip
+"""The nine demand-like series of rungs 1 to 3 and the nulls: seven primaries and one bulk and one
+grid supply point. BSP1 is the bulk supply point that holds NGED battery A, and S4 and GSP2 are net
+exporters with large gaps (`report_inputs.md`)."""
 B1610_DIR: Final = SOLAR_BMU_CENSUS_INPUTS_DIR / "b1610"
 B1610_SUFFIX: Final[str] = "_20250901_20260901.parquet"
 CAMS_PATH: Final = REANALYSIS_DOWNLOADS_DIR / "CAMS_public_points" / "cams_public_points.parquet"
@@ -171,32 +173,14 @@ def nged_series() -> dict[str, np.ndarray]:
     return {labels[series_id]: placed[series_id] for series_id in ids}
 
 
-def public_demand_series() -> dict[str, np.ndarray]:
-    """Return the three public demand-like series on the window grid, import-positive.
-
-    Returns:
-        Arrays in MW by label `D1` to `D3`, NaN where B1610 published nothing.
-    """
-    grid = pl.DataFrame({"half_hour_end_time": window_half_hours()})
-    out = {}
-    for position, bmu_id in enumerate(DEMAND_BMUS, start=1):
-        frame = pl.read_parquet(B1610_DIR / f"{bmu_id}{B1610_SUFFIX}").select(
-            half_hour_end_time=pl.col("half_hour_end_time").dt.cast_time_unit("us"),
-            output_mw=pl.col("output_mwh") * 2.0,
-        )
-        joined = grid.join(frame, on="half_hour_end_time", how="left")
-        out[f"D{position}"] = -joined["output_mw"].to_numpy().copy()
-    return out
-
-
 def demand_series() -> dict[str, np.ndarray]:
-    """Return the 11 demand series of rungs 1 to 3 and the nulls: S1 to S8 and D1 to D3.
+    """Return the nine demand-like series of rungs 1 to 3 and the nulls (`DEMAND_LABELS`).
 
     Returns:
         Arrays in MW, import-positive, on the window grid.
     """
     nged = nged_series()
-    return {f"S{k}": nged[f"S{k}"] for k in range(1, 9)} | public_demand_series()
+    return {label: nged[label] for label in DEMAND_LABELS}
 
 
 def agile_prices() -> pl.DataFrame:
@@ -435,7 +419,6 @@ def main() -> None:
     """Validate every input and write `report_inputs.md`."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     nged = nged_series()
-    public = public_demand_series()
     metadata = _metadata()
     lines = ["# Inputs report", ""]
     grid = window_half_hours()
@@ -478,9 +461,7 @@ def main() -> None:
         "## Per-series checks (import-positive MW)",
         "",
     ]
-    rows = [
-        validate_series(label=k, values=v) for k, v in (nged | public).items() if k != "battery_A"
-    ]
+    rows = [validate_series(label=k, values=v) for k, v in nged.items() if k != "battery_A"]
     lines.append(pl.DataFrame(rows).write_csv(separator="|"))
     lines += ["", "## Is a bulk supply point's flow connected to NGED battery A?", ""]
     correlation = change_correlations(series=nged, reference="battery_A")
