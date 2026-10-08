@@ -95,11 +95,12 @@ needs a second N2EX download and a second time grid.
 **The template posterior.** Within a 3-month block, the aggregate is modelled as
 
 ```text
-y(t) = calendar baseline + fleet-curve solar - sum over classes c of a_c * template_c(t; d_c) + noise
+y(t) = calendar baseline + fleet-curve solar - sum over classes c of a_c * template_c(t; d_c, eta) + noise
 ```
 
 where `a_c >= 0` is the power of battery class `c` in MW, and `template_c` is a one-megawatt
-schedule, positive for export, simulated from that class's signal for a duration `d_c` in hours.
+schedule, positive for export, simulated from that class's signal for a duration `d_c` in hours
+and a round-trip efficiency `eta` (passed to `lp_schedule` as `eta_one_way = sqrt(eta)`).
 The three battery classes are:
 
 - **Merchant**: `studies.battery_dispatch.lp_schedule` on the N2EX day-ahead price.
@@ -118,38 +119,49 @@ the four fleet curves (`studies.pv_separation.solar_basis`) enter linearly, as d
 and the charge-only nuisance templates, so for a fixed set of durations the model is
 linear-Gaussian.
 
-**Only the three class durations are inferred; every other physical parameter is fixed.** The
-efficiency, the state-of-charge limits, and the cycle cap change a template's shape far less
-than the duration does, and each would add a dimension to the inference without answering the
-question. They are fixed at the values below, and the second setting moves them.
+**Power, duration, and round-trip efficiency each get an explicit prior and a posterior; the
+state-of-charge limits and the cycle cap are fixed, and a sensitivity arm moves them.** The priors
+come from the prior study and the research note; the domestic durations are unverified.
 
-| Parameter | Value or prior |
-|---|---|
-| One-way efficiency | Fixed at 0.93 (round trip about 0.87); the prior study fitted 0.92 to 0.94 |
-| State-of-charge limits | Fixed at 5% and 95% |
-| Cycles a day, merchant and Agile | Capped at 1 (`lp_schedule`'s `cycles_per_day_cap`, which stands in for a throughput cost; `lp_schedule` has no cost argument) |
-| Duration (MWh per MW), merchant | Log-normal, median 2 hours, 95% between 1 and 4 hours |
-| Duration, domestic fleet | Log-normal, median 2 hours, 95% between 1.2 and 3.5 hours, for products of 5 to 13.5 kWh at 3 to 5 kW (unverified) |
-| Duration, commercial and industrial | Log-normal, median 1.5 hours, 95% between 1 and 3 hours |
-| Each class or tariff power | Half-normal with scale 20% of the aggregate's p99 |
+| Parameter | Prior | Why this prior |
+|---|---|---|
+| Power of each class or tariff (MW) | Half-normal, scale 20% of the aggregate's p99 | Non-negative, and puts prior mass on every share from 0.5% to 40% without favouring any |
+| Duration (MWh per MW), merchant | Log-normal, median 2 hours, 95% between 1 and 4 hours | Distribution-connected merchant batteries are mostly 1 to 2 hours, with newer ones longer |
+| Duration, domestic fleet | Log-normal, median 2 hours, 95% between 1.2 and 3.5 hours | Home products of 5 to 13.5 kWh at 3 to 5 kW (unverified) |
+| Duration, commercial and industrial | Log-normal, median 1.5 hours, 95% between 1 and 3 hours | A red band of 3 hours needs at most 3 hours, and most sites cover part of it |
+| Round-trip efficiency, shared by all classes | Beta, mean 0.87, 95% between 0.80 and 0.92 | The prior study fitted one-way 0.92 to 0.94 (round trip 0.85 to 0.88) on public batteries; home systems with an inverter each way are likely lower |
 
-**Inference: an exact grid over the three durations, exact integration over the linear terms.** Each
-duration takes 8 log-spaced grid values from 0.5 to 6 hours, weighted by its log-normal prior, so
-the posterior is a sum over 512 duration combinations and needs no sampling over the durations. The
-templates do not depend on the aggregate, so each block's 48 template columns (8 durations for the
-merchant class, 8 for commercial and industrial, and 8 times four tariff columns for the domestic
-class) and their projections off the baseline and solar columns are computed once and shared by
-every sum in that block. For each sum and combination, the baseline, solar, and nuisance
-coefficients are integrated out analytically under a wide Gaussian prior. The class powers have a
-half-normal prior, so the combination's evidence is the unconstrained Gaussian evidence times the
-posterior probability of the positive orthant over the prior's
+**Two physical parameters stay fixed, because each only rescales what the grid already infers.**
+The state-of-charge limits (5% and 95%) set the usable share of the energy capacity, which trades
+one for one against the duration, so the duration posterior is read as usable hours at full power,
+and the page says so. The cycle cap of 1 a day (`lp_schedule`'s `cycles_per_day_cap`, which stands
+in for a throughput cost; `lp_schedule` has no cost argument) only bites on days with two price
+peaks. Neither would change a verdict unless the posterior for MWh moved by more than its own
+interval width, and the second setting tests that: it re-runs every planned contrast with the
+limits at 0% and 100% and a cap of 2 cycles a day.
+
+**Inference: an exact grid over duration and efficiency, exact integration over power.** Each
+class's duration takes 6 log-spaced grid values from 0.5 to 6 hours (0.5, 0.82, 1.35, 2.2, 3.6, and
+6.0), and the shared round-trip efficiency takes 4 values (0.78, 0.83, 0.88, and 0.93), each grid
+point weighted by its prior. The posterior is therefore a sum over 6 x 6 x 6 x 4 = 864 combinations
+and needs no sampling over duration or efficiency. The powers enter the model linearly, so their
+integral is exact rather than gridded, which is the limit of an infinitely fine power grid. The
+templates do not depend on the aggregate, so each block's 144 template columns (36 columns for each
+efficiency: 6 durations for the merchant class, 6 for commercial and industrial, and 6 times four
+tariff columns for the domestic class) and their projections off the baseline and solar columns are
+computed once and shared by every sum in that block. For each sum and combination, the baseline,
+solar, and nuisance coefficients are integrated out analytically under a wide Gaussian prior. The
+class powers have a half-normal prior, so the combination's evidence is the unconstrained Gaussian
+evidence times the posterior probability of the positive orthant over the prior's
 (`scipy.stats.multivariate_normal.cdf`, at most 6 dimensions). The class powers are then sampled
 from their truncated Gaussian conditional (Gibbs sampling with `scipy.stats.truncnorm`) for the
 combinations holding 99% of the posterior mass. The noise is serially correlated, so the residual is
 prewhitened with a first-order autoregression fitted to the scored aggregate's own residual from the
 highest-evidence combination, iterated twice; the noise parameters carry no truth, so estimating
-them from the scored sum is not leakage. MWh is the posterior of `a_c * duration_c`. All of this is
-numpy and scipy, and no posterior can collapse onto a few importance weights.
+them from the scored sum is not leakage. The report gives, for every sum, the marginal posterior of
+each class's MW, of its MWh (`a_c * duration_c`), and of the round-trip efficiency, with 50% and 90%
+credible intervals. All of this is numpy and scipy, and no posterior can collapse onto a few
+importance weights.
 
 **The detection statistic** is the log Bayes factor of the model with batteries against the model
 with none. The threshold is the 95th percentile of the statistic over the blocks of the other demand
@@ -223,8 +235,9 @@ demand series and whole batteries (a two-level cluster bootstrap, 2,000 resample
 study's rungs 4 to 6 resampled whole aggregates. A per-block posterior is not a per-month score, so
 the month-resampled default does not apply, and the page says why. Rates also carry Clopper-Pearson
 intervals with the count of blocks beside them. **Second setting**: every planned contrast is
-re-run with the duration priors' log-standard-deviations doubled, the one-way efficiency fixed at
-0.89, and the state-of-charge limits at 0% and 100%, so a verdict that rests on those choices shows.
+re-run with the duration priors' log-standard-deviations doubled, the efficiency prior's 95% range
+widened to 0.70 to 0.95, the state-of-charge limits at 0% and 100%, and a cap of 2 cycles a day, so
+a verdict that rests on those choices shows.
 
 **Controls.** The positive control is a simulated 2-hour merchant battery at a 40% share on the
 calendar replica of a demand half; the 90% interval must hold `P` and `E`, and the posterior median
@@ -234,10 +247,10 @@ real window-edge signal should beat; and Agile prices from 7 days earlier.
 
 **The simulated truth is never drawn from the estimator's own template family.** Rung 1's merchant
 batteries are dispatched by `lp_schedule` with the one-way efficiency drawn uniformly from 0.88 to
-0.95, the state-of-charge limits from 0% to 10% and 90% to 100%, a cap of 1 or 2 cycles a day, and
-durations of 1, 2, and 4 hours, which lie near but not on the estimator's grid values, while the
-estimator keeps its fixed values. A calibration that holds only when the truth is a template would
-otherwise pass C2 for free.
+0.95 (round trip 0.77 to 0.90, mostly between grid values), the state-of-charge limits from 0% to
+10% and 90% to 100%, a cap of 1 or 2 cycles a day, and durations of 1, 2, and 4 hours, which lie
+between the estimator's grid values, while the estimator keeps its fixed limits and cap. A
+calibration that holds only when the truth is a template would otherwise pass C2 for free.
 
 ## The ladder (five rungs)
 
@@ -311,11 +324,13 @@ scored. If rung 1 finds nothing at a 40% share on real demand, rungs 2 to 5 are 
 demonstration that the method fails.
 
 **Compute budget.** Each block's template columns and projections are computed once, so a sum costs
-48 inner products and 512 small evidence evaluations, each with an orthant probability of at most
-6 dimensions (`multivariate_normal.cdf` with `maxpts` capped, since scipy's default is a million
-points per dimension). Rungs 1 to 3 hold about 5,300 sums (924, 308, and 4,048), each run at both
-settings, so the budget of about 2 hours on 4 workers allows about 2.7 seconds per sum. One sum's
-timing decides whether that fits; if not, the cut order in the work breakdown applies.
+144 inner products and 864 small evidence evaluations, each with an orthant probability of at most
+6 dimensions (`multivariate_normal.cdf` with `maxpts=2000`, since scipy's default is a million
+points per dimension). A timing on this workstation at `OMP_NUM_THREADS=2` put one 6-dimensional
+orthant probability at 1.8 ms with `maxpts=2000`, so a sum takes about 1.6 seconds. Rungs 1 to 3
+hold about 5,300 sums (924, 308, and 4,048), each run at both settings, which is about 4.7 hours of
+one core, or about 1.2 hours on 4 workers. The report records the first full sum's timing and the
+grid size; if rungs 1 to 3 would exceed 2 hours, the cut order in the work breakdown applies.
 
 ## What counts as "not identifiable", and what it would mean for NGED
 
@@ -342,6 +357,8 @@ few sentences.**
 - **Conclusions** at the top: at most five bolded sentences, one each for false alarms, the
   smallest detectable merchant battery, the smallest detectable domestic fleet, whether MWh is
   identified separately from MW, and what the primary screen found.
+- **One sentence on frequency** beside the signal list: grid frequency was reviewed, and its
+  half-hourly mean barely moves, so the estimator does not use it.
 - **Headline figure**: detection probability against battery size in `P / sigma_step` (log axis,
   0.5% to 40% shares marked), one line each for a merchant battery, a domestic fleet, and a real
   public battery, with the 5% false-alarm level; beneath it, on the same axis, the median width of
@@ -406,10 +423,10 @@ first run. Results go to `data/studies/per_study/unmetered_battery_capacity/`.
    one to the `studies` package's dependencies, or convert the sheet to CSV once and record how);
    NGED's definition of "Disaggregated Demand"; data-validation checks into `report_inputs.md`.
    Nothing that identifies a generator is written.
-5. **Templates** `capacity_templates.py`: every block's 48 template columns, for both settings,
-   saved. Time one sum's posterior; if rungs 1 to 3 would take more than 2 hours, cut in this order
-   and record the cut: rung 3's fleet draws from 5 to 3; rung 3's 5% share; the duration grid from 8
-   to 6 values.
+5. **Templates** `capacity_templates.py`: every block's 144 template columns, for both settings,
+   saved. Time one sum's posterior and record it with the grid size; if rungs 1 to 3 would take more
+   than 2 hours, cut in this order and record the cut: rung 3's fleet draws from 5 to 3; rung 3's 5%
+   share; the efficiency grid from 4 to 3 values.
 6. **Positive control**, then **nulls and thresholds** (`capacity_nulls.py`).
 7. **Rungs 1 to 5**, one script each, saving every posterior's grid weights and power draws so a
    chart needs no refit.
@@ -465,11 +482,11 @@ One reviewer ran both lenses, simplicity then correctness, and edited the plan i
   N2EX download (only 4 of the 8 primaries have data that early); rung 1's solar arm and its
   calendar-replica halves; and rung 3's 2% share and half its fleet draws.
 - **Replaced**: importance sampling over 4,000 prior draws of about a dozen parameters with an exact
-  512-point grid over the three durations. With some 4,400 half-hours per block the likelihood is
-  sharp enough that a few importance weights would carry the whole posterior, and the planned
-  fallback still left about eight dimensions. Tariff membership shares became per-tariff linear
-  powers, and efficiency, state-of-charge limits, and the cycle cap are fixed, moved only by the
-  second setting.
+  864-point grid over the three durations and a shared round-trip efficiency, with power integrated
+  exactly. With some 4,400 half-hours per block the likelihood is sharp enough that a few importance
+  weights would carry the whole posterior, and the planned fallback still left about eight
+  dimensions. Tariff membership shares became per-tariff linear powers. The state-of-charge limits
+  and the cycle cap are fixed, with a sensitivity arm in the second setting.
 - **Corrected**: the battery sign in the model; the count of `battery_hint` BMUs (101, not 149); the
   throughput-cost parameter, which `lp_schedule` does not have; the noise parameters, which now
   come from the scored sum rather than from other series; a power error that was minus infinity
