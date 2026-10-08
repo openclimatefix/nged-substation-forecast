@@ -5,6 +5,7 @@ import numpy as np
 import polars as pl
 import pytest
 from studies.battery_templates import (
+    SENSITIVITY_LP_SETTINGS,
     TARIFF_WINDOWS,
     DomesticTariffNameType,
     FleetSpec,
@@ -302,3 +303,27 @@ def test_a_fleet_of_identical_homes_is_one_template_times_the_home_count() -> No
         spread_sd_log=0.0,
     )
     assert fleet.output_mw == pytest.approx(50 * 0.004 * single)
+
+
+def test_a_merchant_templates_daily_discharge_is_capped_at_its_usable_duration() -> None:
+    day = np.concatenate([np.full(12, 20.0), np.full(24, 50.0), np.full(12, 120.0)])
+    prices = np.tile(day, 3) + np.tile(np.linspace(0.0, 0.3, 48), 3)
+
+    standard = merchant_template(
+        day_ahead_prices=prices, duration_hours=2.0, round_trip_efficiency=ETA
+    )
+    sensitivity = merchant_template(
+        day_ahead_prices=prices,
+        duration_hours=2.0,
+        round_trip_efficiency=ETA,
+        settings=SENSITIVITY_LP_SETTINGS,
+    )
+
+    # A strong spread cycles the whole usable energy: the cells swing by `duration` and the grid
+    # receives `duration * sqrt(eta)`. A template built from the nameplate energy would cycle 10%
+    # less in the standard setting, whose limits are 5% and 95%.
+    expected = 2.0 * np.sqrt(ETA)
+    assert standard[48:96][standard[48:96] > 0].sum() * 0.5 == pytest.approx(expected, rel=1e-6)
+    assert sensitivity[48:96][sensitivity[48:96] > 0].sum() * 0.5 == pytest.approx(
+        expected, rel=1e-6
+    )

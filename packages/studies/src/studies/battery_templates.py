@@ -308,6 +308,10 @@ def merchant_template(
 ) -> np.ndarray:
     """Return the schedule of a price taker on the day-ahead price.
 
+    The battery's nameplate energy is scaled up so that the energy between the state-of-charge
+    limits equals `duration_hours` at full power, which makes the duration mean the same thing for
+    every template.
+
     Args:
         day_ahead_prices: The price at each half-hour of the grid, in whole UTC days. A day with a
             missing price gets a zero schedule.
@@ -320,7 +324,7 @@ def merchant_template(
     """
     return lp_schedule(
         prices=day_ahead_prices,
-        energy_hours=duration_hours,
+        energy_hours=duration_hours / (settings.soc_max - settings.soc_min),
         eta_one_way=float(np.sqrt(round_trip_efficiency)),
         soc_min=settings.soc_min,
         soc_max=settings.soc_max,

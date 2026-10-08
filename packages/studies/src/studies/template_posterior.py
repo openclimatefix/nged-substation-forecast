@@ -46,6 +46,9 @@ FREE_PRIOR_SD_OVER_SIGNAL_SD: Final[float] = 100.0
 """The prior standard deviation of a free coefficient, as a multiple of the aggregate's standard
 deviation. It is wide enough to be uninformative, and it cancels from the Bayes factor because the
 no-battery model carries the same free columns."""
+SIGMA2_FLOOR_RATIO: Final[float] = 1e-8
+"""The noise variance never falls below this fraction of the aggregate's variance, so that an
+aggregate that is exactly zero for long stretches does not give a singular fit."""
 GIBBS_BURN_IN_SWEEPS: Final[int] = 60
 POSTERIOR_MASS_SAMPLED: Final[float] = 0.99
 
@@ -426,14 +429,18 @@ def fit_aggregate(
         The posterior.
     """
     free_sd = float(np.std(target[valid]))
-    tau = FREE_PRIOR_SD_OVER_SIGNAL_SD * free_sd
+    tau = FREE_PRIOR_SD_OVER_SIGNAL_SD * max(free_sd, 1e-12)
+    sigma2_floor = max(SIGMA2_FLOOR_RATIO * free_sd**2, 1e-24)
     rho = 0.0
     n_parameters = free.shape[1] + grid.combos.shape[1]
     start = prewhiten(free=free, candidates=candidates, target=target, valid=valid, rho=0.0)
     ols = np.linalg.lstsq(start.free_gram, start.free_target, rcond=None)[0]
-    sigma2 = float(
-        (start.target_norm - 2 * ols @ start.free_target + ols @ start.free_gram @ ols)
-        / max(start.effective_rows - free.shape[1], 1)
+    sigma2 = max(
+        float(
+            (start.target_norm - 2 * ols @ start.free_target + ols @ start.free_gram @ ols)
+            / max(start.effective_rows - free.shape[1], 1)
+        ),
+        sigma2_floor,
     )
     evaluation = None
     for iteration in range(noise_iterations + 1):
@@ -465,6 +472,7 @@ def fit_aggregate(
         rho, sigma2 = estimate_noise(
             residual=residual, n_parameters=n_parameters, effective_rows=system.effective_rows
         )
+        sigma2 = max(sigma2, sigma2_floor)
     assert evaluation is not None
     kept = ~evaluation.pruned
     log_posterior = np.full(len(kept), LOG_FLOOR)
