@@ -19,6 +19,7 @@ from typing import Final
 import numpy as np
 import polars as pl
 from battery_inputs import BATTERIES, NAMES, OUTPUT_DIR, battery_frame, p99_output_mw
+from studies.battery_capacity import cell_energy_path, smallest_capacity
 
 ETA_MIN: Final[float] = 0.80
 ETA_MAX: Final[float] = 0.98
@@ -31,34 +32,6 @@ BOUND_FRACTION: Final[float] = 0.02
 DAYS_IN_WINDOW: Final[int] = 365
 SHORT_WINDOW_HALF_HOURS: Final[int] = 7 * 48
 """The length of the short windows of the post hoc drift check: one week."""
-
-
-def cell_energy_path(*, output_mwh: np.ndarray, eta: float) -> np.ndarray:
-    """Return the cumulative energy added to the cells, in megawatt-hours.
-
-    Args:
-        output_mwh: The half-hourly output, positive for export.
-        eta: The one-way efficiency.
-
-    Returns:
-        The running sum of `-x / eta` for export and `-x * eta` for import.
-    """
-    step = np.where(output_mwh > 0, -output_mwh / eta, -output_mwh * eta)
-    return np.cumsum(step)
-
-
-def smallest_capacity(*, output_mwh: np.ndarray, eta: float) -> tuple[float, np.ndarray]:
-    """Return the smallest capacity that holds the path, and the path that starts it at zero.
-
-    Args:
-        output_mwh: The half-hourly output, positive for export.
-        eta: The one-way efficiency.
-
-    Returns:
-        The capacity `max(c) - min(c)` and the SoC path `c - min(c)`.
-    """
-    path = cell_energy_path(output_mwh=output_mwh, eta=eta)
-    return float(path.max() - path.min()), path - path.min()
 
 
 def fit_efficiency(*, output_mwh: np.ndarray) -> tuple[float, float, np.ndarray, np.ndarray]:

@@ -130,7 +130,7 @@ def fetch_month(*, product_code: str, month_start: datetime) -> pl.DataFrame:
     period_to = min(month_end, WINDOW_END)
     tariff = f"E-1R-{product_code}-{REGION_LETTER}"
     url = f"{API_ROOT}/products/{product_code}/electricity-tariffs/{tariff}/standard-unit-rates/"
-    params: dict[str, str | int] = {
+    params: dict[str, str | int] | None = {
         "period_from": period_from.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "period_to": period_to.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "page_size": PAGE_SIZE,
