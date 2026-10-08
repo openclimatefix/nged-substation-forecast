@@ -2,7 +2,8 @@
 
 Six units in three classes: the merchant battery (a price taker on the N2EX day-ahead price), the
 Agile tariff (a price taker on the Agile price, in the domestic class), the commercial and
-industrial red-band battery, and the three fixed-window domestic tariffs. Each class has its own
+industrial red-band battery, and the three fixed-window domestic tariffs. The two price takers
+interpolate the schedule stacks of `capacity_stacks.py`. Each class has its own
 usable duration and round-trip efficiency, with the grid estimator's priors.
 
 The differentiable estimator reads the same free columns as the grid estimator (the monthly
@@ -11,17 +12,15 @@ projection.
 """
 
 import os
+from dataclasses import replace
 from functools import cache
+from pathlib import Path
 from typing import Final
 
 import numpy as np
 import torch
-from capacity_inputs import (
-    agile_prices,
-    block_slices,
-    day_ahead_on_grid,
-    window_half_hours,
-)
+from capacity_inputs import block_slices, window_half_hours
+from capacity_stacks import STACKS_PATH
 from capacity_templates import (
     CLASS_NAMES,
     DURATION_PRIORS,
@@ -40,12 +39,11 @@ from studies.battery_state_space import (
     Priors,
     Problems,
     Sharpness,
-    daily_rank_fraction,
     make_problems,
     natural_draws,
     natural_point,
 )
-from studies.battery_templates import TARIFF_WINDOWS, agile_days, window_coverage
+from studies.battery_templates import TARIFF_WINDOWS, TariffWindow, window_coverage
 
 UNIT_NAMES: Final[tuple[str, ...]] = (
     "merchant",
@@ -55,8 +53,8 @@ UNIT_NAMES: Final[tuple[str, ...]] = (
     "octopus_go",
     "octopus_flux",
 )
-LAYOUT: Final = Layout(unit_class=(0, 2, 1, 2, 2, 2), n_classes=3, n_rank=2)
-"""Units 0 and 1 are rank units; the class indices follow `CLASS_NAMES`."""
+LAYOUT: Final = Layout(unit_class=(0, 2, 1, 2, 2, 2), n_classes=3, n_stack=2)
+"""Units 0 and 1 are stack units; the class indices follow `CLASS_NAMES`."""
 FIXED_WINDOWS: Final[tuple[str, ...]] = (
     "red_band",
     "intelligent_octopus_go",
@@ -65,9 +63,9 @@ FIXED_WINDOWS: Final[tuple[str, ...]] = (
 )
 STARTS: Final[int] = 3
 ADAM_STAGES: Final[tuple[tuple[int, float, Sharpness], ...]] = (
-    (120, 0.08, Sharpness(rank=20.0, smoothing=1e-2)),
-    (120, 0.04, Sharpness(rank=60.0, smoothing=1e-3)),
-    (160, 0.02, Sharpness(rank=150.0, smoothing=1e-4)),
+    (150, 0.08, Sharpness(smoothing=1e-2)),
+    (150, 0.04, Sharpness(smoothing=1e-3)),
+    (200, 0.02, Sharpness(smoothing=1e-4)),
 )
 """Adam stages: iterations, learning rate, and annealed sharpness; the last is the final model."""
 N_DRAWS: Final[int] = 2000
@@ -105,41 +103,89 @@ def priors(*, setting: SettingNameType) -> Priors:
     )
 
 
+def shifted_window(*, name: str, hours: float) -> TariffWindow:
+    """Return a tariff window with every edge moved by some hours (a placebo window)."""
+    window = TARIFF_WINDOWS[name]
+    return replace(
+        window,
+        charge_start_hour=window.charge_start_hour + hours,
+        charge_end_hour=window.charge_end_hour + hours,
+        discharge_start_hour=window.discharge_start_hour + hours,
+        discharge_end_hour=window.discharge_end_hour + hours,
+    )
+
+
 @cache
-def signals_numpy() -> dict[str, np.ndarray]:
+def signals_numpy(
+    *, stack_path: Path = STACKS_PATH, window_shift_hours: float = 0.0
+) -> dict[str, np.ndarray]:
     """Return the policy signals on the study year's half-hour grid.
 
+    Args:
+        stack_path: Which saved stacks the price takers interpolate.
+        window_shift_hours: Moves every tariff window by this many hours (zero for the real
+            windows, nonzero for a placebo).
+
     Returns:
-        The keyword arguments of `studies.battery_state_space.make_signals` other than the device.
+        The keyword arguments of `studies.battery_state_space.make_signals` other than the device
+        and dtype: the merchant and Agile stacks, their node grids, and the window indicators.
     """
     grid = window_half_hours()
-    n_grid = len(grid)
-    merchant_rank, merchant_valid = daily_rank_fraction(prices=day_ahead_on_grid())
-    day_prices, slot_index = agile_days(half_hour_end_time=grid, agile_prices=agile_prices())
-    agile_rank_by_slot, agile_valid_by_slot = daily_rank_fraction(prices=day_prices.ravel())
-    agile_rank = np.full(n_grid, 0.5)
-    agile_valid = np.zeros(n_grid, dtype=bool)
-    flat_index = slot_index.ravel()
-    inside = (flat_index >= 0) & (flat_index < n_grid)
-    agile_rank[flat_index[inside]] = agile_rank_by_slot[inside]
-    agile_valid[flat_index[inside]] = agile_valid_by_slot[inside]
+    saved = np.load(stack_path)
     coverage = [
-        window_coverage(half_hour_end_time=grid, window=TARIFF_WINDOWS[n]) for n in FIXED_WINDOWS
+        window_coverage(
+            half_hour_end_time=grid, window=shifted_window(name=name, hours=window_shift_hours)
+        )
+        for name in FIXED_WINDOWS
     ]
     return {
-        "rank_fraction": np.stack([merchant_rank, agile_rank]),
-        "rank_valid": np.stack([merchant_valid, agile_valid]),
+        "stacks": np.stack([saved["merchant"], saved["agile"]]),
+        "duration_nodes": saved["duration_nodes"],
+        "efficiency_nodes": saved["efficiency_nodes"],
         "fixed_charge": np.stack([c for c, _ in coverage]),
         "fixed_discharge": np.stack([d for _, d in coverage]),
     }
 
 
-def estimator(*, setting: SettingNameType, block: int) -> Estimator:
-    """Build the estimator for one setting and one block on the best available device."""
-    rows = block_slices()[block]
+def _block_signals(
+    *, rows: slice, stack_path: Path, window_shift_hours: float
+) -> dict[str, np.ndarray]:
+    """Cut the signals to a block's half-hours."""
+    signals = signals_numpy(stack_path=stack_path, window_shift_hours=window_shift_hours)
+    return {
+        "stacks": signals["stacks"][:, :, rows],
+        "duration_nodes": signals["duration_nodes"],
+        "efficiency_nodes": signals["efficiency_nodes"],
+        "fixed_charge": signals["fixed_charge"][:, rows],
+        "fixed_discharge": signals["fixed_discharge"][:, rows],
+    }
+
+
+def estimator(
+    *,
+    setting: SettingNameType,
+    block: int,
+    stack_path: Path = STACKS_PATH,
+    window_shift_hours: float = 0.0,
+) -> Estimator:
+    """Build the estimator for one setting and one block on the best available device.
+
+    Args:
+        setting: The setting.
+        block: The block's index.
+        stack_path: Which saved stacks the price takers interpolate.
+        window_shift_hours: Moves every tariff window by this many hours (a placebo).
+
+    Returns:
+        The estimator.
+    """
     return Estimator(
         layout=LAYOUT,
-        signals_numpy={name: values[:, rows] for name, values in signals_numpy().items()},
+        signals_numpy=_block_signals(
+            rows=block_slices()[block],
+            stack_path=stack_path,
+            window_shift_hours=window_shift_hours,
+        ),
         priors=priors(setting=setting),
         device=device(),
     )
@@ -148,22 +194,20 @@ def estimator(*, setting: SettingNameType, block: int) -> Estimator:
 def start_parameters() -> np.ndarray:
     """Return the `STARTS` initial parameter vectors, with `log P` relative to the power scale.
 
-    The three starts differ in the merchant battery's power, duration, and thresholds; the other
-    units start small.
+    The three starts differ in the merchant battery's power and duration; the other units start
+    small.
 
     Returns:
         Shape (starts, parameters).
     """
     layout = LAYOUT
     rows = []
-    for merchant_power, duration, threshold in ((-0.7, 1.0, 0.1), (0.4, 2.0, 0.2), (1.1, 4.0, 0.3)):
+    for merchant_power, duration in ((-0.7, 1.0), (0.4, 2.0), (1.1, 4.0)):
         theta = np.zeros(layout.n_parameters)
         theta[layout.power] = -3.0
         theta[0] = merchant_power
         theta[layout.log_duration] = np.log([duration, 1.5, 2.0])
         theta[layout.logit_efficiency] = np.log(0.87 / 0.13)
-        theta[layout.threshold_charge] = np.log(2 * threshold / (1 - 2 * threshold))
-        theta[layout.threshold_discharge] = np.log(2 * threshold / (1 - 2 * threshold))
         rows.append(theta)
     return np.stack(rows)
 
@@ -212,7 +256,7 @@ def block_problems(
 def posterior_summary(
     *, fit: FitResult, group: int, lane: int, rng: np.random.Generator
 ) -> dict[str, float | bool]:
-    """Summarise one aggregate's best start: medians and 5/25/75/95% quantiles of MW and MWh.
+    """Summarise one aggregate's best start: point values and quantiles of MW and MWh per class.
 
     Args:
         fit: The fit.
@@ -221,9 +265,13 @@ def posterior_summary(
         rng: The random generator for the draws.
 
     Returns:
-        For the merchant class and for the sum of the other units: `<name>_<quantity>_<q>` entries,
-        the log-posterior loss, the integrated autocorrelation time, whether an interval exists,
-        and the spread of the merchant power across the starts.
+        The log-posterior loss, the integrated autocorrelation time, whether an interval exists,
+        whether a parameter sits on its bound, the spread of the merchant power across the starts,
+        the point values (`<class>_power_point`, `<class>_energy_point`, the merchant class's
+        `merchant_duration_point`, `merchant_efficiency_point`, and `merchant_cap_weight_point`),
+        and, where an interval exists, the 5, 25, 50, 75, and 95% quantiles
+        (`<class>_<quantity>_<q>`) of every class's power and energy and of the merchant class's
+        duration and efficiency. `<class>` is a name in `CLASS_NAMES`.
     """
     start = int(fit.best_start[group, lane])
     theta = fit.theta[group, lane, start]
@@ -237,13 +285,13 @@ def posterior_summary(
         ),
     }
     point = natural_point(theta=theta, layout=LAYOUT)
+    row |= _class_quantities(natural=point)
     row |= {
-        "merchant_power_point": float(point["power"][0]),
-        "merchant_energy_point": float(point["energy"][0]),
         "merchant_duration_point": float(point["duration"][0]),
         "merchant_efficiency_point": float(point["efficiency"][0]),
-        "other_units_power_point": float(point["power"][1:].sum()),
+        "merchant_cap_weight_point": float(point["cap_weight"][0]),
     }
+    row = {k: (float(v) if isinstance(v, np.floating) else v) for k, v in row.items()}
     if not row["has_interval"]:
         return row
     draws = natural_draws(
@@ -253,14 +301,11 @@ def posterior_summary(
         n_draws=N_DRAWS,
         rng=rng,
     )
-    quantities = {
-        "merchant_power": draws["power"][:, 0],
-        "merchant_energy": draws["energy"][:, 0],
-        "merchant_duration": draws["duration"][:, 0],
-        "merchant_efficiency": draws["efficiency"][:, 0],
-        "other_units_power": draws["power"][:, 1:].sum(axis=1),
-    }
-    for name, values in quantities.items():
+    quantities = _class_quantities(natural=draws)
+    quantities["merchant_duration"] = draws["duration"][:, 0]
+    quantities["merchant_efficiency"] = draws["efficiency"][:, 0]
+    for key, values in quantities.items():
+        name = key.removesuffix("_point")
         for label, level in (
             ("q05", 0.05),
             ("q25", 0.25),
@@ -270,3 +315,17 @@ def posterior_summary(
         ):
             row[f"{name}_{label}"] = float(np.quantile(values, level))
     return row
+
+
+def _class_quantities(*, natural: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+    """Sum the units of each class: `<class>_power_point` and `<class>_energy_point`.
+
+    Works for one optimum (1-D arrays) or for draws (2-D arrays with one row per draw).
+    """
+    out = {}
+    classes = np.array(LAYOUT.unit_class)
+    for index, name in enumerate(CLASS_NAMES):
+        members = np.where(classes == index)[0]
+        out[f"{name}_power_point"] = natural["power"][..., members].sum(axis=-1)
+        out[f"{name}_energy_point"] = natural["energy"][..., members].sum(axis=-1)
+    return out

@@ -8,6 +8,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
+from studies.battery_dispatch import lp_schedule  # noqa: E402
 from studies.battery_recurrence import recurrence  # noqa: E402
 from studies.battery_state_space import (  # noqa: E402
     Estimator,
@@ -15,7 +16,7 @@ from studies.battery_state_space import (  # noqa: E402
     Priors,
     Problems,
     Sharpness,
-    daily_rank_fraction,
+    _node_weights,
     integrated_autocorrelation_time,
     make_problems,
     make_signals,
@@ -26,8 +27,12 @@ from studies.battery_state_space import (  # noqa: E402
 from studies.template_posterior import tempering_from_residual  # noqa: E402
 
 SLOTS: Final[int] = 48
-SHARP: Final[Sharpness] = Sharpness(rank=150.0, smoothing=1e-6)
+SHARP: Final[Sharpness] = Sharpness(smoothing=1e-6)
 DEVICE: Final = torch.device("cpu")
+DURATION_NODES: Final = np.geomspace(0.5, 6.0, 9)
+EFFICIENCY_NODES: Final = np.array([0.7, 0.8, 0.9, 0.97])
+LAYOUT: Final = Layout(unit_class=(0, 1), n_classes=2, n_stack=1)
+"""Unit 0 is a price taker (class 0) and unit 1 follows a fixed window (class 1)."""
 
 
 def _prices(*, days: int, seed: int) -> np.ndarray:
@@ -38,6 +43,23 @@ def _prices(*, days: int, seed: int) -> np.ndarray:
     return np.concatenate(
         [shape * rng.uniform(0.8, 1.2) + rng.normal(0, 4, SLOTS) for _ in range(days)]
     )
+
+
+def _stack(*, days: int) -> np.ndarray:
+    """The linear-programme schedules of the price taker at every node, shape (nodes, T)."""
+    prices = _prices(days=days, seed=1)
+    columns = [
+        lp_schedule(
+            prices=prices,
+            energy_hours=duration / 0.9,
+            eta_one_way=float(np.sqrt(efficiency)),
+            cycles_per_day_cap=cap,
+        )
+        for duration in DURATION_NODES
+        for efficiency in EFFICIENCY_NODES
+        for cap in (1.0, 2.0)
+    ]
+    return np.stack(columns)
 
 
 def _window(
@@ -52,23 +74,25 @@ def _window(
 
 
 def _signals(*, days: int) -> dict[str, np.ndarray]:
-    """One rank unit (merchant) and one window unit, in separate classes."""
-    rank, valid = daily_rank_fraction(prices=_prices(days=days, seed=1))
+    """The price taker's stack and one fixed-window unit."""
     charge, discharge = _window(days=days, charge=(2, 12), discharge=(34, 40))
     return {
-        "rank_fraction": rank[None],
-        "rank_valid": valid[None],
+        "stacks": _stack(days=days)[None],
+        "duration_nodes": DURATION_NODES,
+        "efficiency_nodes": EFFICIENCY_NODES,
         "fixed_charge": charge[None],
         "fixed_discharge": discharge[None],
     }
 
 
-LAYOUT: Final = Layout(unit_class=(0, 1), n_classes=2, n_rank=1)
-
-
-def _theta(*, power: tuple[float, float], duration: float, efficiency: float) -> np.ndarray:
+def _theta(
+    *, power: tuple[float, float], duration: float, efficiency: float, cap_weight: float = 0.5
+) -> np.ndarray:
     """Parameters of the two-unit layout in the unconstrained space."""
-    logit = lambda p: float(np.log(p / (1 - p)))  # noqa: E731
+
+    def logit(p: float) -> float:
+        return float(np.log(p / (1 - p)))
+
     return np.array(
         [
             np.log(power[0]),
@@ -77,8 +101,7 @@ def _theta(*, power: tuple[float, float], duration: float, efficiency: float) ->
             np.log(duration),
             logit(efficiency),
             logit(efficiency),
-            logit(0.25 / 0.5),
-            logit(0.25 / 0.5),
+            logit(cap_weight),
         ]
     )
 
@@ -86,18 +109,17 @@ def _theta(*, power: tuple[float, float], duration: float, efficiency: float) ->
 def test_the_state_of_charge_stays_within_the_usable_energy_over_a_week_of_random_policies() -> (
     None
 ):
-    days = 7
-    signals = make_signals(**_signals(days=days), device=DEVICE, dtype=torch.float64)
+    signals = make_signals(**_signals(days=7), device=DEVICE, dtype=torch.float64)
     rng = np.random.default_rng(0)
     theta = torch.as_tensor(
         np.stack(
             [
                 _theta(
                     power=(rng.uniform(0.5, 4), rng.uniform(0.5, 4)),
-                    duration=rng.uniform(0.5, 6),
-                    efficiency=rng.uniform(0.6, 0.98),
+                    duration=rng.uniform(0.6, 5),
+                    efficiency=rng.uniform(0.72, 0.96),
+                    cap_weight=rng.uniform(0.05, 0.95),
                 )
-                + rng.normal(0, 0.8, LAYOUT.n_parameters) * np.array([0, 0, 0, 0, 0, 0, 1, 1])
                 for _ in range(16)
             ]
         )
@@ -122,34 +144,74 @@ def test_a_full_charge_and_discharge_returns_the_charged_energy_times_the_effici
     assert discharged / charged == pytest.approx(efficiency, rel=2e-3)
 
 
+def test_the_node_weights_are_one_at_a_node_and_blend_two_nodes_between_them() -> None:
+    signals = make_signals(**_signals(days=1), device=DEVICE, dtype=torch.float64)
+    at_node = _node_weights(
+        duration=torch.tensor([DURATION_NODES[3]], dtype=torch.float64),
+        efficiency=torch.tensor([EFFICIENCY_NODES[2]], dtype=torch.float64),
+        cap_weight=torch.tensor([0.0], dtype=torch.float64),
+        signals=signals,
+    )[0]
+    index = (3 * len(EFFICIENCY_NODES) + 2) * 2
+    assert float(at_node[index]) == pytest.approx(1.0)
+    assert float(at_node.sum()) == pytest.approx(1.0)
+    midpoint = float(np.sqrt(DURATION_NODES[3] * DURATION_NODES[4]))
+    between = _node_weights(
+        duration=torch.tensor([midpoint], dtype=torch.float64),
+        efficiency=torch.tensor([EFFICIENCY_NODES[2]], dtype=torch.float64),
+        cap_weight=torch.tensor([0.0], dtype=torch.float64),
+        signals=signals,
+    )[0]
+    assert float(between[index]) == pytest.approx(0.5)
+    assert float(between[index + len(EFFICIENCY_NODES) * 2]) == pytest.approx(0.5)
+
+
+def test_interpolating_between_duration_nodes_beats_the_nearest_node() -> None:
+    days = 20
+    prices = _prices(days=days, seed=1)
+    signals = make_signals(**_signals(days=days), device=DEVICE, dtype=torch.float64)
+    duration = float(np.sqrt(DURATION_NODES[4] * DURATION_NODES[5]))
+    efficiency = 0.86
+    exact = lp_schedule(
+        prices=prices,
+        energy_hours=duration / 0.9,
+        eta_one_way=float(np.sqrt(efficiency)),
+        cycles_per_day_cap=1.0,
+    )
+    theta = torch.as_tensor(
+        _theta(power=(1.0, 1e-9), duration=duration, efficiency=efficiency, cap_weight=1e-9)[None]
+    )
+    interpolated = simulate(theta=theta, layout=LAYOUT, signals=signals, sharpness=SHARP)[0].numpy()
+    nearest = [
+        simulate(
+            theta=torch.as_tensor(
+                _theta(power=(1.0, 1e-9), duration=float(d), efficiency=e, cap_weight=1e-9)[None]
+            ),
+            layout=LAYOUT,
+            signals=signals,
+            sharpness=SHARP,
+        )[0].numpy()
+        for d in DURATION_NODES[4:6]
+        for e in (0.8, 0.9)
+    ]
+    error = np.sqrt(np.mean((interpolated - exact) ** 2))
+    assert error < 0.7 * min(np.sqrt(np.mean((n - exact) ** 2)) for n in nearest)
+
+
 def test_the_gradient_of_the_export_matches_central_finite_differences() -> None:
     signals = make_signals(**_signals(days=2), device=DEVICE, dtype=torch.float64)
-    sharpness = Sharpness(rank=20.0, smoothing=1e-3)
+    sharpness = Sharpness(smoothing=1e-3)
     theta = torch.as_tensor(
-        _theta(power=(1.7, 2.3), duration=1.8, efficiency=0.83)[None] + 0.03,
+        _theta(power=(1.7, 2.3), duration=1.37, efficiency=0.853, cap_weight=0.4)[None],
         dtype=torch.float64,
     ).requires_grad_(True)
+    weights = torch.linspace(0.5, 1.5, 96, dtype=torch.float64)
 
     def objective(vector: torch.Tensor) -> torch.Tensor:
-        weights = torch.linspace(0.5, 1.5, 96, dtype=torch.float64)
-        return (
-            simulate(theta=vector, layout=LAYOUT, signals=signals, sharpness=sharpness) ** 2
-            * weights
-        ).sum()
+        export = simulate(theta=vector, layout=LAYOUT, signals=signals, sharpness=sharpness)
+        return (export**2 * weights).sum()
 
     assert torch.autograd.gradcheck(objective, (theta,), eps=1e-6, atol=1e-5, rtol=1e-5)
-
-
-def test_rank_fractions_count_ties_as_half_and_mark_days_with_a_missing_price() -> None:
-    day_one = np.arange(SLOTS, dtype=float)
-    day_two = np.zeros(SLOTS)
-    day_three = np.arange(SLOTS, dtype=float)
-    day_three[5] = np.nan
-    fraction, valid = daily_rank_fraction(prices=np.concatenate([day_one, day_two, day_three]))
-    assert fraction[0] == pytest.approx(0.5 / SLOTS)
-    assert fraction[SLOTS - 1] == pytest.approx((SLOTS - 0.5) / SLOTS)
-    assert fraction[SLOTS + 3] == pytest.approx(0.5)
-    assert valid.reshape(3, SLOTS).all(axis=1).tolist() == [True, True, False]
 
 
 def test_the_autocorrelation_time_agrees_with_the_numpy_tempering_function() -> None:
@@ -170,14 +232,12 @@ def test_the_autocorrelation_time_agrees_with_the_numpy_tempering_function() -> 
     assert times == pytest.approx(expected, rel=0.01)
 
 
-def _estimator(
-    *, days: int, durations_sd: float = 0.5, sharp_efficiency: bool = False
-) -> Estimator:
+def _estimator(*, days: int, durations_sd: float = 0.5, pin_efficiency: bool = False) -> Estimator:
     priors = Priors(
         log_duration_mean=np.log([2.0, 2.0]),
         log_duration_sd=np.array([durations_sd, durations_sd]),
-        efficiency_alpha=np.array([30.0, 30.0]) if not sharp_efficiency else np.array([1e4, 1e4]),
-        efficiency_beta=np.array([5.0, 5.0]) if not sharp_efficiency else np.array([1.2e3, 1.2e3]),
+        efficiency_alpha=np.array([1e4, 1e4]) if pin_efficiency else np.array([30.0, 30.0]),
+        efficiency_beta=np.array([1.2e3, 1.2e3]) if pin_efficiency else np.array([5.0, 5.0]),
     )
     return Estimator(layout=LAYOUT, signals_numpy=_signals(days=days), priors=priors, device=DEVICE)
 
@@ -200,7 +260,7 @@ def _problems(*, estimator: Estimator, theta_true: np.ndarray, days: int, noise:
         theta=torch.as_tensor(theta_true[None]),
         layout=LAYOUT,
         signals=estimator.signals64,
-        sharpness=SHARP,
+        sharpness=FINAL,
     )[0].numpy()
     rng = np.random.default_rng(5)
     aggregate = base - export + rng.normal(0, noise, n_time)
@@ -213,59 +273,77 @@ def _problems(*, estimator: Estimator, theta_true: np.ndarray, days: int, noise:
     )
 
 
+FINAL: Final[Sharpness] = Sharpness(smoothing=1e-5)
 STARTS: Final = np.array(
     [
-        [-0.5, -3.0, np.log(1.5), np.log(2.5), 1.0, 1.0, -0.5, -0.5],
-        [0.5, -3.0, np.log(3.0), np.log(2.0), 2.0, 1.5, 0.5, 0.0],
+        [-0.5, -3.0, np.log(1.5), np.log(2.5), 1.0, 1.0, 0.0],
+        [0.5, -3.0, np.log(3.0), np.log(2.0), 2.0, 1.5, 0.0],
     ]
 )
-STAGES: Final = [
-    (80, 0.08, Sharpness(rank=30.0, smoothing=1e-2)),
-    (80, 0.03, Sharpness(rank=150.0, smoothing=1e-6)),
-]
+STAGES: Final = [(80, 0.08, Sharpness(smoothing=1e-2)), (80, 0.03, FINAL)]
 
 
 def test_a_noise_free_sum_built_by_the_model_gives_back_its_power_duration_and_efficiency() -> None:
     days = 7
     estimator = _estimator(days=days)
-    truth = _theta(power=(3.0, 1e-3), duration=2.0, efficiency=0.85)
+    truth = _theta(power=(3.0, 1e-3), duration=1.7, efficiency=0.86, cap_weight=0.3)
     problems = _problems(estimator=estimator, theta_true=truth, days=days, noise=1e-3)
     fit = estimator.fit(problems=problems, starts=STARTS, stages=STAGES)
     best = fit.best_start[0, 0]
     point = natural_point(theta=fit.theta[0, 0, best], layout=LAYOUT)
     assert point["power"][0] == pytest.approx(3.0, rel=0.02)
-    assert point["duration"][0] == pytest.approx(2.0, rel=0.02)
-    assert point["efficiency"][0] == pytest.approx(0.85, rel=0.02)
-    assert point["energy"][0] == pytest.approx(6.0, rel=0.02)
+    assert point["duration"][0] == pytest.approx(1.7, rel=0.02)
+    assert point["efficiency"][0] == pytest.approx(0.86, rel=0.02)
+    assert point["energy"][0] == pytest.approx(3.0 * 1.7, rel=0.02)
 
 
 def test_with_shape_parameters_pinned_the_laplace_interval_matches_least_squares() -> None:
     days = 7
-    estimator = _estimator(days=days, durations_sd=1e-4, sharp_efficiency=True)
-    truth = _theta(power=(3.0, 1e-3), duration=2.0, efficiency=0.88)
-    noise = 0.5
-    problems = _problems(estimator=estimator, theta_true=truth, days=days, noise=noise)
+    estimator = _estimator(days=days, durations_sd=1e-4, pin_efficiency=True)
+    truth = _theta(power=(3.0, 1e-3), duration=2.0, efficiency=0.88, cap_weight=0.5)
+    problems = _problems(estimator=estimator, theta_true=truth, days=days, noise=0.5)
     # A very wide power prior, so that the prior does not add to the interval.
     problems = replace(problems, power_scale=np.array([[500.0]]))
     fit = estimator.fit(problems=problems, starts=STARTS[:1], stages=STAGES)
     assert fit.has_interval[0, 0, 0]
     theta = fit.theta[0, 0, 0]
-    log_power_sd = np.sqrt(fit.covariance[0, 0, 0][0, 0])
-    sd_power = np.exp(theta[0]) * log_power_sd
+    # The sd of the power with every other parameter held at the optimum is 1 / sqrt(Hessian[0, 0]).
+    precision = np.linalg.inv(fit.covariance[0, 0, 0])
+    sd_power = np.exp(theta[0]) / np.sqrt(precision[0, 0])
     # Ordinary least squares: sd = sigma / norm(M t), t the unit's per-megawatt export.
+    stack_only = theta.copy()
+    stack_only[
+        1
+    ] = -50.0  # switch the window unit off, so that the export is the stack unit's alone
     export = simulate(
-        theta=torch.as_tensor(theta[None]),
+        theta=torch.as_tensor(stack_only[None]),
         layout=LAYOUT,
         signals=estimator.signals64,
-        sharpness=SHARP,
+        sharpness=FINAL,
     )[0].numpy()
     basis = problems.basis[0]
-    # The window unit's power is negligible, so the export is the rank unit's alone.
     template = export / np.exp(theta[0])
     template = template - basis @ (basis.T @ template)
     sigma = np.sqrt(fit.rss[0, 0, 0] / (problems.valid.sum() - problems.rank[0]))
     ols_sd = sigma / np.linalg.norm(template)
     assert sd_power == pytest.approx(ols_sd * fit.tau[0, 0, 0] ** 0.5, rel=0.01)
+
+
+def test_the_log_bayes_factor_is_large_with_a_battery_in_the_sum_and_small_without() -> None:
+    days = 7
+    estimator = _estimator(days=days)
+    log_bayes_factors = []
+    for power in (3.0, 1e-9):
+        truth = _theta(power=(power, 1e-9), duration=1.7, efficiency=0.86, cap_weight=0.3)
+        problems = _problems(estimator=estimator, theta_true=truth, days=days, noise=0.3)
+        fit = estimator.fit(problems=problems, starts=STARTS, stages=STAGES)
+        best = fit.best_start[0, 0]
+        log_bayes_factors.append(
+            float(fit.log_evidence[0, 0, best] - fit.null_log_evidence[0, 0, best])
+        )
+    with_battery, without_battery = log_bayes_factors
+    assert with_battery > 50.0
+    assert without_battery < 5.0
 
 
 def test_draws_from_the_laplace_approximation_are_positive_and_centred_on_the_optimum() -> None:

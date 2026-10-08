@@ -28,6 +28,7 @@ from studies.pv_physics import SunAndSky, half_hour_sun_and_sky
 from studies.pv_separation import solar_basis
 from studies.sources import (
     AGILE_EAST_MIDLANDS_DIR,
+    BATTERY_PV_SEPARATION_DIR,
     MARKET_DOWNLOADS_DIR,
     PRIVATE_DIR,
     REANALYSIS_DOWNLOADS_DIR,
@@ -181,6 +182,37 @@ def demand_series() -> dict[str, np.ndarray]:
     """
     nged = nged_series()
     return {label: nged[label] for label in DEMAND_LABELS}
+
+
+def public_battery_output(*, bmu_id: str) -> np.ndarray:
+    """Return a public battery's settled output in MW at every half-hour of the window.
+
+    Args:
+        bmu_id: The Elexon BMU identifier.
+
+    Returns:
+        The output, positive for export, NaN where B1610 published none.
+    """
+    output = pl.read_parquet(B1610_DIR / f"{bmu_id}{B1610_SUFFIX}").select(
+        half_hour_end_time=pl.col("half_hour_end_time").dt.cast_time_unit("us"),
+        output_mw=pl.col("output_mwh") * 2.0,
+    )
+    grid = pl.DataFrame({"half_hour_end_time": window_half_hours()})
+    return grid.join(output, on="half_hour_end_time", how="left")["output_mw"].to_numpy()
+
+
+def public_battery_registry() -> pl.DataFrame:
+    """Return the census list's battery-hint BMUs with their registered generation capacity.
+
+    Returns:
+        Columns `elexon_bmu_id` and `generation_capacity_mw`, one row per BMU with a battery hint.
+    """
+    return (
+        pl.read_csv(BATTERY_PV_SEPARATION_DIR / "bmu_list.csv")
+        .filter(pl.col("battery_hint"))
+        .select("elexon_bmu_id", "generation_capacity_mw")
+        .sort("elexon_bmu_id")
+    )
 
 
 def agile_prices() -> pl.DataFrame:

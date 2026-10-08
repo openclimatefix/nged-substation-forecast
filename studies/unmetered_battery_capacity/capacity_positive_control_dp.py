@@ -141,7 +141,7 @@ def report_lines(*, frame: pl.DataFrame) -> list[str]:
             "power_median", "merchant_power_q95", "power_in_90", "power_median_error",
             "true_energy_mwh", "merchant_energy_q05", "energy_median", "merchant_energy_q95",
             "energy_in_90", "energy_median_error", "merchant_duration_median",
-            "merchant_efficiency_median", "other_units_power_point", "start_spread_merchant_power",
+            "merchant_efficiency_median", "domestic_power_point", "start_spread_merchant_power",
             "tau", "has_interval", "at_bound", "fit_seconds",
         ).write_csv(separator="|"),
     ]  # fmt: skip
