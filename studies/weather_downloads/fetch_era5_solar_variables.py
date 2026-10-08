@@ -101,6 +101,28 @@ SECONDS_PER_VARIABLE_HOUR: Final[float] = 150 / 2200
 """The measured CDS rate for a small box: about 2.5 minutes per 2,200 variable-hours."""
 
 
+def _credentials() -> tuple[str, str]:
+    """Read the Copernicus URL and API key from `~/.cdsapirc`.
+
+    `ecmwf.datastores.Client` looks for `~/.ecmwfdatastoresrc` when it is given no credentials, so
+    the script passes the ones `cdsapi` already uses.
+
+    Returns:
+        The URL and the key. The key must never be logged or written.
+
+    Raises:
+        RuntimeError: If the file holds no `url:` line or no `key:` line.
+    """
+    values: dict[str, str] = {}
+    for line in Path.home().joinpath(".cdsapirc").read_text().splitlines():
+        name, _, value = line.partition(":")
+        values[name.strip()] = value.strip()
+    if "url" not in values or "key" not in values:
+        msg = "~/.cdsapirc needs a url: line and a key: line"
+        raise RuntimeError(msg)
+    return values["url"], values["key"]
+
+
 def _download(chunk: PlannedChunk, destination: Path) -> None:
     """Submit one request to CDS and write the archive to `destination`.
 
@@ -108,8 +130,9 @@ def _download(chunk: PlannedChunk, destination: Path) -> None:
     """
     from ecmwf.datastores import Client  # ty: ignore[unresolved-import]  # `--with cdsapi` only
 
+    url, key = _credentials()
     retrieve_with_cleanup(
-        client=Client(progress=False),
+        client=Client(url=url, key=key, progress=False),
         collection=CDS_DATASET,
         request=request_body(chunk=chunk),
         destination=destination,
