@@ -731,6 +731,9 @@ SOLAR_BMU_CENSUS_DIR: Final[Path] = study_dir_for(study="solar_bmu_census")
 SOLAR_BMU_CENSUS_INPUTS_DIR: Final[Path] = SOLAR_BMU_CENSUS_DIR / "inputs"
 """The census's downloads from Elexon, NESO, and the Renewable Energy Planning Database."""
 
+SOLAR_BMU_DISAGGREGATION_DIR: Final[Path] = study_dir_for(study="solar_disaggregation")
+"""The study of separating solar output from aggregate BMUs: fits, saved series, and `report.md`."""
+
 NFC_STUDY_DIR: Final[Path] = study_dir_for(study="nwp_forecast_comparison")
 """The folder of the NWP forecast comparison, one subfolder per batch of fits."""
 

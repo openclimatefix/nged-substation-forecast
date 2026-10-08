@@ -300,6 +300,20 @@ sets out the rule and the products the rule covers.
 
 ## Charts
 
+**A study page is mostly figures: the figures carry the argument, and the text only explains
+them.** The maintainer asked for this directly. Both the page's concept and its vertical space
+belong largely to the figures, so a reader who scrolls past the text still follows the story. The
+figures are mostly time series, with scatter plots, distributions, and other data graphics where
+they show the point better. They step the reader through the processing, in the order the method
+runs, so that the reader understands the problem, the method, and why the method works by looking.
+Plan the page as that sequence of figures first, then write the few sentences each figure needs.
+Where a study separates, estimates, or recovers a quantity, the sequence starts from the raw
+inputs, shows how a known-answer case is built (for example, which real series were added together
+to make a synthetic aggregate), shows each processing step's output, and compares the recovered
+quantity with the truth drawn beside it. Only then does it apply the method to real data with no
+answer key. Keep a figure's explanation to a short bolded lead and a few sentences; move anything
+longer to "Data and methods" or "Limitations".
+
 **Load the `dataviz` skill before drawing any chart, then apply the rules below on top of it.** Put
 plenty of charts in every study page, because many technical readers look at the charts before
 reading any text. Each chart, with its title, subtitle, axis labels, and legend, tells its part of

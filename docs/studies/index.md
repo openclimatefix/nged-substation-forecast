@@ -36,6 +36,10 @@ regions or climates, so a result may not hold elsewhere.
   storage built or planned, reports 26 aggregate BMUs apart, and sets the five published capacity
   figures side by side.
 
+- [Can solar be separated from an aggregate Balancing Mechanism Unit?](solar-bmu-disaggregation.md)
+  — a physical solar plant fitted to four-hour changes in output recovers the solar part of synthetic
+  aggregates of real BMUs beside wind and gas, and finds solar in the supplier BMUs.
+
 ## Past weather
 
 **Three studies score how well each weather product describes weather that has already happened.**
