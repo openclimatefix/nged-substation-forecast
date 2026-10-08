@@ -1,8 +1,7 @@
 # Plan: which ERA5 variables help explain how much sunlight reaches a solar farm?
 
-Status: draft. The maintainer has answered the open questions (recorded at the end). The plan still
-needs its two agentic reviews and the maintainer's sign-off. A `Spike` issue under the studies epic
-is created after that, with this plan as its body. No code has been written and nothing has been
+Status: signed off by the maintainer after two agentic reviews. A `Spike` issue under the studies
+epic carries this plan as its body. No code has been written and nothing has been
 downloaded.
 
 ## Question
@@ -153,7 +152,7 @@ Each is run on both targets, so there are eight planned contrasts:
 level of 5% becomes 0.625% per contrast (a 99.375% interval, `bootstrap_difference_at_level`). Every
 interval is also shown at 95%, labelled exploratory. The page states each planned result as "rules
 out a gain larger than X" using the upper bound, with a smallest effect of interest fixed before any
-result (see "Decisions needed").
+result (0.1 percentage points of capacity for PV, 0.01 for the clearness index).
 
 Every other number is exploratory: each rung against G0, each rung against the one below it, the
 drop-one-group runs, the per-farm numbers, and the regime and season splits. The page labels them so
@@ -276,7 +275,12 @@ reviews, because the page will carry numbers.
    little signal, so the study wants as much data as it can get.
 2. **CAMS target:** the clearness index, with W m⁻² reported beside it.
 3. **Aerosol:** include CAMS EAC4 aerosol optical depth as the eleventh rung (G10).
-4. **GitHub issue:** a `Spike` issue under the studies epic, with the full plan as its body, created
+4. **MARS-only variables:** keep all 12. The study's purpose includes telling the team whether
+   fetching them from MARS is worth the effort.
+5. **Smallest effect of interest:** 0.1 percentage points of capacity on the PV target, and 0.01 on
+   the clearness index on the CAMS target.
+6. **Daylight threshold:** top-of-atmosphere horizontal flux above 50 W m⁻².
+7. **GitHub issue:** a `Spike` issue under the studies epic, with the full plan as its body, created
    after the maintainer signs off and the plan has had its two agentic reviews.
 
 ## Review 1 (simplicity) triage
@@ -296,18 +300,9 @@ Rejected, with the reason:
   a plain input in G5. The derived DNI, DHI, and plane-of-array features are cut under the derived-
   feature item above.
 
-Left for the maintainer to decide: **cut the 12 MARS-only variables** (`ssrdc`, `cdir`, `tclw`, `tciw`,
-`tcslw`, `cbh`, `tcrw`, `tcsw`, `tco3`, `uvb`, `fal`, `deg0l`), which removes G4 and shortens the CDS
-queue by about 13 hours? The reviewer recommends the cut because the study's aim is IFS features.
-The maintainer's request named `tclw`, `tciw`, `tcslw`, and `cbh` as variables to try.
-
-## Decisions needed from the maintainer
-
-1. **Cut the 12 MARS-only variables?** (see the review 1 triage above.)
-2. **Smallest effect of interest** for the planned contrasts. Proposal: 0.1 percentage points of
-   capacity on the PV target, and 0.01 on the clearness index on the CAMS target. The past-weather
-   solar page's contrasts between products are mostly larger than this.
-3. **Daylight threshold.** Proposal: top-of-atmosphere horizontal flux above 50 W m⁻².
+Decided by the maintainer: **keep the 12 MARS-only variables.** The study exists to tell the team whether
+the effort of fetching these variables from MARS is worth it, so cutting them would remove the
+answer.
 
 ## Review 2 (correctness and testability) triage
 
