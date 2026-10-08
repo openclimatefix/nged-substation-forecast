@@ -502,6 +502,55 @@ which case C2 fails and the page reports coverage instead of intervals. Whether 
 reader that is not installed. The compute budget rests on an orthant probability costing a few
 milliseconds, which the first timed sum must confirm.
 
+## Plan changes after the positive control failed
+
+**The positive control failed, and the failed result stays in the report and on the page as a
+labelled finding.** On the S6 calendar replica at a 40% share with an off-grid truth, the posterior
+median power was 10 to 19% below the truth in every block, and the 90% intervals were about plus or
+minus 3% wide, so none held the truth. The residual's autocorrelation was 0.6 even after the
+first-order filter, so the likelihood treated roughly 4,400 correlated half-hours as independent. The
+single-factor table showed a cap of 2 cycles a day costing 21% of the power and a usable duration
+off the grid costing 6%. The changes below are made in this order. Where they conflict with an
+earlier section of this plan, this section governs.
+
+1. **Temper the likelihood.** The scored sum's own residual after the autoregressive filter (the
+   innovations) has its autocorrelations `rho_k` computed for lags 1 to 336 (one week). The
+   integrated autocorrelation time is `tau = 1 + 2 * sum_k (1 - k / 337) * rho_k` (Bartlett weights),
+   floored at 1, and the effective sample size is the number of equations divided by `tau`. The
+   likelihood is raised to the power `1 / tau`, which is the same as dividing the noise variance by
+   `1 / tau` in every evidence and posterior formula. The factor is re-estimated at each of the
+   noise iterations from that iteration's residual. A daily-repeating residual therefore widens
+   every interval and flattens the Bayes factor. The window of 336 lags and the Bartlett weights are
+   fixed here and are not tuned.
+2. **The cycle cap is a grid dimension of the merchant class.** The merchant template takes a cap of
+   1 or 2 cycles a day, with prior probability one half each, so the combination grid doubles from
+   864 to 1,728 and the candidate columns rise from 144 to 168. The cap of the Agile price taker in
+   the domestic class stays the setting's cap. The second setting no longer differs in the merchant
+   cap; it differs in the state-of-charge limits, the doubled duration priors, and the wider
+   efficiency prior. Merchant durations rise to 8 grid values only if the timed budget allows, and
+   the first cut in the cut order still applies.
+3. **The baseline is monthly.** `baseline_design(flexibility="monthly")` replaces `"daily"`, giving
+   one projection per block (the 3 months inside a block each get their own daily profile, and the
+   all-zero columns of the other 9 months are dropped). The page says the baseline already absorbs
+   a battery's mean daily shape in each month, so only the day-to-day variation of the signal
+   identifies a battery.
+4. **The three public D series are replaced.** D1 to D3 are plus-or-minus megawatt series with a
+   median of 0, which is not demand. The demand-like halves are S1 to S3, S5 to S8, BSP2, and GSP1
+   (9 series, labelled as in `report_inputs.md`). BSP1 is excluded because it is the bulk supply
+   point holding NGED battery A, and S4 and GSP2 are excluded as net exporters with large gaps.
+   Rung 1 becomes 9 series x 4 blocks x 3 durations x 7 shares = 756 sums plus 36 blocks with no
+   added battery; rung 2 is 252 sums; rung 3 is 3,312 sums. Contrast C1 counts 36 blocks (9 series,
+   4 blocks each) and builds each threshold from the other 8 series.
+5. **Pass rule for the re-run, fixed before it.** Tuning may use S6 September to November and S2 (all
+   blocks) only. The scored blocks are S6 December to February, March to May, and June to August,
+   in the standard setting with the off-grid truth. The control passes if, in at least 2 of the 3
+   scored blocks, the 90% interval for the merchant power holds the true power and the 90%
+   interval for the merchant energy holds the true usable energy, and, with the on-grid truth in
+   all 3 scored blocks, both posterior medians lie within 1% of the truth. The sensitivity setting
+   is reported and does not enter the pass rule. If the control still fails, the study stops and
+   the report is the finding. If it passes only loosely, the study is reframed as "identifiable to
+   plus or minus X% given the template family".
+
 ## Open questions for the maintainer
 
 None. The maintainer has settled the priors, the per-primary publication, the size range, the MVA
