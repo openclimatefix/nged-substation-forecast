@@ -550,8 +550,17 @@ def neighbour_statistics(
         Columns `time`, `neighbour_mean_fraction` (the mean of each notification as a fraction of
         its own battery's p99), `neighbour_mean_fraction_previous` (the same mean at the half-hour
         before), and `neighbour_discharging_share` (the share of neighbours with a notification
-        above zero), sorted by time.
+        above zero), sorted by time. No neighbours gives an empty frame.
     """
+    if not neighbours:
+        return pl.DataFrame(
+            schema={
+                "time": fpn.schema["time"],
+                "neighbour_mean_fraction": pl.Float64,
+                "neighbour_mean_fraction_previous": pl.Float64,
+                "neighbour_discharging_share": pl.Float64,
+            }
+        )
     scaled = (
         fpn.filter(pl.col("bmu_id").is_in(list(neighbours)))
         .filter(pl.col("fpn_mw").is_not_null())

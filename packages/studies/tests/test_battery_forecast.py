@@ -510,3 +510,17 @@ def test_a_notification_for_a_later_half_hour_never_enters_an_earlier_row() -> N
 
     assert first.head(2).equals(second.head(2))
     assert not first.equals(second)
+
+
+def test_no_neighbours_give_an_empty_frame_with_the_same_columns() -> None:
+    fpn = _fpn([(0, "x", 10.0)])
+
+    result = neighbour_statistics(fpn=fpn, neighbours=[], p99_mw={})
+
+    assert result.height == 0
+    assert result.columns == [
+        "time",
+        "neighbour_mean_fraction",
+        "neighbour_mean_fraction_previous",
+        "neighbour_discharging_share",
+    ]
