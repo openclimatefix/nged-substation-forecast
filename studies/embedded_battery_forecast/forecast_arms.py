@@ -21,16 +21,16 @@ from studies.battery_forecast import IssueType, issue_time_for, persistence_sour
 SENSITIVITY_ARMS: Final[dict[str, tuple[str, ...]]] = {
     "DA-early": ("price_model", "price_shuffled"),
     "DA-late": ("price_actual", "price_shuffled"),
-    "ID-1h": ("no_neighbour", "neighbour_fpn", "neighbour_fpn_shuffled"),
+    "ID-1h": ("neighbour_fpn", "neighbour_fpn_shuffled"),
 }
 """The recipes refitted at the second setting, for a testbed battery: the arms of the planned
-contrasts D1 to D4 (D1 and D2 at `DA-late`, D3 at `DA-early`, D4 at `ID-1h`) and, for D4's
-false-alarm rule, `no_neighbour`."""
+contrasts D1 to D4: D1 and D2 at `DA-late`, D3 at `DA-early`, and D4 at `ID-1h`. D4's
+false-alarm rule reads the primary setting only."""
 
 NGED_BATTERY_A_SENSITIVITY_ARMS: Final[dict[str, tuple[str, ...]]] = {
     "DA-early": ("price_model", "price_shuffled"),
     "DA-late": ("price_actual", "price_shuffled"),
-    "ID-1h": ("no_neighbour", "fleet_fpn", "fleet_fpn_shuffled"),
+    "ID-1h": ("fleet_fpn", "fleet_fpn_shuffled"),
 }
 """The same for NGED battery A, which runs the fleet arms at gate closure."""
 
