@@ -8,22 +8,21 @@ read as pure PV, and a grid position read as degrees.
 import collate
 import polars as pl
 import pytest
+from studies.name_matching import best_match, normalise
 
 PV = "PV Array (Photo Voltaic/solar)"
 
 
 def test_a_spelling_without_a_space_still_matches() -> None:
-    assert collate.best_match(
-        site_name="Beechgreen Energy Farm", candidates={"a": "Beechgreen Energyfarm"}
-    )
+    assert best_match(site_name="Beechgreen Energy Farm", candidates={"a": "Beechgreen Energyfarm"})
 
 
 def test_a_different_farm_with_a_similar_name_does_not_match() -> None:
-    assert collate.best_match(site_name="Beechgreen", candidates={"a": "Beechgrove"}) is None
+    assert best_match(site_name="Beechgreen", candidates={"a": "Beechgrove"}) is None
 
 
 def test_the_best_of_several_candidates_wins() -> None:
-    match = collate.best_match(
+    match = best_match(
         site_name="Larks Green Solar", candidates={"a": "Larks Green Solar Farm", "b": "Larkfield"}
     )
     assert match is not None
@@ -31,7 +30,7 @@ def test_the_best_of_several_candidates_wins() -> None:
 
 
 def test_a_name_made_only_of_generic_words_matches_nothing() -> None:
-    assert collate.best_match(site_name="Solar Farm", candidates={"a": "Solar Farm"}) is None
+    assert best_match(site_name="Solar Farm", candidates={"a": "Solar Farm"}) is None
 
 
 def test_pv_with_storage_is_a_hybrid() -> None:
@@ -133,16 +132,12 @@ def test_storage_evidence_is_graded_from_the_strongest_first() -> None:
 
 
 def test_a_near_spelling_at_0_95_matches_and_the_score_is_rounded() -> None:
-    match = collate.best_match(
-        site_name="Longfield Solar", candidates={"k": "Long Field 2 Solar Farm"}
-    )
+    match = best_match(site_name="Longfield Solar", candidates={"k": "Long Field 2 Solar Farm"})
     assert match == ("k", 0.95)
 
 
 def test_a_tie_goes_to_the_key_that_sorts_first() -> None:
-    match = collate.best_match(
-        site_name="Larks Green", candidates={"b": "Larks Green", "a": "Larks Green"}
-    )
+    match = best_match(site_name="Larks Green", candidates={"b": "Larks Green", "a": "Larks Green"})
     assert match == ("a", 1.0)
 
 
@@ -156,7 +151,7 @@ def test_a_tie_goes_to_the_key_that_sorts_first() -> None:
     ],
 )
 def test_normalise_on_literal_names(name: str, expected: str) -> None:
-    assert collate.normalise(name) == expected
+    assert normalise(name) == expected
 
 
 def test_pv_with_reactive_compensation_is_pure_pv() -> None:
