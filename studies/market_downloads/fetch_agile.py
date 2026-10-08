@@ -27,7 +27,7 @@ from typing import Final
 
 import polars as pl
 import requests
-from studies.sources import MARKET_DOWNLOADS_DIR
+from studies.sources import AGILE_EAST_MIDLANDS_DIR
 
 API_ROOT: Final[str] = "https://api.octopus.energy/v1"
 GUIDE_PAGE: Final[str] = "https://developer.octopus.energy/rest/guides/api-basics/"
@@ -37,7 +37,7 @@ WINDOW_START: Final[datetime] = datetime(2025, 8, 31, tzinfo=UTC)
 WINDOW_END: Final[datetime] = datetime(2026, 9, 2, tzinfo=UTC)
 """The study year (September 2025 to August 2026) plus a day either side, so that every Agile
 delivery day (23:00 to 23:00 local time) that touches the year is whole."""
-OUTPUT_DIR: Final[Path] = MARKET_DOWNLOADS_DIR / "octopus_agile_east_midlands"
+OUTPUT_DIR: Final[Path] = AGILE_EAST_MIDLANDS_DIR
 PAGE_SIZE: Final[int] = 1500
 """Octopus's maximum page size; a 31-day month holds 1,488 half-hours, so a month is one page."""
 PAUSE_SECONDS: Final[float] = 0.3

@@ -743,6 +743,12 @@ NGED_BATTERY_A_FIGURES_DIR: Final[Path] = BATTERY_PV_SEPARATION_DIR / "nged_batt
 MARKET_DOWNLOADS_DIR: Final[Path] = DOWNLOADS_DIR / "market"
 """Public GB electricity-market downloads: day-ahead and system prices, the EPEX index, carbon."""
 
+AGILE_EAST_MIDLANDS_DIR: Final[Path] = MARKET_DOWNLOADS_DIR / "octopus_agile_east_midlands"
+"""Octopus Agile half-hourly import prices for the East Midlands region."""
+
+UNMETERED_BATTERY_CAPACITY_DIR: Final[Path] = study_dir_for(study="unmetered_battery_capacity")
+"""The unmetered-battery-capacity study: inputs, templates, fits, and reports."""
+
 NFC_STUDY_DIR: Final[Path] = study_dir_for(study="nwp_forecast_comparison")
 """The folder of the NWP forecast comparison, one subfolder per batch of fits."""
 

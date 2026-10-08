@@ -225,18 +225,21 @@ def test_pruning_changes_the_log_bayes_factor_by_less_than_the_margin_allows(
     target = 10.0 - 2.0 * templates[:, 3] + rng.standard_normal(n_days * 48)
     free = np.ones((len(target), 1))
     grid = ComboGrid(combos=np.arange(6)[:, None], log_prior=np.full(6, np.log(1 / 6)), axes=(6,))
-    kwargs = {
-        "free": free,
-        "candidates": -templates,
-        "target": target,
-        "valid": np.ones(len(target), bool),
-        "grid": grid,
-        "power_prior_scale": 4.0,
-    }
 
-    pruned = fit_aggregate(**kwargs, rng=np.random.default_rng(3))
+    def fit() -> template_posterior.SumPosterior:
+        return fit_aggregate(
+            free=free,
+            candidates=-templates,
+            target=target,
+            valid=np.ones(len(target), bool),
+            grid=grid,
+            power_prior_scale=4.0,
+            rng=np.random.default_rng(3),
+        )
+
+    pruned = fit()
     monkeypatch.setattr(template_posterior, "PRUNE_LOG_MARGIN", 1e9)
-    full = fit_aggregate(**kwargs, rng=np.random.default_rng(3))
+    full = fit()
 
     assert pruned.evaluation.pruned.sum() > 0
     assert full.evaluation.pruned.sum() == 0
