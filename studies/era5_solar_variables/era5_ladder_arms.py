@@ -134,7 +134,7 @@ ARM_LABELS: Final[dict[str, str]] = {
     NEGATIVE_CONTROL_ARM: "Negative control",
     POSITIVE_CONTROL_ARM: "Positive control (+ CAMS)",
     KNOWN_ANSWER_ARM: "ssrd and sun only",
-    **{f"{DROP_PREFIX}{rung}": f"G9 without {rung.upper()}" for rung in RUNGS[1:]},
+    **{f"{DROP_PREFIX}{rung}": f"G9 without {rung.upper()}'s additions" for rung in RUNGS[1:]},
 }
 """The words each arm carries on a chart and in the report."""
 

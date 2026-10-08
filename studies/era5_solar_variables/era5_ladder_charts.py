@@ -339,7 +339,7 @@ def figure_1_headline(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMix
     return figure(
         panels=panels,
         number=1,
-        title="Change in error from adding ERA5 variables to the minimal set, planned contrasts",
+        title="Change in error from adding ERA5 variables, the eight planned contrasts",
         subtitle=[
             scope,
             "Dot: estimate. Thin line: 95% interval from resampling whole months.",
@@ -546,7 +546,7 @@ def figure_drop_one(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
             continue
         rows = selected.select(
             label=pl.col("treatment").str.replace(DROP_PREFIX, "").str.to_uppercase()
-            + pl.lit(" removed"),
+            + pl.lit("'s additions removed"),
             value=pl.col("difference") * scale,
             lower=pl.col("lower_95") * scale,
             upper=pl.col("upper_95") * scale,
@@ -577,13 +577,17 @@ def figure_drop_one(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
     )
 
 
-def choose_days(*, dataset: pl.DataFrame, site: str, exclude: Sequence[date] = ()) -> pl.DataFrame:
+def choose_days(
+    *, dataset: pl.DataFrame, site: str, exclude: Sequence[date] = (), log_site: bool = True
+) -> pl.DataFrame:
     """Choose the clearest, most variable, and dullest day on one farm by the stated rule.
 
     Args:
         dataset: The kept rows.
         site: The farm.
         exclude: Dates that may not be chosen.
+        log_site: Whether the log names the farm. The weather figures leave it out, because a page
+            that named the farm beside public weather would let a reader place the farm.
 
     Returns:
         One row per chosen day with `day_label`, `site`, and `date`.
@@ -606,7 +610,11 @@ def choose_days(*, dataset: pl.DataFrame, site: str, exclude: Sequence[date] = (
         ("Dullest day", daily.sort("mean_index").row(0, named=True)),
     ]
     for label, row in chosen:
-        _LOG.info("%s: farm %s, %s", label, site, row["date"].strftime("%B %Y"))
+        month = row["date"].strftime("%B %Y")
+        if log_site:
+            _LOG.info("%s: farm %s, %s", label, site, month)
+        else:
+            _LOG.info("%s: %s", label, month)
     return pl.DataFrame(
         {
             "day_label": [label for label, _ in chosen],
@@ -895,6 +903,7 @@ def figure_6_cloud_water(*, dataset: pl.DataFrame, scope: str) -> alt.TopLevelMi
                 "water:Q",
                 title="ERA5 cloud liquid plus ice water (kg m⁻²)",
                 scale=alt.Scale(type="symlog", constant=0.01),
+                axis=alt.Axis(values=[0, 0.01, 0.03, 0.1, 0.3, 1]),
             ),
             y=alt.Y("mean_index:Q", title="CAMS clearness index"),
             color=alt.Color(
@@ -1081,7 +1090,9 @@ def figure_11_hour_and_worst_days(
             alt.Chart(rows)
             .mark_line(point=True, strokeWidth=1.5, aria=False)
             .encode(  # ty: ignore[unresolved-attribute]
-                x=alt.X("hour:Q", title="Hour of day (UTC)"),
+                x=alt.X(
+                    "hour:Q", title="Hour of day (UTC)", axis=alt.Axis(format="d", tickMinStep=1)
+                ),
                 y=alt.Y("value:Q", title=f"Mean absolute error ({_error_unit(target=target)})"),
                 color=alt.Color("treatment:N", scale=arm_scale, legend=legend),
             )
@@ -1161,7 +1172,9 @@ def main() -> int:
         f"{first.strftime('%B %Y')} to {last.strftime('%B %Y')}."  # ty: ignore[unresolved-attribute]
     )
 
-    weather_days = choose_days(dataset=dataset, site=min(dataset["site"].unique().to_list()))
+    weather_days = choose_days(
+        dataset=dataset, site=min(dataset["site"].unique().to_list()), log_site=False
+    )
     farm_days = pl.concat(
         choose_days(dataset=dataset, site=site, exclude=weather_days["date"].to_list())
         for site in sorted(dataset["site"].unique().to_list())

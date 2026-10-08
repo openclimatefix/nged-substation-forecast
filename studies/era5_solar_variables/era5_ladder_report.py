@@ -69,7 +69,6 @@ from studies.bootstrap import (
     bootstrap_absolute,
     bootstrap_difference,
     bootstrap_difference_at_level,
-    combine_setting_verdicts,
 )
 from studies.correlation import pooled_correlation_interval
 from studies.era5_ladder import (
@@ -100,10 +99,44 @@ SPLIT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (("g1", "g0"), ("g2", "g0"
 
 NO_GAIN_BEYOND_EFFECT: Final[str] = "rules out a gain larger than the smallest effect"
 GAIN_NOT_EXCLUDED: Final[str] = "does not rule out a gain larger than the smallest effect"
-IMPROVES: Final[str] = "improves"
+IMPROVES: Final[str] = "improves; a gain larger than the smallest effect is not ruled out"
 IMPROVES_BY_LESS_THAN_EFFECT: Final[str] = "improves, by less than the smallest effect"
 WORSENS: Final[str] = "worsens"
 UNRESOLVED: Final[str] = "unresolved"
+
+RULES_OUT_LARGE_GAIN: Final[frozenset[str]] = frozenset(
+    {NO_GAIN_BEYOND_EFFECT, IMPROVES_BY_LESS_THAN_EFFECT, WORSENS}
+)
+"""The verdicts that each rule out a gain larger than the smallest effect."""
+
+LARGE_GAIN_POSSIBLE: Final[frozenset[str]] = frozenset({IMPROVES, GAIN_NOT_EXCLUDED})
+"""The verdicts that each leave a gain larger than the smallest effect possible."""
+
+
+def combine_planned(*, primary: str, sensitivity: str) -> str:
+    """Combine a planned contrast's verdicts at the two settings into one.
+
+    The plan's question is whether a gain larger than the smallest effect is ruled out, so two
+    settings that both rule it out agree even where one says `improves, by less than the smallest
+    effect` and the other says `rules out a gain larger than the smallest effect`.
+
+    Args:
+        primary: The verdict at the primary setting.
+        sensitivity: The verdict at the second setting.
+
+    Returns:
+        The shared verdict if the two are equal. Otherwise `rules out a gain larger than the
+        smallest effect` if both rule it out, `does not rule out a gain larger than the smallest
+        effect` if both leave it possible, and `unresolved` if they disagree on that.
+    """
+    if primary == sensitivity:
+        return primary
+    pair = {primary, sensitivity}
+    if pair <= RULES_OUT_LARGE_GAIN:
+        return NO_GAIN_BEYOND_EFFECT
+    if pair <= LARGE_GAIN_POSSIBLE:
+        return GAIN_NOT_EXCLUDED
+    return UNRESOLVED
 
 
 def contrast_verdict(*, lower: float, upper: float, smallest_effect: float) -> str:
@@ -482,10 +515,8 @@ def planned_verdicts(*, contrasts: pl.DataFrame) -> pl.DataFrame:
         if second is None:
             msg = f"planned contrast {label} on the {target} target has no sensitivity-setting run"
             raise ValueError(msg)
-        combined = combine_setting_verdicts(
-            primary=primary["verdict_adjusted"],
-            sensitivity=second["verdict_adjusted"],
-            unresolved=UNRESOLVED,
+        combined = combine_planned(
+            primary=primary["verdict_adjusted"], sensitivity=second["verdict_adjusted"]
         )
         rows.append(
             {
@@ -820,7 +851,9 @@ def render_report(
         parts.append("")
     near = near_line_without_second_setting(contrasts=contrasts)
     if not near.is_empty():
-        arms_to_add = sorted({*near["treatment"].to_list(), *near["reference"].to_list()})
+        second = contrasts.filter(pl.col("setting") == SENSITIVITY_SETTING)
+        already = {*second["treatment"].to_list(), *second["reference"].to_list()}
+        arms_to_add = sorted({*near["treatment"].to_list(), *near["reference"].to_list()} - already)
         parts += [
             "## Exploratory contrasts near the 5% line with no second-setting run",
             "",
@@ -830,7 +863,8 @@ def render_report(
             ),
             "",
             (
-                "Fit the second setting with `era5_ladder_fit.py --view extra_sensitivity "
+                f"Fit the second setting with `era5_ladder_fit.py --variant {variant} "
+                f"--through-rung {through_rung} --view extra_sensitivity "
                 f"--sensitivity-arms {' '.join(arms_to_add)}`, then re-run the report."
             ),
             "",

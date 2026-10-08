@@ -342,6 +342,12 @@ def run_ladder_view(
         _LOG.info("%s target: wrote %d loss rows", target, losses.height)
 
 
+def _other_target_arms(*, target: TargetType, through_rung: RungType) -> list[str]:
+    """Return the other target's arms, so that a name valid for either target is known."""
+    other: TargetType = "cams" if target == "pv" else "pv"
+    return list(arm_features(target=other, through_rung=through_rung))
+
+
 def run_extra_sensitivity_view(
     *,
     frame: pl.DataFrame,
@@ -362,12 +368,32 @@ def run_extra_sensitivity_view(
         max_workers: How many (arm, farm) fits run at once.
     """
     for target in TARGETS:
-        arms = {
-            name: features
-            for name, features in arm_features(target=target, through_rung=through_rung).items()
-            if name in arm_names
-        }
+        known = arm_features(target=target, through_rung=through_rung)
+        unknown = sorted(
+            set(arm_names)
+            - set(known)
+            - set(_other_target_arms(target=target, through_rung=through_rung))
+        )
+        if unknown:
+            msg = f"unknown arms {unknown}; the arms are {sorted(known)}"
+            raise ValueError(msg)
+        arms = {name: features for name, features in known.items() if name in arm_names}
         key = FitKey(variant=variant, through_rung=through_rung, target=target, view="ladder_extra")
+        ladder_key = key._replace(view="ladder")
+        fitted = set(
+            pl.scan_parquet(results_path(key=ladder_key))
+            .filter(pl.col("setting") == SENSITIVITY_SETTING)
+            .select("arm")
+            .unique()
+            .collect()["arm"]
+            .to_list()
+        )
+        repeated = sorted(fitted & set(arms))
+        if repeated:
+            msg = (
+                f"{repeated} already have the sensitivity setting in {results_path(key=ladder_key)}"
+            )
+            raise ValueError(msg)
         refuse_to_overwrite(paths=[results_path(key=key), arms_path(key=key)])
         losses = fit_one_view(
             frame=frame,
@@ -460,7 +486,13 @@ def main() -> int:
         if absent:
             msg = f"the frame lacks {absent}; rebuild it once eac4_aod.parquet exists"
             raise ValueError(msg)
+    if arguments.view in ("aerosol", "both") and arguments.variant != "main":
+        msg = "the aerosol view is fitted on the main rows only"
+        raise ValueError(msg)
     if arguments.view == "extra_sensitivity":
+        if arguments.arms is not None:
+            msg = "--arms does not apply to the extra_sensitivity view; use --sensitivity-arms"
+            raise ValueError(msg)
         run_extra_sensitivity_view(
             frame=frame,
             variant=arguments.variant,
