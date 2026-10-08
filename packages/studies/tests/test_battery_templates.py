@@ -6,7 +6,9 @@ import polars as pl
 import pytest
 from studies.battery_templates import (
     TARIFF_WINDOWS,
+    DomesticTariffNameType,
     FleetSpec,
+    TariffNameType,
     agile_template,
     charge_only_template,
     domestic_template,
@@ -42,7 +44,7 @@ SEPTEMBER = datetime(2025, 9, 1, tzinfo=UTC)  # UK clock is UTC + 1 hour
 
 @pytest.mark.parametrize("name", ["intelligent_octopus_go", "octopus_go", "octopus_flux"])
 def test_a_window_template_starts_charging_exactly_at_the_windows_first_half_hour(
-    name: str,
+    name: TariffNameType,
 ) -> None:
     grid = _grid(start=DECEMBER, days=10)
     window = TARIFF_WINDOWS[name]
@@ -78,7 +80,7 @@ def test_a_window_template_follows_the_uk_clock_through_daylight_saving() -> Non
 @pytest.mark.parametrize("name", ["intelligent_octopus_go", "octopus_go", "octopus_flux"])
 @pytest.mark.parametrize("duration_hours", [0.8, 2.0, 6.0])
 def test_a_window_template_discharges_its_charged_energy_times_the_round_trip_efficiency(
-    name: str, duration_hours: float
+    name: TariffNameType, duration_hours: float
 ) -> None:
     grid = _grid(start=DECEMBER, days=12)
     template = window_template(
@@ -235,7 +237,12 @@ def test_an_agile_day_with_a_missing_price_has_a_zero_schedule() -> None:
     assert template[48 * 3 : 48 * 4].any()
 
 
-_SHARES = {"intelligent_octopus_go": 0.4, "octopus_go": 0.3, "octopus_flux": 0.1, "agile": 0.2}
+_SHARES: dict[DomesticTariffNameType, float] = {
+    "intelligent_octopus_go": 0.4,
+    "octopus_go": 0.3,
+    "octopus_flux": 0.1,
+    "agile": 0.2,
+}
 
 
 def test_a_fleets_output_is_the_sum_of_its_homes_outputs() -> None:
