@@ -209,6 +209,7 @@ Each of the five contrasts below is run on both targets, so there are ten planne
    variables (see Targets).
 
 **The decision rule for the MARS fetch is fixed before any result.** The adjusted interval of P4 on
+
 the PV target, at both hyperparameter settings, decides:
 - If the whole interval of the error difference lies below minus the smallest effect of interest, a
   limited MARS pilot (matched-lead IFS forecasts of the variables that carry the gain) is
@@ -216,6 +217,7 @@ the PV target, at both hyperparameter settings, decides:
 - If the interval lies wholly above minus the smallest effect of interest, a gain as large as the
   smallest effect is ruled out, and the page recommends against the fetch.
 - Otherwise the result is unresolved, and the page says what a larger sample would need.
+
 The availability lists above (free feed, Open-Meteo, MARS-only) are re-verified against a recent
 run before the page assigns a variable to a class.
 
