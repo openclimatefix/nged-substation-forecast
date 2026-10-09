@@ -600,7 +600,8 @@ grid. What follows records what was built, so that a reader can tell it from the
    of the model minus the evidence of no battery.
 4. **Compute.** One block of rung 1 (594 fits) takes 4 minutes on the RTX A6000, against 4.4 hours
    on 4 workers for the grid estimator's planned rungs 1 to 3. A fused Triton kernel runs the
-   recurrence, because the Python loop over 4,400 half-hours cost 3 seconds per step of the fit.
+   recurrence, because the Python loop over 4,400 half-hours cost 3 seconds per forward and backward pass,
+   and the kernel costs 3 milliseconds.
 5. **Changes to the rungs.**
     - Rung 1 is unchanged. Its 36 blocks with no added battery are its first lane, and the
       thresholds are computed from them in `capacity_report.py` (there is no separate nulls
