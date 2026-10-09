@@ -36,12 +36,18 @@ PRIOR_SCALE_OVER_P99: Final[float] = 0.2
 
 
 def with_season(*, frame: pl.DataFrame) -> pl.DataFrame:
-    """Add `season`: Jun-Aug (where the nulls' false alarms cluster) or Sep-May."""
+    """Add `season`: Jun-Aug or Sep-May."""
     return frame.with_columns(
         season=pl.when(pl.col("block") == SUMMER_BLOCK)
         .then(pl.lit("Jun-Aug"))
         .otherwise(pl.lit("Sep-May"))
     )
+
+
+def flagged_null_series(*, nulls: pl.DataFrame, limits: dict[str, float]) -> tuple[str, ...]:
+    """Return the series that have a flagged null block, sorted."""
+    flagged = flag(frame=nulls, threshold=limits, default=np.nan).filter(pl.col("flagged"))
+    return tuple(sorted(flagged["series"].unique().to_list()))
 
 
 def default_threshold(*, limits: dict[str, float]) -> float:
@@ -323,20 +329,45 @@ def detection_curve_section(
     families: dict[str, pl.DataFrame],
     steps: pl.DataFrame,
     limits: dict[str, float],
+    nulls: pl.DataFrame,
 ) -> list[str]:
-    """Detection rate against battery power over the noise unit `sigma_step`."""
+    """Detection rate against battery power over the noise unit `sigma_step`.
+
+    Args:
+        families: The rows of each battery family, with the family's name as the key.
+        steps: Rung 1's step-tail table, which holds the noise unit.
+        limits: Each series' detection threshold.
+        nulls: Rung 1's rows with no added battery, from which the thresholds of the variant
+            without the series that false-alarm are rebuilt.
+
+    Returns:
+        The report lines.
+    """
     default = default_threshold(limits=limits)
+    false_alarm_series = flagged_null_series(nulls=nulls, limits=limits)
+    clean_limits = thresholds(nulls=nulls.filter(~pl.col("series").is_in(false_alarm_series)))
+    clean_default = default_threshold(limits=clean_limits)
     sigma = steps.filter(pl.col("share") == 0).select(
         "series", "block", sigma_step_null="sigma_step_mw"
     )
     tables = []
     for name, frame in families.items():
         flagged = flag(frame=frame, threshold=limits, default=default)
-        flagged = with_season(frame=flagged).join(sigma, on=["series", "block"], how="left")
+        clean = flag(frame=frame, threshold=clean_limits, default=clean_default).select(
+            "series", "block", "share", "true_power_mw", clean_flagged="flagged"
+        )
+        flagged = with_season(frame=flagged)
+        flagged = flagged.with_columns(row=pl.int_range(pl.len())).join(
+            clean.with_columns(row=pl.int_range(pl.len())).select("row", "clean_flagged"),
+            on="row",
+        )
+        flagged = flagged.join(sigma, on=["series", "block"], how="left")
         tables.append(
             flagged.with_columns(
                 ratio=pl.col("true_power_mw") / pl.col("sigma_step_null"), family=pl.lit(name)
-            ).select("family", "series", "block", "season", "share", "ratio", "flagged")
+            ).select(
+                "family", "series", "block", "season", "share", "ratio", "flagged", "clean_flagged"
+            )
         )
     everything = pl.concat(tables).filter(pl.col("ratio").is_finite() & (pl.col("ratio") > 0))
     ratios = everything["ratio"].to_numpy()
@@ -356,13 +387,21 @@ def detection_curve_section(
             "block (`sigma_step`), so a primary with a noisier flow needs a bigger battery. Bins "
             "are powers of 2. Rung 1 is the in-family best case, `rank_rule` and `noisy_price` "
             "are simulated batteries outside the family, and rung 3 is real public batteries "
-            "(the registered power is the truth). The second table drops Jun-Aug, where the "
-            "nulls' false alarms cluster."
+            "(the registered power is the truth). The second table drops the series with a "
+            "flagged null block and rebuilds the thresholds from the others; the third drops "
+            "Jun-Aug."
         ),
         "",
     ]
+    clean_name = f"Without {', '.join(false_alarm_series)}"
     for label, frame in (
         ("All blocks", everything),
+        (
+            clean_name,
+            everything.filter(~pl.col("series").is_in(false_alarm_series)).with_columns(
+                flagged=pl.col("clean_flagged")
+            ),
+        ),
         ("Sep-May only", everything.filter(pl.col("season") == "Sep-May")),
     ):
         summary = (
@@ -528,12 +567,8 @@ def tuning_series_section(*, rung1: pl.DataFrame) -> list[str]:
     null blocks are flagged, because a series flagged with no battery adds its false alarms to
     every detection rate.
     """
-    flagged_nulls = flag(
-        frame=rung1.filter(pl.col("share") == 0),
-        threshold=thresholds(nulls=rung1.filter(pl.col("share") == 0)),
-        default=np.nan,
-    ).filter(pl.col("flagged"))
-    false_alarm_series = tuple(sorted(flagged_nulls["series"].unique().to_list()))
+    nulls = rung1.filter(pl.col("share") == 0)
+    false_alarm_series = flagged_null_series(nulls=nulls, limits=thresholds(nulls=nulls))
     lines = [
         "## Rung 1 with series removed (exploratory)",
         "",

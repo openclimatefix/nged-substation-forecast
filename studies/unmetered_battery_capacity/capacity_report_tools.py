@@ -16,7 +16,7 @@ BLOCK_NAMES_BY_INDEX: Final[dict[int, str]] = {
     3: "Jun-Aug",
 }
 SUMMER_BLOCK: Final[int] = 3
-"""The index of the Jun-Aug block, where the nulls raise their false alarms."""
+"""The index of the Jun-Aug block, which the report splits from the other three."""
 
 
 def table(frame: pl.DataFrame) -> str:

@@ -4,9 +4,11 @@ Reads the rungs' saved posteriors (`rung*_posteriors.parquet`), the step tails, 
 estimator's rung 1 posteriors, and the positive control, and writes: the thresholds and false-alarm
 rate (C1), the detection rates, the calibration (C2), the posterior against the step tail (C3), the
 energy against the rule (C4), the fleets (C5), the negative controls, rung 4, the primary screen
-with its within-primary placebo, and the comparison with the grid estimator. Intervals on errors,
-coverages, and rates resample whole demand series and whole batteries (a two-level cluster
-bootstrap, 2,000 resamples); rates also carry Clopper-Pearson intervals.
+with its within-primary placebo, and the comparison with the grid estimator. Intervals on the mean
+errors of C3, C4, and C5 and on the grid-estimator difference resample whole demand series and
+whole batteries (a two-level cluster bootstrap, 2,000 resamples). Rates and coverages carry
+Clopper-Pearson intervals on sums, which treat the sums as independent although they share series
+and blocks, so they are too narrow.
 
 Run: `uv run python studies/unmetered_battery_capacity/capacity_report.py`
 """
@@ -71,10 +73,7 @@ def c1_section(
             "flagged."
         ),
         "",
-        (
-            "Flags by block (the nulls' false alarms cluster in one block, so a detection rate "
-            "should be read by block):"
-        ),
+        "Flags by block:",
         "",
         table(
             nulls.with_columns(block_name=pl.col("block").replace_strict(BLOCK_NAMES_BY_INDEX))
@@ -98,6 +97,13 @@ def c1_section(
             + "."
         ),
         "",
+        "Flags by series:",
+        "",
+        table(
+            nulls.group_by("series")
+            .agg(flagged=pl.col("flagged").sum(), blocks=pl.len())
+            .sort("series")
+        ),
         "Thresholds (the 95th percentile of the other 8 series' null log Bayes factors):",
         "",
         table(
@@ -116,7 +122,7 @@ def c1_section(
 
 
 def season(*, frame: pl.DataFrame) -> pl.DataFrame:
-    """Add a `season` column: Jun-Aug (where the nulls' false alarms cluster) or Sep-May."""
+    """Add a `season` column: Jun-Aug or Sep-May."""
     return frame.with_columns(
         season=pl.when(pl.col("block") == SUMMER_BLOCK)
         .then(pl.lit("Jun-Aug"))
@@ -134,8 +140,10 @@ def detection_section(
         f"## Detection rates at the nominal 5% false-alarm threshold (exploratory){heading_suffix}",
         "",
         (
-            "The threshold's realised false-alarm rate is in the C1 section, and the nulls' false "
-            "alarms fall in Jun-Aug, so every table is also split into Jun-Aug and Sep-May."
+            "The threshold's realised false-alarm rate is in the C1 section. A series whose null "
+            "blocks are flagged adds its false alarms to every rate, including the rates at the "
+            "smallest shares, so the tables of rung 1 without that series follow in the section "
+            "on series removed. Every table is also split into Jun-Aug and Sep-May."
         ),
         "",
     ]
@@ -531,7 +539,7 @@ def rung3_section(
         ),
         f"The median log Bayes factor with no battery is {null_bf:.2f}.",
         "",
-        "Flags at the nominal 5% threshold, by share and season (Jun-Aug is where the nulls flag):",
+        "Flags at the nominal 5% threshold, by share and season:",
         "",
         table(flags_by_season.sort("share", "season")),
         "The same rates with Clopper-Pearson intervals (sums share their series-blocks):",
@@ -836,6 +844,7 @@ def main() -> None:
         },
         steps=steps,
         limits=limits,
+        nulls=rung1.filter(pl.col("share") == 0),
     )
     lines += review.rung1b_section(rung1=rung1, others=outside, limits=limits)
     lines += calibration_section(rung1=rung1, rung2=rung2)
