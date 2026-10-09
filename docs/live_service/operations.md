@@ -280,9 +280,9 @@ and was swallowed so the power write could go ahead, and it also reaches Sentry 
 is derived data that NGED re-delivers, and the power time series is not, so a metadata table fault
 must not stall the ingest until an operator intervenes. The metadata table is left unchanged and the
 next run that finds new files retries it, but *that run's* metadata change is lost, because the
-power rows have landed and `select_new_rows` will not offer those files again. Read the traceback in the run's logs — an off-contract metadata
-table after a schema change and a bug in our own code both land here, and both want a fix rather
-than a re-run.
+power rows have landed and `select_new_rows` will not offer those files again. Read the traceback in
+the run's logs — an off-contract metadata table after a schema change and a bug in our own code both
+land here, and both want a fix rather than a re-run.
 
 The 6-hourly forecasts are unaffected while this persists, however long it persists:
 `live_forecasts` locates each series from the promoted model's own frozen copy of the metadata table
