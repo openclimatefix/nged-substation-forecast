@@ -462,10 +462,10 @@ minutes spent, and whether this runbook covered it. A gap in this page is itself
 a run failing with `NgedFileParseError`.
 
 **The ingest downloads each file in NGED's bucket once.** `power_time_series_and_metadata` keeps a
-downloaded-files list, `downloaded_files.parquet`, beside `metadata.parquet`. The list holds the path
-and `LastModified` of every file in the bucket listing that the previous run processed in full. Each
-run downloads only the files whose path and `LastModified` the list lacks, appends their readings,
-and then writes the whole listing as the new list. A file that NGED rewrites gets a new
+downloaded-files list, `list_of_downloaded_files.parquet`, beside `metadata.parquet`. The list holds
+the path and `LastModified` of every file in the bucket listing that the previous run processed in
+full. Each run downloads only the files whose path and `LastModified` the list lacks, appends their
+readings, and then writes the whole listing as the new list. A file that NGED rewrites gets a new
 `LastModified`, so the ingest downloads it again.
 
 **Run the ingest once by hand on a new deployment.** With no list, the first run downloads every
@@ -486,13 +486,13 @@ run. Moving the `power_time_series` table aside rebuilds the power table the sam
 
 **Delete the list too when you put an older or different `power_time_series` table at its path.**
 The list then records files as loaded whose readings the restored table lacks, and the ingest cannot
-tell. Deleting `downloaded_files.parquet` makes the next run download every file.
+tell. Deleting `list_of_downloaded_files.parquet` makes the next run download every file.
 
 **Force one file to download again by removing its row from the list.** Read
-`downloaded_files.parquet` with `polars.read_parquet`, filter out the row whose `path` is that NGED
-file's key, and write the list back with `write_parquet`. Before appending, the ingest drops every
-reading already in the `power_time_series` table, so a repeat download adds nothing unless NGED
-changed a reading's time.
+`list_of_downloaded_files.parquet` with `polars.read_parquet`, filter out the row whose `path` is
+that NGED file's key, and write the list back with `write_parquet`. Before appending, the ingest
+drops every reading already in the `power_time_series` table, so a repeat download adds nothing
+unless NGED changed a reading's time.
 
 **A `DownloadedFilesError` means the list is damaged, and the ingest stops until you delete the
 list.** The error message, which Sentry shows too, names the list's path. The ingest stops rather

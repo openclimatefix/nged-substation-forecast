@@ -590,10 +590,10 @@ def _power_table_and_metadata(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def _read(
-    downloaded_files_path: Path, power_path: Path, metadata_path: Path
+    list_of_downloaded_files_path: Path, power_path: Path, metadata_path: Path
 ) -> pt.DataFrame[_DownloadedFiles]:
     return read_downloaded_files(
-        downloaded_files_path=str(downloaded_files_path),
+        list_of_downloaded_files_path=str(list_of_downloaded_files_path),
         power_table_path=str(power_path),
         metadata_path=str(metadata_path),
     )
@@ -601,11 +601,13 @@ def _read(
 
 def test_downloaded_files_survive_a_write_and_a_read_with_microseconds(tmp_path: Path):
     power_path, metadata_path = _power_table_and_metadata(tmp_path)
-    downloaded_files_path = tmp_path / "downloaded_files.parquet"
+    list_of_downloaded_files_path = tmp_path / "list_of_downloaded_files.parquet"
     listing = _listing_of([_key(1, 1_774_533_600_000)])
 
-    write_downloaded_files(downloaded_files_path=str(downloaded_files_path), listing=listing)
-    result = _read(downloaded_files_path, power_path, metadata_path)
+    write_downloaded_files(
+        list_of_downloaded_files_path=str(list_of_downloaded_files_path), listing=listing
+    )
+    result = _read(list_of_downloaded_files_path, power_path, metadata_path)
 
     assert result.rows() == [(listing["path"][0], _LAST_MODIFIED)]
     assert select_files_not_yet_downloaded(listing, result).is_empty()
@@ -615,9 +617,11 @@ def test_write_downloaded_files_keeps_the_previous_list_when_the_rename_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     power_path, metadata_path = _power_table_and_metadata(tmp_path)
-    downloaded_files_path = tmp_path / "downloaded_files.parquet"
+    list_of_downloaded_files_path = tmp_path / "list_of_downloaded_files.parquet"
     first = _listing_of([_key(1, 1_774_533_600_000)])
-    write_downloaded_files(downloaded_files_path=str(downloaded_files_path), listing=first)
+    write_downloaded_files(
+        list_of_downloaded_files_path=str(list_of_downloaded_files_path), listing=first
+    )
 
     def fail(self: Path, target: str) -> Path:
         raise OSError("killed before the rename")
@@ -625,12 +629,12 @@ def test_write_downloaded_files_keeps_the_previous_list_when_the_rename_fails(
     monkeypatch.setattr(Path, "replace", fail)
     with pytest.raises(OSError, match="killed"):
         write_downloaded_files(
-            downloaded_files_path=str(downloaded_files_path),
+            list_of_downloaded_files_path=str(list_of_downloaded_files_path),
             listing=_listing_of([_key(2, 1_774_555_200_000)]),
         )
     monkeypatch.undo()
 
-    assert _read(downloaded_files_path, power_path, metadata_path)["path"].to_list() == (
+    assert _read(list_of_downloaded_files_path, power_path, metadata_path)["path"].to_list() == (
         first["path"].to_list()
     )
 
@@ -639,16 +643,16 @@ def test_read_downloaded_files_is_empty_unless_the_list_the_table_and_the_metada
     tmp_path: Path,
 ):
     power_path, metadata_path = _power_table_and_metadata(tmp_path)
-    downloaded_files_path = tmp_path / "downloaded_files.parquet"
+    list_of_downloaded_files_path = tmp_path / "list_of_downloaded_files.parquet"
     write_downloaded_files(
-        downloaded_files_path=str(downloaded_files_path),
+        list_of_downloaded_files_path=str(list_of_downloaded_files_path),
         listing=_listing_of([_key(1, 1_774_533_600_000)]),
     )
-    assert _read(downloaded_files_path, power_path, metadata_path).height == 1
+    assert _read(list_of_downloaded_files_path, power_path, metadata_path).height == 1
 
     missing_list = _read(tmp_path / "absent.parquet", power_path, metadata_path)
-    missing_table = _read(downloaded_files_path, tmp_path / "absent.delta", metadata_path)
-    missing_metadata = _read(downloaded_files_path, power_path, tmp_path / "absent.pq")
+    missing_table = _read(list_of_downloaded_files_path, tmp_path / "absent.delta", metadata_path)
+    missing_metadata = _read(list_of_downloaded_files_path, power_path, tmp_path / "absent.pq")
 
     for result in (missing_list, missing_table, missing_metadata):
         assert result.is_empty()
@@ -657,20 +661,20 @@ def test_read_downloaded_files_is_empty_unless_the_list_the_table_and_the_metada
 
 def test_read_downloaded_files_raises_a_named_error_for_a_corrupt_file(tmp_path: Path):
     power_path, metadata_path = _power_table_and_metadata(tmp_path)
-    downloaded_files_path = tmp_path / "downloaded_files.parquet"
-    downloaded_files_path.write_bytes(b"not a parquet file")
+    list_of_downloaded_files_path = tmp_path / "list_of_downloaded_files.parquet"
+    list_of_downloaded_files_path.write_bytes(b"not a parquet file")
 
     with pytest.raises(DownloadedFilesError, match=r"downloaded_files\.parquet"):
-        _read(downloaded_files_path, power_path, metadata_path)
+        _read(list_of_downloaded_files_path, power_path, metadata_path)
 
 
 def test_read_downloaded_files_raises_a_named_error_for_a_file_off_contract(tmp_path: Path):
     power_path, metadata_path = _power_table_and_metadata(tmp_path)
-    downloaded_files_path = tmp_path / "downloaded_files.parquet"
-    pl.DataFrame({"path": ["a"], "unexpected": [1]}).write_parquet(downloaded_files_path)
+    list_of_downloaded_files_path = tmp_path / "list_of_downloaded_files.parquet"
+    pl.DataFrame({"path": ["a"], "unexpected": [1]}).write_parquet(list_of_downloaded_files_path)
 
     with pytest.raises(DownloadedFilesError, match=r"downloaded_files\.parquet"):
-        _read(downloaded_files_path, power_path, metadata_path)
+        _read(list_of_downloaded_files_path, power_path, metadata_path)
 
 
 def test_read_downloaded_files_does_not_wrap_a_transient_error_from_an_existence_check(
@@ -683,7 +687,7 @@ def test_read_downloaded_files_does_not_wrap_a_transient_error_from_an_existence
 
     with pytest.raises(OSError, match="transient") as excinfo:
         read_downloaded_files(
-            downloaded_files_path=str(tmp_path / "a.parquet"),
+            list_of_downloaded_files_path=str(tmp_path / "a.parquet"),
             power_table_path=str(tmp_path / "p.delta"),
             metadata_path=str(tmp_path / "m.parquet"),
         )
@@ -875,7 +879,7 @@ def test_read_downloaded_files_does_not_wrap_a_polars_error_reading_a_remote_fil
 
     with pytest.raises(pl.exceptions.ComputeError):
         read_downloaded_files(
-            downloaded_files_path="s3://bucket/downloaded_files.parquet",
+            list_of_downloaded_files_path="s3://bucket/list_of_downloaded_files.parquet",
             power_table_path="s3://bucket/power.delta",
             metadata_path="s3://bucket/metadata.parquet",
         )
@@ -895,7 +899,7 @@ def test_read_downloaded_files_passes_the_storage_options_to_the_read(
     monkeypatch.setattr(pl, "read_parquet", read)
 
     read_downloaded_files(
-        downloaded_files_path="s3://bucket/downloaded_files.parquet",
+        list_of_downloaded_files_path="s3://bucket/list_of_downloaded_files.parquet",
         power_table_path="s3://bucket/power.delta",
         metadata_path="s3://bucket/metadata.parquet",
         storage_options={"aws_region": "eu-west-2"},

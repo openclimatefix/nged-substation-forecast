@@ -185,7 +185,7 @@ def _empty_downloaded_files() -> pt.DataFrame[_DownloadedFiles]:
 
 
 def read_downloaded_files(
-    downloaded_files_path: str,
+    list_of_downloaded_files_path: str,
     power_table_path: str,
     metadata_path: str,
     storage_options: ObjectStoreOptions | None = None,
@@ -199,7 +199,7 @@ def read_downloaded_files(
     power table, or the metadata parquet does not exist.
 
     Args:
-        downloaded_files_path: Local path or remote URI of the downloaded-files parquet file.
+        list_of_downloaded_files_path: Local path or remote URI of the list's parquet file.
         power_table_path: Local path or remote URI of the `power_time_series` Delta table.
         metadata_path: Local path or remote URI of the metadata parquet file.
         storage_options: Object-store credentials/endpoint for remote paths; ``None``/empty for
@@ -213,33 +213,36 @@ def read_downloaded_files(
             transient object-store error is not wrapped, so the caller's retry guard can retry it.
     """
     if not (
-        object_exists(downloaded_files_path, storage_options)
+        object_exists(list_of_downloaded_files_path, storage_options)
         and delta_table_exists(power_table_path, storage_options)
         and object_exists(metadata_path, storage_options)
     ):
-        log.info(f"No usable downloaded-files list at {downloaded_files_path}; using an empty one.")
+        log.info(
+            f"No usable downloaded-files list at {list_of_downloaded_files_path};"
+            " using an empty one."
+        )
         return _empty_downloaded_files()
     # A local parquet file can be torn or truncated. An object-store write replaces the object in
     # one request, so a remote file can be off-contract but never torn. A Polars error reading a
     # remote file is therefore a transient object-store error, which the caller's retry guard should
     # retry.
     unreadable_errors: tuple[type[Exception], ...] = (pt.exceptions.DataFrameValidationError,)
-    if not is_remote_uri(downloaded_files_path):
+    if not is_remote_uri(list_of_downloaded_files_path):
         unreadable_errors += (pl.exceptions.PolarsError, OSError)
     try:
         stored = pl.read_parquet(
-            downloaded_files_path, storage_options=typeddict_to_dict(storage_options)
+            list_of_downloaded_files_path, storage_options=typeddict_to_dict(storage_options)
         )
         return pt.DataFrame(_DownloadedFiles.validate(stored)).set_model(_DownloadedFiles)
     except unreadable_errors as exc:
         raise DownloadedFilesError(
-            f"Could not read the downloaded-files list at {downloaded_files_path}. Delete the"
-            " file to download every file in NGED's bucket again."
+            f"Could not read the downloaded-files list at {list_of_downloaded_files_path}."
+            " Delete the file to download every file in NGED's bucket again."
         ) from exc
 
 
 def write_downloaded_files(
-    downloaded_files_path: str,
+    list_of_downloaded_files_path: str,
     listing: pt.DataFrame[_ProcessedFileListing],
     storage_options: ObjectStoreOptions | None = None,
 ) -> None:
@@ -250,7 +253,7 @@ def write_downloaded_files(
     object-store write replaces the object in one request.
 
     Args:
-        downloaded_files_path: Local path or remote URI of the downloaded-files parquet file.
+        list_of_downloaded_files_path: Local path or remote URI of the list's parquet file.
         listing: The whole bucket listing that the run processed.
         storage_options: Object-store credentials/endpoint for a remote path; ``None``/empty for a
             local path.
@@ -259,15 +262,15 @@ def write_downloaded_files(
         listing.select("path", "last_modified").sort("path")
     )
     options = typeddict_to_dict(storage_options)
-    if is_remote_uri(downloaded_files_path):
+    if is_remote_uri(list_of_downloaded_files_path):
         downloaded_files.write_parquet(
-            downloaded_files_path, compression="zstd", storage_options=options
+            list_of_downloaded_files_path, compression="zstd", storage_options=options
         )
         return
-    if_local_path_then_make_parent_dir(downloaded_files_path)
-    temporary_path = f"{downloaded_files_path}.tmp"
+    if_local_path_then_make_parent_dir(list_of_downloaded_files_path)
+    temporary_path = f"{list_of_downloaded_files_path}.tmp"
     downloaded_files.write_parquet(temporary_path, compression="zstd")
-    Path(temporary_path).replace(downloaded_files_path)
+    Path(temporary_path).replace(list_of_downloaded_files_path)
 
 
 def select_files_not_yet_downloaded(

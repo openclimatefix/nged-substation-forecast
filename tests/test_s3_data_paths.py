@@ -267,7 +267,7 @@ def test_downloaded_files_list_round_trip_over_s3(s3_endpoint: str) -> None:
     ``DeltaTable`` client that hangs against moto (see the module docstring).
     """
     settings = _s3_settings(s3_endpoint, "downloaded")
-    uri = settings.downloaded_files_path
+    uri = settings.list_of_downloaded_files_path
     opts = settings.storage_options
     last_modified = datetime(2026, 3, 26, 14, 5, 0, 123456, tzinfo=UTC)
 

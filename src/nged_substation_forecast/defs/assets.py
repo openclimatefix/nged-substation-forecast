@@ -95,14 +95,14 @@ _POWER_INGEST_RETRY_DELAY_SECONDS: Final[int] = 2
 
 def _write_downloaded_files_or_degrade(
     context: AssetExecutionContext,
-    downloaded_files_path: str,
+    list_of_downloaded_files_path: str,
     listing: pt.DataFrame[_ProcessedFileListing],
     storage_options: ObjectStoreOptions | None,
 ) -> None:
     """Write the downloaded-files list, reporting a failure instead of raising it."""
     try:
         write_downloaded_files(
-            downloaded_files_path=downloaded_files_path,
+            list_of_downloaded_files_path=list_of_downloaded_files_path,
             listing=listing,
             storage_options=storage_options,
         )
@@ -110,12 +110,12 @@ def _write_downloaded_files_or_degrade(
         if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
             raise  # A cancelled run must cancel.
         context.log.exception(
-            f"Could not write the downloaded-files list at {downloaded_files_path}"
+            f"Could not write the downloaded-files list at {list_of_downloaded_files_path}"
         )
         # A distinct fingerprint, because this event shares the `degraded_asset` tag with the
         # metadata upsert's, and a message naming the path, so the alert says which file failed.
         reported = RuntimeError(
-            f"Could not write the downloaded-files list at {downloaded_files_path}: {exc!r}"
+            f"Could not write the downloaded-files list at {list_of_downloaded_files_path}: {exc!r}"
         )
         reported.__cause__ = exc
         report_asset_degradation(
@@ -157,7 +157,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     republish them, ``correct_late_timestamps`` must be removed before the next rebuild, or the
     ingest will move readings NGED has already realigned, putting them 30 minutes early.
 
-    WHAT IS DOWNLOADED. The downloaded-files list (``downloaded_files.parquet``, beside the
+    WHAT IS DOWNLOADED. The downloaded-files list (``list_of_downloaded_files.parquet``, beside the
     metadata parquet) holds the path and ``LastModified`` of every file in the bucket listing that
     the previous run processed in full. Each run lists the bucket and downloads only the files
     whose ``(path, LastModified)`` the list lacks, so a late file, a back-filled file, and a
@@ -185,7 +185,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     settings = Settings()
     delta_path = settings.power_time_series_data_path
     metadata_path = settings.metadata_path
-    downloaded_files_path = settings.downloaded_files_path
+    list_of_downloaded_files_path = settings.list_of_downloaded_files_path
     storage_options = settings.storage_options
 
     # Everything that talks to NGED's bucket, or reads the downloaded-files list, sits under one
@@ -198,7 +198,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     # ConfigurableResource in the future.
     try:
         downloaded_files = read_downloaded_files(
-            downloaded_files_path=downloaded_files_path,
+            list_of_downloaded_files_path=list_of_downloaded_files_path,
             power_table_path=delta_path,
             metadata_path=metadata_path,
             storage_options=storage_options,
@@ -313,7 +313,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     # landed, and raising would stop `clean_nged_power_data` in the same job.
     _write_downloaded_files_or_degrade(
         context=context,
-        downloaded_files_path=downloaded_files_path,
+        list_of_downloaded_files_path=list_of_downloaded_files_path,
         listing=list_of_all_json_files,
         storage_options=storage_options,
     )
