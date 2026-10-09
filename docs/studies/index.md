@@ -55,9 +55,10 @@ regions or climates, so a result may not hold elsewhere.
 
 - [How well can an embedded battery's output be forecast, and how many of NGED's batteries have a
   published plan?](embedded-battery-forecast.md) — across 35 battery BMUs, no XGBoost forecast
-  tested beats a 56-day trailing climatology day ahead; the real day-ahead price lowers the error
-  by 1.1% and other batteries' published plans by 1.3% one hour ahead. The registers show at most
-  4.5% of NGED's connected storage rows could have a BMU. All numbers are provisional.
+  tested beats a 56-day trailing climatology day ahead; the real day-ahead price lowers an XGBoost
+  forecast's CRPS by 1.1%, and the planned output of other companies' batteries lowers it by 1.3%
+  1 hour ahead. The registers list 8 embedded storage BMUs against 176 connected storage rows in
+  NGED's area, and cannot say how many rows the 8 stand for. All numbers are provisional.
 - [Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?](indgen-inddem-and-gsp-take.md)
   — Elexon's indicated demand and generation series sum the Physical Notifications of every
   Balancing Mechanism Unit for the national total and 17 transmission boundaries. An issue reaches

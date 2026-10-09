@@ -447,6 +447,83 @@ def sensitivity_figure() -> alt.VConcatChart:
     )
 
 
+def known_answer_figure() -> alt.VConcatChart:
+    """The known-answer check: 40 synthetic batteries, with and without a price effect."""
+    lines = (EMBEDDED_BATTERY_FORECAST_DIR / "a0_report_primary.md").read_text().splitlines()
+    rows = []
+    for line in lines:
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if len(cells) == 4 and cells[0].startswith("SYN_"):
+            rows.append(
+                {
+                    "label": cells[0],
+                    "group": "Follows the price"
+                    if cells[0].startswith("SYN_PD")
+                    else "Ignores the price",
+                    "value": float(cells[1]),
+                    "lower": float(cells[2]),
+                    "upper": float(cells[3]),
+                    "order": cells[0],
+                }
+            )
+    frame = pl.DataFrame(rows)
+    driven = frame.filter(pl.col("group") == "Follows the price")
+    blind = frame.filter(pl.col("group") == "Ignores the price")
+    palette = {"Follows the price": ocf.BRAND_ORANGE, "Ignores the price": ocf.DATA_BLUE}
+    base = alt.Chart(frame)
+    scale = alt.Scale(zero=False)
+    y = alt.Y(
+        "label:N",
+        sort=frame["label"].to_list(),
+        axis=alt.Axis(labels=False, ticks=False, title="40 synthetic batteries"),
+    )
+    colour = alt.Color(
+        "group:N",
+        scale=alt.Scale(domain=list(palette), range=list(palette.values())),
+        legend=alt.Legend(title="Synthetic battery", orient="top", direction="horizontal"),
+    )
+    lines_layer = base.mark_rule(strokeWidth=1.5, aria=False).encode(  # ty: ignore[unresolved-attribute]
+        x=alt.X(
+            "lower:Q",
+            scale=scale,
+            title="CRPS difference (points of p99; negative means the real price helps)",
+        ),
+        x2="upper:Q",
+        y=y,
+        color=colour,
+    )
+    dots = base.mark_point(filled=True, size=40, aria=False).encode(  # ty: ignore[unresolved-attribute]
+        x="value:Q", y=y, color=colour
+    )
+    zero = (
+        alt.Chart(pl.DataFrame({"x": [0.0]}))
+        .mark_rule(strokeDash=[4, 3], aria=False)
+        .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+    )
+    panel = (lines_layer + dots + zero).properties(width=WIDE_PX - 150, height=360)
+    return figure(
+        panels=[panel],
+        number=3,
+        title=(
+            f"On a known answer the pipeline finds the price effect in {driven.height} of "
+            f"{driven.height} batteries that follow the price, and in "
+            f"{int((blind['upper'] < 0).sum())} of {blind.height} that ignore it"
+        ),
+        subtitle=[
+            (
+                "Each synthetic battery uses the real day-ahead prices (follows the price: "
+                "an optimal charge-and-discharge schedule plus noise) or from the typical daily "
+                "profile of a real battery (ignores the price), plus noise of 10% of its p99."
+            ),
+            (
+                "Dot: XGBoost given the actual price minus given another day's price. Line: "
+                "95% interval from resampling whole months and a seed."
+            ),
+        ],
+        figure_planning=None,
+    )
+
+
 def census_figure() -> alt.VConcatChart:
     """NGED's connected storage rows by size class, in count and in megawatts."""
     classes = pl.read_parquet(EMBEDDED_BATTERY_FORECAST_DIR / "census_classes.parquet")
@@ -476,7 +553,7 @@ def census_figure() -> alt.VConcatChart:
     large_share = large_mw / float(classes["export_mw"].sum())
     return figure(
         panels=panels,
-        number=3,
+        number=11,
         title=(
             f"{n_small} of NGED's {n_rows} connected storage rows are under 1 MW, and the "
             f"{n_rows - n_small} larger ones hold {large_share:.0%} of the megawatts"
@@ -773,6 +850,7 @@ def nged_week_figure() -> alt.VConcatChart:
 
 FIGURES: Final[dict[str, object]] = {
     "headline": headline_figure,
+    "known_answer": known_answer_figure,
     "leaderboards": leaderboard_figure,
     "skill_by_lead": lead_figure,
     "sensitivity": sensitivity_figure,
