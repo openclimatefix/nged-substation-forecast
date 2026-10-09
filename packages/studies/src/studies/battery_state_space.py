@@ -681,7 +681,6 @@ class Estimator:
         problems: Problems,
         starts: np.ndarray,
         stages: Sequence[tuple[int, float, Sharpness]],
-        seed: int = 0,
         verbose: bool = False,
     ) -> FitResult:
         """Fit every aggregate from every start, then polish and approximate the posterior.
@@ -693,13 +692,11 @@ class Estimator:
                 scale, the others are absolute.
             stages: Adam stages, each `(iterations, learning rate, sharpness)`. The last stage's
                 sharpness defines the model that is polished and approximated.
-            seed: Unused apart from reproducibility of future randomised starts.
             verbose: Print progress.
 
         Returns:
             The fit.
         """
-        del seed
         layout = self.layout
         groups, lanes, n_time = problems.aggregate.shape
         n_starts = starts.shape[0]
@@ -712,9 +709,8 @@ class Estimator:
         per_group = lanes * n_starts
         n_lanes = groups * per_group
         flat_valid = valid64.repeat_interleave(per_group, dim=0)
-        basis_per_lane_group = basis64
         projected_aggregate = self._project(
-            export=flat_aggregate, basis=basis_per_lane_group, valid=valid64, groups=groups
+            export=flat_aggregate, basis=basis64, valid=valid64, groups=groups
         )
         n_equations = torch.as_tensor(
             problems.valid.sum(axis=1) - problems.rank, dtype=torch.float64, device=device
@@ -732,7 +728,7 @@ class Estimator:
             *, theta_in: torch.Tensor, export: torch.Tensor, effective: torch.Tensor
         ) -> tuple[torch.Tensor, torch.Tensor]:
             residual = projected_aggregate + self._project(
-                export=export, basis=basis_per_lane_group, valid=valid64, groups=groups
+                export=export, basis=basis64, valid=valid64, groups=groups
             ).to(projected_aggregate.dtype)
             rss = (residual**2).sum(dim=1).clamp_min(RSS_FLOOR)
             loss = 0.5 * effective * torch.log(rss) - self._prior(theta=theta_in, scale=scale)

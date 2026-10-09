@@ -3,7 +3,9 @@
 - **Second setting.** Rungs 1 and 2 re-run with the estimator's `sensitivity` setting: the duration
   priors' log standard deviations doubled and the efficiency prior's 95% range widened to 0.70 to
   0.95. (The differentiable estimator has no state-of-charge limits or cap to move; the usable
-  duration absorbs the limits, and the cap is a learned weight.) Writes
+  duration absorbs the limits, and the merchant battery's cap is a learned weight between 1 and 2
+  cycles a day. The Agile unit's cap is fixed at 1 cycle a day in both settings, and the second
+  setting's cap of 2 and limits of 0% and 100% apply only to the grid estimator.) Writes
   `rung1_sensitivity_posteriors.parquet` and `rung2_sensitivity_posteriors.parquet`.
 - **Rung 2 negative control with the Agile price also moved.** The one-hour-early windows move only
   the four fixed-window units, and the Agile unit, which carries rung 2's detection, is unchanged.

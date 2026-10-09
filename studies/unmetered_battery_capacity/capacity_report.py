@@ -34,6 +34,7 @@ from capacity_runs import p99_flow
 from capacity_templates import DURATION_PRIORS
 from scipy.stats import binomtest
 
+# Duplicated from `capacity_state_space` so that the report need not import torch.
 UNIT_NAMES: Final[tuple[str, ...]] = (
     "merchant",
     "agile",
@@ -191,6 +192,25 @@ def calibration_section(
             "",
             table(coverage(frame=frame, by=["share"])),
         ]
+    agile = rung2.with_columns(
+        power_in_90=(pl.col("unit_agile_power_q05") <= pl.col("true_agile_power_mw"))
+        & (pl.col("true_agile_power_mw") <= pl.col("unit_agile_power_q95")),
+        all=pl.lit("all"),
+    )
+    lines += [
+        (
+            "**Fleet calibration scored on the Agile unit alone.** The three fixed-window units "
+            "return their prior's mode, because the monthly baseline absorbs any schedule that "
+            "repeats every day, so the fleet's summed power is scored here against the simulated "
+            "Agile homes' rated power only:"
+        ),
+        "",
+        table(
+            agile.group_by("share")
+            .agg(n=pl.len(), agile_power_90=pl.col("power_in_90").fill_null(False).mean())
+            .sort("share")
+        ),
+    ]
     simulated = pl.concat(
         [
             merchant.select(
@@ -514,6 +534,9 @@ def rung3_section(
         "Flags at the nominal 5% threshold, by share and season (Jun-Aug is where the nulls flag):",
         "",
         table(flags_by_season.sort("share", "season")),
+        "The same rates with Clopper-Pearson intervals (sums share their series-blocks):",
+        "",
+        table(rate_table(frame=flagged, by=["share", "season"])),
         (
             f"Outside Jun-Aug, {int(outside['flagged'].sum())} of {outside.height} sums are "
             f"flagged ({outside['flagged'].mean():.1%}), against the nominal 5% of a null."
@@ -527,6 +550,18 @@ def rung3_section(
         ),
         "",
         table(coverage(frame=frame, by=["kind", "share"])),
+        (
+            "The coverage is a property of the series-block more than of the battery: the 23 "
+            "units share 36 series-blocks at each share. The number of distinct 90% power "
+            "coverages across the five kinds at each share:"
+        ),
+        "",
+        table(
+            coverage(frame=frame, by=["kind", "share"])
+            .group_by("share")
+            .agg(distinct_power_90=pl.col("power_90").n_unique(), n_kinds=pl.len())
+            .sort("share")
+        ),
         "Median relative error of the merchant class's power median against the registered power:",
         "",
         table(
@@ -788,6 +823,8 @@ def main() -> None:
     )
     lines += review.rung1b_section(rung1=rung1, others=outside, limits=limits)
     lines += calibration_section(rung1=rung1, rung2=rung2)
+    lines += review.low_share_posterior_section(rung1=rung1)
+    lines += review.tuning_series_section(rung1=rung1)
     lines += fleet_units_section(rung2=rung2)
     lines += review.rung2_controls_section(
         rung2=rung2,

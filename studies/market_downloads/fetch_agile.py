@@ -7,7 +7,9 @@ account, a key, or a payment. The script checks that before fetching anything: a
 or 403) stops the script, because it would mean the terms now require something the maintainer must
 accept. The script also records the API guide page at fetch time.
 
-Every Agile product version that overlaps the window is fetched, one calendar month at a time. Each
+Every Agile product version in the product listing whose availability overlaps the window is
+fetched, one calendar month at a time. The listing shows only the versions on sale now, so the
+validation counts the half-hours priced against the half-hours expected. Each
 month is written to `_month_cache/` as soon as it arrives, so a crash costs one month and a re-run
 skips what is cached. The combined file is built from the months of the current window only.
 
@@ -75,7 +77,10 @@ def _get_json(*, url: str, params: dict[str, str | int] | None = None) -> dict:
 
 
 def agile_products() -> list[dict]:
-    """Return every Agile import product version whose availability overlaps the window.
+    """Return every listed Agile import product version whose availability overlaps the window.
+
+    `/v1/products/` lists only the versions on sale now, so a version withdrawn before today is
+    missing from the listing; the validation of the combined file catches any unpriced half-hour.
 
     Returns:
         The products' records from `/v1/products/`, oldest first.
@@ -199,7 +204,7 @@ def combine(*, paths: list[Path]) -> pl.DataFrame:
         The combined frame, sorted by time.
     """
     return (
-        pl.concat([pl.read_parquet(path) for path in paths if path.stat().st_size > 0])
+        pl.concat([pl.read_parquet(path) for path in paths])
         .sort("time", "product_code")
         .unique(subset="time", keep="last", maintain_order=True)
         .sort("time")

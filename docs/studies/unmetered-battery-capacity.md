@@ -88,10 +88,15 @@ solar columns mean.
 **A planned contrast was written into the plan before any result existed, and every other number is
 exploratory.** The five planned contrasts are C1 (false alarms), C2 (calibration), C3 (the posterior
 against a step statistic), C4 (energy separately from power), and C5 (fleets of real batteries).
-Intervals on errors, coverages, and rates resample whole demand series and whole batteries in a
-two-level cluster bootstrap of 2,000 resamples, and rates also carry Clopper-Pearson intervals.
-These intervals do not cover the month-to-month weather, so a detection rate is read per block and
-per season. An exploratory row with no real effect has a nominal 5% chance of being statistically
+Intervals on the mean errors of C3, C4, and C5 and on the grid-estimator difference resample whole
+demand series and whole batteries in a two-level cluster bootstrap of 2,000 resamples. Rates and
+coverages carry Clopper-Pearson intervals on sums. Those intervals treat sums as independent, but
+sums share series and blocks (the 108 sums at one share of rung 1 are 3 durations on the same 36
+series-blocks), so they are too narrow. These intervals do not cover the month-to-month weather, so
+a detection rate is read per block and per season. A **post hoc** analysis was written after
+results on the same series existed; the sections for rung 1b, the calendar-replica rung 3, the
+price-only screen, the season split, and the clean positive control's rule are post hoc, and each
+says so. An exploratory row with no real effect has a nominal 5% chance of being statistically
 significant at the 5% level, the number of such rows is unknown, and the page does not correct for
 multiple comparisons.
 
@@ -117,7 +122,7 @@ posterior.
 ![Figure 2: One simulated sum, step by step: the posterior interval holds the true power and
 energy](assets/unmetered_battery_capacity_worked_example.svg)
 
-**The battery is differentiable, so a graphics card fits it in minutes.** The estimator reads each
+**The battery is differentiable, so a graphics card fits a sum in about one second.** The estimator reads each
 price-taking battery's schedule between precomputed linear-programme schedules (3,800 of them for
 the merchant battery) and passes the schedule through a smooth state-of-charge recurrence. It then
 fits the power, duration, efficiency, and cycle-cap weight by gradient descent (the PyTorch optional
@@ -150,8 +155,9 @@ says](assets/unmetered_battery_capacity_coverage.svg)
    of its 99th-percentile flow. Rung 1b uses two simulated truths from outside that family.
 2. **Rung 2:** a simulated fleet of home batteries on the four tariffs.
 3. **Rung 3:** 23 real public batteries and fleets of 2, 4, and 8 of them, added to the series.
-4. **Rung 4:** NGED battery A inside its bulk supply point's flow, with 1 to 11 further copies of
-   its output subtracted.
+4. **Rung 4:** NGED battery A inside the flow of the bulk supply point BSP1 at multiples 0, 1, 2, 4,
+   and 11 of its metered output. Multiple 0 adds the output back as a matched null, and 1 is the
+   flow as metered.
 5. **Rung 5:** the eight primaries as they are.
 
 **Battery sizes are shares of a series' 99th-percentile flow, and the noise unit makes them

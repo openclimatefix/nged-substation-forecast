@@ -64,6 +64,12 @@ REGISTER_PATH: Final = PRIVATE_DIR / "embedded_capacity_register_storage.parquet
 STUCK_RUN_REPORT_LENGTH: Final[int] = 6
 
 
+STATIC_RESPONSE_TRIGGER_HZ: Final[float] = 49.7
+"""The frequency below which static frequency response acts."""
+FAULTY_FREQUENCY_HZ: Final[float] = 45.0
+"""A half-hour whose minimum frequency is below this is a faulty reading, not an excursion."""
+
+
 def window_half_hours() -> pl.Series:
     """Return the end time of every half-hour of the study year (UTC).
 
@@ -447,6 +453,35 @@ def validate_series(*, label: str, values: np.ndarray) -> dict[str, object]:
     }
 
 
+def frequency_excursion_lines() -> list[str]:
+    """Return the report lines that count the half-hours below the 49.7 Hz static-response trigger.
+
+    Half-hours whose minimum is below 45 Hz are faulty readings (an exact zero), not excursions, and
+    are counted separately. Only half-hours inside the study window are counted.
+
+    Returns:
+        Lines of the report.
+    """
+    frequency = pl.read_parquet(
+        MARKET_DOWNLOADS_DIR / "elexon_frequency" / "elexon_frequency.parquet"
+    ).filter((pl.col("time") >= WINDOW_START) & (pl.col("time") < WINDOW_END))
+    faulty = frequency.filter(pl.col("frequency_min_hz") < FAULTY_FREQUENCY_HZ)
+    low = frequency.filter(
+        (pl.col("frequency_min_hz") >= FAULTY_FREQUENCY_HZ)
+        & (pl.col("frequency_min_hz") < STATIC_RESPONSE_TRIGGER_HZ)
+    )
+    return [
+        (
+            f"Half-hours in the window: {frequency.height}. Faulty readings (minimum below "
+            f"{FAULTY_FREQUENCY_HZ} Hz) dropped: {faulty.height}."
+        ),
+        (
+            f"Half-hours whose minimum frequency is below {STATIC_RESPONSE_TRIGGER_HZ} Hz: "
+            f"{low.height}, on {low['time'].dt.date().n_unique()} days."
+        ),
+    ]
+
+
 def main() -> None:
     """Validate every input and write `report_inputs.md`."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -510,6 +545,7 @@ def main() -> None:
     lines += ["", "## Register (storage entries of 50 kW and above) by primary", ""]
     for label, found in storage_presence_by_primary().items():
         lines.append(f"- {label}: {found}")
+    lines += ["", "## Grid frequency", "", *frequency_excursion_lines(), ""]
     sky_basis = solar_columns()
     lines += [
         "",

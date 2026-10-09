@@ -49,6 +49,9 @@ def _cell_text(*, cell: ET.Element) -> str:
     Returns:
         The text, or an empty string.
     """
+    if cell.get("t") == "s":
+        message = "A shared-string cell holds an index into the string table, not text."
+        raise ValueError(message)
     if cell.get("t") == "inlineStr":
         return "".join(node.text or "" for node in cell.iter(NS + "t"))
     value = cell.find(NS + "v")

@@ -20,6 +20,7 @@ from capacity_report_tools import (
     flag,
     rate_table,
     table,
+    thresholds,
     with_errors,
 )
 from capacity_runs import p99_flow
@@ -28,6 +29,10 @@ PASS_FRACTION: Final[float] = 2.0 / 3.0
 """The clean positive control's pass rule: the 90% interval holds both power and energy in at least
 this fraction of the replica fits (committed in `capacity_positive_control_clean.py`)."""
 RATIO_BIN_START_LOG2: Final[int] = -3
+TUNING_SERIES: Final[tuple[str, ...]] = ("S2", "S6")
+"""The two series the estimator was tuned on, which every pooled rate also scores."""
+PRIOR_SCALE_OVER_P99: Final[float] = 0.2
+"""The scale of the half-normal prior on a class's power, as a share of the series' p99."""
 
 
 def with_season(*, frame: pl.DataFrame) -> pl.DataFrame:
@@ -76,6 +81,38 @@ def positive_control_clean_section(*, draws: pl.DataFrame) -> list[str]:
             "of fits, because the tempering by the residual's autocorrelation widens them."
         ),
         "",
+    ]
+    real_widths = real["power_width_over_truth"].to_numpy()
+    real_error = float(np.median(real["power_median_error"].to_numpy()))
+    gsp1_error = float(
+        np.median(real.filter(pl.col("series") == "GSP1")["power_median_error"].to_numpy())
+    )
+    lines += [
+        (
+            f"**On real demand the 90% interval holds both truths in {real_both:.1%} of "
+            f"{real.height} fits, and is wide.** The interval is {np.min(real_widths):.0%} to "
+            f"{np.max(real_widths):.0%} of the truth wide (median {np.median(real_widths):.0%}). "
+            f"The median power error is {real_error:.1%}, and it is {gsp1_error:.1%} for GSP1."
+        ),
+        "",
+        (
+            f"**The truths are the estimator's own dispatch, at a 40% share only.** Each truth is "
+            "a day-by-day linear programme on the day-ahead price with parameters off the "
+            f"estimator's grid, and its usable duration is {draws['truth_usable_hours'].min():.2f} "
+            f"to {draws['truth_usable_hours'].max():.2f} hours, so the control tests the "
+            "interpolation between precomputed schedules, not a real dispatch. The pass rule "
+            "(two thirds of fits holding both truths) is lenient for a nominal 90% interval: two "
+            "independent 90% intervals hold both truths in 81% of fits."
+        ),
+        "",
+        "Replica fits holding both truths, by truth:",
+        "",
+        table(
+            replica.with_columns(both=pl.col("power_in_90") & pl.col("energy_in_90"))
+            .group_by("truth")
+            .agg(fits=pl.len(), both_in_90=pl.col("both").mean())
+            .sort("truth")
+        ),
     ]
     for name, frame in (("Calendar replicas", replica), ("Real demand", real)):
         lines += [
@@ -399,6 +436,10 @@ def rung3_replica_section(*, replica: pl.DataFrame) -> list[str]:
             pl.col("merchant_power_median") / pl.col("true_power_mw")
         ),
     )
+    limits = thresholds(nulls=frame.filter(pl.col("share") == 0))
+    flagged = with_season(
+        frame=flag(frame=frame.filter(pl.col("share") > 0), threshold=limits, default=np.nan)
+    )
     return [
         "## Rung 3 on calendar replicas (exploratory)",
         "",
@@ -420,6 +461,15 @@ def rung3_replica_section(*, replica: pl.DataFrame) -> list[str]:
             )
             .sort("share")
         ),
+        (
+            "**Flagged by a threshold from the replicas' own nulls.** Each series' threshold is "
+            "the 95th percentile of the other series' log Bayes factors on the 36 replica blocks "
+            "with no added battery, because the real-demand threshold does not apply to a "
+            "demand series with almost no noise."
+        ),
+        "",
+        table(rate_table(frame=flagged, by=["share"])),
+        table(rate_table(frame=flagged, by=["share", "season"])),
         "By kind of unit, 40% share:",
         "",
         table(
@@ -434,6 +484,83 @@ def rung3_replica_section(*, replica: pl.DataFrame) -> list[str]:
             .sort("kind")
         ),
     ]
+
+
+def low_share_posterior_section(*, rung1: pl.DataFrame) -> list[str]:
+    """The merchant power's posterior at the smallest shares, against the prior and the null."""
+    p99 = {label: p99_flow(v) for label, v in demand_series().items()}
+    frame = rung1.with_columns(
+        p99=pl.col("series").replace_strict(p99, return_dtype=pl.Float64)
+    ).with_columns(
+        median_over_p99=pl.col("merchant_power_median") / pl.col("p99"),
+        q05_over_p99=pl.col("merchant_power_q05") / pl.col("p99"),
+        q95_over_p99=pl.col("merchant_power_q95") / pl.col("p99"),
+    )
+    z_median, z_q05 = 0.6745, 0.0627
+    return [
+        "## Rung 1: the merchant power's posterior at the smallest shares (exploratory)",
+        "",
+        (
+            "The half-normal prior has scale "
+            f"{PRIOR_SCALE_OVER_P99:.0%} of the series' 99th percentile, so its median is "
+            f"{z_median * PRIOR_SCALE_OVER_P99:.1%} and its 5th percentile "
+            f"{z_q05 * PRIOR_SCALE_OVER_P99:.2%} of the 99th percentile. Share 0 is the nulls."
+        ),
+        "",
+        table(
+            frame.filter(pl.col("share") <= 0.05)
+            .group_by("share")
+            .agg(
+                sums=pl.len(),
+                median_of_posterior_medians=pl.col("median_over_p99").median(),
+                median_of_q05=pl.col("q05_over_p99").median(),
+                median_of_q95=pl.col("q95_over_p99").median(),
+            )
+            .sort("share")
+        ),
+    ]
+
+
+def tuning_series_section(*, rung1: pl.DataFrame) -> list[str]:
+    """Rung 1's false alarms, detection, and calibration with the two tuning series removed."""
+    lines = [
+        "## Rung 1 without the two series the estimator was tuned on (exploratory)",
+        "",
+        (
+            f"The estimator was tuned on {' and '.join(TUNING_SERIES)}, and every pooled rate also "
+            "scores them. The tables repeat the false-alarm rate, the detection rates, and the "
+            "merchant power's 90% coverage with the thresholds rebuilt from the remaining series."
+        ),
+        "",
+    ]
+    for name, frame in (
+        ("All 9 series", rung1),
+        (
+            f"Without {' and '.join(TUNING_SERIES)}",
+            rung1.filter(~pl.col("series").is_in(TUNING_SERIES)),
+        ),
+    ):
+        limits = thresholds(nulls=frame.filter(pl.col("share") == 0))
+        default = default_threshold(limits=limits)
+        nulls = flag(frame=frame.filter(pl.col("share") == 0), threshold=limits, default=default)
+        battery = flag(frame=frame.filter(pl.col("share") > 0), threshold=limits, default=default)
+        merchant = with_errors(
+            frame=frame.filter(pl.col("share") > 0),
+            power="merchant_power",
+            energy="merchant_energy",
+        ).with_columns(all=pl.lit("all"))
+        lines += [
+            f"**{name}: {int(nulls['flagged'].sum())} of {nulls.height} null blocks flagged.**",
+            "",
+            table(
+                rate_table(
+                    frame=with_season(frame=battery.filter(pl.col("share").is_in([0.05, 0.1]))),
+                    by=["share", "season"],
+                )
+            ),
+            table(coverage(frame=merchant, by=["all"])),
+        ]
+    return lines
 
 
 def notes_section() -> list[str]:
@@ -469,9 +596,10 @@ def notes_section() -> list[str]:
         ),
         (
             "- The differentiable estimator has no state-of-charge limits or cycle-cap parameters "
-            "to move: the usable duration absorbs the limits, and the cap is a learned weight "
-            "between 1 and 2 cycles a day. The second setting therefore doubles the duration "
-            "priors' spread and widens the efficiency prior."
+            "to move: the usable duration absorbs the limits, and the merchant battery's cap is a "
+            "learned weight between 1 and 2 cycles a day, while the Agile unit's cap is fixed at 1 "
+            "cycle a day. The second setting therefore doubles the duration priors' spread and "
+            "widens the efficiency prior."
         ),
         (
             "- The simulated batteries' dispatch is a perfect-foresight daily linear programme, "

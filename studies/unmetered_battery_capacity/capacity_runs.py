@@ -205,11 +205,6 @@ def fit_all_blocks(
     return pl.DataFrame(rows, infer_schema_length=None)
 
 
-def block_valid_and_free(*, block: int) -> tuple[np.ndarray, np.ndarray]:
-    """Return a block's free columns and the rows where the solar columns are finite."""
-    return block_free_columns(block=block, nuisance=nuisance_candidates())
-
-
 def step_tail_table(*, aggregates: np.ndarray, metadata: list[list[dict]]) -> pl.DataFrame:
     """Return the step-tail power of every sum in every block.
 
@@ -222,7 +217,7 @@ def step_tail_table(*, aggregates: np.ndarray, metadata: list[list[dict]]) -> pl
     """
     rows = []
     for block in range(N_BLOCKS):
-        free, solar_ok = block_valid_and_free(block=block)
+        free, solar_ok = block_free_columns(block=block, nuisance=nuisance_candidates())
         slice_ = block_slices()[block]
         for g, group in enumerate(metadata):
             for lane, meta in enumerate(group):
