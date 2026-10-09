@@ -126,10 +126,14 @@ CAMS aerosol product McClear uses (EAC4 or the operational analysis) is unverifi
   its own `hourly_from_snapshots` call (see Hour convention), whose hourly value is NaN unless both
   snapshots exist. The first fetched chunk reports each variable's share of NaN, split by `tcc`
   below and above 0.05.
-- **ERA5 release:** the span ends at the last month that is final ERA5 (`expver` 0001) in every
-  file. ERA5T, the preliminary release (`expver` 0005), can later be replaced by ECMWF. The fetch
-  records `expver` per hour, and the build raises if `expver` differs between variables for one
-  hour.
+- **ERA5 release:** the study window ends at a fixed date inside the months known to be final ERA5,
+  at rows before 2026-08-01 (or before 2026-07-01 if the July check below fails). ERA5T, the
+  preliminary release (`expver` 0005), can later be replaced by ECMWF, and the window drops it
+  instead of flagging it. Google's ARCO-ERA5 copy carries no per-hour `expver`, so the ARCO
+  downloads label every hour with a constant, and the build still raises if `expver` differs between
+  variables for one hour. ARCO's own attributes put the end of final ERA5 at 2026-06-30, while the
+  held CDS copy labels July 2026 as final. The download coordinator compares July 2026 with the held
+  CDS files, and the window keeps July only if the two agree to float rounding.
 - **PV cleaning:** reuse `studies.power`, `studies.export_cap`, and `studies.commissioning`, as the
   past-weather solar page does. Hours holding a zero half-hour are dropped, from the power table,
   for both targets.
@@ -285,17 +289,33 @@ capacity, and no coordinate appears.
   over a box of 20 ERA5 grid cells for 2019-09 to 2026-09 from the CDS, plus a CDS-versus-Open-Meteo
   check. CAMS GHI and site-level PV tables exist already (`reanalysis/CAMS/`, the `studies.power`
   loaders, `studies.pv_dataset`).
-- **The new download is the 31 ladder variables not already held,** from the CDS, over the same
-  20-cell box and hours. The CDS runs one job at a time. Each job takes about 2.5 minutes per month
-  of 3 variables, and a request holds at most 121,000 fields (one variable-hour is one field, so one
-  variable for all 85 months is about 62,000 fields). At that rate the 31 variables take about 37
-  hours of serial queue time. The plan splits the fetch into three tiers so the first results do not
-  wait for the whole download:
-    - **Tier 1 (needed for G1 to G7):** `tcc`, `lcc`, `mcc`, `hcc`, `ssrdc`, `cdir`, `tclw`, `tciw`,
-      `tcslw`, `cbh`, `u10`, `v10`, `strd`, `d2m`, `tcwv`, `blh`. About 19 hours.
+- **The new download is the 27 ladder variables not already held,** over the same 20-cell box and
+  hours, from [Google's ARCO-ERA5](https://github.com/google-research/arco-era5) analysis-ready
+  store (`gs://gcp-public-data-arco-era5/ar/full_37-1h-0p25deg-chunk-1.zarr-v3`, anonymous read).
+  The Climate Data Store (CDS) was the first choice, but its queue ran at about 2.8 hours per
+  chunk of 60 in tier 1b, which put the last ERA5 tier at about 25 October. The tiers 1 and 2 hold
+  31 variables, and 4 of them (`tcc`, `lcc`, `mcc`, `hcc`, tier 1a) were already downloaded from the
+  CDS, which leaves 27. The ARCO store has all 34 ladder variables.
+    - **Agreement with the CDS:** on the 20-cell box, `ssrd`, `fdir`, and `t2m` correlate with the
+      held CDS copy at 0.99999998 or better in 2024-03 and 2025-09, with mean absolute differences
+      of 8 J m⁻² on `ssrd`, 7 J m⁻² on `fdir`, and 0.0004 K on `t2m`. For 2025-06, `tcc`, `lcc`,
+      `mcc`, and `hcc` agree to a mean of about 2e-6 (float rounding), and `ssrdc`, `cdir`, `strd`,
+      `cape`, `fal`, and `asn` agree to within 0.002% of their means or better (`cape` to 0.12 at most). Shifting by one hour makes the
+      mean difference 1,000 to 50,000 times larger, so the hour convention is the CDS one: the
+      accumulations cover the hour ending at the label, and the snapshots are at the label. The
+      CDS values already held stay in place, and nothing in the study depends on the two copies
+      being byte-for-byte identical.
+    - **Cost of the read:** each hourly chunk is global (721 by 1,440 values, about 2 MB
+      compressed), and the box is cut after reading. The download coordinator measured 14.8 hours
+      of data per second at 16 threads, which is about 0.9 hours per variable for 60,624 hours, so
+      about 31 hours and about 3.3 TB read for 27 variables (estimated from a sample of seven
+      variables). The coordinator runs the download in the order below, while the CDS chain keeps
+      running until tier 1b has been validated from ARCO.
+    - **Tier 1b (needed for G3 to G7):** `ssrdc`, `cdir`, `tclw`, `tciw`, `tcslw`, `cbh`, `u10`,
+      `v10`, `strd`, `d2m`, `tcwv`, `blh`.
     - **Tier 2 (needed for G8 and G9):** `sd`, `sf`, `asn`, `fal`, `tp`, `tcrw`, `tcsw`, `cape`,
-      `cin`, `skt`, `tco3`, `uvb`, `i10fg`, `sp`, `deg0l`. About 18 hours. `tisr` is not downloaded:
-      the top-of-atmosphere flux comes from `add_solar_geometry`.
+      `cin`, `skt`, `tco3`, `uvb`, `i10fg`, `sp`, `deg0l`. `tisr` is not downloaded: the
+      top-of-atmosphere flux comes from `add_solar_geometry`.
     - **Tier 3 (not ERA5, from the Atmosphere Data Store, ADS):** CAMS EAC4 total and dust aerosol
       optical depth at 550 nm, 3-hourly, 2019-09 to the end of EAC4 (the ADS catalogue gave 31
       December 2025 on 2026-10-08; the fetch sets the end month from the listing). A few MB and a
