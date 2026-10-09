@@ -68,8 +68,9 @@ def build() -> tuple[np.ndarray, list[list[dict]], list[dict]]:
                 "rated_power_per_reference_mw": rated,
                 "usable_hours_power_weighted": energy / rated,
                 "round_trip_power_weighted": float(
-                    (homes["power_mw"] * homes["round_trip_efficiency"]).sum() / rated
-                ),
+                    (homes["power_mw"] * homes["round_trip_efficiency"]).sum()
+                )
+                / rated,
                 "seconds": time.monotonic() - started,
             }
         )

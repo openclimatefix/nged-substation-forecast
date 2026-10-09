@@ -43,7 +43,12 @@ from studies.battery_state_space import (
     natural_draws,
     natural_point,
 )
-from studies.battery_templates import TARIFF_WINDOWS, TariffWindow, window_coverage
+from studies.battery_templates import (
+    TARIFF_WINDOWS,
+    TariffNameType,
+    TariffWindow,
+    window_coverage,
+)
 
 UNIT_NAMES: Final[tuple[str, ...]] = (
     "merchant",
@@ -55,7 +60,7 @@ UNIT_NAMES: Final[tuple[str, ...]] = (
 )
 LAYOUT: Final = Layout(unit_class=(0, 2, 1, 2, 2, 2), n_classes=3, n_stack=2)
 """Units 0 and 1 are stack units; the class indices follow `CLASS_NAMES`."""
-FIXED_WINDOWS: Final[tuple[str, ...]] = (
+FIXED_WINDOWS: Final[tuple[TariffNameType, ...]] = (
     "red_band",
     "intelligent_octopus_go",
     "octopus_go",
@@ -103,7 +108,7 @@ def priors(*, setting: SettingNameType) -> Priors:
     )
 
 
-def shifted_window(*, name: str, hours: float) -> TariffWindow:
+def shifted_window(*, name: TariffNameType, hours: float) -> TariffWindow:
     """Return a tariff window with every edge moved by some hours (a placebo window)."""
     window = TARIFF_WINDOWS[name]
     return replace(
@@ -285,7 +290,7 @@ def posterior_summary(
         ),
     }
     point = natural_point(theta=theta, layout=LAYOUT)
-    row |= _class_quantities(natural=point)
+    row |= {k: float(v) for k, v in _class_quantities(natural=point).items()}
     row |= {
         "merchant_duration_point": float(point["duration"][0]),
         "merchant_efficiency_point": float(point["efficiency"][0]),

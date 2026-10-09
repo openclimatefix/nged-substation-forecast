@@ -77,7 +77,7 @@ def cluster_bootstrap(
             total += sums[pick].sum()
             count += counts[pick].sum()
         means[r] = total / count
-    overall = float(rows["total"].sum() / rows["count"].sum())
+    overall = float(rows["total"].sum()) / float(rows["count"].sum())
     low, high = np.quantile(means, [0.025, 0.975])
     return overall, float(low), float(high)
 
@@ -167,6 +167,7 @@ def c1_section(*, rung1: pl.DataFrame, limits: dict[str, float]) -> list[str]:
     """C1: the false-alarm rate on the blocks with no added battery."""
     nulls = flag(frame=rung1.filter(pl.col("share") == 0), threshold=limits, default=np.nan)
     count, total = int(nulls["flagged"].sum()), nulls.height
+    n_unevaluated = int((~nulls["log_bayes_factor"].is_finite()).sum())
     test = binomtest(count, total, FALSE_ALARM_RATE, alternative="greater")
     low, high = clopper_pearson(count=count, total=total)
     return [
@@ -176,7 +177,7 @@ def c1_section(*, rung1: pl.DataFrame, limits: dict[str, float]) -> list[str]:
             f"{count} of {total} blocks flagged ({count / total:.3f}; Clopper-Pearson 95% interval "
             f"{low:.3f} to {high:.3f}). One-sided exact binomial test against 5%: p = "
             f"{test.pvalue:.3f}; the contrast {'holds' if test.pvalue >= 0.05 else 'fails'}. "
-            f"{int(nulls['log_bayes_factor'].is_nan().sum() + nulls['log_bayes_factor'].is_null().sum())}"
+            f"{n_unevaluated}"
             " null blocks have no log Bayes factor (no positive-definite Hessian) and count as not "
             "flagged."
         ),
@@ -353,8 +354,10 @@ def c3_c4_section(*, rung1: pl.DataFrame, steps: pl.DataFrame) -> list[str]:
             f"{low:+.4f} to {high:+.4f}); the contrast {'holds' if high < 0 else 'fails'}."
         ),
         "",
-        "Ratio of the duration's 90% posterior width to its prior width (a ratio near 1 means the "
-        "aggregate taught the estimator nothing about duration):",
+        (
+            "Ratio of the duration's 90% posterior width to its prior width (a ratio near 1 means "
+            "the aggregate taught the estimator nothing about duration):"
+        ),
         "",
         table(
             widths.group_by("share", "nameplate_hours")
@@ -385,8 +388,8 @@ def c5_section(*, rung3: pl.DataFrame) -> list[str]:
         (
             f"On {fleets.height} sums of fleets of 2, 4, and 8 public batteries, the mean paired "
             "difference in |log2(P_hat / coincident peak)| minus |log2(P_hat / registered sum)| "
-            f"is {mean:+.4f} (95% cluster-bootstrap interval {low:+.4f} to {high:+.4f}), with P_hat "
-            f"the merchant class's posterior median power; the contrast "
+            f"is {mean:+.4f} (95% cluster-bootstrap interval {low:+.4f} to {high:+.4f}), with "
+            f"P_hat the merchant class's posterior median power; the contrast "
             f"{'holds' if high < 0 else 'fails'}."
         ),
         "",
@@ -407,11 +410,11 @@ def c5_section(*, rung3: pl.DataFrame) -> list[str]:
 
 
 def rung3_section(*, rung3: pl.DataFrame) -> list[str]:
-    """Coverage and error of real public batteries against registered power and the energy reference."""
+    """Coverage and error of real public batteries against registered power and energy."""
     frame = rung3.with_columns(true_energy_mwh=pl.col("true_energy_reference_mwh"))
     frame = with_errors(frame=frame, power="merchant_power", energy="merchant_energy")
     return [
-        "## Rung 3: real public batteries against registered power and the energy reference (exploratory)",
+        "## Rung 3: real public batteries against registered power and energy (exploratory)",
         "",
         table(coverage(frame=frame, by=["kind", "share"])),
         "Median relative error of the merchant class's power median against the registered power:",
@@ -436,7 +439,10 @@ def rung4_section(*, rung4: pl.DataFrame, limits: dict[str, float]) -> list[str]
     return [
         "## Rung 4: NGED battery A inside a bulk supply point's flow (exploratory, one site)",
         "",
-        f"Detection threshold: {threshold:.2f} (the 95th percentile over the {len(limits)} series' means of thresholds).",
+        (
+            f"Detection threshold: {threshold:.2f} (the 95th percentile of the {len(limits)} "
+            "series' thresholds)."
+        ),
         "",
         table(
             frame.select(
@@ -453,7 +459,7 @@ def rung4_section(*, rung4: pl.DataFrame, limits: dict[str, float]) -> list[str]
                 "merchant_energy_median",
                 "merchant_energy_q95",
             ).sort("multiple", "block")
-        ),  # fmt: skip
+        ),
     ]
 
 
@@ -503,10 +509,10 @@ def rung5_section(*, rung5: pl.DataFrame) -> list[str]:
         "## Rung 5: the screen of the 8 primaries with a within-primary placebo (exploratory)",
         "",
         (
-            "Each primary's log Bayes factor summed over the four blocks, for the real template set "
-            "and for 12 placebo sets (tariff windows moved by -3 to +3 hours, and N2EX and Agile "
-            "prices taken from 6 other weeks). A primary shows evidence of a battery when its real "
-            "set ranks first of 13; 1 in 13 would rank first by chance."
+            "Each primary's log Bayes factor summed over the four blocks, for the real template "
+            "set and for 12 placebo sets (tariff windows moved by -3 to +3 hours, and N2EX and "
+            "Agile prices taken from 6 other weeks). A primary shows evidence of a battery when "
+            "its real set ranks first of 13; 1 in 13 would rank first by chance."
         ),
         "",
         table(screen),

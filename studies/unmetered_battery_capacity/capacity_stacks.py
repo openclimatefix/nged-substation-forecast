@@ -131,7 +131,11 @@ def save(
         shift_days=shift * DAYS_PER_WEEK,
     )
     np.savez_compressed(
-        path, duration_nodes=duration_nodes, efficiency_nodes=efficiency_nodes, **stacks
+        path,
+        duration_nodes=duration_nodes,
+        efficiency_nodes=efficiency_nodes,
+        merchant=stacks["merchant"],
+        agile=stacks["agile"],
     )
     print(f"{path.name}: {stacks['merchant'].shape[0]} nodes in {time.monotonic() - started:.0f} s")
 

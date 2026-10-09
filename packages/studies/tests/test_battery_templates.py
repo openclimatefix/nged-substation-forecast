@@ -10,6 +10,8 @@ from studies.battery_templates import (
     DomesticTariffNameType,
     FleetSpec,
     TariffNameType,
+    TariffWindow,
+    agile_days,
     agile_template,
     charge_only_template,
     domestic_template,
@@ -17,6 +19,7 @@ from studies.battery_templates import (
     merchant_template,
     simulate_fleet,
     spread_mean,
+    window_coverage,
     window_template,
 )
 
@@ -236,6 +239,61 @@ def test_an_agile_day_with_a_missing_price_has_a_zero_schedule() -> None:
     day_slice = slice(48 * 2 - 2, 48 * 3 - 2)
     assert not template[day_slice].any()
     assert template[48 * 3 : 48 * 4].any()
+
+
+def test_window_coverage_is_one_inside_each_window_and_a_share_at_a_half_covered_edge() -> None:
+    grid = _grid(start=DECEMBER, days=4)
+    window = TariffWindow(
+        charge_start_hour=0.75,
+        charge_end_hour=5.5,
+        discharge_start_hour=16.0,
+        discharge_end_hour=19.0,
+    )
+
+    charge, discharge = window_coverage(half_hour_end_time=grid, window=window)
+
+    day = 48
+    # The half-hour 00:30 to 01:00 is covered from 00:45, so half of it.
+    assert charge[day + 1] == pytest.approx(0.5)
+    assert charge[day] == 0.0
+    assert charge[day + 2 : day + 11].tolist() == [1.0] * 9
+    assert charge[day + 11] == 0.0
+    assert discharge[day + 32 : day + 38].tolist() == [1.0] * 6
+    assert discharge[day + 31] == 0.0
+    assert discharge[day + 38] == 0.0
+
+
+def test_a_weekday_only_window_covers_nothing_at_the_weekend() -> None:
+    grid = _grid(start=DECEMBER, days=7)  # Monday 1 December 2025 to Sunday 7 December
+
+    charge, discharge = window_coverage(half_hour_end_time=grid, window=TARIFF_WINDOWS["red_band"])
+
+    day = 48
+    assert discharge[2 * day + 32 : 2 * day + 38].tolist() == [1.0] * 6  # Wednesday
+    assert not discharge[5 * day : 7 * day].any()  # Saturday and Sunday
+    assert not charge[5 * day : 7 * day].any()
+
+
+def test_agile_days_returns_each_delivery_days_prices_and_their_grid_positions() -> None:
+    grid = _grid(start=DECEMBER, days=6)
+    prices = _agile_prices(start=DECEMBER - timedelta(days=2), days=10, cheapest_local_hour=3.0)
+
+    day_prices, slot_index = agile_days(half_hour_end_time=grid, agile_prices=prices)
+
+    assert day_prices.shape[1] == 48
+    assert slot_index.shape == day_prices.shape
+    lookup = dict(
+        zip(prices["time"].to_list(), prices["price_inc_vat_p_per_kwh"].to_list(), strict=True)
+    )
+    checked = 0
+    for day in range(day_prices.shape[0]):
+        for slot in range(48):
+            index = slot_index[day, slot]
+            if 0 <= index < len(grid):
+                slot_start = DECEMBER + (index) * HALF_HOUR
+                assert day_prices[day, slot] == pytest.approx(lookup[slot_start])
+                checked += 1
+    assert checked > 48 * 4
 
 
 _SHARES: dict[DomesticTariffNameType, float] = {

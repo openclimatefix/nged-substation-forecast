@@ -47,7 +47,7 @@ Requires the optional `gpu` dependency group (`torch`); the CPU path in float64 
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, Literal, overload
 
 import numpy as np
 import torch
@@ -252,6 +252,28 @@ def _node_weights(
                 index = (((i_d + a) * n_e + (i_e + b)) * 2 + c)[:, None]
                 weights.scatter_add_(1, index, w[:, None])
     return weights
+
+
+@overload
+def simulate(
+    *,
+    theta: torch.Tensor,
+    layout: Layout,
+    signals: Signals,
+    sharpness: Sharpness,
+    return_state: Literal[False] = False,
+) -> torch.Tensor: ...
+
+
+@overload
+def simulate(
+    *,
+    theta: torch.Tensor,
+    layout: Layout,
+    signals: Signals,
+    sharpness: Sharpness,
+    return_state: Literal[True],
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]: ...
 
 
 def simulate(
