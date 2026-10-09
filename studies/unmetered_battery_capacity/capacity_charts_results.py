@@ -32,6 +32,7 @@ from capacity_charts_common import (
     write_notes,
 )
 from capacity_inputs import OUTPUT_DIR
+from capacity_report_tools import clopper_pearson
 
 SHARE_TITLE: Final[str] = "Battery power as a share of the series' 99th-percentile flow"
 SHARES: Final[list[float]] = [0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.4]
@@ -68,8 +69,8 @@ def headline_figure() -> alt.VConcatChart:
     """Draw figure 1: detection probability against battery power over the noise unit."""
     panels = []
     for marker, label in (
-        ("**Sep-May only.**", "September to May (the nulls' false alarms fall in June to August)"),
-        ("**All blocks.**", "All four 3-month blocks"),
+        ("**All blocks.**", "All 9 series"),
+        ("**Without GSP1.**", "Without GSP1, whose null blocks are flagged (thresholds rebuilt)"),
     ):
         frame = report_table(marker=marker).with_columns(family=pl.col("family").replace(FAMILIES))
         panels.append(
@@ -320,10 +321,16 @@ def false_alarm_figure() -> alt.VConcatChart:
         height=PANEL_HEIGHT_PX * 1.6,
         title=alt.TitleParams("Four blocks per series, no battery added", anchor="start"),
     )
+    flagged_blocks = frame.filter(pl.col("flagged"))
+    flagged_series = sorted(flagged_blocks["series"].unique().to_list())
+    low, high = clopper_pearson(count=flagged_blocks.height, total=frame.height)
     return draw_figure(
         panels=[panel],
         number=12,
-        title="With no battery added, 3 of 36 blocks are flagged, all in June to August",
+        title=(
+            f"With no battery added, {flagged_blocks.height} of {frame.height} blocks are "
+            f"flagged, all of them {' and '.join(flagged_series)}"
+        ),
         subtitle=[
             (
                 "Planned contrast C1. Dot: one 3-month block of a series with no added "
@@ -332,7 +339,8 @@ def false_alarm_figure() -> alt.VConcatChart:
             ),
             (
                 "Flagged: the log Bayes factor lies above the threshold. The realised "
-                "rate is 8.3%, 95% interval 1.8% to 22.5%, against a nominal 5%."
+                f"rate is {flagged_blocks.height / frame.height:.1%}, 95% interval "
+                f"{low:.1%} to {high:.1%}, against a nominal 5%."
             ),
         ],
         figure_planning=None,
