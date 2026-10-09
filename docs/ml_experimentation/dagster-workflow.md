@@ -267,8 +267,8 @@ run config dialog before launching.
    remaining group before scoring any, raising on a refusal; see [What the `metrics` asset refuses
    to score](cross-validation-folds.md#what-the-metrics-asset-refuses-to-score). A run that scores
    a study also scores the reference experiment's group for the same fold, so the study's fold run
-   can hold each score minus the reference's. The skipped studies are tagged stale or current, and
-   every fold run is tagged with a row-key fingerprint.
+   can hold each score minus the reference's. In leaderboard scope, the skipped studies are tagged
+   stale or current, and every fold run is tagged with a row-key fingerprint.
 4. Scores each group in batches of four `time_series_id` values at a time — peak memory is one
    batch, never a whole fold or the entire matched population. See [The other hard ceiling: Polars'
    32-bit row index](../architecture/performance.md#the-other-hard-ceiling-polars-32-bit-row-index)

@@ -82,9 +82,9 @@ ROW_KEY_COLUMNS: Final[tuple[str, ...]] = (
 
 ``ensemble_member`` is part of the key. The fair continuous ranked probability score (CRPS) is
 unbiased only for members drawn at random from the forecaster's belief. A study that chose its own
-member positions, or its own member count, could place two members on either side of the observation
-and score a CRPS near zero while leaving the ensemble mean, and so every deterministic metric,
-unchanged. A study therefore carries the reference's members.
+member count could forecast with two members, one either side of the observation, and score a fair
+CRPS of zero while leaving the ensemble mean, and so every deterministic metric, unchanged. A study
+therefore carries the reference's ensemble-member labels, and so the reference's member count.
 """
 
 

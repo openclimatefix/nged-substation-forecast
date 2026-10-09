@@ -1279,6 +1279,22 @@ def _submission_log() -> list[dict[str, object]]:
     return [json.loads(line) for line in log_path.read_text().splitlines()]
 
 
+def test_score_study_logs_a_stored_study_as_scored_when_tagging_the_run_fails(
+    study_predictions: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail_to_tag(**_: object) -> None:
+        raise ConnectionError("MLflow is unreachable")
+
+    monkeypatch.setattr(score_study, "_tag_submission_number", fail_to_tag)
+
+    with pytest.raises(ConnectionError):
+        score_study.score_study(
+            predictions=study_predictions, study_name="my_study", fold_id=FOLD_ID, replace=False
+        )
+
+    assert [entry["event"] for entry in _submission_log()] == ["attempt", "scored"]
+
+
 def test_score_study_logs_every_attempt_including_a_refused_one_and_tags_the_run(
     study_predictions: Path, tmp_path: Path
 ) -> None:

@@ -903,8 +903,10 @@ times, and valid times, so their scores rest on the same forecast problem; other
 A reviewed experiment that differs from the reference is scored and tagged, never refused."""
 
 STALE_TAG: Final[str] = "stale_against_reference"
-"""``"true"`` on a study's fold run once the reference experiment's row keys have changed since the
-study was scored. An unfiltered ``metrics`` run sets it on every study it skips."""
+"""``"true"`` on a study's fold run once the reference experiment's series, initialisation times, or
+valid times have changed since the study was scored. A change in the reference's ensemble members
+alone is not detected, because ``row_key_fingerprint`` ignores ``ensemble_member``. An unfiltered
+``metrics`` run sets the tag on every study it skips."""
 
 PAIRED_METRIC_PREFIX: Final[str] = "vs_reference__"
 """Prefix of the metric keys that hold a study's score minus the reference's, on a study fold run.
@@ -956,9 +958,10 @@ def _tag_stale_studies(
 ) -> None:
     """Tag each skipped study's fold run stale or current against the reference's row keys.
 
-    A study's fold run holds the fingerprint of the row keys it was scored against. The study is
-    stale when the reference's fingerprint for the fold has since changed. A group with no fold run
-    was never scored and is left alone.
+    A study's fold run holds the study's own fingerprint, which equalled the reference's when the
+    study was scored, because a study is scored only when its row keys match the reference's. The
+    study is stale when the reference's fingerprint for the fold has since changed. A group with no
+    fold run was never scored and is left alone.
     """
     client = MlflowClient()
     reference_fingerprints: dict[str, str] = {}

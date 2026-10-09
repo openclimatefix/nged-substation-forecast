@@ -41,6 +41,6 @@ min_training_months: 6
 # few months, not an independent year. It must be later than every leaderboard fold's val_end.
 final_test_start: "2026-07-01"
 
-# The experiment whose (time_series_id, power_fcst_init_time, valid_time) keys every `study/`
-# experiment must match before the metrics asset scores the study.
+# The experiment whose (time_series_id, power_fcst_init_time, valid_time, ensemble_member) keys
+# every `study/` experiment must match before the metrics asset scores the study.
 reference_experiment_name: "xgboost_no_power_lags"

@@ -29,10 +29,11 @@ run code in the first process.
         predictions.parquet my_study mid_2025_to_mid_2026
 
 Every attempt is appended to `study_submissions.jsonl` in `local_artifacts_path`, whether the
-script scores the file or refuses it. The log is append-only, and each study's MLflow fold run
-carries the `study_submission_number` tag: how many attempts the log holds for that fold, including
-this one. Each new study name is another attempt against the same fold and the same reference, so
-the number says how far a leaderboard score has been selected.
+script scores the file or refuses it. The log is append-only. Each scored study's MLflow fold run
+carries the `study_submission_number` tag, which counts the log's attempts at that fold by every
+study, including this one. Each new study name is another attempt against the same fold and the
+same reference, so the number says how many chances the submitters have had to find a lucky score
+on that fold.
 
 A study that has already been scored is not overwritten. `--replace` overwrites the earlier
 submission, its metrics, and its MLflow fold run, so the script accepts the flag only when
@@ -272,12 +273,6 @@ def score_study(*, predictions: Path, study_name: str, fold_id: str, replace: bo
         _score_study(
             predictions=predictions, study_name=study_name, fold_id=fold_id, replace=replace
         )
-        _tag_submission_number(
-            settings=settings,
-            experiment_name=f"{STUDY_EXPERIMENT_PREFIX}{study_name}",
-            fold_id=fold_id,
-            submission_number=submission_number,
-        )
     except Exception as error:
         _append_to_log(
             log_path=log_path,
@@ -290,6 +285,12 @@ def score_study(*, predictions: Path, study_name: str, fold_id: str, replace: bo
         )
         raise
     _append_to_log(log_path=log_path, entry={**entry, "event": "scored"})
+    _tag_submission_number(
+        settings=settings,
+        experiment_name=f"{STUDY_EXPERIMENT_PREFIX}{study_name}",
+        fold_id=fold_id,
+        submission_number=submission_number,
+    )
 
 
 def _score_study(*, predictions: Path, study_name: str, fold_id: str, replace: bool) -> None:

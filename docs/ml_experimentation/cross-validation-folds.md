@@ -221,23 +221,24 @@ is scored, so a refusal leaves no rows or MLflow runs behind.
   `scripts/forecasting/score_study.py`. The rows of a study must have exactly the keys
   `(time_series_id, power_fcst_init_time, valid_time, ensemble_member)` of the experiment named by
   `reference_experiment_name` in the same config, for the same fold. A study that omits a row the
-  reference forecasts, adds a series, forecasts only at short lead times, or uses a different
-  number of ensemble members is refused. The row key
-  includes `power_fcst_init_time`, so a study must forecast from the reference's initialisation
-  times, which are the times each run of the European Centre for Medium-Range Weather Forecasts
-  (ECMWF) ensemble becomes available. The row key includes `ensemble_member`, because a
-  study that chose its own member positions could score a fair continuous ranked probability score
-  near zero without changing the ensemble mean. A study must also carry exactly one
+  reference forecasts, adds a series, forecasts only at short lead times, or uses ensemble-member
+  labels other than the reference's is refused. The row key includes `power_fcst_init_time`, so a
+  study must forecast from the reference's initialisation times, which are the times each run of the
+  European Centre for Medium-Range Weather Forecasts (ECMWF) ensemble becomes available. The row key
+  includes `ensemble_member`, because a study that chose its own member count could forecast with
+  two members either side of the observation, and so score a fair continuous ranked probability
+  score of zero without changing the ensemble mean. A study must also carry exactly one
   `power_fcst_model_name`, because spreading rows across several model names could down-weight the
   hard rows and so lower the mean error that the leaderboard reports.
 
 **The refusals check which rows a forecast covers, not how the forecast was made.** The `metrics`
 asset cannot tell a forecast trained on the validation year, or built from power observed after its
-initialisation time, from an honest forecast, because `studies.power.scan_power` serves the whole
-validation year. Until the planned submit command truncates training data at `train_end` and runs a
-leakage test, a study's leaderboard number is out-of-sample only if a reviewer has confirmed that
-the study used no observation after the fold's `train_end`, except as a lag earlier than each
-forecast's initialisation time.
+initialisation time, from an honest forecast. A study can build either forecast, because
+`studies.power.scan_power` serves the whole validation year. Until the planned [submit
+command](../roadmap/auto-research.md#the-research-lead-the-submit-command-and-the-review) truncates
+training data at `train_end` and runs a leakage test, a study's leaderboard number is out-of-sample
+only if a reviewer has confirmed that the study used no observation after the fold's `train_end`,
+except as a lag earlier than each forecast's initialisation time.
 
 **An unfiltered run of the `metrics` asset skips study experiments rather than refusing them.**
 Re-materialising the reference experiment can change its row keys, so a study scored earlier stops
@@ -246,7 +247,8 @@ experiment in the `skipped_study_experiments` metadata and scores the reviewed e
 them. A run whose population filter names a study's `experiment_name` scores that study.
 
 **The `metrics` asset also records what each score rests on, so that a reader can compare scores
-safely.** Four records sit beside every leaderboard fold run:
+safely.** Four tags and metrics record this, and only the fingerprint is on every leaderboard fold
+run:
 
 - **A study is scored beside the reference, in the same run.** The `metrics` asset adds the
   reference experiment's group to any run that scores a study, so the study and the reference share
@@ -256,21 +258,24 @@ safely.** Four records sit beside every leaderboard fold run:
   those metrics, not through the two runs' separate numbers.
 - **Every fold run carries a fingerprint of its forecast problem.** `row_key_fingerprint` hashes the
   distinct `(time_series_id, power_fcst_init_time, valid_time)` keys of the group, ignoring
-  `ensemble_member`. The tag `row_keys_match_reference` says whether a group's fingerprint equals
-  the reference's. A reviewed experiment whose fingerprint differs is scored and tagged `false`, not
-  refused, because a reviewed experiment such as `manual_heuristic` may forecast a different set of
-  series. A score compared with a reviewed experiment is comparable with the reference only where
-  the tag is `true`.
+  `ensemble_member`, so a reviewed experiment with 13 members and the reference with 51 members have
+  the same fingerprint when they forecast the same series, initialisation times, and valid times.
+  The tag `row_keys_match_reference` says whether a group's fingerprint equals the reference's. A
+  reviewed experiment whose fingerprint differs is scored and tagged `false`, not refused, because a
+  reviewed experiment such as `manual_heuristic` may forecast a different set of series. A reviewed
+  experiment's score is comparable with the reference's only where that experiment's fold run
+  carries `row_keys_match_reference` set to `true`.
 - **An unfiltered run marks each study it skips as stale or current.** The tag
   `stale_against_reference` is `true` when the reference's fingerprint for the fold no longer equals
-  the one the study was scored against.
+  the one the study was scored against. The fingerprint ignores `ensemble_member`, so a change to the
+  reference's members alone leaves the tag `false`.
 - **Every submission attempt is logged.** `scripts/forecasting/score_study.py` appends each attempt,
-  scored or refused, to `study_submissions.jsonl`, and tags the study's fold run
-  `study_submission_number` with the count of attempts at that fold. Each new study name is another
-  chance to find a lucky score on the one fold, so a leaderboard number from the 200th attempt
-  deserves less trust than one from the first. The script overwrites an earlier submission only
-  when the maintainer's own shell sets `NGED_ALLOW_REPLACE=1`, and the log keeps a record of the
-  overwritten submission.
+  scored or refused, to `study_submissions.jsonl`. The script tags a scored study's fold run
+  `study_submission_number` with the count of attempts by every study at that fold. Each new study
+  name is another chance to find a lucky score on the one fold, so a leaderboard number from the
+  200th attempt deserves less trust than one from the first. The script overwrites an earlier
+  submission only when the maintainer's own shell sets `NGED_ALLOW_REPLACE=1`, and the log keeps a
+  record of the overwritten submission.
 
 ---
 

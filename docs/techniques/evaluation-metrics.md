@@ -255,9 +255,10 @@ roughly ±0.005 depending on the forecast distribution's shape; the central band
 
 PICP alone is also **gameable**: an absurdly wide band hits any coverage target for free. It must
 always be read alongside a sharpness measure — which is what interval width is for (and the proper
-scores, CRPS and pinball, punish over-widening automatically when the members are drawn at random;
-a submitter who chooses the member values can drive fair CRPS to zero, which is why the leaderboard
-scorer requires a study to carry the reference's members).
+scores, CRPS and pinball, punish over-widening automatically when the members are drawn at random).
+A submitter who chooses both the member count and the member values can drive fair CRPS to zero,
+with two members either side of the observation. The leaderboard scorer therefore requires a study
+to carry the reference's ensemble-member labels, which fixes the member count.
 
 ### Interval width
 
