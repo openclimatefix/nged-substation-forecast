@@ -29,8 +29,8 @@ save/load round trip, move out of `manual_heuristic.py` into shared modules, bec
 their second caller. Nothing under `src/nged_substation_forecast/defs/` changes.
 
 **The pooling and the member count were changed by the maintainer after both plan reviews, on the
-evidence of a measurement on the leaderboard fold (decision 4).** The changed parts have not been
-through a fresh adversarial review (review log).
+evidence of a measurement on the leaderboard fold (decision 4).** A third correctness review then
+checked the changed parts, and its findings are applied (review log).
 
 ## Solution
 
@@ -55,18 +55,23 @@ other forecaster gets, with `power` attached and no weather value read.
 cell.** `train` keeps the requested series with non-null `power`, then deduplicates on
 `(time_series_id, valid_time)`. The dedupe comes before the quantiles because the engineer repeats
 each target once per NWP run covering it, up to 15 times, and an undeduplicated target would be
-counted 15 times in its cell. `_local_calendar_cell_keys` then adds `local_month`,
-`local_half_hour_of_day`, and `local_is_weekend` from `valid_time` in `DEFAULT_LOCAL_TIMEZONE`. The
-keys are local, not UTC, because the substation load follows the local clock (decision 2 weighs UTC
-keys on real data). A cross join with the nine offsets in `CLIMATOLOGY_POOLING_OFFSETS` copies each
-sample into its own cell and its eight neighbours, wrapping December to January and half-hour 47 to
-half-hour 0. A `group_by` on `time_series_id` plus the three keys computes the 51 columns
-`power_quantile_member_00` to `power_quantile_member_50` at the levels in
-`CLIMATOLOGY_QUANTILE_LEVELS`, with `"linear"` interpolation passed explicitly because Polars'
-default is `"nearest"`. The collect is streamed, and the result is sorted so the saved parquet is
-deterministic. `trained_time_series_ids` is set from the lookup's distinct series. One aggregate log
-line reports the cell counts, the minimum and median number of pooled samples per cell, and the
-latest training `valid_time`. The sample counts are computed during training and never stored.
+counted 15 times in its cell. `train` collects the deduplicated `(time_series_id, valid_time,
+power)` frame once, with the streaming engine: about 640,000 rows on the leaderboard fold. The
+earliest and latest training `valid_time` for the log line are read from that frame. The pooling
+then runs over batches of series taken from the collected frame, so the nine copies of the samples
+exist for one batch at a time (decision 2). For each batch, `_local_calendar_cell_keys` adds
+`local_month` (`Int8`), `local_half_hour_of_day` (`Int8`), and `local_is_weekend` (`Boolean`) from
+`valid_time` in `DEFAULT_LOCAL_TIMEZONE`. The keys are local, not UTC, because the substation load
+follows the local clock (decision 2 weighs UTC keys on real data). A cross join with the nine
+`Int8` offsets in `CLIMATOLOGY_POOLING_OFFSETS` copies each sample into its own cell and its eight
+neighbours, wrapping December to January and half-hour 47 to half-hour 0. A `group_by` on
+`time_series_id` plus the three keys computes the 51 columns `power_quantile_member_00` to
+`power_quantile_member_50` at the levels in `CLIMATOLOGY_QUANTILE_LEVELS`, with `"linear"`
+interpolation passed explicitly because Polars' default is `"nearest"`. The batches' lookups are
+concatenated and sorted so the saved parquet is deterministic. `trained_time_series_ids` is set from
+the lookup's distinct series. One aggregate log line reports the cell counts, the minimum and median
+number of pooled samples per cell, and the earliest and latest training `valid_time`. The sample
+counts are computed during training and never stored.
 
 **`save` writes the lookup, and `trained_cv_model` uploads it.** `save_to_mlflow` calls
 `ClimatologyForecaster.save(model_dir)`. `save` first calls the new `_saved_model.py` helper, which
@@ -121,8 +126,8 @@ valid_time)`, takes the fair CRPS over the members, and reads the delivery quant
   chunk, so a fold with unseen cells logs one warning per affected chunk. On the leaderboard fold,
   two series with short histories (series 12 and 13, departure 4) leave 12,463 of the 518,294
   validation half-hours that have cleaned power (2.4%) in unseen cells, all in August to December
-  2025. The warning therefore fires in about 12 of the roughly 28 chunks: those whose runs reach
-  August to December 2025.
+  2025. The warning fires in about 12 of the roughly 28 chunks: those whose runs reach August to
+  December 2025. The warnings count rows per NWP run, so their sum exceeds that half-hour count.
 - **An empty chunk** gives a zero-row, correctly typed `PowerForecast` with no special branch. The
   first chunk is written even when empty, because `cv_power_forecasts` uses the first write to
   overwrite the partition.
@@ -284,36 +289,41 @@ the import, and must pass before and after.
 
 ### 2. `train()`: the cells, the dedupe, the pooling, the quantiles, and the leakage argument
 
-**`train(data, time_series_ids)` builds one lookup row per populated cell, in seven lazy steps and
-one streamed collect:**
+**`train(data, time_series_ids)` builds one lookup row per populated cell, in eight steps:**
 
 1. Select `time_series_id`, `valid_time`, and `power`. Keep rows whose `time_series_id` is in
    `time_series_ids` and whose `power` is not null.
 2. Deduplicate on `(time_series_id, valid_time)`. `power` is the observation at `valid_time`, so
    every duplicate carries the same value and `keep="any"` is correct.
-3. Add the three cell keys from one shared helper, `_local_calendar_cell_keys`, which `predict`
-   calls too, so the two cannot drift: `local_month` (1 to 12), `local_half_hour_of_day` (0 to 47),
-   and `local_is_weekend` (local Saturday or Sunday). Each derives from `valid_time` converted to
+3. Collect the deduplicated three-column frame once, with `engine="streaming"`: 639,551 rows on the
+   leaderboard fold. Read the earliest and latest `valid_time` for the log line from this frame.
+   Steps 4 to 6 run on one batch of series at a time, taken from this frame.
+4. Add the three cell keys from one shared helper, `_local_calendar_cell_keys`, which `predict`
+   calls too, so the two cannot drift: `local_month` (`Int8`, 1 to 12), `local_half_hour_of_day`
+   (`Int8`, 0 to 47), and `local_is_weekend` (`Boolean`, local Saturday or Sunday). Each derives
+   from `valid_time` converted to
    `DEFAULT_LOCAL_TIMEZONE` (Europe/London, from `ml_core.features.feature_engineer`), so a
    23:30 UTC target in British Summer Time falls in the next local day's 00:30 slot. The pipeline's
    own `local_*` features are sine and cosine pairs plus a weekday enum, with no integer month or
    half-hour, so the forecaster derives the keys itself, as the roadmap says. Then project to the
    five narrow columns `time_series_id`, `power`, and the three keys, dropping `valid_time`.
-4. Pool: cross-join the samples with `CLIMATOLOGY_POOLING_OFFSETS`, a nine-row frame of every
-   `(month_offset, half_hour_offset)` pair with each offset in −1, 0, and +1. Replace the keys by
+5. Pool: cross-join the samples with `CLIMATOLOGY_POOLING_OFFSETS`, a nine-row frame of every
+   `(month_offset, half_hour_offset)` pair with each offset in −1, 0, and +1. Both offset columns
+   are `Int8`, so the shifted keys keep the `Int8` dtype `_local_calendar_cell_keys` returns and
+   join `predict`'s keys without a cast. Replace the keys by
    the keys of the cell each copy feeds: `local_month` becomes `(local_month − 1 + month_offset) %
    12 + 1`, `local_half_hour_of_day` becomes `(local_half_hour_of_day + half_hour_offset) % 48`,
    and `local_is_weekend` is left unchanged. Polars' integer `%` is floor modulo (checked on Polars
    2.0.0: `-1 % 12` is 11, and `-1 % 48` is 47), so December and January are neighbours, and so
    are half-hours 47 and 0. Drop the offset columns.
-5. Group by `time_series_id` and the three keys. Aggregate one column per member,
+6. Group by `time_series_id` and the three keys. Aggregate one column per member,
    `power_quantile_member_00` to `power_quantile_member_50`, each
    `pl.col("power").quantile(level, "linear")` cast to `Float32`, plus `pl.len()` as the pooled
-   sample count for the train log line described below. The count is dropped before the lookup is
-   stored.
-6. Collect with `engine="streaming"`, and sort by the four key columns so the saved parquet is
+   sample count for the train log line described below. Collect the batch's lookup. The count is
+   dropped before the lookup is stored.
+7. Concatenate the batches' lookups, and sort by the four key columns so the saved parquet is
    deterministic.
-7. Set `trained_time_series_ids` to the sorted distinct `time_series_id` values in the lookup. That
+8. Set `trained_time_series_ids` to the sorted distinct `time_series_id` values in the lookup. That
    set equals "requested and has at least one non-null `power`", the manual heuristic's and
    XGBoost's rule, because pooling never removes a series.
 
@@ -330,14 +340,24 @@ joins exactly as before.
 
 **Pooling costs nine copies of the training samples, and the copies cannot be avoided for exact
 quantiles.** A quantile of a union of samples cannot be assembled from per-cell summaries, so each
-cell's aggregation must see the full set of its pooled samples. The plan keeps the copies small and
-the input read once. Step 3 projects to five narrow columns of about 10 bytes a row before the
-cross join. A cross join reads the deduplicated frame once, whereas a `pl.concat` of nine shifted
-frames would build the engineered frame nine times unless Polars caches the shared subplan. On the
-leaderboard fold, the 639,551 deduplicated training samples become 5.76 million pooled rows, about
-60 MB. At V2 scale, about 55 million samples become about 490 million pooled rows, about 5 GB,
-under the 2³² row-count limit (risk 7). The quantile aggregation holds each group's values in
-memory whatever engine runs the collect, so the plan does not claim the pooled group-by streams.
+cell's aggregation must see the full set of its pooled samples. The quantile aggregation holds each
+group's values in memory whatever engine runs the collect, so the plan does not claim the pooled
+group-by streams. Measured on Polars 2.0.0, the pooled group-by peaks at about 65 bytes per pooled
+row: 0.54 GB for 0.64 million samples, 4.1 GB for 6.4 million, and 11.6 GB for 20 million samples
+(180 million pooled rows). On the leaderboard fold, the 639,551 deduplicated samples become 5.76
+million pooled rows, a peak of about 0.5 GB. At V2 scale, about 55 million samples would become
+about 490 million pooled rows and a peak of about 32 GB in one group-by, above the workstation's
+29 GB.
+
+**`train` therefore pools in batches of series, and the batches give the same lookup as one
+group-by.** Every pooled group sits inside one series, because `time_series_id` is a group-by key
+and the cross join never changes it. Splitting the series into batches therefore changes no
+group's samples. A module constant, `_POOLING_SERIES_PER_BATCH: Final = 100`, sets the batch size.
+At V2 a series holds about 22,000 samples, which pool to about 200,000 rows and about 13 MB, so a
+batch of 100 series peaks at about 1.3 GB. At V1 the 31 series fit in one batch. The loop is a
+`for` over `itertools.batched` of the sorted series ids, filtering the collected frame with
+`is_in`, about 6 lines. Collecting the deduplicated frame once (step 3) means the engineered frame
+is built once, however many batches follow. Test 10 pins that batching changes nothing.
 
 **The quantile interpolation is Polars' `"linear"`, passed explicitly.** `"linear"` is
 Hyndman and Fan's type 7: for n samples, level p reads position (n − 1)·p between the sorted
@@ -437,11 +457,13 @@ Christmas, and Easter are ordinary days.** The maintainer decided this after a r
 on the leaderboard fold, whose alternatives and numbers are in "Considered and rejected". Christmas
 Day on a weekday therefore falls in December's weekday cells, as in the manual heuristic.
 
-**The best alternative improves substations by only 0.33% over all rows, and needs a holiday
-calendar.** Treating bank holidays as weekend-type days helps on Christmas bank holidays but worsens
-the upper tail on the other bank holidays and worsens PV. The calendar would be a hand-kept list of
-dates or the `holidays` package, which would change `uv.lock`. A calendar-aware day type is the
-design question of
+**The best alternative overall improves substations by only 0.33% over all rows, and needs a
+holiday calendar.** That alternative, B in "Considered and rejected", treats bank holidays as
+weekend-type days. B helps on Christmas bank holidays but worsens the upper tail on the other bank
+holidays and worsens PV. Alternative C, which adds 24 December to 1 January to B, improves
+substations by 0.49% over all rows but is 4.6% worse on the Christmas-week weekdays that are not
+bank holidays. The calendar would be a hand-kept list of dates or the `holidays` package, which
+would change `uv.lock`. A calendar-aware day type is the design question of
 [issue #1088 (Implement the manual_heuristic_holiday_aligned baseline forecaster)](https://github.com/openclimatefix/nged-substation-forecast/issues/1088),
 so treating bank holidays as weekend-type days in climatology belongs with that issue.
 
@@ -534,7 +556,8 @@ over nine cells improves the substations' pinball loss at p99 by 42% and the low
 members and 20.0% at 13 unpooled. For substations and wind, the 51-member pooled variant has the
 best plain CRPS, mean pinball loss, p99 pinball loss, and p99 exceedance of the variants measured.
 For PV, pooling over the months alone at 51 members is up to 1.4 percentage points better on the
-plain CRPS, the mean pinball loss, and the p99 pinball loss, and worse on the p99 exceedance. For
+plain CRPS, the mean pinball loss, and the p99 pinball loss, up to 3.4 percentage points better on
+the p95 pinball loss, and worse on the p99 exceedance. For
 the two series in the other group, a battery and a biofuel generator, 13 members pooled over nine
 cells score better on the plain CRPS and the mean pinball loss, and 51 members score better on the
 p99 pinball loss and the p99 exceedance.
@@ -568,7 +591,7 @@ tails, which are this project's priority.
 
 **On the leaderboard's fair CRPS, the chosen climatology reads the same as 13 unpooled members.**
 For substations, 51 pooled members change the fair CRPS by +0.04% against 13 unpooled members, and
-read about 5% worse than 13 pooled members, though their plain CRPS is 3.4% better than 13
+read 5.6% worse than 13 pooled members, though their plain CRPS is 3.4% better than 13
 unpooled. A reader comparing `crps__all__extended_range` across forecasters needs that, so the
 README states the fair CRPS bias.
 
@@ -644,10 +667,13 @@ copies the manual-heuristic run, so the shared data folder gains only climatolog
   `PopulationFilter(experiment_name="climatology", fold_id="mid_2025_to_mid_2026")`. Nothing
   touches the `xgboost_*` or `manual_heuristic` partitions or MLflow experiments.
 - Before reading results, record per series the number of populated cells out of 1,152, from the
-  saved lookup, and the rows `predict` dropped, summed over the per-chunk warnings. Expect 1,152
-  cells for the 29 full-history series, 676 for series 12, and 781 for series 13, and expect the
-  dropped rows to cover 12,463 validation half-hours with cleaned power, all in series 12 and 13.
-  A mismatch means the pooling differs from the measured neighbourhood. Record the minimum and
+  saved lookup. Expect 1,152 cells for the 29 full-history series, 676 for series 12, and 781 for
+  series 13. Then count the `(time_series_id, valid_time)` pairs of the cleaned truth in the
+  validation window that XGBoost forecasts and climatology does not. Expect 12,463 pairs, all in
+  series 12 and 13. A mismatch in either count means the pooling differs from the measured
+  neighbourhood. Record the summed counts of the per-chunk `predict` warnings separately, as rows
+  per NWP run. Those counts cannot equal 12,463, because `predict` counts one dropped row per
+  series, NWP run, and valid time, including valid times with no cleaned power. Record the minimum and
   median pooled samples per cell from the train log line (expected 1 and 156). Confirm that the
   latest training `valid_time` in the train log is no later than 2025-06-30 23:59:59 UTC, and that
   every forecast row has 51 members.
@@ -695,9 +721,10 @@ XGBoost comparison still needs a retrain. Fourth, one fold of one year, with no 
   and `load` call the shared helpers. The `predict` docstring names the new engineer.
 - **`climatology.py` (new).** `CLIMATOLOGY_MEMBER_COUNT: Final = 51`,
   `CLIMATOLOGY_QUANTILE_LEVELS: Final[tuple[float, ...]]` derived from it, the 51 quantile-column
-  names, `CLIMATOLOGY_POOLING_OFFSETS` (the nine `(month_offset, half_hour_offset)` pairs, each
-  offset in −1, 0, and +1), `_local_calendar_cell_keys` (one function returning the three key
-  expressions from a `valid_time` expression and a time zone), a module `logger`, and
+  names, `CLIMATOLOGY_POOLING_OFFSETS` (the nine `(month_offset, half_hour_offset)` pairs as two
+  `Int8` columns, each offset in −1, 0, and +1), `_POOLING_SERIES_PER_BATCH: Final = 100`,
+  `_local_calendar_cell_keys` (one function returning the three key expressions, `Int8`, `Int8`,
+  and `Boolean`, from a `valid_time` expression and a time zone), a module `logger`, and
   `ClimatologyForecaster` with `MODEL_NAME = "climatology"`, `MODEL_VERSION = 1`, `CONFIG_CLASS =
   BaseForecasterConfig`, `feature_engineer = NwpRunRowsWithoutWeatherFeatureEngineer()`,
   `__init__`, `trained_time_series_ids`, `train`, `predict`, `save`, and `load` as described above.
@@ -767,7 +794,10 @@ samples, and the expected members follow from a one-line formula per cell.
 1. **Construction.** `ClimatologyForecaster(BaseForecasterConfig(selected_features=set()))`
    succeeds. A config selecting `power_lag_168h` raises `ValueError`.
 2. **Hand-computed quantiles and the wrap.** One series, one cell, 5 deduplicated samples with
-   power 0, 10, 20, 30, and 40, all at local January, half-hour 0, on weekdays. The lookup holds
+   power 0, 10, 20, 30, and 40, all at local January, half-hour 0, on weekdays. One of the five
+   samples is a Monday at local 00:00. A pooling that shifts the instant (`valid_time` by ±30
+   minutes or ±1 month) instead of the cell keys puts that sample's −30-minute copy at Sunday
+   23:30, in a weekend half-hour-47 cell, and fails the assertion that follows. The lookup holds
    exactly 9 rows: months 12, 1, and 2 × half-hours 47, 0, and 1, all with `local_is_weekend`
    false. Every row's member-k column equals 40·(k + 0.5)/51 for k = 0 to 50, to `Float32`
    precision, so the test pins all 51 levels: member 0 is 0.392, member 25 is 20, and member 50 is
@@ -810,7 +840,9 @@ samples, and the expected members follow from a one-line formula per cell.
     series 2 has only null power, series 3 is not requested, and series 1 and 4 carry different
     power in the same calendar cell, give `trained_time_series_ids == [1, 4]`. The lookup holds no
     cell for series 2 or 3, and the quantiles of series 1 and 4 in the shared cell differ. A
-    group-by or a cross join that drops `time_series_id` fails.
+    group-by or a cross join that drops `time_series_id` fails. With `_POOLING_SERIES_PER_BATCH`
+    monkeypatched to 1, so series 1 and 4 pool in separate batches, the lookup equals
+    (`assert_frame_equal`) the lookup trained in one batch.
 11. **Save and load.** `load(save(...))` returns the same `trained_time_series_ids`, an equal config,
     and an equal lookup, and `predict` after the round trip equals `predict` before it. A stale file
     placed in the directory before `save` is gone afterwards. `meta.json`'s `model_class` is
@@ -837,8 +869,10 @@ unchanged apart from the engineer's import and name.
 
 **`tests/test_climatology_cv.py` (integration, `pytestmark = pytest.mark.integration`), test 13:**
 modelled on `tests/test_manual_heuristic_cv.py`. Register `conf/model/climatology.yaml` with
-`config_overrides={}`. Write power from 30 days before the first training day to 12 hours after the
-validation day, then `write_cleaned_copy` it, so `scan_cleaned_power` sees every row. Write the
+`config_overrides={}`. Write power from 30 days before the first training day through Saturday
+2025-08-02 12:00 UTC, then `write_cleaned_copy` it, so `scan_cleaned_power` sees every row. The
+Saturday run's valid times then carry power, so a `predict` that wrongly dropped rows with null
+power cannot pass for the unseen-cell drop. Write the
 metadata and the eligible-series table as that module does. Write NWP as: member-0 runs on five
 weekdays of August 2024 inside the training window (each giving the five valid times `half_hours`
 yields, 11:00 to 13:00 BST, local half-hours 22 to 26); a validation run with members 0, 1, and 2
@@ -850,15 +884,19 @@ then read `power_forecasts` and assert:
   EXPERIMENT_NAME`, and `power_fcst_model_name == "climatology"`.
 - The rows are exactly the five Friday valid times × 51 members, 255 rows: the three NWP members are
   not repeated, and the Saturday run's rows are dropped without failing the asset.
-- Each row's `power_fcst` equals an oracle computed in the test. The oracle pools in plain Python:
+- Each row's `power_fcst` equals an oracle computed in the test, after the oracle values pass
+  through `delta_store.precision.round_to_significand_bits` with
+  `keep_bits=POWER_FCST_SIGNIFICAND_BITS` (13, from `delta_store.power_forecasts`). The rounding is
+  needed because `write_power_forecasts` rounds `power_fcst` to 13 significand bits, so `==`
+  against an unrounded interpolated quantile fails. The oracle pools in plain Python:
   for a validation row in local half-hour h, the training samples are the 25 August 2024 samples
   whose local half-hour is within one of h, cyclically, on a weekday, with the month within one of
   August. Here that is the 10 samples of half-hours 22 and 23 for h = 22, 15 samples for h = 23 to
   25, and 10 for h = 26. The oracle then takes `numpy.quantile(..., method="linear")` at level
-  (k + 0.5)/51. `power_at` gives each training half-hour a distinct value, so the 51 members of
-  each row are distinct, and a mislabelled member fails. The validation-day power is never a
-  sample, so a training step that read validation data would fail the oracle, and so would a
-  `train` that did not pool.
+  (k + 0.5)/51. `power_at` gives each training half-hour a distinct value. The test asserts that
+  each row's 51 rounded oracle values are pairwise distinct, so a mislabelled member fails. The
+  validation-day power is never a sample, so a training step that read validation data would fail
+  the oracle, and so would a `train` that did not pool.
 - **CRPS flows over the members.** The test calls `compute_metrics` on the forecasts it read back,
   with `scan_cleaned_power` as the actuals, the metadata it wrote, and a one-row effective-capacity
   frame. The `horizon_slice="all"` row for `crps` is non-null and differs from the `mae` row, which
@@ -890,6 +928,8 @@ The test fails on `main` at the missing YAML target. The NWP run on a training d
     - Most of the remaining tail miscalibration is year-to-year variation that no member
       representation fixes: on the leaderboard fold the substations' p99 is still exceeded on 6.4%
       of rows.
+    - For the battery and the biofuel generator, 51 pooled members worsen the p01 and p05 pinball
+      losses by 18% and 14% against 13 unpooled members, giving no series ID.
     - The 51-member climatology compares with XGBoost's 51 members at equal m, and with the
       13-member manual heuristic at unequal m on PICP, pinball loss, interval width, and the
       exceedance rate.
@@ -1004,10 +1044,12 @@ dropped rows, and pooled sample counts check that the implemented pooling is the
 7. **Training memory and time at V2 scale.** The training frame is about 2,500 series × 21,900
    half-hours × up to 15 runs, around 820 million rows before the dedupe, under the 2³² row-count
    limit. The dedupe leaves about 55 million samples, and pooling copies them to about 490 million
-   narrow rows, about 5 GB, which the 51 quantile expressions then aggregate. Recommendation: accept
-   now, because the V1 pooled frame is 5.76 million rows. If V2 memory or time is too high, run the
-   pooling and the group-by over batches of series on the collected, deduplicated frame, so the
-   nine copies cover one batch at a time. Question 8 is the structural fix for the pre-dedupe
+   rows. At the measured 65 bytes per pooled row, one group-by over all of them would peak at about
+   32 GB, above the workstation's 29 GB. The plan therefore pools in batches of 100 series
+   (decision 2), which caps the pooled group-by at about 1.3 GB at V2, and the collected
+   deduplicated frame of about 55 million rows stays in memory beside it. The time at V2 is not
+   measured. The pre-dedupe engineered frame of about 820 million rows is not batched, because
+   `trained_cv_model` builds it before `train` runs. Question 8 is the structural fix for that
    frame.
 8. **Should `train` receive one row per series and valid time, with no NWP runs?** The simplicity
    review proposed a training-specific hook on `FeatureEngineer` that gives `train` one row per
@@ -1051,10 +1093,10 @@ give the pooled cell counts and the dropped rows per series.
   exceeded on 20.0% of rows, and 51 pooled members cut the p99 pinball loss by 53%. The PR C item's
   "false precision" argument assumed 8 to 19 samples per cell. Pooling raises the 29 full-history
   series to at least 66 (decision 4).
-- **Pool over months only (three cells).** Better than no pooling, and up to 1.4 percentage points
-  better than nine cells for PV on the plain CRPS, the mean pinball loss, and the p95 and p99
-  pinball losses, but worse than nine cells
-  at the same member count on every pinball loss and on the p99 exceedance for substations.
+- **Pool over months only (three cells).** Better than no pooling. For PV, better than nine cells
+  by up to 1.4 percentage points on the plain CRPS, the mean pinball loss, and the p99 pinball
+  loss, and by up to 3.4 percentage points on the p95 pinball loss. For substations, worse than
+  nine cells at the same member count on every pinball loss and on the p99 exceedance.
 - **More than 51 members.** At 101 unpooled members, the p99 pinball loss improves by 2.3
   percentage points more than at 51 and the plain CRPS barely moves, for twice the stored rows.
 - **A normal distribution per cell.** Never the best variant: 2.8% better than 13 unpooled members
@@ -1154,3 +1196,16 @@ in the planning session's scratchpad, not committed.
   kept the plain local weekday and weekend day type. The bank-holiday risk was removed from "Risks
   and open questions" and recorded as a subsection of decision 2, and the three alternatives joined
   "Considered and rejected". **These changes have not been through a fresh adversarial review.**
+- Plan review 3, correctness review of the pooling and member-count changes (Opus), 2026-10-09:
+  verdict "implementation can start after edits"; all 8 findings accepted. The reviewer verified
+  that the pooling specification and the hand-computed test values are exact. Finding 1 corrects
+  the V2 training memory from about 5 GB to about 32 GB, at a measured 65 bytes per pooled row, and
+  makes per-series batching of the pooling part of `train` (decision 2, risk 7, and test 10).
+  Finding 2 rounds test 13's oracle to 13 significand bits before comparing. Finding 3 replaces
+  decision 6's dropped-row check with a count of truth pairs XGBoost forecasts and climatology does
+  not. Finding 4 adds a Monday 00:00 sample to test 2. Finding 5 makes `train` collect the
+  deduplicated frame once and log the earliest and latest `valid_time` from it. Finding 6 states the
+  `Int8` offsets and key dtypes. Finding 7 extends test 13's power through Saturday 2025-08-02.
+  Finding 8 corrects the three-cell PV figures, the bank-holiday alternatives B and C, and the
+  5.6% fair CRPS gap to 13 pooled members, and adds a README caveat for the battery and the
+  biofuel generator.
