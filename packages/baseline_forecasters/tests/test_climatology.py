@@ -9,6 +9,7 @@ import polars as pl
 import pytest
 from baseline_forecasters import climatology
 from baseline_forecasters.climatology import (
+    _LOOKUP_SCHEMA,
     CLIMATOLOGY_MEMBER_COUNT,
     CLIMATOLOGY_QUANTILE_COLUMNS,
     ClimatologyForecaster,
@@ -174,6 +175,22 @@ def test_predict_on_empty_input_returns_a_valid_empty_frame() -> None:
     PowerForecast.validate(forecast)
 
 
+def test_train_on_no_samples_warns_and_predict_drops_every_row(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    forecaster = _forecaster()
+
+    with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+        forecaster.train(_features([(1, _utc(2025, 1, 6), None)]), [1])
+        forecast = forecaster.predict(_features([(1, _utc(2025, 1, 14), 5.0)]))
+
+    assert "found no training samples" in caplog.records[0].getMessage()
+    assert forecaster.trained_time_series_ids == []
+    assert forecast.height == 0
+    PowerForecast.validate(forecast)
+    assert "dropped 1 forecast rows" in caplog.records[1].getMessage()
+
+
 def test_predict_stamps_the_identity_columns() -> None:
     forecaster = _forecaster(experiment_name="exp_clim", ml_flow_experiment_id=7)
     forecaster.train(_features(_january_weekday_samples()), [1])
@@ -246,6 +263,8 @@ def test_save_then_load_round_trips_and_replaces_the_directory(tmp_path: Path) -
     assert loaded.trained_time_series_ids == [1]
     assert loaded.model_params == forecaster.model_params
     assert_frame_equal(loaded._lookup, forecaster._lookup)
+    assert dict(forecaster._lookup.schema) == _LOOKUP_SCHEMA
+    assert dict(loaded._lookup.schema) == _LOOKUP_SCHEMA
     assert_frame_equal(loaded.predict(_features(rows)), forecaster.predict(_features(rows)))
     meta = json.loads((tmp_path / "meta.json").read_text())
     assert meta["model_class"] == "baseline_forecasters.climatology.ClimatologyForecaster"
@@ -260,6 +279,8 @@ def test_neighbourhood_is_one_month_and_one_half_hour_with_the_same_day_type(
         (1, _utc(2025, 3, 6, 5, 30), 20.0),  # Thursday, March, half-hour 11
         (1, _utc(2025, 5, 6, 4), 100.0),  # Tuesday, May, half-hour 10 (04:00 UTC is 05:00 BST)
         (1, _utc(2025, 3, 8, 5), 1000.0),  # Saturday, March, half-hour 10
+        (1, _utc(2025, 3, 7, 23, 30), 7.0),  # Friday, March, half-hour 47
+        (1, _utc(2025, 3, 9, 23, 30), 9.0),  # Sunday, March, half-hour 47
     ]
     forecaster = _forecaster()
 
@@ -287,6 +308,9 @@ def test_neighbourhood_is_one_month_and_one_half_hour_with_the_same_day_type(
     assert members(6, 10, weekend=False) == pytest.approx([100.0] * 51)
     assert members(3, 12, weekend=False) == pytest.approx([20.0] * 51)
     assert members(3, 10, weekend=True) == pytest.approx([1000.0] * 51)
+    # Half-hour 47 wraps up to half-hour 0 and keeps its own day type, not the next day's.
+    assert members(3, 0, weekend=False) == pytest.approx([7.0] * 51)
+    assert members(3, 0, weekend=True) == pytest.approx([9.0] * 51)
     assert members(3, 13, weekend=False) is None
     assert members(7, 10, weekend=False) is None
     assert any("minimum 1," in record.getMessage() for record in caplog.records)
