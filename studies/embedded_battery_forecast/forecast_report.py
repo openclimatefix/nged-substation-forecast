@@ -429,12 +429,7 @@ def leaderboard(
 ) -> tuple[list[str], pl.DataFrame]:
     """Return the report lines and the data of one issue time's leaderboard."""
     losses = load_losses(setting=setting, issue=issue, arms=arms, batteries=batteries)
-    clim_means = losses.filter(pl.col("arm") == CLIM)["crps_pct"].mean()
-    clim_values = (
-        losses.filter(pl.col("arm") == CLIM)
-        .sort("site", "time", "seed")
-        .select("crps_pct", "month")
-    )
+    clim_losses = losses.filter(pl.col("arm") == CLIM)
     rows = []
     data = []
     for arm in arms:
@@ -444,15 +439,22 @@ def leaderboard(
         interval = bootstrap_absolute(losses=subset, arm=arm, metric="crps_pct")
         stats = coverage_summary(setting=setting, issue=issue, arm=arm, batteries=batteries)
         arm_values = subset.sort("site", "time", "seed").select("crps_pct", "month")
+        reference_values = (
+            clim_losses.filter(pl.col("site").is_in(subset["site"].unique().to_list()))
+            .sort("site", "time", "seed")
+            .select("crps_pct", "month")
+        )
         skill = (
             month_skill_interval(
                 treatment=arm_values["crps_pct"].to_numpy(),
-                reference=clim_values["crps_pct"].to_numpy(),
+                reference=reference_values["crps_pct"].to_numpy(),
                 months=arm_values["month"].to_numpy(),
             )
-            if arm_values.height == clim_values.height
+            if arm_values.height == reference_values.height
             else (float("nan"),) * 3
         )
+        n_batteries = subset["site"].n_unique()
+        shown = arm if n_batteries == len(batteries) else f"{arm} ({n_batteries} batteries only)"
         index_80 = SYMMETRIC_BANDS.index((0.1, 0.9))
         index_98 = SYMMETRIC_BANDS.index((0.01, 0.99))
         data.append(
@@ -460,6 +462,7 @@ def leaderboard(
                 "label": label,
                 "issue": issue,
                 "arm": arm,
+                "n_batteries": n_batteries,
                 "crps": interval["value"],
                 "crps_lower": interval["lower_95"],
                 "crps_upper": interval["upper_95"],
@@ -478,7 +481,7 @@ def leaderboard(
         )
         rows.append(
             [
-                f"`{arm}`",
+                f"`{shown}`",
                 f"{interval['value']:.3f} [{interval['lower_95']:.3f}, {interval['upper_95']:.3f}]",
                 f"{subset['pinball_pct'].mean():.3f}",
                 f"{subset['median_abs_error_pct'].mean():.3f}",
@@ -489,7 +492,6 @@ def leaderboard(
                 f"{stats['width_pct'][index_98]:.2f}",
             ]
         )
-    del clim_means
     lines = table(
         headers=[
             "Arm",
@@ -893,6 +895,16 @@ def main() -> None:
         *arm_lines(),
         "",
     ]
+    for name in ("a0_report_primary.md", "price_model_report.md", "inputs/inputs_report.md"):
+        path = EMBEDDED_BATTERY_FORECAST_DIR / name
+        if path.exists():
+            text = path.read_text().splitlines()
+            lines += [
+                f"## From `{name}`",
+                "",
+                *[f"#{line}" if line.startswith("#") else line for line in text[1:]],
+                "",
+            ]
     lines += leaderboard_section(testbed=testbed, nged=nged)
     planned_lines, planned = planned_section(testbed=testbed, nged=nged)
     exploratory_lines, exploratory = exploratory_section(testbed=testbed, nged=nged)
