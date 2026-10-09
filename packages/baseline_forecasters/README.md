@@ -73,11 +73,11 @@ samples sit at the observed extremes of those samples, because linear interpolat
 extrapolates. A cell with one pooled sample gives 51 equal members. The training run logs the
 minimum and median pooled samples per cell.
 
-**The climatology is tuned in-sample on the leaderboard fold.** The cell keying, pooling width, member count, and
-holiday handling were chosen by scoring on the same validation year the leaderboard fold uses, so
-the climatology is a slightly stronger reference than an untuned one. Series with under 7 months of
-history (two of the 31) are forecast only on the cells they have, and a CRPSS against climatology is
-not meaningful for them.
+**The climatology is tuned in-sample on the leaderboard fold.** The cell keying, pooling width,
+member count, and holiday handling were chosen by scoring on the same validation year the
+leaderboard fold uses, so the climatology is a slightly stronger reference than an untuned one.
+Series with under 7 months of history (two of the 31) are forecast only on the cells they have, and
+a CRPSS against climatology is not meaningful for them.
 
 **Climatology drops a forecast row whose cell has no training sample anywhere in its
 neighbourhood.** `predict` logs one warning with the count and the series. A series whose history is
@@ -93,8 +93,8 @@ members, and 51 members read about 2% below (1.6% to 2.3% across the 27 full-his
 51-member pooled climatology therefore reads no better on the fair CRPS than a 13-member unpooled
 climatology would, though its tails are far better. The same effect flatters climatology by about
 2% against the manual heuristic and XGBoost, which does not change any ranking, because the gaps are
-8% and 29%. The same effect also gives climatology a small structural edge in a CRPS comparison with the
-weather ensemble ([Ferro (2014)](https://doi.org/10.1002/qj.2270)): read a near-tie at extended
+8% and 29%. The effect also gives climatology a small structural edge in a CRPS comparison with
+the weather ensemble ([Ferro (2014)](https://doi.org/10.1002/qj.2270)): read a near-tie at extended
 range as "the weather ensemble adds little out here", not as climatology winning.
 
 **Most of the remaining tail miscalibration is year-to-year variation and sampling error that no
