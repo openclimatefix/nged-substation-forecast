@@ -1,63 +1,108 @@
 # Plan: protect the leaderboard scorer for autonomous research (#958)
 
-**Problem.** Anything that scores a forecast today can also edit the scoring code, drop the rows it
-is bad at, or score on actuals it should not have seen. An autonomous research session would hit all
-three. The issue also bundles two kinds of work: code changes in this repository, and sysadmin steps
-(Unix user, ACLs, a `sudo` rule) that only the maintainer can run.
+**Problem.** Any code or session that scores a forecast today can also edit the scoring code, drop
+the rows it is bad at, or score on actuals it should not have seen. An autonomous research session
+could do all three.
+
+**The issue also bundles two kinds of work.** Code changes in this repository sit beside sysadmin
+steps (Unix user, access control lists (ACLs), a `sudo` rule) that only the maintainer can run.
 
 **Solution.** The `metrics` asset becomes the only source of a leaderboard number and protects
 itself. A study's forecasts must carry exactly the same row keys as a reference experiment's, so a
 study cannot abstain on hard rows. Scoring refuses any window reaching past `FINAL_TEST_START`
 unless `NGED_FINAL_TEST=1` is set. A new `scripts/forecasting/score_study.py` scores a study's
-predictions file by running the asset from `main`. The shared study power reader (issue #1082) stops
-at the same date. An `import-linter` contract keeps the scorer free of `dagster`, `mlflow`, and
-`studies`. The sysadmin steps move into a separate maintainer-run issue.
+predictions file by running the asset from `main`. The shared study power reader (issue #1082) also
+stops at the same date. An `import-linter` contract keeps the scorer free of `dagster`, `mlflow`,
+and `studies`. The sysadmin steps move into a separate maintainer-run issue.
 
-## Solution
-
-### Walk through
+## Walk through: from a study's predictions file to a leaderboard number
 
 **The happy path: a study's predictions file reaches a leaderboard number.**
 
-- To score a study, the maintainer's `sudo` rule runs `scripts/forecasting/score_study.py` with a predictions parquet file, a study name, and a leaderboard fold id.
-- `main()` first re-executes the interpreter with an environment holding only `PATH`, `HOME`, `LANG`, and `LC_ALL` (plus a marker variable so it re-executes once). We do this because `Settings` reads `DATA_PATH_INTERNAL`, `CV_CONFIG_PATH`, and `MLFLOW_TRACKING_URI`, and the `metrics` asset reads `NGED_FINAL_TEST`, so a variable in the caller's shell could repoint the actuals or lift the date guard.
-- `score_study()` loads `CvConfig` through `Settings().cv_config_path` and checks that the fold is in `leaderboard_fold_ids`. `validate_study_name` allows only `^[a-z0-9_-]{1,64}$`, because the Delta writers build their overwrite predicate by f-string.
-- `_open_predictions` scans the file lazily, refuses a row-key column whose dtype differs from `PowerForecast`'s, refuses a `fold_id` column that holds any other value, and stamps `experiment_name = study/<name>` and the fold id.
-- `_partition_has_rows` refuses an existing `(study/<name>, fold)` partition unless `--replace` is set. This check runs before the expensive key check.
-- `require_same_row_keys` (in `ml_core/metrics.py`) compares the file's keys `(time_series_id, power_fcst_init_time, valid_time)` with the reference experiment's rows for the same fold, named by `CvConfig.reference_experiment_name`. It anti-joins both ways, four series at a time, and leaves out `ensemble_member` so a one-member study can match a 51-member reference.
-- `_write_in_batches` validates every batch as `PowerForecast` in a first pass, then writes: the first batch replaces the `(experiment_name, fold_id)` partition and the rest append, so peak memory is one batch and a malformed row leaves no partial partition.
-- The script then calls `dagster.materialize([metrics])` with a `PopulationFilter` for `study/<name>` and the fold, in `leaderboard` scope.
-- In `metrics`, `_resolve_eval_window` returns an `_EvalWindow` per group, and `_validate_group` runs for every group before any group is scored. For this group it calls `require_window_within_guard` (a no-op in leaderboard scope, where the window ends at `val_end`, earlier than `final_test_start`), `require_valid_times_within_window` (rows outside `[val_start, val_end]` raise), and `require_same_row_keys` again, because the asset is the one source of a leaderboard number.
-- Scoring then follows the unchanged path: `_score_forecast_group` takes the `_EvalWindow`, scores in series batches, writes `forecast_metrics`, and logs to the fold's MLflow run under the `study/<name>` experiment.
+1. To score a study, the maintainer's `sudo` rule runs `scripts/forecasting/score_study.py` with a
+   predictions parquet file, a study name, and a leaderboard fold id.
+2. `main()` first re-executes the interpreter with an environment holding only `PATH`, `HOME`,
+   `LANG`, and `LC_ALL` (plus a marker variable so it re-executes once). We clear the environment
+   because a variable in the caller's shell could otherwise repoint the actuals or lift the date
+   guard: `Settings` reads `DATA_PATH_INTERNAL`, `CV_CONFIG_PATH`, and `MLFLOW_TRACKING_URI`, and
+   the `metrics` asset reads `NGED_FINAL_TEST`.
+3. `score_study()` loads `CvConfig` through `Settings().cv_config_path` and checks that the fold is
+   in `leaderboard_fold_ids`. `validate_study_name` allows only `^[a-z0-9_-]{1,64}$`, because the
+   Delta writers build their overwrite predicate by f-string.
+4. `_open_predictions` scans the file lazily, refuses a row-key column whose dtype differs from
+   `PowerForecast`'s, refuses a `fold_id` column that holds any other value, and stamps
+   `experiment_name = study/<name>` and the fold id.
+5. `_partition_has_rows` refuses an existing `(study/<name>, fold)` partition unless `--replace` is
+   set. This check runs before the expensive key check.
+6. `require_same_row_keys` (in `ml_core/metrics.py`) compares the file's keys `(time_series_id,
+   power_fcst_init_time, valid_time)` with the reference experiment's rows for the same fold, named
+   by `CvConfig.reference_experiment_name`. It anti-joins both ways, four series at a time, and
+   leaves out `ensemble_member` so a one-member study can match a 51-member reference.
+7. `_write_in_batches` validates every batch as `PowerForecast` in a first pass, then writes: the
+   first batch replaces the `(experiment_name, fold_id)` partition and the remaining batches append.
+   Peak memory is therefore one batch, and a malformed row leaves no partial partition.
+8. The script then calls `dagster.materialize([metrics])` with a `PopulationFilter` for
+   `study/<name>` and the fold, in `leaderboard` scope.
+9. In `metrics`, `_resolve_eval_window` returns an `_EvalWindow` per group, and `_validate_group`
+   runs for every group before any group is scored. For the study's group, `_validate_group` calls
+   `require_window_within_guard` (a no-op in leaderboard scope, where the window ends at `val_end`,
+   earlier than `final_test_start`), `require_valid_times_within_window` (rows outside `[val_start,
+   val_end]` raise), and `require_same_row_keys` again, because the asset is the one source of a
+   leaderboard number.
+10. Scoring then follows the unchanged path: `_score_forecast_group` takes the `_EvalWindow`, scores
+    in series batches, writes `forecast_metrics`, and logs to the fold's MLflow run under the
+    `study/<name>` experiment.
 
 **Branches off the happy path.**
 
-- **A reviewed experiment** (name not starting `study/`) skips the key check, but still gets the row-window check in leaderboard scope and the date guard in ad-hoc scope.
-- **An unfiltered run** (`population_filter.experiment_name is None`) skips every `study/` experiment and names them in the `skipped_study_experiments` metadata, so a stale study cannot stop reviewed experiments scoring.
-- **Ad-hoc scope** takes the window from the observed `valid_time` extent, so the date guard is live there: a window reaching `final_test_start` raises unless `NGED_FINAL_TEST=1`. `fold_id == "live"` rows are exempt.
-- **Promotion**: `list_promotable_runs` skips `study/` experiments, so a study's fold run never reaches the candidates list.
-- **Studies reading power**: `studies.power.scan_power()` reads cleaned power and stops before midnight UTC on the config's `final_test_start`, so a study never sees the observations the scorer refuses.
-- **CI**: `lint-imports` runs as a pre-commit hook, and CI's "Pre-commit (every hook, every file)" step runs it. It fails if `ml_core.metrics` or `ml_core.cv_helpers` imports `dagster`, `mlflow`, or `studies`, directly or indirectly.
+- **A reviewed experiment** (name not starting `study/`) skips the key check, but still gets the
+  row-window check in leaderboard scope and the date guard in ad-hoc scope.
+- **An unfiltered run** (`population_filter.experiment_name is None`) skips every `study/`
+  experiment and names the skipped experiments in a warning and in the `skipped_study_experiments`
+  metadata. A study whose reference experiment has since been re-materialised or renamed therefore
+  cannot stop reviewed experiments scoring.
+- **Ad-hoc scope** takes the window from the observed `valid_time` extent, so the date guard is live
+  there: a window reaching `final_test_start` raises unless `NGED_FINAL_TEST=1`. `fold_id == "live"`
+  rows are exempt.
+- **Promotion**: `list_promotable_runs` skips `study/` experiments, so a study's fold run never
+  reaches the candidates list.
+- **Studies reading power**: `studies.power.scan_power()` reads cleaned power and stops before
+  midnight UTC on the config's `final_test_start`, so a study never sees the observations the scorer
+  refuses.
+- **Continuous integration (CI)**: `lint-imports` runs as a pre-commit hook, and CI's "Pre-commit
+  (every hook, every file)" step runs it. `lint-imports` fails if `ml_core.metrics` or
+  `ml_core.cv_helpers` imports `dagster`, `mlflow`, or `studies`, directly or indirectly.
 
-**The main error-handling paths.** All of these raise, because the scorer is R&D code and fails fast.
+**The main error-handling paths.** All of these raise, because the scorer is research and
+development (R&D) code and fails fast.
 
-- A bad study name, a non-leaderboard fold, a mismatched `fold_id` column, a wrong dtype, or an existing partition raises `ValueError` before anything is written.
-- A file whose keys differ from the reference's raises `RowKeyMismatchError`, naming the series and the counts of missing and extra keys. A reference with no rows also raises, with a message telling the maintainer to materialise it.
+- `score_study.py` raises `ValueError` before writing any row when given a bad study name, a
+  non-leaderboard fold, a mismatched `fold_id` column, a wrong dtype, or an existing partition.
+- A file whose keys differ from the reference's raises `RowKeyMismatchError`, naming the series and
+  the counts of missing and extra keys. A reference with no rows also raises, with a message telling
+  the maintainer to materialise the reference experiment.
 - A malformed row fails `PowerForecast.validate` in the first pass, so no partition is written.
-- In `metrics`, `FinalTestWindowError` and `RowsOutsideWindowError` fire in the validation pass, before any group is scored, so no `forecast_metrics` rows or MLflow runs are left behind.
-- A `CvConfig` whose `final_test_start` is not later than every leaderboard `val_end`, or whose reference name starts with `study/`, fails at load time.
-- Not covered by code: a session that edits the scorer or reads the actuals. The sysadmin steps in the follow-up issue cover that, and the script's guarantee holds only when the `sudo` rule runs the `main` checkout's interpreter.
+- In `metrics`, `FinalTestWindowError` and `RowsOutsideWindowError` fire in the validation pass,
+  before any group is scored, so no `forecast_metrics` rows or MLflow runs are left behind.
+- Loading a `CvConfig` fails when its `final_test_start` is not later than every leaderboard
+  `val_end`, or when its reference name starts with `study/`.
 
-## Verdict, size and departures
+**Code cannot stop a session that edits the scorer or reads the actuals; the sysadmin steps in the
+follow-up issue cover those two attacks.** The script's guarantee holds only when the `sudo` rule
+runs the `main` checkout's interpreter.
+
+## Verdict, size, and departures from the issue
 
 **Verdict: worth implementing, with the departures below.** Premises checked on `main`: `metrics`
 scores whatever rows it is given; `_resolve_eval_window` takes dates from the fold config and only
 stamps them on the output rows; no `FINAL_TEST_START` exists; there is no `import-linter` in
-`pyproject.toml`, CI, or `uv.lock`; `packages/studies` has no shared power reader, which
-[issue #1082 (Make every study read cleaned power through one reader)](https://github.com/openclimatefix/nged-substation-forecast/issues/1082)
-adds first. PR #1028 and PR #1040 have merged. [Issue #960 (Design rolling-origin CV folds, assuming at least monthly retraining)](https://github.com/openclimatefix/nged-substation-forecast/issues/960)
-is open and has not decided the final-test design; the issue says the scorer protections are not
-blocked on it.
+`pyproject.toml`, CI, or `uv.lock`; `packages/studies` had no shared power reader, which
+[issue #1082 (Make every study read cleaned power through one
+reader)](https://github.com/openclimatefix/nged-substation-forecast/issues/1082) has since added as
+`scan_power()`. PR #1028 and PR #1040 have merged. [Issue #960 (Design rolling-origin CV folds,
+assuming at least monthly
+retraining)](https://github.com/openclimatefix/nged-substation-forecast/issues/960) is open and has
+not decided the final-test design; the issue says the scorer protections are not blocked on #960.
 
 **Size: complex.** One line per trigger:
 
@@ -72,7 +117,8 @@ blocked on it.
   `CvConfig(...)` constructions in tests, and the `study/` prefix reaches the promotion path in
   `ml_core/mlflow_runs.py`.
 
-That buys the plan, both plan reviews, and both diff reviews.
+A complex size calls for the plan, three plan reviews (one simplicity review and two correctness
+reviews), and both diff reviews.
 
 **Departures from the issue body:**
 
@@ -81,96 +127,109 @@ That buys the plan, both plan reviews, and both diff reviews.
 2. **Skip the optional `.claude/settings.json` deny rule and the CODEOWNERS file.** The issue itself
    says a deny rule is bypassed by Bash, and #1035's submit command restores protected paths from
    the session's starting commit. Adding `features/_lags.py` to a deny list is still unagreed.
-3. **Split the sysadmin steps into their own issue** (see "Splitting").
+3. **Split the sysadmin steps into their own issue** (see "Splitting the sysadmin steps into a
+   follow-up issue").
 4. **Check the scored rows' `valid_time`.** The issue's guard tests the configured window, which in
    leaderboard scope is always `val_end` and so can never fire.
 5. **Split the study-reader migration into issue #1082**, which reads cleaned power with no cutoff.
    This plan keeps only the cutoff.
 6. **Move the runbook page and the layer-1 documentation alignment into the follow-up issue**,
-   because both depend on the Q1 decision.
-7. **Define the expected row set by a reference experiment** (Q4), not by the fold's eligible series.
+   because both depend on the decision on in-window power (Q1, below).
+7. **Define the expected row set by a reference experiment** (Q4, below), not by the fold's eligible
+   series.
 
 ## Decisions by the maintainer
 
-**Q1: in-window power. Decided: option (b).** The research user reads all power before
-`FINAL_TEST_START` and none after. Layer 1's wording becomes "cannot read power after
-`FINAL_TEST_START`". What stops a worker using in-window future power is the leakage test in the
-submit command (#1035), which perturbs power after each cut-off and rejects any node whose earlier
-forecasts change; the same test catches a worker that hard-codes validation actuals. The remaining
-cost is that a worker can fit to validation actuals it can see, which is the selection-bias risk
-#960 and the Ladder guard address. The research user needs a copy of the power table truncated at
-`FINAL_TEST_START`, because Delta files cannot be hidden row by row; the follow-up issue builds it
-with a `scripts/maintenance/` script. Alternatives considered:
+**Q1: in-window power. Decided: option (b), the research user reads all power before
+`FINAL_TEST_START` and none after.** Layer 1's wording becomes "cannot read power after
+`FINAL_TEST_START`". **The submit command's leakage test (#1035), not file permissions, stops a
+worker using in-window future power.** The test perturbs power after each cut-off and rejects any
+node whose earlier forecasts change. The same leakage test catches a worker that hard-codes
+validation actuals. The remaining risk is that a worker can fit to validation actuals it can see,
+which is the selection-bias risk that #960 and the Ladder guard address.
 
-- **(a) Staging harness.** A maintainer-user harness stages, per initialisation time, only the power
-  observed before it, and runs the worker's code as the research user against the staged copy. It
-  needs a harness that copies or views the power table per initialisation time (about 17,500 hourly
-  steps over the fold), and the worker's code must write nothing the session can read back. By the
-  last initialisation time the staged copies cover almost the whole window, so the secrecy is thin
-  where it matters.
-- **(c) One Delta table, partitioned at the cutoff.** The power tables gain a derived partition
-  column, such as `after_cutoff`, so the rows after the cutoff sit in their own directory and an
-  ACL denies the research user that directory. Delta has no setting that splits files at a date, so
-  a partition column is the only mechanism. `_delta_log/` stays one shared log that the research
-  user must read, and it lists every data file, including the denied ones, with row counts and
-  per-column minimum and maximum values; skipping statistics on `power` removes most of that leak.
-  A scan filtered on `after_cutoff = false` prunes the denied directory; an unfiltered scan fails
-  with a permission error. Costs: a one-off rewrite of the table, and another rewrite whenever
-  `FINAL_TEST_START` moves; the writer in `defs/assets.py` (issue #1020's territory) and the
-  cleaning asset must derive the column on every write; the cleaned table needs the same layout.
-  Not chosen now because it edits out-of-bounds files and is expensive to redo when the date moves.
+**Option (b) needs a copy of the power table truncated at `FINAL_TEST_START`, because Delta files
+cannot be hidden row by row.** The follow-up issue builds the truncated copy with a
+`scripts/maintenance/` script. Alternatives considered:
+
+- **(a) Staging harness, rejected: by the last initialisation time the staged copies cover almost
+  the whole window, so late in the fold the staged copy hides almost none of the power the worker
+  would want.** A harness running as the maintainer's Unix user stages, per initialisation time,
+  only the power observed before that initialisation time, and runs the worker's code as the
+  research user against the staged copy. Option (a) needs a harness that copies or views the power
+  table per initialisation time (about 17,500 hourly steps over the fold). The worker's code must
+  also write nothing the session can read back.
+- **(c) One Delta table, partitioned at the cutoff, not chosen now: it edits files outside this
+  issue's scope and needs another table rewrite whenever the date moves.** The power tables gain a
+  derived partition column, such as `after_cutoff`, so the rows after the cutoff sit in their own
+  directory and an ACL denies the research user that directory. Delta has no setting that splits
+  files at a date, so a partition column is the mechanism we found. `_delta_log/` stays one shared
+  log that the research user must read. The log lists every data file, including the denied files,
+  with row counts and per-column minimum and maximum values. Skipping statistics on `power` removes
+  most of that leak. A scan filtered on `after_cutoff = false` prunes the denied directory; an
+  unfiltered scan fails with a permission error. Drawbacks: a one-off rewrite of the table, and
+  another rewrite whenever `FINAL_TEST_START` moves; the writer in `defs/assets.py` (issue #1020's
+  territory) and the cleaning asset must derive the column on every write; the cleaned table needs
+  the same layout.
 
 **Q2: which windows the date guard covers. Decided: every group except `fold_id == "live"`.** The
-guard applies to both `leaderboard` and `ad_hoc` scopes, because `ad_hoc` is the route for
-deliberate final-test scoring and must still demand the variable. Live rows are forecasts of the
-future, not a held-out set, and exempting them keeps ad-hoc production monitoring working.
+guard applies to both `leaderboard` and `ad_hoc` scopes, but in leaderboard scope the window always
+ends at the fold's `val_end`, so there the row-window check carries the protection. The guard exists
+in both scopes because `ad_hoc` is the route for deliberate final-test scoring and must still demand
+the variable. Live rows are forecasts of the future, not a held-out set, and exempting them keeps
+ad-hoc production monitoring working.
 
 **Q3: the cutoff date. Decided: `2026-07-01`,** the day after the only leaderboard fold's `val_end`
 (`2026-06-30`). `CvConfig` validates that `final_test_start` is later than every leaderboard fold's
 `val_end`. **Issue #960 has not decided the final-test design, so the field is a guard, not a sealed
-test year:** the data after the cutoff is about three months, not an independent year, and nothing
-this change writes (documentation, field docstring, error message) calls it a "final-test year" or
-claims independence. If #960 moves the date, only `conf/cv/default.yaml` changes. This plan is not
-delayed until #960 resolves.
+test year:** the data after the cutoff covers about three months, not an independent year. Nothing
+this change writes (documentation, field docstring, error message) calls that data a "final-test
+year" or claims independence. If #960 moves the date, only `conf/cv/default.yaml` changes. This plan
+is not delayed until #960 resolves.
 
-**Q4: the expected row set. Decided: option B, a reference experiment.** The check applies to
-groups whose `experiment_name` starts with `study/`; reviewed experiments are not checked, because
-their code is reviewed. A new `reference_experiment_name` field on `CvConfig` names the reference
-(the XGBoost baseline; its exact name is `xgboost_no_power_lags` in
-`scripts/forecasting/run_baseline_experiment.py`, to be re-read at implementation). Why not the
-fold's eligible series: the issue's wording would refuse the existing XGBoost fold, because
+**Q4: the expected row set. Decided: option B, a reference experiment.** The check applies to groups
+whose `experiment_name` starts with `study/`; reviewed experiments are not checked, because their
+code is reviewed. A new `reference_experiment_name` field on `CvConfig` names the reference (the
+XGBoost baseline; its exact name is `xgboost_no_power_lags` in
+`scripts/forecasting/run_baseline_experiment.py`, to be re-read at implementation). **The fold's
+eligible series cannot define the row set, because they would refuse the existing XGBoost fold.**
 `cv_power_forecasts` builds each run's half-hourly grid only between that run's first and last
-native NWP step, so the last valid times of `val_end` (21:30 to 23:30 with 3-hour steps) have
-actuals but no forecast row for any series. Option B inherits the reference's own coverage.
+native numerical weather prediction (NWP) step, so the last valid times of `val_end` (21:30 to 23:30
+with 3-hour steps) have actuals but no forecast row for any series. Option B inherits the
+reference's own coverage.
 
 - **The key is `(time_series_id, power_fcst_init_time, valid_time)`, without `ensemble_member`.**
   The reference is a roughly 51-member ensemble, and the scorer treats single-member forecasts as
-  first-class, so requiring the same member keys would refuse any deterministic study or any study
-  with a different member count. Dropping members drops no hard row. (A refinement of option B made
-  after the third correctness review; flagged to the maintainer.)
+  first-class, so requiring the same member keys would therefore refuse any deterministic study or
+  any study with a different member count. Dropping members drops no hard row. (A refinement of
+  option B made after the second correctness review; flagged to the maintainer.)
 - **A study must use the reference's initialisation-time grid.** The reference's initialisation
-  times are the ECMWF ENS run time plus the publication delay, so a study built on another weather
-  product with different initialisation times is refused. Scoring such a study needs a different
-  reference, which is a decision for when one arrives.
+  times are the run time of the European Centre for Medium-Range Weather Forecasts ensemble (ECMWF
+  ENS) plus the publication delay, so a study built on another weather product with different
+  initialisation times is refused. Scoring a study built on another weather product needs a
+  different reference experiment, which is a decision for when the first such study arrives.
 - **The check is an anti-join in both directions** on the distinct keys, per series batch with the
   same batch size scoring already uses, plus an up-front comparison of the two series sets. Batching
   bounds memory; one fold is about 364M rows. The streaming engine is used throughout.
 - **The reference scan is a fresh `pl.scan_delta`** filtered on `experiment_name ==
   reference_experiment_name`, `fold_id`, and the batch's `time_series_id` values, with the same
-  `valid_time_min`/`valid_time_max` filter the operator's `PopulationFilter` carries. It cannot come
-  from `_group_scan(pruned_scan, ...)`, because `pruned_scan` is already pinned to the study.
+  `valid_time_min`/`valid_time_max` filter the operator's `PopulationFilter` carries. The reference
+  scan cannot come from `_group_scan(pruned_scan, ...)`, because `pruned_scan` is already pinned to
+  the study.
 - **A missing reference partition raises** with a message naming the experiment to materialise. The
   reference's own forecasts are trusted: they come from a reviewed experiment.
 - **Rows outside the fold window.** For every leaderboard-scope group, each row's `valid_time` must
-  lie in `[val_start, val_end]`. For `study/` groups the key equality already implies this.
+  lie in `[val_start, val_end]`. For `study/` groups the key equality already implies the window
+  check.
 - **Stale study groups.** A study group goes stale when the reference is re-materialised or renamed.
   An unfiltered leaderboard run skips `study/` groups with a warning naming them, so a stale study
-  cannot block scoring of reviewed experiments; `score_study.py` pins its own experiment, so the
-  check still raises there.
+  cannot block scoring of reviewed experiments. `score_study.py` pins its own experiment, so the key
+  check still raises inside `score_study.py`.
 
 **Q5: whether `scan_power()` truncates at the cutoff. Decided: yes.** A re-run of a published study
-then loses about 3 months of power (2026-07-01 to October), which can change site lists, seeded
-anonymised labels, and numbers. Published pages keep the numbers they were computed with.
+then loses about three months of power (2026-07-01 to October). Losing those months can change the
+study's site list, its seeded anonymised labels, and its numbers. Published pages keep the numbers
+they were computed with.
 
 ## What changes, file by file
 
@@ -178,8 +237,8 @@ anonymised labels, and numbers. Published pages keep the numbers they were compu
 `final_test_start: date` (`2026-07-01`) and `reference_experiment_name: str` to `CvConfig`, both
 required. Validators: `final_test_start` exceeds every leaderboard fold's `val_end`;
 `reference_experiment_name` does not start with `study/`. Docstrings say "guard", not "test year".
-Update the six existing `CvConfig(...)` constructions in `tests/test_jobs.py` and
-`packages/contracts/tests/test_config_schemas.py` (lines 15, 48, 71, 113, and 171).
+Update the six existing `CvConfig(...)` constructions, one in `tests/test_jobs.py` and five in
+`packages/contracts/tests/test_config_schemas.py` (lines 15, 48, 71, 113, and 171 on `main`).
 
 **`packages/ml_core/src/ml_core/metrics.py`** gains the pure checks, so the import-linter contract
 and #1035's protected paths cover them and they test without Dagster: `require_window_within_guard`
@@ -190,14 +249,14 @@ and `require_same_row_keys`, raising `FinalTestWindowError` and `RowKeyMismatchE
 `_resolve_eval_window`, `_score_forecast_group`, and new helpers; `eligible_time_series`,
 `effective_capacity`, `trained_cv_model`, and `cv_power_forecasts` are not touched).
 
-- **Validate every group before scoring any.** `metrics` first resolves each group's window and
-  runs the date guard and the key check for all groups, then scores. A refusal on group N therefore
-  never leaves groups 1 to N-1's rows or MLflow runs behind. This moves `_resolve_eval_window` ahead
-  of scoring, where today it runs after, and changes `_score_forecast_group`'s signature (its
-  positional callers in `tests/test_metrics.py` are updated).
-- **Date guard.** Raises when the window's end is at or after `final_test_start`,
-  `NGED_FINAL_TEST != "1"`, and `fold_id != "live"`. In ad-hoc scope the window end is the observed
-  maximum `valid_time`. In leaderboard scope the window is the fold's `val_end`, so the leaderboard
+- **Validate every group before scoring any.** `metrics` first resolves each group's window and runs
+  the date guard and the key check for all groups, then scores. A refusal on group N therefore never
+  leaves groups 1 to N-1's rows or MLflow runs behind. Validating first moves `_resolve_eval_window`
+  ahead of scoring. It also changes `_score_forecast_group`'s signature, and its positional callers
+  in `tests/test_metrics.py` are updated.
+- **Date guard.** Raises when the window's end is at or after `final_test_start`, `NGED_FINAL_TEST
+  != "1"`, and `fold_id != "live"`. In ad-hoc scope the window end is the observed maximum
+  `valid_time`. In leaderboard scope the window is the fold's `val_end`, so the leaderboard
   protection is the row-window check above.
 - **Key check** per Q4, for `study/` groups in leaderboard scope. `ad_hoc` scope is exempt from both
   the key check and the row-window check, because it has no fold.
@@ -220,59 +279,65 @@ fold id. It takes no code and no actuals.
 - **Clean environment.** The script clears its environment and keeps only `PATH`, `HOME`, `LANG`,
   and `LC_ALL`, instead of checking a deny list: `Settings` reads `DATA_PATH_INTERNAL`,
   `DATA_PATH_DELIVERY`, `LOCAL_ARTIFACTS_PATH`, `METADATA_PATH`, `DATA_STORE_*`, `CV_CONFIG_PATH`,
-  `MLFLOW_TRACKING_URI`, and `NGED_FINAL_TEST`, and any of them could repoint the actuals or the
-  guard.
+  and `MLFLOW_TRACKING_URI`, and the `metrics` asset reads `NGED_FINAL_TEST`. Any of those variables
+  could repoint the actuals or lift the date guard.
 - **Batched, not whole-file.** A full fold is about 364M rows, and one `write_power_forecasts` call
   on the whole frame sorts and converts it to Arrow, which already exhausts a 29 GB machine. The
-  script reads the file lazily per series batch, runs `require_same_row_keys`, then writes the first
-  chunk with `replace_partition` and appends the rest, as `cv_power_forecasts` does. Key checks
-  finish before the first write, so a rejected file leaves no partition behind.
+  script reads the file lazily per series batch. It runs `require_same_row_keys`, then validates
+  every batch as `PowerForecast` in a first pass, then writes the first batch with
+  `replace_partition` and appends the rest, as `cv_power_forecasts` does. The key check and the
+  validation pass both finish before the first write, so a rejected or malformed file leaves no
+  partition behind.
 - **Score.** It calls `dagster.materialize([metrics], run_config=...)` in-process with
   `evaluation_scope="leaderboard"` and a `PopulationFilter` pinned to `study/<name>` and the fold,
   following `scripts/forecasting/run_baseline_experiment.py`.
 - **Experiment name with a slash.** `study/<name>` becomes a partition value in `power_forecasts`
   and `forecast_metrics` and an MLflow experiment name. The implementer verifies that delta-rs
-  handles the slash; if it nests the partition directory, the prefix becomes `study__`.
+  handles the slash. If delta-rs nests the partition directory, the prefix becomes `study__`.
 
-**`packages/studies/src/studies/power.py`** (after issue #1082 merges) adds the cutoff to
-`scan_power()`: one filter, `time < final_test_start` (read from the CV config, with no parameter to override it). Studies find their data through
-`REPO_DATA_DIR`, never through `Settings`, so `power.py` loads the date with
+**`packages/studies/src/studies/power.py`** adds the cutoff to `scan_power()`: one filter, `time <
+final_test_start` (read from the CV config, with no parameter to override it). Studies find their
+data through `REPO_DATA_DIR`, never through `Settings`, so `power.py` loads the date with
 `contracts.config_schemas.load_cv_config` on `conf/cv/default.yaml` under the repository root
-(`CV_CONFIG_PATH` is not consulted). If this plan is implemented first, #1082 lands first.
+(`CV_CONFIG_PATH` is not consulted).
 
-**`pyproject.toml`, `uv.lock`, `.pre-commit-config.yaml`.** Add `import-linter` to the dev group
-and a `[tool.importlinter]` block with one `forbidden` contract: `ml_core.metrics` and
+**`pyproject.toml`, `uv.lock`, `.pre-commit-config.yaml`.** Add `import-linter` to the dev group and
+a `[tool.importlinter]` block with one `forbidden` contract: `ml_core.metrics` and
 `ml_core.cv_helpers` may not import `dagster`, `mlflow`, or `studies` (`include_external_packages =
-true`, indirect imports included). Add a local `import-linter` pre-commit hook running `uv run lint-imports`, which CI's every-hook step runs (a separate CI step was refused by the push token's missing `workflow` scope). If the strict
-indirect check trips on `contracts`, narrow the contract to direct imports and record why in the
-TOML. `uv.lock` is also edited by #147 and #1082; whichever lands later re-runs `uv lock`.
+true`, indirect imports included). Add a local `import-linter` pre-commit hook running `uv run
+lint-imports`. CI's "Pre-commit (every hook, every file)" step runs that hook. A separate CI step
+was not possible, because the push token lacks the `workflow` scope. If the strict indirect check
+trips on `contracts`, narrow the contract to direct imports and record why in the TOML. `uv.lock` is
+also edited by other issues' PRs; whichever lands later re-runs `uv lock`.
 
 **Sysadmin steps (follow-up issue, not this PR).** A runbook the maintainer runs by hand: the Unix
-user, `setfacl` on the data folders, setgid directories with umask 002, the research user's own
-`uv` cache and credentials, tightening `/mnt/data` (mode 2777 today), the narrow `sudo` rule naming
+user, `setfacl` on the data folders, setgid directories with umask 002, the research user's own `uv`
+cache and credentials, tightening `/mnt/data` (mode 2777 today), the narrow `sudo` rule naming
 `scripts/forecasting/score_study.py` with `env_reset` on, the truncated power copy, and **no write
 access for the research user to `power_forecasts` or `forecast_metrics`**, because option B trusts
 the reference partition.
 
-## Splitting
+## Splitting the sysadmin steps into a follow-up issue
 
 **Split the sysadmin steps into a new issue, and keep one PR for the code.** The code half is
 testable and reviewable in the diff. The sysadmin half is a checklist only the maintainer can run
-and verify (`getfacl`, a failed `cat` as the research user), and its closing condition is a human
-confirming it works. Bundling the two would hold #958 open until the maintainer has done sysadmin
-work, or close it with the layer-1 claim unverified. The new issue is blocked by this one (the
-`sudo` rule names the script). This PR updates the issue's checklist to point at it.
+and verify (`getfacl`, a failed `cat` as the research user). The sysadmin issue closes when a human
+confirms the checklist works. Bundling the two would hold #958 open until the maintainer has done
+sysadmin work, or close it with the layer-1 claim unverified. The new issue is blocked by this one
+(the `sudo` rule names the script). This PR updates #958's checklist to point at the new sysadmin
+issue.
 
-## Design-philosophy check
+## Fit with the design principles and inherent stability
 
-All of this runs in R&D, where `inherent-stability.md` says to fail fast: the guard, the key check,
-and `score_study.py` raise, and none adds an asset check, so the WARN/non-blocking rule is not
-engaged. The one exception is deliberate: an unfiltered leaderboard run skips stale `study/` groups
-with a warning instead of raising, so a stale study cannot block reviewed experiments. Nothing
-touches `live_forecast_assets.py` or the serving path, and the `live` exemption keeps production
-monitoring unaffected. Hypothesis H2 is reworded in the docs (confirmed promotions per month, not
-experiments per month). The design principle traded away is principle 3's "research runs on the
-production pipeline" for autonomous studies, bought back by "one scoring path for all research".
+The guard, the key check, and `score_study.py` all run in research and development (R&D), where
+`inherent-stability.md` says to fail fast, so all three raise. None of the three adds an asset
+check, so the WARN/non-blocking rule does not apply. The one exception is deliberate: an unfiltered
+leaderboard run skips stale `study/` groups with a warning instead of raising, so a stale study
+cannot block reviewed experiments. Nothing touches `live_forecast_assets.py` or the serving path,
+and the `live` exemption keeps production monitoring unaffected. Hypothesis H2 is reworded in the
+docs (confirmed promotions per month, not experiments per month). The design principle traded away
+is principle 3's "research runs on the production pipeline" for autonomous studies, bought back by
+"one scoring path for all research".
 
 ## Tests
 
@@ -286,10 +351,11 @@ Tests marked *regression* pass on `main` today and guard against over-refusal; a
   partition raises naming the experiment; the same `valid_time_min`/`valid_time_max` filter applies
   to the reference scan.
 - **Row window** (leaderboard scope): a group with a row whose `valid_time` is past `val_end`
-  raises. This proves the date guard is not vacuous.
+  raises. This test proves that leaderboard scope has a window check that can fire, because the date
+  guard cannot fire there.
 - **Date guard:** an ad-hoc group whose observed `valid_time` maximum is at or after
-  `final_test_start` raises without `NGED_FINAL_TEST=1` and scores with it (`monkeypatch.setenv`);
-  a `fold_id == "live"` ad-hoc group scores with the variable unset (*regression*).
+  `final_test_start` raises without `NGED_FINAL_TEST=1` and scores with it (`monkeypatch.setenv`); a
+  `fold_id == "live"` ad-hoc group scores with the variable unset (*regression*).
 - **No partial writes:** with two groups where the second is refused, the first writes no
   `forecast_metrics` rows and no MLflow run.
 - **Stale study groups:** an unfiltered leaderboard run skips a `study/` group whose reference
@@ -302,12 +368,13 @@ Tests marked *regression* pass on `main` today and guard against over-refusal; a
 - **`score_study`** (`tests/test_metrics.py`, which already holds the fixtures): rejects a name with
   a quote or a leading `study/`, a non-leaderboard fold id, a mixed or disagreeing `fold_id`, a
   wrong-dtype key column, and a file whose keys differ from the reference, leaving no partition;
-  stores every batch of series; writes nothing when a later batch is invalid; scores a matching
-  file in leaderboard scope; does not block another fold; and `main()` re-executes with the cleaned
+  stores every batch of series; writes nothing when a later batch is invalid; scores a matching file
+  in leaderboard scope; does not block another fold; and `main()` re-executes with the cleaned
   environment.
 - **Import linter:** CI runs the real contract. The mutation-testing review adds `import mlflow` to
   `ml_core.metrics` once and confirms `lint-imports` fails.
-- **Existing XGBoost leaderboard fold path** (`tests/test_cv_assets.py`) keeps passing (*regression*).
+- **Existing XGBoost leaderboard fold path** (`tests/test_cv_assets.py`) keeps passing
+  (*regression*).
 
 ## Docs to update
 
@@ -356,12 +423,11 @@ plain `pytest` skips the `packages/studies` tests, which `--run-studies` runs.
   partition hourly. The implementer verifies that delta-rs resolves disjoint-partition commits, or
   the script retries.
 - The slash in `study/<name>` as a partition value (see `score_study.py`).
-- [PR #1057 (Add the manual_heuristic baseline forecaster (#147))](https://github.com/openclimatefix/nged-substation-forecast/pull/1057)
-  emits up to 13 `ensemble_member` rows per key on the same NWP runs as every other experiment. That
-  confirms the three-column key: the baseline passes the key check against the 51-member reference.
-  The same PR edits `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CLAUDE.md`, and
-  `docs/roadmap/metrics-and-leaderboard.md`, which this plan also edits (the MLflow fixtures move to
-  `conftest.py`); whichever lands later rebases and re-runs `uv lock`.
+- [PR #1057 (Add the manual_heuristic baseline forecaster
+  (#147))](https://github.com/openclimatefix/nged-substation-forecast/pull/1057) emits up to 13
+  `ensemble_member` rows per key on the same NWP runs as every other experiment. Those rows confirm
+  the three-column key: the baseline passes the key check against the 51-member reference.
+  
 - Requiring the reference's initialisation-time grid excludes studies built on another weather
   product until a second reference exists.
 
@@ -388,16 +454,26 @@ the eligible-series check would refuse the existing XGBoost fold.
 **Correctness review 2 (Opus), accepted:** dropped `ensemble_member` from the key; a batched
 `score_study.py`; the reference scan source and its filters; stale study groups skipped in
 unfiltered runs; a cleared environment instead of a deny list; no research-user write access to the
-forecast tables; `reference_experiment_name` validated and listed as a stored-data change; the
-test list completed; the stale sentences rewritten; the slash risk; how `power.py` finds the CV
-config. Nothing rejected.
+forecast tables; `reference_experiment_name` validated and listed as a stored-data change; the test
+list completed; the stale sentences rewritten; the slash risk; how `power.py` finds the CV config.
+Nothing rejected.
 
 **Main merged after the plan was written (2026-10-07):** PR #1040 changed `metrics` to read cleaned
 power; the studies tests now run behind `--run-studies`; `uv.lock` changed heavily and is re-locked
 at implementation.
 
-**Diff review 1 (Opus), accepted:** the already-scored check is per fold; every batch is validated before the first write; a dtype check on the row-key columns; the `scan_power` date override removed; the unreachable `promoted_model` refusal deleted (`list_promotable_runs` still filters); the `UV_*` and `VIRTUAL_ENV` variables dropped from the environment allow-list; prose fixes; duplicate integration tests deleted. **Rejected:** moving the environment check above the heavy imports; sharing the batch-size constant; extending the study boundary test to the cleaned table.
+**Diff review 1 (Opus), accepted:** the already-scored check is per fold; every batch is validated
+before the first write; a dtype check on the row-key columns; the `scan_power` date override
+removed; the unreachable `promoted_model` refusal deleted (`list_promotable_runs` still filters);
+the `UV_*` and `VIRTUAL_ENV` variables dropped from the environment allow-list; prose fixes;
+duplicate integration tests deleted. **Rejected:** moving the environment check above the heavy
+imports; sharing the batch-size constant; extending the study boundary test to the cleaned table.
 
-**Diff review 2 (mutation testing, Opus), accepted:** 66 mutations, 50 killed; tests added for the 10 real survivors. **Departures from this plan:** the import-linter check is a pre-commit hook, not a CI step (the push token lacks the `workflow` scope); no MLflow tag for the reference's Delta version.
+**Diff review 2 (mutation testing, Opus), accepted:** 66 mutations, 50 killed; tests added for the
+10 real survivors. **Departures from this plan:** the import-linter check is a pre-commit hook, not
+a CI step (the push token lacks the `workflow` scope); no MLflow tag for the reference's Delta
+version.
 
 **Main merged after PR #1118 (2026-10-09):** no conflicts. This walk through section was added.
+
+**Prose review of this plan (Opus, structure passes and sentence sweep), accepted:** stale statements about #1082, #147, and the batching pass were corrected; the Q1 and option leads now carry their verdicts; counts were closed (three plan reviews, six `CvConfig` constructions); headings were renamed; the happy path is numbered; and acronyms are expanded on first use. **Rejected:** moving the promotion-path and row-window paragraphs between sections (the plan is deleted before merge), and splitting every two-claim sentence (low value in a temporary file). The "Ladder guard" has no definition in this repository, so it stays unglossed.
