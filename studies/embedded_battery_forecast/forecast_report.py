@@ -704,6 +704,9 @@ def share_recovered(
         setting: The hyperparameter setting.
         batteries: The target batteries.
         excluded: Targets left out of the share. Their neighbour statistics are not rebuilt.
+
+    Returns:
+        Report lines giving the two gains and the share with its interval.
     """
     arms = [f"{XGB}no_neighbour", f"{XGB}own_fpn", f"{XGB}neighbour_fpn"]
     kept = [b for b in batteries if b not in excluded]

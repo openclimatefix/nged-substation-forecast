@@ -121,6 +121,12 @@ def _sheet_part(*, archive: zipfile.ZipFile, sheet_name: str) -> str:
 def _cell_text(*, cell: ElementTree.Element) -> str | None:
     """Return a cell's text, or None for an empty cell.
 
+    Args:
+        cell: A worksheet `c` element.
+
+    Returns:
+        The cell's inline string or stored value, or None if it holds neither.
+
     Raises:
         ValueError: If the cell holds a shared-string index. The reader supports only inline
             strings, and an index would otherwise be read as a number and match nothing.

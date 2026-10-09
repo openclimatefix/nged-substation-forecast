@@ -87,6 +87,8 @@ LEVELS: Final[tuple[float, ...]] = DELIVERY_QUANTILES
 Q_COLUMNS: Final[tuple[str, ...]] = tuple(f"q{level}" for level in LEVELS)
 FIT_THREADS: Final[int] = int(os.environ.get("OMP_NUM_THREADS", "2"))
 """Threads per XGBoost fit; the study runs four fits at once, so this is 2 rather than 4."""
+DEFAULT_WORKERS: Final[int] = int(os.environ.get("FIT_WORKERS", "4"))
+"""Processes fitting at once, set by `FIT_WORKERS`; the cores used are this times `FIT_THREADS`."""
 RANK_RULE_DURATIONS: Final[tuple[int, ...]] = (2, 4, 6, 8)
 """The durations (in half-hours) the rank rule's duration is fitted over, per battery and fold."""
 N_FOLDS: Final[int] = 4
@@ -330,6 +332,9 @@ def uses_the_actual_price(*, issue: str, arm: str) -> bool:
     Args:
         issue: The saved issue folder name (`A0_DA-late` for rung A0).
         arm: The arm name.
+
+    Returns:
+        True for an arm that the `as_written` fits refit.
     """
     if issue == "DA-early":
         return arm.endswith("price_model")
@@ -437,7 +442,7 @@ def run_job(
 
 
 def run_in_pool[T](
-    *, function: Callable[[T], object], tasks: Sequence[T], workers: int = 4
+    *, function: Callable[[T], object], tasks: Sequence[T], workers: int = DEFAULT_WORKERS
 ) -> None:
     """Run `function` on every task in a pool of spawned processes, printing each as it finishes.
 
