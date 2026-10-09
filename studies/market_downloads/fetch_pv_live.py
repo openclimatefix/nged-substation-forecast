@@ -1,9 +1,8 @@
 r"""Download Sheffield Solar's PV_Live solar generation for NGED's four licence areas.
 
 Written for the study of Elexon's indicated generation and demand. PV_Live estimates the solar
-generation of each distribution licence area every half-hour, covering the photovoltaic (PV) fleet
-that does not take part in the Balancing Mechanism. Run it for 2025-09-01 to 2026-09-30, or pass
-`--start`, `--end` (both inclusive), and `--output-root` for a small test run:
+generation of each distribution licence area every half-hour. Run it for 2025-09-01 to 2026-09-30,
+or pass `--start`, `--end` (both inclusive), and `--output-root` for a small test run:
 
     uv run python studies/market_downloads/fetch_pv_live.py
 
@@ -201,7 +200,6 @@ def run(*, root: Path, start: date, end: date, threads: int) -> pl.DataFrame:
             for letter, gaps in checks.items()
         ),
         gotchas=[
-            "PV_Live estimates only the PV that does not take part in the Balancing Mechanism.",
             (
                 "PV_Live revises its estimates, so a re-download can change values; "
                 "`updated_at` says when each value was last revised."

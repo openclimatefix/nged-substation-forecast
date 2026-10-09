@@ -18,7 +18,7 @@ Every script's module docstring gives the command that runs it.
 | `market_downloads/fetch_pv_live.py` | Downloads PV_Live's solar generation for NGED's four licence areas. |
 | `market_downloads/fetch_pn_all_bmus_sample.py` | Downloads every BMU's Physical Notifications for four sample days. |
 | `indgen_inddem_common.py` | Holds the paths, the study window, and the boundary-to-zone table from Elexon CVA Change Circular 235. |
-| `build_tables.py` | Builds the two views of every target half-hour, recovers the zones, joins AGV, PV_Live, and the sampled Physical Notifications, writes the tables, and writes `report.md`, which holds every number the page quotes. |
+| `build_tables.py` | Builds the two views of every target half-hour, recovers the zones, nets each interconnector's BMUs in the sampled Physical Notifications, fits the zones' shares, joins AGV and PV_Live, writes the tables, and writes `report.md`, which holds every number the page quotes. |
 | `make_charts.py` | Draws the page's 11 figures from the tables, as SVG under `docs/studies/assets/`. |
 
 **The tests for the download scripts are in `packages/studies/tests/`.** They are

@@ -47,13 +47,13 @@ regions or climates, so a result may not hold elsewhere.
   solar capacity, and on the 25 real aggregate BMUs its 1.1 to 1.2 GW is not validated.
 
 - [Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?](indgen-inddem-and-gsp-take.md)
-  — Elexon's indicated demand and generation series sum every Balancing Mechanism Unit's Physical
-  Notifications for the national total and 17 transmission boundaries. An issue reaches 15 to 42
-  hours ahead, and the zones recover from the boundaries to within rounding. The series do not
-  line up with the 14 Grid Supply Point groups, whose settled take is the best public record of
-  NGED's four licence areas' demand. The highest correlation between a group and a zone, once the
-  shared cycles are removed, is 0.72, and the zone that correlates best with an NGED group is 0.5
-  to 2.5 times its size.
+  — Elexon's indicated demand and generation series sum the Physical Notifications of every
+  Balancing Mechanism Unit for the national total and 17 transmission boundaries. An issue reaches
+  15 to 42 hours ahead, the zones recover from the boundaries to within rounding, and the sum of the
+  Physical Notifications reproduces INDDEM to within 5 MW in 125 of 192 sampled half-hours once each
+  interconnector is netted. The series do not map cleanly onto the 14 Grid Supply Point groups: with
+  the shared cycles and the national anomaly removed, the highest correlation between a group's
+  settled take and a zone's INDDEM is 0.58, and 0.32 for an NGED group.
 
 ## Past weather
 

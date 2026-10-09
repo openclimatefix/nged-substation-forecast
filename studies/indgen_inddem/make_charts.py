@@ -578,7 +578,11 @@ def weights_figure(*, number: int) -> alt.VConcatChart:
         alt.Chart(fractions)
         .mark_rect(aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("gsp_group:N", sort=groups, axis=alt.Axis(title="GSP group", labelAngle=0)),
+            x=alt.X(
+                "gsp_group:N",
+                sort=groups,
+                axis=alt.Axis(title="Column (GSP group or interconnector)", labelAngle=-90),
+            ),
             y=alt.Y("zone:N", sort=list(ZONES), axis=alt.Axis(title="Study zone")),
             color=alt.Color(
                 "fraction:Q",

@@ -7,7 +7,7 @@ for each year in which a settlement run was published:
 
     uv run python studies/market_downloads/fetch_agv.py
 
-The script keeps only the rows of one settlement run (`SF`, the interim settlement run), so the
+The script keeps only the rows of one settlement run (`SF`, the initial settlement run), so the
 whole window has one vintage. The latest run of each settlement period would mix runs from the
 initial run to the final reconciliation across the window. Pass `--start`, `--end` (both
 inclusive), and `--output-root` for a small test run.
@@ -40,7 +40,7 @@ SOURCE_PAGE: Final[str] = "https://elexon.co.uk/data/open-settlement-data"
 ZIP_URL: Final[str] = "https://www.elexon.co.uk/open-data/AGV_{year}.zip"
 """The URL of one year's zip. It redirects to Elexon's S3 bucket, so the client follows it."""
 SETTLEMENT_RUN: Final[str] = "SF"
-"""The interim settlement run, which has one row for every settlement period of the window."""
+"""The initial settlement run, which has one row for every settlement period of the window."""
 GSP_GROUPS: Final[tuple[str, ...]] = tuple(f"_{letter}" for letter in "ABCDEFGHJKLMNP")
 """The 14 GSP groups, which Elexon labels `_A` to `_P` and skips `_I` and `_O`."""
 PURPOSE: Final[str] = (
