@@ -458,9 +458,9 @@ which our own fold already meets in length but not in independence. The winner's
 grow more optimistically biased over time, because hundreds of experiments are planned. The search
 run by a large language model (LLM) agent that [Experiments run by an LLM agent](auto-research.md)
 describes screens ideas on folds that end before the leaderboard fold's validation window, but each
-finalist the maintainer scores on the leaderboard fold adds to the bias. Our own fold is small in effective
-sample size rather than in row count, because consecutive half-hours are strongly correlated. The
-epoch mechanism handles *data* changes but not *adaptive selection* on a fixed fold.
+finalist the maintainer scores on the leaderboard fold adds to the bias. Our own fold is small in
+effective sample size rather than in row count, because consecutive half-hours are strongly
+correlated. The epoch mechanism handles *data* changes but not *adaptive selection* on a fixed fold.
 
 **Whether to reserve a genuinely untouched final-test year remains a design decision in #960.**
 Jack has questioned whether to reserve that year rather than train on more history and report
