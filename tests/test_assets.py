@@ -299,7 +299,9 @@ def test_power_time_series_and_metadata_writes_power_when_the_metadata_upsert_fa
     # `type(...) is`, not `isinstance`: under `isinstance` the `rust_panic` case would pass on a
     # `RuntimeError`, so a guard narrowed to `except Exception` would still look correct.
     assert type(reported[0][1]) is raised
-    assert pl.read_parquet(env / "NGED" / "downloaded_files.parquet").height == len(_NGED_FILES)
+    assert pl.read_parquet(env / "NGED" / "list_of_downloaded_files.parquet").height == len(
+        _NGED_FILES
+    )
 
 
 def test_power_time_series_and_metadata_re_raises_a_cancelled_run(
@@ -565,7 +567,7 @@ def test_power_time_series_and_metadata_does_not_retry_a_failure_after_the_write
 
 _DELTA = "NGED/power_time_series.delta"
 _METADATA = "NGED/metadata.parquet"
-_DOWNLOADED_FILES = "NGED/downloaded_files.parquet"
+_DOWNLOADED_FILES = "NGED/list_of_downloaded_files.parquet"
 
 
 def _key(time_series_id: int, end_hours: int) -> str:
