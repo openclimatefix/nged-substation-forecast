@@ -35,14 +35,15 @@ and no later watermark commits nothing. This deletes the size filter, the 3-day 
   cost is bounded: a silent series publishes about 4 data-less files a day, so its next file
   restores its `Information` note within about 6 hours. `docs/live_service/operations.md` already
   accepts that a failed upsert loses that run's metadata change.
-- Departure 3: files are downloaded in `(last_modified, end_time, path)` order, not `end_time`
-  order. A run that holds several files of one series (the first run, or a backlog after an
-  outage) takes that series' metadata from the last file in download order, and `upsert_metadata`
-  replaces the series wholesale. A late file has an old `end_time`, so `end_time` order would let it
-  supply the metadata over a file written after it. The `end_time` and `path` tiebreaks give files
-  with equal `LastModified` (the bulk backfill files were written within a few days) a fixed order.
-  Where two files cover overlapping windows, the more recently written file's readings win the
-  `unique(..., keep="last")` dedupe.
+- Departure 3: a series' metadata comes only from its newest file by `end_time` in the whole
+  listing, and only on a run that selected that file. `upsert_metadata` replaces a series
+  wholesale, and a late or back-filled file has an old `end_time` but a new `last_modified`, so
+  taking metadata from the last file downloaded would overwrite the series' current `Information`
+  note and fields with those of an old window. A silent series' newest file is its latest data-less
+  file, so its note still updates. Files are downloaded in `(last_modified, end_time, path)` order,
+  which gives files with equal `LastModified` (the bulk backfill files were written within a few
+  days) a fixed order. Where two files cover overlapping windows, the more recently written file's
+  readings win the `unique(..., keep="last")` dedupe.
 - Departure 4: the equivalence test compares the new ingest with a "download every file, every
   run" reference, not with a copy of the old ingest. See Tests.
 - Departure 5: each file is downloaded once only up to a band. The rule
@@ -108,7 +109,10 @@ and no later watermark commits nothing. This deletes the size filter, the 3-day 
   created after the listing passed its key can be missed while a later file sets the watermark. The
   value is fixed at implementation time from a measured listing duration and a measured spread of
   `LastModified` values.
-- `download_and_parse_files` sorts by `(last_modified, end_time, path)`. It no longer raises
+- New `newest_file_of_each_series(file_listing)` returns the path of each series' newest file by
+  `(end_time, last_modified, path)`, taken from the whole listing before any selection.
+  `download_and_parse_files` takes it as an argument and extracts metadata only from those files,
+  whatever else it downloads. It sorts by `(last_modified, end_time, path)`. It no longer raises
   `NoNewData` when every file was data-less: it returns the metadata and an empty, validated
   `PowerTimeSeries` frame. It skips a file that fails to parse and returns the skipped paths in
   `DownloadAndParseResult`. `NoNewData` stays for an empty listing only. The data-less change is
@@ -185,7 +189,9 @@ Each test states the assertion that fails on `main` today.
    `read_ingest_watermark` monkeypatched to return `None` every run, which downloads the whole fake
    bucket each run. After each run, assert exact frame equality, ignoring row order, of the two
    `power_time_series` tables and the two metadata parquet files. The replay: initial files for 3
-   series; new files; a late file whose `end_time` is more than 3 days before its series' newest
+   series; new files; a back-fill of old windows (files with `end_time` two months old and a new
+   `last_modified`, for series that also have a newer live file), which must add only the missing
+   readings and leave the metadata unchanged; a late file whose `end_time` is more than 3 days before its series' newest
    reading and whose `last_modified` is new (the old ingest's known loss); a file that appears
    after a run with a `last_modified` earlier than the watermark but inside the margin; a series
    that stops reporting and publishes a data-less file with a new `Information` note; a rewritten
@@ -209,9 +215,11 @@ Each test states the assertion that fails on `main` today.
    carry no key, returns the newest value after several commits including an unrelated commit, and
    raises for a table whose log holds junk (written into `_delta_log/00000000000000000000.json`).
 8. **`download_and_parse_files`** returns metadata and an empty power frame when every file is
-   data-less. Built from a listing with explicit `last_modified` values, it supplies metadata from
-   the later-written of two files of one series whatever their `end_time`, and orders two files with
-   equal `last_modified` by `end_time` then `path`.
+   data-less. Built from a listing with explicit `last_modified` values, it extracts metadata only
+   from the file `newest_file_of_each_series` names: given a newer-`end_time` file and a
+   later-written older-`end_time` file of one series, the metadata comes from the newer-`end_time`
+   file. It orders two files with equal `last_modified` by `end_time` then `path`. A
+   `newest_file_of_each_series` test pins the `(end_time, last_modified, path)` tiebreak.
 9. **`write_power_time_series`** with `custom_metadata` and zero rows adds a commit whose history
    carries the key.
 
@@ -270,6 +278,11 @@ empty appends commit and keep their property, and that `write_power_time_series`
 of the table); dropping the hold-back on a metadata fault; ordering by `last_modified`; the
 "download everything" test reference. Rejected: nothing. Kept, as the reviewer judged: the margin,
 and `select_files_modified_since` as a separate function.
+
+**Maintainer question after the reviews.** Asked whether a back-fill of old files is handled,
+the answer was yes for the rows (a back-fill file has a new `last_modified`), but not for the
+metadata, which the old-window file would have overwritten. Departure 3 and the back-fill scenario
+in the replay test now cover it.
 
 **Correctness review (Opus).** Accepted: the margin band re-fetch, with no commit on a band-only run
 and a measured margin (defect 1); the cleaning-asset rebuild and the cleaning-lag check wording
