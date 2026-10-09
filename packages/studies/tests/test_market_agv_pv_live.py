@@ -1,6 +1,6 @@
 """Tests for the AGV and PV_Live download scripts, with no network access."""
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import fetch_pn_all_bmus_sample
 import fetch_pv_live
@@ -8,7 +8,7 @@ import polars as pl
 import pytest
 from fetch_agv import completeness, tidy
 from fetch_pv_live import check_pes_list, chunk_keys, fetch_chunk, parse_pes_rows
-from market_common import IncompleteChunkError
+from market_common import IncompleteChunkError, period_start_utc
 
 
 def _agv_row(
@@ -122,15 +122,17 @@ def test_check_pes_list_raises_when_a_letter_differs(monkeypatch: pytest.MonkeyP
         check_pes_list()
 
 
-def _pn_body(*, period: int, segments: int) -> dict[str, object]:
+def _pn_body(*, period: int, segments: int) -> dict[str, list[dict[str, object]]]:
+    start = period_start_utc(settlement_date=date(2026, 3, 4), settlement_period=period)
     return {
         "data": [
             {
                 "settlementDate": "2026-03-04",
                 "settlementPeriod": period,
                 "bmUnit": "2__XTEST001",
-                "timeFrom": "2026-03-04T12:00:00Z",
-                "timeTo": "2026-03-04T12:30:00Z",
+                "nationalGridBmUnit": "T_XTEST-1",
+                "timeFrom": f"{start:%Y-%m-%dT%H:%M:%SZ}",
+                "timeTo": f"{start + timedelta(minutes=30):%Y-%m-%dT%H:%M:%SZ}",
                 "levelFrom": -21,
                 "levelTo": -20,
             }
@@ -156,3 +158,21 @@ def test_fetch_day_raises_when_a_period_is_empty(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(fetch_pn_all_bmus_sample, "get_json", fake_get_json)
     with pytest.raises(IncompleteChunkError, match="7"):
         fetch_pn_all_bmus_sample.fetch_day("2026-03-04")
+
+
+def test_fetch_period_keeps_bmus_without_an_elexon_id_apart(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    template = _pn_body(period=25, segments=1)["data"][0]
+    rows = [dict(template, bmUnit=None, nationalGridBmUnit=name) for name in ("NG-A", "NG-B")]
+    monkeypatch.setattr(fetch_pn_all_bmus_sample, "get_json", lambda **_: {"data": rows})
+    frame = fetch_pn_all_bmus_sample.fetch_period(settlement_date=date(2026, 3, 4), period=25)
+    assert frame["national_grid_bmu_id"].to_list() == ["NG-A", "NG-B"]
+
+
+def test_fetch_period_raises_when_segments_overlap(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        fetch_pn_all_bmus_sample, "get_json", lambda **_: _pn_body(period=25, segments=2)
+    )
+    with pytest.raises(ValueError, match="tile"):
+        fetch_pn_all_bmus_sample.fetch_period(settlement_date=date(2026, 3, 4), period=25)

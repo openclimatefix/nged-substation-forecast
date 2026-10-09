@@ -16,18 +16,20 @@ one day and a re-run fetches only the missing days.
 import argparse
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import polars as pl
-from fetch_system_series import UTC_TIME
+from fetch_system_series import UTC_TIME, Col, frame_from_rows, schema_of
 from market_common import (
     ELEXON_API,
     ELEXON_ATTRIBUTION,
     ELEXON_LICENCE,
     FETCH_THREADS,
+    SETTLEMENT_PERIOD,
     IncompleteChunkError,
     fetch_missing_chunks,
     get_json,
+    period_start_utc,
     periods_in_settlement_day,
     read_chunks,
     write_lineage,
@@ -50,29 +52,80 @@ PURPOSE: Final[str] = (
     "Public data for the study of Elexon's indicated generation and demand "
     "(<https://github.com/openclimatefix/nged-substation-forecast/issues/1108>)."
 )
-SCHEMA: Final[dict[str, object]] = {
-    "settlement_date": pl.Date,
-    "settlement_period": pl.Int16,
-    "bmu_id": pl.String,
-    "time_from": UTC_TIME,
-    "time_to": UTC_TIME,
-    "level_from_mw": pl.Float64,
-    "level_to_mw": pl.Float64,
-}
-COLUMN_DOCS: Final[dict[str, str]] = {
-    "settlement_date": "Settlement date (UK clock-time day).",
-    "settlement_period": "Settlement period within the settlement date.",
-    "bmu_id": "Elexon BMU identifier (`bmUnit`). Supplier base BMUs start with `2__`.",
-    "time_from": "UTC start of the PN segment.",
-    "time_to": "UTC end of the PN segment.",
-    "level_from_mw": "Notified level at the segment start, MW. Negative is import.",
-    "level_to_mw": "Notified level at the segment end, MW. The level changes linearly between "
-    "the two ends.",
-}
+COLUMNS: Final[tuple[Col, ...]] = (
+    Col("settlementDate", "settlement_date", pl.Date, "Settlement date (UK clock-time day)."),
+    Col(
+        "settlementPeriod",
+        "settlement_period",
+        pl.Int16,
+        "Settlement period within the settlement date.",
+    ),
+    Col(
+        "nationalGridBmUnit",
+        "national_grid_bmu_id",
+        pl.String,
+        "National Grid BMU identifier (`nationalGridBmUnit`). Never null, so it is the key.",
+    ),
+    Col(
+        "bmUnit",
+        "bmu_id",
+        pl.String,
+        (
+            "Elexon BMU identifier (`bmUnit`). Null for BMUs Elexon gives no Elexon identifier. "
+            "Supplier base BMUs start with `2__`."
+        ),
+    ),
+    Col("timeFrom", "time_from", UTC_TIME, "UTC start of the PN segment."),
+    Col("timeTo", "time_to", UTC_TIME, "UTC end of the PN segment."),
+    Col(
+        "levelFrom",
+        "level_from_mw",
+        pl.Float64,
+        "Notified level at the segment start, MW. Negative is import.",
+    ),
+    Col(
+        "levelTo",
+        "level_to_mw",
+        pl.Float64,
+        "Notified level at the segment end, MW. The level changes linearly within one segment.",
+    ),
+)
+SCHEMA: Final[dict[str, Any]] = schema_of(columns=COLUMNS)
+COLUMN_DOCS: Final[dict[str, str]] = {col.name: col.doc for col in COLUMNS}
+
+
+def untiled_bmus(*, frame: pl.DataFrame, settlement_date: date, period: int) -> int:
+    """Count the BMUs whose segments do not tile the settlement period exactly."""
+    start = period_start_utc(settlement_date=settlement_date, settlement_period=period)
+    bad = (
+        frame.sort("national_grid_bmu_id", "time_from")
+        .group_by("national_grid_bmu_id")
+        .agg(
+            first=pl.col("time_from").min(),
+            last=pl.col("time_to").max(),
+            seams=(pl.col("time_from").shift(-1) == pl.col("time_to")).drop_nulls().all(),
+            wrong_period=(
+                (pl.col("settlement_date") != settlement_date)
+                | (pl.col("settlement_period") != period)
+            ).any(),
+        )
+        .filter(
+            (pl.col("first") != start)
+            | (pl.col("last") != start + SETTLEMENT_PERIOD)
+            | ~pl.col("seams")
+            | pl.col("wrong_period")
+        )
+    )
+    return bad.height
 
 
 def fetch_period(*, settlement_date: date, period: int) -> pl.DataFrame:
-    """Fetch the PN segments of every BMU for one settlement period."""
+    """Fetch the PN segments of every BMU for one settlement period.
+
+    Raises:
+        TypeError: If the response is not an object holding a list of rows.
+        ValueError: If any BMU's segments do not tile the settlement period.
+    """
     body = get_json(
         url=PN_URL,
         params=[
@@ -83,36 +136,13 @@ def fetch_period(*, settlement_date: date, period: int) -> pl.DataFrame:
     )
     if not isinstance(body, dict) or not isinstance(body.get("data"), list):
         raise TypeError(f"PN {settlement_date} P{period}: unexpected body {str(body)[:200]!r}")
-    rows = body["data"]
-    frame = pl.DataFrame(
-        {
-            "settlement_date": [row["settlementDate"] for row in rows],
-            "settlement_period": [row["settlementPeriod"] for row in rows],
-            "bmu_id": [row["bmUnit"] for row in rows],
-            "time_from": [row["timeFrom"] for row in rows],
-            "time_to": [row["timeTo"] for row in rows],
-            "level_from_mw": [row["levelFrom"] for row in rows],
-            "level_to_mw": [row["levelTo"] for row in rows],
-        },
-        schema={
-            "settlement_date": pl.String,
-            "settlement_period": pl.Int16,
-            "bmu_id": pl.String,
-            "time_from": pl.String,
-            "time_to": pl.String,
-            "level_from_mw": pl.Float64,
-            "level_to_mw": pl.Float64,
-        },
+    frame = frame_from_rows(
+        rows=body["data"], columns=COLUMNS, what=f"PN {settlement_date} P{period}"
     )
-    return frame.with_columns(
-        settlement_date=pl.col("settlement_date").str.to_date(format="%Y-%m-%d"),
-        time_from=pl.col("time_from").str.to_datetime(
-            format="%Y-%m-%dT%H:%M:%SZ", time_zone="UTC", time_unit="us"
-        ),
-        time_to=pl.col("time_to").str.to_datetime(
-            format="%Y-%m-%dT%H:%M:%SZ", time_zone="UTC", time_unit="us"
-        ),
-    )
+    untiled = untiled_bmus(frame=frame, settlement_date=settlement_date, period=period)
+    if untiled and not frame.is_empty():
+        raise ValueError(f"PN {settlement_date} P{period}: {untiled} BMUs do not tile the period")
+    return frame
 
 
 def fetch_day(key: str) -> pl.DataFrame:
@@ -129,6 +159,37 @@ def fetch_day(key: str) -> pl.DataFrame:
     return pl.concat(frames)
 
 
+def day_summaries(*, frame: pl.DataFrame) -> dict[str, dict[str, int]]:
+    """Measure each sampled day: rows, periods against the expected count, and BMUs per period."""
+    per_period = frame.group_by("settlement_date", "settlement_period").agg(
+        bmus=pl.col("national_grid_bmu_id").n_unique()
+    )
+    per_day = (
+        frame.group_by("settlement_date")
+        .agg(
+            rows=pl.len(),
+            periods=pl.col("settlement_period").n_unique(),
+            bmus_without_elexon_id=pl.col("national_grid_bmu_id")
+            .filter(pl.col("bmu_id").is_null())
+            .n_unique(),
+        )
+        .join(
+            per_period.group_by("settlement_date").agg(
+                bmus_min_per_period=pl.col("bmus").min(), bmus_max_per_period=pl.col("bmus").max()
+            ),
+            on="settlement_date",
+        )
+        .sort("settlement_date")
+    )
+    return {
+        str(row["settlement_date"]): {
+            **{key: value for key, value in row.items() if key != "settlement_date"},
+            "periods_expected": periods_in_settlement_day(settlement_date=row["settlement_date"]),
+        }
+        for row in per_day.iter_rows(named=True)
+    }
+
+
 def run(*, root: Path, days: list[date], threads: int) -> pl.DataFrame:
     """Download the days, then write the parquet, the lineage note, and the README."""
     output_dir = root / "elexon_pn_sample"
@@ -138,20 +199,10 @@ def run(*, root: Path, days: list[date], threads: int) -> pl.DataFrame:
         cache_dir=cache_dir, keys=keys, fetch=fetch_day, label="pn_sample", threads=threads
     )
     frame = read_chunks(cache_dir=cache_dir, keys=keys, schema=SCHEMA).sort(
-        "settlement_date", "settlement_period", "bmu_id", "time_from"
+        "settlement_date", "settlement_period", "national_grid_bmu_id", "time_from"
     )
     write_parquet_atomic(frame=frame, path=output_dir / "elexon_pn_sample.parquet")
-    per_day = dict(
-        frame.group_by("settlement_date")
-        .agg(
-            rows=pl.len(),
-            periods=pl.col("settlement_period").n_unique(),
-            bmus=pl.col("bmu_id").n_unique(),
-        )
-        .sort("settlement_date")
-        .select(pl.col("settlement_date").cast(pl.String), pl.struct("rows", "periods", "bmus"))
-        .iter_rows()
-    )
+    per_day = day_summaries(frame=frame)
     write_lineage(
         product_dir=output_dir,
         note={
@@ -165,7 +216,7 @@ def run(*, root: Path, days: list[date], threads: int) -> pl.DataFrame:
     )
     write_readme(
         product_dir=output_dir,
-        title="Elexon final Physical Notifications of every BMU, four sample days",
+        title=f"Elexon final Physical Notifications of every BMU, {len(keys)} sample days",
         source_page=SOURCE_PAGE,
         script_path=SCRIPT_PATH,
         attribution=ELEXON_ATTRIBUTION,
@@ -177,13 +228,25 @@ def run(*, root: Path, days: list[date], threads: int) -> pl.DataFrame:
         ),
         columns=COLUMN_DOCS,
         row_summary="\n".join(
-            f"- {day}: {counts['rows']} rows, {counts['periods']} periods, {counts['bmus']} BMUs."
+            f"- {day}: {counts['rows']} rows, {counts['periods']} of {counts['periods_expected']} "
+            f"periods, {counts['bmus_min_per_period']} to {counts['bmus_max_per_period']} BMUs "
+            f"in a period, {counts['bmus_without_elexon_id']} of them without an Elexon "
+            "identifier."
             for day, counts in per_day.items()
         ),
         gotchas=[
             (
                 "The values are the PNs as Elexon serves them now, which are the final PNs. The "
                 "PNs in force when an INDDEM or INDGEN issue was published can differ."
+            ),
+            (
+                "Some BMUs have no Elexon identifier (`bmu_id` is null), so key on "
+                "`national_grid_bmu_id`. The count is in the row summary above."
+            ),
+            (
+                "A BMU's level can jump where one segment meets the next, at period boundaries "
+                "especially, so average each segment on its own and never interpolate across "
+                "segments."
             ),
         ],
         purpose=PURPOSE,
