@@ -476,4 +476,10 @@ version.
 
 **Main merged after PR #1118 (2026-10-09):** no conflicts. This walk through section was added.
 
-**Prose review of this plan (Opus, structure passes and sentence sweep), accepted:** stale statements about #1082, #147, and the batching pass were corrected; the Q1 and option leads now carry their verdicts; counts were closed (three plan reviews, six `CvConfig` constructions); headings were renamed; the happy path is numbered; and acronyms are expanded on first use. **Rejected:** moving the promotion-path and row-window paragraphs between sections (the plan is deleted before merge), and splitting every two-claim sentence (low value in a temporary file). The "Ladder guard" has no definition in this repository, so it stays unglossed.
+**Prose review of this plan (Opus, structure passes and sentence sweep), accepted:** stale
+statements about #1082, #147, and the batching pass were corrected; the Q1 and option leads now
+carry their verdicts; counts were closed (three plan reviews, six `CvConfig` constructions);
+headings were renamed; the happy path is numbered; and acronyms are expanded on first use.
+**Rejected:** moving the promotion-path and row-window paragraphs between sections (the plan is
+deleted before merge), and splitting every two-claim sentence (low value in a temporary file). The
+"Ladder guard" has no definition in this repository, so it stays unglossed.
