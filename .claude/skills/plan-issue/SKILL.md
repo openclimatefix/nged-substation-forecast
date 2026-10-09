@@ -221,12 +221,14 @@ W (through the new `baz` parameter)". It has sub-sections for:
 - **The main error-handling paths**: what each failure does, whether the run degrades or raises,
   and what is reported.
 
-Name the real functions, parameters and files, so the reader can match the story to the file-by-file
+Name the real functions, parameters, and files, so the reader can match the story to the file-by-file
 section. Wherever a step is non-obvious, say why it happens: "we read the stored watermark before
 listing the bucket, because the listing is filtered by it", "the watermark is written in the same
 commit as the rows, so a crash cannot leave it ahead of them". An ordering, a parameter or a
-branch that the reader would not guess needs its reason beside it. Write it after the rest of the plan is settled, and update it after each review, because
-a review that changes the design makes the walk through stale first.
+branch that the reader would not guess needs its reason beside it.
+
+Write the walk through after the rest of the plan is settled, and update it after each review,
+because a review that changes the design makes the walk through stale first.
 
 The plan covers:
 
