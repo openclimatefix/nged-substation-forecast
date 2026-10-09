@@ -259,7 +259,11 @@ class SeriesSpec:
     expect_daily_publish: bool = False
     """Whether every UTC day of the window should have at least one publication."""
     publications_per_day: int | None = None
-    """How many distinct publish times a full UTC day holds, if the schedule is regular."""
+    """How many half-hour slots of a full UTC day hold a publication, if the schedule is regular.
+
+    INDDEM and INDGEN hold 47: Elexon publishes no issue in the half-hour starting 08:30 UK local
+    time.
+    """
     purpose: str | None = None
     """The sentence for the README that says which study the download was made for."""
 
@@ -475,8 +479,8 @@ SERIES: Final[dict[str, SeriesSpec]] = {
         sort=("publish_time", "boundary", "time"),
         timestamp_convention=(
             "`publish_time` is when the issue was published (UTC). `time` is the UTC start of "
-            "the half-hour the value covers. Every issue is kept, and an issue holds about 44 to "
-            "82 half-hours depending on when it is published."
+            "the half-hour the value covers. Every issue is kept. An issue holds between about "
+            "35 and 82 half-hours (measured in March 2026), depending on when it is published."
         ),
         gotchas=(
             "Values are negative for import, so a larger demand is a more negative number.",
@@ -487,7 +491,7 @@ SERIES: Final[dict[str, SeriesSpec]] = {
             "The window is applied to `publish_time`, so `time` values reach past the window end.",
         ),
         expect_daily_publish=True,
-        publications_per_day=48,
+        publications_per_day=47,
         purpose=INDGEN_INDDEM_PURPOSE,
     ),
     "elexon_indgen": SeriesSpec(
@@ -518,8 +522,8 @@ SERIES: Final[dict[str, SeriesSpec]] = {
         sort=("publish_time", "boundary", "time"),
         timestamp_convention=(
             "`publish_time` is when the issue was published (UTC). `time` is the UTC start of "
-            "the half-hour the value covers. Every issue is kept, and an issue holds about 44 to "
-            "82 half-hours depending on when it is published."
+            "the half-hour the value covers. Every issue is kept. An issue holds between about "
+            "35 and 82 half-hours (measured in March 2026), depending on when it is published."
         ),
         gotchas=(
             (
@@ -529,7 +533,7 @@ SERIES: Final[dict[str, SeriesSpec]] = {
             "The window is applied to `publish_time`, so `time` values reach past the window end.",
         ),
         expect_daily_publish=True,
-        publications_per_day=48,
+        publications_per_day=47,
         purpose=INDGEN_INDDEM_PURPOSE,
     ),
     "elexon_netbsad": SeriesSpec(
@@ -750,11 +754,15 @@ def series_schema(*, spec: SeriesSpec) -> dict[str, Any]:
 
 
 def days_with_missing_issues(*, frame: pl.DataFrame, expected_per_day: int) -> dict[str, Any]:
-    """Count the UTC days whose number of distinct publish times is below `expected_per_day`."""
+    """Count the UTC days with fewer than `expected_per_day` half-hour slots holding an issue.
+
+    Counting slots rather than publish times means two issues in one slot cannot hide a missing
+    slot.
+    """
     per_day = (
-        frame.select("publish_time")
+        frame.select(slot=pl.col("publish_time").dt.truncate("30m"))
         .unique()
-        .group_by(day=pl.col("publish_time").dt.date())
+        .group_by(day=pl.col("slot").dt.date())
         .agg(issues=pl.len())
         .filter(pl.col("issues") < expected_per_day)
         .sort("day")

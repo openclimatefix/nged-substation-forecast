@@ -298,11 +298,19 @@ def test_ind_series_read_the_value_from_the_raw_field_each_dataset_uses(
 
 
 def test_days_with_missing_issues_lists_only_short_days() -> None:
-    times = [datetime(2026, 3, 1, 0, 17, tzinfo=UTC) + timedelta(minutes=30 * i) for i in range(48)]
+    times = [datetime(2026, 3, 1, 0, 17, tzinfo=UTC) + timedelta(minutes=30 * i) for i in range(47)]
     short_day = [
-        datetime(2026, 3, 2, 0, 17, tzinfo=UTC) + timedelta(minutes=30 * i) for i in range(47)
+        datetime(2026, 3, 2, 0, 17, tzinfo=UTC) + timedelta(minutes=30 * i) for i in range(46)
     ]
     frame = pl.DataFrame({"publish_time": [*times, *times, *short_day]})
-    result = days_with_missing_issues(frame=frame, expected_per_day=48)
+    result = days_with_missing_issues(frame=frame, expected_per_day=47)
     assert result["count"] == 1
-    assert result["first"] == [{"day": "2026-03-02", "issues": 47}]
+    assert result["first"] == [{"day": "2026-03-02", "issues": 46}]
+
+
+def test_days_with_missing_issues_counts_half_hour_slots_not_publish_times() -> None:
+    slots = [datetime(2026, 3, 1, 0, 17, tzinfo=UTC) + timedelta(minutes=30 * i) for i in range(46)]
+    extra_issue_in_an_existing_slot = datetime(2026, 3, 1, 0, 16, tzinfo=UTC)
+    frame = pl.DataFrame({"publish_time": [*slots, extra_issue_in_an_existing_slot]})
+    result = days_with_missing_issues(frame=frame, expected_per_day=47)
+    assert result["first"] == [{"day": "2026-03-01", "issues": 46}]

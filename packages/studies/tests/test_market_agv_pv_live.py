@@ -2,11 +2,10 @@
 
 from datetime import UTC, date, datetime
 
-import fetch_agv
 import fetch_pv_live
 import polars as pl
 import pytest
-from fetch_agv import tidy
+from fetch_agv import completeness, tidy
 from fetch_pv_live import check_pes_list, chunk_keys, fetch_chunk, parse_pes_rows
 from market_common import IncompleteChunkError
 
@@ -51,10 +50,16 @@ def test_tidy_raises_when_a_group_date_and_period_repeat() -> None:
         tidy(raw=raw, start=date(2026, 3, 1), end=date(2026, 3, 31))
 
 
-def test_agv_groups_are_the_14_elexon_letters() -> None:
-    assert len(fetch_agv.GSP_GROUPS) == 14
-    assert "_I" not in fetch_agv.GSP_GROUPS
-    assert "_O" not in fetch_agv.GSP_GROUPS
+def test_completeness_counts_a_missing_group_period() -> None:
+    rows = [
+        _agv_row(group=group, period=str(period)) for group in ("_A", "_B") for period in (1, 2)
+    ]
+    frame = tidy(raw=pl.DataFrame(rows[:-1]), start=date(2026, 3, 1), end=date(2026, 3, 1))
+    checks = completeness(frame=frame, start=date(2026, 3, 1), end=date(2026, 3, 1))
+    assert checks["rows_present"] == 3
+    assert checks["rows_expected"] == 14 * 48
+    assert checks["periods_per_group"] == {"_A": 2, "_B": 1}
+    assert checks["sf_lag_days_median"] == 31.0
 
 
 def _pes_body(*, labels: list[str]) -> dict[str, object]:

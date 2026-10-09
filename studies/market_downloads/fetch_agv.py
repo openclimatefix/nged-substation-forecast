@@ -72,9 +72,10 @@ COLUMN_DOCS: Final[dict[str, str]] = {
     "gsp_group": "GSP group, `_A` to `_P` (`_I` and `_O` do not exist).",
     "import_export": "`I` if the group imports from the transmission system in the period, "
     "`E` if it exports. A group, date, period, and run has one row, so never both.",
-    "take_mwh": "Energy in the period, MWh. Always positive; the sign is in `import_export`. "
+    "take_mwh": "Energy in the period, MWh. Never negative; the sign is in `import_export`. "
     "The unit is not stated in the source and was checked against the national demand "
-    "outturn (INDO): twice the sum over the 14 groups is about 0.93 of INDO.",
+    "outturn (INDO) while planning issue 1108: twice the sum over the 14 groups was about 0.93 "
+    "of INDO.",
     "estimate_indicator": "Elexon's estimate flag (`T` on most rows). Its meaning is not "
     "documented in the files.",
     "settlement_run": "Always `SF`.",
@@ -122,9 +123,13 @@ def tidy(*, raw: pl.DataFrame, start: date, end: date) -> pl.DataFrame:
 def completeness(*, frame: pl.DataFrame, start: date, end: date) -> dict[str, Any]:
     """Compare the table with 14 groups in every settlement period of the window."""
     expected = expected_settlement_starts(start=start, end=end)
+    lag_days = (frame["flow_run_date"] - frame["settlement_date"]).dt.total_days()
     per_group = frame.group_by("gsp_group").agg(periods=pl.col("time").n_unique())
     last_date = frame["settlement_date"].max()
     return {
+        "rows_present": frame.height,
+        "rows_expected": len(GSP_GROUPS) * len(expected),
+        "sf_lag_days_median": lag_days.median(),
         "gsp_groups": sorted(frame["gsp_group"].unique().to_list()),
         "gsp_groups_expected": list(GSP_GROUPS),
         "last_settlement_date_present": None if last_date is None else str(last_date),
@@ -149,10 +154,16 @@ def run(*, root: Path, start: date, end: date) -> pl.DataFrame:
     zip_dir.mkdir(parents=True, exist_ok=True)
     raw_frames = []
     zips = {}
-    for year in range(start.year, end.year + 1):
-        url = ZIP_URL.format(year=year)
-        content = get_response(url=url).content
-        (zip_dir / f"AGV_{year}.zip").write_bytes(content)
+    this_year = datetime.now(UTC).year
+    # A zip is named for the year its settlement runs were published, so the SF rows of the last
+    # weeks of a year sit in the next year's zip.
+    for year in range(start.year, min(end.year + 1, this_year) + 1):
+        zip_path = zip_dir / f"AGV_{year}.zip"
+        if zip_path.exists() and year < this_year:
+            content = zip_path.read_bytes()
+        else:
+            content = get_response(url=ZIP_URL.format(year=year)).content
+            zip_path.write_bytes(content)
         zips[f"AGV_{year}.zip"] = {
             "bytes": len(content),
             "sha256": hashlib.sha256(content).hexdigest(),
@@ -188,7 +199,8 @@ def run(*, root: Path, start: date, end: date) -> pl.DataFrame:
         ),
         columns=COLUMN_DOCS,
         row_summary=(
-            f"- {frame.height} rows for {len(checks['periods_per_group'])} GSP groups.\n"
+            f"- {frame.height} of {checks['rows_expected']} group-periods present, for "
+            f"{len(checks['periods_per_group'])} GSP groups.\n"
             f"- The last settlement date present is {checks['last_settlement_date_present']}.\n"
             f"- Settlement periods with at least one row: {coverage['distinct_rows']} of "
             f"{coverage['expected_rows']} expected; {coverage['missing_count']} are missing "
@@ -198,7 +210,7 @@ def run(*, root: Path, start: date, end: date) -> pl.DataFrame:
             (
                 f"Only the `{SETTLEMENT_RUN}` run is kept. Elexon publishes seven runs (II, SF, "
                 "R1, R2, R3, RF, DF), and each settlement period has one row for every run "
-                "published so far. The SF run appears about 28 days after the settlement date, "
+                "published so far. The SF run appears about 20 days after the settlement date, "
                 "so the last weeks of any download have no SF rows yet."
             ),
             (
@@ -208,7 +220,8 @@ def run(*, root: Path, start: date, end: date) -> pl.DataFrame:
             (
                 "Each zip is named for the year the settlement run was published, so a zip holds "
                 "settlement dates from earlier years. The script reads every year from the "
-                "window start to the window end."
+                "window start to the year after the window end, or to the current year if that is "
+                "earlier."
             ),
             (
                 "`AGV_<current year>.zip` is rewritten daily, so `lineage.json` records a "

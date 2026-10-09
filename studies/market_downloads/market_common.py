@@ -1,7 +1,8 @@
 """Shared machinery for the GB electricity price and dispatch download scripts.
 
-Written for the battery-versus-solar-PV study. `fetch_gb_prices.py` and `fetch_bmu_dispatch.py`
-both import this module. The module holds the HTTP client with retry and backoff, the
+Written for the battery-versus-solar-PV study, and since used by the download scripts of the
+study of Elexon's indicated generation and demand. Every `fetch_*.py` script in this folder
+imports this module. The module holds the HTTP client with retry and backoff, the
 resumable per-chunk cache, the Elexon settlement-period arithmetic, the expected-row-count and gap
 helpers, and the `README.md` and `lineage.json` writers.
 

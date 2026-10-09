@@ -15,7 +15,7 @@ that spans more than 366 days.
 import argparse
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import polars as pl
 from fetch_bmu_dispatch import month_chunks
@@ -61,7 +61,7 @@ LICENCE: Final[str] = (
     "The maintainer accepted PV_Live's published terms for this download. The terms and any "
     "attribution wording have not been independently verified."
 )
-SCHEMA: Final[dict[str, object]] = {
+SCHEMA: Final[dict[str, Any]] = {
     "time": UTC_TIME,
     "pes_id": pl.Int16,
     "gsp_group": pl.String,
@@ -138,7 +138,7 @@ def fetch_chunk(key: str) -> pl.DataFrame:
     frame = parse_pes_rows(body=body, pes_id=pes_id)
     frame = frame.filter(pl.col("time").is_between(window_start, window_end, closed="left"))
     expected = int((window_end - window_start) / HALF_HOUR)
-    if frame.height < expected:
+    if frame["time"].n_unique() < expected:
         raise IncompleteChunkError(
             f"PES {pes_id} chunk {key} has {frame.height} of {expected} rows"
         )
@@ -180,6 +180,7 @@ def run(*, root: Path, start: date, end: date, threads: int) -> pl.DataFrame:
             "areas": NGED_AREAS,
             "chunks_not_published": sorted(outcome["not_published"]),
             "rows": frame.height,
+            "null_generation_mw": frame["generation_mw"].null_count(),
             "latest_update": frame["updated_at"].max(),
             "checks": checks,
         },
