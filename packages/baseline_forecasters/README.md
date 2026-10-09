@@ -64,16 +64,16 @@ sits an hour away from the target in local clock time, whereas the operator's me
 weekday and time of day. About one member value in ten is affected.
 
 **Climatology pools at least 66 samples per cell, with a median of 156, for a series with a full
-training history.** Those samples come from 22 to 66 distinct days, because neighbouring half-hours
-of one day are almost perfectly correlated (median lag-1 autocorrelation 0.97). Without pooling,
+training history.** The pooled samples come from at least 22 distinct days in a weekend cell (median
+26) and at least 49 in a weekday cell (median 66), because neighbouring half-hours of one day are
+strongly correlated (median lag-1 autocorrelation of raw power 0.97). Without pooling,
 such a series holds 8 to 19 samples in a weekend cell and 20 to 45 in a weekday cell. Pooling over
 nine cells multiplies the typical count by about eight. The tail members of a cell with few pooled
 samples sit at the observed extremes of those samples, because linear interpolation never
 extrapolates. A cell with one pooled sample gives 51 equal members. The training run logs the
 minimum and median pooled samples per cell.
 
-**The climatology is tuned in-sample on the leaderboard fold, and 15 months of history make it
-close to last year's distribution per cell.** The cell keying, pooling width, member count, and
+**The climatology is tuned in-sample on the leaderboard fold.** The cell keying, pooling width, member count, and
 holiday handling were chosen by scoring on the same validation year the leaderboard fold uses, so
 the climatology is a slightly stronger reference than an untuned one. Series with under 7 months of
 history (two of the 31) are forecast only on the cells they have, and a CRPSS against climatology is
@@ -93,7 +93,7 @@ members, and 51 members read about 2% below (1.6% to 2.3% across the 27 full-his
 51-member pooled climatology therefore reads no better on the fair CRPS than a 13-member unpooled
 climatology would, though its tails are far better. The same effect flatters climatology by about
 2% against the manual heuristic and XGBoost, which does not change any ranking, because the gaps are
-9% and 29%. It also gives climatology a small structural edge in a CRPS comparison with the
+8% and 29%. The same effect also gives climatology a small structural edge in a CRPS comparison with the
 weather ensemble ([Ferro (2014)](https://doi.org/10.1002/qj.2270)): read a near-tie at extended
 range as "the weather ensemble adds little out here", not as climatology winning.
 
@@ -101,20 +101,20 @@ range as "the weather ensemble adds little out here", not as climatology winning
 choice of members fixes.** On the leaderboard fold, the 18 full-history substations exceed the top
 member on 3.1% of rows, against 1.0% for calibrated quantiles. Part of the excess is year-to-year
 variation, which no choice of members fixes: the median member's monthly bias ranges from −10% to
-+14% of mean power. Part is sampling error in the tail quantiles, which are estimated from only 22
-to 66 distinct days per cell: weekend cells exceed their top member on 3.4% of rows and weekday
-cells on 2.3%.
++14% of mean power. Part is sampling error in the tail quantiles, which are estimated from few
+distinct days per cell: across the 27 full-history substation, PV, and wind series, weekend cells
+exceed their top member on 3.4% of rows and weekday cells on 2.3%.
 
 **For a battery and a biofuel generator, 51 pooled members worsen the lower-tail pinball losses.**
 Against 13 unpooled members, the pinball loss at the 1st percentile worsens by 18% and at the 5th
 percentile by 14%, because the power of both series is bimodal. The improvement in the pinball loss
 at the 99th percentile from 13 to 51 members is partly mechanical, since the derived 99th percentile
-of 13 equiprobable members sits at level about 0.93 and of 51 members at about 0.98.
+of 13 equiprobable members sits at level about 0.95 and of 51 members at about 0.98.
 
 **In March and October, a photovoltaic cell mixes days an hour apart in solar time.** The cell keys
 use local time, so a March or October cell mixes days on Greenwich Mean Time with days on British
-Summer Time. At 13 unpooled members that mixing cost about 2.6% of the CRPS of photovoltaic series
-in those two months.
+Summer Time. At 13 unpooled members that mixing raised the CRPS of photovoltaic series by
+about 2.6% in those two months.
 
 **The 51-member climatology compares with XGBoost's 51 members at equal member count, and with the
 13-member manual heuristic at unequal member count.** The prediction interval coverage, pinball
