@@ -4,7 +4,6 @@ import numpy as np
 import polars as pl
 import pytest
 from studies.battery_forecast import (
-    ID_PERSISTENCE_LAG_HALF_HOURS,
     SYMMETRIC_BANDS,
     asof_at_issue_time,
     band_coverage_and_width,
@@ -151,7 +150,6 @@ def test_persistence_at_one_hour_ahead_is_the_half_hour_that_ended_at_the_issue_
 
     assert source == target - timedelta(hours=1, minutes=30)
     assert source + timedelta(minutes=30) == issue_time_for(target_start=target, issue="ID-1h")
-    assert ID_PERSISTENCE_LAG_HALF_HOURS == 3
 
 
 def test_persistence_never_ends_after_the_issue_time_at_any_half_hour_of_the_day() -> None:
@@ -176,7 +174,7 @@ def _climatology_targets(*, times: list[datetime], issue: str) -> pl.DataFrame:
 def test_climatology_window_stops_at_the_last_complete_day() -> None:
     # Value equals the day index, so the window's days can be read off the quantiles.
     history = _history(days=60, value_of_day=lambda i: i)
-    target = datetime(2025, 10, 20, 12, 0, tzinfo=UTC)  # day index 49, a Monday
+    target = datetime(2025, 10, 22, 12, 0, tzinfo=UTC)  # day index 51, a Wednesday
     targets = _climatology_targets(times=[target], issue="DA-early")
 
     result = climatology_quantiles(
@@ -187,16 +185,18 @@ def test_climatology_window_stops_at_the_last_complete_day() -> None:
         window_days=10,
     )
 
-    # DA-early issue is 06:00 on day 48, so the last complete day is 47. That day is a Saturday,
-    # so the newest working day in the ten-day window 38 to 47 is the Friday, day 46.
-    assert result["q1.0"].to_list() == [46.0]
-    assert result["q0.0"].to_list()[0] >= 38.0
+    # DA-early issue is 06:00 on day 50, so the last complete day is 49, a Monday and a working
+    # day. The newest working day in the ten-day window 40 to 49 is therefore day 49 itself; an
+    # off-by-one that admitted the issue day (day 50, a Tuesday) would return 50.
+    assert result["q1.0"].to_list() == [49.0]
+    assert result["q0.0"].to_list()[0] >= 40.0
 
 
 def test_climatology_at_da_late_ignores_the_afternoon_of_the_day_before() -> None:
-    # Day 48 is the day before the target. Make its values huge: they must not enter.
-    history = _history(days=60, value_of_day=lambda i: 1000.0 if i == 48 else 1.0)
-    target = datetime(2025, 10, 20, 12, 0, tzinfo=UTC)
+    # Day 50 is the working day before the target (day 51). Make its values huge: they must not
+    # enter, because part of it ends after the 18:00 issue time.
+    history = _history(days=60, value_of_day=lambda i: 1000.0 if i == 50 else 1.0)
+    target = datetime(2025, 10, 22, 12, 0, tzinfo=UTC)
     targets = _climatology_targets(times=[target], issue="DA-late")
 
     result = climatology_quantiles(
@@ -207,16 +207,31 @@ def test_climatology_at_da_late_ignores_the_afternoon_of_the_day_before() -> Non
 
 
 def test_climatology_at_one_hour_ahead_includes_the_day_before_but_not_the_target_day() -> None:
-    history = _history(days=60, value_of_day=lambda i: 1000.0 if i == 49 else float(i))
-    # A Monday, day index 49 is the target day itself; day 48 is Sunday (non-working).
-    target = datetime(2025, 10, 20, 12, 0, tzinfo=UTC)
+    history = _history(days=60, value_of_day=lambda i: 1000.0 if i == 51 else float(i))
+    # A Wednesday, day index 51, is the target day itself; day 50, a Tuesday, is the day before.
+    target = datetime(2025, 10, 22, 12, 0, tzinfo=UTC)
     targets = _climatology_targets(times=[target], issue="ID-1h")
 
     result = climatology_quantiles(
         history=history, targets=targets, levels=[1.0], non_working_dates=NO_HOLIDAYS
     )
 
-    assert result["q1.0"].to_list()[0] < 1000.0
+    assert result["q1.0"].to_list() == [50.0]
+
+
+def test_climatology_with_a_target_before_any_history_has_an_empty_sample() -> None:
+    # The target is on the history's first day, so the last complete day is two days before it.
+    # A negative window stop once wrapped round and took almost the whole history.
+    history = _history(days=60, value_of_day=lambda i: float(i))
+    target = datetime(2025, 9, 1, 12, 0, tzinfo=UTC)
+    targets = _climatology_targets(times=[target], issue="DA-early")
+
+    result = climatology_quantiles(
+        history=history, targets=targets, levels=[0.5], non_working_dates=NO_HOLIDAYS
+    )
+
+    assert result["climatology_n"].to_list() == [0]
+    assert result["q0.5"].to_list() == [None]
 
 
 def test_climatology_matches_day_type() -> None:
@@ -242,13 +257,15 @@ def test_climatology_treats_a_bank_holiday_as_non_working() -> None:
     result = climatology_quantiles(
         history=history,
         targets=targets,
-        levels=[0.5],
+        levels=[1.0],
         non_working_dates=frozenset({holiday, target.date()}),
     )
 
-    # Only non-working days in the window: weekends (value 1) and the holiday (value 100).
-    assert result["climatology_n"].to_list()[0] > 0
-    assert result["q0.5"].to_list() == [1.0]
+    # The window is days 0 to 47: 13 weekend days plus the holiday, 14 days, each read at the
+    # target half-hour and its two neighbours. The holiday's value 100 is the sample's maximum, so
+    # a day type that ignored bank holidays would return 1.0 and a sample of 39.
+    assert result["climatology_n"].to_list() == [14 * 3]
+    assert result["q1.0"].to_list() == [100.0]
 
 
 def test_climatology_uses_the_neighbouring_half_hours_and_reports_the_sample_size() -> None:

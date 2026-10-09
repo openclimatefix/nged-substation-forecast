@@ -254,7 +254,7 @@ def climatology_quantiles(
         tod = target_time.hour * 2 + target_time.minute // 30
         key = (last_complete, is_working, tod)
         if key not in cache:
-            stop = min((last_complete - first_day).days + 1, matrix.shape[0])
+            stop = max(0, min((last_complete - first_day).days + 1, matrix.shape[0]))
             start = max(stop - window_days, 0)
             columns = [
                 c
