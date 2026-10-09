@@ -2,6 +2,7 @@
 
 from datetime import UTC, date, datetime
 
+import fetch_pn_all_bmus_sample
 import fetch_pv_live
 import polars as pl
 import pytest
@@ -119,3 +120,39 @@ def test_check_pes_list_raises_when_a_letter_differs(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(fetch_pv_live, "get_json", lambda **_: listing)
     with pytest.raises(ValueError, match="22"):
         check_pes_list()
+
+
+def _pn_body(*, period: int, segments: int) -> dict[str, object]:
+    return {
+        "data": [
+            {
+                "settlementDate": "2026-03-04",
+                "settlementPeriod": period,
+                "bmUnit": "2__XTEST001",
+                "timeFrom": "2026-03-04T12:00:00Z",
+                "timeTo": "2026-03-04T12:30:00Z",
+                "levelFrom": -21,
+                "levelTo": -20,
+            }
+        ]
+        * segments
+    }
+
+
+def test_fetch_period_parses_the_segments(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        fetch_pn_all_bmus_sample, "get_json", lambda **_: _pn_body(period=25, segments=1)
+    )
+    frame = fetch_pn_all_bmus_sample.fetch_period(settlement_date=date(2026, 3, 4), period=25)
+    assert frame["level_from_mw"].to_list() == [-21.0]
+    assert frame["time_to"].to_list() == [datetime(2026, 3, 4, 12, 30, tzinfo=UTC)]
+
+
+def test_fetch_day_raises_when_a_period_is_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_get_json(*, url: str, params: list[tuple[str, str]]) -> dict[str, object]:
+        period = int(dict(params)["settlementPeriod"])
+        return _pn_body(period=period, segments=0 if period == 7 else 1)
+
+    monkeypatch.setattr(fetch_pn_all_bmus_sample, "get_json", fake_get_json)
+    with pytest.raises(IncompleteChunkError, match="7"):
+        fetch_pn_all_bmus_sample.fetch_day("2026-03-04")
