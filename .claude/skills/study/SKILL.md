@@ -181,15 +181,16 @@ effect must exist) shows the instrument can detect an effect at all. Before a nu
 "no effect", either a positive control must have passed or the interval must bound the effect, as in
 "an effect as large as 0.08 points is not excluded".
 
-**When a study fits XGBoost models, look at their feature importance too, and plot it.** Show the
-share of total gain (`Booster.get_score(importance_type="total_gain")`) of each column, scaled to sum
-to 1 per model and averaged over folds and seeds, with the spread across folds. Sum the shares by
-feature group where the study adds columns in groups. Put a negative control's permuted columns on
-the same plot, because they show how much importance a column earns from nothing. Importance is
-descriptive and never the evidence that an input helps, because gain splits credit between
-correlated columns arbitrarily. The contrasts decide, and the page says where importance disagrees
-with them. `fit_one_fold` does not return its booster, so a study that wants importance refits the
-arms it needs and saves the gains.
+**When a study fits XGBoost models, plot each column's feature importance, but never read importance as evidence that an input helps.** Show each column's share of the total gain
+(`Booster.get_score(importance_type="total_gain")`), with the spread across folds and seeds. Scale
+the shares to sum to 1 within each XGBoost model, then average them over folds and seeds. Sum the
+shares by feature group where the study adds columns in groups. Add a negative control to the same
+plot, such as shuffled copies of real columns that carry no information. The shuffled columns' share
+shows how much importance a column receives from noise alone. Importance is descriptive, because
+gain splits credit between correlated columns arbitrarily. The planned contrasts are the evidence on
+whether an input helps. Where importance disagrees with the planned contrasts, the page says so.
+`fit_one_fold` does not return its booster, so a study that reports importance refits the arms it
+plots and saves each booster's gains.
 
 **Clean the target, not the inputs, and never correct NGED's timestamps twice.**
 `PowerTimeSeries.correct_late_timestamps` already moves NGED's readings to the right half-hour at
