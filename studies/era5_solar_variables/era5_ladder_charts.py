@@ -339,12 +339,12 @@ def figure_1_headline(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMix
     return figure(
         panels=panels,
         number=1,
-        title="Change in error from adding ERA5 variables, the eight planned contrasts",
+        title="Change in error from adding ERA5 variables, the ten planned contrasts",
         subtitle=[
             scope,
             "Dot: estimate. Thin line: 95% interval from resampling whole months.",
             (
-                f"Thick line: {ADJUSTED_LEVEL_PERCENT:.3f}% interval, adjusted for the eight "
+                f"Thick line: {ADJUSTED_LEVEL_PERCENT:.1f}% interval, adjusted for the ten "
                 "planned contrasts."
             ),
             "Dashed rules: no difference, and the smallest improvement worth acting on.",
@@ -1219,14 +1219,21 @@ def main() -> int:
         )
         seasons_by_regime = [f"{season} / {regime}" for season in SEASONS for regime in SKY_REGIMES]
         for number, kind, groups, title, note, name in (
-            (8, "regime_cams", SKY_REGIMES, "Contrasts by sky regime", cams_note, "regimes"),
             (
-                "8b",
+                8,
                 "regime_era5",
                 SKY_REGIMES,
                 "Contrasts by sky regime, from ERA5 total cloud cover",
                 era5_note,
-                "regimes_era5",
+                "regimes",
+            ),
+            (
+                "8b",
+                "regime_cams",
+                SKY_REGIMES,
+                "Contrasts by sky regime, from the CAMS clear-sky index",
+                cams_note,
+                "regimes_cams",
             ),
             (9, "season", SEASONS, "Contrasts by season", None, "seasons"),
             (
