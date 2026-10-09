@@ -3,18 +3,21 @@
 **This study asks whether the half-hourly electricity flow of a primary substation can reveal the
 power in megawatts (MW) and the energy capacity in megawatt-hours (MWh) of a battery that nobody
 meters.** National Grid Electricity Distribution (NGED) needs that answer for the storage behind its
-substations. An estimator fits a battery that follows public signals (the day-ahead electricity
-price, a half-hourly retail price, and the fixed windows of home-battery tariffs) to the flow, and
-reports a probability distribution (the *posterior*) for the battery's power and energy. The page
-tests the estimator on simulated batteries with a known answer, and then on real batteries. All
-numbers in the Summary are provisional until the remaining reviews finish.
+substations. An estimator assumes that a battery follows a daily schedule set by public signals (the
+day-ahead electricity price, a half-hourly retail price, or the fixed windows of home-battery
+tariffs): it charges at the cheap times and discharges at the dear ones. The estimator tries many
+battery sizes, keeps the sizes whose schedule makes the flow match the measured flow, and reports a
+probability distribution (the *posterior*) for the battery's power and energy. The page tests the
+estimator on simulated batteries with a known answer, and then on real batteries. All numbers in the
+Summary are provisional until the remaining reviews finish.
 
 **The Summary uses these terms.**
 
 - **Primary, bulk supply point, and grid supply point.** A *primary* is a substation that steps
   voltage down for local distribution. A *bulk supply point* and a *grid supply point* are larger
-  substations above the primaries. The study labels the series S1 to S8, BSP1, BSP2, and GSP1. The
-  labels are the study's own, not NGED's names.
+  substations above the primaries. The study labels the series S1 to S8, BSP1, BSP2, and GSP1. Rungs
+  1 to 4 use 9 series (7 primaries, S4 excluded, BSP2, and GSP1), and the screen of the primaries
+  uses all 8 primaries, S4 included. The labels are the study's own, not NGED's names.
 - **Flow series and sum.** A *flow series* is one substation's half-hourly flow. A *sum* is one
   battery (simulated or real) added to one flow series in one 3-month block, which the estimator
   then fits.
@@ -24,8 +27,10 @@ numbers in the Summary are provisional until the remaining reviews finish.
   times better the flow fits with a battery than without one, after a penalty for the battery's
   extra fitted quantities (power, usable energy, and efficiency). A block is *flagged* when its
   detection score is higher than in 95% of the blocks of the other series that have no battery.
-  Scores of batteryless blocks are negative, so flagged means "scores higher than almost all
-  batteryless blocks" and not "has positive evidence of a battery".
+  The penalty makes a block with no battery score below zero, because the fit with a battery then
+  gains little and pays the penalty. A score counts as big when it beats the threshold, which is the
+  95th percentile of the scores of no-battery blocks (-2.5 to -3.6). Flagged therefore means "scores
+  higher than almost all batteryless blocks" and not "has positive evidence of a battery".
 
 - **Can a simulated battery of known dispatch be found, and from what size? Yes if it follows the
   rule the estimator assumes, from a 10% share (58% of sums flagged) to a 20% share (94%)
@@ -37,9 +42,10 @@ numbers in the Summary are provisional until the remaining reviews finish.
       assumes.
     - **The result (provisional).** In-family batteries were flagged in 18% of sums at a 5% share,
       58% at 10%, 94% at 20%, and 100% at 40%.
-    - **The baseline (provisional).** With no battery added, 3 of 36 blocks (8.3%, 95% interval 1.8%
-      to 22.5%) were flagged, all of them one series (GSP1). Every rate above therefore includes
-      that 8.3% of false alarms.
+    - **The baseline (provisional).** The threshold targets a false-alarm rate of 5%. With no
+      battery added, 3 of 36 blocks (8.3%, 95% interval 1.8% to 22.5%) were flagged, all of them one
+      series (GSP1). Every rate above therefore includes that 8.3%, which is the false-alarm
+      baseline for all 9 series. Without GSP1 the same thresholds flagged 0 of 32 no-battery blocks.
     - **Other dispatch rules are found less often (provisional).** A battery that charges in each
       day's cheapest half-hours and discharges in the dearest was flagged in 44% of sums at a 10%
       share and 83% at 20%. A battery that follows a noisy copy of the price was flagged in 8% at
@@ -50,17 +56,20 @@ numbers in the Summary are provisional until the remaining reviews finish.
       sums. The 23 are 8 single batteries and 15 fleets of 2, 4, or 8 batteries.
     - **The result (provisional).** Without GSP1 (whose false alarms would inflate the rates), 0 of
       736 sums were flagged at shares of 5% and 10%, 1 of 736 at 20%, and 50 of 736 (6.8%, 95%
-      interval 5.1% to 8.9%) at 40%. A flagging rate of 5% is what a battery-free series would give
-      by design.
+      interval 5.1% to 8.9%) at 40%. The baseline without GSP1 is 0 of 32 no-battery blocks, so no
+      baseline needs subtracting, and 6.8% at 40% is above that baseline. It counts as a weak
+      detection at the largest share, and not as a size or as proof, because the target false-alarm
+      rate is 5% and the measured rate with GSP1 is 8.3%.
     - **One real battery in a real flow (provisional).** NGED battery A, a battery that NGED meters,
       was put back into the flow of the bulk supply point it connects to, at up to 11 times its
       metered output (as metered it is 3.2% of that flow's peak flow, and at 11 times 35.5%): 0 of
       20 blocks were flagged.
     - **Demand noise is part of the reason (provisional).** A *calendar replica* is a series rebuilt
       as the mean of its own month, half-hour of the day, and day type, so it keeps the daily and
-      seasonal shape and almost none of the random noise. On replicas the real batteries were
-      flagged in 71% of sums at a 10% share and 84% at 40%, against a threshold built from the
-      replicas' own no-battery blocks.
+      seasonal shape and almost none of the random noise. Real flows are not replicas. The replica
+      is a test of whether the method works once demand noise is removed. On replicas the real
+      batteries were flagged in 71% of sums at a 10% share and 84% at 40%, against a threshold built
+      from the replicas' own no-battery blocks.
 - **Can a battery's MW and MWh be estimated, and how reliable are the intervals? Not for real
   batteries (provisional).**
     - **What was tested.** The 90% interval for power from every sum above. *Interval coverage* is
@@ -69,8 +78,10 @@ numbers in the Summary are provisional until the remaining reviews finish.
       too narrow.
     - **In-family batteries (provisional).** The 90% power interval held the true power in 100% of
       sums at shares of 5% to 20% and 99% at 40%. Pooled over simulated merchant batteries and
-      simulated home-battery fleets, it held the true power in 68.9% of sums, short of the 80% set
-      before the study ran.
+      simulated home-battery fleets, which enter here and whose intervals mostly miss (0% to 36% of
+      sums), it held the true power in 68.9% of sums, short of the 80% that planned contrast C2
+      required in the study plan. Merchant batteries alone held it in 90% of sums over all seven
+      shares, which is the "slightly more than 90%" below, at shares of 5% or more.
     - **Other dispatch rules (provisional).** At 10%, 20%, and 40% shares the 90% power interval
       held the truth in 90%, 60%, and 26% of sums for the cheapest-and-dearest rule, and in 65%,
       33%, and 6% for the noisy price. The median absolute power error was about 30% for the
@@ -87,13 +98,16 @@ numbers in the Summary are provisional until the remaining reviews finish.
       templates with the tariff windows moved by 1 to 3 hours or the prices taken from another
       week. A copy with the wrong times should fit no better if no battery follows the real times.
     - **The result (provisional).** The real templates ranked first for none of the eight primaries.
-      The screen cannot tell a battery from none: a *lane* (one series with its four blocks added
-      together) with a simulated battery ranked the real templates first in 1 of 54 lanes (1.9%), no
-      more often than 1 in 13 (7.7%).
+      The screen cannot tell a battery from none. A *lane* is one series with its four blocks added
+      together. A lane with a simulated battery ranked the real templates first in 1 of 54 lanes
+      (1.9%). A *template* is the schedule the battery is assumed to follow, and a *control copy* is
+      that schedule moved to the wrong times. With 13 sets in all (the real one and 12 copies), a
+      screen with no information would rank the real set first in 1 of 13 lanes (7.7%).
     - **A price-only version (provisional).** Restricted to price-shifted copies, a screen added
       after the study's first scientific review ranked the real templates first in 53 of 54
       simulated lanes, 30 of 36 real-battery lanes at a 40% share, and 0 of 9 lanes with no battery
-      (95% interval 0% to 34%). By the price-only screen, no primary ranks first.
+      (95% interval 0% to 34%). By the price-only screen, no primary ranks first. That means the
+      screen found no sign of a battery, which is not the same as showing that no primary holds one.
 - **Does fitting the battery by gradient descent on a graphics card beat a grid search over battery
   sizes? Its intervals hold the truth far more often, but its medians are no more accurate
   (provisional).**
@@ -150,7 +164,8 @@ not](assets/unmetered_battery_capacity_headline.svg)
   15](#real-public-batteries-added-to-nged-flows-are-mostly-not-detected-or-sized)).
 - **The estimator reports about 2.6% of peak flow where no battery exists** ([Figure
   12](#for-a-battery-following-the-estimators-own-rule-the-90-power-interval-holds-the-true-power-from-a-5-share)).
-- **A second setting, with wider priors, gives the same verdicts** ([the second setting](#a-wider-prior-gives-the-same-verdicts)).
+- **A second setting, with wider priors, gives the same verdicts** ([the second
+  setting](#a-wider-prior-gives-the-same-verdicts)).
 
 ## Introduction
 
