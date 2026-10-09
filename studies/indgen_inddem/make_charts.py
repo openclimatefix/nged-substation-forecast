@@ -185,7 +185,7 @@ def unit_check_figure(*, number: int) -> alt.VConcatChart:
                 "transmission system, times 2 to give megawatts. Blue: the national demand "
                 "outturn (INDO). In the scatter, the dashed line is equality."
             ),
-            f"The correlation of the {len(check)} half-hours is {correlation:.3f}.",
+            f"The correlation of the {len(check):,} half-hours is {correlation:.3f}.",
         ],
         figure_planning=None,
     )
@@ -227,9 +227,10 @@ def zone_sign_figure(*, number: int) -> alt.VConcatChart:
         ),
         subtitle=[
             (
-                "Each zone is a combination of the national total and the 17 boundaries, by the "
-                "formulas of Elexon CVA Change Circular 235. A demand zone should be zero or "
-                "negative and a generation zone zero or positive, within 1 MW of rounding."
+                "Each zone is the least-squares solution for the national total and the 17 "
+                "boundaries, using the zone table of Elexon CVA Change Circular 235. A demand "
+                "zone should be zero or negative and a generation zone zero or positive, within "
+                "1 MW of rounding."
             ),
             "The latest issue before each half-hour, 1 September 2025 to 30 September 2026.",
         ],
@@ -363,7 +364,7 @@ def zone_profiles_figure(*, number: int) -> alt.VConcatChart:
         panels=rows,
         number=number,
         title=(
-            f"Zone {largest['zone'][1:]} holds the most INDDEM, {largest['mean'] / 1000:.1f} GW on "
+            f"Zone {largest['zone']} holds the most INDDEM, {largest['mean'] / 1000:.1f} GW on "
             "average, and the zones differ in the shape of their day"
         ),
         subtitle=[
@@ -419,7 +420,7 @@ def reach_figure(*, number: int) -> alt.VConcatChart:
         ),
         subtitle=[
             (
-                f"Each dot is one of {len(data)} issues of the national total. The reach is the "
+                f"Each dot is one of {len(data):,} issues of the national total. The reach is the "
                 "time from publication to the end of the last half-hour in the issue. INDGEN's "
                 "issues have the same reach."
             ),
@@ -606,12 +607,17 @@ def weights_figure(*, number: int) -> alt.VConcatChart:
             text=alt.Text("fraction:Q", format=".1f"),
         )
     )
+    stability = pl.read_parquet(STUDY_DIR / "leave_one_day_out.parquet")
+    stable_groups = stability.filter(
+        pl.col("gsp_group").str.starts_with("_") & (pl.col("fits_agreeing") == pl.col("fits"))
+    ).height
     return figure(
         panels=[layered(heat, labels)],
         number=number,
         title=(
-            "Each interconnector lands in the zone where it is known to land, and no GSP group "
-            f"is settled by a fit on {fractions['half_hours'][0]} half-hours"
+            f"Each interconnector lands in the zone where it is known to land, and {stable_groups} "
+            f"of the 14 GSP groups stay in one zone in every fit on "
+            f"{fractions['half_hours'][0]} half-hours"
         ),
         subtitle=[
             (
@@ -652,12 +658,14 @@ def correlation_figure(*, number: int) -> alt.VConcatChart:
         .properties(width=PLOT_WIDTH_PX, height=ROW_HEIGHT_PX * 2)
     )
     labels = (
-        alt.Chart(correlations)
+        alt.Chart(
+            correlations.with_columns(label=pl.col("correlation_without_national").round(1) + 0.0)
+        )
         .mark_text(fontSize=8, color=ocf.BLACK_1, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("zone:N", sort=list(ZONES)),
             y=alt.Y("gsp_group:N", sort=groups),
-            text=alt.Text("correlation_without_national:Q", format=".1f"),
+            text=alt.Text("label:Q", format=".1f"),
         )
     )
     highest = correlations["correlation_without_national"].max()

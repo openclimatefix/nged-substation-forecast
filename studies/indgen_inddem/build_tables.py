@@ -45,12 +45,15 @@ from indgen_inddem_common import (
 from scipy.optimize import nnls
 
 VALUE_COLUMNS: Final[dict[DatasetType, str]] = {"inddem": "demand_mw", "indgen": "generation_mw"}
+"""The name of each dataset's value column in the downloaded table."""
 SOURCE_PATHS: Final[dict[DatasetType, str]] = {
     "inddem": str(INDDEM_PATH),
     "indgen": str(INDGEN_PATH),
 }
 VIEWS: Final[tuple[ViewType, ...]] = ("latest", "first_of_day")
+"""The two as-of lookups of each target half-hour."""
 HALF_HOUR_MINUTES: Final[int] = 30
+"""The length of a settlement period in minutes."""
 LAST_LOCAL_SLOTS_FROM: Final[int] = 44
 """The first UK local half-hour slot (22:00) of the late-evening slots the report lists."""
 FIRST_LOCAL_SLOTS_TO: Final[int] = 4
@@ -59,7 +62,6 @@ SHORT_REACH_HOURS: Final[float] = 18.0
 """Issues that reach less than this many hours ahead are the shortest tail of the reach."""
 LONG_ISSUE_HOURS: Final[float] = 30.0
 """An issue that reaches further than this is the long issue published from about 12:00 UK local."""
-LAST_SLOTS_FROM: Final[int] = 44
 """The first UTC half-hour of the day (22:00 UTC) in the late-day slots the report lists."""
 SATURDAY: Final[int] = 6
 """The ISO weekday number of Saturday, so a weekday number at or above it is a weekend day."""
@@ -76,7 +78,6 @@ WINDOW_AFTER_UTC: Final[datetime] = datetime(
     STUDY_END.year, STUDY_END.month, STUDY_END.day, tzinfo=UTC
 ) + timedelta(days=1)
 """Midnight after the last day of the study window."""
-UTC_TIME: Final[pl.Datetime] = pl.Datetime(time_unit="us", time_zone="UTC")
 
 report_lines: list[str] = []
 
@@ -473,16 +474,20 @@ def remove_component(*, series: pl.Series, national: pl.Series) -> np.ndarray:
     return values - slope * reference
 
 
-def anomaly_correlations(*, agv: pl.DataFrame, zones: pl.DataFrame) -> pl.DataFrame:
-    """Correlate each GSP group's AGV with each zone's INDDEM, raw and after removing the cycle.
+def joint_anomalies(*, agv: pl.DataFrame, zones: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Return the raw and the anomaly series of every GSP group's AGV and every zone's INDDEM.
 
     The anomaly of a series is the series minus its own mean at the same UK local half-hour of the
-    day, the same day type (weekday or weekend), and the same month. Every series shares the daily,
-    weekly, and seasonal cycles, so correlations of the raw series sit near 0.76 between any two GSP
-    groups, and the anomaly correlation shows what is left. A GSP group's AGV anomaly and a zone's
-    INDDEM anomaly also share the national anomaly, which is mostly weather. The study therefore
-    also removes from each series the multiple of the national anomaly (the sum of the 14 groups,
-    or of the 17 zones) that a least-squares fit gives, and correlates what remains.
+    day, the same day type (weekday or weekend), and the same month. INDDEM's sign is reversed, so
+    both kinds of series are positive when demand is positive.
+
+    Args:
+        agv: Each GSP group's AGV in MW, from `agv_import_mw`.
+        zones: Every zone's value for every half-hour, from `zones_from_boundaries`.
+
+    Returns:
+        The raw series and the anomalies, each with a `time` column and a column for each GSP
+        group and each zone.
     """
     wide_agv = agv.pivot(on="gsp_group", index="time", values="import_mw")
     wide_zones = (
@@ -502,7 +507,27 @@ def anomaly_correlations(*, agv: pl.DataFrame, zones: pl.DataFrame) -> pl.DataFr
     anomalies = keyed.with_columns(
         pl.col(column) - pl.col(column).mean().over("half_hour", "weekend", "month")
         for column in series
-    )
+    ).select("time", *series)
+    return joined, anomalies
+
+
+def anomaly_correlations(*, agv: pl.DataFrame, zones: pl.DataFrame) -> pl.DataFrame:
+    """Correlate each GSP group's AGV with each zone's INDDEM, raw and after removing components.
+
+    Every series shares the daily, weekly, and seasonal cycles, so the correlation of the anomalies
+    shows what is left after the cycles. A GSP group's AGV anomaly and a zone's INDDEM anomaly each
+    also share a national anomaly, the sum of the 14 groups' anomalies or of the 17 zones'. The
+    study removes from each series the multiple of its own national anomaly that a least-squares
+    fit gives, and correlates what remains.
+
+    Args:
+        agv: Each GSP group's AGV in MW, from `agv_import_mw`.
+        zones: Every zone's value for every half-hour, from `zones_from_boundaries`.
+
+    Returns:
+        One row for each GSP group and zone, with the three correlations.
+    """
+    joined, anomalies = joint_anomalies(agv=agv, zones=zones)
     national_agv = anomalies.select(pl.sum_horizontal(list(GSP_GROUPS))).to_series()
     national_inddem = anomalies.select(pl.sum_horizontal(list(ZONES))).to_series()
     without_national = {
@@ -529,6 +554,48 @@ def anomaly_correlations(*, agv: pl.DataFrame, zones: pl.DataFrame) -> pl.DataFr
         for zone in ZONES
     ]
     return pl.DataFrame(rows)
+
+
+def report_national_anomalies(*, agv: pl.DataFrame, zones: pl.DataFrame) -> None:
+    """Report what the national AGV and INDDEM anomalies are made of and how they relate to INDO."""
+    _, anomalies = joint_anomalies(agv=agv, zones=zones)
+    national_agv = anomalies.select(pl.sum_horizontal(list(GSP_GROUPS))).to_series()
+    national_inddem = anomalies.select(pl.sum_horizontal(list(ZONES))).to_series()
+    indo = pl.read_parquet(INDO_PATH).select("time", "indo_mw").unique("time")
+    local = pl.col("time").dt.convert_time_zone(LONDON)
+    indo_anomaly = (
+        anomalies.select("time")
+        .join(indo, on="time", how="left", validate="1:1")
+        .with_columns(
+            half_hour=local.dt.hour().cast(pl.Int32) * 2
+            + local.dt.minute().cast(pl.Int32) // HALF_HOUR_MINUTES,
+            weekend=local.dt.weekday() >= SATURDAY,
+            month=local.dt.month(),
+        )
+        .select(pl.col("indo_mw") - pl.col("indo_mw").mean().over("half_hour", "weekend", "month"))
+        .to_series()
+    )
+    say()
+    say("## National anomalies")
+    say(
+        f"Correlation of the national AGV anomaly with the national INDDEM anomaly: "
+        f"{np.corrcoef(national_agv, national_inddem)[0, 1]:.2f}; with the INDO anomaly: AGV "
+        f"{np.corrcoef(national_agv, indo_anomaly)[0, 1]:.2f}, INDDEM "
+        f"{np.corrcoef(national_inddem, indo_anomaly)[0, 1]:.2f}."
+    )
+    variance = float(np.dot(national_inddem.to_numpy(), national_inddem.to_numpy()))
+    shares = sorted(
+        (
+            (float(np.dot(anomalies[zone].to_numpy(), national_inddem.to_numpy())) / variance, zone)
+            for zone in ZONES
+        ),
+        reverse=True,
+    )
+    say(
+        "Share of the national INDDEM anomaly's variance that each zone covers, top four: "
+        + ", ".join(f"{zone} {share:.2f}" for share, zone in shares[:4])
+        + "."
+    )
 
 
 def agv_pair_correlations(*, agv: pl.DataFrame) -> dict[str, float]:
@@ -653,16 +720,6 @@ def report_issues(*, views: pl.DataFrame, reach: pl.DataFrame) -> None:
         .sort("dataset")
     )
     say()
-    say("Mean first-minus-latest difference by UTC target half-hour, last four slots (MW):")
-    for row in (
-        fvl.filter(pl.col("utc_half_hour") >= LAST_SLOTS_FROM)
-        .group_by("dataset", "utc_half_hour")
-        .agg(mean_mw=pl.col("difference_mw").mean())
-        .sort("dataset", "utc_half_hour")
-        .iter_rows(named=True)
-    ):
-        say(f"- {row['dataset']} slot {row['utc_half_hour']}: {row['mean_mw']:.0f}")
-    say()
     say("Mean first-minus-latest difference by UK local target half-hour and clocks, MW:")
     seasonal = (
         fvl.filter(
@@ -679,16 +736,20 @@ def report_issues(*, views: pl.DataFrame, reach: pl.DataFrame) -> None:
             f"- {row['dataset']} {row['clocks']} local slot {row['local_half_hour']}: "
             f"{row['mean_mw']:.0f}"
         )
-    outside = (
-        fvl.filter(
-            ~pl.col("local_half_hour").is_in(
-                [*range(LAST_LOCAL_SLOTS_FROM, 48), *range(FIRST_LOCAL_SLOTS_TO)]
-            )
+    outside_rows = fvl.filter(
+        ~pl.col("local_half_hour").is_in(
+            [*range(LAST_LOCAL_SLOTS_FROM, 48), *range(FIRST_LOCAL_SLOTS_TO)]
         )
-        .group_by("dataset")
-        .agg(
-            largest_abs_mean_mw=pl.col("difference_mw").mean().abs().max(),
-            mean_abs_mw=pl.col("difference_mw").abs().mean(),
+    )
+    per_slot = outside_rows.group_by("dataset", "clocks", "local_half_hour").agg(
+        mean_mw=pl.col("difference_mw").mean()
+    )
+    outside = (
+        per_slot.group_by("dataset")
+        .agg(largest_abs_slot_mean_mw=pl.col("mean_mw").abs().max())
+        .join(
+            outside_rows.group_by("dataset").agg(mean_abs_mw=pl.col("difference_mw").abs().mean()),
+            on="dataset",
         )
         .sort("dataset")
     )
@@ -714,7 +775,8 @@ def report_issues(*, views: pl.DataFrame, reach: pl.DataFrame) -> None:
     )
     say(
         f"Reach 1st and 99th percentile: {regular['reach_hours'].quantile(0.01):.1f} and "
-        f"{regular['reach_hours'].quantile(0.99):.1f} hours; issues reaching under 18 hours: "
+        f"{regular['reach_hours'].quantile(0.99):.1f} hours; issues reaching under "
+        f"{SHORT_REACH_HOURS:g} hours: "
         f"{regular.filter(pl.col('reach_hours') < SHORT_REACH_HOURS).height}."
     )
     local_hour = pl.col("publish_time").dt.convert_time_zone(LONDON).dt.hour()
@@ -728,6 +790,23 @@ def report_issues(*, views: pl.DataFrame, reach: pl.DataFrame) -> None:
         .group_by("day")
         .agg(slots=pl.len())
     )
+    first_issue = views.filter(
+        (pl.col("view") == "first_of_day")
+        & (pl.col("boundary") == "N")
+        & (pl.col("dataset") == "inddem")
+    ).select(minute=pl.col("publish_time").dt.minute(), hour=pl.col("publish_time").dt.hour())
+    say("Publish time (UTC hour and minute) of the 00:00 UTC view's issue, share of target rows:")
+    say(
+        first_issue.group_by("hour", "minute")
+        .agg(rows=pl.len())
+        .sort("rows", descending=True)
+        .head(4)
+    )
+    long_issues = regular.filter(pl.col("reach_hours") > LONG_ISSUE_HOURS)
+    earliest_local = long_issues.select(
+        pl.col("publish_time").dt.convert_time_zone(LONDON).dt.strftime("%H:%M").min()
+    ).item()
+    say(f"Earliest UK local publication time of a long issue: {earliest_local}.")
     say(f"Slots with an issue in a UTC day: {slots['slots'].value_counts().sort('slots')}")
     local_slots = (
         regular.select(
@@ -752,7 +831,10 @@ def report_issues(*, views: pl.DataFrame, reach: pl.DataFrame) -> None:
         .agg(issues=pl.len())
         .sort("long_issue", "end_local")
     )
-    say("End of the last half-hour of an issue, UK local time (long issue means over 30 hours):")
+    say(
+        "End of the last half-hour of an issue, UK local time "
+        f"(long issue means over {LONG_ISSUE_HOURS:g} hours):"
+    )
     say(ends)
     odd = reach.filter(pl.col("reach_hours") < 1)
     say(f"Issues that reach less than one hour ahead: {odd.height}.")
@@ -851,19 +933,28 @@ def report_national_against_indo(*, views: pl.DataFrame) -> None:
 
 
 def supplier_import_share() -> float:
-    """Return the share of the sampled import PNs that supplier base BMUs (`2__`) hold."""
+    """Return the share of the sampled netted import PNs that supplier base BMUs (`2__`) hold.
+
+    The BMUs of an interconnector are netted first, as in `group_sums_from_pn`. A netting group
+    counts as a supplier only if every BMU in it is a supplier base BMU.
+    """
     averages = period_average_mw(segments=pl.read_parquet(PN_SAMPLE_PATH))
     register = (
         pl.read_parquet(BMU_REFERENCE_PATH)
-        .select("national_grid_bmu_id", "elexon_bmu_id")
+        .select("national_grid_bmu_id", "elexon_bmu_id", "interconnector_id")
         .unique("national_grid_bmu_id")
     )
-    imports = averages.filter(pl.col("average_mw") < 0).join(
-        register, on="national_grid_bmu_id", how="left"
+    units = (
+        averages.join(register, on="national_grid_bmu_id", how="left", validate="m:1")
+        .group_by("time", unit=pl.coalesce("interconnector_id", "national_grid_bmu_id"))
+        .agg(
+            net_mw=pl.col("average_mw").sum(),
+            supplier=pl.col("elexon_bmu_id").str.starts_with("2__").fill_null(False).all(),
+        )
     )
+    imports = units.filter(pl.col("net_mw") < 0)
     return imports.select(
-        pl.col("average_mw").filter(pl.col("elexon_bmu_id").str.starts_with("2__")).sum()
-        / pl.col("average_mw").sum()
+        pl.col("net_mw").filter(pl.col("supplier")).sum() / pl.col("net_mw").sum()
     ).item()
 
 
@@ -874,6 +965,7 @@ def build_agv(*, views: pl.DataFrame, zones: pl.DataFrame) -> pl.DataFrame:
     correlations = anomaly_correlations(agv=agv, zones=zones)
     correlations.write_parquet(STUDY_DIR / "anomaly_correlations.parquet")
     pair = agv_pair_correlations(agv=agv)
+    report_national_anomalies(agv=agv, zones=zones)
     say()
     say("## Correlation between GSP groups' AGV, median of the 91 pairs")
     say(
@@ -971,6 +1063,9 @@ def build_pn_fit(*, views: pl.DataFrame, zones: pl.DataFrame) -> None:
             inddem_minus_pn_max_abs_mw=(pl.col("inddem") - pl.col("pn_import_mw")).abs().max(),
             indgen_minus_pn_median_mw=(pl.col("indgen") - pl.col("pn_export_mw")).median(),
             indgen_minus_pn_max_abs_mw=(pl.col("indgen") - pl.col("pn_export_mw")).abs().max(),
+            indgen_minus_pn_min_mw=(pl.col("indgen") - pl.col("pn_export_mw")).min(),
+            indgen_minus_pn_max_mw=(pl.col("indgen") - pl.col("pn_export_mw")).max(),
+            indgen_above_pn_half_hours=((pl.col("indgen") - pl.col("pn_export_mw")) > 0).sum(),
         )
     )
     reproduced = joined.filter(
@@ -1023,6 +1118,7 @@ def build_pn_fit(*, views: pl.DataFrame, zones: pl.DataFrame) -> None:
         .sort(pl.col("zone").str.slice(1).cast(pl.Int32))
     )
     stability = leave_one_day_out(zones=zones, sums=sums, keep_times=reproduced)
+    stability.write_parquet(STUDY_DIR / "leave_one_day_out.parquet")
     say()
     say(
         "Leave-one-day-out check: zone of the largest fraction of each column, full fit versus fits"
