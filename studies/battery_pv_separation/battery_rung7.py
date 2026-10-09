@@ -38,6 +38,7 @@ from battery_synthetic import (
 )
 from pyproj import Transformer
 from shapely.geometry import shape
+from studies.battery_capacity import calendar_replica
 from studies.battery_joint_lp import fit_joint_solar_battery
 from studies.pv_separation import solar_basis
 from studies.sources import SOLAR_BMU_CENSUS_INPUTS_DIR, SOLAR_BMU_DISAGGREGATION_DIR
@@ -108,36 +109,6 @@ def gsp_group(*, bmu_id: str) -> str:
     return register.filter(pl.col("elexonBmUnit") == bmu_id)["gspGroupId"][0]
 
 
-def calendar_replica(*, output: np.ndarray) -> np.ndarray:
-    """Return the mean output of each month, half-hour of the day, and day type, on the same grid.
-
-    Months, half-hours, and day types follow UK local time, because demand follows the clock.
-
-    Args:
-        output: The output in megawatts on the window grid. NaN marks a missing half-hour.
-
-    Returns:
-        A series on the same grid. Each half-hour holds the mean of the finite outputs that share
-        its month, local half-hour of the day, and day type. Half-hours with no output stay NaN.
-    """
-    local = window_half_hours().dt.offset_by("-15m").dt.convert_time_zone("Europe/London")
-    frame = pl.DataFrame(
-        {
-            "month": local.dt.month(),
-            "half_hour": local.dt.hour() * 2 + local.dt.minute() // 30,
-            "weekday": local.dt.weekday(),
-            "output": output,
-        },
-        nan_to_null=True,
-    )
-    frame = frame.with_columns(
-        day_type=pl.when(pl.col("weekday") >= 6).then(pl.col("weekday")).otherwise(0)
-    )
-    mean = pl.col("output").mean().over("month", "half_hour", "day_type")
-    replica = frame.select(pl.when(pl.col("output").is_not_null()).then(mean))["output"]
-    return replica.fill_null(float("nan")).to_numpy()
-
-
 def run_bmu(bmu_id: str) -> tuple[list[dict], list[dict]]:
     """Fit the sweep of assumed battery powers to one BMU's output and to its calendar replica.
 
@@ -155,7 +126,10 @@ def run_bmu(bmu_id: str) -> tuple[list[dict], list[dict]]:
         values=solar_basis(sky=sky, dc_ac_ratio=stage1_ratio(excluded=())),
     )
     real = output_on_grid(bmu_id=bmu_id)
-    outputs = {"real": real, "replica": calendar_replica(output=real)}
+    outputs = {
+        "real": real,
+        "replica": calendar_replica(output=real, half_hour_end_time=window_half_hours()),
+    }
     rows: list[dict] = []
     series: list[dict] = []
     for source in SOURCES:

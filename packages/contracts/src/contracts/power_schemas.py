@@ -360,7 +360,10 @@ class TimeSeriesMetadata(pt.Model):
     information: str | None = pt.Field(
         dtype=pl.String,
         allow_missing=True,
-        description="Free-text NGED notes field; always null in the V1 trial area.",
+        description=(
+            "Free-text note from NGED about a known meter fault or a customer's status. Null for"
+            " most series."
+        ),
     )
 
     area_wkt: str | None = pt.Field(

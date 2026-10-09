@@ -381,6 +381,32 @@ def test_power_time_series_and_metadata_handles_no_new_data(
     assert calls == 1
 
 
+def test_the_newest_small_file_of_a_series_sets_its_metadata(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """Series 10 has an older large file and a newer data-less file that carries NGED's note.
+    The size filter drops the newer file from the power download, but its metadata must win."""
+    small_file = json.loads((_NGED_JSON_DIR / "TimeSeries_33_no_data.json").read_text())
+    small_file.update(TimeSeriesID=10, Information="Invented fault note.")
+    small_file_key = (
+        "timeseries/1774555200000_1774576800000"
+        "/TimeSeries_10_20260326T140000Z_20260326T200000Z.json"
+    )
+    files = {**_NGED_FILES, small_file_key: json.dumps(small_file).encode()}
+    monkeypatch.setattr(
+        target=assets.Settings, name="get_nged_s3_store", value=lambda self: _FakeS3Store(files)
+    )
+
+    result = materialize([power_time_series_and_metadata], instance=dagster_instance)
+
+    assert result.success
+    metadata = pl.read_parquet(env / "NGED" / "metadata.parquet")
+    notes = dict(metadata.select("time_series_id", "information").rows())
+    assert notes[10] == "Invented fault note."
+    assert notes[11] is None
+    assert pl.read_delta(str(env / "NGED" / "power_time_series.delta")).height > 0
+
+
 def test_power_time_series_and_metadata_retries_a_transient_upstream_failure(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:

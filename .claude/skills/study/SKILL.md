@@ -372,10 +372,12 @@ Every study page follows the structure of an academic paper, in this order:
 
 1. **Title.** An `h1` that states the finding, scoped to the products tested. A page that ranks
    products in answer to a question may instead title itself with that question.
-2. **Summary.** The question-and-answer bullets described below, then the headline figure (the
-   leaderboard and then the paired contrasts, where the study ranks products), then scoped
-   take-home bullets, one per use of the data. The Summary bullets are the only place a
-   recommendation appears without its evidence.
+2. **Summary.** A one-paragraph **bottom line** directly under the title, in plain words: a bold
+   sentence stating the answer to the study's main question, then one or two sentences on what
+   would change the answer and what the study did not test. Then come the question-and-answer
+   bullets described below, the headline figure (the leaderboard and then the paired contrasts,
+   where the study ranks products), and scoped take-home bullets, one per use of the data. The
+   Summary bullets are the only place a recommendation appears without its evidence.
 
    **The Summary opens by answering each question the study asks, in plain words.** Write one short
    bolded bullet per question, such as "Can an unmetered battery be identified?", with the answer

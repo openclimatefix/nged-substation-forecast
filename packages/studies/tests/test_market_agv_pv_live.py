@@ -1,0 +1,179 @@
+"""Tests for the AGV and PV_Live download scripts, with no network access."""
+
+from datetime import UTC, date, datetime, timedelta
+from typing import Any
+
+import fetch_pn_all_bmus_sample
+import fetch_pv_live
+import polars as pl
+import pytest
+from fetch_agv import completeness, tidy
+from fetch_pv_live import check_pes_list, chunk_keys, fetch_chunk, parse_pes_rows
+from market_common import IncompleteChunkError, period_start_utc
+
+
+def _agv_row(
+    *, run: str = "SF", day: str = "20260301", period: str = "1", group: str = "_B"
+) -> dict[str, str]:
+    return {
+        "gsp_group": group,
+        "settlement_date": day,
+        "settlement_run": run,
+        "cdca_run_number": "1",
+        "settlement_period": period,
+        "estimate_indicator": "T",
+        "import_export": "I",
+        "take_mwh": "100.5",
+        "flow_run_date": "20260401",
+    }
+
+
+def test_tidy_keeps_only_the_sf_run_inside_the_window() -> None:
+    raw = pl.DataFrame(
+        [
+            _agv_row(run="SF"),
+            _agv_row(run="R3"),
+            _agv_row(run="SF", day="20250801"),
+            _agv_row(run="SF", day="20260301", period="2"),
+        ]
+    )
+    frame = tidy(raw=raw, start=date(2026, 3, 1), end=date(2026, 3, 31))
+    assert frame["settlement_period"].to_list() == [1, 2]
+    assert frame["time"].to_list() == [
+        datetime(2026, 3, 1, 0, 0, tzinfo=UTC),
+        datetime(2026, 3, 1, 0, 30, tzinfo=UTC),
+    ]
+    assert frame["take_mwh"].to_list() == [100.5, 100.5]
+
+
+def test_tidy_raises_when_a_group_date_and_period_repeat() -> None:
+    raw = pl.DataFrame([_agv_row(), _agv_row()])
+    with pytest.raises(ValueError, match="share a group"):
+        tidy(raw=raw, start=date(2026, 3, 1), end=date(2026, 3, 31))
+
+
+def test_completeness_counts_a_missing_group_period() -> None:
+    rows = [
+        _agv_row(group=group, period=str(period)) for group in ("_A", "_B") for period in (1, 2)
+    ]
+    frame = tidy(raw=pl.DataFrame(rows[:-1]), start=date(2026, 3, 1), end=date(2026, 3, 1))
+    checks = completeness(frame=frame, start=date(2026, 3, 1), end=date(2026, 3, 1))
+    assert checks["rows_present"] == 3
+    assert checks["rows_expected"] == 14 * 48
+    assert checks["periods_per_group"] == {"_A": 2, "_B": 1}
+    assert checks["sf_lag_days_median"] == 31.0
+
+
+def _pes_body(*, labels: list[str]) -> dict[str, object]:
+    return {
+        "meta": ["pes_id", "datetime_gmt", "generation_mw", "installedcapacity_mwp", "updated_gmt"],
+        "data": [[22, label, 1.5, 2400.0, "2026-08-04T18:13:59Z"] for label in labels],
+    }
+
+
+def test_parse_pes_rows_moves_the_end_label_back_to_the_start_of_the_half_hour() -> None:
+    frame = parse_pes_rows(body=_pes_body(labels=["2026-03-01T00:30:00Z"]), pes_id=22)
+    assert frame["time"].to_list() == [datetime(2026, 3, 1, 0, 0, tzinfo=UTC)]
+    assert frame["gsp_group"].to_list() == ["_L"]
+
+
+def test_parse_pes_rows_rejects_an_error_body() -> None:
+    with pytest.raises(TypeError):
+        parse_pes_rows(body={"detail": "bad"}, pes_id=22)
+
+
+def test_chunk_keys_cover_each_area_and_month() -> None:
+    keys = chunk_keys(start=date(2026, 1, 15), end=date(2026, 2, 10))
+    assert len(keys) == 4 * 2
+    assert "22_2026-02-01_2026-02-11" in keys
+
+
+def test_fetch_chunk_raises_when_the_month_is_short(monkeypatch: pytest.MonkeyPatch) -> None:
+    body = _pes_body(labels=["2026-03-01T00:30:00Z"])
+    monkeypatch.setattr(fetch_pv_live, "get_json", lambda **_: body)
+    with pytest.raises(IncompleteChunkError):
+        fetch_chunk("22_2026-03-01_2026-03-02")
+
+
+def test_fetch_chunk_asks_for_labels_from_the_first_half_hour_to_midnight(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict[str, str] = {}
+
+    def fake_get_json(*, url: str, params: list[tuple[str, str]]) -> dict[str, object]:
+        seen.update(dict(params))
+        labels = [
+            f"2026-03-01T{hour:02d}:{minute:02d}:00Z" for hour in range(24) for minute in (0, 30)
+        ]
+        # Labels 00:30 ... 23:30 of the day, then midnight of the next day.
+        return _pes_body(labels=[*labels[1:], "2026-03-02T00:00:00Z"])
+
+    monkeypatch.setattr(fetch_pv_live, "get_json", fake_get_json)
+    frame = fetch_chunk("22_2026-03-01_2026-03-02")
+    assert seen["start"] == "2026-03-01T00:30:00"
+    assert seen["end"] == "2026-03-02T00:00:00"
+    assert frame.height == 48
+    assert frame["time"].min() == datetime(2026, 3, 1, 0, 0, tzinfo=UTC)
+
+
+def test_check_pes_list_raises_when_a_letter_differs(monkeypatch: pytest.MonkeyPatch) -> None:
+    listing = {"data": [[11, "_B", "x"], [14, "_E", "x"], [21, "_K", "x"], [22, "_H", "x"]]}
+    monkeypatch.setattr(fetch_pv_live, "get_json", lambda **_: listing)
+    with pytest.raises(ValueError, match="22"):
+        check_pes_list()
+
+
+def _pn_body(*, period: int, segments: int) -> dict[str, Any]:
+    start = period_start_utc(settlement_date=date(2026, 3, 4), settlement_period=period)
+    return {
+        "data": [
+            {
+                "settlementDate": "2026-03-04",
+                "settlementPeriod": period,
+                "bmUnit": "2__XTEST001",
+                "nationalGridBmUnit": "T_XTEST-1",
+                "timeFrom": f"{start:%Y-%m-%dT%H:%M:%SZ}",
+                "timeTo": f"{start + timedelta(minutes=30):%Y-%m-%dT%H:%M:%SZ}",
+                "levelFrom": -21,
+                "levelTo": -20,
+            }
+        ]
+        * segments
+    }
+
+
+def test_fetch_period_parses_the_segments(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        fetch_pn_all_bmus_sample, "get_json", lambda **_: _pn_body(period=25, segments=1)
+    )
+    frame = fetch_pn_all_bmus_sample.fetch_period(settlement_date=date(2026, 3, 4), period=25)
+    assert frame["level_from_mw"].to_list() == [-21.0]
+    assert frame["time_to"].to_list() == [datetime(2026, 3, 4, 12, 30, tzinfo=UTC)]
+
+
+def test_fetch_day_raises_when_a_period_is_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_get_json(*, url: str, params: list[tuple[str, str]]) -> dict[str, object]:
+        period = int(dict(params)["settlementPeriod"])
+        return _pn_body(period=period, segments=0 if period == 7 else 1)
+
+    monkeypatch.setattr(fetch_pn_all_bmus_sample, "get_json", fake_get_json)
+    with pytest.raises(IncompleteChunkError, match="7"):
+        fetch_pn_all_bmus_sample.fetch_day("2026-03-04")
+
+
+def test_fetch_period_keeps_bmus_without_an_elexon_id_apart(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    template = _pn_body(period=25, segments=1)["data"][0]
+    rows = [dict(template, bmUnit=None, nationalGridBmUnit=name) for name in ("NG-A", "NG-B")]
+    monkeypatch.setattr(fetch_pn_all_bmus_sample, "get_json", lambda **_: {"data": rows})
+    frame = fetch_pn_all_bmus_sample.fetch_period(settlement_date=date(2026, 3, 4), period=25)
+    assert frame["national_grid_bmu_id"].to_list() == ["NG-A", "NG-B"]
+
+
+def test_fetch_period_raises_when_segments_overlap(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        fetch_pn_all_bmus_sample, "get_json", lambda **_: _pn_body(period=25, segments=2)
+    )
+    with pytest.raises(ValueError, match="tile"):
+        fetch_pn_all_bmus_sample.fetch_period(settlement_date=date(2026, 3, 4), period=25)

@@ -61,6 +61,7 @@ from nged_data.storage import (
     NoNewData,
     UpsertMetadataStats,
     _ProcessedFileListing,
+    add_newest_file_of_each_series,
     download_and_parse_files,
     list_timeseries_json_files,
     remove_small_files_from_listing,
@@ -96,7 +97,9 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
 
     This asset is the entry point for NGED data into the pipeline. It fetches the latest
     available data from NGED's external S3 bucket, appends new readings to the local
-    ``PowerTimeSeries`` Delta table, and upserts the latest substation metadata parquet. Nothing
+    ``PowerTimeSeries`` Delta table, and upserts the latest substation metadata parquet. The
+    metadata comes from the newest NGED file of every series, including a series that has stopped
+    reporting, so the metadata parquet holds NGED's current ``Information`` note for it. Nothing
     cleans this data further: ``eligible_time_series``, ``effective_capacity``,
     ``trained_cv_model``, and ``cv_power_forecasts`` in ``defs/cv_assets.py``, and
     ``live_forecasts`` in ``defs/live_forecast_assets.py``, all read the Delta table this asset
@@ -143,6 +146,13 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
             list_of_large_json_files, delta_path, storage_options
         )
 
+        # The newest file of each series is downloaded too, so a series that has stopped reporting
+        # still has its metadata, including NGED's `Information` note, refreshed. A series that is
+        # reporting already has its newest file in the list.
+        list_of_files_to_download = add_newest_file_of_each_series(
+            all_files=list_of_all_json_files, new_files=list_of_new_json_files
+        )
+
         # Log statistics to be shown in Dagster's UI.
         context.add_output_metadata(
             _FileListingSummary.make_table(
@@ -151,11 +161,12 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
                     "All JSON files on S3": list_of_all_json_files,
                     "Files above the size threshold": list_of_large_json_files,
                     "Files with new data": list_of_new_json_files,
+                    "Files downloaded": list_of_files_to_download,
                 },
             )
         )
 
-        downloaded = download_and_parse_files(store, list_of_new_json_files)
+        downloaded = download_and_parse_files(store, list_of_files_to_download)
     except NoNewData:
         # An ordinary hour in which NGED published nothing new. Must be caught before the retry
         # guard below, or every such hour would retry.
