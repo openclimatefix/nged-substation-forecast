@@ -122,6 +122,13 @@ def untiled_bmus(*, frame: pl.DataFrame, settlement_date: date, period: int) -> 
 def fetch_period(*, settlement_date: date, period: int) -> pl.DataFrame:
     """Fetch the PN segments of every BMU for one settlement period.
 
+    Args:
+        settlement_date: The settlement date.
+        period: The settlement period within the date.
+
+    Returns:
+        One row for each PN segment of each BMU in the period.
+
     Raises:
         TypeError: If the response is not an object holding a list of rows.
         ValueError: If any BMU's segments do not tile the settlement period.

@@ -494,8 +494,8 @@ def first_versus_latest_figure(*, number: int) -> alt.VConcatChart:
         number=number,
         title=(
             f"The 00:00 UTC issue differs from the latest issue by a mean absolute "
-            f"{inddem_abs:,.0f} MW (INDDEM) and {indgen_abs:,.0f} MW (INDGEN), most of it from "
-            "23:00 UK local time"
+            f"{inddem_abs:,.0f} MW (INDDEM) and {indgen_abs:,.0f} MW (INDGEN), with its largest "
+            "step at 23:00 UK local time"
         ),
         subtitle=[
             (

@@ -55,6 +55,8 @@ LAST_LOCAL_SLOTS_FROM: Final[int] = 44
 """The first UK local half-hour slot (22:00) of the late-evening slots the report lists."""
 FIRST_LOCAL_SLOTS_TO: Final[int] = 4
 """The slots 0 to 3 (00:00 to 02:00 UK local) that the report lists with the late-evening slots."""
+SHORT_REACH_HOURS: Final[float] = 18.0
+"""Issues that reach less than this many hours ahead are the shortest tail of the reach."""
 LONG_ISSUE_HOURS: Final[float] = 30.0
 """An issue that reaches further than this is the long issue published from about 12:00 UK local."""
 LAST_SLOTS_FROM: Final[int] = 44
@@ -392,6 +394,11 @@ def leave_one_day_out(
 ) -> pl.DataFrame:
     """Refit the fractions leaving out each sample day in turn, and report each column's top zone.
 
+    Args:
+        zones: Every zone's value for every half-hour, from `zones_from_boundaries`.
+        sums: The sampled half-hours' PN sums by column, from `group_sums_from_pn`.
+        keep_times: The half-hours to fit on.
+
     Returns:
         One row for each column, with the zone of the largest fraction in the full fit, and the
         number of the full fit and the leave-one-day-out fits that put the largest fraction in that
@@ -704,6 +711,11 @@ def report_issues(*, views: pl.DataFrame, reach: pl.DataFrame) -> None:
     say(
         f"Reach of the {regular.height} regular INDDEM issues: {regular['reach_hours'].min():.1f} "
         f"to {regular['reach_hours'].max():.1f} hours."
+    )
+    say(
+        f"Reach 1st and 99th percentile: {regular['reach_hours'].quantile(0.01):.1f} and "
+        f"{regular['reach_hours'].quantile(0.99):.1f} hours; issues reaching under 18 hours: "
+        f"{regular.filter(pl.col('reach_hours') < SHORT_REACH_HOURS).height}."
     )
     local_hour = pl.col("publish_time").dt.convert_time_zone(LONDON).dt.hour()
     say("Median reach by UK local hour of publication (hours ahead):")
