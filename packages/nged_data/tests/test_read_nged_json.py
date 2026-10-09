@@ -7,7 +7,6 @@ import pytest
 from contracts.common import MIN_PLAUSIBLE_DATETIME
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from nged_data.read_nged_json import (
-    NoReadingsInFile,
     _camel_to_snake,
     _extract_power_time_series,
     _extract_time_series_metadata,
@@ -196,13 +195,11 @@ def test_extract_power_time_series_drops_a_reading_the_correction_pushes_out_of_
     assert extracted.n_dropped == 1
 
 
-@pytest.mark.parametrize("data_field", ["null", "[]"])
-def test_extract_power_time_series_raises_no_readings_in_file_for_a_file_without_readings(
+@pytest.mark.parametrize("data_field", ['{"endTime": "2026-03-05T12:30:00Z"}', "[[1, 2]]"])
+def test_extract_power_time_series_does_not_treat_a_malformed_data_field_as_no_readings(
     data_field: str,
 ):
-    """NGED writes either `null` or `[]` when a meter reported nothing. Polars reads them as
-    different dtypes and raises a different error for each, so the function checks the dtype."""
     df = pl.read_json(f'{{"TimeSeriesID": 3, "data": {data_field}}}'.encode())
 
-    with pytest.raises(NoReadingsInFile):
+    with pytest.raises(pl.exceptions.PolarsError):
         _extract_power_time_series(df=df, time_series_id=3)

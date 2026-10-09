@@ -28,8 +28,7 @@ log = logging.getLogger(__name__)
 class NoReadingsInFile(Exception):
     """Raised by `_extract_power_time_series` when a file's `data` field holds no readings.
 
-    NGED's meter reported nothing for the period the file covers. The field is then `null`, which
-    `pl.read_json` reads as `Null`, or an empty array `[]`, which it reads as `List(Null)`.
+    NGED's meter reported nothing for the period the file covers.
     """
 
 
@@ -70,10 +69,11 @@ def _extract_time_series_metadata(df: pl.DataFrame) -> pt.DataFrame[TimeSeriesMe
 def _extract_power_time_series(df: pl.DataFrame, time_series_id: int) -> ExtractedPowerTimeSeries:
     """Extract PowerTimeSeries from NGED's JSON data converted to DataFrame.
 
-    If NGED's meter reported no values, the `data` field in the JSON will be Null. Less commonly
-    the field is an empty array `[]`, which `pl.read_json` infers as `List(Null)`. In both cases
-    this function raises `NoReadingsInFile`. The check reads the dtype, because the error Polars
-    raises from `explode` and `unnest` differs between the two cases and between Polars versions.
+    If NGED's meter reported no values, the `data` field in the JSON is an empty array `[]`, which
+    `pl.read_json` infers as `List(Null)`, or `null`, which it infers as `Null`. In both cases this
+    function raises `NoReadingsInFile`. The check reads the dtype, because the error Polars raises
+    differs between the two cases: `unnest` raises for `[]` and `explode` for `null`. A `data` field
+    of any other dtype that is not a list of structs is malformed, and raises from Polars.
 
     Args:
         df: One NGED JSON file, read by `pl.read_json`.
@@ -85,17 +85,13 @@ def _extract_power_time_series(df: pl.DataFrame, time_series_id: int) -> Extract
     Raises:
         NoReadingsInFile: if the `data` field is null or an empty array.
     """
-    data_dtype = df.schema["data"]
-    if not (isinstance(data_dtype, pl.List) and isinstance(data_dtype.inner, pl.Struct)):
+    if df.schema["data"] in (pl.Null, pl.List(pl.Null)):
         raise NoReadingsInFile
     # Extract time series data: explode the 'data' column and unnest the struct. 'explode' expands
     # the list of structs into individual rows. 'unnest' expands the struct fields into individual
     # columns.
     #
-    # empty_as_null=False matches the Polars 2.0 default and silences the deprecation warning. The
-    # two settings differ on one case only: an empty List(Struct) with a known schema, which can't
-    # arise from pl.read_json of a single file. A file with no readings never reaches this line,
-    # because the dtype check above raises `NoReadingsInFile` first.
+    # empty_as_null=False matches the Polars 2.0 default and silences the deprecation warning.
     time_series_df = df.select("data").explode("data", empty_as_null=False).unnest("data")
 
     time_series_df = time_series_df.rename({"endTime": "time", "value": "power"})

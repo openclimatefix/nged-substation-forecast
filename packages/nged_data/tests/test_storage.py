@@ -619,29 +619,6 @@ def test_coverage_from_power_matches_time_series_coverage(tmp_path: Path):
     assert coverage_from_power(power).equals(time_series_coverage(str(delta_path)))
 
 
-# The fake's `.bytes()` method (named to match obstore's API) shadows the `bytes` builtin inside
-# its own class scope, so its annotations use this module-level alias.
-_JsonBytes = bytes
-
-
-class _FakeGetResult:
-    def __init__(self, data: _JsonBytes) -> None:
-        self._data = data
-
-    def bytes(self) -> _JsonBytes:
-        return self._data
-
-
-class _FakeStore:
-    """Serves fixed file contents through the one `obstore` method the function under test calls."""
-
-    def __init__(self, files: dict[str, bytes]) -> None:
-        self._files = files
-
-    def get(self, path: str) -> _FakeGetResult:
-        return _FakeGetResult(self._files[path])
-
-
 def _file_without_readings(*, time_series_id: int, data_field: str) -> bytes:
     """A real NGED file's metadata fields, with the given `data` field instead of readings."""
     fixture = Path(__file__).parent / "data" / "TimeSeries_10.json"
@@ -663,12 +640,9 @@ def test_download_and_parse_files_skips_a_file_without_readings_and_keeps_the_ot
     real_file = (Path(__file__).parent / "data" / "TimeSeries_11.json").read_bytes()
     real_path = "timeseries/1774512000000_1774533600000/TimeSeries_11_a_b.json"
     empty_path = "timeseries/1774512000000_1774533600000/TimeSeries_10_a_b.json"
-    store = _FakeStore(
-        {
-            real_path: real_file,
-            empty_path: _file_without_readings(time_series_id=10, data_field=data_field),
-        }
-    )
+    store = obstore.store.MemoryStore()
+    obstore.put(store, real_path, real_file)
+    obstore.put(store, empty_path, _file_without_readings(time_series_id=10, data_field=data_field))
 
     result = download_and_parse_files(
         store=cast(obstore.store.S3Store, store), paths_df=_listing_of([empty_path, real_path])
@@ -680,7 +654,8 @@ def test_download_and_parse_files_skips_a_file_without_readings_and_keeps_the_ot
 
 def test_download_and_parse_files_raises_no_new_data_when_every_file_is_without_readings():
     path = "timeseries/1774512000000_1774533600000/TimeSeries_10_a_b.json"
-    store = _FakeStore({path: _file_without_readings(time_series_id=10, data_field="null")})
+    store = obstore.store.MemoryStore()
+    obstore.put(store, path, _file_without_readings(time_series_id=10, data_field="null"))
 
     with pytest.raises(NoNewData):
         download_and_parse_files(

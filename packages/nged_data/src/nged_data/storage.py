@@ -173,8 +173,8 @@ def remove_small_files_from_listing(
 class NoNewData(Exception):
     """Raised by `download_and_parse_files` when none of its listed files carried power data.
 
-    Raised when the file listing was empty, or when every listed file's ``data`` field was null.
-    A file whose ``data`` field is present contributes a DataFrame, even when every row in that
+    Raised when the file listing was empty, or when every listed file held no readings
+    (`NoReadingsInFile`). A file with readings contributes a DataFrame, even when every row in that
     file is dropped as implausible. A file that yields zero usable rows therefore does not raise.
     """
 
@@ -212,10 +212,10 @@ def download_and_parse_files(
         docstring for what each field holds.
 
     Raises:
-        NoNewData: if `paths_df` was empty, or if every listed file's `data` field was null. A null
-            `data` field means NGED's meter reported nothing for the period that file covers. The
-            guard counts the DataFrames collected, not the rows in them. A file whose `data` field
-            is present therefore still counts, even when every one of its rows is dropped as
+        NoNewData: if `paths_df` was empty, or if every listed file held no readings
+            (`NoReadingsInFile`), meaning NGED's meter reported nothing for the period that file
+            covers. The guard counts the DataFrames collected, not the rows in them. A file with
+            readings therefore still counts, even when every one of its rows is dropped as
             implausible, and does not raise. The `power_time_series_and_metadata` asset catches
             `NoNewData` and reports an empty ingest, so an empty listing degrades the run rather
             than failing it.
