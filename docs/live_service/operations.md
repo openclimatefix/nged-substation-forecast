@@ -473,8 +473,8 @@ estimate the run, and expect a few minutes, since the ingest keeps at most 32 re
 time. Before the first run, set the `NGED_INGEST` pool's limit to 1 with `dagster instance
 concurrency set NGED_INGEST 1`, because Dagster's YAML takes no per-pool limits and its
 `default_limit` would otherwise apply. The pool then queues any scheduled run behind the first run,
-so the two cannot append the same rows. The first run also parses every historical file that has no readings, so a malformed old file fails the run
-(see the last paragraph of this section).
+so the two cannot append the same rows. The first run also parses every historical file that has no
+readings, so a malformed old file fails the run (see the last paragraph of this section).
 
 **Rebuild a table by deleting it.** The ingest counts the list as empty, and downloads every file
 again, whenever the list, the `power_time_series` Delta table, or `metadata.parquet` does not exist.
