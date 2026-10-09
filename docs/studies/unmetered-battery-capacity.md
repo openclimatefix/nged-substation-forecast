@@ -1,4 +1,5 @@
-# Simulated unmetered batteries are found from about 10% to 20% of a primary's high flow, and real public batteries mostly are not
+# Simulated unmetered batteries are found from about 10% to 20% of a primary's high flow, and real
+public batteries mostly are not
 
 **This study asks whether the half-hourly electricity flow of a primary substation (a substation
 that steps voltage down for local distribution) can reveal the power in megawatts (MW) and the
