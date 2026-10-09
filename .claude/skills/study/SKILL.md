@@ -191,6 +191,28 @@ effect must exist) shows the instrument can detect an effect at all. Before a nu
 "no effect", either a positive control must have passed or the interval must bound the effect, as in
 "an effect as large as 0.08 points is not excluded".
 
+**When a study fits XGBoost models, plot each column's feature importance, but never read importance
+as evidence that an input helps.** Take the gains from the point model's booster, not the quantile
+model's, whose `get_score` pools every quantile level. Read
+`Booster.get_score(importance_type="total_gain")`, map its positional keys (`f0`, `f1`, ...) back to
+the column names unless the `DMatrix` was given `feature_names`, and fill every column the booster
+never split on with 0. Scale the shares to sum to 1 within each XGBoost model, then average them
+over folds and seeds. Plot each column's mean share with its range across folds and seeds, and call
+that range the variability across refits, because the fold models share most of their training
+months. Sum the shares by feature group where the study adds columns in groups.
+
+**Gain is measured on the training data and splits credit between correlated columns according to
+which the greedy split search picks first, so importance is descriptive.** A group's total is more
+stable than any one column's share. Where the study can afford a refit, add a separate
+importance-only fit with shuffled copies of real columns, which keep each column's distribution and
+so set the share that noise earns. Never score that fit in a planned contrast, because the extra
+columns change the trees and break the equal-column-count rule. A held-out permutation importance,
+which scores the test fold with one column permuted at a time through `fit_one_fold_scoring_many`,
+measures the increase in the study's own loss on unseen months, and stays descriptive for the same
+reason. The planned contrasts are the evidence on whether an input helps. Where importance disagrees
+with them, the page says so. `fit_one_fold` does not return its booster, so a study that reports
+importance refits the arms it plots and saves each booster's gains.
+
 **Clean the target, not the inputs, and never correct NGED's timestamps twice.**
 `PowerTimeSeries.correct_late_timestamps` already moves NGED's readings to the right half-hour at
 ingest, and shifting again undoes the repair on 93% of rows (`studies.power` warns about this). The

@@ -30,8 +30,8 @@ from battery_rung3 import (
     SHORT_WINDOW_HALF_HOURS,
     fit_efficiency,
 )
-from nged_battery_a import ALIAS, battery_a_frame
 from studies.battery_capacity import cell_energy_path, smallest_capacity
+from studies.nged_battery_a import ALIAS, battery_a_frame
 
 PERCENT: Final[float] = 100.0
 
