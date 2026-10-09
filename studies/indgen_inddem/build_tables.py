@@ -330,13 +330,12 @@ def first_versus_latest(*, views: pl.DataFrame) -> pl.DataFrame:
     first = national.filter(pl.col("view") == "first_of_day").select(
         "dataset", "time", first_of_day_mw="value_mw"
     )
-    local = pl.col("time").dt.convert_time_zone(LONDON)
     return (
         latest.join(first, on=["dataset", "time"])
         .with_columns(
             difference_mw=pl.col("first_of_day_mw") - pl.col("latest_mw"),
-            local_half_hour=local.dt.hour().cast(pl.Int32) * 2
-            + local.dt.minute().cast(pl.Int32) // HALF_HOUR_MINUTES,
+            utc_half_hour=pl.col("time").dt.hour().cast(pl.Int32) * 2
+            + pl.col("time").dt.minute().cast(pl.Int32) // HALF_HOUR_MINUTES,
         )
         .sort("dataset", "time")
     )
@@ -543,7 +542,7 @@ def build_pn_fit(*, views: pl.DataFrame, zones: pl.DataFrame) -> None:
         pn_import_mw=pl.col("import_mw").sum(), pn_export_mw=pl.col("export_mw").sum()
     )
     joined = totals.join(national, on="time")
-    joined.write_parquet(STUDY_DIR / "pn_against_indd.parquet")
+    joined.write_parquet(STUDY_DIR / "pn_against_inddem.parquet")
     say(
         joined.select(
             half_hours=pl.len(),
