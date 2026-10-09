@@ -22,6 +22,9 @@ whose table id differs from the current table's id, or whose table does not exis
 This deletes the size filter, the 3-day lookback, and `add_newest_file_of_each_series`, and it adds
 no margin, no watermark, and no change to the `power_time_series` Delta table.
 
+**Assumption.** NGED have said they plan to change how they deliver files before Flexpectation
+v2, without details, and the change may be delayed. The plan assumes the files keep today's layout.
+
 ### Walk through
 
 **Each hour, the ingest compares the bucket's listing with a record of what it has already
@@ -48,10 +51,13 @@ follow one run, then its branches, then its failures.
    because a series' newest file may have been downloaded in an earlier hour and be absent from
    the selection.
 5. **The run downloads and parses the selected files.** `download_and_parse_files` sorts the
-   selection by `end_time`, reads the files in that order, and returns the metadata, the power
-   rows, and a count of dropped rows. The function sorts for itself because an anti-join does not
-   promise to keep the listing's order, and both in-batch dedupes keep the last row, so the more
-   recent window must come last.
+   selection by `end_time` and works through it in chunks. For each chunk it fetches all the files
+   concurrently, at most 32 at a time, through `asyncio.run`, and then parses them in order. The
+   function sorts for itself because an anti-join does not promise to keep the listing's order, and
+   both in-batch dedupes keep the last row, so the more recent window must come last. The
+   concurrency exists because a first run fetches tens of thousands of files, and `gather` returns
+   results in input order so that the concurrency cannot reorder the dedupes. The chunks exist so
+   that the raw JSON of tens of thousands of files is never held in memory at once.
 6. **The run keeps only the metadata of newest files.** The asset filters the returned metadata to
    the series whose newest file (step 4) is in the selection. The filter exists because
    `upsert_metadata` replaces a series wholesale, and a late or back-filled file would otherwise
@@ -127,7 +133,7 @@ follow one run, then its branches, then its failures.
 
 ## Verdict, size and departures
 
-**Verdict: worth implementing, with a ledger in place of the issue's watermark and four
+**Verdict: worth implementing, with a ledger in place of the issue's watermark and five
 departures.**
 
 - Departure 1: the plan records downloaded files in a ledger, not a watermark (the issue's two
@@ -156,6 +162,11 @@ departures.**
   updates. The rule lives in the asset, so `download_and_parse_files` keeps its signature.
 - Departure 4: the equivalence test compares the new ingest with a "download every file, every
   run" reference, not with a copy of the old ingest. See Tests.
+- Departure 5: the plan folds in the concurrent download that the issue does not mention. With the
+  ledger, the cost that remains is the first run, which downloads every file once. Fetching
+  concurrently turns a first run of 20 to 45 minutes into about 5, so an overlapping hourly run
+  becomes unlikely and a seeded cutover becomes optional. At today's 33 series, the saving in
+  steady state is small.
 
 **Size: complex.** One line per trigger:
 
@@ -197,11 +208,22 @@ The plan has had two simplicity reviews and three correctness reviews so far.
   through a temporary file and a rename, so a crash cannot leave a torn ledger.
 - New `select_files_not_yet_downloaded(file_listing, ledger)` anti-joins the listing with the
   ledger on `(path, last_modified)`.
-- `download_and_parse_files` sorts its input by `end_time` itself, and no longer raises `NoNewData`
-  when every file was data-less: it returns the metadata and an empty, validated `PowerTimeSeries`
-  frame. `NoNewData` stays for an empty selection only. The change is required, because a silent
-  series' newest file is data-less, is now downloaded once, and its metadata must reach the upsert
-  in that run.
+- `download_and_parse_files` stays synchronous and keeps its signature. It sorts its input by
+  `end_time`, then works through the sorted input in chunks of `_DOWNLOAD_CHUNK_FILES` files (a
+  `Final` constant, about 500). For each chunk it calls `asyncio.run` on a coroutine that fetches
+  every file of the chunk with `store.get_async` and `bytes_async`, at most
+  `_MAX_REQUESTS_IN_FLIGHT` (about 32) at a time through an `asyncio.Semaphore`, and joins them
+  with `asyncio.gather`, which returns the bytes in input order. It then parses the chunk's files
+  sequentially in that order. Chunks bound the memory held in raw JSON. The semaphore bounds the
+  load on NGED's bucket. `gather` returning in input order keeps the `end_time` order that both
+  `keep="last"` dedupes need. The first failing request raises out of `gather`, and
+  `asyncio.run` cancels the unfinished requests when it exits, so a failure fails the run as it
+  does today. A fault cannot arise from an event loop already running, because Dagster runs a
+  synchronous asset in a thread with no loop. The function no longer raises `NoNewData` when every
+  file was data-less: it returns the metadata and an empty, validated `PowerTimeSeries` frame.
+  `NoNewData` stays for an empty selection only. The change is required, because a silent series'
+  newest file is data-less, is now downloaded once, and its metadata must reach the upsert in that
+  run. The `get_async` TODO is deleted.
 - Deleted: `remove_small_files_from_listing`, `add_newest_file_of_each_series`,
   `_LATE_FILE_LOOKBACK`, and `select_new_rows`'s `_ProcessedFileListing` overload and branch. The
   `PowerTimeSeries` branch stays, because it is the row dedupe that makes a re-download safe.
@@ -258,6 +280,9 @@ The plan has had two simplicity reviews and three correctness reviews so far.
   `:1523`; `test_storage.py:29-48`, `:379`, `:531`, `:626-628`, `:670-672`). `_FakeS3Store.list`
   must return `last_modified` or every existing asset test fails. The stubs of
   `download_and_parse_files` at `tests/test_assets.py:368, 430, 474, 520` keep their signature.
+- The `get_async` TODO in `download_and_parse_files` is deleted. The operations page's first-run
+  estimate becomes a few minutes. `packages/nged_data/README.md` mentions the concurrent
+  download.
 - No change is needed to `checks.py`, `cleaning_assets.py`, `schedules.py`, or the
   `delta_store` package, because the plan adds no commit to the `power_time_series` table.
 
@@ -285,8 +310,9 @@ The plan has had two simplicity reviews and three correctness reviews so far.
 Each test states the assertion that fails on `main` today. Most tests fail on `main` only because
 the new function does not exist, so the named mutation is the real test of each.
 
-1. **Equivalence replay** (`tests/test_assets.py`). `_FakeS3Store` gains a `last_modified` per file,
-   a `put(path, data, last_modified)` for adding files between runs, and a count of `get` calls.
+1. **Equivalence replay** (`tests/test_assets.py`). `_FakeS3Store` gains a `get_async` (with a
+   `bytes_async` on its result), a `last_modified` per file, a `put(path, data, last_modified)` for
+   adding files between runs, and a count of `get_async` calls.
    Run the real asset over one replay twice, each time from empty storage: once normally, once with
    `read_downloaded_files` monkeypatched to return an empty ledger every run, which downloads the
    whole fake bucket each run. After each run, assert exact frame equality, ignoring row order, of
@@ -301,13 +327,13 @@ the new function does not exist, so the named mutation is the real test of each.
    no new files. The two arms share the parsing code, so equality alone cannot catch a parsing bug.
    The test therefore also asserts directly: the stopped series' new `Information` note is stored,
    the late file's rows landed, the rewritten key's added reading landed, and the back-fill left
-   the metadata unchanged. The ledger arm's `get` count is asserted exactly on every run, and is
+   the metadata unchanged. The ledger arm's `get_async` count is asserted exactly on every run, and is
    zero on the run with no new files. The reference arm's count is every file, every run.
 2. **A run with nothing new does nothing.** A second run over an unchanged bucket makes zero `get`
    calls, appends nothing, and leaves the ledger file unchanged. The mutation to catch is selecting
    files within a window instead of by the ledger.
 3. **A data-less hour is recorded once.** A run whose only new file is data-less upserts the
-   metadata, appends no rows, and records the file, so the next run makes zero `get` calls. The
+   metadata, appends no rows, and records the file, so the next run makes zero `get_async` calls. The
    mutation to catch is not recording a file that yielded no rows.
 4. **`select_files_not_yet_downloaded`** excludes a file whose `(path, last_modified)` is in the
    ledger, includes one whose path is in the ledger with a different `last_modified`, includes a
@@ -318,8 +344,7 @@ the new function does not exist, so the named mutation is the real test of each.
    land, the run succeeds, and the ledger records the files.
 6. **A malformed file fails the run and records nothing.** One file with invalid JSON among valid
    ones: the run raises (as `RetryRequested`, then failure), nothing is appended, and the ledger is
-   unchanged. The mutation to catch is a `try`/`except` that skips the file. A second case: a
-   failing `get` also raises and leaves the ledger unchanged.
+   unchanged. The mutation to catch is a `try`/`except` that skips the file.
 7. **Ledger write failures lose nothing.** Monkeypatch `write_downloaded_files` to raise on one run.
    The run succeeds, the rows are on disk, `report_asset_degradation` is called, and the next run
    downloads the same files again and appends no duplicate rows. The mutation to catch is writing
@@ -337,6 +362,16 @@ the new function does not exist, so the named mutation is the real test of each.
 10. **`download_and_parse_files`** returns metadata and an empty power frame when every file is
     data-less.
 11. **Settings.** `downloaded_files_path` is covered by the enumerating settings tests.
+12. **The download order does not depend on completion order.** A fake store whose `get_async`
+    finishes the later-window files first: of two overlapping files of one series that differ in a
+    reading, the later window's reading survives, and the series' metadata comes from the later
+    file. The mutation to catch is parsing in completion order.
+13. **The download is concurrent and capped.** With 100 files, a fake store that records its peak
+    number of requests in flight reports a peak above 1 and no higher than the cap. The mutation to
+    catch is a sequential loop (peak 1) and a missing semaphore (peak 100).
+14. **A failing request fails the run and records nothing.** One `get_async` raises among many: the
+    function raises, no rows are appended, and the ledger is unchanged. The tests are synchronous,
+    because `asyncio.run` raises inside a running event loop.
 
 The deleted functions' tests are deleted with them.
 
@@ -354,23 +389,30 @@ uv run mkdocs build --strict    # read the rendered operations page
 ## Risks and open questions
 
 - **Cutover on the existing deployment.** With no ledger file, the first run would download the
-  whole bucket: about 22,000 sequential GETs for 33 series over about 165 days. Two further risks
-  come with it. The size filter has meant that no data-less file has been parsed except each
-  series' newest, so the first run parses every historical data-less file, and one odd file
-  would stall the ingest under the loud-failure rule. Any transient error in the 22,000 requests
-  restarts the whole download, up to the retry guard's 3 attempts. A second run that started before
-  the first finished would also find no ledger and append duplicate rows. Recommend a seeded
-  cutover instead: before the first deployed run, the operator writes a ledger from the current
-  listing, containing every file whose `LastModified` is more than 3 days old, using
-  `write_downloaded_files` in a documented snippet. Those files' rows are already in the table,
-  except for files the old 3-day rule had skipped, which are lost already. The first run then
-  downloads about 3 days of files, as one old-ingest run does. Does the maintainer accept the
-  seeded cutover, or want a script for it? A dry parse of the whole bucket before cutover is cheap
-  insurance against the odd-file stall either way.
+  whole bucket: about 22,000 GETs for 33 series over about 165 days. With the concurrent download
+  the run takes about 3 to 6 minutes: about 1 minute of GETs at 32 in flight and 100 ms a GET
+  (unmeasured), plus 1.5 to 4 minutes of sequential parsing. The size filter has meant that no
+  data-less file has been parsed except each series' newest, so the first run also parses every
+  historical data-less file, and one odd file would stall the ingest under the loud-failure rule.
+  A second run that started before the first finished would find no ledger and append duplicate
+  rows, so the operator pauses the hourly schedule for the first run. An optional seeded cutover
+  avoids the historical data-less files: before the first deployed run, the operator writes a
+  ledger from the current listing, containing every file whose `LastModified` is more than 3 days
+  old, using `write_downloaded_files` in a documented snippet. Those files' rows are already in
+  the table, except for files the old 3-day rule had skipped, which are lost already. The first run
+  then downloads about 3 days of files. Recommend the unseeded first run with the schedule paused,
+  because a stall on an odd file is better found now than at v2 ingestion. Does the maintainer
+  prefer the seeded cutover?
 - **No run-concurrency limit exists on the ingest.** The hazard of two overlapping runs appending
   the same rows exists today and the plan neither adds nor removes it. A `pool` of 1 for the asset
-  would remove it. Recommend a separate issue, together with chunking or parallelising the first
-  run of a fresh Flexpectation v2 table (the `get_async` TODO in `download_and_parse_files`).
+  would remove it. Recommend a separate issue. The concurrent download shortens the first run to a
+  few minutes, so an overlap with the next hourly tick becomes unlikely, not impossible.
+- **A fresh table at Flexpectation v2 scale is parked.** About 2,500 series over 165 days is about
+  1.65 million files. That needs chunked commits with a ledger write per chunk, and parsing in
+  parallel, because sequential parsing at about 5 ms a file would take about 2 hours. NGED has said
+  they plan to change how they deliver files before v2, without details, and the change may be
+  delayed. The plan assumes the files keep today's layout and does not build this machinery. If
+  NGED's change lands, the machinery may be moot.
 - **A stalled ingest on a contract violation.** At Flexpectation v2 scale, files from licence areas
   other than `EMids` will fail the `TimeSeriesMetadata` enum, and the ingest will stall on them
   until the contract is widened. Widening a contract needs the maintainer's agreement first, so
