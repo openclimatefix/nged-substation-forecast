@@ -30,7 +30,8 @@ weather. Bank holidays are ordinary days.
 treats the members as an equiprobable sample, so members at the tail-heavy delivery levels would be
 read as a wider-tailed distribution than the climatology they represent. The 51 members match the 51
 members of the ECMWF ensemble, so climatology and a 51-member XGBoost ensemble compare at equal
-member count on the size-dependent metrics.
+member count on the size-dependent metrics. Equal count does not equalise member type, because
+quantile members and random draws have different calibrated exceedance rates.
 
 ## Why the baselines have their own feature engineer
 
@@ -63,36 +64,52 @@ sits an hour away from the target in local clock time, whereas the operator's me
 weekday and time of day. About one member value in ten is affected.
 
 **Climatology pools at least 66 samples per cell, with a median of 156, for a series with a full
-training history.** Without pooling, such a series holds 8 to 19 samples in a weekend cell and 20 to
-45 in a weekday cell. Pooling over nine cells multiplies the typical count by about eight. The
-tail members of a cell with few pooled samples sit at the observed extremes of those samples,
-because linear interpolation never extrapolates. A cell with one pooled sample gives 51 equal
-members. The training run logs the minimum and median pooled samples per cell.
+training history.** Those samples come from 22 to 66 distinct days, because neighbouring half-hours
+of one day are almost perfectly correlated (median lag-1 autocorrelation 0.97). Without pooling,
+such a series holds 8 to 19 samples in a weekend cell and 20 to 45 in a weekday cell. Pooling over
+nine cells multiplies the typical count by about eight. The tail members of a cell with few pooled
+samples sit at the observed extremes of those samples, because linear interpolation never
+extrapolates. A cell with one pooled sample gives 51 equal members. The training run logs the
+minimum and median pooled samples per cell.
 
-**Climatology drops a forecast row whose cell has no training sample anywhere in its neighbourhood.**
-`predict` logs one warning with the count and the series. A series whose history is shorter than
-the training window loses the most: on the leaderboard fold, two such series lose about a third to
-two fifths of their validation rows. Compare climatology with other forecasters on the rows that all
-of them forecast.
+**The climatology is tuned in-sample on the leaderboard fold, and 15 months of history make it
+close to last year's distribution per cell.** The cell keying, pooling width, member count, and
+holiday handling were chosen by scoring on the same validation year the leaderboard fold uses, so
+the climatology is a slightly stronger reference than an untuned one. Series with under 7 months of
+history (two of the 31) are forecast only on the cells they have, and a CRPSS against climatology is
+not meaningful for them.
+
+**Climatology drops a forecast row whose cell has no training sample anywhere in its
+neighbourhood.** `predict` logs one warning with the count and the series. A series whose history is
+shorter than the training window loses the most: on the leaderboard fold, two such series lose about
+a third to two fifths of their validation rows. Compare climatology with other forecasters on the
+rows that all of them forecast.
 
 **A set of quantiles reads lower under the fair CRPS the fewer members it has, so the fair CRPS
 cannot compare member counts.** The fair CRPS corrects its spread term for members that are
 independent draws, and a set of equally spaced quantiles is not independent draws. On the
 leaderboard fold, 13 unpooled climatology members read about 4% to 7% below the plain CRPS of 101
-members, and 51 members read about 0.5% to 2% below. The 51-member pooled climatology therefore
-reads no better on the fair CRPS than a 13-member unpooled climatology would, though its tails are
-far better. The same effect gives climatology a small structural edge in a CRPS comparison with the
+members, and 51 members read about 2% below (1.6% to 2.3% across the 27 full-history series). The
+51-member pooled climatology therefore reads no better on the fair CRPS than a 13-member unpooled
+climatology would, though its tails are far better. The same effect flatters climatology by about
+2% against the manual heuristic and XGBoost, which does not change any ranking, because the gaps are
+9% and 29%. It also gives climatology a small structural edge in a CRPS comparison with the
 weather ensemble ([Ferro (2014)](https://doi.org/10.1002/qj.2270)): read a near-tie at extended
 range as "the weather ensemble adds little out here", not as climatology winning.
 
-**Most of the remaining tail miscalibration is year-to-year variation that no choice of members
-fixes.** On the leaderboard fold, the substations' 99th percentile from the members is still
-exceeded on 6.4% of rows, against an ideal of 1%. The validation year's power differs from the
-training year's in level and in extremes, and a distribution of the training year cannot know that.
+**Most of the remaining tail miscalibration is year-to-year variation and sampling error that no
+choice of members fixes.** On the leaderboard fold, the 18 full-history substations exceed the top
+member on 3.1% of rows, against 1.0% for calibrated quantiles. Part of the excess is year-to-year
+variation, which no choice of members fixes: the median member's monthly bias ranges from −10% to
++14% of mean power. Part is sampling error in the tail quantiles, which are estimated from only 22
+to 66 distinct days per cell: weekend cells exceed their top member on 3.4% of rows and weekday
+cells on 2.3%.
 
 **For a battery and a biofuel generator, 51 pooled members worsen the lower-tail pinball losses.**
 Against 13 unpooled members, the pinball loss at the 1st percentile worsens by 18% and at the 5th
-percentile by 14%, because the power of both series is bimodal.
+percentile by 14%, because the power of both series is bimodal. The improvement in the pinball loss
+at the 99th percentile from 13 to 51 members is partly mechanical, since the derived 99th percentile
+of 13 equiprobable members sits at level about 0.93 and of 51 members at about 0.98.
 
 **In March and October, a photovoltaic cell mixes days an hour apart in solar time.** The cell keys
 use local time, so a March or October cell mixes days on Greenwich Mean Time with days on British
@@ -100,6 +117,7 @@ Summer Time. At 13 unpooled members that mixing cost about 2.6% of the CRPS of p
 in those two months.
 
 **The 51-member climatology compares with XGBoost's 51 members at equal member count, and with the
-13-member manual heuristic at unequal member count.** The prediction interval coverage, pinball loss,
-interval width, and exceedance rate all depend partly on the member count, so a difference from the
-manual heuristic on those metrics is partly a difference in member count.
+13-member manual heuristic at unequal member count.** The prediction interval coverage, pinball
+loss, interval width, and exceedance rate all depend partly on member count and member type, so a
+difference from the manual heuristic on those metrics is partly a difference in member count and
+member type.
