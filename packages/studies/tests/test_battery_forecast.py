@@ -645,3 +645,212 @@ def test_pinball_loss_charges_an_underforecast_at_the_level_and_an_overforecast_
 
     assert under[0].tolist() == pytest.approx([0.2 * 3.0, 0.9 * 3.0])
     assert over[0].tolist() == pytest.approx([0.8 * 1.0, 0.1 * 1.0])
+
+
+# ---- gaps found by hand-mutating the module
+
+
+def test_asof_matches_a_brute_force_search_for_any_target_and_vintage_order() -> None:
+    rng = np.random.default_rng(5)
+    valid_times = [_utc(10, 12), _utc(10, 12, 30)]
+    vintage_rows = [
+        {
+            "time": valid,
+            "publish_time": _utc(day, hour),
+            "wind_mw": float(10 * day + hour + 1000 * valid_times.index(valid)),
+        }
+        for valid in valid_times
+        for day in (7, 8, 9)
+        for hour in (0, 6, 12)
+    ]
+    vintages = pl.DataFrame(vintage_rows).sample(fraction=1.0, shuffle=True, seed=3)
+    target_rows = [
+        {"time": valid_times[int(rng.integers(2))], "issue_time": _utc(int(d), int(h))}
+        for d, h in zip(rng.integers(6, 11, size=40), rng.integers(0, 24, size=40), strict=True)
+    ]
+    targets = pl.DataFrame(target_rows)
+
+    result = asof_at_issue_time(targets=targets, vintages=vintages, value_columns=["wind_mw"])
+
+    expected = []
+    for row in target_rows:
+        known = [
+            v
+            for v in vintage_rows
+            if v["time"] == row["time"] and v["publish_time"] <= row["issue_time"]
+        ]
+        expected.append(max(known, key=lambda v: v["publish_time"])["wind_mw"] if known else None)
+    assert result["time"].to_list() == [r["time"] for r in target_rows]
+    assert result["wind_mw"].to_list() == expected
+
+
+def _climatology_oracle(
+    *, history: pl.DataFrame, time: datetime, issue_time: datetime, window_days: int, levels: list
+) -> tuple[list[float | None], int]:
+    """Brute-force the climatology sample of one target."""
+    by_time = dict(zip(history["time"].to_list(), history["output_mw"].to_list(), strict=True))
+    last_complete = issue_time.date() - timedelta(days=1)
+    target_type = day_type(day=time.date(), non_working_dates=NO_HOLIDAYS)
+    tod = time.hour * 2 + time.minute // 30
+    sample = []
+    for back in range(window_days):
+        day = last_complete - timedelta(days=back)
+        if day_type(day=day, non_working_dates=NO_HOLIDAYS) != target_type:
+            continue
+        for half_hour in (tod - 1, tod, tod + 1):
+            if not 0 <= half_hour < 48:
+                continue
+            stamp = datetime(day.year, day.month, day.day, tzinfo=UTC) + timedelta(
+                minutes=30 * half_hour
+            )
+            if stamp in by_time:
+                sample.append(by_time[stamp])
+    if not sample:
+        return [None] * len(levels), 0
+    return [float(v) for v in np.quantile(sample, levels)], len(sample)
+
+
+@pytest.mark.parametrize("window_days", [10, 56])
+def test_climatology_matches_a_brute_force_sample_at_the_window_edges(window_days: int) -> None:
+    history = _history(days=60, value_of_day=lambda i: (i * 7) % 23 + i / 100).with_columns(
+        output_mw=pl.col("output_mw")
+        + (pl.col("time").dt.hour() * 2 + pl.col("time").dt.minute() // 30)
+    )
+    # Working and non-working targets, a half-hour past :00, the first and last half-hour of the
+    # day, and issue times near the start and the end of the history.
+    times = [
+        _utc(day, hour, minute, month)
+        for month, day in ((9, 3), (9, 9), (10, 5), (10, 6), (10, 21), (10, 25), (10, 30), (10, 31))
+        for hour, minute in ((0, 0), (1, 30), (12, 0), (23, 30))
+    ]
+    targets = pl.DataFrame({"time": times}).with_columns(pl.col("time").dt.cast_time_unit("us"))
+    targets = with_issue_time(frame=targets, issue="DA-early").with_columns(
+        pl.col("issue_time").dt.cast_time_unit("us")
+    )
+    levels = [0.0, 0.3, 1.0]
+
+    result = climatology_quantiles(
+        history=history,
+        targets=targets,
+        levels=levels,
+        non_working_dates=NO_HOLIDAYS,
+        window_days=window_days,
+    )
+
+    for row in result.iter_rows(named=True):
+        quantiles, size = _climatology_oracle(
+            history=history,
+            time=row["time"],
+            issue_time=row["issue_time"],
+            window_days=window_days,
+            levels=levels,
+        )
+        assert [row["q0.0"], row["q0.3"], row["q1.0"]] == pytest.approx(quantiles) or size == 0
+        assert row["climatology_n"] == size
+
+
+def test_climatology_does_not_reuse_a_working_day_sample_for_a_non_working_target() -> None:
+    history = _history(days=60, value_of_day=float)
+    issue_time = _utc(14, 6)
+    targets = pl.DataFrame(
+        {"time": [_utc(17, 12), _utc(18, 12)], "issue_time": [issue_time, issue_time]}
+    ).with_columns(
+        pl.col("time", "issue_time").dt.cast_time_unit("us")
+    )  # a Friday, then a Saturday
+
+    result = climatology_quantiles(
+        history=history, targets=targets, levels=[0.5], non_working_dates=NO_HOLIDAYS
+    )
+
+    assert result["climatology_n"].to_list() == [
+        _climatology_oracle(
+            history=history, time=t, issue_time=issue_time, window_days=56, levels=[0.5]
+        )[1]
+        for t in (_utc(17, 12), _utc(18, 12))
+    ]
+    assert result["q0.5"][0] != result["q0.5"][1]
+
+
+def test_climatology_keeps_a_sample_of_one_value() -> None:
+    history = pl.DataFrame({"time": [_utc(2, 10)], "output_mw": [7.0]}).with_columns(
+        pl.col("time").dt.cast_time_unit("us")
+    )  # a Thursday, at half-hour 20
+    targets = pl.DataFrame({"time": [_utc(3, 10)], "issue_time": [_utc(2, 12)]}).with_columns(
+        pl.col("time", "issue_time").dt.cast_time_unit("us")
+    )
+
+    result = climatology_quantiles(
+        history=history, targets=targets, levels=[0.5], non_working_dates=NO_HOLIDAYS
+    )
+
+    assert result["climatology_n"].to_list() == [0]  # day 2 is not complete at 12:00 on day 2
+    targets = targets.with_columns(issue_time=pl.lit(_utc(3, 6)).dt.cast_time_unit("us"))
+    result = climatology_quantiles(
+        history=history, targets=targets, levels=[0.5], non_working_dates=NO_HOLIDAYS
+    )
+    assert result["climatology_n"].to_list() == [1]
+    assert result["q0.5"].to_list() == [7.0]
+
+
+def test_a_residual_group_of_one_row_still_gets_a_quantile() -> None:
+    table = residual_quantile_table(
+        residuals=np.array([4.0, 1.0, 2.0]), groups=np.array([0, 1, 1]), levels=[0.5]
+    )
+
+    assert table[0].tolist() == [4.0]
+
+
+def test_shuffle_does_not_depend_on_the_order_or_repeats_of_the_days_given() -> None:
+    days = [date(2025, 10, 1) + timedelta(days=i) for i in range(31)]
+    reference = day_shuffle_map(days=days, non_working_dates=NO_HOLIDAYS, seed=4)
+
+    scrambled = day_shuffle_map(
+        days=[*reversed(days), *days[:5]], non_working_dates=NO_HOLIDAYS, seed=4
+    )
+
+    assert scrambled.equals(reference)
+
+
+def test_shuffle_lists_the_days_in_date_order() -> None:
+    days = [date(2025, 10, 1) + timedelta(days=i) for i in range(31)]
+
+    drawn = day_shuffle_map(days=days, non_working_dates=NO_HOLIDAYS, seed=0)
+
+    assert drawn["date"].to_list() == days
+
+
+def test_neighbour_ids_are_sorted_under_both_rules() -> None:
+    lead_party = {"z": "A", "b": "B", "y": "A", "a": "C", "t": "A", "c": "B"}
+
+    assert neighbour_ids(target="t", lead_party=lead_party) == ["a", "b", "c"]
+    assert neighbour_ids(target="t", lead_party=lead_party, rule="same_party") == ["y", "z"]
+
+
+def test_a_half_hour_whose_only_notification_is_missing_has_no_row() -> None:
+    fpn = _fpn([(0, "x", 10.0), (1, "x", None), (2, "x", 20.0)])
+
+    result = neighbour_statistics(fpn=fpn, neighbours=["x"], p99_mw={"x": 100.0})
+
+    assert result["time"].dt.minute().to_list() == [0, 0]
+    assert result.height == 2
+    assert result["neighbour_mean_fraction_previous"].to_list() == [None, None]
+
+
+def test_a_neighbour_notifying_exactly_zero_is_not_discharging() -> None:
+    fpn = _fpn([(0, "x", 0.0), (0, "y", 5.0), (0, "z", -5.0)])
+
+    result = neighbour_statistics(
+        fpn=fpn, neighbours=["x", "y", "z"], p99_mw={"x": 10.0, "y": 10.0, "z": 10.0}
+    )
+
+    assert result["neighbour_discharging_share"].to_list() == [pytest.approx(1 / 3)]
+
+
+def test_a_month_with_no_published_output_is_not_a_month_of_zeros() -> None:
+    output = _monthly_output(zero_share_by_month=[0.0, 0.0]).with_columns(
+        output_mw=pl.when(pl.col("time") < datetime(2025, 10, 1, tzinfo=UTC))
+        .then(None)
+        .otherwise(pl.col("output_mw"))
+    )
+
+    assert leading_idle_end(output=output) is None

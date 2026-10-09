@@ -303,7 +303,10 @@ def climatology_quantiles(
     the issue time, at the target's half-hour of day and the half-hours either side of it, on days
     of the same type as the target day. A day is complete when it ended at or before the issue
     time, so the window never includes the target day, and at `DA-late` never includes a half-hour
-    ending after 18:00 on the day before. A day missing some half-hours contributes the rest.
+    ending after 18:00 on the day before. A day missing some half-hours contributes the rest. The
+    window is also clamped to the history: if an issue time falls after the history's last day, the
+    window is the last `window_days` days of the history, not the days before the issue. Every
+    target in this study has its issue time inside the history, so no published number is affected.
 
     Args:
         history: Rows with `time` (start of the half-hour, UTC) and `output_mw`.
