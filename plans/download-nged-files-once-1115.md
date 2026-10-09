@@ -15,45 +15,64 @@ row-level dedupe makes the repeats harmless, so the cost is requests and run tim
 custom property on the Delta commit that appends the power rows.** The watermark is the largest
 `LastModified` among the files already processed. Each hour the ingest downloads files whose
 `LastModified` is later than `watermark - margin`, then appends their power rows, stamping the new
-watermark on that same commit. The append happens whenever any file was selected, even when every
-selected file was data-less, so the commit is empty of rows but still advances the watermark. This
-deletes the size filter, the 3-day lookback, and `add_newest_file_of_each_series`.
+watermark on that same commit. The append also happens when the selected files carried no readings
+but raised the watermark, so a commit of zero rows advances the watermark. A run that adds no rows
+and no later watermark commits nothing. This deletes the size filter, the 3-day lookback, and
+`add_newest_file_of_each_series`.
 
 ## Verdict, size and departures
 
-**Verdict: worth implementing, with one of the issue's two homes chosen and four departures.**
+**Verdict: worth implementing, with one of the issue's two homes chosen and six departures.**
 
-- Departure 1: the plan uses the Delta commit property, as the issue's first option, and answers
-  the issue's worry that "an hour that appends no rows writes no commit". delta-rs 1.6.6 writes a
+- Departure 1: the plan uses the Delta commit property, the issue's first option, and answers the
+  issue's worry that "an hour that appends no rows writes no commit". delta-rs 1.6.6 writes a
   commit for an append of zero rows and keeps its `custom_metadata` (verified: an empty append with
-  `custom_metadata={"wm": "2"}` after one with `"1"` gives history `['2', '1']`). The asset therefore
-  appends an empty frame when the selected files carried no readings.
-- Departure 2: the watermark advances after every run that selected files, whether or not the
+  `custom_metadata={"wm": "2"}` after one with `"1"` gives history `['2', '1']`).
+- Departure 2: the watermark advances after every run that raised it, whether or not the
   `TimeSeriesMetadata` upsert succeeded. A persistent upsert fault (the stored table is corrupt or
   off-contract) would otherwise freeze the watermark, and each hour would re-download every file
   since the freeze, a number that grows by about 10,000 files a day at Flexpectation v2 scale. The
-  cost is bounded: a silent series publishes about 4 data-less files a day, so the next file
+  cost is bounded: a silent series publishes about 4 data-less files a day, so its next file
   restores its `Information` note within about 6 hours. `docs/live_service/operations.md` already
   accepts that a failed upsert loses that run's metadata change.
-- Departure 3: files are downloaded and grouped in `last_modified` order, not `end_time` order. A
-  late file (old `end_time`, new `last_modified`) can be the only file of its series in a run.
-  Metadata comes from the last file in download order, and `upsert_metadata` replaces the series
-  wholesale, so `end_time` order would regress the series' metadata to the late file's fields.
-  Today the 3-day window and `add_newest_file_of_each_series` hide this. With `last_modified`
-  order, the most recently written file wins both within a run and across runs. Where two files
-  cover overlapping windows, the more recently written file's readings now win the
-  `unique(..., keep="last")` dedupe, which is the meaning "newer file wins" always intended.
+- Departure 3: files are downloaded in `(last_modified, end_time, path)` order, not `end_time`
+  order. A run that holds several files of one series (the first run, or a backlog after an
+  outage) takes that series' metadata from the last file in download order, and `upsert_metadata`
+  replaces the series wholesale. A late file has an old `end_time`, so `end_time` order would let it
+  supply the metadata over a file written after it. The `end_time` and `path` tiebreaks give files
+  with equal `LastModified` (the bulk backfill files were written within a few days) a fixed order.
+  Where two files cover overlapping windows, the more recently written file's readings win the
+  `unique(..., keep="last")` dedupe.
 - Departure 4: the equivalence test compares the new ingest with a "download every file, every
   run" reference, not with a copy of the old ingest. See Tests.
+- Departure 5: each file is downloaded once only up to a band. The rule
+  `last_modified > watermark - margin` always re-selects files whose `last_modified` lies within
+  one margin below the watermark, because nothing records which files were downloaded. Every hour
+  until the next batch arrives, the ingest re-fetches that band. The band is small if files arrive
+  spread over time. It is a whole batch if NGED writes every series' file for one window together
+  (all series share one `<start_ms>_<end_ms>` directory, and live files land about 3.0 hours after
+  the window ends). The saving is then a factor of about 12 to 13, not "once". The plan commits
+  nothing for a band-only run and measures the band before it fixes the margin.
+- Departure 6: one malformed file no longer stalls the whole ingest. Today a file that fails
+  `pl.read_json` or Patito validation raises, the run fails, and the stall ends when the file ages
+  out of the 3-day window. With a watermark the bad file would be selected forever and the backlog
+  behind it would grow. `download_and_parse_files` instead skips a file that fails to parse,
+  returns its path in the result, and the asset reports each skipped path to Sentry through
+  `report_asset_degradation`, tagged with the path. The watermark then advances past the file. The
+  cost is that a skipped file's readings are not retried, and an operator re-ingests them by hand
+  from the Sentry event. This follows "liberal about missing inputs, strict about malformed ones":
+  the file is rejected at the boundary and the run is not.
 
 **Size: complex.** One line per trigger:
 
 - What gets stored: yes. The watermark is new stored state, and empty commits now appear in
   the `power_time_series` Delta table's history.
-- Production serving path: no. The ingest runs upstream of `live_forecasts`, and no code on the
-  serving path changes.
-- A degradation rule: yes. Where the watermark may advance when the metadata upsert fails, and what
-  an absent or unreadable watermark means, are degradation decisions.
+- Production serving path: no code on the serving path changes. The ingest runs upstream of
+  `live_forecasts`. Empty commits bump the raw table's Delta version, which `clean_nged_power_data`
+  uses to decide whether to rebuild the cleaned table that `live_forecasts` reads. That is an
+  indirect effect, covered in Risks.
+- A degradation rule: yes. Where the watermark may advance when the metadata upsert fails or a file
+  is malformed, and what a missing watermark means, are degradation decisions.
 - More than one defensible design: yes. The commit property, a state file, and a shorter lookback
   each satisfy the issue.
 - Code whose callers could not be named without searching: no. `remove_small_files_from_listing`,
@@ -71,94 +90,129 @@ deletes the size filter, the 3-day lookback, and `add_newest_file_of_each_series
   `cleaned_power_time_series.py` already uses. It accepts a frame with zero rows.
 - A new `read_ingest_watermark(table_uri, storage_options)` modelled on `read_cleaning_provenance`:
   it walks a small history window to the newest commit carrying the watermark key and returns a
-  UTC datetime, or `None` for a missing table, an unreadable log, or no commit carrying the key. It
-  never raises. A new module constant names the commit key.
+  UTC datetime. It returns `None` only for a missing table or no commit carrying the key, which
+  mean "first run". A read error raises, inside the asset's S3 retry guard, so a transient fault
+  reading our own store cannot trigger a whole-bucket download. It opens the table with
+  `without_files=True` so the history read does not load every add action. A new module constant
+  names the commit key.
+- `packages/delta_store/README.md` (line 40) gains the new keyword argument and the reader.
 
 ### `packages/nged_data/src/nged_data/storage.py`
 
 - `_RawFileListItem` and `_ProcessedFileListing` gain `last_modified`, a UTC datetime read from
-  `object_meta["last_modified"]` in `list_timeseries_json_files`.
+  `object_meta["last_modified"]` in `list_timeseries_json_files` (obstore returns a UTC datetime).
 - New `select_files_modified_since(file_listing, watermark)` returns files with
   `last_modified > watermark - _LAST_MODIFIED_MARGIN`, or every file when `watermark` is `None`.
-  `_LAST_MODIFIED_MARGIN` (1 hour; see open questions) replaces `_LATE_FILE_LOOKBACK`. The margin
-  covers an upload still in flight during a listing, which can carry an earlier `LastModified` than
-  a file that finished uploading first.
-- `download_and_parse_files` sorts and groups by `last_modified`, and no longer raises `NoNewData`
-  when every file was data-less: it returns the metadata and an empty, validated `PowerTimeSeries`
-  frame. `NoNewData` stays for an empty listing only. The change is required, because a silent
-  series' newest file is data-less, is now downloaded once, and its metadata must reach the upsert
-  in that run.
+  `_LAST_MODIFIED_MARGIN` replaces `_LATE_FILE_LOOKBACK`. The margin has to exceed the time one
+  listing takes, because a listing of the whole `timeseries` prefix takes minutes, and a file
+  created after the listing passed its key can be missed while a later file sets the watermark. The
+  value is fixed at implementation time from a measured listing duration and a measured spread of
+  `LastModified` values.
+- `download_and_parse_files` sorts by `(last_modified, end_time, path)`. It no longer raises
+  `NoNewData` when every file was data-less: it returns the metadata and an empty, validated
+  `PowerTimeSeries` frame. It skips a file that fails to parse and returns the skipped paths in
+  `DownloadAndParseResult`. `NoNewData` stays for an empty listing only. The data-less change is
+  required, because a silent series' newest file is data-less, is now downloaded once, and its
+  metadata must reach the upsert in that run.
 - Deleted: `remove_small_files_from_listing`, `add_newest_file_of_each_series`,
   `_LATE_FILE_LOOKBACK`, and `select_new_rows`'s `_ProcessedFileListing` overload and branch. The
-  `PowerTimeSeries` branch stays, because it is the row dedupe that makes a re-download safe. The
-  module docstring and the `time_series_coverage` docstring (which says the whole-table scan runs
-  twice an hour) are updated.
+  `PowerTimeSeries` branch stays, because it is the row dedupe that makes a re-download safe.
+- Docstrings that describe the removed behaviour are rewritten: the module docstring, the
+  `time_series_coverage` docstring (the whole-table scan no longer runs twice an hour),
+  `UpsertMetadataStats.metadata_upsert_failed` (the stale metadata is no longer retried next hour),
+  and the `upsert_metadata` docstring (it says metadata comes only from files `select_new_rows`
+  judged new, and gives rebuild advice).
 
 ### `src/nged_substation_forecast/defs/assets.py` (`power_time_series_and_metadata`)
 
-- Read the watermark with `read_ingest_watermark`. List, select with `select_files_modified_since`,
-  download, upsert the metadata (still swallowed on failure), dedupe the rows with `select_new_rows`.
-- When any file was selected, call `write_power_time_series` with the deduped rows (possibly none)
-  and `custom_metadata` set to the largest `last_modified` among the selected files. An empty
-  listing selection still raises `NoNewData` and commits nothing, so idle hours add no commits.
+- Read the watermark with `read_ingest_watermark`, inside the retry guard. List, select with
+  `select_files_modified_since`, download, upsert the metadata (still swallowed on failure), dedupe
+  the rows with `select_new_rows`.
+- Report each skipped path with `report_asset_degradation`.
+- Commit with `write_power_time_series` and `custom_metadata` set to the largest `last_modified`
+  among the selected files, when the deduped rows are not empty or that value is later than the
+  stored watermark. Otherwise commit nothing. An empty selection still raises `NoNewData`.
 - Remove the size filter, the listing-level `select_new_rows`, and `add_newest_file_of_each_series`.
   The `nged_s3_paths` table collapses its "Files above the size threshold", "Files with new data"
   and "Files downloaded" rows to "Files modified since the watermark".
-- The docstring says the watermark exists, where it lives, and that a run with no watermark (a new
-  table) downloads every file in the bucket.
+- The docstring says the watermark exists, where it lives, and that a table with no watermark
+  commit downloads every file in the bucket.
 
-### Docs
+### Docs and comments the change invalidates
 
-- `packages/nged_data/README.md`: remove the entries for the deleted functions and describe the
-  new ones.
-- `docs/live_service/operations.md`, "Reading a failed metadata table upsert": replace "`select_new_rows`
-  will not offer those files again" with the watermark having moved past those files, and say that a
-  silent series' note is restored by its next file.
-- Search `docs/` for `select_new_rows`, `_LATE_FILE_LOOKBACK`, `3 days`, and `re-lists NGED's bucket`
-  and rewrite each hit to describe the present behaviour.
+- `packages/nged_data/README.md`: remove the entries for the deleted functions, describe the new
+  ones.
+- `docs/live_service/operations.md`: lines 234-235 ("The ingest downloads the newest file of every
+  series, even a small file…"), lines 263-266 (a failed upsert: the watermark has moved past those
+  files, and a silent series' note is restored by its next file), and the "6 to 12 hours" wording.
+  Add the one-off seeding step (see Risks) and what a skipped malformed file looks like in Sentry.
+- The "commits only when NGED delivers new rows, about every 6 hours" wording, which empty commits
+  make untrue: `checks.py` (`_CLEANING_LAG_WARN_COMMITS` and the `cleaned_power_keeps_up_with_raw`
+  description string), `cleaning_assets.py` (lines 117-118), `schedules.py` (lines 23-24),
+  `docs/live_service/operations.md` (lines 263-266), and `docs/roadmap/data-cleaning.md` (lines
+  40-41).
+- Grep `docs/` and `src/` for `select_new_rows`, `_LATE_FILE_LOOKBACK`, `3 days`, `newest file`, and
+  `re-lists NGED's bucket` and rewrite each remaining hit to describe the present behaviour.
+- Test docstrings and fixtures: `test_storage.py:307`, `tests/test_assets.py:388` (its premise is
+  the size filter), and every fixture that builds `_ProcessedFileListing` or `_RawFileListItem`
+  without `last_modified` (`tests/test_assets.py:1463-1480`, `:1523`; `test_storage.py:29-48`,
+  `:670-672`). `_FakeS3Store.list` must return `last_modified` or every existing asset test fails.
 
 ## Design-philosophy check
 
-- **Production code, so degrade.** A missing, unreadable, or keyless history reads as `None`, which
-  means "download everything", and the row dedupe makes that safe. `read_ingest_watermark` never
-  raises. If the Delta log is unreadable the append fails anyway, through the existing path.
+- **Production code, so degrade.** A missing watermark means "download everything", and the row
+  dedupe makes that safe. A malformed NGED file is rejected, reported with its path, and the run
+  goes on. A read error on our own Delta log raises inside the retry guard: that is our own store
+  misbehaving, not the outside world, and an unreadable log would fail the append anyway.
 - **The watermark comes from S3's `LastModified`, never the wall clock**, so clock skew on the
   control-plane VM cannot skip files.
 - **Atomicity.** The watermark moves in the same commit as the readings, so no crash can leave it
-  ahead of the rows. A crash before the commit re-downloads files that the dedupe absorbs.
-- No asset check is added or changed. `power_data_is_fresh` still reads `time_series_coverage`.
+  ahead of the rows. A crash or a `RetryRequested` retry before the commit re-downloads files that
+  the dedupe absorbs. Overlapping runs can only move the watermark backwards, which costs
+  re-downloads and loses nothing.
+- No asset check is added or changed beyond the wording above. `power_data_is_fresh` still reads
+  `time_series_coverage`, which empty commits do not affect.
 - Hypotheses: this serves H1 (the pipeline keeps running through an outage) by lowering the request
   load, and trades away no principle in `design-principles.md`.
 
 ## Tests
 
-Each test below states the assertion that fails on `main` today.
+Each test states the assertion that fails on `main` today.
 
-1. **Equivalence replay** (`tests/test_assets.py`). The fake store `_FakeS3Store` gains a
-   `last_modified` per file, a `put(path, data, last_modified)` for adding files between runs, and
-   a count of `get` calls. Run the real asset over one replay twice, each time from empty storage:
-   once normally, once with `read_ingest_watermark` monkeypatched to return `None` every run, which
-   downloads the whole fake bucket each run. After each run, assert exact frame equality, ignoring
-   row order, of the two `power_time_series` tables and the two metadata parquet files. The replay:
-   initial files for 3 series; new files; a late file (old `end_time`, new `last_modified`) that is
-   the only file of its series in its run; a series that stops reporting and publishes a data-less
-   file with a new `Information` note; a rewritten key (same path, new `last_modified`); a run with
-   no new files. The only expected difference is the `get` count, asserted to be smaller, and zero
-   on the run with no new files. On `main` the watermark reader does not exist, so the test fails.
-2. **Empty commit advances the watermark.** A run whose only new file is data-less appends zero rows
-   and the table's newest commit carries the larger watermark. The mutation to catch is skipping
-   the write when there are no rows.
-3. **Margin comparison.** `select_files_modified_since` keeps a file one second after
+1. **Equivalence replay** (`tests/test_assets.py`). `_FakeS3Store` gains a `last_modified` per file,
+   a `put(path, data, last_modified)` for adding files between runs, and a count of `get` calls.
+   Run the real asset over one replay twice, each time from empty storage: once normally, once with
+   `read_ingest_watermark` monkeypatched to return `None` every run, which downloads the whole fake
+   bucket each run. After each run, assert exact frame equality, ignoring row order, of the two
+   `power_time_series` tables and the two metadata parquet files. The replay: initial files for 3
+   series; new files; a late file whose `end_time` is more than 3 days before its series' newest
+   reading and whose `last_modified` is new (the old ingest's known loss); a file that appears
+   after a run with a `last_modified` earlier than the watermark but inside the margin; a series
+   that stops reporting and publishes a data-less file with a new `Information` note; a rewritten
+   key (same path, new `last_modified`); a run with no new files. The only expected difference is
+   the `get` count. On the run with no new files, the count equals the number of files inside the
+   margin band, computed from the fake store, and is smaller than the reference's. On `main` the
+   watermark reader does not exist, so the test fails.
+2. **A run with nothing new commits nothing.** Two runs with no new files leave the table's version
+   unchanged after the first. The mutation to catch is committing on every run.
+3. **Empty commit advances the watermark.** A run whose only new file is data-less appends zero rows
+   and the table's newest commit carries the larger watermark. The mutation to catch is skipping the
+   write when there are no rows.
+4. **Margin comparison.** `select_files_modified_since` keeps a file one second after
    `watermark - margin`, drops one exactly at it, and returns every file for `None`.
-4. **Watermark survives a metadata fault.** Monkeypatch `upsert_metadata` to raise. The power rows
+5. **Watermark survives a metadata fault.** Monkeypatch `upsert_metadata` to raise. The power rows
    land, the run succeeds, and the watermark advances.
-5. **`read_ingest_watermark`** returns `None` for a missing table, a table whose commits carry no
-   key, and an unreadable log, and returns the newest value after several commits including an
-   unrelated commit.
-6. **`download_and_parse_files`** returns metadata and an empty power frame when every file is
-   data-less, and orders by `last_modified`: given two files for one series, the one written later
-   supplies the metadata whatever its `end_time`.
-7. **`write_power_time_series`** with `custom_metadata` and zero rows adds a commit whose history
+6. **A malformed file is skipped, reported and passed.** One file with invalid JSON among valid
+   ones: the valid rows land, `report_asset_degradation` receives the bad file's path, and the
+   watermark advances past it. The mutation to catch is letting the exception escape.
+7. **`read_ingest_watermark`** returns `None` for a missing table and for a table whose commits
+   carry no key, returns the newest value after several commits including an unrelated commit, and
+   raises for a table whose log holds junk (written into `_delta_log/00000000000000000000.json`).
+8. **`download_and_parse_files`** returns metadata and an empty power frame when every file is
+   data-less. Built from a listing with explicit `last_modified` values, it supplies metadata from
+   the later-written of two files of one series whatever their `end_time`, and orders two files with
+   equal `last_modified` by `end_time` then `path`.
+9. **`write_power_time_series`** with `custom_metadata` and zero rows adds a commit whose history
    carries the key.
 
 The deleted functions' tests are deleted with them.
@@ -176,34 +230,52 @@ uv run mkdocs build --strict    # read the rendered operations page
 
 ## Risks and open questions
 
-- **Margin length.** Recommend 1 hour. S3 sets `LastModified` when the upload starts, and NGED's
-  files are small, so a file should become visible within seconds. A longer margin re-downloads
-  every file written inside it on every run. At 2,500 series each publishing about 4 files a day, a
-  1-hour margin re-fetches about 400 files an hour, against about 32,500 today. Does the maintainer
-  want a longer margin?
-- **Forcing a full re-ingest.** With a state file this would be "delete the file". With a commit
-  property it means deleting the Delta table or adding an override. The issue does not ask for the
-  capability. Is that acceptable?
-- **First run.** A table with no watermark commit downloads the whole bucket in one run, all held in
-  memory. This is how an empty table behaves today too, and on the existing deployment the first run
-  after this change does it once. At Flexpectation v2 scale a fresh deployment could run out of
-  memory. Out of scope here; worth a follow-up issue that chunks the first run.
+- **Margin and band, measured before fixing.** Before choosing the margin, the implementer lists the
+  real bucket, times the listing, and tabulates the spread of `LastModified` per window directory.
+  The margin must exceed the listing time. The spread says how big the re-fetched band is. Does the
+  maintainer accept a band of repeat downloads, up to a whole batch, if NGED writes batches?
+- **Empty commits and the cleaning asset.** `clean_nged_power_data` rebuilds the whole cleaned
+  table whenever the raw table's Delta version changes. An empty commit from a data-less file
+  therefore triggers a full rebuild, where today a rebuild follows only a delivery of rows. At 33
+  series the silent series add about 4 such commits a day each. At Flexpectation v2 scale, hourly
+  commits are likely anyway, because some series deliver nearly every hour. Recommend accepting this
+  and updating the wording listed above. The alternative is a cleaning change that ignores commits
+  adding no rows, which is a separate issue.
+- **Cleaning-lag check.** `cleaned_power_keeps_up_with_raw` counts raw commits, and 2 commits no
+  longer means 6 to 12 hours. The wording changes; whether to retune the threshold is a separate
+  question.
+- **First run on the existing deployment.** A table with no watermark commit downloads the whole
+  bucket in one run: about 22,000 sequential GETs for 33 series over about 165 days, which could
+  outlast the next hourly tick. Two overlapping runs could append duplicate rows. Recommend a
+  one-off seeding step before the first deployed run: append a zero-row commit carrying a watermark
+  of 3 days before the deploy, documented in `operations.md`, which mimics today's window. Does
+  the maintainer want the seeding as a documented command or a small script? The implementer also
+  checks whether the hourly job has a run-concurrency limit.
+- **A fresh Flexpectation v2 table** would download the whole bucket in one run, all held in
+  memory. Out of scope; worth a follow-up issue that chunks the first run.
+- **Forcing a full re-ingest** now means deleting the Delta table or seeding an old watermark. The
+  issue does not ask for the capability.
 - **A rewritten key with corrected values** is downloaded again, but `select_new_rows` drops rows
-  that already exist, so the corrected values are never applied. This is today's behaviour. Whether
-  NGED ever rewrites a key is not known.
+  that already exist, so the corrected values are never applied. This is today's behaviour.
 - **Listing cost.** The ingest still lists the whole `timeseries` prefix every hour. At 2,500 series
   the listing, not the downloads, becomes the dominant request count. Possible follow-up issue.
 - **Test departs from the issue's wording.** The issue says to compare with the old ingest. The
-  plan compares with "download everything", because the old ingest has known defects (it skips files
-  more than 3 days late, and its metadata goes stale) and a copy of it in the tests would only be
-  there to be deleted. Please confirm.
+  plan compares with "download everything", because the old ingest has known defects and a copy of
+  it in the tests would only be there to be deleted. Please confirm.
 
 ## Review record
 
 **Simplicity review (Opus).** Accepted: the commit property in place of a state file (verified
-empty appends commit and keep their property; verified `write_power_time_series` is the only
-writer of the table); dropping the hold-back on a metadata fault; ordering by `last_modified`; the
-"download everything" test reference. Rejected: nothing. Kept as the reviewer judged: the margin,
+empty appends commit and keep their property, and that `write_power_time_series` is the only writer
+of the table); dropping the hold-back on a metadata fault; ordering by `last_modified`; the
+"download everything" test reference. Rejected: nothing. Kept, as the reviewer judged: the margin,
 and `select_files_modified_since` as a separate function.
 
-**Correctness review.** (Filled in after the review.)
+**Correctness review (Opus).** Accepted: the margin band re-fetch, with no commit on a band-only run
+and a measured margin (defect 1); the cleaning-asset rebuild and the cleaning-lag check wording
+(defects 2 and 3, as open questions with a recommendation); the malformed-file stall (defect 4,
+Departure 6); `read_ingest_watermark` raising on read errors (defect 5); the tiebreak (defect 6);
+the first-run seeding (defect 7); the missed docs, docstrings and fixtures (defect 8); the extra
+replay scenarios. Accepted with a correction: the review says Departure 3's reason was wrong when a
+late file is the only file of its series in a run, which is true, so the reason is restated for runs
+with several files of one series. Rejected: nothing.
