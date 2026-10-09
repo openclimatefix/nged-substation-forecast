@@ -81,7 +81,7 @@ Summary are provisional until the remaining reviews finish.
       simulated home-battery fleets, which enter here and whose intervals mostly miss (0% to 36% of
       sums), it held the true power in 68.9% of sums, short of the 80% that planned contrast C2
       required in the study plan. Merchant batteries alone held it in 90% of sums over all seven
-      shares, which is the "slightly more than 90%" below, at shares of 5% or more.
+      shares, and in 99% to 100% at shares of 5% to 40%.
     - **Other dispatch rules (provisional).** At 10%, 20%, and 40% shares the 90% power interval
       held the truth in 90%, 60%, and 26% of sums for the cheapest-and-dearest rule, and in 65%,
       33%, and 6% for the noisy price. The median absolute power error was about 30% for the
