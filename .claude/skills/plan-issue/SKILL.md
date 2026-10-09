@@ -209,6 +209,22 @@ feature is, then what the planned solution is. A reader who stops after the firs
 should already know what is broken (or missing) and roughly how the plan fixes it, without reading
 the file-by-file detail.
 
+Follow the two summaries with a **"Walk through"** section, under a "Solution" heading, in every
+plan. The maintainer reads this section first, to check that the pieces fit together before
+reading any file-by-file detail. It tells a concise story in plain language of how the change
+works end to end, in the form "To do X, we first do Y, which loads Z, which is passed to function
+W (through the new `baz` parameter)". It has sub-sections for:
+
+- **The happy path**, from the trigger to the stored result.
+- **The main branches through the happy path**, such as the first run against an empty table
+  versus an append to an existing one.
+- **The main error-handling paths**: what each failure does, whether the run degrades or raises,
+  and what is reported.
+
+Name the real functions, parameters and files, so the reader can match the story to the file-by-file
+section. Write it after the rest of the plan is settled, and update it after each review, because
+a review that changes the design makes the walk through stale first.
+
 The plan covers:
 
 - **Verdict, size and departures** — the step-2 conclusion, the step-3 size with the reviews it
@@ -322,6 +338,7 @@ Tailor the brief to this issue's specific failure modes rather than asking for a
 attacks worth naming, when they apply:
 
 - Does the plan's description of *current* behaviour actually match the code on `main`?
+- Does the "Walk through" agree with the file-by-file section, the tests, and the code it names?
 - Would each proposed test really have failed before the change? A test that passes on `main` today
   tests nothing about this change.
 - Is any part of the plan untestable as written — needing network, wall-clock time, or a whole
