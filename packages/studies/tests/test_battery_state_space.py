@@ -391,7 +391,12 @@ def test_draws_from_the_laplace_approximation_are_positive_and_centred_on_the_op
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="needs a CUDA device")
-def test_the_gpu_kernel_matches_the_reference_loop_in_value_and_in_every_gradient() -> None:
+@pytest.mark.parametrize(
+    ("dtype", "relative_tolerance"), [(torch.float32, 1e-4), (torch.float64, 1e-6)]
+)
+def test_the_gpu_kernel_matches_the_reference_loop_in_value_and_in_every_gradient(
+    dtype: torch.dtype, relative_tolerance: float
+) -> None:
     generator = torch.Generator().manual_seed(0)
     n_time, n_lanes = 700, 37
     charge = (torch.rand(n_time, n_lanes, generator=generator, dtype=torch.float64) > 0.6).double()
@@ -402,7 +407,8 @@ def test_the_gpu_kernel_matches_the_reference_loop_in_value_and_in_every_gradien
     results = []
     for device in ("cpu", "cuda"):
         inputs = [
-            t.to(device).clone().requires_grad_(True) for t in (charge, discharge, duration, eta)
+            t.to(device=device, dtype=dtype).clone().requires_grad_(True)
+            for t in (charge, discharge, duration, eta)
         ]
         output, _ = recurrence(
             charge=inputs[0],
@@ -411,7 +417,11 @@ def test_the_gpu_kernel_matches_the_reference_loop_in_value_and_in_every_gradien
             eta_one_way=inputs[3],
             smoothing=1e-3,
         )
-        gradients = torch.autograd.grad((output * weights.to(device)).sum(), inputs)
+        gradients = torch.autograd.grad(
+            (output * weights.to(device=device, dtype=dtype)).sum(), inputs
+        )
         results.append([output.detach().cpu(), *[g.cpu() for g in gradients]])
     for reference, kernel in zip(results[0], results[1], strict=True):
-        assert float((reference - kernel).abs().max()) <= 1e-6 * float(reference.abs().max())
+        assert float((reference - kernel).abs().max()) <= relative_tolerance * float(
+            reference.abs().max()
+        )
