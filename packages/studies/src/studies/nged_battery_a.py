@@ -21,7 +21,8 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from battery_inputs import (
+
+from studies.battery_market import (
     FOLD_MONTHS,
     HALF_HOURS_PER_DAY,
     MINUTES_PER_HALF_HOUR,
@@ -56,6 +57,24 @@ def _battery_row() -> dict[str, object]:
         msg = f"The metadata search matched {hits.height} series, not 1."
         raise ValueError(msg)
     return hits.row(0, named=True)
+
+
+def battery_a_site() -> dict[str, object]:
+    """Return NGED battery A's name, position and unit, for matching it against public registers.
+
+    The caller must keep every value out of anything printed, logged, or written. A script reports
+    only whether a match was found.
+
+    Returns:
+        The keys `name`, `latitude`, `longitude`, and `units` of the series' metadata row.
+    """
+    row = _battery_row()
+    return {
+        "name": str(row["time_series_name"]),
+        "latitude": float(row["latitude"]),  # ty: ignore[invalid-argument-type]
+        "longitude": float(row["longitude"]),  # ty: ignore[invalid-argument-type]
+        "units": str(row["units"]),
+    }
 
 
 def battery_a_units() -> str:
@@ -119,7 +138,7 @@ def battery_a_frame(*, sign: float = 1.0) -> tuple[pl.DataFrame, float]:
     Returns:
         The frame, and the 99th percentile absolute output in the metered unit. `output_mw` and
         `output_mwh` are expressed as fractions of that percentile, so the frame carries no
-        capacity. The columns are the ones `battery_inputs.battery_frame` returns: `time`, the
+        capacity. The columns are the ones `battery_frame` of the battery study returns: `time`, the
         outputs, the day-ahead price, `date`, `tod`, `month`, `rank_pct`, `fold`, and `tercile`.
     """
     raw = battery_a_raw().filter(window_filter())
