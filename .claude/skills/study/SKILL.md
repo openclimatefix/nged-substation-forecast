@@ -79,17 +79,20 @@ is on pytest's path. `packages/studies/tests/test_study_boundaries.py` enforces 
 script on the study's predictions file (a parquet file of `PowerForecast` rows) and quote the number
 from the `forecast_metrics` row that the `metrics` asset writes under the experiment name
 `study/<study name>`. Never quote a leaderboard skill number computed by the study's own scoring
-code. Never edit the scorer files in a study: `packages/ml_core/src/ml_core/metrics.py`,
-`packages/ml_core/src/ml_core/cv_helpers.py`, `src/nged_substation_forecast/defs/cv_assets.py`,
-`scripts/forecasting/score_study.py`, and `conf/cv/`. The script refuses a file whose row keys
-differ from the reference experiment's for the fold, so the file must hold exactly the reference's
-series, initialisation times, valid times, and ensemble members, with none missing and none extra.
-Read observed power through `studies.power.scan_power`, which stops at `final_test_start` and so
-includes the whole validation year. The `metrics` asset refuses to score a window that reaches that
-date unless the maintainer sets `NGED_FINAL_TEST=1`. The script checks which rows the file holds, not
-how the forecast was made, so the study itself must fit only on observations up to the fold's
-`train_end`, and use observations after that only as lags earlier than each forecast's
-initialisation time.
+code. The script logs every attempt, refused ones included, so do not retry a submission to find a
+lucky score: each attempt raises the `study_submission_number` on the fold run. Quote a skill number
+against the reference through the study's `vs_reference__` metrics, which the `metrics` asset
+computes in the same run as the reference's own scores. Never edit the scorer files in a study:
+`packages/ml_core/src/ml_core/metrics.py`, `packages/ml_core/src/ml_core/cv_helpers.py`,
+`src/nged_substation_forecast/defs/cv_assets.py`, `scripts/forecasting/score_study.py`, and
+`conf/cv/`. The script refuses a file whose row keys differ from the reference experiment's for the
+fold, so the file must hold exactly the reference's series, initialisation times, valid times, and
+ensemble members, with none missing and none extra. Read observed power through
+`studies.power.scan_power`, which stops at `final_test_start` and so includes the whole validation
+year. The `metrics` asset refuses to score a window that reaches that date unless the maintainer
+sets `NGED_FINAL_TEST=1`. The script checks which rows the file holds, not how the forecast was
+made, so the study itself must fit only on observations up to the fold's `train_end`, and use
+observations after that only as lags earlier than each forecast's initialisation time.
 
 **A study script is not unit-tested as a whole, so its check is its own output.** Every table the
 page quotes is printed by a committed script into a `report.md`, never transcribed by hand, and

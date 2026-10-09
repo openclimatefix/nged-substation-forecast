@@ -245,6 +245,33 @@ matching. A run whose population filter names no `experiment_name` therefore lis
 experiment in the `skipped_study_experiments` metadata and scores the reviewed experiments without
 them. A run whose population filter names a study's `experiment_name` scores that study.
 
+**The `metrics` asset also records what each score rests on, so that a reader can compare scores
+safely.** Four records sit beside every leaderboard fold run:
+
+- **A study is scored beside the reference, in the same run.** The `metrics` asset adds the
+  reference experiment's group to any run that scores a study, so the study and the reference share
+  one snapshot of the observed power and of `effective_capacity`, which both change as data arrives
+  and as cleaning rules change. The study's fold run holds each score minus the reference's under
+  `vs_reference__`, such as `vs_reference__nmae__all`. Compare a study with the reference through
+  those metrics, not through the two runs' separate numbers.
+- **Every fold run carries a fingerprint of its forecast problem.** `row_key_fingerprint` hashes the
+  distinct `(time_series_id, power_fcst_init_time, valid_time)` keys of the group, ignoring
+  `ensemble_member`. The tag `row_keys_match_reference` says whether a group's fingerprint equals
+  the reference's. A reviewed experiment whose fingerprint differs is scored and tagged `false`, not
+  refused, because a reviewed experiment such as `manual_heuristic` may forecast a different set of
+  series. A score compared with a reviewed experiment is comparable with the reference only where
+  the tag is `true`.
+- **An unfiltered run marks each study it skips as stale or current.** The tag
+  `stale_against_reference` is `true` when the reference's fingerprint for the fold no longer equals
+  the one the study was scored against.
+- **Every submission attempt is logged.** `scripts/forecasting/score_study.py` appends each attempt,
+  scored or refused, to `study_submissions.jsonl`, and tags the study's fold run
+  `study_submission_number` with the count of attempts at that fold. Each new study name is another
+  chance to find a lucky score on the one fold, so a leaderboard number from the 200th attempt
+  deserves less trust than one from the first. The script overwrites an earlier submission only
+  when the maintainer's own shell sets `NGED_ALLOW_REPLACE=1`, and the log keeps a record of the
+  overwritten submission.
+
 ---
 
 ## Alternatives considered

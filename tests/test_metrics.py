@@ -12,6 +12,7 @@ Tests at two tiers:
 """
 
 import importlib.util
+import json
 import os
 import socket
 import subprocess
@@ -152,6 +153,7 @@ def _base_env(
     monkeypatch.setenv("ELIGIBLE_TIME_SERIES_DATA_PATH", str(tmp_path / "eligible"))
     monkeypatch.setenv("POWER_FORECASTS_DATA_PATH", str(forecasts_path))
     monkeypatch.setenv("FORECAST_METRICS_DATA_PATH", str(metrics_path))
+    monkeypatch.setenv("LOCAL_ARTIFACTS_PATH", str(tmp_path / "artifacts"))
     # Point at a temp path so metrics never reads the repo's real effective_capacity table; the
     # table is absent until a test materialises it, and the metrics asset fails cleanly without it
     # (see test_metrics_raises_without_effective_capacity).
@@ -808,7 +810,29 @@ def _scored_experiments(metrics_path: Path) -> set[str]:
     return set(pl.read_delta(str(metrics_path))["experiment_name"].unique().to_list())
 
 
-def test_metrics_scores_a_study_whose_row_keys_match_the_reference(
+def _fold_run_tags(experiment_name: str) -> dict[str, str]:
+    """The tags of an experiment's single leaderboard fold run."""
+    experiment = mlflow.get_experiment_by_name(experiment_name)
+    assert experiment is not None
+    (run,) = MlflowClient().search_runs(
+        experiment_ids=[experiment.experiment_id],
+        filter_string=f"tags.cv_role = 'fold' and tags.fold_id = '{FOLD_ID}'",
+    )
+    return dict(run.data.tags)
+
+
+def _fold_run_metrics(experiment_name: str) -> dict[str, float]:
+    """The metrics of an experiment's single leaderboard fold run."""
+    experiment = mlflow.get_experiment_by_name(experiment_name)
+    assert experiment is not None
+    (run,) = MlflowClient().search_runs(
+        experiment_ids=[experiment.experiment_id],
+        filter_string=f"tags.cv_role = 'fold' and tags.fold_id = '{FOLD_ID}'",
+    )
+    return dict(run.data.metrics)
+
+
+def test_metrics_scores_a_study_beside_the_reference_in_the_same_run(
     file_mlflow_env: dict[str, Path],
     dagster_instance: DagsterInstance,
     register_experiment: RegisterExperiment,
@@ -824,7 +848,79 @@ def test_metrics_scores_a_study_whose_row_keys_match_the_reference(
         instance=dagster_instance,
     ).success
 
-    assert _scored_experiments(file_mlflow_env["metrics"]) == {STUDY_EXPERIMENT_NAME}
+    assert _scored_experiments(file_mlflow_env["metrics"]) == {
+        STUDY_EXPERIMENT_NAME,
+        EXPERIMENT_NAME,
+    }
+    study_tags = _fold_run_tags(STUDY_EXPERIMENT_NAME)
+    assert study_tags["row_key_fingerprint"] == study_tags["reference_row_key_fingerprint"]
+    assert study_tags["row_keys_match_reference"] == "true"
+    assert study_tags["stale_against_reference"] == "false"
+    # The study holds the reference's own rows, so every paired difference is zero.
+    paired = {
+        key: value
+        for key, value in _fold_run_metrics(STUDY_EXPERIMENT_NAME).items()
+        if key.startswith("vs_reference__")
+    }
+    assert "vs_reference__rmse__all" in paired
+    assert paired == pytest.approx(dict.fromkeys(paired, 0.0))
+
+
+def test_metrics_tags_a_reviewed_experiment_whose_row_keys_differ_from_the_reference(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A reviewed experiment on another forecast problem is scored and tagged, never refused."""
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    _use_as_reference(monkeypatch, EXPERIMENT_NAME)
+    _store_variant(
+        file_mlflow_env["forecasts"],
+        experiment_name="reviewed_other",
+        transform=lambda rows: rows.filter(pl.col("valid_time") != rows["valid_time"].min()),
+    )
+
+    assert materialize(
+        [metrics],
+        run_config=_score_run_config(experiment_name=None),
+        instance=dagster_instance,
+    ).success
+
+    assert _fold_run_tags(EXPERIMENT_NAME)["row_keys_match_reference"] == "true"
+    other_tags = _fold_run_tags("reviewed_other")
+    assert other_tags["row_keys_match_reference"] == "false"
+    assert other_tags["row_key_fingerprint"] != other_tags["reference_row_key_fingerprint"]
+
+
+def test_unfiltered_run_tags_a_study_stale_once_the_reference_row_keys_change(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    _use_as_reference(monkeypatch, EXPERIMENT_NAME)
+    _store_variant(file_mlflow_env["forecasts"], experiment_name=STUDY_EXPERIMENT_NAME)
+    assert materialize(
+        [metrics],
+        run_config=_score_run_config(experiment_name=STUDY_EXPERIMENT_NAME),
+        instance=dagster_instance,
+    ).success
+
+    _store_variant(
+        file_mlflow_env["forecasts"],
+        experiment_name="new_reference",
+        transform=lambda rows: rows.filter(pl.col("valid_time") != rows["valid_time"].min()),
+    )
+    _use_as_reference(monkeypatch, "new_reference")
+    assert materialize(
+        [metrics],
+        run_config=_score_run_config(experiment_name=None),
+        instance=dagster_instance,
+    ).success
+
+    assert _fold_run_tags(STUDY_EXPERIMENT_NAME)["stale_against_reference"] == "true"
 
 
 def test_metrics_refuses_a_study_that_omits_the_rows_of_a_valid_time(
@@ -1148,8 +1244,9 @@ def test_score_study_writes_nothing_when_a_later_batch_is_invalid(
 
 
 def test_score_study_does_not_overwrite_a_submission_unless_asked(
-    study_predictions: Path,
+    study_predictions: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setenv(score_study.ALLOW_REPLACE_VARIABLE, "1")
     score_study.score_study(
         predictions=study_predictions, study_name="my_study", fold_id=FOLD_ID, replace=False
     )
@@ -1161,6 +1258,58 @@ def test_score_study_does_not_overwrite_a_submission_unless_asked(
     score_study.score_study(
         predictions=study_predictions, study_name="my_study", fold_id=FOLD_ID, replace=True
     )
+
+
+def test_score_study_refuses_replace_unless_the_maintainers_variable_is_set(
+    study_predictions: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv(score_study.ALLOW_REPLACE_VARIABLE, raising=False)
+    score_study.score_study(
+        predictions=study_predictions, study_name="my_study", fold_id=FOLD_ID, replace=False
+    )
+
+    with pytest.raises(ValueError, match=score_study.ALLOW_REPLACE_VARIABLE):
+        score_study.score_study(
+            predictions=study_predictions, study_name="my_study", fold_id=FOLD_ID, replace=True
+        )
+
+
+def _submission_log() -> list[dict[str, object]]:
+    log_path = Path(Settings().local_artifacts_path) / score_study.SUBMISSION_LOG_NAME
+    return [json.loads(line) for line in log_path.read_text().splitlines()]
+
+
+def test_score_study_logs_every_attempt_including_a_refused_one_and_tags_the_run(
+    study_predictions: Path, tmp_path: Path
+) -> None:
+    spread = tmp_path / "spread.parquet"
+    rows = pl.read_parquet(study_predictions)
+    pl.concat(
+        [
+            rows.filter(pl.col("valid_time") <= rows["valid_time"].median()),
+            rows.filter(pl.col("valid_time") > rows["valid_time"].median()).with_columns(
+                power_fcst_model_name=pl.lit("other_name")
+            ),
+        ]
+    ).write_parquet(spread)
+
+    with pytest.raises(MultipleModelNamesError):
+        score_study.score_study(
+            predictions=spread, study_name="refused_study", fold_id=FOLD_ID, replace=False
+        )
+    score_study.score_study(
+        predictions=study_predictions, study_name="scored_study", fold_id=FOLD_ID, replace=False
+    )
+
+    assert [(entry["study_name"], entry["event"]) for entry in _submission_log()] == [
+        ("refused_study", "attempt"),
+        ("refused_study", "refused"),
+        ("scored_study", "attempt"),
+        ("scored_study", "scored"),
+    ]
+    assert _submission_log()[1]["error_type"] == "MultipleModelNamesError"
+    # The refused attempt counts: the scored study is the second attempt at the fold.
+    assert _fold_run_tags("study/scored_study")["study_submission_number"] == "2"
 
 
 def test_score_study_refuses_a_file_with_two_model_names_and_leaves_no_partition(
@@ -1304,6 +1453,26 @@ def test_score_study_main_re_executes_with_the_cleaned_environment(
 
     assert "NGED_FINAL_TEST" not in executed[0]
     assert executed[0][score_study.CLEAN_ENVIRONMENT_MARKER] == "1"
+    assert score_study.ALLOW_REPLACE_VARIABLE not in executed[0]
+
+
+def test_score_study_main_forwards_the_maintainers_replace_variable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executed: list[dict[str, str]] = []
+
+    def record_execve(_path: str, _argv: list[str], environment: dict[str, str]) -> None:
+        executed.append(environment)
+        raise SystemExit
+
+    monkeypatch.setattr(score_study.os, "execve", record_execve)
+    monkeypatch.setenv(score_study.ALLOW_REPLACE_VARIABLE, "1")
+    monkeypatch.delenv(score_study.CLEAN_ENVIRONMENT_MARKER, raising=False)
+
+    with pytest.raises(SystemExit):
+        score_study.main()
+
+    assert executed[0][score_study.ALLOW_REPLACE_VARIABLE] == "1"
 
 
 def test_score_study_loads_the_cv_config_like_the_metrics_asset(

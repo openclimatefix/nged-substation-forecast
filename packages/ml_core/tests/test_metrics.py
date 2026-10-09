@@ -26,6 +26,7 @@ from ml_core.metrics import (
     require_single_model_name,
     require_valid_times_within_window,
     require_window_within_guard,
+    row_key_fingerprint,
 )
 from polars.testing import assert_frame_equal
 
@@ -1078,6 +1079,36 @@ def test_require_same_row_keys_refuses_a_reference_with_no_rows() -> None:
 
     with pytest.raises(RowKeyMismatchError, match="Materialise the reference"):
         _check_row_keys(study=_row_key_frame(series={1: _TIMES}), reference=reference)
+
+
+def _fingerprint(frame: pl.LazyFrame, series_batch_size: int = 1) -> str:
+    return row_key_fingerprint(forecasts=frame, series_batch_size=series_batch_size)
+
+
+def test_row_key_fingerprint_ignores_row_order_member_count_and_batch_size() -> None:
+    frame = _row_key_frame(series={1: _TIMES, 2: _TIMES}, members=(0, 1, 2))
+
+    reference = _fingerprint(frame)
+
+    assert _fingerprint(frame.reverse()) == reference
+    assert _fingerprint(_row_key_frame(series={1: _TIMES, 2: _TIMES}, members=(0,))) == reference
+    assert _fingerprint(frame, series_batch_size=5) == reference
+
+
+@pytest.mark.parametrize(
+    "other",
+    [
+        {1: _TIMES},
+        {1: _TIMES, 2: _TIMES[:-1]},
+        {1: _TIMES, 3: _TIMES},
+        {1: _TIMES, 2: [time + timedelta(hours=1) for time in _TIMES]},
+    ],
+    ids=["omitted_series", "omitted_row", "other_series", "other_valid_times"],
+)
+def test_row_key_fingerprint_changes_when_the_keys_change(other: dict[int, list[datetime]]) -> None:
+    reference = _fingerprint(_row_key_frame(series={1: _TIMES, 2: _TIMES}))
+
+    assert _fingerprint(_row_key_frame(series=other)) != reference
 
 
 def test_require_same_row_keys_refuses_a_study_that_drops_a_longer_lead_time() -> None:

@@ -4,12 +4,13 @@ A study's leaderboard number comes only from this script. The script takes a pre
 nothing else: no code, no actuals, no scoring options. It runs `metrics` in leaderboard scope on the
 file's rows, stored in `power_forecasts` under the experiment name `study/<study name>`.
 
-Before anything is written, the script refuses a file whose row keys
-`(time_series_id, power_fcst_init_time, valid_time)` differ from those of the cross-validation (CV)
+Before anything is written, the script refuses a file whose row keys `(time_series_id,
+power_fcst_init_time, valid_time, ensemble_member)` differ from those of the cross-validation (CV)
 config's `reference_experiment_name` experiment for the same fold. The script also refuses a file
 whose rows carry more than one `power_fcst_model_name`. A study therefore cannot abstain on hard
-rows, or down-weight them by spreading rows across model names. The `metrics` asset repeats both
-checks when it scores a study, because the asset is the one source of a leaderboard number.
+rows, choose its own ensemble members, or down-weight rows by spreading them across model names.
+The `metrics` asset repeats both checks when it scores a study, because the asset is the one source
+of a leaderboard number.
 
 The script also discards the environment it was started with. `Settings` reads `DATA_PATH_INTERNAL`,
 `METADATA_PATH`, `CV_CONFIG_PATH`, and `MLFLOW_TRACKING_URI` from the environment, and the `metrics`
@@ -27,21 +28,32 @@ run code in the first process.
     uv run python scripts/forecasting/score_study.py \
         predictions.parquet my_study mid_2025_to_mid_2026
 
-A study that has already been scored is not overwritten unless `--replace` is passed. The `sudo`
-rule should not allow `--replace`, because the flag overwrites the earlier submission, its metrics,
-and its MLflow fold run.
+Every attempt is appended to `study_submissions.jsonl` in `local_artifacts_path`, whether the
+script scores the file or refuses it. The log is append-only, and each study's MLflow fold run
+carries the `study_submission_number` tag: how many attempts the log holds for that fold, including
+this one. Each new study name is another attempt against the same fold and the same reference, so
+the number says how far a leaderboard score has been selected.
+
+A study that has already been scored is not overwritten. `--replace` overwrites the earlier
+submission, its metrics, and its MLflow fold run, so the script accepts the flag only when
+`NGED_ALLOW_REPLACE=1` is set in the environment of the maintainer's own shell. The `sudo` rule's
+`env_reset` drops that variable. The log keeps the record of an overwritten submission.
 """
 
 import argparse
+import fcntl
+import json
 import os
 import re
 import shutil
 import sys
 import tempfile
 from collections.abc import Iterator, Mapping
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
+import mlflow
 import patito as pt
 import polars as pl
 from contracts.config_schemas import STUDY_EXPERIMENT_PREFIX, load_cv_config
@@ -51,6 +63,12 @@ from contracts.typing_utils import typeddict_to_dict
 from dagster import DagsterInstance, RunConfig, materialize
 from delta_store.power_forecasts import write_power_forecasts
 from ml_core.metrics import ROW_KEY_COLUMNS, require_same_row_keys, require_single_model_name
+from ml_core.mlflow_runs import (
+    get_or_create_experiment,
+    get_or_create_fold_run,
+    get_or_create_parent_run,
+)
+from mlflow.tracking import MlflowClient
 
 from nged_substation_forecast.defs.cv_assets import MetricsConfig, PopulationFilter, metrics
 
@@ -66,6 +84,19 @@ ALLOWED_ENVIRONMENT: Final[frozenset[str]] = frozenset({"PATH", "HOME", "LANG", 
 
 CLEAN_ENVIRONMENT_MARKER: Final[str] = "NGED_SCORE_STUDY_CLEAN_ENVIRONMENT"
 """Set to `1` in the re-executed process, so the process re-executes once only."""
+
+ALLOW_REPLACE_VARIABLE: Final[str] = "NGED_ALLOW_REPLACE"
+"""The environment variable that lets `--replace` overwrite a submission.
+
+Only the maintainer's own shell sets it to `1`. The script forwards it across the re-execution,
+whose cleaned environment would otherwise drop it.
+"""
+
+SUBMISSION_LOG_NAME: Final[str] = "study_submissions.jsonl"
+"""The append-only log of every submission attempt, in `local_artifacts_path`."""
+
+SUBMISSION_NUMBER_TAG: Final[str] = "study_submission_number"
+"""The MLflow fold-run tag holding the attempt's number among the log's attempts at the fold."""
 
 SERIES_BATCH_SIZE: Final[int] = 4
 """How many `time_series_id` values to check and write at once.
@@ -178,7 +209,90 @@ def _write_in_batches(
         )
 
 
+def _append_to_log(*, log_path: Path, entry: dict[str, object]) -> int:
+    """Append one JSON line to the submission log under an exclusive lock.
+
+    Args:
+        log_path: The submission log, created with its parent directory if absent.
+        entry: The line to append. An `attempt` entry carries the fold it attempts in `fold_id`.
+
+    Returns:
+        How many `attempt` entries for the entry's fold the log now holds, including this entry.
+    """
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a+", encoding="utf-8") as log:
+        fcntl.flock(log, fcntl.LOCK_EX)
+        log.seek(0)
+        earlier_attempts = 0
+        for line in log:
+            earlier = json.loads(line)
+            is_attempt_at_fold = (
+                earlier["event"] == "attempt" and earlier["fold_id"] == entry["fold_id"]
+            )
+            earlier_attempts += is_attempt_at_fold
+        log.write(json.dumps(entry) + "\n")
+    return earlier_attempts + (entry["event"] == "attempt")
+
+
+def _tag_submission_number(
+    *, settings: Settings, experiment_name: str, fold_id: str, submission_number: int
+) -> None:
+    """Tag the study's MLflow fold run with the attempt's number in the submission log."""
+    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+    experiment_id = get_or_create_experiment(experiment_name)
+    run_id = get_or_create_fold_run(experiment_id, get_or_create_parent_run(experiment_id), fold_id)
+    MlflowClient().set_tag(run_id, SUBMISSION_NUMBER_TAG, str(submission_number))
+
+
 def score_study(*, predictions: Path, study_name: str, fold_id: str, replace: bool) -> None:
+    """Log the attempt, then store and score the study, then log the outcome.
+
+    Every attempt is written to the submission log before anything else happens, so a refusal
+    leaves a record. A scored study's fold run is tagged with the attempt's number.
+
+    Args:
+        predictions: Parquet file of `PowerForecast` rows.
+        study_name: The study's name; see `validate_study_name`.
+        fold_id: A leaderboard fold of the CV config.
+        replace: Whether to overwrite an existing `study/<study_name>` partition.
+
+    Raises:
+        Exception: Whatever `_score_study` raises; the log records the exception's type and text.
+    """
+    settings = Settings()
+    log_path = Path(settings.local_artifacts_path) / SUBMISSION_LOG_NAME
+    entry: dict[str, object] = {
+        "time": datetime.now(UTC).isoformat(),
+        "study_name": study_name,
+        "fold_id": fold_id,
+        "replace": replace,
+    }
+    submission_number = _append_to_log(log_path=log_path, entry={**entry, "event": "attempt"})
+    try:
+        _score_study(
+            predictions=predictions, study_name=study_name, fold_id=fold_id, replace=replace
+        )
+        _tag_submission_number(
+            settings=settings,
+            experiment_name=f"{STUDY_EXPERIMENT_PREFIX}{study_name}",
+            fold_id=fold_id,
+            submission_number=submission_number,
+        )
+    except Exception as error:
+        _append_to_log(
+            log_path=log_path,
+            entry={
+                **entry,
+                "event": "refused",
+                "error_type": type(error).__name__,
+                "error": str(error),
+            },
+        )
+        raise
+    _append_to_log(log_path=log_path, entry={**entry, "event": "scored"})
+
+
+def _score_study(*, predictions: Path, study_name: str, fold_id: str, replace: bool) -> None:
     """Store a study's predictions under `study/<study_name>` and score them with `metrics`.
 
     Args:
@@ -189,11 +303,17 @@ def score_study(*, predictions: Path, study_name: str, fold_id: str, replace: bo
 
     Raises:
         ValueError: If the study name or the fold is not allowed, the file lacks a row-key column or
-            holds one with the wrong dtype, the file's `fold_id` disagrees, or the partition
-            already exists and `replace` is False.
+            holds one with the wrong dtype, the file's `fold_id` disagrees, the partition already
+            exists and `replace` is False, or `replace` is True and `NGED_ALLOW_REPLACE=1` is not
+            set.
         MultipleModelNamesError: If the rows carry more than one `power_fcst_model_name`.
         RowKeyMismatchError: If the row keys differ from the reference experiment's.
     """
+    if replace and os.environ.get(ALLOW_REPLACE_VARIABLE) != "1":
+        raise ValueError(
+            f"--replace overwrites an earlier submission, so it needs {ALLOW_REPLACE_VARIABLE}=1 "
+            "in the maintainer's own shell."
+        )
     settings = Settings()
     # Load the CV config the way the `metrics` asset does, from the environment variable alone. A
     # `CV_CONFIG_PATH` entry in the `.env` file, which `Settings` would also read, then cannot make
@@ -257,10 +377,13 @@ def score_study(*, predictions: Path, study_name: str, fold_id: str, replace: bo
 def main() -> None:
     """Re-execute with a clean environment, then score the study named on the command line."""
     if os.environ.get(CLEAN_ENVIRONMENT_MARKER) != "1":
+        forwarded = (
+            {ALLOW_REPLACE_VARIABLE: "1"} if os.environ.get(ALLOW_REPLACE_VARIABLE) == "1" else {}
+        )
         os.execve(
             sys.executable,
             [sys.executable, *sys.argv],
-            {**clean_environment(os.environ), CLEAN_ENVIRONMENT_MARKER: "1"},
+            {**clean_environment(os.environ), **forwarded, CLEAN_ENVIRONMENT_MARKER: "1"},
         )
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("predictions", type=Path, help="Parquet file of PowerForecast rows.")

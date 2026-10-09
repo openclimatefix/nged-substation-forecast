@@ -28,6 +28,7 @@ record the corners where a degenerate input needed a defined answer rather than 
 degenerate inputs are a single-member ensemble and a forecast with zero error.
 """
 
+import hashlib
 import re
 from datetime import date, datetime
 from typing import Final
@@ -84,6 +85,17 @@ unbiased only for members drawn at random from the forecaster's belief. A study 
 member positions, or its own member count, could place two members on either side of the observation
 and score a CRPS near zero while leaving the ensemble mean, and so every deterministic metric,
 unchanged. A study therefore carries the reference's members.
+"""
+
+
+COMPARABLE_KEY_COLUMNS: Final[tuple[str, ...]] = tuple(
+    column for column in ROW_KEY_COLUMNS if column != "ensemble_member"
+)
+"""The columns of ``ROW_KEY_COLUMNS`` that name the same forecast problem in any experiment.
+
+``row_key_fingerprint`` hashes these columns, so a reviewed experiment with 13 members and a
+reference with 51 members have the same fingerprint when they forecast the same series,
+initialisation times, and valid times.
 """
 
 
@@ -279,6 +291,41 @@ def require_same_row_keys(
                 f"{batch_ids}: {n_missing} reference row keys are missing and {n_extra} study row "
                 f"keys are extra, on the columns {keys}."
             )
+
+
+def row_key_fingerprint(*, forecasts: pl.LazyFrame, series_batch_size: int) -> str:
+    """Return a hash of the distinct ``COMPARABLE_KEY_COLUMNS`` keys in ``forecasts``.
+
+    Two experiments have the same fingerprint exactly when they forecast the same series, from the
+    same initialisation times, for the same valid times, however many ensemble members each holds
+    and in whatever row order. The ``metrics`` asset stamps the fingerprint on every leaderboard
+    fold run, so a reader can see whether two scores rest on the same forecast problem, and whether
+    a study was scored against a reference that has since changed.
+
+    The keys are hashed in batches of ``series_batch_size`` series, so peak memory is one batch.
+
+    Args:
+        forecasts: Lazy scan of one group's forecast rows, carrying ``COMPARABLE_KEY_COLUMNS``.
+        series_batch_size: How many ``time_series_id`` values to hash at once. The fingerprint
+            does not depend on it.
+
+    Returns:
+        A hexadecimal SHA-256 digest. The digest of no rows is the digest of the empty string.
+    """
+    keys = list(COMPARABLE_KEY_COLUMNS)
+    series_ids = _distinct_series_ids(forecasts)
+    digest = hashlib.sha256()
+    for start in range(0, len(series_ids), series_batch_size):
+        batch_ids = series_ids[start : start + series_batch_size]
+        batch = (
+            forecasts.filter(pl.col("time_series_id").is_in(batch_ids))
+            .select(keys)
+            .unique()
+            .sort(keys)
+            .collect(engine="streaming")
+        )
+        digest.update(batch.cast(pl.Int64).to_numpy().tobytes())
+    return digest.hexdigest()
 
 
 def compute_effective_capacity(
