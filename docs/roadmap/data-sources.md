@@ -147,7 +147,9 @@ historical data (full detail + plots in the Milestone 1 report, Appendices A & B
   generators legitimately don't report overnight, but not all gaps are nighttime; gaps can last
   hours to months.
 - **Meter quality flags**: some meters carry NGED's own quality flags ("analogue not working" or
-  "analogue suspect"), which ingestion does not yet act on.
+  "analogue suspect"), in the `Information` field of each JSON file. Ingestion stores the field and
+  the freshness check shows it to the operator, but cleaning does not act on it, because a flag has
+  no date and can stay set after the fault.
 - **False zeros**: substation telemetry has occasional drop-outs to zero, visible as an excess of
   exact zeros in the distribution vs. near-zero values.
 - **Not-on assets**: one trial-area generator (ID 19) has not been operating since mid-2024 —

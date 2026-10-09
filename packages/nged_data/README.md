@@ -16,8 +16,12 @@ nged_data.storage import list_timeseries_json_files`, etc.).
 - `nged_data.storage.list_timeseries_json_files(store)` — lists the timeseries JSON files on NGED's
   S3 bucket, parsing `time_series_id`, `start_time`, and `end_time` out of each file's path.
 - `nged_data.storage.remove_small_files_from_listing(file_listing, size_threshold_bytes=520)` —
-  drops files too small to carry any readings, so `download_and_parse_files` never fetches and
-  parses one only to discard the result.
+  drops files too small to carry any readings (`SMALL_FILE_SIZE_THRESHOLD_BYTES`), so
+  `download_and_parse_files` never fetches and parses one only to discard the result.
+- `nged_data.storage.download_metadata_of_series_without_new_files(store, all_files,
+  downloaded_files)` — downloads the newest small file of each series that has no new file, and
+  returns only its `TimeSeriesMetadata`, so a series that stopped reporting keeps current metadata
+  (including NGED's `Information` note).
 - `nged_data.storage.download_and_parse_files(store, paths_df)` — downloads and parses each listed
   file, returning a `DownloadAndParseResult` of `metadata` (`TimeSeriesMetadata`),
   `power_time_series` (`PowerTimeSeries`), and `n_implausible_power_rows_dropped`. Raises

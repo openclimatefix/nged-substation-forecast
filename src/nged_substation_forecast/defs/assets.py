@@ -10,7 +10,7 @@ from typing import Any, Final, Self
 import patito as pt
 import polars as pl
 from contracts.geo_schemas import H3GridWeights
-from contracts.power_schemas import PowerTimeSeries
+from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
 from contracts.uri import if_local_path_then_make_parent_dir
@@ -62,6 +62,7 @@ from nged_data.storage import (
     UpsertMetadataStats,
     _ProcessedFileListing,
     download_and_parse_files,
+    download_metadata_of_series_without_new_files,
     list_timeseries_json_files,
     remove_small_files_from_listing,
     select_new_rows,
@@ -96,7 +97,10 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
 
     This asset is the entry point for NGED data into the pipeline. It fetches the latest
     available data from NGED's external S3 bucket, appends new readings to the local
-    ``PowerTimeSeries`` Delta table, and upserts the latest substation metadata parquet. Nothing
+    ``PowerTimeSeries`` Delta table, and upserts the latest substation metadata parquet. The
+    metadata of a series whose newest NGED file carries no readings, such as a stopped meter, is
+    read from that file on every run, so the metadata parquet holds NGED's current ``Information``
+    note for that series too. Nothing
     cleans this data further: ``eligible_time_series``, ``effective_capacity``,
     ``trained_cv_model``, and ``cv_power_forecasts`` in ``defs/cv_assets.py``, and
     ``live_forecasts`` in ``defs/live_forecast_assets.py``, all read the Delta table this asset
@@ -155,14 +159,16 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
             )
         )
 
-        downloaded = download_and_parse_files(store, list_of_new_json_files)
-    except NoNewData:
-        # An ordinary hour in which NGED published nothing new. Must be caught before the retry
-        # guard below, or every such hour would retry.
-        context.add_output_metadata(
-            UpsertMetadataStats(metadata_n_new_TimeSeriesIDs=0, metadata_n_updated_TimeSeriesIDs=0)
+        # Runs before the power download so that an hour in which NGED published no new readings
+        # still refreshes the metadata of the series that have stopped reporting.
+        metadata_only = download_metadata_of_series_without_new_files(
+            store=store, all_files=list_of_all_json_files, downloaded_files=list_of_new_json_files
         )
-        return
+        try:
+            downloaded = download_and_parse_files(store, list_of_new_json_files)
+        except NoNewData:
+            # An ordinary hour in which NGED published nothing new.
+            downloaded = None
     except BaseException as exc:
         # `BaseException` for the same reason as `checks.py::power_data_is_fresh`: obstore, delta-rs
         # and polars each define their own exception classes and a Rust panic is not an `Exception`,
@@ -176,17 +182,42 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
             max_retries=_POWER_INGEST_MAX_RETRIES,
             seconds_to_wait=_POWER_INGEST_RETRY_DELAY_SECONDS,
         ) from exc
-    new_metadata, new_power_ts = downloaded.metadata, downloaded.power_time_series
 
-    if downloaded.n_implausible_power_rows_dropped > 0:
+    context.add_output_metadata(
+        {
+            "n_metadata_only_files_downloaded": metadata_only.n_downloaded,
+            "n_metadata_only_files_failed": metadata_only.n_failed,
+        }
+    )
+    if metadata_only.n_failed > 0:
+        context.log.warning(
+            f"Could not read the metadata in {metadata_only.n_failed} of"
+            f" {metadata_only.n_downloaded} small NGED file(s) that carry no readings."
+        )
+    # The two frames share no `time_series_id`: `metadata_only` skips every series that has a file
+    # in the power download.
+    new_metadata_frames = [
+        frame
+        for frame in (None if downloaded is None else downloaded.metadata, metadata_only.metadata)
+        if frame is not None
+    ]
+    if not new_metadata_frames:
+        context.add_output_metadata(
+            UpsertMetadataStats(metadata_n_new_TimeSeriesIDs=0, metadata_n_updated_TimeSeriesIDs=0)
+        )
+        return
+    new_metadata = TimeSeriesMetadata.validate(pl.concat(new_metadata_frames, how="diagonal"))
+
+    if downloaded is not None and downloaded.n_implausible_power_rows_dropped > 0:
         context.log.warning(
             f"Dropped {downloaded.n_implausible_power_rows_dropped} PowerTimeSeries row(s) with a"
             " malformed `time` during ingestion (outside the plausible datetime range or not"
             " aligned to :00/:30)."
         )
-    context.add_output_metadata(
-        {"n_implausible_power_rows_dropped": downloaded.n_implausible_power_rows_dropped}
-    )
+    if downloaded is not None:
+        context.add_output_metadata(
+            {"n_implausible_power_rows_dropped": downloaded.n_implausible_power_rows_dropped}
+        )
 
     # Save TimeSeriesMetadata. A metadata table failure must not stop the power write below: the
     # metadata table is data NGED re-delivers every run, and the power series is not, so a metadata
@@ -209,7 +240,11 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
 
     context.add_output_metadata(upsert_metadata_stats)
 
+    if downloaded is None:
+        return
+
     # Save PowerTimeSeries:
+    new_power_ts = downloaded.power_time_series
     new_power_ts_deduped = select_new_rows(new_power_ts, delta_path, storage_options)
     if not new_power_ts_deduped.is_empty():
         if_local_path_then_make_parent_dir(delta_path)

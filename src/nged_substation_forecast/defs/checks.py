@@ -64,7 +64,7 @@ metadata table as a green tick.
 
 import json
 import logging
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -303,18 +303,29 @@ def evaluate_power_freshness(
     )
 
 
-def _read_expected_ids(
+def _read_expected_ids_and_fault_notes(
     metadata_path: str, storage_options: ObjectStoreOptions | None
-) -> pl.Series | None:
-    """Return the expected ``time_series_id``s from the metadata table, or ``None`` if absent."""
+) -> tuple[pl.Series | None, dict[int, str]]:
+    """Read the expected ``time_series_id``s and NGED's fault notes from the metadata table.
+
+    Returns ``(None, {})`` if the metadata table is absent. The notes are the non-null values of
+    the table's ``information`` column, which ``TimeSeriesMetadata`` allows to be missing, so a
+    table without the column gives no notes.
+    """
     if not object_exists(metadata_path, storage_options):
-        return None
-    metadata_table = (
-        pl.scan_parquet(metadata_path, storage_options=typeddict_to_dict(storage_options))
-        .select("time_series_id")
-        .collect()
+        return None, {}
+    metadata_table = pl.scan_parquet(
+        metadata_path, storage_options=typeddict_to_dict(storage_options)
     )
-    return metadata_table["time_series_id"]
+    has_notes = "information" in metadata_table.collect_schema().names()
+    columns = ["time_series_id", "information"] if has_notes else ["time_series_id"]
+    metadata = metadata_table.select(columns).collect()
+    notes = (
+        dict(metadata.drop_nulls("information").select("time_series_id", "information").rows())
+        if has_notes
+        else {}
+    )
+    return metadata["time_series_id"], notes
 
 
 def _late_table_metadata(late: pl.DataFrame) -> MetadataValue:
@@ -337,8 +348,14 @@ def _late_table_metadata(late: pl.DataFrame) -> MetadataValue:
     return MetadataValue.table(records, schema=_LATE_TABLE_SCHEMA)
 
 
-def _describe_power_freshness(result: PowerFreshnessResult) -> str:
-    """One human-readable line: the state of the watched feed, and what is being ignored."""
+def _describe_power_freshness(
+    result: PowerFreshnessResult, fault_notes: Mapping[int, str] | None = None
+) -> str:
+    """One human-readable line: the state of the watched feed, and what is being ignored.
+
+    ``fault_notes`` maps each ``time_series_id`` to NGED's free-text note about it. Every note is
+    named, whether or not the series is silenced.
+    """
     threshold_h = result.threshold_hours
     if result.n_series_total == 0:
         summary = "No power data on disk yet."
@@ -363,10 +380,17 @@ def _describe_power_freshness(result: PowerFreshnessResult) -> str:
         sentences.append(
             f"Reporting again, so remove {ids} from _SILENCED_TIME_SERIES_IDS in defs/checks.py."
         )
+    if fault_notes:
+        notes = "; ".join(
+            f'{series_id}: "{note}"' for series_id, note in sorted(fault_notes.items())
+        )
+        sentences.append(f"NGED fault notes: {notes}.")
     return " ".join(sentences)
 
 
-def _to_asset_check_result(result: PowerFreshnessResult) -> AssetCheckResult:
+def _to_asset_check_result(
+    result: PowerFreshnessResult, fault_notes: Mapping[int, str] | None = None
+) -> AssetCheckResult:
     """Turn a ``PowerFreshnessResult`` into a WARN-severity Dagster check result."""
     # Truncate once, here, so the table and the count that describes it come from one slice.
     listed = result.late.head(_MAX_LATE_SERIES_IN_TABLE)
@@ -377,7 +401,7 @@ def _to_asset_check_result(result: PowerFreshnessResult) -> AssetCheckResult:
         # `is_healthy` stays true, and only an edit to the silenced list clears it.
         passed=result.is_healthy and result.n_series_total > 0 and not result.resurrected_ids,
         severity=AssetCheckSeverity.WARN,
-        description=_describe_power_freshness(result),
+        description=_describe_power_freshness(result, fault_notes),
         metadata={
             "n_late": result.n_late,
             "n_stale": result.n_stale,
@@ -400,7 +424,9 @@ def _check_power_data_freshness() -> AssetCheckResult:
     settings = Settings()
     storage_options = settings.storage_options
     coverage = time_series_coverage(settings.power_time_series_data_path, storage_options)
-    expected_ids = _read_expected_ids(settings.metadata_path, storage_options)
+    expected_ids, fault_notes = _read_expected_ids_and_fault_notes(
+        settings.metadata_path, storage_options
+    )
     result = evaluate_power_freshness(
         coverage=coverage,
         expected_ids=expected_ids,
@@ -413,7 +439,7 @@ def _check_power_data_freshness() -> AssetCheckResult:
     # Best-effort: report_power_freshness never raises, so a telemetry hiccup costs no more than
     # its own event — were it to raise, the caller's catch-all would discard this whole evaluation.
     report_power_freshness(settings, result)
-    return _to_asset_check_result(result)
+    return _to_asset_check_result(result, fault_notes)
 
 
 @asset_check(
