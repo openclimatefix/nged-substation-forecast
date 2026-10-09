@@ -216,11 +216,27 @@ what the group adds on top of the minimal set (ladder) and what is lost without 
 
 ## XGBoost feature importance
 
-**The fitted XGBoost models' own importance scores are a third, descriptive view of which variables the models lean on.** They sit beside the ladder and the drop-one-group runs, and they decide nothing. Gain importance splits credit between correlated columns arbitrarily (the cloud covers, `tclw`, and `tciw` are all correlated), so a variable can score high yet add nothing when removed. The planned contrasts and the drop-one-group runs stay the evidence for whether a group helps. Importance shows what the models used, and where it disagrees with the two instruments the page says so.
+**The fitted XGBoost models' own importance scores are a third, descriptive view of which variables
+the models lean on.** They sit beside the ladder and the drop-one-group runs, and they decide
+nothing. Gain importance splits credit between correlated columns arbitrarily (the cloud covers,
+`tclw`, and `tciw` are all correlated), so a variable can score high yet add nothing when removed.
+The planned contrasts and the drop-one-group runs stay the evidence for whether a group helps.
+Importance shows what the models used, and where it disagrees with the two instruments the page says
+so.
 
-- **What is computed:** the total gain of every column in the fitted G0, G2, G9, and negative-control models, on both targets, for each fold and each seed. Gain is read from `Booster.get_score(importance_type="total_gain")`. `studies.cross_validation.fit_one_fold` does not return its booster, so a new script, `era5_ladder_importance.py`, refits only those four arms with the same folds, seeds, and settings, and saves the gains. The shared fit loop stays unchanged. The refit costs about as much as the ladder's G0, G2, and G9 arms, and needs a slot from the study coordinator.
-- **How it is summarised:** each model's gains are scaled to sum to 1, then averaged over seeds and folds. The page shows each variable's share, each rung's share (the sum over the rung's columns), and the spread across folds as a range.
-- **Negative control:** the permuted columns' share in the negative-control model shows how much importance a column earns from nothing. A real variable must stand clear of that share before the page reads anything into it.
+- **What is computed:** the total gain of every column in the fitted G0, G2, G9, and
+  negative-control models, on both targets, for each fold and each seed. Gain is read from
+  `Booster.get_score(importance_type="total_gain")`. `studies.cross_validation.fit_one_fold` does
+  not return its booster, so a new script, `era5_ladder_importance.py`, refits only those four arms
+  with the same folds, seeds, and settings, and saves the gains. The shared fit loop stays
+  unchanged. The refit costs about as much as the ladder's G0, G2, and G9 arms, and needs a slot
+  from the study coordinator.
+- **How it is summarised:** each model's gains are scaled to sum to 1, then averaged over seeds and
+  folds. The page shows each variable's share, each rung's share (the sum over the rung's columns),
+  and the spread across folds as a range.
+- **Negative control:** the permuted columns' share in the negative-control model shows how much
+  importance a column earns from nothing. A real variable must stand clear of that share before the
+  page reads anything into it.
 - **Grouped permutation importance stays cut** (Review 1). Gain needs no refit and no extra rows.
 
 ## Figures, in page order
@@ -306,7 +322,9 @@ capacity, and no coordinate appears.
 - **Aerosol join:** a linear ramp in 3-hourly values gives the analytic hour-ending mean, and a
   3-hour shift of the input fails the test.
 - **Pairing guard:** a contrast between arms with different row sets raises.
-- **Importance summary:** gains scaled to sum to 1 per model, a rung's share equals the sum of its columns' shares, and a column the model never split on gets a share of 0 rather than going missing.
+- **Importance summary:** gains scaled to sum to 1 per model, a rung's share equals the sum of its
+  columns' shares, and a column the model never split on gets a share of 0 rather than going
+  missing.
 
 ## The five complexity triggers (for sizing)
 
