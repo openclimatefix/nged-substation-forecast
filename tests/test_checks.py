@@ -525,6 +525,38 @@ def test_power_data_is_fresh_silences_the_configured_series(
     assert "Ignoring 1 silenced time series: 99." in result.description
 
 
+def test_power_data_is_fresh_names_the_fault_notes_in_the_metadata_table(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The whole path: a note in the metadata parquet reaches the check's description, for a
+    silenced series and for a reporting one."""
+    monkeypatch.setattr(checks, "_SILENCED_TIME_SERIES_IDS", (99,))
+    now = datetime.now(UTC)
+    settings = Settings()
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 99], dtype=pl.Int32),
+            "time": pl.Series([now - timedelta(hours=1), now - timedelta(days=200)]).cast(
+                UTC_DATETIME_DTYPE
+            ),
+            "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
+        }
+    ).write_delta(settings.power_time_series_data_path)
+    write_metadata(settings.metadata_path, dict.fromkeys([1, 99], "Primary"))
+    metadata = pl.read_parquet(settings.metadata_path).with_columns(
+        information=pl.Series(["Invented note one.", "Invented note two."], dtype=pl.String)
+    )
+    metadata.write_parquet(settings.metadata_path)
+
+    result = checks.power_data_is_fresh()
+
+    assert isinstance(result, AssetCheckResult)
+    assert result.description is not None
+    assert (
+        'NGED fault notes: 1: "Invented note one."; 99: "Invented note two.".' in result.description
+    )
+
+
 def test_power_data_is_fresh_uses_the_production_threshold(env: Path) -> None:
     """The check's own boundary, not just the constant's value: series 7, a minute short of
     ``_POWER_DATA_STALENESS_THRESHOLD``, is fresh, and series 8, a minute past it, is stale.
