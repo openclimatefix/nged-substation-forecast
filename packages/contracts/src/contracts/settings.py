@@ -293,6 +293,9 @@ class Settings(BaseSettings):
     consumer of observed power except the ingest."""
     metadata_path: str = ""
     """Parquet file of per-series substation metadata (under nged_data_path)."""
+    downloaded_files_path: str = ""
+    """Parquet file listing the NGED JSON files the ingest has already downloaded (under
+    nged_data_path)."""
     eligible_time_series_data_path: str = Field(
         default="",
         description=(
@@ -407,6 +410,9 @@ class Settings(BaseSettings):
             or uri_join(self.nged_data_path, "cleaned_power_time_series.delta")
         )
         self.metadata_path = self.metadata_path or uri_join(self.nged_data_path, "metadata.parquet")
+        self.downloaded_files_path = self.downloaded_files_path or uri_join(
+            self.nged_data_path, "downloaded_files.parquet"
+        )
         # Always-local artifacts.
         self.production_model_path = self.production_model_path or uri_join(
             self.local_artifacts_path, "production_model"

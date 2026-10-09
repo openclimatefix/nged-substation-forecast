@@ -4,14 +4,20 @@ Each file yields `TimeSeriesMetadata` describing one series and `PowerTimeSeries
 observations from it. The metadata is upserted here, into a Parquet metadata table (see
 `upsert_metadata`). The power observations are not. This module never writes `PowerTimeSeries`
 rows to disk. It returns them to the caller, and the caller appends them to the
-`power_time_series` Delta table. `time_series_coverage` and `select_new_rows` read that same
-Delta table, to find what is new, but neither writes to it.
+`power_time_series` Delta table. `select_new_rows` reads that same Delta table, to drop rows
+already on disk, but does not write to it.
+
+The module downloads each NGED file once. The downloaded-files list (`read_downloaded_files`,
+`write_downloaded_files`) records the bucket listing that the ingest last processed in full, and
+`select_files_not_yet_downloaded` keeps only the listed files that the downloaded-files list lacks.
 """
 
+import asyncio
 import logging
 from collections.abc import Sequence
-from datetime import timedelta
-from typing import Final, NamedTuple, TypedDict, overload
+from datetime import datetime
+from pathlib import Path
+from typing import Final, NamedTuple, TypedDict
 
 import obstore
 import patito as pt
@@ -23,10 +29,12 @@ from contracts.uri import (
     ObjectStoreOptions,
     delta_table_exists,
     if_local_path_then_make_parent_dir,
+    is_remote_uri,
     object_exists,
 )
 
 from nged_data.read_nged_json import (
+    ExtractedPowerTimeSeries,
     NoReadingsInFile,
     _extract_power_time_series,
     _extract_time_series_metadata,
@@ -38,11 +46,19 @@ log = logging.getLogger(__name__)
 class _RawFileListItem(TypedDict):
     path: str
     filesize_bytes: int
+    last_modified: datetime
 
 
 class _ProcessedFileListing(pt.Model):
     path: str
     filesize_bytes: int
+    last_modified: int = pt.Field(
+        dtype=UTC_DATETIME_DTYPE,
+        description=(
+            "When NGED last wrote the object, from the bucket listing. A rewritten key keeps its"
+            " path and changes this value."
+        ),
+    )
     time_series_id: int = _get_time_series_id_dtype()
     start_time: int = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
@@ -93,6 +109,7 @@ def list_timeseries_json_files(
                     _RawFileListItem(
                         path=object_meta["path"],
                         filesize_bytes=object_meta["size"],
+                        last_modified=object_meta["last_modified"],
                     ),
                 )
     log.info(f"JSON files on NGED's S3: {len(raw_file_listing)} out of {total_objects=}")
@@ -134,86 +151,135 @@ def _process_file_listing(
     return _ProcessedFileListing.validate(paths_df)
 
 
-def remove_small_files_from_listing(
-    file_listing: pt.DataFrame[_ProcessedFileListing],
-    size_threshold_bytes: int = 520,
-) -> pt.DataFrame[_ProcessedFileListing]:
-    """Remove files too small to carry any readings.
+class _DownloadedFiles(pt.Model):
+    """The two columns of a stored downloaded-files list.
 
-    The filter skips NGED JSON files that have no `data` field, so `download_and_parse_files`
-    never has to fetch and parse them only to discard the result. It is an optimisation, not a
-    correctness requirement: `download_and_parse_files` already tolerates a null `data` field.
-
-    `size_threshold_bytes` defaults to 520, derived from the real files on NGED's S3. Some NGED
-    files carry a Well-Known Text (WKT) geometry string, which dominates their size; the rest are
-    WKT-less. A WKT-less file with zero readings tops out at 488 bytes. A WKT-less file with a
-    single reading starts at 556 bytes. The 520-byte default sits in the gap between 488 and 556.
-    WKT-bearing (Primary substation) files run far larger: zero-reading examples measured between
-    4,405 and 20,148 bytes. The WKT-less floor is therefore the binding constraint on the
-    threshold.
-
-    That 68-byte gap comes from V1's 32 series ([phased
-    rollout](https://openclimatefix.github.io/nged-substation-forecast/background/requirements/#phased-rollout)),
-    The gap is narrow, so V2's ~2,500 series want re-measuring before this default is trusted there.
-    Two changes would close the gap. A long `information` note would push a zero-reading file above
-    520 bytes: the longest note on a WKT-less zero-reading file measured so far leaves a file of 488
-    bytes. A substation name shorter than any in V1 would pull a one-reading file below 520 bytes.
-    Re-run the measurement rather than assume the gap survives.
-
-    The files this filter removes still carry the series' metadata, including NGED's `Information`
-    note. `add_newest_file_of_each_series` puts the newest file of each series back, so that the
-    metadata of a series that has stopped reporting stays current.
+    The list stores only these columns, so a later change to `_ProcessedFileListing`'s other
+    columns cannot invalidate a list already on disk.
     """
-    n_files_before_filter = file_listing.height
-    filtered = file_listing.filter(pl.col("filesize_bytes") > size_threshold_bytes)
-    log.info(
-        f"Files retained after the size filter: {filtered.height} out of {n_files_before_filter=}"
+
+    path: str
+    last_modified: int = pt.Field(dtype=UTC_DATETIME_DTYPE)
+
+
+class DownloadedFilesError(Exception):
+    """Raised when the stored downloaded-files list cannot be read or fails validation.
+
+    The ingest must stop on this error. Reading a damaged list as an empty one would download
+    every file in NGED's bucket.
+    """
+
+
+def _empty_downloaded_files() -> pt.DataFrame[_DownloadedFiles]:
+    empty = pl.DataFrame(
+        schema={name: _DownloadedFiles.dtypes[name] for name in _DownloadedFiles.columns}
     )
-    # An eager `filter` returns a plain frame, so re-attach the Patito model the return type
-    # promises.
-    return pt.DataFrame(filtered).set_model(_ProcessedFileListing)
+    return pt.DataFrame(empty).set_model(_DownloadedFiles).validate()
 
 
-def add_newest_file_of_each_series(
-    all_files: pt.DataFrame[_ProcessedFileListing],
-    new_files: pt.DataFrame[_ProcessedFileListing],
-) -> pt.DataFrame[_ProcessedFileListing]:
-    """Add the newest file of every series to the files being downloaded, whatever its size.
+def read_downloaded_files(
+    downloaded_files_path: str,
+    power_table_path: str,
+    metadata_path: str,
+    storage_options: ObjectStoreOptions | None = None,
+) -> pt.DataFrame[_DownloadedFiles]:
+    """Read the bucket listing that the ingest last processed in full.
 
-    `download_and_parse_files` takes each series' metadata from the newest file it downloads. A
-    series that has stopped reporting publishes small files with no readings, which
-    `remove_small_files_from_listing` drops, and its older files with readings can still be
-    offered by `select_new_rows`. The metadata would then come from an old file, and NGED's current
-    `Information` note would never be read. Adding the newest file of each series puts that file
-    last in the download order, so its metadata wins. A series whose newest file is already in
-    `new_files` adds nothing, so a healthy series costs no extra download.
+    The list describes files loaded into the `power_time_series` Delta table and the metadata
+    parquet. If an operator moves either aside to rebuild it, the list would claim that files are
+    loaded which the rebuilt state lacks. The list therefore counts as empty, and the next run
+    downloads every file, whenever the list file, the power table, or the metadata parquet does not
+    exist.
 
     Args:
-        all_files: The whole file listing, before any filtering.
-        new_files: The files chosen for download as power data.
+        downloaded_files_path: Local path or remote URI of the downloaded-files parquet file.
+        power_table_path: Local path or remote URI of the `power_time_series` Delta table.
+        metadata_path: Local path or remote URI of the metadata parquet file.
+        storage_options: Object-store credentials/endpoint for remote paths; ``None``/empty for
+            local paths.
 
     Returns:
-        `new_files` plus the newest file of each series, without duplicates, in ascending
-        `end_time` order.
+        The stored `path` and `last_modified` of each file, or an empty frame of the same type.
+
+    Raises:
+        DownloadedFilesError: if the list file exists but cannot be read or fails validation. A
+            transient object-store error from an existence check is not wrapped, so the caller's
+            retry guard can retry it.
     """
-    newest_file_of_each_series = (
-        all_files.sort("end_time").group_by("time_series_id").last().select(all_files.columns)
-    )
-    combined = (
-        pl.concat([new_files, newest_file_of_each_series])
-        .unique(subset="path", keep="first")
-        .sort("end_time")
-    )
-    return pt.DataFrame(combined).set_model(_ProcessedFileListing).validate()
+    if not (
+        object_exists(downloaded_files_path, storage_options)
+        and delta_table_exists(power_table_path, storage_options)
+        and object_exists(metadata_path, storage_options)
+    ):
+        log.info(f"No usable downloaded-files list at {downloaded_files_path}; using an empty one.")
+        return _empty_downloaded_files()
+    try:
+        stored = pl.read_parquet(
+            downloaded_files_path, storage_options=typeddict_to_dict(storage_options)
+        )
+        return pt.DataFrame(_DownloadedFiles.validate(stored)).set_model(_DownloadedFiles)
+    except (pl.exceptions.PolarsError, pt.exceptions.DataFrameValidationError, OSError) as exc:
+        raise DownloadedFilesError(
+            f"Could not read the downloaded-files list at {downloaded_files_path}. Delete the"
+            " file to download every file in NGED's bucket again."
+        ) from exc
 
 
-class NoNewData(Exception):
-    """Raised by `download_and_parse_files` when none of its listed files carried power data.
+def write_downloaded_files(
+    downloaded_files_path: str,
+    listing: pt.DataFrame[_ProcessedFileListing],
+    storage_options: ObjectStoreOptions | None = None,
+) -> None:
+    """Replace the downloaded-files list with `listing`'s `path` and `last_modified` columns.
 
-    Raised when the file listing was empty, or when every listed file held no readings
-    (`NoReadingsInFile`). A file with readings contributes a DataFrame, even when every row in that
-    file is dropped as implausible. A file that yields zero usable rows therefore does not raise.
+    A local write goes through a temporary file and `Path.replace`, so a killed process cannot leave
+    a torn list. A torn list would stop the ingest, whereas a torn metadata parquet does not. An
+    object-store write replaces the object in one request.
+
+    Args:
+        downloaded_files_path: Local path or remote URI of the downloaded-files parquet file.
+        listing: The whole bucket listing that the run processed.
+        storage_options: Object-store credentials/endpoint for a remote path; ``None``/empty for a
+            local path.
     """
+    downloaded_files = _DownloadedFiles.validate(
+        listing.select("path", "last_modified").sort("path")
+    )
+    options = typeddict_to_dict(storage_options)
+    if is_remote_uri(downloaded_files_path):
+        downloaded_files.write_parquet(
+            downloaded_files_path, compression="zstd", storage_options=options
+        )
+        return
+    if_local_path_then_make_parent_dir(downloaded_files_path)
+    temporary_path = f"{downloaded_files_path}.tmp"
+    downloaded_files.write_parquet(temporary_path, compression="zstd")
+    Path(temporary_path).replace(downloaded_files_path)
+
+
+def select_files_not_yet_downloaded(
+    file_listing: pt.DataFrame[_ProcessedFileListing],
+    downloaded_files: pt.DataFrame[_DownloadedFiles],
+) -> pt.DataFrame[_ProcessedFileListing]:
+    """Keep the listed files whose `(path, last_modified)` the downloaded-files list lacks.
+
+    A file whose path is known but whose `last_modified` changed was rewritten by NGED, so it is
+    selected again. No time margin is needed: a file absent from an earlier listing is absent from
+    the list, so a later listing selects it.
+
+    Args:
+        file_listing: The whole bucket listing.
+        downloaded_files: The listing that the ingest last processed in full.
+
+    Returns:
+        The selected files in ascending `end_time` order.
+    """
+    # Strip the Patito model so Polars' cross-subclass join check accepts the right-hand frame.
+    plain_downloaded_files = pl.DataFrame._from_pydf(downloaded_files._df)
+    selected = file_listing.join(
+        plain_downloaded_files, on=["path", "last_modified"], how="anti"
+    ).sort("end_time", "path")
+    return pt.DataFrame(selected).set_model(_ProcessedFileListing).validate()
 
 
 class DownloadAndParseResult(NamedTuple):
@@ -229,58 +295,106 @@ class DownloadAndParseResult(NamedTuple):
     n_implausible_power_rows_dropped: int
 
 
+_DOWNLOAD_CHUNK_FILES: Final[int] = 500
+"""How many files `download_and_parse_files` fetches before parsing them.
+
+Chunks bound the raw JSON held in memory, because a full download fetches tens of thousands of
+files."""
+
+_MAX_REQUESTS_IN_FLIGHT: Final[int] = 32
+"""How many requests `download_and_parse_files` has open on NGED's bucket at once."""
+
+
+async def _fetch_all(store: obstore.store.S3Store, paths: Sequence[str]) -> list[bytes]:
+    """Fetch every path concurrently, returning the bytes in the order of `paths`.
+
+    The semaphore is created here, inside the coroutine, because a semaphore binds to the event
+    loop that first uses it and each `asyncio.run` call starts a new loop.
+    """
+    semaphore = asyncio.Semaphore(_MAX_REQUESTS_IN_FLIGHT)
+
+    async def fetch(path: str) -> bytes:
+        async with semaphore:
+            result = await store.get_async(path)
+            return bytes(await result.bytes_async())
+
+    return list(await asyncio.gather(*(fetch(path) for path in paths)))
+
+
+def _parse_file(
+    path: str, json_bytes: bytes
+) -> tuple[pt.DataFrame[TimeSeriesMetadata], ExtractedPowerTimeSeries | None]:
+    """Parse one NGED JSON file into its metadata and, if it has readings, its power rows.
+
+    Args:
+        path: The file's key in NGED's bucket, named in the error if parsing fails.
+        json_bytes: The file's contents.
+
+    Returns:
+        The file's `TimeSeriesMetadata`, and its readings, or ``None`` when the `data` field is
+        null or empty.
+
+    Raises:
+        ValueError: if the file is malformed or breaks the `TimeSeriesMetadata` contract. The
+            message names `path`.
+    """
+    try:
+        df = pl.read_json(json_bytes)
+        metadata = _extract_time_series_metadata(df)
+        time_series_id: int = metadata["time_series_id"].item()
+        try:
+            extracted = _extract_power_time_series(df=df, time_series_id=time_series_id)
+        except NoReadingsInFile:
+            log.warning(
+                f"The 'data' field is null or empty in {path=}. This is expected behaviour if"
+                " NGED's meter reported no values for the period covered by the JSON file."
+            )
+            return metadata, None
+    except Exception as exc:
+        raise ValueError(f"Could not parse the NGED file {path}") from exc
+    return metadata, extracted
+
+
 def download_and_parse_files(
     store: obstore.store.S3Store, paths_df: pt.DataFrame[_ProcessedFileListing]
 ) -> DownloadAndParseResult:
-    """Download and parse each listed file, one `end_time` group at a time.
+    """Download and parse each listed file, in ascending `end_time` order.
 
-    The listing is taken in ascending `end_time` order. Two files can cover overlapping periods for
-    the same `time_series_id`. Processing in `end_time` order means the more recent file's readings
-    overwrite the older file's duplicate rows, in the `unique(..., keep="last")` dedupe below.
+    Two files can cover overlapping periods for the same `time_series_id`. The function sorts its
+    input by `end_time` itself, because an anti-join does not keep the listing's order. Processing
+    in that order means the more recent file's readings overwrite the older file's duplicate rows,
+    in the `unique(..., keep="last")` dedupes below.
+
+    The function works through the sorted input in chunks of `_DOWNLOAD_CHUNK_FILES`. Per chunk it
+    fetches all the files concurrently, at most `_MAX_REQUESTS_IN_FLIGHT` at a time, through
+    `asyncio.run`, then parses them sequentially in input order. The function is synchronous and
+    needs a thread with no running event loop, which a synchronous Dagster asset has.
 
     Args:
         store: The NGED S3 bucket to download each file from.
-        paths_df: The file listing to process — typically already filtered by
-            `remove_small_files_from_listing` and `select_new_rows`.
+        paths_df: The files to process, typically the output of `select_files_not_yet_downloaded`.
 
     Returns:
         A `DownloadAndParseResult` bundling every file's parsed `TimeSeriesMetadata` and
         `PowerTimeSeries` rows, deduplicated across files — see `DownloadAndParseResult`'s
-        docstring for what each field holds.
+        docstring for what each field holds. When every file was data-less (`NoReadingsInFile`),
+        the metadata is still returned and the power frame is empty.
 
     Raises:
-        NoNewData: if `paths_df` was empty, or if every listed file held no readings
-            (`NoReadingsInFile`), meaning NGED's meter reported nothing for the period that file
-            covers. The guard counts the DataFrames collected, not the rows in them. A file with
-            readings therefore still counts, even when every one of its rows is dropped as
-            implausible, and does not raise. The `power_time_series_and_metadata` asset catches
-            `NoNewData` and reports an empty ingest, so an empty listing degrades the run rather
-            than failing it.
+        ValueError: if a file is malformed or breaks the `TimeSeriesMetadata` contract. The message
+            names the file's path. The first failing request also raises, out of `asyncio.run`.
     """
-    metadata_dfs = []
-    power_time_series_dfs = []
+    paths = paths_df.sort("end_time", "path")["path"].to_list()
+    metadata_dfs: list[pt.DataFrame[TimeSeriesMetadata]] = []
+    power_time_series_dfs: list[pt.DataFrame[PowerTimeSeries]] = []
     n_implausible_power_rows_dropped = 0
-    for _end_time, df_for_end_time in paths_df.group_by("end_time", maintain_order=True):
-        for path in df_for_end_time["path"]:
-            # TODO: Use `store.get_async` to get all files for this group concurrently.
-            result = store.get(path)
-            json_bytes = bytes(result.bytes())
-            df = pl.read_json(json_bytes)
-
-            # Extract TimeSeriesMetadata from df:
-            new_metadata_df = _extract_time_series_metadata(df)
-            metadata_dfs.append(new_metadata_df)
-            time_series_id: int = new_metadata_df["time_series_id"].item()
-
-            # Extract PowerTimeSeries from df:
-            try:
-                extracted = _extract_power_time_series(df=df, time_series_id=time_series_id)
-            except NoReadingsInFile:
-                log.warning(
-                    f"The 'data' field is null or empty in {path=}. This is expected behaviour if"
-                    " NGED's meter reported no values for the period covered by the JSON file."
-                )
-            else:
+    for chunk_start in range(0, len(paths), _DOWNLOAD_CHUNK_FILES):
+        chunk_paths = paths[chunk_start : chunk_start + _DOWNLOAD_CHUNK_FILES]
+        chunk_bytes = asyncio.run(_fetch_all(store, chunk_paths))
+        for path, json_bytes in zip(chunk_paths, chunk_bytes, strict=True):
+            metadata, extracted = _parse_file(path, json_bytes)
+            metadata_dfs.append(metadata)
+            if extracted is not None:
                 power_time_series_dfs.append(extracted.dataframe)
                 n_implausible_power_rows_dropped += extracted.n_dropped
 
@@ -289,20 +403,21 @@ def download_and_parse_files(
         " new PowerTimeSeries dataframes extracted from NGED JSON data."
     )
 
-    if len(metadata_dfs) == 0 or len(power_time_series_dfs) == 0:
-        raise NoNewData
-
-    # Concatenate and return:
     metadata_df = (
         pl.concat(metadata_dfs, how="diagonal")
         .unique(subset="time_series_id", keep="last")
         .sort("time_series_id")
     )
-    time_series_df = (
-        pl.concat(power_time_series_dfs)
-        .unique(subset=["time_series_id", "time"], keep="last")
-        .sort(by=PowerTimeSeries.columns_to_sort_by)
-    )
+    if power_time_series_dfs:
+        time_series_df = (
+            pl.concat(power_time_series_dfs)
+            .unique(subset=["time_series_id", "time"], keep="last")
+            .sort(by=PowerTimeSeries.columns_to_sort_by)
+        )
+    else:
+        time_series_df = pl.DataFrame(
+            schema={name: PowerTimeSeries.dtypes[name] for name in PowerTimeSeries.columns}
+        )
 
     return DownloadAndParseResult(
         metadata=TimeSeriesMetadata.validate(metadata_df),
@@ -315,12 +430,11 @@ class TimeSeriesCoverage(pt.Model):
     """Per-series observation-time span of the ``power_time_series`` Delta table.
 
     ``first_time``/``last_time`` are the earliest/latest observation ``time`` for each
-    ``time_series_id``. This frame is a transient intermediate, never persisted. Three callers
-    read the frame: the freshness asset check reads ``last_time`` to detect staleness,
-    ``select_new_rows`` reads ``last_time`` to find genuinely-new rows, and cross-validation (CV)
-    fold-eligibility (``eligible_time_series_ids``) reads both ``first_time`` and ``last_time``.
-    A CV fold is one train/test split of the history, and a series is eligible for a fold only if
-    its data covers that split.
+    ``time_series_id``. This frame is a transient intermediate, never persisted. Two callers
+    read the frame: the freshness asset check reads ``last_time`` to detect staleness, and
+    cross-validation (CV) fold-eligibility (``eligible_time_series_ids``) reads both
+    ``first_time`` and ``last_time``. A CV fold is one train/test split of the history, and a
+    series is eligible for a fold only if its data covers that split.
 
     The freshness check reads this on-disk recency rather than the asset's materialisation
     timestamp. A materialisation-freshness policy would miss the failure the check exists to
@@ -353,12 +467,10 @@ def time_series_coverage(
     more wall-clock time and no extra memory, because the shared scan dominates.
 
     The ``collect`` uses the streaming engine to keep peak memory bounded, because this scan runs
-    hourly on a small control-plane VM. The scan runs twice in each of those hours. The
-    ``power_data_is_fresh`` asset check runs it once. ``power_time_series_and_metadata`` runs it
-    again, inside the ``select_new_rows`` call that asset makes on the file listing. The second
-    ``select_new_rows`` call, on the parsed rows, uses ``_existing_power_time_series_keys``
-    instead — a scan restricted to the reporting series' own history, not the whole-table scan
-    this function runs. The measurement used a synthetic V2 table: 2,500 series, half-hourly,
+    hourly on a small control-plane VM, in the ``power_data_is_fresh`` asset check. The ingest does
+    not run it: ``select_new_rows`` uses ``_existing_power_time_series_keys`` instead, a scan
+    restricted to the reporting series' own history. The measurement used a synthetic V2 table:
+    2,500 series, half-hourly,
     partitioned by ``time_series_id``, holding a year of history (43.8M rows). The streaming
     engine took ~0.21 s at ~190 MB peak. The in-memory engine peaked at ~1.3 GB for the same
     result, so streaming uses ~7x less memory.
@@ -437,21 +549,6 @@ def scan_cleaned_power(
     return pt.LazyFrame.from_existing(unflagged).set_model(PowerTimeSeries)
 
 
-_LATE_FILE_LOOKBACK: Final[timedelta] = timedelta(days=3)
-"""How far a file's `end_time` may fall before its series' on-disk `last_time` and the file still be
-downloaded. `select_new_rows`'s `_ProcessedFileListing` branch applies this margin.
-
-NGED's files land "at irregular, several-hours-apart intervals with no fixed schedule" (see
-`power_time_series_and_metadata`'s docstring). It is therefore an ordinary late arrival, not a
-fault, when a file's `end_time` falls a short while before the current watermark. The 3-day margin
-is a judgement call — generous enough to cover an ordinary late arrival, small enough that an hour
-doesn't re-download the whole bucket. Getting the margin's length exactly right doesn't matter for
-correctness: `select_new_rows`'s `PowerTimeSeries` branch is what decides which downloaded rows are
-genuinely new. A file let through by too generous a margin here just costs an extra download. A file
-dropped by too tight a margin is still caught the next hour it's listed, unless it ages past
-the margin first."""
-
-
 def _existing_power_time_series_keys(
     delta_path: str,
     storage_options: ObjectStoreOptions | None,
@@ -487,103 +584,44 @@ def _existing_power_time_series_keys(
     )
 
 
-# This overload tells type checkers that if you pass a `pt.DataFrame[PowerTimeSeries]` into
-# `select_new_rows` then you get a `pt.DataFrame[PowerTimeSeries]` back.
-@overload
 def select_new_rows(
     time_series: pt.DataFrame[PowerTimeSeries],
     delta_path: str,
     storage_options: ObjectStoreOptions | None = None,
-) -> pt.DataFrame[PowerTimeSeries]: ...
-
-
-# This overload tells type checkers that if you pass a `pt.DataFrame[_ProcessedFileListing]` into
-# `select_new_rows` then you get a `pt.DataFrame[_ProcessedFileListing]` back.
-@overload
-def select_new_rows(
-    time_series: pt.DataFrame[_ProcessedFileListing],
-    delta_path: str,
-    storage_options: ObjectStoreOptions | None = None,
-) -> pt.DataFrame[_ProcessedFileListing]: ...
-
-
-def select_new_rows(
-    time_series: pt.DataFrame[PowerTimeSeries] | pt.DataFrame[_ProcessedFileListing],
-    delta_path: str,
-    storage_options: ObjectStoreOptions | None = None,
-) -> pt.DataFrame[PowerTimeSeries] | pt.DataFrame[_ProcessedFileListing]:
+) -> pt.DataFrame[PowerTimeSeries]:
     """Return rows in `time_series` genuinely missing from the Delta table.
 
-    `time_series` is either `PowerTimeSeries` rows or the `_ProcessedFileListing` a raw S3
-    listing parses into. The function tells the two apart by which of `time`/`end_time` is
-    present. The two `@overload` declarations above tell a type checker which input type produces
-    which output type. `delta_path` is a local path or remote URI for the ``power_time_series``
-    Delta table; `storage_options` carries the object-store credentials/endpoint for a remote
-    `delta_path`.
+    The filter is a genuine existence check: an anti-join on `(time_series_id, time)` against
+    `_existing_power_time_series_keys`. A late file is therefore ingested even when a later reading
+    for the same series is already on disk. So is a file that fills a gap earlier in a series'
+    history. It also makes a re-download safe, because a rewritten file or a crash between the
+    append and the downloaded-files list write can offer readings the table already holds. See
+    `_existing_power_time_series_keys`'s docstring for the cost the existence check trades in
+    return.
 
     When the Delta table does not exist yet, a call returns its input unchanged and scans nothing.
 
-    For `PowerTimeSeries` rows, the filter is a genuine existence check: an anti-join on
-    `(time_series_id, time)` against `_existing_power_time_series_keys`. A late file is therefore
-    ingested even when a later reading for the same series is already on disk. So is a file that
-    fills a gap earlier in a series' history. See `_existing_power_time_series_keys`'s docstring
-    for the cost the existence check trades in return.
+    Args:
+        time_series: The parsed rows to check.
+        delta_path: Local path or remote URI for the ``power_time_series`` Delta table.
+        storage_options: Object-store credentials/endpoint for a remote `delta_path`.
 
-    For the file listing, there is no per-row `time` to check existence against before download —
-    only the file's `start_time`/`end_time` window from its S3 key. The filter therefore compares
-    `end_time` against each series' on-disk `last_time`, which it takes from
-    `time_series_coverage` and which acts as that series' watermark. `_LATE_FILE_LOOKBACK`
-    loosens that comparison, so a file whose `end_time` falls a short while before the watermark
-    is still downloaded. A file whose `end_time` falls more than `_LATE_FILE_LOOKBACK` before
-    `last_time` is still dropped before download.
-
-    Cost: the file-listing branch runs `time_series_coverage`, one full two-column scan of
-    `power_time_series` — see that function for the measured figures. The `PowerTimeSeries`
-    branch instead runs `_existing_power_time_series_keys`, restricted to the `time_series_id`s
-    in `time_series` — see that function's docstring for its own measured figures.
-    `power_time_series_and_metadata` calls `select_new_rows` once on the file listing. The asset
-    calls `select_new_rows` again on the parsed rows, but only if that listing turned up files
-    worth downloading. An hour in which NGED published nothing new stops after the first call,
-    because `download_and_parse_files` raises `NoNewData` in between and the asset returns.
+    Returns:
+        The rows of `time_series` that the Delta table lacks, in `PowerTimeSeries` sort order.
     """
     if not delta_table_exists(delta_path, storage_options):
         log.info(f"{delta_path=} does not exist yet.")
         return time_series
 
-    if "time" in time_series.columns:
-        reporting_ids = time_series["time_series_id"].unique().to_list()
-        existing_keys = _existing_power_time_series_keys(delta_path, storage_options, reporting_ids)
-        filtered_df = (
-            time_series.lazy()
-            .join(existing_keys, on=["time_series_id", "time"], how="anti")
-            .sort(by=PowerTimeSeries.columns_to_sort_by)
-            .collect()
-        )
-        return pt.DataFrame(filtered_df).set_model(PowerTimeSeries).validate()
-    if "end_time" in time_series.columns:
-        # Strip the Patito model from `coverage` so Polars' cross-subclass join check accepts it,
-        # and keep only `last_time` (the most recent time on disk per series) for the filter below.
-        coverage = time_series_coverage(delta_path, storage_options)
-        plain_last_times = pl.LazyFrame._from_pyldf(coverage.lazy()._ldf).select(
-            "time_series_id", "last_time"
-        )
-        filtered_df = (
-            time_series.lazy()
-            .join(plain_last_times, on="time_series_id", how="left")
-            # A null last_time means this is a new time_series_id, so keep it unconditionally.
-            .filter(
-                pl.col("last_time").is_null()
-                | (pl.col("end_time") > pl.col("last_time") - _LATE_FILE_LOOKBACK)
-            )
-            .drop("last_time")
-            .sort(by="end_time")
-            .collect()
-        )
-        return pt.DataFrame(filtered_df).set_model(_ProcessedFileListing).validate()
-    raise ValueError(
-        "Expected `time_series` to have either a `time` column or an `end_time` column,"
-        f" not {time_series.columns=}"
+    reporting_ids = time_series["time_series_id"].unique().to_list()
+    existing_keys = _existing_power_time_series_keys(delta_path, storage_options, reporting_ids)
+    filtered_df = (
+        time_series.lazy()
+        .join(existing_keys, on=["time_series_id", "time"], how="anti")
+        .sort(by=PowerTimeSeries.columns_to_sort_by)
+        .collect()
     )
+    return pt.DataFrame(filtered_df).set_model(PowerTimeSeries).validate()
 
 
 class UpsertMetadataStats(TypedDict, total=False):
@@ -595,9 +633,9 @@ class UpsertMetadataStats(TypedDict, total=False):
     metadata_upsert_failed: str
     """Set by the asset when the whole upsert raised, so the power write went ahead without it.
 
-    Read this field's presence as "the metadata table is stale, retry next hour", not as a
-    power-ingest failure — the power write is unaffected. See [Degraded input
-    data](https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#degraded-input-data-nwp-feed-down-or-telemetry-stalled),
+    Read this field's presence as "the metadata table is stale until each affected series
+    publishes its next file", not as a power-ingest failure — the power write is unaffected. See
+    [Degraded input data](https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#degraded-input-data-nwp-feed-down-or-telemetry-stalled),
     under "Reading a failed metadata table upsert", for the operational read of this field and what
     a stale metadata table costs while the failure persists.
     """
@@ -635,14 +673,9 @@ def upsert_metadata(
     an operator acts. A corrupt file is not a missing file, so the create branch below never runs
     again by itself.
 
-    Deleting the file is not on its own a fix. `power_time_series_and_metadata` extracts metadata
-    only from the files `select_new_rows` judged new. The next hourly run would therefore rebuild
-    the metadata table from whichever series happened to publish that hour, rather than from every
-    series NGED publishes. Nothing is permanently lost, and a rebuild is cheaper than re-reading the
-    bucket. Every JSON file carries its own series' metadata in its top-level fields, and
-    `list_timeseries_json_files` returns a `time_series_id` per key. The newest file per series is
-    therefore enough — one download per time series rather than one per file NGED has ever
-    published.
+    Deleting the file rebuilds it. `read_downloaded_files` counts the downloaded-files list as empty
+    when the metadata table does not exist, so the next run downloads every file in NGED's bucket
+    and the metadata table gets every series NGED publishes.
 
     Args:
         new_metadata: The new metadata DataFrame.

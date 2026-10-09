@@ -10,10 +10,10 @@ from typing import Any, Final, Self
 import patito as pt
 import polars as pl
 from contracts.geo_schemas import H3GridWeights
-from contracts.power_schemas import PowerTimeSeries
+from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
-from contracts.uri import if_local_path_then_make_parent_dir
+from contracts.uri import ObjectStoreOptions, if_local_path_then_make_parent_dir
 from contracts.weather_schemas import (
     ECMWF_ENS_H3_RESOLUTION,
     Nwp,
@@ -58,15 +58,16 @@ from dynamical_data.ecmwf_ens.upstream_nulls import (
 from geo.great_britain.load import load_gb_boundary
 from geo.h3 import compute_h3_grid_weights_for_boundary
 from nged_data.storage import (
-    NoNewData,
+    DownloadedFilesError,
     UpsertMetadataStats,
     _ProcessedFileListing,
-    add_newest_file_of_each_series,
     download_and_parse_files,
     list_timeseries_json_files,
-    remove_small_files_from_listing,
+    read_downloaded_files,
+    select_files_not_yet_downloaded,
     select_new_rows,
     upsert_metadata,
+    write_downloaded_files,
 )
 from pydantic import BaseModel, field_validator
 
@@ -82,28 +83,68 @@ _POWER_INGEST_MAX_RETRIES: Final[int] = 2
 
 Deliberately small. The retry exists only to stop a transient object-store error from reporting a
 fault that has already fixed itself; the data is never at risk, because this asset is unpartitioned,
-re-lists NGED's bucket from scratch on every attempt, and the next hourly run back-fills whatever
-this one missed. A longer budget would buy nothing the next hour does not already buy, and each
-retry re-runs the whole listing, download and parse — which at V2 scale costs far more than the
+records a file as downloaded only after its rows have landed, and the next hourly run downloads
+whatever this one missed. A longer budget would buy nothing the next hour does not already buy, and
+each retry re-runs the whole listing, download and parse — which at V2 scale costs far more than the
 delay does. A persistent outage still fails after the budget and still reports."""
 
 _POWER_INGEST_RETRY_DELAY_SECONDS: Final[int] = 2
 """How long to wait between retries of a transient NGED S3 failure."""
 
 
-@asset(tags=PRODUCTION_LAYER_TAGS)
+def _write_downloaded_files_or_degrade(
+    context: AssetExecutionContext,
+    downloaded_files_path: str,
+    listing: pt.DataFrame[_ProcessedFileListing],
+    storage_options: ObjectStoreOptions | None,
+) -> None:
+    """Write the downloaded-files list, reporting a failure instead of raising it."""
+    try:
+        write_downloaded_files(
+            downloaded_files_path=downloaded_files_path,
+            listing=listing,
+            storage_options=storage_options,
+        )
+    except BaseException as exc:
+        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+            raise  # A cancelled run must cancel.
+        context.log.exception(
+            f"Could not write the downloaded-files list at {downloaded_files_path}"
+        )
+        # A distinct fingerprint, because this event shares the `degraded_asset` tag with the
+        # metadata upsert's, and a message naming the path, so the alert says which file failed.
+        report_asset_degradation(
+            asset_name="power_time_series_and_metadata",
+            exc=RuntimeError(
+                f"Could not write the downloaded-files list at {downloaded_files_path}"
+            ).with_traceback(exc.__traceback__),
+            fingerprint=["downloaded_files_write_failed"],
+        )
+
+
+@asset(
+    tags=PRODUCTION_LAYER_TAGS,
+    # `pool="NGED_INGEST"` stops two runs of this asset overlapping, in conjunction with the Dagster
+    # instance configuration: a per-pool limit of 1, set with
+    # `dagster instance concurrency set NGED_INGEST 1`, because `dagster.yaml` takes only a default
+    # limit for every pool. Two overlapping runs would each compare
+    # their rows with the same snapshot of the `power_time_series` table and both append them, and
+    # the duplicate rows would make `clean_nged_power_data` fail its `(time_series_id, time)`
+    # uniqueness check every hour after. The pool queues the later run behind the earlier one. See:
+    # https://docs.dagster.io/guides/operate/managing-concurrency/concurrency-pools
+    pool="NGED_INGEST",
+)
 def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     """Ingests raw telemetry and metadata from NGED S3 into our local storage.
 
-    This asset is the entry point for NGED data into the pipeline. It fetches the latest
-    available data from NGED's external S3 bucket, appends new readings to the local
-    ``PowerTimeSeries`` Delta table, and upserts the latest substation metadata parquet. The
-    metadata comes from the newest NGED file of every series, including a series that has stopped
-    reporting, so the metadata parquet holds NGED's current ``Information`` note for it. Nothing
-    cleans this data further: ``eligible_time_series``, ``effective_capacity``,
-    ``trained_cv_model``, and ``cv_power_forecasts`` in ``defs/cv_assets.py``, and
-    ``live_forecasts`` in ``defs/live_forecast_assets.py``, all read the Delta table this asset
-    writes directly.
+    This asset is the entry point for NGED data into the pipeline. It downloads each file in NGED's
+    external S3 bucket once, appends the new readings to the local ``PowerTimeSeries`` Delta table,
+    and upserts the latest substation metadata parquet. The metadata of a series comes from its
+    newest file, including a series that has stopped reporting, so the metadata parquet holds
+    NGED's current ``Information`` note for it. Nothing cleans this data further:
+    ``eligible_time_series``, ``effective_capacity``, ``trained_cv_model``, and
+    ``cv_power_forecasts`` in ``defs/cv_assets.py``, and ``live_forecasts`` in
+    ``defs/live_forecast_assets.py``, all read the Delta table this asset writes directly.
 
     The stored timestamps are not always NGED's own, and an operator rebuilding this table has to
     know that. NGED's feed stamped every reading half an hour late until
@@ -113,10 +154,24 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     republish them, ``correct_late_timestamps`` must be removed before the next rebuild, or the
     ingest will move readings NGED has already realigned, putting them 30 minutes early.
 
+    WHAT IS DOWNLOADED. The downloaded-files list (``downloaded_files.parquet``, beside the
+    metadata parquet) holds the path and ``LastModified`` of every file in the bucket listing that
+    the previous run processed in full. Each run lists the bucket and downloads only the files
+    whose ``(path, LastModified)`` the list lacks, so a late file, a back-filled file, and a
+    rewritten file are each downloaded once. The run writes the whole listing as the new list last,
+    after the readings have landed, so a crash makes the next run download the files again and the
+    row dedupe drops the repeats. The list counts as empty, and the run downloads every file in the
+    bucket, when the list file, the ``power_time_series`` table, or the metadata parquet does not
+    exist. That is how a fresh install and a rebuild work. A list that exists but cannot be read
+    stops the run with ``DownloadedFilesError`` instead, because reading it as empty would download
+    the whole bucket. A malformed file, or one that breaks the ``TimeSeriesMetadata`` contract,
+    fails the run and records nothing, so the ingest stalls on that file until the cause is fixed
+    and no readings are lost.
+
     Runs hourly on ``power_time_series_and_metadata_schedule``, 5 minutes before
-    ``live_forecasts_schedule`` ticks. A failed or skipped run leaves nothing behind to repair:
-    this asset re-lists NGED's bucket from scratch on every run, so the next hourly run appends
-    whatever this one missed.
+    ``live_forecasts_schedule`` ticks. A failed or skipped run leaves nothing behind to repair: the
+    next hourly run downloads whatever this one missed. The ``NGED_INGEST`` pool limits the asset
+    to one run at a time.
 
     WHY UNPARTITIONED? Because NGED's JSON files land at irregular, several-hours-apart intervals
     with no fixed schedule, so the start time changes every day. And because we don't want people
@@ -127,30 +182,28 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     settings = Settings()
     delta_path = settings.power_time_series_data_path
     metadata_path = settings.metadata_path
+    downloaded_files_path = settings.downloaded_files_path
     storage_options = settings.storage_options
 
-    # Fetch new data from S3, using the existing delta table to determine what's new.
-    # We are deliberately keeping the code simple for now, but may move the S3 store
-    # to a Dagster ConfigurableResource in the future.
+    # Everything that talks to NGED's bucket, or reads the downloaded-files list, sits under one
+    # retry guard, so a transient object-store error costs a short wait instead of a Sentry event
+    # for a fault that has already fixed itself. The guard stops here rather than wrapping the whole
+    # body: a fault in the writes below is ours, and retrying it would let `select_new_rows` dedupe
+    # the second attempt to a no-op and turn a real failure into a green run.
     #
-    # Everything that talks to NGED's bucket sits under one retry guard, so a transient object-store
-    # error costs a short wait instead of a Sentry event for a fault that has already fixed itself.
-    # The guard stops here rather than wrapping the whole body: a fault in the writes below is ours,
-    # and retrying it would let `select_new_rows` dedupe the second attempt to a no-op and turn a
-    # real failure into a green run.
+    # We are deliberately keeping the code simple for now, but may move the S3 store to a Dagster
+    # ConfigurableResource in the future.
     try:
+        downloaded_files = read_downloaded_files(
+            downloaded_files_path=downloaded_files_path,
+            power_table_path=delta_path,
+            metadata_path=metadata_path,
+            storage_options=storage_options,
+        )
         store = settings.get_nged_s3_store()
         list_of_all_json_files = list_timeseries_json_files(store)
-        list_of_large_json_files = remove_small_files_from_listing(list_of_all_json_files)
-        list_of_new_json_files = select_new_rows(
-            list_of_large_json_files, delta_path, storage_options
-        )
-
-        # The newest file of each series is downloaded too, so a series that has stopped reporting
-        # still has its metadata, including NGED's `Information` note, refreshed. A series that is
-        # reporting already has its newest file in the list.
-        list_of_files_to_download = add_newest_file_of_each_series(
-            all_files=list_of_all_json_files, new_files=list_of_new_json_files
+        list_of_files_to_download = select_files_not_yet_downloaded(
+            file_listing=list_of_all_json_files, downloaded_files=downloaded_files
         )
 
         # Log statistics to be shown in Dagster's UI.
@@ -159,21 +212,34 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
                 "nged_s3_paths",
                 {
                     "All JSON files on S3": list_of_all_json_files,
-                    "Files above the size threshold": list_of_large_json_files,
-                    "Files with new data": list_of_new_json_files,
-                    "Files downloaded": list_of_files_to_download,
+                    "Files not yet downloaded": list_of_files_to_download,
                 },
             )
         )
 
-        downloaded = download_and_parse_files(store, list_of_files_to_download)
-    except NoNewData:
-        # An ordinary hour in which NGED published nothing new. Must be caught before the retry
-        # guard below, or every such hour would retry.
-        context.add_output_metadata(
-            UpsertMetadataStats(metadata_n_new_TimeSeriesIDs=0, metadata_n_updated_TimeSeriesIDs=0)
+        if list_of_files_to_download.is_empty():
+            # An ordinary hour in which NGED published nothing new.
+            context.add_output_metadata(
+                UpsertMetadataStats(
+                    metadata_n_new_TimeSeriesIDs=0, metadata_n_updated_TimeSeriesIDs=0
+                )
+            )
+            return
+
+        # A series' metadata comes only from its newest file in the whole listing, and only on a
+        # run that selected that file. A late or back-filled file has an old `end_time`, and
+        # `upsert_metadata` replaces a series wholesale, so its metadata would otherwise overwrite
+        # the series' current `Information` note. The newest file of a series may have been
+        # downloaded in an earlier hour, so it is found in the whole listing, not the selection.
+        newest_file_of_each_series = (
+            list_of_all_json_files.sort("end_time", "path").group_by("time_series_id").last()
         )
-        return
+        series_ids_with_newest_file_selected = newest_file_of_each_series.filter(
+            pl.col("path").is_in(list_of_files_to_download["path"].to_list())
+        )["time_series_id"]
+        downloaded = download_and_parse_files(store, list_of_files_to_download)
+    except DownloadedFilesError:
+        raise  # Our own storage is damaged. A retry cannot fix it, and Sentry should say so.
     except BaseException as exc:
         # `BaseException` for the same reason as `checks.py::power_data_is_fresh`: obstore, delta-rs
         # and polars each define their own exception classes and a Rust panic is not an `Exception`,
@@ -187,7 +253,12 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
             max_retries=_POWER_INGEST_MAX_RETRIES,
             seconds_to_wait=_POWER_INGEST_RETRY_DELAY_SECONDS,
         ) from exc
-    new_metadata, new_power_ts = downloaded.metadata, downloaded.power_time_series
+    new_power_ts = downloaded.power_time_series
+    new_metadata = pt.DataFrame(
+        downloaded.metadata.filter(
+            pl.col("time_series_id").is_in(series_ids_with_newest_file_selected.to_list())
+        )
+    ).set_model(TimeSeriesMetadata)
 
     if downloaded.n_implausible_power_rows_dropped > 0:
         context.log.warning(
@@ -200,23 +271,34 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     )
 
     # Save TimeSeriesMetadata. A metadata table failure must not stop the power write below: the
-    # metadata table is data NGED re-delivers every run, and the power series is not, so a metadata
-    # table fault must never stall the hourly ingest. The only cost is this run's metadata change,
-    # lost until the next successful upsert — and `live_forecasts` reads the promoted model's own
-    # frozen copy of the metadata table, not this one, so inference is unaffected. What that costs
-    # in full: https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/
-    try:
-        upsert_metadata_stats = upsert_metadata(
-            new_metadata=new_metadata, metadata_path=metadata_path, storage_options=storage_options
+    # metadata table is derived data, and the power series is not, so a metadata table fault must
+    # never stall the hourly ingest. The only cost is this run's metadata change, lost until the
+    # series' next file arrives, about 6 hours later — and `live_forecasts` reads the promoted
+    # model's own frozen copy of the metadata table, not this one, so inference is unaffected. The
+    # downloaded-files list is still written below, because holding it back would make every later
+    # hour download a growing backlog. What that costs in full:
+    # https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/
+    if new_metadata.is_empty():
+        upsert_metadata_stats = UpsertMetadataStats(
+            metadata_n_new_TimeSeriesIDs=0, metadata_n_updated_TimeSeriesIDs=0
         )
-    except BaseException as exc:
-        # The same guard as the asset checks, for the same reason — see the comment in
-        # `checks.py::power_data_is_fresh` for why `BaseException` and what it costs in tests.
-        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
-            raise  # A cancelled run must cancel.
-        context.log.exception(f"Could not upsert the TimeSeriesMetadata table at {metadata_path}")
-        report_asset_degradation(asset_name="power_time_series_and_metadata", exc=exc)
-        upsert_metadata_stats = UpsertMetadataStats(metadata_upsert_failed=repr(exc))
+    else:
+        try:
+            upsert_metadata_stats = upsert_metadata(
+                new_metadata=new_metadata,
+                metadata_path=metadata_path,
+                storage_options=storage_options,
+            )
+        except BaseException as exc:
+            # The same guard as the asset checks, for the same reason — see the comment in
+            # `checks.py::power_data_is_fresh` for why `BaseException` and what it costs in tests.
+            if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+                raise  # A cancelled run must cancel.
+            context.log.exception(
+                f"Could not upsert the TimeSeriesMetadata table at {metadata_path}"
+            )
+            report_asset_degradation(asset_name="power_time_series_and_metadata", exc=exc)
+            upsert_metadata_stats = UpsertMetadataStats(metadata_upsert_failed=repr(exc))
 
     context.add_output_metadata(upsert_metadata_stats)
 
@@ -227,6 +309,18 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
         write_power_time_series(
             power_ts=new_power_ts_deduped, table_uri=delta_path, storage_options=storage_options
         )
+
+    # Record the listing last, so the downloaded-files list is never ahead of the readings: a crash
+    # before this write leaves the old list, and the next run downloads the unrecorded files again
+    # while `select_new_rows` drops their rows. A failed write is swallowed because the rows have
+    # landed, and raising would stop `clean_nged_power_data` in the same job. The next run
+    # downloads the unrecorded files again.
+    _write_downloaded_files_or_degrade(
+        context=context,
+        downloaded_files_path=downloaded_files_path,
+        listing=list_of_all_json_files,
+        storage_options=storage_options,
+    )
 
     # Log statistics to be shown in Dagster's UI.
     context.add_output_metadata(
