@@ -155,10 +155,14 @@ def remove_small_files_from_listing(
     That 68-byte gap comes from V1's 32 series ([phased
     rollout](https://openclimatefix.github.io/nged-substation-forecast/background/requirements/#phased-rollout)),
     The gap is narrow, so V2's ~2,500 series want re-measuring before this default is trusted there.
-    Two changes would close the gap. A populated `information` field would push a zero-reading file
-    above 520 bytes; `TimeSeriesMetadata` records that field as always null in the V1 trial area. A
-    substation name shorter than any in V1 would pull a one-reading file below 520 bytes. Re-run the
-    measurement rather than assume the gap survives.
+    Two changes would close the gap. A long `information` note would push a zero-reading file above
+    520 bytes: the longest note on a WKT-less zero-reading file measured so far leaves a file of 488
+    bytes. A substation name shorter than any in V1 would pull a one-reading file below 520 bytes.
+    Re-run the measurement rather than assume the gap survives.
+
+    The files this filter removes still carry the series' metadata, including NGED's `Information`
+    note. `add_newest_file_of_each_series` puts the newest file of each series back, so that the
+    metadata of a series that has stopped reporting stays current.
     """
     n_files_before_filter = file_listing.height
     filtered = file_listing.filter(pl.col("filesize_bytes") > size_threshold_bytes)
@@ -168,6 +172,39 @@ def remove_small_files_from_listing(
     # An eager `filter` returns a plain frame, so re-attach the Patito model the return type
     # promises.
     return pt.DataFrame(filtered).set_model(_ProcessedFileListing)
+
+
+def add_newest_file_of_each_series(
+    all_files: pt.DataFrame[_ProcessedFileListing],
+    new_files: pt.DataFrame[_ProcessedFileListing],
+) -> pt.DataFrame[_ProcessedFileListing]:
+    """Add the newest file of every series to the files being downloaded, whatever its size.
+
+    `download_and_parse_files` takes each series' metadata from the newest file it downloads. A
+    series that has stopped reporting publishes small files with no readings, which
+    `remove_small_files_from_listing` drops, and its older files with readings can still be
+    offered by `select_new_rows`. The metadata would then come from an old file, and NGED's current
+    `Information` note would never be read. Adding the newest file of each series puts that file
+    last in the download order, so its metadata wins. A series whose newest file is already in
+    `new_files` adds nothing, so a healthy series costs no extra download.
+
+    Args:
+        all_files: The whole file listing, before any filtering.
+        new_files: The files chosen for download as power data.
+
+    Returns:
+        `new_files` plus the newest file of each series, without duplicates, in ascending
+        `end_time` order.
+    """
+    newest_file_of_each_series = (
+        all_files.sort("end_time").group_by("time_series_id").last().select(all_files.columns)
+    )
+    combined = (
+        pl.concat([new_files, newest_file_of_each_series])
+        .unique(subset="path", keep="first")
+        .sort("end_time")
+    )
+    return pt.DataFrame(combined).set_model(_ProcessedFileListing).validate()
 
 
 class NoNewData(Exception):

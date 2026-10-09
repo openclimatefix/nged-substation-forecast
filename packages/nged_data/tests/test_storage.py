@@ -15,6 +15,7 @@ from nged_data.storage import (
     _process_file_listing,
     _ProcessedFileListing,
     _RawFileListItem,
+    add_newest_file_of_each_series,
     coverage_from_power,
     download_and_parse_files,
     remove_small_files_from_listing,
@@ -619,6 +620,44 @@ def test_coverage_from_power_matches_time_series_coverage(tmp_path: Path):
     assert coverage_from_power(power).equals(time_series_coverage(str(delta_path)))
 
 
+# --- add_newest_file_of_each_series -----------------------------------------------------------
+
+
+def _listing_of(paths_and_sizes: dict[str, int]) -> pt.DataFrame[_ProcessedFileListing]:
+    return _process_file_listing(
+        [_RawFileListItem(path=path, filesize_bytes=size) for path, size in paths_and_sizes.items()]
+    )
+
+
+def _key(time_series_id: int, end_ms: int) -> str:
+    return (
+        f"timeseries/{end_ms - 21_600_000}_{end_ms}/TimeSeries_{time_series_id}_20260326T080000Z_"
+        "20260326T140000Z.json"
+    )
+
+
+def test_add_newest_file_of_each_series_adds_the_small_file_of_a_series_with_only_old_new_files():
+    old_large_file = _key(33, 1_774_533_600_000)
+    newest_small_file = _key(33, 1_774_555_200_000)
+    all_files = _listing_of({old_large_file: 5_000, newest_small_file: 450})
+    new_files = remove_small_files_from_listing(all_files)
+    assert new_files["path"].to_list() == [old_large_file]
+
+    result = add_newest_file_of_each_series(all_files=all_files, new_files=new_files)
+
+    # The newest file comes last, so `download_and_parse_files` keeps its metadata.
+    assert result["path"].to_list() == [old_large_file, newest_small_file]
+
+
+def test_add_newest_file_of_each_series_adds_nothing_for_a_series_whose_newest_file_is_listed():
+    files = {_key(33, 1_774_533_600_000): 5_000, _key(34, 1_774_533_600_000): 5_000}
+    all_files = _listing_of(files)
+
+    result = add_newest_file_of_each_series(all_files=all_files, new_files=all_files)
+
+    assert sorted(result["path"].to_list()) == sorted(files)
+
+
 def _file_without_readings(*, time_series_id: int, data_field: str) -> bytes:
     """A real NGED file's metadata fields, with the given `data` field instead of readings."""
     fixture = Path(__file__).parent / "data" / "TimeSeries_10.json"
@@ -627,7 +666,7 @@ def _file_without_readings(*, time_series_id: int, data_field: str) -> bytes:
     return json.dumps(file_contents).encode()
 
 
-def _listing_of(paths: list[str]) -> pt.DataFrame[_ProcessedFileListing]:
+def _listing_of_large_files(paths: list[str]) -> pt.DataFrame[_ProcessedFileListing]:
     return _process_file_listing(
         [_RawFileListItem(path=path, filesize_bytes=10_000) for path in paths]
     )
@@ -645,7 +684,8 @@ def test_download_and_parse_files_skips_a_file_without_readings_and_keeps_the_ot
     obstore.put(store, empty_path, _file_without_readings(time_series_id=10, data_field=data_field))
 
     result = download_and_parse_files(
-        store=cast(obstore.store.S3Store, store), paths_df=_listing_of([empty_path, real_path])
+        store=cast(obstore.store.S3Store, store),
+        paths_df=_listing_of_large_files([empty_path, real_path]),
     )
 
     assert set(result.power_time_series["time_series_id"]) == {11}
@@ -659,5 +699,5 @@ def test_download_and_parse_files_raises_no_new_data_when_every_file_is_without_
 
     with pytest.raises(NoNewData):
         download_and_parse_files(
-            store=cast(obstore.store.S3Store, store), paths_df=_listing_of([path])
+            store=cast(obstore.store.S3Store, store), paths_df=_listing_of_large_files([path])
         )

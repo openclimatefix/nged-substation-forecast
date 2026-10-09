@@ -228,6 +228,12 @@ threshold, which fails the check until you delete it from the list; the check do
 you, and the yellow lasts only while the series keeps reporting, so a series that reports for an
 afternoon and then stops again leaves no trace.
 
+**NGED's fault notes.** The check description also carries one sentence naming each series whose
+metadata table row has an `information` note, for example `NGED fault notes: 33: "Analogues not
+working."`, whether or not the series is silenced. The note is NGED's own free text. Cleaning does
+not read it, because a note has no date. The ingest downloads the newest file of every series, even
+a small file with no readings, so a silenced series' note stays current.
+
 `n_silenced` counts the ids you listed, not the ids that were actually withheld, so an id that
 matches no series still appears: that is how a mistyped id shows itself rather than vanishing.
 
