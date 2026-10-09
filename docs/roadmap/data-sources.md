@@ -1,13 +1,13 @@
 # Data sources
 
-The inputs to the forecasting system: NGED's power-flow data, supporting NGED files, and weather
-data.
+The inputs to the forecasting system: NGED's power-flow data, supporting NGED files, weather data,
+and electricity price data.
 
 > **Status legend** — ✅ Ingested today · 🚧 Planned ingestion · 🔬 Research. The ECMWF ENS NWP and the
 > NGED time-series JSON / metadata are ✅ ingested; the supporting NGED files and the extra weather
 > datasets are 🚧 planned (needed for switching-event detection, capacity estimation, and the
 > training history), and
-> NGED's published electricity-network model is 🔬 research. See the
+> NGED's published electricity-network model and the electricity price data are 🔬 research. See the
 > [roadmap index](index.md) for status conventions.
 
 ---
@@ -147,7 +147,9 @@ historical data (full detail + plots in the Milestone 1 report, Appendices A & B
   generators legitimately don't report overnight, but not all gaps are nighttime; gaps can last
   hours to months.
 - **Meter quality flags**: some meters carry NGED's own quality flags ("analogue not working" or
-  "analogue suspect"), which ingestion does not yet act on.
+  "analogue suspect"), in the `Information` field of each JSON file. Ingestion stores the field and
+  the freshness check shows it to the operator, but cleaning does not act on it, because a flag has
+  no date and can stay set after the fault.
 - **False zeros**: substation telemetry has occasional drop-outs to zero, visible as an excess of
   exact zeros in the distribution vs. near-zero values.
 - **Not-on assets**: one trial-area generator (ID 19) has not been operating since mid-2024 —
@@ -684,6 +686,56 @@ of 100 to 500 m, [Cheynet et al. (2025)](https://doi.org/10.5194/wes-10-733-2025
 3 km Norwegian hindcast NORA3 similar offshore, and NORA3 better than ERA5 at two coastal sites and
 one complex-terrain site in Norway.
 
+### Five traps when ERA5 hourly fields are forecasting-model inputs
+
+**ERA5's hourly fields can drop rows, mix releases, or inflate a ratio unless the build handles five
+traps.** The traps come from ECMWF's documentation of ERA5 and from the checks written for the [ERA5
+solar-variables study](https://github.com/openclimatefix/nged-substation-forecast/issues/1098). Each
+trap changes which rows a forecasting model sees or what a column means, and none raises an error.
+
+**Convective inhibition is missing wherever ERA5 finds no cloud base, and cloud base height probably
+is too, so dropping rows with a missing value drops clear-sky and low-instability hours.** ECMWF's
+documentation says a missing value is assigned to convective inhibition "for values of CIN > 1000 or
+where there is no cloud base", which "can occur where convective available potential energy (CAPE)
+is low". ECMWF documents no missing value for cloud base height, so the study's first download chunk
+is checked for one. A build should keep both fields as missing, for which XGBoost learns a branch of
+its own, and should drop rows by the target and the clock only.
+
+**ERA5 hours from the last few months are preliminary ERA5T data, which final ERA5 overwrites,
+usually with identical values.** ERA5T marks its hours with `expver` 0005, and final ERA5 uses
+`expver` 0001 (see the ERA5 row of the [weather-data table](#weather-data) for the roughly
+2-to-3-month wait). Two downloads of different variables can therefore cover the same hour with
+different releases. A netCDF request that returns only one stream carries no `expver`, so request
+GRIB or check the file. A build should record `expver` for every hour, end the span at the last
+month that is final in every file, and raise if `expver` differs between variables for one hour.
+
+**Dividing ERA5 irradiance by the top-of-atmosphere flux gives an unstable clearness index at low
+sun.** ERA5's `tisr` is accumulated over the hour ending at the timestamp, in J m⁻², and a
+top-of-atmosphere flux computed from the zenith angle at the hour's midpoint differs from it near
+sunrise and sunset. The ratio is large and noisy in those hours, so a mean absolute error of the
+clearness index is dominated by dawn and dusk. A build should fix a daylight threshold in W m⁻²
+before any XGBoost model is fitted, and should take the top-of-atmosphere value from one source for
+both numerator and denominator.
+
+**An XGBoost model trained to predict CAMS irradiance can gain partly by construction from CAMS
+aerosol, and from ERA5's water-vapour and ozone fields.** CAMS computes clear-sky irradiance with
+McClear, which reads aerosol, total column water vapour, and ozone from the CAMS global forecasting
+system, and from the CAMS reanalysis for 2004 to 2020 ([CAMS radiation
+documentation](https://confluence.ecmwf.int/x/jOLjDw)). CAMS aerosol optical depth as an input is
+therefore close to McClear's own input. ERA5's `tcwv` and `tco3` come from a separate ECMWF analysis
+of the same quantities, so they correlate with McClear's inputs without being identical to them. A
+gain from any of these fields on a CAMS target therefore measures a shared input as well as the
+atmosphere. Conclusions about those fields should rest on a target measured at a solar farm. The
+CAMS reanalysis EAC4, which supplies aerosol optical depth, ran to 31 December 2025 on the
+Atmosphere Data Store when read on 2026-10-08, months short of ERA5, so an XGBoost model fitted on
+it needs a baseline refitted on exactly the same rows, with folds cut on that shorter span.
+
+**A solar-farm target that drops zero-output hours also drops the hours when snow covers the
+panels.** A fully covered panel is likely to read zero or close to zero, so removing hours that hold
+a zero half-hour biases any test of ERA5's snow fields (`sd`, `sf`, `asn`) towards no effect. A
+study should say so beside the result, and can keep zero hours where snow depth is positive in an
+exploratory run.
+
 ### CAMS: use the point API, not the gridded product
 
 **Two CAMS products exist, and only the point time-series product is current.** The [gridded
@@ -1188,3 +1240,201 @@ fetch](#cams-use-the-point-api-not-the-gridded-product).
 **Two fields in Dynamical.org's ENS archive start part-way through it.** The archive starts on
 2024-04-01, but 10 m gust starts on 2024-11-13 and total cloud cover on 2025-11-21. Neither field is
 ingested today; a feature built on either would meet nulls across the early part of the record.
+
+## Electricity price data
+
+**The price series below are free and need no API key.** Batteries, pumped storage, and flexible
+demand and generation charge and discharge according to the prices, so the prices shape part of what
+NGED's substations see. The sources are 🔬 research: the project has downloaded the four price series
+(imbalance system price, market index price, N2EX day-ahead auction price, and carbon intensity) for
+1 September 2025 to 30 September 2026 for one study, is downloading the balancing-unit-level
+acceptance series (`BOAV`, `EBOCF`, and `BOALF`), and ingests none of them.
+
+**Each licence's attribution wording applies wherever the data is shown.** Elexon's Balancing
+Mechanism Reporting Service (BMRS) licence requires the wording "Contains BMRS data © Elexon Limited
+copyright and database right [year]", which the project has not independently verified. The Carbon
+Intensity API's CC BY 4.0 licence comes from its documentation, and the API's responses carry no
+licence field.
+
+### Which price series are free, and how far back they go
+
+| Series | Source and licence | Resolution | History found |
+|---|---|---|---|
+| **Imbalance system price** (Elexon dataset `DISEBSP`) | [Elexon Insights API](https://bmrs.elexon.co.uk/system-prices), `/balancing/settlement/system-prices/{date}`; Elexon's open licence for BMRS data | Half-hourly | A request for 2015-12-01 returned 48 periods |
+| **Market index price** (Elexon dataset `MID`, provider `APXMIDP`) | [Elexon Insights API](https://bmrs.elexon.co.uk/market-index-data), `/datasets/MID/stream`; Elexon's open licence for BMRS data | Half-hourly | A request for 2016-10-31 returned data, and a request for 2016-01-01 returned none |
+| **Day-ahead auction price** (N2EX) | [National Energy System Operator (NESO) data portal](https://www.neso.energy/data-portal/gb-n2ex-day-ahead-price), Comprehensive Knowledge Archive Network (CKAN) resource `4f27eea5-7038-4f73-9740-e3e4ad47c26a`; [NESO Open Data Licence](https://www.neso.energy/data-portal/neso-open-licence) | Hourly | From 2021-09-20 |
+| **Carbon intensity** (national) | [Carbon Intensity API](https://carbonintensity.org.uk/); CC BY 4.0 (unverified) | Half-hourly | A request for 2017-09-30 returned data |
+| **Bid and offer prices** (Elexon datasets `BOD`, `BOALF`, `BOAV`, `EBOCF`) | [Elexon Insights API](https://bmrs.elexon.co.uk/); Elexon's open licence for BMRS data | Per balancing unit, per half-hour | Not checked |
+
+**The imbalance system price, the market index price, and the N2EX day-ahead auction price are
+different products, and none stands in for another.** The imbalance system price is what a party
+pays or receives for the energy it was short or long in a settlement period, and is known only after
+the period ends. The market index price is the half-hourly price of short-term trading on the EPEX
+exchange, published with the traded volume beside it, so a battery can read it during the delivery
+day. The `APXMIDP` price is not the day-ahead auction price. The N2EX day-ahead auction price is an
+hourly price fixed the morning before delivery. Elexon's `MID` dataset has a second provider,
+`N2EXMIDP`, which returned a price and a volume of exactly 0 in every period the project checked, so
+it carries no information.
+
+**Bid-offer data shows what batteries and other flexible units were paid to do, and is large.**
+`BOD` holds the prices each balancing unit has submitted for being turned up or down, which the
+project estimated at about 1.4 GB a year for all units. `BOALF` holds the instructions the system
+operator accepted, with the time and power level. `BOAV` and `EBOCF` hold the accepted volumes and
+the indicative cash flows, and the price an accepted bid or offer received is the cash flow divided
+by the volume. Elexon marks these endpoints as quota-limited and publishes no rate limit. The
+endpoints worked without a key.
+
+**Ember's price data needs an API key and is monthly, so it is not recommended.**
+
+### What the data looks like
+
+**The imbalance system price, market index price, and N2EX day-ahead tables share one timestamp
+convention: `time` is the UTC start of the period.** The imbalance system price and the market index
+also carry Elexon's `settlement_date` and `settlement_period`. Settlement period 1 starts at 00:00
+UK local time, so a settlement date has 48 periods, 46 on the day the clocks go forward, and 50 on
+the day they go back. The N2EX day-ahead table has 24 rows on both clock-change days, which says
+that NESO's `Delivery Period (GMT)` column is on a UTC grid. The hourly N2EX series also correlates
+best with the hourly mean of the market index at a lag of 0 hours, with the N2EX series on the same
+grid as the index and neither leading the other (0.90, against 0.87 at -1 hour and 0.86 at +1 hour,
+over the 395 days downloaded). **These tables mark the start of each period, whereas the NGED power
+feed marks the end of each half-hour,** so a join on `time` without shifting one side by 30 minutes
+is off by one period. The rows below are three consecutive half-hours from the evening of 23 June
+2026, in the project's downloaded copy.
+
+Imbalance system price (the columns of `DISEBSP` the project keeps; the table also holds
+`price_derivation_code`):
+
+| `time` (UTC) | `settlement_date` | `settlement_period` | `system_sell_price_gbp_per_mwh` | `system_buy_price_gbp_per_mwh` | `net_imbalance_volume_mwh` | `total_accepted_offer_volume_mwh` | `total_accepted_bid_volume_mwh` |
+|---|---|---|---|---|---|---|---|
+| 2026-06-23 18:30 | 2026-06-23 | 40 | 770.05 | 770.05 | 597.1 | 1131.5 | -1006.0 |
+| 2026-06-23 19:00 | 2026-06-23 | 41 | 789.04 | 789.04 | 617.4 | 1233.5 | -1082.8 |
+| 2026-06-23 19:30 | 2026-06-23 | 42 | 800.00 | 800.00 | 748.3 | 1223.5 | -943.8 |
+
+Market index price (`APXMIDP`), the same half-hours:
+
+| `time` (UTC) | `settlement_date` | `settlement_period` | `price_gbp_per_mwh` | `volume_mwh` |
+|---|---|---|---|---|
+| 2026-06-23 18:30 | 2026-06-23 | 40 | 530.66 | 4313.35 |
+| 2026-06-23 19:00 | 2026-06-23 | 41 | 545.21 | 5189.20 |
+| 2026-06-23 19:30 | 2026-06-23 | 42 | 560.81 | 4971.75 |
+
+N2EX day-ahead auction price, the two hours that cover them:
+
+| `time` (UTC) | `delivery_date` | `price_gbp_per_mwh` |
+|---|---|---|
+| 2026-06-23 18:00 | 2026-06-23 | 248.39 |
+| 2026-06-23 19:00 | 2026-06-23 | 250.08 |
+
+Carbon intensity, the same half-hours (`time_end` is the UTC end of the half-hour; `index` is the
+API's band):
+
+| `time` (UTC) | `forecast_gco2_per_kwh` | `actual_gco2_per_kwh` | `index` |
+|---|---|---|---|
+| 2026-06-23 18:30 | 205 | 218 | high |
+| 2026-06-23 19:00 | 209 | 218 | high |
+| 2026-06-23 19:30 | 215 | 224 | high |
+
+**Units are pounds sterling per megawatt-hour for prices and megawatt-hours for volumes.** The net
+imbalance volume is positive when the system was short of energy. The accepted bid volume is
+negative. The sell price and the buy price were equal in every one of the 18,960 periods downloaded,
+because GB has used a single imbalance price since November 2015. The NESO source column is labelled
+"Price (GBP)" with no energy unit, and the project reads its prices as pounds per megawatt-hour on
+the strength of the column's description ("Auction price for the delivery period, expressed in the
+requested currency (GBP)") and the series' agreement with the market index.
+
+**Prices can be negative, and rare spikes dominate the ranges.** Across the 395 days downloaded, the
+system price ranged from -97.92 to 800.00 pounds per megawatt-hour, and only one period, 19:30 UTC
+on 23 June 2026, reached 800.00. The market index ranged from -102.92 to 560.81 and the N2EX
+day-ahead price from -42.05 to 420.10. The N2EX table has 17 hours priced at exactly 0.0, which are
+real prices and not missing values. The half-hourly system price and the market index had a
+correlation of 0.85, and the system price differed from the index by 19.2 pounds per megawatt-hour
+on average (mean absolute difference).
+
+**Contains BMRS data © Elexon Limited copyright and database right 2026 (imbalance system price and
+market index price); N2EX day-ahead price from the NESO data portal.**
+
+![Line chart of three GB electricity prices over 22 to 28 June 2026: the hourly N2EX day-ahead
+price, the half-hourly market index price, and the half-hourly imbalance system price. All three
+rise and fall together, the system price reaching 800 pounds per megawatt-hour on 23 June and the
+day-ahead price peaking at 420 on 24 June.](assets/gb_prices_one_week.svg)
+
+**The day-ahead price follows a daily shape that a battery can plan around.** Over the 395 days
+downloaded, the mean N2EX price was highest in the evening, from 17:00 to 19:00 UTC, peaking at the
+hour starting 18:00 UTC (about 128 pounds per megawatt-hour, against about 127 at 17:00) and lowest
+around the middle of the day, at 12:00 and 13:00 UTC (about 75). The interquartile range at 18:00
+UTC runs from about 101 to 147 pounds per megawatt-hour. A second, lower rise appears at 06:00 and
+07:00 UTC.
+
+![Step chart of the mean N2EX day-ahead price by hour of day in UTC, with a shaded interquartile
+range. The mean is about 75 pounds per megawatt-hour at midday, rises to about 128 at 18:00 UTC, and
+falls back to about 88 by 23:00 UTC.](assets/gb_day_ahead_daily_profile.svg)
+
+### Which series are known before delivery
+
+**Elexon's feeds publish within minutes to hours of the moment a value is fixed, but a series only
+helps a forecast if it is known before the power it influences.** NESO's copy of the N2EX prices
+lagged the auction by more than a day in the check described below. The first group below is known
+ahead of delivery. The second group is a price outcome that the project can use only as history.
+
+Known ahead of delivery:
+
+- **The N2EX day-ahead auction price** for the whole next day is fixed the morning before delivery.
+  Nord Pool states that gate closure is at 09:50 GMT and that results are published at the latest at
+  10:00 GMT ([Nord
+  Pool](https://support.nordpoolgroup.com/support/solutions/articles/8000088463-about-the-n2ex-day-ahead-auction)).
+  Whether "GMT" means UTC all year or UK clock time is not stated, and the project has not checked
+  it. The timing of NESO's copy is in the table below.
+- **Final physical notifications** (Elexon dataset `PN`), the stable export and import limits
+  (`SEL`, `SIL`), and the maximum export limit (`MELS`) and maximum import limit (`MILS`) are what
+  each balancing unit says it will do and can do. For a battery, the final physical notification is
+  the unit's own plan for charging and discharging. Each unit's data is published only for periods
+  whose gate has closed.
+- **Submitted bid and offer prices** (`BOD`), per unit and per half-hour, show at what price each
+  unit has said it will be turned up or down. They share the gate-closure horizon above.
+- **National demand and wind forecasts**: Elexon's national demand forecast (`NDF`) and transmission
+  system demand forecast (`TSDF`), the `WINDFOR` wind forecast, and the day-ahead wind and solar
+  generation forecast (`DGWS`, from Elexon's `/datasets/DGWS` endpoint). These describe the
+  conditions that drive the price, and not the price itself.
+- **The carbon intensity forecast** from the Carbon Intensity API is documented as reaching up to 2
+  days ahead, and a request for the 48-hour window returned 97 half-hourly values.
+
+Known only after the fact, so history for a model and not an input to a forecast of the same period:
+
+- **The imbalance system price** for a period appears about 19 minutes after the period ends and is
+  written again about 24 hours later. The project has not established what the second write changes.
+- **Accepted bid and offer volumes and cash flows** (`BOALF`, `BOAV`, `EBOCF`). `BOALF` shows an
+  instruction soon after the system operator issues it, so a unit's current instruction is visible
+  during the period it applies to. `BOAV` and `EBOCF` are settlement outputs.
+- **The market index price** appears during the half-hour the row describes. The dataset has no
+  publish-time field, so the delay is not measured.
+
+**Whether a published price or notification predicts a battery's behaviour has not been tested
+here.** Which series improve a forecast of a substation's power flow is an open question, and the
+[Metrics and leaderboard](metrics-and-leaderboard.md) page owns how any such comparison would be
+scored.
+
+### When each series is published
+
+**Publication times are stated in UTC unless a row says otherwise.** In UK summer time (BST), UTC is
+one hour behind local clock time.
+
+| Series | Time observed or stated | Status |
+|---|---|---|
+| N2EX day-ahead auction | Gate closure 09:50 GMT, results at the latest at 10:00 GMT, the day before delivery (Nord Pool's documentation) | Stated by Nord Pool; not checked against a live result |
+| NESO's copy of the N2EX prices | The data portal resource's `metadata_modified` was 2026-10-07 11:30 UTC. At 12:17 UTC on 2026-10-08, the newest row was the delivery hour 21:00 to 22:00 UTC on 2026-10-08, although the auction for 2026-10-09 had closed by 10:00 UTC | Observed once; the update schedule is unverified |
+| Imbalance system price | About 19 minutes after the settlement period ends (the `createdDateTime` of every period on 2026-10-08, to the nearest minute), then written again about 24 hours and 15 minutes after the period ends | Observed on 2026-10-08 and on seven earlier days (2025-10-26, 2026-01-15, 2026-08-01, 2026-09-20, 2026-10-03, 2026-10-06, 2026-10-07) |
+| Later settlement runs | Elexon's settlement runs follow at 5, 16, about 36 to 40, about 81 to 85, about 151 to 155, and about 289 to 293 working days after the settlement day. Which runs change the imbalance price is not established here | Unverified: from a web search of Elexon pages |
+| Market index price | During the half-hour the row describes: at 12:13 UTC on 2026-10-08 the row for the half-hour starting 12:00 UTC was present and the row for 12:30 UTC was not | Observed once |
+| `PN`, `BOD`, `MELS`, `BOALF` | Within minutes; limited to periods whose gate has closed. For one battery unit queried at about 12:17 UTC on 2026-10-08, `PN`, `BOD`, and `MELS` reached 13:30 UTC and no further; a `BOALF` acceptance with `acceptanceTime` 12:00 UTC was present at 12:12 UTC | Observed once, for one unit |
+| `NDF`, `TSDF` | `publishTime` 11:48 UTC on 2026-10-08, with the first forecast period at 12:00 UTC | Observed once; the cadence is unverified |
+| `WINDFOR` | Latest `publishTime` 10:30 UTC on 2026-10-08, with an earlier publication at 03:30 UTC the same day; forecast periods reached 2026-10-10 | Observed once; the cadence is unverified |
+| Day-ahead wind and solar forecast | `publishTime` 16:45 UTC on 2026-10-07, for 8 and 9 October | Observed once; the cadence is unverified |
+| Carbon intensity forecast | A 48-hour forecast was returned at 12:13 UTC on 2026-10-08 | The update schedule is unverified |
+
+**The EPEX GB day-ahead auctions are a separate series that the project has not downloaded, and they
+are not free.** A web search of EPEX SPOT's published trading brochures (for example [the October
+2022 brochure](https://www.epexspot.com/sites/default/files/2023-01/22-10-25_TradingBrochure.pdf))
+found statements of an hourly GB day-ahead auction at 09:20 UK time and a half-hourly auction at
+15:30 UK time, with results soon after. The project could not confirm these times on EPEX SPOT's
+trading-products page, which refused an automated request, so treat them as unverified. Elexon's
+`MID` market index (above) is the EPEX series the project has.

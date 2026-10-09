@@ -3,7 +3,8 @@
 **This section is the context every other page assumes: NGED's electricity network, what NGED has
 asked for, how distribution network operators have traditionally forecast, and the two limits —
 measurement artefacts in the telemetry and a fragmented literature — that shape the rest of the
-design.** [Design philosophy](../design-philosophy/index.md) states the principles that answer to
+design. It also holds two pages of Great Britain battery and price background for the battery
+study.** [Design philosophy](../design-philosophy/index.md) states the principles that answer to
 this problem; [architecture](../architecture/overview.md) describes what is built to solve it.
 
 - [NGED's network and its data](network.md) — the primary substations, bulk supply points, and grid
@@ -20,5 +21,9 @@ this problem; [architecture](../architecture/overview.md) describes what is buil
   weather model and no machine learning, and the baseline our own forecasts are measured against.
 - [Switching events](switching-events.md) — why NGED's meshed network is operated as a radial tree,
   and why reconfiguring that tree moves load between substations without warning.
+- [How GB batteries schedule themselves](gb-battery-scheduling.md) — what a battery's charging and
+  discharging follows, which of its decisions are visible in public data, and what must be inferred.
+- [GB electricity prices: which are free and when each is known](gb-price-data-and-ancillary-markets.md)
+  — which GB prices are free to download, when each becomes known, and how predictable the prices are.
 - [The state of the art in energy forecasting](energy-forecasting-review.md) — what the published
   literature does and does not settle, and where Flexpectation's plan sits against it.

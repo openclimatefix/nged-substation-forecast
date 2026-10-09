@@ -116,11 +116,33 @@ LABEL_STEP_PX: Final[int] = 11
 LABEL_RIGHT_ALIGN_LONGITUDE: Final[float] = 0.3
 """Labels of points east of this longitude sit left of their dot, so the labels stay on the page."""
 OVERVIEW_SCALE: Final[int] = 2200
-ZOOM_SCALE: Final[int] = 8500
+ZOOM_SCALE: Final[int] = 6000
 ZOOM_HEIGHT_PX: Final[int] = 460
-ZOOM_CENTRE_LONGITUDE: Final[float] = -0.7
-ZOOM_CENTRE_LATITUDE: Final[float] = 52.1
+ZOOM_CENTRE_LONGITUDE: Final[float] = -1.6
+ZOOM_CENTRE_LATITUDE: Final[float] = 51.9
 SCOTLAND_LATITUDE: Final[float] = 55.5
+NUMBER_WORDS: Final[dict[int, str]] = {
+    0: "No",
+    1: "One",
+    2: "Two",
+    3: "Three",
+    4: "Four",
+    5: "Five",
+    6: "Six",
+    7: "Seven",
+    8: "Eight",
+    9: "Nine",
+    10: "Ten",
+    11: "Eleven",
+    12: "Twelve",
+    13: "Thirteen",
+}
+"""The count words that a figure title uses, from none to thirteen."""
+
+
+def number_word(count: int) -> str:
+    """Return the count as a capitalised word, or as a numeral past `NUMBER_WORDS`."""
+    return NUMBER_WORDS.get(count, str(count))
 
 
 def storage_bmu_at(*, site_bmu_id: str, census: pl.DataFrame) -> str | None:
@@ -311,8 +333,8 @@ def example_week_figure(
         panels=panels,
         number=number,
         title=(
-            f"Solar BMUs at hybrid sites follow the sun like the pure PV BMU in the {season} week; "
-            "storage BMUs do not"
+            "Solar BMUs at hybrid sites follow the sun like the pure PV BMUs in the "
+            f"{season} week; storage BMUs do not"
         ),
         subtitle=[
             (
@@ -840,8 +862,8 @@ def correlation_figure(*, correlations: pl.DataFrame, number: int) -> alt.VConca
         title="A wide gap separates single-site BMUs whose output follows the sun from the rest",
         subtitle=[
             (
-                "One count per BMU with a T_, E_, or M_ identifier and enough output to judge: "
-                f"{frame.height} in all."
+                "One count per single-site BMU (a T_, E_, or M_ identifier, or a C__ identifier "
+                f"with one named CfD unit) with enough output to judge: {frame.height} in all."
             ),
             f"Dashed line: the threshold of {SOLAR_CORRELATION_THRESHOLD}.",
         ],
@@ -949,6 +971,7 @@ def map_figure(*, census: pl.DataFrame, number: int) -> alt.VConcatChart:
         translate=[width / 2, MAP_HEIGHT_PX / 2],
     )
     england = located.filter(pl.col("latitude") < SCOTLAND_LATITUDE)
+    english_sites = england.select("longitude", "latitude").unique().height
     label_table = map_labels(located=england)
     labels = [
         alt.Chart(label_table.filter((pl.col("offset") == offset) & (pl.col("align") == align)))
@@ -977,13 +1000,19 @@ def map_figure(*, census: pl.DataFrame, number: int) -> alt.VConcatChart:
     return figure(
         panels=[cast(alt.LayerChart, overview), cast(alt.LayerChart, zoom)],
         number=number,
-        title="Nine single-site solar BMUs lie in England and one in Scotland",
+        title=(
+            f"{number_word(england.height)} single-site solar BMUs lie in England and "
+            f"{number_word(scotland.height).lower()} in Scotland"
+        ),
         subtitle=[
             (
                 f"{located.height} of {single.height} single-site solar BMUs have a position, from "
                 "the Renewable Energy Planning Database row matched to each BMU."
             ),
-            "Top: Great Britain. Bottom: a zoom on the nine BMUs in England, at eight sites.",
+            (
+                f"Top: Great Britain. Bottom: a zoom on the {number_word(england.height).lower()} "
+                f"BMUs in England, at {number_word(english_sites).lower()} sites."
+            ),
             "Blue: pure PV site. Orange: hybrid site, with storage built or planned.",
         ],
         figure_planning=None,

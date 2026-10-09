@@ -1,0 +1,21 @@
+{
+  "Area": {
+    "WKT": null,
+    "SRID": null,
+    "IsValid": false,
+    "CenterLat": null,
+    "CenterLon": null,
+    "GeometryType": null
+  },
+  "Units": "MW",
+  "Latitude": 52.9,
+  "Longitude": -0.01,
+  "Information": null,
+  "LicenceArea": "EMids",
+  "TimeSeriesID": 33,
+  "SubstationType": "HV Customer",
+  "TimeSeriesName": "Test Generation 33",
+  "TimeSeriesType": "Other (Generation)",
+  "SubstationNumber": 900033,
+  "data": []
+}
