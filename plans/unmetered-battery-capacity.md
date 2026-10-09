@@ -569,3 +569,48 @@ tried.
 None. The maintainer has settled the priors, the per-primary publication, the size range, the MVA
 scope, and the register's use. The download step stops for the maintainer only if a provider's terms
 turn out to require accepting a licence.
+
+## Plan changes: a differentiable estimator becomes the main estimator
+
+**The maintainer asked for a differentiable battery fitted on the GPU, and this section governs
+over the grid estimator wherever the two conflict.** The grid estimator stays as the comparator and
+as a reported finding: its 1,728-point grid is overconfident and biased when the truth lies off the
+grid. What follows records what was built, so that a reader can tell it from the plan above.
+
+1. **The model.** Six units in three classes (merchant, commercial and industrial, domestic) share
+   a usable duration and a round-trip efficiency per class. A state-of-charge recurrence with a
+   smooth minimum enforces the energy and power limits. The two price takers (the merchant battery
+   and the Agile tariff) follow the linear programme's own dispatch, interpolated bilinearly in
+   (log duration, efficiency) and linearly in the cycle cap (a learned weight between 1 and 2 cycles
+   a day) between precomputed nodes (`capacity_stacks.py`). The four window units follow their fixed
+   windows. The state-of-charge limits do not appear, because the usable duration is the parameter
+   (they only rescale it, as the grid estimator found).
+2. **Why the dispatch is interpolated rather than learned.** A first version drove the price takers
+   by a learned rank-threshold policy and failed the positive control (the merchant power was 7% to
+   30% below the truth), because no simple price-rank policy reproduces the linear programme's
+   dispatch. The interpolation error is proportional to the node spacing, so the stack was refined
+   (durations 1.0235 apart, efficiencies 0.0125 apart, 3,800 nodes for the merchant battery) until
+   the positive control passed. The refinement was guided by diagnostics on a scored block, so the
+   pass is optimistic (`report_positive_control.md` says so).
+3. **Inference.** Adam in float32 on the GPU from three starts, a float64 Levenberg-Marquardt
+   polish, a Laplace approximation from a float64 Gauss-Newton Hessian, and the likelihood tempered
+   by the residual's integrated autocorrelation time as in the grid estimator. The priors are the
+   grid estimator's, with an efficiency per class. The residual is not prewhitened: the
+   autocorrelation enters through the tempering only. The log Bayes factor is the Laplace evidence
+   of the model minus the evidence of no battery.
+4. **Compute.** One block of rung 1 (594 fits) takes 4 minutes on the RTX A6000, against 4.4 hours
+   on 4 workers for the grid estimator's planned rungs 1 to 3. A fused Triton kernel runs the
+   recurrence, because the Python loop over 4,400 half-hours cost 3 seconds per step of the fit.
+5. **Changes to the rungs.**
+    - Rung 1 is unchanged. Its 36 blocks with no added battery are its first lane, and the
+      thresholds are computed from them in `capacity_report.py` (there is no separate nulls
+      script).
+    - Rung 2 is fitted twice: with the real windows, and with every window one hour early.
+    - Rung 3 draws its fleets from the 98 battery-hint BMUs that list a registered generation
+      capacity above zero (3 of the 101 list none).
+    - Rung 5 uses coarse stacks for all 13 template sets (real, six window shifts, six price
+      shifts), so that no set is favoured by a finer interpolation. The negative control "Agile
+      prices from 7 days earlier" is the rung 5 price placebo of one week.
+    - The sensitivity setting is not run for the differentiable estimator.
+6. **The grid estimator's comparison** runs on all of rung 1 (756 sums and the 36 nulls), in the
+   standard setting, which costs under 1 core-hour.
