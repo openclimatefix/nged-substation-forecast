@@ -3,7 +3,11 @@ import pytest
 from scipy.special import log_ndtr
 from scipy.stats import multivariate_normal, truncnorm
 from studies.template_posterior import (
+    MAX_AUTOCORRELATION,
+    POSTERIOR_MASS_SAMPLED,
     ComboGrid,
+    Evaluation,
+    SumPosterior,
     estimate_noise,
     evaluate_combinations,
     fit_aggregate,
@@ -350,3 +354,232 @@ def test_noise_that_repeats_daily_widens_the_power_interval_when_tempering_is_on
     assert untempered == 1.0
     assert tempered < 0.8
     assert wide > 1.15 * narrow
+
+
+def test_a_combinations_prior_weight_adds_to_its_log_weight() -> None:
+    rng = np.random.default_rng(0)
+    column = rng.normal(size=(40, 1))
+    candidates = np.hstack([column, column])  # two identical columns, so equal evidence
+    target = 2.0 * column[:, 0] + 0.3 * rng.normal(size=40)
+    system = prewhiten(
+        free=np.ones((40, 1)),
+        candidates=candidates,
+        target=target,
+        valid=np.ones(40, bool),
+        rho=0.0,
+    )
+    grid = ComboGrid(combos=np.array([[0], [1]]), log_prior=np.array([0.0, -3.0]), axes=(2,))
+
+    evaluation = evaluate_combinations(
+        projected=project_out_free(system=system, sigma2=0.1, free_prior_sd=100.0),
+        grid=grid,
+        sigma2=0.1,
+        power_prior_scale=4.0,
+        rng=np.random.default_rng(1),
+    )
+
+    assert evaluation.log_weight[0] - evaluation.log_weight[1] == pytest.approx(3.0)
+
+
+def test_only_combinations_with_an_uncertain_sign_count_as_numerical_orthant_evaluations() -> None:
+    n_rows = 60
+    candidates = np.random.default_rng(2).normal(size=(n_rows, 1))
+    system = prewhiten(
+        free=np.ones((n_rows, 1)),
+        candidates=candidates,
+        target=50.0 * candidates[:, 0],  # the power is certainly positive
+        valid=np.ones(n_rows, bool),
+        rho=0.0,
+    )
+
+    evaluation = evaluate_combinations(
+        projected=project_out_free(system=system, sigma2=0.01, free_prior_sd=100.0),
+        grid=_single_combo_grid(columns=[0]),
+        sigma2=0.01,
+        power_prior_scale=100.0,
+        rng=np.random.default_rng(3),
+    )
+
+    assert evaluation.orthant_evaluations == 0
+
+
+def test_the_noise_estimate_of_alternating_residuals_has_no_negative_coefficient() -> None:
+    residual = np.tile([1.0, -1.0], 50)
+
+    rho, sigma2 = estimate_noise(residual=residual, n_parameters=4, effective_rows=99)
+
+    assert rho == 0.0
+    assert sigma2 == pytest.approx(99.0 / (99 - 4))
+
+
+def test_the_noise_estimate_of_a_slowly_varying_residual_stops_at_the_largest_coefficient() -> None:
+    residual = np.linspace(1.0, 2.0, 200)
+
+    rho, _ = estimate_noise(residual=residual, n_parameters=1, effective_rows=199)
+
+    assert rho == MAX_AUTOCORRELATION
+
+
+def test_tempering_ignores_a_constant_offset_in_the_innovations() -> None:
+    white = np.random.default_rng(0).standard_normal(4000)
+
+    assert tempering_from_residual(residual=white + 10.0, rho=0.0) == pytest.approx(
+        tempering_from_residual(residual=white, rho=0.0)
+    )
+
+
+def test_tempering_matches_a_hand_computed_bartlett_weighted_autocorrelation_time() -> None:
+    residual = np.array([1.0, 2.0, 0.5, -1.0, -0.5, 1.5, 2.5, 0.0, -2.0, -1.0])
+    max_lag = 3
+    value = tempering_from_residual(residual=residual, rho=0.0, max_lag=max_lag)
+
+    # With rho = 0 the innovations are the residual without its first element.
+    shifted = residual[1:]
+    centred = shifted - shifted.mean()
+    energy = centred @ centred
+    correlations = [centred[k:] @ centred[:-k] / energy for k in range(1, max_lag + 1)]
+    tau = 1.0 + 2.0 * sum(
+        (1.0 - k / (max_lag + 1)) * c
+        for k, c in zip(range(1, max_lag + 1), correlations, strict=True)
+    )
+    assert value == pytest.approx(1.0 / max(tau, 1.0))
+
+
+def test_the_final_evaluation_uses_the_last_noise_estimate_tempered() -> None:
+    n_days = 40
+    templates = _boxcar_columns(n_days=n_days, widths=(4,))
+    rng = np.random.default_rng(3)
+    target = 10.0 - 2.0 * templates[:, 0] + _same_time_yesterday_noise(n_days=n_days, rng=rng)
+    free = np.ones((len(target), 1))
+    valid = np.ones(len(target), bool)
+    grid = ComboGrid(combos=np.array([[0]]), log_prior=np.array([0.0]), axes=(1,))
+
+    posterior = fit_aggregate(
+        free=free,
+        candidates=-templates,
+        target=target,
+        valid=valid,
+        grid=grid,
+        power_prior_scale=4.0,
+        rng=np.random.default_rng(4),
+    )
+
+    system = prewhiten(
+        free=free, candidates=-templates, target=target, valid=valid, rho=posterior.rho
+    )
+    projected = project_out_free(
+        system=system,
+        sigma2=posterior.sigma2,
+        free_prior_sd=template_posterior.FREE_PRIOR_SD_OVER_SIGNAL_SD * float(np.std(target)),
+    )
+    expected = evaluate_combinations(
+        projected=projected,
+        grid=grid,
+        sigma2=posterior.sigma2 / posterior.tempering,
+        power_prior_scale=4.0,
+        rng=np.random.default_rng(4),
+    )
+    assert posterior.tempering < 0.8
+    assert posterior.evaluation.mean == pytest.approx(expected.mean)
+    assert posterior.evaluation.cov == pytest.approx(expected.cov)
+
+
+def test_the_best_combination_is_the_one_with_the_highest_posterior_weight() -> None:
+    n_days = 20
+    templates = _boxcar_columns(n_days=n_days, widths=(1, 2, 4, 6))
+    rng = np.random.default_rng(0)
+    target = 10.0 - 3.0 * templates[:, 2] + 0.05 * rng.standard_normal(n_days * 48)
+    grid = ComboGrid(combos=np.arange(4)[:, None], log_prior=np.full(4, np.log(0.25)), axes=(4,))
+
+    posterior = fit_aggregate(
+        free=np.ones((len(target), 1)),
+        candidates=-templates,
+        target=target,
+        valid=np.ones(len(target), bool),
+        grid=grid,
+        power_prior_scale=5.0,
+        rng=np.random.default_rng(1),
+    )
+
+    assert posterior.best_combination == 2
+
+
+def test_the_fit_does_not_depend_on_the_units_of_the_aggregate() -> None:
+    n_days = 20
+    templates = _boxcar_columns(n_days=n_days, widths=(2, 4))
+    rng = np.random.default_rng(6)
+    target = 10.0 - 3.0 * templates[:, 1] + 0.3 * rng.standard_normal(n_days * 48)
+    grid = ComboGrid(combos=np.arange(2)[:, None], log_prior=np.full(2, np.log(0.5)), axes=(2,))
+
+    def fit(*, unit: float) -> SumPosterior:
+        return fit_aggregate(
+            free=np.ones((len(target), 1)),
+            candidates=-templates,
+            target=target * unit,
+            valid=np.ones(len(target), bool),
+            grid=grid,
+            power_prior_scale=5.0 * unit,
+            rng=np.random.default_rng(1),
+        )
+
+    assert fit(unit=1000.0).log_bayes_factor == pytest.approx(
+        fit(unit=1.0).log_bayes_factor, rel=1e-3
+    )
+
+
+def test_combinations_are_drawn_in_proportion_to_their_posterior_weights(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    weights = np.array([0.6, 0.39, 0.01])
+    assert POSTERIOR_MASS_SAMPLED == 0.99  # the 0.01 combination is left out
+    posterior = SumPosterior(
+        evaluation=Evaluation(
+            log_weight=np.log(weights),
+            pruned=np.array([False, False, False]),
+            mean=np.ones((3, 1)),
+            cov=np.ones((3, 1, 1)),
+            log_bayes_factor=0.0,
+            orthant_evaluations=0,
+        ),
+        log_posterior=np.log(weights),
+        rho=0.0,
+        sigma2=1.0,
+        tempering=1.0,
+        log_bayes_factor=0.0,
+        best_combination=0,
+    )
+    monkeypatch.setattr(
+        template_posterior, "sample_truncated_gaussians", lambda *, mean, **_: np.ones_like(mean)
+    )
+
+    combos, _ = posterior_draws(posterior=posterior, n_draws=400_000, rng=np.random.default_rng(0))
+
+    assert set(combos) == {0, 1}
+    assert (combos == 0).mean() == pytest.approx(0.6 / 0.99, abs=0.003)
+
+
+def test_pruned_combinations_are_never_drawn(monkeypatch: pytest.MonkeyPatch) -> None:
+    log_weight = np.log(np.array([0.5, 0.5, 0.5]))
+    posterior = SumPosterior(
+        evaluation=Evaluation(
+            log_weight=log_weight,
+            pruned=np.array([False, False, True]),
+            mean=np.ones((3, 1)),
+            cov=np.ones((3, 1, 1)),
+            log_bayes_factor=0.0,
+            orthant_evaluations=0,
+        ),
+        log_posterior=log_weight,
+        rho=0.0,
+        sigma2=1.0,
+        tempering=1.0,
+        log_bayes_factor=0.0,
+        best_combination=0,
+    )
+    monkeypatch.setattr(
+        template_posterior, "sample_truncated_gaussians", lambda *, mean, **_: np.ones_like(mean)
+    )
+
+    combos, _ = posterior_draws(posterior=posterior, n_draws=1000, rng=np.random.default_rng(0))
+
+    assert 2 not in combos
