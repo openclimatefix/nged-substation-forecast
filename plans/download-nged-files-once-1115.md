@@ -1,4 +1,4 @@
-# Plan: download each NGED file once, with a ledger of downloaded files (#1115)
+# Plan: download each NGED file once, with a ledger of the last listing processed (#1115)
 
 ## Problem
 
@@ -11,41 +11,42 @@ row-level dedupe makes the repeats harmless, so the cost is requests and run tim
 
 ## Solution
 
-**Record every downloaded file in a ledger, and download only listed files that the ledger lacks.**
-The ledger is a parquet file of `(path, last_modified)`, one row per downloaded NGED file, stored
-beside `metadata.parquet`, together with the Delta table id of the `power_time_series` table the
-files were loaded into. Each hour the ingest lists the bucket, which returns each object's
-`LastModified`, and anti-joins the listing with the ledger. A file whose path is new, or whose path
-is known but whose `LastModified` changed because NGED rewrote it, is downloaded. After the power
-rows are appended, the ingest writes the ledger again with the downloaded files added. A ledger
-whose table id differs from the current table's id, or whose table does not exist, counts as empty.
-This deletes the size filter, the 3-day lookback, and `add_newest_file_of_each_series`, and it adds
-no margin, no watermark, and no change to the `power_time_series` Delta table.
+**Keep a ledger of the bucket listing that the ingest last processed in full, and download only
+listed files that the ledger lacks.** The ledger is a parquet file stored beside `metadata.parquet`.
+It holds the same columns as a listing: each file's path, size, series, window, and `LastModified`.
+Each hour the ingest lists the bucket and anti-joins the listing with the ledger on
+`(path, last_modified)`. A file whose path is new, or whose path is known but whose `LastModified`
+changed because NGED rewrote it, is downloaded. After the power rows are appended, the ingest
+writes the whole listing as the new ledger. When the `power_time_series` table does not exist, the
+ledger counts as empty. This deletes the size filter, the 3-day lookback, and
+`add_newest_file_of_each_series`, and it adds no margin, no watermark, and no change to the
+`power_time_series` Delta table.
 
 **Assumption.** NGED have said they plan to change how they deliver files before Flexpectation
 v2, without details, and the change may be delayed. The plan assumes the files keep today's layout.
 
 ### Walk through
 
-**Each hour, the ingest compares the bucket's listing with a record of what it has already
-downloaded, downloads only the difference, and updates the record last.** The sub-sections below
-follow one run, then its branches, then its failures.
+**Each hour, the ingest compares the bucket's listing with the listing it last processed in full,
+downloads only the difference, and replaces the record last.** The sub-sections below follow one
+run, then its branches, then its failures.
 
 #### The happy path
 
-1. **The run reads the ledger.** `read_downloaded_files` returns the ledger as a frame of
-   `(path, last_modified)`, or an empty frame when the ledger's table id does not match the
-   `power_time_series` table's current id. The id check exists because the ledger describes one
-   specific table: if an operator rebuilds the table, the old ledger would claim that files are
-   loaded which the new table lacks. The read comes before the listing is filtered because the
-   filter is an anti-join with the ledger, and it sits outside the S3 retry guard because a
-   fault in our own ledger must not be reported as a fault in NGED's bucket.
+1. **The run reads the ledger.** `read_downloaded_files` returns the last processed listing, or an
+   empty frame when the ledger file or the `power_time_series` table does not exist. The table
+   check exists because the ledger describes files loaded into that table: if an operator moves the
+   table aside to rebuild it, the old ledger would claim that files are loaded which the new table
+   lacks. The read comes before the listing is filtered because the filter is an anti-join with the
+   ledger, and it sits outside the S3 retry guard because a fault in our own ledger must not be
+   reported as a fault in NGED's bucket.
 2. **The run lists the bucket.** `list_timeseries_json_files` now also returns each object's
    `last_modified`. The ledger needs `last_modified` because a rewritten key keeps its path, and
    only `LastModified` shows that the content changed.
 3. **The run selects files.** `select_files_not_yet_downloaded` keeps the listed files whose
-   `(path, last_modified)` is not in the ledger. No time margin is needed: a file that was not yet
-   visible in an earlier listing was never recorded, so a later listing selects the file.
+   `(path, last_modified)` is not in the ledger. If the selection is empty, the run records an
+   empty ingest and stops. No time margin is needed: a file that was not yet visible in an earlier
+   listing was not in the ledger, so a later listing selects the file.
 4. **The run notes each series' newest file.** The asset computes the newest file of each series by
    `end_time` from the whole listing, before the selection. The asset needs the whole listing
    because a series' newest file may have been downloaded in an earlier hour and be absent from
@@ -55,9 +56,9 @@ follow one run, then its branches, then its failures.
    concurrently, at most 32 at a time, through `asyncio.run`, and then parses them in order. The
    function sorts for itself because an anti-join does not promise to keep the listing's order, and
    both in-batch dedupes keep the last row, so the more recent window must come last. The
-   concurrency exists because a first run fetches tens of thousands of files, and `gather` returns
-   results in input order so that the concurrency cannot reorder the dedupes. The chunks exist so
-   that the raw JSON of tens of thousands of files is never held in memory at once.
+   concurrency exists because a full rebuild fetches tens of thousands of files, and `gather`
+   returns results in input order so that the concurrency cannot reorder the dedupes. The chunks
+   exist so that the raw JSON of tens of thousands of files is never held in memory at once.
 6. **The run keeps only the metadata of newest files.** The asset filters the returned metadata to
    the series whose newest file (step 4) is in the selection. The filter exists because
    `upsert_metadata` replaces a series wholesale, and a late or back-filled file would otherwise
@@ -69,23 +70,24 @@ follow one run, then its branches, then its failures.
    stored `(time_series_id, time)` keys, because a rewritten key and a back-filled file can
    re-deliver readings the table already has.
 9. **The run appends the new rows.** `write_power_time_series` is unchanged.
-10. **The run writes the ledger last.** `write_downloaded_files` writes the old ledger plus the
-    files this run downloaded, stamped with the table's current id, after the append. The ledger
-    comes second so that it can never be ahead of the readings: a crash between the two steps
-    leaves some files unrecorded, and the next run downloads them again and the row dedupe absorbs
-    them.
+10. **The run writes the ledger last.** `write_downloaded_files` replaces the ledger with this
+    run's whole listing, after the append. Every listed file is now either in the old ledger or was
+    processed in this run, so the listing is exactly what has been loaded. The ledger comes second
+    so that it can never be ahead of the readings: a crash between the two steps leaves the old
+    ledger, and the next run downloads the unrecorded files again and the row dedupe absorbs them.
 
 #### Branches off the happy path
 
 - **First run, with no ledger file.** `read_downloaded_files` returns an empty frame, so every
   listed file is selected. This is the same as today's first run on an empty table. On the existing
   deployment the operator seeds the ledger first (see Risks).
-- **The operator rebuilds the `power_time_series` table.** The new table has a new id, so the old
-  ledger counts as empty and the full history is downloaded again, as the rebuild intends. Restoring
-  the table to an older Delta version keeps the id, so the operator must delete the ledger too.
-- **An hour with nothing new.** Every listed file is in the ledger, so the selection is empty.
-  `download_and_parse_files` raises `NoNewData`, as today, the asset catches it and writes nothing,
-  and the run makes no `get` request.
+- **The operator rebuilds the `power_time_series` table by moving it aside.** The table does not
+  exist during the next read, so the old ledger counts as empty and the full history is downloaded
+  again, as the rebuild intends. Restoring the table to an older Delta version, or putting a
+  different table at the path, leaves the ledger ahead of the rows, so the operator must delete the
+  ledger too.
+- **An hour with nothing new.** Every listed file is in the ledger, so the selection is empty. The
+  asset records an empty ingest, writes nothing, and makes no `get_async` request.
 - **An hour in which every new file is data-less.** A series that has stopped reporting publishes
   files with a fault note and no readings. `download_and_parse_files` returns the metadata and an
   empty power frame instead of raising, the metadata upsert runs, no power rows are appended, and
@@ -100,20 +102,19 @@ follow one run, then its branches, then its failures.
   does not either, and the next listing selects it. Nothing is lost.
 - **A run in which no series' newest file was selected.** A back-fill-only run is one. The filter in
   step 6 leaves no metadata, so the upsert is skipped.
-- **A first run that appends no rows.** The `power_time_series` table does not exist yet, so there
-  is no table id to stamp. The ledger is not written, and the next run downloads the same data-less
-  files again. The state ends once a run appends rows.
+- **NGED deletes a file.** The next ledger omits the file. If NGED re-creates the key later, the
+  ingest downloads the file once more and the row dedupe absorbs the repeat.
 
 #### Error handling
 
 - **NGED's bucket fails to list or download.** The existing retry guard raises `RetryRequested`.
   Nothing was appended or recorded, so the retry repeats the same selection.
-- **The ledger cannot be read.** A missing file reads as an empty ledger, but a corrupt or
-  unreadable file raises, with a message naming the ledger's path. The read is outside the retry
-  guard, so the run fails at once and Sentry names the ledger, not NGED's bucket. A fault in our
-  own ledger must not read as an empty ledger, because that would download the whole bucket.
-  `read_downloaded_files` uses `object_exists`, so only a `FileNotFoundError` counts as missing and
-  a transient S3 error raises.
+- **The ledger cannot be read.** A missing file or a missing table reads as an empty ledger, but a
+  corrupt or unreadable file raises, with a message naming the ledger's path. The read is outside
+  the retry guard, so the run fails at once and Sentry names the ledger, not NGED's bucket. A
+  fault in our own ledger must not read as an empty ledger, because that would download the whole
+  bucket. `read_downloaded_files` uses `object_exists`, so only a `FileNotFoundError` counts as
+  missing and a transient S3 error raises.
 - **The metadata upsert fails.** The failure is swallowed and reported as today, and the ledger is
   still written. If the ledger were held back, a persistent upsert fault would make every hour
   download a growing backlog. A silent series' note is restored by its next file, about 6 hours
@@ -136,17 +137,15 @@ follow one run, then its branches, then its failures.
 **Verdict: worth implementing, with a ledger in place of the issue's watermark and five
 departures.**
 
-- Departure 1: the plan records downloaded files in a ledger, not a watermark (the issue's two
+- Departure 1: the plan records the processed listing in a ledger, not a watermark (the issue's two
   homes both store one). A watermark filters on a time, so it needs a margin for files that appear
   in a listing late, and the margin re-selects a band of files every hour. It also needs empty
   commits to advance when a batch is all data-less, and those commits make the cleaning asset
   rebuild. The ledger has no margin, no band, no empty commits, and no lost-file hazard from late
-  visibility: a file that is absent from a listing is simply not recorded. Its cost is state that
-  grows with the bucket instead of one timestamp, and a link to the table it describes (the table
-  id). A synthetic ledger of 3.65 million rows (2,500 series, 4 files a day, one year) read,
-  anti-joined with a same-size listing, de-duplicated and written in about 0.4 seconds in total,
-  holds about 395 MB in memory, and peaks near 2.7 GB with the listing, the ledger and the merged
-  ledger all held. The peak is no problem at 33 series.
+  visibility: a file that is absent from a listing is simply not in the ledger. Its cost is state
+  that grows with the bucket instead of one timestamp. A synthetic ledger of 3.65 million rows
+  (2,500 series, 4 files a day, one year) read, anti-joined with a same-size listing, and written
+  in well under a second, and holds about 395 MB in memory. The peak is no problem at 33 series.
 - Departure 2: the ledger is written even when the `TimeSeriesMetadata` upsert failed. A persistent
   upsert fault (the stored table is corrupt or off-contract) would otherwise freeze the ledger,
   and each hour would re-download every file since the freeze, a number that grows by about 10,000
@@ -162,11 +161,11 @@ departures.**
   updates. The rule lives in the asset, so `download_and_parse_files` keeps its signature.
 - Departure 4: the equivalence test compares the new ingest with a "download every file, every
   run" reference, not with a copy of the old ingest. See Tests.
-- Departure 5: the plan folds in the concurrent download that the issue does not mention. With the
-  ledger, the cost that remains is the first run, which downloads every file once. Fetching
-  concurrently turns a first run of 20 to 45 minutes into about 5, so an overlapping hourly run
-  becomes unlikely and a seeded cutover becomes optional. At today's 33 series, the saving in
-  steady state is small.
+- Departure 5: the plan folds in the concurrent download that the issue does not mention, at the
+  maintainer's request. With the ledger, the cost that remains is a full download of the bucket,
+  which a rebuild or a fresh install needs. Fetching concurrently turns a full download of 20 to 45
+  minutes into about 5. At today's 33 series and in steady state the saving is small, and the
+  download is a separable change that could ship in its own pull request.
 
 **Size: complex.** One line per trigger:
 
@@ -184,7 +183,7 @@ departures.**
   branch each have one production caller, the asset.
 
 **Reviews bought: all four** (two plan reviews, then the two diff reviews in `implement-issue`).
-The plan has had two simplicity reviews and three correctness reviews so far.
+The plan has had three simplicity reviews and three correctness reviews so far.
 
 ## What changes, file by file
 
@@ -193,19 +192,14 @@ The plan has had two simplicity reviews and three correctness reviews so far.
 - `_RawFileListItem` and `_ProcessedFileListing` gain `last_modified`, a UTC datetime read from
   `object_meta["last_modified"]` in `list_timeseries_json_files` (obstore returns a UTC datetime
   with microseconds, and the value recorded in the ledger must come from the listing, not from a
-  `get` response, whose header has only seconds).
-- A new private Patito model `_DownloadedFiles` holds `path` and `last_modified`, beside
-  `_ProcessedFileListing`. The ledger file also carries the power table's Delta id.
+  `get` response, whose header has only seconds). The ledger reuses `_ProcessedFileListing`, so no
+  new model is needed.
 - New `read_downloaded_files(ledger_path, power_table_path, storage_options)` returns the ledger as
-  `pt.DataFrame[_DownloadedFiles]`. It returns an empty, typed frame when the ledger file is
-  missing (tested with `object_exists`), when the power table does not exist, or when the ledger's
-  table id differs from `DeltaTable(...).metadata().id`, the id the cleaning asset already reads.
-  An unreadable or invalid file raises, naming the path.
-- New `write_downloaded_files(ledger_path, power_table_path, downloaded, storage_options)` writes
-  the old ledger plus `downloaded`, de-duplicated on `path` keeping the later `last_modified`,
-  stamped with the table's current id. It does nothing when the table does not exist. Its I/O
-  mirrors `upsert_metadata`'s handling of local paths and object-store URIs. A local write goes
-  through a temporary file and a rename, so a crash cannot leave a torn ledger.
+  `pt.DataFrame[_ProcessedFileListing]`. It returns an empty, typed frame when the ledger file is
+  missing (tested with `object_exists`) or when the power table does not exist (tested with
+  `delta_table_exists`). An unreadable or invalid file raises, naming the path.
+- New `write_downloaded_files(ledger_path, listing, storage_options)` replaces the ledger with
+  `listing`. Its I/O mirrors `upsert_metadata`'s handling of local paths and object-store URIs.
 - New `select_files_not_yet_downloaded(file_listing, ledger)` anti-joins the listing with the
   ledger on `(path, last_modified)`.
 - `download_and_parse_files` stays synchronous and keeps its signature. It sorts its input by
@@ -220,13 +214,14 @@ The plan has had two simplicity reviews and three correctness reviews so far.
   `asyncio.run` cancels the unfinished requests when it exits, so a failure fails the run as it
   does today. A fault cannot arise from an event loop already running, because Dagster runs a
   synchronous asset in a thread with no loop. The function no longer raises `NoNewData` when every
-  file was data-less: it returns the metadata and an empty, validated `PowerTimeSeries` frame.
-  `NoNewData` stays for an empty selection only. The change is required, because a silent series'
-  newest file is data-less, is now downloaded once, and its metadata must reach the upsert in that
-  run. The `get_async` TODO is deleted.
-- Deleted: `remove_small_files_from_listing`, `add_newest_file_of_each_series`,
-  `_LATE_FILE_LOOKBACK`, and `select_new_rows`'s `_ProcessedFileListing` overload and branch. The
-  `PowerTimeSeries` branch stays, because it is the row dedupe that makes a re-download safe.
+  file was data-less: it returns the metadata and an empty, validated `PowerTimeSeries` frame. The
+  change is required, because a silent series' newest file is data-less, is now downloaded once,
+  and its metadata must reach the upsert in that run. The asset never calls the function with an
+  empty selection. The `get_async` TODO is deleted.
+- Deleted: `NoNewData` (the asset checks for an empty selection itself), `remove_small_files_from_listing`,
+  `add_newest_file_of_each_series`, `_LATE_FILE_LOOKBACK`, and `select_new_rows`'s
+  `_ProcessedFileListing` overload and branch. The `PowerTimeSeries` branch stays, because it is the
+  row dedupe that makes a re-download safe.
 - Docstrings that describe the removed behaviour are rewritten: the module docstring, the
   `time_series_coverage` docstring (the whole-table scan no longer runs twice an hour), the
   `TimeSeriesCoverage` docstring (lines 318-321, which says `select_new_rows` reads `last_time`),
@@ -244,16 +239,16 @@ The plan has had two simplicity reviews and three correctness reviews so far.
 ### `src/nged_substation_forecast/defs/assets.py` (`power_time_series_and_metadata`)
 
 - Read the ledger before the retry guard. Inside the guard, list, select with
-  `select_files_not_yet_downloaded`, compute each series' newest file from the whole listing, and
-  download. After the guard, filter the metadata to the series whose newest file was selected,
-  upsert the metadata when any remains (still swallowed on failure), dedupe the rows with
-  `select_new_rows`, append when any rows remain, then write the ledger (swallowed and reported on
-  failure). An empty selection still raises `NoNewData` and writes nothing.
-- Remove the size filter, the listing-level `select_new_rows`, and `add_newest_file_of_each_series`.
-  The `nged_s3_paths` table collapses its "Files above the size threshold", "Files with new data"
-  and "Files downloaded" rows to "Files not yet downloaded". The ledger write comes after the
-  `_PowerTimeSeriesSummary` table only if `tests/test_assets.py:557-560` still holds; otherwise
-  that comment is rewritten.
+  `select_files_not_yet_downloaded`, return early with an empty-ingest record when the selection is
+  empty, compute each series' newest file from the whole listing, and download. After the guard,
+  filter the metadata to the series whose newest file was selected, upsert the metadata when any
+  remains (still swallowed on failure), dedupe the rows with `select_new_rows`, append when any
+  rows remain, then write the ledger (swallowed and reported on failure).
+- Remove the size filter, the listing-level `select_new_rows`, the `NoNewData` handler, and
+  `add_newest_file_of_each_series`. The `nged_s3_paths` table collapses its "Files above the size
+  threshold", "Files with new data" and "Files downloaded" rows to "Files not yet downloaded". The
+  ledger write comes after the `_PowerTimeSeriesSummary` table only if `tests/test_assets.py:557-560`
+  still holds; otherwise that comment is rewritten.
 - The comments and docstring that call the metadata table "data NGED re-delivers every run"
   (`assets.py:202-207`) are rewritten: a lost metadata change now lasts until the series' next
   file. The asset docstring says the ledger exists, where it lives, and that a missing ledger
@@ -262,27 +257,26 @@ The plan has had two simplicity reviews and three correctness reviews so far.
 ### Docs and comments the change invalidates
 
 - `packages/nged_data/README.md`: remove the entries for the deleted functions, describe the new
-  ones.
+  ones and the concurrent download.
 - `docs/live_service/operations.md`: lines 234-235 ("The ingest downloads the newest file of every
   series, even a small file…") and lines 276-283 (a failed upsert: the ledger has recorded those
   files, and a silent series' note is restored by its next file). Add the cutover procedure, how
-  to force a re-download of a file (remove its row from the ledger), that a restore of the
-  `power_time_series` table to an older version needs the ledger deleted, and how to rebuild the
+  to force a re-download of a file (remove its row from the ledger), that putting an older or
+  different `power_time_series` table at its path needs the ledger deleted, how to rebuild the
   metadata table (delete `metadata.parquet` and the ledger, then run the ingest, which downloads
-  the whole bucket). `docs/live_service/intervention-log.md:208-211` records a past rebuild and
-  needs no edit.
-- Grep `docs/` and `src/` for `select_new_rows`, `_LATE_FILE_LOOKBACK`, `3 days`, `newest file`,
-  `re-lists NGED's bucket`, `re-delivers`, and `re-delivered`, and rewrite each remaining hit to
-  describe the present behaviour.
+  the whole bucket), and the first-run estimate of a few minutes.
+  `docs/live_service/intervention-log.md:208-211` records a past rebuild and needs no edit.
+- Grep `docs/` and `src/` for `select_new_rows`, `_LATE_FILE_LOOKBACK`, `NoNewData`, `3 days`,
+  `newest file`, `re-lists NGED's bucket`, `re-delivers`, and `re-delivered`, and rewrite each
+  remaining hit to describe the present behaviour.
 - Test docstrings, stubs and fixtures: `test_storage.py:307`, `tests/test_assets.py:237` ("derived
-  data NGED re-delivers"), `:388` (its premise is the size filter), and every fixture that builds
-  `_ProcessedFileListing` or `_RawFileListItem` without `last_modified` (`tests/test_assets.py:1463-1480`,
-  `:1523`; `test_storage.py:29-48`, `:379`, `:531`, `:626-628`, `:670-672`). `_FakeS3Store.list`
-  must return `last_modified` or every existing asset test fails. The stubs of
-  `download_and_parse_files` at `tests/test_assets.py:368, 430, 474, 520` keep their signature.
-- The `get_async` TODO in `download_and_parse_files` is deleted. The operations page's first-run
-  estimate becomes a few minutes. `packages/nged_data/README.md` mentions the concurrent
-  download.
+  data NGED re-delivers"), `:388` (its premise is the size filter), the two tests of `NoNewData`
+  (`test_storage.py:700` and `tests/test_assets.py:359`, rewritten for the empty-selection return),
+  and every fixture that builds `_ProcessedFileListing` or `_RawFileListItem` without
+  `last_modified` (`tests/test_assets.py:1463-1480`, `:1523`; `test_storage.py:29-48`, `:379`,
+  `:531`, `:626-628`, `:670-672`). `_FakeS3Store.list` must return `last_modified` or every
+  existing asset test fails. The stubs of `download_and_parse_files` at
+  `tests/test_assets.py:368, 430, 474, 520` keep their signature.
 - No change is needed to `checks.py`, `cleaning_assets.py`, `schedules.py`, or the
   `delta_store` package, because the plan adds no commit to the `power_time_series` table.
 
@@ -312,29 +306,29 @@ the new function does not exist, so the named mutation is the real test of each.
 
 1. **Equivalence replay** (`tests/test_assets.py`). `_FakeS3Store` gains a `get_async` (with a
    `bytes_async` on its result), a `last_modified` per file, a `put(path, data, last_modified)` for
-   adding files between runs, and a count of `get_async` calls.
-   Run the real asset over one replay twice, each time from empty storage: once normally, once with
-   `read_downloaded_files` monkeypatched to return an empty ledger every run, which downloads the
-   whole fake bucket each run. After each run, assert exact frame equality, ignoring row order, of
-   the two `power_time_series` tables and the two metadata parquet files. The replay: initial files
-   for 3 series; new files; a back-fill of old windows (files with `end_time` two months old, a new
-   path, and an `Information` note that differs from the live file's) for series that also have a
-   newer live file, which must add only the missing readings and leave the metadata unchanged; a
-   late file whose `end_time` is more than 3 days before its series' newest reading; a file that
-   appears in the bucket only after a later file was already downloaded; a series that stops
-   reporting and publishes a data-less file with a new `Information` note; a rewritten key (same
-   path, new `last_modified`) that adds one reading and changes the newest file's note; a run with
-   no new files. The two arms share the parsing code, so equality alone cannot catch a parsing bug.
-   The test therefore also asserts directly: the stopped series' new `Information` note is stored,
-   the late file's rows landed, the rewritten key's added reading landed, and the back-fill left
-   the metadata unchanged. The ledger arm's `get_async` count is asserted exactly on every run, and is
+   adding files between runs, and a count of `get_async` calls. Run the real asset over one replay
+   twice, each time from empty storage: once normally, once with `read_downloaded_files`
+   monkeypatched to return an empty ledger every run, which downloads the whole fake bucket each
+   run. After each run, assert exact frame equality, ignoring row order, of the two
+   `power_time_series` tables and the two metadata parquet files. The replay: initial files for 3
+   series; new files; a back-fill of old windows (files with `end_time` two months old, a new path,
+   and an `Information` note that differs from the live file's) for series that also have a newer
+   live file, which must add only the missing readings and leave the metadata unchanged; a late file
+   whose `end_time` is more than 3 days before its series' newest reading; a file that appears in
+   the bucket only after a later file was already downloaded; a series that stops reporting and
+   publishes a data-less file with a new `Information` note; a rewritten key (same path, new
+   `last_modified`) that adds one reading and changes the newest file's note; a run with no new
+   files. The two arms share the parsing code, so equality alone cannot catch a parsing bug. The
+   test therefore also asserts directly: the stopped series' new `Information` note is stored, the
+   late file's rows landed, the rewritten key's added reading landed, and the back-fill left the
+   metadata unchanged. The ledger arm's `get_async` count is asserted exactly on every run, and is
    zero on the run with no new files. The reference arm's count is every file, every run.
-2. **A run with nothing new does nothing.** A second run over an unchanged bucket makes zero `get_async`
-   calls, appends nothing, and leaves the ledger file unchanged. The mutation to catch is selecting
-   files within a window instead of by the ledger.
+2. **A run with nothing new does nothing.** A second run over an unchanged bucket makes zero
+   `get_async` calls, appends nothing, and leaves the ledger file unchanged. The mutation to catch
+   is selecting files within a window instead of by the ledger.
 3. **A data-less hour is recorded once.** A run whose only new file is data-less upserts the
-   metadata, appends no rows, and records the file, so the next run makes zero `get_async` calls. The
-   mutation to catch is not recording a file that yielded no rows.
+   metadata, appends no rows, and records the file, so the next run makes zero `get_async` calls.
+   The mutation to catch is not recording a file that yielded no rows.
 4. **`select_files_not_yet_downloaded`** excludes a file whose `(path, last_modified)` is in the
    ledger, includes one whose path is in the ledger with a different `last_modified`, includes a
    new path, and returns every file for an empty ledger. **`download_and_parse_files`** given a
@@ -351,16 +345,16 @@ the new function does not exist, so the named mutation is the real test of each.
    the ledger before the append, which fails the "rows are on disk" assertion once the patched
    write raises first.
 8. **The ledger's storage.** `read_downloaded_files` returns an empty typed frame for a missing
-   file, and raises, naming the path, for a corrupt one and for a transient error on a moto S3
-   bucket. A write followed by a read returns the same rows, on a local path and on moto S3
-   (reset per test, per `docs/architecture/testing.md`), and `last_modified` compares equal after
-   the round trip. `write_downloaded_files` de-duplicates on `path` keeping the later
-   `last_modified`.
+   file and for a missing power table, and raises, naming the path, for a corrupt file and for a
+   transient error on a moto S3 bucket. A write followed by a read returns the same rows, on a
+   local path and on moto S3 (reset per test, per `docs/architecture/testing.md`), and
+   `last_modified` compares equal after the round trip.
 9. **A rebuilt table re-downloads its history.** Run the asset, delete the `power_time_series`
    table, run again: the full history is downloaded and appended. The mutation to catch is a
-   ledger with no table id. A restore case: deleting only the ledger also re-downloads everything.
+   ledger read that ignores whether the table exists.
 10. **`download_and_parse_files`** returns metadata and an empty power frame when every file is
-    data-less.
+    data-less. The asset, given a bucket whose listing is already fully in the ledger, records an
+    empty ingest without calling the function.
 11. **Settings.** `downloaded_files_path` is covered by the enumerating settings tests.
 12. **The download order does not depend on completion order.** A fake store whose `get_async`
     finishes the later-window files first: of two overlapping files of one series that differ in a
@@ -395,24 +389,29 @@ uv run mkdocs build --strict    # read the rendered operations page
   data-less file has been parsed except each series' newest, so the first run also parses every
   historical data-less file, and one odd file would stall the ingest under the loud-failure rule.
   A second run that started before the first finished would find no ledger and append duplicate
-  rows, so the operator pauses the hourly schedule for the first run. An optional seeded cutover
-  avoids the historical data-less files: before the first deployed run, the operator writes a
-  ledger from the current listing, containing every file whose `LastModified` is more than 3 days
-  old, using `write_downloaded_files` in a documented snippet. Those files' rows are already in
-  the table, except for files the old 3-day rule had skipped, which are lost already. The first run
-  then downloads about 3 days of files. Recommend the unseeded first run with the schedule paused,
-  because a stall on an odd file is better found now than at v2 ingestion. Does the maintainer
-  prefer the seeded cutover?
+  rows. Recommend a seeded cutover, which avoids both: before the first deployed run, the operator
+  pauses the hourly schedule, lists the bucket, keeps the files whose `LastModified` is more than 3
+  days old, and writes them as the ledger with `write_downloaded_files` in a documented snippet.
+  Those files' rows are already in the table, except for files the old 3-day rule had skipped,
+  which are lost already. The first run then downloads about 3 days of files and writes the full
+  listing. The unseeded alternative takes a few minutes, with the schedule paused, and would show
+  an odd historical file now rather than at v2 ingestion. Does the maintainer prefer the unseeded
+  first run?
 - **No run-concurrency limit exists on the ingest.** The hazard of two overlapping runs appending
   the same rows exists today and the plan neither adds nor removes it. A `pool` of 1 for the asset
-  would remove it. Recommend a separate issue. The concurrent download shortens the first run to a
-  few minutes, so an overlap with the next hourly tick becomes unlikely, not impossible.
+  would remove it. Recommend a separate issue.
 - **A fresh table at Flexpectation v2 scale is parked.** About 2,500 series over 165 days is about
   1.65 million files. That needs chunked commits with a ledger write per chunk, and parsing in
   parallel, because sequential parsing at about 5 ms a file would take about 2 hours. NGED has said
   they plan to change how they deliver files before v2, without details, and the change may be
   delayed. The plan assumes the files keep today's layout and does not build this machinery. If
   NGED's change lands, the machinery may be moot.
+- **Should the concurrent download be its own pull request?** The simplicity review recommends it,
+  because the issue does not ask for the download, the seeded cutover removes the first-run need,
+  and the download adds about a quarter of the plan's tests. The maintainer asked for the download
+  to be folded in, so the plan keeps it. Splitting it out removes `_DOWNLOAD_CHUNK_FILES`,
+  `_MAX_REQUESTS_IN_FLIGHT`, `asyncio.run`, tests 12 to 14, and the async methods of the test fake,
+  and leaves a full rebuild taking 20 to 45 minutes.
 - **A stalled ingest on a contract violation.** At Flexpectation v2 scale, files from licence areas
   other than `EMids` will fail the `TimeSeriesMetadata` enum, and the ingest will stall on them
   until the contract is widened. Widening a contract needs the maintainer's agreement first, so
@@ -420,15 +419,14 @@ uv run mkdocs build --strict    # read the rendered operations page
   prefer that the ingest skips only files that are not valid JSON, with a circuit breaker and a
   Sentry event naming the file? Recommend no: `report_asset_degradation` takes no path tag and
   needs a fingerprint, and skipping gives up the guarantee that no readings are lost.
-- **Ledger size and rewrite cost.** The ledger grows by one row per downloaded file and is written
+- **Ledger size and rewrite cost.** The ledger holds one row per file in the bucket and is written
   whole each run that downloads a file. At 2,500 series for one year that is 3.65 million rows,
-  about 16 MB on disk, with a peak near 2.7 GB of memory while the listing, the ledger and the
-  merged ledger are all held. The implementer may key the ledger on integers (`time_series_id`,
-  `start_time`, `end_time`, `last_modified`) instead of path strings to cut memory. Neither is a
-  problem at 33 series.
-- **The ledger's home.** The `_DownloadedFiles` model is private to `storage.py`, like
-  `_ProcessedFileListing`, so no contract in `packages/contracts/` changes. It is nevertheless
-  persisted. Does the maintainer want it in `contracts` instead? Recommend `storage.py`.
+  about 16 MB on disk for two columns. The ledger has six columns, so the implementer may write
+  only the columns the anti-join needs (`path` and `last_modified`) and validate them with a
+  narrower read. Neither is a problem at 33 series.
+- **A partial listing shrinks the ledger.** If a listing omits files without raising, the next
+  ledger omits them, and the files are downloaded once more when they return. The row dedupe
+  absorbs the repeat. An empty listing selects nothing and writes nothing.
 - **Stored metadata no longer repairs itself every hour.** Since PR #1112, every run re-reads each
   series' newest file, so deleting `metadata.parquet` rebuilds it within an hour. After this
   change, a rebuild needs the ledger deleted too, which downloads the whole bucket, and a series
@@ -480,17 +478,33 @@ the ingest and cleaning assets, listing only recent windows, S3 event notificati
 manifest object.
 
 **Correctness review 3 (Opus, of the ledger design).** Accepted: the ledger was not tied to the
-table it describes, so a rebuilt or restored table would silently lose history, so the ledger now
-carries the table's Delta id (defect 1); `download_and_parse_files` must sort by `end_time` itself,
-because an anti-join does not keep order (defect 2); a failed ledger write is swallowed and
-reported, because raising stops the cleaning asset (defect 3, which also corrects the plan's
-earlier reason for raising); the replay test needs back-fill files with a differing note, a
-rewritten key that changes something observable, and exact `get` counts (defect 4); the ledger
-read moves outside the retry guard so that a ledger fault is not reported as an NGED outage
-(defect 5); missed comments, docstrings and settings tests are listed (finding 6); the cutover
-risks, including parsing every historical data-less file and the 22,000-request restart, are in
-Risks, and the recommendation is now a seeded cutover (finding 7); the peak-memory figure is
-corrected (finding 8); the metadata-rebuild procedure goes in the operations page (finding 9); the
-wording errors are fixed (finding 10). Rejected: nothing. The reviewer checked and cleared the
-`LastModified` round trip through parquet, transient S3 errors being mistaken for a missing file,
-the claim that no commit is added to the power table, and the ledger ordering in each crash case.
+table it describes, so a rebuilt table would silently lose history (defect 1; the fix is now the
+table-exists rule, after simplicity review 3 replaced the table id); `download_and_parse_files`
+must sort by `end_time` itself, because an anti-join does not keep order (defect 2); a failed
+ledger write is swallowed and reported, because raising stops the cleaning asset (defect 3); the
+replay test needs back-fill files with a differing note, a rewritten key that changes something
+observable, and exact call counts (defect 4); the ledger read moves outside the retry guard so
+that a ledger fault is not reported as an NGED outage (defect 5); missed comments, docstrings and
+settings tests are listed (finding 6); the cutover risks are in Risks (finding 7); the
+metadata-rebuild procedure goes in the operations page (finding 9); the wording errors are fixed
+(finding 10). Rejected: nothing. The reviewer checked and cleared the `LastModified` round trip
+through parquet, transient S3 errors being mistaken for a missing file, the claim that no commit is
+added to the power table, and the ledger ordering in each crash case.
+
+**Maintainer decisions after review 3.** The `asyncio` download is folded in, and NGED's planned
+change to file delivery is noted as an assumption.
+
+**Simplicity review 3 (Opus, wide net).** Accepted: the ledger is the last listing processed in
+full, which deletes the merge, the keep-later dedupe, the new `_DownloadedFiles` model, and the
+memory peak of three held frames; the Delta table id is dropped and the ledger is ignored when the
+power table does not exist, with a manual rule for restores and swapped tables; `NoNewData` is
+deleted and the asset checks for an empty selection; the local temp-file-and-rename write is
+dropped to match `upsert_metadata`; the cutover recommendation is now the seeded one, which also
+fixes a contradiction between the Risks section and this record. Rejected: inlining
+`select_files_not_yet_downloaded` into the asset, because a tested helper guards the Patito
+cross-model join trap. Left to the maintainer: moving the concurrent download to its own pull
+request, which the reviewer recommends and the maintainer asked to fold in (see Risks). The
+reviewer checked and kept the newest-file metadata filter, the ledger written after the append, the
+swallowed ledger-write and metadata-upsert failures, the ledger read outside the retry guard, and
+`last_modified` in the key, and rejected three stateless or already-stored alternatives that fail
+the "once" requirement.
