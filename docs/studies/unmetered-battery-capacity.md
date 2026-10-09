@@ -204,64 +204,93 @@ eye](assets/unmetered_battery_capacity_battery_a_in_bsp.svg)
 their nominal level on calendar replicas.** The 90% interval holds both the merchant power and the
 merchant energy in 202 of 280 replica fits (72.1%), against the 187 the rule required. The truths
 are 10 fresh draws, off the estimator's grid, on 7 series no earlier diagnostic touched, in all 4
-blocks, at a 40% share. On the replicas the 90% power interval holds the truth in 78.2% of fits and
-the energy interval in 73.9%. The median absolute power error is 0.36%. This control replaces an
-earlier pass that followed tuning on a scored block, which the [Limitations](#limitations) describe.
+blocks, at a 40% share. On the replicas the 90% power interval holds the truth in 77.9% of fits and
+the energy interval in 74.3%. Coverage varies by truth: both intervals hold in 39% of the fits of
+the worst truth and in 93% of the best, and in December to February the power interval holds in
+60.0% of fits. The median absolute power error is 0.36%. The rule is lenient for a nominal 90%
+interval, because two independent 90% intervals hold both truths in 81% of fits.
+
+**On real demand the same truths are covered in 280 of 280 fits, because the tempering widens the
+intervals.** The 90% power interval is 10% to 107% of the truth wide (median 31%). The median power
+estimate is 2.2% low, and 18.2% low on GSP1. The truths are dispatched by the same linear programme
+that the estimator interpolates, at a 40% share only, with usable durations of 1.65 to 1.94 hours.
+The control therefore tests the interpolation between precomputed schedules, and does not test the
+estimator on a real dispatch. The rule was written after an earlier control had been tuned and scored on the same
+series, so it is post hoc, and the control replaces that earlier one, which the
+[Limitations](#limitations) describe.
 
 ![Figure 10: The positive control passes its rule, but its intervals are narrower than 90% on
 replicas](assets/unmetered_battery_capacity_positive_control.svg)
 
-### With no battery added, 3 of 36 blocks are flagged
+### With no battery added, 3 of 36 blocks are flagged, all for one series
 
-**The false-alarm rate is 8.3% against a nominal 5%, and the three false alarms fall in June to
-August.** Planned contrast C1 holds: a one-sided exact binomial test against 5% gives p = 0.268. The
-false alarms are BSP2, S1, and S7 in June to August, and a detection rate is therefore read
-separately for June to August and for September to May. The cause of the June-to-August cluster is
-not isolated.
+**The false-alarm rate is 8.3% against a nominal 5%, and all three false alarms are GSP1's, in
+September to November, December to February, and March to May.** Planned contrast C1 holds: a
+one-sided exact binomial test against 5% gives p = 0.268. The test rejects only at 5 or more flags
+in 36 blocks (p = 0.032), and 4 flags (11.1%) give p = 0.104. GSP1's null log Bayes factors (-2.1,
+-2.1, -3.2, and -4.1 in the four blocks) lie just above the threshold built from the other 8 series
+(-3.2), and GSP1's baseline of false alarms therefore sits in every detection rate below, including
+the rates at the smallest shares. Rebuilding the thresholds without GSP1 flags 4 of the other 32
+null blocks (12.5%), in S3 and S2, so the threshold's false-alarm rate is uncertain by several
+percentage points with 36 null blocks. A threshold on the log Bayes factor is a percentile of the
+null blocks, and the values (-2.5 to -3.6) are negative, so a "detection" is a block that scores
+higher than 95% of the nulls and not a block with positive evidence.
 
-![Figure 12: With no battery added, 3 of 36 blocks are flagged, all in June to
-August](assets/unmetered_battery_capacity_false_alarms.svg)
+![Figure 12: With no battery added, 3 of 36 blocks are flagged, all of them
+GSP1](assets/unmetered_battery_capacity_false_alarms.svg)
 
 ### In the family, the 90% interval holds the truth from a 5% share
 
 **For a simulated merchant battery that follows the estimator's own model, the 90% power interval
 holds the truth in 100% of sums at shares of 5% to 20%, and the posterior beats a step statistic.**
-Planned contrast C2 fails when pooled over rungs 1 and 2: the 90% interval holds the power in 68.8%
-of sums (at least 80% was required). The pooled figure hides the spread by rung and share. Below a
-2% share the posterior equals the prior. Planned contrasts C3 and C4 hold in the family: the mean
-difference in relative power error (posterior minus step statistic) is -0.39 (95% interval -0.45 to
--0.32), and in relative energy error (posterior minus a rule of 2 hours times the power) -0.61
-(-0.77 to -0.46). Both are statistically significant at the 5% level, for in-family batteries only.
-The aggregate teaches the estimator the duration: the 90% width of the duration is 0.29 to 0.35 of
-its prior width at a 10% share, and 0.08 to 0.09 at 40%.
+The 50% interval is too wide there: it holds the truth in 90%, 91%, and 87% of sums at shares of
+5%, 10%, and 20%, against a nominal 50%. Planned contrast C2 fails when pooled over rungs 1 and 2:
+the 90% interval holds the power in 68.9% of sums (at least 80% was required). The pooled figure
+hides the spread by rung and share. Below a 2% share the posterior is the same as with no battery:
+its median sits at 2.8% to 3.2% of the 99th percentile at shares of 0.5% to 2%, against 2.6% with
+none (the prior's median is 13.5%). The estimator therefore reports a merchant battery of about
+2.6% of the 99th-percentile flow where none exists, so a small reported MW is the floor and not a
+battery. Planned contrasts C3 and C4 hold in the family: the mean difference in relative power
+error (posterior minus step statistic) is -0.39 (95% interval -0.45 to -0.33), and in relative
+energy error (posterior minus a rule of 2 hours times the power) -0.61 (-0.77 to -0.46). Both are
+statistically significant at the 5% level, for in-family batteries only. The aggregate teaches the
+estimator the duration: the 90% width of the duration is 0.29 to 0.35 of its prior width at a 10%
+share, and 0.08 to 0.09 at 40%.
 
 ![Figure 11: The 90% interval for a simulated merchant battery holds the truth from a 5% share; a
 domestic fleet's does not](assets/unmetered_battery_capacity_calibration.svg)
 
-### Batteries from outside the estimator's family are found but sized wrongly
+### Batteries from outside the estimator's family are found less often and sized wrongly
 
-**A battery that follows another rule is flagged about as often, but its interval misses the
-truth.** The rank rule charges in each day's cheapest and discharges in its dearest half-hours. The
-noisy price adds independent noise of standard deviation 0.2 to the price before the dispatch. The
-rank rule is flagged in 75%, 96%, and 99% of sums at shares of 10%, 20%, and 40%, but its 90% power
-interval holds the truth in 90%, 61%, and 25%, and its median absolute power error stays near 30%.
-The noisy price is flagged in 53% at a 40% share, with 6% coverage and a median absolute power error
-of 76%. At least half of the in-family sums are flagged from a battery of 2 noise units (4 outside
-June to August), the rank-rule sums from 4, and the noisy-price sums from 32. No bin of real public
-batteries up to 32 noise units has half of its sums flagged (21% at 32).
+**The rank-rule battery is flagged about as often as an in-family battery, the noisy-price battery
+far less often, and both are sized wrongly.** This section is post hoc: it was added after the
+first science review. The rank rule charges in each day's cheapest and discharges in its dearest
+half-hours. The noisy price adds independent noise of standard deviation 0.2 to the price before
+the dispatch. The rank rule is flagged in 44%, 83%, and 100% of sums at shares of 10%, 20%, and
+40%, but its 90% power interval holds the truth in 90%, 60%, and 26%, and its median absolute power
+error stays near 30%. The noisy price is flagged in 8%, 24%, and 52%, with 90% intervals holding
+the truth in 65%, 33%, and 6%, and a median absolute power error of 61% to 76%. At least half of
+the in-family sums are flagged from a battery of 4 noise units, the rank-rule sums from 8, and
+the noisy-price sums at no size we tested. Without GSP1 the three families reach half at 4, 4, and
+16 noise units.
 
-![Figure 13: Outside the estimator's family, large batteries are found but their size is
-wrong](assets/unmetered_battery_capacity_outside_family.svg)
+![Figure 13: In-family and rank-rule batteries are flagged above 4 to 8 noise units;
+noisy-price batteries barely](assets/unmetered_battery_capacity_outside_family.svg)
 
 ### A simulated domestic fleet is found only through its Agile homes
 
 **The fixed tariff windows are not identifiable, because the monthly baseline absorbs a schedule
 that repeats every day.** Detections of a simulated fleet come from the Agile unit, whose schedule
-follows a price that changes daily. The fleet is flagged in 69% of sums at a 20% share and 94% at
-40%, and in at most 17% at shares of 10% and below. Moving the windows one hour early leaves the
-detections, and moving the prices as well brings the flags to 1 of 36 at every share. The 90% power
-interval of a whole fleet holds the truth in 0% to 33% of sums (planned contrast C2 for fleets
-fails).
+follows a price that changes daily. The fleet is flagged in 31% of sums at a 20% share and 75% at
+40%, and in 8% (GSP1's false alarms) at shares of 10% and below. Moving the windows one hour early
+lowers the flags from 11 to 7 of 36 at a 20% share and from 27 to 25 at 40%, and moving the prices
+as well brings the flags to 2 of 36 at every share. The fitted power of each of the three
+fixed-window units sits at 79% to 95% of the scale of its prior (20% of the 99th-percentile flow),
+and not at zero, so a fleet's summed power is the prior's. The Agile unit's own 90% interval holds
+its simulated homes' rated power in 94% to 100% of sums at shares of 10% and above, so the Agile
+unit is both detected and sized. The 90% interval of the whole fleet's power holds the truth in 0%
+to 36% of sums (planned contrast C2 for fleets fails), because the fixed-window units add the
+prior's power to the sum.
 
 ![Figure 14: A simulated domestic fleet is found only through its Agile homes, and not below a 20%
 share](assets/unmetered_battery_capacity_fleets.svg)

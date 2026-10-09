@@ -609,6 +609,13 @@ def rung4_section(*, rung4: pl.DataFrame, nulls: pl.DataFrame) -> list[str]:
         f"multiple {m}: {m * battery_p99 / flow_p99:.1%}"
         for m in sorted(frame["multiple"].unique().to_list())
     )
+    change = np.diff(nged["BSP1"])
+    change = change[np.isfinite(change)]
+    noise_unit = 1.4826 * float(np.median(np.abs(change - np.median(change))))
+    noise_units = ", ".join(
+        f"multiple {m}: {m * battery_p99 / noise_unit:.1f}"
+        for m in sorted(frame["multiple"].unique().to_list())
+    )
     return [
         "## Rung 4: NGED battery A inside a bulk supply point's flow (exploratory, one site)",
         "",
@@ -623,6 +630,13 @@ def rung4_section(*, rung4: pl.DataFrame, nulls: pl.DataFrame) -> list[str]:
         (
             "The battery's metered 99th-percentile output at each multiple, as a share of BSP1's "
             f"99th-percentile flow: {shares}."
+        ),
+        "",
+        (
+            "The same power in noise units, taking the noise unit as the robust standard "
+            f"deviation of BSP1's raw half-hour changes ({noise_unit:.2f} MW; rung 1's noise "
+            f"unit is the same statistic of the residual after the baseline and solar are "
+            f"removed): {noise_units}."
         ),
         "",
         (
