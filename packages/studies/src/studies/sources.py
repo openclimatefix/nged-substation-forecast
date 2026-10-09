@@ -375,6 +375,21 @@ others, with the CAMS satellite retrieval."""
 OBSERVATIONS_DOWNLOADS_DIR: Final[Path] = DOWNLOADS_DIR / "observations"
 """Measurements: weather stations, the SARAH-3 satellite retrieval, and NGED's own exports."""
 
+MARKET_DOWNLOADS_DIR: Final[Path] = DOWNLOADS_DIR / "market"
+"""GB electricity-market downloads, one folder per source.
+
+The folders hold electricity prices, the carbon intensity of the GB electricity grid, and the
+balancing-market dispatch, physical notifications, and bid-offer prices of individual balancing
+mechanism units. They also hold the National Energy System Operator's (NESO) Enduring Auction
+Capability (EAC) results with a table linking auction units to balancing mechanism units, and
+system-wide series: frequency, demand, generation by fuel type, demand and wind forecasts,
+balancing services adjustments, and system warnings.
+
+Most folders hold a tidy parquet per table, a `README.md`, a `lineage.json`, and a `_day_cache/`
+of the per-day chunks that let a re-run of the download resume. `neso_eac_unit_to_bmu/` holds two
+CSV files, a `README.md`, and a `lineage.json`, and no cache.
+"""
+
 PER_STUDY_DIR: Final[Path] = STUDIES_DATA_DIR / "per_study"
 """The layer of `data/studies/` that holds one folder per study.
 
@@ -742,6 +757,15 @@ SOLAR_BMU_CENSUS_INPUTS_DIR: Final[Path] = SOLAR_BMU_CENSUS_DIR / "inputs"
 
 SOLAR_BMU_DISAGGREGATION_DIR: Final[Path] = study_dir_for(study="solar_disaggregation")
 """The study of separating solar output from aggregate BMUs: fits, saved series, and `report.md`."""
+
+BATTERY_PV_SEPARATION_DIR: Final[Path] = study_dir_for(study="battery_pv_separation")
+"""The study of separating batteries from solar: the BMU list, saved series, and `report.md`."""
+
+NGED_BATTERY_A_FIGURES_DIR: Final[Path] = BATTERY_PV_SEPARATION_DIR / "nged_battery_a_figures"
+"""Where the private NGED battery case study writes its figures: outside `docs/`, unpublished."""
+
+MARKET_DOWNLOADS_DIR: Final[Path] = DOWNLOADS_DIR / "market"
+"""Public GB electricity-market downloads: day-ahead and system prices, the EPEX index, carbon."""
 
 NFC_STUDY_DIR: Final[Path] = study_dir_for(study="nwp_forecast_comparison")
 """The folder of the NWP forecast comparison, one subfolder per batch of fits."""
