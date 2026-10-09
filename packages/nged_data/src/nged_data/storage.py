@@ -162,6 +162,13 @@ class _DownloadedFiles(pt.Model):
     last_modified: int = pt.Field(dtype=UTC_DATETIME_DTYPE)
 
 
+class NgedFileParseError(ValueError):
+    """Raised when an NGED file is malformed or breaks the `TimeSeriesMetadata` contract.
+
+    Parsing is deterministic, so retrying the download cannot fix the file.
+    """
+
+
 class DownloadedFilesError(Exception):
     """Raised when the stored downloaded-files list cannot be read or fails validation.
 
@@ -202,9 +209,8 @@ def read_downloaded_files(
         The stored `path` and `last_modified` of each file, or an empty frame of the same type.
 
     Raises:
-        DownloadedFilesError: if the list file exists but cannot be read or fails validation. A
-            transient object-store error from an existence check is not wrapped, so the caller's
-            retry guard can retry it.
+        DownloadedFilesError: if the list file exists but is damaged or fails validation. A
+            transient object-store error is not wrapped, so the caller's retry guard can retry it.
     """
     if not (
         object_exists(downloaded_files_path, storage_options)
@@ -213,12 +219,18 @@ def read_downloaded_files(
     ):
         log.info(f"No usable downloaded-files list at {downloaded_files_path}; using an empty one.")
         return _empty_downloaded_files()
+    # A local parquet file can be torn or truncated. An object-store write replaces the object in
+    # one request, so a remote file can only be off-contract, and a Polars error reading it is a
+    # transient object-store error that the caller's retry guard should retry.
+    unreadable_errors: tuple[type[Exception], ...] = (pt.exceptions.DataFrameValidationError,)
+    if not is_remote_uri(downloaded_files_path):
+        unreadable_errors += (pl.exceptions.PolarsError, OSError)
     try:
         stored = pl.read_parquet(
             downloaded_files_path, storage_options=typeddict_to_dict(storage_options)
         )
         return pt.DataFrame(_DownloadedFiles.validate(stored)).set_model(_DownloadedFiles)
-    except (pl.exceptions.PolarsError, pt.exceptions.DataFrameValidationError, OSError) as exc:
+    except unreadable_errors as exc:
         raise DownloadedFilesError(
             f"Could not read the downloaded-files list at {downloaded_files_path}. Delete the"
             " file to download every file in NGED's bucket again."
@@ -272,13 +284,11 @@ def select_files_not_yet_downloaded(
         downloaded_files: The listing that the ingest last processed in full.
 
     Returns:
-        The selected files in ascending `end_time` order.
+        The selected files, in no particular order.
     """
     # Strip the Patito model so Polars' cross-subclass join check accepts the right-hand frame.
     plain_downloaded_files = pl.DataFrame._from_pydf(downloaded_files._df)
-    selected = file_listing.join(
-        plain_downloaded_files, on=["path", "last_modified"], how="anti"
-    ).sort("end_time", "path")
+    selected = file_listing.join(plain_downloaded_files, on=["path", "last_modified"], how="anti")
     return pt.DataFrame(selected).set_model(_ProcessedFileListing).validate()
 
 
@@ -335,8 +345,8 @@ def _parse_file(
         null or empty.
 
     Raises:
-        ValueError: if the file is malformed or breaks the `TimeSeriesMetadata` contract. The
-            message names `path`.
+        NgedFileParseError: if the file is malformed or breaks the `TimeSeriesMetadata` contract.
+            The message names `path`.
     """
     try:
         df = pl.read_json(json_bytes)
@@ -351,7 +361,7 @@ def _parse_file(
             )
             return metadata, None
     except Exception as exc:
-        raise ValueError(f"Could not parse the NGED file {path}") from exc
+        raise NgedFileParseError(f"Could not parse the NGED file {path}") from exc
     return metadata, extracted
 
 
@@ -361,9 +371,8 @@ def download_and_parse_files(
     """Download and parse each listed file, in ascending `end_time` order.
 
     Two files can cover overlapping periods for the same `time_series_id`. The function sorts its
-    input by `end_time` itself, because an anti-join does not keep the listing's order. Processing
-    in that order means the more recent file's readings overwrite the older file's duplicate rows,
-    in the `unique(..., keep="last")` dedupes below.
+    input by `end_time` itself. Processing in that order means the more recent file's readings
+    overwrite the older file's duplicate rows, in the `unique(..., keep="last")` dedupes below.
 
     The function works through the sorted input in chunks of `_DOWNLOAD_CHUNK_FILES`. Per chunk it
     fetches all the files concurrently, at most `_MAX_REQUESTS_IN_FLIGHT` at a time, through
@@ -381,8 +390,9 @@ def download_and_parse_files(
         the metadata is still returned and the power frame is empty.
 
     Raises:
-        ValueError: if a file is malformed or breaks the `TimeSeriesMetadata` contract. The message
-            names the file's path. The first failing request also raises, out of `asyncio.run`.
+        NgedFileParseError: if a file is malformed or breaks the `TimeSeriesMetadata` contract. The
+            message names the file's path. The first failing request also raises, out of
+            `asyncio.run`.
     """
     paths = paths_df.sort("end_time", "path")["path"].to_list()
     metadata_dfs: list[pt.DataFrame[TimeSeriesMetadata]] = []

@@ -468,12 +468,12 @@ and then writes the whole listing as the new list. A file that NGED rewrites get
 `LastModified`, so the ingest downloads it again.
 
 **Run the ingest once by hand on a new deployment.** With no list, the first run downloads every
-file in the bucket: about 22,000 files for the 33 series and 165 days of history at the time of
-writing. Time one request first to estimate the run, and expect a few minutes, since the ingest keeps
-at most 32 requests open at a time. The `NGED_INGEST` concurrency pool queues any scheduled run
-behind the first run, so the two cannot append the same rows. Dagster's YAML takes no per-pool
-limits, so set the pool's limit of 1 with `dagster instance concurrency set NGED_INGEST 1`. The first
-run also parses every historical file that has no readings, so a malformed old file fails the run
+file in the bucket: about 22,000 files (33 series, 165 days of history). Time one request first to
+estimate the run, and expect a few minutes, since the ingest keeps at most 32 requests open at a
+time. Before the first run, set the `NGED_INGEST` pool's limit to 1 with `dagster instance
+concurrency set NGED_INGEST 1`, because Dagster's YAML takes no per-pool limits and its
+`default_limit` would otherwise apply. The pool then queues any scheduled run behind the first run,
+so the two cannot append the same rows. The first run also parses every historical file that has no readings, so a malformed old file fails the run
 (see the last paragraph of this section).
 
 **Rebuild a table by deleting it.** The ingest counts the list as empty, and downloads every file
@@ -493,8 +493,8 @@ reading's time.
 **A `DownloadedFilesError` means the list is damaged, and the ingest stops until you delete it.**
 The error message names the file's path, and Sentry shows the same message instead of an NGED
 bucket error. The ingest stops rather than reading a damaged list as empty, because an empty list
-would download the whole bucket. After the same kind of change to the list's columns, delete the list
-too. The next run downloads every file, and the row dedupe drops the readings already on disk.
+would download the whole bucket. After a change to the list's columns, delete the list too. The next
+run downloads every file, and the row dedupe drops the readings already on disk.
 
 **A failed list write is reported and does not fail the run.** A Sentry event tagged
 `degraded_asset:power_time_series_and_metadata` whose message names the downloaded-files list's path
@@ -502,9 +502,9 @@ means the readings landed and the list write failed. The next run downloads the 
 and the row dedupe drops their readings.
 
 **A malformed file, or a file that breaks the `TimeSeriesMetadata` contract, fails the run and
-records nothing.** The error names the file's path. The same file is selected every hour, so the
-ingest stalls until someone fixes the cause, and no readings are lost. After the fix, the next run
-ingests the whole backlog.
+records nothing.** The run fails with a `NgedFileParseError` naming the file's path, and is not
+retried. The same file is selected every hour, so the ingest stalls until someone fixes the cause,
+and no readings are lost. After the fix, the next run ingests the whole backlog.
 
 ## Inspecting a live forecast
 

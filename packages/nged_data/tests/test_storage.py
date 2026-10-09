@@ -13,6 +13,7 @@ from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from nged_data import storage
 from nged_data.storage import (
     DownloadedFilesError,
+    NgedFileParseError,
     _DownloadedFiles,
     _process_file_listing,
     _ProcessedFileListing,
@@ -554,7 +555,7 @@ def _downloaded(*rows: tuple[str, datetime]) -> pt.DataFrame[_DownloadedFiles]:
     return pt.DataFrame(frame).set_model(_DownloadedFiles).validate()
 
 
-def test_select_files_not_yet_downloaded_selects_new_and_rewritten_files_in_end_time_order():
+def test_select_files_not_yet_downloaded_selects_new_and_rewritten_files():
     known_file = _key(1, 1_774_533_600_000)
     rewritten_file = _key(2, 1_774_555_200_000)
     new_file = _key(3, 1_774_520_000_000)
@@ -565,7 +566,7 @@ def test_select_files_not_yet_downloaded_selects_new_and_rewritten_files_in_end_
 
     result = select_files_not_yet_downloaded(file_listing=listing, downloaded_files=downloaded)
 
-    assert result["path"].to_list() == [new_file, rewritten_file]
+    assert set(result["path"]) == {new_file, rewritten_file}
     _ProcessedFileListing.validate(result)
 
 
@@ -576,7 +577,7 @@ def test_select_files_not_yet_downloaded_selects_everything_for_an_empty_list():
         file_listing=_listing_of(paths), downloaded_files=_downloaded()
     )
 
-    assert result["path"].to_list() == paths
+    assert set(result["path"]) == set(paths)
 
 
 def _power_table_and_metadata(tmp_path: Path) -> tuple[Path, Path]:
@@ -589,7 +590,7 @@ def _power_table_and_metadata(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def _read(
-    tmp_path: Path, downloaded_files_path: Path, power_path: Path, metadata_path: Path
+    downloaded_files_path: Path, power_path: Path, metadata_path: Path
 ) -> pt.DataFrame[_DownloadedFiles]:
     return read_downloaded_files(
         downloaded_files_path=str(downloaded_files_path),
@@ -604,7 +605,7 @@ def test_downloaded_files_survive_a_write_and_a_read_with_microseconds(tmp_path:
     listing = _listing_of([_key(1, 1_774_533_600_000)])
 
     write_downloaded_files(downloaded_files_path=str(downloaded_files_path), listing=listing)
-    result = _read(tmp_path, downloaded_files_path, power_path, metadata_path)
+    result = _read(downloaded_files_path, power_path, metadata_path)
 
     assert result.rows() == [(listing["path"][0], _LAST_MODIFIED)]
     assert select_files_not_yet_downloaded(listing, result).is_empty()
@@ -629,7 +630,7 @@ def test_write_downloaded_files_keeps_the_previous_list_when_the_rename_fails(
         )
     monkeypatch.undo()
 
-    assert _read(tmp_path, downloaded_files_path, power_path, metadata_path)["path"].to_list() == (
+    assert _read(downloaded_files_path, power_path, metadata_path)["path"].to_list() == (
         first["path"].to_list()
     )
 
@@ -643,11 +644,11 @@ def test_read_downloaded_files_is_empty_unless_the_list_the_table_and_the_metada
         downloaded_files_path=str(downloaded_files_path),
         listing=_listing_of([_key(1, 1_774_533_600_000)]),
     )
-    assert _read(tmp_path, downloaded_files_path, power_path, metadata_path).height == 1
+    assert _read(downloaded_files_path, power_path, metadata_path).height == 1
 
-    missing_list = _read(tmp_path, tmp_path / "absent.parquet", power_path, metadata_path)
-    missing_table = _read(tmp_path, downloaded_files_path, tmp_path / "absent.delta", metadata_path)
-    missing_metadata = _read(tmp_path, downloaded_files_path, power_path, tmp_path / "absent.pq")
+    missing_list = _read(tmp_path / "absent.parquet", power_path, metadata_path)
+    missing_table = _read(downloaded_files_path, tmp_path / "absent.delta", metadata_path)
+    missing_metadata = _read(downloaded_files_path, power_path, tmp_path / "absent.pq")
 
     for result in (missing_list, missing_table, missing_metadata):
         assert result.is_empty()
@@ -660,7 +661,7 @@ def test_read_downloaded_files_raises_a_named_error_for_a_corrupt_file(tmp_path:
     downloaded_files_path.write_bytes(b"not a parquet file")
 
     with pytest.raises(DownloadedFilesError, match=r"downloaded_files\.parquet"):
-        _read(tmp_path, downloaded_files_path, power_path, metadata_path)
+        _read(downloaded_files_path, power_path, metadata_path)
 
 
 def test_read_downloaded_files_raises_a_named_error_for_a_file_off_contract(tmp_path: Path):
@@ -669,7 +670,7 @@ def test_read_downloaded_files_raises_a_named_error_for_a_file_off_contract(tmp_
     pl.DataFrame({"path": ["a"], "unexpected": [1]}).write_parquet(downloaded_files_path)
 
     with pytest.raises(DownloadedFilesError, match=r"downloaded_files\.parquet"):
-        _read(tmp_path, downloaded_files_path, power_path, metadata_path)
+        _read(downloaded_files_path, power_path, metadata_path)
 
 
 def test_read_downloaded_files_does_not_wrap_a_transient_error_from_an_existence_check(
@@ -687,14 +688,6 @@ def test_read_downloaded_files_does_not_wrap_a_transient_error_from_an_existence
             metadata_path=str(tmp_path / "m.parquet"),
         )
     assert not isinstance(excinfo.value, DownloadedFilesError)
-
-
-def _file_without_readings(*, time_series_id: int, data_field: str) -> bytes:
-    """A real NGED file's metadata fields, with the given `data` field instead of readings."""
-    fixture = Path(__file__).parent / "data" / "TimeSeries_10.json"
-    file_contents = json.loads(fixture.read_text())
-    file_contents.update(TimeSeriesID=time_series_id, data=json.loads(data_field))
-    return json.dumps(file_contents).encode()
 
 
 def _file_with_readings(
@@ -794,7 +787,7 @@ def test_download_and_parse_files_names_the_path_of_a_malformed_file():
         }
     )
 
-    with pytest.raises(ValueError, match=bad_path):
+    with pytest.raises(NgedFileParseError, match=bad_path):
         download_and_parse_files(
             store=_as_store(store), paths_df=_listing_of([good_path, bad_path])
         )
@@ -825,9 +818,14 @@ def test_download_and_parse_files_keeps_the_later_window_whatever_order_requests
     assert result.metadata["information"].to_list() == ["later note"]
 
 
-def test_download_and_parse_files_is_concurrent_and_capped(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(storage, "_MAX_REQUESTS_IN_FLIGHT", 8)
-    paths = [_key(11, 1_774_533_600_000 + i * 21_600_000) for i in range(100)]
+def test_download_and_parse_files_is_concurrent_and_capped_across_chunks(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A sequential loop has a peak of 1, a missing semaphore a peak of 10, and a semaphore made at
+    module level raises `RuntimeError` on the second chunk's event loop."""
+    monkeypatch.setattr(storage, "_DOWNLOAD_CHUNK_FILES", 3)
+    monkeypatch.setattr(storage, "_MAX_REQUESTS_IN_FLIGHT", 2)
+    paths = [_key(11, 1_774_533_600_000 + i * 21_600_000) for i in range(10)]
     store = _FakeAsyncStore(
         {
             path: _file_with_readings(time_series_id=11, information=None, values=[1.0])
@@ -836,27 +834,10 @@ def test_download_and_parse_files_is_concurrent_and_capped(monkeypatch: pytest.M
         delays=dict.fromkeys(paths, 0.01),
     )
 
-    download_and_parse_files(store=_as_store(store), paths_df=_listing_of(paths))
-
-    assert 1 < store.peak_in_flight <= 8
-
-
-def test_download_and_parse_files_reuses_the_cap_across_chunks(monkeypatch: pytest.MonkeyPatch):
-    """A semaphore made at module level would raise `RuntimeError` on the second chunk's loop."""
-    monkeypatch.setattr(storage, "_DOWNLOAD_CHUNK_FILES", 3)
-    monkeypatch.setattr(storage, "_MAX_REQUESTS_IN_FLIGHT", 2)
-    paths = [_key(11, 1_774_533_600_000 + i * 21_600_000) for i in range(10)]
-    store = _FakeAsyncStore(
-        {
-            path: _file_with_readings(time_series_id=11, information=None, values=[1.0])
-            for path in paths
-        }
-    )
-
     result = download_and_parse_files(store=_as_store(store), paths_df=_listing_of(paths))
 
     assert result.metadata.height == 1
-    assert store.peak_in_flight <= 2
+    assert 1 < store.peak_in_flight <= 2
 
 
 def test_download_and_parse_files_raises_when_a_request_fails():
@@ -871,3 +852,23 @@ def test_download_and_parse_files_raises_when_a_request_fails():
 
     with pytest.raises(OSError, match="request failed"):
         download_and_parse_files(store=_as_store(store), paths_df=_listing_of(paths))
+
+
+def test_read_downloaded_files_does_not_wrap_a_polars_error_reading_a_remote_file(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """An object-store write is atomic, so a Polars error reading a remote list is transient."""
+    monkeypatch.setattr(storage, "object_exists", lambda uri, storage_options=None: True)
+    monkeypatch.setattr(storage, "delta_table_exists", lambda uri, storage_options=None: True)
+
+    def fail(*args: object, **kwargs: object) -> pl.DataFrame:
+        raise pl.exceptions.ComputeError("connection reset")
+
+    monkeypatch.setattr(pl, "read_parquet", fail)
+
+    with pytest.raises(pl.exceptions.ComputeError):
+        read_downloaded_files(
+            downloaded_files_path="s3://bucket/downloaded_files.parquet",
+            power_table_path="s3://bucket/power.delta",
+            metadata_path="s3://bucket/metadata.parquet",
+        )

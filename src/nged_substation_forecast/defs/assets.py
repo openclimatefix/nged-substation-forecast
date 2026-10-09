@@ -59,6 +59,7 @@ from geo.great_britain.load import load_gb_boundary
 from geo.h3 import compute_h3_grid_weights_for_boundary
 from nged_data.storage import (
     DownloadedFilesError,
+    NgedFileParseError,
     UpsertMetadataStats,
     _ProcessedFileListing,
     download_and_parse_files,
@@ -113,11 +114,13 @@ def _write_downloaded_files_or_degrade(
         )
         # A distinct fingerprint, because this event shares the `degraded_asset` tag with the
         # metadata upsert's, and a message naming the path, so the alert says which file failed.
+        reported = RuntimeError(
+            f"Could not write the downloaded-files list at {downloaded_files_path}: {exc!r}"
+        )
+        reported.__cause__ = exc
         report_asset_degradation(
             asset_name="power_time_series_and_metadata",
-            exc=RuntimeError(
-                f"Could not write the downloaded-files list at {downloaded_files_path}"
-            ).with_traceback(exc.__traceback__),
+            exc=reported,
             fingerprint=["downloaded_files_write_failed"],
         )
 
@@ -162,11 +165,10 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     after the readings have landed, so a crash makes the next run download the files again and the
     row dedupe drops the repeats. The list counts as empty, and the run downloads every file in the
     bucket, when the list file, the ``power_time_series`` table, or the metadata parquet does not
-    exist. That is how a fresh install and a rebuild work. A list that exists but cannot be read
-    stops the run with ``DownloadedFilesError`` instead, because reading it as empty would download
-    the whole bucket. A malformed file, or one that breaks the ``TimeSeriesMetadata`` contract,
-    fails the run and records nothing, so the ingest stalls on that file until the cause is fixed
-    and no readings are lost.
+    exist. A damaged list stops the run with ``DownloadedFilesError``, and a malformed NGED file
+    stops it with ``NgedFileParseError``. Both stalls lose no readings. See
+    https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/ for the
+    first run, rebuilds, and these errors.
 
     Runs hourly on ``power_time_series_and_metadata_schedule``, 5 minutes before
     ``live_forecasts_schedule`` ticks. A failed or skipped run leaves nothing behind to repair: the
@@ -226,20 +228,11 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
             )
             return
 
-        # A series' metadata comes only from its newest file in the whole listing, and only on a
-        # run that selected that file. A late or back-filled file has an old `end_time`, and
-        # `upsert_metadata` replaces a series wholesale, so its metadata would otherwise overwrite
-        # the series' current `Information` note. The newest file of a series may have been
-        # downloaded in an earlier hour, so it is found in the whole listing, not the selection.
-        newest_file_of_each_series = (
-            list_of_all_json_files.sort("end_time", "path").group_by("time_series_id").last()
-        )
-        series_ids_with_newest_file_selected = newest_file_of_each_series.filter(
-            pl.col("path").is_in(list_of_files_to_download["path"].to_list())
-        )["time_series_id"]
         downloaded = download_and_parse_files(store, list_of_files_to_download)
-    except DownloadedFilesError:
-        raise  # Our own storage is damaged. A retry cannot fix it, and Sentry should say so.
+    except DownloadedFilesError, NgedFileParseError:
+        # Our own storage is damaged, or NGED sent a file we cannot parse. A retry cannot fix
+        # either, so the failure must reach Sentry under its own name instead of as a bucket error.
+        raise
     except BaseException as exc:
         # `BaseException` for the same reason as `checks.py::power_data_is_fresh`: obstore, delta-rs
         # and polars each define their own exception classes and a Rust panic is not an `Exception`,
@@ -254,6 +247,18 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
             seconds_to_wait=_POWER_INGEST_RETRY_DELAY_SECONDS,
         ) from exc
     new_power_ts = downloaded.power_time_series
+
+    # A series' metadata comes only from its newest file in the whole listing, and only on a run
+    # that selected that file. A late or back-filled file has an old `end_time`, and
+    # `upsert_metadata` replaces a series wholesale, so its metadata would otherwise overwrite the
+    # series' current `Information` note. The newest file of a series may have been downloaded in an
+    # earlier hour, so it is found in the whole listing, not the selection.
+    newest_file_of_each_series = (
+        list_of_all_json_files.sort("end_time", "path").group_by("time_series_id").last()
+    )
+    series_ids_with_newest_file_selected = newest_file_of_each_series.filter(
+        pl.col("path").is_in(list_of_files_to_download["path"].to_list())
+    )["time_series_id"]
     new_metadata = pt.DataFrame(
         downloaded.metadata.filter(
             pl.col("time_series_id").is_in(series_ids_with_newest_file_selected.to_list())
@@ -278,27 +283,18 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     # downloaded-files list is still written below, because holding it back would make every later
     # hour download a growing backlog. What that costs in full:
     # https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/
-    if new_metadata.is_empty():
-        upsert_metadata_stats = UpsertMetadataStats(
-            metadata_n_new_TimeSeriesIDs=0, metadata_n_updated_TimeSeriesIDs=0
+    try:
+        upsert_metadata_stats = upsert_metadata(
+            new_metadata=new_metadata, metadata_path=metadata_path, storage_options=storage_options
         )
-    else:
-        try:
-            upsert_metadata_stats = upsert_metadata(
-                new_metadata=new_metadata,
-                metadata_path=metadata_path,
-                storage_options=storage_options,
-            )
-        except BaseException as exc:
-            # The same guard as the asset checks, for the same reason — see the comment in
-            # `checks.py::power_data_is_fresh` for why `BaseException` and what it costs in tests.
-            if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
-                raise  # A cancelled run must cancel.
-            context.log.exception(
-                f"Could not upsert the TimeSeriesMetadata table at {metadata_path}"
-            )
-            report_asset_degradation(asset_name="power_time_series_and_metadata", exc=exc)
-            upsert_metadata_stats = UpsertMetadataStats(metadata_upsert_failed=repr(exc))
+    except BaseException as exc:
+        # The same guard as the asset checks, for the same reason — see the comment in
+        # `checks.py::power_data_is_fresh` for why `BaseException` and what it costs in tests.
+        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+            raise  # A cancelled run must cancel.
+        context.log.exception(f"Could not upsert the TimeSeriesMetadata table at {metadata_path}")
+        report_asset_degradation(asset_name="power_time_series_and_metadata", exc=exc)
+        upsert_metadata_stats = UpsertMetadataStats(metadata_upsert_failed=repr(exc))
 
     context.add_output_metadata(upsert_metadata_stats)
 
@@ -313,8 +309,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     # Record the listing last, so the downloaded-files list is never ahead of the readings: a crash
     # before this write leaves the old list, and the next run downloads the unrecorded files again
     # while `select_new_rows` drops their rows. A failed write is swallowed because the rows have
-    # landed, and raising would stop `clean_nged_power_data` in the same job. The next run
-    # downloads the unrecorded files again.
+    # landed, and raising would stop `clean_nged_power_data` in the same job.
     _write_downloaded_files_or_degrade(
         context=context,
         downloaded_files_path=downloaded_files_path,

@@ -770,37 +770,20 @@ def test_a_run_with_nothing_new_downloads_nothing_and_leaves_the_files_unchanged
     assert metadata["metadata_n_new_TimeSeriesIDs"].value == 0
 
 
-def test_a_data_less_file_is_downloaded_once_and_its_note_is_stored(
-    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
-) -> None:
-    store = _FakeS3Store(_NGED_FILES)
-    _use_store(monkeypatch, store)
-    _run(dagster_instance)
-    version = _delta_version(env)
-    data_less_key = _key(10, 100_000)
-    store.put(data_less_key, _data_less_file(10, "stopped reporting"))
-
-    _run(dagster_instance)
-    _run(dagster_instance)
-
-    assert store.requested_paths.count(data_less_key) == 1
-    assert _delta_version(env) == version
-    notes = dict(pl.read_parquet(env / _METADATA).select("time_series_id", "information").rows())
-    assert notes[10] == "stopped reporting"
-
-
-def test_a_malformed_file_fails_the_run_and_records_nothing(
+def test_a_malformed_file_fails_the_run_without_a_retry_and_records_nothing(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
     store = _FakeS3Store({**_NGED_FILES, _key(10, 100_000): b"{not json"})
     _use_store(monkeypatch, store)
-    monkeypatch.setattr(target=assets, name="_POWER_INGEST_RETRY_DELAY_SECONDS", value=0)
 
-    _run(dagster_instance, succeeds=False)
+    result = _run(dagster_instance, succeeds=False)
 
     assert not (env / _DELTA).exists()
     assert not (env / _METADATA).exists()
     assert not (env / _DOWNLOADED_FILES).exists()
+    assert len(store.requested_paths) == len(store._files)
+    failures = [event for event in result.all_events if event.is_step_failure]
+    assert "NgedFileParseError" in str(failures[0].step_failure_data.error)
 
 
 def test_the_downloaded_files_list_is_never_ahead_of_the_rows(
@@ -904,7 +887,6 @@ def test_a_corrupt_downloaded_files_list_stops_the_run_without_a_retry_or_a_list
     assert reads == 1
     assert store.n_list_calls == n_lists
     failures = [event for event in result.all_events if event.is_step_failure]
-    assert "DownloadedFilesError" in str(failures[0].step_failure_data.error)
     assert DownloadedFilesError.__name__ in str(failures[0].step_failure_data.error)
 
 
