@@ -125,7 +125,7 @@ class Signals:
 
     Attributes:
         stacks: For each stack unit, the schedules on the grid of durations, efficiencies, and
-            cycle caps, positive for export; shape (stack units, n_d * n_e * 2, T), where the node
+            cycle caps, positive for export; shape (stack units, n_d x n_e x 2, T), where the node
             index is `(i_d * n_e + i_e) * 2 + cap`.
         duration_nodes: The stack's usable durations in hours, increasing and log-spaced; (n_d,).
         efficiency_nodes: The stack's round-trip efficiencies, increasing; (n_e,).
@@ -153,7 +153,7 @@ def make_signals(
     """Move the policy signals onto the device.
 
     Args:
-        stacks: Shape (stack units, n_d * n_e * 2, T).
+        stacks: Shape (stack units, n_d x n_e x 2, T).
         duration_nodes: Shape (n_d,).
         efficiency_nodes: Shape (n_e,).
         fixed_charge: Shape (window units, T).
@@ -556,12 +556,8 @@ class FitResult:
 class Estimator:
     """Fits batches of aggregates with the differentiable state-space battery.
 
-    Attributes:
-        layout: The parameter layout.
-        signals: The policy signals, in the fit dtype on the device.
-        signals64: The same signals in float64, for the polish and the Hessian.
-        priors: The class priors.
-        device: The device.
+    The estimator keeps the parameter layout, the class priors, the device, and the policy signals
+    twice: in float32 for the Adam stage and in float64 for the polish and the Hessian.
     """
 
     def __init__(
@@ -979,6 +975,16 @@ class Estimator:
         groups: int,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Return each lane's Laplace covariance, its definiteness, and its log determinant.
+
+        Args:
+            theta: The optimum of every lane.
+            effective: The effective number of equations of every lane.
+            scale: The power prior's scale of every lane.
+            sharpness: The gate's smoothing.
+            projected_aggregate: The aggregates projected off the free columns.
+            basis: The orthonormal bases of the free columns.
+            valid: Where the aggregates are used.
+            groups: The number of groups.
 
         Returns:
             The covariance (NaN where the Hessian is not positive definite), whether the Hessian is

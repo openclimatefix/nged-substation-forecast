@@ -11,9 +11,11 @@ scored blocks with the off-grid truth, and the on-grid medians are within 1% of 
 
 The report `report_positive_control.md` holds the grid estimator's result (written by
 `capacity_positive_control.py`) and, below it, this estimator's result under the heading
-"Differentiable estimator". Run: `uv run python \
-studies/unmetered_battery_capacity/capacity_positive_control_dp.py`. If the control fails, nothing
-else is scored.
+"Differentiable estimator". If the control fails, nothing else is scored. Run:
+
+```text
+uv run python studies/unmetered_battery_capacity/capacity_positive_control_dp.py
+```
 """
 
 import time

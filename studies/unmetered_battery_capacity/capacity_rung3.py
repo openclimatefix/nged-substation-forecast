@@ -1,11 +1,12 @@
 """Rung 3: real public batteries, alone and in fleets, added to real demand.
 
-The batteries are 23 units: the four of the prior battery study (`BATTERIES`), the four with the
-smallest registered power among the census list's battery-hint BMUs that have at least 95% of
-their half-hours (the rule fixed here), and fleets of 2, 4, and 8 BMUs drawn from all 101
-battery-hint BMUs (a fixed seed, 5 draws per size). Each unit's settled output (B1610) is scaled so
-that its registered generation capacity (a fleet's sum of registered capacities) is a share of 5%,
-10%, 20%, or 40% of a demand series' 99th percentile absolute flow, and subtracted from the series.
+The batteries are 23 units: the four of the prior battery study (`NAMED_BATTERIES`), the four with
+the smallest registered power among the census list's battery-hint BMUs that have at least 95% of
+their half-hours (the rule fixed here), and 15 fleets of 2, 4, and 8 BMUs (a fixed seed, 5 draws
+per size) drawn from the 98 battery-hint BMUs with a registered generation capacity above zero (3
+of the 101 list none). Each unit's settled output (B1610) is scaled so that its registered
+generation capacity (a fleet's sum of registered capacities) is a share of 5%, 10%, 20%, or 40% of
+a demand series' 99th percentile absolute flow, and subtracted from the series.
 
 The power truth is the registered capacity; the metered 99th percentile and, for a fleet, the
 coincident peak (the 99th percentile of the fleet's summed output) are saved beside it. No public
@@ -59,7 +60,7 @@ def energy_reference(*, output_mw: np.ndarray) -> tuple[float, float]:
 
 def units() -> list[dict]:
     """Return the 23 units: member BMUs, registered power, and the summed output on the grid."""
-    registry = public_battery_registry()
+    registry = public_battery_registry().filter(pl.col("generation_capacity_mw") > 0)
     capacity = dict(zip(registry["elexon_bmu_id"], registry["generation_capacity_mw"], strict=True))
     outputs = {b: public_battery_output(bmu_id=b) for b in capacity}
     present = {b: float(np.isfinite(o).mean()) for b, o in outputs.items()}
