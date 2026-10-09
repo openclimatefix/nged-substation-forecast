@@ -187,7 +187,7 @@ def positive_control_figure() -> alt.VConcatChart:
 
 
 def calibration_figure() -> alt.VConcatChart:
-    """Draw figure 11: error and interval coverage against share, in the estimator's family."""
+    """Draw figure 12: error and interval coverage against share, in the estimator's family."""
     by_share = report_table(marker="**Rung 1 (merchant class), by share.**")
     rung2 = report_table(marker="**Rung 2 (domestic class), by share.**")
     coverage = pl.concat(
@@ -267,7 +267,7 @@ def calibration_figure() -> alt.VConcatChart:
                 rule=0.9,
             ),
         ],
-        number=11,
+        number=12,
         title=(
             "The 90% interval for a simulated merchant battery holds the truth "
             "from a 5% share; a domestic fleet's does not"
@@ -287,7 +287,7 @@ def calibration_figure() -> alt.VConcatChart:
 
 
 def false_alarm_figure() -> alt.VConcatChart:
-    """Draw figure 12: the log Bayes factor of every block with no added battery."""
+    """Draw figure 11: the log Bayes factor of every block with no added battery."""
     frame = report_table(marker="Log Bayes factor of every null block:").with_columns(
         block_name=pl.col("block").replace_strict(
             {0: "Sep-Nov", 1: "Dec-Feb", 2: "Mar-May", 3: "Jun-Aug"}, return_dtype=pl.String
@@ -327,7 +327,7 @@ def false_alarm_figure() -> alt.VConcatChart:
     low, high = clopper_pearson(count=flagged_blocks.height, total=frame.height)
     return draw_figure(
         panels=[panel],
-        number=12,
+        number=11,
         title=(
             f"With no battery added, {flagged_blocks.height} of {frame.height} blocks are "
             f"flagged, all of them {' and '.join(flagged_series)}"

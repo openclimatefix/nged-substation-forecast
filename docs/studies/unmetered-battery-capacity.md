@@ -1,26 +1,34 @@
-# Simulated unmetered batteries are found from 10% to 20% of a primary's flow; real ones mostly not
+# Simulated unmetered batteries are found at 10% to 20% of peak flow; real ones mostly not
 
-**This study asks whether the half-hourly electricity flow of a primary substation (a substation
-that steps voltage down for local distribution) can reveal the power in megawatts (MW) and the
-energy capacity in megawatt-hours (MWh) of a battery that nobody meters.** An estimator fits a
-battery that follows public signals (the day-ahead electricity price, a half-hourly retail price,
-and the fixed windows of home-battery tariffs) to the flow, and reports a probability distribution
-for the battery's power and energy. The page tests the estimator on simulated batteries with a known
-answer, and then on real batteries. All numbers below are provisional until the remaining reviews
-finish.
+**This study asks whether the half-hourly electricity flow of a primary substation can reveal the
+power in megawatts (MW) and the energy capacity in megawatt-hours (MWh) of a battery that nobody
+meters.** An estimator fits a battery that follows public signals (the day-ahead electricity price,
+a half-hourly retail price, and the fixed windows of home-battery tariffs) to the flow, and reports
+a probability distribution (the *posterior*) for the battery's power and energy. The page tests the
+estimator on simulated batteries with a known answer, and then on real batteries. All numbers below
+are provisional until the remaining reviews finish.
+
+**Six terms recur.** A *primary* is a substation that steps voltage down for local distribution. A
+*bulk supply point* and a *grid supply point* are larger substations above the primaries. The study
+labels each series S1 to S8, BSP1, BSP2, GSP1, and GSP2, and these are study labels and not NGED's
+names. A *flow series* is one such substation's half-hourly flow. A *sum* is one battery (simulated
+or real) added to one flow series in one 3-month block, which the estimator then fits. *Peak flow*
+is a series' 99th-percentile flow, the flow exceeded in 1% of half-hours, and a battery's *share* is
+its power as a percentage of that peak flow. The *detection score* is a log Bayes factor: the log of
+how many times better the flow fits with a battery than without one, after a penalty for the extra
+parameters. A block is *flagged* when its detection score is higher than in 95% of the blocks of the
+other series that have no battery. Scores of batteryless blocks are negative, so flagged means
+"scores higher than almost all batteryless blocks" and not "has positive evidence of a battery".
 
 - **Can a simulated battery of known dispatch be found, and from what size? Yes if it follows the
-  rule the estimator assumes, from about 10% of the primary's high flow (provisional).**
+  rule the estimator assumes, from a 10% share (58% of sums flagged) to a 20% share (94%).**
     - **What was tested.** A *merchant battery* charges when the day-ahead price is low and
       discharges when it is high. The study added 756 simulated merchant batteries to 9 NGED flow
       series (7 primaries, 1 bulk supply point, and 1 grid supply point), each in four 3-month
       blocks. *In-family* means the battery follows exactly the dispatch rule that the estimator
       assumes.
-    - **The size and the result.** A battery's *share* is its power as a percentage of the series'
-      *99th-percentile flow*, the flow exceeded in 1% of half-hours. A block is *flagged* when its
-      detection score is higher than in 95% of the other series' blocks with no battery. In-family
-      batteries were flagged in 18% of sums at a 5% share, 58% at 10%, 94% at 20%, and 100% at
-      40%.
+    - **The result.** In-family batteries were flagged in 18% of sums at a 5% share, 58% at 10%, 94%
+      at 20%, and 100% at 40%.
     - **The baseline.** With no battery added, 3 of 36 blocks (8.3%, 95% interval 1.8% to 22.5%)
       were flagged, all of them one series (GSP1). Every rate above therefore includes that 8.3%
       of false alarms.
@@ -28,53 +36,65 @@ finish.
       half-hours and discharges in the dearest was flagged in 44% of sums at a 10% share and 83% at
       20%. A battery that follows a noisy copy of the price was flagged in 8% at 10% and 52% at
       40%.
-- **Can a real battery added to NGED flows be found? Mostly no (provisional).**
+- **Can a real battery added to NGED flows be found? Mostly no.**
     - **What was tested.** The metered output of 23 real public batteries and fleets of them
       (Elexon data), scaled to shares of 5% to 40%, was added to the same 9 series: 3,312 sums.
     - **The result.** Without GSP1 (whose false alarms would inflate the rates), 0 of 736 sums were
       flagged at shares of 5% and 10%, 1 of 736 at 20%, and 50 of 736 (6.8%, 95% interval 5.1% to
-      8.9%) at 40%. A nominal 5% would be flagged with no battery at all.
+      8.9%) at 40%. A flagging rate of 5% is what a battery-free series would give by design.
     - **One real battery in a real flow.** NGED battery A, a battery that NGED meters, was put back
       into the flow of the bulk supply point it connects to, at up to 11 times its metered output
-      (35.5% of that flow's 99th-percentile flow): 0 of 20 blocks were flagged.
-    - **Demand noise is part of the reason.** On calendar replicas (the same series rebuilt with
-      almost no demand noise) the real batteries were flagged in 71% of sums at a 10% share and
-      84% at 40%, against a threshold built from the replicas' own no-battery blocks.
-- **Can its MW and MWh be estimated, and are the intervals honest? Not for real batteries
-  (provisional).**
-    - **What was tested.** *Interval coverage* is the share of 90% intervals that hold the true
-      value; an honest 90% interval holds it about 90% of the time.
+      (as metered it is 3.2% of that flow's peak flow, and at 11 times 35.5%): 0 of 20 blocks were
+      flagged.
+    - **Demand noise is part of the reason.** A *calendar replica* is a series rebuilt as the mean
+      of its own month, half-hour of the day, and day type, so it keeps the daily and seasonal shape
+      and almost none of the random noise. On replicas the real batteries were flagged in 71% of
+      sums at a 10% share and 84% at 40%, against a threshold built from the replicas' own
+      no-battery blocks.
+- **Can its MW and MWh be estimated, and how reliable are the intervals? Not for real batteries.**
+    - **What was tested.** *Interval coverage* is the share of intervals that hold the true value. A
+      90% interval should hold it 90% of the time: holding it more often means the interval is too
+      wide, and less often means it is too narrow.
     - **In-family batteries.** The 90% power interval held the truth in 100% of sums at shares of
-      5% to 20% and 99% at 40%. The 50% interval held it in 87% to 91% at 5% to 20%, so the
-      intervals are too wide there.
+      5% to 20% and 99% at 40% (slightly too wide at the middle shares: the 50% interval held it in
+      87% to 91% of sums at 5% to 20%, against the 50% it should). The pooled coverage over rungs
+      1 and 2 failed its planned test at 68.9%, and the positive control's intervals held in 72%
+      of replica fits.
     - **Other dispatch rules.** At 10%, 20%, and 40% shares the 90% power interval held the truth in
       90%, 60%, and 26% of sums for the cheapest-and-dearest rule, and in 65%, 33%, and 6% for the
       noisy price. The median power error was about 30% and 61% to 76%.
     - **Real batteries.** At a 40% share the 90% power interval held the truth in 6% of sums. The
-      power estimate rose from 2.6% of the high flow with no battery to 4.1% with a 40% battery.
-    - **Small batteries.** Below a 2% share the estimate is the same as with no battery (2.8% to
-      3.2% against 2.6% of the high flow), so a small reported MW is a floor and not a battery.
-- **Can the primary screen say any primary holds a battery? No (provisional).**
-    - **What was tested.** The screen asks whether the real tariff-and-price templates fit a primary
-      better than 12 copies with shifted windows or prices.
-    - **The result.** The real templates ranked first for none of the 8 primaries. The screen has
-      no power: it ranked the real templates first in 1 of 54 simulated lanes (1.9%), against 1 in
-      13 (7.7%) by chance.
+      power estimate rose from 2.6% of peak flow with no battery to 4.1% with a 40% battery.
+    - **Small batteries.** The estimator reports about 2.6% of peak flow with no battery at all, a
+      bias. Below a 2% share the estimate is 2.8% to 3.2%, no different, so a small reported MW is
+      that bias and not a battery.
+- **Can the primary screen say any primary holds a battery? No.**
+    - **What was tested.** The screen asks whether the real tariff-and-price *templates* (the
+      schedules a battery would follow) fit a primary better than 12 control copies of the same
+      templates with the tariff windows moved by 1 to 3 hours or the prices taken from another
+      week. A copy with the wrong times should fit no better if no battery follows the real times.
+    - **The result.** The real templates ranked first for none of the 8 primaries. The screen cannot
+      tell a battery from none: a *lane* (one series with its four blocks added together) with a
+      simulated battery ranked the real templates first in 1 of 54 lanes (1.9%), against 1 in 13
+      (7.7%) by chance.
     - **A price-only version.** Restricted to price-shifted copies, a screen added after the first
       review ranked the real templates first in 53 of 54 simulated lanes, 30 of 36 real-battery
       lanes at a 40% share, and 0 of 9 lanes with no battery (95% interval 0% to 34%). By it, no
       primary ranks first.
-- **Does the differentiable GPU estimator beat the grid search? Its intervals are honest where the
-  grid search's are not, but its medians are no better (provisional).**
-    - **What was tested.** The same 756 in-family sums were fitted by the differentiable estimator
-      (gradient descent on a graphics card) and by a grid search over duration and efficiency.
+- **Does the differentiable GPU estimator beat the grid search? Its intervals hold the truth far
+  more often than the grid search's, but its medians are no more accurate.**
+    - **What was tested.** The study has two estimators. The *differentiable estimator* adjusts a
+      battery's power, usable duration, and efficiency continuously by gradient descent on a
+      graphics card. The *grid search* tries a fixed grid of durations and efficiencies. Both
+      fitted the same 756 in-family sums.
     - **Coverage.** At a 40% share the 90% power interval held the truth in 99% of sums for the
       differentiable estimator and 11% for the grid search.
     - **Accuracy.** The mean difference in absolute relative power error (differentiable minus grid)
-      was +0.04 (95% interval -0.03 to +0.14), so the medians are no more accurate.
+      was +0.04 (95% interval -0.03 to +0.14), where 0.04 means 4% of the true power, so the medians
+      are no more accurate.
 - **What the methods can and cannot support.** They support saying that a battery that follows the
-  assumed rule and is above about 10% of a primary's high flow is detectable, and that the
-  intervals are honest only for such batteries. They do not support sizing a real battery, or
+  assumed rule and is at a share of 10% to 20% of peak flow or more is detectable, and that its
+  intervals are roughly calibrated, a little too wide. They do not support sizing a real battery, or
   saying that a primary holds none: the study covers 9 series from one year, the thresholds rest on
   36 no-battery blocks, and one series (GSP1) false-alarms in every comparison.
 
@@ -87,24 +107,38 @@ not](assets/unmetered_battery_capacity_headline.svg)
 > design and the results adversarially, and a third has reviewed the code; the prose and persona
 > reviews are still to come, as the [Limitations](#limitations) say.
 
+## What to use this for
+
+**A detection of a battery in a primary's flow should be read as "something follows the day-ahead
+price", not as a size.** The estimator flags a simulated battery at a share of 10% to 20% of the
+primary's 99th-percentile flow or more (58% of sums at 10%, 94% at 20%) only if the battery's
+dispatch resembles the estimator's. For a real battery, planning should rely on connection records
+and metering, which the register's 50 kW floor and missing MWh limit, and treat unregistered
+batteries as uncertainty near the evening peak and at the tariff window edges. A longer record, a
+battery-free reference series, or a known battery inside a primary would change this.
+
+**The coverage numbers say which intervals to distrust.** A 90% power interval from this estimator
+holds the truth at most 26% of the time for a rank-rule battery at a 40% share, and 6% for a real
+public battery. No MW or MWh interval for a real battery should be published from this estimator.
+
 ## Key findings
 
 - **The positive control passes its committed rule, but its intervals are narrower than 90% on
   calendar replicas** ([Figure
   10](#the-positive-control-passes-its-rule-with-intervals-narrower-than-90-on-replicas)).
 - **False alarms are 3 of 36 blocks, all for GSP1** ([Figure
-  12](#with-no-battery-added-3-of-36-blocks-are-flagged-all-for-one-series)).
+  11](#with-no-battery-added-3-of-36-blocks-are-flagged-all-for-one-series)).
 - **Intervals for a simulated merchant battery in the estimator's family hold the truth from a 5%
-  share** ([Figure 11](#in-the-family-the-90-interval-holds-the-truth-from-a-5-share)).
+  share** ([Figure 12](#in-the-family-the-90-interval-holds-the-truth-from-a-5-share)).
 - **A power and energy posterior beats a model-free step statistic, in the family only** ([Figure
-  11](#in-the-family-the-90-interval-holds-the-truth-from-a-5-share)).
+  12](#in-the-family-the-90-interval-holds-the-truth-from-a-5-share)).
 - **Outside the family, large batteries are flagged less often and sized wrongly** ([Figure
   13](#batteries-from-outside-the-estimators-family-are-found-less-often-and-sized-wrongly)).
 - **Real public batteries and NGED battery A are mostly not detected, and their power is not
   recovered** ([Figure 15](#real-public-batteries-are-mostly-not-recovered), [Figure
   16](#nged-battery-a-is-not-detected-inside-its-bulk-supply-point)).
-- **The primary screen has no power, and the grid estimator is overconfident** ([Figure
-  17](#the-primary-screen-cannot-find-a-battery), [Figure
+- **The primary screen cannot tell a battery from none, and the grid estimator is overconfident**
+  ([Figure 17](#the-primary-screen-cannot-find-a-battery), [Figure
   18](#the-grid-estimator-is-overconfident-where-the-differentiable-one-is-not)).
 
 ## Introduction
@@ -121,27 +155,55 @@ signal, and only a few physical numbers are fitted.
 **Frequency excursions are too rare to move half-hourly means, so grid frequency is not used as a
 signal.** In the Elexon data for September 2025 to August 2026 the half-hourly minimum frequency
 fell below 49.7 Hz in 6 half-hours on 4 days, after 188 faulty readings of exactly 0 Hz are dropped.
-The availability blocks that shape the dispatch of a battery in frequency services are not modelled.
-In the Electricity Forward Agreement market a battery holds headroom for each 4-hour block and
-trades around those blocks, and that pattern, not frequency excursions, shapes its half-hourly
+Batteries in frequency services may also follow 4-hour availability blocks that the estimator does
+not model. That is a hypothesis, not a finding: the study did not check the pattern in any battery's
 output.
 
 ## Data and methods
 
 **The study year is September 2025 to August 2026, split into four 3-month blocks.** The 9
 demand-like series are seven NGED primaries metered in MW (labelled S1 to S3 and S5 to S8), one bulk
-supply point (BSP2), and one grid supply point (GSP1). A primary metered in MVA is out of scope,
-because MVA has no sign. NGED labels its primary series "Disaggregated Demand", and its definition
-of that label is unverified. A series with embedded generation added back would change what the
-solar columns mean.
+supply point (BSP2), and one grid supply point (GSP1). The primary S4 is a net exporter at the
+median, so its flow is not demand-like and rungs 1 to 4 leave it out, but the screen of rung 5
+includes it, which is why the screen covers 8 primaries. BSP1 appears only in rung 4. A primary
+metered in MVA is out of scope, because MVA has no sign. NGED labels its primary series
+"Disaggregated Demand", and its definition of that label is unverified. A series with embedded
+generation added back would change what the solar columns mean.
+
+### The ladder
+
+**The study is a ladder of five rungs, and each rung makes the truth harder to match with the
+estimator's assumptions.** Later sections refer to the rungs by number.
+
+1. **Rung 1:** a simulated merchant battery that follows the day-ahead price in the estimator's own
+   way (the in-family best case), added to each demand-like series at seven shares from 0.5% to 40%
+   of its 99th-percentile flow. Rung 1b uses two simulated truths from outside that family.
+2. **Rung 2:** a simulated fleet of home batteries on the four tariffs.
+3. **Rung 3:** 23 real public batteries and fleets of 2, 4, and 8 of them, added to the series.
+4. **Rung 4:** NGED battery A inside the flow of the bulk supply point BSP1 at multiples 0, 1, 2, 4,
+   and 11 of its metered output. Multiple 0 adds the output back as a matched null, and 1 is the
+   flow as metered.
+5. **Rung 5:** the eight primaries as they are.
+
+**Battery sizes are shares of a series' 99th-percentile flow, and the noise unit makes them
+comparable.** The *residual* is what is left of a series' flow after the fitted baseline and solar
+are removed. The noise unit is `sigma_step`, the robust standard deviation of the half-hour changes
+of that residual with no battery, in MW: the size of a typical random half-hour jump. A battery's
+power divided by `sigma_step` says how many such jumps it is worth, which is how large it is
+against the noise of the series it sits in.
 
 **A planned contrast was written into the plan before any result existed, and every other number is
-exploratory.** The five planned contrasts are C1 (false alarms), C2 (calibration), C3 (the posterior
-against a step statistic), C4 (energy separately from power), and C5 (fleets of real batteries).
-Intervals on the mean errors of C3, C4, and C5 and on the grid-estimator difference resample whole
-demand series and whole batteries in a two-level cluster bootstrap of 2,000 resamples. Rates and
-coverages carry Clopper-Pearson intervals on sums. Those intervals treat sums as independent, but
-sums share series and blocks (the 108 sums at one share of rung 1 are 3 durations on the same 36
+exploratory.** The five planned contrasts are C1 (false alarms), C2 (calibration: do intervals hold
+the truth as often as they claim), C3 (the posterior against a *step statistic*, a model-free
+estimate of power from the largest half-hour jumps in the residual), C4 (energy estimated separately
+from power), and C5 (whether the estimate for a fleet of real batteries is closer to its *coincident
+peak*, the largest summed output of the fleet in any half-hour, than to its *registered power*, the
+sum of the capacities the batteries are registered with). A *cluster bootstrap* (2,000 resamples)
+puts an interval on the mean errors of C3, C4, and C5 and on the grid-estimator difference by
+redrawing whole demand series and whole batteries, so that sums from one series stay together. A
+*Clopper-Pearson interval* is the standard exact 95% interval for a rate such as 18 flagged in 100;
+every rate and coverage carries one, computed on sums. Those intervals treat sums as independent,
+but sums share series and blocks (the 108 sums at one share of rung 1 are 3 durations on the same 36
 series-blocks), so they are too narrow. These intervals do not cover the month-to-month weather, so
 a detection rate is read per block and per season. A **post hoc** analysis was written after results
 on the same series existed; the sections for rung 1b, the calendar-replica rung 3, the price-only
@@ -161,8 +223,9 @@ schedules follow public signals.** Four signals schedule the batteries:
 - **A home-battery fleet** follows fixed tariff windows (Intelligent Octopus Go 23:30 to 05:30,
   Octopus Go 00:30 to 05:30, and Octopus Flux with cheap import 02:00 to 05:00 and high export 16:00
   to 19:00) or the East Midlands Octopus Agile half-hourly price.
-- **A commercial and industrial battery** discharges across the weekday red band (16:00 to 19:00),
-  an assumption not checked against NGED's charging statement.
+- **A commercial and industrial battery** discharges across the weekday red band (16:00 to 19:00,
+  when distribution charges are highest), an assumption not checked against NGED's charging
+  statement.
 - **A baseline** of one daily profile per month and four solar fleet curves absorbs everything else.
 
 **The estimator reports, for each class, a probability distribution for the power, the usable
@@ -175,49 +238,40 @@ underestimated](assets/unmetered_battery_capacity_worked_example.svg)
 **The battery is differentiable, so a graphics card fits a sum in one to two seconds.** The
 estimator reads each price-taking battery's schedule between precomputed linear-programme schedules
 (3,800 of them for the merchant battery) and passes the schedule through a smooth state-of-charge
-recurrence. It then fits the power, duration, efficiency, and cycle-cap weight by gradient descent
-(the PyTorch optional `gpu` dependency group of `packages/studies`, with a fused Triton kernel for
-the recurrence), polishes the fit, and approximates the posterior around the optimum (a Laplace
-approximation). The three starts of the gradient descent agree in all but 2 of 5,868 sums with an
-interval. The likelihood is raised to the power `1 / tau`, where `tau` is the integrated
-autocorrelation time of the residual, which widens every interval. The differentiable estimator
-fitted rung 1's 792 sums in 1,554 seconds and rung 3's 3,312 sums in 7,392 seconds on one RTX A6000
-shared with one or two other fits.
+recurrence. It then fits the power, duration, efficiency, and cycle-cap weight (the mix of a cap of
+1 and a cap of 2 charge cycles a day) by gradient descent (the PyTorch optional `gpu` dependency
+group of `packages/studies`, with a fused Triton kernel for the recurrence), polishes the fit, and
+approximates the posterior around the optimum (a Laplace approximation). The three starts of the
+gradient descent agree in all but 2 of 5,868 sums with an interval. The likelihood is raised to the
+power `1 / tau`, where `tau` is the integrated autocorrelation time of the residual, roughly the
+number of consecutive half-hours that carry one half-hour's worth of information. Neighbouring
+half-hours are correlated, so the data hold less information than their count suggests, and this
+*tempering* widens every interval to match. The differentiable estimator fitted rung 1's 792 sums in
+1,554 seconds and rung 3's 3,312 sums in 7,392 seconds on one RTX A6000 shared with one or two other
+fits.
 
 ![Figure 3: The differentiable battery follows the price through precomputed dispatches and fits
 only a few numbers](assets/unmetered_battery_capacity_dispatch.svg)
 
-**A detection is a log Bayes factor above a threshold.** The statistic compares the Laplace evidence
+**A detection is a detection score above a threshold.** The statistic compares the Laplace evidence
 of the model with batteries against the model with none. Both evidences are tempered by the same
 factor `1 / tau`, with `tau` taken from the model with batteries, so the statistic does not change
 with the unit of power. The threshold for a series is the 95th
 percentile of the other 8 series' statistics on blocks with no added battery, so no series sets its
 own threshold. The statistic is calibrated only empirically, against 36 null blocks from one year.
 
-**A coverage plot says whether an interval means what it says.** An interval is calibrated when its
-share of truths held equals its nominal level, and Figure 4 shows how to read it.
+**A coverage plot says whether an interval means what it says.** An X% interval should hold the true
+value X% of the time. An interval that holds it more often than stated is too wide, and one that
+holds it less often is too narrow. Figure 4 shows how to read the plot.
 
 ![Figure 4: A coverage plot shows whether an interval means what it
 says](assets/unmetered_battery_capacity_coverage.svg)
 
-### The ladder
-
-**Each rung makes the truth harder to match with the estimator's assumptions.**
-
-1. **Rung 1:** a simulated merchant battery that follows the day-ahead price in the estimator's own
-   way (the in-family best case), added to each demand-like series at seven shares from 0.5% to 40%
-   of its 99th-percentile flow. Rung 1b uses two simulated truths from outside that family.
-2. **Rung 2:** a simulated fleet of home batteries on the four tariffs.
-3. **Rung 3:** 23 real public batteries and fleets of 2, 4, and 8 of them, added to the series.
-4. **Rung 4:** NGED battery A inside the flow of the bulk supply point BSP1 at multiples 0, 1, 2, 4,
-   and 11 of its metered output. Multiple 0 adds the output back as a matched null, and 1 is the
-   flow as metered.
-5. **Rung 5:** the eight primaries as they are.
-
-**Battery sizes are shares of a series' 99th-percentile flow, and the noise unit makes them
-comparable.** The noise unit is `sigma_step`, the robust standard deviation of the half-hour changes
-of a series' residual with no battery. A battery's power divided by `sigma_step` says how large it
-is against the noise of the series it sits in.
+**A positive control checks that the estimator can succeed where success is possible, and its pass
+rule was fixed before its run.** The control adds 10 simulated merchant batteries, off the
+estimator's grid of durations and efficiencies, at a 40% share to calendar replicas of 7 series in
+all 4 blocks (280 fits). The rule: the 90% interval must hold both the true power and the true
+energy in at least two thirds of the 280 fits (187).
 
 ## What the data looks like
 
@@ -236,11 +290,13 @@ windows](assets/unmetered_battery_capacity_profiles.svg)
 ![Figure 7: The two prices share a daily shape, and Agile's cheap slots move from day to
 day](assets/unmetered_battery_capacity_prices.svg)
 
-**A real battery of a few percent of a bulk supply point's flow is hard to see by eye.** The
-half-hour changes of NGED battery A correlate at -0.29 with one bulk supply point's flow over the
-study year, and at 0.07 or less with every primary and the other supply points. The correlation is
-evidence of connection, not a network-topology record. Figure 8 normalises both series by their own
-99th percentile and numbers the days.
+**A real battery of a few percent of a bulk supply point's flow is hard to see by eye.** As metered,
+NGED battery A's 99th-percentile output is 3.2% of BSP1's 99th-percentile flow. The half-hour
+changes of NGED battery A correlate at -0.29 with BSP1's flow over the study year, and at 0.07 or
+less with every primary and the other supply points. A correlation of -0.29 against 0.07 or less
+elsewhere singles out BSP1, so the pattern fits a connection to BSP1, but it is an indication and
+not a network record. Figure 8 normalises both series by their own 99th percentile and numbers the
+days.
 
 ![Figure 8: A real battery of a few percent of a bulk supply point's flow is hard to see by
 eye](assets/unmetered_battery_capacity_battery_a_in_bsp.svg)
@@ -290,28 +346,29 @@ percentage points with 36 null blocks. A threshold on the log Bayes factor is a 
 null blocks, and the values (-2.5 to -3.6) are negative, so a "detection" is a block that scores
 higher than 95% of the nulls and not a block with positive evidence.
 
-![Figure 12: With no battery added, 3 of 36 blocks are flagged, all of them
+![Figure 11: With no battery added, 3 of 36 blocks are flagged, all of them
 GSP1](assets/unmetered_battery_capacity_false_alarms.svg)
 
 ### In the family, the 90% interval holds the truth from a 5% share
 
 **For a simulated merchant battery that follows the estimator's own model, the 90% power interval
 holds the truth in 100% of sums at shares of 5% to 20%, and the posterior beats a step statistic.**
-The 50% interval is too wide there: it holds the truth in 90%, 91%, and 87% of sums at shares of
-5%, 10%, and 20%, against a nominal 50%. Planned contrast C2 fails when pooled over rungs 1 and 2:
-the 90% interval holds the power in 68.9% of sums (at least 80% was required). The pooled figure
-hides the spread by rung and share. Below a 2% share the posterior is the same as with no battery:
-its median sits at 2.8% to 3.2% of the 99th percentile at shares of 0.5% to 2%, against 2.6% with
-none (the prior's median is 13.5%). The estimator therefore reports a merchant battery of about
-2.6% of the 99th-percentile flow where none exists, so a small reported MW is the floor and not a
-battery. Planned contrasts C3 and C4 hold in the family: the mean difference in relative power
-error (posterior minus step statistic) is -0.39 (95% interval -0.45 to -0.33), and in relative
-energy error (posterior minus a rule of 2 hours times the power) -0.61 (-0.77 to -0.46). Both are
-statistically significant at the 5% level, for in-family batteries only. The aggregate teaches the
-estimator the duration: the 90% width of the duration is 0.29 to 0.35 of its prior width at a 10%
-share, and 0.08 to 0.09 at 40%.
+An X% interval should hold the truth X% of the time, so a 50% interval should hold it in 50% of
+sums. The 50% interval holds it in 90%, 91%, and 87% of sums at shares of 5%, 10%, and 20%, so it is
+too wide there. Planned contrast C2 fails when pooled over rungs 1 and 2: the 90% interval holds the
+power in 68.9% of sums (at least 80% was required). The pooled figure hides the spread by rung and
+share. Below a 2% share the posterior is the same as with no battery: its median sits at 2.8% to
+3.2% of the 99th percentile at shares of 0.5% to 2%, against 2.6% with none (the prior's median is
+13.5%). The estimator therefore has a bias: it reports a merchant battery of about 2.6% of the
+99th-percentile flow where none exists, so a small reported power near that value is the bias and
+not a battery. Planned contrasts C3 and C4 hold in the family: the mean difference in relative power
+error (the error as a fraction of the true power; posterior minus step statistic) is -0.39 (95%
+interval -0.45 to -0.33), and in relative energy error (posterior minus a rule of 2 hours times the
+power) -0.61 (-0.77 to -0.46). Both are statistically significant at the 5% level, for in-family
+batteries only. The aggregate teaches the estimator the duration: the 90% width of the duration is
+0.29 to 0.35 of its prior width at a 10% share, and 0.08 to 0.09 at 40%.
 
-![Figure 11: The 90% interval for a simulated merchant battery holds the truth from a 5% share; a
+![Figure 12: The 90% interval for a simulated merchant battery holds the truth from a 5% share; a
 domestic fleet's does not](assets/unmetered_battery_capacity_calibration.svg)
 
 ### Batteries from outside the estimator's family are found less often and sized wrongly
@@ -396,18 +453,21 @@ output](assets/unmetered_battery_capacity_battery_a.svg)
 
 ### The primary screen cannot find a battery
 
-**The 13-set screen asks whether the real template set ranks first among 13 sets, and it does for
-none of the 8 primaries.** The 12 placebo sets move the tariff windows by 1 to 3 hours in either
-direction and take the prices from 6 other weeks. The placebos are not exchangeable with the real
-set, so 1 in 13 is not the chance rate. Run on 54 simulated lanes, the real set ranks first in 1
-(1.9%), no more often than 1 in 13 (7.7%), so the 13-set screen has no power. A screen of the real
-set against its 6 price-shifted rivals alone is post hoc: it was added after the first review. It
-ranks the real set first in 53 of 54 simulated merchant lanes, in 0 of 9 lanes with no battery
-(95% interval 0% to 34%), and in 30 of 36 lanes holding a real public battery at a 40% share. By
-that screen no primary of the 8 ranks first. S7, which the register lists with no connected
-storage, ranks second of 7, and S1 and S2, the two primaries the register lists with connected
-storage, rank fifth and third. The table gives each primary's result, and whether NGED's register
-lists connected storage of 50 kW or more at the primary.
+**The 13-set screen asks whether the real template set (the schedules a battery would follow) ranks
+first among 13 sets, and it does for none of the 8 primaries.** The 12 other sets are control
+copies: a copy with the tariff windows or the prices moved to the wrong times should fit a primary
+no better than the real set unless a battery follows the real times. The 12 control sets move the
+tariff windows by 1 to 3 hours in either direction and take the prices from 6 other weeks. The
+control sets are not exchangeable with the real set, so 1 in 13 is not the chance rate. Run on 54
+simulated lanes, the real set ranks first in 1 (1.9%), no more often than 1 in 13 (7.7%), so the
+13-set screen cannot tell a battery from none. A screen of the real set against its 6 price-shifted
+rivals alone is post hoc: it was added after the first review. It ranks the real set first in 53 of
+54 simulated merchant lanes, in 0 of 9 lanes with no battery (95% interval 0% to 34%), and in 30 of
+36 lanes holding a real public battery at a 40% share. By that screen no primary of the 8 ranks
+first. S7, which the register lists with no connected storage, ranks second of 7, and S1 and S2, the
+two primaries the register lists with connected storage, rank fifth and third. The table gives each
+primary's result, and whether NGED's register lists connected storage of 50 kW or more at the
+primary.
 
 | Primary | Rank of the real set among 13 | Rank among the 7 price-differing sets | Register |
 |---|---|---|---|
@@ -441,32 +501,20 @@ interval). C3 is -0.39 (-0.45 to -0.33), and C4 is -0.70 (-0.86 to -0.54). In-fa
 flagged in 16%, 52%, and 94% at shares of 5%, 10%, and 20%, against 18%, 58%, and 94% in the main
 setting.
 
-## Discussion: what to use
-
-**A detection of a battery in a primary's flow should be read as "something follows the day-ahead
-price", not as a size.** The estimator flags a simulated battery above about 10% to 20% of the
-primary's high flow only if the battery's dispatch resembles the estimator's. For a real battery,
-planning should rely on connection records and metering, which the register's 50 kW floor and
-missing MWh limit, and treat unregistered batteries as uncertainty near the evening peak and at the
-tariff window edges. A longer record, a battery-free reference series, or a known battery inside a
-primary would change this.
-
-**The coverage numbers say which intervals to distrust.** A 90% power interval from this estimator
-holds the truth at most 26% of the time for a rank-rule battery at a 40% share, and 6% for a real
-public battery. No MW or MWh interval for a real battery should be published from this estimator.
-
 ## Limitations
 
 **The scripts have had one diff review, and the page has had two science reviews.** The study has
 not yet had the prose review or the persona reviews that the `study` skill requires before a study
 merges. The mutation pass over the changes to `packages/studies/` runs in a separate worktree.
 
-**The tuning history is optimistic.** A first learned dispatch failed the positive control. The fine
-linear-programme stack was refined until the control passed, guided by diagnostics on a scored
-block, so the first pass was optimistic. The clean control replaces it with a rule committed before
-the run, on 7 series no diagnostic had touched. Tuning used S6 in September to November and S2 in
-all blocks only. Removing S2 and S6 changes the in-family detection rate at a 10% share from 58% to
-51%, and the 90% power coverage from 90% to 89%.
+**An earlier positive control is not an independent test.** The first control failed with a learned
+dispatch. The fine linear-programme stack was then refined until the control passed, using
+diagnostics from a scored block, so that pass was not independent. The clean control replaces it,
+with a rule fixed before the run, on 7 series no diagnostic had touched. Tuning used S6 in September
+to November and S2 in all blocks only. Removing S2 and S6 changes the in-family detection rate at a
+10% share from 58% to 51%, and the 90% power coverage from 90% to 89%. The 90% and 89% are pooled
+over all seven shares, including the shares of 2% and below where coverage is 57% to 94%. The 100%
+in the in-family section is at shares of 5% to 20% only, so both are right.
 
 **The branch changes a dependency.** The optional `gpu` group of `packages/studies` adds PyTorch and
 Triton, and a spreadsheet reader converts the register once. A change to a dependency needs a human
