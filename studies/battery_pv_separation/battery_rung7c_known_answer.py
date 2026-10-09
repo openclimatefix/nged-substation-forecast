@@ -39,7 +39,6 @@ from battery_rung7 import (
     MAX_WORKERS,
     ONE_WAY_EFFICIENCY,
     WINDOW_HALF_HOURS,
-    calendar_replica,
 )
 from battery_rung7b import SOLVER_METHOD
 from battery_synthetic import (
@@ -49,6 +48,7 @@ from battery_synthetic import (
     output_on_grid,
     window_half_hours,
 )
+from studies.battery_capacity import calendar_replica
 from studies.battery_joint_lp import fit_joint_solar_battery
 from studies.pv_fit import fit_plant
 from studies.pv_separation import baseline_design, separate_by_differences
@@ -73,7 +73,10 @@ def demand_series() -> dict[tuple[str, str], np.ndarray]:
     series = {}
     for bmu_id in DEMAND_BMUS:
         real = output_on_grid(bmu_id=bmu_id)
-        for kind, raw in (("real", real), ("replica", calendar_replica(output=real))):
+        for kind, raw in (
+            ("real", real),
+            ("replica", calendar_replica(output=real, half_hour_end_time=window_half_hours())),
+        ):
             series[(bmu_id, kind)] = raw * DEMAND_P99_MW / np.nanquantile(np.abs(raw), 0.99)
     return series
 
