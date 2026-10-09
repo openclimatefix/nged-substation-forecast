@@ -1,6 +1,7 @@
 import itertools
 import json
 import logging
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -30,7 +31,7 @@ def _utc(year: int, month: int, day: int, hour: int = 0, minute: int = 0) -> dat
     return datetime(year, month, day, hour, minute, tzinfo=UTC)
 
 
-def _features(rows: list[tuple[int, datetime, float | None]]) -> pt.LazyFrame[AllFeatures]:
+def _features(rows: Sequence[tuple[int, datetime, float | None]]) -> pt.LazyFrame[AllFeatures]:
     """Engineered rows of ``(time_series_id, valid_time, power)``, all issued at ``_INIT_TIME``."""
     frame = pl.DataFrame(
         {
@@ -49,8 +50,16 @@ def _features(rows: list[tuple[int, datetime, float | None]]) -> pt.LazyFrame[Al
     return pt.LazyFrame.from_existing(frame.lazy()).set_model(AllFeatures)
 
 
-def _forecaster(**config: object) -> ClimatologyForecaster:
-    return ClimatologyForecaster(BaseForecasterConfig(selected_features=set(), **config))
+def _forecaster(
+    *, experiment_name: str = "", ml_flow_experiment_id: int | None = None
+) -> ClimatologyForecaster:
+    return ClimatologyForecaster(
+        BaseForecasterConfig(
+            selected_features=set(),
+            experiment_name=experiment_name,
+            ml_flow_experiment_id=ml_flow_experiment_id,
+        )
+    )
 
 
 def _january_weekday_samples() -> list[tuple[int, datetime, float | None]]:
