@@ -375,6 +375,21 @@ others, with the CAMS satellite retrieval."""
 OBSERVATIONS_DOWNLOADS_DIR: Final[Path] = DOWNLOADS_DIR / "observations"
 """Measurements: weather stations, the SARAH-3 satellite retrieval, and NGED's own exports."""
 
+MARKET_DOWNLOADS_DIR: Final[Path] = DOWNLOADS_DIR / "market"
+"""GB electricity-market downloads, one folder per source.
+
+The folders hold electricity prices, the carbon intensity of the GB electricity grid, and the
+balancing-market dispatch, physical notifications, and bid-offer prices of individual balancing
+mechanism units. They also hold the National Energy System Operator's (NESO) Enduring Auction
+Capability (EAC) results with a table linking auction units to balancing mechanism units, and
+system-wide series: frequency, demand, generation by fuel type, demand and wind forecasts,
+balancing services adjustments, and system warnings.
+
+Most folders hold a tidy parquet per table, a `README.md`, a `lineage.json`, and a `_day_cache/`
+of the per-day chunks that let a re-run of the download resume. `neso_eac_unit_to_bmu/` holds two
+CSV files, a `README.md`, and a `lineage.json`, and no cache.
+"""
+
 PER_STUDY_DIR: Final[Path] = STUDIES_DATA_DIR / "per_study"
 """The layer of `data/studies/` that holds one folder per study.
 
