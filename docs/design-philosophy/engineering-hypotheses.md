@@ -149,12 +149,14 @@ qualifier that would need a human-effort log to measure. If the threshold is eve
 sweeps, that will be obvious from reading the runs, and the fix is to *append a T2.2* then — never
 to redefine T2.1.
 
-**T2.1 counts reviewed experiments, not autonomous studies.** The MLflow experiments that
-`scripts/forecasting/score_study.py` creates are named with the prefix `study/`, and a count of
-T2.1 leaves them out. Once autonomous studies score many forecasts a month, the number of
-registered experiments says little about progress, because a study finding reaches production only
-through a reviewed re-implementation. The figure to watch then is the number of promotions per
-month that live monitoring confirms.
+**A count of T2.1 leaves out every MLflow experiment named with the prefix `study/`.** A study's
+forecasts are scored through `scripts/forecasting/score_study.py` under such an experiment, which
+never goes through experiment registration, and the promotion path never offers a `study/`
+experiment as a candidate. T2.1 counts registered experiments, so the count filters out the prefix
+and T2.1's definition does not change. A study finding reaches production
+only through a reviewed re-implementation, so a count of studies would say little about how fast the
+project learns what to ship. If studies come to outnumber reviewed experiments, a new appended
+hypothesis can count what studies produce, and T2.1 stays as written.
 
 ## H3 — one-click promotion, and one-click rollback
 

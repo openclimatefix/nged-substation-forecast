@@ -28,6 +28,7 @@ record the corners where a degenerate input needed a defined answer rather than 
 degenerate inputs are a single-member ensemble and a forecast with zero error.
 """
 
+import hashlib
 import re
 from datetime import date, datetime
 from typing import Final
@@ -71,12 +72,30 @@ Live rows are forecasts of the future, not a held-out set, so the final-test dat
 them.
 """
 
-ROW_KEY_COLUMNS: Final[tuple[str, ...]] = ("time_series_id", "power_fcst_init_time", "valid_time")
-"""The columns that identify one forecast row, ignoring which ensemble member produced it.
+ROW_KEY_COLUMNS: Final[tuple[str, ...]] = (
+    "time_series_id",
+    "power_fcst_init_time",
+    "valid_time",
+    "ensemble_member",
+)
+"""The columns that identify one forecast row: the primary key of `PowerForecast`.
 
-``ensemble_member`` is left out on purpose. A study may forecast with one member or with many, and
-dropping members drops no hard row, so only the other three columns decide whether a forecast
-abstained on any row.
+``ensemble_member`` is part of the key. The fair continuous ranked probability score (CRPS) is
+unbiased only for members drawn at random from the forecaster's belief. A study that chose its own
+member count could forecast with two members, one either side of the observation, and score a fair
+CRPS of zero while leaving the ensemble mean, and so every deterministic metric, unchanged. A study
+therefore carries the reference's ensemble-member labels, and so the reference's member count.
+"""
+
+
+COMPARABLE_KEY_COLUMNS: Final[tuple[str, ...]] = tuple(
+    column for column in ROW_KEY_COLUMNS if column != "ensemble_member"
+)
+"""The columns of ``ROW_KEY_COLUMNS`` that name the same forecast problem in any experiment.
+
+``row_key_fingerprint`` hashes these columns, so a reviewed experiment with 13 members and a
+reference with 51 members have the same fingerprint when they forecast the same series,
+initialisation times, and valid times.
 """
 
 
@@ -215,7 +234,8 @@ def require_same_row_keys(
 
     The keys are ``ROW_KEY_COLUMNS``. A study that omits a row the reference forecasts, or adds a
     row the reference does not, cannot raise its score by abstaining on hard rows, by adding easy
-    series, or by forecasting only at short lead times. The reference's own forecasts are trusted:
+    series, by forecasting only at short lead times, or by choosing its own number of ensemble
+    members. The reference's own forecasts are trusted:
     they come from a reviewed experiment.
 
     The series sets are compared first. The keys are then compared in batches of
@@ -271,6 +291,41 @@ def require_same_row_keys(
                 f"{batch_ids}: {n_missing} reference row keys are missing and {n_extra} study row "
                 f"keys are extra, on the columns {keys}."
             )
+
+
+def row_key_fingerprint(*, forecasts: pl.LazyFrame, series_batch_size: int) -> str:
+    """Return a hash of the distinct ``COMPARABLE_KEY_COLUMNS`` keys in ``forecasts``.
+
+    Two experiments have the same fingerprint exactly when they forecast the same series, from the
+    same initialisation times, for the same valid times, however many ensemble members each holds
+    and in whatever row order. The ``metrics`` asset stamps the fingerprint on every leaderboard
+    fold run, so a reader can see whether two scores rest on the same forecast problem, and whether
+    a study was scored against a reference that has since changed.
+
+    The keys are hashed in batches of ``series_batch_size`` series, so peak memory is one batch.
+
+    Args:
+        forecasts: Lazy scan of one group's forecast rows, carrying ``COMPARABLE_KEY_COLUMNS``.
+        series_batch_size: How many ``time_series_id`` values to hash at once. The fingerprint
+            does not depend on it.
+
+    Returns:
+        A hexadecimal SHA-256 digest. The digest of no rows is the digest of the empty string.
+    """
+    keys = list(COMPARABLE_KEY_COLUMNS)
+    series_ids = _distinct_series_ids(forecasts)
+    digest = hashlib.sha256()
+    for start in range(0, len(series_ids), series_batch_size):
+        batch_ids = series_ids[start : start + series_batch_size]
+        batch = (
+            forecasts.filter(pl.col("time_series_id").is_in(batch_ids))
+            .select(keys)
+            .unique()
+            .sort(keys)
+            .collect(engine="streaming")
+        )
+        digest.update(batch.cast(pl.Int64).to_numpy().tobytes())
+    return digest.hexdigest()
 
 
 def compute_effective_capacity(
