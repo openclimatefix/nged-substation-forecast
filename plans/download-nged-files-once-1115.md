@@ -191,8 +191,9 @@ Each test states the assertion that fails on `main` today.
    `power_time_series` tables and the two metadata parquet files. The replay: initial files for 3
    series; new files; a back-fill of old windows (files with `end_time` two months old and a new
    `last_modified`, for series that also have a newer live file), which must add only the missing
-   readings and leave the metadata unchanged; a late file whose `end_time` is more than 3 days before its series' newest
-   reading and whose `last_modified` is new (the old ingest's known loss); a file that appears
+   readings and leave the metadata unchanged; a late file whose `end_time` is more than 3 days
+   before its series' newest reading and whose `last_modified` is new (the old ingest's known
+   loss); a file that appears
    after a run with a `last_modified` earlier than the watermark but inside the margin; a series
    that stops reporting and publishes a data-less file with a new `Information` note; a rewritten
    key (same path, new `last_modified`); a run with no new files. The only expected difference is
