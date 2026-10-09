@@ -150,9 +150,10 @@ sweeps, that will be obvious from reading the runs, and the fix is to *append a 
 to redefine T2.1.
 
 **A count of T2.1 leaves out every MLflow experiment named with the prefix `study/`.** A study's
-forecasts are scored through `scripts/forecasting/score_study.py` under such an experiment, and the
-promotion path never offers a `study/` experiment as a candidate. T2.1 counts experiments that
-reach the promotion path, so T2.1's definition does not change. A study finding reaches production
+forecasts are scored through `scripts/forecasting/score_study.py` under such an experiment, which
+never goes through experiment registration, and the promotion path never offers a `study/`
+experiment as a candidate. T2.1 counts registered experiments, so the count filters out the prefix
+and T2.1's definition does not change. A study finding reaches production
 only through a reviewed re-implementation, so a count of studies would say little about how fast the
 project learns what to ship. If studies come to outnumber reviewed experiments, a new appended
 hypothesis can count what studies produce, and T2.1 stays as written.

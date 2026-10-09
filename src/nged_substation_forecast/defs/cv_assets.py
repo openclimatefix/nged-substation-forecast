@@ -1483,9 +1483,12 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             _compare_with_reference(
                 exp_name=exp_name, fold_id=fold_id, fold_metrics_by_group=fold_metrics_by_group
             )
-            exp_metrics = experiment_fold_metrics.setdefault(exp_name, {})
-            for key, value in fold_metric_dict.items():
-                exp_metrics.setdefault(key, []).append(value)
+            # A reference scored only to be compared with a study leaves its parent run alone: the
+            # parent run averages over the folds of this run, and this run holds one fold.
+            if (exp_name, fold_id) not in reference_groups_added:
+                exp_metrics = experiment_fold_metrics.setdefault(exp_name, {})
+                for key, value in fold_metric_dict.items():
+                    exp_metrics.setdefault(key, []).append(value)
 
     if config.evaluation_scope == "leaderboard":
         _log_parent_aggregates(experiment_fold_metrics, metrics_provenance)

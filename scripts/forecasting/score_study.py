@@ -226,7 +226,11 @@ def _append_to_log(*, log_path: Path, entry: dict[str, object]) -> int:
         log.seek(0)
         earlier_attempts = 0
         for line in log:
-            earlier = json.loads(line)
+            try:
+                earlier = json.loads(line)
+            except json.JSONDecodeError:
+                # A crash mid-write leaves a truncated line; it must not block later attempts.
+                continue
             is_attempt_at_fold = (
                 earlier["event"] == "attempt" and earlier["fold_id"] == entry["fold_id"]
             )

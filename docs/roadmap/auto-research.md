@@ -586,8 +586,8 @@ a token for the research repository only. Each route meets at least one check:
   initialisation time is perturbed. The reviewer checks for refitting inside the validation window,
   which the leakage test cannot see.
 - **Dropping hard rows or hard series.** The scorer's row-set refusal rejects a forecast whose row
-  keys `(time_series_id, power_fcst_init_time, valid_time)` differ from the reference experiment's
-  for the fold.
+  keys `(time_series_id, power_fcst_init_time, valid_time, ensemble_member)` differ from the
+  reference experiment's for the fold.
 - **Hiding failed attempts.** The submit command records every submission, including rejected
   submissions, in MLflow and in the hypothesis store, so the record of every submission does not
   depend on the research lead. Which implementations are submitted at all does depend on the

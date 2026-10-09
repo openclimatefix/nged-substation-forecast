@@ -255,7 +255,9 @@ run:
   one snapshot of the observed power and of `effective_capacity`, which both change as data arrives
   and as cleaning rules change. The study's fold run holds each score minus the reference's under
   `vs_reference__`, such as `vs_reference__nmae__all`. Compare a study with the reference through
-  those metrics, not through the two runs' separate numbers.
+  those metrics, not through the two runs' separate numbers. Scoring the reference this way
+  rewrites its `forecast_metrics` partition and its fold-run metrics from the current snapshot, and
+  leaves its parent run alone.
 - **Every fold run carries a fingerprint of its forecast problem.** `row_key_fingerprint` hashes the
   distinct `(time_series_id, power_fcst_init_time, valid_time)` keys of the group, ignoring
   `ensemble_member`, so a reviewed experiment with 13 members and the reference with 51 members have

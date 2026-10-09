@@ -866,6 +866,35 @@ def test_metrics_scores_a_study_beside_the_reference_in_the_same_run(
     assert paired == pytest.approx(dict.fromkeys(paired, 0.0))
 
 
+def test_metrics_logs_a_study_score_minus_the_reference_score(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A study that forecasts 5 MW too high has a larger RMSE than the reference."""
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    _use_as_reference(monkeypatch, EXPERIMENT_NAME)
+    _store_variant(
+        file_mlflow_env["forecasts"],
+        experiment_name=STUDY_EXPERIMENT_NAME,
+        transform=lambda rows: rows.with_columns(power_fcst=pl.col("power_fcst") + 5.0),
+    )
+
+    assert materialize(
+        [metrics],
+        run_config=_score_run_config(experiment_name=STUDY_EXPERIMENT_NAME),
+        instance=dagster_instance,
+    ).success
+
+    study = _fold_run_metrics(STUDY_EXPERIMENT_NAME)
+    reference = _fold_run_metrics(EXPERIMENT_NAME)
+    assert study["vs_reference__rmse__all"] > 0
+    assert study["vs_reference__rmse__all"] == pytest.approx(
+        study["rmse__all"] - reference["rmse__all"]
+    )
+
+
 def test_metrics_tags_a_reviewed_experiment_whose_row_keys_differ_from_the_reference(
     file_mlflow_env: dict[str, Path],
     dagster_instance: DagsterInstance,
@@ -893,6 +922,24 @@ def test_metrics_tags_a_reviewed_experiment_whose_row_keys_differ_from_the_refer
     assert other_tags["row_key_fingerprint"] != other_tags["reference_row_key_fingerprint"]
 
 
+def test_with_reference_groups_adds_the_reference_and_scores_studies_last(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from nged_substation_forecast.defs import cv_assets
+
+    _use_as_reference(monkeypatch, "zz_reference")
+    monkeypatch.setattr(cv_assets, "_group_has_rows", lambda *_: True)
+
+    groups, added = cv_assets._with_reference_groups(
+        groups=[("study/x", FOLD_ID), ("aaa", FOLD_ID)],
+        scan=None,  # ty: ignore[invalid-argument-type]
+        evaluation_scope="leaderboard",
+    )
+
+    assert added == [("zz_reference", FOLD_ID)]
+    assert groups == [("aaa", FOLD_ID), ("zz_reference", FOLD_ID), ("study/x", FOLD_ID)]
+
+
 def test_unfiltered_run_tags_a_study_stale_once_the_reference_row_keys_change(
     file_mlflow_env: dict[str, Path],
     dagster_instance: DagsterInstance,
@@ -907,6 +954,13 @@ def test_unfiltered_run_tags_a_study_stale_once_the_reference_row_keys_change(
         run_config=_score_run_config(experiment_name=STUDY_EXPERIMENT_NAME),
         instance=dagster_instance,
     ).success
+
+    assert materialize(
+        [metrics],
+        run_config=_score_run_config(experiment_name=None),
+        instance=dagster_instance,
+    ).success
+    assert _fold_run_tags(STUDY_EXPERIMENT_NAME)["stale_against_reference"] == "false"
 
     _store_variant(
         file_mlflow_env["forecasts"],
@@ -1277,6 +1331,17 @@ def test_score_study_refuses_replace_unless_the_maintainers_variable_is_set(
 def _submission_log() -> list[dict[str, object]]:
     log_path = Path(Settings().local_artifacts_path) / score_study.SUBMISSION_LOG_NAME
     return [json.loads(line) for line in log_path.read_text().splitlines()]
+
+
+def test_score_study_counts_attempts_past_a_truncated_log_line(tmp_path: Path) -> None:
+    log_path = tmp_path / "log.jsonl"
+    log_path.write_text('{"event": "attempt", "fold_id": "f", "stu')
+
+    number = score_study._append_to_log(
+        log_path=log_path, entry={"event": "attempt", "fold_id": "f", "study_name": "x"}
+    )
+
+    assert number == 1
 
 
 def test_score_study_logs_a_stored_study_as_scored_when_tagging_the_run_fails(
