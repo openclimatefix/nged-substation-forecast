@@ -812,7 +812,6 @@ def _validate_group(
         group_scan: Lazy scan of this group's forecast rows.
         scan: Typed lazy scan of the whole ``power_forecasts`` table, from which the reference
             experiment's rows are read.
-
         evaluation_scope: ``"leaderboard"`` or ``"ad_hoc"``.
 
     Returns:
