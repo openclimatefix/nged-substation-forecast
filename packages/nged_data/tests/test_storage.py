@@ -664,7 +664,7 @@ def test_read_downloaded_files_raises_a_named_error_for_a_corrupt_file(tmp_path:
     list_of_downloaded_files_path = tmp_path / "list_of_downloaded_files.parquet"
     list_of_downloaded_files_path.write_bytes(b"not a parquet file")
 
-    with pytest.raises(DownloadedFilesError, match=r"downloaded_files\.parquet"):
+    with pytest.raises(DownloadedFilesError, match=r"list_of_downloaded_files\.parquet"):
         _read(list_of_downloaded_files_path, power_path, metadata_path)
 
 
@@ -673,7 +673,7 @@ def test_read_downloaded_files_raises_a_named_error_for_a_file_off_contract(tmp_
     list_of_downloaded_files_path = tmp_path / "list_of_downloaded_files.parquet"
     pl.DataFrame({"path": ["a"], "unexpected": [1]}).write_parquet(list_of_downloaded_files_path)
 
-    with pytest.raises(DownloadedFilesError, match=r"downloaded_files\.parquet"):
+    with pytest.raises(DownloadedFilesError, match=r"list_of_downloaded_files\.parquet"):
         _read(list_of_downloaded_files_path, power_path, metadata_path)
 
 
