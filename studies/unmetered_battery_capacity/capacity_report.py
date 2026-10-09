@@ -265,7 +265,10 @@ def c3_c4_section(
             f"At shares of {MIN_SHARE_C3:.0%} and above ({c3.height} sums), the mean paired "
             f"difference in relative power error (posterior median minus step tail) is {mean:+.4f} "
             f"(95% cluster-bootstrap interval {low:+.4f} to {high:+.4f}); the contrast "
-            f"{'holds' if high < 0 else 'fails'}."
+            f"{'holds' if high < 0 else 'fails'}. Rung 1 is the in-family best case, and the step "
+            "tail is a weak comparator (an LP battery rarely flips from full charge to full "
+            "discharge within one half-hour), so a pass says the posterior beats a naive "
+            "statistic on its own family and nothing about real batteries."
         ),
         "",
         "Median relative power error by share:",
@@ -305,7 +308,9 @@ def c3_c4_section(
             f"For 1-hour and 4-hour nameplate batteries at shares of {MIN_SHARE_C4:.0%} and above "
             f"({c4.height} sums), the mean paired difference in relative energy error (posterior "
             f"median minus the rule 2 hours times the power median) is {mean:+.4f} (95% interval "
-            f"{low:+.4f} to {high:+.4f}); the contrast {'holds' if high < 0 else 'fails'}."
+            f"{low:+.4f} to {high:+.4f}); the contrast {'holds' if high < 0 else 'fails'}, in "
+            "the family only. For real batteries the energy medians are prior-driven and the "
+            "energy reference is a lower bound, so no MWh claim transfers."
         ),
         "",
         (
@@ -642,6 +647,8 @@ def rung5_section(*, rung5: pl.DataFrame) -> list[str]:
         .join(presence, on="series")
         .sort("series")
     )
+    first_all = int(screen.filter(pl.col("real_rank") == 1).height)
+    first_price = int(screen.filter(pl.col("real_rank_among_price_placebos") == 1).height)
     return [
         "## Rung 5: the screen of the 8 primaries with a within-primary placebo (exploratory)",
         "",
@@ -657,6 +664,12 @@ def rung5_section(*, rung5: pl.DataFrame) -> list[str]:
         ),
         "",
         table(screen),
+        (
+            f"**The real template set ranks first of 13 for {first_all} of {screen.height} "
+            f"primaries, and first among the 7 sets that differ only in their prices for "
+            f"{first_price}.** The power of each form of the screen is in the next section."
+        ),
+        "",
         "Every set's summed log Bayes factor:",
         "",
         table(ranked.select("series", "template_set", "log_bayes_factor", "rank")),

@@ -227,6 +227,8 @@ def screen_power_section(*, screen: pl.DataFrame) -> list[str]:
         median_rank_of_13=pl.col("rank_all").median(),
     )
     null = real.filter(pl.col("lane_kind") == "null")
+    merchant = real.filter(pl.col("lane_kind") == "merchant")
+    public = real.filter(pl.col("lane_kind") == "public")
     null_count, null_total = int(null["first_of_13"].sum()), null.height
     low, high = clopper_pearson(count=null_count, total=null_total)
     return [
@@ -249,6 +251,21 @@ def screen_power_section(*, screen: pl.DataFrame) -> list[str]:
         ),
         "",
         table(groups.sort("lane_kind", "share")),
+        (
+            "**The 13-set screen has no power to find a battery; the screen restricted to the "
+            "6 price-shifted placebos does.** Against all 13 sets the real set ranks first in "
+            f"{int(merchant['first_of_13'].sum())} of {merchant.height} lanes holding a simulated "
+            f"merchant battery of 10% or 40% ({merchant['first_of_13'].mean():.1%}), no more "
+            "often than 1 in 13 (7.7%): the shifted-window placebos often outrank the real set "
+            "(the median rank of the real set is in the table). Against the real set's 6 "
+            "price-shifted rivals alone "
+            f"(7 sets in all) it ranks first in {int(merchant['first_of_price'].sum())} of "
+            f"{merchant.height} simulated merchant lanes, in {int(null['first_of_price'].sum())} "
+            f"of {null.height} lanes with no battery, and in "
+            f"{int(public['first_of_price'].sum())} of {public.height} lanes holding a real "
+            "public battery at 40%."
+        ),
+        "",
         "By nameplate duration (merchant lanes only):",
         "",
         table(
@@ -378,7 +395,9 @@ def rung3_replica_section(*, replica: pl.DataFrame) -> list[str]:
         registered_over_p99=pl.col("share"),
     ).with_columns(
         median_power_over_p99=pl.col("merchant_power_median") / pl.col("p99"),
-        median_over_registered=pl.col("merchant_power_median") / pl.col("true_power_mw"),
+        median_over_registered=pl.when(pl.col("true_power_mw") > 0).then(
+            pl.col("merchant_power_median") / pl.col("true_power_mw")
+        ),
     )
     return [
         "## Rung 3 on calendar replicas (exploratory)",
