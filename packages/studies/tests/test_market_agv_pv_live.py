@@ -1,6 +1,7 @@
 """Tests for the AGV and PV_Live download scripts, with no network access."""
 
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
 
 import fetch_pn_all_bmus_sample
 import fetch_pv_live
@@ -122,7 +123,7 @@ def test_check_pes_list_raises_when_a_letter_differs(monkeypatch: pytest.MonkeyP
         check_pes_list()
 
 
-def _pn_body(*, period: int, segments: int) -> dict[str, list[dict[str, object]]]:
+def _pn_body(*, period: int, segments: int) -> dict[str, Any]:
     start = period_start_utc(settlement_date=date(2026, 3, 4), settlement_period=period)
     return {
         "data": [

@@ -96,6 +96,11 @@ NGED_GROUPS: Final[dict[str, str]] = {
 }
 """NGED's four licence areas, as the GSP group letter and the name Elexon gives the group."""
 
+LONDON: Final[str] = "Europe/London"
+"""The time zone of the settlement day and of the local-time keys."""
+INDDEM_MATCH_TOLERANCE_MW: Final[float] = 5.0
+"""A half-hour counts as one where the sampled PN import sum reproduces INDDEM's national total if
+the two differ by no more than this many megawatts."""
 SIGN_TOLERANCE_MW: Final[float] = 1.0
 """INDDEM and INDGEN values are whole megawatts, so a derived zone may stray this far past zero."""
 

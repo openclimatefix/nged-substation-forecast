@@ -25,9 +25,11 @@ from indgen_inddem_common import (
     BMU_REFERENCE_PATH,
     BOUNDARIES,
     GSP_GROUPS,
+    INDDEM_MATCH_TOLERANCE_MW,
     INDDEM_PATH,
     INDGEN_PATH,
     INDO_PATH,
+    LONDON,
     NGED_GROUPS,
     PN_SAMPLE_PATH,
     PV_LIVE_PATH,
@@ -49,15 +51,22 @@ SOURCE_PATHS: Final[dict[DatasetType, str]] = {
 }
 VIEWS: Final[tuple[ViewType, ...]] = ("latest", "first_of_day")
 HALF_HOUR_MINUTES: Final[int] = 30
+LAST_LOCAL_SLOTS_FROM: Final[int] = 44
+"""The first UK local half-hour slot (22:00) of the late-evening slots the report lists."""
+FIRST_LOCAL_SLOTS_TO: Final[int] = 4
+"""The slots 0 to 3 (00:00 to 02:00 UK local) that the report lists with the late-evening slots."""
+LONG_ISSUE_HOURS: Final[float] = 30.0
+"""An issue that reaches further than this is the long issue published from about 12:00 UK local."""
 LAST_SLOTS_FROM: Final[int] = 44
 """The first UTC half-hour of the day (22:00 UTC) in the late-day slots the report lists."""
 SATURDAY: Final[int] = 6
 """The ISO weekday number of Saturday, so a weekday number at or above it is a weekend day."""
-LONDON: Final[str] = "Europe/London"
-INDDEM_MATCH_TOLERANCE_MW: Final[float] = 5.0
-"""The zone-to-group fit of INDDEM uses the half-hours where the sampled PN sum reproduces INDDEM's
-national total to within this many megawatts. On the other half-hours the sampled PNs and INDDEM
-differ by up to 1.7 GW for a reason the study has not found."""
+STUDY_HALF_HOURS: Final[int] = 18960
+"""The half-hours of the study window, 395 days of 48 half-hours, with the two clock-change days
+making up for each other."""
+SUM_TO_ONE_WEIGHT: Final[float] = 20.0
+"""How many times the largest summed PN the fit weights its rows that make each group's fractions
+sum to 1."""
 WINDOW_START_UTC: Final[datetime] = datetime(
     STUDY_START.year, STUDY_START.month, STUDY_START.day, tzinfo=UTC
 )
@@ -70,9 +79,9 @@ UTC_TIME: Final[pl.Datetime] = pl.Datetime(time_unit="us", time_zone="UTC")
 report_lines: list[str] = []
 
 
-def say(text: str = "") -> None:
-    """Add a line to the report."""
-    report_lines.append(text)
+def say(text: object = "") -> None:
+    """Add a line to the report, turning a table into its printed form."""
+    report_lines.append(str(text))
 
 
 def issues_table(*, dataset: DatasetType) -> pl.DataFrame:
@@ -101,7 +110,7 @@ def views_table(*, dataset: DatasetType, issues: pl.DataFrame) -> pl.DataFrame:
     for view in VIEWS:
         cutoff = pl.col("time") if view == "latest" else pl.col("time").dt.truncate("1d")
         with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+            warnings.simplefilter("ignore", category=UserWarning)
             looked_up = (
                 targets.with_columns(cutoff=cutoff)
                 .sort("cutoff")
@@ -174,6 +183,7 @@ def issue_reach(*, issues: pl.DataFrame, dataset: DatasetType) -> pl.DataFrame:
             dataset=pl.lit(dataset),
             publish_time="publish_time",
             half_hours="half_hours",
+            end_time=pl.col("last_time") + pl.duration(minutes=HALF_HOUR_MINUTES),
             reach_hours=(
                 (pl.col("last_time") - pl.col("publish_time")).dt.total_minutes()
                 + HALF_HOUR_MINUTES
@@ -248,79 +258,173 @@ def period_average_mw(*, segments: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def bmu_groups() -> pl.DataFrame:
+    """Return Elexon's register of each BMU's GSP group and interconnector.
+
+    The table has one row for each National Grid identifier. The register holds some BMUs twice
+    with identical rows, so the table drops exact duplicates.
+    """
+    return (
+        pl.read_parquet(BMU_REFERENCE_PATH)
+        .select(
+            "national_grid_bmu_id",
+            gsp_group="gsp_group_id",
+            interconnector="interconnector_id",
+        )
+        .unique()
+    )
+
+
 def group_sums_from_pn() -> pl.DataFrame:
-    """Sum the sampled BMUs' average PN by GSP group, split into import and export."""
+    """Sum the sampled BMUs' average PN by column, split into import and export.
+
+    The BMUs of one interconnector are netted into one unit before the split, because an
+    interconnector's trading BMUs import and export in the same half-hour and INDDEM and INDGEN
+    count the interconnector once. Each interconnector is its own column, `IC <name>`. Every other
+    BMU is its own unit and goes in the column of its GSP group. A BMU that the register gives no
+    GSP group, or does not list, goes in the column `none`.
+    """
     averages = period_average_mw(segments=pl.read_parquet(PN_SAMPLE_PATH))
-    groups = pl.read_parquet(BMU_REFERENCE_PATH).select(
-        "national_grid_bmu_id", gsp_group="gsp_group_id"
+    units = (
+        averages.join(bmu_groups(), on="national_grid_bmu_id", how="left", validate="m:1")
+        .with_columns(
+            unit=pl.coalesce("interconnector", "national_grid_bmu_id"),
+            column=pl.coalesce(
+                pl.when(pl.col("interconnector").is_not_null())
+                .then(pl.lit("IC ") + pl.col("interconnector"))
+                .otherwise(None),
+                "gsp_group",
+                pl.lit("none"),
+            ),
+        )
+        .group_by("time", "unit", "column")
+        .agg(net_mw=pl.col("average_mw").sum())
     )
     return (
-        averages.join(groups, on="national_grid_bmu_id", how="left")
-        .with_columns(gsp_group=pl.col("gsp_group").fill_null("none"))
-        .group_by("time", "gsp_group")
+        units.group_by("time", gsp_group=pl.col("column"))
         .agg(
-            import_mw=pl.col("average_mw").filter(pl.col("average_mw") < 0).sum(),
-            export_mw=pl.col("average_mw").filter(pl.col("average_mw") > 0).sum(),
-            bmus=pl.len(),
+            import_mw=pl.col("net_mw").filter(pl.col("net_mw") < 0).sum(),
+            export_mw=pl.col("net_mw").filter(pl.col("net_mw") > 0).sum(),
+            units=pl.len(),
         )
         .sort("time", "gsp_group")
     )
 
 
-def zone_group_weights(
-    *, zones: pl.DataFrame, sums: pl.DataFrame, dataset: DatasetType, keep_times: pl.Series
-) -> pl.DataFrame:
-    """Fit each zone's INDDEM or INDGEN on the GSP groups' summed PNs, with non-negative weights.
+def report_bmu_group_coverage() -> None:
+    """Report how many sampled BMUs have a GSP group in Elexon's register."""
+    sampled = pl.read_parquet(PN_SAMPLE_PATH).select("national_grid_bmu_id").unique()
+    registered = bmu_groups()
+    joined = sampled.join(registered, on="national_grid_bmu_id", how="left", validate="m:1")
+    in_register = sampled.join(registered, on="national_grid_bmu_id", how="semi").height
+    say()
+    say("## Sampled BMUs and Elexon's register")
+    say(
+        f"- {sampled.height} distinct BMUs in the sample; {in_register} are in the register; "
+        f"{joined['gsp_group'].is_not_null().sum()} have a GSP group."
+    )
 
-    Each BMU belongs to one GSP group in Elexon's BMU register, so if a GSP group lies wholly
-    inside one zone, the weight of that group in that zone's fit is close to 1 and every other
-    weight is close to 0. A group that straddles two zones shows two fractional weights.
+
+def zone_group_fractions(
+    *, zones: pl.DataFrame, sums: pl.DataFrame, keep_times: pl.Series
+) -> pl.DataFrame:
+    """Fit the share of each GSP group's import PNs that sits in each zone.
+
+    Every zone's INDDEM is modelled as the sum over GSP groups of the group's summed import PNs
+    times a non-negative fraction, and each group's fractions over the 17 zones sum to 1. The
+    study fits all zones jointly by non-negative least squares, with the sum-to-one rows weighted
+    heavily. If a GSP group lies wholly inside one zone, its fraction there is close to 1.
 
     Args:
         zones: Every zone's value for every half-hour, from `zones_from_boundaries`.
         sums: The sampled half-hours' PN sums by GSP group, from `group_sums_from_pn`.
-        dataset: Whether to fit INDDEM on the import sums, or INDGEN on the export sums.
         keep_times: The half-hours to fit on.
 
     Returns:
-        One row for every zone and GSP group (or `none`, the BMUs the register gives no group),
-        with the fitted weight, and the zone's fit in MW.
+        One row for every zone and GSP group (or `none`), with the fitted fraction, and the RMS
+        residual of the fit in MW.
     """
-    side = "import_mw" if dataset == "inddem" else "export_mw"
     wide = (
         sums.filter(pl.col("time").is_in(keep_times.implode()))
-        .pivot(on="gsp_group", index="time", values=side)
+        .pivot(on="gsp_group", index="time", values="import_mw")
         .fill_null(0.0)
-        .sort("time")
     )
+    target = zones.filter((pl.col("dataset") == "inddem") & (pl.col("view") == "latest")).pivot(
+        on="zone", index="time", values="value_mw"
+    )
+    frame = wide.join(target, on="time", how="inner", validate="1:1").sort("time")
     groups = [column for column in wide.columns if column != "time"]
-    design = wide.select(groups).to_numpy()
-    target = (
-        zones.filter((pl.col("dataset") == dataset) & (pl.col("view") == "latest"))
-        .pivot(on="zone", index="time", values="value_mw")
-        .join(wide.select("time"), on="time", how="semi")
-        .sort("time")
-    )
-    rows = []
-    for zone in ZONES:
-        values = target[zone].to_numpy()
-        coefficients, norm = nnls(
-            design * (-1.0 if dataset == "inddem" else 1.0),
-            values * (-1.0 if dataset == "inddem" else 1.0),
-        )
-        rms = norm / np.sqrt(len(values))
-        rows.extend(
+    design = -frame.select(groups).to_numpy()
+    observed = -frame.select(list(ZONES)).to_numpy()
+    times, group_count, zone_count = design.shape[0], len(groups), len(ZONES)
+    scale = float(np.abs(design).max()) * SUM_TO_ONE_WEIGHT
+    matrix = np.zeros((times * zone_count + group_count, group_count * zone_count))
+    target_vector = np.zeros(times * zone_count + group_count)
+    for zone_index in range(zone_count):
+        rows = slice(zone_index * times, (zone_index + 1) * times)
+        matrix[rows, zone_index * group_count : (zone_index + 1) * group_count] = design
+        target_vector[rows] = observed[:, zone_index]
+    for group_index in range(group_count):
+        for zone_index in range(zone_count):
+            matrix[times * zone_count + group_index, zone_index * group_count + group_index] = scale
+        target_vector[times * zone_count + group_index] = scale
+    coefficients, _ = nnls(matrix, target_vector)
+    fitted = matrix[: times * zone_count] @ coefficients
+    rms = float(np.sqrt(np.mean((fitted - target_vector[: times * zone_count]) ** 2)))
+    shaped = coefficients.reshape(zone_count, group_count)
+    return pl.DataFrame(
+        [
             {
-                "dataset": dataset,
                 "zone": zone,
                 "gsp_group": group,
-                "weight": float(weight),
-                "rms_residual_mw": float(rms),
-                "zone_rms_mw": float(np.sqrt(np.mean(values**2))),
+                "fraction": float(shaped[zone_index, group_index]),
+                "rms_residual_mw": rms,
+                "half_hours": times,
             }
-            for group, weight in zip(groups, coefficients, strict=True)
+            for zone_index, zone in enumerate(ZONES)
+            for group_index, group in enumerate(groups)
+        ]
+    )
+
+
+def leave_one_day_out(
+    *, zones: pl.DataFrame, sums: pl.DataFrame, keep_times: pl.Series
+) -> pl.DataFrame:
+    """Refit the fractions leaving out each sample day in turn, and report each column's top zone.
+
+    Returns:
+        One row for each column, with the zone of the largest fraction in the full fit, and the
+        number of the full fit and the leave-one-day-out fits that put the largest fraction in that
+        zone.
+    """
+    days = keep_times.dt.convert_time_zone(LONDON).dt.date()
+    sample_days = sorted(set(days))
+    fits = {"all": zone_group_fractions(zones=zones, sums=sums, keep_times=keep_times)}
+    for day in sample_days:
+        kept = keep_times.filter(days != day)
+        if len(kept):
+            fits[f"without {day}"] = zone_group_fractions(zones=zones, sums=sums, keep_times=kept)
+    tops = pl.concat(
+        [
+            fit.sort("fraction", descending=True)
+            .group_by("gsp_group", maintain_order=True)
+            .first()
+            .select("gsp_group", "zone", "fraction")
+            .with_columns(fit=pl.lit(name))
+            for name, fit in fits.items()
+        ]
+    )
+    full = tops.filter(pl.col("fit") == "all").select("gsp_group", full_zone="zone")
+    return (
+        tops.join(full, on="gsp_group")
+        .group_by("gsp_group")
+        .agg(
+            top_zone_all=pl.col("full_zone").first(),
+            fits=pl.len(),
+            fits_agreeing=(pl.col("zone") == pl.col("full_zone")).sum(),
         )
-    return pl.DataFrame(rows)
+        .sort("gsp_group")
+    )
 
 
 def first_versus_latest(*, views: pl.DataFrame) -> pl.DataFrame:
@@ -338,9 +442,28 @@ def first_versus_latest(*, views: pl.DataFrame) -> pl.DataFrame:
             difference_mw=pl.col("first_of_day_mw") - pl.col("latest_mw"),
             utc_half_hour=pl.col("time").dt.hour().cast(pl.Int32) * 2
             + pl.col("time").dt.minute().cast(pl.Int32) // HALF_HOUR_MINUTES,
+            local_half_hour=pl.col("time").dt.convert_time_zone(LONDON).dt.hour().cast(pl.Int32) * 2
+            + pl.col("time").dt.convert_time_zone(LONDON).dt.minute().cast(pl.Int32)
+            // HALF_HOUR_MINUTES,
+            clocks=pl.when(
+                pl.col("time").dt.convert_time_zone(LONDON).dt.dst_offset().dt.total_hours() == 0
+            )
+            .then(pl.lit("GMT"))
+            .otherwise(pl.lit("BST")),
         )
         .sort("dataset", "time")
     )
+
+
+def remove_component(*, series: pl.Series, national: pl.Series) -> np.ndarray:
+    """Return `series` minus its least-squares multiple of `national`, as an array.
+
+    Both series are anomalies with mean zero, so the fit needs no intercept.
+    """
+    values = series.to_numpy()
+    reference = national.to_numpy()
+    slope = float(np.dot(values, reference) / np.dot(reference, reference))
+    return values - slope * reference
 
 
 def anomaly_correlations(*, agv: pl.DataFrame, zones: pl.DataFrame) -> pl.DataFrame:
@@ -349,7 +472,10 @@ def anomaly_correlations(*, agv: pl.DataFrame, zones: pl.DataFrame) -> pl.DataFr
     The anomaly of a series is the series minus its own mean at the same UK local half-hour of the
     day, the same day type (weekday or weekend), and the same month. Every series shares the daily,
     weekly, and seasonal cycles, so correlations of the raw series sit near 0.76 between any two GSP
-    groups, and the anomaly correlation shows what is left.
+    groups, and the anomaly correlation shows what is left. A GSP group's AGV anomaly and a zone's
+    INDDEM anomaly also share the national anomaly, which is mostly weather. The study therefore
+    also removes from each series the multiple of the national anomaly (the sum of the 14 groups,
+    or of the 17 zones) that a least-squares fit gives, and correlates what remains.
     """
     wide_agv = agv.pivot(on="gsp_group", index="time", values="import_mw")
     wide_zones = (
@@ -370,12 +496,27 @@ def anomaly_correlations(*, agv: pl.DataFrame, zones: pl.DataFrame) -> pl.DataFr
         pl.col(column) - pl.col(column).mean().over("half_hour", "weekend", "month")
         for column in series
     )
+    national_agv = anomalies.select(pl.sum_horizontal(list(GSP_GROUPS))).to_series()
+    national_inddem = anomalies.select(pl.sum_horizontal(list(ZONES))).to_series()
+    without_national = {
+        **{
+            group: remove_component(series=anomalies[group], national=national_agv)
+            for group in GSP_GROUPS
+        },
+        **{
+            zone: remove_component(series=anomalies[zone], national=national_inddem)
+            for zone in ZONES
+        },
+    }
     rows = [
         {
             "gsp_group": group,
             "zone": zone,
             "correlation_raw": joined.select(pl.corr(group, zone)).item(),
             "correlation_anomaly": anomalies.select(pl.corr(group, zone)).item(),
+            "correlation_without_national": float(
+                np.corrcoef(without_national[group], without_national[zone])[0, 1]
+            ),
         }
         for group in GSP_GROUPS
         for zone in ZONES
@@ -428,7 +569,12 @@ def build_views_and_zones() -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     views.write_parquet(STUDY_DIR / "views.parquet")
     reach.write_parquet(STUDY_DIR / "issue_reach.parquet")
     say()
-    say(f"Views: {views.height} rows. Rows with no issue: {views['value_mw'].null_count()}.")
+    expected_rows = len(BOUNDARIES) * STUDY_HALF_HOURS * len(VIEWS) * 2
+    say(
+        f"Views: {views.height} rows, expected {expected_rows} (18 boundaries x {STUDY_HALF_HOURS} "
+        f"half-hours x {len(VIEWS)} views x 2 datasets). Rows with no issue: "
+        f"{views['value_mw'].null_count()}."
+    )
     zones = zones_from_boundaries(views=views)
     zones.write_parquet(STUDY_DIR / "zones.parquet")
     residual = boundary_identity_residual(views=views).drop_nulls()
@@ -442,13 +588,12 @@ def build_views_and_zones() -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
             share_nonzero=(pl.col("residual_mw").abs() > 0).mean(),
         )
         .sort("dataset", "view")
-        .__str__()
     )
     say()
     say("## Zone sign check")
     sign = zone_sign_report(zones=zones)
     sign.write_parquet(STUDY_DIR / "zone_signs.parquet")
-    say(sign.filter(pl.col("view") == "latest").__str__())
+    say(sign.filter(pl.col("view") == "latest"))
     report_levels(views=views, zones=zones)
     return views, zones, reach
 
@@ -499,7 +644,6 @@ def report_issues(*, views: pl.DataFrame, reach: pl.DataFrame) -> None:
             mean_abs_latest_mw=pl.col("latest_mw").abs().mean(),
         )
         .sort("dataset")
-        .__str__()
     )
     say()
     say("Mean first-minus-latest difference by UTC target half-hour, last four slots (MW):")
@@ -512,6 +656,38 @@ def report_issues(*, views: pl.DataFrame, reach: pl.DataFrame) -> None:
     ):
         say(f"- {row['dataset']} slot {row['utc_half_hour']}: {row['mean_mw']:.0f}")
     say()
+    say("Mean first-minus-latest difference by UK local target half-hour and clocks, MW:")
+    seasonal = (
+        fvl.filter(
+            pl.col("local_half_hour").is_in(
+                [*range(LAST_LOCAL_SLOTS_FROM, 48), *range(FIRST_LOCAL_SLOTS_TO)]
+            )
+        )
+        .group_by("dataset", "clocks", "local_half_hour")
+        .agg(mean_mw=pl.col("difference_mw").mean())
+        .sort("dataset", "clocks", "local_half_hour")
+    )
+    for row in seasonal.iter_rows(named=True):
+        say(
+            f"- {row['dataset']} {row['clocks']} local slot {row['local_half_hour']}: "
+            f"{row['mean_mw']:.0f}"
+        )
+    outside = (
+        fvl.filter(
+            ~pl.col("local_half_hour").is_in(
+                [*range(LAST_LOCAL_SLOTS_FROM, 48), *range(FIRST_LOCAL_SLOTS_TO)]
+            )
+        )
+        .group_by("dataset")
+        .agg(
+            largest_abs_mean_mw=pl.col("difference_mw").mean().abs().max(),
+            mean_abs_mw=pl.col("difference_mw").abs().mean(),
+        )
+        .sort("dataset")
+    )
+    say(f"Outside local slots {LAST_LOCAL_SLOTS_FROM} to 47 and 0 to {FIRST_LOCAL_SLOTS_TO - 1}:")
+    say(outside)
+    say()
     say("## Issue reach, hours ahead")
     say(
         reach.group_by("dataset")
@@ -523,8 +699,49 @@ def report_issues(*, views: pl.DataFrame, reach: pl.DataFrame) -> None:
             reach_hours_max=pl.col("reach_hours").max(),
         )
         .sort("dataset")
-        .__str__()
     )
+    regular = reach.filter((pl.col("dataset") == "inddem") & (pl.col("reach_hours") > 1))
+    say(
+        f"Reach of the {regular.height} regular INDDEM issues: {regular['reach_hours'].min():.1f} "
+        f"to {regular['reach_hours'].max():.1f} hours."
+    )
+    local_hour = pl.col("publish_time").dt.convert_time_zone(LONDON).dt.hour()
+    say("Median reach by UK local hour of publication (hours ahead):")
+    say(regular.group_by(hour=local_hour).agg(median=pl.col("reach_hours").median()).sort("hour"))
+    slots = (
+        regular.select(
+            day=pl.col("publish_time").dt.date(), slot=pl.col("publish_time").dt.truncate("30m")
+        )
+        .unique()
+        .group_by("day")
+        .agg(slots=pl.len())
+    )
+    say(f"Slots with an issue in a UTC day: {slots['slots'].value_counts().sort('slots')}")
+    local_slots = (
+        regular.select(
+            slot=(
+                pl.col("publish_time").dt.convert_time_zone(LONDON).dt.hour().cast(pl.Int32) * 2
+                + pl.col("publish_time").dt.convert_time_zone(LONDON).dt.minute().cast(pl.Int32)
+                // HALF_HOUR_MINUTES
+            )
+        )
+        .unique()
+        .sort("slot")["slot"]
+        .to_list()
+    )
+    missing_local = [slot for slot in range(48) if slot not in local_slots]
+    say(f"UK local half-hour slots (0 to 47) that never hold a regular issue: {missing_local}")
+    ends = (
+        regular.select(
+            end_local=pl.col("end_time").dt.convert_time_zone(LONDON).dt.strftime("%H:%M"),
+            long_issue=pl.col("reach_hours") > LONG_ISSUE_HOURS,
+        )
+        .group_by("long_issue", "end_local")
+        .agg(issues=pl.len())
+        .sort("long_issue", "end_local")
+    )
+    say("End of the last half-hour of an issue, UK local time (long issue means over 30 hours):")
+    say(ends)
     odd = reach.filter(pl.col("reach_hours") < 1)
     say(f"Issues that reach less than one hour ahead: {odd.height}.")
     for row in odd.iter_rows(named=True):
@@ -535,7 +752,110 @@ def report_issues(*, views: pl.DataFrame, reach: pl.DataFrame) -> None:
         )
 
 
-def build_agv(*, zones: pl.DataFrame) -> pl.DataFrame:
+def report_nged_levels(
+    *, agv: pl.DataFrame, zones: pl.DataFrame, correlations: pl.DataFrame
+) -> None:
+    """Report, for each NGED group, its best-correlated zone, the mean levels, and the solar share.
+
+    The means use only the half-hours that AGV, the zone, and PV_Live all cover, so the ratios and
+    the shares describe one window.
+    """
+    zone_inddem = (
+        zones.filter((pl.col("dataset") == "inddem") & (pl.col("view") == "latest"))
+        .select("zone", "time", zone_mw=-pl.col("value_mw"))
+        .sort("zone", "time")
+    )
+    pv = pl.read_parquet(PV_LIVE_PATH).select("time", "gsp_group", solar_mw="generation_mw")
+    rows = []
+    for group, name in NGED_GROUPS.items():
+        best = correlations.filter(pl.col("gsp_group") == group).sort(
+            "correlation_without_national", descending=True
+        )
+        zone = best["zone"][0]
+        joined = (
+            agv.filter(pl.col("gsp_group") == group)
+            .join(zone_inddem.filter(pl.col("zone") == zone), on="time", validate="1:1")
+            .join(pv.filter(pl.col("gsp_group") == group), on=["time", "gsp_group"], validate="1:1")
+        )
+        rows.append(
+            {
+                "gsp_group": group,
+                "name": name,
+                "best_zone": zone,
+                "correlation": best["correlation_without_national"][0],
+                "correlation_anomaly": best["correlation_anomaly"][0],
+                "half_hours": joined.height,
+                "mean_agv_mw": joined["import_mw"].mean(),
+                "mean_zone_inddem_mw": joined["zone_mw"].mean(),
+                "zone_to_agv_ratio": joined.select(
+                    pl.col("zone_mw").mean() / pl.col("import_mw").mean()
+                ).item(),
+                "mean_solar_mw": joined["solar_mw"].mean(),
+                "solar_over_agv": joined.select(
+                    pl.col("solar_mw").sum() / pl.col("import_mw").sum()
+                ).item(),
+                "solar_share_of_gross": joined.select(
+                    pl.col("solar_mw").sum() / (pl.col("import_mw") + pl.col("solar_mw")).sum()
+                ).item(),
+                "negative_agv_half_hours": int((joined["import_mw"] < 0).sum()),
+            }
+        )
+    table = pl.DataFrame(rows)
+    table.write_parquet(STUDY_DIR / "nged_levels.parquet")
+    say()
+    say("## NGED groups: best-correlated zone, mean levels (MW), and solar share")
+    for row in table.iter_rows(named=True):
+        say(
+            f"- {row['gsp_group']} {row['name']}: best zone {row['best_zone']} "
+            f"(correlation without the national anomaly {row['correlation']:.2f}; anomaly "
+            f"correlation {row['correlation_anomaly']:.2f}); mean AGV {row['mean_agv_mw']:.0f}, "
+            "mean zone "
+            f"INDDEM {row['mean_zone_inddem_mw']:.0f}, ratio {row['zone_to_agv_ratio']:.2f}; "
+            f"mean solar {row['mean_solar_mw']:.0f}, solar over AGV {row['solar_over_agv']:.3f}, "
+            f"solar over AGV plus solar "
+            f"{row['solar_share_of_gross']:.3f}; AGV negative in "
+            f"{row['negative_agv_half_hours']} of {row['half_hours']} half-hours."
+        )
+
+
+def report_national_against_indo(*, views: pl.DataFrame) -> None:
+    """Report how national INDDEM compares with the national demand outturn (INDO)."""
+    national = views.filter(
+        (pl.col("view") == "latest") & (pl.col("boundary") == "N") & (pl.col("dataset") == "inddem")
+    ).select("time", inddem_mw=-pl.col("value_mw"))
+    indo = pl.read_parquet(INDO_PATH).select("time", "indo_mw").unique("time")
+    joined = national.join(indo, on="time", validate="1:1").with_columns(
+        ratio=pl.col("inddem_mw") / pl.col("indo_mw")
+    )
+    say()
+    say("## National INDDEM against INDO")
+    say(
+        joined.select(
+            half_hours=pl.len(),
+            median_ratio=pl.col("ratio").median(),
+            correlation=pl.corr("inddem_mw", "indo_mw"),
+        )
+    )
+
+
+def supplier_import_share() -> float:
+    """Return the share of the sampled import PNs that supplier base BMUs (`2__`) hold."""
+    averages = period_average_mw(segments=pl.read_parquet(PN_SAMPLE_PATH))
+    register = (
+        pl.read_parquet(BMU_REFERENCE_PATH)
+        .select("national_grid_bmu_id", "elexon_bmu_id")
+        .unique("national_grid_bmu_id")
+    )
+    imports = averages.filter(pl.col("average_mw") < 0).join(
+        register, on="national_grid_bmu_id", how="left"
+    )
+    return imports.select(
+        pl.col("average_mw").filter(pl.col("elexon_bmu_id").str.starts_with("2__")).sum()
+        / pl.col("average_mw").sum()
+    ).item()
+
+
+def build_agv(*, views: pl.DataFrame, zones: pl.DataFrame) -> pl.DataFrame:
     """Build and report the AGV tables, the unit check, and the correlations with the zones."""
     agv = agv_import_mw()
     agv.write_parquet(STUDY_DIR / "agv_groups.parquet")
@@ -548,16 +868,30 @@ def build_agv(*, zones: pl.DataFrame) -> pl.DataFrame:
         f"raw {pair['raw']:.3f}, minus the mean daily profile {pair['daily_profile']:.3f}, "
         f"anomaly {pair['anomaly']:.3f}"
     )
-    say("Highest anomaly correlation of each NGED group with a zone's INDDEM:")
-    for group, name in NGED_GROUPS.items():
-        top = correlations.filter(pl.col("gsp_group") == group).sort(
-            "correlation_anomaly", descending=True
-        )
-        best = ", ".join(
-            f"{row['zone']} {row['correlation_anomaly']:.2f}"
-            for row in top.head(3).iter_rows(named=True)
-        )
-        say(f"- {group} {name}: {best}")
+    for column, label in (
+        ("correlation_anomaly", "anomaly correlation"),
+        ("correlation_without_national", "correlation with the national anomaly removed"),
+    ):
+        say(f"Highest {label} of each GSP group with a zone's INDDEM (top three zones):")
+        for group in GSP_GROUPS:
+            top = correlations.filter(pl.col("gsp_group") == group).sort(column, descending=True)
+            best = ", ".join(
+                f"{row['zone']} {row[column]:.2f}" for row in top.head(3).iter_rows(named=True)
+            )
+            say(f"- {group}{' ' + NGED_GROUPS[group] if group in NGED_GROUPS else ''}: {best}")
+    say(
+        f"Over all {correlations.height} pairs of a GSP group and a zone, the median correlation "
+        "is "
+        f"{correlations['correlation_raw'].median():.2f} for the raw series and "
+        f"{correlations['correlation_anomaly'].median():.2f} for the anomalies, and "
+        f"{correlations['correlation_without_national'].median():.2f} with the national anomaly "
+        "removed."
+    )
+    for column in ("correlation_anomaly", "correlation_without_national"):
+        top = correlations.sort(column, descending=True).row(0, named=True)
+        say(f"The highest {column} is {top[column]:.2f}, {top['gsp_group']} with {top['zone']}.")
+    report_nged_levels(agv=agv, zones=zones, correlations=correlations)
+    report_national_against_indo(views=views)
     check = agv_against_indo(agv=agv)
     check.write_parquet(STUDY_DIR / "agv_against_indo.parquet")
     say()
@@ -569,20 +903,34 @@ def build_agv(*, zones: pl.DataFrame) -> pl.DataFrame:
             p01=pl.col("ratio").quantile(0.01),
             p99=pl.col("ratio").quantile(0.99),
             correlation=pl.corr("agv_mw", "indo_mw"),
-        ).__str__()
+        )
     )
     say(f"AGV windows: SF rows to {AGV_END}; groups per time: {check['groups'].unique().to_list()}")
+    by_hour = (
+        check.group_by(hour=pl.col("time").dt.hour())
+        .agg(median_ratio=pl.col("ratio").median())
+        .sort("hour")
+    )
+    say(
+        f"Median ratio by UTC hour of day: {by_hour['median_ratio'].min():.3f} to "
+        f"{by_hour['median_ratio'].max():.3f}."
+    )
     say(
         f"GSP groups in AGV: {sorted(agv['gsp_group'].unique().to_list())}; "
         f"expected {list(GSP_GROUPS)}"
     )
     say(f"NGED groups: {NGED_GROUPS}")
+    estimate = agv.height
+    flagged = pl.read_parquet(AGV_PATH).select((pl.col("estimate_indicator") == "T").mean()).item()
+    say(f"AGV rows with Estimate Indicator T: {flagged:.3f} of {estimate} rows.")
     pv = pl.read_parquet(PV_LIVE_PATH)
     say(f"PV_Live rows {pv.height}, groups {sorted(pv['gsp_group'].unique().to_list())}")
     summer = pv.filter(
         (pl.col("gsp_group") == "_L") & pl.col("time").dt.month().is_in([6, 7])
     ).with_columns(hour=pl.col("time").dt.hour().cast(pl.Float64) + pl.col("time").dt.minute() / 60)
-    centroid = (summer["hour"] * summer["generation_mw"]).sum() / summer["generation_mw"].sum()
+    centroid = summer.select(
+        (pl.col("hour") * pl.col("generation_mw")).sum() / pl.col("generation_mw").sum()
+    ).item()
     say(
         f"PV_Live South West, June and July: generation-weighted mean start of the half-hour "
         f"{centroid:.2f} h UTC, so the centre of the half-hour is {centroid + 0.25:.2f} h UTC."
@@ -611,7 +959,7 @@ def build_pn_fit(*, views: pl.DataFrame, zones: pl.DataFrame) -> None:
             inddem_minus_pn_max_abs_mw=(pl.col("inddem") - pl.col("pn_import_mw")).abs().max(),
             indgen_minus_pn_median_mw=(pl.col("indgen") - pl.col("pn_export_mw")).median(),
             indgen_minus_pn_max_abs_mw=(pl.col("indgen") - pl.col("pn_export_mw")).abs().max(),
-        ).__str__()
+        )
     )
     reproduced = joined.filter(
         (pl.col("inddem") - pl.col("pn_import_mw")).abs() <= INDDEM_MATCH_TOLERANCE_MW
@@ -637,7 +985,7 @@ def build_pn_fit(*, views: pl.DataFrame, zones: pl.DataFrame) -> None:
         .sort("day")
     )
     say("Reproduced half-hours by UK local day:")
-    say(per_day.__str__())
+    say(per_day)
     gaps = joined.select(
         inddem_gap=pl.col("inddem") - pl.col("pn_import_mw"),
         indgen_gap=pl.col("indgen") - pl.col("pn_export_mw"),
@@ -649,33 +997,33 @@ def build_pn_fit(*, views: pl.DataFrame, zones: pl.DataFrame) -> None:
         "an INDDEM gap above 5 MW and an INDGEN gap below -5 MW: "
         f"{gaps.select(both).item():.2f}"
     )
-    weights = pl.concat(
-        [
-            zone_group_weights(zones=zones, sums=sums, dataset="inddem", keep_times=reproduced),
-            zone_group_weights(zones=zones, sums=sums, dataset="indgen", keep_times=joined["time"]),
-        ]
+    fractions = zone_group_fractions(zones=zones, sums=sums, keep_times=reproduced)
+    fractions.write_parquet(STUDY_DIR / "zone_group_fractions.parquet")
+    report_bmu_group_coverage()
+    say()
+    say(
+        f"## Fitted fraction of each GSP group's import PNs in each zone ({len(reproduced)} "
+        f"half-hours, RMS residual {fractions['rms_residual_mw'][0]:.0f} MW)"
     )
-    weights.write_parquet(STUDY_DIR / "zone_group_weights.parquet")
+    say(
+        fractions.pivot(on="gsp_group", index="zone", values="fraction")
+        .with_columns(pl.exclude("zone").round(2))
+        .sort(pl.col("zone").str.slice(1).cast(pl.Int32))
+    )
+    stability = leave_one_day_out(zones=zones, sums=sums, keep_times=reproduced)
     say()
-    say("## Fit residuals (RMS, MW) and zone size (RMS, MW)")
-    for row in (
-        weights.group_by("dataset", "zone")
-        .agg(rms=pl.col("rms_residual_mw").first(), size=pl.col("zone_rms_mw").first())
-        .sort("dataset", pl.col("zone").str.slice(1).cast(pl.Int32))
-        .iter_rows(named=True)
-    ):
-        say(f"- {row['dataset']} {row['zone']}: residual {row['rms']:.0f}, zone {row['size']:.0f}")
+    say(
+        "Leave-one-day-out check: zone of the largest fraction of each column, full fit versus fits"
+    )
+    say("without each sample day:")
+    say(stability)
+    say(f"Supplier base BMUs (2__) hold {supplier_import_share():.3f} of the sampled import PNs.")
+    sums_by_group = sums.group_by("gsp_group").agg(
+        mean_import_mw=pl.col("import_mw").mean(), mean_export_mw=pl.col("export_mw").mean()
+    )
     say()
-    say("## Fitted weights of each GSP group in each zone (non-negative least squares)")
-    for dataset in ("inddem", "indgen"):
-        say(f"### {dataset}")
-        say(
-            weights.filter(pl.col("dataset") == dataset)
-            .pivot(on="gsp_group", index="zone", values="weight")
-            .with_columns(pl.exclude("zone").round(2))
-            .sort(pl.col("zone").str.slice(1).cast(pl.Int32))
-            .__str__()
-        )
+    say("Mean summed PNs by GSP group, MW:")
+    say(sums_by_group.sort("gsp_group"))
 
 
 def main() -> None:
@@ -688,7 +1036,7 @@ def main() -> None:
     say()
     views, zones, reach = build_views_and_zones()
     report_issues(views=views, reach=reach)
-    build_agv(zones=zones)
+    build_agv(views=views, zones=zones)
     build_pn_fit(views=views, zones=zones)
     (STUDY_DIR / "report.md").write_text("\n".join(report_lines) + "\n")
     print("\n".join(report_lines))
