@@ -677,7 +677,7 @@ def test_asof_matches_a_brute_force_search_for_any_target_and_vintage_order() ->
         known = [
             v
             for v in vintage_rows
-            if v["time"] == row["time"] and v["publish_time"] <= row["issue_time"]
+            if v["time"] == row["time"] and v["publish_time"] <= row["issue_time"]  # ty: ignore[unsupported-operator]
         ]
         expected.append(max(known, key=lambda v: v["publish_time"])["wind_mw"] if known else None)
     assert result["time"].to_list() == [r["time"] for r in target_rows]
