@@ -25,7 +25,8 @@ from battery_charts import (
     line_panel,
 )
 from battery_inputs import OUTPUT_DIR, TERCILE_LABELS
-from battery_rung3 import fit_efficiency, smallest_capacity
+from battery_rung3 import fit_efficiency
+from studies.battery_capacity import smallest_capacity
 from studies.charts import figure
 from studies.nged_battery_a import ALIAS, battery_a_frame
 from studies.sources import NGED_BATTERY_A_FIGURES_DIR

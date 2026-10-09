@@ -205,7 +205,8 @@ and prices alone.
 | Quantity | Observed in public data | Must be inferred |
 |---|---|---|
 | Day-ahead and system prices | Yes (NESO, Elexon) | No |
-| Planned output (physical notification) and the output limits | Yes (Elexon) | No |
+| Planned output (physical notification) | Yes, the final version only (Elexon) | The versions before the final one |
+| Output limits | Yes (Elexon) | No |
 | Accepted balancing volumes and submitted prices | Yes (Elexon) | Which offers or bids the system operator skipped |
 | Auction results for response and reserve | Yes, by auction unit (NESO) | Which BMU holds the contract, when the unit-to-BMU mapping is not exact |
 | Grid frequency | Yes (Elexon) | No |
@@ -220,3 +221,74 @@ and prices alone.
 after the event, the day before, and an hour before is tabulated in the study's section [Historical
 separation versus forecasting a
 battery](../studies/battery-pv-separation.md#historical-separation-versus-forecasting-a-battery).
+
+## Physical notifications: submission times and public sources
+
+**A physical notification (PN) is a BMU's planned output, and each resubmission is a new version
+that replaces the last.** A PN is a series of MW levels over time that the BMU submits to NESO. For
+one half-hour that starts at time T, the versions follow this timeline:
+
+- **11:00 on the day before:** NESO requires a PN for every half-hour of the next day (BC1.4.2). A
+  BMU that submits none gets a defaulted PN (BC1.4.5).
+- **Between 11:00 and gate closure:** the BMU revises the PN whenever its expected output changes
+  (BC1.4.2 and BC1.4.3).
+- **T minus 1 hour, at gate closure:** the PN in force at that moment becomes the Final Physical
+  Notification (FPN), which does not change afterwards (BC1.4.4).
+- **T to T plus 30 minutes:** NESO may change the BMU's output by accepting its bids or offers, and
+  these are measured against the FPN.
+
+**Clause BC1.4.2 covers three groups of BMU.** The groups are BMUs with 50 MW or more of demand
+capacity in England and Wales (10 MW and 30 MW in the two Scottish areas), BMUs at large or medium
+power stations (and transmission-connected small ones), and BMUs whose participant chooses to submit
+bid-offer data. The clause also covers each Generating Unit that clause BC1.2 brings in. This
+wording is from [Grid Code BC1, Issue 6 Revision 22](https://neso.energy/document/33851/download),
+dated 2 April 2024, and later revisions were not checked.
+
+**Elexon publishes only the final version, from about a minute after gate closure.** In tests on
+2026-10-08 and 2026-10-09, the [Elexon Insights
+API](https://data.elexon.co.uk/bmrs/api/v1/datasets/PN) returned PN rows for a half-hour from about
+1 minute after its gate closure, and returned no rows for the next day. A row holds the settlement
+date and period, the start and end of the interval, the MW level at each end, and the BMU's NESO
+identifier and its Elexon identifier. A row has no publish time and no revision number, and the PN
+endpoint accepts only the settlement date and period, an optional BMU, and an output format. One
+half-hour (settlement period 20 on 2026-09-01) returned 2,679 rows, which is 580 KB of JSON.
+Elexon's [glossary](https://www.elexon.co.uk/glossary/final-physical-notification/) says that
+initial PNs, which BMUs submit at the day-ahead stage, "are not displayed on the Insights Solution
+or used in Settlement calculations".
+
+**The Insights Real-time Information Service (IRIS) is documented as carrying the same data as the
+API.** The [`iris-clients` README](https://github.com/elexon-data/iris-clients) says that IRIS and
+the APIs "make available the same data, in the same output format". Whether an IRIS message carries
+a publish time or a revision has not been checked, and IRIS sign-up needs an account in Elexon's
+identity tenant.
+
+**Apart from the Generating Units that clause BC1.2 brings in, a unit that is not a BMU submits no
+PN under BC1.4.2.** The one NESO dataset we found that holds non-BM PNs is the [Non-BM Physical
+Notifications
+dataset](https://www.neso.energy/data-portal/obp-non-bm-physical-notifications/non-bm_physical_notifications).
+It covers only units whose providers declare to NESO's Open Balancing Platform. On 2026-10-09 the
+dataset held about 498,000 rows. Each row has a unit ID, a start time and level, and an end time and
+level. The dataset has no owner or location column, so no column links a unit to an NGED substation.
+A non-BM embedded generator whose provider does not declare to that platform has no PN in either
+source we found.
+
+**A free sum of the day-ahead PNs exists, but it is unlikely to help a substation forecast.**
+Elexon's [INDGEN dataset](https://data.elexon.co.uk/bmrs/api/v1/datasets/INDGEN) gives, for each
+half-hour, the sum of the PNs of every BMU that plans to export energy. The INDDEM dataset gives the
+same sum for BMUs that plan to import. Each row is an average MW for one settlement period, with a
+publish time. On 2026-10-08, NESO reissued INDGEN every 30 minutes (47 issues that day), and each
+issue covered about 82 half-hours, which reaches the end of the next day. Every issue holds a
+national total (boundary `N`) and 17 further series labelled B1 to B17. At 12:00 UTC on 2026-10-08,
+the 17 boundary values summed to far more than the national value, so the boundaries overlap and do
+not divide Great Britain into parts. The Elexon API does not define the boundaries, and no source we
+found maps them to NGED's licence areas or supply points. The datasets hold no value for a single
+BMU, and they sum mostly large transmission-connected plants, so they say little about the net load
+at one primary substation. Whether the sums include embedded BMUs has not been tested.
+
+**Both sources may be re-used with attribution.** The [Elexon "Licence to use BMRS open
+data"](https://www.elexon.co.uk/data/balancing-mechanism-reporting-agent/copyright-licence-bmrs-data/)
+allows copying, publishing, adapting, and commercial use, on condition that the copy carries
+"Contains BMRS data © Elexon Limited copyright and database right [year]". That licence applies to
+users who are not BSC Parties, and it has not been confirmed to cover Insights and IRIS data. NESO's
+data carries the [NESO Open Data Licence](https://www.neso.energy/data-portal/neso-open-licence),
+which is based on the Open Government Licence v3.

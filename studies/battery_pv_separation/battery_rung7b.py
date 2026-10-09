@@ -37,7 +37,6 @@ from battery_rung7 import (
     SOURCES,
     WINDOW_HALF_HOURS,
     aggregate_bmus,
-    calendar_replica,
     gsp_group,
     gsp_group_centroids,
 )
@@ -51,6 +50,7 @@ from battery_synthetic import (
     stage1_ratio,
     window_half_hours,
 )
+from studies.battery_capacity import calendar_replica
 from studies.battery_joint_lp import fit_joint_solar_battery
 from studies.pv_separation import baseline_design, solar_basis
 
@@ -82,7 +82,14 @@ def bmu_inputs(*, bmu_id: str) -> tuple[np.ndarray, np.ndarray, dict[str, np.nda
     )
     design = baseline_design(half_hour_end_time=window_half_hours(), flexibility="seasonal")
     real = output_on_grid(bmu_id=bmu_id)
-    return basis, design, {"real": real, "replica": calendar_replica(output=real)}
+    return (
+        basis,
+        design,
+        {
+            "real": real,
+            "replica": calendar_replica(output=real, half_hour_end_time=window_half_hours()),
+        },
+    )
 
 
 def run_bmu(bmu_id: str) -> list[dict]:

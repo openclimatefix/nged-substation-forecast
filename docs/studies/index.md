@@ -46,6 +46,13 @@ regions or climates, so a result may not hold elsewhere.
   output, against 27.2% for a solar-only fit. With a demand-like part added the model overshoots the
   solar capacity, and on the 25 real aggregate BMUs its 1.1 to 1.2 GW is not validated.
 
+- [How well can a primary substation's half-hourly flow reveal an unmetered battery?](unmetered-battery-capacity.md)
+  — a simulated merchant battery that follows the day-ahead price in the estimator's own way is found
+  from about 10% of a primary's 99th-percentile flow, with 3 of 36 blocks flagged falsely. Real
+  public batteries and NGED battery A are not found at any size tested, the intervals of a battery
+  that follows another rule hold the truth far less often than stated, and the screen of eight
+  primaries has no power.
+
 ## Past weather
 
 **Three studies score how well each weather product describes weather that has already happened.**

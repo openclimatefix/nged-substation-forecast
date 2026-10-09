@@ -26,7 +26,13 @@ from forecast_arms import arm_definitions, issue_cutoff_lines
 from forecast_fit import FIT_VARIANT, LEVELS, Q_COLUMNS, SettingType, arm_file
 from forecast_inputs import SCORING_START, load_physical_notifications
 from forecast_results import load_losses
-from forecast_runner import NGED_BATTERY_A_FILE_ID, battery_for, lead_parties, testbed_ids
+from forecast_runner import (
+    NGED_BATTERY_A_FILE_ID,
+    batteries_with_idle_lead_in,
+    battery_for,
+    lead_parties,
+    testbed_ids,
+)
 from studies.battery_forecast import IDLE_MONTH_ZERO_SHARE, SYMMETRIC_BANDS, IssueType
 from studies.bootstrap import (
     BOOTSTRAP_SEED,
@@ -1057,6 +1063,32 @@ def fpn_zero_lines(*, testbed: list[str]) -> list[str]:
     ]
 
 
+def leave_out_section(*, testbed: list[str]) -> tuple[list[str], pl.DataFrame]:
+    """Return D1 to D4 with the batteries that have an idle lead-in removed entirely.
+
+    This is a post hoc sensitivity. It differs from the `idle_dropped` fits, which keep those
+    batteries' working months and drop only their idle lead-in.
+    """
+    removed = batteries_with_idle_lead_in()
+    kept = [b for b in testbed if b not in removed]
+    rows = [
+        contrast_row(contrast=contrast, setting=setting, batteries=kept)
+        for contrast in PLANNED_CONTRASTS
+        if contrast.part == "A"
+        for setting in ("primary", "sensitivity")
+    ]
+    frame = pl.DataFrame(rows)
+    lines = [
+        "## D1 to D4 with the batteries that have an idle lead-in removed (post hoc)",
+        "",
+        f"- Removed: {', '.join(f'`{b}`' for b in removed)}. {len(kept)} batteries remain.",
+        "",
+        *contrast_lines(rows=frame),
+        "",
+    ]
+    return lines, frame
+
+
 def comparison_lines(
     *, planned: pl.DataFrame, other_path: Path, title: str, other: str
 ) -> list[str]:
@@ -1197,6 +1229,9 @@ def main() -> None:
     party_lines, party_frame = party_resampling_section(testbed=testbed)
     save_table(frame=party_frame, name="party_resampling.parquet")
     lines += party_lines
+    leave_out_lines, leave_out_frame = leave_out_section(testbed=testbed)
+    save_table(frame=leave_out_frame, name="leave_out_idle_lead_in.parquet")
+    lines += leave_out_lines
     if FIT_VARIANT == "as_written":
         lines += comparison_lines(
             planned=planned,

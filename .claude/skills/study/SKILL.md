@@ -372,13 +372,27 @@ Every study page follows the structure of an academic paper, in this order:
 
 1. **Title.** An `h1` that states the finding, scoped to the products tested. A page that ranks
    products in answer to a question may instead title itself with that question.
-2. **Summary.** At most two paragraphs stating the headline result, the abstract of the page,
-   followed by the headline figure: the leaderboard and then the paired contrasts, where the study
-   ranks products. Scoped take-home bullets, one per use of the data, follow the two paragraphs. The
+2. **Summary.** A one-paragraph **bottom line** directly under the title, in plain words: a bold
+   sentence stating the answer to the study's main question, then one or two sentences on what
+   would change the answer and what the study did not test. Then come the question-and-answer
+   bullets described below, the headline figure (the leaderboard and then the paired contrasts,
+   where the study ranks products), and scoped take-home bullets, one per use of the data. The
    Summary bullets are the only place a recommendation appears without its evidence.
+
+   **The Summary opens by answering each question the study asks, in plain words.** Write one short
+   bolded bullet per question, such as "Can an unmetered battery be identified?", with the answer
+   on the same line ("Mostly no, apart from simulated cases"). Under each question, give three to
+   six bullets of the findings that support the answer. Each finding names what was tested, the
+   number with its scope, and the baseline it was compared with. A reader who knows none of the
+   study's terms must be able to follow the Summary. Define each term at first use, or leave the
+   term out. Label every provisional number "(provisional)". Close the question-and-answer bullets
+   with one bullet saying what the data and methods used can and cannot support, before the
+   headline figure.
+
 3. **The AI disclaimer** (below).
 4. **Key findings.** The finer conclusions, one bolded sentence each, each linking to its results
-   section.
+   section. Key findings do not repeat a Summary finding. They hold the conclusions that need the
+   study's vocabulary.
 5. **Introduction.** The question, who needs the answer, and what is being compared, with a table
    of each product's lead, grid, coverage, history, and delay.
 6. **Data and methods.** Methods only: the rows, the XGBoost model or other forecasting model, the
