@@ -197,6 +197,46 @@ not a sample size.
 
 ---
 
+## What the `metrics` asset refuses to score
+
+**The `metrics` asset is the only source of a leaderboard number, so it checks its input before it
+scores anything.** Three refusals protect the number against an experiment, or an autonomous study,
+that could otherwise raise its own score. Each refusal raises, because the metrics asset is research
+code that fails fast. Every group is checked before any group is scored, so a refusal leaves no rows
+or MLflow runs behind.
+
+- **The final-test date guard.** `conf/cv/default.yaml` holds `final_test_start`, which must be
+  later than the end of every leaderboard fold. The asset refuses a window that reaches that date
+  unless the maintainer's shell sets `NGED_FINAL_TEST=1`. Forecasts stored under `fold_id="live"`
+  are exempt, because live rows forecast the future. The date is a guard and not a sealed test year:
+  the observations after `final_test_start` cover a few months, not an independent year. The
+  fold-hygiene section of the [leaderboard
+  roadmap](../roadmap/metrics-and-leaderboard.md#fold-hygiene-selection-bias-and-a-final-test-window)
+  records why a sealed year is still undecided.
+- **Rows inside the fold window.** In leaderboard scope, every forecast row's `valid_time` must lie
+  between the fold's `val_start` and `val_end`. Without this check, rows outside the fold's window
+  would be scored and labelled as the fold's window.
+- **The reference row keys and a single model name, for a study.** In leaderboard scope, an
+  experiment whose name starts with `study/` holds a forecast submitted through
+  `scripts/forecasting/score_study.py`. The rows of a study must have exactly the keys
+  `(time_series_id, power_fcst_init_time, valid_time)` of the experiment named by
+  `reference_experiment_name` in the same config, for the same fold. A study that omits a row the
+  reference forecasts, adds a series, or forecasts only at short lead times is refused. The row key
+  includes `power_fcst_init_time`, so a study must forecast from the reference's initialisation
+  times, which are the times each run of the European Centre for Medium-Range Weather Forecasts
+  (ECMWF) ensemble becomes available. The row key leaves out `ensemble_member`, so a study may
+  forecast with any number of ensemble members. A study must also carry exactly one
+  `power_fcst_model_name`, because spreading rows across several model names could down-weight the
+  hard rows and so lower the mean error that the leaderboard reports.
+
+**An unfiltered run of the `metrics` asset skips study experiments rather than refusing them.**
+Re-materialising the reference experiment can change its row keys, so a study scored earlier stops
+matching. A run whose population filter names no `experiment_name` therefore lists every study
+experiment in the `skipped_study_experiments` metadata and scores the reviewed experiments without
+them. A run whose population filter names a study's `experiment_name` scores that study.
+
+---
+
 ## Alternatives considered
 
 We weighed three other ways to slice the limited honest data — monthly expanding CV, quarterly

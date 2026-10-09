@@ -1,5 +1,6 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import polars as pl
 import pytest
@@ -100,4 +101,31 @@ def test_scan_power_returns_only_the_rows_no_cleaning_rule_flagged(
     kept = power.scan_power().collect()
 
     assert kept.columns == ["time_series_id", "time", "power"]
+    assert kept["power"].to_list() == [1.0]
+
+
+def test_scan_power_stops_before_midnight_on_final_test_start(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    delta_path = tmp_path / "cleaned_power_time_series.delta"
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 1, 1], dtype=pl.Int32),
+            "time": [
+                datetime(2026, 6, 30, 23, 30, tzinfo=UTC),
+                datetime(2026, 7, 1, 0, 0, tzinfo=UTC),
+                datetime(2026, 7, 1, 0, 30, tzinfo=UTC),
+            ],
+            "power": pl.Series([1.0, 2.0, 3.0], dtype=pl.Float32),
+            "drop_reason": [None, None, None],
+        },
+        schema_overrides={"time": pl.Datetime("us", "UTC"), "drop_reason": pl.String},
+    ).write_delta(delta_path)
+    monkeypatch.setattr(power, "CLEANED_POWER_DELTA_URI", str(delta_path))
+    monkeypatch.setattr(
+        power, "load_cv_config", lambda _path: SimpleNamespace(final_test_start=date(2026, 7, 1))
+    )
+
+    kept = power.scan_power().collect()
+
     assert kept["power"].to_list() == [1.0]

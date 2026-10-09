@@ -303,13 +303,12 @@ node's commit.
 
 **A worker may change any part of the pipeline except a short list of protected paths, and every
 worker must end with the same output.** That output is a parquet file of `PowerForecast` rows for
-the fold. The study route planned in [issue #958 (Protect the leaderboard scorer for autonomous
-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958) scores the file
-the submit command hands over, by running `scripts/score_study.py` from the `main` checkout as the
-maintainer's Unix user. An extension point narrower than the whole pipeline could not express the
-large ideas above. Each implementation must also run end to end from the raw power, weather, and
-time-series metadata tables, so that the leakage test below can re-run the implementation on
-perturbed copies of those tables.
+the fold. The planned submit command will score the file the worker hands over by running
+`scripts/forecasting/score_study.py` from the `main` checkout as the maintainer's Unix user. An
+extension point narrower than the whole pipeline could not express the large ideas above. Each
+implementation must also run end to end from the raw power, weather, and time-series metadata
+tables, so that the leakage test below can re-run the implementation on perturbed copies of those
+tables.
 
 ### An LLM research lead decides what to try next
 
@@ -345,14 +344,14 @@ research-lead session.
 is the only process that trains and runs inference for a scored node.** The research lead submits a
 node by calling one narrow command, such as `submit_node <commit>`, through a `sudo` rule, the same
 pattern [issue #958 (Protect the leaderboard scorer for autonomous
-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958) plans for
-`scripts/score_study.py`. The submit command is plain Python in this repository, tested with the
-rest of the code. The submit command does every step the agents must not control: launching the
-review, building the scored checkout, training the node and running inference, running the leakage
-test, handing the predictions to the scorer, logging to MLflow, preserving each scored commit, and
-opening the hypothesis-store pull request. [Issue #1037 (Build the trusted submit command for
-auto-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1037) tracks the
-submit command.
+research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958) uses for
+`scripts/forecasting/score_study.py`. The submit command is plain Python in this repository, tested
+with the rest of the code. The submit command does every step the agents must not control: launching
+the review, building the scored checkout, training the node and running inference, running the
+leakage test, handing the predictions to the scorer, logging to MLflow, preserving each scored
+commit, and opening the hypothesis-store pull request. [Issue #1037 (Build the trusted submit
+command for auto-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1037)
+tracks the submit command.
 
 **No agent trains or predicts for a scored run, and the worker's code never runs as the maintainer's
 user.** The submit command executes the worker's code as a subprocess running as the restricted
@@ -360,8 +359,9 @@ research user, because the worker's code is untrusted. A worker may still train 
 the training window while developing an idea, but those runs never reach the leaderboard. Workers
 never report their own scores. Every node is logged as an MLflow run under a `study/`-prefixed
 experiment name, so the search is visible on the leaderboard but outside every promotion path. The
-plan in issue #958 uses the same prefix for every autonomous study. Only the maintainer's user can
-write to the MLflow tracking store. The research user reads the store through the leaderboard query.
+`score_study.py` script uses the same prefix for every autonomous study. Only the maintainer's user
+can write to the MLflow tracking store. The research user reads the store through the leaderboard
+query.
 
 **The trusted checks do not live in a Claude Code mod.** A mod is a JavaScript or TypeScript plugin
 that runs inside a Claude Code session's process, with the session's permissions. A mod holding the
@@ -423,9 +423,11 @@ calls the protected code.** A worker may stop calling `cv_helpers.py` and write 
 filter, write a new lag module that nulls nothing, or point the workspace in `pyproject.toml` at a
 modified copy of `ml_core`. The worker's code also runs in the same Python process as the protected
 code, so the worker's code could replace the lag-nullification function in memory. Two checks cover
-behaviour instead. The row-set refusal planned in [issue #958 (Protect the leaderboard scorer for
-autonomous research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958) stops a
-worker dropping hard rows or hard series from the forecast. The leakage test stops lookahead.
+behaviour instead. The `metrics` asset's row-key refusal stops a worker dropping hard rows or hard
+series from the forecast. The asset refuses a study whose row keys differ from the reference
+experiment's (see [What the `metrics` asset refuses to
+score](../ml_experimentation/cross-validation-folds.md#what-the-metrics-asset-refuses-to-score)).
+The leakage test stops lookahead.
 
 **The submit command, not the worker's code, truncates the training data at the fold's `train_end`,
 and the leakage test re-runs the pipeline on perturbed data.** The leakage test samples cut-off
@@ -583,8 +585,9 @@ a token for the research repository only. Each route meets at least one check:
   cut-offs, rejects an implementation whose forecasts change when data from after the forecast's
   initialisation time is perturbed. The reviewer checks for refitting inside the validation window,
   which the leakage test cannot see.
-- **Dropping hard rows or hard series.** The scorer's row-set refusal rejects a forecast that leaves
-  out any row of an eligible series.
+- **Dropping hard rows or hard series.** The scorer's row-set refusal rejects a forecast whose row
+  keys `(time_series_id, power_fcst_init_time, valid_time)` differ from the reference experiment's
+  for the fold.
 - **Hiding failed attempts.** The submit command records every submission, including rejected
   submissions, in MLflow and in the hypothesis store, so the record of every submission does not
   depend on the research lead. Which implementations are submitted at all does depend on the

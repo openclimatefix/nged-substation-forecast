@@ -1,9 +1,9 @@
 # Studies
 
-**Code in this directory is held to a lower standard than the rest of the repository, and it is
-kept anyway because the findings it produced are cited elsewhere.** A study answers a question once.
-The answer goes into `docs/`, and a reader who doubts the answer needs the code that produced it, so
-the code stays where they can find and re-run it.
+**Code in this directory is held to a lower standard than the rest of the repository, and it is kept
+anyway because the findings it produced are cited elsewhere.** A study answers a question once. The
+answer goes into `docs/`, and a reader who doubts the answer needs the code that produced it, so the
+code stays where they can find and re-run it.
 
 **"Study" rather than "experiment", because `experiment` already names a column.** `PowerForecast`
 carries `experiment_name` and `ml_flow_experiment_id`, and the forecasts Delta table is partitioned
@@ -48,11 +48,31 @@ existing.
 **A study that produced nothing worth citing does not belong here.** Delete it, or leave it on a
 branch. The directory is not an attic.
 
+## A study's leaderboard number comes only from `score_study.py`
+
+**A study that reports a forecast skill number hands a predictions file to
+`scripts/forecasting/score_study.py`, and the `metrics` asset produces the number.** The script
+takes a file of `PowerForecast` rows, a study name, and a leaderboard fold. The script stores the
+rows in `power_forecasts` under the experiment name `study/<study name>`, and scores them in
+leaderboard scope. Before the script writes anything, it refuses a file whose `(time_series_id,
+power_fcst_init_time, valid_time)` keys differ from the keys of the reference experiment that
+`conf/cv/default.yaml` names for the same fold, or whose rows carry more than one
+`power_fcst_model_name`. A study therefore cannot raise its score by leaving out the rows it
+forecasts worst. The `metrics` asset repeats both checks when it scores the study. Every leaderboard
+skill number on a study page must trace to a `forecast_metrics` row. The `study/` prefix keeps a
+study's forecasts out of the promotion candidates, and lets a reader filter the study experiments
+out of the leaderboard.
+
+**A study reads observed power through `studies.power.scan_power`.** The function returns cleaned
+power before `final_test_start` in `conf/cv/default.yaml`, the date from which the `metrics` asset
+refuses to score unless the maintainer sets `NGED_FINAL_TEST=1`.
+
 ## What to expect when reading one
 
 - **Nothing here is imported by production code.** No study touches a Patito contract or enters the
   Dagster asset graph, and nothing in `src/` or `packages/` imports one. A study that needs to do
-  any of that has stopped being a study.
+  any of that has stopped being a study. The one route from a study to the leaderboard is
+  `scripts/forecasting/score_study.py`, described above.
 - **Each folder holds the scripts of one family of pages, and its README maps every script to the
   page it feeds.** A script runs with only its own folder on `sys.path`: it never reaches into
   another folder, and code that two folders share is in `packages/studies/src/studies/`.
@@ -97,8 +117,8 @@ folder name themselves.
 | `observations/NGED-ANM/` | NGED's active network management setpoint exports, and the export-cap parquet derived from each | `beam_diffuse_split/anm_setpoints.py` (the exports come from NGED) |
 | `market/<source>/` | GB electricity prices (NESO N2EX day-ahead, Elexon system prices, Elexon APX market index), the national Carbon Intensity series, the Elexon BMU register with its storage-candidate list, and the bid-offer acceptance volumes, cashflows, and levels of the listed BMUs (`fetch_gb_prices.py`, `fetch_bmu_dispatch.py`); the physical notifications and maximum export and import limits of the listed BMUs (`fetch_bmu_notifications.py`); NESO's Enduring Auction Capability (EAC) results for response and reserve, with a table linking auction units to BMUs (`fetch_neso_eac.py`); and the bid-offer prices of the listed BMUs with system-wide series — frequency, demand outturn, generation by fuel type, demand and wind forecasts, balancing services adjustments, loss of load probability and de-rated margin, and system warnings (`fetch_system_series.py`); Elexon's indicated demand and generation sums of the final physical notifications for the national total and 17 boundaries (`fetch_system_series.py --sources elexon_inddem elexon_indgen`); the settled half-hourly energy each of the 14 GSP groups takes from the transmission system, from Elexon's Open Settlement Data (`fetch_agv.py`); and Sheffield Solar's PV_Live solar generation for NGED's four licence areas (`fetch_pv_live.py`); each folder holds a `README.md` and a `lineage.json` | `market_downloads/fetch_gb_prices.py`, `market_downloads/fetch_bmu_dispatch.py`, `market_downloads/fetch_bmu_notifications.py`, `market_downloads/fetch_neso_eac.py`, `market_downloads/fetch_system_series.py`, `market_downloads/fetch_agv.py`, `market_downloads/fetch_pv_live.py` |
 
-`data/studies/_private/trial_area_box.json` holds the trial-area box, derived from the private
-list of generators.
+`data/studies/_private/trial_area_box.json` holds the trial-area box, derived from the private list
+of generators.
 
 **Each study keeps one folder under `data/studies/per_study/`.**
 
