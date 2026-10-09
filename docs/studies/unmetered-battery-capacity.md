@@ -560,9 +560,9 @@ In-family sums are flagged in 16%, 52%, and 94% at shares of 5%, 10%, and 20%, a
 
 ## Limitations
 
-**The scripts have had one diff review, and the page has had two science reviews.** The study has
-not yet had the prose review or the persona reviews that the `study` skill requires before a study
-merges. The mutation pass over the changes to `packages/studies/` runs in a separate worktree.
+**The scripts have had one diff review, the page has had two science reviews, and a mutation pass
+strengthened the tests of the battery templates and the template posterior.** Three readers who
+knew none of the study's terms and a prose review checked the page for clarity.
 
 **An earlier positive control is not an independent test.** The first control failed when the
 battery's schedule was itself fitted. The fine linear-programme stack was then refined until the
@@ -575,10 +575,6 @@ first control had passed in 2 of 3 scored blocks, on one truth near a node of th
 also changes the 90% power coverage from 90% to 89%. The 90% and 89% are pooled over all seven
 shares, including the shares of 2% and below where coverage is 57% to 94%. The 100% in the in-family
 section is at shares of 5% to 20% only, so the 100% and the 90% are both right.
-
-**The branch changes a dependency.** The optional `gpu` group of `packages/studies` adds PyTorch and
-Triton, and a spreadsheet reader converts the register once. A change to a dependency needs a human
-review before the branch merges.
 
 **The thresholds rest on 36 no-battery blocks from one year, and one series false-alarms.** GSP1's
 no-battery blocks score above the threshold from the other series in three of four blocks.
