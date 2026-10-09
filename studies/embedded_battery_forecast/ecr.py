@@ -119,7 +119,15 @@ def _sheet_part(*, archive: zipfile.ZipFile, sheet_name: str) -> str:
 
 
 def _cell_text(*, cell: ElementTree.Element) -> str | None:
-    """Return a cell's text, or None for an empty cell."""
+    """Return a cell's text, or None for an empty cell.
+
+    Raises:
+        ValueError: If the cell holds a shared-string index. The reader supports only inline
+            strings, and an index would otherwise be read as a number and match nothing.
+    """
+    if cell.get("t") == "s":
+        msg = "The workbook uses shared strings, which this reader does not support."
+        raise ValueError(msg)
     if cell.get("t") == "inlineStr":
         return "".join(node.text or "" for node in cell.iter(f"{_SPREADSHEET_NS}t"))
     value = cell.find(f"{_SPREADSHEET_NS}v")

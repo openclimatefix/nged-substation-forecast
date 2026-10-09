@@ -9,7 +9,6 @@ from studies.battery_forecast import (
     band_coverage_and_width,
     climatology_quantiles,
     conformal_quantiles,
-    crps_skill_score,
     day_shuffle_map,
     day_type,
     issue_time_for,
@@ -18,7 +17,6 @@ from studies.battery_forecast import (
     neighbour_statistics,
     output_bounds,
     persistence_source_times,
-    reliability_table,
     repair_quantiles,
     residual_quantile_table,
     weighted_crps,
@@ -221,8 +219,8 @@ def test_climatology_at_one_hour_ahead_includes_the_day_before_but_not_the_targe
 
 def test_climatology_with_a_target_before_any_history_has_an_empty_sample() -> None:
     # The target is on the history's first day, so the last complete day is two days before it.
-    # A negative window stop once wrapped round and took almost the whole history.
-    history = _history(days=60, value_of_day=lambda i: float(i))
+    # An unclamped negative window stop would wrap round and take almost the whole history.
+    history = _history(days=60, value_of_day=float)
     target = datetime(2025, 9, 1, 12, 0, tzinfo=UTC)
     targets = _climatology_targets(times=[target], issue="DA-early")
 
@@ -383,11 +381,6 @@ def test_crps_of_a_point_mass_is_the_absolute_error_scaled_by_the_covered_probab
     assert score[0] == pytest.approx(4.0 * 0.99)
 
 
-def test_skill_score_is_positive_for_a_better_forecast() -> None:
-    assert crps_skill_score(crps=np.array([1.0, 1.0]), reference_crps=np.array([2.0, 2.0])) == 0.5
-    assert crps_skill_score(crps=np.array([3.0]), reference_crps=np.array([2.0])) < 0.0
-
-
 def test_coverage_counts_a_value_on_the_band_edge_as_inside() -> None:
     quantiles = np.tile(np.arange(13, dtype=float), (4, 1))  # level i has value i
     truth = np.array([3.0, 9.0, 2.9, 9.1])  # p10 is index 3, p90 is index 9
@@ -410,15 +403,6 @@ def test_a_wider_band_never_covers_less_than_a_narrower_one() -> None:
 
     assert table["coverage"].to_list() == sorted(table["coverage"].to_list())
     assert table["coverage"].to_list()[2] == pytest.approx(0.8, abs=0.08)
-
-
-def test_reliability_is_the_share_at_or_below_each_quantile() -> None:
-    quantiles = np.tile([1.0, 2.0, 3.0], (4, 1))
-    truth = np.array([0.0, 1.0, 2.5, 4.0])
-
-    table = reliability_table(truth=truth, quantiles=quantiles, levels=[0.25, 0.5, 0.75])
-
-    assert table["observed_share"].to_list() == [0.5, 0.5, 0.75]
 
 
 # ---- the day shuffle

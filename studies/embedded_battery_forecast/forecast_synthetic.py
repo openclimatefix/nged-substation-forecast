@@ -1,11 +1,14 @@
 """Rung A0: does the instrument find a price effect that is there, and stay silent when none is?
 
-Forty synthetic batteries, all issued at `DA-late` and scored on the same half-hours as the real
-batteries:
+Forty synthetic batteries, all issued at `DA-late`. Each battery is scored from the scoring start
+on the half-hours where its own series and the inputs of both XGBoost arms are present:
 
 - 20 **price-driven** batteries follow `lp_schedule` on the actual N2EX day-ahead price (energy
   durations of 1, 2, and 4 hours, one-way efficiencies of 0.90, 0.92, and 0.94), plus Gaussian noise
-  of 10% of the noise-free output's 99th-percentile absolute value.
+  of 10% of the noise-free output's 99th-percentile absolute value. The 20 batteries cover only 9
+  distinct schedules (3 durations by 3 efficiencies), so batteries that share a schedule differ
+  only in their noise, and the pooled positive control rests on fewer independent schedules than
+  20.
 - 20 **price-blind** batteries repeat the trailing 28-day time-of-day mean of a real embedded
   battery BMU's output, plus the same noise. They carry a battery-like daily shape and no
   information about the target day's price.
@@ -75,7 +78,7 @@ def synthetic_ids() -> tuple[list[str], list[str]]:
 
 
 def price_driven_output(*, prices: np.ndarray, index: int) -> np.ndarray:
-    """Return one price-driven battery's noise-free output on the half-hour grid, in per-unit."""
+    """Return one price-driven battery's noise-free output on the half-hour grid, in per-unit power."""
     return lp_schedule(
         prices=prices,
         energy_hours=DURATIONS_HOURS[index % len(DURATIONS_HOURS)],
@@ -105,7 +108,7 @@ def trailing_profile(*, output: np.ndarray, days: int = PROFILE_DAYS) -> np.ndar
 
 
 def build_synthetic_series() -> dict[str, np.ndarray]:
-    """Return the 40 synthetic batteries' outputs on the half-hour grid, in per-unit of p99."""
+    """Return the 40 synthetic batteries' outputs on the half-hour grid, in per-unit power."""
     grid = half_hour_grid()
     prices = price_sources(grid=grid)["price_actual"].to_numpy()
     rng = np.random.default_rng(SEED)

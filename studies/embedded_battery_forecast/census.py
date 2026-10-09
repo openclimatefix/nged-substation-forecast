@@ -498,8 +498,10 @@ def classify_connected_storage(
 def bmu_share_band(*, classified: pl.DataFrame, recall: float) -> dict[str, float]:
     """Return the BMU share by count and by megawatts, as a lower and an upper bound.
 
-    The lower bound counts only the matched batteries. The upper bound adds the batteries without
-    a BMU (with or without a response contract), multiplied by the miss rate (one minus `recall`).
+    The lower bound counts only the matched batteries. The upper bound adds the batteries the match
+    is expected to have missed. A match that finds a share `recall` of the BMUs finds
+    `found * recall` of `found / recall` and misses `found * (1 - recall) / recall`, so that is the
+    number added, capped at the number of rows without a BMU (with or without a response contract).
 
     Args:
         classified: The frame `classify_connected_storage` returns.
@@ -511,7 +513,7 @@ def bmu_share_band(*, classified: pl.DataFrame, recall: float) -> dict[str, floa
     is_bmu = classified["bmu_class"].is_in(["own BMU, FPN submitted", "own BMU, no FPN"])
     unknown = classified["bmu_class"].is_in(["no BMU found", "response provider, no BMU found"])
     weight = classified["export_mw"].fill_null(0.0)
-    miss = 1.0 - recall
+    missed_per_found = (1.0 - recall) / recall if recall > 0 else float("inf")
     n = classified.height
     bmu_count = float(is_bmu.sum())
     unknown_count = float(unknown.sum())
@@ -520,7 +522,7 @@ def bmu_share_band(*, classified: pl.DataFrame, recall: float) -> dict[str, floa
     total_mw = float(weight.sum())
     return {
         "count_low": bmu_count / n,
-        "count_high": (bmu_count + miss * unknown_count) / n,
+        "count_high": (bmu_count + min(unknown_count, bmu_count * missed_per_found)) / n,
         "megawatts_low": bmu_mw / total_mw,
-        "megawatts_high": (bmu_mw + miss * unknown_mw) / total_mw,
+        "megawatts_high": (bmu_mw + min(unknown_mw, bmu_mw * missed_per_found)) / total_mw,
     }

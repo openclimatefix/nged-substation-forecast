@@ -375,18 +375,32 @@ def test_two_bmus_matched_to_one_row_give_that_row_one_class() -> None:
     assert classified.height == ecr_storage.height
 
 
-def test_the_share_band_adds_the_missed_share_of_the_unknown_rows_to_the_upper_bound() -> None:
+def test_the_share_band_adds_the_expected_missed_bmus_to_the_upper_bound() -> None:
     ecr_storage, bmus, accepted = _classified_inputs()
     classified = census.classify_connected_storage(
         ecr_storage=ecr_storage, accepted_matches=accepted, bmus=bmus, participants=frozenset()
     )
 
-    band = census.bmu_share_band(classified=classified, recall=0.5)
+    band = census.bmu_share_band(classified=classified, recall=0.8)
 
+    # 2 BMUs found at a recall of 0.8 means 0.5 expected misses (2 * 0.2 / 0.8), and 60 MW found
+    # means 15 MW expected missed; both are below the 2 rows and 40 MW without a BMU.
     assert band["count_low"] == pytest.approx(2 / 4)
-    assert band["count_high"] == pytest.approx((2 + 0.5 * 2) / 4)
+    assert band["count_high"] == pytest.approx((2 + 0.5) / 4)
     assert band["megawatts_low"] == pytest.approx(60 / 100)
-    assert band["megawatts_high"] == pytest.approx((60 + 0.5 * 40) / 100)
+    assert band["megawatts_high"] == pytest.approx((60 + 15) / 100)
+
+
+def test_the_share_band_cannot_add_more_than_the_rows_without_a_bmu() -> None:
+    ecr_storage, bmus, accepted = _classified_inputs()
+    classified = census.classify_connected_storage(
+        ecr_storage=ecr_storage, accepted_matches=accepted, bmus=bmus, participants=frozenset()
+    )
+
+    band = census.bmu_share_band(classified=classified, recall=0.2)
+
+    assert band["count_high"] == pytest.approx(1.0)
+    assert band["megawatts_high"] == pytest.approx(1.0)
 
 
 def test_a_perfect_recall_leaves_no_unknown_band() -> None:

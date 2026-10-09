@@ -401,6 +401,19 @@ def weighted_crps(
     return 2.0 * (losses * level_weights(levels=levels)[None, :]).sum(axis=1)
 
 
+def crps_skill_score(*, crps: np.ndarray, reference_crps: np.ndarray) -> float:
+    """Return one minus the ratio of mean CRPS values.
+
+    Args:
+        crps: The forecast's per-row CRPS.
+        reference_crps: The reference's per-row CRPS on the same rows.
+
+    Returns:
+        A positive value when the forecast beats the reference.
+    """
+    return float(1.0 - np.mean(crps) / np.mean(reference_crps))
+
+
 def band_coverage_and_width(
     *,
     truth: np.ndarray,
@@ -436,6 +449,23 @@ def band_coverage_and_width(
             }
         )
     return pl.DataFrame(rows)
+
+
+def reliability_table(
+    *, truth: np.ndarray, quantiles: np.ndarray, levels: Sequence[float]
+) -> pl.DataFrame:
+    """Return the share of half-hours whose output was at or below each forecast quantile.
+
+    Args:
+        truth: Observed output, shape (n_rows,).
+        quantiles: Forecast quantiles, shape (n_rows, n_levels).
+        levels: The quantile levels.
+
+    Returns:
+        One row per level with `level` and `observed_share`. The two are equal when calibrated.
+    """
+    shares = np.mean(truth[:, None] <= quantiles, axis=0)
+    return pl.DataFrame({"level": list(levels), "observed_share": shares.tolist()})
 
 
 def day_shuffle_map(

@@ -350,7 +350,8 @@ def classification_section(
             f"connected "
             f"storage rows by count, and {band['megawatts_low']:.1%} to "
             f"{band['megawatts_high']:.1%} "
-            "by megawatts. With a recall this low, the upper bound says the match cannot tell."
+            "by megawatts. The upper bound adds the BMUs that the recall implies the match missed, "
+            "capped at the rows without a BMU."
         ),
         (
             f"- Band from the BMU register's side: the {int(ledger['embedded_in_area'])} embedded "

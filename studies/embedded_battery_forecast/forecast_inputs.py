@@ -76,14 +76,6 @@ NeighbourSlotType = Literal[
     "without_largest_party",
     "without_largest_party_shuffled",
 ]
-NEIGHBOUR_SETS: Final[tuple[str, ...]] = (
-    "different_party",
-    "different_party_shuffled",
-    "same_party",
-    "all_testbed",
-    "all_testbed_shuffled",
-)
-
 FEATURE_COLUMNS: Final[tuple[str, ...]] = (
     "tod",
     "day_of_week",
@@ -141,16 +133,16 @@ GATE_CLOSURE_ARMS: Final[dict[str, ArmSpec]] = {
     "fleet_fpn_shuffled": ArmSpec(
         price_source="actual", own_slot="filler", neighbour_slot="all_testbed_shuffled"
     ),
+    "neighbour_fpn_without_largest_party": ArmSpec(
+        price_source="actual", own_slot="filler", neighbour_slot="without_largest_party"
+    ),
+    "neighbour_fpn_without_largest_party_shuffled": ArmSpec(
+        price_source="actual", own_slot="filler", neighbour_slot="without_largest_party_shuffled"
+    ),
 }
-"""The arms at `ID-1h`. `fleet_fpn` and its shuffled twin are rung B2's arms for NGED battery A."""
-
-
-GATE_CLOSURE_ARMS["neighbour_fpn_without_largest_party"] = ArmSpec(
-    price_source="actual", own_slot="filler", neighbour_slot="without_largest_party"
-)
-GATE_CLOSURE_ARMS["neighbour_fpn_without_largest_party_shuffled"] = ArmSpec(
-    price_source="actual", own_slot="filler", neighbour_slot="without_largest_party_shuffled"
-)
+"""The arms at `ID-1h`. `fleet_fpn` and its shuffled twin are rung B2's arms for NGED battery A.
+The two `without_largest_party` arms leave the testbed's largest lead party out of the neighbour
+set."""
 
 TESTBED_GATE_CLOSURE_ARMS: Final[tuple[str, ...]] = (
     "no_neighbour",
@@ -212,7 +204,8 @@ def scored_arms(*, battery: Battery, issue: IssueType, has_model_price: bool) ->
     Args:
         battery: The target battery.
         issue: The issue type.
-        has_model_price: Whether the frame carries the price model's `price_model` column.
+        has_model_price: Whether the frame carries the price model's `price_model` column. Only
+            `DA-early` runs the `model` price, so the flag changes nothing at the other issue times.
 
     Returns:
         The day-ahead arms at `DA-early` and `DA-late` (without `price_model` until the price
@@ -222,7 +215,7 @@ def scored_arms(*, battery: Battery, issue: IssueType, has_model_price: bool) ->
         return {
             name: arm
             for name, arm in DAY_AHEAD_ARMS.items()
-            if arm.price_source != "model" or has_model_price
+            if arm.price_source != "model" or (issue == "DA-early" and has_model_price)
         }
     names = TESTBED_GATE_CLOSURE_ARMS if battery.has_fpn else NGED_BATTERY_A_GATE_CLOSURE_ARMS
     return {name: GATE_CLOSURE_ARMS[name] for name in names}
@@ -484,7 +477,8 @@ def build_issue_frame(
         quantiles `q<level>` and `climatology_n`, `climatology_median_mw`, `climatology_filler_mw`,
         the price columns of every source in `prices`, `own_fpn_mw`, `own_fpn_filler_mw`, and the
         neighbour columns `<set>__mean`, `<set>__previous`, `<set>__share` with their `_filler`
-        versions for each set in `NEIGHBOUR_SETS` that the battery has.
+        versions for each neighbour set that the battery has (`all_testbed`, plus `different_party`
+        and `same_party` for a battery with a lead party).
     """
     frame = with_issue_time(frame=grid, issue=issue).with_columns(
         tod=pl.col("time").dt.hour().cast(pl.Int64) * 2 + pl.col("time").dt.minute() // 30,

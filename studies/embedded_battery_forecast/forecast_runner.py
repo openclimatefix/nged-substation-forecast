@@ -70,7 +70,7 @@ def with_largest_party_removed(*, base: pl.DataFrame, battery_id: str) -> pl.Dat
         The frame with `without_largest_party__*` and `without_largest_party_shuffled__*` columns.
     """
     parties = {b: lead_parties()[b] for b in testbed_ids()}
-    largest = max(set(parties.values()), key=list(parties.values()).count)
+    largest = max(sorted(set(parties.values())), key=list(parties.values()).count)
     neighbours = [
         b for b in neighbour_ids(target=battery_id, lead_party=parties) if parties[b] != largest
     ]

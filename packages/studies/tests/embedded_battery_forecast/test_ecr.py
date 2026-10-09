@@ -1,6 +1,7 @@
 import zipfile
 from collections.abc import Mapping
 from pathlib import Path
+from xml.etree import ElementTree
 from xml.sax.saxutils import escape
 
 import ecr
@@ -78,6 +79,15 @@ def test_a_cell_reference_maps_to_its_zero_based_column() -> None:
     assert ecr._column_index(reference="Z1") == 25
     assert ecr._column_index(reference="AB12") == 27
     assert ecr._column_index(reference="BG8000") == 58
+
+
+def test_a_shared_string_cell_raises_instead_of_reading_its_index_as_a_value() -> None:
+    cell = ElementTree.fromstring(
+        f'<c xmlns="{ecr._SPREADSHEET_NS[1:-1]}" r="A1" t="s"><v>7</v></c>'
+    )
+
+    with pytest.raises(ValueError, match="shared strings"):
+        ecr._cell_text(cell=cell)
 
 
 def test_read_sheet_collapses_a_heading_with_a_line_break_and_keeps_empty_cells_as_null(

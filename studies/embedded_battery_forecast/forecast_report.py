@@ -760,7 +760,7 @@ def arm_lines() -> list[str]:
     """Return a table of the arms: method and feature recipe (columns: see `inputs_report.md`)."""
     rows = []
     for label, battery_id in (
-        ("testbed battery", "E_ARBRB-1"),
+        ("testbed battery", testbed_ids()[0]),
         ("NGED battery A", NGED_BATTERY_A_FILE_ID),
     ):
         battery = battery_for(battery_id=battery_id)
@@ -838,10 +838,18 @@ def exploratory_section(*, testbed: list[str], nged: list[str]) -> tuple[list[st
     rows = []
     for contrast in EXPLORATORY_CONTRASTS:
         batteries = nged if contrast.part == "B" else testbed
-        try:
-            rows.append(contrast_row(contrast=contrast, setting="primary", batteries=batteries))
-        except (pl.exceptions.ColumnNotFoundError, ValueError, IndexError) as error:
-            lines.append(f"- {contrast.label} could not be computed: {error!r}")
+        missing = [
+            arm
+            for arm in (contrast.treatment, contrast.reference)
+            if not any(
+                arm_file(setting="primary", issue=contrast.issue, battery_id=b, arm=arm).exists()
+                for b in batteries
+            )
+        ]
+        if missing:
+            lines.append(f"- {contrast.label} was not computed: no saved fit for {missing}.")
+            continue
+        rows.append(contrast_row(contrast=contrast, setting="primary", batteries=batteries))
     exploratory = pl.DataFrame(rows)
     save_table(frame=exploratory, name="exploratory_contrasts.parquet")
     return [*lines, "", *contrast_lines(rows=exploratory), ""], exploratory

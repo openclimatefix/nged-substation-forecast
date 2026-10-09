@@ -395,8 +395,10 @@ def test_the_model_price_arm_joins_the_day_ahead_arms_once_the_price_model_has_r
     battery = _battery(battery_id="E_A-1", party="P1", value_of_time=lambda t: 0.0)
 
     without = fi.scored_arms(battery=battery, issue="DA-early", has_model_price=False)
-    with_model = fi.scored_arms(battery=battery, issue="DA-late", has_model_price=True)
+    with_model = fi.scored_arms(battery=battery, issue="DA-early", has_model_price=True)
+    day_late = fi.scored_arms(battery=battery, issue="DA-late", has_model_price=True)
 
     assert "price_model" not in without
     assert "price_model" in with_model
+    assert "price_model" not in day_late
     assert len(without) == 3
