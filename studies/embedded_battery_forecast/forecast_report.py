@@ -325,6 +325,12 @@ EXPLORATORY_CONTRASTS: Final[tuple[Contrast, ...]] = (
 """Exploratory contrasts: every one is labelled exploratory on the page."""
 
 
+def save_table(*, frame: pl.DataFrame, name: str) -> None:
+    """Write a report table under `TABLES_DIR`."""
+    TABLES_DIR.mkdir(parents=True, exist_ok=True)
+    frame.write_parquet(TABLES_DIR / name)
+
+
 def table(*, headers: list[str], rows: list[list[str]]) -> list[str]:
     """Return a Markdown table."""
     return [
@@ -796,7 +802,7 @@ def leaderboard_section(*, testbed: list[str], nged: list[str]) -> list[str]:
                 ),
                 "",
             ]
-    pl.concat(boards, how="diagonal_relaxed").write_parquet(TABLES_DIR / "leaderboards.parquet")
+    save_table(frame=pl.concat(boards, how="diagonal_relaxed"), name="leaderboards.parquet")
     return lines
 
 
@@ -810,7 +816,7 @@ def planned_section(*, testbed: list[str], nged: list[str]) -> tuple[list[str], 
             for setting in ("primary", "sensitivity")
         ]
     planned = pl.DataFrame(rows)
-    planned.write_parquet(TABLES_DIR / "planned_contrasts.parquet")
+    save_table(frame=planned, name="planned_contrasts.parquet")
     lines = ["## Planned contrasts", "", *contrast_lines(rows=planned), "", "### Verdicts", ""]
     for contrast in PLANNED_CONTRASTS:
         both = planned.filter(pl.col("label") == contrast.label)
@@ -835,7 +841,7 @@ def exploratory_section(*, testbed: list[str], nged: list[str]) -> tuple[list[st
         except (pl.exceptions.ColumnNotFoundError, ValueError, IndexError) as error:
             lines.append(f"- {contrast.label} could not be computed: {error!r}")
     exploratory = pl.DataFrame(rows)
-    exploratory.write_parquet(TABLES_DIR / "exploratory_contrasts.parquet")
+    save_table(frame=exploratory, name="exploratory_contrasts.parquet")
     return [*lines, "", *contrast_lines(rows=exploratory), ""], exploratory
 
 
@@ -896,13 +902,13 @@ def main() -> None:
     lines += false_alarm_lines(planned=planned, exploratory=exploratory)
     lines += ["## CRPS skill by lead time (primary setting)", ""]
     lead_lines, lead_data = skill_by_lead(setting="primary", batteries=testbed)
-    lead_data.write_parquet(TABLES_DIR / "skill_by_lead_testbed.parquet")
+    save_table(frame=lead_data, name="skill_by_lead_testbed.parquet")
     nged_lead_lines, nged_lead_data = skill_by_lead(setting="primary", batteries=nged)
-    nged_lead_data.write_parquet(TABLES_DIR / "skill_by_lead_nged_battery_a.parquet")
+    save_table(frame=nged_lead_data, name="skill_by_lead_nged_battery_a.parquet")
     lines += [*lead_lines, "", "### NGED battery A", "", *nged_lead_lines, ""]
     lines += ["## Per-battery CRPS skill against `clim` (primary setting)", ""]
     battery_lines, battery_data = per_battery_skill(setting="primary", batteries=testbed)
-    battery_data.write_parquet(TABLES_DIR / "per_battery_skill.parquet")
+    save_table(frame=battery_data, name="per_battery_skill.parquet")
     lines += [*battery_lines, ""]
     REPORT_PATH.write_text("\n".join(lines))
     print("\n".join(lines))
