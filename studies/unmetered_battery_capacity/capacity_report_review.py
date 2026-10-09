@@ -522,24 +522,38 @@ def low_share_posterior_section(*, rung1: pl.DataFrame) -> list[str]:
 
 
 def tuning_series_section(*, rung1: pl.DataFrame) -> list[str]:
-    """Rung 1's false alarms, detection, and calibration with the two tuning series removed."""
+    """Rung 1's false alarms, detection, and calibration with some series removed.
+
+    One variant drops the two series the estimator was tuned on. The other drops the series whose
+    null blocks are flagged, because a series flagged with no battery adds its false alarms to
+    every detection rate.
+    """
+    flagged_nulls = flag(
+        frame=rung1.filter(pl.col("share") == 0),
+        threshold=thresholds(nulls=rung1.filter(pl.col("share") == 0)),
+        default=np.nan,
+    ).filter(pl.col("flagged"))
+    false_alarm_series = tuple(sorted(flagged_nulls["series"].unique().to_list()))
     lines = [
-        "## Rung 1 without the two series the estimator was tuned on (exploratory)",
+        "## Rung 1 with series removed (exploratory)",
         "",
         (
             f"The estimator was tuned on {' and '.join(TUNING_SERIES)}, and every pooled rate also "
-            "scores them. The tables repeat the false-alarm rate, the detection rates, and the "
-            "merchant power's 90% coverage with the thresholds rebuilt from the remaining series."
+            "scores them. The series with a flagged null block ("
+            f"{', '.join(false_alarm_series)}) adds its false alarms to every detection rate, "
+            "including the rates at the smallest shares. The tables repeat the false-alarm rate, "
+            "the detection rates, and the merchant power's 90% coverage with the thresholds "
+            "rebuilt from the remaining series."
         ),
         "",
     ]
-    for name, frame in (
-        ("All 9 series", rung1),
-        (
-            f"Without {' and '.join(TUNING_SERIES)}",
-            rung1.filter(~pl.col("series").is_in(TUNING_SERIES)),
-        ),
-    ):
+    variants = (
+        ("All 9 series", ()),
+        (f"Without {' and '.join(TUNING_SERIES)}", TUNING_SERIES),
+        (f"Without {', '.join(false_alarm_series)}", false_alarm_series),
+    )
+    for name, removed in variants:
+        frame = rung1.filter(~pl.col("series").is_in(removed))
         limits = thresholds(nulls=frame.filter(pl.col("share") == 0))
         default = default_threshold(limits=limits)
         nulls = flag(frame=frame.filter(pl.col("share") == 0), threshold=limits, default=default)
@@ -552,6 +566,7 @@ def tuning_series_section(*, rung1: pl.DataFrame) -> list[str]:
         lines += [
             f"**{name}: {int(nulls['flagged'].sum())} of {nulls.height} null blocks flagged.**",
             "",
+            table(rate_table(frame=battery, by=["share"])),
             table(
                 rate_table(
                     frame=with_season(frame=battery.filter(pl.col("share").is_in([0.05, 0.1]))),

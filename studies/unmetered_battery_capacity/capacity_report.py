@@ -593,6 +593,7 @@ def rung4_section(*, rung4: pl.DataFrame, nulls: pl.DataFrame) -> list[str]:
     unit_columns = [f"{name}_power_over_prior_scale" for name in UNIT_NAMES]
     summer = frame.filter(pl.col("block") == SUMMER_BLOCK)
     other = frame.filter(pl.col("block") != SUMMER_BLOCK)
+    matched = frame.filter(pl.col("multiple") == 0)
     nged = nged_series()
     flow_p99 = p99_flow(nged["BSP1"])
     battery_p99 = p99_flow(nged["battery_A"])
@@ -624,8 +625,8 @@ def rung4_section(*, rung4: pl.DataFrame, nulls: pl.DataFrame) -> list[str]:
             f"from {other['log_bayes_factor'].min():.1f} to {other['log_bayes_factor'].max():.1f} "
             f"across all multiples and {int(other['flagged'].sum())} of {other.height} blocks are "
             f"flagged. In Jun-Aug {int(summer['flagged'].sum())} of {summer.height} blocks are "
-            "flagged, including the matched null (multiple 0), where the nulls of the other series "
-            "also false-alarm. The merchant power posterior median ranges from "
+            f"flagged ({int(matched['flagged'].sum())} of {matched.height} matched nulls, at "
+            "multiple 0). The merchant power posterior median ranges from "
             f"{frame['merchant_power_median'].min():.2f} to "
             f"{frame['merchant_power_median'].max():.2f} MW while the truth ranges from "
             f"{frame['true_power_mw'].min():.1f} to {frame['true_power_mw'].max():.1f} MW."
