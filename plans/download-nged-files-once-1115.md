@@ -495,8 +495,6 @@ uv run mkdocs build --strict    # read the rendered operations page
 - **Listing cost.** The ingest still lists the whole `timeseries` prefix every hour. At 2,500 series
   the listing, not the downloads, becomes the dominant request count. Possible follow-up issue.
   Listing only recent windows would miss a back-fill of old windows.
-- **The plan departs from the issue's proposal.** The issue proposes a watermark on `LastModified`.
-  The plan proposes a downloaded-files list instead. Please confirm.
 
 ## Review record
 
@@ -597,3 +595,6 @@ the first run is unseeded.
 pull request. The parked v2-scale work and the contract-violation question became sub-issues of a
 new v2.0 epic. Comparing the new ingest with "download every file, every run" is accepted. The word
 "downloaded-files list" is replaced throughout by "downloaded-files list".
+
+**Maintainer decision.** The maintainer approved the downloaded-files list in place of the issue's
+watermark.
