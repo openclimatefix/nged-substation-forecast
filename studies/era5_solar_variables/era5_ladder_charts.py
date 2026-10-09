@@ -51,12 +51,15 @@ from era5_ladder_arms import (
     FitKey,
     TargetType,
     dataset_path,
+    importance_path,
     report_paths,
     results_path,
 )
 from studies.charts import LABEL_WIDTH_PX, PLOT_WIDTH_PX, Panel, figure
 from studies.era5_ladder import (
     CLEAR_SKY_INDEX_THRESHOLDS,
+    DERIVED_BY_RUNG,
+    RUNG_ADDITIONS,
     RUNGS,
     SEASONS,
     SKY_REGIMES,
@@ -572,6 +575,136 @@ def figure_drop_one(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
             "Dashed rule: no difference.",
             "A group counts as useful only if the ladder (figure 2) and this figure agree.",
             "All rows are exploratory and are not corrected for multiple comparisons.",
+        ],
+        figure_planning=None,
+    )
+
+
+SHUFFLED_SUFFIX: Final[str] = "_shuffled"
+"""What `era5_ladder_importance.py` appends to a shuffled copy's column name."""
+
+SHUFFLED_ARM: Final[str] = "g9_with_shuffled"
+"""The importance arm that carries shuffled copies."""
+
+TOP_COLUMNS: Final[int] = 20
+"""How many columns the first importance panel shows."""
+
+SUN_AND_CALENDAR: Final[str] = "Sun position and calendar"
+"""The group label of the features every arm shares."""
+
+CLOUD_COVERS: Final[tuple[str, ...]] = ("tcc", "lcc", "mcc", "hcc")
+"""The columns the third importance panel sums as the cloud covers."""
+
+
+def column_group(*, column: str) -> str:
+    """Return the label of the ladder rung that adds a column, or the shared or shuffled group."""
+    if column.endswith(SHUFFLED_SUFFIX):
+        return "Shuffled copies (noise)"
+    for rung in RUNGS:
+        if column in (*RUNG_ADDITIONS[rung], *DERIVED_BY_RUNG.get(rung, ())):
+            return ARM_LABELS[rung]
+    return SUN_AND_CALENDAR
+
+
+def figure_12_importance(
+    *, shares: pl.DataFrame, target: TargetType, scope: str
+) -> alt.TopLevelMixin:
+    """Draw how much of XGBoost's total gain each column, group, and model used, for one target.
+
+    Args:
+        shares: Each column's share of gain by arm, farm, fold, and seed (`importance_*.parquet`).
+        target: The target.
+        scope: The line naming the farms, hours, and span.
+
+    Returns:
+        The figure with three panels: the top columns of the full set, the full set's shares by
+        group, and the shares of `ssrd` and the cloud covers in three models.
+    """
+    in_target = shares.filter(pl.col("target") == target)
+
+    def refit_means(*, arm: str, grouped: pl.Expr) -> pl.DataFrame:
+        """Mean over farms for each refit (fold and seed), then the mean and range over refits."""
+        return (
+            in_target.filter(pl.col("arm") == arm)
+            .group_by("fold", "seed", grouped.alias("label"))
+            .agg(share=pl.col("share").sum() / pl.col("site").n_unique())
+            .group_by("label")
+            .agg(
+                value=pl.col("share").mean() * 100.0,
+                lower=pl.col("share").min() * 100.0,
+                upper=pl.col("share").max() * 100.0,
+            )
+        )
+
+    full = refit_means(arm="g9", grouped=pl.col("column"))
+    top = full.sort("value", descending=True).head(TOP_COLUMNS)
+    # The noise line is the largest shuffled copy's share in one refit of one farm, averaged.
+    noise_line = float(
+        in_target.filter(
+            (pl.col("arm") == SHUFFLED_ARM) & pl.col("column").str.ends_with(SHUFFLED_SUFFIX)
+        )
+        .group_by("site", "fold", "seed")
+        .agg(largest=pl.col("share").max())["largest"]
+        .mean()
+        * 100.0  # ty: ignore[unsupported-operator]
+    )
+    by_group = refit_means(
+        arm=SHUFFLED_ARM,
+        grouped=pl.col("column").map_elements(
+            lambda column: column_group(column=column), return_dtype=pl.String
+        ),
+    ).sort("value", descending=True)
+    models = pl.concat(
+        refit_means(
+            arm=arm,
+            grouped=pl.when(pl.col("column") == "ssrd")
+            .then(pl.lit("ssrd"))
+            .when(pl.col("column").is_in(CLOUD_COVERS))
+            .then(pl.lit("Cloud covers"))
+            .otherwise(pl.lit("Every other column")),
+        ).with_columns(label=pl.col("label") + pl.lit(f", in {ARM_LABELS[arm].split(' ')[0]}"))
+        for arm in ("g0", "g2", "g9")
+    ).filter(~pl.col("label").str.starts_with("Every other"))
+    model_order = [
+        f"{name}, in {ARM_LABELS[arm].split(' ')[0]}"
+        for arm in ("g0", "g2", "g9")
+        for name in ("ssrd", "Cloud covers")
+        if f"{name}, in {ARM_LABELS[arm].split(' ')[0]}" in models["label"].to_list()
+    ]
+    panels = [
+        dot_interval_panel(
+            rows=top,
+            x_title=f"Share of total gain (%) in the full set, {TOP_COLUMNS} largest columns",
+            panel_title="Columns of the full set (G9)",
+            colour=TARGET_COLOURS[target],
+            reference_rules=(noise_line,),
+        ),
+        dot_interval_panel(
+            rows=by_group,
+            x_title="Share of total gain (%), summed over each group's columns",
+            panel_title="Groups, with shuffled copies as one more group",
+            colour=TARGET_COLOURS[target],
+            reference_rules=(),
+        ),
+        dot_interval_panel(
+            rows=models,
+            order=model_order,
+            x_title="Share of total gain (%); cloud covers are tcc, lcc, mcc, hcc",
+            panel_title="ssrd and the cloud covers as variables are added",
+            colour=TARGET_COLOURS[target],
+            reference_rules=(),
+        ),
+    ]
+    return figure(
+        panels=panels,
+        number=12,
+        title=f"What the XGBoost models used, {PANEL_TITLES[target]}",
+        subtitle=[
+            scope,
+            "Dot: mean over refits. Line: range over refits (folds and seeds).",
+            f"Dashed rule, first panel: the largest shuffled copy's share ({noise_line:.1f}%).",
+            "Gain is measured on the training data and splits credit between correlated columns.",
+            "Descriptive only: the planned contrasts decide whether a variable helps.",
         ],
         figure_planning=None,
     )
@@ -1259,6 +1392,16 @@ def main() -> int:
             )
     if (contrasts["family"] == "drop_one").any():
         save(chart=figure_drop_one(contrasts=contrasts, scope=scope), name="drop_one")
+    importance_file = importance_path(variant=variant, through_rung=through_rung)
+    if importance_file.exists():
+        shares = pl.read_parquet(importance_file)
+        for target in TARGETS:
+            save(
+                chart=figure_12_importance(shares=shares, target=target, scope=scope),
+                name=f"importance_{target}",
+            )
+    else:
+        _LOG.info("no %s yet, so figure 12 is skipped", importance_file.name)
     figure_11 = figure_11_hour_and_worst_days(splits=splits, worst=worst, scope=scope)
     if figure_11 is not None:
         save(chart=figure_11, name="hour_and_worst_days")

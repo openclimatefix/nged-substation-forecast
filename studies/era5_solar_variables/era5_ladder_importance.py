@@ -27,7 +27,6 @@ after asking the study coordinator for a GPU slot.
 import argparse
 import logging
 import sys
-from pathlib import Path
 from typing import Final, cast
 
 import polars as pl
@@ -40,6 +39,7 @@ from era5_ladder_arms import (
     TARGETS,
     TargetType,
     dataset_path,
+    importance_path,
 )
 from era5_ladder_fit import (
     SETTINGS,
@@ -72,11 +72,6 @@ IMPORTANCE_ARMS: Final[tuple[str, ...]] = ("g0", "g2", "g9", SHUFFLED_ARM)
 
 SHUFFLE_SEED: Final[int] = NEGATIVE_CONTROL_SEED + 1
 """The seed of the shuffle, different from the negative control's so the two never coincide."""
-
-
-def importance_path(*, variant: str, through_rung: RungType) -> Path:
-    """Return where the shares are written for one variant and rung."""
-    return RESULTS_DIR / f"importance_{variant}_through_{through_rung}.parquet"
 
 
 def arm_columns(*, through_rung: RungType) -> dict[str, tuple[str, ...]]:

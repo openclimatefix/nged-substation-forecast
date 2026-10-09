@@ -239,6 +239,11 @@ def report_paths(*, variant: str, through_rung: RungType) -> ReportPaths:
     )
 
 
+def importance_path(*, variant: str, through_rung: RungType) -> Path:
+    """Return where `era5_ladder_importance.py` writes each column's share of gain."""
+    return RESULTS_DIR / f"importance_{variant}_through_{through_rung}.parquet"
+
+
 def results_path(*, key: FitKey) -> Path:
     """Return where one fit's per-row losses are written."""
     stem = f"{key.variant}_through_{key.through_rung}_{key.target}_{key.view}"
