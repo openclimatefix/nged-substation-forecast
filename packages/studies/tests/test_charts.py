@@ -785,6 +785,23 @@ def test_a_figure_without_planning_adds_no_note():
     assert spec.to_dict()["title"]["subtitle"] == ["s"]
 
 
+def test_a_figure_caption_starts_with_its_label_and_number():
+    panels = [_panel_chart(_rows(["satellite", "reanalysis"]))]
+
+    plain = figure(panels=panels, number=1, title="t", subtitle=["s"], figure_planning=None)
+    labelled = figure(
+        panels=panels,
+        number=2,
+        label="NGED figure",
+        title="t",
+        subtitle=["s"],
+        figure_planning=None,
+    )
+
+    assert plain.to_dict()["title"]["text"] == ["Figure 1: t"]
+    assert labelled.to_dict()["title"]["text"] == ["NGED figure 2: t"]
+
+
 def test_the_station_family_is_purple_and_named_in_the_key():
     spec = _panel(_rows(["station observations", "satellite"]))
     key, _ = spec["vconcat"]

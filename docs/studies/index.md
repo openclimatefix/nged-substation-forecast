@@ -32,9 +32,35 @@ regions or climates, so a result may not hold elsewhere.
 
 - [How many Balancing Mechanism Units in Great Britain are solar?](solar-bmu-census.md) — a census
   of the BMUs whose settled output follows the sun, found because no field in the BMU register says
-  which units are solar. The study finds 10 single-site solar BMUs at 9 sites, 8 of those sites with
-  storage built or planned, reports 28 aggregate BMUs apart, and sets the five published capacity
+  which units are solar. The study finds 12 single-site solar BMUs at 11 sites, 8 of those sites with
+  storage built or planned, reports 26 aggregate BMUs apart, and sets the five published capacity
   figures side by side.
+
+- [Can solar be separated from an aggregate Balancing Mechanism Unit?](solar-bmu-disaggregation.md)
+  — a physical solar plant fitted to four-hour changes in output recovers the solar part of synthetic
+  aggregates of real BMUs beside wind and gas, and finds solar in the supplier BMUs.
+
+- [Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?](battery-pv-separation.md)
+  — on synthetic aggregates of a real solar BMU and a real battery BMU, a joint model of solar and a
+  battery with a state-of-charge limit has a solar error of 14.8% of the solar part's 99th-percentile
+  output, against 27.2% for a solar-only fit. With a demand-like part added the model overshoots the
+  solar capacity, and on the 25 real aggregate BMUs its 1.1 to 1.2 GW is not validated.
+
+- [How well can a primary substation's half-hourly flow reveal an unmetered battery?](unmetered-battery-capacity.md)
+  — a simulated merchant battery that follows the day-ahead price in the estimator's own way is found
+  from about 10% of a primary's 99th-percentile flow, with 3 of 36 blocks flagged falsely. Real
+  public batteries and NGED battery A are not found at any size tested, the intervals of a battery
+  that follows another rule hold the truth far less often than stated, and the screen of eight
+  primaries has no power.
+
+- [Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?](indgen-inddem-and-gsp-take.md)
+  — Elexon's indicated demand and generation series sum the Physical Notifications of every
+  Balancing Mechanism Unit for the national total and 17 transmission boundaries. An issue reaches
+  15 to 42 hours ahead, the zones recover from the boundaries to within rounding, and the sum of the
+  Physical Notifications reproduces INDDEM to within 5 MW in 125 of 192 sampled half-hours once each
+  interconnector is netted. The series do not map cleanly onto the 14 Grid Supply Point groups: with
+  the shared cycles and the national anomaly removed, the highest correlation between a group's
+  settled take and a zone's INDDEM is 0.58, and 0.32 for an NGED group.
 
 ## Past weather
 

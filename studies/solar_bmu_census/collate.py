@@ -26,10 +26,12 @@ from fetch_sources import (
     fetch_bmu_reference,
     fetch_dno_areas,
     fetch_igcpu,
+    fetch_lccc,
     fetch_mels,
     fetch_repd,
     fetch_tec,
     recorded_run,
+    single_site_cfd_bmus,
 )
 from pyproj import Transformer
 
@@ -345,11 +347,22 @@ def distance_to_other_areas_m(
     return nearest
 
 
-def connection_type(*, elexon_bmu_id: str) -> str:
-    """Classify a BMU's connection from its identifier prefix."""
-    if elexon_bmu_id.startswith("T_"):
+def connection_type(*, elexon_bmu_id: str, cfd_connection: str | None = None) -> str:
+    """Classify a BMU's connection from its identifier prefix, or from its CfD unit's connection.
+
+    Args:
+        elexon_bmu_id: The BMU's Elexon identifier.
+        cfd_connection: For a `C__` BMU that carries one named CfD unit, the unit's connection in
+            the Low Carbon Contracts Company's portfolio (`Distribution` or `Transmission`), else
+            None.
+
+    Returns:
+        `transmission-connected` for a `T_` BMU or a `Transmission` CfD unit, `embedded` for an `E_`
+        BMU or a `Distribution` CfD unit, and `other` for every other BMU.
+    """
+    if elexon_bmu_id.startswith("T_") or cfd_connection == "Transmission":
         return "transmission-connected"
-    if elexon_bmu_id.startswith("E_"):
+    if elexon_bmu_id.startswith("E_") or cfd_connection == "Distribution":
         return "embedded"
     return "other"
 
@@ -580,6 +593,8 @@ def build_table() -> pl.DataFrame:
     repd_rows = {str(r["Ref ID"]): r for r in repd.iter_rows(named=True)}
     reviewed = _reviewed_matches()
     licence_areas = fetch_dno_areas()
+    cfd_mapping, cfd_portfolio = fetch_lccc(today=today)
+    cfd_units = single_site_cfd_bmus(mapping=cfd_mapping, portfolio=cfd_portfolio, today=today)
 
     out = []
     for class_row in classes.iter_rows(named=True):
@@ -588,7 +603,11 @@ def build_table() -> pl.DataFrame:
         output = pl.read_parquet(output_path) if output_path.exists() else empty_output()
         ref = reference.get(bmu_id, {})
         igcpu_row = latest_igcpu.get(bmu_id)
-        site_name = ref.get("bmUnitName") or (igcpu_row or {}).get("registeredResourceName") or ""
+        cfd_unit = cfd_units.get(bmu_id)
+        register_name = (
+            ref.get("bmUnitName") or (igcpu_row or {}).get("registeredResourceName") or ""
+        )
+        site_name = cfd_unit["name"] if cfd_unit else register_name
         tec_match = best_match(site_name=site_name, candidates=tec_names)
         repd_match = best_match(site_name=site_name, candidates=repd_names)
         hand = reviewed.get(bmu_id)
@@ -626,6 +645,7 @@ def build_table() -> pl.DataFrame:
                 "elexon_bmu_id": bmu_id,
                 "national_grid_bmu_id": ref.get("nationalGridBmUnit") or bmu_id.split("_", 1)[-1],
                 "site_name": site_name,
+                "register_name": register_name,
                 "display_name": _display_name(
                     site_name=site_name,
                     bmu_id=bmu_id,
@@ -636,7 +656,10 @@ def build_table() -> pl.DataFrame:
                 "tec_name": tec_names.get(tec_match[0]) if tec_match else None,
                 "repd_name": repd_names.get(repd_match[0]) if repd_match else None,
                 "lead_party": ref.get("leadPartyName"),
-                "connection_type": connection_type(elexon_bmu_id=bmu_id),
+                "connection_type": connection_type(
+                    elexon_bmu_id=bmu_id,
+                    cfd_connection=cfd_unit["connection"] if cfd_unit else None,
+                ),
                 "gsp_group": ref.get("gspGroupId"),
                 "dno_area": dno_area(gsp_group_id=ref.get("gspGroupId")),
                 "position_gsp_group": area_at_position["Name"] if area_at_position else None,
@@ -655,6 +678,10 @@ def build_table() -> pl.DataFrame:
                 )
                 if grid_position and area_at_position
                 else None,
+                "cfd_id": cfd_unit["cfd_id"] if cfd_unit else None,
+                "cfd_unit_name": cfd_unit["name"] if cfd_unit else None,
+                "lccc_technology": cfd_unit["technology"] if cfd_unit else None,
+                "lccc_contract_capacity_mw": cfd_unit["capacity_mw"] if cfd_unit else None,
                 "scope": class_row["scope"],
                 "basis": class_row["basis"],
                 "correlation": class_row["correlation"],
@@ -706,6 +733,7 @@ def build_table() -> pl.DataFrame:
             P99_COLUMN: pl.Float64,
             "longitude": pl.Float64,
             "latitude": pl.Float64,
+            "lccc_contract_capacity_mw": pl.Float64,
         },
     )
 
