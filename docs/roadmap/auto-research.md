@@ -303,13 +303,12 @@ node's commit.
 
 **A worker may change any part of the pipeline except a short list of protected paths, and every
 worker must end with the same output.** That output is a parquet file of `PowerForecast` rows for
-the fold. The study route, built in [issue #958 (Protect the leaderboard scorer for autonomous
-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958), scores the file
-the submit command hands over, by running `scripts/forecasting/score_study.py` from the `main`
-checkout as the maintainer's Unix user. An extension point narrower than the whole pipeline could
-not express the large ideas above. Each implementation must also run end to end from the raw power,
-weather, and time-series metadata tables, so that the leakage test below can re-run the
-implementation on perturbed copies of those tables.
+the fold. The planned submit command will score the file the worker hands over by running
+`scripts/forecasting/score_study.py` from the `main` checkout as the maintainer's Unix user. An
+extension point narrower than the whole pipeline could not express the large ideas above. Each
+implementation must also run end to end from the raw power, weather, and time-series metadata
+tables, so that the leakage test below can re-run the implementation on perturbed copies of those
+tables.
 
 ### An LLM research lead decides what to try next
 
@@ -424,10 +423,11 @@ calls the protected code.** A worker may stop calling `cv_helpers.py` and write 
 filter, write a new lag module that nulls nothing, or point the workspace in `pyproject.toml` at a
 modified copy of `ml_core`. The worker's code also runs in the same Python process as the protected
 code, so the worker's code could replace the lag-nullification function in memory. Two checks cover
-behaviour instead. The row-set refusal built in [issue #958 (Protect the leaderboard scorer for
-autonomous research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958) stops a
-worker dropping hard rows or hard series from the forecast: the `metrics` asset refuses a study
-whose row keys differ from the reference experiment's. The leakage test stops lookahead.
+behaviour instead. The `metrics` asset's row-key refusal stops a worker dropping hard rows or hard
+series from the forecast. The asset refuses a study whose row keys differ from the reference
+experiment's (see [What the `metrics` asset refuses to
+score](../ml_experimentation/cross-validation-folds.md#what-the-metrics-asset-refuses-to-score)).
+The leakage test stops lookahead.
 
 **The submit command, not the worker's code, truncates the training data at the fold's `train_end`,
 and the leakage test re-runs the pipeline on perturbed data.** The leakage test samples cut-off

@@ -566,15 +566,15 @@ single answer. TS-Arena avoids reusing any fixed evaluation window at all ([Meye
 for the reason just given, and it is the live-monitoring check where our practice matches the
 TS-Arena pattern instead.
 
-**A narrow scoring guard is already in place, independently of the reservation decision.**
-`final_test_start` in `conf/cv/default.yaml` is a single date after the only leaderboard fold. The
-`metrics` asset refuses to score a window reaching that date unless the maintainer's shell sets
-`NGED_FINAL_TEST=1`, and `studies.power.scan_power` stops at the same date. The date alone does not
-reserve an independent final-test year or show that its observations were never used for training.
-Ahead of Dynamical.org's backfill, the date protects against an experiment, especially an
+**A narrow scoring guard works whether or not a final-test year is ever reserved.**
+`final_test_start` in `conf/cv/default.yaml` is a date later than every leaderboard fold's
+`val_end`. The `metrics` asset refuses to score a window reaching that date unless the maintainer's
+shell sets `NGED_FINAL_TEST=1`. `studies.power.scan_power` stops at the same date. The date alone
+does not reserve an independent final-test year or show that its observations were never used for
+training. Ahead of Dynamical.org's backfill, the date protects against an experiment, especially an
 unsupervised autonomous research session, scoring on later data without the maintainer's say-so. The
-other refusals of the `metrics` asset, and the `study/` experiment prefix, are described in [What the
-`metrics` asset refuses to
+other refusals of the `metrics` asset, and the `study/` experiment prefix, are described in [What
+the `metrics` asset refuses to
 score](../ml_experimentation/cross-validation-folds.md#what-the-metrics-asset-refuses-to-score).
 
 #### Implementation details — final-test window (deleted when it ships)

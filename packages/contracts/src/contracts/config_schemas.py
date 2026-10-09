@@ -14,12 +14,12 @@ from pydantic import BaseModel, Field, model_validator
 from contracts.power_schemas import FoldId
 
 STUDY_EXPERIMENT_PREFIX: Final[str] = "study/"
-"""The prefix on the ``experiment_name`` of every forecast that ``score_study.py`` scores.
+"""The prefix on the ``experiment_name`` of every forecast that
+``scripts/forecasting/score_study.py`` scores.
 
-``score_study.py`` is ``scripts/forecasting/score_study.py``.
-
-The prefix keeps a study's rows out of the promotion path and lets a reader filter them from the
-leaderboard. No reviewed experiment may use the prefix.
+The prefix keeps a study's rows out of the promotion path, lets a reader filter a study's rows from
+the leaderboard, and marks the experiments on which the ``metrics`` asset runs the study checks and
+which an unfiltered ``metrics`` run skips. No reviewed experiment may use the prefix.
 """
 
 
@@ -136,14 +136,15 @@ class CvConfig(BaseModel):
     data through val_end.
 
     ``final_test_start`` is a guard, not a sealed test year. The ``metrics`` asset refuses to score
-    a window reaching this date unless ``NGED_FINAL_TEST=1`` is set in the environment, and the
-    study power reader stops here. The data after the date is a few months, not an independent
-    year, and nothing claims otherwise. The date must be later than every leaderboard fold's
-    ``val_end``.
+    a window reaching this date, except under the live fold, unless ``NGED_FINAL_TEST=1`` is set in
+    the environment. ``studies.power.scan_power`` returns no reading at or after this date. The
+    observations after the date span a few months, not an independent year. The date must be later
+    than every leaderboard fold's ``val_end``.
 
     ``reference_experiment_name`` names the experiment whose forecast row keys a study's forecasts
-    must match exactly before the ``metrics`` asset scores them. It must not carry the study
-    prefix, because a study cannot be its own reference.
+    must match exactly before the ``metrics`` asset scores them. The reference experiment's
+    name must not start with ``STUDY_EXPERIMENT_PREFIX``, because a study cannot be its own
+    reference.
     """
 
     folds: list[CvFoldConfig]
@@ -153,7 +154,7 @@ class CvConfig(BaseModel):
 
     @model_validator(mode="after")
     def _check_guard_and_reference(self) -> Self:
-        """Reject a cutoff inside a leaderboard fold, and a reference that is a study."""
+        """Reject a cutoff not after every leaderboard ``val_end``, and a study as the reference."""
         for fold in self.folds:
             if fold.leaderboard and fold.val_end >= self.final_test_start:
                 raise ValueError(

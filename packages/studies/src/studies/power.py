@@ -29,9 +29,10 @@ def scan_power() -> pt.LazyFrame[PowerTimeSeries]:
     """Scan the cleaned half-hourly power of every series, before `final_test_start`.
 
     `scan_power` is the one way a study reads observed power, so a study and the leaderboard scorer
-    rest on the same observations. The cutoff is a guard, not a sealed test year: it stops a study
-    reading the observations that the `metrics` asset refuses to score without the maintainer's
-    say-so. A study that reads the cleaned or raw power table directly bypasses the guard.
+    rest on the same observations. The `final_test_start` cutoff is a guard, not a sealed test
+    year: the cutoff stops a study reading the observations that the `metrics` asset refuses to
+    score without the maintainer's say-so. A study that reads the cleaned or raw power table
+    directly bypasses the guard.
 
     Returns:
         A lazy frame with the `time_series_id`, `time`, and `power` columns of `PowerTimeSeries`,

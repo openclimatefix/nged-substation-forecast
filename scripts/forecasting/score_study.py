@@ -5,22 +5,24 @@ nothing else: no code, no actuals, no scoring options. It runs `metrics` in lead
 file's rows, stored in `power_forecasts` under the experiment name `study/<study name>`.
 
 Before anything is written, the script refuses a file whose row keys
-`(time_series_id, power_fcst_init_time, valid_time)` differ from the CV config's
-`reference_experiment_name` for the same fold. The file therefore cannot abstain on hard rows. The
-`metrics` asset repeats the check when it scores, because the asset is the one source of a
-leaderboard number.
+`(time_series_id, power_fcst_init_time, valid_time)` differ from those of the cross-validation (CV)
+config's `reference_experiment_name` experiment for the same fold. The script also refuses a file
+whose rows carry more than one `power_fcst_model_name`. A study therefore cannot abstain on hard
+rows, or down-weight them by spreading rows across model names. The `metrics` asset repeats both
+checks when it scores a study, because the asset is the one source of a leaderboard number.
 
-The script also refuses to trust its environment. `Settings` reads `DATA_PATH_INTERNAL`,
+The script also discards the environment it was started with. `Settings` reads `DATA_PATH_INTERNAL`,
 `METADATA_PATH`, `CV_CONFIG_PATH`, and `MLFLOW_TRACKING_URI` from the environment, and the `metrics`
 asset reads `NGED_FINAL_TEST`. Any of them could repoint the actuals or switch off the final-test
 date guard. The script therefore re-executes itself with an environment holding only
 `ALLOWED_ENVIRONMENT`. The paths and credentials come from the `.env` file of the checkout.
 
 The script runs the code of whichever checkout its interpreter belongs to. An autonomous research
-session therefore cannot change what the script executes only when the maintainer's `sudo` rule
-runs the `main` checkout's interpreter directly (not `uv run`) on the `main` checkout's copy of the
-script, with `env_reset` and a fixed `secure_path`. The re-execution below happens after the heavy
-imports, so it cannot stop a `PYTHONPATH` or `PATH` set before the script starts.
+session can therefore change what the script executes, unless the maintainer's `sudo` rule runs
+the `main` checkout's interpreter directly (not `uv run`) on the `main` checkout's copy of the
+script, with `env_reset` and a fixed `secure_path`. The re-execution in `main` happens only after
+the module's imports have run, so a `PYTHONPATH` or `PATH` set before the script starts can still
+run code in the first process.
 
     uv run python scripts/forecasting/score_study.py \
         predictions.parquet my_study mid_2025_to_mid_2026
@@ -95,7 +97,8 @@ def validate_study_name(study_name: str) -> str:
         `study_name`, unchanged.
 
     Raises:
-        ValueError: If the name contains a character outside `STUDY_NAME_PATTERN`, including a
+        ValueError: If the name does not match `STUDY_NAME_PATTERN`: an empty name, a name over 64
+            characters, or a name with a character outside the pattern, such as the `/` of a
             leading `study/`.
     """
     if STUDY_NAME_PATTERN.fullmatch(study_name) is None:
@@ -107,7 +110,7 @@ def validate_study_name(study_name: str) -> str:
 
 
 def _open_predictions(*, predictions: Path, experiment_name: str, fold_id: str) -> pl.LazyFrame:
-    """Scan the predictions file, stamping the experiment name and checking the fold id.
+    """Scan the predictions file, checking its row-key dtypes and fold id, and stamping both ids.
 
     Args:
         predictions: Parquet file of `PowerForecast` rows.
@@ -115,7 +118,8 @@ def _open_predictions(*, predictions: Path, experiment_name: str, fold_id: str) 
         fold_id: The leaderboard fold the rows forecast.
 
     Returns:
-        A lazy scan whose `experiment_name` is `experiment_name`.
+        A lazy scan whose `experiment_name` column is `experiment_name` and whose `fold_id` column
+        is `fold_id`.
 
     Raises:
         ValueError: If the file lacks a row-key column, a row-key column has a different dtype
@@ -184,8 +188,11 @@ def score_study(*, predictions: Path, study_name: str, fold_id: str, replace: bo
         replace: Whether to overwrite an existing `study/<study_name>` partition.
 
     Raises:
-        ValueError: If the study name or the fold is not allowed, the file's `fold_id` disagrees,
-            or the partition already exists and `replace` is False.
+        ValueError: If the study name or the fold is not allowed, the file lacks a row-key column or
+            holds one with the wrong dtype, the file's `fold_id` disagrees, or the partition
+            already exists and `replace` is False.
+        MultipleModelNamesError: If the rows carry more than one `power_fcst_model_name`.
+        RowKeyMismatchError: If the row keys differ from the reference experiment's.
     """
     settings = Settings()
     # Load the CV config the way the `metrics` asset does, from the environment variable alone. A
@@ -261,9 +268,12 @@ def main() -> None:
     parser.add_argument("fold_id", help="A leaderboard fold id of conf/cv/default.yaml.")
     parser.add_argument("--replace", action="store_true", help="Overwrite an existing submission.")
     arguments = parser.parse_args()
+    if not arguments.predictions.is_file():
+        parser.error(f"{arguments.predictions} is not a regular file.")
     # The file is read several times, and the caller may change it between reads. Read a private
-    # copy, in a directory only this user can write to.
-    with tempfile.TemporaryDirectory() as private_directory:
+    # copy, in a directory only this user can write to. The directory sits beside the script, on
+    # disk, because `/tmp` is memory-backed and a full fold's file is several gigabytes.
+    with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as private_directory:
         private_copy = Path(private_directory) / "predictions.parquet"
         shutil.copyfile(arguments.predictions, private_copy)
         score_study(

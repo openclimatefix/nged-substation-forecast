@@ -558,11 +558,13 @@ plugins.md051.enabled = false
 plugins.md049.enabled = false
 
 [tool.importlinter]
-# `ml_core.metrics` and `ml_core.cv_helpers` are the scorer's pure core. They may not import the
-# orchestrator (`dagster`), the experiment tracker (`mlflow`), or the autonomous-study code
-# (`studies`), so a session that edits the studies cannot change what the scorer executes, and the
-# scorer stays unit-testable without a Dagster or MLflow instance. The root packages below include
-# the external packages so that the contract can name them.
+# `ml_core.metrics` and `ml_core.cv_helpers` are the scorer's pure core. The two modules may not
+# import the orchestrator (`dagster`), the experiment tracker (`mlflow`), or the autonomous-study
+# code (`studies`). Edits to the study code therefore cannot change what these two modules execute,
+# and the two modules stay unit-testable without a Dagster or MLflow instance. The root packages
+# below include the external packages so that the contract can name them. They also include every
+# first-party package that the scorer imports (`contracts`), because imports through a package that
+# is not a root package are not traced.
 root_packages = ["ml_core", "contracts", "dagster", "mlflow", "studies"]
 include_external_packages = true
 

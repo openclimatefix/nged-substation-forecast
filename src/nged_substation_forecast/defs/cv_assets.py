@@ -780,10 +780,11 @@ def _validate_group(
 ) -> _EvalWindow:
     """Refuse a group the scorer must not score, and return its evaluation window.
 
-    Runs for every group before any group is scored, so a refusal on a later group never leaves
+    The ``metrics`` asset calls this function for every group before scoring any group, so a
+    refusal on a later group never leaves
     an earlier group's ``forecast_metrics`` rows or MLflow runs behind.
 
-    Three checks, each raising. The final-test date guard applies to every scope. In leaderboard
+    Four checks, each raising. The final-test date guard applies to every scope. In leaderboard
     scope every row's ``valid_time`` must also lie inside the fold's window. A ``study/``
     experiment in leaderboard scope must additionally carry exactly the reference experiment's row
     keys for the fold, so it cannot abstain on hard rows, and a single ``power_fcst_model_name``,
@@ -1055,11 +1056,13 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     ``valid_time`` must lie inside the fold's window.
 
     Experiments whose name starts with ``study/`` hold forecasts submitted through
-    ``scripts/forecasting/score_study.py``. In leaderboard scope each must carry exactly the row
-    keys ``(time_series_id, power_fcst_init_time, valid_time)`` of the CV config's
-    ``reference_experiment_name`` for the same fold, so a study cannot abstain on hard rows. An
-    unfiltered run skips study experiments, naming them in the ``skipped_study_experiments`` output
-    metadata; a run whose population filter names a study's ``experiment_name`` scores it.
+    ``scripts/forecasting/score_study.py``. In leaderboard scope each study experiment must carry
+    exactly the row keys ``(time_series_id, power_fcst_init_time, valid_time)`` of the CV config's
+    ``reference_experiment_name`` for the same fold, so a study cannot abstain on hard rows, and a
+    single ``power_fcst_model_name``, so a study cannot down-weight hard rows by spreading rows
+    across model names. A run whose population filter names no ``experiment_name`` skips study
+    experiments, naming them in a warning and in the ``skipped_study_experiments`` output metadata;
+    a run whose population filter names a study's ``experiment_name`` scores that study.
 
     Args:
         context: Dagster execution context; used for logging and ``add_output_metadata``.

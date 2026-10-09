@@ -13,9 +13,10 @@ tall ``Metrics`` frame. ``enrich_metrics_rows`` stamps the evaluation window and
 frame once the calling asset knows the window and the scope. The enriched frame is what the asset
 writes to Delta. ``build_mlflow_aggregate_metrics`` takes the un-enriched frame that
 ``compute_metrics`` returned. That function reduces the frame to the flat key/value dictionary
-the MLflow leaderboard displays. The ``require_*`` functions beside them refuse a group the
-scorer must not score: a window reaching the final-test date, rows outside the fold's window, and
-a study whose row keys or model names differ from what the reference allows.
+the MLflow leaderboard displays. The ``require_*`` functions beside the four scoring functions
+refuse a group the scorer must not score: a window reaching ``final_test_start``, rows outside the
+fold's window, a study whose row keys differ from the reference experiment's, and a study that
+carries more than one model name.
 
 Every function here is pure: no Dagster, no MLflow, and no IO. Each function is therefore
 unit-testable on an in-memory frame. The asset that calls the function owns every read and write.
@@ -100,8 +101,8 @@ def require_window_within_guard(
 ) -> None:
     """Refuse a window that reaches ``final_test_start``, unless the maintainer allows it.
 
-    ``final_test_start`` is a guard rather than a sealed test year: the observations after it are
-    a few months, not an independent year. The guard exists so that no experiment, and no
+    ``final_test_start`` is a guard rather than a sealed test year: the observations after that
+    date span a few months, not an independent year. The guard exists so that no experiment, and no
     autonomous research session, scores on those observations without the maintainer's say-so.
     Forecasts stored under ``LIVE_FOLD_ID`` are exempt, because live rows are forecasts of the
     future and not a held-out set.
@@ -175,9 +176,10 @@ class MultipleModelNamesError(ValueError):
 def require_single_model_name(*, study: pl.LazyFrame, group_label: str) -> None:
     """Refuse a study whose rows carry more than one ``power_fcst_model_name``.
 
-    ``compute_metrics`` computes metrics per ``power_fcst_model_name`` and the leaderboard number
-    is the mean over those rows. A study that spreads the easy rows across several model names
-    and keeps the hard rows under one would therefore lower its mean error while still carrying
+    ``compute_metrics`` returns separate metric rows for each ``power_fcst_model_name``, and the
+    leaderboard number is the mean over all of those metric rows. A study that spreads the easy
+    forecast rows across several model names and keeps the hard forecast rows under a single model
+    name would therefore lower its mean error while still carrying
     the reference's row keys. Spreading the members of one ensemble across model names would also
     split that ensemble.
 

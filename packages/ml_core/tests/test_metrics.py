@@ -917,7 +917,8 @@ def test_build_mlflow_aggregate_metrics_parametric_sliced_keys():
 
 
 # ---------------------------------------------------------------------------
-# The scorer's refusals: the final-test date guard, the fold window, and the reference row keys
+# The scorer's refusals: the final-test date guard, the fold window, the reference row keys,
+# and the single model name
 # ---------------------------------------------------------------------------
 
 _FINAL_TEST_START = date(2026, 7, 1)

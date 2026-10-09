@@ -751,7 +751,8 @@ def test_metrics_ad_hoc_scores_fold_ids_the_cv_config_does_not_define(
 
 
 # ---------------------------------------------------------------------------
-# Scorer protections: the final-test date guard, the fold-window row check, and the study row keys
+# Scorer protections: the final-test date guard, the fold-window row check, the study row keys,
+# and the single study model name
 # ---------------------------------------------------------------------------
 
 STUDY_EXPERIMENT_NAME = "study/some_study"
@@ -1149,6 +1150,52 @@ def test_score_study_does_not_overwrite_a_submission_unless_asked(
     score_study.score_study(
         predictions=study_predictions, study_name="my_study", fold_id=FOLD_ID, replace=True
     )
+
+
+def test_score_study_refuses_a_file_with_two_model_names_and_leaves_no_partition(
+    file_mlflow_env: dict[str, Path], study_predictions: Path, tmp_path: Path
+) -> None:
+    spread = tmp_path / "spread.parquet"
+    rows = pl.read_parquet(study_predictions)
+    pl.concat(
+        [
+            rows.filter(pl.col("valid_time") <= rows["valid_time"].median()),
+            rows.filter(pl.col("valid_time") > rows["valid_time"].median()).with_columns(
+                power_fcst_model_name=pl.lit("other_name")
+            ),
+        ]
+    ).write_parquet(spread)
+
+    with pytest.raises(MultipleModelNamesError):
+        score_study.score_study(
+            predictions=spread, study_name="my_study", fold_id=FOLD_ID, replace=False
+        )
+
+    stored = pl.read_delta(str(file_mlflow_env["forecasts"]))
+    assert "study/my_study" not in set(stored["experiment_name"].unique().to_list())
+
+
+def test_score_study_main_scores_a_private_copy_that_is_removed_afterwards(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = tmp_path / "predictions.parquet"
+    original.write_bytes(b"parquet bytes")
+    received: list[Path] = []
+
+    def record_score_study(*, predictions: Path, **_: object) -> None:
+        assert predictions.read_bytes() == b"parquet bytes"
+        received.append(predictions)
+
+    monkeypatch.setattr(score_study, "score_study", record_score_study)
+    monkeypatch.setenv(score_study.CLEAN_ENVIRONMENT_MARKER, "1")
+    monkeypatch.setattr(
+        score_study.sys, "argv", ["score_study.py", str(original), "my_study", FOLD_ID]
+    )
+
+    score_study.main()
+
+    assert received[0] != original
+    assert not received[0].exists()
 
 
 def test_score_study_refuses_a_file_missing_rows_and_leaves_no_partition(
