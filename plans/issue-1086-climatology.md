@@ -26,6 +26,111 @@ equiprobable sample. That engineer, and the `meta.json` save/load round trip, mo
 `manual_heuristic.py` into shared modules, because climatology is their second caller. Nothing under
 `src/nged_substation_forecast/defs/` changes.
 
+## Solution
+
+### Walk through
+
+#### The happy path
+
+**To train climatology for a fold, `trained_cv_model` builds the training rows with the shared
+engineer, and `ClimatologyForecaster.train` reduces them to a quantile lookup.** The asset reads the
+config `register_experiment_job` stored from `conf/model/climatology.yaml`, whose
+`selected_features` is empty. `ParsedFeatures.from_strings(set()).max_power_lag()` is therefore
+zero, so `load_engineering_inputs` gets a `power_lookback` of zero and bounds the cleaned power scan
+(`scan_cleaned_power`) and the NWP scan to the fold's training window. The NWP scan is restricted to
+member 0 (`ensemble_members=[0]`). The asset calls
+`ClimatologyForecaster.feature_engineer.engineer(...)`, which is
+`NwpRunRowsWithoutWeatherFeatureEngineer` in the new `nwp_run_rows.py`. The engineer strips the NWP
+frame to its run, cell, and valid-time keys and hands the key-only frame to
+`TabularFeatureEngineer`, so the rows are the same `(power_fcst_init_time, valid_time)` rows every
+other forecaster gets, with `power` attached and no weather value read.
+
+**`train(features, eligible_ids)` turns those rows into one lookup row per calendar cell.** `train`
+keeps the requested series with non-null `power`, then deduplicates on `(time_series_id,
+valid_time)`. The dedupe comes before the quantiles because the engineer repeats each target once
+per NWP run covering it, up to 15 times, and an undeduplicated target would be counted 15 times in
+its cell. `_local_calendar_cell_keys` then adds `local_month`, `local_half_hour_of_day`, and
+`local_is_weekend` from `valid_time` in `DEFAULT_LOCAL_TIMEZONE`. The keys are local, not UTC,
+because the load follows the local clock. A `group_by` on `time_series_id` plus the three keys
+computes the 13 columns `power_quantile_member_00` to `power_quantile_member_12` at the levels in
+`CLIMATOLOGY_QUANTILE_LEVELS`, with `"linear"` interpolation passed explicitly because Polars'
+default is `"nearest"`. The group-by also counts `training_sample_count`. The collect is streamed,
+and the result is sorted so the saved parquet is deterministic. `trained_time_series_ids` is set
+from the lookup's distinct series, and one aggregate log line reports the cell counts and the latest
+training `valid_time`.
+
+**`save` writes the lookup, and `trained_cv_model` uploads it.** `save_to_mlflow` calls
+`ClimatologyForecaster.save(model_dir)`. `save` first calls the new `_saved_model.py` helper, which
+clears the directory and writes `meta.json` with `model_params`, `trained_time_series_ids`, and
+`model_class`. The directory is cleared first so a re-materialised fold never keeps a stale file.
+`save` then writes `climatology_quantiles.parquet`, named so it cannot collide with the
+`time_series_metadata.parquet` that `save_to_mlflow` adds next. `save_to_mlflow` packs the directory
+into the single `model.tar.gz` archive.
+
+**To forecast, `cv_power_forecasts` loads the model and calls `predict` once per 14-day `init_time`
+chunk.** `load_from_mlflow` unpacks the archive and calls `ClimatologyForecaster.load`, which reads
+`meta.json` through the shared helper, rebuilds the config through `CONFIG_CLASS.model_validate`,
+and reads the parquet. The population comes from `meta.json`, not the parquet, as in
+`XGBoostForecaster.load`. For each chunk (`_PREDICT_INIT_CHUNK`), the asset engineers the validation
+rows with the same engineer, every NWP member included, and calls `predict(features,
+fold_id=fold_id)`. The engineer's key-only NWP frame carries no member, so each row is one series,
+run, and valid time.
+
+**`predict` joins the lookup onto the rows and unpivots the 13 quantile columns into members.**
+`predict` collects only `time_series_id`, `power_fcst_init_time`, and `valid_time`. `power` is left
+out so the validation-period power cannot reach the forecast. `predict` strips the Patito model with
+`.as_polars()` before the join, because a cross-model `pt` join raises. `predict` adds the cell keys
+with the same `_local_calendar_cell_keys` that `train` uses, so the two cannot disagree on a cell,
+and inner-joins the lookup on the four key columns. An unpivot maps each quantile column to its
+`ensemble_member` through `replace_strict(..., return_dtype=pl.Int8)`, so member 0 is the lowest
+quantile and member 6 the median on every row. A null `nwp_init_time` and the identity literals are
+added, and `PowerForecast.validate` returns the frame. `write_power_forecasts` stores each chunk
+under the `(climatology, fold_id)` partition of `power_forecasts`.
+
+**`metrics` then scores the 13 members as an equiprobable sample, with no change to
+`compute_metrics`.** `compute_metrics` groups each `(time_series_id, power_fcst_init_time,
+valid_time)`, takes the fair CRPS over the members, and reads the delivery quantiles with
+`quantile(q, "linear")`, the same interpolation the forecaster used.
+
+#### The main branches off the happy path
+
+- **A training target covered by several NWP runs** appears once per run in the engineered frame.
+  The dedupe keeps one copy. `keep="any"` is safe because every copy carries the same `power`.
+- **A series with no non-null training `power`, or not in `eligible_ids`,** gets no lookup row and
+  is absent from `trained_time_series_ids`, so `cv_power_forecasts` never loads its rows. This
+  matches the manual heuristic's and XGBoost's population rule.
+- **A sparse cell** (few training samples) is kept. A cell with one sample gives 13 equal members.
+  No minimum-sample threshold or neighbouring-month fallback is applied (decision 2).
+- **A validation row in a cell with no training sample** finds no lookup row, so the inner join
+  drops the row. `predict` counts the dropped rows and logs one warning naming the count and the
+  series. `cv_power_forecasts` calls `predict` once per 14-day chunk, so a fold with unseen cells
+  logs one warning per affected chunk.
+- **An empty chunk** gives a zero-row, correctly typed `PowerForecast` with no special branch. The
+  first chunk is written even when empty, because `cv_power_forecasts` uses the first write to
+  overwrite the partition. The `smoke_test` fold (train January 2025, validate February 2025) takes
+  this branch on every chunk, because every validation cell is unseen.
+- **A re-materialised fold** reuses its MLflow run. `save` clears the model directory before
+  writing, and the first chunk's `replace_partition` overwrites the earlier forecasts.
+
+#### The main error-handling paths
+
+**Climatology is an R&D baseline, so it raises only on our own bugs and degrades on a missing
+cell.**
+
+- **A non-empty `selected_features`** raises `ValueError` in `ClimatologyForecaster.__init__`. The
+  error surfaces when `trained_cv_model` constructs the forecaster, because registration validates
+  only `CONFIG_CLASS`.
+- **No eligible series has training power** gives an empty lookup, and `trained_cv_model` raises its
+  existing "Trained 0 of N eligible time series" error before anything is saved.
+- **A loaded model with no trained series** raises in `cv_power_forecasts`' existing guard.
+- **A single-run call** (`power_fcst_init_time` given, as `live_forecasts` would make for a promoted
+  climatology model) raises `NotImplementedError` in `NwpRunRowsWithoutWeatherFeatureEngineer`,
+  whose message names the class and says baselines are not served live.
+- **A frame that breaks the `PowerForecast` contract** raises in `PowerForecast.validate`, which
+  would mean a bug in `predict`.
+- **An unseen cell** never raises: the rows are dropped and the warning above names the count and
+  the series, so the leaderboard's row-set difference is visible in the logs.
+
 ## Verdict, size and departures
 
 **Worth implementing, and now.** The maintainer has put climatology next, #354 waits on it, and
@@ -209,7 +314,9 @@ present in the engineered frame, and `predict` must not read it: test 10 pins th
 2. Add the cell keys with `_local_calendar_cell_keys`, and inner-join the lookup on the four key
    columns (both sides plain Polars frames, per `polars-patito-gotchas`).
 3. Count the input rows the join dropped and, when the count is positive, log one warning naming
-   the count and the `time_series_id`s affected. Nothing raises.
+   the count and the `time_series_id`s affected. Nothing raises. `cv_power_forecasts` calls
+   `predict` once per 14-day `init_time` chunk (`_PREDICT_INIT_CHUNK`), so the warning is one per
+   affected chunk, not one per fold.
 4. Unpivot the 13 quantile columns into `ensemble_member` and `power_fcst`, mapping each column
    name to its member index with `replace_strict(..., return_dtype=pl.Int8)`, so member 0 is the
    lowest quantile on every row.
@@ -291,7 +398,8 @@ copies the manual-heuristic run, so the shared data folder gains only climatolog
   `PopulationFilter(experiment_name="climatology", fold_id="mid_2025_to_mid_2026")`. Nothing
   touches the `xgboost_*` or `manual_heuristic` partitions or MLflow experiments.
 - Before reading results, record per series: the number of populated cells out of 1,152, the
-  minimum `training_sample_count`, and the rows `predict` dropped. Confirm that the latest training
+  minimum `training_sample_count`, and the rows `predict` dropped, summed over the per-chunk
+  warnings. Confirm that the latest training
   `valid_time` in the train log is no later than 2025-06-30 23:59:59 UTC, and that every forecast
   row has 13 members.
 - Re-score all three experiments in a scratch script with the repo's `compute_metrics`, the same
@@ -361,7 +469,8 @@ contract" rule.
 ## Design-philosophy check
 
 **The code runs in the R&D asset chain only, and `predict` drops and logs rather than raising.** An
-unseen cell drops its rows with one aggregate warning naming the series, as "Make the telemetry
+unseen cell drops its rows with one aggregate warning per `predict` call (one per `init_time`
+chunk in `cv_power_forecasts`) naming the series, as "Make the telemetry
 name the fault" asks. Nothing raises except our own bugs: a non-empty `selected_features`, a
 contract violation in `PowerForecast.validate`, or a single-run call to the shared engineer. No
 asset check is added, and no warning path can raise.
