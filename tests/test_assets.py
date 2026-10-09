@@ -569,7 +569,7 @@ _DOWNLOADED_FILES = "NGED/downloaded_files.parquet"
 
 
 def _key(time_series_id: int, end_hours: int) -> str:
-    """The key of a six-hour window ending `end_hours` after 2026-01-01 00:00 UTC."""
+    """The key of a 6-hour window ending `end_hours` after 2026-01-01 00:00 UTC."""
     end_ms = int(datetime(2026, 1, 1, tzinfo=UTC).timestamp() * 1000) + end_hours * 3_600_000
     return (
         f"timeseries/{end_ms - 21_600_000}_{end_ms}/TimeSeries_{time_series_id}_"
@@ -714,7 +714,7 @@ def test_the_downloaded_files_list_matches_a_download_everything_reference_on_ev
     put(_key(11, 12), _window_file(11, 12, [8.0]))
     run_and_compare(n_new_files=2)
 
-    # Run 3: a back-fill two months before the data, with a different note, and a late file more
+    # Run 3: a back-fill 2 months before the data, with a different note, and a late file more
     # than 3 days before the newest reading of its series.
     put(_key(10, -24 * 60), _window_file(10, -24 * 60, [9.0], information="old back-fill note"))
     put(_key(11, 12 - 24 * 4), _window_file(11, 12 - 24 * 4, [10.0]))

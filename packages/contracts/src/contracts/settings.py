@@ -294,7 +294,7 @@ class Settings(BaseSettings):
     metadata_path: str = ""
     """Parquet file of per-series substation metadata (under nged_data_path)."""
     downloaded_files_path: str = ""
-    """Parquet file listing the NGED JSON files the ingest has already downloaded (under
+    """Parquet file that lists the NGED JSON files the ingest has already downloaded (under
     nged_data_path)."""
     eligible_time_series_data_path: str = Field(
         default="",

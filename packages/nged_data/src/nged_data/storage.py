@@ -193,10 +193,10 @@ def read_downloaded_files(
     """Read the bucket listing that the ingest last processed in full.
 
     The list describes files loaded into the `power_time_series` Delta table and the metadata
-    parquet. If an operator moves either aside to rebuild it, the list would claim that files are
-    loaded which the rebuilt state lacks. The list therefore counts as empty, and the next run
-    downloads every file, whenever the list file, the power table, or the metadata parquet does not
-    exist.
+    parquet. If an operator moves the power table or the metadata parquet aside to rebuild that
+    table, the list would record files as loaded whose readings the rebuilt table lacks. The list
+    therefore counts as empty, and the next run downloads every file, whenever the list file, the
+    power table, or the metadata parquet does not exist.
 
     Args:
         downloaded_files_path: Local path or remote URI of the downloaded-files parquet file.
@@ -220,8 +220,9 @@ def read_downloaded_files(
         log.info(f"No usable downloaded-files list at {downloaded_files_path}; using an empty one.")
         return _empty_downloaded_files()
     # A local parquet file can be torn or truncated. An object-store write replaces the object in
-    # one request, so a remote file can only be off-contract, and a Polars error reading it is a
-    # transient object-store error that the caller's retry guard should retry.
+    # one request, so a remote file can be off-contract but never torn. A Polars error reading a
+    # remote file is therefore a transient object-store error, which the caller's retry guard should
+    # retry.
     unreadable_errors: tuple[type[Exception], ...] = (pt.exceptions.DataFrameValidationError,)
     if not is_remote_uri(downloaded_files_path):
         unreadable_errors += (pl.exceptions.PolarsError, OSError)
@@ -276,8 +277,8 @@ def select_files_not_yet_downloaded(
     """Keep the listed files whose `(path, last_modified)` the downloaded-files list lacks.
 
     A file whose path is known but whose `last_modified` changed was rewritten by NGED, so it is
-    selected again. No time margin is needed: a file absent from an earlier listing is absent from
-    the list, so a later listing selects it.
+    selected again. A late file is selected too: a file absent from an earlier listing is absent
+    from the list, so a later listing selects it.
 
     Args:
         file_listing: The whole bucket listing.
@@ -478,12 +479,11 @@ def time_series_coverage(
 
     The ``collect`` uses the streaming engine to keep peak memory bounded, because this scan runs
     hourly on a small control-plane VM, in the ``power_data_is_fresh`` asset check. The ingest does
-    not run it: ``select_new_rows`` uses ``_existing_power_time_series_keys`` instead, a scan
-    restricted to the reporting series' own history. The measurement used a synthetic V2 table:
-    2,500 series, half-hourly,
-    partitioned by ``time_series_id``, holding a year of history (43.8M rows). The streaming
-    engine took ~0.21 s at ~190 MB peak. The in-memory engine peaked at ~1.3 GB for the same
-    result, so streaming uses ~7x less memory.
+    not run ``time_series_coverage``: ``select_new_rows`` uses ``_existing_power_time_series_keys``
+    instead, a scan restricted to the reporting series' own history. The measurement used a
+    synthetic V2 table: 2,500 series, half-hourly, partitioned by ``time_series_id``, holding a
+    year of history (43.8M rows). The streaming engine took ~0.21 s at ~190 MB peak. The in-memory
+    engine peaked at ~1.3 GB for the same result, so streaming uses ~7x less memory.
 
     Cost scales linearly with accumulated history. If the scan ever becomes a problem, both
     bounds can instead be read from the Delta add-action ``min.time``/``max.time`` file
@@ -601,11 +601,12 @@ def select_new_rows(
 ) -> pt.DataFrame[PowerTimeSeries]:
     """Return rows in `time_series` genuinely missing from the Delta table.
 
-    The filter is a genuine existence check: an anti-join on `(time_series_id, time)` against
+    The filter is an existence check: an anti-join on `(time_series_id, time)` against
     `_existing_power_time_series_keys`. A late file is therefore ingested even when a later reading
     for the same series is already on disk. So is a file that fills a gap earlier in a series'
-    history. It also makes a re-download safe, because a rewritten file or a crash between the
-    append and the downloaded-files list write can offer readings the table already holds. See
+    history. The existence check also makes a re-download safe, because a rewritten file or a
+    crash between the append and the downloaded-files list write can offer readings the table
+    already holds. See
     `_existing_power_time_series_keys`'s docstring for the cost the existence check trades in
     return.
 
@@ -683,7 +684,8 @@ def upsert_metadata(
     an operator acts. A corrupt file is not a missing file, so the create branch below never runs
     again by itself.
 
-    Deleting the file rebuilds it. `read_downloaded_files` counts the downloaded-files list as empty
+    Deleting the metadata parquet makes the next run rebuild the metadata table.
+    `read_downloaded_files` counts the downloaded-files list as empty
     when the metadata table does not exist, so the next run downloads every file in NGED's bucket
     and the metadata table gets every series NGED publishes.
 

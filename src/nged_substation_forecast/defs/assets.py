@@ -127,13 +127,13 @@ def _write_downloaded_files_or_degrade(
 
 @asset(
     tags=PRODUCTION_LAYER_TAGS,
-    # `pool="NGED_INGEST"` stops two runs of this asset overlapping, in conjunction with the Dagster
-    # instance configuration: a per-pool limit of 1, set with
-    # `dagster instance concurrency set NGED_INGEST 1`, because `dagster.yaml` takes only a default
-    # limit for every pool. Two overlapping runs would each compare
-    # their rows with the same snapshot of the `power_time_series` table and both append them, and
-    # the duplicate rows would make `clean_nged_power_data` fail its `(time_series_id, time)`
-    # uniqueness check every hour after. The pool queues the later run behind the earlier one. See:
+    # `pool="NGED_INGEST"` stops two runs of this asset overlapping once the Dagster instance gives
+    # the pool a limit of 1 with `dagster instance concurrency set NGED_INGEST 1`. The limit is set
+    # that way because `dagster.yaml` takes only a default limit for every pool. Two overlapping
+    # runs would each compare their rows with the same snapshot of the `power_time_series` table
+    # and both append them. The duplicate rows would then make `clean_nged_power_data` fail its
+    # `(time_series_id, time)` uniqueness check every hour after. The pool queues the later run
+    # behind the earlier one. See:
     # https://docs.dagster.io/guides/operate/managing-concurrency/concurrency-pools
     pool="NGED_INGEST",
 )
@@ -162,11 +162,12 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     the previous run processed in full. Each run lists the bucket and downloads only the files
     whose ``(path, LastModified)`` the list lacks, so a late file, a back-filled file, and a
     rewritten file are each downloaded once. The run writes the whole listing as the new list last,
-    after the readings have landed, so a crash makes the next run download the files again and the
-    row dedupe drops the repeats. The list counts as empty, and the run downloads every file in the
-    bucket, when the list file, the ``power_time_series`` table, or the metadata parquet does not
-    exist. A damaged list stops the run with ``DownloadedFilesError``, and a malformed NGED file
-    stops it with ``NgedFileParseError``. Both stalls lose no readings. The [operations
+    after the readings have landed. A crash before that write makes the next run download the same
+    files again, and ``select_new_rows`` drops the repeated readings. The list counts as empty, and
+    the run downloads every file in the bucket, when the list file, the ``power_time_series``
+    table, or the metadata parquet does not exist. A damaged list stops the run with
+    ``DownloadedFilesError``, and a malformed NGED file stops it with ``NgedFileParseError``. Both
+    stalls lose no readings. The [operations
     page](https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/)
     covers the first run, rebuilds, and these errors.
 
@@ -249,10 +250,10 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     new_power_ts = downloaded.power_time_series
 
     # A series' metadata comes only from its newest file in the whole listing, and only on a run
-    # that selected that file. A late or back-filled file has an old `end_time`, and
-    # `upsert_metadata` replaces a series wholesale, so its metadata would otherwise overwrite the
-    # series' current `Information` note. The newest file of a series may have been downloaded in an
-    # earlier hour, so it is found in the whole listing, not the selection.
+    # that selected that file. A late or back-filled file has an old `end_time`.
+    # `upsert_metadata` replaces a series wholesale, so without this filter the old file's metadata
+    # would overwrite the series' current `Information` note. The newest file of a series may have
+    # been downloaded in an earlier hour, so it is found in the whole listing, not the selection.
     newest_file_of_each_series = (
         list_of_all_json_files.sort("end_time", "path").group_by("time_series_id").last()
     )
@@ -277,11 +278,11 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
 
     # Save TimeSeriesMetadata. A metadata table failure must not stop the power write below: the
     # metadata table is derived data, and the power series is not, so a metadata table fault must
-    # never stall the hourly ingest. The only cost is this run's metadata change, lost until the
+    # never stall the hourly ingest. The only loss is this run's metadata change, lost until the
     # series' next file arrives, about 6 hours later — and `live_forecasts` reads the promoted
     # model's own frozen copy of the metadata table, not this one, so inference is unaffected. The
     # downloaded-files list is still written below, because holding it back would make every later
-    # hour download a growing backlog. What that costs in full:
+    # hour download a growing backlog. The full consequences:
     # https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/
     try:
         upsert_metadata_stats = upsert_metadata(

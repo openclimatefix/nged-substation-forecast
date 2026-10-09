@@ -796,7 +796,10 @@ def test_download_and_parse_files_names_the_path_of_a_malformed_file():
 
 
 def test_download_and_parse_files_keeps_the_later_window_whatever_order_requests_finish_in():
-    """Of two overlapping files, the later window's reading and note win, even if it lands first."""
+    """Of two overlapping files, the later window's reading and note win.
+
+    They win even when the later window's file finishes downloading first.
+    """
     earlier_path = _key(11, 1_774_533_600_000)
     later_path = _key(11, 1_774_555_200_000)
     store = _FakeAsyncStore(
