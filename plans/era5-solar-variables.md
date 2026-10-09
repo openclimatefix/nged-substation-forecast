@@ -1,8 +1,8 @@
 # Plan: which ERA5 variables help explain how much sunlight reaches a solar farm?
 
 Status: signed off by the maintainer after two agentic reviews and a prose review. The `Spike` issue
-under the studies epic carries this plan as its body. The ERA5 download has started; no analysis
-code has been written.
+under the studies epic carries this plan as its body. The ERA5 download has started, and the
+analysis scripts are written and run on rungs G0 to G2.
 
 ## Question
 
@@ -31,17 +31,21 @@ separate agent session) checked which IFS products the project can get:
   the cloud layers and `fdir` are native or derived there is unverified.
 - **The remaining 12 are only in ECMWF's full Meteorological Archival and Retrieval System (MARS):**
   `ssrdc`, `cdir`, `tclw`, `tciw`, `tcslw`, `cbh`, `tcrw`, `tcsw`, `tco3`, `uvb`, `fal`, and
-  `deg0l`. For a production forecast, these 12 variables are worth asking ECMWF for, and are not
+  `deg0l`. The study screens whether these 12 are worth asking ECMWF for, and they are not
   candidate features today.
 - **The IFS archives are short:** Open-Meteo's `ecmwf_ifs` starts 2024-03-14, the Dynamical.org
   ensemble archive (ENS) starts 2024-04-01, and the Source Cooperative backfill covers about 2021-03
   to 2024-03 (14 surface fields, no `fdir`).
 
-**ERA5 is therefore an upper-bound screen, not the training source.** ERA5 was produced with a
-frozen 2016 version of the IFS weather model (cycle 41r2), and its hourly fields come from short
-forecasts. ERA5's cloud and radiation are therefore more accurate than an IFS forecast's at leads of
-day 1 to day 14. A variable that improves an XGBoost model trained on ERA5 may add only noise to an
-XGBoost model fed day-3 IFS forecasts. The page reports each result against the variable's IFS
+**ERA5 is a screen, not the training source, and a result transfers to the IFS only in part.** ERA5
+was produced with a frozen 2016 version of the IFS weather model (cycle 41r2), and its hourly
+fields come from short forecasts. ERA5's `ssrd` comes from the same radiation scheme and the same
+clouds as its cloud variables, so the cloud variables are largely redundant with `ssrd`, and a gain
+can come only from radiation-scheme error. A day-3 IFS forecast at 9 km has a different error
+structure, and its cloud layers may carry local information that ERA5's 31 km fields lack. A gain in
+ERA5 therefore justifies a matched-lead IFS test and a limited MARS pilot fetch, and does not
+justify adopting a variable. A null in ERA5 weakens the case for fetching the MARS-only variables
+and does not exclude a gain in the IFS. The page reports each result against the variable's IFS
 availability (free feed, Open-Meteo, or MARS-only), so the reader sees which winners are usable.
 Confirming any winning rung on matched-lead IFS forecasts is a follow-up study, outside this plan.
 
@@ -77,7 +81,10 @@ The ladder comes from the Opus variable review, whose brief is at
 
 **Every rung is a nested superset, so the number of feature columns differs between rungs.**
 XGBoost runs with `colsample_bytree=1`, so column subsampling gives a wider rung no advantage. The
-negative control (below) measures what the extra columns do on their own.
+study skill records that, on synthetic data, about 0.4% of the mean absolute error still favours a
+wider arm at `colsample_bytree=1`. With G9 at about 40 columns against about 6 for G0 or G2, that is
+roughly 0.02 percentage points on the PV target, well below the smallest effect of interest (0.1
+points). The negative control (below) measures what the extra columns do on their own.
 
 **Two fields on the maintainer's original list, cloud ceiling (`ceil`) and convective cloud-top
 height (`hcct`), are not ERA5 variables.** The Climate Data Store (CDS) download form (checked
@@ -112,7 +119,10 @@ about 4 MB in total.
 
 **Gains from aerosol, `tcwv`, and `tco3` on the CAMS target are partly by construction.** McClear
 computes CAMS GHI from CAMS aerosol, water vapour, and ozone, which come from the same IFS-based
-assimilation family as ERA5's fields. Conclusions about those variables rest on the PV target. Which
+assimilation family as ERA5's fields. Conclusions about those variables rest on the PV target. The
+same holds for `ssrdc` (G3): McClear's clear-sky inputs differ from ERA5's aerosol climatology, so a
+G3 gain on the CAMS target can be a mismatch in clear-sky climatology by construction. Every
+conclusion about the MARS-only variables rests on the PV target alone. Which
 CAMS aerosol product McClear uses (EAC4 or the operational analysis) is unverified.
 
 ## Rows, folds, metric, and fitting rules
@@ -146,12 +156,21 @@ CAMS aerosol product McClear uses (EAC4 or the operational analysis) is unverifi
 - **Clearness index:** the clearness index is unstable at low sun, so the daylight threshold also
   bounds the clearness index. The CAMS target's clearness index uses the hour-integrated
   top-of-atmosphere value that the CAMS files carry, and W m⁻² is reported beside it.
+- **Geometry in every rung:** the minimal set carries the sun's elevation and a midpoint-zenith
+  estimate of the top-of-atmosphere flux, while `ssrd`, `ssrdc`, and `cdir` are hour integrals. To
+  stop `ssrdc` and `cdir` winning by supplying hour-integrated geometry that can be computed for
+  free, every rung also carries the hour-integrated top-of-atmosphere horizontal flux
+  (`extraterrestrial_hour_w_m2`, computed from the sun's position at five instants across the hour),
+  which needs no fetch in production.
 - **Metric:** mean absolute error is the main metric: as a percentage of capacity (PV), and as a
   clearness-index error and in W m⁻² (CAMS). Pearson correlation between out-of-fold prediction and
   measured value, pooled over each fold's rows, is reported beside mean absolute error for every
-  rung (exploratory), with intervals from the month-resampling bootstrap described under Intervals.
+  rung (exploratory, and dominated by the daily cycle, so every rung reads close to 1), with
+  intervals from the month-resampling bootstrap described under Intervals.
   Each farm's error is normalised by its own capacity before any mean or difference.
-- **Intervals:** `studies.bootstrap.bootstrap_difference`, 2,000 resamples of whole calendar months,
+- **Intervals:** `studies.bootstrap.bootstrap_difference`, 2,000 resamples for exploratory intervals
+  and 10,000 for the planned contrasts (a 99.5% tail holds about 25 of 10,000 resamples, against 6
+  of 2,000) of whole calendar months,
   paired across rungs. Each arm is fitted with three random seeds, and each resample draws one of
   the three seeds. The page explains once what the test covers and what it does not.
 - **Hour convention:** `ssrd`, `ssrdc`, `fdir`, `cdir`, `strd`, `tp`, `sf`, and `uvb` are
@@ -175,16 +194,33 @@ CAMS aerosol product McClear uses (EAC4 or the operational analysis) is unverifi
 
 ## Planned contrasts (written before any result exists)
 
-Each of the four contrasts below is run on both targets, so there are eight planned contrasts:
+Each of the five contrasts below is run on both targets, so there are ten planned contrasts:
 
 1. **P0:** G9 (every ERA5 variable) minus G0. P0 is the study question, and P0 equals P2 plus P3.
 2. **P1:** G1 (adds `tcc`) minus G0. Does total cloud help at all beyond `ssrd` and `t2m`?
 3. **P2:** G2 minus G0. Do the three cloud layers help beyond the minimal set?
 4. **P3:** G9 minus G2. Does any variable beyond the three cloud layers help? P3 is the maintainer's
    headline question.
+5. **P4:** G9 minus G9 without the 12 MARS-only variables (`ssrdc`, `cdir`, `tclw`, `tciw`, `tcslw`,
+   `cbh`, `tcrw`, `tcsw`, `tco3`, `uvb`, `fal`, `deg0l`). P4 answers whether fetching them from MARS
+   is
+   worth it, against a reference that holds only variables the production forecast can already
+   get. P4 is judged on the PV target, because the CAMS target is partly circular for these
+   variables (see Targets).
 
-**Planned verdicts use a Bonferroni-adjusted level.** With eight planned contrasts, the family-wise
-level of 5% becomes 0.625% per contrast (a 99.375% interval, `bootstrap_difference_at_level`). Every
+**The decision rule for the MARS fetch is fixed before any result.** The adjusted interval of P4 on
+the PV target, at both hyperparameter settings, decides:
+- If the whole interval of the error difference lies below minus the smallest effect of interest, a
+  limited MARS pilot (matched-lead IFS forecasts of the variables that carry the gain) is
+  recommended.
+- If the interval lies wholly above minus the smallest effect of interest, a gain as large as the
+  smallest effect is ruled out, and the page recommends against the fetch.
+- Otherwise the result is unresolved, and the page says what a larger sample would need.
+The availability lists above (free feed, Open-Meteo, MARS-only) are re-verified against a recent
+run before the page assigns a variable to a class.
+
+**Planned verdicts use a Bonferroni-adjusted level.** With ten planned contrasts, the family-wise
+level of 5% becomes 0.5% per contrast (a 99.5% interval, `bootstrap_difference_at_level`). Every
 interval is also shown at 95%, labelled exploratory. The page states each planned result as "rules
 out a gain larger than X" using the lower bound of the error difference (treatment minus
 reference, so a negative difference is a gain), with a smallest effect of interest fixed before any
@@ -204,9 +240,13 @@ numbers exploratory and does not correct those numbers for multiple comparisons.
   contrast of this arm against G2 shows how large a difference the pipeline produces from nothing.
 - **Positive control:** G2 plus CAMS GHI itself as an input on the PV target. CAMS GHI is a column
   that must help. If the pipeline cannot see the CAMS GHI gain, a G9 result of no gain is not
-  evidence of no effect. The positive control is not run on the CAMS target, where CAMS GHI is the
+  evidence of no effect. The gain is many times the smallest effect of
+  interest, so a pass shows that the instrument detects a large effect only. A null planned result
+  is read through the width of its interval, as "a gain larger than X is ruled out", and not through
+  this control. The positive control is not run on the CAMS target, where CAMS GHI is the
   target itself.
-- **Known-answer step for the CAMS target:** an XGBoost model on the CAMS target is first fitted
+- **Baseline for the CAMS target (the `ssrd`-only arm):** an XGBoost model on the CAMS target is
+  first fitted
   with only `ssrd` and solar geometry, so the page shows how much of CAMS GHI the standard ERA5
   field already explains before any extra variable is tried.
 
@@ -216,7 +256,11 @@ numbers exploratory and does not correct those numbers for multiple comparisons.
 set.** A group that adds nothing after G2 may add a lot if it came first. The drop-one-group run
 starts from G9 and removes one rung's variables at a time, so the page can say for each group both
 what the group adds on top of the minimal set (ladder) and what is lost without the group
-(drop-one). A group is called useful only if the two instruments agree.
+(drop-one). A group is called useful only if both instruments give an error difference of the same
+sign whose
+95% interval excludes zero. Both instruments are exploratory, and a group of substitutes (`tcc`
+against the cloud layers, `ssrdc` against `cdir`) can show a drop-one loss near zero even when the
+set as a whole matters, so the planned contrasts decide, not the drop-one runs.
 
 ## XGBoost feature importance
 
@@ -228,8 +272,8 @@ The planned contrasts and the drop-one-group runs stay the evidence for whether 
 Importance shows what the models used, and where it disagrees with the two instruments the page says
 so.
 
-- **What is computed:** the total gain of every column in the fitted G0, G2, G9, and
-  negative-control models, on both targets, for each fold and each seed. Gain is read from
+- **What is computed:** the total gain of every column in the fitted G0, G2, and G9 models, plus the
+  G9 refit with shuffled copies,, on both targets, for each fold and each seed. Gain is read from
   `Booster.get_score(importance_type="total_gain")`. `studies.cross_validation.fit_one_fold` does
   not return its booster, so a new script, `era5_ladder_importance.py`, refits only those four arms
   with the same folds, seeds, and settings, and saves the gains. The shared fit loop stays
@@ -237,19 +281,43 @@ so.
   from the study coordinator.
 - **How it is summarised:** each model's gains are scaled to sum to 1, then averaged over seeds and
   folds. The page shows each variable's share, each rung's share (the sum over the rung's columns),
-  and the spread across folds as a range.
-- **Negative control:** the permuted columns' share in the negative-control model shows how much
-  importance a column earns from nothing. A real variable must stand clear of that share before the
-  page reads anything into it.
+  and the range across folds and seeds, called the variability across refits because the fold models
+  share most of their training months. The positional keys (`f0`, `f1`, ...) are mapped back to
+  column names. Gain is measured on the training data, so it shows what the fit used, not what
+  generalises.
+- **Noise reference:** the importance refit of G9 also carries shuffled copies of the G3 to G9
+  columns, shuffled over all rows of a farm, so each copy keeps its column's distribution. The
+  largest shuffled copy's share is the line a real column must stand clear of. The refit is never
+  scored in a planned contrast, because the extra columns change the trees.
 - **Grouped permutation importance stays cut** (Review 1). Gain needs no refit and no extra rows.
+
+## Page structure
+
+The page follows the study skill's order: title, then a Summary that opens with a one-paragraph
+bottom line, then one bolded question-and-answer bullet per question, then a closing bullet on what
+the data and methods can and cannot support, then the headline figure, then the AI disclaimer, Key
+findings, Introduction, Data and methods, Results, and Limitations. The Summary's questions are:
+
+1. Do ERA5 variables beyond `ssrd`, `t2m`, and sun position help predict solar farm output, and by
+   how much?
+2. Which groups of variables carry the information (cloud amount, cloud layers, clear-sky
+   irradiance, cloud water, direct beam, wind and thermal radiation, humidity and haze, snow and
+   albedo, the rest, CAMS aerosol)?
+3. Is fetching the 12 MARS-only IFS variables worth it (planned contrast P4 and its decision rule)?
+4. Does the answer on ERA5 carry over to IFS forecasts, and what would a matched-lead follow-up
+   need?
 
 ## Figures, in page order
 
 The page is mostly figures, in the order below. Each has a bolded one-sentence lead and a few
 sentences of support. Every chart is anonymised: farms are A to F, outputs are normalised by
-capacity, and no coordinate appears.
+capacity, and no coordinate
+appears. A dated per-farm series can identify a farm, so a series of output or of a farm's weather
+carries no calendar date on its axis (days are counted 1 to n, with the month and year given in the
+text), has `aria=False` on its marks, and shows the weather series without the farm's label. Figures
+3, 5, 7, and 11 follow this rule.
 
-1. **Headline (top of page).** The planned contrasts P0 to P3 on both targets, at the adjusted
+1. **Headline (top of page).** The planned contrasts P0 to P4 on both targets, at the adjusted
    level, with the smallest effect of interest marked.
 2. **The leaderboard.** Every rung's own mean absolute error with a 95% interval on the PV target
    and the CAMS target, best first, with G0 and the two controls included. A second panel shows
@@ -267,17 +335,19 @@ capacity, and no coordinate appears.
 7. **The XGBoost models work.** Out-of-fold PV against measured for figure 3's three stated-rule
    days at every farm, G0 against G9, and each rung's error per farm.
 8. **Weather regimes.** The difference in error between G9 and G0, between G1 and G0, and between G2
-   and G0, split by regime: clear sky, broken cloud, and overcast. Regimes are set from the CAMS
-   clear-sky index with thresholds fixed before any result, and a second panel splits by the ERA5
-   cloud cover `tcc` for readers who want an ERA5-only definition. Exploratory.
+   and G0, split by regime: clear sky, broken cloud, and overcast. The primary panel splits by the
+   ERA5 cloud cover `tcc` (clear below 0.2, overcast from 0.8), which
+    is a forecast-time variable. A second panel splits by the CAMS clear-sky index (overcast below
+    0.4, clear from 0.8), which is conditioned on the observed sky and can show regression to the
+    mean. Both thresholds are fixed before any result. Exploratory.
 9. **Seasons.** The same differences by season (winter, spring, summer, autumn), and for the
    clear-sky, broken-cloud, and overcast regimes within each season. Exploratory.
 10. **Drop-one-group.** Error added when each group is removed from G9.
 11. **Hour of day and snow.** Error by hour of day for G0 against G9, and the worst 20 days for G0
     with what G9 changed on them, anonymised by farm label.
 12. **What the XGBoost models lean on.** Three panels, per target. First, the top 20 columns of the
-    G9 model by share of gain, with the largest permuted column of the negative control marked as a
-    reference line. Second, gain share summed by rung, G9 against the negative control. Third, how
+    G9 model by share of gain, with the largest shuffled copy's share marked as a reference line.
+    Second, gain share summed by rung, with the shuffled copies as one more group. Third, how
     the share of `ssrd` and of the cloud covers moves from G0 to G2 to G9, as a bar for each model.
     Importance is descriptive, and the caption says that gain splits credit between correlated
     columns.
@@ -324,13 +394,20 @@ capacity, and no coordinate appears.
       download already used the ADS account.
 - **The fetch is the `data-download` skill's job:** resumable, one pilot month first, with the
   `data-validation` checklist on the first chunk and again after the last.
-- **Code:** `studies/era5_solar_variables/` for the scripts (`fetch_era5_variables.py`,
-  `build_dataset.py`, `fit_ladder.py`, `report.py`, charts). The clearness-index and aerosol-join
+- **Code:** `studies/era5_solar_variables/` for the scripts (`era5_ladder_build_dataset.py`,
+  `era5_ladder_fit.py`, `era5_ladder_report.py`, `era5_ladder_charts.py`, `era5_ladder_arms.py`, and
+  `era5_ladder_importance.py`), with outputs under `data/studies/per_study/era5_solar_variables/`.
+  The fetch scripts live with the download coordinator's `weather_downloads` folder. The
+  clearness-index and aerosol-join
   functions, which a second study might use, go into `packages/studies/src/studies/` with tests. The
   page goes under Studies > Past weather, as `docs/studies/past-weather/era5-solar-variables.md`.
-- **Order of work:** issue (type `Spike`), then fetch script review, pilot month, tier 1 fetch,
-  build and first report, first Opus science review, tier 2 fetch and full report, charts and draft
-  page, second Opus science review, diff review, prose review and persona reviews, merge.
+- **Order of work:** issue (type `Spike`), then the fetch scripts (reviewed by the download
+  coordinator's session), then
+the build, fit, importance, report, and chart scripts, each with at least one fresh Opus review
+before it runs (done for the first four, the importance script still to write and review), a run on
+rungs G0 to G2, the full run once the data arrives, the first Opus science review, charts and draft
+page, the second Opus science review, the diff review, a mutation pass because `packages/studies`
+changes (`era5_ladder`, `correlation`), the prose review and persona reviews, and merge.
 
 ## Tests for the new `packages/studies` functions
 
@@ -343,6 +420,9 @@ capacity, and no coordinate appears.
 - **Aerosol join:** a linear ramp in 3-hourly values gives the analytic hour-ending mean, and a
   3-hour shift of the input fails the test.
 - **Pairing guard:** a contrast between arms with different row sets raises.
+- **Regime and correlation functions:** `sky_regime` returns each regime at and between its
+  thresholds, and `pooled_correlation_interval` returns the known correlation of a constructed pair.
+  Tests run with `--run-studies`.
 - **Importance summary:** gains scaled to sum to 1 per model, a rung's share equals the sum of its
   columns' shares, and a column the model never split on gets a share of 0 rather than going
   missing.
@@ -367,7 +447,8 @@ reviews, because the page will carry numbers.
 2. **CAMS target:** the clearness index, with W m⁻² reported beside it.
 3. **Aerosol:** include CAMS EAC4 aerosol optical depth as the eleventh rung (G10).
 4. **MARS-only variables:** keep all 12. The study's purpose includes telling the team whether
-   fetching them from MARS is worth the effort.
+   fetching them from MARS is worth the effort, which planned contrast P4 and its decision rule
+   answer.
 5. **Smallest effect of interest:** 0.1 percentage points of capacity on the PV target, and 0.01 on
    the clearness index on the CAMS target.
 6. **Daylight threshold:** top-of-atmosphere horizontal flux above 50 W m⁻².
