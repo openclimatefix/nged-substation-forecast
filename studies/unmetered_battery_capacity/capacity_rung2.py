@@ -16,12 +16,15 @@ Run: `OMP_NUM_THREADS=2 uv run python studies/unmetered_battery_capacity/capacit
 """
 
 import time
+from pathlib import Path
 
 import numpy as np
 import polars as pl
 from capacity_inputs import OUTPUT_DIR, agile_prices, demand_series, window_half_hours
 from capacity_runs import N_BLOCKS, SHARES, fit_block, p99_flow, posterior_row
+from capacity_stacks import STACKS_PATH
 from capacity_state_space import estimator
+from capacity_templates import SettingNameType
 from studies.battery_templates import FleetSpec, simulate_fleet
 
 SEED = 20261010
@@ -109,12 +112,33 @@ def build() -> tuple[np.ndarray, list[list[dict]], list[dict]]:
 
 
 def fit(
-    *, aggregates: np.ndarray, metadata: list[list[dict]], window_shift_hours: float
+    *,
+    aggregates: np.ndarray,
+    metadata: list[list[dict]],
+    window_shift_hours: float,
+    setting: SettingNameType = "standard",
+    stack_path: Path = STACKS_PATH,
 ) -> pl.DataFrame:
-    """Fit every block with the windows moved by `window_shift_hours`."""
+    """Fit every block with the windows moved by `window_shift_hours`.
+
+    Args:
+        aggregates: Shape (series, shares, 17,520).
+        metadata: The identifiers and truth of each aggregate.
+        window_shift_hours: Moves every tariff window by this many hours.
+        setting: The estimator's setting.
+        stack_path: The schedule stacks the price takers interpolate.
+
+    Returns:
+        One row per series, share, and block.
+    """
     rows = []
     for block in range(N_BLOCKS):
-        model = estimator(setting="standard", block=block, window_shift_hours=window_shift_hours)
+        model = estimator(
+            setting=setting,
+            block=block,
+            window_shift_hours=window_shift_hours,
+            stack_path=stack_path,
+        )
         result, seconds = fit_block(block=block, aggregates=aggregates, model=model)
         print(
             f"rung 2 (shift {window_shift_hours:+.0f} h) block {block}: {seconds:.0f} s", flush=True
@@ -126,6 +150,8 @@ def fit(
                         **meta,
                         "block": block,
                         "window_shift_hours": window_shift_hours,
+                        "setting": setting,
+                        "stack": stack_path.name,
                         "fit_seconds": seconds,
                         **posterior_row(fit=result, group=g, lane=lane, seed=1000 * block + g),
                     }

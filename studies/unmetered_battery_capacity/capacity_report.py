@@ -13,157 +13,35 @@ Run: `uv run python studies/unmetered_battery_capacity/capacity_report.py`
 
 from typing import Final
 
+import capacity_report_review as review
 import numpy as np
 import polars as pl
-from capacity_inputs import OUTPUT_DIR, storage_presence_by_primary
+from capacity_inputs import OUTPUT_DIR, demand_series, storage_presence_by_primary
+from capacity_report_tools import (
+    BLOCK_NAMES_BY_INDEX,
+    FALSE_ALARM_RATE,
+    SUMMER_BLOCK,
+    clopper_pearson,
+    cluster_bootstrap,
+    coverage,
+    flag,
+    rate_table,
+    table,
+    thresholds,
+    with_errors,
+)
+from capacity_runs import p99_flow
 from capacity_templates import DURATION_PRIORS
-from scipy.stats import beta, binomtest
+from scipy.stats import binomtest
 
-N_RESAMPLES: Final[int] = 2000
-SEED: Final[int] = 20261013
-FALSE_ALARM_RATE: Final[float] = 0.05
 MIN_SHARE_C3: Final[float] = 0.05
 MIN_SHARE_C4: Final[float] = 0.10
 Z90: Final[float] = 1.645
 
 
-def table(frame: pl.DataFrame) -> str:
-    """Return a frame as a pipe-separated table with rounded floats."""
-    return frame.with_columns(pl.col(pl.Float64).round(4)).write_csv(separator="|")
-
-
-def clopper_pearson(*, count: int, total: int, level: float = 0.95) -> tuple[float, float]:
-    """Return the Clopper-Pearson interval of a binomial proportion."""
-    alpha = 1 - level
-    low = 0.0 if count == 0 else float(beta.ppf(alpha / 2, count, total - count + 1))
-    high = 1.0 if count == total else float(beta.ppf(1 - alpha / 2, count + 1, total - count))
-    return low, high
-
-
-def cluster_bootstrap(
-    *, frame: pl.DataFrame, value: str, outer: str, inner: str, seed: int = SEED
-) -> tuple[float, float, float]:
-    """Return the mean of a column and its 95% interval, resampling outer then inner clusters.
-
-    Whole demand series (outer) are resampled with replacement, then whole batteries (inner) within
-    each resampled series, as the prior study resampled whole aggregates.
-
-    Args:
-        frame: The rows.
-        value: The column to average.
-        outer: The outer cluster column (the demand series).
-        inner: The inner cluster column (the battery).
-        seed: Seeds the resampling.
-
-    Returns:
-        The mean, and the 2.5% and 97.5% quantiles of the resampled means.
-    """
-    rows = (
-        frame.filter(pl.col(value).is_finite())
-        .group_by(outer, inner)
-        .agg(total=pl.col(value).sum(), count=pl.len())
-    )
-    by_outer: dict[str, tuple[np.ndarray, np.ndarray]] = {}
-    for key, part in rows.group_by(outer):
-        by_outer[str(key[0])] = (part["total"].to_numpy(), part["count"].to_numpy())
-    names = list(by_outer)
-    rng = np.random.default_rng(seed)
-    means = np.empty(N_RESAMPLES)
-    for r in range(N_RESAMPLES):
-        total = count = 0.0
-        for name in rng.choice(names, size=len(names), replace=True):
-            sums, counts = by_outer[str(name)]
-            pick = rng.integers(0, len(sums), size=len(sums))
-            total += sums[pick].sum()
-            count += counts[pick].sum()
-        means[r] = total / count
-    overall = float(rows["total"].sum()) / float(rows["count"].sum())
-    low, high = np.quantile(means, [0.025, 0.975])
-    return overall, float(low), float(high)
-
-
-def thresholds(*, nulls: pl.DataFrame) -> dict[str, float]:
-    """Return each series' detection threshold: the 95th percentile of the other series' nulls.
-
-    Args:
-        nulls: Rung 1's rows with no added battery; columns `series` and `log_bayes_factor`.
-
-    Returns:
-        By series label, the threshold on the log Bayes factor.
-    """
-    finite = nulls.filter(pl.col("log_bayes_factor").is_finite())
-    out = {}
-    for label in nulls["series"].unique().to_list():
-        others = finite.filter(pl.col("series") != label)["log_bayes_factor"].to_numpy()
-        out[label] = float(np.quantile(others, 1 - FALSE_ALARM_RATE))
-    return out
-
-
-def flag(*, frame: pl.DataFrame, threshold: dict[str, float], default: float) -> pl.DataFrame:
-    """Add a boolean `flagged` column: the log Bayes factor is finite and above its threshold."""
-    return frame.with_columns(
-        threshold=pl.col("series").replace_strict(
-            threshold, default=default, return_dtype=pl.Float64
-        )
-    ).with_columns(
-        flagged=pl.col("log_bayes_factor").is_finite()
-        & (pl.col("log_bayes_factor") > pl.col("threshold"))
-    )
-
-
-def rate_table(*, frame: pl.DataFrame, by: list[str]) -> pl.DataFrame:
-    """Return the share of flagged sums per group with a Clopper-Pearson interval."""
-    grouped = frame.group_by(by).agg(flagged=pl.col("flagged").sum(), total=pl.len()).sort(by)
-    lows, highs = zip(
-        *[
-            clopper_pearson(count=int(f), total=int(t))
-            for f, t in zip(grouped["flagged"], grouped["total"], strict=True)
-        ],
-        strict=True,
-    )
-    return grouped.with_columns(
-        rate=pl.col("flagged") / pl.col("total"), ci_low=pl.Series(lows), ci_high=pl.Series(highs)
-    )
-
-
-def with_errors(*, frame: pl.DataFrame, power: str, energy: str) -> pl.DataFrame:
-    """Add relative errors, interval membership, and a finite-interval flag for one class."""
-    return frame.with_columns(
-        power_error=(pl.col(f"{power}_median") - pl.col("true_power_mw")).abs()
-        / pl.col("true_power_mw"),
-        energy_error=(pl.col(f"{energy}_median") - pl.col("true_energy_mwh")).abs()
-        / pl.col("true_energy_mwh"),
-        power_in_90=(pl.col(f"{power}_q05") <= pl.col("true_power_mw"))
-        & (pl.col("true_power_mw") <= pl.col(f"{power}_q95")),
-        power_in_50=(pl.col(f"{power}_q25") <= pl.col("true_power_mw"))
-        & (pl.col("true_power_mw") <= pl.col(f"{power}_q75")),
-        energy_in_90=(pl.col(f"{energy}_q05") <= pl.col("true_energy_mwh"))
-        & (pl.col("true_energy_mwh") <= pl.col(f"{energy}_q95")),
-        energy_in_50=(pl.col(f"{energy}_q25") <= pl.col("true_energy_mwh"))
-        & (pl.col("true_energy_mwh") <= pl.col(f"{energy}_q75")),
-    )
-
-
-def coverage(*, frame: pl.DataFrame, by: list[str]) -> pl.DataFrame:
-    """Return the coverage of the 50% and 90% intervals of power and energy per group.
-
-    Sums without a covariance (no interval) count as not covering.
-    """
-    return (
-        frame.group_by(by)
-        .agg(
-            n=pl.len(),
-            with_interval=pl.col("has_interval").sum(),
-            power_90=pl.col("power_in_90").fill_null(False).mean(),
-            power_50=pl.col("power_in_50").fill_null(False).mean(),
-            energy_90=pl.col("energy_in_90").fill_null(False).mean(),
-            energy_50=pl.col("energy_in_50").fill_null(False).mean(),
-        )
-        .sort(by)
-    )
-
-
-def c1_section(*, rung1: pl.DataFrame, limits: dict[str, float]) -> list[str]:
+def c1_section(
+    *, rung1: pl.DataFrame, limits: dict[str, float], heading_suffix: str = ""
+) -> list[str]:
     """C1: the false-alarm rate on the blocks with no added battery."""
     nulls = flag(frame=rung1.filter(pl.col("share") == 0), threshold=limits, default=np.nan)
     count, total = int(nulls["flagged"].sum()), nulls.height
@@ -171,15 +49,43 @@ def c1_section(*, rung1: pl.DataFrame, limits: dict[str, float]) -> list[str]:
     test = binomtest(count, total, FALSE_ALARM_RATE, alternative="greater")
     low, high = clopper_pearson(count=count, total=total)
     return [
-        "## C1: false alarms on the blocks with no added battery (planned)",
+        f"## C1: false alarms on the blocks with no added battery (planned){heading_suffix}",
         "",
         (
-            f"{count} of {total} blocks flagged ({count / total:.3f}; Clopper-Pearson 95% interval "
-            f"{low:.3f} to {high:.3f}). One-sided exact binomial test against 5%: p = "
+            f"**The nominal false-alarm rate is 5%; the realised rate is {count} of {total} "
+            f"blocks ({count / total:.1%}).** Clopper-Pearson 95% interval "
+            f"{low:.3f} to {high:.3f}. One-sided exact binomial test against 5%: p = "
             f"{test.pvalue:.3f}; the contrast {'holds' if test.pvalue >= 0.05 else 'fails'}. "
             f"{n_unevaluated}"
             " null blocks have no log Bayes factor (no positive-definite Hessian) and count as not "
             "flagged."
+        ),
+        "",
+        (
+            "Flags by block (the nulls' false alarms cluster in one block, so a detection rate "
+            "should be read by block):"
+        ),
+        "",
+        table(
+            nulls.with_columns(block_name=pl.col("block").replace_strict(BLOCK_NAMES_BY_INDEX))
+            .group_by("block", "block_name")
+            .agg(
+                flagged=pl.col("flagged").sum(),
+                blocks=pl.len(),
+                median_tau=pl.col("tau").median(),
+                min_tau=pl.col("tau").min(),
+                max_tau=pl.col("tau").max(),
+                median_log_bayes_factor=pl.col("log_bayes_factor").median(),
+            )
+            .sort("block")
+        ),
+        (
+            "The flagged series and blocks: "
+            + ", ".join(
+                f"{r['series']} {BLOCK_NAMES_BY_INDEX[r['block']]}"
+                for r in nulls.filter(pl.col("flagged")).sort("series", "block").to_dicts()
+            )
+            + "."
         ),
         "",
         "Thresholds (the 95th percentile of the other 8 series' null log Bayes factors):",
@@ -199,13 +105,30 @@ def c1_section(*, rung1: pl.DataFrame, limits: dict[str, float]) -> list[str]:
     ]
 
 
+def season(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Add a `season` column: Jun-Aug (where the nulls' false alarms cluster) or Sep-May."""
+    return frame.with_columns(
+        season=pl.when(pl.col("block") == SUMMER_BLOCK)
+        .then(pl.lit("Jun-Aug"))
+        .otherwise(pl.lit("Sep-May"))
+    )
+
+
 def detection_section(
     *, rung1: pl.DataFrame, rung2: pl.DataFrame, shifted: pl.DataFrame, rung3: pl.DataFrame,
-    limits: dict[str, float],
+    limits: dict[str, float], heading_suffix: str = "",
 ) -> list[str]:  # fmt: skip
     """Detection rates by share for rungs 1 to 3 and the shifted-window negative control."""
     default = float(np.quantile(list(limits.values()), 1 - FALSE_ALARM_RATE))
-    lines = ["## Detection rates at the 5% false-alarm threshold (exploratory)", ""]
+    lines = [
+        f"## Detection rates at the nominal 5% false-alarm threshold (exploratory){heading_suffix}",
+        "",
+        (
+            "The threshold's realised false-alarm rate is in the C1 section, and the nulls' false "
+            "alarms fall in Jun-Aug, so every table is also split into Jun-Aug and Sep-May."
+        ),
+        "",
+    ]
     for name, frame, by in (
         ("Rung 1, merchant batteries, by share", rung1.filter(pl.col("share") > 0), ["share"]),
         (
@@ -218,21 +141,26 @@ def detection_section(
         ("Rung 3, real public batteries, by share", rung3, ["share"]),
         ("Rung 3, by share and kind", rung3, ["share", "kind"]),
     ):
-        lines += [
-            f"**{name}.**",
-            "",
-            table(rate_table(frame=flag(frame=frame, threshold=limits, default=default), by=by)),
-        ]
+        flagged = season(frame=flag(frame=frame, threshold=limits, default=default))
+        lines += [f"**{name}.**", "", table(rate_table(frame=flagged, by=by))]
+        if by == ["share"]:
+            lines += [
+                f"**{name}, split by season.**",
+                "",
+                table(rate_table(frame=flagged, by=[*by, "season"])),
+            ]
     return lines
 
 
-def calibration_section(*, rung1: pl.DataFrame, rung2: pl.DataFrame) -> list[str]:
+def calibration_section(
+    *, rung1: pl.DataFrame, rung2: pl.DataFrame, heading_suffix: str = ""
+) -> list[str]:
     """C2: the coverage of the credible intervals on the simulated known answers."""
     merchant = with_errors(
         frame=rung1.filter(pl.col("share") > 0), power="merchant_power", energy="merchant_energy"
     )
     fleets = with_errors(frame=rung2, power="domestic_power", energy="domestic_energy")
-    lines = ["## C2: calibration of the credible intervals (planned)", ""]
+    lines = [f"## C2: calibration of the credible intervals (planned){heading_suffix}", ""]
     for name, frame in (("Rung 1 (merchant class)", merchant), ("Rung 2 (domestic class)", fleets)):
         overall = frame.with_columns(all=pl.lit("all"))
         lines += [
@@ -269,7 +197,11 @@ def calibration_section(*, rung1: pl.DataFrame, rung2: pl.DataFrame) -> list[str
     row = summary.row(0, named=True)
     verdict_power = row["power_90"] >= 0.80 and 0.40 <= row["power_50"] <= 0.60
     lines += [
-        "**Rungs 1 and 2 together (the plan's judgement).**",
+        (
+            "**Rungs 1 and 2 pooled (the plan's judgement).** The pooled figure hides the spread "
+            "by share and by rung that the tables above give; the page reports the per-share "
+            "coverage, not this figure alone."
+        ),
         "",
         table(summary),
         (
@@ -283,7 +215,9 @@ def calibration_section(*, rung1: pl.DataFrame, rung2: pl.DataFrame) -> list[str
     return lines
 
 
-def c3_c4_section(*, rung1: pl.DataFrame, steps: pl.DataFrame) -> list[str]:
+def c3_c4_section(
+    *, rung1: pl.DataFrame, steps: pl.DataFrame, heading_suffix: str = ""
+) -> list[str]:
     """C3 (posterior against the step tail) and C4 (energy against the rule)."""
     keys = ["series", "nameplate_hours", "share", "block"]
     joined = (
@@ -305,7 +239,7 @@ def c3_c4_section(*, rung1: pl.DataFrame, steps: pl.DataFrame) -> list[str]:
         frame=c3, value="difference", outer="series", inner="battery"
     )
     lines = [
-        "## C3: posterior median against the step tail, power error (planned)",
+        f"## C3: posterior median against the step tail, power error (planned){heading_suffix}",
         "",
         (
             f"At shares of {MIN_SHARE_C3:.0%} and above ({c3.height} sums), the mean paired "
@@ -345,7 +279,7 @@ def c3_c4_section(*, rung1: pl.DataFrame, steps: pl.DataFrame) -> list[str]:
     )
     lines += [
         "",
-        "## C4: energy separately from power (planned)",
+        f"## C4: energy separately from power (planned){heading_suffix}",
         "",
         (
             f"For 1-hour and 4-hour nameplate batteries at shares of {MIN_SHARE_C4:.0%} and above "
@@ -369,7 +303,7 @@ def c3_c4_section(*, rung1: pl.DataFrame, steps: pl.DataFrame) -> list[str]:
 
 
 def c5_section(*, rung3: pl.DataFrame) -> list[str]:
-    """C5: fleets of real batteries are seen as their coincident peak."""
+    """C5: fleets of real batteries against the coincident peak and the registered sum."""
     fleets = rung3.filter(
         pl.col("kind").str.starts_with("fleet") & (pl.col("merchant_power_median") > 0)
     )
@@ -378,6 +312,8 @@ def c5_section(*, rung3: pl.DataFrame) -> list[str]:
         difference=(log2("merchant_power_median") - log2("coincident_peak_mw")).abs()
         - (log2("merchant_power_median") - log2("true_power_mw")).abs(),
         battery=pl.col("unit"),
+        below_peak=pl.col("merchant_power_median") < pl.col("coincident_peak_mw"),
+        below_registered=pl.col("merchant_power_median") < pl.col("true_power_mw"),
     )
     mean, low, high = cluster_bootstrap(
         frame=fleets, value="difference", outer="series", inner="battery"
@@ -393,6 +329,15 @@ def c5_section(*, rung3: pl.DataFrame) -> list[str]:
             f"{'holds' if high < 0 else 'fails'}."
         ),
         "",
+        (
+            f"**C5 is degenerate, and its pass is not evidence for the coincident-peak reading.** "
+            f"The posterior median lies below the coincident peak in "
+            f"{fleets['below_peak'].mean():.1%} of the {fleets.height} fleet sums and below the "
+            f"registered sum in {fleets['below_registered'].mean():.1%}. Whenever the estimate is "
+            "below both references, the nearer one in log terms is the smaller, which is always "
+            "the coincident peak, so an estimate near zero would pass C5."
+        ),
+        "",
         "Median ratio of P_hat to the registered sum and to the coincident peak, by fleet size:",
         "",
         table(
@@ -402,6 +347,8 @@ def c5_section(*, rung3: pl.DataFrame) -> list[str]:
                 to_coincident_peak=(
                     pl.col("merchant_power_median") / pl.col("coincident_peak_mw")
                 ).median(),
+                below_peak=pl.col("below_peak").mean(),
+                below_registered=pl.col("below_registered").mean(),
                 n=pl.len(),
             )
             .sort("kind")
@@ -496,12 +443,63 @@ def fleet_units_section(*, rung2: pl.DataFrame) -> list[str]:
     return lines
 
 
-def rung3_section(*, rung3: pl.DataFrame) -> list[str]:
-    """Coverage and error of real public batteries against registered power and energy."""
+def rung3_section(
+    *, rung3: pl.DataFrame, rung1: pl.DataFrame, limits: dict[str, float]
+) -> list[str]:
+    """Real public batteries against registered power and energy and the no-battery level."""
+    series_p99 = {label: p99_flow(v) for label, v in demand_series().items()}
+    nulls = rung1.filter(pl.col("share") == 0).with_columns(
+        p99=pl.col("series").replace_strict(series_p99, return_dtype=pl.Float64)
+    )
+    null_fraction = float(np.median((nulls["merchant_power_median"] / nulls["p99"]).to_numpy()))
+    null_bf = float(np.median(nulls["log_bayes_factor"].to_numpy()))
+    default = float(np.quantile(list(limits.values()), 1 - FALSE_ALARM_RATE))
+    flagged = season(frame=flag(frame=rung3, threshold=limits, default=default))
     frame = rung3.with_columns(true_energy_mwh=pl.col("true_energy_reference_mwh"))
     frame = with_errors(frame=frame, power="merchant_power", energy="merchant_energy")
+    by_share = rung3.with_columns(
+        median_over_p99=pl.col("merchant_power_median")
+        / (pl.col("true_power_mw") / pl.col("share"))
+    )
+    outside = flagged.filter(pl.col("season") == "Sep-May")
+    flags_by_season = flagged.group_by("share", "season").agg(
+        flagged=pl.col("flagged").sum(), sums=pl.len()
+    )
     return [
         "## Rung 3: real public batteries against registered power and energy (exploratory)",
+        "",
+        (
+            "**The posterior barely moves when a real public battery is added.** The posterior "
+            f"median of the merchant class's power, as a fraction of the series' 99th percentile "
+            f"absolute flow, is {null_fraction:.3f} with no battery (rung 1's {nulls.height} null "
+            "blocks) and:"
+        ),
+        "",
+        table(
+            by_share.group_by("share")
+            .agg(
+                median_power_over_p99=pl.col("median_over_p99").median(),
+                median_log_bayes_factor=pl.col("log_bayes_factor").median(),
+                n=pl.len(),
+            )
+            .sort("share")
+        ),
+        f"The median log Bayes factor with no battery is {null_bf:.2f}.",
+        "",
+        "Flags at the nominal 5% threshold, by share and season (Jun-Aug is where the nulls flag):",
+        "",
+        table(flags_by_season.sort("share", "season")),
+        (
+            f"Outside Jun-Aug, {int(outside['flagged'].sum())} of {outside.height} sums are "
+            f"flagged ({outside['flagged'].mean():.1%}), against the nominal 5% of a null."
+        ),
+        "",
+        (
+            "Coverage of the 90% and 50% intervals. The power interval for a 5% share is the "
+            "prior's, which is why it covers; the energy reference is the smallest holding "
+            "capacity of the battery's metered output (a lower bound on the energy capacity), so "
+            "the energy coverage is against a lower bound, not a measured capacity."
+        ),
         "",
         table(coverage(frame=frame, by=["kind", "share"])),
         "Median relative error of the merchant class's power median against the registered power:",
@@ -522,8 +520,14 @@ def rung4_section(*, rung4: pl.DataFrame, nulls: pl.DataFrame) -> list[str]:
     finite = nulls.filter(pl.col("log_bayes_factor").is_finite())["log_bayes_factor"].to_numpy()
     threshold = float(np.quantile(finite, 1 - FALSE_ALARM_RATE))
     frame = rung4.with_columns(
-        flagged=pl.col("log_bayes_factor").is_finite() & (pl.col("log_bayes_factor") > threshold)
+        flagged=pl.col("log_bayes_factor").is_finite() & (pl.col("log_bayes_factor") > threshold),
+        block_name=pl.col("block").replace_strict(BLOCK_NAMES_BY_INDEX),
     )
+    unit_columns = [
+        c for c in frame.columns if c.startswith("unit_") and c.endswith("_power_point")
+    ]
+    summer = frame.filter(pl.col("block") == SUMMER_BLOCK)
+    other = frame.filter(pl.col("block") != SUMMER_BLOCK)
     return [
         "## Rung 4: NGED battery A inside a bulk supply point's flow (exploratory, one site)",
         "",
@@ -532,10 +536,25 @@ def rung4_section(*, rung4: pl.DataFrame, nulls: pl.DataFrame) -> list[str]:
             "blocks of rung 1, because no series' own nulls exist for this flow)."
         ),
         "",
+        (
+            "**NGED battery A is not detected, and its power is not recovered, at any multiple of "
+            "its metered output.** The multiples run from 0 (the metered output added back, a "
+            "matched null) to 11 times the metered output; the truth is the multiple times the "
+            f"metered 99th percentile output. From September to May the log Bayes factor ranges "
+            f"from {other['log_bayes_factor'].min():.1f} to {other['log_bayes_factor'].max():.1f} "
+            f"across all multiples and {int(other['flagged'].sum())} of {other.height} blocks are "
+            f"flagged. In Jun-Aug {int(summer['flagged'].sum())} of {summer.height} blocks are "
+            "flagged, including the matched null (multiple 0), where the nulls of the other series "
+            "also false-alarm. The merchant power posterior median ranges from "
+            f"{frame['merchant_power_median'].min():.2f} to "
+            f"{frame['merchant_power_median'].max():.2f} MW while the truth ranges from "
+            f"{frame['true_power_mw'].min():.1f} to {frame['true_power_mw'].max():.1f} MW."
+        ),
+        "",
         table(
             frame.select(
                 "multiple",
-                "block",
+                "block_name",
                 "log_bayes_factor",
                 "flagged",
                 "true_power_mw",
@@ -546,8 +565,14 @@ def rung4_section(*, rung4: pl.DataFrame, nulls: pl.DataFrame) -> list[str]:
                 "merchant_energy_q05",
                 "merchant_energy_median",
                 "merchant_energy_q95",
-            ).sort("multiple", "block")
+            ).sort("multiple", "block_name")
         ),
+        (
+            "Jun-Aug log Bayes factor and the point power (MW) of every unit, by multiple, to show "
+            "which unit absorbs the factor's rise with the multiple:"
+        ),
+        "",
+        table(summer.select("multiple", "log_bayes_factor", "tau", *unit_columns).sort("multiple")),
     ]
 
 
@@ -564,6 +589,14 @@ def rung5_section(*, rung5: pl.DataFrame) -> list[str]:
     real = ranked.filter(pl.col("template_set") == "real").select(
         "series", real_log_bayes_factor="log_bayes_factor", real_rank="rank"
     )
+    price_only = (
+        yearly.filter(pl.col("set_kind").is_in(["real", "price_placebo"]))
+        .with_columns(
+            rank=pl.col("log_bayes_factor").rank(method="min", descending=True).over("series")
+        )
+        .filter(pl.col("template_set") == "real")
+        .select("series", real_rank_among_price_placebos="rank")
+    )
     best_placebo = (
         yearly.filter(pl.col("template_set") != "real")
         .group_by("series")
@@ -577,20 +610,10 @@ def rung5_section(*, rung5: pl.DataFrame) -> list[str]:
             "register_accepted_storage": [v["accepted_storage"] for v in register.values()],
         }
     )
-    classes = (
-        rung5.filter(pl.col("template_set") == "real")
-        .group_by("series")
-        .agg(
-            merchant_mw=pl.col("merchant_power_point").mean(),
-            commercial_mw=pl.col("commercial_and_industrial_power_point").mean(),
-            domestic_mw=pl.col("domestic_power_point").mean(),
-            merchant_mwh=pl.col("merchant_energy_point").mean(),
-        )
-    )
     screen = (
-        real.join(best_placebo, on="series")
+        real.join(price_only, on="series")
+        .join(best_placebo, on="series")
         .join(presence, on="series")
-        .join(classes, on="series")
         .sort("series")
     )
     return [
@@ -599,8 +622,12 @@ def rung5_section(*, rung5: pl.DataFrame) -> list[str]:
         (
             "Each primary's log Bayes factor summed over the four blocks, for the real template "
             "set and for 12 placebo sets (tariff windows moved by -3 to +3 hours, and N2EX and "
-            "Agile prices taken from 6 other weeks). A primary shows evidence of a battery when "
-            "its real set ranks first of 13; 1 in 13 would rank first by chance."
+            "Agile prices taken from 6 other weeks). Under the null the real set's rank is "
+            "uniform over 13 only if the 12 placebos are exchangeable with the real set, and they "
+            "are not (the early-window placebos rank last in most primaries), so the screen's "
+            "false-first rate is measured on rung 1's null lanes in the next section. The MW and "
+            "MWh posteriors of the domestic and commercial classes are not printed: rung 2 shows "
+            "they sit at the prior."
         ),
         "",
         table(screen),
@@ -645,18 +672,24 @@ def grid_section(*, rung1: pl.DataFrame, grid: pl.DataFrame) -> list[str]:
         "## The grid estimator beside the differentiable estimator on rung 1 (exploratory)",
         "",
         (
-            f"The grid estimator ran on all {both.height} rung 1 sums (the same aggregates). At "
+            f"The grid estimator ran on all {both.height} rung 1 sums (the same aggregates). "
+            "The `*_signed_median_power_error` columns are signed relative errors (positive is an "
+            "overestimate); the paired difference uses absolute errors. At "
             f"shares of {MIN_SHARE_C3:.0%} and above, the mean paired difference in absolute "
             f"relative power error (differentiable minus grid) is {mean:+.4f} (95% interval "
-            f"{low:+.4f} to {high:+.4f})."
+            f"{low:+.4f} to {high:+.4f}); the differentiable estimator's medians are "
+            f"{'no more accurate than' if high >= 0 else 'more accurate than'} the grid's, and its "
+            "gain is the coverage of the 90% intervals in the table."
         ),
         "",
         table(
             both.group_by("share")
             .agg(
                 n=pl.len(),
-                dp_median_power_error=pl.col("dp_power_error").median(),
-                grid_median_power_error=pl.col("grid_power_error").median(),
+                dp_signed_median_power_error=pl.col("dp_power_error").median(),
+                grid_signed_median_power_error=pl.col("grid_power_error").median(),
+                dp_median_absolute_power_error=pl.col("dp_power_error").abs().median(),
+                grid_median_absolute_power_error=pl.col("grid_power_error").abs().median(),
                 dp_power_90=pl.col("dp_power_in_90").mean(),
                 grid_power_90=pl.col("grid_power_in_90").mean(),
                 dp_energy_90=pl.col("dp_energy_in_90").mean(),
@@ -690,22 +723,74 @@ def main() -> None:
     rung4, rung5 = read("rung4_posteriors"), read("rung5_posteriors")
     steps, grid = read("rung1_step_tail"), read("rung1_grid_posteriors")
     limits = thresholds(nulls=rung1.filter(pl.col("share") == 0))
+    outside = {
+        policy: read(f"rung1b_{policy}_posteriors") for policy in ("rank_rule", "noisy_price")
+    }
+    sensitivity1, sensitivity2 = (
+        read("rung1_sensitivity_posteriors"),
+        read("rung2_sensitivity_posteriors"),
+    )
+    limits_sensitivity = thresholds(nulls=sensitivity1.filter(pl.col("share") == 0))
     lines = ["# Report: how well can an aggregate reveal an unmetered battery?", ""]
+    lines += review.positive_control_clean_section(draws=read("positive_control_clean_draws"))
     lines += c1_section(rung1=rung1, limits=limits)
     lines += detection_section(
         rung1=rung1, rung2=rung2, shifted=shifted, rung3=rung3, limits=limits
     )
+    lines += review.detection_curve_section(
+        families={
+            "rung1 (in the family)": rung1.filter(pl.col("share") > 0),
+            "rank_rule (outside)": outside["rank_rule"],
+            "noisy_price (outside)": outside["noisy_price"],
+            "rung3 (real public batteries)": rung3,
+        },
+        steps=steps,
+        limits=limits,
+    )
+    lines += review.rung1b_section(rung1=rung1, others=outside, limits=limits)
     lines += calibration_section(rung1=rung1, rung2=rung2)
     lines += fleet_units_section(rung2=rung2)
+    lines += review.rung2_controls_section(
+        rung2=rung2,
+        shifted=shifted,
+        coarse_real=read("rung2_coarse_real_posteriors"),
+        coarse_placebo=read("rung2_coarse_placebo_posteriors"),
+        limits=limits,
+    )
     lines += c3_c4_section(rung1=rung1, steps=steps)
     lines += c5_section(rung3=rung3)
-    lines += rung3_section(rung3=rung3)
+    lines += rung3_section(rung3=rung3, rung1=rung1, limits=limits)
+    lines += review.rung3_replica_section(replica=read("rung3_replica_posteriors"))
     lines += rung4_section(rung4=rung4, nulls=rung1.filter(pl.col("share") == 0))
     lines += rung5_section(rung5=rung5)
+    lines += review.screen_power_section(screen=read("screen_power_posteriors"))
     lines += grid_section(rung1=rung1, grid=grid)
+    suffix = " (second setting)"
+    lines += ["# The second setting (doubled duration priors, wider efficiency prior)", ""]
+    lines += c1_section(rung1=sensitivity1, limits=limits_sensitivity, heading_suffix=suffix)
+    lines += calibration_section(rung1=sensitivity1, rung2=sensitivity2, heading_suffix=suffix)
+    lines += c3_c4_section(rung1=sensitivity1, steps=steps, heading_suffix=suffix)
+    lines += detection_section(
+        rung1=sensitivity1,
+        rung2=sensitivity2,
+        shifted=shifted,
+        rung3=rung3,
+        limits=limits_sensitivity,
+        heading_suffix=suffix,
+    )
+    lines += review.start_disagreement_section(
+        frames={
+            "rung1": rung1,
+            "rung2": rung2,
+            "rung3": rung3,
+            "rung1b_rank_rule": outside["rank_rule"],
+            "rung1b_noisy_price": outside["noisy_price"],
+        }
+    )
     lines += timing_section(
         frames={"rung1": rung1, "rung2": rung2, "rung3": rung3, "rung4": rung4, "rung5": rung5}
     )
+    lines += review.notes_section()
     (OUTPUT_DIR / "report.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines[:60]))
 

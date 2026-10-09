@@ -228,17 +228,19 @@ def run(*, demand_kind: str) -> pl.DataFrame:
 
 def summarise(*, frame: pl.DataFrame) -> dict[str, float]:
     """Return the control's headline numbers for one set of fits."""
-    both = frame["power_in_90"] & frame["energy_in_90"]
+    both = (frame["power_in_90"] & frame["energy_in_90"]).to_numpy()
+    power_error = frame["power_median_error"].to_numpy()
+    energy_error = frame["energy_median_error"].to_numpy()
     return {
         "fits": float(frame.height),
         "both_in_90": float(both.sum()),
         "both_rate": float(both.mean()),
-        "power_in_90_rate": float(frame["power_in_90"].mean()),
-        "energy_in_90_rate": float(frame["energy_in_90"].mean()),
-        "median_power_error": float(frame["power_median_error"].median()),
-        "median_abs_power_error": float(frame["power_median_error"].abs().median()),
-        "median_abs_energy_error": float(frame["energy_median_error"].abs().median()),
-        "without_interval": float((~frame["has_interval"]).sum()),
+        "power_in_90_rate": float(frame["power_in_90"].to_numpy().mean()),
+        "energy_in_90_rate": float(frame["energy_in_90"].to_numpy().mean()),
+        "median_power_error": float(np.median(power_error)),
+        "median_abs_power_error": float(np.median(np.abs(power_error))),
+        "median_abs_energy_error": float(np.median(np.abs(energy_error))),
+        "without_interval": float((~frame["has_interval"].to_numpy()).sum()),
     }
 
 

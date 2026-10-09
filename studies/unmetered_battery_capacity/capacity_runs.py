@@ -20,7 +20,11 @@ from capacity_state_space import (
     posterior_summary,
     start_parameters,
 )
-from capacity_templates import block_free_columns, nuisance_candidates
+from capacity_templates import (
+    SettingNameType,
+    block_free_columns,
+    nuisance_candidates,
+)
 from studies.battery_dispatch import lp_schedule
 from studies.battery_state_space import Estimator, FitResult
 
@@ -159,7 +163,11 @@ def posterior_row(*, fit: FitResult, group: int, lane: int, seed: int) -> dict:
 
 
 def fit_all_blocks(
-    *, aggregates: np.ndarray, metadata: list[list[dict]], label: str
+    *,
+    aggregates: np.ndarray,
+    metadata: list[list[dict]],
+    label: str,
+    setting: SettingNameType = "standard",
 ) -> pl.DataFrame:
     """Fit every block of a rung and return the table of posterior rows.
 
@@ -167,13 +175,16 @@ def fit_all_blocks(
         aggregates: Shape (groups, lanes, 17,520), identical in every block.
         metadata: For each group and lane, the identifiers and truth to store beside the posterior.
         label: Names the rung in the timing lines.
+        setting: The estimator's setting (`standard`, or `sensitivity` for the second setting).
 
     Returns:
         One row per group, lane, and block.
     """
     rows = []
     for block in range(N_BLOCKS):
-        fit, seconds = fit_block(block=block, aggregates=aggregates)
+        fit, seconds = fit_block(
+            block=block, aggregates=aggregates, model=estimator(setting=setting, block=block)
+        )
         n_fits = fit.theta.shape[0] * fit.theta.shape[1] * fit.theta.shape[2]
         print(
             f"{label} block {block}: {seconds:.0f} s on "
@@ -186,6 +197,7 @@ def fit_all_blocks(
                     {
                         **meta,
                         "block": block,
+                        "setting": setting,
                         "fit_seconds": seconds,
                         **posterior_row(fit=fit, group=g, lane=lane, seed=1000 * block + g),
                     }

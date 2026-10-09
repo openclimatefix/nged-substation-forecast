@@ -133,6 +133,16 @@ def report_lines(*, frame: pl.DataFrame) -> list[str]:
         ),
         "",
         (
+            "**This pass is superseded by the clean positive control "
+            "(`report_positive_control_clean.md`).** It is a pass of 2 of 3 scored blocks, "
+            "with one "
+            "truth whose usable duration and round-trip efficiency lay 9% and 11% of a node "
+            "spacing from the fine stack's nodes, after diagnostics on a scored block guided the "
+            "refinement. The failing scored block (Dec-Feb) is the block those diagnostics used, "
+            "and the tuning block (Sep-Nov) also failed the 90% interval for both truths."
+        ),
+        "",
+        (
             "**How the model reached this result, stated because it limits what the pass means.** "
             "The first differentiable model drove each price taker by a learned rank-threshold "
             "policy; it failed this control (the merchant power was 7% to 30% below the truth in "
