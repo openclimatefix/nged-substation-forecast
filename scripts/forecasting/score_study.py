@@ -18,19 +18,24 @@ date guard. The script therefore re-executes itself with an environment holding 
 
 The script runs the code of whichever checkout its interpreter belongs to. An autonomous research
 session therefore cannot change what the script executes only when the maintainer's `sudo` rule
-runs the `main` checkout's interpreter on the `main` checkout's copy of the script.
+runs the `main` checkout's interpreter directly (not `uv run`) on the `main` checkout's copy of the
+script, with `env_reset` and a fixed `secure_path`. The re-execution below happens after the heavy
+imports, so it cannot stop a `PYTHONPATH` or `PATH` set before the script starts.
 
     uv run python scripts/forecasting/score_study.py \
         predictions.parquet my_study mid_2025_to_mid_2026
 
-A study that has already been scored is not overwritten unless `--replace` is passed, so every
-submission stays on record.
+A study that has already been scored is not overwritten unless `--replace` is passed. The `sudo`
+rule should not allow `--replace`, because the flag overwrites the earlier submission, its metrics,
+and its MLflow fold run.
 """
 
 import argparse
 import os
 import re
+import shutil
 import sys
+import tempfile
 from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Final
@@ -43,7 +48,7 @@ from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
 from dagster import DagsterInstance, RunConfig, materialize
 from delta_store.power_forecasts import write_power_forecasts
-from ml_core.metrics import ROW_KEY_COLUMNS, require_same_row_keys
+from ml_core.metrics import ROW_KEY_COLUMNS, require_same_row_keys, require_single_model_name
 
 from nged_substation_forecast.defs.cv_assets import MetricsConfig, PopulationFilter, metrics
 
@@ -207,6 +212,7 @@ def score_study(*, predictions: Path, study_name: str, fold_id: str, replace: bo
             f"{experiment_name} already holds rows for {fold_id}; pass --replace to overwrite them."
         )
 
+    require_single_model_name(study=study, group_label=f"{experiment_name}, {fold_id}")
     require_same_row_keys(
         study=study,
         reference=PopulationFilter(
@@ -250,12 +256,17 @@ def main() -> None:
     parser.add_argument("fold_id", help="A leaderboard fold id of conf/cv/default.yaml.")
     parser.add_argument("--replace", action="store_true", help="Overwrite an existing submission.")
     arguments = parser.parse_args()
-    score_study(
-        predictions=arguments.predictions,
-        study_name=arguments.study_name,
-        fold_id=arguments.fold_id,
-        replace=arguments.replace,
-    )
+    # The file is read several times, and the caller may change it between reads. Read a private
+    # copy, in a directory only this user can write to.
+    with tempfile.TemporaryDirectory() as private_directory:
+        private_copy = Path(private_directory) / "predictions.parquet"
+        shutil.copyfile(arguments.predictions, private_copy)
+        score_study(
+            predictions=private_copy,
+            study_name=arguments.study_name,
+            fold_id=arguments.fold_id,
+            replace=arguments.replace,
+        )
 
 
 if __name__ == "__main__":

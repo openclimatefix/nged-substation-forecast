@@ -563,7 +563,7 @@ plugins.md049.enabled = false
 # (`studies`), so a session that edits the studies cannot change what the scorer executes, and the
 # scorer stays unit-testable without a Dagster or MLflow instance. The root packages below include
 # the external packages so that the contract can name them.
-root_packages = ["ml_core", "dagster", "mlflow", "studies"]
+root_packages = ["ml_core", "contracts", "dagster", "mlflow", "studies"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]

@@ -220,7 +220,9 @@ or MLflow runs behind.
   forecast submitted through `scripts/forecasting/score_study.py`. Its rows must have exactly the
   keys `(time_series_id, power_fcst_init_time, valid_time)` of the experiment named by
   `reference_experiment_name` in the same config, for the same fold. A study that omits a row the
-  reference forecasts, adds a series, or forecasts only at short lead times is refused. The key
+  reference forecasts, adds a series, or forecasts only at short lead times is refused. A study
+  must also carry exactly one `power_fcst_model_name`, because spreading rows across several names
+  would lower the mean error that the leaderboard reports. The key
   leaves out `ensemble_member`, so a study may forecast with any number of members. A study
   therefore forecasts the reference's initialisation times: those of the European Centre for
   Medium-Range Weather Forecasts' ensemble. An unfiltered run skips study experiments, naming them

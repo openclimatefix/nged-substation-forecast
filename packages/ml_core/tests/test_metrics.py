@@ -15,6 +15,7 @@ from contracts.power_schemas import (
 )
 from ml_core.metrics import (
     FinalTestWindowError,
+    MultipleModelNamesError,
     NoOverlappingActualsError,
     RowKeyMismatchError,
     RowsOutsideWindowError,
@@ -22,6 +23,7 @@ from ml_core.metrics import (
     compute_effective_capacity,
     compute_metrics,
     require_same_row_keys,
+    require_single_model_name,
     require_valid_times_within_window,
     require_window_within_guard,
 )
@@ -1081,3 +1083,16 @@ def test_require_same_row_keys_checks_every_series_in_a_batch() -> None:
             reference_label="reference",
             series_batch_size=2,
         )
+
+
+def test_require_single_model_name_refuses_a_study_with_two_model_names() -> None:
+    rows = pl.LazyFrame({"power_fcst_model_name": ["a", "b", "a"]})
+
+    with pytest.raises(MultipleModelNamesError, match=r"\['a', 'b'\]"):
+        require_single_model_name(study=rows, group_label="study/x, fold")
+
+
+def test_require_single_model_name_accepts_one_model_name() -> None:
+    require_single_model_name(
+        study=pl.LazyFrame({"power_fcst_model_name": ["a", "a"]}), group_label="study/x, fold"
+    )

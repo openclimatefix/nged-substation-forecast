@@ -6,14 +6,16 @@ scores below measure. A cross-validation (CV) fold is one train-and-validate spl
 history, identified by a ``fold_id``. MLflow is the experiment tracker the scores are logged to,
 and its leaderboard is the ranked comparison of one run's scores against another's.
 
-Four public functions, in the order the cross-validation Dagster assets call them.
+Four scoring functions, in the order the cross-validation Dagster assets call them.
 ``compute_effective_capacity`` derives the per-series denominator that normalised mean absolute
 error (NMAE) divides by. ``compute_metrics`` joins predictions to observed power and returns the
 tall ``Metrics`` frame. ``enrich_metrics_rows`` stamps the evaluation window and scope onto that
 frame once the calling asset knows the window and the scope. The enriched frame is what the asset
 writes to Delta. ``build_mlflow_aggregate_metrics`` takes the un-enriched frame that
 ``compute_metrics`` returned. That function reduces the frame to the flat key/value dictionary
-the MLflow leaderboard displays.
+the MLflow leaderboard displays. The ``require_*`` functions beside them refuse a group the
+scorer must not score: a window reaching the final-test date, rows outside the fold's window, and
+a study whose row keys or model names differ from what the reference allows.
 
 Every function here is pure: no Dagster, no MLflow, and no IO. Each function is therefore
 unit-testable on an in-memory frame. The asset that calls the function owns every read and write.
@@ -164,6 +166,39 @@ def _distinct_series_ids(forecasts: pl.LazyFrame) -> list[int]:
     return sorted(
         forecasts.select("time_series_id").unique().collect(engine="streaming")["time_series_id"]
     )
+
+
+class MultipleModelNamesError(ValueError):
+    """Raised when a study's forecast rows carry more than one ``power_fcst_model_name``."""
+
+
+def require_single_model_name(*, study: pl.LazyFrame, group_label: str) -> None:
+    """Refuse a study whose rows carry more than one ``power_fcst_model_name``.
+
+    ``compute_metrics`` computes metrics per ``power_fcst_model_name`` and the leaderboard number
+    is the mean over those rows. A study that spreads the easy rows across several model names
+    and keeps the hard rows under one would therefore lower its mean error while still carrying
+    the reference's row keys. Spreading the members of one ensemble across model names would also
+    split that ensemble.
+
+    Args:
+        study: Lazy scan of the study's forecast rows, carrying ``power_fcst_model_name``.
+        group_label: Names the group in the error message.
+
+    Raises:
+        MultipleModelNamesError: If the rows hold zero or several distinct model names.
+    """
+    names = (
+        study.select("power_fcst_model_name")
+        .unique()
+        .collect(engine="streaming")["power_fcst_model_name"]
+        .to_list()
+    )
+    if len(names) != 1:
+        raise MultipleModelNamesError(
+            f"Group ({group_label}) must carry exactly one power_fcst_model_name; "
+            f"found {sorted(map(str, names))}."
+        )
 
 
 def require_same_row_keys(

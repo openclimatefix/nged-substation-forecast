@@ -213,10 +213,10 @@ and an **Experiment** dropdown appears when the chosen fold holds more than one 
 Then choose a **time series** (the dropdown groups the 32 series by type, so all the PV sites or all
 the primaries sit together), a **forecast date**, and one of that day's **forecast runs**.
 
-**Compare with** optionally adds a second experiment's ensemble in orange for the same fold,
-series, and forecast init time. The default is **No comparison**. If the second experiment has no
-matching rows, a warning appears and the primary forecast stays visible. The NWP panel shows the
-primary experiment's weather run.
+**Compare with** optionally adds a second experiment's ensemble in orange for the same fold, series,
+and forecast init time. The default is **No comparison**. If the second experiment has no matching
+rows, a warning appears and the primary forecast stays visible. The NWP panel shows the primary
+experiment's weather run.
 
 **Reload data** re-reads the tables, so a CV job that finishes while the app is open shows up
 without restarting marimo. Its new experiment appears in the **Experiment** dropdown; **Fold**,
@@ -262,20 +262,19 @@ run config dialog before launching.
    scope dates its evaluation window from the CV config's leaderboard folds and has none for those
    rows. To score live output or a dev fold, run the asset with `evaluation_scope="ad_hoc"`, which
    takes the window from the forecast rows themselves.
-3. Before scoring any matched group, checks every group and raises on a refusal; see [What the
-   `metrics` asset refuses to
-   score](cross-validation-folds.md#what-the-metrics-asset-refuses-to-score). An unfiltered run
-   skips `study/` experiments, naming them in the `skipped_study_experiments` metadata.
-4. Discovers the matching `(experiment_name, fold_id)` groups, then scores each group in batches of
-   four `time_series_id` values at a time — peak memory is one batch, never a whole fold or the
-   entire matched population. See [The other hard ceiling: Polars' 32-bit row
-   index](../architecture/performance.md#the-other-hard-ceiling-polars-32-bit-row-index) for why
-   this chunking also keeps the row-index cap out of reach at V2 scale. For each group: a. Calls
-   `compute_metrics()` — joins observed power, collapses each forecast run's ensemble members into
-   per-timestamp quantities, and computes the deterministic metrics (MAE / NMAE / RMSE / MBE on the
-   ensemble mean) plus the probabilistic metrics (fair CRPS, spread-skill ratio, pinball loss at the
-   13 delivery quantiles, PICP and interval width for the 6 symmetric bands) per `(time_series_id,
-   fold_id, power_fcst_model_name, horizon_slice)` — see the [evaluation-metrics
+3. Discovers the matching `(experiment_name, fold_id)` groups, skips every `study/` experiment of an
+   unfiltered run (naming them in the `skipped_study_experiments` metadata), and checks every
+   remaining group before scoring any, raising on a refusal; see [What the `metrics` asset refuses
+   to score](cross-validation-folds.md#what-the-metrics-asset-refuses-to-score).
+4. Scores each group in batches of four `time_series_id` values at a time — peak memory is one
+   batch, never a whole fold or the entire matched population. See [The other hard ceiling: Polars'
+   32-bit row index](../architecture/performance.md#the-other-hard-ceiling-polars-32-bit-row-index)
+   for why this chunking also keeps the row-index cap out of reach at V2 scale. For each group: a.
+   Calls `compute_metrics()` — joins observed power, collapses each forecast run's ensemble members
+   into per-timestamp quantities, and computes the deterministic metrics (MAE / NMAE / RMSE / MBE on
+   the ensemble mean) plus the probabilistic metrics (fair CRPS, spread-skill ratio, pinball loss at
+   the 13 delivery quantiles, PICP and interval width for the 6 symmetric bands) per
+   `(time_series_id, fold_id, power_fcst_model_name, horizon_slice)` — see the [evaluation-metrics
    reference](../techniques/evaluation-metrics.md) for definitions. b. Enriches rows with scope
    (`evaluation_scope`), window bounds (`window_start`, `window_end`, `window_label`),
    `computed_at`, and the MLflow fold run id (leaderboard scope only). c. Writes to

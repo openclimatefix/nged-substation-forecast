@@ -53,6 +53,7 @@ from ml_core.metrics import (
     compute_metrics,
     enrich_metrics_rows,
     require_same_row_keys,
+    require_single_model_name,
     require_valid_times_within_window,
     require_window_within_guard,
 )
@@ -785,7 +786,8 @@ def _validate_group(
     Three checks, each raising. The final-test date guard applies to every scope. In leaderboard
     scope every row's ``valid_time`` must also lie inside the fold's window. A ``study/``
     experiment in leaderboard scope must additionally carry exactly the reference experiment's row
-    keys for the fold, so it cannot abstain on hard rows.
+    keys for the fold, so it cannot abstain on hard rows, and a single ``power_fcst_model_name``,
+    so it cannot down-weight them by spreading rows across model names.
 
     Args:
         exp_name: Experiment name of the group.
@@ -819,6 +821,7 @@ def _validate_group(
         group_label=group_label,
     )
     if exp_name.startswith(STUDY_EXPERIMENT_PREFIX):
+        require_single_model_name(study=group_scan, group_label=group_label)
         reference = PopulationFilter(
             experiment_name=_cv_config.reference_experiment_name,
             fold_id=fold_id,

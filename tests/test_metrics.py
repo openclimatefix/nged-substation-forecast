@@ -42,6 +42,7 @@ from dagster import DagsterInstance, RunConfig, materialize
 from deltalake import write_deltalake
 from ml_core.metrics import (
     FinalTestWindowError,
+    MultipleModelNamesError,
     RowKeyMismatchError,
     RowsOutsideWindowError,
 )
@@ -840,6 +841,33 @@ def test_metrics_refuses_a_study_that_omits_the_rows_of_a_valid_time(
     )
 
     with pytest.raises(RowKeyMismatchError, match="reference row keys are missing"):
+        materialize(
+            [metrics],
+            run_config=_score_run_config(experiment_name=STUDY_EXPERIMENT_NAME),
+            instance=dagster_instance,
+        )
+
+
+def test_metrics_refuses_a_study_that_spreads_rows_across_model_names(
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Splitting the easy rows under another model name would lower the mean error."""
+    _run_cv_pipeline(dagster_instance, register_experiment)
+    _use_as_reference(monkeypatch, EXPERIMENT_NAME)
+    _store_variant(
+        file_mlflow_env["forecasts"],
+        experiment_name=STUDY_EXPERIMENT_NAME,
+        transform=lambda rows: rows.with_columns(
+            power_fcst_model_name=pl.when(pl.col("valid_time") > rows["valid_time"].median())
+            .then(pl.lit("other_name"))
+            .otherwise(pl.col("power_fcst_model_name"))
+        ),
+    )
+
+    with pytest.raises(MultipleModelNamesError):
         materialize(
             [metrics],
             run_config=_score_run_config(experiment_name=STUDY_EXPERIMENT_NAME),
