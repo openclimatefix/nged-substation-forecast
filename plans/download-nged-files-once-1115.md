@@ -82,7 +82,7 @@ run, then its branches, then its failures.
 
 - **First run, with no ledger file.** `read_downloaded_files` returns an empty frame, so every
   listed file is selected. This is the same as today's first run on an empty table. On the existing
-  deployment the operator seeds the ledger first (see Risks).
+  deployment the operator pauses the hourly schedule and runs the ingest once by hand (see Risks).
 - **The operator rebuilds the `power_time_series` table or `metadata.parquet` by moving it aside.**
   The file does not exist during the next read, so the old ledger counts as empty and the full
   history is downloaded again, as the rebuild intends. Restoring the table to an older Delta
@@ -280,12 +280,13 @@ The plan has had three simplicity reviews and three correctness reviews so far.
   ones and the concurrent download.
 - `docs/live_service/operations.md`: lines 234-235 ("The ingest downloads the newest file of every
   series, even a small file…") and lines 276-283 (a failed upsert: the ledger has recorded those
-  files, and a silent series' note is restored by its next file). Add the cutover procedure, how
-  to force a re-download of a file (remove its row from the ledger), that putting an older or
-  different `power_time_series` table at its path needs the ledger deleted, that a corrupt ledger
-  stops the ingest until it is deleted and what to do after a change to the ledger's columns, how
-  to rebuild the metadata table (delete `metadata.parquet`; the next run downloads the whole bucket
-  because the ledger then counts as empty), and the first-run estimate of a few minutes.
+  files, and a silent series' note is restored by its next file). Add the first-run procedure (pause
+  the schedule, time one GET, run once by hand, resume), how to force a re-download of a file
+  (remove its row from the ledger), that putting an older or different `power_time_series` table at
+  its path needs the ledger deleted, that a corrupt ledger stops the ingest until it is deleted and
+  what to do after a change to the ledger's columns, how to rebuild the metadata table (delete
+  `metadata.parquet`; the next run downloads the whole bucket because the ledger then counts as
+  empty), and the first-run estimate of a few minutes.
   `docs/live_service/intervention-log.md:208-211` records a past rebuild and needs no edit.
 - Grep `docs/`, `src/`, `packages/`, and `pyproject.toml` for `select_new_rows`,
   `_LATE_FILE_LOOKBACK`, `NoNewData`, `3 days`, `newest file`, `re-lists NGED's bucket`,
@@ -420,22 +421,19 @@ uv run mkdocs build --strict    # read the rendered operations page
 
 ## Risks and open questions
 
-- **Cutover on the existing deployment.** With no ledger file, the first run would download the
-  whole bucket: about 22,000 GETs for 33 series over about 165 days. With the concurrent download
-  the run takes about 3 to 6 minutes: about 1 minute of GETs at 32 in flight and 100 ms a GET
-  (unmeasured), plus 1.5 to 4 minutes of sequential parsing. The size filter has meant that no
-  data-less file has been parsed except each series' newest, so the first run also parses every
-  historical data-less file, and one odd file would stall the ingest under the loud-failure rule.
-  A second run that started before the first finished would find no ledger and append duplicate
-  rows. An unseeded first run also recovers any file that the old 3-day rule skipped, because the
-  old ingest never offered it. A seeded cutover avoids the odd-file stall and the overlap: before
-  the first deployed run, the operator pauses the hourly schedule, lists the bucket, keeps the
-  files whose `LastModified` is more than 3 days before the old ingest's last successful run, and
-  writes them as the ledger with `write_downloaded_files` in a documented snippet. The cutoff is
-  measured from the last successful old run, not from the present, because files written after
-  that run and before the 3-day mark were never offered, and seeding them as done would lose them
-  for good. The first run then downloads the files since the cutoff and writes the full listing.
-  Recommend the seeded cutover. Does the maintainer prefer the unseeded first run?
+- **Cutover on the existing deployment.** With no ledger file, the first run downloads the whole
+  bucket: about 22,000 GETs for 33 series over about 165 days. With the concurrent download the run
+  takes about 3 to 6 minutes: about 1 minute of GETs at 32 in flight and 100 ms a GET (unmeasured),
+  plus 1.5 to 4 minutes of sequential parsing. The plan has no seeding step, because the full
+  download is short and an unseeded run also recovers any file that the old 3-day rule never
+  offered. The operator pauses the hourly schedule before the first run, because a second run that
+  started before the first finished would find no ledger and append duplicate rows, and resumes
+  it once the ledger exists. The operator times one real GET beforehand, to check the 100 ms
+  assumption. The size filter has meant that no data-less file has been parsed except each
+  series' newest, so the first run parses every historical data-less file, and one odd file would
+  stall the ingest under the loud-failure rule. That is a fault worth finding while the schedule is
+  paused. Nothing is lost, because the ledger is written only after a run succeeds, and the next
+  run repeats the download once the fault is fixed.
 - **No run-concurrency limit exists on the ingest.** The hazard of two overlapping runs appending
   the same rows exists today and the plan neither adds nor removes it. A `pool` of 1 for the asset
   would remove it. Recommend a separate issue.
@@ -446,10 +444,10 @@ uv run mkdocs build --strict    # read the rendered operations page
   delayed. The plan assumes the files keep today's layout and does not build this machinery. If
   NGED's change lands, the machinery may be moot.
 - **The concurrent download stays in this pull request.** The simplicity review recommended a
-  separate pull request, because the issue does not ask for the download and the seeded cutover
-  removes the first-run need. The maintainer decided to keep it here. Splitting it out would
-  remove `_DOWNLOAD_CHUNK_FILES`, `_MAX_REQUESTS_IN_FLIGHT`, `asyncio.run`, tests 12 to 15, and
-  the async methods of the test fake, and leave a full rebuild taking 20 to 45 minutes.
+  separate pull request, because the issue does not ask for the download. The maintainer decided
+  to keep it here. Splitting it out would remove `_DOWNLOAD_CHUNK_FILES`,
+  `_MAX_REQUESTS_IN_FLIGHT`, `asyncio.run`, tests 12 to 15, and the async methods of the test fake,
+  and leave a full rebuild taking 20 to 45 minutes.
 - **A stalled ingest on a contract violation.** At Flexpectation v2 scale, files from licence areas
   other than `EMids` will fail the `TimeSeriesMetadata` enum, and the ingest will stall on them
   until the contract is widened. Widening a contract needs the maintainer's agreement first, so
@@ -535,39 +533,40 @@ change to file delivery is noted as an assumption.
 full, which deletes the merge, the keep-later dedupe, the new `_DownloadedFiles` model, and the
 memory peak of three held frames; the Delta table id is dropped and the ledger is ignored when the
 power table does not exist, with a manual rule for restores and swapped tables; `NoNewData` is
-deleted and the asset checks for an empty selection; the local temp-file-and-rename write is
-dropped to match `upsert_metadata`; the cutover recommendation is now the seeded one, which also
-fixes a contradiction between the Risks section and this record. Rejected: inlining
-`select_files_not_yet_downloaded` into the asset, because a tested helper is easier to test. Left
-to the maintainer: moving the concurrent download to its own pull request, which the reviewer
-recommends and the maintainer asked to fold in (see Risks). Correctness review 4 later brought back
-a narrow two-column model for the ledger, because the full listing model made stored ledgers
-brittle. The
-reviewer checked and kept the newest-file metadata filter, the ledger written after the append, the
-swallowed ledger-write and metadata-upsert failures, the ledger read outside the retry guard, and
-`last_modified` in the key, and rejected three stateless or already-stored alternatives that fail
-the "once" requirement.
+deleted and the asset checks for an empty selection; the local temp-file-and-rename write is dropped
+to match `upsert_metadata`; the cutover recommendation was made the seeded one (later reversed, see
+the maintainer decision below). Rejected: inlining `select_files_not_yet_downloaded` into the asset,
+because a tested helper is easier to test. Left to the maintainer: moving the concurrent download to
+its own pull request, which the reviewer recommends and the maintainer asked to fold in (see Risks).
+Correctness review 4 later brought back a narrow two-column model for the ledger, because the full
+listing model made stored ledgers brittle. The reviewer checked and kept the newest-file metadata
+filter, the ledger written after the append, the swallowed ledger-write and metadata-upsert
+failures, the ledger read outside the retry guard, and `last_modified` in the key, and rejected
+three stateless or already-stored alternatives that fail the "once" requirement.
 
 **Maintainer decision.** The `asyncio` download stays in this pull request.
 
 **Correctness review 4 (Opus).** Cleared the ledger design: in no crash or retry ordering is a file
-recorded before its rows land, and none is lost for good except the documented metadata-upsert
-case. Cleared the `asyncio` approach in Dagster (no running loop, interrupts propagate,
-`get_async` and `bytes_async` exist in obstore 0.11.1, `gather` keeps input order). Accepted: the
-semaphore must be created inside the per-chunk coroutine, with a multi-chunk test (defect 1); test
-7 must patch the append, because a moved write would move its `try`/`except` with it (defect 2);
-one bad ledger stops all ingest, so the ledger stores only two columns under a narrow model, the
-local write goes through a temporary file and a rename again, and the operations page covers a
-corrupt ledger and a column change, while a corrupt ledger still raises because reading it as
-empty would download the whole bucket (finding 3); a first run that creates no table re-downloads
-until a row lands, now stated (finding 4); a missing `metadata.parquet` now makes the ledger count
-as empty (finding 5); the ledger read stays inside the retry guard so a transient error on our own
-storage is retried, and a dedicated error for a corrupt ledger skips the retry (finding 6); the
-ledger-write failure carries the ledger's path and its own fingerprint, and a parse failure names
-its file (finding 7); the seed cutoff is the old ingest's last successful run minus 3 days
-(finding 8); the empty-listing claim is corrected (finding 9); the grep covers `packages/` and
-`pyproject.toml`, and the storage docstrings are listed (finding 10); the verification commands
-match CI (finding 11); an unnecessary fixture edit is removed (finding 12); the transient-error
-test monkeypatches the existence check (finding 13); an asset test covers the corrupt-ledger path
-(finding 14); the wrong claim about the Patito join trap is removed (finding 15). Rejected:
-degrading to an empty ledger on corruption, for the reason above.
+recorded before its rows land, and none is lost for good except the documented metadata-upsert case.
+Cleared the `asyncio` approach in Dagster (no running loop, interrupts propagate, `get_async` and
+`bytes_async` exist in obstore 0.11.1, `gather` keeps input order). Accepted: the semaphore must be
+created inside the per-chunk coroutine, with a multi-chunk test (defect 1); test 7 must patch the
+append, because a moved write would move its `try`/`except` with it (defect 2); one bad ledger stops
+all ingest, so the ledger stores only two columns under a narrow model, the local write goes through
+a temporary file and a rename again, and the operations page covers a corrupt ledger and a column
+change, while a corrupt ledger still raises because reading it as empty would download the whole
+bucket (finding 3); a first run that creates no table re-downloads until a row lands, now stated
+(finding 4); a missing `metadata.parquet` now makes the ledger count as empty (finding 5); the
+ledger read stays inside the retry guard so a transient error on our own storage is retried, and a
+dedicated error for a corrupt ledger skips the retry (finding 6); the ledger-write failure carries
+the ledger's path and its own fingerprint, and a parse failure names its file (finding 7); the seed
+cutoff is the old ingest's last successful run minus 3 days (finding 8, moot after the maintainer
+dropped the seeding step); the empty-listing claim is corrected (finding 9); the grep covers
+`packages/` and `pyproject.toml`, and the storage docstrings are listed (finding 10); the
+verification commands match CI (finding 11); an unnecessary fixture edit is removed (finding 12);
+the transient-error test monkeypatches the existence check (finding 13); an asset test covers the
+corrupt-ledger path (finding 14); the wrong claim about the Patito join trap is removed (finding
+15). Rejected: degrading to an empty ledger on corruption, for the reason above.
+
+**Maintainer decision.** The seeded cutover is dropped. The full download takes a few minutes, so
+the first run is unseeded, with the schedule paused.
