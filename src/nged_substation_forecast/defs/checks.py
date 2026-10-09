@@ -320,11 +320,7 @@ def _read_expected_ids_and_fault_notes(
     has_notes = "information" in metadata_table.collect_schema().names()
     columns = ["time_series_id", "information"] if has_notes else ["time_series_id"]
     metadata = metadata_table.select(columns).collect()
-    notes = (
-        dict(metadata.drop_nulls("information").select("time_series_id", "information").rows())
-        if has_notes
-        else {}
-    )
+    notes = dict(metadata.drop_nulls("information").rows()) if has_notes else {}
     return metadata["time_series_id"], notes
 
 
@@ -382,7 +378,8 @@ def _describe_power_freshness(
         )
     if fault_notes:
         notes = "; ".join(
-            f'{series_id}: "{note}"' for series_id, note in sorted(fault_notes.items())
+            f"{series_id}: {json.dumps(note, ensure_ascii=False)}"
+            for series_id, note in sorted(fault_notes.items())
         )
         sentences.append(f"NGED fault notes: {notes}.")
     return " ".join(sentences)

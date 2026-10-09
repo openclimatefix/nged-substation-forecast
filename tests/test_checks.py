@@ -688,7 +688,7 @@ def test_power_data_is_fresh_never_fails_the_run(
     executor is the only way to assert that; ``AssetSelection.checks`` runs the check step alone,
     so no asset materialises and nothing touches S3. No fixture data is needed either: with no
     tables on disk ``time_series_coverage`` returns an empty frame and
-    ``_read_expected_ids_and_fault_notes`` returns ``None``, so the patched evaluator is still
+    ``_read_expected_ids_and_fault_notes`` returns ``(None, {})``, so the patched evaluator is still
     reached.
     """
     monkeypatch.setattr(checks, "evaluate_power_freshness", _raise_inside_the_check)
@@ -1681,7 +1681,6 @@ def test_the_description_is_unchanged_when_there_are_no_fault_notes() -> None:
     )
 
     assert checks._describe_power_freshness(result, {}) == checks._describe_power_freshness(result)
-    assert "fault notes" not in checks._describe_power_freshness(result, {})
 
 
 def test_read_expected_ids_and_fault_notes_returns_the_non_null_notes(tmp_path: Path) -> None:

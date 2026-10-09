@@ -33,14 +33,6 @@ from nged_data.read_nged_json import (
 
 log = logging.getLogger(__name__)
 
-SMALL_FILE_SIZE_THRESHOLD_BYTES: Final[int] = 520
-"""Files of this many bytes or fewer carry no readings, and are not downloaded as power data.
-
-Measured on NGED's S3 for V1's 32 series. `remove_small_files_from_listing` explains the
-measurement, and `download_metadata_of_series_without_new_files` reads the files this threshold
-excludes, to keep each series' metadata current.
-"""
-
 
 class _RawFileListItem(TypedDict):
     path: str
@@ -143,7 +135,7 @@ def _process_file_listing(
 
 def remove_small_files_from_listing(
     file_listing: pt.DataFrame[_ProcessedFileListing],
-    size_threshold_bytes: int = SMALL_FILE_SIZE_THRESHOLD_BYTES,
+    size_threshold_bytes: int = 520,
 ) -> pt.DataFrame[_ProcessedFileListing]:
     """Remove files too small to carry any readings.
 
@@ -151,13 +143,13 @@ def remove_small_files_from_listing(
     never has to fetch and parse them only to discard the result. It is an optimisation, not a
     correctness requirement: `download_and_parse_files` already tolerates a null `data` field.
 
-    `size_threshold_bytes` defaults to `SMALL_FILE_SIZE_THRESHOLD_BYTES`, derived from the real
-    files on NGED's S3. Some NGED files carry a Well-Known Text (WKT) geometry string, which
-    dominates their size; the rest are WKT-less. A WKT-less file with zero readings tops out at
-    488 bytes. A WKT-less file with a single reading starts at 556 bytes. The 520-byte default sits
-    in the gap between 488 and 556. WKT-bearing (Primary substation) files run far larger:
-    zero-reading examples measured between 4,405 and 20,148 bytes. The WKT-less floor is therefore
-    the binding constraint on the threshold.
+    `size_threshold_bytes` defaults to 520, derived from the real files on NGED's S3. Some NGED
+    files carry a Well-Known Text (WKT) geometry string, which dominates their size; the rest are
+    WKT-less. A WKT-less file with zero readings tops out at 488 bytes. A WKT-less file with a
+    single reading starts at 556 bytes. The 520-byte default sits in the gap between 488 and 556.
+    WKT-bearing (Primary substation) files run far larger: zero-reading examples measured between
+    4,405 and 20,148 bytes. The WKT-less floor is therefore the binding constraint on the
+    threshold.
 
     That 68-byte gap comes from V1's 32 series ([phased
     rollout](https://openclimatefix.github.io/nged-substation-forecast/background/requirements/#phased-rollout)),
@@ -168,8 +160,8 @@ def remove_small_files_from_listing(
     Re-run the measurement rather than assume the gap survives.
 
     The files this filter removes still carry the series' metadata, including NGED's `Information`
-    note. `download_metadata_of_series_without_new_files` reads the newest of them for each series
-    that has no new file.
+    note. `add_newest_file_of_each_series` puts the newest file of each series back, so that the
+    metadata of a series that has stopped reporting stays current.
     """
     n_files_before_filter = file_listing.height
     filtered = file_listing.filter(pl.col("filesize_bytes") > size_threshold_bytes)
@@ -179,6 +171,39 @@ def remove_small_files_from_listing(
     # An eager `filter` returns a plain frame, so re-attach the Patito model the return type
     # promises.
     return pt.DataFrame(filtered).set_model(_ProcessedFileListing)
+
+
+def add_newest_file_of_each_series(
+    all_files: pt.DataFrame[_ProcessedFileListing],
+    new_files: pt.DataFrame[_ProcessedFileListing],
+) -> pt.DataFrame[_ProcessedFileListing]:
+    """Add the newest file of every series to the files being downloaded, whatever its size.
+
+    `download_and_parse_files` takes each series' metadata from the newest file it downloads. A
+    series that has stopped reporting publishes small files with no readings, which
+    `remove_small_files_from_listing` drops, and its older files with readings can still be
+    offered by `select_new_rows`. The metadata would then come from an old file, and NGED's current
+    `Information` note would never be read. Adding the newest file of each series puts that file
+    last in the download order, so its metadata wins. A series whose newest file is already in
+    `new_files` adds nothing, so a healthy series costs no extra download.
+
+    Args:
+        all_files: The whole file listing, before any filtering.
+        new_files: The files chosen for download as power data.
+
+    Returns:
+        `new_files` plus the newest file of each series, without duplicates, in ascending
+        `end_time` order.
+    """
+    newest_file_of_each_series = (
+        all_files.sort("end_time").group_by("time_series_id").last().select(all_files.columns)
+    )
+    combined = (
+        pl.concat([new_files, newest_file_of_each_series])
+        .unique(subset="path", keep="first")
+        .sort("end_time")
+    )
+    return pt.DataFrame(combined).set_model(_ProcessedFileListing).validate()
 
 
 class NoNewData(Exception):
@@ -285,79 +310,6 @@ def download_and_parse_files(
         metadata=TimeSeriesMetadata.validate(metadata_df),
         power_time_series=PowerTimeSeries.validate(time_series_df),
         n_implausible_power_rows_dropped=n_implausible_power_rows_dropped,
-    )
-
-
-class MetadataOnlyDownload(NamedTuple):
-    """Result of ``download_metadata_of_series_without_new_files``.
-
-    ``metadata`` is ``None`` when no file was read successfully, because ``pl.concat`` cannot
-    build a frame from nothing. ``n_failed`` counts the files that were downloaded but could not be
-    parsed.
-    """
-
-    metadata: pt.DataFrame[TimeSeriesMetadata] | None
-    n_downloaded: int
-    n_failed: int
-
-
-def download_metadata_of_series_without_new_files(
-    store: obstore.store.S3Store,
-    all_files: pt.DataFrame[_ProcessedFileListing],
-    downloaded_files: pt.DataFrame[_ProcessedFileListing],
-    size_threshold_bytes: int = SMALL_FILE_SIZE_THRESHOLD_BYTES,
-) -> MetadataOnlyDownload:
-    """Read the metadata of each series whose newest file carries no readings.
-
-    A series that has stopped reporting publishes small files with no readings, which
-    `remove_small_files_from_listing` drops before download. Those files still carry the series'
-    metadata, including NGED's `Information` note, and nothing else reads them. This function
-    downloads the newest such file of each series that has no file in `downloaded_files`, and
-    returns the metadata alone. It never parses power.
-
-    A series is skipped when its newest file is larger than `size_threshold_bytes`. That series is
-    either in `downloaded_files` already, or publishes a large file with no readings, which is not
-    the silent case this function covers. Downloading the newest file of every series each hour
-    would cost one request per series per hour.
-
-    A file that downloads but cannot be parsed is logged at warning level and counted in
-    `n_failed`. NGED's own malformed file therefore costs one series' metadata, not every series'.
-    An error from the object store is not caught, so the caller's retry handling sees it.
-
-    Args:
-        store: The NGED S3 bucket to download each file from.
-        all_files: The whole file listing, before any filtering.
-        downloaded_files: The files being downloaded as power data this run. A series with a file
-            here gets its metadata from that download.
-        size_threshold_bytes: Files of this many bytes or fewer count as small.
-
-    Returns:
-        The metadata of each series read, with the counts of files downloaded and failed.
-    """
-    newest_file_of_each_series = (
-        all_files.filter(~pl.col("time_series_id").is_in(downloaded_files["time_series_id"]))
-        .sort("end_time")
-        .group_by("time_series_id")
-        .last()
-        .filter(pl.col("filesize_bytes") <= size_threshold_bytes)
-    )
-    metadata_dfs = []
-    n_failed = 0
-    for path in newest_file_of_each_series["path"]:
-        json_bytes = bytes(store.get(path).bytes())
-        try:
-            metadata_dfs.append(_extract_time_series_metadata(pl.read_json(json_bytes)))
-        except Exception:
-            log.warning(f"Could not read the metadata in {path=}", exc_info=True)
-            n_failed += 1
-    return MetadataOnlyDownload(
-        metadata=(
-            TimeSeriesMetadata.validate(pl.concat(metadata_dfs, how="diagonal"))
-            if metadata_dfs
-            else None
-        ),
-        n_downloaded=newest_file_of_each_series.height,
-        n_failed=n_failed,
     )
 
 
@@ -686,9 +638,8 @@ def upsert_metadata(
     again by itself.
 
     Deleting the file is not on its own a fix. `power_time_series_and_metadata` extracts metadata
-    from the files `select_new_rows` judged new, and from the newest small file of each series with
-    no new file. The next hourly run would therefore rebuild the metadata table from whichever
-    series happened to publish that hour, or whose newest file is small, rather than from every
+    only from the files `select_new_rows` judged new. The next hourly run would therefore rebuild
+    the metadata table from whichever series happened to publish that hour, rather than from every
     series NGED publishes. Nothing is permanently lost, and a rebuild is cheaper than re-reading the
     bucket. Every JSON file carries its own series' metadata in its top-level fields, and
     `list_timeseries_json_files` returns a `time_series_id` per key. The newest file per series is

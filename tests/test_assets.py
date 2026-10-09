@@ -381,46 +381,18 @@ def test_power_time_series_and_metadata_handles_no_new_data(
     assert calls == 1
 
 
-_SILENT_SERIES_KEY = (
-    "timeseries/1774512000000_1774533600000/TimeSeries_33_20260326T080000Z_20260326T140000Z.json"
-)
-"""The key of a file for a series that has stopped reporting."""
-
-
-def _silent_series_file(*, note: str, area: object = None) -> bytes:
-    """A data-less file of the size NGED publishes for a series that has stopped reporting."""
-    null_area = {
-        "WKT": None,
-        "SRID": None,
-        "IsValid": False,
-        "CenterLat": None,
-        "CenterLon": None,
-        "GeometryType": None,
-    }
-    return json.dumps(
-        {
-            "Area": null_area if area is None else area,
-            "Units": "MW",
-            "Latitude": 52.9,
-            "Longitude": -0.01,
-            "Information": note,
-            "LicenceArea": "EMids",
-            "TimeSeriesID": 33,
-            "SubstationType": "HV Customer",
-            "TimeSeriesName": "Test Generation 33",
-            "TimeSeriesType": "Other (Generation)",
-            "SubstationNumber": 900_033,
-            "data": None,
-        }
-    ).encode()
-
-
-def test_an_hour_without_new_readings_still_stores_the_note_of_a_silent_series(
+def test_the_newest_small_file_of_a_series_sets_its_metadata(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
-    """The only file is small and carries no readings, so no power is downloaded and
-    ``NoNewData`` is raised. The note must reach the metadata table regardless."""
-    files = {_SILENT_SERIES_KEY: _silent_series_file(note="Invented fault note.")}
+    """Series 10 has an older large file and a newer data-less file that carries NGED's note.
+    The size filter drops the newer file from the power download, but its metadata must win."""
+    small_file = json.loads((_NGED_JSON_DIR / "TimeSeries_33_no_data.json").read_text())
+    small_file.update(TimeSeriesID=10, Information="Invented fault note.")
+    small_file_key = (
+        "timeseries/1774555200000_1774576800000"
+        "/TimeSeries_10_20260326T140000Z_20260326T200000Z.json"
+    )
+    files = {**_NGED_FILES, small_file_key: json.dumps(small_file).encode()}
     monkeypatch.setattr(
         target=assets.Settings, name="get_nged_s3_store", value=lambda self: _FakeS3Store(files)
     )
@@ -429,46 +401,10 @@ def test_an_hour_without_new_readings_still_stores_the_note_of_a_silent_series(
 
     assert result.success
     metadata = pl.read_parquet(env / "NGED" / "metadata.parquet")
-    assert metadata.select("time_series_id", "information").rows() == [(33, "Invented fault note.")]
-    assert not (env / "NGED" / "power_time_series.delta").exists()
-
-
-def test_an_hour_with_new_readings_stores_both_the_new_series_and_the_silent_series_note(
-    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
-) -> None:
-    files = {**_NGED_FILES, _SILENT_SERIES_KEY: _silent_series_file(note="Invented fault note.")}
-    monkeypatch.setattr(
-        target=assets.Settings, name="get_nged_s3_store", value=lambda self: _FakeS3Store(files)
-    )
-
-    result = materialize([power_time_series_and_metadata], instance=dagster_instance)
-
-    assert result.success
-    metadata = pl.read_parquet(env / "NGED" / "metadata.parquet")
-    assert dict(metadata.select("time_series_id", "information").rows())[33] == (
-        "Invented fault note."
-    )
-    assert {10, 11} <= set(metadata["time_series_id"])
+    notes = dict(metadata.select("time_series_id", "information").rows())
+    assert notes[10] == "Invented fault note."
+    assert notes[11] is None
     assert pl.read_delta(str(env / "NGED" / "power_time_series.delta")).height > 0
-
-
-def test_a_malformed_silent_series_file_does_not_stop_the_power_write(
-    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
-) -> None:
-    """`Area: null` is not the struct the parser expects, so the small file cannot be read."""
-    files = {**_NGED_FILES, _SILENT_SERIES_KEY: _silent_series_file(note="x", area="not a struct")}
-    monkeypatch.setattr(
-        target=assets.Settings, name="get_nged_s3_store", value=lambda self: _FakeS3Store(files)
-    )
-
-    result = materialize([power_time_series_and_metadata], instance=dagster_instance)
-
-    assert result.success
-    assert pl.read_delta(str(env / "NGED" / "power_time_series.delta")).height > 0
-    materialisations = result.asset_materializations_for_node("power_time_series_and_metadata")
-    metadata = {k: v for mat in materialisations for k, v in mat.metadata.items()}
-    assert metadata["n_metadata_only_files_failed"].value == 1
-    assert 33 not in set(pl.read_parquet(env / "NGED" / "metadata.parquet")["time_series_id"])
 
 
 def test_power_time_series_and_metadata_retries_a_transient_upstream_failure(

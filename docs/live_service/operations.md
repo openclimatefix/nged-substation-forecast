@@ -230,12 +230,9 @@ afternoon and then stops again leaves no trace.
 
 **NGED's fault notes.** The check description also carries one sentence naming each series whose
 metadata table row has an `information` note, for example `NGED fault notes: 33: "Analogues not
-working.".`, whether or not the series is silenced. The note is NGED's own free text, and cleaning
-does not read it: a note has no date, so a rule based on it would rewrite a series' whole history.
-The ingest reads the newest small file of each series that has stopped reporting, so a silenced
-series' note stays current
-(`n_metadata_only_files_downloaded` and `n_metadata_only_files_failed` in the run metadata count
-those files).
+working."`, whether or not the series is silenced. The note is NGED's own free text. Cleaning does
+not read it, because a note has no date. The ingest downloads the newest file of every series, even
+a small file with no readings, so a silenced series' note stays current.
 
 `n_silenced` counts the ids you listed, not the ids that were actually withheld, so an id that
 matches no series still appears: that is how a mistyped id shows itself rather than vanishing.
@@ -283,11 +280,9 @@ and was swallowed so the power write could go ahead, and it also reaches Sentry 
 is derived data that NGED re-delivers, and the power time series is not, so a metadata table fault
 must not stall the ingest until an operator intervenes. The metadata table is left unchanged and the
 next run that finds new files retries it, but *that run's* metadata change is lost, because the
-power rows have landed and `select_new_rows` will not offer those files again. A series whose
-newest file carries no readings is the exception: the ingest reads that file on every run, so
-the next hour retries its metadata. Read the traceback in
-the run's logs — an off-contract metadata table after a schema change and a bug in our own code both
-land here, and both want a fix rather than a re-run.
+power rows have landed and `select_new_rows` will not offer those files again. Read the traceback in the run's logs — an off-contract metadata
+table after a schema change and a bug in our own code both land here, and both want a fix rather
+than a re-run.
 
 The 6-hourly forecasts are unaffected while this persists, however long it persists:
 `live_forecasts` locates each series from the promoted model's own frozen copy of the metadata table

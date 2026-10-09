@@ -1,22 +1,18 @@
-import json
 import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import cast
 
-import obstore
 import patito as pt
 import polars as pl
 import pytest
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from nged_data.storage import (
-    SMALL_FILE_SIZE_THRESHOLD_BYTES,
     _process_file_listing,
     _ProcessedFileListing,
     _RawFileListItem,
+    add_newest_file_of_each_series,
     coverage_from_power,
-    download_metadata_of_series_without_new_files,
     remove_small_files_from_listing,
     scan_cleaned_power,
     select_new_rows,
@@ -619,76 +615,12 @@ def test_coverage_from_power_matches_time_series_coverage(tmp_path: Path):
     assert coverage_from_power(power).equals(time_series_coverage(str(delta_path)))
 
 
-# --- download_metadata_of_series_without_new_files -----------------------------------------------
+# --- add_newest_file_of_each_series -----------------------------------------------------------
 
 
-def _small_nged_json(*, time_series_id: int, note: str | None, area: object = None) -> bytes:
-    """A data-less NGED file of the size NGED publishes for a series that has stopped reporting.
-
-    `area` defaults to the all-null struct that real files carry for a non-Primary series.
-    """
-    null_area = {
-        "WKT": None,
-        "SRID": None,
-        "IsValid": False,
-        "CenterLat": None,
-        "CenterLon": None,
-        "GeometryType": None,
-    }
-    return json.dumps(
-        {
-            "Area": null_area if area is None else area,
-            "Units": "MW",
-            "Latitude": 52.9,
-            "Longitude": -0.01,
-            "Information": note,
-            "LicenceArea": "EMids",
-            "TimeSeriesID": time_series_id,
-            "SubstationType": "HV Customer",
-            "TimeSeriesName": f"Test Generation {time_series_id}",
-            "TimeSeriesType": "Other (Generation)",
-            "SubstationNumber": 900_000 + time_series_id,
-            "data": None,
-        }
-    ).encode()
-
-
-# The fake's `.bytes()` method (named to match obstore's API) shadows the `bytes` builtin inside
-# its own class scope, so its annotations use this module-level alias.
-_JsonBytes = bytes
-
-
-class _FakeGetResult:
-    def __init__(self, data: _JsonBytes) -> None:
-        self._data = data
-
-    def bytes(self) -> _JsonBytes:
-        return self._data
-
-
-class _FakeStore:
-    """Serves fixed file contents through the one `obstore` method the function under test calls."""
-
-    def __init__(self, files: dict[str, bytes]) -> None:
-        self._files = files
-
-    def get(self, path: str) -> _FakeGetResult:
-        return _FakeGetResult(self._files[path])
-
-
-def _fake_store(files: dict[str, bytes]) -> obstore.store.S3Store:
-    """Type the fake as the store the function under test takes: it only calls `.get()`."""
-    return cast(obstore.store.S3Store, _FakeStore(files))
-
-
-def _as_listing(listing: pl.DataFrame) -> pt.DataFrame[_ProcessedFileListing]:
-    """Re-attach the Patito model that an eager Polars method drops."""
-    return pt.DataFrame(listing).set_model(_ProcessedFileListing)
-
-
-def _listing_of(files: dict[str, bytes]) -> pt.DataFrame[_ProcessedFileListing]:
+def _listing_of(paths_and_sizes: dict[str, int]) -> pt.DataFrame[_ProcessedFileListing]:
     return _process_file_listing(
-        [_RawFileListItem(path=path, filesize_bytes=len(data)) for path, data in files.items()]
+        [_RawFileListItem(path=path, filesize_bytes=size) for path, size in paths_and_sizes.items()]
     )
 
 
@@ -699,87 +631,23 @@ def _key(time_series_id: int, end_ms: int) -> str:
     )
 
 
-def test_download_metadata_of_series_without_new_files_reads_the_newest_small_file_of_each_series():
-    files = {
-        _key(33, 1_774_533_600_000): _small_nged_json(time_series_id=33, note="older note"),
-        _key(33, 1_774_555_200_000): _small_nged_json(time_series_id=33, note="newer note"),
-        _key(32, 1_774_533_600_000): _small_nged_json(time_series_id=32, note=None),
-    }
+def test_add_newest_file_of_each_series_adds_the_small_file_of_a_series_with_only_old_new_files():
+    old_large_file = _key(33, 1_774_533_600_000)
+    newest_small_file = _key(33, 1_774_555_200_000)
+    all_files = _listing_of({old_large_file: 5_000, newest_small_file: 450})
+    new_files = remove_small_files_from_listing(all_files)
+    assert new_files["path"].to_list() == [old_large_file]
+
+    result = add_newest_file_of_each_series(all_files=all_files, new_files=new_files)
+
+    # The newest file comes last, so `download_and_parse_files` keeps its metadata.
+    assert result["path"].to_list() == [old_large_file, newest_small_file]
+
+
+def test_add_newest_file_of_each_series_adds_nothing_for_a_series_whose_newest_file_is_listed():
+    files = {_key(33, 1_774_533_600_000): 5_000, _key(34, 1_774_533_600_000): 5_000}
     all_files = _listing_of(files)
 
-    result = download_metadata_of_series_without_new_files(
-        store=_fake_store(files),
-        all_files=all_files,
-        downloaded_files=_as_listing(all_files.clear()),
-    )
+    result = add_newest_file_of_each_series(all_files=all_files, new_files=all_files)
 
-    assert result.metadata is not None
-    assert dict(result.metadata.select("time_series_id", "information").rows()) == {
-        32: None,
-        33: "newer note",
-    }
-    assert (result.n_downloaded, result.n_failed) == (2, 0)
-
-
-def test_download_metadata_of_series_without_new_files_skips_series_with_a_downloaded_file():
-    files = {
-        _key(33, 1_774_533_600_000): _small_nged_json(time_series_id=33, note="note"),
-        _key(34, 1_774_533_600_000): _small_nged_json(time_series_id=34, note="note"),
-    }
-    all_files = _listing_of(files)
-
-    result = download_metadata_of_series_without_new_files(
-        store=_fake_store(files),
-        all_files=all_files,
-        downloaded_files=_as_listing(all_files.filter(pl.col("time_series_id") == 34)),
-    )
-
-    assert result.metadata is not None
-    assert result.metadata["time_series_id"].to_list() == [33]
-
-
-def test_download_metadata_of_series_without_new_files_skips_a_series_whose_newest_file_is_large():
-    large_note = "x" * SMALL_FILE_SIZE_THRESHOLD_BYTES
-    files = {_key(33, 1_774_533_600_000): _small_nged_json(time_series_id=33, note=large_note)}
-    all_files = _listing_of(files)
-
-    result = download_metadata_of_series_without_new_files(
-        store=_fake_store(files),
-        all_files=all_files,
-        downloaded_files=_as_listing(all_files.clear()),
-    )
-
-    assert result.metadata is None
-    assert result.n_downloaded == 0
-
-
-def test_download_metadata_of_series_without_new_files_counts_a_malformed_file_and_keeps_the_rest():
-    files = {
-        _key(33, 1_774_533_600_000): _small_nged_json(time_series_id=33, note="note"),
-        # `Area: null` is not a struct, so `_extract_time_series_metadata` raises on it.
-        _key(34, 1_774_533_600_000): _small_nged_json(time_series_id=34, note="note").replace(
-            b'"Area": {', b'"Area": null, "Unused": {'
-        ),
-    }
-    all_files = _listing_of(files)
-
-    result = download_metadata_of_series_without_new_files(
-        store=_fake_store(files),
-        all_files=all_files,
-        downloaded_files=_as_listing(all_files.clear()),
-    )
-
-    assert result.metadata is not None
-    assert result.metadata["time_series_id"].to_list() == [33]
-    assert (result.n_downloaded, result.n_failed) == (2, 1)
-
-
-def test_download_metadata_of_series_without_new_files_with_nothing_to_read():
-    files = {_key(33, 1_774_533_600_000): _small_nged_json(time_series_id=33, note="note")}
-    all_files = _listing_of(files)
-
-    result = download_metadata_of_series_without_new_files(
-        store=_fake_store(files), all_files=all_files, downloaded_files=all_files
-    )
-
-    assert result == (None, 0, 0)
+    assert sorted(result["path"].to_list()) == sorted(files)
