@@ -403,6 +403,7 @@ include = [
     "packages/studies/src/studies/battery_recurrence.py",
     "packages/studies/src/studies/battery_state_space.py",
     "packages/studies/tests/test_battery_state_space.py",
+    "studies/unmetered_battery_capacity/capacity_runs.py",
     "studies/unmetered_battery_capacity/capacity_state_space.py",
 ]
 
