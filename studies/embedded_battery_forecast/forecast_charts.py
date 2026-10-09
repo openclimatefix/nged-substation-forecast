@@ -247,7 +247,7 @@ def leaderboard_figure() -> alt.VConcatChart:
         )
     return figure(
         panels=panels,
-        number=2,
+        number=6,
         title="At every issue time the XGBoost quantile models match the climatology or sit "
         "just above it; only the battery's own notification at gate closure beats it",
         subtitle=[
@@ -309,7 +309,7 @@ def lead_figure() -> alt.VConcatChart:
     panel = (band + chart + zero).properties(width=WIDE_PX, height=220)
     return figure(
         panels=[panel],
-        number=3,
+        number=7,
         title=(
             "XGBoost skill against the climatology stays within 0.03 of zero at every lead, "
             "and the rank rule is 0.03 to 0.09 below it"
@@ -385,7 +385,7 @@ def sensitivity_figure() -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=4,
+        number=9,
         title="D2 and D4 survive every check; D1 stays null, and D3 loses its significance "
         "once lead parties are resampled",
         subtitle=[
@@ -424,7 +424,7 @@ def census_figure() -> alt.VConcatChart:
         )
     return figure(
         panels=panels,
-        number=5,
+        number=3,
         title="141 of NGED's 176 connected batteries are under 1 MW, and the 35 larger ones hold "
         "96% of the megawatts",
         subtitle=[
@@ -488,7 +488,7 @@ def week_figure() -> alt.VConcatChart:
     )
     return figure(
         panels=[output, prices],
-        number=6,
+        number=2,
         title="A battery charges and exports in short bursts that follow the day-ahead price only "
         "loosely",
         subtitle=[
@@ -543,11 +543,11 @@ def fan_figure() -> alt.VConcatChart:
         )
     return figure(
         panels=panels,
-        number=7,
+        number=4,
         title="Both forecasts give a wide band, and neither predicts which days the battery cycles",
         subtitle=[
             (
-                f"{EXAMPLE_BATTERY}, the same week as Figure 6. Black line: metered output. "
+                f"{EXAMPLE_BATTERY}, the same week as Figure 2. Black line: metered output. "
                 "Coloured line: median forecast. Shaded band: p10 to p90 of the forecast."
             ),
         ],
@@ -601,7 +601,7 @@ def reliability_figure() -> alt.VConcatChart:
     panel = (reference + lines).properties(width=WIDE_PX, height=260)
     return figure(
         panels=[panel],
-        number=8,
+        number=5,
         title="The XGBoost forecast is close to calibrated; the climatology's lower tail is too "
         "narrow, with 6% of outcomes below its p1",
         subtitle=[
@@ -640,7 +640,7 @@ def battery_skill_figure() -> alt.VConcatChart:
     )
     return figure(
         panels=[(panel + zero).properties(width=PLOT_PX, height=12 * len(sort))],
-        number=9,
+        number=8,
         title=f"{positive} of 35 batteries beat the climatology slightly, and 2 do much worse",
         subtitle=[
             (

@@ -53,6 +53,12 @@ regions or climates, so a result may not hold elsewhere.
   that follows another rule hold the truth far less often than stated, and the screen of eight
   primaries has no power.
 
+- [How well can an embedded battery's output be forecast, and how many of NGED's batteries have a
+  published plan?](embedded-battery-forecast.md) — across 35 battery BMUs, no XGBoost forecast
+  tested beats a 56-day trailing climatology day ahead; the real day-ahead price lowers the error
+  by 1.1% and other batteries' published plans by 1.3% one hour ahead. The registers show at most
+  4.5% of NGED's connected storage rows could have a BMU. All numbers are provisional.
+
 ## Past weather
 
 **Three studies score how well each weather product describes weather that has already happened.**
