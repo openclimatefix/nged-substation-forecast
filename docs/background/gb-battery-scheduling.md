@@ -77,26 +77,24 @@ algorithms below are our plain-language summary of operator and analyst descript
 [battery and solar separation study](../studies/battery-pv-separation.md) uses only the first.
 
 1. **Day-ahead arbitrage.** Take tomorrow's 48 day-ahead prices. Start from the expected state of
-   charge at midnight. Choose a charge or discharge power for each half-hour to maximise revenue
-   from discharging, minus the cost of charging and a wear charge per MWh. Keep the state of charge
-   between about 5% and 95% (source not checked), keep the power inside the import and export
-   limits, apply a round-trip efficiency of about 0.85 to 0.90 (source not checked), and cap the
-   cycles per day (a cycle is one full charge and discharge). Submit the result as the day-ahead
-   position, which appears in the physical notification. A one-cycle shortcut charges in the
-   cheapest block as long as the battery's duration and discharges in the dearest block after it,
-   and idles if the price spread is smaller than the losses plus the wear.
-2. **Frequency-response holdback.** One day before, offer megawatts into the Dynamic Containment,
-   Moderation, or Regulation auctions when the expected response price beats the value of
-   arbitrage, then run algorithm 1 on the power that remains. Inputs: response auction prices and
-   the contracted megawatts.
-3. **Within-day re-optimiser.** After each intraday auction, or every half-hour, solve algorithm 1
-   again over the remaining half-hours from the current state of charge. Inputs: the committed
-   positions and the latest intraday prices.
-4. **BM acceptance rule.** Set offer and bid prices around the expected later sale price, adjusted
-   for efficiency and a margin, and let the system operator accept or skip each offer and bid ([ESS
-   News](https://www.ess-news.com/2026/07/14/lower-skip-rates-for-uk-battery-storage-but-neso-plans-further-reform/)
-   reports a skip-rate measure that fell from 49% in the first half of 2025 to 38% in the first half
-   of 2026). Inputs: expected prices and the state of charge.
+charge at midnight. Choose a charge or discharge power for each half-hour to maximise revenue from
+discharging, minus the cost of charging and a wear charge per MWh. Keep the state of charge between
+about 5% and 95% (source not checked), keep the power inside the import and export limits, apply a
+round-trip efficiency of about 0.85 to 0.90 (source not checked), and cap the cycles per day (a
+cycle is one full charge and discharge). Submit the result as the day-ahead position, which appears
+in the physical notification. A one-cycle shortcut charges in the cheapest block as long as the
+battery's duration and discharges in the dearest block after it, and idles if the price spread is
+smaller than the losses plus the wear. 2. **Frequency-response holdback.** One day before, offer
+megawatts into the Dynamic Containment, Moderation, or Regulation auctions when the expected
+response price beats the value of arbitrage, then run algorithm 1 on the power that remains. Inputs:
+response auction prices and the contracted megawatts. 3. **Within-day re-optimiser.** After each
+intraday auction, or every half-hour, solve algorithm 1 again over the remaining half-hours from the
+current state of charge. Inputs: the committed positions and the latest intraday prices. 4. **BM
+acceptance rule.** Set offer and bid prices around the expected later sale price, adjusted for
+efficiency and a margin, and let the system operator accept or skip each offer and bid ([ESS
+News](https://www.ess-news.com/2026/07/14/lower-skip-rates-for-uk-battery-storage-but-neso-plans-further-reform/)
+reports a skip-rate measure that fell from 49% in the first half of 2025 to 38% in the first half of
+2026). Inputs: expected prices and the state of charge.
 
 **GB batteries cycle less than a perfect-foresight optimiser would, which is about 0.6 to 1.0 cycles
 a day against 2.4.** Modo's analysis of 2026 operations finds 1-hour batteries at about 0.6 cycles a
@@ -128,77 +126,68 @@ day, which is what a battery's schedule follows.
 
 ## How many batteries are connected in NGED's area?
 
-**About 200 batteries of 50 kW or more are connected to the distribution network in NGED's four
-licence areas, and about 12 of them have a Balancing Mechanism Unit (BMU) with planned output.**
-This is a first estimate, not a census. It comes from hand-matching public registers to NGED's own
-Embedded Capacity Register (ECR), and the matching has no authoritative answer to check against. No
-committed script reproduces the hand-matching: only the 176 batteries listed as storage in the ECR
-can be recounted from the ECR file alone. The
-registers are dated: the ECR is the August 2026 release, the Renewable Energy Planning Database
-(REPD) is the July 2026 release, and the National Energy System Operator's (NESO's) transmission
-entry capacity (TEC) register is the October 2026 release. A battery connected after those dates is
-missing.
+**NGED's Embedded Capacity Register (ECR) lists 176 connected storage rows of 50 kW or more, and the
+public registers match none of them to a Balancing Mechanism Unit (BMU) by name and capacity.**
+A BMU is the unit in which output is notified, metered, and settled with the system operator.
+Each BMU submits a Final Physical Notification (FPN), its planned output. The counts below come from
+`studies/embedded_battery_forecast/census_report.py`, which recounts the registers. The registers
+are dated: the ECR is the August 2026 release, the Renewable Energy Planning Database (REPD) is the
+July 2026 release, and the National Energy System Operator's (NESO's) transmission entry capacity
+(TEC) register is the October 2026 release. A battery connected after those dates is missing.
 
-**The ECR alone cannot say which batteries have a BMU.** The ECR lists every generator and store
-connected to NGED's distribution network, but it carries no BMU identifier. By name alone it
-recovered none of the 7 batteries whose BMU we could confirm. The REPD supplied operational
-batteries, which we placed in a licence area by the nearest ECR site within 5 km. The TEC register
-supplied transmission-connected batteries: built, directly connected storage at the grid supply
-points (the points where the transmission network meets the distribution network) that the ECR
-lists. We then joined each entry to the ECR and to the Elexon BMU register by hand, on name tokens,
-on capacity within about 10%, on lead party, and on grid supply point.
+**The count is 210 embedded batteries, most of them small.** The ECR lists 176 connected storage
+rows. The REPD adds 34 operational batteries that lie more than 1 km from every connected ECR
+storage row, so they are not already counted. Each is placed in the licence area of a connected ECR
+row of any technology within 5 km. Several sites converted from backup generation are still listed
+in the ECR as gas or oil. Domestic batteries are not counted, because the ECR starts at 50 kW.
 
-**The estimate is 202 embedded batteries, most of them small.** The range is 190 to 215. Of the 202,
-176 are listed as storage in the ECR. Several sites converted from backup generation are still
-listed there as gas or oil. Domestic batteries are not counted, because the ECR starts at 50 kW.
+| Licence area | Connected storage rows in the ECR | Added from the REPD | Total |
+|---|---|---|---|
+| East Midlands | 58 | 9 | 67 |
+| West Midlands | 45 | 14 | 59 |
+| South Wales | 31 | 3 | 34 |
+| South West | 42 | 8 | 50 |
+| Total | 176 | 34 | 210 |
 
-| Licence area | Embedded batteries of 50 kW or more | Of which listed as storage in the ECR |
-|---|---|---|
-| East Midlands | 66 | 58 |
-| West Midlands | 54 | 45 |
-| South Wales | 35 | 31 |
-| South West | 47 | 42 |
-| Total | 202 | 176 |
-
-| Export size | Batteries |
+| Export size of an ECR storage row | Rows |
 |---|---|
 | Under 1 MW | 141 |
-| 1 to 5 MW | 12 |
-| 5 to 50 MW | 46 |
-| Over 50 MW | 3 |
+| 1 to 10 MW | 14 |
+| 10 to 50 MW | 20 |
+| 50 to 100 MW | 1 |
 
-**About 7 more batteries (5 to 7) are connected to the transmission network, and 5 of those have
-BMUs.** They sit outside the 202, because NGED's distribution network does not carry their output.
+**The ECR alone cannot say which batteries have a BMU, and name and capacity together matched
+none.** The ECR lists every generator and store connected to NGED's distribution network, but it
+carries no BMU identifier. The census compared each of the 8 embedded storage BMUs in NGED's four
+grid supply point groups with the ECR rows. No BMU had a row that agreed on both name and capacity
+(a string-similarity ratio of at least 0.85 between the names, and a capacity within 10%), so the
+match found none of the 8.
 
-**Only about 6% of the embedded batteries by count, but about 31% by megawatts, have a BMU of their
-own with planned output.** Planned output here means the Final Physical Notification (FPN), the
-planned output that a BMU submits to the system operator. Of the 202 batteries, 7 are confirmed
-own-BMU batteries, with their FPN data on disk. A further 5 are probable: the Elexon register flags
-FPNs for them, but we hold no FPN data. That makes about 12 (range 7 to 18), roughly 420 of the
-1,330 MW in total.
+**The BMU register gives a ratio from the other side: 8 embedded storage BMUs against the ECR's 176
+storage rows, 4.5% by count and 47% by megawatts.** The BMU register holds 8 embedded storage BMUs
+in NGED's four grid supply point groups (the groups of substations where the transmission network
+meets NGED's distribution network). Of those, 5 have at least 95% of the year's settled output in
+Elexon's B1610 data, a ratio of 2.8% by count. The share by megawatts divides the 8 BMUs'
+generation capacity by the 699 MW of connected storage export capacity. Each BMU may stand for more
+than one ECR row, or for none, so the 4.5% and the 47% are ratios of two registers, not counts of
+matched batteries.
 
-| BMU status | Batteries |
-|---|---|
-| Own BMU, FPN data on disk | 7 |
-| Own BMU, FPN flagged by Elexon, no FPN data on disk | 5 |
-| Own BMU, no FPN flag | 1 to 3 |
-| Inside a secondary BMU run by a virtual lead party | 2 to 3 |
-| No BMU found | about 185 (92%) |
+**About 55 transmission-connected batteries are in the TEC register, and 11 sit at a connection site
+whose first word matches one of the ECR's grid supply point names.** That match is loose. The 55
+transmission-connected batteries sit outside the 210, because NGED's distribution network does not
+carry their output.
 
-**Of the 185 batteries with no BMU found, 141 are under 1 MW and almost certainly have no BMU of
-their own.** The census cannot say whether the roughly 45 batteries of 1 MW or more sit inside a
-supplier's BMU or have no BMU at all.
-
-**The band is wide for three reasons.** There are 11 sites of unclear status or size. The ECR
-carries stale technology labels. A site's licence area is assigned by the nearest ECR site, so a
-site near a boundary can land in the wrong area.
+**Of the 176 storage rows, 141 are under 1 MW and almost certainly have no BMU of their own.** The
+census cannot say whether the 35 rows of 1 MW or more sit inside a supplier's BMU or have no BMU
+at all.
 
 **For forecasting, most embedded batteries have no planned output, so a forecast for them cannot use
-it.** Any forecast that takes the FPN as an input applies to roughly 6% of the embedded batteries. The
-[battery and solar separation study](../studies/battery-pv-separation.md) does not need the FPN
-for its separation, and uses it only in the primer's decomposition of the output. The public BMU batteries
-are therefore a small testbed, and a forecast for the other batteries has to work from metered flows
-and prices alone.
+it.** A forecast that takes the FPN as an input applies to a small share of the embedded batteries:
+about 4.5% of the storage rows by count, on the ratio of the two registers. The [battery and solar
+separation study](../studies/battery-pv-separation.md) does not need the FPN for its separation, and
+uses it only in the primer's decomposition of the output. The public BMU batteries are therefore a
+small testbed, and a forecast for the other batteries has to work from metered flows and prices
+alone.
 
 ## What the public data show and what must be inferred
 

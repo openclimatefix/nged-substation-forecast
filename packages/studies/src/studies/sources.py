@@ -761,6 +761,12 @@ SOLAR_BMU_DISAGGREGATION_DIR: Final[Path] = study_dir_for(study="solar_disaggreg
 BATTERY_PV_SEPARATION_DIR: Final[Path] = study_dir_for(study="battery_pv_separation")
 """The study of separating batteries from solar: the BMU list, saved series, and `report.md`."""
 
+EMBEDDED_BATTERY_FORECAST_DIR: Final[Path] = study_dir_for(study="embedded_battery_forecast")
+"""The study of forecasting embedded batteries' output: the census tables and `census_report.md`."""
+
+EMBEDDED_BATTERY_FORECAST_INPUTS_DIR: Final[Path] = EMBEDDED_BATTERY_FORECAST_DIR / "inputs"
+"""The study's wide input frame for each battery and issue time, and `inputs_report.md`."""
+
 NGED_BATTERY_A_FIGURES_DIR: Final[Path] = BATTERY_PV_SEPARATION_DIR / "nged_battery_a_figures"
 """Where the private NGED battery case study writes its figures: outside `docs/`, unpublished."""
 

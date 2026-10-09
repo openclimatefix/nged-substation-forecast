@@ -209,6 +209,28 @@ feature is, then what the planned solution is. A reader who stops after the firs
 should already know what is broken (or missing) and roughly how the plan fixes it, without reading
 the file-by-file detail.
 
+Follow the two summaries with a **"Walk through"** section, under a "Solution" heading, in every
+plan. The maintainer reads the walk through before the file-by-file section, to check that the
+changes to each file fit together. The walk through tells, in plain language, a concise story of
+how the change works end to end, in the form "To do X, we first do Y, which loads Z, which is
+passed to function W (through the new `baz` parameter)". The walk through has three sub-sections:
+
+- **The happy path**, from the trigger to the stored result.
+- **The main branches off the happy path**, such as the first run against an empty table versus an
+  append to an existing table.
+- **The main error-handling paths**: what the code does on each failure, whether the run degrades
+  or raises, and what is reported.
+
+Name the real functions, parameters, and files, so the reader can match the story to the
+file-by-file section. Give the reason beside every ordering, parameter, or branch that the reader
+would not guess: "we read the stored watermark before listing the bucket, because the listing is
+filtered by the watermark", "the watermark is written in the same commit as the rows, so a crash
+cannot leave the watermark ahead of the rows".
+
+Write the walk through after the rest of the plan is settled. Update the walk through after each
+review, because the walk through names functions and parameters, and any design change a review
+makes leaves those names out of date.
+
 The plan covers:
 
 - **Verdict, size and departures** — the step-2 conclusion, the step-3 size with the reviews it
@@ -322,6 +344,7 @@ Tailor the brief to this issue's specific failure modes rather than asking for a
 attacks worth naming, when they apply:
 
 - Does the plan's description of *current* behaviour actually match the code on `main`?
+- Does the "Walk through" agree with the file-by-file section, the tests, and the code it names?
 - Would each proposed test really have failed before the change? A test that passes on `main` today
   tests nothing about this change.
 - Is any part of the plan untestable as written — needing network, wall-clock time, or a whole
