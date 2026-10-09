@@ -1,7 +1,7 @@
 # Embedded-battery forecast
 
 Scripts for the study of how well the distribution of an embedded battery's next-day output can be
-predicted. The plan is `plans/embedded-battery-forecast.md`. Every output sits under
+predicted. Every output sits under
 `data/studies/per_study/embedded_battery_forecast/` (the folder `studies.sources` names), never in
 the repository.
 
