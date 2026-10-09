@@ -849,6 +849,17 @@ def test_metrics_refuses_a_study_that_omits_the_rows_of_a_valid_time(
         )
 
 
+@pytest.mark.parametrize("bound", ["valid_time_min", "valid_time_max"])
+def test_metrics_config_refuses_a_valid_time_bound_in_leaderboard_scope(bound: str) -> None:
+    """A trimmed window would be scored under the full fold's label."""
+    population_filter = PopulationFilter(**{bound: "2025-10-01T00:00:00+00:00"})
+
+    with pytest.raises(ValueError, match="only allowed with"):
+        MetricsConfig(population_filter=population_filter, evaluation_scope="leaderboard")
+
+    MetricsConfig(population_filter=population_filter, evaluation_scope="ad_hoc")
+
+
 def test_metrics_refuses_a_study_that_spreads_rows_across_model_names(
     file_mlflow_env: dict[str, Path],
     dagster_instance: DagsterInstance,

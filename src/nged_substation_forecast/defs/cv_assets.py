@@ -8,7 +8,7 @@ the logic stays fast to unit-test and the assets stay readable.
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Final, NamedTuple
+from typing import Final, NamedTuple, Self
 
 import mlflow
 import patito as pt
@@ -65,6 +65,7 @@ from ml_core.mlflow_runs import (
 )
 from ml_core.repro import ABSENT, MlflowTags, StageType, TableNameType, provenance_tags
 from nged_data.storage import coverage_from_power, scan_cleaned_power, time_series_coverage
+from pydantic import model_validator
 
 from nged_substation_forecast.defs._engineering_inputs import (
     MAX_NWP_LEAD,
@@ -698,9 +699,25 @@ class MetricsConfig(Config):
     """Which evaluation scope this run produces.
 
     - ``"leaderboard"``: logs per-fold + aggregate metrics to the golden leaderboard MLflow
-      experiments (canonical complete-window folds only).
+      experiments (canonical complete-window folds only). The population filter may not
+      set ``valid_time_min`` or ``valid_time_max`` in this scope, because a trimmed window would be
+      scored under the full fold's label.
     - ``"ad_hoc"``: writes to ``forecast_metrics`` Delta only; no MLflow logging.
     """
+
+    @model_validator(mode="after")
+    def _refuse_trimmed_leaderboard_window(self) -> Self:
+        """Reject a ``valid_time`` bound on the population filter in leaderboard scope."""
+        trimmed = (
+            self.population_filter.valid_time_min is not None
+            or self.population_filter.valid_time_max is not None
+        )
+        if self.evaluation_scope == "leaderboard" and trimmed:
+            raise ValueError(
+                "population_filter.valid_time_min/max trims the window, so it is only allowed "
+                'with evaluation_scope="ad_hoc".'
+            )
+        return self
 
 
 FINAL_TEST_ENV_VAR: Final[str] = "NGED_FINAL_TEST"
@@ -775,7 +792,6 @@ def _validate_group(
     fold_id: str,
     group_scan: pl.LazyFrame,
     scan: pt.LazyFrame[PowerForecast],
-    population_filter: PopulationFilter,
     evaluation_scope: EvalScopeType,
 ) -> _EvalWindow:
     """Refuse a group the scorer must not score, and return its evaluation window.
@@ -796,8 +812,7 @@ def _validate_group(
         group_scan: Lazy scan of this group's forecast rows.
         scan: Typed lazy scan of the whole ``power_forecasts`` table, from which the reference
             experiment's rows are read.
-        population_filter: The run's population filter; its ``valid_time`` bounds apply to the
-            reference rows as well, so the two sides cover the same window.
+
         evaluation_scope: ``"leaderboard"`` or ``"ad_hoc"``.
 
     Returns:
@@ -824,10 +839,7 @@ def _validate_group(
     if exp_name.startswith(STUDY_EXPERIMENT_PREFIX):
         require_single_model_name(study=group_scan, group_label=group_label)
         reference = PopulationFilter(
-            experiment_name=_cv_config.reference_experiment_name,
-            fold_id=fold_id,
-            valid_time_min=population_filter.valid_time_min,
-            valid_time_max=population_filter.valid_time_max,
+            experiment_name=_cv_config.reference_experiment_name, fold_id=fold_id
         ).apply(scan)
         require_same_row_keys(
             study=group_scan,
@@ -1155,7 +1167,6 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             fold_id=fold_id,
             group_scan=_group_scan(pruned_scan, exp_name, fold_id),
             scan=scan,
-            population_filter=config.population_filter,
             evaluation_scope=config.evaluation_scope,
         )
         for exp_name, fold_id in groups

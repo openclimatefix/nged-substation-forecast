@@ -246,7 +246,7 @@ run config dialog before launching.
 |---|---|---|
 | `population_filter.experiment_name` | `"xgboost_smoke_test"` | Filters `power_forecasts` to one experiment; leave null to score all experiments at once |
 | `population_filter.fold_id` | `"mid_2025_to_mid_2026"` | Filters to one fold; leave null to score all folds for the experiment |
-| `population_filter.valid_time_min/max` | `"2025-10-01T00:00:00+00:00"` | ISO-8601 UTC; trims the valid_time window for ad_hoc scoring |
+| `population_filter.valid_time_min/max` | `"2025-10-01T00:00:00+00:00"` | ISO-8601 UTC; trims the valid_time window. Allowed only with `evaluation_scope="ad_hoc"` |
 | `evaluation_scope` | `"leaderboard"` | `"leaderboard"` logs to MLflow; `"ad_hoc"` writes Delta only |
 
 **What the asset does:**
