@@ -208,8 +208,8 @@ def rung2_controls_section(
             "Agile unit (a price taker on the Agile price) is unchanged, so the flag counts "
             "below show how many detections the shift removes. A fixed window repeats every day, "
             "and the monthly baseline's daily profile absorbs a schedule that repeats every day by "
-            "construction, so the fixed-window result is a property of the baseline's design as well as of the "
-            "data. The control below moves the windows one hour early and takes both prices "
+            "construction, so the fixed-window result is a property of the baseline's design as "
+            "well as of the data. The control below moves the windows one hour early and takes both prices "
             "from 7 days later (the coarse stacks), beside the same coarse stacks with the real "
             "windows and prices."
         ),
