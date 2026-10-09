@@ -215,7 +215,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
                 "nged_s3_paths",
                 {
                     "All JSON files on S3": list_of_all_json_files,
-                    "Files not yet downloaded": list_of_files_to_download,
+                    "New or changed files since the last run": list_of_files_to_download,
                 },
             )
         )
