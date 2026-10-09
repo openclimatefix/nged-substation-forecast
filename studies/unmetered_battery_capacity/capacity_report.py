@@ -409,6 +409,93 @@ def c5_section(*, rung3: pl.DataFrame) -> list[str]:
     ]
 
 
+def unit_power_quantiles(*, frame: pl.DataFrame, unit: int) -> pl.DataFrame:
+    """Add the 5, 50, and 95% quantiles of one unit's power from the saved Laplace approximation.
+
+    The marginal of `log P` is Gaussian, so the quantiles of the power are exact.
+
+    Args:
+        frame: Rows with the saved `theta` and `covariance`.
+        unit: The unit's index in the parameter vector.
+
+    Returns:
+        The frame with `unit_power_q05`, `unit_power_median`, and `unit_power_q95`.
+    """
+    n = len(frame["theta"][0])
+    theta = np.array(frame["theta"].to_list())
+    variance = np.array(frame["covariance"].to_list()).reshape(-1, n, n)[:, unit, unit]
+    centre, sd = theta[:, unit], np.sqrt(np.where(np.isfinite(variance), variance, np.nan))
+    return frame.with_columns(
+        unit_power_q05=pl.Series(np.exp(centre - Z90 * sd)),
+        unit_power_median=pl.Series(np.exp(centre)),
+        unit_power_q95=pl.Series(np.exp(centre + Z90 * sd)),
+        unit_power_over_prior_scale=pl.Series(np.exp(centre)),
+    )
+
+
+def fleet_units_section(*, rung2: pl.DataFrame) -> list[str]:
+    """Which units of the domestic class the aggregate identifies in rung 2."""
+    if "true_agile_power_mw" not in rung2.columns:
+        return []
+    prior_scale = pl.col("true_power_mw") / pl.col("share") * 0.2
+    lines = [
+        "## Rung 2: which domestic units the aggregate identifies (exploratory)",
+        "",
+        (
+            "A fixed tariff window repeats every day, so the monthly baseline absorbs it, and the "
+            "likelihood is flat in its power. The table shows each unit's fitted power divided by "
+            "the scale of its prior (0.2 times the series' 99th percentile absolute flow): a ratio "
+            "that stays near the same value as the fleet grows means the prior, not the aggregate, "
+            "sets the power. The Agile tariff follows a price that changes every day."
+        ),
+        "",
+    ]
+    rows = []
+    for unit, name in (
+        (1, "agile"),
+        (3, "intelligent_octopus_go"),
+        (4, "octopus_go"),
+        (5, "octopus_flux"),
+    ):
+        frame = unit_power_quantiles(frame=rung2, unit=unit)
+        rows.append(
+            frame.group_by("share")
+            .agg(
+                (pl.col("unit_power_median") / prior_scale).median().alias("power_over_prior_scale")
+            )
+            .with_columns(unit=pl.lit(name))
+        )
+    lines += [
+        table(
+            pl.concat(rows)
+            .pivot(on="unit", index="share", values="power_over_prior_scale")
+            .sort("share")
+        )
+    ]
+    agile = unit_power_quantiles(frame=rung2, unit=1).with_columns(
+        truth=pl.col("true_agile_power_mw"),
+        covered=(pl.col("unit_power_q05") <= pl.col("true_agile_power_mw"))
+        & (pl.col("true_agile_power_mw") <= pl.col("unit_power_q95")),
+    )
+    lines += [
+        (
+            "Coverage of the Agile unit's 90% interval against the simulated Agile homes' rated "
+            "power, and the median ratio of its power to the truth:"
+        ),
+        "",
+        table(
+            agile.group_by("share")
+            .agg(
+                n=pl.len(),
+                covered=pl.col("covered").mean(),
+                median_ratio=(pl.col("unit_power_median") / pl.col("truth")).median(),
+            )
+            .sort("share")
+        ),
+    ]
+    return lines
+
+
 def rung3_section(*, rung3: pl.DataFrame) -> list[str]:
     """Coverage and error of real public batteries against registered power and energy."""
     frame = rung3.with_columns(true_energy_mwh=pl.col("true_energy_reference_mwh"))
@@ -430,9 +517,10 @@ def rung3_section(*, rung3: pl.DataFrame) -> list[str]:
     ]
 
 
-def rung4_section(*, rung4: pl.DataFrame, limits: dict[str, float]) -> list[str]:
+def rung4_section(*, rung4: pl.DataFrame, nulls: pl.DataFrame) -> list[str]:
     """NGED battery A inside a bulk supply point's flow."""
-    threshold = float(np.quantile(list(limits.values()), 1 - FALSE_ALARM_RATE))
+    finite = nulls.filter(pl.col("log_bayes_factor").is_finite())["log_bayes_factor"].to_numpy()
+    threshold = float(np.quantile(finite, 1 - FALSE_ALARM_RATE))
     frame = rung4.with_columns(
         flagged=pl.col("log_bayes_factor").is_finite() & (pl.col("log_bayes_factor") > threshold)
     )
@@ -440,8 +528,8 @@ def rung4_section(*, rung4: pl.DataFrame, limits: dict[str, float]) -> list[str]
         "## Rung 4: NGED battery A inside a bulk supply point's flow (exploratory, one site)",
         "",
         (
-            f"Detection threshold: {threshold:.2f} (the 95th percentile of the {len(limits)} "
-            "series' thresholds)."
+            f"Detection threshold: {threshold:.2f} (the 95th percentile of the {len(finite)} null "
+            "blocks of rung 1, because no series' own nulls exist for this flow)."
         ),
         "",
         table(
@@ -608,10 +696,11 @@ def main() -> None:
         rung1=rung1, rung2=rung2, shifted=shifted, rung3=rung3, limits=limits
     )
     lines += calibration_section(rung1=rung1, rung2=rung2)
+    lines += fleet_units_section(rung2=rung2)
     lines += c3_c4_section(rung1=rung1, steps=steps)
     lines += c5_section(rung3=rung3)
     lines += rung3_section(rung3=rung3)
-    lines += rung4_section(rung4=rung4, limits=limits)
+    lines += rung4_section(rung4=rung4, nulls=rung1.filter(pl.col("share") == 0))
     lines += rung5_section(rung5=rung5)
     lines += grid_section(rung1=rung1, grid=grid)
     lines += timing_section(

@@ -323,7 +323,7 @@ def posterior_summary(
 
 
 def _class_quantities(*, natural: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
-    """Sum the units of each class: `<class>_power_point` and `<class>_energy_point`.
+    """Sum the units of each class, and keep each unit: `<class>_power_point`, `unit_<unit>_...`.
 
     Works for one optimum (1-D arrays) or for draws (2-D arrays with one row per draw).
     """
@@ -333,4 +333,7 @@ def _class_quantities(*, natural: dict[str, np.ndarray]) -> dict[str, np.ndarray
         members = np.where(classes == index)[0]
         out[f"{name}_power_point"] = natural["power"][..., members].sum(axis=-1)
         out[f"{name}_energy_point"] = natural["energy"][..., members].sum(axis=-1)
+    for index, name in enumerate(UNIT_NAMES):
+        out[f"unit_{name}_power_point"] = natural["power"][..., index]
+        out[f"unit_{name}_energy_point"] = natural["energy"][..., index]
     return out

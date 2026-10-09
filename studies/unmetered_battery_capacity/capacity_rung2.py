@@ -87,9 +87,13 @@ def build() -> tuple[np.ndarray, list[list[dict]], list[dict]]:
             rated = float(homes["power_mw"].sum())
             scale = share * p99 / rated
             lanes.append(demand - scale * fleet.output_mw)
+            tariff_power = homes.group_by("tariff").agg(pl.col("power_mw").sum())
+            agile_rated = float(tariff_power.filter(pl.col("tariff") == "agile")["power_mw"].sum())
             meta.append(
                 {
                     "rung": "rung2",
+                    "true_agile_power_mw": scale * agile_rated,
+                    "true_fixed_window_power_mw": scale * (rated - agile_rated),
                     "series": label,
                     "share": share,
                     "true_power_mw": share * p99,
