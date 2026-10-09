@@ -60,10 +60,36 @@ SHARED_FEATURES: Final[tuple[str, ...]] = (
     "solar_zenith_deg",
     "solar_azimuth_deg",
     "extraterrestrial_horizontal_w_m2",
+    "cams_toa_w_m2",
     "hour_of_day",
     "day_of_year",
 )
-"""The solar geometry and calendar features every arm is shown, beside its rung's variables."""
+"""The solar geometry and calendar features every arm is shown, beside its rung's variables.
+
+`extraterrestrial_horizontal_w_m2` is a midpoint-zenith estimate of the top-of-atmosphere flux.
+`cams_toa_w_m2` is the hour-integrated flux, a function of the sun's position alone, so the
+accumulated clear-sky and direct-beam variables cannot win by supplying hour-integrated geometry
+that a production forecast could compute for nothing.
+"""
+
+DERIVED_FROM_MARS_ONLY: Final[tuple[str, ...]] = ("clear_sky_index",)
+"""The derived features built from a MARS-only variable."""
+
+MARS_ONLY_VARIABLES: Final[tuple[str, ...]] = (
+    "ssrdc",
+    "cdir",
+    "tclw",
+    "tciw",
+    "tcslw",
+    "cbh",
+    "tcrw",
+    "tcsw",
+    "tco3",
+    "uvb",
+    "fal",
+    "deg0l",
+)
+"""The ladder variables found only in ECMWF's full archive (MARS), not in a free feed."""
 
 ACCUMULATED_VARIABLES: Final[tuple[str, ...]] = (
     "ssrd",
@@ -222,6 +248,18 @@ def drop_one_group_features(*, dropped: RungType) -> tuple[str, ...]:
         msg = "g0 is the base every arm keeps, so it cannot be dropped"
         raise ValueError(msg)
     removed = set(_rung_own_columns(rung=dropped))
+    return tuple(name for name in rung_features(rung=RUNGS[-1]) if name not in removed)
+
+
+def without_mars_only_features() -> tuple[str, ...]:
+    """Return the features of `g9` less the MARS-only variables and what is derived from them.
+
+    The clear-sky index divides `ssrd` by `ssrdc`, so it leaves with `ssrdc`.
+
+    Returns:
+        The `g9` features that a production forecast could get without fetching from MARS.
+    """
+    removed = {*MARS_ONLY_VARIABLES, *DERIVED_FROM_MARS_ONLY}
     return tuple(name for name in rung_features(rung=RUNGS[-1]) if name not in removed)
 
 

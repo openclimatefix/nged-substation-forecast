@@ -48,6 +48,7 @@ from era5_ladder_arms import (
     NEAR_LINE_SHARE,
     NEGATIVE_CONTROL_ARM,
     PLANNED_CONTRASTS,
+    PLANNED_RESAMPLES,
     POSITIVE_CONTROL_ARM,
     PRIMARY_SETTING,
     SENSITIVITY_SETTING,
@@ -392,6 +393,7 @@ def contrast_row(
         reference=reference,
         metric=METRIC,
         level=ADJUSTED_LEVEL_PERCENT,
+        n_resamples=PLANNED_RESAMPLES,
     )
     smallest = SMALLEST_EFFECT[target]
     return {

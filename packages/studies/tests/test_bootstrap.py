@@ -4,6 +4,7 @@ import numpy as np
 import polars as pl
 import pytest
 from studies.bootstrap import (
+    N_BOOTSTRAP_RESAMPLES,
     BootstrapInterval,
     blend_verdict,
     bootstrap_absolute,
@@ -671,3 +672,39 @@ def test_a_level_that_is_not_a_percentage_raises(level: float):
         bootstrap_difference_at_level(
             losses=_losses(seeds=(0,)), treatment="T", reference="R", metric="loss", level=level
         )
+
+
+def test_a_difference_interval_at_a_level_uses_the_default_resamples_unless_told_otherwise():
+    losses = _losses(seeds=(1, 2, 3))
+
+    default = bootstrap_difference_at_level(
+        losses=losses, treatment="T", reference="R", metric="loss", level=99.5
+    )
+    explicit = bootstrap_difference_at_level(
+        losses=losses,
+        treatment="T",
+        reference="R",
+        metric="loss",
+        level=99.5,
+        n_resamples=N_BOOTSTRAP_RESAMPLES,
+    )
+    fewer = bootstrap_difference_at_level(
+        losses=losses, treatment="T", reference="R", metric="loss", level=99.5, n_resamples=40
+    )
+
+    assert default == explicit
+    assert fewer != default
+
+
+def test_more_resamples_widen_an_extreme_tail_towards_its_limit():
+    losses = _losses(seeds=(1, 2, 3))
+
+    few = bootstrap_difference_at_level(
+        losses=losses, treatment="T", reference="R", metric="loss", level=99.5, n_resamples=100
+    )
+    many = bootstrap_difference_at_level(
+        losses=losses, treatment="T", reference="R", metric="loss", level=99.5, n_resamples=10_000
+    )
+
+    assert many[0] <= few[0]
+    assert many[1] >= few[1]

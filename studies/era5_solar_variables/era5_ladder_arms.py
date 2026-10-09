@@ -22,6 +22,7 @@ from studies.era5_ladder import (
     drop_one_group_features,
     negative_control_features,
     rung_features,
+    without_mars_only_features,
 )
 from studies.sources import ERA5_LADDER_INPUTS_DIR, ERA5_LADDER_RESULTS_DIR
 
@@ -65,7 +66,7 @@ NEGATIVE_CONTROL_SEED: Final[int] = 20261008
 PERMUTATION_GROUPING: Final[tuple[str, ...]] = ("site", "month", "hour_of_day")
 """The columns whose shared values define the rows a permuted value may move between."""
 
-SENSITIVITY_ARMS: Final[tuple[str, ...]] = ("g0", "g1", "g2", "g9")
+SENSITIVITY_ARMS: Final[tuple[str, ...]] = ("g0", "g1", "g2", "g9", "g9_without_mars_only")
 """The arms also fitted at the second hyperparameter setting: the arms of the planned contrasts."""
 
 PLANNED_CONTRASTS: Final[tuple[tuple[str, str, str], ...]] = (
@@ -73,21 +74,24 @@ PLANNED_CONTRASTS: Final[tuple[tuple[str, str, str], ...]] = (
     ("P1", "g1", "g0"),
     ("P2", "g2", "g0"),
     ("P3", "g9", "g2"),
+    ("P4", "g9", "g9_without_mars_only"),
 )
 """The planned contrasts as (label, treatment arm, reference arm), written before any result.
 
 P0 is every ERA5 variable against the minimal set, P1 adds total cloud, P2 adds the three cloud
-layers, and P3 asks whether anything beyond the cloud layers helps. Each is run on both targets.
+layers, and P3 asks whether anything beyond the cloud layers helps. P4 asks whether the 12 MARS-only
+variables help beyond everything a production forecast can already get. Each is run on both
+targets, and P4 is judged on the output target.
 """
 
 FAMILY_WISE_ALPHA_PERCENT: Final[float] = 5.0
-"""The family-wise level of the eight planned contrasts (four contrasts on two targets)."""
+"""The family-wise level of the ten planned contrasts (five contrasts on two targets)."""
 
 PLANNED_CONTRAST_COUNT: Final[int] = len(PLANNED_CONTRASTS) * len(TARGETS)
 """How many planned contrasts the family holds."""
 
 ADJUSTED_LEVEL_PERCENT: Final[float] = 100.0 - FAMILY_WISE_ALPHA_PERCENT / PLANNED_CONTRAST_COUNT
-"""The coverage of a planned contrast's interval, Bonferroni-adjusted: 99.375% for eight."""
+"""The coverage of a planned contrast's interval, Bonferroni-adjusted: 99.5% for ten."""
 
 SMALLEST_EFFECT: Final[dict[TargetType, float]] = {"pv": 0.001, "cams": 0.01}
 """The smallest improvement in the metric worth acting on, fixed before any result.
@@ -95,6 +99,9 @@ SMALLEST_EFFECT: Final[dict[TargetType, float]] = {"pv": 0.001, "cams": 0.01}
 0.1 percentage points of capacity on the output target (as a fraction), and 0.01 on the CAMS
 clearness index.
 """
+
+PLANNED_RESAMPLES: Final[int] = 10_000
+"""The resamples behind a planned contrast's adjusted interval: each 0.25% tail holds about 25."""
 
 NEAR_LINE_SHARE: Final[float] = 0.2
 """A result is near the 5% line if a bound of its 95% interval lies within this share of the
@@ -108,6 +115,9 @@ AEROSOL_REFERENCE: Final[str] = "g9_aerosol_rows"
 
 KNOWN_ANSWER_ARM: Final[str] = "known_answer_ssrd_only"
 """The CAMS-target arm shown only `ssrd` and the solar geometry."""
+
+MARS_FREE_ARM: Final[str] = "g9_without_mars_only"
+"""The arm of every ERA5 variable except the 12 found only in MARS."""
 
 NEGATIVE_CONTROL_ARM: Final[str] = "negative_control"
 """The arm given `g2` and permuted copies of every later column."""
@@ -130,6 +140,7 @@ ARM_LABELS: Final[dict[str, str]] = {
     "g8": "G8 + snow, albedo",
     "g9": "G9 + all other ERA5",
     "g10": "G10 + CAMS aerosol",
+    MARS_FREE_ARM: "G9 without the MARS-only variables",
     "g9_aerosol_rows": "G9 on aerosol rows",
     NEGATIVE_CONTROL_ARM: "Negative control",
     POSITIVE_CONTROL_ARM: "Positive control (+ CAMS)",
@@ -258,6 +269,7 @@ def arm_features(*, target: TargetType, through_rung: RungType) -> dict[str, tup
         rung: rung_features(rung=rung) for rung in RUNGS[: RUNGS.index(through_rung) + 1]
     }
     if through_rung == RUNGS[-1]:
+        arms[MARS_FREE_ARM] = without_mars_only_features()
         arms[NEGATIVE_CONTROL_ARM] = negative_control_features(suffix=PERMUTED_SUFFIX)
         for rung in RUNGS[1:]:
             arms[f"{DROP_PREFIX}{rung}"] = drop_one_group_features(dropped=rung)

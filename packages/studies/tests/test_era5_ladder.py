@@ -9,6 +9,7 @@ from studies.era5_ladder import (
     AEROSOL_COLUMNS,
     CLEAR_SKY_INDEX_THRESHOLDS,
     INSTANTANEOUS_VARIABLES,
+    MARS_ONLY_VARIABLES,
     MISSING_UNDER_CLEAR_SKY_VARIABLES,
     RUNG_ADDITIONS,
     RUNGS,
@@ -25,6 +26,7 @@ from studies.era5_ladder import (
     season_of_month,
     sky_regime,
     sky_regime_from_cloud_cover,
+    without_mars_only_features,
 )
 
 LADDER_TABLE_VARIABLES = {
@@ -310,3 +312,24 @@ def test_the_result_is_sorted_by_site_and_time():
     result = aerosol_hour_ending_mean(aerosol=aerosol, labels=labels, value_columns=["aod550"])
 
     assert result["time"].to_list() == sorted(labels["time"].to_list())
+
+
+def test_the_mars_free_arm_drops_the_mars_variables_and_the_clear_sky_index_only():
+    g9 = set(rung_features(rung="g9"))
+    free = set(without_mars_only_features())
+
+    assert g9 - free == {*MARS_ONLY_VARIABLES, "clear_sky_index"}
+    assert free < g9
+    assert "ssrd" in free
+    assert "tcc" in free
+
+
+def test_every_mars_only_variable_is_a_ladder_variable():
+    assert set(MARS_ONLY_VARIABLES) <= set(rung_variables(rung="g9"))
+    assert len(MARS_ONLY_VARIABLES) == 12
+
+
+def test_every_arm_is_shown_the_hour_integrated_top_of_atmosphere_flux():
+    assert "cams_toa_w_m2" in SHARED_FEATURES
+    assert "cams_toa_w_m2" in rung_features(rung="g0")
+    assert "cams_toa_w_m2" in without_mars_only_features()
