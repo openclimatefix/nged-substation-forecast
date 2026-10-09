@@ -166,8 +166,7 @@ actuals but no forecast row for any series. Option B inherits the reference's ow
 - **Stale study groups.** A study group goes stale when the reference is re-materialised or renamed.
   An unfiltered leaderboard run skips `study/` groups with a warning naming them, so a stale study
   cannot block scoring of reviewed experiments; `score_study.py` pins its own experiment, so the
-  check still raises there. Each study metric row's MLflow run is tagged with the reference
-  partition's Delta version.
+  check still raises there.
 
 **Q5: whether `scan_power()` truncates at the cutoff. Decided: yes.** A re-run of a published study
 then loses about 3 months of power (2026-07-01 to October), which can change site lists, seeded
@@ -207,7 +206,8 @@ and `require_same_row_keys`, raising `FinalTestWindowError` and `RowKeyMismatchE
   `eligible_time_series`.
 - **Promotion path.** `ml_core/mlflow_runs.py:list_promotable_runs` lists every fold run in every
   MLflow experiment, so a `study/` fold run would reach the `promotable_model_runs` candidates. The
-  plan filters `study/` experiments there and refuses them in `promoted_model`.
+  plan filters `study/` experiments there. (An earlier draft also refused them in `promoted_model`;
+  the diff review deleted that refusal, because a study's fold run holds no model archive.)
 
 **`scripts/forecasting/score_study.py`** (new). Arguments: predictions parquet path, study name,
 fold id. It takes no code and no actuals.
@@ -218,7 +218,7 @@ fold id. It takes no code and no actuals.
   `leaderboard_fold_ids`, which refuses `live` and `smoke_test`. The file's `fold_id` column agrees.
   An existing `study/<name>` partition is not overwritten unless `--replace` is passed.
 - **Clean environment.** The script clears its environment and keeps only `PATH`, `HOME`, `LANG`,
-  and the `UV_*` variables, instead of checking a deny list: `Settings` reads `DATA_PATH_INTERNAL`,
+  and `LC_ALL`, instead of checking a deny list: `Settings` reads `DATA_PATH_INTERNAL`,
   `DATA_PATH_DELIVERY`, `LOCAL_ARTIFACTS_PATH`, `METADATA_PATH`, `DATA_STORE_*`, `CV_CONFIG_PATH`,
   `MLFLOW_TRACKING_URI`, and `NGED_FINAL_TEST`, and any of them could repoint the actuals or the
   guard.
@@ -235,15 +235,15 @@ fold id. It takes no code and no actuals.
   handles the slash; if it nests the partition directory, the prefix becomes `study__`.
 
 **`packages/studies/src/studies/power.py`** (after issue #1082 merges) adds the cutoff to
-`scan_power()`: one filter, `time < FINAL_TEST_START`. Studies find their data through
+`scan_power()`: one filter, `time < final_test_start` (read from the CV config, with no parameter to override it). Studies find their data through
 `REPO_DATA_DIR`, never through `Settings`, so `power.py` loads the date with
 `contracts.config_schemas.load_cv_config` on `conf/cv/default.yaml` under the repository root
 (`CV_CONFIG_PATH` is not consulted). If this plan is implemented first, #1082 lands first.
 
-**`pyproject.toml`, `uv.lock`, `.github/workflows/ci.yml`.** Add `import-linter` to the dev group
+**`pyproject.toml`, `uv.lock`, `.pre-commit-config.yaml`.** Add `import-linter` to the dev group
 and a `[tool.importlinter]` block with one `forbidden` contract: `ml_core.metrics` and
 `ml_core.cv_helpers` may not import `dagster`, `mlflow`, or `studies` (`include_external_packages =
-true`, indirect imports included). Add a `uv run lint-imports` step to CI after `ty`. If the strict
+true`, indirect imports included). Add a local `import-linter` pre-commit hook running `uv run lint-imports`, which CI's every-hook step runs (a separate CI step was refused by the push token's missing `workflow` scope). If the strict
 indirect check trips on `contracts`, narrow the contract to direct imports and record why in the
 TOML. `uv.lock` is also edited by #147 and #1082; whichever lands later re-runs `uv lock`.
 
@@ -296,14 +296,15 @@ Tests marked *regression* pass on `main` today and guard against over-refusal; a
   partition is missing, with a warning, and still scores the reviewed experiment.
 - **`CvConfig`:** rejects a `final_test_start` not after every leaderboard `val_end`; rejects a
   `reference_experiment_name` starting `study/`.
-- **Promotion:** `list_promotable_runs` omits `study/` experiments, and `promoted_model` refuses
-  one.
+- **Promotion:** `list_promotable_runs` omits `study/` experiments.
 - **`scan_power()`** (`packages/studies/tests`): returns no row at or after the cutoff on a small
-  Delta table in `tmp_path`, with the cutoff injected.
-- **`score_study`** (`tests/test_score_study.py`): rejects a name with a quote or a leading `study/`,
-  a non-leaderboard fold id, and a file whose keys differ from the reference, leaving no partition;
-  scores a matching file; ignores a `DATA_PATH_INTERNAL` set in the caller's environment. The MLflow
-  file-store fixtures in `tests/test_metrics.py` move to `conftest.py` for it.
+  Delta table in `tmp_path`, with `load_cv_config` monkeypatched.
+- **`score_study`** (`tests/test_metrics.py`, which already holds the fixtures): rejects a name with
+  a quote or a leading `study/`, a non-leaderboard fold id, a mixed or disagreeing `fold_id`, a
+  wrong-dtype key column, and a file whose keys differ from the reference, leaving no partition;
+  stores every batch of series; writes nothing when a later batch is invalid; scores a matching
+  file in leaderboard scope; does not block another fold; and `main()` re-executes with the cleaned
+  environment.
 - **Import linter:** CI runs the real contract. The mutation-testing review adds `import mlflow` to
   `ml_core.metrics` once and confirms `lint-imports` fails.
 - **Existing XGBoost leaderboard fold path** (`tests/test_cv_assets.py`) keeps passing (*regression*).
