@@ -300,7 +300,8 @@ capacity, and no coordinate appears.
       held CDS copy at 0.99999998 or better in 2024-03 and 2025-09, with mean absolute differences
       of 8 J m⁻² on `ssrd`, 7 J m⁻² on `fdir`, and 0.0004 K on `t2m`. For 2025-06, `tcc`, `lcc`,
       `mcc`, and `hcc` agree to a mean of about 2e-6 (float rounding), and `ssrdc`, `cdir`, `strd`,
-      `cape`, `fal`, and `asn` agree to within 0.002% of their means or better (`cape` to 0.12 at most). Shifting by one hour makes the
+      `cape`, `fal`, and `asn` agree to within 0.002% of their means or better (`cape` to 0.12 at
+      most). Shifting by one hour makes the
       mean difference 1,000 to 50,000 times larger, so the hour convention is the CDS one: the
       accumulations cover the hour ending at the label, and the snapshots are at the label. The
       CDS values already held stay in place, and nothing in the study depends on the two copies
