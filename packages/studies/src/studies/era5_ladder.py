@@ -263,6 +263,35 @@ def without_mars_only_features() -> tuple[str, ...]:
     return tuple(name for name in rung_features(rung=RUNGS[-1]) if name not in removed)
 
 
+MarsRecommendationType = Literal["pilot", "against", "unresolved"]
+"""What the MARS fetch decision rule says at one hyperparameter setting."""
+
+
+def mars_fetch_recommendation(
+    *, lower: float, upper: float, smallest_effect: float
+) -> MarsRecommendationType:
+    """Return the decision rule on fetching the MARS-only variables, from one adjusted interval.
+
+    The interval is of the error difference (all variables minus all variables except the MARS-only
+    ones), so a negative difference is a gain. The rule was fixed before any result.
+
+    Args:
+        lower: The adjusted interval's lower bound.
+        upper: The adjusted interval's upper bound.
+        smallest_effect: The smallest improvement worth acting on, in the same unit.
+
+    Returns:
+        `pilot` if the whole interval lies below minus the smallest effect, `against` if the whole
+        interval lies above minus the smallest effect (a gain that large is ruled out), and
+        `unresolved` otherwise.
+    """
+    if upper < -smallest_effect:
+        return "pilot"
+    if lower > -smallest_effect:
+        return "against"
+    return "unresolved"
+
+
 def negative_control_columns() -> tuple[str, ...]:
     """Return the columns the negative control permutes: everything `g3` to `g9` adds.
 

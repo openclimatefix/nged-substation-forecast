@@ -17,6 +17,7 @@ from studies.era5_ladder import (
     accumulation_to_hourly_rate,
     aerosol_hour_ending_mean,
     drop_one_group_features,
+    mars_fetch_recommendation,
     negative_control_columns,
     negative_control_features,
     raise_unless_same_rows,
@@ -333,3 +334,20 @@ def test_every_arm_is_shown_the_hour_integrated_top_of_atmosphere_flux():
     assert "cams_toa_w_m2" in SHARED_FEATURES
     assert "cams_toa_w_m2" in rung_features(rung="g0")
     assert "cams_toa_w_m2" in without_mars_only_features()
+
+
+@pytest.mark.parametrize(
+    ("lower", "upper", "expected"),
+    [
+        (-0.5, -0.2, "pilot"),
+        (-0.5, -0.1, "unresolved"),
+        (-0.5, 0.3, "unresolved"),
+        (-0.05, 0.3, "against"),
+        (0.1, 0.3, "against"),
+        (-0.1, 0.3, "unresolved"),
+    ],
+)
+def test_the_mars_fetch_rule_compares_the_whole_interval_with_minus_the_smallest_effect(
+    lower: float, upper: float, expected: str
+):
+    assert mars_fetch_recommendation(lower=lower, upper=upper, smallest_effect=0.1) == expected

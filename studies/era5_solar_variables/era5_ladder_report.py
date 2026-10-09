@@ -76,6 +76,7 @@ from studies.era5_ladder import (
     CLEAR_SKY_INDEX_THRESHOLDS,
     RUNGS,
     RungType,
+    mars_fetch_recommendation,
     raise_unless_same_rows,
     season_of_month,
     sky_regime,
@@ -815,6 +816,49 @@ def near_line_without_second_setting(*, contrasts: pl.DataFrame) -> pl.DataFrame
     )
 
 
+def render_mars_decision(*, contrasts: pl.DataFrame) -> list[str]:
+    """Return the report lines stating what the MARS decision rule says about contrast P4.
+
+    The rule reads the output target's adjusted interval at both settings, and recommends a pilot or
+    recommends against only if the two settings agree.
+
+    Args:
+        contrasts: The contrast table.
+
+    Returns:
+        Lines of markdown, empty if P4 on the output target has not been computed.
+    """
+    p4 = contrasts.filter(
+        (pl.col("label") == "P4") & (pl.col("target") == "pv") & pl.col("planned")
+    )
+    if p4.is_empty():
+        return []
+    by_setting = {row["setting"]: row for row in p4.iter_rows(named=True)}
+    recommendations = {
+        setting: mars_fetch_recommendation(
+            lower=row["lower_adjusted"],
+            upper=row["upper_adjusted"],
+            smallest_effect=SMALLEST_EFFECT["pv"],
+        )
+        for setting, row in by_setting.items()
+    }
+    distinct = set(recommendations.values())
+    if SENSITIVITY_SETTING not in by_setting or len(distinct) > 1:
+        overall = "unresolved"
+    else:
+        overall = next(iter(distinct))
+    return [
+        "## MARS fetch decision (planned contrast P4, output target)",
+        "",
+        *(
+            f"- {setting} setting: {recommendation}"
+            for setting, recommendation in recommendations.items()
+        ),
+        f"- **Overall: {overall}**",
+        "",
+    ]
+
+
 def render_report(
     *,
     variant: str,
@@ -871,6 +915,7 @@ def render_report(
             ),
             "",
         ]
+    parts += render_mars_decision(contrasts=contrasts)
     parts += ["## Planned verdicts, both settings combined", ""]
     parts.append(
         table(
