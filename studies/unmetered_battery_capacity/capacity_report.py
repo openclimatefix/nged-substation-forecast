@@ -34,6 +34,15 @@ from capacity_runs import p99_flow
 from capacity_templates import DURATION_PRIORS
 from scipy.stats import binomtest
 
+UNIT_NAMES: Final[tuple[str, ...]] = (
+    "merchant",
+    "agile",
+    "commercial_and_industrial",
+    "intelligent_octopus_go",
+    "octopus_go",
+    "octopus_flux",
+)
+"""The estimator's six units, in the order of its parameter vector."""
 MIN_SHARE_C3: Final[float] = 0.05
 MIN_SHARE_C4: Final[float] = 0.10
 Z90: Final[float] = 1.645
@@ -115,8 +124,8 @@ def season(*, frame: pl.DataFrame) -> pl.DataFrame:
 
 
 def detection_section(
-    *, rung1: pl.DataFrame, rung2: pl.DataFrame, shifted: pl.DataFrame, rung3: pl.DataFrame,
-    limits: dict[str, float], heading_suffix: str = "",
+    *, rung1: pl.DataFrame, rung2: pl.DataFrame, shifted: pl.DataFrame | None,
+    rung3: pl.DataFrame | None, limits: dict[str, float], heading_suffix: str = "",
 ) -> list[str]:  # fmt: skip
     """Detection rates by share for rungs 1 to 3 and the shifted-window negative control."""
     default = float(np.quantile(list(limits.values()), 1 - FALSE_ALARM_RATE))
@@ -129,7 +138,7 @@ def detection_section(
         ),
         "",
     ]
-    for name, frame, by in (
+    tables: list[tuple[str, pl.DataFrame, list[str]]] = [
         ("Rung 1, merchant batteries, by share", rung1.filter(pl.col("share") > 0), ["share"]),
         (
             "Rung 1, by share and nameplate duration",
@@ -137,10 +146,21 @@ def detection_section(
             ["share", "nameplate_hours"],
         ),
         ("Rung 2, simulated fleets, real windows", rung2, ["share"]),
-        ("Rung 2, simulated fleets, windows one hour early (negative control)", shifted, ["share"]),
-        ("Rung 3, real public batteries, by share", rung3, ["share"]),
-        ("Rung 3, by share and kind", rung3, ["share", "kind"]),
-    ):
+    ]
+    if shifted is not None:
+        tables.append(
+            (
+                "Rung 2, simulated fleets, windows one hour early (negative control)",
+                shifted,
+                ["share"],
+            )
+        )
+    if rung3 is not None:
+        tables += [
+            ("Rung 3, real public batteries, by share", rung3, ["share"]),
+            ("Rung 3, by share and kind", rung3, ["share", "kind"]),
+        ]
+    for name, frame, by in tables:
         flagged = season(frame=flag(frame=frame, threshold=limits, default=default))
         lines += [f"**{name}.**", "", table(rate_table(frame=flagged, by=by))]
         if by == ["share"]:
@@ -523,9 +543,14 @@ def rung4_section(*, rung4: pl.DataFrame, nulls: pl.DataFrame) -> list[str]:
         flagged=pl.col("log_bayes_factor").is_finite() & (pl.col("log_bayes_factor") > threshold),
         block_name=pl.col("block").replace_strict(BLOCK_NAMES_BY_INDEX),
     )
-    unit_columns = [
-        c for c in frame.columns if c.startswith("unit_") and c.endswith("_power_point")
-    ]
+    theta = np.array(frame["theta"].to_list())
+    frame = frame.with_columns(
+        **{
+            f"{name}_power_over_prior_scale": pl.Series(np.exp(theta[:, index]))
+            for index, name in enumerate(UNIT_NAMES)
+        }
+    )
+    unit_columns = [f"{name}_power_over_prior_scale" for name in UNIT_NAMES]
     summer = frame.filter(pl.col("block") == SUMMER_BLOCK)
     other = frame.filter(pl.col("block") != SUMMER_BLOCK)
     return [
@@ -568,8 +593,9 @@ def rung4_section(*, rung4: pl.DataFrame, nulls: pl.DataFrame) -> list[str]:
             ).sort("multiple", "block_name")
         ),
         (
-            "Jun-Aug log Bayes factor and the point power (MW) of every unit, by multiple, to show "
-            "which unit absorbs the factor's rise with the multiple:"
+            "Jun-Aug log Bayes factor and the fitted power of every unit as a multiple of its "
+            "prior scale, by multiple, to show which unit absorbs the factor's rise with the "
+            "multiple:"
         ),
         "",
         table(summer.select("multiple", "log_bayes_factor", "tau", *unit_columns).sort("multiple")),
@@ -773,8 +799,8 @@ def main() -> None:
     lines += detection_section(
         rung1=sensitivity1,
         rung2=sensitivity2,
-        shifted=shifted,
-        rung3=rung3,
+        shifted=None,
+        rung3=None,
         limits=limits_sensitivity,
         heading_suffix=suffix,
     )

@@ -50,6 +50,7 @@ def positive_control_clean_section(*, draws: pl.DataFrame) -> list[str]:
     real = draws.filter(pl.col("demand") == "real")
     needed = math.ceil(PASS_FRACTION * replica.height)
     both = replica["power_in_90"] & replica["energy_in_90"]
+    real_both = float((real["power_in_90"] & real["energy_in_90"]).to_numpy().mean())
     lines = [
         "## The clean positive control (pass rule committed before the run)",
         "",
@@ -61,6 +62,18 @@ def positive_control_clean_section(*, draws: pl.DataFrame) -> list[str]:
             "4 blocks, at a 40% share. This supersedes the earlier pass (2 of 3 blocks, one "
             "truth, after tuning on a scored block, a truth 9% and 11% of a node spacing from the "
             "nodes)."
+        ),
+        "",
+        (
+            f"**The pass is a pass of the committed rule, not of the nominal 90%.** On the "
+            f"replicas the 90% interval holds the power in {replica['power_in_90'].mean():.1%} of "
+            f"fits and the energy in {replica['energy_in_90'].mean():.1%}, below its nominal "
+            f"coverage, with intervals about "
+            f"{float(np.median(replica['power_width_over_truth'].to_numpy())):.1%} of the truth "
+            "wide; the median absolute power error is "
+            f"{float(np.median(np.abs(replica['power_median_error'].to_numpy()))):.2%}. On real "
+            f"demand the intervals hold both in {real_both:.1%} "
+            "of fits, because the tempering by the residual's autocorrelation widens them."
         ),
         "",
     ]
@@ -289,7 +302,7 @@ def detection_curve_section(
             "block (`sigma_step`), so a primary with a noisier flow needs a bigger battery. Bins "
             "are powers of 2. Rung 1 is the in-family best case, `rank_rule` and `noisy_price` "
             "are simulated batteries outside the family, and rung 3 is real public batteries "
-            "(the registered power is the truth). The right-hand table drops Jun-Aug, where the "
+            "(the registered power is the truth). The second table drops Jun-Aug, where the "
             "nulls' false alarms cluster."
         ),
         "",
@@ -302,6 +315,14 @@ def detection_curve_section(
             frame.group_by("family", "bin_low")
             .agg(sums=pl.len(), flagged=pl.col("flagged").sum(), rate=pl.col("flagged").mean())
             .sort("family", "bin_low")
+        )
+        intervals = [
+            clopper_pearson(count=int(f), total=int(n))
+            for f, n in zip(summary["flagged"], summary["sums"], strict=True)
+        ]
+        summary = summary.with_columns(
+            ci_low=pl.Series([i[0] for i in intervals]),
+            ci_high=pl.Series([i[1] for i in intervals]),
         )
         lines += [f"**{label}.**", "", table(summary)]
         for family in summary["family"].unique().sort().to_list():

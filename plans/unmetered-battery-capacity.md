@@ -245,7 +245,10 @@ must lie within 10% of each. If the positive control fails, nothing else is scor
 controls are the blocks with no added battery; tariff templates shifted one hour early, which a
 real window-edge signal should beat; and Agile prices from 7 days earlier.
 
-**The simulated truth is never drawn from the estimator's own template family.** Rung 1's merchant
+**The simulated truth is never drawn from the estimator's own template family.** (Corrected by
+"Plan changes after the first science review": rung 1's truth is the linear programme the
+estimator interpolates, so rung 1 is the in-family best case, and rung 1b holds the truths from
+outside the family.) Rung 1's merchant
 batteries are dispatched by `lp_schedule` with the one-way efficiency drawn uniformly from 0.88 to
 0.95 (round trip 0.77 to 0.90, mostly between grid values), the state-of-charge limits from 0% to
 10% and 90% to 100%, a cap of 1 or 2 cycles a day, and durations of 1, 2, and 4 hours, which lie
@@ -303,8 +306,9 @@ screen's evidence is a within-series placebo instead: each primary's log Bayes f
 templates is ranked against its log Bayes factors for 12 placebo template sets on the same primary
 (tariff windows shifted by -3, -2, -1, +1, +2, and +3 hours, and N2EX and Agile prices taken from 6
 other weeks). A real battery class should beat every placebo; a primary whose real templates rank
-first of 13 is reported as showing evidence, and the page states that 1 in 13 would rank first by
-chance. NGED's Embedded Capacity Register (August 2026,
+first of 13 is reported as showing evidence. (Corrected by "Plan changes after the first science
+review": the 12 placebos are not exchangeable with the real set, so 1 in 13 is not the chance rate,
+and the screen's chance rate and power are measured instead.) NGED's Embedded Capacity Register (August 2026,
 on disk) gives a partial answer key for connected storage of 50 kW and above: 2 of the 8 primaries
 have a connected storage entry. The register lists no storage capacity in MWh and no duration for
 any of its storage rows, so it can check presence and MW size class, never MWh. Below 50 kW the
@@ -338,8 +342,9 @@ grid size; if rungs 1 to 3 would exceed 2 hours, the cut order in the work break
 the 5% false-alarm threshold, or the 90% credible interval for power spans more than a factor of 4.
 **Energy is not identified separately from power** where the duration's posterior width is more than
 0.7 of its prior width and C4 fails. **A fleet's power is identified only as its coincident peak**
-if C5 holds; the coincident peak is what matters at the network's peak, so that outcome is not a
-shortfall. **Every credible interval is untrustworthy** wherever C2 fails, and the page then reports
+if C5 holds (corrected by "Plan changes after the first science review": C5 is degenerate and its
+pass does not support this reading); the coincident peak is what matters at the network's peak, so
+that outcome would not be a shortfall. **Every credible interval is untrustworthy** wherever C2 fails, and the page then reports
 coverage instead of intervals.
 
 **If small batteries are not identifiable, a primary's half-hourly flow cannot inventory domestic
@@ -612,6 +617,7 @@ grid. What follows records what was built, so that a reader can tell it from the
     - Rung 5 uses coarse stacks for all 13 template sets (real, six window shifts, six price
       shifts), so that no set is favoured by a finer interpolation. The negative control "Agile
       prices from 7 days earlier" is the rung 5 price placebo of one week.
-    - The sensitivity setting is not run for the differentiable estimator.
+    - The sensitivity setting is not run for the differentiable estimator. (Corrected by "Plan
+     changes after the first science review": it is run for rungs 1 and 2.)
 6. **The grid estimator's comparison** runs on all of rung 1 (756 sums and the 36 nulls), in the
    standard setting, which costs under 1 core-hour.
