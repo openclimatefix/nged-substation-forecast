@@ -45,7 +45,7 @@ BACKGROUND_PAGE_TARGETS: Final[dict[str, dict[str, int]]] = {
         "South West": 42,
     },
 }
-"""The counts the background page `gb-battery-scheduling` reports from hand-matching."""
+"""The counts an earlier hand-matching of the registers reported."""
 
 BACKGROUND_PAGE_SIZE_EDGES_MW: Final[tuple[float, ...]] = (1.0, 5.0, 50.0)
 BACKGROUND_PAGE_SIZE_TARGETS: Final[tuple[int, ...]] = (141, 12, 46, 3)
@@ -129,7 +129,7 @@ def register_checks(*, frame: pl.DataFrame, storage: pl.DataFrame) -> list[str]:
 
 
 def licence_area_table(*, connected: pl.DataFrame) -> list[str]:
-    """Return the report lines for rung C1 on the ECR side, compared with the background page."""
+    """Return the report lines for rung C1 on the ECR side, beside the earlier hand-matched counts."""
     by_area = connected.group_by("licence_area_short").agg(
         total=pl.len(),
         storage_only=(~pl.col("hybrid")).sum(),
@@ -177,7 +177,7 @@ def licence_area_table(*, connected: pl.DataFrame) -> list[str]:
         "## Rung C1: the ECR's connected storage rows",
         "",
         (
-            "Connected storage rows by licence area, against the background page's hand-matched "
+            "Connected storage rows by licence area, against the earlier hand-matched "
             "count "
             "of rows listed as storage in the ECR."
         ),
@@ -189,7 +189,7 @@ def licence_area_table(*, connected: pl.DataFrame) -> list[str]:
                 "Storage only",
                 "Hybrid site",
                 "Export MW",
-                "Background page",
+                "Earlier hand-matched",
                 "Same",
             ],
             rows=rows,
@@ -203,12 +203,12 @@ def licence_area_table(*, connected: pl.DataFrame) -> list[str]:
         "",
         *_table(header=["Class", "Rows", "Export MW"], rows=size_rows),
         (
-            "By the background page's bands, against its hand-matched count of 202 embedded "
+            "By the earlier hand-matched count of 202 embedded "
             "batteries "
             "(a different population, so only the under-1-MW band is expected to agree):"
         ),
         "",
-        *_table(header=["Band", "ECR rows", "Background page (202)"], rows=band_rows),
+        *_table(header=["Band", "ECR rows", "Earlier hand-matched (202)"], rows=band_rows),
     ]
 
 
@@ -368,7 +368,7 @@ def classification_section(
 
 
 def repd_universe_section(*, ecr_all: pl.DataFrame, connected: pl.DataFrame) -> list[str]:
-    """Return the report lines that try to reproduce the background page's total of 202.
+    """Return the report lines that try to reproduce the earlier hand-matched total of 202.
 
     Operational REPD batteries in England and Wales that lie within 5 km of a connected ECR row
     (of any technology) are placed in that row's licence area. A REPD battery within 1 km of a
@@ -426,12 +426,12 @@ def repd_universe_section(*, ecr_all: pl.DataFrame, connected: pl.DataFrame) -> 
                 "ECR storage rows",
                 "Added from REPD",
                 "Reproduced total",
-                "Background page",
+                "Earlier hand-matched",
             ],
             rows=rows,
         ),
         (
-            "The background page's total came from a hand-matching of the REPD, the TEC "
+            "The earlier total came from a hand-matching of the REPD, the TEC "
             "register, and "
             "the ECR that no script recorded. This count follows the rule above, so a difference "
             "from "
@@ -470,7 +470,7 @@ def transmission_section() -> list[str]:
             f"connection site whose first word matches one of the ECR's grid supply point names "
             f"(a loose match): {hits.height}, with "
             f"{hits['MW Connected'].cast(pl.Float64).sum():.0f} MW "
-            "connected. The background page counts 5 to 7."
+            "connected. The earlier hand count was 5 to 7."
         ),
         "",
     ]
@@ -588,7 +588,7 @@ def main() -> None:
         "## What the registers cannot reproduce",
         "",
         (
-            "- The background page's hand-matching used external knowledge of site names that the "
+            "- The earlier hand-matching used external knowledge of site names that the "
             "registers do not carry: no BMU in NGED's four groups matches an ECR row on name and "
             "capacity together. The proposals in `census_matches.csv` are leads for a person."
         ),
