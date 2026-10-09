@@ -263,13 +263,16 @@ def window_coverage(
                 for d in dates
             ]
         )
-        covered = np.zeros(len(half_hour_end_time))
-        _add_intervals(
-            power=covered,
-            starts_h=starts,
-            lengths_h=np.full(len(dates), end_hour - start_hour),
-            sign=1.0,
+        # The length is the real elapsed time between the two wall-clock edges, which is an hour
+        # shorter or longer than `end_hour - start_hour` on a night the clocks change.
+        ends = np.array(
+            [
+                _local_instant_hours(local_date=d, hour=end_hour, grid_start=grid_start)
+                for d in dates
+            ]
         )
+        covered = np.zeros(len(half_hour_end_time))
+        _add_intervals(power=covered, starts_h=starts, lengths_h=ends - starts, sign=1.0)
         coverage.append(covered)
     return coverage[0], coverage[1]
 

@@ -535,8 +535,9 @@ class FitResult:
         at_bound: Whether any parameter sits on a bound of the box it is fitted in.
         log_evidence: The Laplace log marginal likelihood of the model with batteries, NaN where
             there is no covariance.
-        null_log_evidence: The log marginal likelihood of the model with no battery, from the same
-            tempered likelihood. `log_evidence - null_log_evidence` is the log Bayes factor.
+        null_log_evidence: The log marginal likelihood of the model with no battery, tempered by
+            the same factor `1 / tau` as the model with batteries. `log_evidence -
+            null_log_evidence` is the log Bayes factor.
         best_start: For each group and lane, the start with the lowest untempered loss; shape
             (groups, lanes).
     """
@@ -796,12 +797,11 @@ class Estimator:
             + 0.5 * layout.n_parameters * math.log(2 * math.pi)
             - 0.5 * log_determinant
         )
+        # The null model is tempered by the battery model's `effective`, not by its own residual's
+        # integrated autocorrelation time. Both evidences then carry the same factor, so their
+        # difference does not change with the unit of power or with each series' noise level.
         null_rss = (projected_aggregate**2).sum(dim=1).clamp_min(RSS_FLOOR)
-        null_tau = integrated_autocorrelation_time(
-            residual=projected_aggregate, valid=flat_valid > 0
-        )
-        null_effective = n_equations / null_tau
-        null_log_evidence = torch.lgamma(null_effective / 2) - null_effective / 2 * (
+        null_log_evidence = torch.lgamma(effective / 2) - effective / 2 * (
             math.log(math.pi) + torch.log(null_rss)
         )
         shape = (groups, lanes, n_starts)

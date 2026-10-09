@@ -23,11 +23,11 @@ import sys
 import time
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import replace
-from datetime import timedelta
 from pathlib import Path
 from typing import Final
 
 import numpy as np
+import polars as pl
 from capacity_inputs import OUTPUT_DIR, agile_prices, day_ahead_on_grid, window_half_hours
 from studies.battery_templates import STANDARD_LP_SETTINGS, agile_template, merchant_template
 
@@ -70,8 +70,16 @@ def _build(
             settings=settings,
         )
     else:
-        agile = agile_prices().with_columns(
-            time=agile_prices()["time"] - timedelta(days=shift_days)
+        # Roll the prices round the file's span, as the N2EX prices are rolled, so every day of
+        # the window still has an Agile schedule. The file covers the window plus a day each side.
+        agile = agile_prices().sort("time")
+        agile = agile.with_columns(
+            price_inc_vat_p_per_kwh=pl.Series(
+                np.roll(
+                    agile["price_inc_vat_p_per_kwh"].to_numpy(),
+                    -shift_days * HALF_HOURS_PER_DAY,
+                )
+            )
         )
         column = agile_template(
             half_hour_end_time=window_half_hours(),

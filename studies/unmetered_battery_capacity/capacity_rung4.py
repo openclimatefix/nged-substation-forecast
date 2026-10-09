@@ -30,7 +30,7 @@ MULTIPLES: Final[tuple[int, ...]] = (0, 1, 2, 4, 11)
 def main() -> None:
     """Fit the five forms of the flow and save the posteriors."""
     nged = nged_series()
-    flow, battery = nged["BSP1"], np.nan_to_num(nged["battery_A"])
+    flow, battery = nged["BSP1"], nged["battery_A"]
     battery_p99 = p99_flow(battery)
     lanes, meta = [], []
     for m in MULTIPLES:

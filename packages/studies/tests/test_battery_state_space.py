@@ -242,7 +242,9 @@ def _estimator(*, days: int, durations_sd: float = 0.5, pin_efficiency: bool = F
     return Estimator(layout=LAYOUT, signals_numpy=_signals(days=days), priors=priors, device=DEVICE)
 
 
-def _problems(*, estimator: Estimator, theta_true: np.ndarray, days: int, noise: float) -> Problems:
+def _problems(
+    *, estimator: Estimator, theta_true: np.ndarray, days: int, noise: float, memory: float = 0.0
+) -> Problems:
     """One group: a calendar-like free part, the battery subtracted, and white noise."""
     n_time = days * SLOTS
     slot = np.tile(np.arange(SLOTS), days)
@@ -263,7 +265,11 @@ def _problems(*, estimator: Estimator, theta_true: np.ndarray, days: int, noise:
         sharpness=FINAL,
     )[0].numpy()
     rng = np.random.default_rng(5)
-    aggregate = base - export + rng.normal(0, noise, n_time)
+    innovations = rng.normal(0, noise, n_time)
+    errors = np.zeros(n_time)
+    for t in range(n_time):
+        errors[t] = innovations[t] + (memory * errors[t - 1] if t else 0.0)
+    aggregate = base - export + errors
     valid = np.ones(n_time, dtype=bool)
     return make_problems(
         aggregate=aggregate[None, None, :],
@@ -344,6 +350,29 @@ def test_the_log_bayes_factor_is_large_with_a_battery_in_the_sum_and_small_witho
     with_battery, without_battery = log_bayes_factors
     assert with_battery > 50.0
     assert without_battery < 5.0
+
+
+def test_the_log_bayes_factor_does_not_change_with_the_unit_of_power() -> None:
+    days = 7
+    estimator = _estimator(days=days)
+    truth = _theta(power=(3.0, 1e-9), duration=1.7, efficiency=0.86, cap_weight=0.3)
+    problems = _problems(estimator=estimator, theta_true=truth, days=days, noise=0.2, memory=0.9)
+    kilowatts = replace(
+        problems,
+        aggregate=problems.aggregate * 1000.0,
+        power_scale=problems.power_scale * 1000.0,
+    )
+    log_bayes_factors = []
+    for candidate in (problems, kilowatts):
+        fit = estimator.fit(problems=candidate, starts=STARTS, stages=STAGES)
+        best = fit.best_start[0, 0]
+        log_bayes_factors.append(
+            float(fit.log_evidence[0, 0, best] - fit.null_log_evidence[0, 0, best])
+        )
+        # The battery model's residual is more autocorrelated than the null's here, so the two
+        # models' autocorrelation times differ, which made the old statistic depend on the unit.
+        assert fit.tau[0, 0, best] > 3.0
+    assert log_bayes_factors[1] == pytest.approx(log_bayes_factors[0], abs=1e-3)
 
 
 def test_draws_from_the_laplace_approximation_are_positive_and_centred_on_the_optimum() -> None:

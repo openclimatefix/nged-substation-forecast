@@ -263,6 +263,21 @@ def test_window_coverage_is_one_inside_each_window_and_a_share_at_a_half_covered
     assert discharge[day + 38] == 0.0
 
 
+def test_a_window_that_spans_the_spring_clock_change_ends_at_its_wall_clock_time() -> None:
+    start = datetime(2026, 3, 28, tzinfo=UTC)  # The clocks go forward at 01:00 on 29 March.
+    grid = _grid(start=start, days=3)
+
+    charge, _ = window_coverage(
+        half_hour_end_time=grid, window=TARIFF_WINDOWS["intelligent_octopus_go"]
+    )
+
+    # The window runs from 23:30 on 28 March (GMT) to 05:30 on 29 March (BST), which is 04:30 UTC.
+    last_covered = _index(grid=grid, start=start, instant=datetime(2026, 3, 29, 4, 0, tzinfo=UTC))
+    assert charge[last_covered] == 1.0
+    assert charge[last_covered + 1] == 0.0
+    assert charge[last_covered - 9 : last_covered + 1].sum() == pytest.approx(10.0)
+
+
 def test_a_weekday_only_window_covers_nothing_at_the_weekend() -> None:
     grid = _grid(start=DECEMBER, days=7)  # Monday 1 December 2025 to Sunday 7 December
 
