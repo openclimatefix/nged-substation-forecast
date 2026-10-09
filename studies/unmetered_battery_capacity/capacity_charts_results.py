@@ -94,7 +94,7 @@ def headline_figure() -> alt.VConcatChart:
     return draw_figure(
         panels=panels,
         number=1,
-        title="Simulated batteries are found above a size; real public batteries are not found",
+        title="Simulated batteries are found above a size; real public batteries mostly are not",
         subtitle=[
             (
                 "Share of 3-month blocks in which the detector flags a battery, against"
@@ -104,7 +104,8 @@ def headline_figure() -> alt.VConcatChart:
             (
                 "Band: 95% Clopper-Pearson interval. Dashed line: the 5% false-alarm "
                 "level. Rung 1 simulated batteries follow the estimator's own dispatch;"
-                " the other simulated families and the real batteries do not."
+                " the other simulated families and the real batteries do not. GSP1's "
+                "false alarms lift the lowest bins of the top panel."
             ),
         ],
         figure_planning=None,
@@ -277,8 +278,8 @@ def calibration_figure() -> alt.VConcatChart:
                 " Dashed line: the nominal 90%; the 50% interval should sit at 0.5."
             ),
             (
-                "Below a 2% share the posterior is the prior, so the coverage and the "
-                "error describe the prior, not the data."
+                "Below a 2% share the posterior is the same as with no battery, so the "
+                "coverage and the error describe the prior, not the data."
             ),
         ],
         figure_planning=None,
@@ -393,7 +394,10 @@ def outside_family_figure() -> alt.VConcatChart:
     return draw_figure(
         panels=panels,
         number=13,
-        title="Outside the estimator's family, large batteries are found but their size is wrong",
+        title=(
+            "Outside the estimator's family, large batteries are flagged less often "
+            "and sized wrongly"
+        ),
         subtitle=[
             (
                 "Each family: 9 series, 4 blocks, and 3 durations, so 108 sums per "
@@ -402,8 +406,8 @@ def outside_family_figure() -> alt.VConcatChart:
             ),
             (
                 "Exploratory. Dashed line: the nominal 90%. At a 40% share the rank "
-                "rule is flagged in 99% of sums, yet its 90% power interval holds the "
-                "truth in 25%."
+                "rule is flagged in 100% of sums, yet its 90% power interval holds the "
+                "truth in 26%."
             ),
         ],
         figure_planning=None,
@@ -475,9 +479,9 @@ def fleet_figure() -> alt.VConcatChart:
                 " and the nominal 90%."
             ),
             (
-                "Moving the windows alone leaves the detections, because the Agile unit"
-                " follows a price; moving the prices as well brings flags to 1 of 36 at"
-                " every share."
+                "Moving the windows alone lowers the detections only a little, because the"
+                " Agile unit follows a price; moving the prices as well brings flags to"
+                " 2 of 36 at every share."
             ),
         ],
         figure_planning=None,
@@ -506,7 +510,19 @@ def real_battery_figure() -> alt.VConcatChart:
         {"share": [0.05, 0.1, 0.2, 0.4], "value": [0.05, 0.1, 0.2, 0.4], "series": "Truth"}
     )
     power = pl.concat([real, replica.filter(pl.col("share") > 0.05), truth], how="vertical")
-    season = report_table(marker="**Rung 3, real public batteries, by share, split by season.**")
+    flags = pl.concat(
+        [
+            report_table(marker="**Rung 3, real public batteries, by share.**").with_columns(
+                series=pl.lit("Real demand, all 9 series")
+            ),
+            report_table(marker="The same rates without GSP1").with_columns(
+                series=pl.lit("Real demand, without GSP1")
+            ),
+            report_table(marker="**Flagged by a threshold from the replicas' own nulls.**")
+            .with_columns(series=pl.lit("Calendar replicas"))
+            .select("share", "flagged", "total", "rate", "ci_low", "ci_high", "series"),
+        ]
+    )
     domain = ["Truth", "Real demand: posterior median", "Calendar replica: posterior median"]
     return draw_figure(
         panels=[
@@ -527,21 +543,21 @@ def real_battery_figure() -> alt.VConcatChart:
                 log_y=True,
             ),
             line_panel(
-                frame=season.with_columns(
-                    season=pl.col("season").replace(
-                        {"Jun-Aug": "June to August", "Sep-May": "September to May"}
-                    )
-                ),
+                frame=flags,
                 x="share",
                 y="rate",
-                group="season",
-                domain=["June to August", "September to May"],
-                colours=[ocf.BRAND_ORANGE, ocf.DATA_BLUE],
+                group="series",
+                domain=[
+                    "Real demand, all 9 series",
+                    "Real demand, without GSP1",
+                    "Calendar replicas",
+                ],
+                colours=[ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_GREEN],
                 x_title=(
                     "True battery power as a share of the series' 99th-percentile flow (log axis)"
                 ),
                 y_title="Share of sums flagged",
-                title="Flagged mainly in June to August, where false alarms fall",
+                title="Flagged mostly only at a 40% share, and on replicas",
                 log_x=True,
                 x_values=[0.05, 0.1, 0.2, 0.4],
                 y_domain=(0.0, 1.0),
@@ -550,7 +566,7 @@ def real_battery_figure() -> alt.VConcatChart:
             ),
         ],
         number=15,
-        title="Real public batteries added to NGED demand are not recovered",
+        title="Real public batteries added to NGED demand are mostly not recovered",
         subtitle=[
             (
                 "Exploratory. 23 real batteries and fleets of 2, 4, and 8 batteries, "
@@ -558,9 +574,9 @@ def real_battery_figure() -> alt.VConcatChart:
                 "the registered power."
             ),
             (
-                "On calendar replicas (almost no demand noise) the posterior median is "
-                "still about 6% of the registered power, so the real dispatch lies "
-                "outside the estimator's family."
+                "On calendar replicas (almost no demand noise, thresholds from their own "
+                "no-battery blocks) the real batteries are flagged, but the posterior "
+                "median is still about 6% of the registered power."
             ),
         ],
         figure_planning=None,
@@ -632,9 +648,8 @@ def battery_a_figure() -> alt.VConcatChart:
                 "flow. Dashed line in the upper panel: the detection threshold."
             ),
             (
-                "Dashed line in the lower panel: the true added power. In June to "
-                "August the detection statistic rises, but the matched null (0 copies) "
-                "is flagged there too."
+                "Dashed line in the lower panel: the true added power. No block is "
+                "flagged at any multiple, including the matched null (0 copies)."
             ),
         ],
         figure_planning=None,

@@ -507,6 +507,7 @@ def rung3_section(
     null_fraction = float(np.median((nulls["merchant_power_median"] / nulls["p99"]).to_numpy()))
     null_bf = float(np.median(nulls["log_bayes_factor"].to_numpy()))
     default = float(np.quantile(list(limits.values()), 1 - FALSE_ALARM_RATE))
+    false_alarm_series = review.flagged_null_series(nulls=nulls, limits=limits)
     flagged = season(frame=flag(frame=rung3, threshold=limits, default=default))
     frame = rung3.with_columns(true_energy_mwh=pl.col("true_energy_reference_mwh"))
     frame = with_errors(frame=frame, power="merchant_power", energy="merchant_energy")
@@ -545,6 +546,24 @@ def rung3_section(
         "The same rates with Clopper-Pearson intervals (sums share their series-blocks):",
         "",
         table(rate_table(frame=flagged, by=["share", "season"])),
+        (
+            f"The same rates without {', '.join(false_alarm_series)}, whose null blocks are "
+            "flagged with no battery added (the thresholds are unchanged), so that the rates "
+            "are not lifted by that series' false alarms:"
+        ),
+        "",
+        table(
+            rate_table(
+                frame=flagged.filter(~pl.col("series").is_in(false_alarm_series)),
+                by=["share"],
+            )
+        ),
+        table(
+            rate_table(
+                frame=flagged.filter(~pl.col("series").is_in(false_alarm_series)),
+                by=["share", "season"],
+            )
+        ),
         (
             f"Outside Jun-Aug, {int(outside['flagged'].sum())} of {outside.height} sums are "
             f"flagged ({outside['flagged'].mean():.1%}), against the nominal 5% of a null."

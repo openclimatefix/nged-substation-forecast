@@ -128,8 +128,9 @@ def _fit_and_posterior_panels(
     true_energy: float,
     truth_label: str,
     step_prefix: str,
+    posterior_prefix: str,
     x_domain: tuple[float, float] = (0.4, 1.8),
-) -> tuple[alt.Chart, alt.Chart]:
+) -> tuple[alt.Chart, alt.LayerChart | alt.FacetChart]:
     """Draw the fitted-against-true schedule panel and the posterior-beside-truth panel.
 
     Args:
@@ -138,7 +139,8 @@ def _fit_and_posterior_panels(
         true_power: The true (or registered) power in MW.
         true_energy: The true usable energy, or the energy reference, in MWh.
         truth_label: The legend label of the truth line.
-        step_prefix: Prefixes both panel titles.
+        step_prefix: Prefixes the schedule panel's title.
+        posterior_prefix: Prefixes the posterior panel's title.
         x_domain: The posterior panel's range, as multiples of the truth.
 
     Returns:
@@ -222,13 +224,15 @@ def _fit_and_posterior_panels(
         width=PLOT_WIDTH_PX,
         height=70,
         title=alt.TitleParams(
-            f"{step_prefix}the posterior of power and energy beside the truth", anchor="start"
+            f"{posterior_prefix}the posterior of power and energy beside the truth", anchor="start"
         ),
     )
     return fitted_chart, posterior
 
 
-def _real_battery_panels(*, demand: np.ndarray, p99: float) -> tuple[alt.Chart, alt.Chart, dict]:
+def _real_battery_panels(
+    *, demand: np.ndarray, p99: float
+) -> tuple[alt.Chart, alt.LayerChart | alt.FacetChart, dict]:
     """Draw the worked example's second half: a real public battery, by the same rule.
 
     The rule is the first series (S3), the first block, the middle share (20%), and the first named
@@ -274,6 +278,7 @@ def _real_battery_panels(*, demand: np.ndarray, p99: float) -> tuple[alt.Chart, 
         true_energy=row["true_energy_reference_mwh"],
         truth_label="Real battery (metered output scaled to the share)",
         step_prefix="A real public battery: ",
+        posterior_prefix="A real public battery: ",
         x_domain=(0.0, 1.8),
     )
     return fitted_chart, posterior, row
@@ -331,6 +336,7 @@ def worked_example_figure() -> alt.VConcatChart:
         true_energy=true_power * usable,
         truth_label="True battery",
         step_prefix="Step 3: ",
+        posterior_prefix="Step 4: ",
     )
     real_fitted_chart, real_posterior, real_row = _real_battery_panels(demand=demand, p99=p99)
     _note_example(row=row, true_power=true_power, usable=usable)
@@ -365,15 +371,17 @@ def worked_example_figure() -> alt.VConcatChart:
         ],
         number=2,
         title=(
-            "One simulated sum, step by step: the posterior interval holds the "
-            "true power and energy"
+            "A simulated in-family battery is sized well; a real public battery's power "
+            "is underestimated"
         ),
         subtitle=[
             (
                 f"Primary {EXAMPLE_SERIES}, September to November, a {EXAMPLE_HOURS:g}-hour"
                 f" battery at a {EXAMPLE_SHARE * PERCENT:g}% share, week from 6 October 2025."
                 " Series, battery, and block follow a fixed rule (the first of each), not the"
-                " best result."
+                " best result. The simulated battery follows the estimator's own dispatch."
+                " The last two panels repeat steps 3 and 4 for the first real public battery"
+                " of rung 3, in the same series, block, week, and share."
             ),
             (
                 "Step 4: dot, posterior median; thick bar, 50% interval; thin line, 90%"
