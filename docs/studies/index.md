@@ -53,6 +53,15 @@ regions or climates, so a result may not hold elsewhere.
   that follows another rule hold the truth far less often than stated, and the screen of eight
   primaries has no power.
 
+- [Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?](indgen-inddem-and-gsp-take.md)
+  — Elexon's indicated demand and generation series sum the Physical Notifications of every
+  Balancing Mechanism Unit for the national total and 17 transmission boundaries. An issue reaches
+  15 to 42 hours ahead, the zones recover from the boundaries to within rounding, and the sum of the
+  Physical Notifications reproduces INDDEM to within 5 MW in 125 of 192 sampled half-hours once each
+  interconnector is netted. The series do not map cleanly onto the 14 Grid Supply Point groups: with
+  the shared cycles and the national anomaly removed, the highest correlation between a group's
+  settled take and a zone's INDDEM is 0.58, and 0.32 for an NGED group.
+
 ## Past weather
 
 **Three studies score how well each weather product describes weather that has already happened.**

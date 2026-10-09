@@ -1,7 +1,8 @@
 """Shared machinery for the GB electricity price and dispatch download scripts.
 
-Written for the battery-versus-solar-PV study. `fetch_gb_prices.py` and `fetch_bmu_dispatch.py`
-both import this module. The module holds the HTTP client with retry and backoff, the
+Written for the battery-versus-solar-PV study, and since used by the download scripts of the
+study of Elexon's indicated generation and demand. Every `fetch_*.py` script in this folder
+imports this module. The module holds the HTTP client with retry and backoff, the
 resumable per-chunk cache, the Elexon settlement-period arithmetic, the expected-row-count and gap
 helpers, and the `README.md` and `lineage.json` writers.
 
@@ -36,6 +37,12 @@ ELEXON_API: Final[str] = "https://data.elexon.co.uk/bmrs/api/v1"
 ELEXON_ATTRIBUTION: Final[str] = (
     "Contains BMRS data © Elexon Limited copyright and database right 2026"
 )
+DEFAULT_README_PURPOSE: Final[str] = (
+    "Public data for the battery-versus-solar-PV study "
+    "(<https://github.com/openclimatefix/nged-substation-forecast/pull/1094>)."
+)
+"""The sentence `write_readme` uses to say why a download exists, unless the caller says."""
+
 ELEXON_LICENCE: Final[str] = (
     "The terms of Elexon's Balancing Mechanism Reporting Service (BMRS) require the attribution "
     "line above. The wording is taken from the Elexon Insights Solution documentation and has "
@@ -350,6 +357,7 @@ def write_readme(
     columns: dict[str, str],
     row_summary: str,
     gotchas: list[str],
+    purpose: str = DEFAULT_README_PURPOSE,
 ) -> None:
     """Write `<product_dir>/README.md`, a companion to `lineage.json` for humans.
 
@@ -365,6 +373,7 @@ def write_readme(
         columns: Every column of the written parquet mapped to a one-line description with units.
         row_summary: The measured row counts against the expected counts, and the gaps.
         gotchas: Known traps, one bullet each.
+        purpose: The sentence that says which study the download was made for.
     """
     product_dir.mkdir(parents=True, exist_ok=True)
     column_lines = "\n".join(f"- `{name}`: {description}" for name, description in columns.items())
@@ -372,9 +381,7 @@ def write_readme(
     attribution_lines = f"\n**Attribution:** {attribution}\n" if attribution else ""
     readme = f"""# {title}
 
-Public data for the battery-versus-solar-PV study
-(<https://github.com/openclimatefix/nged-substation-forecast/pull/1094>). Nothing under
-`data/` is committed to the repository.
+{purpose} Nothing under `data/` is committed to the repository.
 
 - **Source:** <{source_page}>
 - **Re-download with:** `{script_path}`. The script's docstring gives the exact command. Delete a
