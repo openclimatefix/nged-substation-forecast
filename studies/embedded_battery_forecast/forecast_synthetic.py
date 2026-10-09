@@ -20,7 +20,8 @@ false-alarm control is at most 2 of the 20 price-blind batteries showing the sam
 
 Run: `OMP_NUM_THREADS=2 uv run python
 studies/embedded_battery_forecast/forecast_synthetic.py [primary|sensitivity]`. Writes the frames
-under `inputs/synthetic/`, the fits under `fits/<setting>/A0_DA-late/`, and `a0_report.md`.
+under `inputs/synthetic/`, the fits under `fits_as_written/<setting>/A0_DA-late/`, and
+`a0_report.md`.
 """
 
 import sys

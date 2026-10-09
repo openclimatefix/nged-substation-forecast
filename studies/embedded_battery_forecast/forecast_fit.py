@@ -66,14 +66,15 @@ SETTINGS: Final[dict[SettingType, HyperParameters]] = {
     "primary": PRIMARY_HYPER_PARAMETERS,
     "sensitivity": SENSITIVITY_HYPER_PARAMETERS,
 }
-FIT_VARIANT: Final[VariantType] = (
-    "idle_dropped"
-    if os.environ.get("FIT_VARIANT") == "idle_dropped"
-    else "pre_review"
-    if os.environ.get("FIT_VARIANT") == "pre_review"
-    else "as_written"
-)
-"""The variant this process fits and reads, set by the `FIT_VARIANT` environment variable."""
+FIT_VARIANT_NAME: Final[str] = os.environ.get("FIT_VARIANT", "as_written")
+if FIT_VARIANT_NAME not in ("pre_review", "as_written", "idle_dropped"):
+    _MESSAGE = (
+        f"FIT_VARIANT must be pre_review, as_written, or idle_dropped, not {FIT_VARIANT_NAME!r}."
+    )
+    raise ValueError(_MESSAGE)
+FIT_VARIANT: Final[VariantType] = FIT_VARIANT_NAME
+"""The variant this process fits and reads, set by the `FIT_VARIANT` environment variable. An
+unknown name raises, so a typo cannot write fits into the `as_written` tree."""
 FITS_DIRS: Final[dict[VariantType, Path]] = {
     "pre_review": EMBEDDED_BATTERY_FORECAST_DIR / "fits",
     "as_written": EMBEDDED_BATTERY_FORECAST_DIR / "fits_as_written",
@@ -87,6 +88,11 @@ LEVELS: Final[tuple[float, ...]] = DELIVERY_QUANTILES
 Q_COLUMNS: Final[tuple[str, ...]] = tuple(f"q{level}" for level in LEVELS)
 FIT_THREADS: Final[int] = int(os.environ.get("OMP_NUM_THREADS", "2"))
 """Threads per XGBoost fit; the study runs four fits at once, so this is 2 rather than 4."""
+OVERWRITE_ARMS: Final[frozenset[str]] = frozenset(
+    a for a in os.environ.get("FIT_OVERWRITE_ARMS", "").split(",") if a
+)
+"""Arm names that `run_job` refits even when a file exists, set by `FIT_OVERWRITE_ARMS` as a
+comma-separated list, for a change that touches those arms alone."""
 DEFAULT_WORKERS: Final[int] = int(os.environ.get("FIT_WORKERS", "4"))
 """Processes fitting at once, set by `FIT_WORKERS`; the cores used are this times `FIT_THREADS`."""
 RANK_RULE_DURATIONS: Final[tuple[int, ...]] = (2, 4, 6, 8)
@@ -179,6 +185,27 @@ def _quantiles_persistence(
     return conformal_quantiles(centre=centre[test], groups=groups[test], table=table)
 
 
+def schedule_at_issue(
+    *, prices: np.ndarray, hidden: np.ndarray, unpublished: np.ndarray, duration: int
+) -> np.ndarray:
+    """Return the rank-rule schedule that a forecaster could build at each row's issue time.
+
+    Args:
+        prices: The price of each half-hour.
+        hidden: The same prices with the hour that is not yet public replaced.
+        unpublished: Whether each row's issue time precedes that hour's publication.
+        duration: The schedule's duration in half-hours.
+
+    Returns:
+        For each row, the schedule built from `hidden` if `unpublished`, else from `prices`.
+    """
+    return np.where(
+        unpublished,
+        rank_rule_schedule(prices=hidden, duration_half_hours=duration),
+        rank_rule_schedule(prices=prices, duration_half_hours=duration),
+    )
+
+
 def _quantiles_rank_rule(
     *, frame: pl.DataFrame, price_column: str, train: np.ndarray, test: np.ndarray
 ) -> np.ndarray:
@@ -186,13 +213,23 @@ def _quantiles_rank_rule(
 
     The schedule's duration is the one of `RANK_RULE_DURATIONS` with the lowest mean absolute
     error on the training rows once the schedule is scaled; the scale is the least-squares
-    coefficient through the origin on the training rows.
+    coefficient through the origin on the training rows. A row issued before the next UK day's
+    price is public takes its schedule from the price with that hour replaced.
     """
     prices = frame[price_column].to_numpy()
+    published_view = price_column == "price_actual" and "price_actual_unpublished" in frame.columns
+    hidden = frame["price_actual_hidden"].to_numpy() if published_view else prices
+    unpublished = (
+        frame["price_actual_unpublished"].to_numpy()
+        if published_view
+        else np.zeros(len(prices), bool)
+    )
     output = frame["output_mw"].to_numpy()
     best: tuple[float, np.ndarray, np.ndarray] | None = None
     for duration in RANK_RULE_DURATIONS:
-        schedule = rank_rule_schedule(prices=prices, duration_half_hours=duration)
+        schedule = schedule_at_issue(
+            prices=prices, hidden=hidden, unpublished=unpublished, duration=duration
+        )
         squared = float(np.sum(schedule[train] ** 2))
         scale = float(np.sum(output[train] * schedule[train]) / squared) if squared > 0 else 0.0
         centre = scale * schedule
@@ -425,7 +462,10 @@ def run_job(
     ran = []
     for arm in arms:
         path = arm_file(setting=setting, issue=issue, battery_id=battery_id, arm=arm.name)
-        if path.exists():
+        if FIT_VARIANT == "pre_review":
+            msg = "The pre_review fits are read-only."
+            raise ValueError(msg)
+        if path.exists() and arm.name not in OVERWRITE_ARMS:
             continue
         result = run_arm(
             base=base,

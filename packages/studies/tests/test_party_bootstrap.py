@@ -127,3 +127,42 @@ def test_the_share_recovered_is_the_ratio_of_the_two_gains() -> None:
     assert result["share"] == pytest.approx(0.25)
     assert result["lower_95"] == pytest.approx(0.25)
     assert result["upper_95"] == pytest.approx(0.25)
+
+
+def test_the_share_rejects_arms_over_different_half_hours() -> None:
+    cells = _cells(loss_of=lambda site, month, arm: 1.0, arm="reference")
+    fewer = PartyMonthCells(
+        sums=cells.sums, counts=cells.counts - 1.0, parties=cells.parties, months=cells.months
+    )
+
+    with pytest.raises(ValueError, match="same parties"):
+        party_month_share(baseline=cells, full=cells, partial=fewer)
+
+
+def test_an_effect_found_in_one_month_only_has_an_interval_that_reaches_zero() -> None:
+    def loss(site: str, month: str, arm: str) -> float:
+        gain = 1.0 if month == MONTHS[0] else 0.0
+        return 3.0 if arm == "reference" else 3.0 - gain
+
+    result = party_month_difference(
+        treatment=_cells(loss_of=loss, arm="treatment"),
+        reference=_cells(loss_of=loss, arm="reference"),
+    )
+
+    # A resample that omits the one month with an effect has no effect at all.
+    assert result["difference"] == pytest.approx(-0.25)
+    assert result["upper_95"] == pytest.approx(0.0)
+    assert result["lower_95"] < -0.25
+
+
+def test_resampled_totals_equal_the_weighted_sum_of_the_cells() -> None:
+    stacked = np.arange(1.0, 13.0).reshape(1, 3, 4)
+
+    totals = resample_totals(stacked=stacked, n_resamples=5, seed=7)
+
+    generator = np.random.default_rng(7)
+    party_draws = generator.integers(0, 3, size=(5, 3))
+    month_draws = generator.integers(0, 4, size=(5, 4))
+    for r in range(5):
+        expected = sum(stacked[0, p, m] for p in party_draws[r] for m in month_draws[r])
+        assert totals[r, 0] == pytest.approx(expected)

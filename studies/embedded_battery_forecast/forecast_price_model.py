@@ -62,6 +62,9 @@ WEAK_RATIO: Final[float] = 0.8
 def price_frame() -> pl.DataFrame:
     """Return the price model's features and target on the half-hour grid.
 
+    The `price_known` column replaces the next UK day's hour on every day, including the days
+    where that hour was public in time. That is conservative, and it keeps the rule one line.
+
     Returns:
         Columns `time`, `fold`, `month`, `price_actual` (the target), and `FEATURES`.
     """

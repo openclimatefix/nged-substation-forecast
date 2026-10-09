@@ -8,6 +8,7 @@ from census import BMU_LIST_PATH
 from forecast_arms import arm_definitions
 from forecast_fit import SettingType, run_job, with_model_price
 from forecast_inputs import (
+    SCORING_START,
     Battery,
     half_hour_grid,
     load_physical_notifications,
@@ -31,15 +32,16 @@ def testbed_ids() -> list[str]:
 
 
 def batteries_with_idle_lead_in() -> list[str]:
-    """Return the testbed batteries whose saved input frame has half-hours outside service."""
-    return [
-        battery
-        for battery in testbed_ids()
-        if not pl.read_parquet(
+    """Return the testbed batteries with scored half-hours outside service."""
+    flagged = []
+    for battery in testbed_ids():
+        frame = pl.read_parquet(
             EMBEDDED_BATTERY_FORECAST_INPUTS_DIR / f"ID-1h__{battery}.parquet",
-            columns=["in_service"],
-        )["in_service"].all()
-    ]
+            columns=["time", "in_service"],
+        )
+        if not frame.filter(~pl.col("in_service") & (pl.col("time") >= SCORING_START)).is_empty():
+            flagged.append(battery)
+    return flagged
 
 
 def lead_parties() -> dict[str, str]:

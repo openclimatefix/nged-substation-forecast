@@ -347,7 +347,8 @@ VARIANT_RULES: Final[dict[str, str]] = {
     "as_written": "every half-hour from 1 October 2025 whose inputs exist, for every arm (the "
     "plan's rule).",
     "idle_dropped": "as `as_written`, less each battery's idle lead-in, from training and "
-    "scoring alike, for every arm (a rule decided after the first science review).",
+    "scoring alike, for every arm (a rule decided after the first science review). The "
+    "climatology still reads the idle months in its 56-day window, as a forecaster would.",
     "pre_review": "as `as_written`, but with price features that treated the whole UTC day as "
     "published (the fits made before the first science review).",
 }
@@ -429,6 +430,7 @@ def coverage_summary(*, setting: SettingType, issue: str, arm: str, batteries: l
     hits = np.zeros(len(SYMMETRIC_BANDS))
     widths = np.zeros(len(SYMMETRIC_BANDS))
     below = np.zeros(len(LEVELS))
+    strictly_below = np.zeros(len(LEVELS))
     total = 0
     for battery in batteries:
         path = arm_file(setting=setting, issue=issue, battery_id=battery, arm=arm)
@@ -443,12 +445,16 @@ def coverage_summary(*, setting: SettingType, issue: str, arm: str, batteries: l
             high = quantiles[:, LEVELS.index(upper)]
             hits[i] += np.sum((truth >= low) & (truth <= high))
             widths[i] += np.sum(100.0 * (high - low) / p99)
-        below += np.sum(truth[:, None] <= quantiles, axis=0)
+        below += np.sum(truth[:, None] < quantiles, axis=0) + 0.5 * np.sum(
+            truth[:, None] == quantiles, axis=0
+        )
+        strictly_below += np.sum(truth[:, None] < quantiles, axis=0)
         total += truth.size
     return {
         "coverage": (hits / total).tolist(),
         "width_pct": (widths / total).tolist(),
         "reliability": (below / total).tolist(),
+        "strictly_below": (strictly_below / total).tolist(),
         "n_rows": total,
     }
 
@@ -590,14 +596,13 @@ def band_and_reliability_lines(
         rows=band_rows,
     )
     lines += [""]
-    reliability_rows = [
-        [f"`{arm}`"] + [f"{share:.3f}" for share in s["reliability"]] for arm, s in stats.items()
-    ]
-    lines += table(
-        headers=["Arm, share of half-hours at or below the quantile of level"]
-        + [f"{level:g}" for level in LEVELS],
-        rows=reliability_rows,
-    )
+    for key, title in (
+        ("reliability", "Arm, share of half-hours below the quantile of level (a tie counts half)"),
+        ("strictly_below", "Arm, share of half-hours strictly below the quantile of level"),
+    ):
+        rows = [[f"`{arm}`"] + [f"{share:.3f}" for share in s[key]] for arm, s in stats.items()]
+        lines += table(headers=[title] + [f"{level:g}" for level in LEVELS], rows=rows)
+        lines += [""]
     return lines
 
 
@@ -1036,7 +1041,7 @@ def output_regime_section(*, testbed: list[str]) -> list[str]:
             "lead-in, and the `idle_dropped` variant drops it from training and scoring."
         ),
         *[
-            f"- {battery}: idle lead-in ends {end:%Y-%m-%d}; {n} scored half-hours dropped."
+            f"- {battery}: the last idle day is {end:%Y-%m-%d}; {n} scored half-hours dropped."
             for battery, end, n in lead_ins
         ],
         "",
@@ -1186,6 +1191,12 @@ def main() -> None:
         "",
         f"- Testbed batteries: {len(testbed)}. Scored months: October 2025 to August 2026.",
         "- Unit of every loss: points of the battery's own 99th-percentile absolute output.",
+        (
+            "- Coverage counts an outcome on a band's edge as inside. A reliability share counts "
+            "an outcome equal to a quantile as half below it, and a second table counts strictly "
+            "below only; ties are common because a battery's output is exactly zero in many "
+            "half-hours."
+        ),
         f"- Rows scored: {VARIANT_RULES[FIT_VARIANT]}",
         (
             "- Score: CRPS approximated from the 13 delivery quantiles (the gap-weighted sum of "

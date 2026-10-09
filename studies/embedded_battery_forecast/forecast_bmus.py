@@ -2,7 +2,8 @@
 
 Fits every arm of `forecast_arms.arm_definitions` for every testbed battery at the issue times
 asked for, and saves each arm's out-of-fold quantiles and per-row losses under
-`fits/<setting>/<issue>/`. An arm whose file exists is skipped, so an interrupted run resumes.
+`fits_as_written/<setting>/<issue>/`. An arm whose file exists is skipped, so an interrupted run
+resumes.
 Rung A1 is `clim`, rung A2 the two conformal baselines, rung A3 the XGBoost quantile model at
 `DA-early` and `DA-late`, rung A4 the `own_fpn` and `no_neighbour` arms at `ID-1h`, and rung A5 the
 `neighbour_fpn` and `neighbour_fpn_shuffled` arms at `ID-1h`.

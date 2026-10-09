@@ -19,6 +19,7 @@ from studies.battery_forecast import (
     next_uk_day_hour,
     output_bounds,
     persistence_source_times,
+    pinball_losses,
     price_published_at,
     repair_quantiles,
     residual_quantile_table,
@@ -628,3 +629,19 @@ def test_a_battery_idle_throughout_has_a_lead_in_that_covers_the_whole_series() 
 
     assert end is not None
     assert end > output.select(pl.col("time").max()).item()
+
+
+# ---- pinball loss
+
+
+def test_pinball_loss_charges_an_underforecast_at_the_level_and_an_overforecast_at_the_rest() -> (
+    None
+):
+    quantiles = np.array([[2.0, 2.0]])
+    levels = [0.2, 0.9]
+
+    under = pinball_losses(truth=np.array([5.0]), quantiles=quantiles, levels=levels)
+    over = pinball_losses(truth=np.array([1.0]), quantiles=quantiles, levels=levels)
+
+    assert under[0].tolist() == pytest.approx([0.2 * 3.0, 0.9 * 3.0])
+    assert over[0].tolist() == pytest.approx([0.8 * 1.0, 0.1 * 1.0])

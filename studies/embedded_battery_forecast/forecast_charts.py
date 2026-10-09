@@ -9,20 +9,26 @@ Run, after the reports: `uv run python studies/embedded_battery_forecast/forecas
 Optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline` before committing.
 """
 
+import math
+from collections import Counter
 from collections.abc import Mapping
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final, cast
 
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
-from forecast_fit import FITS_DIRS
+from forecast_fit import FITS_DIRS, LEVELS
+from forecast_report import coverage_summary
+from forecast_runner import lead_parties, testbed_ids
 from studies.battery_market import WEEK_START, market_frame
 from studies.charts import CONTENT_WIDTH_PX, figure
 from studies.sources import EMBEDDED_BATTERY_FORECAST_DIR
 
-ASSETS_DIR: Final[Path] = Path("docs/studies/assets")
+LEAD_BIN_HOURS: Final[int] = 6
+"""The width of a lead bin in `forecast_report.py`."""
+ASSETS_DIR: Final[Path] = Path(__file__).resolve().parents[2] / "docs" / "studies" / "assets"
 TABLES: Final[Path] = EMBEDDED_BATTERY_FORECAST_DIR / "report_tables"
 IDLE_TABLES: Final[Path] = EMBEDDED_BATTERY_FORECAST_DIR / "report_tables_idle_dropped"
 FITS: Final[Path] = FITS_DIRS["as_written"]
@@ -32,9 +38,8 @@ WIDE_PX: Final[int] = CONTENT_WIDTH_PX - 90
 ROW_PX: Final[int] = 30
 EXAMPLE_BATTERY: Final[str] = "E_ARBRB-1"
 """The public testbed battery whose week is drawn: the first in the sorted testbed."""
-NGED_WEEK_START: Final[str] = "2026-03-02"
-"""The Monday that starts NGED battery A's drawn week, fixed by a rule and not by eye. The week
-is shown as days 1 to 7."""
+NGED_WEEK_RULE: Final[str] = "the seven days after the first Monday on or after 1 March 2026"
+"""The rule that fixes NGED battery A's drawn week, shown as days 1 to 7."""
 SETTING_COLOURS: Final[dict[str, str]] = {
     "Primary setting": ocf.BRAND_ORANGE,
     "Second setting": ocf.DATA_BLUE,
@@ -178,21 +183,29 @@ def headline_figure() -> alt.VConcatChart:
         upper="upper_95",
         order=pl.col("label"),
     )
+    primary = planned.filter(pl.col("setting") == "primary")
+    n_batteries = int(primary.filter(pl.col("label") == "D1")["n_batteries"][0])
+    shares = [
+        abs(r["difference"]) / r["reference_crps"]
+        for r in primary.iter_rows(named=True)
+        if r["label"] in ("D2", "D3", "D4")
+    ]
     panel = _interval_panel(
         rows=rows,
         x_title="CRPS difference (points of p99; negative means the first forecast is better)",
         colour_title="XGBoost hyperparameter setting",
         palette=SETTING_COLOURS,
         zero_label="no difference",
-        panel_title="Planned contrasts, 35 batteries (D5: one battery)",
+        panel_title=f"Planned contrasts, {n_batteries} batteries (D5: one battery)",
         shapes={"Primary setting": "circle", "Second setting": "triangle-up"},
     )
     return figure(
         panels=[panel],
         number=1,
         title=(
-            "Prices and other batteries' notifications lower the error by 0.3 to 1.3% "
-            "(D2 to D4), but no XGBoost forecast beats the climatology day ahead (D1, D5)"
+            f"Prices and other batteries' notifications lower the error by {min(shares):.1%} to "
+            f"{max(shares):.1%} (D2 to D4), but no XGBoost forecast beats the climatology day "
+            "ahead (D1, D5)"
         ),
         subtitle=[
             (
@@ -204,8 +217,8 @@ def headline_figure() -> alt.VConcatChart:
                 "A notification is the planned output a battery files with the system operator."
             ),
             (
-                "All five contrasts are planned. 35 embedded battery BMUs, October 2025 to August "
-                "2026; D5 is one NGED battery."
+                f"All five contrasts are planned. {n_batteries} embedded battery BMUs, October "
+                "2025 to August 2026; D5 is one NGED battery."
             ),
         ],
         figure_planning=None,
@@ -242,7 +255,10 @@ def leaderboard_figure() -> alt.VConcatChart:
                 palette=KIND_COLOURS,
                 zero_label=None,
                 panel_title=title,
-                x_domain=(10.0, 19.0) if issue != "ID-1h" else (8.0, 19.0),
+                x_domain=(
+                    float(math.floor(rows.select(pl.col("lower").min()).item())),
+                    float(math.ceil(rows.select(pl.col("upper").max()).item())),
+                ),
             )
         )
     return figure(
@@ -252,7 +268,8 @@ def leaderboard_figure() -> alt.VConcatChart:
         "just above it; only the battery's own notification at gate closure beats it",
         subtitle=[
             (
-                "Mean CRPS over 35 batteries and 11 months, as % of each battery's p99. Smaller is "
+                f"Mean CRPS over {boards.select(pl.col('n_batteries').max()).item()} batteries and "
+                "11 months, as % of each battery's p99. Smaller is "
                 "better. Dot: estimate. Line: 95% interval from resampling whole months and a seed."
             ),
             (
@@ -307,12 +324,18 @@ def lead_figure() -> alt.VConcatChart:
         .encode(y="y:Q")  # ty: ignore[unresolved-attribute]
     )
     panel = (band + chart + zero).properties(width=WIDE_PX, height=220)
+    xgb = skill.filter(pl.col("arm").str.starts_with("xgb"))
+    rank = skill.filter(pl.col("arm").str.starts_with("rank"))
+    xgb_gap = math.ceil(xgb.select(pl.col("skill").abs().max()).item() * 100) / 100
+    above = xgb.filter(pl.col("lower") > 0)
+    best = above.sort("skill", descending=True).row(0, named=True) if above.height else None
     return figure(
         panels=[panel],
         number=7,
         title=(
-            "XGBoost skill against the climatology stays within 0.03 of zero at every lead, "
-            "and the rank rule is 0.03 to 0.09 below it"
+            f"XGBoost skill against the climatology stays within {xgb_gap:.2f} of zero at every "
+            f"lead, and the rank rule is {-rank.select(pl.col('skill').max()).item():.2f} to "
+            f"{-rank.select(pl.col('skill').min()).item():.2f} below it"
         ),
         subtitle=[
             (
@@ -320,8 +343,15 @@ def lead_figure() -> alt.VConcatChart:
                 "56-day trailing climatology. Band: 95% interval from resampling whole months."
             ),
             (
-                "35 batteries pooled; leads are 6-hour bins from the issue time. The bin from "
-                "12 to 18 hours, where skill is +0.013, is one of 12 bins, so it is exploratory."
+                f"35 batteries pooled; leads are 6-hour bins from the issue time. XGBoost skill is "
+                f"statistically significantly above zero in {above.height} of {xgb.height} "
+                "bins"
+                + (
+                    f" (the bin from {best['lead']} to {best['lead'] + LEAD_BIN_HOURS} hours, "
+                    f"+{best['skill']:.3f}), which is exploratory."
+                    if best
+                    else "."
+                )
             ),
         ],
         figure_planning=None,
@@ -340,10 +370,13 @@ def sensitivity_figure() -> alt.VConcatChart:
         pl.col("setting") == "primary"
     )
     party = pl.read_parquet(TABLES / "party_resampling.parquet")
+    removed_name = (
+        f"Two idle-lead-in batteries removed, {int(left_out['n_batteries'][0])} remain (post hoc)"
+    )
     groups = {
         "As planned (months and seed resampled)": planned,
         "Idle lead-in dropped (post hoc)": idle,
-        "Two idle-lead-in batteries removed (post hoc)": left_out,
+        removed_name: left_out,
     }
     pieces = [
         frame.filter(pl.col("label").is_in(["D1", "D2", "D3", "D4"])).select(
@@ -368,7 +401,7 @@ def sensitivity_figure() -> alt.VConcatChart:
     palette = {
         "As planned (months and seed resampled)": ocf.BRAND_ORANGE,
         "Idle lead-in dropped (post hoc)": ocf.DATA_BLUE,
-        "Two idle-lead-in batteries removed (post hoc)": ocf.DATA_PURPLE,
+        removed_name: ocf.DATA_PURPLE,
         "Lead parties and months resampled (post hoc)": ocf.BLACK_1,
     }
     shapes = dict(
@@ -380,18 +413,33 @@ def sensitivity_figure() -> alt.VConcatChart:
         colour_title="How the rows or the interval are chosen",
         palette=palette,
         zero_label="no difference",
-        panel_title="D1 to D4, primary setting, 35 batteries",
+        panel_title="D1 to D4, primary setting",
         shapes=shapes,
     )
+    kept, null, changing = [], [], []
+    for label in ("D1", "D2", "D3", "D4"):
+        part = rows.filter(pl.col("label") == label)
+        if (part["upper"] < 0).all():
+            kept.append(label)
+        elif ((part["lower"] < 0) & (part["upper"] > 0)).all():
+            null.append(label)
+        else:
+            changing.append(label)
+    parties = lead_parties()
+    largest = max(Counter(parties[b] for b in testbed_ids()).values())
     return figure(
         panels=[panel],
         number=9,
-        title="D2 and D4 survive every check; D1 stays null, and D3 loses its significance "
-        "once lead parties are resampled",
+        title=(
+            f"{' and '.join(kept)} stay statistically significant under every check; "
+            f"{' and '.join(null)} never reach significance; "
+            f"{' and '.join(changing)} changes with the check"
+        ),
         subtitle=[
             (
-                "Contrasts as in Figure 1. One lead party runs 14 of the 35 batteries, so the "
-                "lead-party resampling is the check closest to the question of other batteries."
+                f"Contrasts as in Figure 1. One lead party runs {largest} of the "
+                f"{len(testbed_ids())} batteries, so the lead-party resampling is the check "
+                "closest to the question of other batteries."
             ),
             "The three post hoc rows were decided after the first science review saw the results.",
         ],
@@ -422,19 +470,22 @@ def census_figure() -> alt.VConcatChart:
             )
             .properties(width=PLOT_PX, height=110)
         )
+    small = summary.filter(pl.col("size_class") == "under 1 MW")
+    n_rows, n_small = classes.height, int(small["rows"][0])
+    large_mw = float(summary.filter(pl.col("size_class") != "under 1 MW")["megawatts"].sum())
+    large_share = large_mw / float(classes["export_mw"].sum())
     return figure(
         panels=panels,
         number=3,
-        title="141 of NGED's 176 connected batteries are under 1 MW, and the 35 larger ones hold "
-        "96% of the megawatts",
+        title=(
+            f"{n_small} of NGED's {n_rows} connected storage rows are under 1 MW, and the "
+            f"{n_rows - n_small} larger ones hold {large_share:.0%} of the megawatts"
+        ),
         subtitle=[
             (
                 "Connected rows listing storage in NGED's Embedded Capacity Register, August 2026 "
-                "release, four licence areas."
-            ),
-            (
-                "Only 8 embedded storage Balancing Mechanism Units sit in NGED's four grid supply "
-                "point groups, 4.5% of the rows."
+                "release, four licence areas. A row is one connection, and a site may have "
+                "several."
             ),
         ],
         figure_planning=None,
@@ -557,18 +608,18 @@ def fan_figure() -> alt.VConcatChart:
 
 def reliability_figure() -> alt.VConcatChart:
     """Observed share of half-hours below each forecast quantile, at 18:00 the day before."""
-    from forecast_report import coverage_summary
-    from forecast_runner import testbed_ids
-
-    levels = [0.01, 0.02, 0.05, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.9, 0.95, 0.98, 0.99]
     rows = []
+    clim_tail = (0.0, 0.0)
     for arm in ("clim", "xgb_quantile__price_actual", "rank_conformal__price_actual"):
         stats = coverage_summary(
             setting="primary", issue="DA-late", arm=arm, batteries=testbed_ids()
         )
+        if arm == "clim":
+            strict = stats["strictly_below"][0]
+            clim_tail = (strict, 2.0 * (stats["reliability"][0] - strict))
         rows += [
             {"arm": ARM_LABELS[arm], "level": lv, "observed": share}
-            for lv, share in zip(levels, stats["reliability"], strict=True)
+            for lv, share in zip(LEVELS, stats["reliability"], strict=True)
         ]
     frame = pl.DataFrame(rows)
     diagonal = pl.DataFrame({"level": [0.0, 1.0], "observed": [0.0, 1.0]})
@@ -583,7 +634,7 @@ def reliability_figure() -> alt.VConcatChart:
                 scale=alt.Scale(domain=[0, 1]),
                 axis=alt.Axis(format=".1f", values=[0, 0.2, 0.4, 0.6, 0.8, 1.0]),
             ),
-            y=alt.Y("observed:Q", title="Share of half-hours at or below that quantile"),
+            y=alt.Y("observed:Q", title="Share of half-hours below the quantile (tie counts half)"),
             color=alt.Color(
                 "arm:N",
                 scale=alt.Scale(range=palette),
@@ -602,12 +653,15 @@ def reliability_figure() -> alt.VConcatChart:
     return figure(
         panels=[panel],
         number=5,
-        title="The XGBoost forecast is close to calibrated; the climatology's lower tail is too "
-        "narrow, with 6% of outcomes below its p1",
+        title=(
+            "The XGBoost forecast is close to calibrated; the climatology's lower-tail miss is "
+            f"mostly ties at zero ({clim_tail[0]:.1%} of outcomes below its p1, {clim_tail[1]:.1%} "
+            "equal to it)"
+        ),
         subtitle=[
             (
                 "A calibrated forecast lies on the dashed diagonal. 35 batteries, issued 18:00 the "
-                "day before. Below the diagonal at a low level, or above it at a high level, means "
+                "day before. Above the diagonal at a low level, or below it at a high level, means "
                 "outcomes fall outside the forecast more often than it says."
             ),
         ],
@@ -622,6 +676,7 @@ def battery_skill_figure() -> alt.VConcatChart:
         skill="DA-late__xgb_quantile__price_actual",
     )
     positive = int((skill["skill"] > 0).sum())
+    much_worse = int((skill["skill"] < -0.1).sum())
     ordered = skill.sort("skill")
     sort = ordered["battery"].to_list()
     panel = (
@@ -641,7 +696,10 @@ def battery_skill_figure() -> alt.VConcatChart:
     return figure(
         panels=[(panel + zero).properties(width=PLOT_PX, height=12 * len(sort))],
         number=8,
-        title=f"{positive} of 35 batteries beat the climatology slightly, and 2 do much worse",
+        title=(
+            f"{positive} of {skill.height} batteries beat the climatology slightly, and "
+            f"{much_worse} do much worse"
+        ),
         subtitle=[
             (
                 "XGBoost quantile model given the actual price, issued 18:00 the day before, "
@@ -655,7 +713,8 @@ def battery_skill_figure() -> alt.VConcatChart:
 
 def nged_week_figure() -> alt.VConcatChart:
     """NGED battery A over seven numbered days: outcome and the two forecasts' medians."""
-    start = pl.lit(NGED_WEEK_START).str.to_datetime(time_zone="UTC")
+    first = datetime(2026, 3, 1, tzinfo=UTC)
+    start = pl.lit(first + timedelta(days=(7 - first.weekday()) % 7))
     frames = []
     for arm, name in (
         ("clim", "Climatology"),
@@ -706,7 +765,7 @@ def nged_week_figure() -> alt.VConcatChart:
                 "Black line: metered output of NGED battery A as a fraction of its own p99. "
                 "Bands: p10 to p90 of each forecast issued 18:00 the day before."
             ),
-            "Seven days chosen by a fixed rule (a Monday in spring 2026), shown as days 1 to 7.",
+            "Seven days chosen by a fixed rule, shown as days 1 to 7.",
         ],
         figure_planning=None,
     )

@@ -90,6 +90,19 @@ def resample_totals(
     return np.einsum("rp,kpm,rm->rk", party_weights, stacked, month_weights)
 
 
+def _require_aligned(*cells: PartyMonthCells) -> None:
+    """Raise unless every set of cells covers the same parties, months, and half-hours."""
+    first = cells[0]
+    for other in cells[1:]:
+        if (
+            other.parties != first.parties
+            or other.months != first.months
+            or not np.array_equal(other.counts, first.counts)
+        ):
+            msg = "The arms must cover the same parties, months, and half-hours."
+            raise ValueError(msg)
+
+
 def party_month_difference(
     *, treatment: PartyMonthCells, reference: PartyMonthCells
 ) -> dict[str, float]:
@@ -107,13 +120,7 @@ def party_month_difference(
     Raises:
         ValueError: If the two arms' parties, months, or cell counts differ.
     """
-    if (
-        treatment.parties != reference.parties
-        or treatment.months != reference.months
-        or not np.array_equal(treatment.counts, reference.counts)
-    ):
-        msg = "The two arms must cover the same parties, months, and half-hours."
-        raise ValueError(msg)
+    _require_aligned(treatment, reference)
     gap = treatment.sums - reference.sums
     totals = resample_totals(stacked=np.stack([gap, treatment.counts]))
     resampled = totals[:, 0] / totals[:, 1]
@@ -142,7 +149,11 @@ def party_month_share(
 
     Returns:
         `share`, `lower_95`, and `upper_95`.
+
+    Raises:
+        ValueError: If the three arms' parties, months, or cell counts differ.
     """
+    _require_aligned(baseline, full, partial)
     totals = resample_totals(stacked=np.stack([baseline.sums, full.sums, partial.sums]))
     resampled = (totals[:, 0] - totals[:, 2]) / (totals[:, 0] - totals[:, 1])
     point = (baseline.sums.sum() - partial.sums.sum()) / (baseline.sums.sum() - full.sums.sum())

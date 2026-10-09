@@ -400,7 +400,10 @@ def published_price_columns(*, frame: pl.DataFrame) -> pl.DataFrame:
 
     Returns:
         The frame with the `actual` price columns as a forecaster issuing at each row's
-        `issue_time` could have computed them.
+        `issue_time` could have computed them. Two columns are added for the rank rule, which
+        rebuilds its schedule at several durations: `price_actual_hidden`, the price with the next
+        UK day's hour replaced on every day, and `price_actual_unpublished`, whether the row's
+        issue time precedes that hour's publication.
     """
     last_hour = pl.col("time").dt.truncate("1d") + pl.duration(hours=23)
     unpublished = price_published_at(time=last_hour) > pl.col("issue_time")
@@ -420,7 +423,9 @@ def published_price_columns(*, frame: pl.DataFrame) -> pl.DataFrame:
         "rank_rule_actual",
     ]
     return frame.with_columns(
-        **{name: pl.when(unpublished).then(hidden[name]).otherwise(pl.col(name)) for name in names}
+        price_actual_unpublished=unpublished,
+        price_actual_hidden=hidden["price_actual"],
+        **{name: pl.when(unpublished).then(hidden[name]).otherwise(pl.col(name)) for name in names},
     )
 
 

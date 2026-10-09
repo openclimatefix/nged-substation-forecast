@@ -11,9 +11,9 @@ the repository.
 |---|---|---|
 | `census.py`, `census_report.py` | Matches NGED's Embedded Capacity Register to the Elexon BMU register and classifies each connected battery | `census_matches.csv`, `census_classes.parquet`, `census_report.md` |
 | `forecast_inputs.py` | Builds, for each battery and issue time, the wide frame of target, prices, persistence value, climatology, and Physical Notification columns | `inputs/<issue>__<battery>.parquet`, `inputs/inputs_report.md` |
-| `forecast_synthetic.py` | Rung A0: 40 synthetic batteries that check the instrument finds a price effect and stays silent without one | `inputs/synthetic/`, `fits/<setting>/A0_DA-late/`, `a0_report_<setting>.md` |
+| `forecast_synthetic.py` | Rung A0: 40 synthetic batteries that check the instrument finds a price effect and stays silent without one | `inputs/synthetic/`, `fits_as_written/<setting>/A0_DA-late/`, `a0_report_<setting>.md` |
 | `forecast_price_model.py` | The price model: a forecast of the N2EX price available at 06:00 UTC | `price_model_by_fold.parquet`, `price_model_report.md` |
-| `forecast_bmus.py` | Part A, rungs A1 to A5: the 35 testbed battery BMUs | `fits/<setting>/<issue>/<battery>__<arm>.parquet` |
+| `forecast_bmus.py` | Part A, rungs A1 to A5: the 35 testbed battery BMUs | `fits_as_written/<setting>/<issue>/<battery>__<arm>.parquet` |
 | `forecast_nged_battery_a.py` | Part B, rungs B1 and B2: NGED battery A | the same, under the battery name `nged_battery_a` |
 | `forecast_report.py` | Prints every table the page quotes | `forecast_report.md`, `report_tables/*.parquet` (and, for the other variants, the same names with `_idle_dropped` or `_pre_review` added) |
 

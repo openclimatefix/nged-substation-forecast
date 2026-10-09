@@ -182,3 +182,44 @@ def test_linking_skips_the_named_files_and_leaves_existing_files_alone(tmp_path:
     assert names == ["E_A-1__clim.parquet", "E_B-1__clim.parquet"]
     assert (target / "primary" / "DA-late" / "E_B-1__clim.parquet").read_text() == "real"
     assert (target / "primary" / "DA-late" / "E_A-1__clim.parquet").is_symlink()
+
+
+def test_a_row_issued_before_the_last_hour_is_public_does_not_see_that_hours_price() -> None:
+    day = np.linspace(0.0, 10.0, 48)
+    cheap_last_hour = day.copy()
+    cheap_last_hour[46:] = -50.0  # the 23:00 hour, which is priced by the next day's auction
+    unpublished = np.ones(48, dtype=bool)
+    hidden = day  # the hour replaced by a value that follows the day's shape
+
+    seen = ff.schedule_at_issue(
+        prices=cheap_last_hour, hidden=hidden, unpublished=unpublished, duration=4
+    )
+    clean = ff.schedule_at_issue(prices=day, hidden=hidden, unpublished=unpublished, duration=4)
+
+    assert seen.tolist() == clean.tolist()
+
+
+def test_a_row_issued_after_the_last_hour_is_public_sees_its_real_price() -> None:
+    day = np.linspace(0.0, 10.0, 48)
+    cheap_last_hour = day.copy()
+    cheap_last_hour[46:] = -50.0
+    published = np.zeros(48, dtype=bool)
+
+    seen = ff.schedule_at_issue(
+        prices=cheap_last_hour, hidden=day, unpublished=published, duration=4
+    )
+    clean = ff.schedule_at_issue(prices=day, hidden=day, unpublished=published, duration=4)
+
+    assert seen.tolist() != clean.tolist()
+
+
+def test_an_unknown_variant_name_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    import importlib
+
+    monkeypatch.setenv("FIT_VARIANT", "idle-dropped")
+
+    with pytest.raises(ValueError, match="FIT_VARIANT"):
+        importlib.reload(ff)
+
+    monkeypatch.delenv("FIT_VARIANT")
+    importlib.reload(ff)
