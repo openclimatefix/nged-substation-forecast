@@ -396,6 +396,31 @@ extra-paths = [
     "packages/studies/tests/past_weather",
 ]
 
+[[tool.ty.overrides]]
+# `torch` and `triton` come from the optional `gpu` dependency group of `packages/studies`, which CI
+# does not install, so `ty` cannot resolve them there. Only the differentiable battery estimator
+# and its tests and study wrapper import them.
+include = [
+    "packages/studies/src/studies/battery_recurrence.py",
+    "packages/studies/src/studies/battery_state_space.py",
+    "packages/studies/tests/test_battery_state_space.py",
+    "studies/unmetered_battery_capacity/capacity_runs.py",
+    "studies/unmetered_battery_capacity/capacity_state_space.py",
+]
+
+[tool.ty.overrides.rules]
+unresolved-import = "ignore"
+
+[[tool.ty.overrides]]
+# Triton's kernel decorators and `torch.autograd.Function`'s context object are not typed in a way
+# `ty` can follow, so the kernel file is checked for the other rules only.
+include = ["packages/studies/src/studies/battery_recurrence.py"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"
+invalid-method-override = "ignore"
+
 [tool.ty.src]
 # The era-fold measurement scripts are a record, not maintained code (see the ruff exclude).
 exclude = ["studies/era_fold_design/scripts"]

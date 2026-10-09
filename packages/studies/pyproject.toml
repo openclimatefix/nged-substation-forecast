@@ -30,3 +30,9 @@ build-backend = "uv_build"
 dev = [
     "pytest>=9.0.2",
 ]
+# Optional: the differentiable battery estimator fits on the GPU. The PyPI wheel is built against
+# CUDA 13.0, which the workstation's driver supports. Install with
+# `uv sync --all-packages --group gpu`. Nothing outside `packages/studies` may import torch.
+gpu = [
+    "torch>=2.14.1",
+]
