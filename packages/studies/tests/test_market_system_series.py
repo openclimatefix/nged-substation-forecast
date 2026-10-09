@@ -1,6 +1,6 @@
 """Tests for the system-series download script, with no network access."""
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import fetch_system_series as fss
@@ -13,6 +13,7 @@ from fetch_system_series import (
     add_period_time,
     chunk_bounds,
     day_chunks,
+    days_with_missing_issues,
     empty_chunks,
     fetch_bod_month,
     fetch_neso_frequency_month,
@@ -267,3 +268,41 @@ def test_empty_chunks_lists_only_zero_row_files(tmp_path: Path) -> None:
     pl.DataFrame({"a": [1]}).write_parquet(tmp_path / "full.parquet")
     pl.DataFrame({"a": []}, schema={"a": pl.Int64}).write_parquet(tmp_path / "empty.parquet")
     assert empty_chunks(cache_dir=tmp_path, keys=["full", "empty", "absent"]) == ["empty"]
+
+
+@pytest.mark.parametrize(
+    ("source", "raw_field", "value_column"),
+    [
+        ("elexon_inddem", "demand", "demand_mw"),
+        ("elexon_indgen", "generation", "generation_mw"),
+    ],
+)
+def test_ind_series_read_the_value_from_the_raw_field_each_dataset_uses(
+    monkeypatch: pytest.MonkeyPatch, source: str, raw_field: str, value_column: str
+) -> None:
+    rows = [
+        {
+            "publishTime": "2026-03-01T00:17:00Z",
+            "startTime": "2026-03-01T01:00:00Z",
+            "settlementDate": "2026-03-01",
+            "settlementPeriod": 3,
+            "boundary": boundary,
+            raw_field: value,
+        }
+        for boundary, value in (("N", -100), ("B1", -7))
+    ]
+    monkeypatch.setattr(fss, "get_json", lambda **_: rows)
+    frame = fetch_series_chunk("2026-03-01_2026-03-02", spec=SERIES[source])
+    assert frame["boundary"].to_list() == ["N", "B1"]
+    assert frame[value_column].to_list() == [-100.0, -7.0]
+
+
+def test_days_with_missing_issues_lists_only_short_days() -> None:
+    times = [datetime(2026, 3, 1, 0, 17, tzinfo=UTC) + timedelta(minutes=30 * i) for i in range(48)]
+    short_day = [
+        datetime(2026, 3, 2, 0, 17, tzinfo=UTC) + timedelta(minutes=30 * i) for i in range(47)
+    ]
+    frame = pl.DataFrame({"publish_time": [*times, *times, *short_day]})
+    result = days_with_missing_issues(frame=frame, expected_per_day=48)
+    assert result["count"] == 1
+    assert result["first"] == [{"day": "2026-03-02", "issues": 47}]

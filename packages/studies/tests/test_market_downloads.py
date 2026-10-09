@@ -45,6 +45,7 @@ from market_common import (
     read_chunks,
     require_complete,
     summarise_gaps,
+    write_readme,
 )
 
 SPRING_FORWARD = date(2026, 3, 29)
@@ -508,3 +509,25 @@ def test_apx_lag_correlation_peaks_at_the_true_lag() -> None:
     assert shifted["1"] == pytest.approx(1.0)
     assert shifted["0"] is not None
     assert shifted["0"] < 0.9
+
+
+def test_write_readme_names_the_study_it_was_given(tmp_path: Path) -> None:
+    kwargs = {
+        "product_dir": tmp_path,
+        "title": "A series",
+        "source_page": "https://example.org",
+        "script_path": "studies/x.py",
+        "attribution": None,
+        "cache_hint": "_cache/",
+        "licence": "Open.",
+        "timestamp_convention": "UTC.",
+        "columns": {"time": "UTC start."},
+        "row_summary": "- 1 row.",
+        "gotchas": [],
+    }
+    write_readme(**kwargs, purpose="Public data for the study of X.")
+    named = (tmp_path / "README.md").read_text()
+    assert "Public data for the study of X." in named
+    assert "battery-versus-solar-PV" not in named
+    write_readme(**kwargs)
+    assert "battery-versus-solar-PV" in (tmp_path / "README.md").read_text()

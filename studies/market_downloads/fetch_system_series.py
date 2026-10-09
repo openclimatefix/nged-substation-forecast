@@ -1,6 +1,7 @@
 r"""Download GB system-wide market series and bid-offer prices for 2025-09-01 to 2026-09-30.
 
-Written for the battery-versus-solar-PV study. Run every default source, or name some:
+Written for the battery-versus-solar-PV study, and extended for the study of INDDEM and INDGEN.
+Run every default source, or name some:
 
     uv run python studies/market_downloads/fetch_system_series.py
     uv run python studies/market_downloads/fetch_system_series.py --sources elexon_frequency
@@ -33,6 +34,15 @@ are keyless, use 4 threads, and back off exponentially on HTTP 429 and 5xx. Pass
 - `elexon_netbsad` and `elexon_disbsad`: balancing services adjustment data.
 - `elexon_lolpdrm`: loss of load probability and de-rated margin forecasts, with publish times.
 - `elexon_syswarn`: system warnings.
+- `elexon_inddem` and `elexon_indgen`: the indicated demand (INDDEM) and indicated generation
+  (INDGEN) sums of the final Physical Notifications, for the national boundary `N` and the 17
+  transmission boundaries B1 to B17, with their publish times. Not run by default, because the two
+  series together hold about 40 million rows for a 13-month window. Their publish window starts
+  one day before the study window, so that the first study day has an issue published before its
+  midnight:
+
+      uv run python studies/market_downloads/fetch_system_series.py \\
+          --sources elexon_inddem elexon_indgen --start 2025-08-31
 """
 
 import argparse
@@ -106,7 +116,12 @@ ELEXON_DEFAULT_SOURCES: Final[tuple[str, ...]] = (
     "elexon_lolpdrm",
     "elexon_syswarn",
 )
-ALL_SOURCES: Final[tuple[str, ...]] = (*ELEXON_DEFAULT_SOURCES, "neso_frequency")
+ALL_SOURCES: Final[tuple[str, ...]] = (
+    *ELEXON_DEFAULT_SOURCES,
+    "elexon_inddem",
+    "elexon_indgen",
+    "neso_frequency",
+)
 
 UTC_TIME: Final[pl.Datetime] = pl.Datetime(time_unit="us", time_zone="UTC")
 ISO_SECONDS: Final[str] = "%Y-%m-%dT%H:%M:%SZ"
@@ -243,6 +258,10 @@ class SeriesSpec:
     """Whether every settlement period of the window should have at least one row."""
     expect_daily_publish: bool = False
     """Whether every UTC day of the window should have at least one publication."""
+    publications_per_day: int | None = None
+    """How many distinct publish times a full UTC day holds, if the schedule is regular."""
+    purpose: str | None = None
+    """The sentence for the README that says which study the download was made for."""
 
 
 _SETTLEMENT_KEYS: Final[tuple[Col, ...]] = (
@@ -253,6 +272,11 @@ _SETTLEMENT_KEYS: Final[tuple[Col, ...]] = (
         pl.Int16,
         "Settlement period within the settlement date, 1 to 48 (46 or 50 on clock-change days).",
     ),
+)
+
+INDGEN_INDDEM_PURPOSE: Final[str] = (
+    "Public data for the study of Elexon's indicated generation and demand "
+    "(<https://github.com/openclimatefix/nged-substation-forecast/issues/1108>)."
 )
 
 SERIES: Final[dict[str, SeriesSpec]] = {
@@ -422,6 +446,91 @@ SERIES: Final[dict[str, SeriesSpec]] = {
         ),
         extra_params=(("boundary", "N"),),
         expect_daily_publish=True,
+    ),
+    "elexon_inddem": SeriesSpec(
+        name="elexon_inddem",
+        title="Elexon indicated demand (INDDEM), national and 17 boundaries",
+        page="https://bmrs.elexon.co.uk/indicated-generation-and-demand",
+        url=f"{ELEXON_API}/datasets/INDDEM/stream",
+        columns=(
+            Col("publishTime", "publish_time", UTC_TIME, "UTC time the issue was published."),
+            Col("startTime", "time", UTC_TIME, "UTC start of the half-hour the value covers."),
+            *_SETTLEMENT_KEYS,
+            Col(
+                "boundary",
+                "boundary",
+                pl.String,
+                "`N` is the national total; B1 to B17 are the 17 overlapping boundaries.",
+            ),
+            Col(
+                "demand",
+                "demand_mw",
+                pl.Float64,
+                "Sum of the final Physical Notifications of the importing BMUs, MW. Negative.",
+            ),
+        ),
+        params=publish_params,
+        chunks=day_chunks,
+        window_column="publish_time",
+        sort=("publish_time", "boundary", "time"),
+        timestamp_convention=(
+            "`publish_time` is when the issue was published (UTC). `time` is the UTC start of "
+            "the half-hour the value covers. Every issue is kept, and an issue holds about 44 to "
+            "82 half-hours depending on when it is published."
+        ),
+        gotchas=(
+            "Values are negative for import, so a larger demand is a more negative number.",
+            (
+                "Boundaries B1 to B17 are nested sums of 17 study zones (Elexon CVA Change "
+                "Circular 235, Appendix 1), so they overlap and do not add up to `N`."
+            ),
+            "The window is applied to `publish_time`, so `time` values reach past the window end.",
+        ),
+        expect_daily_publish=True,
+        publications_per_day=48,
+        purpose=INDGEN_INDDEM_PURPOSE,
+    ),
+    "elexon_indgen": SeriesSpec(
+        name="elexon_indgen",
+        title="Elexon indicated generation (INDGEN), national and 17 boundaries",
+        page="https://bmrs.elexon.co.uk/indicated-generation-and-demand",
+        url=f"{ELEXON_API}/datasets/INDGEN/stream",
+        columns=(
+            Col("publishTime", "publish_time", UTC_TIME, "UTC time the issue was published."),
+            Col("startTime", "time", UTC_TIME, "UTC start of the half-hour the value covers."),
+            *_SETTLEMENT_KEYS,
+            Col(
+                "boundary",
+                "boundary",
+                pl.String,
+                "`N` is the national total; B1 to B17 are the 17 overlapping boundaries.",
+            ),
+            Col(
+                "generation",
+                "generation_mw",
+                pl.Float64,
+                "Sum of the final Physical Notifications of the exporting BMUs, MW.",
+            ),
+        ),
+        params=publish_params,
+        chunks=day_chunks,
+        window_column="publish_time",
+        sort=("publish_time", "boundary", "time"),
+        timestamp_convention=(
+            "`publish_time` is when the issue was published (UTC). `time` is the UTC start of "
+            "the half-hour the value covers. Every issue is kept, and an issue holds about 44 to "
+            "82 half-hours depending on when it is published."
+        ),
+        gotchas=(
+            (
+                "Boundaries B1 to B17 are nested sums of 17 study zones (Elexon CVA Change "
+                "Circular 235, Appendix 1), so they overlap and do not add up to `N`."
+            ),
+            "The window is applied to `publish_time`, so `time` values reach past the window end.",
+        ),
+        expect_daily_publish=True,
+        publications_per_day=48,
+        purpose=INDGEN_INDDEM_PURPOSE,
     ),
     "elexon_netbsad": SeriesSpec(
         name="elexon_netbsad",
@@ -640,6 +749,26 @@ def series_schema(*, spec: SeriesSpec) -> dict[str, Any]:
     return {"time": UTC_TIME, **schema} if spec.add_time else schema
 
 
+def days_with_missing_issues(*, frame: pl.DataFrame, expected_per_day: int) -> dict[str, Any]:
+    """Count the UTC days whose number of distinct publish times is below `expected_per_day`."""
+    per_day = (
+        frame.select("publish_time")
+        .unique()
+        .group_by(day=pl.col("publish_time").dt.date())
+        .agg(issues=pl.len())
+        .filter(pl.col("issues") < expected_per_day)
+        .sort("day")
+    )
+    return {
+        "expected_per_day": expected_per_day,
+        "count": per_day.height,
+        "first": [
+            {"day": day.isoformat(), "issues": issues}
+            for day, issues in per_day.head(50).iter_rows()
+        ],
+    }
+
+
 def run_series(
     *, spec: SeriesSpec, root: Path, start: date, end: date, threads: int
 ) -> pl.DataFrame:
@@ -671,6 +800,10 @@ def run_series(
             "count": len(missing_days),
             "first": [day.isoformat() for day in missing_days[:50]],
         }
+    if spec.publications_per_day is not None:
+        checks["days_with_missing_issues"] = days_with_missing_issues(
+            frame=frame, expected_per_day=spec.publications_per_day
+        )
     summary = _summary_text(rows=frame.height, checks=checks)
     chunk_kind = "daily" if spec.chunks is day_chunks else "monthly"
     request = f"{spec.url} for {start} to {end}, {len(keys)} {chunk_kind} chunks"
@@ -699,6 +832,7 @@ def run_series(
         columns={col.name: col.doc for col in _columns_with_time(spec=spec)},
         row_summary=summary,
         gotchas=list(spec.gotchas),
+        **({} if spec.purpose is None else {"purpose": spec.purpose}),
     )
     print(f"{spec.name}: wrote {frame.height} rows")
     return frame
@@ -723,6 +857,12 @@ def _summary_text(*, rows: int, checks: dict[str, Any]) -> str:
     publications = checks.get("days_without_publication")
     if publications:
         lines.append(f"- UTC days with no publication: {publications['count']}.")
+    short_days = checks.get("days_with_missing_issues")
+    if short_days:
+        lines.append(
+            f"- UTC days with fewer than {short_days['expected_per_day']} issues: "
+            f"{short_days['count']}."
+        )
     return "\n".join(lines)
 
 
