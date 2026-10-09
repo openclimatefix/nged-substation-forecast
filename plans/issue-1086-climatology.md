@@ -51,7 +51,8 @@ valid_time)`. The dedupe comes before the quantiles because the engineer repeats
 per NWP run covering it, up to 15 times, and an undeduplicated target would be counted 15 times in
 its cell. `_local_calendar_cell_keys` then adds `local_month`, `local_half_hour_of_day`, and
 `local_is_weekend` from `valid_time` in `DEFAULT_LOCAL_TIMEZONE`. The keys are local, not UTC,
-because the load follows the local clock. A `group_by` on `time_series_id` plus the three keys
+because the substation load follows the local clock (decision 2 weighs UTC keys on real data). A
+`group_by` on `time_series_id` plus the three keys
 computes the 13 columns `power_quantile_member_00` to `power_quantile_member_12` at the levels in
 `CLIMATOLOGY_QUANTILE_LEVELS`, with `"linear"` interpolation passed explicitly because Polars'
 default is `"nearest"`. The collect is streamed, and the result is sorted so the saved parquet is
@@ -104,11 +105,15 @@ valid_time)`, takes the fair CRPS over the members, and reads the delivery quant
 - **A validation row in a cell with no training sample** finds no lookup row, so the inner join
   drops the row. `predict` counts the dropped rows and logs one warning naming the count and the
   series. `cv_power_forecasts` calls `predict` once per 14-day chunk, so a fold with unseen cells
-  logs one warning per affected chunk.
+  logs one warning per affected chunk. On the leaderboard fold, two series with short histories
+  (series 12 and 13, departure 4) leave 18,284 of the 518,294 validation half-hours that have
+  cleaned power (3.5%) in unseen cells. The warning therefore fires in every chunk from July 2025
+  to January 2026: about 15 of the roughly 27 chunks.
 - **An empty chunk** gives a zero-row, correctly typed `PowerForecast` with no special branch. The
   first chunk is written even when empty, because `cv_power_forecasts` uses the first write to
   overwrite the partition. The `smoke_test` fold (train January 2025, validate February 2025) takes
-  this branch on every chunk, because every validation cell is unseen.
+  this branch on every chunk, because every validation cell is unseen, so its partition is empty
+  and `metrics` finds nothing to score (risk 4).
 - **A re-materialised fold** reuses its MLflow run. `save` clears the model directory before
   writing, and the first chunk's `replace_partition` overwrites the earlier forecasts.
 
@@ -182,13 +187,21 @@ it does, whichever PR lands second re-runs `uv lock`.
    ensemble_member)`". The key-only engineer drops the member axis, and `trained_cv_model` loads
    member 0 only, so a training target repeats once per run covering it: up to 15 times at a 15-day
    horizon. The dedupe is still required.
-4. **The sample counts per cell are slightly wider than the roadmap states.** The roadmap says a
+4. **The sample counts per cell are slightly wider than the roadmap states, and two series have far
+   fewer cells.** The roadmap says a
    weekend cell holds about 9 to 17 samples and a weekday cell about 21 to 43 "over the ~14-month
    training window". The training window, 2024-04-01 to 2025-06-30, is 15 months. Computed in local
    time from the first post-hindcast valid time (2024-04-01 09:30 UTC) to the window's end, a
    series with complete data has 8 to 19 samples per weekend cell and 20 to 45 per weekday cell.
    April, May, and June are covered twice (weekday cells 41 to 45, weekend 16 to 19). July to March
-   are covered once (weekday 20 to 24, weekend 8 to 10). All 1,152 cells per series are populated.
+   are covered once (weekday 20 to 24, weekend 8 to 10). Measured on the cleaned power of the 31
+   eligible series, 29 series populate all 1,152 cells. Their minimum is 8 samples per cell,
+   except series 26 and 29 (7) and series 28 (6). Series 12, whose cleaned history starts on
+   2025-02-06, populates 482 of the 1,152 cells, and its unseen cells hold about 58% of its
+   validation rows. Series 13, whose cleaned history starts on 2024-12-11, populates 583 cells,
+   and its unseen cells hold about 48% of its validation rows. Both have a minimum of 1 sample per
+   cell: for example, series 12's only July samples are the readings labelled 23:00 and 23:30 UTC
+   on 30 June 2025, which fall on 1 July in local time, one sample in each of two cells.
 5. **The ensemble size is a module constant, not a config field.** See decision 4 below.
 6. **Only the PR C item of the `Implementation details — baselines` section is deleted at ship.**
    The PR C item tells its PR to delete the whole section. The section also holds the
@@ -290,13 +303,16 @@ for member k (0-based) is `(k + 0.5)/13`, so member 6 is exactly the median.
 
 **A sparse cell is kept, and an unseen cell gets no lookup row.** Recommendation: no
 minimum-sample threshold and no fallback in this PR. With complete data every cell holds at least 8
-samples (departure 4), and the real-data run measures how many cells fall short (decision 6). A cell
-with 1 sample yields 13 equal members, a degenerate but honest ensemble whose fair CRPS equals its
-mean absolute error (MAE). Pooling the two neighbouring calendar months, the fallback rule
-`packages/studies/src/studies/baselines.py` uses for its deterministic climatology, stays the
-roadmap's "possible refinement if the numbers look ragged". `baseline_forecasters` may not import
-`studies` code. Climatology is an R&D baseline, so the production rule to always emit a forecast
-does not bind it. A dropped row is logged and counted rather than silently missing.
+samples, but on the real data the minimum is 1, in series 12 and 13, whose histories are short
+(departure 4). A cell with 1 sample yields 13 equal members, a degenerate but honest ensemble
+whose fair CRPS equals its mean absolute error (MAE). Pooling the two neighbouring calendar
+months, the fallback rule `packages/studies/src/studies/baselines.py` uses for its deterministic
+climatology, stays the roadmap's "possible refinement if the numbers look ragged".
+`baseline_forecasters` may not import `studies` code. Climatology is an R&D baseline, so the
+production rule to always emit a forecast does not bind it. A dropped row is logged and counted
+rather than silently missing. Pooling would not rescue series 12 or 13 anyway: series 12 has no
+training sample from August to January, and pooling two neighbouring months cannot fill a cell when
+six consecutive months are missing (risk 1).
 
 **`train` logs one aggregate line**: the number of series and cells, the minimum and median number
 of samples per cell, and the earliest and latest deduplicated `valid_time`. The real-data run reads
@@ -312,6 +328,49 @@ neither a training sample nor a scoring target. Bank holidays are ordinary days,
 heuristic: Christmas Day on a weekday falls in that month's weekday cells. `predict` reads only the
 lookup and the calendar keys of each validation row. The validation rows' own `power` column is
 present in the engineered frame, and `predict` must not read it: test 9 pins that.
+
+#### Should the cells be keyed on local time or on UTC?
+
+**Recommendation: keep local keys for every series in this PR.** The maintainer asked whether UTC
+keys would be better, so the planning session measured both keyings on the leaderboard fold.
+
+**Local and UTC keys put a half-hour in different cells only in March and October, and in the
+23:00 to 24:00 UTC hour during summer time.** March and October are the clock-change months, where
+a local cell mixes days on GMT with days on BST. The sample counts per cell are identical under the
+two keyings: 8 to 19 per weekend cell and 20 to 45 per weekday cell.
+
+**UTC keys improve PV by about 0.5% and leave substations and wind slightly worse.** The table
+gives the change in fair CRPS against local keys, negative being better. The CRPS is taken over 13
+members, normalised by effective capacity, and scored on the 499,932 rows that every keying
+forecasts:
+
+| Keying | Substations | PV | Wind |
+|---|---|---|---|
+| UTC, all months | +0.11% (9 of 20 series better) | −0.51% (6 of 6 better) | +0.05% (0 of 3 better) |
+| UTC, March and October rows only | +0.58% | −2.6% | +0.14% |
+| UTC half-hour with the local weekend flag | +0.08% | −0.51% | +0.04% |
+| UTC for PV and wind, local for the rest | 0 | −0.51% | +0.05% |
+| Local keys split by summer time | +1.8% | +2.3% | +2.2% |
+
+Under UTC keys in all months, the BESS and other series change by −0.06%. Pooled over all 31
+series, UTC keys change the CRPS by about −0.03% against local keys, which is a wash. Splitting
+local keys by summer time is worse everywhere, and about 11% worse in March and October, because
+the summer-time half of March holds only one or two training days.
+
+**Three reasons keep local keys.** Substations are the primary target, and the substation load
+still scores better on local keys. UTC keys for PV and wind alone would need `time_series_type`
+inside the forecaster, which reaches a forecaster only through `selected_features`, and so would
+break the rule that climatology's `selected_features` is empty (decision 4). The manual heuristic's
+UTC lags give no reason to match them: the roadmap and the package README already call those lags
+a departure from the operator's local-clock method.
+
+**The README states the PV cost.** In March and October a PV cell mixes days an hour apart in solar
+time, which costs about 2.6% CRPS in those two months. Switching PV and wind to UTC keys is left to
+the maintainer as a cheap follow-up (risk 11).
+
+The evidence is three read-only scripts in the planning session's scratchpad, not committed:
+`clim_keying.py` and `clim_keying2.py` score the keyings, and `clim_counts.py` counts the samples
+per cell and the dropped validation rows per series.
 
 ### 3. `predict()`: join, unpivot, drop, and stamp
 
@@ -415,7 +474,15 @@ copies the manual-heuristic run, so the shared data folder gains only climatolog
   nothing back. Report by group — substations (Primary, bulk supply point, and grid supply point),
   PV, and wind — with group means and the "beats" count per series, as PR #1057 did. The headline
   is `crps__all__extended_range`, with NMAE in each horizon slice. Report absolute values, not only
-  contrasts. If climatology dropped any row, re-score all three on the intersection of rows as well.
+  contrasts.
+- Score all three experiments on the intersection of rows that all three forecast, always, not
+  only if a row was dropped. Series 12 and 13 have unseen cells holding about 58% and 48% of their
+  validation rows (departure 4), so climatology's own `forecast_metrics` rows score those two
+  series on about half a year while the other two experiments are scored on a full year. Series
+  12's and 13's "beats" counts are scored on the shared rows and kept in the count, because
+  dropping them would hide that climatology cannot forecast half their year, and the shared rows
+  keep the comparison like for like. Report the 29 full-history series as a separate group as well,
+  so the two short-history series cannot move the group means.
 - Record time and peak memory for training and prediction, and the saved lookup's size.
 
 **Three caveats go wherever the comparison is read.** First, a set of quantiles at equiprobable
@@ -492,8 +559,9 @@ sit, not the production rung.
 **Principles 3, 8, and 11 are kept.** The forecaster rides the same `register_experiment_job →
 trained_cv_model → cv_power_forecasts → metrics` chain as XGBoost (principle 3), and is scored on
 the same NWP-run rows (principle 8). The one difference in row sets is a row in an unseen cell,
-which is dropped and counted. The key-only engineer and the streamed group-by keep the work in the
-query engine (principle 11).
+which is dropped and counted: 3.5% of the leaderboard fold's validation half-hours, all in series
+12 and 13. Decision 6 therefore scores all three experiments on the rows they share. The key-only
+engineer and the streamed group-by keep the work in the query engine (principle 11).
 
 **One trade is inherited from the manual heuristic: the rows follow the NWP archive.** An
 `init_time` missing from the archive removes that run's climatology rows, as for every other model,
@@ -522,12 +590,14 @@ implementation fails it.
 4. **Member order.** On the fixture of test 2, `predict` emits members 0 to 12 for the row, and
    member k's `power_fcst` equals the lookup's member-k column, so the values strictly increase with
    the member index. A shuffled column-to-member mapping fails.
-5. **Local-time cell keys, across a clock change and at local midnight.** `_local_calendar_cell_keys`
+5. **Local-time cell keys, across both clock changes and at local midnight.** `_local_calendar_cell_keys`
    maps 2025-06-06 23:30 UTC (Saturday 00:30 BST) to June, half-hour 1, weekend; 2025-06-30 23:30 UTC
    (Tuesday 1 July 00:30 BST) to July, half-hour 1, weekday; 2025-01-17 23:30 UTC (Friday 23:30 GMT)
    to January, half-hour 47, weekday; and 2025-03-30 01:00 UTC (02:00 BST, just after the clock
-   change) to March, half-hour 4, weekend. A UTC-keyed implementation fails the first, second, and
-   fourth cases.
+   change) to March, half-hour 4, weekend. At the autumn clock change, 2025-10-26 00:30 UTC
+   (01:30 BST) and 2025-10-26 01:30 UTC (01:30 GMT) both map to October, half-hour 3, weekend
+   (Sunday), so the doubled local hour lands in one cell. A UTC-keyed implementation fails the
+   first, second, and fourth cases, and puts 00:30 UTC in half-hour 1 in the autumn case.
 6. **An unseen cell drops its rows and logs.** A forecast row in a cell with no training sample is
    absent from the output, the call does not raise, and `caplog` holds one warning carrying the
    dropped count and the series id. Rows in seen cells are unaffected.
@@ -590,10 +660,14 @@ The test fails on `main` at the missing YAML target. The NWP run on a training d
   each baseline emits": the cells, the 13 equiprobable levels and why not the delivery levels, the
   member order, and `nwp_init_time` null. The engineer section renamed, and saying both baselines
   use the engineer. New caveats: the small samples per cell, with the measured counts, and the tail
-  members sitting at the observed extremes; unseen cells dropped and logged; bank holidays treated
-  as ordinary days; the Ferro structural edge in a CRPS comparison; and a 13-member climatology
-  compared with the 13-member manual heuristic on equal m. The README becomes the permanent home of
-  the PR C design text, including the "why a distribution, not a mean" argument.
+  members sitting at the observed extremes; unseen cells dropped and logged, with the measured
+  drop for a series whose history is shorter than the training window (about half its validation
+  rows), giving no series ID in case the series is a metered generator; in March and October a PV
+  cell mixing days an hour apart in solar time, which costs about 2.6% CRPS in those months
+  (decision 2); bank holidays treated as ordinary days; the Ferro structural edge in a CRPS
+  comparison; and a 13-member climatology compared with the 13-member manual heuristic on equal m.
+  The README becomes the permanent home of the PR C design text, including the "why a
+  distribution, not a mean" argument.
 - **`CLAUDE.md`, Packages table.** The `baseline_forecasters` row says "currently
   `manual_heuristic`"; it becomes "`manual_heuristic` and `climatology`".
 - **`packages/ml_core/README.md`.** "are the two subclasses outside the tests today" becomes three,
@@ -657,12 +731,19 @@ Then the real-data run in decision 6, whose numbers go in the PR body.
 
 ## Risks and open questions
 
-1. **Should a sparse or unseen cell fall back to a pooled cell?** Recommendation: no fallback in
-   this PR. Drop unseen-cell rows with a logged count, keep sparse cells, and decide on
-   neighbouring-month pooling once the real-data run reports cells per series and the minimum
-   sample count. A fallback chosen before the measurement would be tuned on a guess. A fallback
-   chosen after the measurement must be fixed before looking at scores, as the studies' climatology
-   rule was.
+1. **How should climatology treat a series whose history is shorter than the training window?**
+   Series 12 and 13 have unseen cells holding about 58% and 48% of their validation rows
+   (departure 4). Neighbouring-month pooling cannot fix a short history: series 12 has no training
+   sample in six consecutive months, August to January. The two options are to drop the unseen
+   rows and score every experiment on the shared rows, or to leave both series out of the
+   climatology "beats" count. Recommendation: no fallback in this PR. Drop the unseen-cell rows
+   with a logged count, keep sparse cells, score all three experiments on the shared rows, and
+   report the 29 full-history series as a separate group (decision 6). Climatology's own
+   `forecast_metrics` rows for series 12 and 13 still cover only the cells it could forecast, so
+   a leaderboard read straight from `forecast_metrics` compares those two series on different row
+   sets. Pooling for the sparse cells of the other 29 series (minimum 6 samples) is decided after
+   the real-data run, and must be fixed before looking at scores, as the studies' climatology rule
+   was.
 2. **Rename the engineer?** Recommendation: yes, to `NwpRunRowsWithoutWeatherFeatureEngineer`,
    because the current name is false for climatology. The cost is one example in
    `docs/architecture/code-style.md`. Keeping the old name is defensible only if the maintainer reads
@@ -671,7 +752,13 @@ Then the real-data run in decision 6, whose numbers go in the PR body.
    Moving it to `ml_core` for XGBoost too would touch the serving path for about 10 lines.
 4. **The `smoke_test` fold cannot exercise climatology.** That fold trains on January 2025 and
    validates on February 2025, so every validation row sits in an unseen cell and
-   `cv_power_forecasts` writes an empty partition. `conf/cv/` is out of bounds. Recommendation:
+   `cv_power_forecasts` writes an empty partition. `metrics` discovers its `(experiment_name,
+   fold_id)` groups from the forecast rows, so an empty partition yields no group to score. In
+   leaderboard scope, `smoke_test` is skipped anyway as a non-leaderboard fold. In ad-hoc scope,
+   `metrics` logs "No forecasts matched the population filter — nothing to score." and returns
+   without raising. `NoOverlappingActualsError` (raised in `ml_core/metrics.py` and re-raised in
+   `_score_forecast_group` in `cv_assets.py`) fires only for a group that has forecast rows none of
+   which overlap the actuals, which an empty partition never forms. `conf/cv/` is out of bounds. Recommendation:
    document the limitation in the README and the YAML comment, and register climatology with
    `run_mode="full_cv"`.
 5. **How should #147 close?** Recommendation: the maintainer closes #147 by hand after this PR
@@ -692,9 +779,10 @@ Then the real-data run in decision 6, whose numbers go in the PR body.
    needs an edit to `trained_cv_model`, which sits in the out-of-bounds `defs/`, and a change to
    the `BaseForecaster` and `FeatureEngineer` interfaces. Training would also give up "identical
    chain, identical rows": the forecasters would no longer all train on the same engineered rows.
-   Recommendation: ship climatology under the current architecture, and file the hook as its own
-   issue, gated on measuring the V2 training memory of climatology and the manual heuristic. This is
-   the maintainer's call.
+   Recommendation: ship climatology under the current architecture, and leave the hook to
+   [issue #1119 (Let a forecaster train on one row per series and valid time)](https://github.com/openclimatefix/nged-substation-forecast/issues/1119),
+   gated on measuring the V2 training memory of climatology and the manual heuristic. This is the
+   maintainer's call.
 9. **`docs/design-philosophy/inherent-stability.md` says the manual heuristic's rows "follow the
    NWP run grid".** That sentence uses "grid" for NWP-run rows, which the naming rule warns
    against. The sentence is outside this issue's scope. Recommendation: fix the word in this PR
@@ -704,6 +792,12 @@ Then the real-data run in decision 6, whose numbers go in the PR body.
     the scoring code on one footing for all three experiments, but cannot change what XGBoost was
     trained on. Recommendation: report against it with the narrowed caveat, and leave the retrain to
     its own issue.
+11. **Should PV and wind switch to UTC cell keys?** On the leaderboard fold, UTC keys improve PV
+    CRPS by 0.51% over the year and by 2.6% in March and October, and all 6 PV series improve
+    (decision 2). Wind changes by +0.05%. The switch needs `time_series_type` inside the
+    forecaster, which today reaches a forecaster only through `selected_features`. Recommendation:
+    keep local keys for every series in this PR, and make the switch a cheap follow-up if
+    long-range PV comparisons matter. This is the maintainer's call.
 
 ## Considered and rejected
 
@@ -744,4 +838,11 @@ Then the real-data run in decision 6, whose numbers go in the PR body.
   2, 3, 5, 6; rearchitecture noted. Item 1 keeps the "Implementation details — baselines" heading
   and deletes only the PR C item. Item 4 cuts the unit tests from 14 to 11. Item 7 drops the stored
   sample count. The CRPS test joins integration test 12. The rearchitecture is risk 8.
-- Plan review 2 (correctness and testability): not yet run.
+- Plan review 2, correctness and testability review (Opus), 2026-10-09: accepted 1, 2, 3, and
+  the README caveat for PV in March and October; kept local cell keys; findings 4 and 5 were not
+  defects. Item 1 adds the measured cell counts for series 12 and 13, makes the shared-row re-score
+  unconditional, and rewrites risk 1. Item 2 corrects risk 4 after checking the code: an empty
+  `smoke_test` partition gives `metrics` no group to score, so `metrics` warns and returns rather
+  than raising `NoOverlappingActualsError`. Item 3 adds the autumn clock change to test 5. The
+  maintainer's question on local versus UTC keys is answered in decision 2 and risk 11. Risk 8
+  now links issue #1119.
