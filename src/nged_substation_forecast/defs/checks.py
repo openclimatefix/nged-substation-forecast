@@ -349,8 +349,11 @@ def _describe_power_freshness(
 ) -> str:
     """One human-readable line: the state of the watched feed, and what is being ignored.
 
-    ``fault_notes`` maps each ``time_series_id`` to NGED's free-text note about it. Every note is
-    named, whether or not the series is silenced.
+    ``fault_notes`` maps each ``time_series_id`` to the text of the ``Information`` field in NGED's
+    JSON file for that series, for example ``Analogues not working.``. NGED uses the field to note
+    a known meter fault or a customer's status. ``upsert_metadata`` stores it in the ``information``
+    column of the metadata table, and ``_read_expected_ids_and_fault_notes`` reads it back. Every
+    note is named, whether or not the series is silenced.
     """
     threshold_h = result.threshold_hours
     if result.n_series_total == 0:
@@ -445,7 +448,8 @@ def _check_power_data_freshness() -> AssetCheckResult:
     description=(
         "Warn if any watched time series has no fresh power data within the staleness threshold "
         "(stale) or has never reported at all (never), or if a silenced series has started "
-        "reporting again."
+        "reporting again. The description also names the `Information` note in NGED's JSON file "
+        "for each series that has one."
     ),
 )
 def power_data_is_fresh() -> AssetCheckResult:
