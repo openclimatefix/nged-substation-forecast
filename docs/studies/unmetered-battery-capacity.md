@@ -1,6 +1,8 @@
 # Simulated unmetered batteries above 10% to 20% of peak flow are found; real ones mostly not
 
-**Bottom line: estimating the size of an unmetered battery from substation data mostly fails today.** Better models of demand and generation should help detection. They would not fix sizing unless the real battery's behaviour is also modelled. We have not tested this.
+**Bottom line: estimating the size of an unmetered battery from substation data mostly fails
+today.** Better models of demand and generation should help detection. They would not fix sizing
+unless the real battery's behaviour is also modelled. We have not tested this.
 
 **This study asks whether the half-hourly electricity flow of a primary substation can reveal the
 power in megawatts (MW) and the energy capacity in megawatt-hours (MWh) of a battery that nobody
