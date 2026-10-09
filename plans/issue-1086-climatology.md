@@ -54,10 +54,10 @@ its cell. `_local_calendar_cell_keys` then adds `local_month`, `local_half_hour_
 because the load follows the local clock. A `group_by` on `time_series_id` plus the three keys
 computes the 13 columns `power_quantile_member_00` to `power_quantile_member_12` at the levels in
 `CLIMATOLOGY_QUANTILE_LEVELS`, with `"linear"` interpolation passed explicitly because Polars'
-default is `"nearest"`. The group-by also counts `training_sample_count`. The collect is streamed,
-and the result is sorted so the saved parquet is deterministic. `trained_time_series_ids` is set
-from the lookup's distinct series, and one aggregate log line reports the cell counts and the latest
-training `valid_time`.
+default is `"nearest"`. The collect is streamed, and the result is sorted so the saved parquet is
+deterministic. `trained_time_series_ids` is set from the lookup's distinct series. One aggregate log
+line reports the cell counts, the minimum and median number of samples per cell, and the latest
+training `valid_time`. The sample counts are computed during training and never stored.
 
 **`save` writes the lookup, and `trained_cv_model` uploads it.** `save_to_mlflow` calls
 `ClimatologyForecaster.save(model_dir)`. `save` first calls the new `_saved_model.py` helper, which
@@ -167,8 +167,12 @@ it does, whichever PR lands second re-runs `uv lock`.
 **Departures from the roadmap's "PR C — `ClimatologyForecaster`" item:**
 
 1. **This PR extracts the shared engineer and the shared `meta.json` helper.** The roadmap gives
-   both extractions to PR B (persistence), on the assumption that PR B lands first among the two.
-   PR B is deferred to v0.9 (#1087), so climatology is now the second caller of both.
+   both extractions to PR B (persistence). The roadmap names persistence as "the second forecaster
+   to need" the engineer, because the roadmap did not expect climatology to use the engineer. For
+   the helper, the roadmap counts only persistence and climatology, says "`climatology` lands
+   first, so PR B extracts it", and leaves the manual heuristic's own copy out of the count. PR B is
+   deferred to v0.9 (#1087), and climatology is the second caller of both pieces after the manual
+   heuristic.
 2. **The engineer is renamed to `NwpRunRowsWithoutWeatherFeatureEngineer`.** The current name,
    `PowerLagsPerNwpRunFeatureEngineer`, says it engineers power lags. Climatology requests none, so
    the name would be false for the second caller. The new name says what the engineer delivers: one
@@ -186,11 +190,13 @@ it does, whichever PR lands second re-runs `uv lock`.
    April, May, and June are covered twice (weekday cells 41 to 45, weekend 16 to 19). July to March
    are covered once (weekday 20 to 24, weekend 8 to 10). All 1,152 cells per series are populated.
 5. **The ensemble size is a module constant, not a config field.** See decision 4 below.
-6. **The `Implementation details — baselines` section cannot simply be deleted at ship.** The
-   section also holds the metrics-collapse item for the still-open
-   [#1077](https://github.com/openclimatefix/nged-substation-forecast/issues/1077), whose body links
-   to that section, and the unverified re-run recipe. See "Docs to update" for where each piece
-   goes.
+6. **Only the PR C item of the `Implementation details — baselines` section is deleted at ship.**
+   The PR C item tells its PR to delete the whole section. The section also holds the
+   metrics-collapse item for the still-open
+   [#1077](https://github.com/openclimatefix/nged-substation-forecast/issues/1077), the deferred
+   PR B item, and the unverified re-run recipe. The heading stays, so its anchor and the inbound
+   link at "Implemented as part of the baseline work" survive, and the section is deleted when #1077
+   ships. See "Docs to update".
 
 ## Decisions, with reasons
 
@@ -237,7 +243,7 @@ The callers of the moved pieces, all updated in this PR:
   constructs it in two tests.
 - The prose that names the class: `packages/baseline_forecasters/README.md`,
   `docs/architecture/code-style.md` (the naming example), and `docs/roadmap/metrics-and-leaderboard.md`
-  (the PR B item, which moves to #1087 at ship).
+  (the PR B item, which stays on the page).
 
 **The refactor must not change the manual heuristic's behaviour.** `meta.json` keeps the same three
 keys and the same `json.dumps` call. The existing `test_save_then_load_round_trips_and_replaces_the_directory`
@@ -262,7 +268,8 @@ streamed collect:**
    half-hour, so the forecaster derives the keys itself, as the roadmap says.
 4. Group by `time_series_id` and the three keys. Aggregate one column per member,
    `power_quantile_member_00` to `power_quantile_member_12`, each
-   `pl.col("power").quantile(level, "linear")` cast to `Float32`, plus `training_sample_count`.
+   `pl.col("power").quantile(level, "linear")` cast to `Float32`. A per-cell sample count is
+   computed for the train log line described below, and is dropped before the lookup is stored.
 5. Collect with `engine="streaming"`, and sort by the four key columns so the saved parquet is
    deterministic.
 6. Set `trained_time_series_ids` to the sorted distinct `time_series_id` values in the lookup. That
@@ -291,9 +298,10 @@ roadmap's "possible refinement if the numbers look ragged". `baseline_forecaster
 `studies` code. Climatology is an R&D baseline, so the production rule to always emit a forecast
 does not bind it. A dropped row is logged and counted rather than silently missing.
 
-**`train` logs one aggregate line**: the number of series and cells, the minimum and median
-`training_sample_count`, and the earliest and latest deduplicated `valid_time`. The real-data run
-reads the latest `valid_time` to confirm that no validation target reached the lookup.
+**`train` logs one aggregate line**: the number of series and cells, the minimum and median number
+of samples per cell, and the earliest and latest deduplicated `valid_time`. The real-data run reads
+the sample counts to judge sparse cells, and the latest `valid_time` to confirm that no validation
+target reached the lookup.
 
 **The training never sees validation data.** `trained_cv_model` hands `train` features engineered
 from `load_engineering_inputs` over `[train_start, train_end]` with `power_lookback` zero. The
@@ -303,7 +311,7 @@ leaderboard fold. Truth is the cleaned power table (`scan_cleaned_power`), so a 
 neither a training sample nor a scoring target. Bank holidays are ordinary days, as for the manual
 heuristic: Christmas Day on a weekday falls in that month's weekday cells. `predict` reads only the
 lookup and the calendar keys of each validation row. The validation rows' own `power` column is
-present in the engineered frame, and `predict` must not read it: test 10 pins that.
+present in the engineered frame, and `predict` must not read it: test 9 pins that.
 
 ### 3. `predict()`: join, unpivot, drop, and stamp
 
@@ -326,7 +334,7 @@ present in the engineered frame, and `predict` must not read it: test 10 pins th
    `PowerForecast.validate(...)`.
 
 **Empty input returns a valid empty `PowerForecast`.** The join, unpivot, and literals give a
-correctly typed zero-row frame. Test 8 pins this rather than adding a branch.
+correctly typed zero-row frame. Test 7 pins this rather than adding a branch.
 
 **Nothing in `PowerForecast`, `compute_metrics`, or the dashboard needs a new column or schema for
 a member that is a quantile sample.** Checked against the code:
@@ -374,11 +382,11 @@ never from the parquet's contents, matching `XGBoostForecaster.load`. The file n
 
 **The lookup fits the one-archive MLflow path at V2 scale.** About 2,500 series × 12 months × 48
 half-hours × 2 day types is 2.88 million rows, holding 13 `Float32` quantiles (37.4 million values),
-3 small integer or Boolean keys, the `Int32` series id, and a `UInt32` sample count: about 180 MB
-in memory, and less on disk as compressed parquet. The V1 lookup is 31 × 1,152 = 35,712 rows. The
-archive `save_to_mlflow` writes holds one model file plus the frozen metadata, so the lookup adds
-nothing to the merge problem `_MLFLOW_MODEL_ARTIFACT` documents. By comparison, the 40 XGBoost
-boosters measured on that constant total 77 MB, which scales to several GB at V2.
+3 small integer or Boolean keys, and the `Int32` series id: about 170 MB in memory, and less on disk
+as compressed parquet. The V1 lookup is 31 × 1,152 = 35,712 rows. The archive `save_to_mlflow`
+writes holds one model file plus the frozen metadata, so the lookup adds nothing to the merge
+problem `_MLFLOW_MODEL_ARTIFACT` documents. By comparison, the 40 XGBoost boosters measured on that
+constant total 77 MB, which scales to several GB at V2.
 
 ### 6. The run on real data, after implementation
 
@@ -397,9 +405,9 @@ copies the manual-heuristic run, so the shared data folder gains only climatolog
   `climatology__mid_2025_to_mid_2026`, then `metrics` with
   `PopulationFilter(experiment_name="climatology", fold_id="mid_2025_to_mid_2026")`. Nothing
   touches the `xgboost_*` or `manual_heuristic` partitions or MLflow experiments.
-- Before reading results, record per series: the number of populated cells out of 1,152, the
-  minimum `training_sample_count`, and the rows `predict` dropped, summed over the per-chunk
-  warnings. Confirm that the latest training
+- Before reading results, record per series the number of populated cells out of 1,152, from the
+  saved lookup, and the rows `predict` dropped, summed over the per-chunk warnings. Record the
+  minimum and median samples per cell from the train log line. Confirm that the latest training
   `valid_time` in the train log is no later than 2025-06-30 23:59:59 UTC, and that every forecast
   row has 13 members.
 - Re-score all three experiments in a scratch script with the repo's `compute_metrics`, the same
@@ -414,8 +422,9 @@ copies the manual-heuristic run, so the shared data folder gains only climatolog
 levels slightly out-scores an ensemble of independent draws of the same size under the fair CRPS
 ([Ferro (2014)](https://doi.org/10.1002/qj.2270)), so climatology has a small structural edge: read
 a near-tie at extended range as "the NWP ensemble adds little out here", not as climatology winning.
-Second, `xgboost_baseline_retrain_790` was trained and predicted on power that was not yet cleaned,
-with code older than `main`, so the fair XGBoost comparison needs a retrain. Third, one fold of one
+Second, `xgboost_baseline_retrain_790` was trained on power that was not yet cleaned, with code
+older than `main`. The re-score scores its forecasts against the same truth with the same code, but
+a fair XGBoost comparison still needs a retrain. Third, one fold of one
 year, with no intervals.
 
 ## What changes, file by file
@@ -457,12 +466,12 @@ contract" rule.
 
 ### Tests
 
-- **`packages/baseline_forecasters/tests/test_climatology.py` (new).** Tests 1 to 14 below, on
+- **`packages/baseline_forecasters/tests/test_climatology.py` (new).** Tests 1 to 11 below, on
   hand-built `AllFeatures` frames.
 - **`packages/baseline_forecasters/tests/test_manual_heuristic.py`.** The engineer import becomes
   `from baseline_forecasters.nwp_run_rows import NwpRunRowsWithoutWeatherFeatureEngineer`, and the two
   engineer tests use the new name. No assertion changes.
-- **`tests/test_climatology_cv.py` (new).** Test 15, the integration test.
+- **`tests/test_climatology_cv.py` (new).** Test 12, the integration test.
 - `tests/conftest.py` needs no change: `register_experiment` already takes `base_model_config` and
   `config_overrides`.
 
@@ -502,52 +511,49 @@ implementation fails it.
    succeeds. A config selecting `power_lag_168h` raises `ValueError`.
 2. **Hand-computed quantiles.** One series, one cell, 5 deduplicated samples with power 0, 10, 20,
    30, and 40. The lookup's member-k column equals 40·(k + 0.5)/13 for k = 0 to 12, to `Float32`
-   precision, and `training_sample_count` is 5. A `"nearest"` interpolation gives multiples of 10
-   and fails. A level formula of k/12 fails at k = 0.
+   precision, so the test pins all 13 levels. A `"nearest"` interpolation gives multiples of 10 and
+   fails. A level formula of k/12 fails at k = 0. One further assert checks that the 13 expected
+   values are pairwise distinct, so a mislabelled member cannot pass this test and test 4 by
+   coincidence.
 3. **The dedupe.** Duplicating a subset of the training rows — the two largest samples, under three
    extra `power_fcst_init_time` values each — leaves the lookup equal (`assert_frame_equal`) to the
    lookup trained on the rows without duplicates. Without the dedupe, the duplicated samples pull
    the interior quantiles upwards, so the assertion fails.
-4. **The levels.** `CLIMATOLOGY_QUANTILE_LEVELS` has 13 entries equal to `(i − 0.5)/13` for i = 1
-   to 13, written out in the test.
-5. **Member order.** On the fixture of test 2, `predict` emits members 0 to 12 for the row, and
+4. **Member order.** On the fixture of test 2, `predict` emits members 0 to 12 for the row, and
    member k's `power_fcst` equals the lookup's member-k column, so the values strictly increase with
    the member index. A shuffled column-to-member mapping fails.
-6. **Local-time cell keys, across a clock change and at local midnight.** `_local_calendar_cell_keys`
+5. **Local-time cell keys, across a clock change and at local midnight.** `_local_calendar_cell_keys`
    maps 2025-06-06 23:30 UTC (Saturday 00:30 BST) to June, half-hour 1, weekend; 2025-06-30 23:30 UTC
    (Tuesday 1 July 00:30 BST) to July, half-hour 1, weekday; 2025-01-17 23:30 UTC (Friday 23:30 GMT)
    to January, half-hour 47, weekday; and 2025-03-30 01:00 UTC (02:00 BST, just after the clock
-   change) to March, half-hour 4, weekend. End to end, a forecaster trained only on 2025-06-07
-   00:30 BST forecasts a row at 2025-06-14 23:30 UTC (Sunday 00:30 BST) and drops a row at
-   2025-06-12 23:30 UTC (Friday 00:30 BST). A UTC-keyed implementation fails both halves.
-7. **An unseen cell drops its rows and logs.** A forecast row in a cell with no training sample is
+   change) to March, half-hour 4, weekend. A UTC-keyed implementation fails the first, second, and
+   fourth cases.
+6. **An unseen cell drops its rows and logs.** A forecast row in a cell with no training sample is
    absent from the output, the call does not raise, and `caplog` holds one warning carrying the
    dropped count and the series id. Rows in seen cells are unaffected.
-8. **Empty input.** A zero-row `AllFeatures` frame returns a zero-row frame that
+7. **Empty input.** A zero-row `AllFeatures` frame returns a zero-row frame that
    `PowerForecast.validate` accepts.
-9. **Stamping.** Every row carries `power_fcst_model_name == "climatology"`,
+8. **Stamping.** Every row carries `power_fcst_model_name == "climatology"`,
    `power_fcst_model_version == 1`, the config's `experiment_name` and `ml_flow_experiment_id`, the
    `fold_id` passed in (a non-default value such as `"fold_x"`), and a null `nwp_init_time`. The
    manual heuristic's mutation testing found that stamping goes untested otherwise.
-10. **`predict` ignores the validation power.** Two `predict` calls on the same rows, one with the
-    `power` column replaced by large arbitrary values, give equal output. A `predict` that reads
-    `power` fails, which is the leakage guard the maintainer asked for.
-11. **Train population.** Rows for series 1, 2, and 3, where series 2 has only null power and
-    series 3 is not requested, give `trained_time_series_ids == [1]`, and the lookup holds no cell
-    for series 2 or 3.
-12. **Save and load.** `load(save(...))` returns the same `trained_time_series_ids`, an equal config,
+9. **`predict` ignores the validation power.** Two `predict` calls on the same rows, one with the
+   `power` column replaced by large arbitrary values, give equal output. A `predict` that reads
+   `power` fails, which is the leakage guard the maintainer asked for.
+10. **Train population, and series that do not share cells.** Rows for series 1, 2, 3, and 4, where
+    series 2 has only null power, series 3 is not requested, and series 1 and 4 carry different
+    power in the same calendar cell, give `trained_time_series_ids == [1, 4]`. The lookup holds no
+    cell for series 2 or 3, and the quantiles of series 1 and 4 in the shared cell differ. A
+    group-by that omits `time_series_id` fails.
+11. **Save and load.** `load(save(...))` returns the same `trained_time_series_ids`, an equal config,
     and an equal lookup, and `predict` after the round trip equals `predict` before it. A stale file
     placed in the directory before `save` is gone afterwards. `meta.json`'s `model_class` is
     `"baseline_forecasters.climatology.ClimatologyForecaster"`.
-13. **Two series do not share cells.** Two series with different power in the same calendar cell
-    get different quantiles. A group-by that omits `time_series_id` fails.
-14. **The fixture is not vacuous.** The 13 expected quantiles of test 2's fixture are pairwise
-    distinct, so a mislabelled member cannot pass tests 2 and 5 by coincidence.
 
 The existing `test_manual_heuristic.py` suite is the refactor's regression test: it must pass
 unchanged apart from the engineer's import and name.
 
-**`tests/test_climatology_cv.py` (integration, `pytestmark = pytest.mark.integration`), test 15:**
+**`tests/test_climatology_cv.py` (integration, `pytestmark = pytest.mark.integration`), test 12:**
 modelled on `tests/test_manual_heuristic_cv.py`. Register `conf/model/climatology.yaml` with
 `config_overrides={}`. Write power from 30 days before the first training day to 12 hours after the
 validation day, then `write_cleaned_copy` it, so `scan_cleaned_power` sees every row. Write the
@@ -566,6 +572,12 @@ and `cv_power_forecasts`, then read `power_forecasts` and assert:
   training days carry distinct `power_at` values, so the 13 members of each row are distinct, and a
   mislabelled member fails. The validation-day power is never a sample, so a training step that
   read validation data would fail the oracle.
+- **CRPS flows over the members.** The test calls `compute_metrics` on the forecasts it read back,
+  with `scan_cleaned_power` as the actuals, the metadata it wrote, and a one-row effective-capacity
+  frame. The `horizon_slice="all"` row for `crps` is non-null and differs from the `mae` row, which
+  scores the ensemble mean. A `predict` that wrote one member, or 13 copies of one value, gives
+  `crps == mae` and fails. This is the roadmap PR C item's "CRPS flows over the members" test,
+  without materialising the `metrics` asset and its MLflow logging.
 
 The test fails on `main` at the missing YAML target. The NWP run on a training day is needed because
 `trained_cv_model` raises "Trained 0 of 1 eligible time series" without it.
@@ -596,24 +608,19 @@ The test fails on `main` at the missing YAML target. The NWP run on a training d
     - "Baseline forecasters": "The climatology baseline, built next" becomes present tense.
     - "Persistence and climatology — diagnostic bookends": "today `XGBoostForecaster` and
       `ManualHeuristicForecaster` exercise it" adds `ClimatologyForecaster`.
-    - "Implementation details — baselines" is deleted, with every surviving piece moved first.
-      The PR B item is copied into the body of
-      [#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087), replacing
-      that body's link to the deleted anchor. The metrics-collapse item moves to a new
-      "Implementation details — metrics collapse (deleted when it ships)" subsection under "Which
-      ensemble collapse defines the deterministic point forecast?", which keeps the item in the
-      reviewed docs. The re-run recipe — the `trained_cv_model++` paragraph of "Guiding principle"
-      and cross-cutting items 2 and 3 — moves into that subsection too, because the metrics-collapse
-      item already says the post-collapse backfill is the drill that verifies the recipe. The
-      section link at "Implemented as part of the baseline work" and the link in #1077's body point
-      at the new subsection, and #1077's body stops calling the item "PR 1". The PR C item is
-      promoted to the package README and the PR body. "The recipe" duplicates the background page
-      it links to, and "Data check before interpreting the manual heuristic's results" duplicates
-      the README's short-history caveat, so both are deleted. The holiday-aligned design text sits
-      outside the section and stays.
-    - Grep the page for "PR B", "PR C", "PR 1", and "below" after the deletion, so no sentence
-      points at removed text. "the same audited, no-lookahead pipeline as `PersistenceForecaster`
-      (below)" still points at the bookends section, which stays.
+    - "Implementation details — baselines": only the PR C item is deleted, and its design text is
+      promoted to the package README and the PR body. The heading stays, so its anchor survives,
+      and the section is deleted when
+      [#1077](https://github.com/openclimatefix/nged-substation-forecast/issues/1077) ships. The
+      intro's "One PR is next: `climatology` (PR C)" is rewritten to say that `climatology` has
+      shipped, tracked in #1086. The PR B item's sentences about extracting the engineer and the
+      `meta.json` helper become one sentence saying that `PersistenceForecaster` reuses
+      `NwpRunRowsWithoutWeatherFeatureEngineer` and the shared `meta.json` helper, which this PR
+      extracted. Cross-cutting item 1 drops its "PR C is tracked in #1086" clause. The
+      metrics-collapse item, "The recipe", the data check, and the re-run recipe stay where they
+      are.
+    - Grep the page for "PR C", "PowerLagsPerNwpRunFeatureEngineer", and "built next" after the
+      edit, so no sentence points at removed text or names the old engineer.
 - **`docs/roadmap/index.md`, v0.3.** "Baseline forecasters (persistence + climatology)" becomes the
   manual heuristic and climatology, with persistence in v0.9 (#1087).
 - **`#354` needs nothing from this PR beyond the rows.** The saved forecasts carry 13 members for
@@ -627,7 +634,7 @@ The test fails on `main` at the missing YAML target. The NWP run on a training d
 - **Ship-time triage.** The PR body uses `Closes #1086` and mentions #147 without a closing
   keyword. Once climatology merges, #147's remaining items are the deferred #1087 and #1088 (its
   body says so) and #715, so #147 can close by hand. That close is the maintainer's call (question
-  6).
+  5).
 
 ## Verification commands
 
@@ -662,34 +669,41 @@ Then the real-data run in decision 6, whose numbers go in the PR body.
    "PowerLags" as "power and its lags".
 3. **Extract the `meta.json` helper now, inside `baseline_forecasters` only?** Recommendation: yes.
    Moving it to `ml_core` for XGBoost too would touch the serving path for about 10 lines.
-4. **Is `training_sample_count` in the lookup worth its column?** Recommendation: yes. The train log
-   and the real-data check read it, and #354 or a later fallback rule needs it. The cost is one
-   `UInt32` column.
-5. **The `smoke_test` fold cannot exercise climatology.** That fold trains on January 2025 and
+4. **The `smoke_test` fold cannot exercise climatology.** That fold trains on January 2025 and
    validates on February 2025, so every validation row sits in an unseen cell and
    `cv_power_forecasts` writes an empty partition. `conf/cv/` is out of bounds. Recommendation:
    document the limitation in the README and the YAML comment, and register climatology with
    `run_mode="full_cv"`.
-6. **How should #147 close?** Recommendation: the maintainer closes #147 by hand after this PR
+5. **How should #147 close?** Recommendation: the maintainer closes #147 by hand after this PR
    merges, with a comment pointing at #1087, #1088, and #715. The PR body names #147 without a
    closing keyword.
-7. **May this PR edit the bodies of #1087 and #1077?** Both bodies link to the section this PR
-   deletes. Recommendation: yes, at ship, under the `github-issue-pr-workflow` skill's review step.
-8. **Power labels are period-ending, so local midnight's slot is the previous evening's last half
+6. **Power labels are period-ending, so local midnight's slot is the previous evening's last half
    hour.** Keying on `valid_time` as stored puts a Friday-night reading labelled Saturday 00:00 in
    the weekend cells. Recommendation: keep `valid_time` as stored. The same rule applies in `train`
    and `predict`, and it matches the pipeline's `local_*` features and the dashboard.
-9. **Training memory at V2 scale.** The training frame is about 2,500 series × 21,900 half-hours ×
+7. **Training memory at V2 scale.** The training frame is about 2,500 series × 21,900 half-hours ×
    up to 15 runs, around 820 million rows before the dedupe, under the 2³² row-count limit. The
    collect is streamed and projects three columns. Recommendation: accept now; the manual
-   heuristic's training reads the same frame.
-10. **`docs/design-philosophy/inherent-stability.md` says the manual heuristic's rows "follow the
-    NWP run grid".** That sentence uses "grid" for NWP-run rows, which the naming rule warns
-    against. The sentence is outside this issue's scope. Recommendation: fix the word in this PR
-    only if the maintainer agrees, otherwise leave it.
-11. **The XGBoost comparator is stale.** `xgboost_baseline_retrain_790` predates power cleaning and
-    current code. Recommendation: report against it with the caveat, and leave the retrain to its
-    own issue.
+   heuristic's training reads the same frame. Question 8 is the structural fix.
+8. **Should `train` receive one row per series and valid time, with no NWP runs?** The simplicity
+   review proposed a training-specific hook on `FeatureEngineer` that gives `train` one row per
+   `(time_series_id, valid_time)`. The hook would remove the dedupe from `train` and shrink a V2
+   training frame by up to 15 times, from about 820 million rows to about 55 million. The hook
+   needs an edit to `trained_cv_model`, which sits in the out-of-bounds `defs/`, and a change to
+   the `BaseForecaster` and `FeatureEngineer` interfaces. Training would also give up "identical
+   chain, identical rows": the forecasters would no longer all train on the same engineered rows.
+   Recommendation: ship climatology under the current architecture, and file the hook as its own
+   issue, gated on measuring the V2 training memory of climatology and the manual heuristic. This is
+   the maintainer's call.
+9. **`docs/design-philosophy/inherent-stability.md` says the manual heuristic's rows "follow the
+   NWP run grid".** That sentence uses "grid" for NWP-run rows, which the naming rule warns
+   against. The sentence is outside this issue's scope. Recommendation: fix the word in this PR
+   only if the maintainer agrees, otherwise leave it.
+10. **The XGBoost comparator is stale.** `xgboost_baseline_retrain_790` predates power cleaning and
+    current code. The scratch re-score in decision 6 puts the truth, the effective capacity, and
+    the scoring code on one footing for all three experiments, but cannot change what XGBoost was
+    trained on. Recommendation: report against it with the narrowed caveat, and leave the retrain to
+    its own issue.
 
 ## Considered and rejected
 
@@ -708,8 +722,26 @@ Then the real-data run in decision 6, whose numbers go in the PR body.
   only the engineered frame, and reading power directly would need a change in `defs/`, which is
   out of bounds.
 - **A new feature engineer for climatology.** The NWP-run engineer already gives the shared rows.
+- **A stored `training_sample_count` column in the lookup.** Nothing reads the column after
+  training, so the minimum and median counts go in the train log line, and a later fallback rule
+  can recompute them.
+- **Keeping the name `PowerLagsPerNwpRunFeatureEngineer` and leaving the engineer in
+  `manual_heuristic.py` (simplicity review, item 2).** The maintainer prefers descriptive names,
+  and "PowerLags" is false for climatology, which requests no lags.
+- **Leaving the `meta.json` round trip duplicated (simplicity review, item 3).** This PR is the
+  helper's second caller after the manual heuristic. The roadmap's wording gives the extraction to
+  PR B, but only because the roadmap counted persistence and climatology alone (departure 1).
+- **Scoring climatology alone, without re-scoring the other two experiments (simplicity review,
+  item 5).** The re-score puts the truth, the effective capacity, and the scoring code on one
+  footing for all three experiments, and narrows the stale-XGBoost caveat to XGBoost's training
+  inputs.
+- **Dropping the `selected_features` `ValueError` (simplicity review, item 6).** The check keeps
+  MLflow's params record honest about what ran, for about 8 lines.
 
 ## Review log
 
-- Plan review 1 (simplicity): not yet run.
+- Plan review 1, simplicity review (Opus), 2026-10-09: accepted 1, 4, 7 and the CRPS test; rejected
+  2, 3, 5, 6; rearchitecture noted. Item 1 keeps the "Implementation details — baselines" heading
+  and deletes only the PR C item. Item 4 cuts the unit tests from 14 to 11. Item 7 drops the stored
+  sample count. The CRPS test joins integration test 12. The rearchitecture is risk 8.
 - Plan review 2 (correctness and testability): not yet run.
