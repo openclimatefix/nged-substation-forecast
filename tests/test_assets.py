@@ -770,6 +770,37 @@ def test_a_run_with_nothing_new_downloads_nothing_and_leaves_the_files_unchanged
     assert metadata["metadata_n_new_TimeSeriesIDs"].value == 0
 
 
+def test_an_hour_whose_new_files_add_no_rows_still_records_them(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """Without the record, the same data-less file would be downloaded every hour."""
+    store = _FakeS3Store(_NGED_FILES)
+    _use_store(monkeypatch, store)
+    _run(dagster_instance)
+    version = _delta_version(env)
+    data_less_key = _key(10, 100_000)
+    store.put(data_less_key, _data_less_file(10, "stopped reporting"))
+
+    _run(dagster_instance)
+    _run(dagster_instance)
+
+    assert store.requested_paths.count(data_less_key) == 1
+    assert _delta_version(env) == version
+
+
+def test_a_cancelled_run_is_not_swallowed_by_the_downloaded_files_write(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    _use_store(monkeypatch, _FakeS3Store(_NGED_FILES))
+
+    def cancel(**_: object) -> None:
+        raise DagsterExecutionInterruptedError
+
+    monkeypatch.setattr(target=assets, name="write_downloaded_files", value=cancel)
+
+    _run(dagster_instance, succeeds=False)
+
+
 def test_a_malformed_file_fails_the_run_without_a_retry_and_records_nothing(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:

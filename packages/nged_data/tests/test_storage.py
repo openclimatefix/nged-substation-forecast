@@ -726,8 +726,10 @@ class _FakeAsyncStore:
         self.in_flight = 0
         self.peak_in_flight = 0
         self.failing_paths: set[str] = set()
+        self.requested_paths: list[str] = []
 
     async def get_async(self, path: str) -> _FakeAsyncResult:
+        self.requested_paths.append(path)
         self.in_flight += 1
         self.peak_in_flight = max(self.peak_in_flight, self.in_flight)
         try:
@@ -806,13 +808,14 @@ def test_download_and_parse_files_keeps_the_later_window_whatever_order_requests
                 time_series_id=11, information="later note", values=[10.0, 20.0]
             ),
         },
-        # The earlier window's file finishes last, and the listing is passed shuffled.
+        # The earlier window's file finishes last, and the listing is passed latest-first.
         delays={earlier_path: 0.05, later_path: 0.001},
     )
-
-    result = download_and_parse_files(
-        store=_as_store(store), paths_df=_listing_of([later_path, earlier_path])
+    latest_first = pt.DataFrame(_listing_of([earlier_path, later_path]).reverse()).set_model(
+        _ProcessedFileListing
     )
+
+    result = download_and_parse_files(store=_as_store(store), paths_df=latest_first)
 
     assert result.power_time_series["power"].to_list() == [10.0, 20.0]
     assert result.metadata["information"].to_list() == ["later note"]
@@ -836,6 +839,7 @@ def test_download_and_parse_files_is_concurrent_and_capped_across_chunks(
 
     result = download_and_parse_files(store=_as_store(store), paths_df=_listing_of(paths))
 
+    assert sorted(store.requested_paths) == sorted(paths)
     assert result.metadata.height == 1
     assert 1 < store.peak_in_flight <= 2
 
@@ -872,3 +876,26 @@ def test_read_downloaded_files_does_not_wrap_a_polars_error_reading_a_remote_fil
             power_table_path="s3://bucket/power.delta",
             metadata_path="s3://bucket/metadata.parquet",
         )
+
+
+def test_read_downloaded_files_passes_the_storage_options_to_the_read(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(storage, "object_exists", lambda uri, storage_options=None: True)
+    monkeypatch.setattr(storage, "delta_table_exists", lambda uri, storage_options=None: True)
+    seen: list[object] = []
+
+    def read(path: str, storage_options: object = None) -> pl.DataFrame:
+        seen.append(storage_options)
+        return pl.DataFrame(schema={"path": pl.String, "last_modified": UTC_DATETIME_DTYPE})
+
+    monkeypatch.setattr(pl, "read_parquet", read)
+
+    read_downloaded_files(
+        downloaded_files_path="s3://bucket/downloaded_files.parquet",
+        power_table_path="s3://bucket/power.delta",
+        metadata_path="s3://bucket/metadata.parquet",
+        storage_options={"aws_region": "eu-west-2"},
+    )
+
+    assert seen == [{"aws_region": "eu-west-2"}]
