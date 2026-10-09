@@ -1,8 +1,8 @@
 """Print every table the embedded-battery forecast page quotes, from the saved fits.
 
-Reads `fits/<setting>/<issue>/*.parquet` and nothing else that varies, so the tables can be rebuilt
-without a refit. Writes `forecast_report.md` and the machine-readable tables under
-`report_tables/`.
+Reads the fits of the variant `FIT_VARIANT` names (`as_written` by default) and the saved input
+frames, so the tables can be rebuilt without a refit. Writes `forecast_report.md` and the
+machine-readable tables under `report_tables/`; the other variants add a suffix to both names.
 
 Scores. Every loss is a percentage of the battery's own 99th-percentile absolute output ("points of
 p99"). CRPS is the gap-weighted sum of pinball losses over the 13 delivery levels. Intervals come
@@ -10,7 +10,9 @@ from `studies.bootstrap`, which resamples whole calendar months and a fitting se
 with the months shared across batteries. Skill is one minus the ratio of mean CRPS values, and its
 interval is a month resampling of that ratio (`month_skill_interval`).
 
-Run: `uv run python studies/embedded_battery_forecast/forecast_report.py`.
+Run, in this order so the `as_written` report can show the other two beside it:
+`FIT_VARIANT=pre_review`, then `FIT_VARIANT=idle_dropped`, then no variable, each as
+`uv run python studies/embedded_battery_forecast/forecast_report.py`.
 """
 
 from collections import Counter
@@ -22,10 +24,10 @@ import numpy as np
 import polars as pl
 from forecast_arms import arm_definitions, issue_cutoff_lines
 from forecast_fit import FIT_VARIANT, LEVELS, Q_COLUMNS, SettingType, arm_file
-from forecast_inputs import load_physical_notifications
+from forecast_inputs import SCORING_START, load_physical_notifications
 from forecast_results import load_losses
 from forecast_runner import NGED_BATTERY_A_FILE_ID, battery_for, lead_parties, testbed_ids
-from studies.battery_forecast import SYMMETRIC_BANDS, IssueType
+from studies.battery_forecast import IDLE_MONTH_ZERO_SHARE, SYMMETRIC_BANDS, IssueType
 from studies.bootstrap import (
     BOOTSTRAP_SEED,
     N_BOOTSTRAP_RESAMPLES,
@@ -33,7 +35,7 @@ from studies.bootstrap import (
     bootstrap_difference,
 )
 from studies.party_bootstrap import arm_cells, party_month_difference, party_month_share
-from studies.sources import EMBEDDED_BATTERY_FORECAST_DIR
+from studies.sources import EMBEDDED_BATTERY_FORECAST_DIR, EMBEDDED_BATTERY_FORECAST_INPUTS_DIR
 
 VARIANT_SUFFIX: Final[str] = "" if FIT_VARIANT == "as_written" else f"_{FIT_VARIANT}"
 TABLES_DIR: Final[Path] = EMBEDDED_BATTERY_FORECAST_DIR / f"report_tables{VARIANT_SUFFIX}"
@@ -333,6 +335,16 @@ EXPLORATORY_CONTRASTS: Final[tuple[Contrast, ...]] = (
     ),
 )
 """Exploratory contrasts: every one is labelled exploratory on the page."""
+
+
+VARIANT_RULES: Final[dict[str, str]] = {
+    "as_written": "every half-hour from 1 October 2025 whose inputs exist, for every arm (the "
+    "plan's rule).",
+    "idle_dropped": "as `as_written`, less each battery's idle lead-in, from training and "
+    "scoring alike, for every arm (a rule decided after the first science review).",
+    "pre_review": "as `as_written`, but with price features that treated the whole UTC day as "
+    "published (the fits made before the first science review).",
+}
 
 
 def save_table(*, frame: pl.DataFrame, name: str) -> None:
@@ -976,7 +988,75 @@ def planned_section(*, testbed: list[str], nged: list[str]) -> tuple[list[str], 
     return [*lines, ""], planned
 
 
-def comparison_lines(*, planned: pl.DataFrame, other_path: Path, title: str, other: str) -> list[str]:
+def output_regime_section(*, testbed: list[str]) -> list[str]:
+    """Return each battery's monthly share of exactly-zero output and the idle lead-ins.
+
+    A battery whose first months are idle (`studies.battery_forecast.leading_idle_end`) has those
+    half-hours dropped in the `idle_dropped` variant. The table shows every battery's regime, so a
+    reader can see each change of regime, not only the leading ones.
+    """
+    monthly = []
+    lead_ins = []
+    for battery in testbed:
+        frame = pl.read_parquet(
+            EMBEDDED_BATTERY_FORECAST_INPUTS_DIR / f"ID-1h__{battery}.parquet",
+            columns=["time", "output_mw", "in_service"],
+        )
+        present = frame.drop_nulls("output_mw")
+        zeros = (
+            present.with_columns(month=pl.col("time").dt.strftime("%Y-%m"))
+            .group_by("month")
+            .agg(zero_share=(pl.col("output_mw") == 0.0).mean())
+            .sort("month")
+        )
+        monthly.append((battery, dict(zeros.iter_rows())))
+        dropped = frame.filter(~pl.col("in_service") & (pl.col("time") >= SCORING_START))
+        if dropped.height:
+            lead_ins.append((battery, dropped["time"].max(), dropped.height))
+    months = sorted({m for _, shares in monthly for m in shares})
+    rows = [
+        [battery] + [f"{shares[m]:.2f}" if m in shares else "-" for m in months]
+        for battery, shares in monthly
+    ]
+    return [
+        "## Output regimes: the share of half-hours at exactly zero, by month",
+        "",
+        (
+            f"- A month is idle when at least {IDLE_MONTH_ZERO_SHARE:.0%} of its present "
+            "half-hours are exactly zero. A leading run of idle months is the battery's idle "
+            "lead-in, and the `idle_dropped` variant drops it from training and scoring."
+        ),
+        *[
+            f"- {battery}: idle lead-in ends {end:%Y-%m-%d}; {n} scored half-hours dropped."
+            for battery, end, n in lead_ins
+        ],
+        "",
+        *table(headers=["Battery", *months], rows=rows),
+        "",
+    ]
+
+
+def fpn_zero_lines(*, testbed: list[str]) -> list[str]:
+    """Return the testbed batteries whose Physical Notification is almost always zero."""
+    trivial = trivial_fpn_batteries(batteries=testbed)
+    return [
+        "## Batteries whose Physical Notification is almost always zero",
+        "",
+        (
+            f"- {len(trivial)} of {len(testbed)} testbed batteries have an exactly-zero "
+            f"notification in at least {TRIVIAL_FPN_ZERO_SHARE:.0%} of the half-hours that "
+            "carry one: "
+            + ", ".join(f"`{b}`" for b in trivial)
+            + ". They sit in the neighbour sets of the other batteries, where they pull the mean "
+            "notification towards zero."
+        ),
+        "",
+    ]
+
+
+def comparison_lines(
+    *, planned: pl.DataFrame, other_path: Path, title: str, other: str
+) -> list[str]:
     """Return the planned contrasts of this run beside those of another run's saved table."""
     if not other_path.exists():
         return []
@@ -1071,13 +1151,24 @@ def main() -> None:
         "",
         f"- Testbed batteries: {len(testbed)}. Scored months: October 2025 to August 2026.",
         "- Unit of every loss: points of the battery's own 99th-percentile absolute output.",
+        f"- Rows scored: {VARIANT_RULES[FIT_VARIANT]}",
         (
-            "- Intervals: 95%, whole calendar months and one of 3 fitting seeds resampled "
-            f"together ({N_BOOTSTRAP_RESAMPLES:,} resamples), months shared across batteries."
+            "- Score: CRPS approximated from the 13 delivery quantiles (the gap-weighted sum of "
+            "pinball losses), which does not cover the tails beyond p1 and p99."
+        ),
+        (
+            "- Intervals of contrasts and of absolute errors: 95%, whole calendar months and one "
+            f"of 3 fitting seeds resampled together ({N_BOOTSTRAP_RESAMPLES:,} resamples), "
+            "months shared across batteries."
+        ),
+        (
+            "- Intervals of CRPS skill (`month_skill_interval`) resample whole calendar months "
+            "only, pooling the 3 seeds."
         ),
         (
             "- The deterministic arms (`clim`, `persistence_conformal`, `rank_conformal`) hold "
-            "no random draw, so each result is stored under all 3 seed labels."
+            "no random draw, so each result is stored under all 3 seed labels and the seed "
+            "term of their intervals is zero."
         ),
         "- All XGBoost fits ran on the CPU (one device for every arm), 2 threads per fit.",
         "",
@@ -1100,8 +1191,35 @@ def main() -> None:
     planned_lines, planned = planned_section(testbed=testbed, nged=nged)
     exploratory_lines, exploratory = exploratory_section(testbed=testbed, nged=nged)
     lines += [*planned_lines, *exploratory_lines]
+    party_lines, party_frame = party_resampling_section(testbed=testbed)
+    save_table(frame=party_frame, name="party_resampling.parquet")
+    lines += party_lines
+    if FIT_VARIANT == "as_written":
+        lines += comparison_lines(
+            planned=planned,
+            other_path=IDLE_DROPPED_PLANNED_PATH,
+            title="Planned contrasts: as written (all rows) beside idle lead-in dropped (post hoc)",
+            other="Idle lead-in dropped",
+        )
+        lines += comparison_lines(
+            planned=planned,
+            other_path=EMBEDDED_BATTERY_FORECAST_DIR
+            / "report_tables_pre_review"
+            / "planned_contrasts.parquet",
+            title="Planned contrasts: published prices beside the earlier whole-UTC-day prices",
+            other="Earlier whole-UTC-day prices",
+        )
     lines += ["## Rung A4 and A5: the share of the own-FPN gain that neighbours recover", ""]
     lines += [*share_recovered(setting="primary", batteries=testbed), ""]
+    trivial = tuple(trivial_fpn_batteries(batteries=testbed))
+    lines += [
+        "### The same share with the targets whose notification is almost always zero left out",
+        "",
+        *share_recovered(setting="primary", batteries=testbed, excluded=trivial),
+        "",
+    ]
+    lines += fpn_zero_lines(testbed=testbed)
+    lines += output_regime_section(testbed=testbed)
     lines += false_alarm_lines(planned=planned, exploratory=exploratory)
     lines += ["## CRPS skill by lead time (primary setting)", ""]
     lead_lines, lead_data = skill_by_lead(setting="primary", batteries=testbed)

@@ -185,8 +185,10 @@ rows in the ECR.
 ## Shared forecast design (Parts A and B)
 
 **Three issue times, each defined by what is known at that moment.** All times are UTC. The target
-day is the N2EX delivery day, read from the `delivery_date` column of
-`downloads/market/neso_n2ex_day_ahead/`.
+day is the UTC day, which matches the `delivery_date` column of
+`downloads/market/neso_n2ex_day_ahead/`. The auction's own delivery day is the UK local day (see
+"Which prices are public at an issue time" below), which differs from the UTC day by one hour in
+summer.
 
 | Issue time | When | Price input | Own output known up to | FPN |
 |---|---|---|---|---|
@@ -226,6 +228,36 @@ it is the output in the half-hour that ended at issue.
 
 The EPEX half-hourly auction is not free (from EUR 665 a month), so every price is hourly and both
 half-hours of an hour share a rank.
+
+### Which prices are public at an issue time
+
+**The N2EX auction's delivery day is the UK local day, so in summer the last UTC hour of a day is
+priced by the next day's auction.** [Nord Pool's product
+specification](https://support.nordpoolgroup.com/support/solutions/articles/8000088463-about-the-day-ahead-gb-auction)
+gives the auction results by 10:00 on the day before delivery, and its clock-change notices give
+the GB delivery day 23 hours on the spring change and 25 hours on the autumn change, which is the
+UK local day. The NESO file labels its hours in UTC (the hourly correlation with the Elexon APX
+index peaks at a lag of 0 hours in winter and in summer, 0.851 and 0.897), and it holds 24 rows on
+both clock-change days. When UK clocks are one hour ahead of UTC, the hour 23:00 to 24:00 UTC of a
+day D belongs to UK day D+1, whose auction results are public at 10:00 UTC on D. The rule applied
+is that the price of an hour is public 13 hours before midnight UK time at the start of the hour's
+UK day (10:00 UTC on D for that hour in summer, the later of the two readings of Nord Pool's
+"10:00 GMT"; the rule adds a margin of three hours in winter, where no UTC hour changes day).
+
+**Three inputs were affected, and each now uses only public prices.**
+
+- At `DA-late` (18:00 on D-1), the price of 23:00 to 24:00 UTC on D is not public. Its price takes
+  the `naive` value, and the day's rank, mean, range, and rank-rule value are computed with that
+  hour at its `naive` value.
+- At `ID-1h`, a half-hour issued before 10:00 UTC on D has the same problem for the daily
+  statistics of day D, and uses the same replacement. A half-hour issued later uses the real price.
+- In the price model at `DA-early`, the one-day-earlier price and the seven-day mean take the
+  `naive` value for the 23:00 UTC hour of D-1, which is priced by D's own auction.
+
+**The `actual` arm at `DA-early` stays the perfect-price upper bound and keeps every hour.** Only
+the arms that claim a legitimate forecast use the public-price rule. The fits made before the rule
+are kept under `fits/` (`FIT_VARIANT=pre_review`), and the report prints the planned contrasts of
+both beside each other.
 
 ### Why the forecast is a set of quantiles, never a Gaussian
 
@@ -481,16 +513,83 @@ run is post hoc.
 - D2 and D3 count only if rung A0's false-alarm control passes.
 - D4 counts only if `neighbour_fpn_shuffled` is not better than `no_neighbour` by more than D4's own
   effect, which would mean the neighbour columns carry fleet shape rather than the day's decisions.
-- A null D5 is read as "no effect" only if rung A0's positive control passed, and otherwise as "an
-  effect as large as the interval's bound is not excluded".
+- A null D5, or a null D1, is never read as "no effect". It is read as a bound: "an improvement
+  larger than the interval's bound is excluded". Rung A0's positive control shows that the pipeline
+  detects an improvement of about 5 points of p99, roughly 35 times D2's size, so it supports the
+  statement that the pipeline works but not that it would detect an effect of D2's size.
 
 **What counts as failure.** D1 not met means a day-ahead probabilistic forecast of an embedded
 battery BMU from public inputs describes tomorrow no better than the trailing 56-day climatology.
 D2 not met with D1 met means the gain is calendar shape, not price. D4 not met, or met with
 neighbours recovering less than a tenth of the own-FPN gain in CRPS, means the fleet's FPNs say
-little about another battery's next half-hour; a null D4 beside a strong same-lead-party arm would
+little about another battery's next half-hour (the page states "met, and says little" when both
+hold); a null D4 beside a strong same-lead-party arm would
 place the information in the optimiser, not the fleet.
 Each outcome is published as the finding.
+
+## Amendments after the first science review
+
+**These amendments are post hoc: each was decided after the first science review had seen the
+results, and the page labels every figure that depends on one.** The five planned contrasts and
+their pass rules above are unchanged. The amendments add readings beside them and do not replace
+them.
+
+- **Idle lead-in (review item M1).** Two batteries of one lead party publish exactly zero in every
+  half-hour from September 2025 until March or April 2026. They alone make D1 positive (+0.065,
+  against +0.005 without them), because month-block fits train mostly on idle months while the
+  climatology adapts within weeks. The rule, decided from the target alone so that every arm of a
+  battery keeps the same rows: a calendar month (UTC) is idle when at least 99% of the battery's
+  present half-hours are exactly zero, and a battery's idle lead-in is the run of idle months at
+  the start of its series. Idle months after the first working month are not part of the lead-in.
+  The fits as written score every half-hour (the planned analysis). The `idle_dropped` fits drop
+  each lead-in from training and scoring alike, for every arm of that battery, and refit only the
+  batteries that have one. The page reports D1 to D5 under both rules, and the as-written rule
+  decides whether a planned contrast is met.
+- **Party-and-month resampling (review item M3).** The month-and-seed interval holds the 35
+  batteries fixed. One lead party runs 14 of them, so the lead party is the unit of independence.
+  The report adds, as a post hoc sensitivity for D1 to D4 and the share recovered, an interval that
+  resamples the 12 lead parties and the calendar months together with the fitting seed averaged
+  out, and a mean in which every lead party counts once. D5 has one battery and one party, so it
+  has no party interval.
+- **Wording of D3 and D4 (review item M2).** D3 is "met" (the XGBoost quantile model given the
+  forecast price beats the same model given a shuffled price) while that model is still worse than
+  the climatology at `DA-early`. The page says both. D4's share of the own-FPN gain that neighbours
+  recover falls below the tenth the failure clause names, so the page states D4 as "met, and says
+  little", beside the neighbour model's own CRPS against the climatology. The page states the
+  unverified assumption that a Physical Notification is public at gate closure beside D4.
+- **Bounds for D1 and D5 (review item M5).** See the rules above.
+- **Public prices (review item M4).** See "Which prices are public at an issue time".
+- **Batteries with an almost-always-zero Physical Notification.** The report lists the testbed
+  batteries whose notification is exactly zero in at least 80% of the half-hours that carry one.
+  Those batteries sit in the neighbour sets, so the neighbour mean is pulled towards zero. The
+  report repeats the share recovered with those batteries out of the target set (their neighbour
+  statistics are not rebuilt).
+- **Scope of the climatology comparison.** The climatology is a trailing 56-day estimator that
+  adapts every day, and the XGBoost quantile model is fitted across month blocks, some later than
+  the test month. D1 therefore tests this XGBoost quantile model, trained across month blocks,
+  against an adaptive baseline, and the page does not word it as a test of what public inputs
+  can carry.
+- **Reading the simple arms.** `persistence_conformal` adds one lag's residual spread to a weakly
+  correlated centre, and `rank_conformal` pools residuals across all half-hours by three
+  schedule states. Neither result shows that recent output or the price rank carries no
+  information, and X12 (the ID-1h model with one lag of telemetry) is not a statement about real-time
+  telemetry. X6, X7, X8, X12, and X13 stay exploratory.
+- **Two sentences for the page.** The shuffled arms draw from the whole calendar month, future days
+  included, so they know the month's price level in advance, which suits a negative control. The
+  deterministic arms hold no random draw, so the seed term of their intervals is zero.
+- **Score.** The score is named "CRPS approximated from the 13 delivery quantiles". It does not
+  cover the tails beyond p1 and p99, where `clim` is slightly miscalibrated at `DA-late`, and the
+  reliability tables show that.
+
+**Review items not applied, with the reason.**
+
+- **A weaker positive control (S5) and an XGBoost arm given the climatology's p10 and p90 (S1).**
+  Each needs a new fitting design with its own code review, and neither decides a planned
+  contrast. The bounds for D1 and D5 supply the power statement S5 asks for.
+- **A UK-local half-hour of day in every arm (S6).** The reviewer rated it low priority, and the
+  October-and-March check (D2 of −0.149, against −0.140 pooled) suggests the effect is small.
+- **Removing the `battery_inputs.py` re-export shim (N3) and recomputing the 99th percentile
+  in one place (N4).** Neither changes a result.
 
 ## What the data can and cannot show
 
@@ -559,6 +658,8 @@ loaders.** The import rules forbid one study folder importing another.
   confirms the moved bodies are unchanged; re-run only the prior study's cheapest script
   (`battery_rung1.py`) and confirm its saved output is bit-identical, as a check that the imports
   resolve to the same code.
+- New `packages/studies/src/studies/party_bootstrap.py`, with tests: the party-and-month
+  resampled interval of a paired difference and of a share recovered.
 - New `packages/studies/src/studies/battery_forecast.py`, with tests: the as-of join of a vintaged
   forecast at an issue time, the three issue-time frames, `clim` and the persistence value, the
   conformal residual quantiles by schedule state, the gap-weighted CRPS, coverage and width per
