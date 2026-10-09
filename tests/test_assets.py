@@ -822,7 +822,6 @@ def test_the_downloaded_files_list_is_never_ahead_of_the_rows(
 ) -> None:
     store = _FakeS3Store(_NGED_FILES)
     _use_store(monkeypatch, store)
-    monkeypatch.setattr(target=assets, name="_POWER_INGEST_RETRY_DELAY_SECONDS", value=0)
     real_write = assets.write_power_time_series
     monkeypatch.setattr(
         target=assets,
