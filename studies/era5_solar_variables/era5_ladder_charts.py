@@ -44,6 +44,7 @@ from era5_ladder_arms import (
     ADJUSTED_LEVEL_PERCENT,
     ARM_LABELS,
     DROP_PREFIX,
+    MARS_FREE_ARM,
     PRIMARY_SETTING,
     SIGNED_ERROR,
     SMALLEST_EFFECT,
@@ -319,7 +320,9 @@ def figure_1_headline(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMix
                 "{}: {} minus {}",
                 pl.col("label"),
                 pl.col("treatment").str.to_uppercase(),
-                pl.col("reference").str.to_uppercase(),
+                pl.when(pl.col("reference") == MARS_FREE_ARM)
+                .then(pl.lit(ARM_LABELS[MARS_FREE_ARM]))
+                .otherwise(pl.col("reference").str.to_uppercase()),
             ),
             value=pl.col("difference") * scale,
             lower=pl.col("lower_95") * scale,
@@ -580,7 +583,7 @@ def figure_drop_one(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
     )
 
 
-SHUFFLED_SUFFIX: Final[str] = "_shuffled"
+SHUFFLED_SUFFIX: Final[str] = "_noise"
 """What `era5_ladder_importance.py` appends to a shuffled copy's column name."""
 
 SHUFFLED_ARM: Final[str] = "g9_with_shuffled"
@@ -636,7 +639,11 @@ def figure_12_importance(
             )
         )
 
-    full = refit_means(arm="g9", grouped=pl.col("column"))
+    # The columns come from the refit that carries the shuffled copies, because each refit's shares
+    # sum to 1 over its own columns, so the noise line is only comparable within that refit.
+    full = refit_means(arm=SHUFFLED_ARM, grouped=pl.col("column")).filter(
+        ~pl.col("label").str.ends_with(SHUFFLED_SUFFIX)
+    )
     top = full.sort("value", descending=True).head(TOP_COLUMNS)
     # The noise line is the largest shuffled copy's share in one refit of one farm, averaged.
     noise_line = float(
@@ -675,7 +682,7 @@ def figure_12_importance(
         dot_interval_panel(
             rows=top,
             x_title=f"Share of total gain (%) in the full set, {TOP_COLUMNS} largest columns",
-            panel_title="Columns of the full set (G9)",
+            panel_title="Columns of the full set (G9), refitted with shuffled copies",
             colour=TARGET_COLOURS[target],
             reference_rules=(noise_line,),
         ),

@@ -10,13 +10,15 @@ one another. The chart script reads the tables. Every number on the page comes f
 the split tables it prints are the same numbers as `splits.parquet`.
 
 **Planned contrasts are those the plan named before any result existed**: P0 (every ERA5 variable
-against the minimal set), P1 (total cloud), P2 (the three cloud layers), and P3 (anything beyond the
-cloud layers), each on both targets. Each is reported at the Bonferroni-adjusted level for the
-family of eight, at 95%, and at the second hyperparameter setting, and its verdict stands only if
-both settings agree. Every other contrast is exploratory.
+against the minimal set), P1 (total cloud), P2 (the three cloud layers), P3 (anything beyond the
+cloud layers), and P4 (the 12 MARS-only variables, against everything else), each on both targets.
+Each is reported at the Bonferroni-adjusted level for the family of ten, at 95%, and at the second
+hyperparameter setting, and its verdict stands only if both settings agree. Every other contrast is
+exploratory.
 
-**The adjusted intervals rest on 2,000 resamples**, so each tail of a 99.375% interval is set by
-about 6 of them, and a bound can move by Monte Carlo noise. The page says so.
+**The adjusted intervals of the planned contrasts rest on 10,000 resamples**, so each tail of a
+99.5% interval is set by about 25 of them. The report's `MARS fetch decision` section applies the
+plan's rule to P4 on the output target at both settings.
 
 **The correlation** is the Pearson correlation of the out-of-fold prediction with the measured
 value, over all rows, as a fraction of each farm's capacity, with an interval from the same
@@ -394,7 +396,7 @@ def contrast_row(
         reference=reference,
         metric=METRIC,
         level=ADJUSTED_LEVEL_PERCENT,
-        n_resamples=PLANNED_RESAMPLES,
+        n_resamples=PLANNED_RESAMPLES if planned else None,
     )
     smallest = SMALLEST_EFFECT[target]
     return {

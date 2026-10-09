@@ -159,9 +159,9 @@ CAMS aerosol product McClear uses (EAC4 or the operational analysis) is unverifi
 - **Geometry in every rung:** the minimal set carries the sun's elevation and a midpoint-zenith
   estimate of the top-of-atmosphere flux, while `ssrd`, `ssrdc`, and `cdir` are hour integrals. To
   stop `ssrdc` and `cdir` winning by supplying hour-integrated geometry that can be computed for
-  free, every rung also carries the hour-integrated top-of-atmosphere horizontal flux
-  (`extraterrestrial_hour_w_m2`, computed from the sun's position at five instants across the hour),
-  which needs no fetch in production.
+  free, every rung also carries the hour-integrated top-of-atmosphere horizontal flux that the CAMS
+  files hold (`cams_toa_w_m2`). The value depends on the sun's position alone, so a production
+  forecast could compute it, and every arm sees the same column.
 - **Metric:** mean absolute error is the main metric: as a percentage of capacity (PV), and as a
   clearness-index error and in W m⁻² (CAMS). Pearson correlation between out-of-fold prediction and
   measured value, pooled over each fold's rows, is reported beside mean absolute error for every
@@ -425,9 +425,9 @@ changes (`era5_ladder`, `correlation`), the prose review and persona reviews, an
 - **Regime and correlation functions:** `sky_regime` returns each regime at and between its
   thresholds, and `pooled_correlation_interval` returns the known correlation of a constructed pair.
   Tests run with `--run-studies`.
-- **Importance summary:** gains scaled to sum to 1 per model, a rung's share equals the sum of its
-  columns' shares, and a column the model never split on gets a share of 0 rather than going
-  missing.
+- **Importance summary:** gains scaled to sum to 1 per model, and a column the model never split on
+  gets a share of 0 rather than going missing. The grouping of columns by rung is in the chart
+  script and is checked by looking at the figure.
 
 ## The five complexity triggers (for sizing)
 

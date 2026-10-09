@@ -326,9 +326,15 @@ def test_the_mars_free_arm_drops_the_mars_variables_and_the_clear_sky_index_only
     assert "tcc" in free
 
 
-def test_every_mars_only_variable_is_a_ladder_variable():
-    assert set(MARS_ONLY_VARIABLES) <= set(rung_variables(rung="g9"))
-    assert len(MARS_ONLY_VARIABLES) == 12
+def test_the_mars_only_variables_are_the_twelve_the_plan_names():
+    plan_names = {
+        "ssrdc", "cdir", "tclw", "tciw", "tcslw", "cbh",
+        "tcrw", "tcsw", "tco3", "uvb", "fal", "deg0l",
+    }  # fmt: skip
+
+    assert set(MARS_ONLY_VARIABLES) == plan_names
+    assert len(MARS_ONLY_VARIABLES) == len(plan_names)
+    assert plan_names <= set(rung_variables(rung="g9"))
 
 
 def test_every_arm_is_shown_the_hour_integrated_top_of_atmosphere_flux():

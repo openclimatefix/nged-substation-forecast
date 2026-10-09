@@ -24,6 +24,7 @@ result calls for.
 | `era5_ladder_arms.py` | The arms, targets, planned contrasts, and paths that every other script imports |
 | `era5_ladder_build_dataset.py` | Joins output, CAMS, and every downloaded ERA5 variable into one hourly frame holding all six farms. Run it with `uv run --with netcdf4`. `--through-rung g2` builds from the variables downloaded so far, `--keep-zero-hours-with-snow` builds the snow variant, and the full build adds the EAC4 aerosol columns whenever the aerosol download exists |
 | `era5_ladder_fit.py` | Fits every arm out of fold for both targets. `--view aerosol` fits the aerosol view, and `--view extra_sensitivity --sensitivity-arms ...` adds the second hyperparameter setting for arms whose contrasts lie near the 5% line |
+| `era5_ladder_importance.py` | Refits `g0`, `g2`, `g9`, and `g9` with shuffled copies of the `g3` to `g9` columns, and saves each column's share of XGBoost's total gain (`importance_<variant>_through_<rung>.parquet`). It needs a GPU slot from the study coordinator |
 | `era5_ladder_report.py` | Reads the saved losses and writes `report.md` and the interval tables, each named for the variant and the highest rung |
 | `era5_ladder_charts.py` | Draws the page's figures into `docs/studies/assets/` |
 
@@ -40,6 +41,8 @@ aerosol from `fetch_cams_eac4_aod.py`. The tested machinery is `studies.era5_lad
   it shows what the pipeline produces from nothing.
 - **`positive_control`** is `g2` plus CAMS global irradiance, on the output target only. It must help.
 - **`known_answer_ssrd_only`** is the CAMS target given `ssrd` and the sun position only.
+- **`g9_without_mars_only`** is `g9` without the 12 variables found only in MARS (and the clear-sky
+  index built from `ssrdc`). Planned contrast P4 compares `g9` with it.
 - **`drop_g1` to `drop_g9`** are `g9` without one rung's variables.
 - **`g10` and `g9_aerosol_rows`** are `g9` with and without CAMS EAC4 aerosol optical depth, on the
   rows that EAC4 covers, with the folds cut again on that span.

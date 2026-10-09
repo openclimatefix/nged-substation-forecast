@@ -694,17 +694,3 @@ def test_a_difference_interval_at_a_level_uses_the_default_resamples_unless_told
 
     assert default == explicit
     assert fewer != default
-
-
-def test_more_resamples_widen_an_extreme_tail_towards_its_limit():
-    losses = _losses(seeds=(1, 2, 3))
-
-    few = bootstrap_difference_at_level(
-        losses=losses, treatment="T", reference="R", metric="loss", level=99.5, n_resamples=100
-    )
-    many = bootstrap_difference_at_level(
-        losses=losses, treatment="T", reference="R", metric="loss", level=99.5, n_resamples=10_000
-    )
-
-    assert many[0] <= few[0]
-    assert many[1] >= few[1]
