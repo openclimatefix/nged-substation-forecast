@@ -13,7 +13,10 @@ holds.
 ## Summary
 
 **All numbers on this page are provisional until the maintainer has reviewed the page.** The page
-asks four questions. Terms are defined after Figure 1.
+asks four questions. Differences are in points of p99 (1% of a battery's own 99th-percentile
+output); a negative difference in "first minus second" means the first forecast's error is
+lower, so "worse by X" next to a positive number means the first forecast's error is higher by X;
+square brackets give a 95% interval. The terms are defined after the bullets.
 
 - **Can a battery with a published plan be forecast day ahead? Not better than the
   climatology.**
@@ -32,8 +35,8 @@ asks four questions. Terms are defined after Figure 1.
       is excluded at both XGBoost hyperparameter settings tested (0.075 at the first setting
       alone), because it lies outside the 95% interval (provisional).
     - For individual batteries, 18 of 35 have a positive point estimate of improvement, with a
-      median of +0.1% of the climatology's CRPS. Two batteries with exactly zero output until
-      spring 2026 do much worse (provisional).
+      median skill of +0.001 (a CRPS 0.1% below the climatology's). Two batteries with exactly
+      zero output until spring 2026 do much worse (provisional).
 - **Can a battery without a published plan be forecast? We could test one battery, with the same
   answer.**
     - Tested: the same XGBoost forecast for one NGED battery, called battery A, against the
@@ -51,10 +54,10 @@ asks four questions. Terms are defined after Figure 1.
       for a BMU.
     - The gain was 0.159 points (difference -0.159 [-0.203, -0.113]), 1.3% of the CRPS of XGBoost
       given another day's FPNs (provisional).
-    - Other lead parties' FPNs recover 5.2% of the gain that the battery's own FPN gives, 3.2
-      points (95% interval 2.0% to 7.5% when lead parties are resampled as well as months;
-      provisional). The study plan named a tenth as the share below which the fleet's FPNs "say
-      little".
+    - The battery's own FPN lowers the CRPS by 3.2 points relative to XGBoost given no FPN, and
+      other lead parties' FPNs lower it by 0.17 points, which is 5.2% of the own FPN's gain (95%
+      interval 2.0% to 7.5% when lead parties are resampled as well as months; provisional). The
+      study plan named a tenth as the share below which the fleet's FPNs "say little".
     - XGBoost given others' FPNs was not significantly better than the climatology (-0.120 points
       [-0.283, +0.073]; exploratory).
 - **How many of NGED's batteries have an FPN? The registers list 8 BMUs against 176 storage rows,
@@ -62,8 +65,9 @@ asks four questions. Terms are defined after Figure 1.
     - NGED's Embedded Capacity Register (ECR) lists 176 connected storage rows of 50 kW or more in
       NGED's four licence areas (the regions in which NGED operates), and 141 rows are under 1 MW.
     - The BMU register lists 8 embedded storage BMUs in NGED's four grid supply point groups
-      (sets of substations where the transmission network meets NGED's distribution network): 4.5%
-      of 176 rows (5 of the 8 have at least 95% of the year's settled output, 2.8%; provisional).
+      (sets of substations where the transmission network meets NGED's distribution network). The
+      ratio of 8 BMUs to 176 rows is 4.5%, a ratio of two registers' counts and not a match rate
+      (5 of the 8 have at least 95% of the year's settled output, 2.8%; provisional).
     - Comparing names and capacities matched none of the 8 BMUs to an ECR row, and one BMU may
       stand for several rows or for none.
 - **What the methods can and cannot support.** The study measures month-resampled differences in
@@ -72,32 +76,34 @@ asks four questions. Terms are defined after Figure 1.
   other periods, or about a battery whose meter includes site load. The forecasts also assume
   that the battery's own output is known at the issue time (see "Data and methods").
 
-![Figure 1: planned contrasts](assets/embedded_battery_forecast_headline.svg)
-
 **Terms.** A forecast here is 13 quantiles for each half-hour. A quantile is a value that the
 outcome falls below with a stated probability, so the outcome exceeds the 10th quantile (p10) nine
-times in ten. The score is the CRPS, the continuous ranked probability score: the average, over
-the 13 quantiles, of a penalty that grows with the distance between the outcome and the quantile,
-so a forecast scores well only if it is sharp (narrow) and honest about its spread. Smaller is
-better. A "point of p99" is 1% of a battery's own 99th-percentile absolute output, so batteries of
-different sizes compare, and a negative difference favours the first forecast in "first minus
-second". Square brackets give a 95% interval. A difference is statistically significant at the 5%
-level when its interval does not contain zero, and is "excluded" when it lies outside the
-interval. The five planned contrasts are D1 to D5: **D1** XGBoost given the actual price minus the
-climatology; **D2** XGBoost given the actual price minus XGBoost given another day's price, both
-at 18:00 the day before; **D3** XGBoost given a forecast price minus XGBoost given another day's
-price, at 06:00 the day before; **D4** XGBoost given other lead parties' FPNs minus XGBoost given
-the same lead parties' FPNs of another day, 1 hour ahead; **D5** D1 for NGED battery A. The *lead
-time* of a forecast is the time from its issue to the half-hour it describes.
+times in ten. The score is the CRPS, the continuous ranked probability score: the weighted sum, over
+the 13 quantiles, of a pinball loss, a penalty that grows with the distance between the outcome and
+the quantile, so a forecast scores well only if it is sharp (narrow) and honest about its spread.
+Smaller is better. A CRPS "skill" is one minus the ratio of a forecast's CRPS to the climatology's,
+so +0.01 means a CRPS 1% lower. A "point of p99" is 1% of a battery's own 99th-percentile absolute
+output, so batteries of different sizes compare, and a negative difference favours the first
+forecast in "first minus second". Square brackets give a 95% interval. A difference is statistically
+significant at the 5% level when its interval does not contain zero, and is "excluded" when it lies
+outside the interval. The five planned contrasts are D1 to D5: **D1** XGBoost given the actual price
+minus the climatology; **D2** XGBoost given the actual price minus XGBoost given another day's
+price, both at 18:00 the day before; **D3** XGBoost given a forecast price minus XGBoost given
+another day's price, at 06:00 the day before; **D4** XGBoost given other lead parties' FPNs minus
+XGBoost given the same lead parties' FPNs of another day, 1 hour ahead; **D5** D1 for NGED battery
+A. The *lead time* of a forecast is the time from its issue to the half-hour it describes.
+
+![Figure 1: planned contrasts](assets/embedded_battery_forecast_headline.svg)
 
 **Take-home bullets, one per use of the data:**
 
 - **For a day-ahead forecast of a large embedded battery, use the 56-day climatology as the
   baseline.** No XGBoost forecast tested beat it.
 - **For a forecast 1 hour ahead, the battery's own FPN is the input that matters,** if it is
-  public at gate closure. Other lead parties' FPNs add about 5% of the own FPN's improvement.
-- **For NGED's planning, expect a small share of connected batteries to have an FPN.** The
-  registers list 8 BMUs against 176 storage rows.
+  public at gate closure. Other lead parties' FPNs give 5.2% of the own FPN's CRPS gain.
+- **For NGED's planning, treat the share of connected batteries with an FPN as unknown but
+  probably small.** The registers list 8 BMUs against 176 storage rows, and 141 of the rows are
+  under 1 MW.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
@@ -126,8 +132,9 @@ time* of a forecast is the time from its issue to the half-hour it describes.
 tomorrow, and few of NGED's connected batteries publish their own plan.** A BMU files an FPN, and
 most embedded batteries are not BMUs, so a forecaster of a non-BMU battery sees only prices, the
 calendar, the weather, and the battery's own recent output. The [battery and solar separation
-study](battery-pv-separation.md) used after-the-event inputs throughout, so that study bounds a
-forecast without measuring one. This study measures forecasts built at three issue times, with
+study](battery-pv-separation.md) used after-the-event inputs throughout, so that study gives only an
+upper limit on what a forecast could achieve, because it used inputs that a forecaster would not
+have at the time. This study measures forecasts built at three issue times, with
 one assumption stated under "Data and methods". Part A forecasts 35 battery BMUs, which have
 public output, prices, and FPNs. Part B forecasts NGED battery A, which has no FPN, and says what
 Part A can and cannot transfer. A census counts how many connected batteries are BMUs; its result
@@ -145,21 +152,23 @@ Operator) republishes. Results are public by 10:00 UK time on the day before.
 ## Data and methods
 
 **The testbed is every embedded battery BMU with enough public data.** A BMU is in the testbed if
-its type is embedded and at least 95% of the year's half-hours are present in both Elexon's
-settled output and the half-hourly FPN file: 35 BMUs, with a median generation capacity of 49 MW,
-run by 12 lead parties. One lead party runs 14 of the 35, and 3 of the 35 sit in NGED's grid
-supply point groups. In D4 a battery's neighbours are the testbed batteries of other lead parties,
-wherever they are. A lead party is the trading counterparty, not necessarily the party that
-schedules the battery, so some neighbours may share the target's scheduler.
+its type is embedded and at least 95% of the year's half-hours are present in both Elexon's settled
+output and the half-hourly FPN file: 35 BMUs, with a median generation capacity of 49 MW, run by 12
+lead parties. One lead party runs 14 of the 35, and 3 of the 35 sit in NGED's grid supply point
+groups. Of the 8 embedded storage BMUs in those groups, 5 have a full year of settled output, and
+the testbed also needs a full year of FPNs, which leaves 3. In D4 a battery's neighbours are the
+testbed batteries of other lead parties, wherever they are. A lead party is the trading
+counterparty, not necessarily the party that schedules the battery, so some neighbours may share the
+target's scheduler.
 
 ![Figure 2: one week of a public battery's output and the day-ahead price](assets/embedded_battery_forecast_example_week.svg)
 
-**The forecast is 13 quantiles for each half-hour, never a Gaussian.** A battery's output is
-bounded and has three modes: charging hard, idle at exactly zero, and exporting hard, so a
-Gaussian would put its probability where the battery rarely is. The 13 levels are p1, p2, p5,
-p10, p20, p35, p50, p65, p80, p90, p95, p98, and p99. Each forecast is sorted to repair quantile
-crossing and clipped to the 0.1st and 99.9th percentile of the battery's output on the training
-months.
+**The forecast is 13 quantiles for each half-hour, never a Gaussian.** A battery's output is bounded
+and has three modes: charging hard, idle at exactly zero, and exporting hard, so a Gaussian would
+put its probability where the battery rarely is. The 13 levels are p1, p2, p5, p10, p20, p35, p50,
+p65, p80, p90, p95, p98, and p99. Each forecast is sorted to repair quantile crossing (a model
+sometimes returns a higher quantile below a lower one) and clipped to the 0.1st and 99.9th
+percentile of the battery's output on the training months.
 
 **The score is the CRPS, approximated from the 13 quantiles, and the CRPS skill is positive when a
 forecast beats the climatology.** The CRPS is the weighted sum of pinball losses (a pinball loss
@@ -180,12 +189,14 @@ climatology's median from 7 days earlier). `colsample_bytree` is set to 1, so ev
 13 columns. Each choice of inputs, such as "given another day's price", is called an arm on this
 page.
 
-**The price inputs bracket what a price forecast could deliver.** *Actual* is the N2EX price. *A
-week earlier* is the price at the same hour 7 days before. *Forecast* is an XGBoost model of the
-price, given the latest wind forecast that NESO had published, through Elexon's data portal,
-before the issue time, the calendar, and the earlier prices, fitted out of fold. *Another day's*
-is the price of a different day of the same calendar month and day type. It is the negative
-control: it keeps the price's typical daily shape and removes the target day's decisions.
+**The price inputs bracket what a price forecast could deliver.** *Actual* is the N2EX price. At
+06:00 the actual price is not yet public, so XGBoost given it at 06:00 is a "perfect-price
+forecast", an upper limit on what a price forecast could deliver. *A week earlier* is the price at
+the same hour 7 days before. *Forecast* is an XGBoost model of the price, given the latest wind
+forecast that NESO had published, through Elexon's data portal, before the issue time, the calendar,
+and the earlier prices, fitted out of fold. *Another day's* is the price of a different day of the
+same calendar month and day type. It is the negative control: it keeps the price's typical daily
+shape and removes the target day's decisions.
 
 **Apart from the perfect-price forecast at 06:00, only prices that are public at the issue time
 enter the forecasts.** The auction prices each hour of the UK day, midnight to midnight UK time.
@@ -207,12 +218,21 @@ than these results.
 August 2026, with month-block folds and month-resampled intervals.** The data run from September
 2025, so the climatology has at least 28 days of history at the start of scoring (56 days from
 late October). The folds are four contiguous blocks of three whole months, so the first holds two
-scored months, and there are 11 scored months.
+scored months, and there are 11 scored months. A fold is one block of months held out for
+testing: each forecast of a month comes from a model fitted on the other three blocks, which is
+what "fitted out of fold" means. Training on months later than the test month is acceptable here,
+because no input to a forecast uses the target day's own history after the issue time (the
+climatology, persistence and prices are built only from data public at the issue time, and the
+price forecast is itself fitted without the held-out block), and because the target's own
+months are never in training. It could still let XGBoost learn behaviour that only appears
+later in the year, which favours XGBoost and so makes the D1 result conservative.
 
 **Each 95% interval resamples whole calendar months and one of 3 fitting seeds, so it covers
 month-to-month weather and the seed, not differences between batteries.** Resampling means drawing
 months at random with replacement 2,000 times and recomputing the difference, with the same months
-for both forecasts of a contrast. A second XGBoost hyperparameter setting is run for every planned
+for both forecasts of a contrast. A fitting seed is the random number that sets XGBoost's row
+subsampling, and a hyperparameter setting is one fixed choice of XGBoost's tuning values (tree
+depth, learning rate, and so on). A second XGBoost hyperparameter setting is run for every planned
 contrast, and the bound that holds at both settings is quoted.
 
 **Only D1 to D5 were planned; every other number is exploratory, and no correction is made for
@@ -247,12 +267,13 @@ review.
 
 ![Figure 4: the two forecasts as fans over one week](assets/embedded_battery_forecast_fans.svg)
 
-**XGBoost's p10 to p90 band covers 76.5% of outcomes against the nominal 80%, and its p1 to p99
-band covers 96.3% against 98%.** The climatology's p10 to p90 band covers 77.6% and is 6.2 points
-of p99 wider (48.5 against 42.3). At the lower end, 2.9% of outcomes fall strictly below the
-climatology's p1, and another 2.95% equal it, almost all of them exactly zero outputs of the two
-batteries that were idle until spring 2026. About half of the climatology's lower-tail miss is
-therefore ties at exactly zero. Figure 5 counts a tie as half.
+**XGBoost's p10 to p90 band covers 76.5% of outcomes against the nominal 80%, and its p1 to p99 band
+covers 96.3% against 98%.** The climatology's p10 to p90 band covers 77.6% and is 6.2 points of p99
+wider (48.5 against 42.3). At the lower end, 2.9% of outcomes fall strictly below the climatology's
+p1, and another 2.95% equal it, almost all of them exactly zero outputs of the two batteries that
+were idle until spring 2026. About half of the climatology's lower-tail miss is therefore ties at
+exactly zero. Figure 5 counts a tie as half, and on that count XGBoost is the better calibrated in
+the lower tail even though its p10 to p90 band, at 76.5%, is too narrow.
 
 ![Figure 5: reliability at 18:00 the day before](assets/embedded_battery_forecast_reliability.svg)
 
@@ -307,10 +328,13 @@ forecast price is still 0.195 points worse than the climatology. The perfect pri
 
 ### Other lead parties' FPNs help a little
 
-**Others' FPNs improve the forecast 1 hour ahead by 0.159 points (D4), and the battery's own FPN
-improves it by 3.205 points (exploratory).** The share recovered is 5.2% [4.1%, 6.2%] with months
-resampled, and 2.0% to 7.5% with lead parties resampled too. Leaving out the five batteries whose
-FPN is exactly zero in at least 80% of half-hours changes the share to 5.1%.
+**Others' FPNs improve the forecast 1 hour ahead by 0.159 points over another day's FPNs (D4), and
+by 0.168 points over no FPN, while the battery's own FPN improves it by 3.205 points over no FPN
+(all three exploratory except D4).** The share recovered is the ratio of the last two gains,
+0.168 to 3.205: 5.2% [4.1%, 6.2%] with months resampled, and 2.0% to 7.5% with lead parties
+resampled too. Leaving out the five batteries whose FPN is exactly zero in at least 80% of
+half-hours changes the share to 5.1%. D4's 0.159 is a different comparison, so 0.159 over 3.205
+(5.0%) is not the share.
 
 **The D4 gain survives a negative control and the removal of the largest lead party.** XGBoost
 given another day's FPNs of the same other lead parties gains 0.009 points over no FPN, far below
@@ -349,32 +373,34 @@ to these 35 batteries in this year.
 **D5 is +0.079 points [-0.068, +0.228], and the second setting gives +0.017 [-0.104, +0.140].**
 An improvement larger than 0.068 points is excluded at the first setting and 0.104 at the second.
 With the fleet's FPNs as inputs 1 hour ahead, XGBoost's CRPS is 9.92 against 9.95 for the
-climatology, and gains 0.123 points [-0.160, -0.087] over another day's FPNs (exploratory).
+climatology, and improves on XGBoost given another day's FPNs by 0.123 points (difference
+-0.123 [-0.160, -0.087]; exploratory).
 
 ### The registers list 8 embedded storage BMUs against 176 storage rows
 
 ![Figure 11: connected storage rows by size class](assets/embedded_battery_forecast_census.svg)
 
 **NGED's Embedded Capacity Register lists 176 connected storage rows of 50 kW or more, 141 of them
-under 1 MW, with a total export capacity of 699 MW.** A row is one connection entry in the
-register. The BMU register lists 8 embedded storage BMUs in NGED's four grid supply point groups,
-4.5% of the 176 rows, and 5 of the 8 have at least 95% of the year's settled output (2.8%).
-Comparing names and capacities matched none of the 8 BMUs to a row, and one BMU may stand for
-several rows or for none, so the share of rows with an FPN is not known from these registers. The
-census finds no storage BMU in NGED's grid supply point groups that matches NGED battery A by name
-or capacity, so NGED battery A is very probably not a BMU. The counts and their method are in
-[the background page on battery
+under 1 MW, with a total export capacity of 699 MW.** A row is one connection entry in the register.
+The BMU register lists 8 embedded storage BMUs in NGED's four grid supply point groups, 4.5% of the
+176 rows, and 5 of the 8 have at least 95% of the year's settled output (2.8%). Comparing names and
+capacities matched none of the 8 BMUs to a row, and one BMU may stand for several rows or for none,
+so the share of rows with an FPN is not known from these registers. It is probably small, because
+141 of the 176 rows are under 1 MW. The census finds no storage BMU in NGED's grid supply point
+groups that matches NGED battery A by name or capacity, so NGED battery A is very probably not a
+BMU. The counts and their method are in [the background page on battery
 scheduling](../background/gb-battery-scheduling.md#how-many-batteries-are-connected-in-ngeds-area).
 
 ## Discussion: what to use
 
 - **For a day-ahead forecast of the large batteries tested, and of NGED battery A, the
   climatology is the baseline to beat.** The XGBoost forecasts are level with the climatology in
-  CRPS, slightly sharper, and better calibrated in the lower tail. Below 1 MW the climatology is
+  CRPS, slightly sharper, and better calibrated in the lower tail when ties at exactly zero
+  count as half (Figure 5). Below 1 MW the climatology is
   a starting point, not a tested result.
 - **For NGED's planning, a forecast that needs the battery's own FPN applies to few batteries.**
-  The own FPN moved the error by 3.2 points 1 hour ahead (27%), FPNs of the same lead party by
-  0.6 points (5%), and others' FPNs by 0.16 points (1.3%).
+  The own FPN lowered the CRPS by 3.2 points 1 hour ahead (27% of the CRPS of XGBoost given no
+  FPN), FPNs of the same lead party by 0.6 points (4.8%), and others' FPNs by 0.16 points (1.3%).
 - **What would change these answers:** an XGBoost model that adapts as fast as the climatology
   (see Limitations), more than 11 scored months, and an FPN archive.
 - **Archiving FPNs as they are filed would allow a test of early FPN versions as a day-ahead
@@ -432,7 +458,8 @@ hyperparameters are `PRIMARY_HYPER_PARAMETERS` and `SENSITIVITY_HYPER_PARAMETERS
 
 ## Reproducing the figures
 
-The report that compares the earlier whole-UTC-day prices reads fits archived from the first run,
+The report that compares the earlier fits, which treated the whole UTC day's prices as public,
+reads fits archived from the first run,
 which a clean checkout does not hold, so a clean checkout cannot rebuild that comparison table.
 Every other step below rebuilds from the inputs.
 
