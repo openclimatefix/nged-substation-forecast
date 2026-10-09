@@ -27,6 +27,7 @@ from contracts.uri import (
 )
 
 from nged_data.read_nged_json import (
+    NoReadingsInFile,
     _extract_power_time_series,
     _extract_time_series_metadata,
 )
@@ -237,14 +238,11 @@ def download_and_parse_files(
             # Extract PowerTimeSeries from df:
             try:
                 extracted = _extract_power_time_series(df=df, time_series_id=time_series_id)
-            except pl.exceptions.InvalidOperationError as e:
-                if "invalid dtype: expected 'Struct', got 'Null' for 'data'" in str(e):
-                    log.warning(
-                        f"The 'data' field is 'null' in {path=}. This is expected behaviour if"
-                        " NGED's meter reported no values for the period covered by the JSON file."
-                    )
-                else:
-                    raise
+            except NoReadingsInFile:
+                log.warning(
+                    f"The 'data' field is null or empty in {path=}. This is expected behaviour if"
+                    " NGED's meter reported no values for the period covered by the JSON file."
+                )
             else:
                 power_time_series_dfs.append(extracted.dataframe)
                 n_implausible_power_rows_dropped += extracted.n_dropped
