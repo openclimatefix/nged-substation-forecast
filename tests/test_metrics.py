@@ -1248,6 +1248,23 @@ def test_score_study_main_re_executes_with_the_cleaned_environment(
     assert executed[0][score_study.CLEAN_ENVIRONMENT_MARKER] == "1"
 
 
+def test_score_study_loads_the_cv_config_like_the_metrics_asset(
+    study_predictions: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A `cv_config_path` that only `Settings` sees (as from `.env`) does not change the folds."""
+
+    class SettingsWithOtherConfig(Settings):
+        def __init__(self) -> None:
+            super().__init__()
+            self.cv_config_path = tmp_path / "does_not_exist.yaml"
+
+    monkeypatch.setattr(score_study, "Settings", SettingsWithOtherConfig)
+
+    score_study.score_study(
+        predictions=study_predictions, study_name="my_study", fold_id=FOLD_ID, replace=False
+    )
+
+
 def test_score_study_refuses_a_file_whose_fold_id_disagrees(
     study_predictions: Path, tmp_path: Path
 ) -> None:

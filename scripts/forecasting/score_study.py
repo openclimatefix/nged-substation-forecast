@@ -188,7 +188,12 @@ def score_study(*, predictions: Path, study_name: str, fold_id: str, replace: bo
             or the partition already exists and `replace` is False.
     """
     settings = Settings()
-    cv_config = load_cv_config(settings.cv_config_path)
+    # Load the CV config the way the `metrics` asset does, from the environment variable alone. A
+    # `CV_CONFIG_PATH` entry in the `.env` file, which `Settings` would also read, then cannot make
+    # the script and the asset validate against different folds.
+    cv_config = load_cv_config(
+        Path(os.environ.get("CV_CONFIG_PATH", Settings.model_fields["cv_config_path"].default))
+    )
     if fold_id not in cv_config.leaderboard_fold_ids:
         raise ValueError(
             f"Fold {fold_id!r} is not a leaderboard fold; choose from "
