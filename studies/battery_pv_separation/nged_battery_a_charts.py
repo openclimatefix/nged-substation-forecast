@@ -26,9 +26,9 @@ from battery_charts import (
 )
 from battery_inputs import OUTPUT_DIR, TERCILE_LABELS
 from battery_rung3 import fit_efficiency
-from nged_battery_a import ALIAS, battery_a_frame
 from studies.battery_capacity import smallest_capacity
 from studies.charts import figure
+from studies.nged_battery_a import ALIAS, battery_a_frame
 from studies.sources import NGED_BATTERY_A_FIGURES_DIR
 
 SEARCH_START: Final[datetime] = datetime(2026, 2, 2, tzinfo=UTC)

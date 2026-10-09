@@ -16,7 +16,7 @@ from typing import Final
 import numpy as np
 import polars as pl
 from battery_inputs import HALF_HOURS_PER_DAY, OUTPUT_DIR, WINDOW_START
-from nged_battery_a import (
+from studies.nged_battery_a import (
     ALIAS,
     WINDOW_DAYS,
     battery_a_frame,
