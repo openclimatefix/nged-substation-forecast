@@ -272,6 +272,19 @@ level. The dataset has no owner or location column, so no column links a unit to
 A non-BM embedded generator whose provider does not declare to that platform has no PN in either
 source we found.
 
+**A free sum of the day-ahead PNs exists, but it is unlikely to help a substation forecast.**
+Elexon's [INDGEN dataset](https://data.elexon.co.uk/bmrs/api/v1/datasets/INDGEN) gives, for each
+half-hour, the sum of the PNs of every BMU that plans to export energy. The INDDEM dataset gives the
+same sum for BMUs that plan to import. Each row is an average MW for one settlement period, with a
+publish time. On 2026-10-08, NESO reissued INDGEN every 30 minutes (47 issues that day), and each
+issue covered about 82 half-hours, which reaches the end of the next day. Every issue holds a
+national total (boundary `N`) and 17 further series labelled B1 to B17. At 12:00 UTC on 2026-10-08,
+the 17 boundary values summed to far more than the national value, so the boundaries overlap and do
+not divide Great Britain into parts. The Elexon API does not define the boundaries, and no source we
+found maps them to NGED's licence areas or supply points. The datasets hold no value for a single
+BMU, and they sum mostly large transmission-connected plants, so they say little about the net load
+at one primary substation. Whether the sums include embedded BMUs has not been tested.
+
 **Both sources may be re-used with attribution.** The [Elexon "Licence to use BMRS open
 data"](https://www.elexon.co.uk/data/balancing-mechanism-reporting-agent/copyright-licence-bmrs-data/)
 allows copying, publishing, adapting, and commercial use, on condition that the copy carries
