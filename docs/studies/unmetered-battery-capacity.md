@@ -1,5 +1,4 @@
-# Simulated unmetered batteries are found from about 10% to 20% of a primary's high flow, and real
-public batteries mostly are not
+# Simulated unmetered batteries are found from 10% to 20% of a primary's flow; real ones mostly not
 
 **This study asks whether the half-hourly electricity flow of a primary substation (a substation
 that steps voltage down for local distribution) can reveal the power in megawatts (MW) and the
@@ -144,12 +143,12 @@ demand series and whole batteries in a two-level cluster bootstrap of 2,000 resa
 coverages carry Clopper-Pearson intervals on sums. Those intervals treat sums as independent, but
 sums share series and blocks (the 108 sums at one share of rung 1 are 3 durations on the same 36
 series-blocks), so they are too narrow. These intervals do not cover the month-to-month weather, so
-a detection rate is read per block and per season. A **post hoc** analysis was written after
-results on the same series existed; the sections for rung 1b, the calendar-replica rung 3, the
-price-only screen, the season split, the rates without GSP1 or without S2 and S6, and the clean
-positive control's rule are post hoc, and each says so. An exploratory row with no real effect has a nominal 5% chance of being statistically
-significant at the 5% level, the number of such rows is unknown, and the page does not correct for
-multiple comparisons.
+a detection rate is read per block and per season. A **post hoc** analysis was written after results
+on the same series existed; the sections for rung 1b, the calendar-replica rung 3, the price-only
+screen, the season split, the rates without GSP1 or without S2 and S6, and the clean positive
+control's rule are post hoc, and each says so. An exploratory row with no real effect has a nominal
+5% chance of being statistically significant at the 5% level, the number of such rows is unknown,
+and the page does not correct for multiple comparisons.
 
 ### How the estimator works
 
