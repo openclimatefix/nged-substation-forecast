@@ -64,12 +64,17 @@ Summary are provisional until the remaining reviews finish.
       was put back into the flow of the bulk supply point it connects to, at up to 11 times its
       metered output (as metered it is 3.2% of that flow's peak flow, and at 11 times 35.5%): 0 of
       20 blocks were flagged.
-    - **Demand noise is part of the reason (provisional).** A *calendar replica* is a series rebuilt
-      as the mean of its own month, half-hour of the day, and day type, so it keeps the daily and
-      seasonal shape and almost none of the random noise. Real flows are not replicas. The replica
-      is a test of whether the method works once demand noise is removed. On replicas the real
-      batteries were flagged in 71% of sums at a 10% share and 84% at 40%, against a threshold built
-      from the replicas' own no-battery blocks.
+    - **Demand the estimator cannot explain hides batteries (provisional).** A *calendar replica* is
+      a series rebuilt as the mean of its own month, half-hour of the day, and day type, so it keeps
+      the daily and seasonal shape and almost none of the random noise. On replicas of all 9
+      series, the real public batteries were flagged in 71% of sums at a 10% share and 84% at 40%,
+      against a threshold built from the replicas' own no-battery blocks. On the real flows
+      (without GSP1) the same batteries were flagged in 0% and 6.8%.
+    - **Two limits on that point (provisional).** A replica has an artificially perfect demand
+      model, so 71% and 84% are an upper bound and not a forecast of what a realistic demand model
+      would give. The study did not test a realistic demand model. Better demand modelling alone
+      would not fix sizing either: on the replicas the power is still sized at about 6% of the
+      registered power, because real dispatch differs from the assumed schedule.
 - **Can a battery's MW and MWh be estimated, and how reliable are the intervals? Not for real
   batteries (provisional).**
     - **What was tested.** The 90% interval for power from every sum above. *Interval coverage* is
@@ -139,6 +144,11 @@ not](assets/unmetered_battery_capacity_headline.svg)
   MWh, so planning should treat unregistered batteries as uncertainty near the evening peak and at
   the edges of the tariff windows. A longer record, a battery-free reference series, or a known
   battery inside a primary would change this advice.
+- **What to use this for: demand modelling.** Demand that the estimator cannot explain hides real
+  batteries: on calendar replicas 71% and 84% of real-battery sums were flagged at 10% and 40%
+  shares, against 0% and 6.8% on real flows (provisional). A better demand model is worth trying for
+  detection, but the 71% and 84% are an upper bound from a perfect demand model, the study did not
+  test a realistic one, and sizing would still be off (about 6% of registered power).
 - **What to use this for: intervals.** No MW or MWh interval for a real battery should be published
   from this estimator: the 90% power interval held the truth in 26% of sums for the
   cheapest-and-dearest rule at a 40% share, and in 6% for real public batteries (provisional).
