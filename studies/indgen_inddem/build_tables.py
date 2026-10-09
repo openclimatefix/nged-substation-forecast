@@ -12,6 +12,7 @@ first issue of the target's UTC day, which is the latest issue published at or b
 after its cut-off.
 """
 
+import itertools
 import warnings
 from datetime import UTC, datetime, timedelta
 from typing import Final
@@ -48,6 +49,13 @@ SOURCE_PATHS: Final[dict[DatasetType, str]] = {
 }
 VIEWS: Final[tuple[ViewType, ...]] = ("latest", "first_of_day")
 HALF_HOUR_MINUTES: Final[int] = 30
+SATURDAY: Final[int] = 6
+"""The ISO weekday number of Saturday, so a weekday number at or above it is a weekend day."""
+LONDON: Final[str] = "Europe/London"
+INDDEM_MATCH_TOLERANCE_MW: Final[float] = 5.0
+"""The zone-to-group fit of INDDEM uses the half-hours where the sampled PN sum reproduces INDDEM's
+national total to within this many megawatts. On the other half-hours the sampled PNs and INDDEM
+differ by up to 1.7 GW for a reason the study has not found."""
 WINDOW_START_UTC: Final[datetime] = datetime(
     STUDY_START.year, STUDY_START.month, STUDY_START.day, tzinfo=UTC
 )
@@ -258,7 +266,7 @@ def group_sums_from_pn() -> pl.DataFrame:
 
 
 def zone_group_weights(
-    *, zones: pl.DataFrame, sums: pl.DataFrame, dataset: DatasetType
+    *, zones: pl.DataFrame, sums: pl.DataFrame, dataset: DatasetType, keep_times: pl.Series
 ) -> pl.DataFrame:
     """Fit each zone's INDDEM or INDGEN on the GSP groups' summed PNs, with non-negative weights.
 
@@ -270,13 +278,19 @@ def zone_group_weights(
         zones: Every zone's value for every half-hour, from `zones_from_boundaries`.
         sums: The sampled half-hours' PN sums by GSP group, from `group_sums_from_pn`.
         dataset: Whether to fit INDDEM on the import sums, or INDGEN on the export sums.
+        keep_times: The half-hours to fit on.
 
     Returns:
         One row for every zone and GSP group (or `none`, the BMUs the register gives no group),
         with the fitted weight, and the zone's fit in MW.
     """
     side = "import_mw" if dataset == "inddem" else "export_mw"
-    wide = sums.pivot(on="gsp_group", index="time", values=side).fill_null(0.0).sort("time")
+    wide = (
+        sums.filter(pl.col("time").is_in(keep_times.implode()))
+        .pivot(on="gsp_group", index="time", values=side)
+        .fill_null(0.0)
+        .sort("time")
+    )
     groups = [column for column in wide.columns if column != "time"]
     design = wide.select(groups).to_numpy()
     target = (
@@ -307,11 +321,94 @@ def zone_group_weights(
     return pl.DataFrame(rows)
 
 
-def main() -> None:
-    """Build every table and write the report."""
-    STUDY_DIR.mkdir(parents=True, exist_ok=True)
-    say("# INDDEM, INDGEN, and GSP-group take: numbers the page quotes")
-    say()
+def first_versus_latest(*, views: pl.DataFrame) -> pl.DataFrame:
+    """Join the national total's two views, so the page can show how far they differ."""
+    national = views.filter(pl.col("boundary") == "N")
+    latest = national.filter(pl.col("view") == "latest").select(
+        "dataset", "time", latest_mw="value_mw"
+    )
+    first = national.filter(pl.col("view") == "first_of_day").select(
+        "dataset", "time", first_of_day_mw="value_mw"
+    )
+    local = pl.col("time").dt.convert_time_zone(LONDON)
+    return (
+        latest.join(first, on=["dataset", "time"])
+        .with_columns(
+            difference_mw=pl.col("first_of_day_mw") - pl.col("latest_mw"),
+            local_half_hour=local.dt.hour().cast(pl.Int32) * 2
+            + local.dt.minute().cast(pl.Int32) // HALF_HOUR_MINUTES,
+        )
+        .sort("dataset", "time")
+    )
+
+
+def anomaly_correlations(*, agv: pl.DataFrame, zones: pl.DataFrame) -> pl.DataFrame:
+    """Correlate each GSP group's AGV with each zone's INDDEM, raw and after removing the cycle.
+
+    The anomaly of a series is the series minus its own mean at the same UK local half-hour of the
+    day, the same day type (weekday or weekend), and the same month. Every series shares the daily,
+    weekly, and seasonal cycles, so correlations of the raw series sit near 0.76 between any two GSP
+    groups, and the anomaly correlation shows what is left.
+    """
+    wide_agv = agv.pivot(on="gsp_group", index="time", values="import_mw")
+    wide_zones = (
+        zones.filter((pl.col("dataset") == "inddem") & (pl.col("view") == "latest"))
+        .pivot(on="zone", index="time", values="value_mw")
+        .with_columns(-pl.col(zone) for zone in ZONES)
+    )
+    joined = wide_agv.join(wide_zones, on="time").sort("time")
+    local = pl.col("time").dt.convert_time_zone(LONDON)
+    keyed = joined.with_columns(
+        half_hour=local.dt.hour().cast(pl.Int32) * 2
+        + local.dt.minute().cast(pl.Int32) // HALF_HOUR_MINUTES,
+        weekend=local.dt.weekday() >= SATURDAY,
+        month=local.dt.month(),
+    )
+    series = [column for column in joined.columns if column != "time"]
+    anomalies = keyed.with_columns(
+        pl.col(column) - pl.col(column).mean().over("half_hour", "weekend", "month")
+        for column in series
+    )
+    rows = [
+        {
+            "gsp_group": group,
+            "zone": zone,
+            "correlation_raw": joined.select(pl.corr(group, zone)).item(),
+            "correlation_anomaly": anomalies.select(pl.corr(group, zone)).item(),
+        }
+        for group in GSP_GROUPS
+        for zone in ZONES
+    ]
+    return pl.DataFrame(rows)
+
+
+def agv_pair_correlations(*, agv: pl.DataFrame) -> dict[str, float]:
+    """Return the median raw and anomaly correlation between two GSP groups' AGV."""
+    wide = agv.pivot(on="gsp_group", index="time", values="import_mw").sort("time")
+    local = pl.col("time").dt.convert_time_zone(LONDON)
+    keyed = wide.with_columns(
+        half_hour=local.dt.hour().cast(pl.Int32) * 2
+        + local.dt.minute().cast(pl.Int32) // HALF_HOUR_MINUTES,
+        weekend=local.dt.weekday() >= SATURDAY,
+        month=local.dt.month(),
+    )
+    anomalies = keyed.with_columns(
+        pl.col(group) - pl.col(group).mean().over("half_hour", "weekend", "month")
+        for group in GSP_GROUPS
+    )
+    pairs = list(itertools.combinations(GSP_GROUPS, 2))
+    return {
+        "raw": float(np.median([wide.select(pl.corr(a, b)).item() for a, b in pairs])),
+        "anomaly": float(np.median([anomalies.select(pl.corr(a, b)).item() for a, b in pairs])),
+    }
+
+
+def build_views_and_zones() -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+    """Build and report the two views, the zones, the reach of each issue, and the zone checks.
+
+    Returns:
+        The views, the zones, and the reach of each issue.
+    """
     all_views = []
     reaches = []
     for dataset in ("inddem", "indgen"):
@@ -320,11 +417,11 @@ def main() -> None:
         reaches.append(issue_reach(issues=issues, dataset=dataset))
         say(f"- {dataset}: {issues.height} rows, {issues['publish_time'].n_unique()} issues.")
     views = pl.concat(all_views)
+    reach = pl.concat(reaches)
     views.write_parquet(STUDY_DIR / "views.parquet")
-    pl.concat(reaches).write_parquet(STUDY_DIR / "issue_reach.parquet")
+    reach.write_parquet(STUDY_DIR / "issue_reach.parquet")
     say()
     say(f"Views: {views.height} rows. Rows with no issue: {views['value_mw'].null_count()}.")
-
     zones = zones_from_boundaries(views=views)
     zones.write_parquet(STUDY_DIR / "zones.parquet")
     residual = boundary_identity_residual(views=views).drop_nulls()
@@ -345,9 +442,70 @@ def main() -> None:
     sign = zone_sign_report(zones=zones)
     sign.write_parquet(STUDY_DIR / "zone_signs.parquet")
     say(sign.filter(pl.col("view") == "latest").__str__())
+    return views, zones, reach
 
+
+def report_issues(*, views: pl.DataFrame, reach: pl.DataFrame) -> None:
+    """Report how far apart the two views are and how far ahead each issue reaches."""
+    fvl = first_versus_latest(views=views)
+    fvl.write_parquet(STUDY_DIR / "first_versus_latest.parquet")
+    say()
+    say("## First issue of the day against latest issue, national total")
+    say(
+        fvl.group_by("dataset")
+        .agg(
+            mean_difference_mw=pl.col("difference_mw").mean(),
+            mean_abs_difference_mw=pl.col("difference_mw").abs().mean(),
+            p90_abs_difference_mw=pl.col("difference_mw").abs().quantile(0.9),
+            mean_abs_latest_mw=pl.col("latest_mw").abs().mean(),
+        )
+        .sort("dataset")
+        .__str__()
+    )
+    say()
+    say("## Issue reach, hours ahead")
+    say(
+        reach.group_by("dataset")
+        .agg(
+            issues=pl.len(),
+            half_hours_min=pl.col("half_hours").min(),
+            half_hours_max=pl.col("half_hours").max(),
+            reach_hours_min=pl.col("reach_hours").min(),
+            reach_hours_max=pl.col("reach_hours").max(),
+        )
+        .sort("dataset")
+        .__str__()
+    )
+    odd = reach.filter(pl.col("reach_hours") < 1)
+    say(f"Issues that reach less than one hour ahead: {odd.height}.")
+    for row in odd.iter_rows(named=True):
+        say(
+            f"- {row['dataset']} issue published {row['publish_time']:%Y-%m-%d %H:%M} UTC holds "
+            f"{row['half_hours']} half-hours that end {row['reach_hours']:.1f} hours "
+            "after publication."
+        )
+
+
+def build_agv(*, zones: pl.DataFrame) -> pl.DataFrame:
+    """Build and report the AGV tables, the unit check, and the correlations with the zones."""
     agv = agv_import_mw()
     agv.write_parquet(STUDY_DIR / "agv_groups.parquet")
+    correlations = anomaly_correlations(agv=agv, zones=zones)
+    correlations.write_parquet(STUDY_DIR / "anomaly_correlations.parquet")
+    pair = agv_pair_correlations(agv=agv)
+    say()
+    say("## Correlation between GSP groups' AGV, median of the 91 pairs")
+    say(f"raw {pair['raw']:.3f}, anomaly {pair['anomaly']:.3f}")
+    say("Highest anomaly correlation of each NGED group with a zone's INDDEM:")
+    for group, name in NGED_GROUPS.items():
+        top = correlations.filter(pl.col("gsp_group") == group).sort(
+            "correlation_anomaly", descending=True
+        )
+        best = ", ".join(
+            f"{row['zone']} {row['correlation_anomaly']:.2f}"
+            for row in top.head(3).iter_rows(named=True)
+        )
+        say(f"- {group} {name}: {best}")
     check = agv_against_indo(agv=agv)
     check.write_parquet(STUDY_DIR / "agv_against_indo.parquet")
     say()
@@ -362,7 +520,6 @@ def main() -> None:
         ).__str__()
     )
     say(f"AGV windows: SF rows to {AGV_END}; groups per time: {check['groups'].unique().to_list()}")
-    say()
     say(
         f"GSP groups in AGV: {sorted(agv['gsp_group'].unique().to_list())}; "
         f"expected {list(GSP_GROUPS)}"
@@ -370,15 +527,70 @@ def main() -> None:
     say(f"NGED groups: {NGED_GROUPS}")
     pv = pl.read_parquet(PV_LIVE_PATH)
     say(f"PV_Live rows {pv.height}, groups {sorted(pv['gsp_group'].unique().to_list())}")
-    if PN_SAMPLE_PATH.exists():
-        sums = group_sums_from_pn()
-        sums.write_parquet(STUDY_DIR / "pn_group_sums.parquet")
-        say(f"PN group sums: {sums.height} rows")
-        weights = pl.concat(
-            [zone_group_weights(zones=zones, sums=sums, dataset=d) for d in ("inddem", "indgen")]
-        )
-        weights.write_parquet(STUDY_DIR / "zone_group_weights.parquet")
+    return agv
 
+
+def build_pn_fit(*, views: pl.DataFrame, zones: pl.DataFrame) -> None:
+    """Sum the sampled PNs by GSP group, compare them with INDDEM, and fit the zone weights."""
+    sums = group_sums_from_pn()
+    sums.write_parquet(STUDY_DIR / "pn_group_sums.parquet")
+    say()
+    say(f"## Sampled PNs: {sums.height} rows of group sums")
+    national = views.filter((pl.col("view") == "latest") & (pl.col("boundary") == "N")).pivot(
+        on="dataset", index="time", values="value_mw"
+    )
+    totals = sums.group_by("time").agg(
+        pn_import_mw=pl.col("import_mw").sum(), pn_export_mw=pl.col("export_mw").sum()
+    )
+    joined = totals.join(national, on="time")
+    joined.write_parquet(STUDY_DIR / "pn_against_indd.parquet")
+    say(
+        joined.select(
+            half_hours=pl.len(),
+            inddem_minus_pn_median_mw=(pl.col("inddem") - pl.col("pn_import_mw")).median(),
+            inddem_minus_pn_max_abs_mw=(pl.col("inddem") - pl.col("pn_import_mw")).abs().max(),
+            indgen_minus_pn_median_mw=(pl.col("indgen") - pl.col("pn_export_mw")).median(),
+            indgen_minus_pn_max_abs_mw=(pl.col("indgen") - pl.col("pn_export_mw")).abs().max(),
+        ).__str__()
+    )
+    reproduced = joined.filter(
+        (pl.col("inddem") - pl.col("pn_import_mw")).abs() <= INDDEM_MATCH_TOLERANCE_MW
+    )["time"]
+    say(
+        f"Half-hours where the PN import sum reproduces INDDEM's national total to within "
+        f"{INDDEM_MATCH_TOLERANCE_MW:g} MW: {len(reproduced)} of {joined.height}."
+    )
+    weights = pl.concat(
+        [
+            zone_group_weights(zones=zones, sums=sums, dataset="inddem", keep_times=reproduced),
+            zone_group_weights(zones=zones, sums=sums, dataset="indgen", keep_times=joined["time"]),
+        ]
+    )
+    weights.write_parquet(STUDY_DIR / "zone_group_weights.parquet")
+    say()
+    say("## Fitted weights of each GSP group in each zone (non-negative least squares)")
+    pl.Config.set_tbl_cols(30)
+    pl.Config.set_tbl_rows(40)
+    for dataset in ("inddem", "indgen"):
+        say(f"### {dataset}")
+        say(
+            weights.filter(pl.col("dataset") == dataset)
+            .pivot(on="gsp_group", index="zone", values="weight")
+            .with_columns(pl.exclude("zone").round(2))
+            .sort(pl.col("zone").str.slice(1).cast(pl.Int32))
+            .__str__()
+        )
+
+
+def main() -> None:
+    """Build every table and write the report."""
+    STUDY_DIR.mkdir(parents=True, exist_ok=True)
+    say("# INDDEM, INDGEN, and GSP-group take: numbers the page quotes")
+    say()
+    views, zones, reach = build_views_and_zones()
+    report_issues(views=views, reach=reach)
+    build_agv(zones=zones)
+    build_pn_fit(views=views, zones=zones)
     (STUDY_DIR / "report.md").write_text("\n".join(report_lines) + "\n")
     print("\n".join(report_lines))
 
