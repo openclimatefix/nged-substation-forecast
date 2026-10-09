@@ -329,7 +329,7 @@ the new function does not exist, so the named mutation is the real test of each.
    the late file's rows landed, the rewritten key's added reading landed, and the back-fill left
    the metadata unchanged. The ledger arm's `get_async` count is asserted exactly on every run, and is
    zero on the run with no new files. The reference arm's count is every file, every run.
-2. **A run with nothing new does nothing.** A second run over an unchanged bucket makes zero `get`
+2. **A run with nothing new does nothing.** A second run over an unchanged bucket makes zero `get_async`
    calls, appends nothing, and leaves the ledger file unchanged. The mutation to catch is selecting
    files within a window instead of by the ledger.
 3. **A data-less hour is recorded once.** A run whose only new file is data-less upserts the
