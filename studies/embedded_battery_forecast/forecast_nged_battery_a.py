@@ -11,13 +11,14 @@ studies/embedded_battery_forecast/forecast_nged_battery_a.py <primary|sensitivit
 
 import sys
 
-from forecast_fit import SettingType, run_in_pool
+from forecast_fit import SettingType, link_unchanged_fits, run_in_pool
 from forecast_runner import ISSUES, NGED_BATTERY_A_FILE_ID, battery_job
 
 
 def main() -> None:
     """Fit Part B at the setting named on the command line."""
     setting: SettingType = "sensitivity" if "sensitivity" in sys.argv[1:] else "primary"
+    link_unchanged_fits()
     run_in_pool(
         function=battery_job,
         tasks=[(NGED_BATTERY_A_FILE_ID, issue, setting) for issue in ISSUES],

@@ -13,6 +13,7 @@ interval is a month resampling of that ratio (`month_skill_interval`).
 Run: `uv run python studies/embedded_battery_forecast/forecast_report.py`.
 """
 
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
@@ -20,7 +21,8 @@ from typing import Final
 import numpy as np
 import polars as pl
 from forecast_arms import arm_definitions, issue_cutoff_lines
-from forecast_fit import LEVELS, Q_COLUMNS, SettingType, arm_file
+from forecast_fit import FIT_VARIANT, LEVELS, Q_COLUMNS, SettingType, arm_file
+from forecast_inputs import load_physical_notifications
 from forecast_results import load_losses
 from forecast_runner import NGED_BATTERY_A_FILE_ID, battery_for, lead_parties, testbed_ids
 from studies.battery_forecast import SYMMETRIC_BANDS, IssueType
@@ -30,12 +32,20 @@ from studies.bootstrap import (
     bootstrap_absolute,
     bootstrap_difference,
 )
+from studies.party_bootstrap import arm_cells, party_month_difference, party_month_share
 from studies.sources import EMBEDDED_BATTERY_FORECAST_DIR
 
-TABLES_DIR: Final[Path] = EMBEDDED_BATTERY_FORECAST_DIR / "report_tables"
-REPORT_PATH: Final[Path] = EMBEDDED_BATTERY_FORECAST_DIR / "forecast_report.md"
+VARIANT_SUFFIX: Final[str] = "" if FIT_VARIANT == "as_written" else f"_{FIT_VARIANT}"
+TABLES_DIR: Final[Path] = EMBEDDED_BATTERY_FORECAST_DIR / f"report_tables{VARIANT_SUFFIX}"
+REPORT_PATH: Final[Path] = EMBEDDED_BATTERY_FORECAST_DIR / f"forecast_report{VARIANT_SUFFIX}.md"
+IDLE_DROPPED_PLANNED_PATH: Final[Path] = (
+    EMBEDDED_BATTERY_FORECAST_DIR / "report_tables_idle_dropped" / "planned_contrasts.parquet"
+)
 CLIM: Final[str] = "clim"
 LEAD_BIN_HOURS: Final[int] = 6
+TRIVIAL_FPN_ZERO_SHARE: Final[float] = 0.8
+"""A battery whose Physical Notification is exactly zero in at least this share of the half-hours
+that carry one has a notification that says almost nothing."""
 NEAR_LINE_SHARE: Final[float] = 0.2
 """A bound within this share of the interval's width from zero is near the 5% line."""
 
@@ -377,7 +387,8 @@ def contrast_losses(
         arms=[contrast.reference],
         batteries=batteries,
     )
-    return pl.concat([treatment, reference])
+    sites = sorted(set(treatment["site"].unique()) & set(reference["site"].unique()))
+    return pl.concat([treatment, reference]).filter(pl.col("site").is_in(sites))
 
 
 def significance(*, lower: float, upper: float) -> str:
@@ -424,88 +435,119 @@ def coverage_summary(*, setting: SettingType, issue: str, arm: str, batteries: l
     }
 
 
+LEADERBOARD_HEADERS: Final[list[str]] = [
+    "Arm",
+    "CRPS, points of p99 [95% interval]",
+    "Pinball loss",
+    "Median absolute error",
+    "CRPS skill vs `clim` [95% interval]",
+    "p10-p90 coverage (nominal 0.80)",
+    "p10-p90 width",
+    "p1-p99 coverage (nominal 0.98)",
+    "p1-p99 width",
+]
+
+
+def leaderboard_row(
+    *, losses: pl.DataFrame, setting: SettingType, issue: IssueType, arm: str, sites: list[str]
+) -> tuple[list[str], dict[str, object]]:
+    """Return one arm's leaderboard row, scored on the batteries `sites`, and its data."""
+    subset = losses.filter((pl.col("arm") == arm) & pl.col("site").is_in(sites))
+    interval = bootstrap_absolute(losses=subset, arm=arm, metric="crps_pct")
+    stats = coverage_summary(setting=setting, issue=issue, arm=arm, batteries=sites)
+    arm_values = subset.sort("site", "time", "seed").select("crps_pct", "month")
+    reference_values = (
+        losses.filter((pl.col("arm") == CLIM) & pl.col("site").is_in(sites))
+        .sort("site", "time", "seed")
+        .select("crps_pct", "month")
+    )
+    skill = (
+        month_skill_interval(
+            treatment=arm_values["crps_pct"].to_numpy(),
+            reference=reference_values["crps_pct"].to_numpy(),
+            months=arm_values["month"].to_numpy(),
+        )
+        if arm_values.height == reference_values.height
+        else (float("nan"),) * 3
+    )
+    index_80 = SYMMETRIC_BANDS.index((0.1, 0.9))
+    index_98 = SYMMETRIC_BANDS.index((0.01, 0.99))
+    data = {
+        "issue": issue,
+        "arm": arm,
+        "n_batteries": subset["site"].n_unique(),
+        "crps": interval["value"],
+        "crps_lower": interval["lower_95"],
+        "crps_upper": interval["upper_95"],
+        "pinball": subset["pinball_pct"].mean(),
+        "median_abs_error": subset["median_abs_error_pct"].mean(),
+        "skill": skill[0],
+        "skill_lower": skill[1],
+        "skill_upper": skill[2],
+        "coverage_p10_p90": stats["coverage"][index_80],
+        "width_p10_p90": stats["width_pct"][index_80],
+        "coverage_p1_p99": stats["coverage"][index_98],
+        "width_p1_p99": stats["width_pct"][index_98],
+        "n_rows": stats["n_rows"],
+        "n_months": interval["n_months"],
+    }
+    row = [
+        f"`{arm}`",
+        f"{interval['value']:.3f} [{interval['lower_95']:.3f}, {interval['upper_95']:.3f}]",
+        f"{subset['pinball_pct'].mean():.3f}",
+        f"{subset['median_abs_error_pct'].mean():.3f}",
+        f"{skill[0]:+.3f} [{skill[1]:+.3f}, {skill[2]:+.3f}]",
+        f"{stats['coverage'][index_80]:.3f}",
+        f"{stats['width_pct'][index_80]:.2f}",
+        f"{stats['coverage'][index_98]:.3f}",
+        f"{stats['width_pct'][index_98]:.2f}",
+    ]
+    return row, data
+
+
 def leaderboard(
     *, setting: SettingType, issue: IssueType, batteries: list[str], arms: list[str], label: str
 ) -> tuple[list[str], pl.DataFrame]:
-    """Return the report lines and the data of one issue time's leaderboard."""
+    """Return the report lines and the data of one issue time's leaderboard.
+
+    The main table holds the arms that cover every battery. An arm that covers only some of the
+    batteries goes in a second table, beside the climatology and the `no_neighbour` arm scored on
+    those same batteries, so no level is compared across different battery sets.
+    """
     losses = load_losses(setting=setting, issue=issue, arms=arms, batteries=batteries)
-    clim_losses = losses.filter(pl.col("arm") == CLIM)
-    rows = []
-    data = []
+    covered = {
+        arm: sorted(losses.filter(pl.col("arm") == arm)["site"].unique().to_list()) for arm in arms
+    }
+    rows, data = [], []
     for arm in arms:
-        subset = losses.filter(pl.col("arm") == arm)
-        if subset.is_empty():
-            continue
-        interval = bootstrap_absolute(losses=subset, arm=arm, metric="crps_pct")
-        stats = coverage_summary(setting=setting, issue=issue, arm=arm, batteries=batteries)
-        arm_values = subset.sort("site", "time", "seed").select("crps_pct", "month")
-        reference_values = (
-            clim_losses.filter(pl.col("site").is_in(subset["site"].unique().to_list()))
-            .sort("site", "time", "seed")
-            .select("crps_pct", "month")
-        )
-        skill = (
-            month_skill_interval(
-                treatment=arm_values["crps_pct"].to_numpy(),
-                reference=reference_values["crps_pct"].to_numpy(),
-                months=arm_values["month"].to_numpy(),
+        if covered[arm] and len(covered[arm]) == len(batteries):
+            row, record = leaderboard_row(
+                losses=losses, setting=setting, issue=issue, arm=arm, sites=batteries
             )
-            if arm_values.height == reference_values.height
-            else (float("nan"),) * 3
-        )
-        n_batteries = subset["site"].n_unique()
-        shown = arm if n_batteries == len(batteries) else f"{arm} ({n_batteries} batteries only)"
-        index_80 = SYMMETRIC_BANDS.index((0.1, 0.9))
-        index_98 = SYMMETRIC_BANDS.index((0.01, 0.99))
-        data.append(
-            {
-                "label": label,
-                "issue": issue,
-                "arm": arm,
-                "n_batteries": n_batteries,
-                "crps": interval["value"],
-                "crps_lower": interval["lower_95"],
-                "crps_upper": interval["upper_95"],
-                "pinball": subset["pinball_pct"].mean(),
-                "median_abs_error": subset["median_abs_error_pct"].mean(),
-                "skill": skill[0],
-                "skill_lower": skill[1],
-                "skill_upper": skill[2],
-                "coverage_p10_p90": stats["coverage"][index_80],
-                "width_p10_p90": stats["width_pct"][index_80],
-                "coverage_p1_p99": stats["coverage"][index_98],
-                "width_p1_p99": stats["width_pct"][index_98],
-                "n_rows": stats["n_rows"],
-                "n_months": interval["n_months"],
-            }
-        )
-        rows.append(
-            [
-                f"`{shown}`",
-                f"{interval['value']:.3f} [{interval['lower_95']:.3f}, {interval['upper_95']:.3f}]",
-                f"{subset['pinball_pct'].mean():.3f}",
-                f"{subset['median_abs_error_pct'].mean():.3f}",
-                f"{skill[0]:+.3f} [{skill[1]:+.3f}, {skill[2]:+.3f}]",
-                f"{stats['coverage'][index_80]:.3f}",
-                f"{stats['width_pct'][index_80]:.2f}",
-                f"{stats['coverage'][index_98]:.3f}",
-                f"{stats['width_pct'][index_98]:.2f}",
-            ]
-        )
-    lines = table(
-        headers=[
-            "Arm",
-            "CRPS, points of p99 [95% interval]",
-            "Pinball loss",
-            "Median absolute error",
-            "CRPS skill vs `clim` [95% interval]",
-            "p10-p90 coverage (nominal 0.80)",
-            "p10-p90 width",
-            "p1-p99 coverage (nominal 0.98)",
-            "p1-p99 width",
-        ],
-        rows=rows,
-    )
+            rows.append(row)
+            data.append({"label": label, **record})
+    lines = table(headers=LEADERBOARD_HEADERS, rows=rows)
+    for arm in arms:
+        if not covered[arm] or len(covered[arm]) == len(batteries):
+            continue
+        sites = covered[arm]
+        lines += [
+            "",
+            (
+                f"`{arm}` covers {len(sites)} of the {len(batteries)} batteries. On those "
+                f"{len(sites)} batteries:"
+            ),
+            "",
+        ]
+        subset_rows = []
+        for name in (arm, CLIM, f"{XGB}no_neighbour"):
+            if covered.get(name):
+                row, record = leaderboard_row(
+                    losses=losses, setting=setting, issue=issue, arm=name, sites=sites
+                )
+                subset_rows.append(row)
+                data.append({"label": f"{label}, {len(sites)} batteries of {arm}", **record})
+        lines += table(headers=LEADERBOARD_HEADERS, rows=subset_rows)
     return lines, pl.DataFrame(data)
 
 
@@ -553,14 +595,13 @@ def contrast_row(
         metric="crps_pct",
     )
     reference_setting: SettingType = setting if contrast.reference.startswith(XGB) else "primary"
+    common = sorted(losses["site"].unique().to_list())
     coverage = {}
     for name, arm_setting in (
         (contrast.treatment, setting),
         (contrast.reference, reference_setting),
     ):
-        s = coverage_summary(
-            setting=arm_setting, issue=contrast.issue, arm=name, batteries=batteries
-        )
+        s = coverage_summary(setting=arm_setting, issue=contrast.issue, arm=name, batteries=common)
         index = SYMMETRIC_BANDS.index((0.1, 0.9))
         coverage[name] = (s["coverage"][index], s["width_pct"][index])
     treatment_mean = float(
@@ -583,6 +624,7 @@ def contrast_row(
         "seed_spread": result["seed_spread"],
         "n_rows": result["n_rows"],
         "n_months": result["n_months"],
+        "n_batteries": len(common),
         "treatment_crps": treatment_mean,
         "reference_crps": reference_mean,
         "treatment_skill": 1.0 - treatment_mean / reference_mean
@@ -603,6 +645,7 @@ def contrast_lines(*, rows: pl.DataFrame) -> list[str]:
         [
             f"{r['label']}{' (planned)' if r['planned'] else ' (exploratory)'}",
             r["setting"],
+            str(r["n_batteries"]),
             f"{r['issue']}: `{r['treatment']}` minus `{r['reference']}`",
             f"{r['difference']:+.3f} [{r['lower_95']:+.3f}, {r['upper_95']:+.3f}]",
             r["verdict"] + (", near the line" if r["near_line"] else ""),
@@ -616,6 +659,7 @@ def contrast_lines(*, rows: pl.DataFrame) -> list[str]:
         headers=[
             "Contrast",
             "Setting",
+            "Batteries",
             "Treatment minus reference",
             "CRPS difference, points of p99 [95% interval]",
             "Treatment CRPS is",
@@ -627,10 +671,31 @@ def contrast_lines(*, rows: pl.DataFrame) -> list[str]:
     )
 
 
-def share_recovered(*, setting: SettingType, batteries: list[str]) -> list[str]:
-    """Return the share of the own-FPN gain that neighbours recover, with a month resampling."""
+def trivial_fpn_batteries(*, batteries: list[str]) -> list[str]:
+    """Return the batteries whose Physical Notification is exactly zero in most half-hours.
+
+    A battery qualifies when at least `TRIVIAL_FPN_ZERO_SHARE` of the half-hours that carry a
+    notification hold exactly zero. Its own notification then says almost nothing, and its
+    neighbours' mean is pulled towards zero.
+    """
+    notified = load_physical_notifications().filter(pl.col("bmu_id").is_in(batteries))
+    shares = notified.group_by("bmu_id").agg(zero_share=(pl.col("fpn_mw") == 0.0).mean())
+    return sorted(shares.filter(pl.col("zero_share") >= TRIVIAL_FPN_ZERO_SHARE)["bmu_id"].to_list())
+
+
+def share_recovered(
+    *, setting: SettingType, batteries: list[str], excluded: tuple[str, ...] = ()
+) -> list[str]:
+    """Return the share of the own-FPN gain that neighbours recover, with a month resampling.
+
+    Args:
+        setting: The hyperparameter setting.
+        batteries: The target batteries.
+        excluded: Targets left out of the share. Their neighbour statistics are not rebuilt.
+    """
     arms = [f"{XGB}no_neighbour", f"{XGB}own_fpn", f"{XGB}neighbour_fpn"]
-    losses = load_losses(setting=setting, issue="ID-1h", arms=arms, batteries=batteries)
+    kept = [b for b in batteries if b not in excluded]
+    losses = load_losses(setting=setting, issue="ID-1h", arms=arms, batteries=kept)
     wide = losses.pivot(on="arm", index=["site", "time", "seed", "month"], values="crps_pct").sort(
         "site", "time", "seed"
     )
@@ -646,7 +711,7 @@ def share_recovered(*, setting: SettingType, batteries: list[str]) -> list[str]:
     )
     return [
         (
-            "- Own-FPN gain over `no_neighbour`: "
+            f"- On {len(kept)} target batteries: own-FPN gain over `no_neighbour`: "
             f"{(sums[0].sum() - sums[1].sum()) / none.size:.3f} points of p99 per half-hour; "
             f"neighbours' gain: {(sums[0].sum() - sums[2].sum()) / none.size:.3f}."
         ),
@@ -657,6 +722,70 @@ def share_recovered(*, setting: SettingType, batteries: list[str]) -> list[str]:
             "gain is near zero)."
         ),
     ]
+
+
+def party_resampling_section(*, testbed: list[str]) -> tuple[list[str], pl.DataFrame]:
+    """Return the party-and-month resampled intervals of D1 to D4 and the share recovered.
+
+    This is a post hoc sensitivity. The month-and-seed intervals hold the 35 batteries fixed.
+    Here the lead parties are resampled as well as the months, and the fitting seed is averaged
+    out first, so the interval leaves out seed-to-seed spread. D5 has one battery and so no
+    parties to resample.
+    """
+    parties = lead_parties()
+    party_of = {b: parties[b] for b in testbed}
+    rows = []
+    for contrast in PLANNED_CONTRASTS:
+        if contrast.part == "B":
+            continue
+        losses = contrast_losses(contrast=contrast, setting="primary", batteries=testbed)
+        result = party_month_difference(
+            treatment=arm_cells(losses=losses, arm=contrast.treatment, party_of=party_of),
+            reference=arm_cells(losses=losses, arm=contrast.reference, party_of=party_of),
+        )
+        rows.append({"label": contrast.label, **result})
+    frame = pl.DataFrame(rows)
+    body = [
+        [
+            f"{r['label']} (planned; interval post hoc)",
+            f"{r['difference']:+.3f}",
+            f"[{r['lower_95']:+.3f}, {r['upper_95']:+.3f}]",
+            "crosses zero" if r["lower_95"] < 0 < r["upper_95"] else "excludes zero",
+            f"{r['party_weighted']:+.3f}",
+        ]
+        for r in frame.iter_rows(named=True)
+    ]
+    lines = [
+        "## Party-and-month resampling (post hoc sensitivity, primary setting)",
+        "",
+        (
+            f"- The testbed's {len(set(party_of.values()))} lead parties are resampled with "
+            "replacement, and so are the calendar months; the fitting seed is averaged out first. "
+            "The unit of independence is the lead party, because one party runs "
+            f"{max(Counter(party_of.values()).values())} of the {len(testbed)} batteries."
+        ),
+        "",
+        *table(
+            headers=[
+                "Contrast",
+                "Pooled difference",
+                "Party-and-month 95% interval",
+                "Interval",
+                "Party-weighted mean difference",
+            ],
+            rows=body,
+        ),
+        "",
+    ]
+    arms = [f"{XGB}no_neighbour", f"{XGB}own_fpn", f"{XGB}neighbour_fpn"]
+    losses = load_losses(setting="primary", issue="ID-1h", arms=arms, batteries=testbed)
+    cells = [arm_cells(losses=losses, arm=a, party_of=party_of) for a in arms]
+    share = party_month_share(baseline=cells[0], full=cells[1], partial=cells[2])
+    lines.append(
+        f"- Share of the own-FPN gain that neighbours recover: {share['share']:.3f} "
+        f"(party-and-month 95% interval {share['lower_95']:.3f} to {share['upper_95']:.3f})."
+    )
+    return [*lines, ""], frame
 
 
 def skill_by_lead(*, setting: SettingType, batteries: list[str]) -> tuple[list[str], pl.DataFrame]:
@@ -829,7 +958,61 @@ def planned_section(*, testbed: list[str], nged: list[str]) -> tuple[list[str], 
             "met means negative and statistically significant at the 5% level under both "
             "settings)."
         )
+    lines += ["", "### Size of each effect, and the largest improvement each interval allows", ""]
+    for r in planned.iter_rows(named=True):
+        improvement_bound = -r["lower_95"]
+        text = (
+            f"- {r['label']}, {r['setting']} setting: the difference is "
+            f"{r['difference']:+.3f} points, {abs(r['difference']) / r['reference_crps']:.1%} of "
+            f"the reference's CRPS ({r['reference_crps']:.3f})."
+        )
+        if r["upper_95"] >= 0:
+            text += (
+                f" An improvement larger than {improvement_bound:.3f} points "
+                f"({improvement_bound / r['reference_crps']:.1%} of the reference's CRPS) is "
+                "excluded."
+            )
+        lines.append(text)
     return [*lines, ""], planned
+
+
+def comparison_lines(*, planned: pl.DataFrame, other_path: Path, title: str, other: str) -> list[str]:
+    """Return the planned contrasts of this run beside those of another run's saved table."""
+    if not other_path.exists():
+        return []
+    earlier = pl.read_parquet(other_path)
+    rows = []
+    for r in planned.iter_rows(named=True):
+        match = earlier.filter(
+            (pl.col("label") == r["label"]) & (pl.col("setting") == r["setting"])
+        )
+        if match.is_empty():
+            continue
+        o = match.row(0, named=True)
+        rows.append(
+            [
+                r["label"],
+                r["setting"],
+                f"{r['difference']:+.3f} [{r['lower_95']:+.3f}, {r['upper_95']:+.3f}]",
+                f"{o['difference']:+.3f} [{o['lower_95']:+.3f}, {o['upper_95']:+.3f}]",
+                f"{r['verdict']} / {o['verdict']}",
+            ]
+        )
+    return [
+        f"## {title}",
+        "",
+        *table(
+            headers=[
+                "Contrast",
+                "Setting",
+                "This run, difference [95% interval]",
+                f"{other}, difference [95% interval]",
+                "Verdicts, this run / other",
+            ],
+            rows=rows,
+        ),
+        "",
+    ]
 
 
 def exploratory_section(*, testbed: list[str], nged: list[str]) -> tuple[list[str], pl.DataFrame]:

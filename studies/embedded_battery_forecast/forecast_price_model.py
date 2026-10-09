@@ -11,6 +11,10 @@ given what is known at 06:00 UTC on the day before the target day:
   before the target day cleared at about 10:00 UTC two days before the target day, so it is known);
 - the mean price of the seven days before the target day.
 
+The auction's delivery day is the UK local day, so in summer the UTC hour 23:00 to 24:00 of the
+day before the target day is priced by the target day's own auction, which has not cleared at
+06:00. In the one-day-earlier price and the seven-day mean, that hour takes the `naive` price.
+
 The NESO demand forecasts are not used: the last publication before 06:00 reaches only about 03:00
 on the target day.
 
@@ -35,6 +39,7 @@ from forecast_inputs import (
     price_sources,
     wind_forecast_at_issue,
 )
+from studies.battery_forecast import next_uk_day_hour
 from studies.battery_market import FOLD_MONTHS
 from studies.bootstrap import bootstrap_row_difference
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, booster_parameters
@@ -61,13 +66,21 @@ def price_frame() -> pl.DataFrame:
         Columns `time`, `fold`, `month`, `price_actual` (the target), and `FEATURES`.
     """
     grid = half_hour_grid()
-    prices = price_sources(grid=grid).select("time", "price_actual", "price_naive")
+    prices = (
+        price_sources(grid=grid)
+        .select("time", "price_actual", "price_naive")
+        .with_columns(
+            price_known=pl.when(next_uk_day_hour(time=pl.col("time")))
+            .then(pl.col("price_naive"))
+            .otherwise(pl.col("price_actual"))
+        )
+    )
     wind = wind_forecast_at_issue(issue="DA-early", grid=grid)
     day = pl.col("time").dt.truncate("1d")
     daily = (
         prices.with_columns(day=day)
         .group_by("day")
-        .agg(day_mean=pl.col("price_actual").mean())
+        .agg(day_mean=pl.col("price_known").mean())
         .sort("day")
         .with_columns(
             price_mean_previous_7_days=pl.col("day_mean").rolling_mean(
@@ -78,7 +91,7 @@ def price_frame() -> pl.DataFrame:
         .select("day", "price_mean_previous_7_days")
     )
     lag_one = prices.select(
-        time=pl.col("time") + pl.duration(days=1), price_lag_1_day=pl.col("price_actual")
+        time=pl.col("time") + pl.duration(days=1), price_lag_1_day=pl.col("price_known")
     )
     return (
         prices.join(wind, on="time", how="left")

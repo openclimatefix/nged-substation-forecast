@@ -37,6 +37,17 @@ ID_PERSISTENCE_LAG_HALF_HOURS: Final[int] = 3
 """At ID-1h, persistence is the half-hour that ended at the issue time: the target's start less 90
 minutes."""
 
+UK_TIME_ZONE: Final[str] = "Europe/London"
+RESULTS_HOURS_BEFORE_UK_DAY: Final[int] = 13
+"""How long before midnight UK time at the start of a delivery day the day-ahead auction results
+are taken to be public. The N2EX auction's results come out by 10:00 on the day before. Nord Pool
+words the time as 10:00 GMT, which in summer could mean 10:00 UTC, so 13 hours before the UK
+midnight (23:00 UTC in summer, 00:00 UTC in winter) is the later of the two readings in summer."""
+
+IDLE_MONTH_ZERO_SHARE: Final[float] = 0.99
+"""A calendar month is idle when at least this share of the battery's present half-hours are
+exactly zero."""
+
 BANK_HOLIDAYS_ENGLAND_AND_WALES: Final[frozenset[date]] = frozenset(
     {
         date(2025, 12, 25),
@@ -83,8 +94,9 @@ def day_type(*, day: date, non_working_dates: frozenset[date]) -> DayType:
 def issue_time_for(*, target_start: datetime, issue: IssueType) -> datetime:
     """Return when a forecast of one half-hour is issued.
 
-    The target day is the UTC day, which is the `delivery_date` of the N2EX day-ahead file: that
-    file's README places its hourly grid on UTC.
+    The target day is the UTC day. The N2EX day-ahead file labels its hourly grid in UTC, but the
+    auction's delivery day is the UK local day, so in summer the UTC hour 23:00 to 24:00 of the
+    target day is priced by the next day's auction (see `price_published_at`).
 
     Args:
         target_start: The start of the target half-hour, UTC.
@@ -102,6 +114,78 @@ def issue_time_for(*, target_start: datetime, issue: IssueType) -> datetime:
             return day_start - timedelta(days=1) + timedelta(hours=18)
         case "ID-1h":
             return target_start - timedelta(hours=1)
+
+
+def leading_idle_end(*, output: pl.DataFrame) -> datetime | None:
+    """Return when a battery's idle lead-in ends, decided from its output alone.
+
+    A battery that is not yet commissioned, or is switched off, publishes exactly zero. A calendar
+    month (UTC) is idle when at least `IDLE_MONTH_ZERO_SHARE` of its present half-hours are exactly
+    zero. The lead-in is the run of idle months at the start of the series. Idle months after the
+    first working month are not part of it, because a later outage is a behaviour a forecaster
+    meets. The rule reads the target only, so it gives every arm of a battery the same rows.
+
+    Args:
+        output: Rows with `time` (start of the half-hour, UTC) and `output_mw`; rows with a null
+            output are ignored.
+
+    Returns:
+        The start of the first month that is not idle, or None if the series has no idle lead-in.
+        If every month is idle, the end of the series.
+    """
+    monthly = (
+        output.drop_nulls("output_mw")
+        .with_columns(month=pl.col("time").dt.truncate("1mo"))
+        .group_by("month")
+        .agg(zero_share=(pl.col("output_mw") == 0.0).mean())
+        .sort("month")
+    )
+    first_working = None
+    for month, zero_share in monthly.iter_rows():
+        if zero_share < IDLE_MONTH_ZERO_SHARE:
+            first_working = month
+            break
+    if first_working is None:
+        last = output.select(pl.col("time").max()).item()
+        return last + timedelta(minutes=30) if monthly.height else None
+    if first_working == monthly["month"][0]:
+        return None
+    return first_working
+
+
+def next_uk_day_hour(*, time: pl.Expr) -> pl.Expr:
+    """Return whether an hour's UK delivery day is the day after its UTC day.
+
+    The N2EX auction's delivery day is the UK local day, so in summer the UTC hour 23:00 to 24:00
+    belongs to the next UK day, whose auction clears on the UTC day itself.
+
+    Args:
+        time: The start of the hour, UTC.
+
+    Returns:
+        A Boolean expression, true for the 23:00 UTC hour on days when UK clocks are one hour ahead.
+    """
+    uk_date = time.dt.convert_time_zone(UK_TIME_ZONE).dt.date()
+    return uk_date != time.dt.date()
+
+
+def price_published_at(*, time: pl.Expr) -> pl.Expr:
+    """Return when the day-ahead price of an hour is public.
+
+    Args:
+        time: The start of the hour, UTC.
+
+    Returns:
+        The UTC time `RESULTS_HOURS_BEFORE_UK_DAY` before midnight UK time at the start of the UK
+        day that contains the hour.
+    """
+    uk_date = time.dt.convert_time_zone(UK_TIME_ZONE).dt.date()
+    uk_midnight = (
+        uk_date.cast(pl.Datetime("us"))
+        .dt.replace_time_zone(UK_TIME_ZONE)
+        .dt.convert_time_zone("UTC")
+    )
+    return uk_midnight - pl.duration(hours=RESULTS_HOURS_BEFORE_UK_DAY)
 
 
 def with_issue_time(*, frame: pl.DataFrame, issue: IssueType) -> pl.DataFrame:

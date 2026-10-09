@@ -402,3 +402,64 @@ def test_the_model_price_arm_joins_the_day_ahead_arms_once_the_price_model_has_r
     assert "price_model" in with_model
     assert "price_model" not in day_late
     assert len(without) == 3
+
+
+def _day_mean_with_hour_23_from_a_week_earlier(day_index: int) -> float:
+    """The synthetic market's day mean when 23:00 takes the price seven days earlier."""
+    hours = [day_index * 1000.0 + h for h in range(23)] + [(day_index - 7) * 1000.0 + 23]
+    return sum(hours) / 24
+
+
+def test_a_summer_day_ahead_forecast_does_not_know_the_last_utc_hour_of_the_target_day(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # 5 October 2025 is day 34 and UK clocks are one hour ahead, so 23:00 UTC is in the next UK day.
+    base, *_ = _issue_frames(monkeypatch, "DA-late")
+
+    last = base.filter(pl.col("time") == _utc(10, 5, 23, 0)).row(0, named=True)
+    first = base.filter(pl.col("time") == _utc(10, 5, 0, 0)).row(0, named=True)
+
+    assert last["price_actual"] == last["price_naive"] == 27 * 1000.0 + 23
+    assert first["price_actual"] == 34 * 1000.0
+    expected = _day_mean_with_hour_23_from_a_week_earlier(34)
+    assert first["price_day_mean_actual"] == pytest.approx(expected)
+    assert last["price_day_mean_actual"] == pytest.approx(expected)
+
+
+def test_a_winter_day_ahead_forecast_knows_every_hour_of_the_target_day(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # 5 November 2025 is day 65; UK time equals UTC, so every hour is in the target UK day.
+    base, *_ = _issue_frames(monkeypatch, "DA-late")
+
+    last = base.filter(pl.col("time") == _utc(11, 5, 23, 0)).row(0, named=True)
+
+    assert last["price_actual"] == 65 * 1000.0 + 23
+    assert last["price_day_mean_actual"] == pytest.approx(65 * 1000.0 + 11.5)
+
+
+def test_at_gate_closure_the_last_utc_hour_becomes_known_once_the_next_uk_days_results_are_out(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base, *_ = _issue_frames(monkeypatch, "ID-1h")
+
+    before = base.filter(pl.col("time") == _utc(10, 5, 8, 0)).row(0, named=True)  # issued 07:00
+    after = base.filter(pl.col("time") == _utc(10, 5, 12, 0)).row(0, named=True)  # issued 11:00
+    last = base.filter(pl.col("time") == _utc(10, 5, 23, 0)).row(0, named=True)
+
+    assert before["price_day_mean_actual"] == pytest.approx(
+        _day_mean_with_hour_23_from_a_week_earlier(34)
+    )
+    assert after["price_day_mean_actual"] == pytest.approx(34 * 1000.0 + 11.5)
+    assert last["price_actual"] == 34 * 1000.0 + 23
+
+
+def test_the_perfect_price_arm_at_the_early_issue_time_keeps_every_hour(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base, *_ = _issue_frames(monkeypatch, "DA-early")
+
+    last = base.filter(pl.col("time") == _utc(10, 5, 23, 0)).row(0, named=True)
+
+    assert last["price_actual"] == 34 * 1000.0 + 23
+    assert last["price_day_mean_actual"] == pytest.approx(34 * 1000.0 + 11.5)

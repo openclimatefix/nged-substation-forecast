@@ -26,9 +26,12 @@ from studies.battery_forecast import (
     asof_at_issue_time,
     climatology_quantiles,
     day_shuffle_map,
+    leading_idle_end,
     neighbour_ids,
     neighbour_statistics,
+    next_uk_day_hour,
     persistence_source_times,
+    price_published_at,
     with_issue_time,
 )
 from studies.battery_market import (
@@ -382,6 +385,45 @@ def price_columns(*, frame: pl.DataFrame, source: str) -> pl.DataFrame:
     return ranked.with_columns(**{f"rank_rule_{source}": pl.Series(schedule, dtype=pl.Float64)})
 
 
+def published_price_columns(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Replace the `actual` price columns by what is public at each row's issue time.
+
+    The N2EX auction's delivery day is the UK local day, so in summer the UTC hour 23:00 to 24:00
+    of a UTC day is priced by the next UK day's auction, which clears on the UTC day itself. A row
+    issued before then does not know that hour's price, or the daily statistics that include it.
+    For such a row, every `actual` price column is rebuilt with that hour's price replaced by the
+    `naive` price (the same hour seven days earlier, which is public).
+
+    Args:
+        frame: A frame with `time`, `issue_time`, `price_actual`, `price_naive`, and the columns
+            `price_columns` adds for the source `actual`.
+
+    Returns:
+        The frame with the `actual` price columns as a forecaster issuing at each row's
+        `issue_time` could have computed them.
+    """
+    last_hour = pl.col("time").dt.truncate("1d") + pl.duration(hours=23)
+    unpublished = price_published_at(time=last_hour) > pl.col("issue_time")
+    hidden = price_columns(
+        frame=frame.with_columns(
+            price_actual=pl.when(next_uk_day_hour(time=pl.col("time")))
+            .then(pl.col("price_naive"))
+            .otherwise(pl.col("price_actual"))
+        ),
+        source="actual",
+    )
+    names = [
+        "price_actual",
+        "price_rank_actual",
+        "price_day_mean_actual",
+        "price_day_range_actual",
+        "rank_rule_actual",
+    ]
+    return frame.with_columns(
+        **{name: pl.when(unpublished).then(hidden[name]).otherwise(pl.col(name)) for name in names}
+    )
+
+
 def wind_forecast_at_issue(*, issue: IssueType, grid: pl.DataFrame) -> pl.DataFrame:
     """Return the NESO wind forecast that was published by each half-hour's issue time.
 
@@ -473,12 +515,15 @@ def build_issue_frame(
 
     Returns:
         One row per half-hour of the window. Columns: `time`, `issue_time`, `tod`, `day_of_week`,
-        `month`, `fold`, `output_mw`, the persistence value `persistence_mw`, the climatology
-        quantiles `q<level>` and `climatology_n`, `climatology_median_mw`, `climatology_filler_mw`,
-        the price columns of every source in `prices`, `own_fpn_mw`, `own_fpn_filler_mw`, and the
-        neighbour columns `<set>__mean`, `<set>__previous`, `<set>__share` with their `_filler`
-        versions for each neighbour set that the battery has (`all_testbed`, plus `different_party`
-        and `same_party` for a battery with a lead party).
+        `month`, `fold`, `output_mw`, `in_service` (false before the end of the battery's idle
+        lead-in, which `studies.battery_forecast.leading_idle_end` finds from the output), the
+        persistence value `persistence_mw`, the climatology quantiles `q<level>` and
+        `climatology_n`, `climatology_median_mw`, `climatology_filler_mw`, the price columns of
+        every source in `prices` (at `DA-late` and `ID-1h` the `actual` ones are what
+        `published_price_columns` returns), `own_fpn_mw`, `own_fpn_filler_mw`, and the neighbour
+        columns `<set>__mean`, `<set>__previous`, `<set>__share` with their `_filler` versions for
+        each neighbour set that the battery has (`all_testbed`, plus `different_party` and
+        `same_party` for a battery with a lead party).
     """
     frame = with_issue_time(frame=grid, issue=issue).with_columns(
         tod=pl.col("time").dt.hour().cast(pl.Int64) * 2 + pl.col("time").dt.minute() // 30,
@@ -487,10 +532,17 @@ def build_issue_frame(
         fold=pl.col("time").dt.month().replace_strict(FOLD_MONTHS, return_dtype=pl.Int64),
     )
     frame = frame.join(battery.output, on="time", how="left")
+    idle_end = leading_idle_end(output=battery.output)
+    frame = frame.with_columns(
+        in_service=pl.lit(True) if idle_end is None else pl.col("time") >= idle_end
+    )
     sources = [c.removeprefix("price_") for c in prices.columns if c.startswith("price_")]
     frame = frame.join(prices, on="time", how="left")
     for source in sources:
         frame = price_columns(frame=frame, source=source)
+    if issue != "DA-early":
+        # At DA-early the `actual` arm is the perfect-price upper bound, so it keeps every hour.
+        frame = published_price_columns(frame=frame)
     # Persistence: the output at the source half-hour that the issue time allows.
     source_times = persistence_source_times(target_times=frame["time"].to_list(), issue=issue)
     persistence = (

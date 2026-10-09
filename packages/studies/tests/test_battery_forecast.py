@@ -12,11 +12,14 @@ from studies.battery_forecast import (
     day_shuffle_map,
     day_type,
     issue_time_for,
+    leading_idle_end,
     level_weights,
     neighbour_ids,
     neighbour_statistics,
+    next_uk_day_hour,
     output_bounds,
     persistence_source_times,
+    price_published_at,
     repair_quantiles,
     residual_quantile_table,
     weighted_crps,
@@ -525,3 +528,103 @@ def test_no_neighbours_give_an_empty_frame_with_the_same_columns() -> None:
         "neighbour_mean_fraction_previous",
         "neighbour_discharging_share",
     ]
+
+
+# ---- the UK delivery day of the day-ahead auction
+
+
+def _published_at(hour_start: datetime) -> datetime:
+    frame = pl.DataFrame({"time": [hour_start]}).with_columns(
+        pl.col("time").dt.cast_time_unit("us")
+    )
+    return frame.select(published=price_published_at(time=pl.col("time")))["published"][0]
+
+
+def test_the_last_utc_hour_of_a_summer_day_belongs_to_the_next_uk_day() -> None:
+    frame = pl.DataFrame(
+        {
+            "time": [
+                datetime(2025, 7, 1, 22, tzinfo=UTC),
+                datetime(2025, 7, 1, 23, tzinfo=UTC),
+                datetime(2025, 12, 1, 23, tzinfo=UTC),
+            ]
+        }
+    ).with_columns(pl.col("time").dt.cast_time_unit("us"))
+
+    flags = frame.select(flag=next_uk_day_hour(time=pl.col("time")))["flag"].to_list()
+
+    assert flags == [False, True, False]
+
+
+def test_a_summer_hours_price_is_public_before_the_uk_midnight_that_starts_its_day() -> None:
+    # 23:00 UTC on 1 July is midnight UK time on 2 July, so the day-ahead auction for 2 July
+    # (public by 10:00 UTC on 1 July) prices it. 22:00 UTC is 23:00 UK time on 1 July.
+    assert _published_at(datetime(2025, 7, 1, 23, tzinfo=UTC)) == datetime(
+        2025, 7, 1, 10, tzinfo=UTC
+    )
+    assert _published_at(datetime(2025, 7, 1, 22, tzinfo=UTC)) == datetime(
+        2025, 6, 30, 10, tzinfo=UTC
+    )
+
+
+def test_a_winter_hours_price_is_public_by_the_morning_before_its_day() -> None:
+    assert _published_at(datetime(2025, 12, 1, 23, tzinfo=UTC)) == datetime(
+        2025, 11, 30, 11, tzinfo=UTC
+    )
+
+
+def test_the_spring_clock_change_day_still_has_its_last_utc_hour_in_the_next_uk_day() -> None:
+    # 29 March 2026: clocks go forward at 01:00 UTC, so 23:00 UTC is midnight on 30 March.
+    assert _published_at(datetime(2026, 3, 29, 23, tzinfo=UTC)) == datetime(
+        2026, 3, 29, 10, tzinfo=UTC
+    )
+
+
+# ---- the idle lead-in
+
+
+def _monthly_output(*, zero_share_by_month: list[float]) -> pl.DataFrame:
+    """Output from 1 September 2025 with a given share of exact zeros in each calendar month."""
+    times, values = [], []
+    for block, share in enumerate(zero_share_by_month):
+        start = datetime(2025, 9 + block, 1, tzinfo=UTC)
+        for i in range(100):
+            times.append(start + timedelta(hours=i))
+            values.append(0.0 if i < round(share * 100) else 5.0)
+    return pl.DataFrame({"time": times, "output_mw": values}).with_columns(
+        pl.col("time").dt.cast_time_unit("us")
+    )
+
+
+def test_a_battery_that_is_idle_for_its_first_months_has_an_idle_lead_in() -> None:
+    output = _monthly_output(zero_share_by_month=[1.0, 1.0, 0.2, 0.0])
+
+    end = leading_idle_end(output=output)
+
+    assert end is not None
+    assert end.date() == date(2025, 11, 1)  # the first calendar month that is not idle
+
+
+def test_a_working_battery_has_no_idle_lead_in() -> None:
+    assert leading_idle_end(output=_monthly_output(zero_share_by_month=[0.3, 0.0])) is None
+
+
+def test_an_outage_after_the_first_working_month_is_not_a_lead_in() -> None:
+    assert leading_idle_end(output=_monthly_output(zero_share_by_month=[0.0, 1.0, 1.0])) is None
+
+
+def test_a_month_with_ninety_nine_per_cent_zeros_is_idle_and_with_ninety_eight_is_not() -> None:
+    idle = leading_idle_end(output=_monthly_output(zero_share_by_month=[0.99, 0.0]))
+    working = leading_idle_end(output=_monthly_output(zero_share_by_month=[0.98, 0.0]))
+
+    assert idle is not None
+    assert working is None
+
+
+def test_a_battery_idle_throughout_has_a_lead_in_that_covers_the_whole_series() -> None:
+    output = _monthly_output(zero_share_by_month=[1.0, 1.0])
+
+    end = leading_idle_end(output=output)
+
+    assert end is not None
+    assert end > output.select(pl.col("time").max()).item()

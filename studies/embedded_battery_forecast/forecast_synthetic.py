@@ -36,6 +36,7 @@ from forecast_fit import (
     ArmDefinition,
     SettingType,
     arm_file,
+    link_unchanged_fits,
     run_in_pool,
     run_job,
 )
@@ -78,7 +79,7 @@ def synthetic_ids() -> tuple[list[str], list[str]]:
 
 
 def price_driven_output(*, prices: np.ndarray, index: int) -> np.ndarray:
-    """Return one price-driven battery's noise-free output on the half-hour grid, in per-unit power."""
+    """Return one price-driven battery's noise-free output on the grid, in per-unit power."""
     return lp_schedule(
         prices=prices,
         energy_hours=DURATIONS_HOURS[index % len(DURATIONS_HOURS)],
@@ -289,8 +290,8 @@ def analyse(*, setting: SettingType) -> tuple[list[str], bool]:
 def main() -> None:
     """Build the frames, fit rung A0, and write `a0_report.md`."""
     setting: SettingType = "sensitivity" if "sensitivity" in sys.argv[1:] else "primary"
-    if not (SYNTHETIC_DIR / f"{synthetic_ids()[1][-1]}.parquet").exists():
-        write_frames()
+    write_frames()
+    link_unchanged_fits()
     driven, blind = synthetic_ids()
     run_in_pool(function=job, tasks=[(b, setting) for b in [*driven, *blind]])
     lines, positive = analyse(setting=setting)

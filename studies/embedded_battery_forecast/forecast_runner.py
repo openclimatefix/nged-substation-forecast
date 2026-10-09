@@ -30,6 +30,18 @@ def testbed_ids() -> list[str]:
     return sorted(f.stem.removeprefix("ID-1h__") for f in files)
 
 
+def batteries_with_idle_lead_in() -> list[str]:
+    """Return the testbed batteries whose saved input frame has half-hours outside service."""
+    return [
+        battery
+        for battery in testbed_ids()
+        if not pl.read_parquet(
+            EMBEDDED_BATTERY_FORECAST_INPUTS_DIR / f"ID-1h__{battery}.parquet",
+            columns=["in_service"],
+        )["in_service"].all()
+    ]
+
+
 def lead_parties() -> dict[str, str]:
     """Return each testbed battery's lead party, from the reviewed BMU list."""
     listed = pl.read_csv(BMU_LIST_PATH)

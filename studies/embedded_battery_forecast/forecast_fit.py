@@ -12,7 +12,7 @@ Each battery's 3 seeds and 4 month-block folds are fitted one after another. The
 
 import multiprocessing
 import os
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,12 +50,39 @@ from studies.sources import EMBEDDED_BATTERY_FORECAST_DIR
 MethodType = Literal["clim", "persistence_conformal", "rank_conformal", "xgb_quantile"]
 SettingType = Literal["primary", "sensitivity"]
 
+VariantType = Literal["pre_review", "as_written", "idle_dropped"]
+"""Which set of fits a process reads or writes.
+
+- `pre_review`: the fits made before the first science review, kept unchanged. Their price
+  features treated the whole UTC day as published, and they are read only to report the size of
+  that error.
+- `as_written`: the plan's rule, every half-hour with its inputs, with price features that use
+  only the prices public at each issue time.
+- `idle_dropped`: `as_written` with each battery's idle lead-in (`in_service` false) dropped from
+  training and scoring alike, for every arm. It refits only the batteries that have a lead-in.
+"""
+
 SETTINGS: Final[dict[SettingType, HyperParameters]] = {
     "primary": PRIMARY_HYPER_PARAMETERS,
     "sensitivity": SENSITIVITY_HYPER_PARAMETERS,
 }
-FITS_DIR: Final[Path] = EMBEDDED_BATTERY_FORECAST_DIR / "fits"
-"""One parquet file per battery, issue time, hyperparameter setting, and arm."""
+FIT_VARIANT: Final[VariantType] = (
+    "idle_dropped"
+    if os.environ.get("FIT_VARIANT") == "idle_dropped"
+    else "pre_review"
+    if os.environ.get("FIT_VARIANT") == "pre_review"
+    else "as_written"
+)
+"""The variant this process fits and reads, set by the `FIT_VARIANT` environment variable."""
+FITS_DIRS: Final[dict[VariantType, Path]] = {
+    "pre_review": EMBEDDED_BATTERY_FORECAST_DIR / "fits",
+    "as_written": EMBEDDED_BATTERY_FORECAST_DIR / "fits_as_written",
+    "idle_dropped": EMBEDDED_BATTERY_FORECAST_DIR / "fits_idle_dropped",
+}
+FITS_DIR: Final[Path] = FITS_DIRS[FIT_VARIANT]
+"""One parquet file per battery, issue time, hyperparameter setting, and arm. A tree other than
+`pre_review` holds real files for the fits it made and symbolic links to the earlier tree's files
+for every fit that its changes leave as they were."""
 LEVELS: Final[tuple[float, ...]] = DELIVERY_QUANTILES
 Q_COLUMNS: Final[tuple[str, ...]] = tuple(f"q{level}" for level in LEVELS)
 FIT_THREADS: Final[int] = int(os.environ.get("OMP_NUM_THREADS", "2"))
@@ -283,8 +310,85 @@ def run_arm(
 
 
 def scored_mask(*, base: pl.DataFrame, arms: dict[str, ArmSpec]) -> np.ndarray:
-    """Return `forecast_inputs.is_scored` as a NumPy Boolean array."""
-    return is_scored(base=base, arms=arms).to_numpy()
+    """Return `forecast_inputs.is_scored` as a NumPy Boolean array.
+
+    In the `idle_dropped` variant the mask also excludes the half-hours before the end of the
+    battery's idle lead-in, so those rows are neither trained on nor scored.
+    """
+    mask = is_scored(base=base, arms=arms)
+    if FIT_VARIANT == "idle_dropped":
+        mask = mask & base["in_service"]
+    return mask.to_numpy()
+
+
+def uses_the_actual_price(*, issue: str, arm: str) -> bool:
+    """Return whether an arm's features include the N2EX price of the target day as published.
+
+    The `as_written` fits refit these arms, because their price features changed. `DA-early`'s
+    `price_actual` arm is the perfect-price upper bound and keeps every hour, so it is not one.
+
+    Args:
+        issue: The saved issue folder name (`A0_DA-late` for rung A0).
+        arm: The arm name.
+    """
+    if issue == "DA-early":
+        return arm.endswith("price_model")
+    if issue in ("DA-late", "A0_DA-late"):
+        return arm.endswith("price_actual")
+    return arm.startswith("xgb_quantile__") or arm == "rank_conformal__no_neighbour"
+
+
+def link_fits(
+    *, source: Path, target: Path, skip: Callable[[Path], bool] = lambda path: False
+) -> int:
+    """Link each fit file of `source` into `target`, except those `skip` names.
+
+    Args:
+        source: The tree to link from.
+        target: The tree to link into.
+        skip: Returns true for a file that `target` refits and so must not link.
+
+    Returns:
+        How many links were created.
+    """
+    created = 0
+    for path in sorted(source.rglob("*.parquet")):
+        destination = target / path.relative_to(source)
+        if skip(path) or destination.is_symlink() or destination.exists():
+            continue
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.symlink_to(path.resolve())
+        created += 1
+    return created
+
+
+def link_unchanged_fits(*, affected: Collection[str] = ()) -> int:
+    """Link into this process's tree the fits that its variant leaves unchanged.
+
+    `as_written` links the `pre_review` fits except the arms that use the actual price.
+    `idle_dropped` links the `as_written` fits of every battery not in `affected`.
+
+    Args:
+        affected: For `idle_dropped`, the batteries whose fits are real files.
+
+    Returns:
+        How many links were created.
+    """
+    if FIT_VARIANT == "as_written":
+        return link_fits(
+            source=FITS_DIRS["pre_review"],
+            target=FITS_DIR,
+            skip=lambda path: uses_the_actual_price(
+                issue=path.parent.name, arm=path.stem.split("__", 1)[1]
+            ),
+        )
+    if FIT_VARIANT == "idle_dropped":
+        return link_fits(
+            source=FITS_DIRS["as_written"],
+            target=FITS_DIR,
+            skip=lambda path: path.name.split("__")[0] in affected,
+        )
+    return 0
 
 
 def run_job(

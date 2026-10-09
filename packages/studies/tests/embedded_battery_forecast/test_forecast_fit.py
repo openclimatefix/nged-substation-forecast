@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import forecast_fit as ff
 import forecast_synthetic as fs
@@ -137,3 +138,47 @@ def test_the_trailing_profile_never_includes_the_targets_own_day() -> None:
     assert np.isnan(matrix[0]).all()
     assert matrix[1, 0] == 0.0  # only day 0 precedes day 1
     assert matrix[30, 0] == pytest.approx(np.mean(np.arange(2, 30)))  # days 2 to 29
+
+
+def test_only_arms_that_read_the_published_actual_price_are_refitted() -> None:
+    refit = [
+        ("DA-late", "xgb_quantile__price_actual"),
+        ("DA-late", "rank_conformal__price_actual"),
+        ("DA-early", "xgb_quantile__price_model"),
+        ("DA-early", "rank_conformal__price_model"),
+        ("ID-1h", "xgb_quantile__neighbour_fpn"),
+        ("ID-1h", "rank_conformal__no_neighbour"),
+        ("A0_DA-late", "xgb_quantile__price_actual"),
+    ]
+    kept = [
+        ("DA-late", "clim"),
+        ("DA-late", "xgb_quantile__price_shuffled"),
+        ("DA-late", "xgb_quantile__price_naive"),
+        ("DA-early", "xgb_quantile__price_actual"),
+        ("DA-early", "xgb_quantile__price_shuffled"),
+        ("ID-1h", "clim"),
+        ("ID-1h", "persistence_conformal"),
+        ("A0_DA-late", "xgb_quantile__price_shuffled"),
+    ]
+
+    assert all(ff.uses_the_actual_price(issue=i, arm=a) for i, a in refit)
+    assert not any(ff.uses_the_actual_price(issue=i, arm=a) for i, a in kept)
+
+
+def test_linking_skips_the_named_files_and_leaves_existing_files_alone(tmp_path: Path) -> None:
+    source, target = tmp_path / "source", tmp_path / "target"
+    (source / "primary" / "DA-late").mkdir(parents=True)
+    for name in ("E_A-1__clim", "E_A-1__xgb_quantile__price_actual", "E_B-1__clim"):
+        (source / "primary" / "DA-late" / f"{name}.parquet").write_text(name)
+    (target / "primary" / "DA-late").mkdir(parents=True)
+    (target / "primary" / "DA-late" / "E_B-1__clim.parquet").write_text("real")
+
+    created = ff.link_fits(
+        source=source, target=target, skip=lambda path: path.name.startswith("E_A-1__xgb")
+    )
+
+    names = sorted(p.name for p in (target / "primary" / "DA-late").iterdir())
+    assert created == 1
+    assert names == ["E_A-1__clim.parquet", "E_B-1__clim.parquet"]
+    assert (target / "primary" / "DA-late" / "E_B-1__clim.parquet").read_text() == "real"
+    assert (target / "primary" / "DA-late" / "E_A-1__clim.parquet").is_symlink()
