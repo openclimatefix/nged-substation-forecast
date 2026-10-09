@@ -17,6 +17,7 @@ from studies.era5_ladder import (
     accumulation_to_hourly_rate,
     aerosol_hour_ending_mean,
     drop_one_group_features,
+    gain_shares,
     mars_fetch_recommendation,
     negative_control_columns,
     negative_control_features,
@@ -351,3 +352,26 @@ def test_the_mars_fetch_rule_compares_the_whole_interval_with_minus_the_smallest
     lower: float, upper: float, expected: str
 ):
     assert mars_fetch_recommendation(lower=lower, upper=upper, smallest_effect=0.1) == expected
+
+
+def test_gain_shares_sum_to_one_and_give_a_never_split_column_zero():
+    shares = gain_shares(total_gain={"a": 6.0, "b": 2.0}, features=["a", "b", "c"])
+
+    assert shares == {"a": 0.75, "b": 0.25, "c": 0.0}
+    assert sum(shares.values()) == pytest.approx(1.0)
+
+
+def test_gain_shares_are_the_same_whatever_the_scale_of_the_gain():
+    small = gain_shares(total_gain={"a": 3.0, "b": 1.0}, features=["a", "b"])
+    large = gain_shares(total_gain={"a": 3000.0, "b": 1000.0}, features=["a", "b"])
+
+    assert small == large
+
+
+def test_a_model_that_made_no_split_has_no_share_in_any_column():
+    assert gain_shares(total_gain={}, features=["a", "b"]) == {"a": 0.0, "b": 0.0}
+
+
+def test_gain_for_a_column_the_model_was_not_shown_raises():
+    with pytest.raises(ValueError, match="not shown"):
+        gain_shares(total_gain={"a": 1.0, "f3": 2.0}, features=["a", "b"])

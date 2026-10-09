@@ -16,7 +16,7 @@ snapshot at the label, and is averaged over the labels one hour earlier and at t
 `studies.hourly_means.hourly_from_snapshots`, so the value describes the same hour as the power.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Final, Literal
 
 import polars as pl
@@ -290,6 +290,34 @@ def mars_fetch_recommendation(
     if lower > -smallest_effect:
         return "against"
     return "unresolved"
+
+
+def gain_shares(*, total_gain: Mapping[str, float], features: Sequence[str]) -> dict[str, float]:
+    """Return each column's share of a model's total gain, with 0 for a column never split on.
+
+    XGBoost's `Booster.get_score(importance_type="total_gain")` leaves out a column that no tree
+    split on, and its values are unnormalised sums. Dividing by their total makes models of
+    different sizes comparable, and giving every shown column a key keeps a never-used column in
+    an average over folds as a 0 rather than leaving it out of the mean.
+
+    Args:
+        total_gain: The booster's total gain by feature name.
+        features: Every column the model was shown.
+
+    Returns:
+        A share for every name in `features`, summing to 1, or all 0 if the model made no split.
+
+    Raises:
+        ValueError: If `total_gain` names a column that `features` does not.
+    """
+    unknown = set(total_gain) - set(features)
+    if unknown:
+        msg = f"the booster reports gain for columns the model was not shown: {sorted(unknown)}"
+        raise ValueError(msg)
+    total = sum(total_gain.values())
+    if total <= 0.0:
+        return dict.fromkeys(features, 0.0)
+    return {name: total_gain.get(name, 0.0) / total for name in features}
 
 
 def negative_control_columns() -> tuple[str, ...]:
