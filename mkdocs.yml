@@ -100,6 +100,7 @@ nav:
       - "Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?": studies/battery-pv-separation.md
       - "How well can a primary substation's half-hourly flow reveal an unmetered battery?": studies/unmetered-battery-capacity.md
       - "How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan?": studies/embedded-battery-forecast.md
+      - "Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?": studies/indgen-inddem-and-gsp-take.md
       - Past weather:
           - Overview: studies/past-weather/index.md
           - Methods shared by the past-weather studies: studies/past-weather/methods.md

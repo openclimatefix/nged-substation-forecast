@@ -58,6 +58,14 @@ regions or climates, so a result may not hold elsewhere.
   tested beats a 56-day trailing climatology day ahead; the real day-ahead price lowers the error
   by 1.1% and other batteries' published plans by 1.3% one hour ahead. The registers show at most
   4.5% of NGED's connected storage rows could have a BMU. All numbers are provisional.
+- [Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?](indgen-inddem-and-gsp-take.md)
+  — Elexon's indicated demand and generation series sum the Physical Notifications of every
+  Balancing Mechanism Unit for the national total and 17 transmission boundaries. An issue reaches
+  15 to 42 hours ahead, the zones recover from the boundaries to within rounding, and the sum of the
+  Physical Notifications reproduces INDDEM to within 5 MW in 125 of 192 sampled half-hours once each
+  interconnector is netted. The series do not map cleanly onto the 14 Grid Supply Point groups: with
+  the shared cycles and the national anomaly removed, the highest correlation between a group's
+  settled take and a zone's INDDEM is 0.58, and 0.32 for an NGED group.
 
 ## Past weather
 

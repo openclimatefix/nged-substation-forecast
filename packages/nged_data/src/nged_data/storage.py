@@ -27,6 +27,7 @@ from contracts.uri import (
 )
 
 from nged_data.read_nged_json import (
+    NoReadingsInFile,
     _extract_power_time_series,
     _extract_time_series_metadata,
 )
@@ -154,10 +155,14 @@ def remove_small_files_from_listing(
     That 68-byte gap comes from V1's 32 series ([phased
     rollout](https://openclimatefix.github.io/nged-substation-forecast/background/requirements/#phased-rollout)),
     The gap is narrow, so V2's ~2,500 series want re-measuring before this default is trusted there.
-    Two changes would close the gap. A populated `information` field would push a zero-reading file
-    above 520 bytes; `TimeSeriesMetadata` records that field as always null in the V1 trial area. A
-    substation name shorter than any in V1 would pull a one-reading file below 520 bytes. Re-run the
-    measurement rather than assume the gap survives.
+    Two changes would close the gap. A long `information` note would push a zero-reading file above
+    520 bytes: the longest note on a WKT-less zero-reading file measured so far leaves a file of 488
+    bytes. A substation name shorter than any in V1 would pull a one-reading file below 520 bytes.
+    Re-run the measurement rather than assume the gap survives.
+
+    The files this filter removes still carry the series' metadata, including NGED's `Information`
+    note. `add_newest_file_of_each_series` puts the newest file of each series back, so that the
+    metadata of a series that has stopped reporting stays current.
     """
     n_files_before_filter = file_listing.height
     filtered = file_listing.filter(pl.col("filesize_bytes") > size_threshold_bytes)
@@ -169,11 +174,44 @@ def remove_small_files_from_listing(
     return pt.DataFrame(filtered).set_model(_ProcessedFileListing)
 
 
+def add_newest_file_of_each_series(
+    all_files: pt.DataFrame[_ProcessedFileListing],
+    new_files: pt.DataFrame[_ProcessedFileListing],
+) -> pt.DataFrame[_ProcessedFileListing]:
+    """Add the newest file of every series to the files being downloaded, whatever its size.
+
+    `download_and_parse_files` takes each series' metadata from the newest file it downloads. A
+    series that has stopped reporting publishes small files with no readings, which
+    `remove_small_files_from_listing` drops, and its older files with readings can still be
+    offered by `select_new_rows`. The metadata would then come from an old file, and NGED's current
+    `Information` note would never be read. Adding the newest file of each series puts that file
+    last in the download order, so its metadata wins. A series whose newest file is already in
+    `new_files` adds nothing, so a healthy series costs no extra download.
+
+    Args:
+        all_files: The whole file listing, before any filtering.
+        new_files: The files chosen for download as power data.
+
+    Returns:
+        `new_files` plus the newest file of each series, without duplicates, in ascending
+        `end_time` order.
+    """
+    newest_file_of_each_series = (
+        all_files.sort("end_time").group_by("time_series_id").last().select(all_files.columns)
+    )
+    combined = (
+        pl.concat([new_files, newest_file_of_each_series])
+        .unique(subset="path", keep="first")
+        .sort("end_time")
+    )
+    return pt.DataFrame(combined).set_model(_ProcessedFileListing).validate()
+
+
 class NoNewData(Exception):
     """Raised by `download_and_parse_files` when none of its listed files carried power data.
 
-    Raised when the file listing was empty, or when every listed file's ``data`` field was null.
-    A file whose ``data`` field is present contributes a DataFrame, even when every row in that
+    Raised when the file listing was empty, or when every listed file held no readings
+    (`NoReadingsInFile`). A file with readings contributes a DataFrame, even when every row in that
     file is dropped as implausible. A file that yields zero usable rows therefore does not raise.
     """
 
@@ -211,10 +249,10 @@ def download_and_parse_files(
         docstring for what each field holds.
 
     Raises:
-        NoNewData: if `paths_df` was empty, or if every listed file's `data` field was null. A null
-            `data` field means NGED's meter reported nothing for the period that file covers. The
-            guard counts the DataFrames collected, not the rows in them. A file whose `data` field
-            is present therefore still counts, even when every one of its rows is dropped as
+        NoNewData: if `paths_df` was empty, or if every listed file held no readings
+            (`NoReadingsInFile`), meaning NGED's meter reported nothing for the period that file
+            covers. The guard counts the DataFrames collected, not the rows in them. A file with
+            readings therefore still counts, even when every one of its rows is dropped as
             implausible, and does not raise. The `power_time_series_and_metadata` asset catches
             `NoNewData` and reports an empty ingest, so an empty listing degrades the run rather
             than failing it.
@@ -237,14 +275,11 @@ def download_and_parse_files(
             # Extract PowerTimeSeries from df:
             try:
                 extracted = _extract_power_time_series(df=df, time_series_id=time_series_id)
-            except pl.exceptions.InvalidOperationError as e:
-                if "invalid dtype: expected 'Struct', got 'Null' for 'data'" in str(e):
-                    log.warning(
-                        f"The 'data' field is 'null' in {path=}. This is expected behaviour if"
-                        " NGED's meter reported no values for the period covered by the JSON file."
-                    )
-                else:
-                    raise
+            except NoReadingsInFile:
+                log.warning(
+                    f"The 'data' field is null or empty in {path=}. This is expected behaviour if"
+                    " NGED's meter reported no values for the period covered by the JSON file."
+                )
             else:
                 power_time_series_dfs.append(extracted.dataframe)
                 n_implausible_power_rows_dropped += extracted.n_dropped

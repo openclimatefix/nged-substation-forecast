@@ -193,3 +193,13 @@ def test_extract_power_time_series_drops_a_reading_the_correction_pushes_out_of_
 
     assert extracted.dataframe.is_empty()
     assert extracted.n_dropped == 1
+
+
+@pytest.mark.parametrize("data_field", ['{"endTime": "2026-03-05T12:30:00Z"}', "[[1, 2]]"])
+def test_extract_power_time_series_does_not_treat_a_malformed_data_field_as_no_readings(
+    data_field: str,
+):
+    df = pl.read_json(f'{{"TimeSeriesID": 3, "data": {data_field}}}'.encode())
+
+    with pytest.raises(pl.exceptions.PolarsError):
+        _extract_power_time_series(df=df, time_series_id=3)
