@@ -129,7 +129,7 @@ def register_checks(*, frame: pl.DataFrame, storage: pl.DataFrame) -> list[str]:
 
 
 def licence_area_table(*, connected: pl.DataFrame) -> list[str]:
-    """Return the report lines for rung C1 on the ECR side, beside the earlier hand-matched counts."""
+    """Return the report lines for rung C1 on the ECR side, beside the earlier hand counts."""
     by_area = connected.group_by("licence_area_short").agg(
         total=pl.len(),
         storage_only=(~pl.col("hybrid")).sum(),
