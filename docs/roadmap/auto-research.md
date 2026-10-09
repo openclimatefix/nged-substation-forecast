@@ -1,53 +1,30 @@
 # Experiments run by an LLM agent ("auto-research")
 
-> **Status: 🚧 Planned.** The infrastructure — the leaderboard query, a leaderboard score over 3–10
-> day lead times, the research repository and hypothesis store, the scored checkout and leakage
-> test, the research-lead session and review step, and the trusted submit command — is planned for
-> v0.3, alongside the leaderboard. The experiments themselves run in v0.5, alongside the rest of the
-> [XGBoost improvements](xgboost-improvements.md). Gated on [issue #958 (Protect the leaderboard
-> scorer for autonomous
-> research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958), and should
-> follow [issue #960 (Design rolling-origin CV folds, assuming at least monthly
-> retraining)](https://github.com/openclimatefix/nged-substation-forecast/issues/960). The
-> infrastructure is tracked in [issue #1031 (Tracking: infrastructure for safe experiments run by an
-> LLM agent
-> (auto-research))](https://github.com/openclimatefix/nged-substation-forecast/issues/1031), and the
-> experiments in [issue #1038 (Run ideas through the LLM agent, and decide which ideas go to the
-> agent)](https://github.com/openclimatefix/nged-substation-forecast/issues/1038). Neither the
-> infrastructure nor the search is built yet.
+> **Status: 🚧 Planned.** The infrastructure — a separate Unix user for the agent, a screening
+> harness, a hypothesis store, and a research-lead skill — is planned for v0.3 and tracked in
+> [issue #1031 (Tracking: infrastructure for safe experiments run by an LLM agent
+> (auto-research))](https://github.com/openclimatefix/nged-substation-forecast/issues/1031). The
+> first research sessions are tracked in [issue #1131 (Start running the AI researcher on the
+> XGBoost forecasting
+> model)](https://github.com/openclimatefix/nged-substation-forecast/issues/1131), and can start
+> before the training-history extension in [issue #959 (Extend ECMWF ENS training
+> history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959) lands. Neither
+> the infrastructure nor the search is built yet.
 
-**We plan to have a large language model (LLM) agent run some or all of the [XGBoost
-improvements](xgboost-improvements.md) backlog as a search: implement each idea, score it, and
-combine the ideas that help.** Larger ideas from other roadmap pages, such as a new estimator of
-generator capacity, may also go to the agent. Each idea becomes an experiment: a variant of
-Flexpectation's forecasting pipeline, usually of the XGBoost forecasting model, scored the same way
-as every other variant. The leaderboard is the table that ranks those experiments. The champion is
-the experiment currently promoted to production. The agent works in the style of [Karpathy's
-autoresearch](https://github.com/karpathy/autoresearch), running experiments and reading the
-leaderboard with no human in the loop.
+**We plan to have a large language model (LLM) agent screen the [XGBoost
+improvements](xgboost-improvements.md) backlog: implement each idea, score it, and combine the ideas
+that help.** The agent's job is to narrow down the ideas worth implementing properly, not to write
+production code. Each idea the agent tries becomes an implementation on its own git branch, scored
+the same way as every other implementation. The maintainer then scores the best implementation of
+each of the most promising ideas on the leaderboard, the table that ranks every experiment, and
+re-implements the ideas that survive in reviewed pull requests. The agent works in the style of
+[Karpathy's autoresearch](https://github.com/karpathy/autoresearch), running experiments and reading
+its own results with no human in the loop.
 
-**Which of the XGBoost ideas go to the agent is not yet decided, but the maintainer leans towards
-screening every idea.** Most of the ideas are quick to implement and quick to run, so the agent can
-screen every idea in a reasonable time. The [open questions](#open-questions) below discuss what an
-exhaustive search changes. The options are:
-
-- every idea, screened and combined by the agent;
-- some of the ideas, with the rest tested by hand in the usual way;
-- a broad-but-shallow screen of every idea by the agent, after which a person chooses the ideas for
-  the deeper look.
-
-The design below works for all three options. Under the third option, a person makes the research
-lead's choice of which ideas to deepen. [Issue #1038 (Run ideas through the LLM agent, and decide
-which ideas go to the
-agent)](https://github.com/openclimatefix/nged-substation-forecast/issues/1038) tracks that decision
-and the experiments.
-
-**An agent session is judged on whether a finding moves the leaderboard, not on whether the finding
-is publishable.** A result reaching production has to beat the champion on the honest scorer planned
-in [issue #958 (Protect the leaderboard scorer for autonomous
-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958). The honest scorer
-runs from the reviewed `main` branch as the maintainer's Unix user. Issue #958 also plans for agent
-sessions to run as a separate Unix user barred from the validation data the scorer holds back.
+**Every idea on the XGBoost improvements page is a candidate, and the maintainer leans towards
+screening every idea.** Larger ideas from other roadmap pages, such as a new estimator of generator
+capacity, may also go to the agent. The [open questions](#open-questions) below discuss what an
+exhaustive search changes.
 
 ## Why energy forecasting suits automated research
 
@@ -55,15 +32,15 @@ sessions to run as a separate Unix user barred from the validation data the scor
 check on results that the system being judged does not control.** Two of the research agents
 reviewed [below](#agents-that-generate-rank-and-critique-ideas), the AI Scientist and Co-Scientist,
 judge whether a result is good by a simulated review or a tournament run by the system's own agents.
-A promoted forecasting model is instead checked against power measured at the substation after the
-forecast was made, both in a held-back historical window and in [live
+A forecasting idea found by the agent is instead checked against power measured at the substation,
+in a validation window the agent never saw, and, once promoted, in [live
 monitoring](live-service.md#production-monitoring).
 
-**Live monitoring is the check a session cannot game, even a session that has read the held-back
-validation data.** A session that has read the held-back validation data could game the
-historical-window check but not live monitoring. Issue #958 plans to stop a session reading the
-held-back validation data. The [proposed design](#protecting-the-evaluation-code) sets out the part
-of the plan in issue #958 that is still undecided.
+**Live monitoring is a check no forecast can game, because the power each forecast is scored against
+has not been measured when the forecast is made.** The historical validation window is a weaker
+check, because a person or an agent who has seen that window can steer towards ideas that suit that
+window. The [proposed design](#proposed-design) keeps the agent away from the validation window for
+that reason.
 
 **Data is comparatively plentiful and each experiment is cheap.** Once the training-history
 extension for the European Centre for Medium-Range Weather Forecasts (ECMWF) ensemble ([issue #959
@@ -76,32 +53,6 @@ is worth building here, even though a 2026 survey of the obstacles across scient
 embodied artificial intelligence (AI), and software engineering ([Duan et al.,
 2026](https://arxiv.org/abs/2609.11873)) finds genuine recursive self-improvement still blocked in
 most domains.
-
-## What the experiment platform provides, and the leaderboard query it lacks
-
-**The experiment platform was designed to support an agent from day one.** The pipeline runs on
-Dagster, experiments are registered programmatically rather than through the Dagster user interface
-(UI), MLflow records every run's metrics in a form a program can read, and a manual retirement job
-prunes experiments nobody needs any more.
-
-**The one piece the platform lacks for an agent to read results is a machine-readable leaderboard
-query.** That query is a thin, typed Python surface answering "fetch the aggregate leaderboard
-metrics for experiment X" and "rank every experiment by metric Y", so the agent reads results
-without scraping a UI. The visual leaderboard ([issue #4 (Create "visual leaderboard" script using
-Altair & display it in
-MLFlow)](https://github.com/openclimatefix/nged-substation-forecast/issues/4)) needs the same query
-underneath it. Writing the query as a reusable function, rather than burying the query in the chart
-script, leaves the agent's surface at a few lines of code once the agent is built. [Issue #1032 (Add
-a typed Python query for leaderboard metrics: fetch one experiment, rank all by a
-metric)](https://github.com/openclimatefix/nged-substation-forecast/issues/1032) tracks the query.
-
-**MLflow's own Model Context Protocol (MCP) server does not serve this need.** MCP is the standard
-interface through which an AI agent calls a tool. The server's tools are generated by capturing the
-stdout of a curated subset of MLflow command-line interface (CLI) commands, so a client receives
-rendered text tables rather than structured data. And the two run-reading tools the server exposes
-(`list_runs`, `describe_run`) accept neither a filter nor an `order_by`. Ranking N experiments
-therefore takes N+1 round trips of text to parse — precisely the operation a leaderboard exists to
-perform.
 
 ## Published evidence on research agents
 
@@ -126,12 +77,12 @@ Scientist's automated reviewer reaches an F1 score of 0.57 against a human NeurI
 That automated reviewer's scores correlate more closely with the average human reviewer's score than
 individual human reviewers' scores correlate with each other.
 
-**For deciding whether a finding is real, the proposed design relies on a scorer the search cannot
-edit, and on an evaluation the search does not steer on. Agents review each other's code to catch
-broken implementations and lookahead before the scorer runs.** Adversarial review can be a large
-part of the answer to "is this finding real". But an autonomous session here has a stronger check
-available than a simulated paper review: a scorer and a certifying evaluation outside the search's
-control.
+**For deciding whether a finding is real, the proposed design relies on a reviewed
+re-implementation, scored on a validation window the search never sees, rather than on agents
+reviewing each other.** Adversarial review can be a large part of the answer to "is this finding
+real". But the design here has a stronger check available than a simulated paper review: a person
+re-implements every finding, and the leaderboard scores the re-implementation on data outside the
+search's reach.
 
 **Co-Scientist's hypotheses kept improving as its tournament between agents ran more rounds.**
 [Gottweis et al. (2025)](https://arxiv.org/abs/2502.18864)'s Co-Scientist ranks candidate hypotheses
@@ -144,8 +95,8 @@ evidence that spending more compute on ranking and revision continues to improve
 proposed design answers the question differently.** In Co-Scientist, breadth comes from generating
 many hypotheses up front, depth comes from repeated tournament rounds against the current top of the
 ranking, and the balance between breadth and depth emerges from running more rounds. The [proposed
-design](#an-llm-research-lead-decides-what-to-try-next) below sets the balance with an LLM research
-lead that screens broadly and then goes deeper.
+design](#a-research-session) below sets the balance with an LLM research lead that screens broadly
+and then goes deeper.
 
 **A few rounds of debate between separate instances of a language model beat both a single instance
 and simple majority voting.** [Du et al. (2023)](https://arxiv.org/abs/2305.14325) show that three
@@ -155,8 +106,8 @@ grade-school-math accuracy from 77.0% to 85.0%.
 **Debate between agents bears on how agents here could critique each other's work.** Arithmetic and
 word-problem accuracy resemble the reasoning a session does when checking feature-engineering logic,
 so Du et al.'s result suggests that a second agent's critique can catch errors here, subject to the
-caution above about older LLMs. The proposed design adds that critique as a [review before
-training](#the-research-lead-the-submit-command-and-the-review).
+caution above about older LLMs. The proposed design adds that critique as an [optional
+review](#two-modes-of-work) before the screening harness scores an implementation.
 
 ### Google's ERA: a tree search over code variants
 
@@ -231,45 +182,119 @@ separation addresses that risk.
 
 ## Proposed design
 
-### From idea to score, step by step
+### The agent screens ideas; people decide what ships
 
-**One idea passes through ten steps on its way from the research lead's choice to a score on the
-leaderboard.** The sections below describe each step in detail, and [issue #1031 (Tracking:
-infrastructure for safe experiments run by an LLM agent
-(auto-research))](https://github.com/openclimatefix/nged-substation-forecast/issues/1031) tracks the
-work to build the infrastructure behind those steps.
+**A finding from the agent reaches production only as a reviewed re-implementation, scored on the
+leaderboard like any other experiment.** The person writing the pull request reads the winning
+implementation's diff, writes the idea up, and re-implements the idea through the usual review. No
+code the agent writes is merged into `main`. The re-implementation discards the agent's code, so a
+score that came from a bug or from an edited metric ends in a wasted re-implementation rather than a
+false result on the leaderboard. An idea that is leaky in itself, such as a feature built on data
+from after the forecast was made, would survive a faithful re-implementation, so the person
+re-implementing reads the diff for lookahead before porting the idea, and the pipeline's own guard
+nulls leaky power lags.
 
-1. The research lead, an LLM session that decides what to try next, chooses an idea and the existing
-   implementation to build on, and writes the idea down.
-2. The research lead launches a worker, a separate session of Claude Code, Anthropic's coding agent,
-   in the worker's own git worktree. The worker implements the idea on a branch of a private
-   research repository, and may train and score freely on the training window while doing so.
-3. The worker pushes the implementation to the research repository, and the research lead submits
-   the implementation's commit to the trusted submit command. The submit command is a small Python
-   command in this repository, and runs as the maintainer's Unix user.
-4. The submit command rejects the implementation if the diff touches any of the protected paths,
-   which hold the evaluation code.
-5. The submit command launches a fresh reviewer agent, which reads the written idea and the diff.
-   The submit command relays the reviewer's findings to the worker and counts the rounds, up to a
-   cap, and each revised commit goes back through step 4. An implementation the reviewer still
-   rejects is recorded as failed review and never trained.
-6. The submit command builds the scored checkout: the implementation's commit, with every protected
-   path restored from the commit of `main` the session started from, in a directory the worker
-   cannot write.
-7. The submit command trains the implementation on data truncated at the fold's training end, and
-   runs inference over the validation window. The implementation's code runs as the restricted
-   research user, never as the maintainer. How the research user's code gets power observed inside
-   the validation window is still open, as [Protecting the evaluation
-   code](#protecting-the-evaluation-code) explains.
-8. The submit command runs the leakage test. The test re-runs the implementation on data perturbed
-   after sampled cut-off times, and rejects the implementation if any forecast initialised at or
-   before a cut-off changes.
-9. The scorer, run from `main` as the maintainer, scores the forecasts and refuses a forecast that
-   leaves out any row of an eligible series. The submit command logs the score and the review
-   verdict to MLflow, with the idea the implementation implements and the implementation's commit
-   hash.
-10. The submit command records the score and the review verdict in the hypothesis store. The
-    research lead reads the result and returns to step 1.
+**The design guards against one risk above the others: selection bias on the leaderboard's
+validation window.** The only leaderboard fold, `mid_2025_to_mid_2026`, trains on data up to
+2025-06-30 and validates on 2025-07-01 to 2026-06-30. If the agent chose its shortlist by scoring
+ideas on that validation window, the window would have helped choose the shortlist, and the
+re-implementations' leaderboard scores would come out too high even if the agent behaved honestly.
+The agent therefore never reads power observed after 2025-06-30. The design does not try to stop a
+determined agent from cheating, because the re-implementation discards the agent's code and the
+person re-implementing reads the diff before porting the idea.
+
+**Five roles and objects recur below.** The *research lead* is an LLM session that decides what to
+try next. A *worker* is a separate LLM session that implements one idea once, on its own git branch.
+The *screening harness* is the one command every worker uses to score an implementation. The
+*hypothesis store* is the written record of every idea, every implementation, and every score. The
+*finalists* are the few top-ranked ideas the maintainer chooses, after a session, to score on the
+leaderboard fold.
+
+### Who runs what
+
+**Everything the agent does runs as a separate Unix user, `researcher`. Everything that touches the
+full power data or the leaderboard runs as the maintainer's own user.**
+
+| Unix user | What runs as that user |
+|---|---|
+| The maintainer's user | The one-off setup, Dagster, the leaderboard, the maintainer's MLflow store, the scoring of finalists, and the re-implementation of the winning ideas |
+| `researcher` | Claude Code (the research lead and its workers), the screening harness, and every line of code the agent writes |
+
+**Unix file permissions enforce the cutoff, because a convention would not hold.** Any script that
+opens the cleaned power table directly would read past a cutoff that existed only in a helper
+function or in the agent's instructions, and the agent might not notice the leak. [Issue #1093 (Set
+up the research Unix user and the truncated power copy for
+auto-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1093) tracks the
+setup. The one-off setup is:
+
+1. Create the `researcher` user, with its own Claude login and no AWS credentials, so `researcher`
+   cannot read NGED's raw files on S3.
+2. Give `researcher` its own clone of this repository, which can pull from GitHub but holds no token
+   to push.
+3. Write a copy of the cleaned power table truncated at 2025-07-01, and a copy of the
+   `TimeSeriesMetadata` table, into a data folder `researcher` owns. The copy needs rewriting when
+   the leaderboard fold changes, when a cleaning rule changes, or when a series joins the
+   `TimeSeriesMetadata` table.
+4. Give `researcher` read-only access to the weather data, which holds no power observations.
+5. Deny `researcher` read access to the maintainer's MLflow store, and to everything else in the
+   maintainer's data folder: the full power tables, the maintainer's forecasts and leaderboard
+   metrics, the `effective_capacity` table (a P99 of power over the full history), and the study
+   outputs that hold derived power.
+
+**The maintainer's MLflow store is off limits because it holds every experiment's score on the
+validation window.** Reading those scores would let the research lead steer towards ideas that did
+well there. The research lead learns from the hypothesis store instead, and `researcher` has an
+MLflow store of its own for the screening runs.
+
+### A research session
+
+**A session is a Claude Code session run as `researcher`, following the research-lead skill.**
+[Issue #1036 (Write the research-lead skill for
+auto-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1036) tracks the
+skill. A session works in rounds:
+
+1. The research lead merges the latest `main` into the hypothesis store's branch, then reads the
+   store's index.
+2. The research lead chooses the ideas for the round, starting from the order on the XGBoost
+   improvements page.
+3. For each implementation, the research lead starts a fresh worker on a new git branch, and gives
+   the worker only the written idea, not the earlier branches.
+4. The worker writes the code, commits the code, and scores the commit with the screening harness.
+5. The research lead reads the new scores, writes up what the round showed, and chooses the next
+   round: which ideas to deepen, which to combine, which to implement again, and which to abandon.
+
+**ERA's upper-confidence-bound rule is one tool the research lead can use to choose which
+implementation to extend, and a baseline against which to measure the research lead's choices.** The
+rounds above are the maintainer's current best guess at how to sequence the search.
+
+### The screening harness
+
+**Every implementation is scored by one shared command, the screening harness, so that every idea is
+scored the same way.** [Si et al.](#coding-agents-change-experiments-without-saying-so) found that
+an agent left to run its own experiments quietly changed baselines and defined metric functions
+wrongly, which makes the scores of different ideas incomparable. [Issue #1130 (Build the screening
+harness for auto-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1130)
+tracks the harness.
+
+**The harness reuses the existing cross-validation pipeline, on screening folds that end before
+2025-07-01.** A screening fold is marked `leaderboard: false` in `conf/cv/default.yaml`, like the
+`smoke_test` fold. Reusing the pipeline means screening scores ideas with the same code as the
+leaderboard, and nulls leaky power lags with the same code. The harness refuses to score code that
+is not committed, and refuses a branch whose diff against `main` touches `conf/cv/` or the metrics
+code, so a worker cannot change the folds or the metric by accident. The harness records the score
+and the commit hash in the hypothesis store, so every score points at the exact code that produced
+it. The harness builds `researcher`'s own `eligible_time_series` and `effective_capacity` tables
+from the truncated copy, so screening scores are comparable with each other but not with leaderboard
+scores.
+
+**Until the ECMWF ENS history is extended, the screening folds can validate only on October 2024 to
+June 2025.** The ENS archive starts on 2024-04-01, the pipeline's folds train before they validate,
+and a series needs 6 months of history before the series is scored. Two short folds therefore fit
+before the cutoff: one validating on October to December 2024, and one on January to June 2025.
+Screening can under-rate an idea whose benefit falls mostly in summer, and small effects will not
+stand out from noise. An idea with a large effect should still stand out, and the Tier 1 ideas are
+quick to try, so the first sessions can run before issue #959 lands. Once issue #959 adds about 3
+more years, screening folds can cover every season.
 
 ### Two modes of work
 
@@ -281,9 +306,7 @@ one session. A large idea is a research project lasting days: a new estimator of
 capacity of metered generators, a detector of switching events, a full differentiable-physics
 forecaster, or a method for disaggregating unmetered generation. A large idea usually adds a new
 upstream data product or a new forecaster, so a search over many quick variants does not suit the
-large idea. Tier 3 and Tier 4 entries go to whichever mode fits each entry. In the long-session
-mode, the worker trains and scores freely on the training window during development. The review, the
-leakage test, and the honest scorer apply to the implementation the session submits.
+large idea. Tier 3 and Tier 4 entries go to whichever mode fits each entry.
 
 **A large idea is built in small steps, each validated before the next, and the review of a large
 idea's plan asks for the smallest test of the idea first.** Building a complex pipeline in one
@@ -295,333 +318,135 @@ that would take two months to test: "What's the two day version of testing the s
 worker then builds the idea step by step, validates each step, and runs the smallest test that shows
 whether the idea is worth continuing before building the rest.
 
-**Both modes build nodes, and share the protections, the review, and the record described below.** A
-node is one implementation of an idea: a commit in the research repository, built on its parent
-node's commit.
+**An optional reviewer can read each diff before the harness scores it.** The reviewer is a fresh
+agent, given the written idea and the diff but not the worker's reasoning, so the worker's rationale
+cannot anchor the review. The reviewer checks that the diff implements the idea, that no feature
+uses data from after the forecast was made, and that the code has no plain bug. The review saves
+wasted screening runs. The review is not what makes a finding trustworthy: the re-implementation is.
 
-### Workers change the pipeline; the output is fixed
+### Several implementations of one idea
 
-**A worker may change any part of the pipeline except a short list of protected paths, and every
-worker must end with the same output.** That output is a parquet file of `PowerForecast` rows for
-the fold. The planned submit command will score the file the worker hands over by running
-`scripts/forecasting/score_study.py` from the `main` checkout as the maintainer's Unix user. An
-extension point narrower than the whole pipeline could not express the large ideas above. Each
-implementation must also run end to end from the raw power, weather, and time-series metadata
-tables, so that the leakage test below can re-run the implementation on perturbed copies of those
-tables.
+**Ideas are ranked on the mean score across their implementations, and an idea is implemented a
+second and third time only when its score is close to a competitor's or the idea ranks near the top
+of the index.** Ranking on the mean is the policy [Ning et
+al.](#one-implementation-is-weak-evidence-about-an-idea) propose for crediting an idea rather than
+one implementation of the idea. Ning et al. did not test that policy inside a search like this one.
 
-### An LLM research lead decides what to try next
+**Each implementation of an idea comes from a fresh worker given the same written idea and not the
+earlier branches**, so a later implementation is not a copy of an earlier one. Each implementation
+is its own branch, for example `idea/holiday-flags/impl-1` and `idea/holiday-flags/impl-2`. A
+combination of ideas is also a branch, built on top of the branches it combines.
 
-**An LLM research lead prioritises the ideas, screens them broadly and shallowly, and then goes
-deeper on the promising ones, in repeated rounds.** The research lead works in four steps, and steps
-2 and 3 repeat as rounds:
+### Recording what was learned
 
-1. Prioritise the ideas, starting from the order in which [XGBoost
-   improvements](xgboost-improvements.md) lists the ideas.
-2. Implement each chosen idea once, and score the implementation.
-3. Read the scores and the hypothesis store, then choose which ideas or combinations to explore
-   further, and which ideas get a second or third implementation.
-4. Repeat from step 2 on the chosen subset.
+**Every implementation is a git branch in `researcher`'s clone, and no branch is ever deleted.**
+After each session, the maintainer fetches the branches into the maintainer's own clone with one
+`git fetch`, so the code survives even if `researcher`'s clone is lost.
 
-The four steps are the maintainer's current best guess at how to sequence the search. ERA's
-upper-confidence-bound rule is one tool the research lead can use to choose which node to extend.
-The same rule is also a baseline against which to measure the research lead's choices.
+**A hypothesis store records what each idea taught the project, in a form a person and the research
+lead can both read.** [Issue #1034 (Set up the auto-research hypothesis
+store)](https://github.com/openclimatefix/nged-substation-forecast/issues/1034) tracks the store.
+The store holds one Markdown file per idea under `studies/auto_research/`, with the same fields in
+every file:
 
-### The research lead, the submit command, and the review
+- the hypothesis;
+- each implementation, with its branch and commit hash;
+- each implementation's screening score;
+- the idea's status: worth deepening, combined, or abandoned;
+- the reason for abandoning the idea, where the idea was abandoned;
+- lessons learned, such as "needs feature X first" or "slow to train".
 
-**The design splits into an agent loop, which reuses Claude Code, and a small trusted submit
-command, which no agent can touch.** The agent loop is the research lead choosing ideas, launching
-workers, and reading results. The agent loop is a standard harness, so the design does not build an
-agent loop. The research lead is itself a Claude Code session, run interactively or through the
-[Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk), which packages Claude Code as a
-Python library. For each node the research lead chooses, the research lead launches a worker in the
-worker's own git worktree to implement one idea on top of the parent node's code. [Issue #1036 (Set
-up the auto-research research lead session and review
-step)](https://github.com/openclimatefix/nged-substation-forecast/issues/1036) tracks the
-research-lead session.
+**An index file holds one row per idea, with the idea's status, its mean screening score, and the
+spread across implementations.** The research lead reads the index at the start of every round
+instead of opening every idea file. The harness writes the scores, and the research lead writes only
+the prose fields, so no score is copied by hand.
 
-**The trusted submit command runs as the maintainer's Unix user in a process no agent can reach, and
-is the only process that trains and runs inference for a scored node.** The research lead submits a
-node by calling one narrow command, such as `submit_node <commit>`, through a `sudo` rule, the same
-pattern [issue #958 (Protect the leaderboard scorer for autonomous
-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958) uses for
-`scripts/forecasting/score_study.py`. The submit command is plain Python in this repository, tested
-with the rest of the code. The submit command does every step the agents must not control: launching
-the review, building the scored checkout, training the node and running inference, running the
-leakage test, handing the predictions to the scorer, logging to MLflow, preserving each scored
-commit, and opening the hypothesis-store pull request. [Issue #1037 (Build the trusted submit
-command for auto-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1037)
-tracks the submit command.
-
-**No agent trains or predicts for a scored run, and the worker's code never runs as the maintainer's
-user.** The submit command executes the worker's code as a subprocess running as the restricted
-research user, because the worker's code is untrusted. A worker may still train and score freely on
-the training window while developing an idea, but those runs never reach the leaderboard. Workers
-never report their own scores. Every node is logged as an MLflow run under a `study/`-prefixed
-experiment name, so the search is visible on the leaderboard but outside every promotion path. The
-`score_study.py` script uses the same prefix for every autonomous study. Only the maintainer's user
-can write to the MLflow tracking store. The research user reads the store through the leaderboard
-query.
-
-**The trusted checks do not live in a Claude Code mod.** A mod is a JavaScript or TypeScript plugin
-that runs inside a Claude Code session's process, with the session's permissions. A mod holding the
-trusted checks would sit inside the trust boundary the checks exist to guard, because the research
-lead's session could edit the mod's source or tamper with the mod's state. A mod could still draw a
-live pane of the search tree, with each node's score and review verdict, for a person watching an
-interactive research-lead session. That pane is optional and can wait until the search runs.
-
-**A fresh reviewer agent reads every implementation before the implementation trains a forecasting
-model.** The submit command, not the research lead, launches the reviewer, so no agent can skip the
-review. The reviewer is given the written idea and the worker's diff, but not the worker's
-reasoning, so the worker's rationale cannot anchor the review. The reviewer checks four properties:
-that the diff implements the idea the worker was given, against the [silent changes Si et al.
-found](#coding-agents-change-experiments-without-saying-so); that no feature uses data from after
-the forecast was made; that the pipeline does not refit on power observed inside the validation
-window; and that the code has no plain bug. The reviewer's findings go back to the worker for a
-capped number of rounds. An implementation the reviewer still rejects after the last round is
-recorded in the hypothesis store as failed review, and is not trained. Issue #1036 also tracks the
-review step.
-
-**A review does not guarantee a correct implementation, but makes it less likely that a good idea is
-discarded because one implementation was broken.** A broken implementation is one source of the
-variance between implementations that [Ning et
-al.](#one-implementation-is-weak-evidence-about-an-idea) measured. The diff itself can try to
-persuade the reviewer, through code comments or docstrings, so the score depends on the leakage test
-and the row-set refusal, not on the review.
-
-### Protecting the evaluation code
-
-**The submit command builds the scored run's checkout itself, so a worker's edits to its own copy of
-a protected file change nothing in the scored run.** The submit command checks out the node's
-commit, restores every protected path from the commit of `main` the session started from, removing
-any file the node added under a protected path, and places the checkout in a directory the worker's
-Unix user cannot write. The setup step records that commit's hash in a file only the maintainer's
-user can write, and checks that the commit is on this repository's `main`. The restore and the
-protected-path check both use the recorded hash, never a branch in the research repository, which
-every agent can push to. [Issue #1035 (Build the scored checkout and leakage test for
-auto-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1035) tracks the
-scored checkout and the leakage test. The protected paths are:
-
-- `conf/cv/`, which defines the cross-validation folds;
-- `power_schemas.py` and `config_schemas.py` under `packages/contracts/src/contracts/`, which define
-  the schemas of the raw power data, the time-series metadata, the forecast output, and the
-  cross-validation folds;
-- `metrics.py` under `packages/ml_core/src/ml_core/`, which computes the scores;
-- `cv_helpers.py` under the same directory, which turns fold dates into training and validation
-  windows and computes which series are eligible;
-- `features/_lags.py` under the same directory, which builds the lag features and holds the function
-  that nulls any power lag the forecast could not have known at its initialisation time.
-
-The rest of `packages/contracts/` stays open, so that a worker can add a field to `AllFeatures` for
-a new feature, or a schema for a new data product, in the way the codebase expects. The scorer
-validates the forecast against the copy of every schema on `main`. The submit command also rejects,
-and logs, any diff that touches a protected path, measured against the recorded commit, so that an
-implementation is never scored on evaluation code its author did not expect.
-
-**The restored files guarantee only that the protected code is present, not that the worker's code
-calls the protected code.** A worker may stop calling `cv_helpers.py` and write its own eligibility
-filter, write a new lag module that nulls nothing, or point the workspace in `pyproject.toml` at a
-modified copy of `ml_core`. The worker's code also runs in the same Python process as the protected
-code, so the worker's code could replace the lag-nullification function in memory. Two checks cover
-behaviour instead. The `metrics` asset's row-key refusal stops a worker dropping hard rows or hard
-series from the forecast. The asset refuses a study whose row keys differ from the reference
-experiment's (see [What the `metrics` asset refuses to
-score](../ml_experimentation/cross-validation-folds.md#what-the-metrics-asset-refuses-to-score)).
-The leakage test stops lookahead.
-
-**The submit command, not the worker's code, truncates the training data at the fold's `train_end`,
-and the leakage test re-runs the pipeline on perturbed data.** The leakage test samples cut-off
-times at random after `train_end`, and never discloses the cut-offs to any agent. For each cut-off,
-the test perturbs every power observation, every weather-forecast run published, and every
-time-stamped metadata row after the cut-off. The test re-runs the worker's whole pipeline from the
-perturbed raw tables, including any upstream data product the worker added, and rejects the node if
-any forecast initialised at or before the cut-off changes by more than a declared tolerance. The
-tolerance allows for training that is not bit-for-bit deterministic. The test also checks that the
-pipeline's unperturbed output equals the rows handed to the scorer, so the tested code and the
-scored code are the same code. Each node therefore takes one scored run plus one run per sampled
-cut-off, so the number of cut-offs trades the test's power against the time each node takes.
-
-**Every run in the leakage test, and the scored run, starts from a clean sandbox, so the runs share
-no state.** Without a clean sandbox, the unperturbed run could cache its forecasts on disk and the
-perturbed runs could read the cache back, so the forecasts would not change even though the code
-looks ahead. The submit command runs each run in a fresh sandbox with no writable directory shared
-between runs, and stops every research-user process before the next run starts. The submit command
-copies the predictions into a directory only the maintainer's user can write before the equality
-check, so no process left running can rewrite the predictions before the scorer reads them.
-
-**The leakage test does not stop a pipeline refitting on power observed inside the validation window
-before each initialisation time.** Refitting before each forecast uses no data from the future, so
-the leakage test passes. But a forecasting model that retrains before every forecast is not scored
-the same way as a champion trained once at `train_end`. The reviewer checks for refitting, and a
-retraining cadence is an idea to declare and score openly, not to slip into an implementation.
-
-**A worker's prediction code needs power observed inside the validation window, and issue #958 plans
-to bar the research sessions' Unix user from reading that window.** Forecasting a validation row
-needs power observed before that row's initialisation time, and those observations lie inside the
-validation window. Two options remain open. A harness running as the maintainer's user could stage,
-for each initialisation time, only the power observed before that time, and run the worker's code as
-the research user against the staged copy. Or the design could accept that a session sees in-window
-power, and rely on a separate certifying window and on live monitoring to catch any gaming. The
-choice between the two options belongs in issue #958.
-
-**A guard inside the worker's Claude Code session adds no protection beyond the submit command's
-checks.** A worker can bypass a deny rule in `.claude/settings.json` with a shell command, and can
-edit the `.claude/settings.json` in its own worktree to remove a deny rule or a `PreToolUse` hook. A
-Claude Code mod handling tool-call events would add JavaScript or TypeScript code that runs with the
-user's permissions. A deny rule is still worth having to save a worker from wasting a run on an edit
-the submit command would reject.
+**The store lives on a long-running branch in `researcher`'s clone, because `researcher` holds no
+token to push to GitHub, and the maintainer merges the store into `main` by pull request after each
+session.** The harness writes scores to a dedicated worktree of the store's branch, so the workers'
+branches carry only code. The next session then starts from everything earlier sessions learned, and
+the pull request gives the maintainer a readable summary of the session. The store carries aggregate
+scores only, because a per-series score could identify a metered generator.
 
 ### Ranking and steering
 
-**Ideas are ranked on the mean score across their implementations, and an idea is implemented a
-second and third time only when its score is close to a competitor's or the idea is a finalist.**
-Ranking on the mean is the policy [Ning et al.](#one-implementation-is-weak-evidence-about-an-idea)
-propose for crediting an idea rather than one implementation of the idea. Ning et al. did not test
-that policy inside a search like this one.
-
-**The search steers on the leaderboard's headline score, normalised mean absolute error (NMAE) ([How
-each win is evaluated](xgboost-improvements.md#how-each-win-is-evaluated)), over forecast lead times
-of 3 to 10 days.** The scorer does not yet report that band. [Issue #1033 (Report NMAE over 3–10 day
-lead times as a leaderboard horizon
-slice)](https://github.com/openclimatefix/nged-substation-forecast/issues/1033) adds the band. Using
-the leaderboard's own score means the search and the leaderboard cannot disagree about which
-experiment is best.
+**The search steers on the headline score that the [XGBoost
+improvements](xgboost-improvements.md#how-each-win-is-evaluated) page names, normalised mean
+absolute error (NMAE) over forecast lead times of 3 to 10 days.** The scorer does not yet report
+that band. [Issue #1033 (Report NMAE over 3–10 day lead times as a leaderboard horizon
+slice)](https://github.com/openclimatefix/nged-substation-forecast/issues/1033) adds the band.
+Steering on the same metric as the leaderboard keeps the two rankings comparable, but the two
+rankings can still disagree, because the two rankings are measured on different windows.
 
 **Whether tail skill should steer the search instead of NMAE is open.** Tail skill would be scored
 by [threshold-weighted continuous ranked probability
 score](metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
 (CRPS).
 
-**The recommendation in [issue #960 (Design rolling-origin CV folds, assuming at least monthly
-retraining)](https://github.com/openclimatefix/nged-substation-forecast/issues/960) already
-separates steering from certifying.** Steering on the headline score is the goal-oriented
-optimisation He et al. criticise, so the protection this design relies on is the separate certifying
-evaluation, not the steering signal. The recommendation in issue #960 is a "discovery lane" that
-ranks ideas cheaply by cross-validation over whole-month blocks, and a rolling-origin evaluation
-that confirms the winners. Issue #960 says the discovery lane and the rolling-origin evaluation can
-both be designed and built against the current single fold, `mid_2025_to_mid_2026`, without waiting
-for more history. Until the design in issue #960 lands, the search would steer on the same fold on
-which promotion is decided. The only protection against selection bias would then be the planned
-[Ladder guard](metrics-and-leaderboard.md#fold-hygiene-selection-bias-and-a-final-test-window),
-which publishes a new best only when the new best beats the standing best by a declared margin. The
-scale of search this page proposes is a reason to build the design in issue #960 before the search
-runs.
+**The design separates steering from certifying, as [He et
+al.](#the-score-that-guides-a-search-should-not-also-confirm-the-result) recommend.** The screening
+folds steer the search. The leaderboard's validation window, which the search never sees, certifies
+the finalists. The recommendation in [issue #960 (Design rolling-origin CV folds, assuming at least
+monthly retraining)](https://github.com/openclimatefix/nged-substation-forecast/issues/960) makes
+the same split for the leaderboard as a whole.
 
-### Recording what was learned
+### After a session
 
-**Every implementation is kept as a branch in a separate research repository, which starts as a
-private mirror of this repository.** Before each session, the submit command's setup step copies the
-latest `main` into the research repository, so every session starts from the current reviewed code
-and the champion's configuration. Each node is a branch created from its parent node's commit, so a
-child node inherits every change its parent made. A worker pushes node branches to the research
-repository only. The submit command also pushes each scored commit to a branch under `scored/`,
-which a branch ruleset stops any agent's token from force-pushing or deleting, so the code behind
-every score survives. The node's MLflow run records the commit hash, so every score links to the
-exact code behind the score. Old branches stay pinned to the commit they started from and are never
-updated after a refactor, which is the rule `studies/` already follows. [Issue #1034 (Set up the
-auto-research repository and hypothesis
-store)](https://github.com/openclimatefix/nged-substation-forecast/issues/1034) tracks the research
-repository and the hypothesis store.
+**The maintainer turns a session's results into shipped improvements in four steps:**
 
-**A separate repository keeps the workers' credentials away from this repository without per-branch
-rules on this repository.** Workers, reviewers, and the research lead hold a token for the research
-repository only. The submit command runs as the maintainer's user and is the only automated process
-holding a token for this repository. A separate repository also keeps hundreds of node branches out
-of the branch list people work from.
+1. Fetch the session's branches, and merge the hypothesis store into `main` by pull request.
+2. Choose the finalists from the index.
+3. For each finalist, read the diff of the idea's best-screening implementation, then run that
+   branch through the cross-validation pipeline on the leaderboard fold as the maintainer's own
+   user, and retire the experiment once the decision is made. A finalist that won the screening but
+   loses on the validation window is probably not worth re-implementing. The agent never sees these
+   scores.
+4. Re-implement each idea that survives in a reviewed pull request, scored on the leaderboard as
+   usual.
 
-**A structured hypothesis store records what each idea taught the project, in a form a person can
-read.** The store holds one Markdown file per idea under `studies/auto_research/` on `main`, with
-the same fields in every file:
+**Running a finalist's branch gives the agent's code the full power data, which is the same trust
+the maintainer gives any pull request run before review.** Reading the diff first is the check on
+that step.
 
-- the hypothesis;
-- each implementation, with its commit in the research repository and its MLflow run;
-- each implementation's score, and the spread between implementations;
-- the reviewer's verdict on each implementation;
-- the idea's status: worth deepening, or abandoned;
-- the reason for abandoning the idea, where the idea was abandoned.
+**Comparing the screening ranking with the leaderboard ranking of the finalists tests the screening
+itself.** If the two rankings disagree often, the screening harness or its folds need changing.
 
-Within a session, the submit command writes each implementation's commit, MLflow run, score, and
-review verdict into the store, and the research lead writes the hypothesis, the status, and the
-reason for abandoning an idea. The submit command and the research lead both write to the session's
-branch in the research repository. At the end of the session, the submit command regenerates every
-implementation entry, score, and review verdict from MLflow, and opens one pull request carrying the
-updated store into this repository. The maintainer merges the pull request. A new session starts
-only after the previous session's pull request has merged, so every session reads every earlier
-finding. No worker, reviewer, or research-lead agent holds write access to `main`.
+### Risks that remain
 
-**The store carries aggregate scores only, because a per-series score could identify a metered
-generator.** A person curates the findings worth publishing into `docs/`, the way studies are
-written up today.
-
-**A winning idea reaches production as a reviewed re-implementation, never as merged agent code.**
-The person writing the pull request adds the research repository as a git remote, reads the winning
-node's diff against the commit the session started from, writes the idea up as a specification, and
-re-implements the idea in a reviewed pull request, as [issue #958 (Protect the leaderboard scorer
-for autonomous research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958)
-requires of every autonomous study.
-
-### What stops the research lead cheating
-
-**The research lead never computes, reports, or writes a score, and never touches the evaluation
-code or `main`, so every route to a better-looking result runs into a check the research lead does
-not control.** The research lead runs as the same restricted research user as the workers, and holds
-a token for the research repository only. Each route meets at least one check:
-
-- **Reporting a score the implementation did not earn.** No agent computes or reports a score: the
-  submit command trains the implementation, the scorer computes the score, and MLflow records the
-  score. Only the maintainer's user can write to MLflow. When the submit command opens the session's
-  hypothesis-store pull request, the submit command regenerates every implementation entry, score,
-  and review verdict from MLflow, so an edit to those entries on the session's branch never reaches
-  `main`.
-- **Skipping or steering the review.** The submit command, not the research lead, launches the
-  reviewer, and the reviewer's instructions live in this repository. The research lead supplies only
-  the written idea. A worker's diff can still try to persuade the reviewer, which is why no score
-  depends on the review alone.
-- **Editing the evaluation code, the submit command, or the scorer.** The submit command and the
-  scorer run from this repository as the maintainer's user. The scored checkout restores every
-  protected path, and the submit command rejects a diff that touches a protected path.
-- **Training on the validation window, or looking ahead in time.** The submit command truncates the
-  training data at the fold's training end. The leakage test, run in clean sandboxes at undisclosed
-  cut-offs, rejects an implementation whose forecasts change when data from after the forecast's
-  initialisation time is perturbed. The reviewer checks for refitting inside the validation window,
-  which the leakage test cannot see.
-- **Dropping hard rows or hard series.** The scorer's row-set refusal rejects a forecast whose row
-  keys `(time_series_id, power_fcst_init_time, valid_time, ensemble_member)` differ from the
-  reference experiment's for the fold.
-- **Hiding failed attempts.** The submit command records every submission, including rejected
-  submissions, in MLflow and in the hypothesis store, so the record of every submission does not
-  depend on the research lead. Which implementations are submitted at all does depend on the
-  research lead.
-- **Promoting a winner straight into production.** No agent can write to `main`, and a winning idea
-  reaches production only as a reviewed re-implementation.
-
-**Three risks remain, and none of the three is cheating in the sense the checks above catch.** A
-search that tries hundreds of ideas on one fold will overfit that fold however honestly the search
-runs. The defence is the separate certifying evaluation in [Ranking and
-steering](#ranking-and-steering). A research session sees power observed inside the validation
-window, so the research lead could steer workers towards ideas that suit what the research lead has
-seen. The certifying window and live monitoring are meant to catch that steering. And the LLM may
-know what happened during the evaluation period from its own training data, an open question raised
-[below](#open-questions).
+- **Scoring finalists on the validation window adds selection bias, a little at a time.** Each
+  finalist scored there is one more look at the window. Keep the number of finalists per session
+  small. The planned [Ladder
+  guard](metrics-and-leaderboard.md#fold-hygiene-selection-bias-and-a-final-test-window), which
+  publishes a new best only when the new best beats the standing best by a declared margin, limits
+  the effect on the leaderboard.
+- **A missed file permission leaks power from the validation window.** The likeliest gap is a data
+  folder created later, such as a study output that holds aggregated power. Checking that
+  `researcher` cannot read each new data folder is part of creating the folder.
+- **No file permission hides what the public repository says.** Docs pages, study write-ups, and
+  pull-request bodies can quote scores on the validation window, so the research-lead skill tells
+  the agent not to read them.
+- **A broken or leaky implementation can win the screening.** The damage is a wasted finalist score
+  or a wasted re-implementation, not a false result on the leaderboard.
+- **The LLM may already know what happened during the validation window**, an open question below.
 
 ## Open questions
 
 **None of the papers this page reviews tests how well an LLM research lead chooses what to try
-next.** ERA's upper-confidence-bound rule selects which node to extend, and Co-Scientist's
-tournament ranks hypotheses that already exist. He et al. propose an intermediate signal of progress
-that guides the choice of the next experiment, but test the proposal only in a simulated physics
-environment. Internal discussion has raised the idea that this choice is the crucial component of an
-autonomous research loop. The idea comes from self-driving-lab practice in materials science, not
-from a paper this project has reviewed directly, and is worth checking against the self-driving-lab
-literature before the design relies on the idea.
+next.** ERA's upper-confidence-bound rule selects which node of its tree to extend, and
+Co-Scientist's tournament ranks hypotheses that already exist. He et al. propose an intermediate
+signal of progress that guides the choice of the next experiment, but test the proposal only in a
+simulated physics environment. Internal discussion has raised the idea that the choice of what to
+try next is the crucial component of an autonomous research loop. The idea comes from
+self-driving-lab practice in materials science, not from a paper this project has reviewed directly,
+and is worth checking against the self-driving-lab literature before the design relies on the idea.
 
 **An exhaustive search over the small ideas would make the research lead's choice matter less.**
 Most entries on the [XGBoost improvements](xgboost-improvements.md) page are quick to implement and
 quick to run, so the maintainer leans towards screening every entry rather than letting the research
 lead choose which entries to try. The research lead's choices would then matter for the order of
 work, for which combinations to try, for which ideas get a second or third implementation, and for
-the large ideas. A worker writing the implementation of one node while the previous node trains
-would shorten the search. That overlap is future work.
+the large ideas. A worker writing one implementation while the previous implementation trains would
+shorten the search. That overlap is future work.
 
 **The LLM may already know what happened during the evaluation period.** An LLM trained on text
 written after the start of a validation window may know about events inside the window, such as a
