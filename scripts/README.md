@@ -99,12 +99,13 @@ alone. `score_study.py` is run whenever a study hands over a predictions file to
 
 - `score_study.py` — stores a study's predictions file in `power_forecasts` under the experiment
   name `study/<study name>` and scores it with the `metrics` asset in leaderboard scope. The script
-  refuses a file whose `(time_series_id, power_fcst_init_time, valid_time)` keys differ from those
-  of the reference experiment named in `conf/cv/default.yaml`, or whose rows carry more than one
-  model name. The script re-executes itself with a cleared environment, so a shell variable cannot
-  repoint the observed power or lift the final-test date guard. Run the script with the `main`
-  checkout's own interpreter, directly rather than through `uv run`, as the maintainer's user. The
-  script's module docstring explains why.
+  refuses a file whose `(time_series_id, power_fcst_init_time, valid_time, ensemble_member)` keys
+  differ from those of the reference experiment named in `conf/cv/default.yaml`, or whose rows carry
+  more than one model name. The script re-executes itself with a cleared environment, so, when run
+  through the maintainer's `sudo` rule, a shell variable cannot repoint the observed power or lift
+  the final-test date guard. Run the script with the `main` checkout's own interpreter, directly
+  rather than through `uv run`, as the maintainer's user. The script's module docstring explains
+  why.
 
 ## `maintenance/` — looking after the workstation
 

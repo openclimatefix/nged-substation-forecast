@@ -83,9 +83,13 @@ code. Never edit the scorer files in a study: `packages/ml_core/src/ml_core/metr
 `packages/ml_core/src/ml_core/cv_helpers.py`, `src/nged_substation_forecast/defs/cv_assets.py`,
 `scripts/forecasting/score_study.py`, and `conf/cv/`. The script refuses a file whose row keys
 differ from the reference experiment's for the fold, so the file must hold exactly the reference's
-series, initialisation times, and valid times, with none missing and none extra. Read observed power
-through `studies.power.scan_power`, which stops at `final_test_start`. The `metrics` asset refuses
-to score a window that reaches that date unless the maintainer sets `NGED_FINAL_TEST=1`.
+series, initialisation times, valid times, and ensemble members, with none missing and none extra.
+Read observed power through `studies.power.scan_power`, which stops at `final_test_start` and so
+includes the whole validation year. The `metrics` asset refuses to score a window that reaches that
+date unless the maintainer sets `NGED_FINAL_TEST=1`. The script checks which rows the file holds, not
+how the forecast was made, so the study itself must fit only on observations up to the fold's
+`train_end`, and use observations after that only as lags earlier than each forecast's
+initialisation time.
 
 **A study script is not unit-tested as a whole, so its check is its own output.** Every table the
 page quotes is printed by a committed script into a `report.md`, never transcribed by hand, and
@@ -574,7 +578,8 @@ with the page's chart renders:
   "because", and every chart title against the report and the saved losses, computing what the
   report does not print. Where the page quotes a leaderboard skill number, the reviewer also checks
   that the number traces to a `forecast_metrics` row that the `metrics` asset wrote for a
-  `scripts/forecasting/score_study.py` submission.
+  `scripts/forecasting/score_study.py` submission, and that the study's training data ended at the
+  fold's `train_end`.
 
 The personas earn their place. On the two weather-product pages, the builder reviewers found that
 ICON global's wind steps look like an artefact of how the archive serves its grid cells rather than

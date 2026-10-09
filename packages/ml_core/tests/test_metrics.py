@@ -1013,10 +1013,28 @@ def _check_row_keys(*, study: pl.LazyFrame, reference: pl.LazyFrame) -> None:
     )
 
 
-def test_require_same_row_keys_accepts_the_reference_keys_with_a_different_member_count() -> None:
+def test_require_same_row_keys_accepts_the_reference_keys_with_the_same_members() -> None:
     reference = _row_key_frame(series={1: _TIMES, 2: _TIMES}, members=(0, 1, 2))
 
-    _check_row_keys(study=_row_key_frame(series={1: _TIMES, 2: _TIMES}), reference=reference)
+    _check_row_keys(
+        study=_row_key_frame(series={1: _TIMES, 2: _TIMES}, members=(0, 1, 2)), reference=reference
+    )
+
+
+@pytest.mark.parametrize(
+    "study_members",
+    [(0,), (0, 1), (0, 1, 2, 3), (1, 2, 3)],
+    ids=["one", "fewer", "more", "shifted"],
+)
+def test_require_same_row_keys_refuses_a_different_set_of_ensemble_members(
+    study_members: tuple[int, ...],
+) -> None:
+    reference = _row_key_frame(series={1: _TIMES}, members=(0, 1, 2))
+
+    with pytest.raises(RowKeyMismatchError, match="ensemble_member"):
+        _check_row_keys(
+            study=_row_key_frame(series={1: _TIMES}, members=study_members), reference=reference
+        )
 
 
 @pytest.mark.parametrize(

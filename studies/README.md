@@ -55,17 +55,19 @@ branch. The directory is not an attic.
 takes a file of `PowerForecast` rows, a study name, and a leaderboard fold. The script stores the
 rows in `power_forecasts` under the experiment name `study/<study name>`, and scores them in
 leaderboard scope. Before the script writes anything, it refuses a file whose `(time_series_id,
-power_fcst_init_time, valid_time)` keys differ from the keys of the reference experiment that
-`conf/cv/default.yaml` names for the same fold, or whose rows carry more than one
+power_fcst_init_time, valid_time, ensemble_member)` keys differ from the keys of the reference
+experiment that `conf/cv/default.yaml` names for the same fold, or whose rows carry more than one
 `power_fcst_model_name`. A study therefore cannot raise its score by leaving out the rows it
-forecasts worst. The `metrics` asset repeats both checks when it scores the study. Every leaderboard
-skill number on a study page must trace to a `forecast_metrics` row. The `study/` prefix keeps a
-study's forecasts out of the promotion candidates, and lets a reader filter the study experiments
-out of the leaderboard.
+forecasts worst, or by choosing its own ensemble members. The script checks which rows the file
+holds, not how the forecast was made, so a reviewer must confirm that the study fitted only on
+observations up to the fold's `train_end`. The `metrics` asset repeats both checks when it scores
+the study. Every leaderboard skill number on a study page must trace to a `forecast_metrics` row.
+The `study/` prefix keeps a study's forecasts out of the promotion candidates, and lets a reader
+filter the study experiments out of the leaderboard.
 
 **A study reads observed power through `studies.power.scan_power`.** The function returns cleaned
-power before `final_test_start` in `conf/cv/default.yaml`, the date from which the `metrics` asset
-refuses to score unless the maintainer sets `NGED_FINAL_TEST=1`.
+power, including the whole validation year, before `final_test_start` in `conf/cv/default.yaml`, the
+date from which the `metrics` asset refuses to score unless the maintainer sets `NGED_FINAL_TEST=1`.
 
 ## What to expect when reading one
 

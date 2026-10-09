@@ -71,12 +71,19 @@ Live rows are forecasts of the future, not a held-out set, so the final-test dat
 them.
 """
 
-ROW_KEY_COLUMNS: Final[tuple[str, ...]] = ("time_series_id", "power_fcst_init_time", "valid_time")
-"""The columns that identify one forecast row, ignoring which ensemble member produced it.
+ROW_KEY_COLUMNS: Final[tuple[str, ...]] = (
+    "time_series_id",
+    "power_fcst_init_time",
+    "valid_time",
+    "ensemble_member",
+)
+"""The columns that identify one forecast row: the primary key of `PowerForecast`.
 
-``ensemble_member`` is left out on purpose. A study may forecast with one member or with many, and
-dropping members drops no hard row, so only the other three columns decide whether a forecast
-abstained on any row.
+``ensemble_member`` is part of the key. The fair continuous ranked probability score (CRPS) is
+unbiased only for members drawn at random from the forecaster's belief. A study that chose its own
+member positions, or its own member count, could place two members on either side of the observation
+and score a CRPS near zero while leaving the ensemble mean, and so every deterministic metric,
+unchanged. A study therefore carries the reference's members.
 """
 
 
@@ -215,7 +222,8 @@ def require_same_row_keys(
 
     The keys are ``ROW_KEY_COLUMNS``. A study that omits a row the reference forecasts, or adds a
     row the reference does not, cannot raise its score by abstaining on hard rows, by adding easy
-    series, or by forecasting only at short lead times. The reference's own forecasts are trusted:
+    series, by forecasting only at short lead times, or by choosing its own number of ensemble
+    members. The reference's own forecasts are trusted:
     they come from a reviewed experiment.
 
     The series sets are compared first. The keys are then compared in batches of

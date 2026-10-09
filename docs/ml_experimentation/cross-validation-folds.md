@@ -201,9 +201,9 @@ not a sample size.
 
 **The `metrics` asset is the only source of a leaderboard number, so it checks its input before it
 scores anything.** Three refusals protect the number against an experiment, or an autonomous study,
-that could otherwise raise its own score. Each refusal raises, because the metrics asset is research
-code that fails fast. Every group is checked before any group is scored, so a refusal leaves no rows
-or MLflow runs behind.
+that could otherwise raise its own score by changing which rows are scored. Each refusal raises,
+because the metrics asset is research code that fails fast. Every group is checked before any group
+is scored, so a refusal leaves no rows or MLflow runs behind.
 
 - **The final-test date guard.** `conf/cv/default.yaml` holds `final_test_start`, which must be
   later than the end of every leaderboard fold. The asset refuses a window that reaches that date
@@ -219,15 +219,25 @@ or MLflow runs behind.
 - **The reference row keys and a single model name, for a study.** In leaderboard scope, an
   experiment whose name starts with `study/` holds a forecast submitted through
   `scripts/forecasting/score_study.py`. The rows of a study must have exactly the keys
-  `(time_series_id, power_fcst_init_time, valid_time)` of the experiment named by
+  `(time_series_id, power_fcst_init_time, valid_time, ensemble_member)` of the experiment named by
   `reference_experiment_name` in the same config, for the same fold. A study that omits a row the
-  reference forecasts, adds a series, or forecasts only at short lead times is refused. The row key
+  reference forecasts, adds a series, forecasts only at short lead times, or uses a different
+  number of ensemble members is refused. The row key
   includes `power_fcst_init_time`, so a study must forecast from the reference's initialisation
   times, which are the times each run of the European Centre for Medium-Range Weather Forecasts
-  (ECMWF) ensemble becomes available. The row key leaves out `ensemble_member`, so a study may
-  forecast with any number of ensemble members. A study must also carry exactly one
+  (ECMWF) ensemble becomes available. The row key includes `ensemble_member`, because a
+  study that chose its own member positions could score a fair continuous ranked probability score
+  near zero without changing the ensemble mean. A study must also carry exactly one
   `power_fcst_model_name`, because spreading rows across several model names could down-weight the
   hard rows and so lower the mean error that the leaderboard reports.
+
+**The refusals check which rows a forecast covers, not how the forecast was made.** The `metrics`
+asset cannot tell a forecast trained on the validation year, or built from power observed after its
+initialisation time, from an honest forecast, because `studies.power.scan_power` serves the whole
+validation year. Until the planned submit command truncates training data at `train_end` and runs a
+leakage test, a study's leaderboard number is out-of-sample only if a reviewer has confirmed that
+the study used no observation after the fold's `train_end`, except as a lag earlier than each
+forecast's initialisation time.
 
 **An unfiltered run of the `metrics` asset skips study experiments rather than refusing them.**
 Re-materialising the reference experiment can change its row keys, so a study scored earlier stops

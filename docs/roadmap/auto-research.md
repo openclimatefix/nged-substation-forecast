@@ -598,12 +598,11 @@ a token for the research repository only. Each route meets at least one check:
 **Three risks remain, and none of the three is cheating in the sense the checks above catch.** A
 search that tries hundreds of ideas on one fold will overfit that fold however honestly the search
 runs. The defence is the separate certifying evaluation in [Ranking and
-steering](#ranking-and-steering). If [issue #958 (Protect the leaderboard scorer for autonomous
-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/958) accepts that a
-research session sees power observed inside the validation window, the research lead could steer
-workers towards ideas that suit what the research lead has seen. The certifying window and live
-monitoring are meant to catch that steering. And the LLM may know what happened during the
-evaluation period from its own training data, an open question raised [below](#open-questions).
+steering](#ranking-and-steering). A research session sees power observed inside the validation
+window, so the research lead could steer workers towards ideas that suit what the research lead has
+seen. The certifying window and live monitoring are meant to catch that steering. And the LLM may
+know what happened during the evaluation period from its own training data, an open question raised
+[below](#open-questions).
 
 ## Open questions
 
