@@ -825,15 +825,15 @@ def save(*, chart: alt.TopLevelMixin, name: str) -> None:
 def main() -> None:
     """Write every chart."""
     charts = {
-        "indgen_inddem_unit_check": unit_check_figure(number=1),
-        "indgen_inddem_zone_signs": zone_sign_figure(number=2),
-        "indgen_inddem_national": national_figure(number=3),
-        "indgen_inddem_zone_profiles": zone_profiles_figure(number=4),
-        "indgen_inddem_reach": reach_figure(number=5),
-        "indgen_inddem_first_versus_latest": first_versus_latest_figure(number=6),
-        "indgen_inddem_pn_against_inddem": pn_against_inddem_figure(number=7),
-        "indgen_inddem_weights": weights_figure(number=8),
-        "indgen_inddem_correlations": correlation_figure(number=9),
+        "indgen_inddem_correlations": correlation_figure(number=1),
+        "indgen_inddem_unit_check": unit_check_figure(number=2),
+        "indgen_inddem_zone_signs": zone_sign_figure(number=3),
+        "indgen_inddem_national": national_figure(number=4),
+        "indgen_inddem_zone_profiles": zone_profiles_figure(number=5),
+        "indgen_inddem_reach": reach_figure(number=6),
+        "indgen_inddem_first_versus_latest": first_versus_latest_figure(number=7),
+        "indgen_inddem_pn_against_inddem": pn_against_inddem_figure(number=8),
+        "indgen_inddem_weights": weights_figure(number=9),
         "indgen_inddem_nged": nged_figure(number=10),
         "indgen_inddem_pv_live": pv_live_figure(number=11),
     }

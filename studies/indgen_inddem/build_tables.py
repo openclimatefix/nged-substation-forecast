@@ -49,6 +49,8 @@ SOURCE_PATHS: Final[dict[DatasetType, str]] = {
 }
 VIEWS: Final[tuple[ViewType, ...]] = ("latest", "first_of_day")
 HALF_HOUR_MINUTES: Final[int] = 30
+LAST_SLOTS_FROM: Final[int] = 44
+"""The first UTC half-hour of the day (22:00 UTC) in the late-day slots the report lists."""
 SATURDAY: Final[int] = 6
 """The ISO weekday number of Saturday, so a weekday number at or above it is a weekend day."""
 LONDON: Final[str] = "Europe/London"
@@ -395,9 +397,15 @@ def agv_pair_correlations(*, agv: pl.DataFrame) -> dict[str, float]:
         pl.col(group) - pl.col(group).mean().over("half_hour", "weekend", "month")
         for group in GSP_GROUPS
     )
+    daily_profile = keyed.with_columns(
+        pl.col(group) - pl.col(group).mean().over("half_hour") for group in GSP_GROUPS
+    )
     pairs = list(itertools.combinations(GSP_GROUPS, 2))
     return {
         "raw": float(np.median([wide.select(pl.corr(a, b)).item() for a, b in pairs])),
+        "daily_profile": float(
+            np.median([daily_profile.select(pl.corr(a, b)).item() for a, b in pairs])
+        ),
         "anomaly": float(np.median([anomalies.select(pl.corr(a, b)).item() for a, b in pairs])),
     }
 
@@ -441,7 +449,39 @@ def build_views_and_zones() -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     sign = zone_sign_report(zones=zones)
     sign.write_parquet(STUDY_DIR / "zone_signs.parquet")
     say(sign.filter(pl.col("view") == "latest").__str__())
+    report_levels(views=views, zones=zones)
     return views, zones, reach
+
+
+def report_levels(*, views: pl.DataFrame, zones: pl.DataFrame) -> None:
+    """Report the national and zone levels the page quotes, and how many issues are missing."""
+    national = views.filter((pl.col("view") == "latest") & (pl.col("boundary") == "N"))
+    say()
+    say("## National means by month, MW (INDDEM sign reversed)")
+    monthly = (
+        national.group_by("dataset", month=pl.col("time").dt.truncate("1mo"))
+        .agg(mean_mw=pl.col("value_mw").mean())
+        .sort("dataset", "month")
+    )
+    for row in monthly.iter_rows(named=True):
+        sign = -1.0 if row["dataset"] == "inddem" else 1.0
+        say(f"- {row['dataset']} {row['month']:%Y-%m}: {sign * row['mean_mw']:.0f}")
+    overall = national.group_by("dataset").agg(mean_mw=pl.col("value_mw").mean()).sort("dataset")
+    for row in overall.iter_rows(named=True):
+        say(f"- {row['dataset']} year mean: {abs(row['mean_mw']):.0f}")
+    say()
+    say("## Zone means, MW, latest view (INDDEM sign reversed)")
+    zone_means = (
+        zones.filter(pl.col("view") == "latest")
+        .group_by("dataset", "zone")
+        .agg(mean_mw=pl.col("value_mw").mean())
+        .pivot(on="dataset", index="zone", values="mean_mw")
+        .with_columns(inddem=-pl.col("inddem"))
+        .sort(pl.col("zone").str.slice(1).cast(pl.Int32))
+    )
+    for row in zone_means.iter_rows(named=True):
+        flag = "INDGEN above INDDEM" if row["indgen"] > row["inddem"] else "INDDEM above INDGEN"
+        say(f"- {row['zone']}: INDDEM {row['inddem']:.0f}, INDGEN {row['indgen']:.0f} ({flag})")
 
 
 def report_issues(*, views: pl.DataFrame, reach: pl.DataFrame) -> None:
@@ -461,6 +501,16 @@ def report_issues(*, views: pl.DataFrame, reach: pl.DataFrame) -> None:
         .sort("dataset")
         .__str__()
     )
+    say()
+    say("Mean first-minus-latest difference by UTC target half-hour, last four slots (MW):")
+    for row in (
+        fvl.filter(pl.col("utc_half_hour") >= LAST_SLOTS_FROM)
+        .group_by("dataset", "utc_half_hour")
+        .agg(mean_mw=pl.col("difference_mw").mean())
+        .sort("dataset", "utc_half_hour")
+        .iter_rows(named=True)
+    ):
+        say(f"- {row['dataset']} slot {row['utc_half_hour']}: {row['mean_mw']:.0f}")
     say()
     say("## Issue reach, hours ahead")
     say(
@@ -494,7 +544,10 @@ def build_agv(*, zones: pl.DataFrame) -> pl.DataFrame:
     pair = agv_pair_correlations(agv=agv)
     say()
     say("## Correlation between GSP groups' AGV, median of the 91 pairs")
-    say(f"raw {pair['raw']:.3f}, anomaly {pair['anomaly']:.3f}")
+    say(
+        f"raw {pair['raw']:.3f}, minus the mean daily profile {pair['daily_profile']:.3f}, "
+        f"anomaly {pair['anomaly']:.3f}"
+    )
     say("Highest anomaly correlation of each NGED group with a zone's INDDEM:")
     for group, name in NGED_GROUPS.items():
         top = correlations.filter(pl.col("gsp_group") == group).sort(
@@ -526,6 +579,14 @@ def build_agv(*, zones: pl.DataFrame) -> pl.DataFrame:
     say(f"NGED groups: {NGED_GROUPS}")
     pv = pl.read_parquet(PV_LIVE_PATH)
     say(f"PV_Live rows {pv.height}, groups {sorted(pv['gsp_group'].unique().to_list())}")
+    summer = pv.filter(
+        (pl.col("gsp_group") == "_L") & pl.col("time").dt.month().is_in([6, 7])
+    ).with_columns(hour=pl.col("time").dt.hour().cast(pl.Float64) + pl.col("time").dt.minute() / 60)
+    centroid = (summer["hour"] * summer["generation_mw"]).sum() / summer["generation_mw"].sum()
+    say(
+        f"PV_Live South West, June and July: generation-weighted mean start of the half-hour "
+        f"{centroid:.2f} h UTC, so the centre of the half-hour is {centroid + 0.25:.2f} h UTC."
+    )
     return agv
 
 
@@ -559,6 +620,35 @@ def build_pn_fit(*, views: pl.DataFrame, zones: pl.DataFrame) -> None:
         f"Half-hours where the PN import sum reproduces INDDEM's national total to within "
         f"{INDDEM_MATCH_TOLERANCE_MW:g} MW: {len(reproduced)} of {joined.height}."
     )
+    per_day = (
+        joined.with_columns(
+            day=pl.col("time").dt.convert_time_zone(LONDON).dt.date(),
+            reproduced=(pl.col("inddem") - pl.col("pn_import_mw")).abs()
+            <= INDDEM_MATCH_TOLERANCE_MW,
+            local_hour=pl.col("time").dt.convert_time_zone(LONDON).dt.hour(),
+        )
+        .group_by("day")
+        .agg(
+            half_hours=pl.len(),
+            reproduced=pl.col("reproduced").sum(),
+            first_local_hour=pl.col("local_hour").filter(pl.col("reproduced")).min(),
+            last_local_hour=pl.col("local_hour").filter(pl.col("reproduced")).max(),
+        )
+        .sort("day")
+    )
+    say("Reproduced half-hours by UK local day:")
+    say(per_day.__str__())
+    gaps = joined.select(
+        inddem_gap=pl.col("inddem") - pl.col("pn_import_mw"),
+        indgen_gap=pl.col("indgen") - pl.col("pn_export_mw"),
+    )
+    both = ((pl.col("inddem_gap") > 5) & (pl.col("indgen_gap") < -5)).mean()
+    say(
+        "Correlation of the INDDEM gap with the INDGEN gap: "
+        f"{gaps.select(pl.corr('inddem_gap', 'indgen_gap')).item():.2f}; share of half-hours with "
+        "an INDDEM gap above 5 MW and an INDGEN gap below -5 MW: "
+        f"{gaps.select(both).item():.2f}"
+    )
     weights = pl.concat(
         [
             zone_group_weights(zones=zones, sums=sums, dataset="inddem", keep_times=reproduced),
@@ -567,9 +657,16 @@ def build_pn_fit(*, views: pl.DataFrame, zones: pl.DataFrame) -> None:
     )
     weights.write_parquet(STUDY_DIR / "zone_group_weights.parquet")
     say()
+    say("## Fit residuals (RMS, MW) and zone size (RMS, MW)")
+    for row in (
+        weights.group_by("dataset", "zone")
+        .agg(rms=pl.col("rms_residual_mw").first(), size=pl.col("zone_rms_mw").first())
+        .sort("dataset", pl.col("zone").str.slice(1).cast(pl.Int32))
+        .iter_rows(named=True)
+    ):
+        say(f"- {row['dataset']} {row['zone']}: residual {row['rms']:.0f}, zone {row['size']:.0f}")
+    say()
     say("## Fitted weights of each GSP group in each zone (non-negative least squares)")
-    pl.Config.set_tbl_cols(30)
-    pl.Config.set_tbl_rows(40)
     for dataset in ("inddem", "indgen"):
         say(f"### {dataset}")
         say(
@@ -584,6 +681,9 @@ def build_pn_fit(*, views: pl.DataFrame, zones: pl.DataFrame) -> None:
 def main() -> None:
     """Build every table and write the report."""
     STUDY_DIR.mkdir(parents=True, exist_ok=True)
+    pl.Config.set_tbl_cols(30)
+    pl.Config.set_tbl_rows(60)
+    pl.Config.set_tbl_width_chars(240)
     say("# INDDEM, INDGEN, and GSP-group take: numbers the page quotes")
     say()
     views, zones, reach = build_views_and_zones()
