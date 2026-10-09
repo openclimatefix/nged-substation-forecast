@@ -16,7 +16,7 @@ from typing import Final
 import capacity_report_review as review
 import numpy as np
 import polars as pl
-from capacity_inputs import OUTPUT_DIR, demand_series, storage_presence_by_primary
+from capacity_inputs import OUTPUT_DIR, demand_series, nged_series, storage_presence_by_primary
 from capacity_report_tools import (
     BLOCK_NAMES_BY_INDEX,
     FALSE_ALARM_RATE,
@@ -593,12 +593,27 @@ def rung4_section(*, rung4: pl.DataFrame, nulls: pl.DataFrame) -> list[str]:
     unit_columns = [f"{name}_power_over_prior_scale" for name in UNIT_NAMES]
     summer = frame.filter(pl.col("block") == SUMMER_BLOCK)
     other = frame.filter(pl.col("block") != SUMMER_BLOCK)
+    nged = nged_series()
+    flow_p99 = p99_flow(nged["BSP1"])
+    battery_p99 = p99_flow(nged["battery_A"])
+    shares = ", ".join(
+        f"multiple {m}: {m * battery_p99 / flow_p99:.1%}"
+        for m in sorted(frame["multiple"].unique().to_list())
+    )
     return [
         "## Rung 4: NGED battery A inside a bulk supply point's flow (exploratory, one site)",
         "",
         (
             f"Detection threshold: {threshold:.2f} (the 95th percentile of the {len(finite)} null "
-            "blocks of rung 1, because no series' own nulls exist for this flow)."
+            "blocks of the other series in rung 1, because BSP1 has no nulls of its own). The "
+            "matched null (multiple 0) is a null only if the battery's meter captures the battery "
+            "fully inside BSP1's flow: the half-hour changes correlate at -0.29 at lag 0 and at "
+            "+0.13 at lags of one half-hour either way (`report_inputs.md`)."
+        ),
+        "",
+        (
+            "The battery's metered 99th-percentile output at each multiple, as a share of BSP1's "
+            f"99th-percentile flow: {shares}."
         ),
         "",
         (

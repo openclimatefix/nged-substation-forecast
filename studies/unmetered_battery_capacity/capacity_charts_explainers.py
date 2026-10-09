@@ -33,6 +33,7 @@ from capacity_charts_common import (
 )
 from capacity_inputs import OUTPUT_DIR, day_ahead_on_grid, demand_series, window_half_hours
 from capacity_rung1 import SEED
+from capacity_rung3 import units
 from capacity_runs import simulated_merchant_battery
 from capacity_stacks import STACKS_PATH
 
@@ -40,6 +41,8 @@ EXAMPLE_SERIES: Final[str] = "S3"
 EXAMPLE_HOURS: Final[float] = 2.0
 EXAMPLE_SHARE: Final[float] = 0.2
 EXAMPLE_BLOCK: Final[int] = 0
+REAL_UNIT: Final[str] = "U01"
+"""The first named public battery of rung 3, used for the second worked example by the same rule."""
 WEEK_START: Final[datetime] = datetime(2025, 10, 6, tzinfo=UTC)
 DAYS_PER_WEEK: Final[int] = 7
 DEMAND_ORDER: Final[tuple[str, ...]] = ("S1", "S2", "S3", "S5", "S6", "S7", "S8", "BSP2", "GSP1")
@@ -117,6 +120,165 @@ def _week(*, frame: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def _fit_and_posterior_panels(
+    *,
+    week: pl.DataFrame,
+    row: dict,
+    true_power: float,
+    true_energy: float,
+    truth_label: str,
+    step_prefix: str,
+    x_domain: tuple[float, float] = (0.4, 1.8),
+) -> tuple[alt.Chart, alt.Chart]:
+    """Draw the fitted-against-true schedule panel and the posterior-beside-truth panel.
+
+    Args:
+        week: The example week with `start`, `truth`, and `fitted` columns (MW).
+        row: The saved posterior row.
+        true_power: The true (or registered) power in MW.
+        true_energy: The true usable energy, or the energy reference, in MWh.
+        truth_label: The legend label of the truth line.
+        step_prefix: Prefixes both panel titles.
+        x_domain: The posterior panel's range, as multiples of the truth.
+
+    Returns:
+        The schedule panel and the posterior panel.
+    """
+    x = alt.X("start:T", axis=alt.Axis(format="%a", tickCount=7), title=None)
+    comparison = pl.concat(
+        [
+            week.select("start", pl.col("truth").alias("mw"), pl.lit(truth_label).alias("series")),
+            week.select(
+                "start",
+                pl.col("fitted").alias("mw"),
+                pl.lit("Fitted battery (posterior median power times the template)").alias(
+                    "series"
+                ),
+            ),
+        ]
+    )
+    fitted_chart = (
+        alt.Chart(comparison)
+        .mark_line(strokeWidth=1.3, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=x,
+            y=alt.Y("mw:Q", title="MW"),
+            color=alt.Color(
+                "series:N",
+                scale=alt.Scale(
+                    domain=[
+                        truth_label,
+                        "Fitted battery (posterior median power times the template)",
+                    ],
+                    range=[REFERENCE_COLOUR, ocf.BRAND_ORANGE],
+                ),
+                legend=alt.Legend(title=None, columns=1, labelLimit=420),
+            ),
+        )
+        .properties(
+            width=PLOT_WIDTH_PX,
+            height=95,
+            title=alt.TitleParams(
+                f"{step_prefix}scaling the template by the posterior power", anchor="start"
+            ),
+        )
+    )
+    intervals = pl.DataFrame(
+        {
+            "quantity": ["Power (MW)", "Energy (MWh)"],
+            "q05": [row["merchant_power_q05"], row["merchant_energy_q05"]],
+            "q25": [row["merchant_power_q25"], row["merchant_energy_q25"]],
+            "median": [row["merchant_power_median"], row["merchant_energy_median"]],
+            "q75": [row["merchant_power_q75"], row["merchant_energy_q75"]],
+            "q95": [row["merchant_power_q95"], row["merchant_energy_q95"]],
+            "truth": [true_power, true_energy],
+        }
+    ).with_columns(
+        **{c: pl.col(c) / pl.col("truth") * 1.0 for c in ("q05", "q25", "median", "q75", "q95")},
+        one=pl.lit(1.0),
+    )
+    base = alt.Chart(intervals)
+    y = alt.Y("quantity:N", title=None)
+    posterior = alt.layer(
+        base.mark_rule(strokeWidth=2, color=ocf.DATA_BLUE, clip=True, aria=False).encode(  # ty: ignore[unresolved-attribute]
+            y=y,
+            x=alt.X(
+                "q05:Q",
+                scale=alt.Scale(domain=list(x_domain)),
+                title="Posterior as a multiple of the truth (1 = exact)",
+            ),
+            x2="q95:Q",
+        ),
+        base.mark_bar(height=10, color=ocf.DATA_BLUE, opacity=0.5, aria=False).encode(  # ty: ignore[unresolved-attribute]
+            y=y, x="q25:Q", x2="q75:Q"
+        ),
+        base.mark_point(filled=True, size=70, color=ocf.DATA_BLUE, aria=False).encode(  # ty: ignore[unresolved-attribute]
+            y=y, x="median:Q"
+        ),
+        base.mark_tick(color=ocf.BRAND_ORANGE, thickness=3, size=28, aria=False).encode(  # ty: ignore[unresolved-attribute]
+            y=y, x="one:Q"
+        ),
+    ).properties(
+        width=PLOT_WIDTH_PX,
+        height=70,
+        title=alt.TitleParams(
+            f"{step_prefix}the posterior of power and energy beside the truth", anchor="start"
+        ),
+    )
+    return fitted_chart, posterior
+
+
+def _real_battery_panels(*, demand: np.ndarray, p99: float) -> tuple[alt.Chart, alt.Chart, dict]:
+    """Draw the worked example's second half: a real public battery, by the same rule.
+
+    The rule is the first series (S3), the first block, the middle share (20%), and the first named
+    battery of rung 3. The truth line is the battery's metered output scaled to that share, and the
+    energy truth is the smallest capacity that holds its state of charge (a lower bound).
+
+    Args:
+        demand: The example series' flow in MW.
+        p99: The series' 99th-percentile absolute flow.
+
+    Returns:
+        The schedule panel, the posterior panel, and the saved posterior row.
+    """
+    rows = pl.read_parquet(OUTPUT_DIR / "rung3_posteriors.parquet").filter(
+        (pl.col("series") == EXAMPLE_SERIES)
+        & (pl.col("unit") == REAL_UNIT)
+        & (pl.col("share") == EXAMPLE_SHARE)
+        & (pl.col("block") == EXAMPLE_BLOCK)
+    )
+    if rows.height != 1:
+        raise ValueError(f"Expected one real example row, found {rows.height}")
+    row = rows.row(0, named=True)
+    unit = next(u for u in units() if u["unit"] == REAL_UNIT)
+    true_power = EXAMPLE_SHARE * p99
+    battery = np.nan_to_num(unit["output_mw"]) * (true_power / unit["registered_mw"])
+    template = stack_schedule(
+        stack=np.load(STACKS_PATH)["merchant"],
+        duration=row["merchant_duration_point"],
+        efficiency=row["merchant_efficiency_point"],
+        cap_weight=row["merchant_cap_weight_point"],
+    )
+    frame = pl.DataFrame(
+        {
+            "start": window_half_hours().dt.offset_by("-30m"),
+            "truth": battery,
+            "fitted": row["merchant_power_median"] * template,
+        }
+    )
+    fitted_chart, posterior = _fit_and_posterior_panels(
+        week=_week(frame=frame),
+        row=row,
+        true_power=true_power,
+        true_energy=row["true_energy_reference_mwh"],
+        truth_label="Real battery (metered output scaled to the share)",
+        step_prefix="A real public battery: ",
+        x_domain=(0.0, 1.8),
+    )
+    return fitted_chart, posterior, row
+
+
 def worked_example_figure() -> alt.VConcatChart:
     """Draw figure 2: one sum, from its inputs to the posterior beside the truth."""
     row = _example_row()
@@ -162,89 +324,17 @@ def worked_example_figure() -> alt.VConcatChart:
             )
         )
 
-    comparison = pl.concat(
-        [
-            week.select(
-                "start", pl.col("truth").alias("mw"), pl.lit("True battery").alias("series")
-            ),
-            week.select(
-                "start",
-                pl.col("fitted").alias("mw"),
-                pl.lit("Fitted battery (posterior median power times the template)").alias(
-                    "series"
-                ),
-            ),
-        ]
+    fitted_chart, posterior = _fit_and_posterior_panels(
+        week=week,
+        row=row,
+        true_power=true_power,
+        true_energy=true_power * usable,
+        truth_label="True battery",
+        step_prefix="Step 3: ",
     )
-    fitted_chart = (
-        alt.Chart(comparison)
-        .mark_line(strokeWidth=1.3, aria=False)
-        .encode(  # ty: ignore[unresolved-attribute]
-            x=x,
-            y=alt.Y("mw:Q", title="MW"),
-            color=alt.Color(
-                "series:N",
-                scale=alt.Scale(
-                    domain=[
-                        "True battery",
-                        "Fitted battery (posterior median power times the template)",
-                    ],
-                    range=[REFERENCE_COLOUR, ocf.BRAND_ORANGE],
-                ),
-                legend=alt.Legend(title=None, columns=1, labelLimit=420),
-            ),
-        )
-        .properties(
-            width=PLOT_WIDTH_PX,
-            height=95,
-            title=alt.TitleParams(
-                "Step 3: scaling the template by the posterior power", anchor="start"
-            ),
-        )
-    )
-    intervals = pl.DataFrame(
-        {
-            "quantity": ["Power (MW)", "Energy (MWh)"],
-            "q05": [row["merchant_power_q05"], row["merchant_energy_q05"]],
-            "q25": [row["merchant_power_q25"], row["merchant_energy_q25"]],
-            "median": [row["merchant_power_median"], row["merchant_energy_median"]],
-            "q75": [row["merchant_power_q75"], row["merchant_energy_q75"]],
-            "q95": [row["merchant_power_q95"], row["merchant_energy_q95"]],
-            "truth": [true_power, true_power * usable],
-        }
-    ).with_columns(
-        **{c: pl.col(c) / pl.col("truth") * 1.0 for c in ("q05", "q25", "median", "q75", "q95")},
-        one=pl.lit(1.0),
-    )
-    base = alt.Chart(intervals)
-    y = alt.Y("quantity:N", title=None)
-    posterior = alt.layer(
-        base.mark_rule(strokeWidth=2, color=ocf.DATA_BLUE, clip=True, aria=False).encode(  # ty: ignore[unresolved-attribute]
-            y=y,
-            x=alt.X(
-                "q05:Q",
-                scale=alt.Scale(domain=[0.4, 1.8]),
-                title="Posterior as a multiple of the truth (1 = exact)",
-            ),
-            x2="q95:Q",
-        ),
-        base.mark_bar(height=10, color=ocf.DATA_BLUE, opacity=0.5, aria=False).encode(  # ty: ignore[unresolved-attribute]
-            y=y, x="q25:Q", x2="q75:Q"
-        ),
-        base.mark_point(filled=True, size=70, color=ocf.DATA_BLUE, aria=False).encode(  # ty: ignore[unresolved-attribute]
-            y=y, x="median:Q"
-        ),
-        base.mark_tick(color=ocf.BRAND_ORANGE, thickness=3, size=28, aria=False).encode(  # ty: ignore[unresolved-attribute]
-            y=y, x="one:Q"
-        ),
-    ).properties(
-        width=PLOT_WIDTH_PX,
-        height=70,
-        title=alt.TitleParams(
-            "Step 4: the posterior of power and energy beside the truth", anchor="start"
-        ),
-    )
+    real_fitted_chart, real_posterior, real_row = _real_battery_panels(demand=demand, p99=p99)
     _note_example(row=row, true_power=true_power, usable=usable)
+    _note_real_example(row=real_row, true_power=true_power)
     return draw_figure(
         panels=[
             line(
@@ -270,6 +360,8 @@ def worked_example_figure() -> alt.VConcatChart:
             ),
             fitted_chart,
             posterior,
+            real_fitted_chart,
+            real_posterior,
         ],
         number=2,
         title=(
@@ -292,6 +384,20 @@ def worked_example_figure() -> alt.VConcatChart:
         ],
         figure_planning=None,
     ).resolve_scale(color="independent")
+
+
+def _note_real_example(*, row: dict, true_power: float) -> None:
+    """Record the second worked example's numbers for the page."""
+    true_energy = row["true_energy_reference_mwh"]
+    NOTES.append(
+        f"Second worked example (real public battery {REAL_UNIT}, {EXAMPLE_SERIES},"
+        f" {BLOCK_NAMES[EXAMPLE_BLOCK]}, {EXAMPLE_SHARE:.0%} share): the posterior median power is"
+        f" {row['merchant_power_median'] / true_power:.3f} times the registered share, its 90%"
+        f" interval runs from {row['merchant_power_q05'] / true_power:.3f} to"
+        f" {row['merchant_power_q95'] / true_power:.3f} times, the energy median is"
+        f" {row['merchant_energy_median'] / true_energy:.3f} times the energy reference, the log"
+        f" Bayes factor is {row['log_bayes_factor']:.1f} and tau is {row['tau']:.1f}."
+    )
 
 
 def _note_example(*, row: dict, true_power: float, usable: float) -> None:
