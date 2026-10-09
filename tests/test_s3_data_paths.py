@@ -35,7 +35,13 @@ from contracts.uri import object_exists
 from contracts.weather_schemas import Nwp
 from delta_store.nwp import write_nwp
 from delta_store.power_forecasts import write_power_forecasts
-from nged_data.storage import upsert_metadata
+from nged_data.storage import (
+    _process_file_listing,
+    _ProcessedFileListing,
+    _RawFileListItem,
+    upsert_metadata,
+    write_downloaded_files,
+)
 
 from nged_substation_forecast.defs.cv_assets import PopulationFilter
 
@@ -252,3 +258,31 @@ def test_metadata_parquet_round_trip_over_s3(s3_endpoint: str) -> None:
     # A second upsert of identical rows is a no-op (exercises the read-existing S3 path).
     stats2 = upsert_metadata(metadata, uri, opts)
     assert stats2["metadata_n_new_TimeSeriesIDs"] == 0
+
+
+def test_downloaded_files_list_round_trip_over_s3(s3_endpoint: str) -> None:
+    """``write_downloaded_files`` replaces the list object on S3, keeping microsecond times.
+
+    ``read_downloaded_files`` is not driven here, because it checks the Delta table with the
+    ``DeltaTable`` client that hangs against moto (see the module docstring).
+    """
+    settings = _s3_settings(s3_endpoint, "downloaded")
+    uri = settings.downloaded_files_path
+    opts = settings.storage_options
+    last_modified = datetime(2026, 3, 26, 14, 5, 0, 123456, tzinfo=UTC)
+
+    def listing(*paths: str) -> pt.DataFrame[_ProcessedFileListing]:
+        return _process_file_listing(
+            [
+                _RawFileListItem(path=path, filesize_bytes=1, last_modified=last_modified)
+                for path in paths
+            ]
+        )
+
+    key = "timeseries/1774512000000_1774533600000/TimeSeries_23_a_b.json"
+    other_key = "timeseries/1774512000000_1774555200000/TimeSeries_24_a_b.json"
+    write_downloaded_files(uri, listing(key), opts)
+    write_downloaded_files(uri, listing(other_key), opts)
+
+    back = pl.read_parquet(uri, storage_options=typeddict_to_dict(opts))
+    assert back.rows() == [(other_key, last_modified)]

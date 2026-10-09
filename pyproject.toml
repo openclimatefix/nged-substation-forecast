@@ -241,7 +241,7 @@ ignore = [
     # it is declined in `per-file-ignores` for the notebooks alone and stays live over `src/` and
     # the tests.
     "N806", # variable in function should be lowercase
-    # The three sites are `NoNewData`, `NwpRunNotYetAvailable` and `NwpVariableWhollyMissing`;
+    # The sites are `NoReadingsInFile`, `NwpRunNotYetAvailable` and `NwpVariableWhollyMissing`;
     # renaming any of them is a public-API change across several packages, not a lint fix. Revisit
     # deliberately if we ever want the `Error` suffix.
     "N818", # exception name should be suffixed with `Error`
