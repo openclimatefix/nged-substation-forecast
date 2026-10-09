@@ -1,5 +1,11 @@
 # Elexon's indicated demand and generation reach 15 to 42 hours ahead, and the study found no table that maps their zones to NGED's licence areas
 
+**Bottom line: Elexon's INDDEM and INDGEN reach at most 42 hours ahead, and the study found no
+table that maps their regions to NGED's licence areas, so neither series is a ready input to a
+forecast of those areas.** A published mapping from the series' regions to supply points, or an
+explanation of the gap between INDGEN and the sum of its Physical Notifications, would change that
+answer. The study ran no forecast, and tested neither series against NGED's own telemetry.
+
 **This study describes two Elexon series, Indicated Demand (INDDEM) and Indicated Generation
 (INDGEN), beside the settled energy that each of Great Britain's 14 Grid Supply Point (GSP) groups
 takes from the transmission system.** Elexon runs the settlement of Great Britain's electricity
