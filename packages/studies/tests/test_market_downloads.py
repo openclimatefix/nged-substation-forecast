@@ -511,23 +511,29 @@ def test_apx_lag_correlation_peaks_at_the_true_lag() -> None:
     assert shifted["0"] < 0.9
 
 
+def _write_example_readme(*, product_dir: Path, **purpose: str) -> str:
+    write_readme(
+        product_dir=product_dir,
+        title="A series",
+        source_page="https://example.org",
+        script_path="studies/x.py",
+        attribution=None,
+        cache_hint="_cache/",
+        licence="Open.",
+        timestamp_convention="UTC.",
+        columns={"time": "UTC start."},
+        row_summary="- 1 row.",
+        gotchas=[],
+        **purpose,
+    )
+    return (product_dir / "README.md").read_text()
+
+
 def test_write_readme_names_the_study_it_was_given(tmp_path: Path) -> None:
-    kwargs = {
-        "product_dir": tmp_path,
-        "title": "A series",
-        "source_page": "https://example.org",
-        "script_path": "studies/x.py",
-        "attribution": None,
-        "cache_hint": "_cache/",
-        "licence": "Open.",
-        "timestamp_convention": "UTC.",
-        "columns": {"time": "UTC start."},
-        "row_summary": "- 1 row.",
-        "gotchas": [],
-    }
-    write_readme(**kwargs, purpose="Public data for the study of X.")
-    named = (tmp_path / "README.md").read_text()
+    named = _write_example_readme(product_dir=tmp_path, purpose="Public data for the study of X.")
     assert "Public data for the study of X." in named
     assert "battery-versus-solar-PV" not in named
-    write_readme(**kwargs)
-    assert "battery-versus-solar-PV" in (tmp_path / "README.md").read_text()
+
+
+def test_write_readme_defaults_to_the_battery_study(tmp_path: Path) -> None:
+    assert "battery-versus-solar-PV" in _write_example_readme(product_dir=tmp_path)
