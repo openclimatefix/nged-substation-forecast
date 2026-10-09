@@ -9,7 +9,7 @@ import yaml
 from _nwp_test_data import cast_to_nwp_dtypes, nwp_records
 from _power_test_data import power_at
 from baseline_forecasters import ManualHeuristicForecaster
-from baseline_forecasters.manual_heuristic import PowerLagsPerNwpRunFeatureEngineer
+from baseline_forecasters.nwp_run_rows import NwpRunRowsWithoutWeatherFeatureEngineer
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import Nwp
@@ -245,7 +245,7 @@ def test_engineer_rows_equal_the_tabular_rows_deduplicated_across_members() -> N
     compared_columns = [*key_columns, "nwp_init_time", "power", *sorted(features)]
 
     engineered = (
-        PowerLagsPerNwpRunFeatureEngineer()
+        NwpRunRowsWithoutWeatherFeatureEngineer()
         .engineer(
             selected_features=features,
             power_time_series=power_time_series,
@@ -281,7 +281,7 @@ def test_engineer_rows_equal_the_tabular_rows_deduplicated_across_members() -> N
 def test_engineer_raises_in_single_run_mode() -> None:
     init_time = datetime(2025, 3, 3, tzinfo=UTC)
     with pytest.raises(NotImplementedError, match="bulk mode only"):
-        PowerLagsPerNwpRunFeatureEngineer().engineer(
+        NwpRunRowsWithoutWeatherFeatureEngineer().engineer(
             selected_features={"power_lag_168h"},
             power_time_series=_power_lazy(_power_frame([1], init_time, init_time)),
             time_series_metadata=_metadata({1: _CELL_A}),

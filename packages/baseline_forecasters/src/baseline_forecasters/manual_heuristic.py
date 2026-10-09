@@ -6,90 +6,20 @@ power lag, so the feature pipeline that every other forecaster uses builds the o
 nulls a lag that would not yet have been observed when the forecast was issued.
 """
 
-import json
-import shutil
-from datetime import datetime
 from pathlib import Path
 from typing import ClassVar, Self
 
 import patito as pt
 import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
-from contracts.config_schemas import class_target
 from contracts.ml_schemas import AllFeatures
-from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
-from contracts.weather_schemas import Nwp
+from contracts.power_schemas import PowerForecast
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
-from ml_core.features import NWP_PUBLICATION_DELAY_HOURS, FeatureEngineer, TabularFeatureEngineer
+from ml_core.features import FeatureEngineer
 from ml_core.features._parsed_features import ParsedFeatures
-from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE
 
-
-class PowerLagsPerNwpRunFeatureEngineer(FeatureEngineer):
-    """Engineers power lags on the forecast-run grid, reading no weather value.
-
-    The manual heuristic has to forecast the same ``(power_fcst_init_time, valid_time)`` rows as
-    every other forecaster, so that a leaderboard compares like with like. This engineer therefore
-    reads from the numerical weather prediction (NWP) frame only its four key columns other than the
-    ensemble member: ``nwp_model_id``, ``init_time``, ``h3_index``, and ``valid_time``. It
-    deduplicates those keys and hands the key-only frame to ``TabularFeatureEngineer``. With no
-    weather column present, the tabular pipeline's upsample interpolates nothing, and the
-    half-hourly grid, the hindcast filter, and the cell join all come from the tabular code. The
-    output carries one row per series, run, and valid time, and has no ``ensemble_member`` column.
-    """
-
-    def engineer(
-        self,
-        *,
-        selected_features: set[str],
-        power_time_series: pt.LazyFrame[PowerTimeSeries],
-        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
-        nwp: pt.LazyFrame[Nwp],
-        power_fcst_init_time: datetime | None = None,
-        nwp_init_time: datetime | None = None,
-        nwp_publication_delay_hours: int = NWP_PUBLICATION_DELAY_HOURS,
-        local_timezone: str = DEFAULT_LOCAL_TIMEZONE,
-    ) -> pt.LazyFrame[AllFeatures]:
-        """Strip ``nwp`` to its run, cell, and valid-time keys, then run the tabular pipeline.
-
-        Args:
-            selected_features: The power-lag feature names to produce.
-            power_time_series: Observed power, one row per ``(time_series_id, time)``.
-            time_series_metadata: Per-time-series metadata. Carries the H3 cell each series sits in.
-            nwp: Gridded NWP. Only its run, cell, and valid-time keys are read.
-            power_fcst_init_time: Must be ``None``, which selects bulk mode.
-            nwp_init_time: Must be ``None`` in bulk mode.
-            nwp_publication_delay_hours: Hours after a run's ``init_time`` before the run is
-                usable, which sets each row's ``power_fcst_init_time``.
-            local_timezone: IANA zone the local-time features are computed in.
-
-        Returns:
-            A lazy ``AllFeatures`` frame with one row per ``(time_series_id, power_fcst_init_time,
-            valid_time)``, carrying ``power`` and one column per requested power lag.
-
-        Raises:
-            NotImplementedError: ``power_fcst_init_time`` is given. Delegating would not raise in
-                this engineer, but ``predict`` would then fail on the ``PowerForecast``
-                ``valid_time`` constraint, and ``live_forecasts`` would fail on ``ensemble_member``.
-        """
-        if power_fcst_init_time is not None:
-            raise NotImplementedError(
-                "PowerLagsPerNwpRunFeatureEngineer supports bulk mode only. Baselines are "
-                "research baselines and are not served live, so a baseline must not be promoted."
-            )
-        nwp_keys = pt.LazyFrame.from_existing(
-            nwp.select("nwp_model_id", "init_time", "h3_index", "valid_time").unique()
-        ).set_model(Nwp)
-        return TabularFeatureEngineer().engineer(
-            selected_features=selected_features,
-            power_time_series=power_time_series,
-            time_series_metadata=time_series_metadata,
-            nwp=nwp_keys,
-            power_fcst_init_time=power_fcst_init_time,
-            nwp_init_time=nwp_init_time,
-            nwp_publication_delay_hours=nwp_publication_delay_hours,
-            local_timezone=local_timezone,
-        )
+from baseline_forecasters._saved_model import clear_directory_and_write_meta, read_meta
+from baseline_forecasters.nwp_run_rows import NwpRunRowsWithoutWeatherFeatureEngineer
 
 
 class ManualHeuristicForecaster(BaseForecaster):
@@ -111,7 +41,7 @@ class ManualHeuristicForecaster(BaseForecaster):
     MODEL_VERSION = 1
     CONFIG_CLASS: ClassVar[type[BaseForecasterConfig]] = BaseForecasterConfig
 
-    feature_engineer: ClassVar[FeatureEngineer] = PowerLagsPerNwpRunFeatureEngineer()
+    feature_engineer: ClassVar[FeatureEngineer] = NwpRunRowsWithoutWeatherFeatureEngineer()
 
     def __init__(self, model_params: BaseForecasterConfig) -> None:
         """Parse the power lags that become ensemble members.
@@ -178,7 +108,7 @@ class ManualHeuristicForecaster(BaseForecaster):
         error. Empty input gives an empty frame.
 
         Args:
-            data: Features engineered by ``PowerLagsPerNwpRunFeatureEngineer``.
+            data: Features engineered by ``NwpRunRowsWithoutWeatherFeatureEngineer``.
             fold_id: The value stamped onto every row's ``fold_id`` column.
 
         Returns:
@@ -214,22 +144,12 @@ class ManualHeuristicForecaster(BaseForecaster):
 
     def save(self, path: Path) -> None:
         """Replace ``path`` with a ``meta.json`` holding the config and the trained population."""
-        shutil.rmtree(path, ignore_errors=True)
-        path.mkdir(parents=True, exist_ok=True)
-        (path / "meta.json").write_text(
-            json.dumps(
-                {
-                    "model_params": self.model_params.model_dump(mode="json"),
-                    "trained_time_series_ids": self.trained_time_series_ids,
-                    "model_class": class_target(self),
-                }
-            )
-        )
+        clear_directory_and_write_meta(path=path, forecaster=self)
 
     @classmethod
     def load(cls, path: Path) -> Self:
         """Reconstruct a ManualHeuristicForecaster from the ``meta.json`` that ``save`` wrote."""
-        meta = json.loads((path / "meta.json").read_text())
+        meta = read_meta(path)
         instance = cls(cls.CONFIG_CLASS.model_validate(meta["model_params"]))
         instance._trained_ids = meta["trained_time_series_ids"]
         return instance

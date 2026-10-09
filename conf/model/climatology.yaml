@@ -1,0 +1,17 @@
+# Climatology forecaster configuration.
+#
+# The top-level _target_ identifies the BaseForecaster subclass to instantiate; model_params are
+# validated by that class's CONFIG_CLASS, as in conf/model/xgboost.yaml.
+#
+# The forecaster reads no feature, so selected_features stays empty; a non-empty list raises only
+# when trained_cv_model runs. The calendar cells, the pooling over each cell's eight neighbours,
+# and the 51 equiprobable quantile levels are fixed in code.
+
+_target_: baseline_forecasters.climatology.ClimatologyForecaster
+
+model_params:
+  selected_features: []
+
+  # MLflow experiment tags (used for leaderboard grouping)
+  weather_source: "none"
+  training_strategy: "none"

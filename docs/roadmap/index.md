@@ -133,7 +133,9 @@ AWS.*
   and remaining 🚧 items in [Metrics & leaderboard](metrics-and-leaderboard.md))
 - Time-slice filters: nowcasting (0–6 h), day-ahead (6–36 h), medium range (Day 2–7), extended range
   (Day 8–14), peak events (top 5%)
-- Baseline forecasters (persistence + climatology) so leaderboard scores are interpretable
+- Baseline forecasters (the manual heuristic and climatology, with persistence in v0.9 as
+  [#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087)) so leaderboard
+  scores are interpretable
 - **Cost-savings metrics (£)** — two figures per leaderboard row, for flexibility procurement and
   for curtailment, scored against manual review and against a perfect forecast; see [Estimating the
   money a better forecast saves](cost-savings-metrics.md). Expected to be the metrics NGED read
