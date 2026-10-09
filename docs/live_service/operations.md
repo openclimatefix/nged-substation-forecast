@@ -231,8 +231,9 @@ afternoon and then stops again leaves no trace.
 **NGED's fault notes.** The check description also carries one sentence naming each series whose
 metadata table row has an `information` note, for example `NGED fault notes: 33: "Analogues not
 working."`, whether or not the series is silenced. The note is NGED's own free text. Cleaning does
-not read it, because a note has no date. The ingest downloads the newest file of every series, even
-a small file with no readings, so a silenced series' note stays current.
+not read it, because a note has no date. The ingest downloads every file once, including a file with
+no readings, and takes each series' metadata from its newest file, so a silenced series' note stays
+current.
 
 `n_silenced` counts the ids you listed, not the ids that were actually withheld, so an id that
 matches no series still appears: that is how a mistyped id shows itself rather than vanishing.
@@ -277,12 +278,13 @@ also reaches Sentry tagged `degraded_asset:clean_nged_power_data`.
 `power_time_series_and_metadata`'s run metadata means the `TimeSeriesMetadata` table upsert raised
 and was swallowed so the power write could go ahead, and it also reaches Sentry tagged
 `degraded_asset:power_time_series_and_metadata`. The run **succeeds** by design: the metadata table
-is derived data that NGED re-delivers, and the power time series is not, so a metadata table fault
-must not stall the ingest until an operator intervenes. The metadata table is left unchanged and the
-next run that finds new files retries it, but *that run's* metadata change is lost, because the
-power rows have landed and `select_new_rows` will not offer those files again. Read the traceback in
-the run's logs — an off-contract metadata table after a schema change and a bug in our own code both
-land here, and both want a fix rather than a re-run.
+is derived data, and the power time series is not, so a metadata table fault must not stall the
+ingest until an operator intervenes. The metadata table is left unchanged, and *that run's* metadata
+change is lost until each affected series publishes its next file, about 6 hours later. The
+downloaded-files list still records the files, because holding it back would make every later hour
+download a growing backlog. Read the traceback in the run's logs — an off-contract metadata table
+after a schema change and a bug in our own code both land here, and both want a fix rather than a
+re-run.
 
 The 6-hourly forecasts are unaffected while this persists, however long it persists:
 `live_forecasts` locates each series from the promoted model's own frozen copy of the metadata table
@@ -453,6 +455,63 @@ operability
 test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself): append a
 row to the [intervention log](intervention-log.md) with the date, the trigger, the cause, the
 minutes spent, and whether this runbook covered it. A gap in this page is itself the finding.
+
+## Running the NGED ingest — first run, rebuilds, and the downloaded-files list
+
+**Trigger:** a new deployment, a rebuilt table, a Sentry event naming the downloaded-files list, or
+a run failing with `NgedFileParseError`.
+
+**The ingest downloads each file in NGED's bucket once.** `power_time_series_and_metadata` keeps a
+downloaded-files list, `list_of_downloaded_files.parquet`, beside `metadata.parquet`. The list holds
+the path and `LastModified` of every file in the bucket listing that the previous run processed in
+full. Each run downloads only the files whose path and `LastModified` the list lacks, appends their
+readings, and then writes the whole listing as the new list. A file that NGED rewrites gets a new
+`LastModified`, so the ingest downloads it again.
+
+**Run the ingest once by hand on a new deployment.** With no list, the first run downloads every
+file in the bucket: about 22,000 files (33 series, 165 days of history). Time one request first to
+estimate the run. Expect a few minutes, because the ingest keeps at most 32 requests open at a time.
+The first run also parses every historical file that has no readings, so a malformed old file fails
+the run (see the last paragraph of this section).
+
+**Set the `NGED_INGEST` pool's limit to 1 before the first run.** Run `dagster instance concurrency
+set NGED_INGEST 1`, because Dagster's YAML takes no per-pool limits and its `default_limit` would
+otherwise apply. The pool then queues any scheduled run behind the first run, so the first run and a
+scheduled run cannot append the same rows.
+
+**Rebuild a table by deleting it.** The ingest counts the list as empty, and downloads every file
+again, whenever the list, the `power_time_series` Delta table, or `metadata.parquet` does not exist.
+Deleting `metadata.parquet` therefore rebuilds the metadata table from the whole bucket on the next
+run. Moving the `power_time_series` table aside rebuilds the power table the same way.
+
+**Delete the list too when you put an older or different `power_time_series` table at its path.**
+The list then records files as loaded whose readings the restored table lacks, and the ingest cannot
+tell. Deleting `list_of_downloaded_files.parquet` makes the next run download every file.
+
+**Force one file to download again by removing its row from the list.** Read
+`list_of_downloaded_files.parquet` with `polars.read_parquet`, filter out the row whose `path` is
+that NGED file's key, and write the list back with `write_parquet`. Before appending, the ingest
+drops every reading already in the `power_time_series` table, so a repeat download adds nothing
+unless NGED changed a reading's time.
+
+**A `DownloadedFilesError` means the list is damaged, and the ingest stops until you delete the
+list.** The error message, which Sentry shows too, names the list's path. The ingest stops rather
+than reading a damaged list as empty, because an empty list would download the whole bucket. The next
+run after you delete the list downloads every file, and the ingest drops the readings already on
+disk.
+
+**Delete the list after any change to its columns.** The old list would otherwise fail validation and
+stop the ingest with `DownloadedFilesError`.
+
+**A failed list write is reported and does not fail the run.** Sentry then shows an event tagged
+`degraded_asset:power_time_series_and_metadata` with the downloaded-files list's path in its message:
+the readings landed, and only the list write failed. The next run downloads the same files again, and
+the ingest drops their readings.
+
+**A malformed file, or a file that breaks the `TimeSeriesMetadata` contract, fails the run and
+records nothing.** The run fails with a `NgedFileParseError` naming the file's path, and is not
+retried. The same file is selected every hour, so the ingest stalls until someone fixes the cause. No
+readings are lost: after the fix, the next run ingests the whole backlog.
 
 ## Inspecting a live forecast
 

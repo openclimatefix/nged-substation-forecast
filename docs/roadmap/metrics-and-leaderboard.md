@@ -511,30 +511,23 @@ single answer. TS-Arena avoids reusing any fixed evaluation window at all ([Meye
 for the reason just given, and it is the live-monitoring check where our practice matches the
 TS-Arena pattern instead.
 
+**A narrow scoring guard works whether or not a final-test year is ever reserved.**
+`final_test_start` in `conf/cv/default.yaml` is a date later than every leaderboard fold's
+`val_end`. The `metrics` asset refuses to score a window reaching that date unless the maintainer's
+shell sets `NGED_FINAL_TEST=1`. `studies.power.scan_power` stops at the same date. The date alone
+does not reserve an independent final-test year or show that its observations were never used for
+training. Ahead of Dynamical.org's backfill, the date protects against an experiment, especially an
+unsupervised autonomous research session, scoring on later data without the maintainer's say-so. The
+other refusals of the `metrics` asset, and the `study/` experiment prefix, are described in [What
+the `metrics` asset refuses to
+score](../ml_experimentation/cross-validation-folds.md#what-the-metrics-asset-refuses-to-score).
+
 #### Implementation details — final-test window (deleted when it ships)
 
 **1. Document the caveat (immediately).** A short "Selection bias" subsection in
 `docs/ml_experimentation/cross-validation-folds.md` restating the paragraphs above.
 
-**2. Add a narrow scoring guard independently of the reservation decision (#958).** Add
-`FINAL_TEST_START` to the fold
-configuration in `conf/cv/default.yaml`, a single date near the end of the current archive. The
-`metrics` asset refuses to score any window reaching past `FINAL_TEST_START` unless
-`NGED_FINAL_TEST=1` is set in the environment — set only in the maintainer's own shell, never by an
-experiment or a study script. `packages/studies` has no shared power reader yet (every study script
-reads the Delta table directly today); create one, gated at the same date, as part of this step
-rather than assuming one already exists. A study script that still calls `scan_delta` directly
-bypasses the gate, so this guards only callers that route through the shared reader, not the data
-itself. Choose the cutoff so the full seasonal selection window remains available to ordinary
-runs, and verify that those runs still work without the override. This scoring cutoff alone does
-not reserve an independent final-test year or establish that its observations were never used for
-training. What it buys immediately, ahead of Dynamical.org's backfill, is a guard against an
-experiment — especially an unsupervised autonomous research session (see [Protect the leaderboard
-scorer for autonomous
-research](https://github.com/openclimatefix/nged-substation-forecast/issues/958)) — scoring on data
-past the cutoff without the maintainer's explicit say-so.
-
-**3. If adopted in #960, reserve a final-test window once a second, independent year of data exists
+**2. If adopted in #960, reserve a final-test window once a second, independent year of data exists
 — not by shrinking the fold that decides promotion.** (Jack's note: I'm not convinced we should do
 this yet. Even when we have several years of data, may still want to train on as much data as
 possible, and not to hold
@@ -567,12 +560,10 @@ keys have the same property if fold populations differ. When adding any fold, ei
 leaderboard fold emits an identical key set, or make the parent-run aggregation record its per-key
 denominator.
 
-**Verification.** For the narrow guard: the `metrics` asset raises on a window past
-`FINAL_TEST_START` with `NGED_FINAL_TEST` unset, and accepts it with the variable set; the study
-power reader returns no rows after `FINAL_TEST_START`. If the full reservation is adopted:
-`register_experiment_job` must never create a partition for the `final_test` fold in any run mode
-(extend `tests/test_register_experiment_job.py`); and once the disjoint year lands, score one
-existing experiment against the reserved window end-to-end and confirm the rows reach
+**Verification.** If the full reservation is adopted: `register_experiment_job` must never create a
+partition for the `final_test` fold in any run mode (extend
+`tests/test_register_experiment_job.py`); and once the disjoint year lands, score one existing
+experiment against the reserved window end-to-end and confirm the rows reach
 `forecast_metrics.delta` with the window label while nothing is logged to the leaderboard MLflow
 runs.
 

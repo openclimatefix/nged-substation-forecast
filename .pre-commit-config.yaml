@@ -68,6 +68,15 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+      # The scorer's pure core (`ml_core.metrics`, `ml_core.cv_helpers`) must import neither Dagster,
+      # MLflow, nor the study code. See `[tool.importlinter]` in pyproject.toml. The CI step
+      # "Pre-commit (every hook, every file)" runs this hook, so the contract is checked on every pull request.
+      - id: import-linter
+        name: import-linter
+        entry: uv run lint-imports
+        language: system
+        pass_filenames: false
+        always_run: true
       - id: pymarkdown
         name: pymarkdown (markdown files)
         entry: uv run pymarkdown scan

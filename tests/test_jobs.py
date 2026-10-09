@@ -164,7 +164,11 @@ def _mixed_fold_config() -> CvConfig:
         val_start=date(2025, 2, 1),
         val_end=date(2025, 2, 28),
     )
-    return CvConfig(folds=[*leaderboard_folds, dev_fold])
+    return CvConfig(
+        folds=[*leaderboard_folds, dev_fold],
+        final_test_start=date(2030, 1, 1),
+        reference_experiment_name="reference",
+    )
 
 
 def test_smoke_test_uses_the_non_leaderboard_folds() -> None:

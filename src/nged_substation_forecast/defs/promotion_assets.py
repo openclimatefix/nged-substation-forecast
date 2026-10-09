@@ -71,6 +71,9 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
     which replaces the directory atomically), then reads back ``meta.json`` to report provenance.
     ``live_forecasts`` reads this directory with a plain disk load — never MLflow.
 
+    A run from a ``study/`` experiment holds no model archive, so fetching its artifacts raises
+    before the directory is replaced.
+
     Promotion refuses a model whose saved config this code cannot rebuild — a feature name it
     cannot parse, or a ``model_params`` key it no longer declares — and refuses it before the
     directory is replaced, so the previous champion stays in place and keeps serving.
