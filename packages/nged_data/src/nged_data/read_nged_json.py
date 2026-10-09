@@ -25,6 +25,13 @@ log = logging.getLogger(__name__)
 # for both the ECMWF NWP and the NGED locations.
 
 
+class NoReadingsInFile(Exception):
+    """Raised by `_extract_power_time_series` when a file's `data` field holds no readings.
+
+    NGED's meter reported nothing for the period the file covers.
+    """
+
+
 class ExtractedPowerTimeSeries(NamedTuple):
     """Result of parsing ``PowerTimeSeries`` rows out of one NGED JSON file.
 
@@ -62,24 +69,29 @@ def _extract_time_series_metadata(df: pl.DataFrame) -> pt.DataFrame[TimeSeriesMe
 def _extract_power_time_series(df: pl.DataFrame, time_series_id: int) -> ExtractedPowerTimeSeries:
     """Extract PowerTimeSeries from NGED's JSON data converted to DataFrame.
 
-    If NGED's meter reported no values, the `data` field in the JSON will be Null. Less commonly
-    the field is an empty array `[]`, which `pl.read_json` infers as `List(Null)`. In both cases
-    this function raises `polars.exceptions.InvalidOperationError: invalid dtype: expected
-    'Struct', got 'Null' for 'data'`.
+    If NGED's meter reported no values, the `data` field in the JSON is an empty array `[]`, which
+    `pl.read_json` infers as `List(Null)`, or `null`, which it infers as `Null`. In both cases this
+    function raises `NoReadingsInFile`. The check reads the dtype, because the error Polars raises
+    differs between the two cases: `unnest` raises for `[]` and `explode` for `null`. A `data` field
+    of any other dtype that is not a list of structs is malformed, and raises from Polars.
+
+    Args:
+        df: One NGED JSON file, read by `pl.read_json`.
+        time_series_id: The series the file belongs to, stamped on every row.
+
+    Returns:
+        The file's readings, with the count of rows dropped as implausible.
+
+    Raises:
+        NoReadingsInFile: if the `data` field is null or an empty array.
     """
+    if df.schema["data"] in (pl.Null, pl.List(pl.Null)):
+        raise NoReadingsInFile
     # Extract time series data: explode the 'data' column and unnest the struct. 'explode' expands
     # the list of structs into individual rows. 'unnest' expands the struct fields into individual
     # columns.
     #
-    # empty_as_null=False matches the Polars 2.0 default and silences the deprecation warning; it
-    # has no effect on output here. An empty 'data: []' array is read by pl.read_json as List(Null),
-    # because a single file can't infer the struct fields of an empty array. After explode, under
-    # *both* settings, the .unnest("data") below then raises the same InvalidOperationError that a
-    # Null 'data' field raises: "expected 'Struct', got 'Null' for 'data'". storage.py's
-    # download_and_parse_files catches that exact message, logs a warning, and skips the file. An
-    # empty-data file is therefore handled identically to the documented null-data case, whichever
-    # way empty_as_null is set. The two settings differ on one case only: an empty List(Struct) with
-    # a known schema. That case can't arise from pl.read_json of a single file.
+    # empty_as_null=False matches the Polars 2.0 default and silences the deprecation warning.
     time_series_df = df.select("data").explode("data", empty_as_null=False).unnest("data")
 
     time_series_df = time_series_df.rename({"endTime": "time", "value": "power"})

@@ -1,17 +1,22 @@
+import json
 import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import cast
 
+import obstore
 import patito as pt
 import polars as pl
 import pytest
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from nged_data.storage import (
+    NoNewData,
     _process_file_listing,
     _ProcessedFileListing,
     _RawFileListItem,
     coverage_from_power,
+    download_and_parse_files,
     remove_small_files_from_listing,
     scan_cleaned_power,
     select_new_rows,
@@ -612,3 +617,47 @@ def test_coverage_from_power_matches_time_series_coverage(tmp_path: Path):
     power = pt.LazyFrame.from_existing(pl.scan_delta(str(delta_path))).set_model(PowerTimeSeries)
 
     assert coverage_from_power(power).equals(time_series_coverage(str(delta_path)))
+
+
+def _file_without_readings(*, time_series_id: int, data_field: str) -> bytes:
+    """A real NGED file's metadata fields, with the given `data` field instead of readings."""
+    fixture = Path(__file__).parent / "data" / "TimeSeries_10.json"
+    file_contents = json.loads(fixture.read_text())
+    file_contents.update(TimeSeriesID=time_series_id, data=json.loads(data_field))
+    return json.dumps(file_contents).encode()
+
+
+def _listing_of(paths: list[str]) -> pt.DataFrame[_ProcessedFileListing]:
+    return _process_file_listing(
+        [_RawFileListItem(path=path, filesize_bytes=10_000) for path in paths]
+    )
+
+
+@pytest.mark.parametrize("data_field", ["null", "[]"])
+def test_download_and_parse_files_skips_a_file_without_readings_and_keeps_the_others(
+    data_field: str,
+):
+    real_file = (Path(__file__).parent / "data" / "TimeSeries_11.json").read_bytes()
+    real_path = "timeseries/1774512000000_1774533600000/TimeSeries_11_a_b.json"
+    empty_path = "timeseries/1774512000000_1774533600000/TimeSeries_10_a_b.json"
+    store = obstore.store.MemoryStore()
+    obstore.put(store, real_path, real_file)
+    obstore.put(store, empty_path, _file_without_readings(time_series_id=10, data_field=data_field))
+
+    result = download_and_parse_files(
+        store=cast(obstore.store.S3Store, store), paths_df=_listing_of([empty_path, real_path])
+    )
+
+    assert set(result.power_time_series["time_series_id"]) == {11}
+    assert set(result.metadata["time_series_id"]) == {10, 11}
+
+
+def test_download_and_parse_files_raises_no_new_data_when_every_file_is_without_readings():
+    path = "timeseries/1774512000000_1774533600000/TimeSeries_10_a_b.json"
+    store = obstore.store.MemoryStore()
+    obstore.put(store, path, _file_without_readings(time_series_id=10, data_field="null"))
+
+    with pytest.raises(NoNewData):
+        download_and_parse_files(
+            store=cast(obstore.store.S3Store, store), paths_df=_listing_of([path])
+        )
