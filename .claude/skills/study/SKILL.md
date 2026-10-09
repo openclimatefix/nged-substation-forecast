@@ -181,7 +181,8 @@ effect must exist) shows the instrument can detect an effect at all. Before a nu
 "no effect", either a positive control must have passed or the interval must bound the effect, as in
 "an effect as large as 0.08 points is not excluded".
 
-**When a study fits XGBoost models, plot each column's feature importance, but never read importance as evidence that an input helps.** Show each column's share of the total gain
+**When a study fits XGBoost models, plot each column's feature importance, but never read
+importance as evidence that an input helps.** Show each column's share of the total gain
 (`Booster.get_score(importance_type="total_gain")`), with the spread across folds and seeds. Scale
 the shares to sum to 1 within each XGBoost model, then average them over folds and seeds. Sum the
 shares by feature group where the study adds columns in groups. Add a negative control to the same
