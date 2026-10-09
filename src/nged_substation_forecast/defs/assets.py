@@ -166,9 +166,9 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     row dedupe drops the repeats. The list counts as empty, and the run downloads every file in the
     bucket, when the list file, the ``power_time_series`` table, or the metadata parquet does not
     exist. A damaged list stops the run with ``DownloadedFilesError``, and a malformed NGED file
-    stops it with ``NgedFileParseError``. Both stalls lose no readings. See
-    https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/ for the
-    first run, rebuilds, and these errors.
+    stops it with ``NgedFileParseError``. Both stalls lose no readings. The [operations
+    page](https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/)
+    covers the first run, rebuilds, and these errors.
 
     Runs hourly on ``power_time_series_and_metadata_schedule``, 5 minutes before
     ``live_forecasts_schedule`` ticks. A failed or skipped run leaves nothing behind to repair: the
