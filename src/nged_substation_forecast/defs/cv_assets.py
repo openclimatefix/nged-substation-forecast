@@ -1086,6 +1086,13 @@ def _read_scoring_inputs(
 ]:
     """Read the observed power, the metadata table, and the effective capacity that scoring joins.
 
+    Args:
+        settings: Supplies the storage options and the paths of the three inputs.
+
+    Returns:
+        The lazy observed power, the validated metadata table, and the validated effective
+        capacity, in that order.
+
     Raises:
         FileNotFoundError: If the ``effective_capacity`` Delta table does not exist.
     """
