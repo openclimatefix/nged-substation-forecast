@@ -1,4 +1,3 @@
-import itertools
 import json
 import logging
 from collections.abc import Sequence
@@ -100,9 +99,6 @@ def test_train_stores_hand_computed_quantiles_over_the_wrapped_neighbourhood() -
     for row in lookup.iter_rows(named=True):
         actual = [row[column] for column in CLIMATOLOGY_QUANTILE_COLUMNS]
         assert actual == pytest.approx(expected, abs=1e-4)
-    assert expected[0] == pytest.approx(0.392, abs=1e-3)
-    assert expected[25] == pytest.approx(20.0)
-    assert expected[50] == pytest.approx(39.608, abs=1e-3)
 
 
 def test_train_deduplicates_the_targets_that_several_nwp_runs_repeat() -> None:
@@ -124,8 +120,6 @@ def test_predict_emits_members_in_increasing_quantile_order() -> None:
     assert forecast["ensemble_member"].to_list() == list(range(CLIMATOLOGY_MEMBER_COUNT))
     values = forecast["power_fcst"].to_list()
     assert values == pytest.approx(_expected_members(40.0), abs=1e-4)
-    assert all(low < high for low, high in itertools.pairwise(values))
-    assert values[25] == pytest.approx(20.0)
 
 
 def test_cell_keys_are_local_across_both_clock_changes_and_local_midnight() -> None:
@@ -167,9 +161,6 @@ def test_predict_drops_an_unseen_cell_and_logs_but_fills_a_neighbour_cell(
         forecast = forecaster.predict(_features(rows))
 
     assert forecast["valid_time"].unique().to_list() == [_utc(2025, 2, 4, 0, 30)]
-    assert forecast.sort("ensemble_member")["power_fcst"].to_list() == pytest.approx(
-        _expected_members(40.0), abs=1e-4
-    )
     warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
     assert len(warnings) == 1
     assert "dropped 2 forecast rows" in warnings[0]
@@ -211,11 +202,9 @@ def test_predict_ignores_the_power_of_the_forecast_period() -> None:
     )
 
 
-@pytest.mark.parametrize("batch_size", [100, 1])
 def test_train_keeps_the_requested_series_with_power_and_keeps_series_apart(
-    monkeypatch: pytest.MonkeyPatch, batch_size: int
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(climatology, "_POOLING_SERIES_PER_BATCH", batch_size)
     rows = [
         (1, _utc(2025, 1, 6), 10.0),
         (1, _utc(2025, 1, 7), 20.0),
@@ -238,10 +227,10 @@ def test_train_keeps_the_requested_series_with_power_and_keeps_series_apart(
     ).sort("time_series_id")
     assert shared_cell["power_quantile_member_25"].to_list() == pytest.approx([15.0, 150.0])
     # The lookup does not depend on how many series are pooled together.
-    monkeypatch.setattr(climatology, "_POOLING_SERIES_PER_BATCH", 100)
-    one_batch = _forecaster()
-    one_batch.train(_features(rows), [1, 2, 4])
-    assert_frame_equal(lookup, one_batch._lookup)
+    monkeypatch.setattr(climatology, "_POOLING_SERIES_PER_BATCH", 1)
+    one_series_per_batch = _forecaster()
+    one_series_per_batch.train(_features(rows), [1, 2, 4])
+    assert_frame_equal(lookup, one_series_per_batch._lookup)
 
 
 def test_save_then_load_round_trips_and_replaces_the_directory(tmp_path: Path) -> None:

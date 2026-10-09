@@ -1,10 +1,4 @@
-"""The climatology baseline: quantiles of past power at the same calendar month, time, and day type.
-
-Climatology answers one question: at long lead times, does the weather ensemble know more than the
-distribution of past power at that time of year, time of day, and day type? The forecaster stores
-51 empirical quantiles of training power for each calendar cell, and emits them as 51 ensemble
-members. See the package README for what each member means and for the caveats of the comparison.
-"""
+"""The climatology baseline: see ``ClimatologyForecaster`` and the package README."""
 
 import itertools
 import logging
@@ -289,7 +283,7 @@ class ClimatologyForecaster(BaseForecaster):
                 ensemble_member=pl.col("quantile_column").replace_strict(
                     _QUANTILE_COLUMN_TO_MEMBER, return_dtype=pl.Int8
                 ),
-                power_fcst=pl.col("quantile_value").cast(pl.Float32),
+                power_fcst="quantile_value",
                 nwp_init_time=pl.lit(None, dtype=UTC_DATETIME_DTYPE),
                 power_fcst_model_name=pl.lit(self.MODEL_NAME),
                 power_fcst_model_version=pl.lit(self.MODEL_VERSION, dtype=pl.Int16),

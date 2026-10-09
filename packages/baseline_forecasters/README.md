@@ -16,26 +16,21 @@ analogues and members 6 to 12 are the annual analogues. What the member index me
 forecasters is described on `PowerForecast.ensemble_member`. `nwp_init_time` is null on every row,
 because the forecaster consumes no weather.
 
-**`ClimatologyForecaster` emits 51 quantiles of past power as 51 ensemble members.** Climatology
-answers one question: at long lead times, does the weather ensemble know more than the distribution
-of past power at that time of year, time of day, and day type? A calendar cell is a series, a local
-month, a local half-hour of day, and a local weekday-or-weekend flag, all derived from `valid_time`
-in Europe/London time. Each training sample counts towards nine cells: its own, and the cells one
-month and one half-hour either side, with the same weekend flag. December and January are
-neighbours, and so are half-hours 47 and 0. The weekend flag stays that of the original sample, so a
-weekday cell only ever pools weekday samples. `train` stores the quantiles of each cell's pooled
-samples at the equiprobable levels `(k + 0.5)/51` for k = 0 to 50, using linear interpolation.
-`predict` looks up the cell of each forecast row, and member k is the quantile at level
-`(k + 0.5)/51`, so member 0 is the lowest quantile and member 25 is the median. `nwp_init_time` is
-null on every row, because the forecaster consumes no weather. Bank holidays are ordinary days.
+**`ClimatologyForecaster` emits 51 quantiles of past power as 51 ensemble members.** A calendar cell
+is a series, a local month, a local half-hour of day, and a local weekday-or-weekend flag, all
+derived from `valid_time` in Europe/London time. Each training sample counts towards nine cells: its
+own, and the cells one month and one half-hour either side, with the same weekend flag. December and
+January are neighbours, and so are half-hours 47 and 0. `train` stores the quantiles of each cell's
+pooled samples at the equiprobable levels `(k + 0.5)/51` for k = 0 to 50, using linear
+interpolation. `predict` looks up the cell of each forecast row. Member 0 is the lowest quantile and
+member 25 is the median. `nwp_init_time` is null on every row, because the forecaster consumes no
+weather. Bank holidays are ordinary days.
 
-**The quantiles are equiprobable, and there are 51 of them, for three reasons.** The metrics layer
+**The quantiles are equiprobable, and there are 51 of them, for two reasons.** The metrics layer
 treats the members as an equiprobable sample, so members at the tail-heavy delivery levels would be
 read as a wider-tailed distribution than the climatology they represent. The 51 members match the 51
 members of the ECMWF ensemble, so climatology and a 51-member XGBoost ensemble compare at equal
-member count on the size-dependent metrics. And a deterministic climatology would collapse the
-continuous ranked probability score (CRPS) to the mean absolute error, so it could only be compared
-with the weather ensemble on point accuracy.
+member count on the size-dependent metrics.
 
 ## Why the baselines have their own feature engineer
 

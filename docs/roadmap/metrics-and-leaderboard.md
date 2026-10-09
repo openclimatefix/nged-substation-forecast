@@ -6,10 +6,10 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 > Dagster asset, the deterministic metrics (MAE, NMAE, RMSE, MBE), and the probabilistic metrics
 > (CRPS, spread-skill ratio, pinball loss, PICP, interval width — see the [evaluation-metrics
 > reference](../techniques/evaluation-metrics.md)) are ✅ implemented, as are the `manual_heuristic`
-> and `climatology` baseline forecasters. The interactive leaderboard
-> visualisation is 🚧 planned. The implemented [cross-validation
-> protocol](../ml_experimentation/cross-validation-folds.md) has moved out of the roadmap. See the
-> [roadmap index](index.md) for status conventions. The 🚧 items are tracked under the v0.3 epic
+> and `climatology` baseline forecasters. The interactive leaderboard visualisation is 🚧 planned.
+> The implemented [cross-validation protocol](../ml_experimentation/cross-validation-folds.md) has
+> moved out of the roadmap. See the [roadmap index](index.md) for status conventions. The 🚧 items
+> are tracked under the v0.3 epic
 > [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6): baseline forecasters
 > [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) · probabilistic
 > evaluation [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225) · tail &
@@ -300,9 +300,7 @@ yardstick here; `manual_heuristic` is the point on it.
 
 ### Implementation details — baselines (deleted when they ship)
 
-PR A, the `manual_heuristic` baseline with its `baseline_forecasters` package and its feature
-engineer, has shipped. PR C, the `climatology` baseline, has shipped too, tracked in
-[#1086](https://github.com/openclimatefix/nged-substation-forecast/issues/1086). The `persistence`
+The `persistence`
 baseline (PR B) is deferred to the v0.9 nice-to-haves epic
 ([#361](https://github.com/openclimatefix/nged-substation-forecast/issues/361)) and tracked in
 [#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087). The metrics
