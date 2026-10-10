@@ -475,6 +475,8 @@ def satellite_ratios(
     weather: pl.DataFrame,
     cams: pl.DataFrame,
     lead_day: int,
+    first_days_back: int = SATELLITE_LAG_DAYS,
+    prefix: str = "pc",
 ) -> pl.DataFrame:
     """Return PC: power to satellite irradiance over 7 days, and satellite to forecast over 30.
 
@@ -487,16 +489,18 @@ def satellite_ratios(
         weather: The lead-day's `nwp_ghi`.
         cams: `ghi_cams`, with `site` and `time`.
         lead_day: The forecast's lead-day.
+        first_days_back: The nearest whole day the windows read, 1 for the service's latency.
+        prefix: The columns' prefix, `pc` for PC and `pc2` for PC with a 2-day latency.
 
     Returns:
-        `pc_power_to_cams_7d` and `pc_cams_to_forecast_30d`.
+        `<prefix>_power_to_cams_7d` and `<prefix>_cams_to_forecast_30d`.
     """
     power_cams = (
         hourly.join(cams, on=["site", "time"])
         .drop_nulls(["power_mw", "ghi_cams"])
         .filter(pl.col("ghi_cams") > TRANSFER_MIN_IRRADIANCE_W_M2)
     )
-    first = SATELLITE_LAG_DAYS
+    first = first_days_back
     power = _window(
         rows=rows,
         table=power_cams.select("site", "time", "power_mw"),
@@ -540,8 +544,8 @@ def satellite_ratios(
     )
     return pl.DataFrame(
         {
-            "pc_power_to_cams_7d": power / satellite,
-            "pc_cams_to_forecast_30d": cams_mean / forecast_mean,
+            f"{prefix}_power_to_cams_7d": power / satellite,
+            f"{prefix}_cams_to_forecast_30d": cams_mean / forecast_mean,
         }
     )
 

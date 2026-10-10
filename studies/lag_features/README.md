@@ -40,6 +40,73 @@ plant's month with 20 boosting rounds, writes `checkpoints_smoke/` and
 `losses_<product>_smoke.parquet`, and is not a result. `report_lag_features.py --smoke` and
 `lag_features_charts.py --smoke` read its output.
 
+## The post hoc follow-ups
+
+**The first science review asked for these re-runs and analyses, and every one is post hoc.** They
+add to the first run and never change it: all outputs sit under
+`<output-root>/ens_mean/followups/`, with their own checkpoints, manifest and report. Run the
+scripts in this order, after the first run's four scripts.
+
+```bash
+uv run python studies/lag_features/followup_frames.py
+uv run python studies/lag_features/fit_followups.py --dry-run
+uv run python studies/lag_features/fit_followups.py --device cuda --max-workers 4
+uv run python studies/lag_features/report_followups.py
+uv run python studies/lag_features/lag_features_charts.py --followups --text-only
+uv run python studies/lag_features/lag_features_charts.py --followups
+```
+
+`--smoke` on `fit_followups.py`, `report_followups.py` and `lag_features_charts.py --followups` runs
+the real path on 20 seeded random rows of each plant's month with 20 boosting rounds, and writes
+`_smoke` files.
+
+| Script | What it does |
+|---|---|
+| `followup_frames.py` | Builds the control frames, the long-lead frames with the climatology columns, and the PC2 frame, with the anchor assertions and leak probes. |
+| `fit_followups.py` | Fits the follow-up arms (4,350 fits: `--dry-run` prints the count by group) and scores the no-fit climatology blends. |
+| `report_followups.py` | Prints the follow-up tables and the no-fit analyses into `report_followups_ens_mean.md`. |
+
+**What the follow-ups add.**
+
+- **Positive controls that can be passed.** The oracle O (B0 plus the true shift factor) and the
+  arms W7, Q30, TF, AN and PC in the month-level control at 5% and 10%, and a second control with
+  plant-specific persistent steps (8 steps of 4 to 12 weeks per plant, from three months before the
+  scored period) for O, L1, W7, Q30, TF and AN. "Recovers" is a 99% interval wholly below zero and
+  the share of the oracle's gain recovered, not the 2% rule. B0 is fitted on every control frame
+  too, which the 2,160 fits the review counted leave out (360 more fits).
+- **Long leads** (lead-days 7, 10, 14): CL (B0 plus the out-of-fold climatology), W7+CL, N2-3, the
+  sensitivity setting at days 10 and 14, and the no-fit 50/50 blends of B0 and W7 with climatology.
+- **PC2**: PC with a 2-day CAMS latency (windows days 2 to 8 and 2 to 31) at lead-day 1.
+- **Fingerprint decomposition** (global scope, the first run's fleet-wide folds): G-ID+TF,
+  G-FPnoCK (G-FP without CK), leave-one-plant-out of G-FPnoCK, and per-plant B0 on the fleet-wide
+  folds. A pooled arm is 15 fits, so this group is 210 fits.
+- **No-fit analyses**: every arm's gain over B0 on the 8 unselected months, split by era;
+  per-quantile hit rates of B0 and L1; the count of exploratory intervals in each report; the
+  hindsight per-plant-month scaling bound on the real data and the controls; and the month-cluster
+  t-interval beside the bootstrap interval for P1 to P5.
+
+**Choices the brief did not settle.**
+
+- **R1s** needs no fit and is not scored on the controls.
+- **The climatology column** is a `{fold}` column: for a scored fold, a training row reads the
+  median over the folds outside both its own and the scored fold. It uses other folds' months,
+  including later ones, as the published climatology baseline does.
+- **Overlapping steps** do not compound: the factor is one minus the shift while any step covers
+  the hour.
+- **The hindsight scale** is each plant-month's measured energy over its predicted energy.
+- **The leak probe** runs on the 10% control of each kind, on lead-day 14 and on PC2, because the
+  other frames share their code. The probe cuts PC2's CAMS at two days before the issue day.
+- **The first report's interval count** reads the difference tables outside the planned contrasts
+  and the controls.
+
+**Files under `followups/`.** `frames/<name>_ens_mean.parquet`: the follow-up frames.
+`build_report_followups_ens_mean.md`: their build report, with the realised shifted share per plant.
+`checkpoints/`: one file per (scope, setting, arm) and `run_manifest.json`.
+`losses_followups_ens_mean.parquet`: the per-row losses, including the blends.
+`report_followups_ens_mean.md` and `tables_followups_ens_mean/`: the report and the tables the
+figures read. `figures_followups_ens_mean/` and `figure_text_followups_ens_mean.txt`: the figures
+and their text.
+
 ## Choices the plan did not settle
 
 - **The lag source** is NGED's hourly power with the multi-day zero runs, meter spikes, commissioning

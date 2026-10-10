@@ -238,6 +238,19 @@ arms named `G-` are fitted only as one model across the plants."""
 FRAME_ONLY_ARMS: Final[tuple[str, ...]] = ("N2-wide",)
 """Arms that only name columns the frame must hold; N2-k is fitted from them when X is wide."""
 
+FOLLOWUP_EXTRA_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
+    "O": ("oracle_factor",),
+    "PC2": ("pc2_power_to_cams_7d", "pc2_cams_to_forecast_30d"),
+    "CL": ("climatology_fold{fold}",),
+    "W7+CL": (*W7_COLUMNS, "climatology_fold{fold}"),
+    "G-ID+TF": ("plant_code", *TF_COLUMNS),
+    "G-FPnoCK": (*TF_COLUMNS, *DT_COLUMNS),
+}
+"""The post hoc follow-up arms' columns beyond B0's. They sit apart from `EXTRA_COLUMNS` so that
+`SWEEP_ARMS` and the first run's frames are unchanged. `O` is B0 plus the true shift factor (an
+oracle for the positive controls), `CL` adds the out-of-fold climatology, and `PC2` is PC with a
+2-day CAMS latency."""
+
 GLOBAL_ONLY_ARMS: Final[tuple[str, ...]] = ("G-ID", "G-FP")
 """Arms fitted only in the global scope; they stay out of the per-plant shortlist rule."""
 
@@ -290,6 +303,8 @@ WINDOW_FIRST_DAY: Final[dict[str, int]] = {
     "pc_power_to_cams_7d": SATELLITE_LAG_DAYS,
     "pc_cams_to_forecast_30d": SATELLITE_LAG_DAYS,
     "null_lag_8_to_28": 8,
+    "pc2_power_to_cams_7d": 2,
+    "pc2_cams_to_forecast_30d": 2,
 }
 """The nearest day (counted from the latest whole day) of each same-clock-hour window. The anchor
 assertions check each one. N2's random day is deliberately unanchored, because a true null reads
@@ -338,6 +353,9 @@ POSITIVE_CONTROL_LAST_MONTH: Final[str] = "2026-06"
 
 POSITIVE_CONTROL_SHIFTS: Final[tuple[float, ...]] = (0.02, 0.05, 0.10)
 """The fractions of power lost in a shifted month: 2%, 5% and 10%."""
+
+PC2_FIRST_DAY: Final[int] = 2
+"""PC2 reads CAMS irradiance two whole days back, a 2-day latency (post hoc follow-up)."""
 
 LEAK_PROBE_RELATIVE_TOLERANCE: Final[float] = 1e-9
 """A probe column differs if it moves by more than this times one plus its own size. A clean build
@@ -618,7 +636,7 @@ def _random_other_fold_lags(
     }
     draws = np.full((rows.height, N2_DRAWS), np.nan)
     keyed = rows.select("site", "fold", clock=pl.col("time").dt.time()).with_row_index("row")
-    for (site, clock, fold), group in keyed.group_by("site", "clock", "fold"):
+    for (site, clock, fold), group in keyed.group_by("site", "clock", "fold", maintain_order=True):
         source = sources.get((site, clock))
         if source is None:
             continue
@@ -665,6 +683,41 @@ def _same_hour_columns(
     return columns
 
 
+def _satellite_columns(
+    *,
+    rows: pl.DataFrame,
+    inputs: LagInputs,
+    weather: pl.DataFrame,
+    lead_day: int,
+    needed: set[str],
+) -> dict[str, pl.Series]:
+    """Build PC's and PC2's columns where an arm needs them.
+
+    Args:
+        rows: Rows with `site` and `time`.
+        inputs: The inputs, holding the lag source and CAMS.
+        weather: The lead-day's weather.
+        lead_day: The forecast's lead-day.
+        needed: Every column the arms need.
+
+    Returns:
+        The `pc_*` and `pc2_*` columns in `needed`.
+    """
+    columns: dict[str, pl.Series] = {}
+    for first, prefix in ((SATELLITE_LAG_DAYS, "pc"), (PC2_FIRST_DAY, "pc2")):
+        if f"{prefix}_power_to_cams_7d" in needed:
+            columns |= satellite_ratios(
+                rows=rows,
+                hourly=inputs.hourly,
+                weather=weather,
+                cams=inputs.cams,
+                lead_day=lead_day,
+                first_days_back=first,
+                prefix=prefix,
+            ).to_dict()
+    return columns
+
+
 def lag_columns(
     *,
     rows: pl.DataFrame,
@@ -689,7 +742,7 @@ def lag_columns(
         `rows` with the columns of `EXTRA_COLUMNS` that do not hold a `{fold}`, for those arms, and
         each row's latest issue-morning hour read, or `None` if no arm needs IM.
     """
-    needed = {c for arm in arms for c in EXTRA_COLUMNS[arm] if "{fold}" not in c}
+    needed = {c for arm in arms for c in extra_columns_of(arm=arm) if "{fold}" not in c}
     hourly = inputs.hourly
     columns: dict[str, pl.Series] = {}
     if "lag_ghi_d1" in needed:
@@ -720,10 +773,9 @@ def lag_columns(
         columns |= analogue_ensemble(
             rows=rows, hourly=hourly, weather=weather, clear_sky=inputs.clear_sky, lead_day=lead_day
         ).to_dict()
-    if "pc_power_to_cams_7d" in needed:
-        columns |= satellite_ratios(
-            rows=rows, hourly=hourly, weather=weather, cams=inputs.cams, lead_day=lead_day
-        ).to_dict()
+    columns |= _satellite_columns(
+        rows=rows, inputs=inputs, weather=weather, lead_day=lead_day, needed=needed
+    )
     daily_needed = [c for c in DAILY_FEATURE_COLUMNS if c in needed]
     if daily_needed:
         columns |= lookup_daily(
@@ -850,7 +902,7 @@ def extra_columns_of(*, arm: str) -> tuple[str, ...]:
     """
     if arm.startswith("N2-") and arm != "N2-wide":
         return N2_WIDE_COLUMNS[: int(arm.removeprefix("N2-"))]
-    return EXTRA_COLUMNS[arm]
+    return EXTRA_COLUMNS[arm] if arm in EXTRA_COLUMNS else FOLLOWUP_EXTRA_COLUMNS[arm]
 
 
 def arms_columns_table(*, arms: Sequence[str]) -> list[str]:
@@ -864,7 +916,7 @@ def arms_columns_table(*, arms: Sequence[str]) -> list[str]:
     """
     lines = ["| Arm | Columns | Count |", "|---|---|---|"]
     for arm in arms:
-        columns = (*B0_COLUMNS, *EXTRA_COLUMNS[arm])
+        columns = (*B0_COLUMNS, *extra_columns_of(arm=arm))
         lines.append(f"| {arm} | {', '.join(f'`{c}`' for c in columns)} | {len(columns)} |")
     return lines
 
@@ -878,6 +930,7 @@ def build_frame(
     inputs: LagInputs,
     weather_lead0: pl.DataFrame | None,
     shift: float = 0.0,
+    factor: pl.Expr | None = None,
 ) -> tuple[pl.DataFrame, list[str]]:
     """Build one lead-day's frame: the shared rows with the arms' columns and the row filter.
 
@@ -890,6 +943,9 @@ def build_frame(
             the inputs built from it.
         weather_lead0: The ENS mean's lead-day 0 weather, for IM, or `None`.
         shift: The positive control's fraction of power lost, scaling the target to match `hourly`.
+        factor: A post hoc control's shift factor, an expression of `site` and `time`, which
+            scales the target and fills `oracle_factor`; the caller has scaled the lag source by
+            the same expression.
 
     Returns:
         The frame, and report lines giving the row counts and each requirement's drop count.
@@ -902,6 +958,10 @@ def build_frame(
     rows = rows.filter(pl.col("time") < cutoff)
     if shift:
         rows = rows.with_columns(**{TARGET: shifted_power(shift=shift).cast(pl.Float64)})
+    if factor is not None:
+        rows = rows.with_columns(oracle_factor=factor).with_columns(
+            **{TARGET: (pl.col(TARGET) * pl.col("oracle_factor")).cast(pl.Float64)}
+        )
     assert_before_cutoff(frame=rows, name="the frame's rows")
     built, morning_latest = lag_columns(
         rows=rows,
@@ -923,7 +983,7 @@ def build_frame(
             f"`studies.power.scan_power` cannot read their lags: {after_cutoff}"
         ),
     ]
-    needed = {c for arm in arms for c in EXTRA_COLUMNS[arm]}
+    needed = {c for arm in arms for c in extra_columns_of(arm=arm)}
     anchors = window_anchor_lines(
         rows=built,
         lead_day=lead_day,
@@ -939,13 +999,13 @@ def build_frame(
     kept = built.filter(pl.all_horizontal(pl.col(c).is_not_null() for c in keep))
     lines.append(f"- rows kept: {kept.height}, dropped in all: {built.height - kept.height}")
     optional = [
-        c for arm in arms for c in EXTRA_COLUMNS[arm] if c in kept.columns and c not in keep
+        c for arm in arms for c in extra_columns_of(arm=arm) if c in kept.columns and c not in keep
     ]
     lines.extend(
         f"- null share of `{column}` among kept rows: {kept[column].is_null().mean():.3f}"
         for column in dict.fromkeys(optional)
     )
-    arm_columns = [c for arm in arms for c in EXTRA_COLUMNS[arm] if "{fold}" not in c]
+    arm_columns = [c for arm in arms for c in extra_columns_of(arm=arm) if "{fold}" not in c]
     references = [
         c
         for c in kept.columns
@@ -981,7 +1041,11 @@ LEAK_PROBE_SEED: Final[int] = 1138
 """The leak probe rebuilds the columns of 20 seeded random rows on each of 10 seeded random target
 days, 200 rows in all, from inputs cut at each day's issue time."""
 
-LEAK_PROBE_SKIPPED: Final[tuple[str, ...]] = ("null_lag_8_to_28", *N2_WIDE_COLUMNS)
+LEAK_PROBE_SKIPPED: Final[tuple[str, ...]] = (
+    "null_lag_8_to_28",
+    *N2_WIDE_COLUMNS,
+    "oracle_factor",
+)
 """The random-lag controls, whose draws depend on how many rows are drawn together, and N2, which
 reads the whole record by design."""
 
@@ -994,6 +1058,7 @@ def leak_probe(
     weather_lead0: pl.DataFrame | None,
     arms: Sequence[str],
     lead_day: int,
+    cams_available_days: int = CAMS_AVAILABLE_THROUGH_DAYS_BEFORE_ISSUE,
 ) -> list[str]:
     """Rebuild sampled rows' columns from inputs cut at their issue time, and compare.
 
@@ -1008,6 +1073,8 @@ def leak_probe(
         weather_lead0: The lead-day 0 weather, for IM.
         arms: The arms the frame serves.
         lead_day: The lead-day.
+        cams_available_days: CAMS irradiance is available for whole days up to this many days
+            before the issue day.
 
     Returns:
         Report lines giving the rows and columns compared.
@@ -1047,7 +1114,7 @@ def leak_probe(
             clear_sky=inputs.clear_sky,
             cams=inputs.cams.filter(
                 (pl.col("time") - pl.duration(minutes=30)).dt.date()
-                <= (issue - timedelta(days=CAMS_AVAILABLE_THROUGH_DAYS_BEFORE_ISSUE)).date()
+                <= (issue - timedelta(days=cams_available_days)).date()
             ),
             daily=daily_features(
                 hourly=inputs.hourly.filter(pl.col("time") <= issue),

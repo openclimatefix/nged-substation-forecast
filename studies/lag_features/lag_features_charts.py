@@ -63,6 +63,9 @@ LEAD_ZERO_TICK: Final[str] = "0*"
 """How lead-day 0 is ticked on an axis. Each figure that shows it explains the asterisk: lead-day 0
 is not usable for its early hours in a live service."""
 
+HOUR_TICKS: Final[list[int]] = [0, 6, 12, 18, 24]
+"""An hour-of-day axis is ticked at these hours and clipped to the hours with daylight."""
+
 HOURS_PER_DAY: Final[int] = 24
 """Converts an hour of the day into a fraction of a day on a week's axis."""
 
@@ -859,7 +862,13 @@ def lag_construction_figure(
             default="CTX7: days 2 to 7 back",
         )
     )
-    x = alt.X("clock:Q", title="Hour of the day (UTC, hour midpoint)")
+    daylight = [float(example["clock"].min()) - 0.5, float(example["clock"].max()) + 0.5]  # ty: ignore[invalid-argument-type]
+    x = alt.X(
+        "clock:Q",
+        title="Hour of the day (UTC, hour midpoint)",
+        axis=alt.Axis(values=HOUR_TICKS),
+        scale=alt.Scale(domain=daylight),
+    )
     y = alt.Y("value:Q", title="Power (share of capacity)")
     lines = (
         alt.Chart(long)
@@ -881,12 +890,12 @@ def lag_construction_figure(
     band = (
         alt.Chart(example)
         .mark_area(opacity=0.25, color=ocf.DATA_GREEN)
-        .encode(x="clock:Q", y="week_min:Q", y2="week_max:Q")  # ty: ignore[unresolved-attribute]
+        .encode(x=x, y="week_min:Q", y2="week_max:Q")  # ty: ignore[unresolved-attribute]
     )
     mean = (
         alt.Chart(example)
         .mark_line(color=ocf.DATA_GREEN, strokeDash=[4, 3])
-        .encode(x="clock:Q", y="week_mean:Q")  # ty: ignore[unresolved-attribute]
+        .encode(x=x, y="week_mean:Q")  # ty: ignore[unresolved-attribute]
     )
     title = "How each lag column is read for one target day"
     subtitle = [
@@ -1224,6 +1233,341 @@ def importance_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | N
     )
 
 
+# --- The post hoc follow-ups ----------------------------------------------------------------------
+
+POST_HOC: Final[str] = "All rows are post hoc: written after the first run's results were known."
+"""The subtitle line every follow-up figure ends with."""
+
+KIND_COLOURS: Final[dict[str, str]] = {"month": ocf.DATA_BLUE, "step": ocf.BRAND_ORANGE}
+"""The two positive controls' colours."""
+
+KIND_LABELS: Final[dict[str, str]] = {"month": "Month-level", "step": "Plant steps"}
+"""How a figure names each positive control."""
+
+
+def followup_controls_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
+    """Follow-up figure A: the share of the oracle's gain each arm recovers, in both controls.
+
+    Args:
+        tables: The follow-ups' tables directory.
+        text: The text collector.
+
+    Returns:
+        The figure.
+    """
+    controls = (
+        pl.read_parquet(tables / "controls.parquet")
+        .filter(pl.col("arm") != "O")
+        .with_columns(
+            control=pl.col("kind").replace(KIND_LABELS),
+            shift_label=(pl.col("shift") * 100).round(0).cast(pl.Int32).cast(pl.String) + "%",
+            interval=pl.when(pl.col("wholly_below_zero"))
+            .then(pl.lit("Below zero"))
+            .otherwise(pl.lit("Has zero")),
+        )
+        .drop_nulls("share_of_oracle_gain")
+    )
+    x_title = "Share of the oracle's gain over B0 recovered (0: none, 1: all of it)"
+    order = (
+        controls.group_by("arm")
+        .agg(pl.col("share_of_oracle_gain").mean())
+        .sort("share_of_oracle_gain")
+    )["arm"].to_list()
+    base = alt.Chart(controls)
+    dots = base.mark_point(filled=True, size=90, aria=False).encode(  # ty: ignore[unresolved-attribute]
+        y=alt.Y("arm:N", sort=order, title=None),
+        x=alt.X("share_of_oracle_gain:Q", title=x_title),
+        color=alt.Color(
+            "control:N",
+            scale=alt.Scale(domain=list(KIND_LABELS.values()), range=list(KIND_COLOURS.values())),
+            legend=alt.Legend(title="Control"),
+        ),
+        shape=alt.Shape("shift_label:N", legend=alt.Legend(title="Shift")),
+        opacity=alt.Opacity(
+            "interval:N",
+            scale=alt.Scale(
+                domain=["Below zero", "Has zero"],
+                range=[1.0, 0.3],
+            ),
+            legend=alt.Legend(title="99% interval"),
+        ),
+    )
+    rules = (
+        alt.Chart(pl.DataFrame({"x": [0.0, 1.0]}))
+        .mark_rule(color=ocf.BLACK_1, strokeDash=[4, 3])
+        .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+    )
+    title = "How much of a known shift each lag arm recovers"
+    subtitle = [
+        (
+            "Each dot is one arm in one control at one shift size: its error gain over B0 divided "
+            "by the oracle's gain, where the oracle is B0 given the true shift factor."
+        ),
+        "Dashed lines: no gain (0) and the oracle's gain (1). Faint dots: zero in the interval.",
+        POST_HOC,
+    ]
+    text.add(
+        figure_id="A",
+        plots="Share of the oracle's gain recovered, per arm, control and shift",
+        lines=[title, *subtitle, x_title, "Control", "Shift", "99% interval"],
+    )
+    return figure(
+        panels=[(rules + dots).properties(width=CONTENT_WIDTH_PX - 120, height=240)],
+        number="A",
+        title=title,
+        subtitle=subtitle,
+        figure_planning=None,
+        label="Follow-up figure",
+    )
+
+
+LONG_LEAD_COLOURS: Final[dict[str, str]] = {
+    "CL": ocf.DATA_BLUE,
+    "W7+CL": ocf.BRAND_ORANGE,
+    "B0xCL": ocf.DATA_PURPLE,
+    "W7xCL": ocf.DATA_SKY,
+    "climatology": ocf.ENSEMBLE_LINE,
+    "W7": ocf.DATA_GREEN,
+    "Q30": ocf.DATA_PURPLE_LIGHT,
+    "N2": ocf.BLACK_1,
+    "N2-3": ocf.DATA_BLUE_LIGHT,
+}
+"""One colour per long-lead arm. Grey is for climatology, the no-fit forecast."""
+
+CLIMATOLOGY_ARMS: Final[tuple[str, ...]] = ("CL", "W7+CL", "B0xCL", "W7xCL", "climatology")
+"""The long-lead arms that use climatology, drawn in the top panel."""
+
+LAG_ARMS: Final[tuple[str, ...]] = ("W7", "Q30", "N2", "N2-3")
+"""The long-lead arms that use lags and no climatology, drawn in the bottom panel."""
+
+
+def followup_long_leads_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
+    """Follow-up figure B: the long-lead gains over B0, with climatology and its blends drawn.
+
+    Args:
+        tables: The follow-ups' tables directory.
+        text: The text collector.
+
+    Returns:
+        The figure.
+    """
+    leads = pl.read_parquet(tables / "long_leads.parquet").with_columns(
+        difference=pl.col("difference") * PERCENTAGE_POINTS,
+        lower=pl.col("lower") * PERCENTAGE_POINTS,
+        upper=pl.col("upper") * PERCENTAGE_POINTS,
+        lead=pl.col("lead_day").cast(pl.String),
+    )
+    order = ["7", "10", "14"]
+    y_title = "Error minus B0's (pp of capacity; negative beats B0)"
+    x_title = "Lead-day (days between the run and the target day)"
+    x = alt.X("lead:N", sort=order, title=x_title)
+
+    def panel(arms: tuple[str, ...]) -> alt.LayerChart:
+        rows = leads.filter(pl.col("arm").is_in(arms))
+        colour = alt.Color(
+            "arm:N",
+            scale=alt.Scale(domain=list(arms), range=[LONG_LEAD_COLOURS[arm] for arm in arms]),
+            legend=alt.Legend(title="Arm"),
+        )
+        lines = (
+            alt.Chart(rows)
+            .mark_line(point=True, aria=False)
+            .encode(x=x, y=alt.Y("difference:Q", title=y_title), color=colour)  # ty: ignore[unresolved-attribute]
+        )
+        bars = (
+            alt.Chart(rows)
+            .mark_rule(aria=False)
+            .encode(x=x, y="lower:Q", y2="upper:Q", color=colour)  # ty: ignore[unresolved-attribute]
+        )
+        zero = (
+            alt.Chart(pl.DataFrame({"y": [0.0]})).mark_rule(color=ocf.BLACK_1).encode(y="y:Q")  # ty: ignore[unresolved-attribute]
+        )
+        return (zero + lines + bars).properties(width=CONTENT_WIDTH_PX - 120, height=200)
+
+    title = "At long leads, climatology and the lag arms against B0"
+    subtitle = [
+        (
+            "Top: arms that use climatology. CL adds the out-of-fold climatology to B0 as a "
+            "column, B0xCL and W7xCL blend the forecast half and half with it, with no fit, and "
+            "climatology is the no-fit forecast itself."
+        ),
+        (
+            "Bottom: W7, Q30, and two nulls that read random days (N2, and N2-3 as wide as W7). "
+            "Line: 95% interval from resampling whole months. Zero is B0."
+        ),
+        POST_HOC,
+    ]
+    text.add(
+        figure_id="B",
+        plots="Long-lead gain over B0, climatology arms and lag arms",
+        lines=[title, *subtitle, x_title, y_title, "Arm"],
+    )
+    return figure(
+        panels=[panel(CLIMATOLOGY_ARMS), panel(LAG_ARMS)],
+        number="B",
+        title=title,
+        subtitle=subtitle,
+        figure_planning=None,
+        label="Follow-up figure",
+    )
+
+
+ERA_COLOURS: Final[dict[str, str]] = {
+    "2025-10 onwards (8 months)": ocf.BLACK_1,
+    "2025-10 to 2025-12": ocf.DATA_BLUE,
+    "2026-02 onwards": ocf.BRAND_ORANGE,
+}
+"""The unselected months and each forecast-product era."""
+
+
+def followup_unselected_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
+    """Follow-up figure C: every arm's gain over B0 on the 8 months the sweep never screened.
+
+    Args:
+        tables: The follow-ups' tables directory.
+        text: The text collector.
+
+    Returns:
+        The figure.
+    """
+    rows = pl.read_parquet(tables / "unselected.parquet").with_columns(
+        label=pl.col("arm").replace(ARM_LABELS),
+        difference=pl.col("difference") * PERCENTAGE_POINTS,
+        lower=pl.col("lower") * PERCENTAGE_POINTS,
+        upper=pl.col("upper") * PERCENTAGE_POINTS,
+    )
+    order = (
+        rows.filter(pl.col("era") == "2025-10 onwards (8 months)")
+        .sort("difference")["label"]
+        .to_list()
+    )
+    rows = rows.with_columns(
+        label=pl.col("label").cast(pl.Enum(order)), era=pl.col("era").cast(pl.String)
+    ).sort("label")
+    x_title = "Error minus B0's (pp of capacity; negative beats B0)"
+    chart = _intervals_chart(
+        data=rows,
+        y="label",
+        x_title=x_title,
+        colour="era",
+        shape="era",
+        legend_title="Months",
+    ).properties(height=26 * len(order))
+    title = "Each arm's gain over B0 on the 8 months the sweep never screened"
+    subtitle = [
+        (
+            "Mean absolute error minus B0's at lead-day 1, per-plant fits, primary setting, split "
+            "by forecast-product era. Dot: estimate. Line: 95% interval from resampling months."
+        ),
+        (
+            "AN was chosen as X on the first 10 months, so its row here is out of sample. An era "
+            "of fewer than 6 months has a weak interval. Zero is B0."
+        ),
+        POST_HOC,
+    ]
+    text.add(
+        figure_id="C",
+        plots="Per-arm gain over B0 on the unselected months, by era",
+        lines=[title, *subtitle, x_title, "Months: all 8, 2025-10 to 2025-12, 2026-02 onwards"],
+    )
+    return figure(
+        panels=[chart],
+        number="C",
+        title=title,
+        subtitle=subtitle,
+        figure_planning=None,
+        label="Follow-up figure",
+    )
+
+
+def followup_hit_rate_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
+    """Follow-up figure D: the share of rows at or below each quantile, against the quantile level.
+
+    Args:
+        tables: The follow-ups' tables directory.
+        text: The text collector.
+
+    Returns:
+        The figure.
+    """
+    hits = pl.read_parquet(tables / "hit_rates.parquet").filter(pl.col("month") == "all")
+    y_title = "Share of rows with measured power at or below the quantile"
+    x_title = "Quantile level of the forecast"
+    diagonal = (
+        alt.Chart(pl.DataFrame({"level": [0.0, 1.0], "hit_rate": [0.0, 1.0]}))
+        .mark_line(color=ocf.BLACK_1, strokeDash=[4, 3])
+        .encode(x="level:Q", y="hit_rate:Q")  # ty: ignore[unresolved-attribute]
+    )
+    lines = (
+        alt.Chart(hits)
+        .mark_line(point=True, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("level:Q", title=x_title, scale=alt.Scale(domain=[0, 1])),
+            y=alt.Y("hit_rate:Q", title=y_title, scale=alt.Scale(domain=[0, 1])),
+            color=alt.Color(
+                "arm:N",
+                scale=alt.Scale(domain=["B0", "L1"], range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]),
+                legend=alt.Legend(title="Arm"),
+            ),
+        )
+        .properties(width=CONTENT_WIDTH_PX - 120, height=240)
+    )
+    title = "Whether the nine predicted quantiles hit at their own level"
+    subtitle = [
+        "Out-of-fold quantile forecasts at lead-day 1, one fitting seed, all 18 months.",
+        "Dashed line: a calibrated forecast. Above it the quantile is too high, below it too low.",
+        POST_HOC,
+    ]
+    text.add(
+        figure_id="D",
+        plots="Quantile hit rate against level for B0 and L1",
+        lines=[title, *subtitle, x_title, y_title, "Arm: B0, L1"],
+    )
+    return figure(
+        panels=[diagonal + lines],
+        number="D",
+        title=title,
+        subtitle=subtitle,
+        figure_planning=None,
+        label="Follow-up figure",
+    )
+
+
+def draw_followups(*, root: Path, smoke: bool, text_only: bool) -> int:
+    """Write the follow-up figures' text, and render them unless `text_only`.
+
+    Args:
+        root: The output root.
+        smoke: Whether to draw a smoke run's follow-up tables.
+        text_only: Whether to write the figure text and stop.
+
+    Returns:
+        0.
+    """
+    suffix = run_suffix(smoke=smoke)
+    directory = root / "ens_mean" / "followups"
+    tables = directory / f"tables_followups_ens_mean{suffix}"
+    text = FigureText()
+    figures = {
+        "A_controls": followup_controls_figure(tables=tables, text=text),
+        "B_long_leads": followup_long_leads_figure(tables=tables, text=text),
+        "C_unselected_months": followup_unselected_figure(tables=tables, text=text),
+        "D_hit_rates": followup_hit_rate_figure(tables=tables, text=text),
+    }
+    text_path = directory / f"figure_text_followups_ens_mean{suffix}.txt"
+    text.write(path=text_path)
+    _LOG.info("wrote %s", text_path)
+    if text_only:
+        return 0
+    output = directory / f"figures_followups_ens_mean{suffix}"
+    output.mkdir(exist_ok=True)
+    refuse_to_overwrite(paths=[output / f"{name}.svg" for name in figures])
+    for name, chart in figures.items():
+        chart.save(str(output / f"{name}.svg"))
+        _LOG.info("wrote %s", name)
+    return 0
+
+
 def main() -> int:
     """Write the figure text, and render the figures unless `--text-only` is given."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1231,7 +1575,14 @@ def main() -> int:
     parser.add_argument("--output-root", type=Path, default=LAG_FEATURES_DIR)
     parser.add_argument("--text-only", action="store_true", help="Write the figure text and stop.")
     parser.add_argument("--smoke", action="store_true", help="Draw a `--smoke` run's output.")
+    parser.add_argument(
+        "--followups", action="store_true", help="Draw the post hoc follow-up figures instead."
+    )
     arguments = parser.parse_args()
+    if arguments.followups:
+        return draw_followups(
+            root=arguments.output_root, smoke=arguments.smoke, text_only=arguments.text_only
+        )
     product: WeatherProduct = arguments.weather_product
     smoke: bool = arguments.smoke
     suffix = run_suffix(smoke=smoke)
