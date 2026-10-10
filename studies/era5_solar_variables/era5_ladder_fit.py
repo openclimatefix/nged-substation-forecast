@@ -35,6 +35,7 @@ XGBoost run is using the CPU first. The script prints the load average and refus
 """
 
 import argparse
+import hashlib
 import json
 import logging
 import os
@@ -42,6 +43,7 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Final
 
 import polars as pl
@@ -63,6 +65,7 @@ from era5_ladder_arms import (
     aerosol_arm_features,
     arm_features,
     arms_path,
+    checkpoint_dir_for,
     dataset_path,
     results_path,
 )
@@ -245,6 +248,10 @@ def raise_if_columns_missing(*, frame: pl.DataFrame, arms: dict[str, tuple[str, 
     check_no_missing(frame=frame, columns=sorted(needed - allowed_missing))
 
 
+JOBS_PER_CHECKPOINT: Final[int] = 4
+"""How many (arm, setting) jobs one checkpoint file holds."""
+
+
 def fit_one_view(
     *,
     frame: pl.DataFrame,
@@ -253,9 +260,16 @@ def fit_one_view(
     sensitivity_arms: Sequence[str],
     device: DeviceType,
     max_workers: int,
+    checkpoint_dir: Path,
     sensitivity_only: bool = False,
 ) -> pl.DataFrame:
     """Fit every arm of one view for one target and check that the arms share their rows.
+
+    **The fit resumes after a kill or a reboot.** The jobs run in groups of `JOBS_PER_CHECKPOINT`,
+    and each group's losses are written to `checkpoint_dir` the moment the group finishes. A rerun
+    reads the groups that exist and fits only the others. A group's file name holds a hash of its
+    job names, and the file's own (arm, setting) pairs are checked against the group, so a rerun
+    with different arms refits rather than reuses.
 
     Args:
         frame: The rows with folds, permuted columns, and the target.
@@ -264,24 +278,49 @@ def fit_one_view(
         sensitivity_arms: The arms also fitted at the sensitivity setting.
         device: XGBoost's device.
         max_workers: How many (arm, farm) fits run at once.
+        checkpoint_dir: Where each group of jobs writes its losses.
         sensitivity_only: Fit every arm at the sensitivity setting alone.
 
     Returns:
         The stacked per-row losses of every arm.
+
+    Raises:
+        RuntimeError: If a checkpoint file holds other arms or settings than its name says.
     """
     raise_if_columns_missing(frame=frame, arms=arms)
     view = target_view(frame=frame, target=target)
-    losses = run_all(
-        dataset=view,
-        jobs=jobs_for(
-            arms=arms,
-            target=target,
-            sensitivity_arms=sensitivity_arms,
-            sensitivity_only=sensitivity_only,
-        ),
-        max_workers=max_workers,
-        device=device,
+    jobs = jobs_for(
+        arms=arms,
+        target=target,
+        sensitivity_arms=sensitivity_arms,
+        sensitivity_only=sensitivity_only,
     )
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    parts: list[pl.DataFrame] = []
+    for start in range(0, len(jobs), JOBS_PER_CHECKPOINT):
+        group = jobs[start : start + JOBS_PER_CHECKPOINT]
+        labels = sorted(f"{name}@{setting}" for name, setting, *_ in group)
+        digest = hashlib.sha1("|".join(labels).encode(), usedforsecurity=False).hexdigest()[:10]
+        path = checkpoint_dir / f"group_{digest}.parquet"
+        if path.exists():
+            part = pl.read_parquet(path)
+            held = sorted(
+                f"{name}@{setting}"
+                for name, setting in part.select("arm", "setting").unique().rows()
+            )
+            if held != labels:
+                msg = f"{path.name} holds {held}, expected {labels}"
+                raise RuntimeError(msg)
+            _LOG.info(
+                "group %d of %d: reading %s", start // JOBS_PER_CHECKPOINT + 1, len(jobs), path.name
+            )
+        else:
+            part = run_all(dataset=view, jobs=group, max_workers=max_workers, device=device)
+            temporary = path.with_name(path.name + ".tmp")
+            part.write_parquet(temporary)
+            temporary.rename(path)
+        parts.append(part)
+    losses = pl.concat(parts)
     for setting in losses["setting"].unique().to_list():
         in_setting = losses.filter(pl.col("setting") == setting)
         raise_unless_same_rows(losses=in_setting, arms=sorted(in_setting["arm"].unique().to_list()))
@@ -347,6 +386,7 @@ def run_ladder_view(
             sensitivity_arms=sensitivity_arms,
             device=device,
             max_workers=max_workers,
+            checkpoint_dir=checkpoint_dir_for(key=key),
         )
         losses.write_parquet(results_path(key=key))
         write_arms(arms=arms, key=key, device=device, rows=frame.height)
@@ -413,6 +453,7 @@ def run_extra_sensitivity_view(
             sensitivity_arms=arm_names,
             device=device,
             max_workers=max_workers,
+            checkpoint_dir=checkpoint_dir_for(key=key),
             sensitivity_only=True,
         )
         losses.write_parquet(results_path(key=key))
@@ -454,6 +495,7 @@ def run_aerosol_view(
             sensitivity_arms=[AEROSOL_REFERENCE, AEROSOL_RUNG, *sensitivity_arms],
             device=device,
             max_workers=max_workers,
+            checkpoint_dir=checkpoint_dir_for(key=key),
         )
         losses.write_parquet(results_path(key=key))
         write_arms(arms=arms, key=key, device=device, rows=covered.height)

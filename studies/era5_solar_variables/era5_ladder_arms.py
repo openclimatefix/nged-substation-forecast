@@ -276,6 +276,11 @@ def results_path(*, key: FitKey) -> Path:
     return RESULTS_DIR / f"losses_{stem}.parquet"
 
 
+def checkpoint_dir_for(*, key: FitKey) -> Path:
+    """Return the directory where one fit's groups of jobs checkpoint their losses."""
+    return results_path(key=key).with_suffix(".parts")
+
+
 def arms_path(*, key: FitKey) -> Path:
     """Return where the JSON naming each arm's columns, the device, and the settings is written."""
     stem = f"{key.variant}_through_{key.through_rung}_{key.target}_{key.view}"
