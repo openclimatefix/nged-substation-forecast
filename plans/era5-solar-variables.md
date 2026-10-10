@@ -161,6 +161,57 @@ on what the forecast would give. And the CAMS-irradiance target contains CAMS ae
 construction (see Targets), so a gain on the CAMS target in dusty conditions is expected and says
 little about PV.
 
+## Probabilistic scores (exploratory, pre-specified)
+
+**The point fits rank the arms, and a quantile fit on a few arms asks a second question: does an
+input help the model say how uncertain it is?** For an electricity-network forecast, a narrow
+interval that covers the outcome is worth more than a small error on an average day, and a variable
+can sharpen the interval without moving the median. Mean absolute error from the point model stays
+the only planned ranking, and nothing in the ten planned contrasts, the Bonferroni level, or the
+MARS decision rule changes. The quantile fit is a second XGBoost model (`reg:quantileerror`, the
+nine levels 0.1 to 0.9 that `studies.cross_validation.QUANTILE_LEVELS` already holds) fitted beside
+the point model on the same rows, folds, seeds, and columns. The point model is unchanged by it, so
+each arm's point predictions are the same with or without the quantile fit.
+
+**Quantile fits cover the arms the questions need, at the primary setting only.** They are G0, G2,
+G9, G9 without the 12 MARS-only variables (`g9_without_mars_only`), and the negative control, on
+both targets, plus `g9_aerosol_rows` and G10 in the aerosol view. A multi-quantile fit builds one
+tree per level, so each of these fits costs about nine times a point fit. Fitting every arm would
+add 12 to 25 hours, and the five arms plus the two aerosol arms add an estimated 4 to 8 hours
+(estimates from the superseded G0 to G2 timings; the real time is recorded in the report).
+
+**The scores come from the quantiles after repairing them in three ways, identically for every
+arm.** Each row's quantiles are sorted (XGBoost's multi-quantile head can cross), held at or below
+the export cap in force, and floored at zero, because neither output nor the clearness index is
+negative. Every score is divided by the row's own capacity (PV) or reported in index units (CAMS)
+before averaging.
+
+- **Continuous ranked probability score (CRPS)**, approximated from the nine levels as the existing
+  `crps` does, on the repaired quantiles.
+- **Pinball loss at 0.1 and 0.9.**
+- **Coverage of the 0.1 to 0.9 interval** (nominal 80%) and its **mean width**.
+- **A reliability table:** the share of outcomes at or below each of the nine quantile levels.
+- **The same scores by ERA5 cloud regime** (the primary `tcc` split of the regime panel).
+
+**Four contrasts, each on both targets, with 95% intervals from the same month-resampled paired
+bootstrap, labelled exploratory.** They are G2 minus G0, G9 minus G2, G9 minus the negative control,
+and P4 (G9 minus G9 without the MARS-only variables), each on CRPS, and each also on interval width
+and coverage as differences of means. In the aerosol analysis, G10 minus G9 on the aerosol rows is
+also scored on CRPS, width, and coverage in the four conditions. The page states the number of
+probabilistic contrasts, so a reader can discount.
+
+**A claim that an input "helps the model estimate its own uncertainty" needs narrower intervals at
+the same coverage, measured against the negative control.** CRPS mostly follows the median, so an
+input that improves the median also improves CRPS. The negative control's permuted columns keep each
+month-and-hour mean, which carries seasonal spread, so the control is the reference for any spread
+claim: the page reports G9 against the control, not only G9 against G0. A difference in coverage of
+about one point may be resolvable. Tail quantiles beyond 0.1 and 0.9 and dust-episode spread are
+not, because the independent weather episodes number in the dozens and the six farms share their
+weather. The page says so.
+
+**Gain importance still comes from the point booster.** The quantile model is not used for the
+importance figure.
+
 ## Targets
 
 1. **PV target:** hourly mean output of each of the six NGED solar farms, as a percentage of the
@@ -365,6 +416,8 @@ findings, Introduction, Data and methods, Results, and Limitations. The Summary'
    need?
 5. Does CAMS aerosol help under cloud-free skies and Saharan dust, where a yearly mean error can
    hide a costly bad day (the pre-specified conditional analysis)?
+6. Do any inputs help an XGBoost model estimate its own uncertainty, measured as narrower intervals
+   at the same coverage than the negative control (the exploratory probabilistic scores)?
 
 ## Figures, in page order
 
@@ -401,8 +454,12 @@ text), has `aria=False` on its marks, and shows the weather series without the f
     mean. Both thresholds are fixed before any result. Exploratory.
 9. **Seasons.** The same differences by season (winter, spring, summer, autumn), and for the
    clear-sky, broken-cloud, and overcast regimes within each season. Exploratory.
+    - **Probabilistic scores.** For G0, G2, G9, G9 without the MARS-only variables, and the
+      negative control: CRPS, interval coverage and width, and a reliability chart of the share of
+      outcomes below each quantile level. Exploratory, pre-specified.
     - **Aerosol in unusual conditions.** G10 minus G9 on the aerosol rows in the four conditions of
-      the aerosol section, with the four metrics and the event counts. Exploratory, pre-specified.
+      the aerosol section, with the four metrics, CRPS, interval width and coverage, and the event
+      counts. Exploratory, pre-specified.
 10. **Drop-one-group.** Error added when each group is removed from G9.
 11. **Hour of day and snow.** Error by hour of day for G0 against G9, and the worst 20 days for G0
     with what G9 changed on them, anonymised by farm label.

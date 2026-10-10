@@ -52,6 +52,7 @@ from era5_ladder_arms import (
     NEGATIVE_CONTROL_SEED,
     PERMUTATION_GROUPING,
     PRIMARY_SETTING,
+    QUANTILE_ARMS,
     RESULTS_DIR,
     SENSITIVITY_ARMS,
     SENSITIVITY_SETTING,
@@ -192,6 +193,9 @@ def jobs_for(
 ) -> list[Job]:
     """Return the fits to run: every arm at the primary setting, and some at the second.
 
+    The arms in `QUANTILE_ARMS` also get a quantile fit at the primary setting. The point model is
+    fitted first with the same parameters either way, so the quantile fit does not move it.
+
     Args:
         arms: Each arm's name and columns.
         target: The target the fits predict.
@@ -207,7 +211,14 @@ def jobs_for(
         if sensitivity_only or name in sensitivity_arms:
             settings.append(SENSITIVITY_SETTING)
         jobs.extend(
-            (name, setting, TARGET_COLUMNS[target], features, SETTINGS[setting], False)
+            (
+                name,
+                setting,
+                TARGET_COLUMNS[target],
+                features,
+                SETTINGS[setting],
+                name in QUANTILE_ARMS and setting == PRIMARY_SETTING,
+            )
             for setting in settings
         )
     return jobs

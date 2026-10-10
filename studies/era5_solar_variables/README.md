@@ -60,7 +60,7 @@ Everything is under `data/studies/per_study/era5_solar_variables/`.
 | `inputs/checks_<variant>_through_<rung>.md` | Row counts, the final-ERA5 span, and each missing-under-clear-sky variable's missing share |
 | `results/losses_<variant>_through_<rung>_<target>_<view>.parquet` | One row per (arm, setting, farm, time, seed) with the losses. The prediction is the measured target plus `signed_error_capped_mw` |
 | `results/arms_<...>.json` | Each arm's columns, the device, the settings, and the row count |
-| `results/report_<variant>_through_<rung>.md`, and the `leaderboard`, `contrasts`, `splits`, `worst_days`, and `aerosol_conditions` parquet files (the last holds `g10` against `g9_aerosol_rows` in clear, clear-and-dusty, dusty, and clear-and-clean hours) named in the same way | The numbers the page quotes, and the tables the charts read |
+| `results/report_<variant>_through_<rung>.md`, and the `leaderboard`, `contrasts`, `splits`, `worst_days`, `aerosol_conditions`, and `probabilistic` parquet files (`aerosol_conditions` holds `g10` against `g9_aerosol_rows` in clear, clear-and-dusty, dusty, and clear-and-clean hours) named in the same way | The numbers the page quotes, and the tables the charts read |
 
 A re-run refuses to overwrite a result. Move the old one into a `superseded/` folder first.
 

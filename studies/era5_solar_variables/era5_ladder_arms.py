@@ -128,6 +128,22 @@ POSITIVE_CONTROL_ARM: Final[str] = "positive_control"
 DROP_PREFIX: Final[str] = "drop_"
 """The prefix of a drop-one-group arm's name, followed by the dropped rung."""
 
+QUANTILE_ARMS: Final[tuple[str, ...]] = (
+    "g0",
+    "g2",
+    "g9",
+    MARS_FREE_ARM,
+    NEGATIVE_CONTROL_ARM,
+    AEROSOL_REFERENCE,
+    AEROSOL_RUNG,
+)
+"""The arms that also get a quantile fit, at the primary setting only.
+
+The point fit ranks every arm. The quantile fit asks the second question, whether an input helps
+the model say how uncertain it is, and it costs about nine times a point fit, so it covers only
+the arms that question needs.
+"""
+
 ARM_LABELS: Final[dict[str, str]] = {
     "g0": "G0 minimal (ssrd, t2m)",
     "g1": "G1 + total cloud",
@@ -216,6 +232,7 @@ class ReportPaths(NamedTuple):
         splits: The regime, season, farm, and hour-of-day splits.
         worst_days: The minimal arm's worst farm-days.
         aerosol_conditions: The aerosol rung against its reference inside each aerosol condition.
+        probabilistic: The quantile fits' scores, contrasts, reliability, and regime scores.
     """
 
     report: Path
@@ -224,6 +241,7 @@ class ReportPaths(NamedTuple):
     splits: Path
     worst_days: Path
     aerosol_conditions: Path
+    probabilistic: Path
 
 
 def report_paths(*, variant: str, through_rung: RungType) -> ReportPaths:
@@ -240,6 +258,9 @@ def report_paths(*, variant: str, through_rung: RungType) -> ReportPaths:
         ),
         aerosol_conditions=report_path(
             name="aerosol_conditions.parquet", variant=variant, through_rung=through_rung
+        ),
+        probabilistic=report_path(
+            name="probabilistic.parquet", variant=variant, through_rung=through_rung
         ),
     )
 

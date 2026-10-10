@@ -25,6 +25,7 @@ from studies.cross_validation import (
     fit_one_fold,
     fit_one_fold_scoring_many,
     out_of_fold_losses,
+    probabilistic_scores,
     raise_on_uncovered_months,
     rotate_folds,
     search_fold_offsets,
@@ -1012,3 +1013,46 @@ def test_every_week_fold_is_scored_when_there_are_more_than_five(monkeypatch: py
 
     assert sorted(losses["fold"].unique().to_list()) == list(range(8))
     assert losses.height == site_rows.height * len(SEEDS)
+
+
+def test_probabilistic_scores_repair_the_quantiles_before_scoring():
+    # One row, capacity 2. The quantiles cross, one is negative, and one exceeds the cap of 1.5.
+    quantiles = np.array([[0.9, -0.5, 0.2, 0.3, 0.4, 0.5, 0.6, 2.0, 0.1]])
+
+    scores = probabilistic_scores(
+        actual=np.array([0.35]),
+        quantiles=quantiles,
+        cap_mw=pl.Series([1.5]),
+        capacity_mw=np.array([2.0]),
+    )
+
+    # Sorted and repaired: 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.9, 1.5 for levels 0.1 to 0.9, so the
+    # 10-90 interval is [0, 1.5].
+    assert scores["width_80_fraction_of_capacity"] == pytest.approx([0.75])
+    assert scores["covered_80"] == pytest.approx([1.0])
+    assert scores["below_q40"] == pytest.approx([0.0])
+    assert scores["below_q50"] == pytest.approx([1.0])
+    # The outcome is 0.35 above the 0.1 quantile (0), so the 0.1 pinball is 0.35 * 0.1 / 2.
+    assert scores["pinball_10_fraction_of_capacity"] == pytest.approx([0.35 * 0.1 / 2.0])
+    # The outcome is 1.15 below the 0.9 quantile (1.5), so the 0.9 pinball is 1.15 * 0.1 / 2.
+    assert scores["pinball_90_fraction_of_capacity"] == pytest.approx([1.15 * 0.1 / 2.0])
+    assert scores["crps_floored_fraction_of_capacity"] == pytest.approx(
+        crps(
+            actual=np.array([0.35]),
+            quantiles=np.array([[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.9, 1.5]]),
+        )
+        / 2.0
+    )
+
+
+def test_probabilistic_scores_divide_by_each_rows_own_capacity():
+    quantiles = np.tile(np.linspace(0.1, 0.9, 9), (2, 1))
+
+    scores = probabilistic_scores(
+        actual=np.array([0.5, 0.5]),
+        quantiles=quantiles,
+        cap_mw=pl.Series([None, None], dtype=pl.Float64),
+        capacity_mw=np.array([1.0, 4.0]),
+    )
+
+    assert scores["width_80_fraction_of_capacity"] == pytest.approx([0.8, 0.2])

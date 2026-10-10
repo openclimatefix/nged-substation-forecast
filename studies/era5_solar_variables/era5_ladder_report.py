@@ -46,6 +46,7 @@ from era5_ladder_arms import (
     AEROSOL_RUNG,
     ARM_LABELS,
     DROP_PREFIX,
+    MARS_FREE_ARM,
     METRIC,
     NEAR_LINE_SHARE,
     NEGATIVE_CONTROL_ARM,
@@ -53,6 +54,7 @@ from era5_ladder_arms import (
     PLANNED_RESAMPLES,
     POSITIVE_CONTROL_ARM,
     PRIMARY_SETTING,
+    QUANTILE_ARMS,
     SENSITIVITY_SETTING,
     SIGNED_ERROR,
     SMALLEST_EFFECT,
@@ -75,6 +77,7 @@ from studies.bootstrap import (
     bootstrap_difference_at_level,
 )
 from studies.correlation import pooled_correlation_interval
+from studies.cross_validation import QUANTILE_LEVELS
 from studies.era5_ladder import (
     AEROSOL_CONDITIONS,
     CLEAR_SKY_INDEX_THRESHOLDS,
@@ -103,6 +106,22 @@ WORST_DAY_COUNT: Final[int] = 20
 
 SPLIT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (("g1", "g0"), ("g2", "g0"), ("g9", "g0"))
 """The (treatment, reference) contrasts the regime and season splits show."""
+
+PROBABILISTIC_METRICS: Final[dict[str, str]] = {
+    "crps": "crps_floored_fraction_of_capacity",
+    "coverage_80": "covered_80",
+    "width_80": "width_80_fraction_of_capacity",
+}
+"""The probabilistic scores the report differences, by the name it prints, and their loss column."""
+
+PROBABILISTIC_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("g2", "g0"),
+    ("g9", "g2"),
+    ("g9", NEGATIVE_CONTROL_ARM),
+    ("g9", MARS_FREE_ARM),
+    (AEROSOL_RUNG, AEROSOL_REFERENCE),
+)
+"""The (treatment, reference) pairs scored on the probabilistic metrics."""
 
 NO_GAIN_BEYOND_EFFECT: Final[str] = "rules out a gain larger than the smallest effect"
 GAIN_NOT_EXCLUDED: Final[str] = "does not rule out a gain larger than the smallest effect"
@@ -864,6 +883,197 @@ def render_mars_decision(*, contrasts: pl.DataFrame) -> list[str]:
     ]
 
 
+def probabilistic_rows(
+    *, losses: pl.DataFrame, dataset: pl.DataFrame, target: TargetType, setting: str
+) -> pl.DataFrame:
+    """Summarise the quantile fits: scores by arm, contrasts, reliability, and scores by regime.
+
+    Args:
+        losses: Per-row losses of one fit, holding the probabilistic columns (null for an arm
+            without a quantile fit).
+        dataset: The kept rows, carrying `tcc` and `cams_clear_sky_index`.
+        target: The target.
+        setting: The hyperparameter setting to summarise, which is the one the quantile fits ran at.
+
+    Returns:
+        A long frame with `kind` of `arm`, `contrast`, `reliability`, or `regime`, then `arm`
+        (or `treatment` and `reference`), `group`, `measure`, `value`, `difference`, and the 95%
+        interval bounds of a contrast.
+    """
+    crps_column = PROBABILISTIC_METRICS["crps"]
+    in_setting = losses.filter(
+        (pl.col("setting") == setting)
+        & pl.col("arm").is_in(QUANTILE_ARMS)
+        & pl.col(crps_column).is_not_null()
+    )
+    if in_setting.is_empty():
+        return pl.DataFrame()
+    arms = sorted(in_setting["arm"].unique().to_list(), key=_arm_order)
+    rows: list[dict[str, object]] = []
+    for arm in arms:
+        arm_rows = in_setting.filter(pl.col("arm") == arm)
+        for measure, column in PROBABILISTIC_METRICS.items():
+            rows.append(
+                {
+                    "target": target,
+                    "kind": "arm",
+                    "arm": arm,
+                    "measure": measure,
+                    "value": arm_rows[column].mean(),
+                }
+            )
+        rows.extend(
+            {
+                "target": target,
+                "kind": "reliability",
+                "arm": arm,
+                "group": f"{level:.1f}",
+                "measure": "share_below",
+                "value": arm_rows[f"below_q{round(level * 100)}"].mean(),
+            }
+            for level in QUANTILE_LEVELS
+        )
+    for treatment, reference in PROBABILISTIC_CONTRASTS:
+        if treatment not in arms or reference not in arms:
+            continue
+        for measure, column in PROBABILISTIC_METRICS.items():
+            if (
+                in_setting.filter(pl.col("arm") == treatment)
+                .select(pl.col(column))
+                .to_series()
+                .is_null()
+                .all()
+            ):
+                continue
+            interval = bootstrap_difference(
+                losses=in_setting, treatment=treatment, reference=reference, metric=column
+            )
+            rows.append(
+                {
+                    "target": target,
+                    "kind": "contrast",
+                    "treatment": treatment,
+                    "reference": reference,
+                    "measure": measure,
+                    "difference": interval["difference"],
+                    "lower_95": interval["lower_95"],
+                    "upper_95": interval["upper_95"],
+                }
+            )
+    with_regimes = with_split_columns(losses=in_setting, dataset=dataset)
+    if "regime_era5" in with_regimes.columns:
+        for (arm, regime), subset in with_regimes.group_by("arm", "regime_era5"):
+            rows.extend(
+                {
+                    "target": target,
+                    "kind": "regime",
+                    "arm": arm,
+                    "group": regime,
+                    "measure": measure,
+                    "value": subset[column].mean(),
+                    "n_rows": subset.height,
+                }
+                for measure, column in PROBABILISTIC_METRICS.items()
+            )
+    return pl.DataFrame(rows, infer_schema_length=None)
+
+
+def render_probabilistic(*, rows: pl.DataFrame) -> str:
+    """Render the arm scores, the contrasts, the reliability table, and the regime scores."""
+    if rows.is_empty():
+        return "No quantile fits."
+    parts: list[str] = []
+    for target in TARGETS:
+        subset = rows.filter(pl.col("target") == target)
+        if subset.is_empty():
+            continue
+        unit = {
+            "crps": scale(target=target),
+            "coverage_80": PERCENTAGE_POINTS,
+            "width_80": scale(target=target),
+        }
+        measures = tuple(unit)
+        values = {
+            (row["kind"], row["arm"], row["group"], row["measure"]): row
+            for row in subset.filter(pl.col("kind") != "contrast").iter_rows(named=True)
+        }
+        arms = sorted({key[1] for key in values}, key=_arm_order)
+        parts += [f"### {target} target: scores by arm", ""]
+        parts.append(
+            table(
+                header=["arm", "CRPS", "coverage of the 10-90 interval (%)", "mean width"],
+                rows=[
+                    [
+                        arm,
+                        *(
+                            f"{values[('arm', arm, None, m)]['value'] * unit[m]:.{PRINT_DECIMALS}f}"
+                            for m in measures
+                        ),
+                    ]
+                    for arm in arms
+                ],
+            )
+        )
+        parts += ["", f"### {target} target: contrasts (exploratory, 95% intervals)", ""]
+        parts.append(
+            table(
+                header=["treatment minus reference", "measure", "difference", "95% interval"],
+                rows=[
+                    [
+                        f"{row['treatment']} minus {row['reference']}",
+                        row["measure"],
+                        f"{row['difference'] * unit[row['measure']]:+.{PRINT_DECIMALS}f}",
+                        interval_text(
+                            lower=row["lower_95"],
+                            upper=row["upper_95"],
+                            factor=unit[row["measure"]],
+                        ),
+                    ]
+                    for row in subset.filter(pl.col("kind") == "contrast").iter_rows(named=True)
+                ],
+            )
+        )
+        levels = sorted({key[2] for key in values if key[0] == "reliability"})
+        parts += ["", f"### {target} target: share of outcomes at or below each quantile", ""]
+        parts.append(
+            table(
+                header=["arm", *levels],
+                rows=[
+                    [
+                        arm,
+                        *(
+                            f"{values[('reliability', arm, level, 'share_below')]['value']:.3f}"
+                            for level in levels
+                        ),
+                    ]
+                    for arm in arms
+                ],
+            )
+        )
+        regime_keys = sorted({key[1:3] for key in values if key[0] == "regime"})
+        if regime_keys:
+            parts += ["", f"### {target} target: scores by ERA5 cloud regime", ""]
+            parts.append(
+                table(
+                    header=["arm", "regime", "CRPS", "coverage (%)", "mean width", "rows"],
+                    rows=[
+                        [
+                            arm,
+                            regime,
+                            *(
+                                f"{values[('regime', arm, regime, m)]['value'] * unit[m]:.3f}"
+                                for m in measures
+                            ),
+                            f"{values[('regime', arm, regime, 'crps')]['n_rows']:,}",
+                        ]
+                        for arm, regime in regime_keys
+                    ],
+                )
+            )
+        parts.append("")
+    return "\n".join(parts)
+
+
 def aerosol_condition_rows(
     *, losses: pl.DataFrame, dataset: pl.DataFrame, target: TargetType, setting: str
 ) -> pl.DataFrame:
@@ -920,23 +1130,37 @@ def aerosol_condition_rows(
                 worst=pl.col("error").max(),
             )
         )
+        has_quantiles = subset[PROBABILISTIC_METRICS["crps"]].null_count() < subset.height
+        means = {
+            "mean_absolute_error": METRIC,
+            "signed_error": "signed_share",
+            **(dict(PROBABILISTIC_METRICS) if has_quantiles else {}),
+        }
         by_arm = {
             arm: {
-                "mean_absolute_error": subset.filter(pl.col("arm") == arm)[METRIC].mean(),
-                "signed_error": subset.filter(pl.col("arm") == arm)["signed_share"].mean(),
+                **{
+                    name: subset.filter(pl.col("arm") == arm)[column].mean()
+                    for name, column in means.items()
+                },
                 "farm_day_p95": daily.filter(pl.col("arm") == arm)["p95"].item(),
                 "farm_day_worst": daily.filter(pl.col("arm") == arm)["worst"].item(),
             }
             for arm in (AEROSOL_RUNG, AEROSOL_REFERENCE)
         }
-        interval: BootstrapInterval | None = None
+        intervals: dict[str, BootstrapInterval] = {}
         if counts["months"] >= MIN_MONTHS_FOR_INTERVAL:
-            interval = bootstrap_difference(
-                losses=subset, treatment=AEROSOL_RUNG, reference=AEROSOL_REFERENCE, metric=METRIC
-            )
+            for name in ("mean_absolute_error", "crps"):
+                if name in means:
+                    intervals[name] = bootstrap_difference(
+                        losses=subset,
+                        treatment=AEROSOL_RUNG,
+                        reference=AEROSOL_REFERENCE,
+                        metric=means[name],
+                    )
         for measure in by_arm[AEROSOL_RUNG]:
             treated = float(by_arm[AEROSOL_RUNG][measure])  # ty: ignore[invalid-argument-type]
             reference = float(by_arm[AEROSOL_REFERENCE][measure])  # ty: ignore[invalid-argument-type]
+            interval = intervals.get(measure)
             rows.append(
                 {
                     "target": target,
@@ -948,12 +1172,8 @@ def aerosol_condition_rows(
                     "treatment_value": treated,
                     "reference_value": reference,
                     "difference": treated - reference,
-                    "lower_95": interval["lower_95"]
-                    if interval is not None and measure == "mean_absolute_error"
-                    else None,
-                    "upper_95": interval["upper_95"]
-                    if interval is not None and measure == "mean_absolute_error"
-                    else None,
+                    "lower_95": interval["lower_95"] if interval is not None else None,
+                    "upper_95": interval["upper_95"] if interval is not None else None,
                     **counts,
                 }
             )
@@ -998,7 +1218,7 @@ def render_aerosol_conditions(*, conditions: pl.DataFrame) -> str:
             "g9 on aerosol rows",
             "g10",
             "g10 minus g9",
-            "95% interval (mean absolute error only)",
+            "95% interval (mean absolute error and CRPS only)",
             "hours",
             "farm-days",
             "days",
@@ -1018,6 +1238,7 @@ def render_report(
     build_notes: str,
     worst: pl.DataFrame,
     aerosol_conditions: pl.DataFrame,
+    probabilistic: pl.DataFrame,
 ) -> str:
     """Assemble the report text."""
     parts = [
@@ -1105,6 +1326,19 @@ def render_report(
             "",
             render_worst_days(worst=worst),
         ]
+    if not probabilistic.is_empty():
+        parts += [
+            "",
+            "## Probabilistic scores (exploratory, pre-specified)",
+            "",
+            (
+                "CRPS and width are in points of capacity for the PV target and in clearness-index "
+                "units for the CAMS target. A negative difference is a gain. The quantiles are "
+                "sorted, held at the export cap, and floored at zero."
+            ),
+            "",
+            render_probabilistic(rows=probabilistic),
+        ]
     if not aerosol_conditions.is_empty():
         parts += [
             "",
@@ -1118,6 +1352,24 @@ def render_report(
             render_aerosol_conditions(conditions=aerosol_conditions),
         ]
     return "\n".join(parts) + "\n"
+
+
+def aerosol_conditions_by_setting(
+    *, losses: pl.DataFrame, dataset: pl.DataFrame, target: TargetType
+) -> list[pl.DataFrame]:
+    """Run the aerosol-condition analysis at each hyperparameter setting the fit holds."""
+    present = set(losses["setting"].unique().to_list())
+    return [
+        aerosol_condition_rows(losses=losses, dataset=dataset, target=target, setting=setting)
+        for setting in (PRIMARY_SETTING, SENSITIVITY_SETTING)
+        if setting in present
+    ]
+
+
+def stack_nonempty(*, frames: Sequence[pl.DataFrame]) -> pl.DataFrame:
+    """Stack the frames that hold rows, or return an empty frame if none does."""
+    kept = [frame for frame in frames if not frame.is_empty()]
+    return pl.concat(kept, how="diagonal") if kept else pl.DataFrame()
 
 
 def main() -> int:
@@ -1138,6 +1390,7 @@ def main() -> int:
     split_frames: list[pl.DataFrame] = []
     worst_frames: list[pl.DataFrame] = []
     condition_frames: list[pl.DataFrame] = []
+    probabilistic_frames: list[pl.DataFrame] = []
     arms_json: dict[TargetType, dict[str, object]] = {}
     for target in TARGETS:
         key = FitKey(variant=variant, through_rung=through_rung, target=target, view="ladder")
@@ -1162,34 +1415,44 @@ def main() -> int:
                 split_rows(losses=losses, dataset=dataset, target=target, setting=PRIMARY_SETTING)
             )
         worst_frames.append(worst_days(losses=losses, dataset=dataset, target=target))
+        probabilistic_frames.append(
+            probabilistic_rows(
+                losses=losses, dataset=dataset, target=target, setting=PRIMARY_SETTING
+            )
+        )
         aerosol_key = FitKey(
             variant=variant, through_rung=through_rung, target=target, view="aerosol_rows"
         )
         if results_path(key=aerosol_key).exists():
             aerosol_losses = read_losses(key=aerosol_key)
             contrast_frames.append(all_contrasts(losses=aerosol_losses, target=target))
-            condition_frames.extend(
-                aerosol_condition_rows(
-                    losses=aerosol_losses, dataset=dataset, target=target, setting=setting
+            probabilistic_frames.append(
+                probabilistic_rows(
+                    losses=aerosol_losses,
+                    dataset=dataset,
+                    target=target,
+                    setting=PRIMARY_SETTING,
                 )
-                for setting in (PRIMARY_SETTING, SENSITIVITY_SETTING)
-                if setting in aerosol_losses["setting"].unique().to_list()
+            )
+            condition_frames.extend(
+                aerosol_conditions_by_setting(losses=aerosol_losses, dataset=dataset, target=target)
             )
     contrasts = pl.concat(contrast_frames, how="diagonal")
     verdicts = planned_verdicts(contrasts=contrasts)
     leaderboard_table = pl.concat(list(boards.values()), how="diagonal")
     leaderboard_table.write_parquet(paths.leaderboard)
     contrasts.write_parquet(paths.contrasts)
-    if split_frames:
-        pl.concat(split_frames, how="diagonal").write_parquet(paths.splits)
-    worst = pl.concat(worst_frames, how="diagonal") if worst_frames else pl.DataFrame()
-    if not worst.is_empty():
-        worst.write_parquet(paths.worst_days)
-    aerosol_conditions = (
-        pl.concat(condition_frames, how="diagonal") if condition_frames else pl.DataFrame()
-    )
-    if not aerosol_conditions.is_empty():
-        aerosol_conditions.write_parquet(paths.aerosol_conditions)
+    worst = stack_nonempty(frames=worst_frames)
+    aerosol_conditions = stack_nonempty(frames=condition_frames)
+    probabilistic = stack_nonempty(frames=probabilistic_frames)
+    for frame, path in (
+        (stack_nonempty(frames=split_frames), paths.splits),
+        (worst, paths.worst_days),
+        (aerosol_conditions, paths.aerosol_conditions),
+        (probabilistic, paths.probabilistic),
+    ):
+        if not frame.is_empty():
+            frame.write_parquet(path)
     report = render_report(
         variant=variant,
         through_rung=through_rung,
@@ -1200,6 +1463,7 @@ def main() -> int:
         build_notes=checks_path(through_rung=through_rung, variant=variant).read_text(),
         worst=worst,
         aerosol_conditions=aerosol_conditions,
+        probabilistic=probabilistic,
     )
     paths.report.write_text(report)
     _LOG.info("wrote %s", paths.report)
