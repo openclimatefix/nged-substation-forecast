@@ -145,7 +145,7 @@ Every window below is anchored at the issue day and reads nothing after the issu
 | Lag with weather | L2 L1 plus the forecast irradiance and temperature at the lag hour, from the target's lead day (3); CTX7 raw context: lags and lag-hour forecast irradiance for days 1 to 7 (14) |
 | Weekly statistics | W7 minimum, maximum, mean of the same clock hour over the 7 whole days before the issue day, at least 5 present (3) |
 | Slow trackers | Q30 the 30-day 90th percentile and median of the same clock hour (2); CK the clipping ceiling: expanding 99.5th percentile and 60-day maximum of hourly power, and the share of clear hours near the ceiling (3) |
-| Transfer function | TF the 30-day ratio of power to forecast irradiance at the same clock hour (hours above 50 W m⁻², at least 15 days present), and that ratio times the target's forecast irradiance (2); AN the analogue ensemble: the mean, forecast clear-sky index, and spread of the observed power (rescaled by clear-sky irradiance) on the 5 days in the last 30 whose forecast clear-sky index was closest to the target's (3); PC the ratio of power to satellite irradiance (CAMS) over days 2 to 8 before the issue day, and the ratio of satellite to forecast irradiance over days 2 to 31 (the 2-day gap assumes CAMS is published 2 days late, to be checked; a gain would justify ingesting CAMS into the live system; 2) |
+| Transfer function | TF the 30-day ratio of power to forecast irradiance at the same clock hour (hours above 50 W m⁻², at least 15 days present), and that ratio times the target's forecast irradiance (2); AN the analogue ensemble: the mean, forecast clear-sky index, and spread of the observed power (rescaled by clear-sky irradiance) on the 5 days in the last 30 whose forecast clear-sky index was closest to the target's (3); PC the ratio of power to satellite irradiance (CAMS) over days 3 to 9 before the issue day, and the ratio of satellite to forecast irradiance over days 3 to 32 (the 3-day gap is a conservative reading of CAMS's documented delay of up to 2 days, to be checked; a gain would justify ingesting CAMS into the live system; 2) |
 | Two-step | S2 stage-1 prediction at the target hour and the lag hour, the observed lag, and their difference (4); S3 mean stage-1 residual over the last 1, 7, and 30 whole days before the issue day (3) |
 | Cross-plant | RP the plant's 7-day capacity-normalised energy divided by the mean of the other plants', which isolates a plant-specific fault from shared weather (2, with a 1-day version) |
 | Interpolation bound | T1 days since 2024-03-01 (1): month-block folds interleave, so trees can interpolate a test month's level from months on both sides, including future months; its gain is what interpolation buys, never drift a live forecast could use |
@@ -186,7 +186,9 @@ quantile model), and the global-only arms. Phase 2 carries X.
   whole fleet, the same era months and offsets, checked with `raise_on_uncovered_months`), so every
   fold is a set of calendar months at every plant and training excludes all plants' rows in the
   scored months by construction. The fleet-wide folds differ from the per-plant folds, so the
-  global-against-per-plant comparison is exploratory. The ENS mean's 0.25° grid cells partly
+  global-against-per-plant comparison is exploratory. The global scope skips arms built from the
+  `{fold}` stage-1 columns (S2, S3, KS), because those columns are indexed by the per-plant folds; if
+  the shortlist rule picks one of them as X, the global X is the best remaining eligible arm. The ENS mean's 0.25° grid cells partly
   identify the plant, which the page says. Both settings, three seeds; quantiles for B0 and L1.
 - **Global fingerprint mini-sweep (purpose: a "fingerprint" of each system for a model trained on
   many systems):** G-B0 and G-L1 are the global scope's B0 and L1 fits, reused. G-ID is G-B0 plus an
@@ -224,10 +226,11 @@ quantile model), and the global-only arms. Phase 2 carries X.
 
 ### Controls
 
-- **Positive control:** the same pipeline on a synthetic target in which power after a known date
-  is multiplied by (1 − s), applied to the hourly power table before the lags are built, for s of
-  2%, 5% and 10%. The known date is not an era boundary (2025-10, 2026-02), because B0 carries
-  `era_code` and could learn a shift there. B0 and L1, per-plant, lead-day 1, primary setting, three
+- **Positive control:** the same pipeline on a synthetic target in which power in a seeded random
+  half of the calendar months is multiplied by (1 − s), applied to the hourly power table before the
+  lags are built, for s of 2%, 5% and 10%. Choosing months at random keeps every B0 column (the era
+  code, the day of year) uninformative about which months are shifted, which a single step date
+  would not. B0 and L1, per-plant, lead-day 1, primary setting, three
   seeds (`out_of_fold_losses` always fits all three). "Recovers" means L1 minus B0 at the primary setting has a 99% interval wholly below zero and
   a point estimate at least 2% of B0's mean absolute error; the smallest s that L1 recovers is the
   detection limit at the primary setting.
@@ -308,8 +311,12 @@ another job held the GPU at 99%, found the GPU slower; the idle result supersede
 | Longer leads: 6 arms x 7 extra lead-days (0, 2, 3, 5, 7, 10, 14) x 6 plants x 5 folds x 3 seeds | 3,780 | about 45 min |
 | Stage-1 models, positive control, IFS HRES replicate | about 800 | about 12 min |
 
+Feature importance (descriptive) comes from a separate point-model refit of B0, L1, L2, S2 and X at
+the primary setting, seed 0, one per plant and fold (about 150 fits), because `out_of_fold_losses`
+does not return the boosters.
+
 **Total: about 3.5 h of single-fit time on 4 CPU threads. At the benchmarked GPU throughput (about
-2.8 times a single CPU fit) that is about 1.3 h of wall time, so the slot request is 1.5 h** (GPU,
+2.8 times a single CPU fit) that is about 1.3 h of wall time, so the slot request is 2 h, because the 6 per-plant jobs of an arm run in two waves on 4 workers** (GPU,
 4 workers using 4 cores, 1 GB of GPU memory). On the 8-core CPU budget the same work would take
 about 1.8 h.
 
