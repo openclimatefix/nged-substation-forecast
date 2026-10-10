@@ -490,9 +490,9 @@ text), has `aria=False` on its marks, and shows the weather series without the f
     Importance is descriptive, and the caption says that gain splits credit between correlated
     columns.
 13. **Probabilistic scores.** For G0, G2, G9, G9 without the MARS-only variables, and the negative
-    control: interval coverage against mean width, the constant-width reference, and a reliability
-    chart of the share of outcomes below each quantile level. Exploratory, pre-specified, primary
-    setting only.
+    control: contrasts in CRPS, width, and coverage (13), a reliability chart of the share of
+    outcomes below each quantile level (13b), and interval coverage against mean width with the
+    constant-width reference (13c). Exploratory, pre-specified, primary setting only.
 14. **Aerosol in unusual conditions.** G10 minus G9 on the aerosol rows in the four conditions of
     the aerosol section, for mean absolute error and CRPS, with the event counts beside each bar
     and the outcome of the reading rule stated. Exploratory, pre-specified.

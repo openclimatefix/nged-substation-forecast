@@ -401,8 +401,6 @@ def crps(*, actual: np.ndarray, quantiles: np.ndarray) -> np.ndarray:
 
 PROBABILISTIC_COLUMNS: Final[tuple[str, ...]] = (
     "crps_floored_fraction_of_capacity",
-    "pinball_10_fraction_of_capacity",
-    "pinball_90_fraction_of_capacity",
     "covered_80",
     "width_80_fraction_of_capacity",
     *(f"below_q{round(level * 100)}" for level in QUANTILE_LEVELS),
@@ -433,14 +431,8 @@ def probabilistic_scores(
     lower = repaired[:, levels.index(0.1)]
     upper = repaired[:, levels.index(0.9)]
 
-    def pinball(*, level: float, predicted: np.ndarray) -> np.ndarray:
-        difference = actual - predicted
-        return np.where(difference >= 0, difference * level, -difference * (1.0 - level))
-
     scores: dict[str, np.ndarray] = {
         "crps_floored_fraction_of_capacity": crps(actual=actual, quantiles=repaired) / capacity_mw,
-        "pinball_10_fraction_of_capacity": pinball(level=0.1, predicted=lower) / capacity_mw,
-        "pinball_90_fraction_of_capacity": pinball(level=0.9, predicted=upper) / capacity_mw,
         "covered_80": ((actual >= lower) & (actual <= upper)).astype(np.float64),
         "width_80_fraction_of_capacity": (upper - lower) / capacity_mw,
     }

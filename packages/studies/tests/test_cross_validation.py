@@ -1032,10 +1032,6 @@ def test_probabilistic_scores_repair_the_quantiles_before_scoring():
     assert scores["covered_80"] == pytest.approx([1.0])
     assert scores["below_q40"] == pytest.approx([0.0])
     assert scores["below_q50"] == pytest.approx([1.0])
-    # The outcome is 0.35 above the 0.1 quantile (0), so the 0.1 pinball is 0.35 * 0.1 / 2.
-    assert scores["pinball_10_fraction_of_capacity"] == pytest.approx([0.35 * 0.1 / 2.0])
-    # The outcome is 1.15 below the 0.9 quantile (1.5), so the 0.9 pinball is 1.15 * 0.1 / 2.
-    assert scores["pinball_90_fraction_of_capacity"] == pytest.approx([1.15 * 0.1 / 2.0])
     assert scores["crps_floored_fraction_of_capacity"] == pytest.approx(
         crps(
             actual=np.array([0.35]),
@@ -1056,3 +1052,36 @@ def test_probabilistic_scores_divide_by_each_rows_own_capacity():
     )
 
     assert scores["width_80_fraction_of_capacity"] == pytest.approx([0.8, 0.2])
+
+
+def test_losses_hold_the_same_columns_with_and_without_a_quantile_model():
+    test = pl.DataFrame(
+        {
+            "site": ["A", "A"],
+            "time": [datetime(2025, 1, 1, tzinfo=UTC), datetime(2025, 1, 2, tzinfo=UTC)],
+            "month": ["2025-01", "2025-01"],
+            "fold": [0, 0],
+            "effective_capacity_mw": [2.0, 2.0],
+            "constrained": [False, False],
+            "cap_mw": [None, None],
+        },
+        schema_overrides={"cap_mw": pl.Float64},
+    )
+    actual = np.array([0.5, 0.6])
+    point = np.array([0.4, 0.7])
+
+    without = cross_validation._losses(
+        test=test, actual=actual, point=point, quantiles=None, seed=0
+    )
+    with_quantiles = cross_validation._losses(
+        test=test,
+        actual=actual,
+        point=point,
+        quantiles=np.tile(np.linspace(0.1, 0.9, 9), (2, 1)),
+        seed=0,
+    )
+
+    assert without.columns == with_quantiles.columns
+    assert without.schema == with_quantiles.schema
+    assert without["covered_80"].null_count() == 2
+    assert with_quantiles["covered_80"].null_count() == 0

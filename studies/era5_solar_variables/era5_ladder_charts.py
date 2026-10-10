@@ -1430,6 +1430,74 @@ def figure_13b_reliability(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMix
     )
 
 
+def figure_13c_coverage_and_width(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMixin | None:
+    """Draw each arm's interval coverage against its mean width, with the constant-width reference.
+
+    A quantile model helps with uncertainty only if it reaches the same coverage in a narrower
+    interval than the negative control's, and than one constant interval from its own errors.
+
+    Args:
+        rows: The report's probabilistic table.
+        scope: The line naming the farms, hours, and span.
+
+    Returns:
+        The figure, or `None` if the table holds no arm rows.
+    """
+    arms = rows.filter(pl.col("kind") == "arm")
+    if arms.is_empty():
+        return None
+    panels: list[Panel] = []
+    for target in TARGETS:
+        selected = arms.filter(pl.col("target") == target)
+        if selected.is_empty():
+            continue
+        factor = _scale(target=target)
+        width = selected.filter(pl.col("measure") == "width_80").select(
+            "arm", width=pl.col("value") * factor
+        )
+        coverage = selected.filter(pl.col("measure") == "coverage_80").select(
+            "arm", coverage=pl.col("value") * 100.0
+        )
+        reference = rows.filter(
+            (pl.col("target") == target) & (pl.col("kind") == "residual_reference")
+        ).select("arm", reference_width=pl.col("value") * factor)
+        points = width.join(coverage, on="arm").join(reference, on="arm")
+        base = alt.Chart(points.with_columns(nominal=pl.lit(80.0)))
+        panels.append(
+            alt.layer(
+                base.mark_point(shape="diamond", size=60, color=ocf.TEXT, aria=False).encode(  # ty: ignore[unresolved-attribute]
+                    x=alt.X(
+                        "reference_width:Q",
+                        title=f"Width ({_error_unit(target=target)})",
+                        scale=alt.Scale(zero=False),
+                    ),
+                    y=alt.Y(
+                        "nominal:Q",
+                        title="Coverage of the 10 to 90% interval (%)",
+                        scale=alt.Scale(zero=False),
+                    ),
+                ),
+                base.mark_point(filled=True, size=80, aria=False).encode(  # ty: ignore[unresolved-attribute]
+                    x=alt.X("width:Q"),
+                    y=alt.Y("coverage:Q"),
+                    color=alt.Color("arm:N", title="Arm"),
+                ),
+            ).properties(width=PLOT_WIDTH_PX, height=220, title=_title(PANEL_TITLES[target]))
+        )
+    return figure(
+        panels=panels,
+        number="13c",
+        title="Coverage against interval width",
+        subtitle=[
+            scope,
+            "Circle: the quantile model. Diamond: a constant interval holding 80% of its errors.",
+            "A model that helps with uncertainty sits left of the diamonds at a similar height.",
+            "Exploratory. Primary hyperparameter setting only.",
+        ],
+        figure_planning=None,
+    )
+
+
 def figure_14_aerosol_conditions(
     *, conditions: pl.DataFrame, scope: str
 ) -> alt.TopLevelMixin | None:
@@ -1449,17 +1517,19 @@ def figure_14_aerosol_conditions(
                 (pl.col("target") == target)
                 & (pl.col("measure") == measure)
                 & (pl.col("setting") == PRIMARY_SETTING)
-                & pl.col("lower_95").is_not_null()
             )
             if selected.is_empty():
                 continue
             scale = _scale(target=target)
             rows = selected.select(
                 label=pl.col("condition").replace(CONDITION_LABELS)
-                + pl.format(" ({} d, {} mo)", pl.col("days"), pl.col("months")),
+                + pl.format(" ({} d, {} mo)", pl.col("days"), pl.col("months"))
+                + pl.when(pl.col("lower_95").is_null())
+                .then(pl.lit(", no interval"))
+                .otherwise(pl.lit("")),
                 value=pl.col("difference") * scale,
-                lower=pl.col("lower_95") * scale,
-                upper=pl.col("upper_95") * scale,
+                lower=pl.coalesce("lower_95", "difference") * scale,
+                upper=pl.coalesce("upper_95", "difference") * scale,
             )
             panels.append(
                 dot_interval_panel(
@@ -1482,7 +1552,7 @@ def figure_14_aerosol_conditions(
             scope,
             "Dot: estimate. Line: 95% interval from resampling whole months. Primary setting.",
             "Dashed rule: no difference. Labels give distinct days (d) and months (mo).",
-            "The reading rule needs 20 days and 12 months. The report states its outcome.",
+            "The reading rule needs 20 days and 12 months, and the page states its outcome.",
             "Exploratory. EAC4 is a reanalysis, so a forecast would gain less.",
         ],
         figure_planning=None,
@@ -1496,6 +1566,7 @@ def draw_uncertainty_and_aerosol_figures(*, paths: ReportPaths, scope: str) -> N
         for name, chart in (
             ("probabilistic", figure_13_probabilistic(rows=probabilistic, scope=scope)),
             ("reliability", figure_13b_reliability(rows=probabilistic, scope=scope)),
+            ("coverage_and_width", figure_13c_coverage_and_width(rows=probabilistic, scope=scope)),
         ):
             if chart is not None:
                 save(chart=chart, name=name)

@@ -910,6 +910,7 @@ def probabilistic_rows(
     if in_setting.is_empty():
         return pl.DataFrame()
     arms = sorted(in_setting["arm"].unique().to_list(), key=_arm_order)
+    raise_unless_same_rows(losses=in_setting, arms=arms)
     rows: list[dict[str, object]] = []
     for arm in arms:
         arm_rows = in_setting.filter(pl.col("arm") == arm)
@@ -1138,6 +1139,7 @@ def aerosol_condition_rows(
             day=pl.col("time").dt.date(),
         )
     )
+    raise_unless_same_rows(losses=scored, arms=[AEROSOL_RUNG, AEROSOL_REFERENCE])
     rows: list[dict[str, object]] = []
     for condition in AEROSOL_CONDITIONS:
         subset = scored.filter(pl.col(condition))
@@ -1262,7 +1264,9 @@ def render_aerosol_conditions(*, conditions: pl.DataFrame) -> str:
         return "No aerosol-condition rows."
     body = []
     for row in conditions.iter_rows(named=True):
-        factor = scale(target=row["target"])
+        factor = (
+            PERCENTAGE_POINTS if row["measure"] == "coverage_80" else scale(target=row["target"])
+        )
         interval = (
             interval_text(lower=row["lower_95"], upper=row["upper_95"], factor=factor)
             if row["lower_95"] is not None
@@ -1446,7 +1450,7 @@ def aerosol_conditions_by_setting(
 def stack_nonempty(*, frames: Sequence[pl.DataFrame]) -> pl.DataFrame:
     """Stack the frames that hold rows, or return an empty frame if none does."""
     kept = [frame for frame in frames if not frame.is_empty()]
-    return pl.concat(kept, how="diagonal") if kept else pl.DataFrame()
+    return pl.concat(kept, how="diagonal_relaxed") if kept else pl.DataFrame()
 
 
 def main() -> int:
