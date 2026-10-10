@@ -31,10 +31,9 @@ archive serves, or into ingesting another forecast.
   needed only if the groups that help are ones the open-data feed does not carry.
 
 - **Whether to ingest the MARS-only variables or another forecast.** The study cannot test the 12
-  MARS-only variables, because Open-Meteo does not serve them. The ERA5 study's planned contrast P4
-  is the only evidence on those, and ERA5 is a reanalysis, so P4 is an upper bound on the gain at
-  any lead. The comparison section below measures what a second forecast adds on the same
-  target, and the page sets the two gains side by side.
+  MARS-only variables, because Open-Meteo does not serve them. The plan sets the gain from adding a
+  second forecast to a rich IFS set (P5) beside the gain from the 12 variables on top of a rich
+  ERA5 set (the ERA5 study's P4), and "Decisions and their rules" below states the rule.
 
 ## Why this design
 
@@ -53,8 +52,7 @@ archive serves, or into ingesting another forecast.
   day-ahead decision uses, and "lead day 1" means the 24 to 47 hour leads of that run.
 - **Open-Meteo builds some hourly values from coarser output.** IFS output steps coarsen beyond 90
   hours, so values at lead days 5 to 9 are interpolated. Open-Meteo labels the runs before
-  2024-11-12 as cycle 49r1 hindcasts, so the 2024-11 boundary is a change of source as well as of
-  cycle.
+  2024-11-12 as cycle 49r1 hindcasts, so the 2024-11 boundary is a change of cycle in the operational model, and both sides of it carry the 49r1 label.
 
 ## Arms: a shortened ladder from the free IFS variables
 
@@ -83,10 +81,11 @@ carries downward long-wave radiation, a strong cloud signal that Open-Meteo does
 page states that cloud gains here may overstate the gain over the production set.
 
 **Column counts and subsampling.** Column subsampling is off (`colsample_bytree=1`). The arms of a
-planned contrast differ by 1, 2, and 12 columns, and the study skill asks for equal counts. The
-negative control (below) has the same columns as F6, so each planned contrast is also read against
-it, and the report states the size of difference that extra columns produce from nothing. P3 is
-read as F6 minus F2 and as F6 minus the negative control.
+planned contrast differ by 1 column (P1), 3 (P2), 14 (P3), and 2 (P4 and P5), and the study skill
+asks for equal counts, so each planned contrast is also read against a negative control with the
+same columns (below). The ERA5 study's negative control made the error 0.11 points worse for 29
+extra columns, so the report states the size of difference that extra columns produce from nothing,
+and prints every arm's column list.
 
 ## Targets
 
@@ -127,45 +126,123 @@ Both targets are scored with `absolute_error_capped_fraction_of_capacity`, as in
 
 ## Planned contrasts (written before any result exists)
 
-Two lead days (1 and 3) and three contrasts on the PV target make six planned contrasts, each a
-treatment minus a reference, so a negative difference is a gain.
+**Lead days 1, 2, and 3 are pooled into one planned contrast each.** The lead days are separate
+XGBoost models, so the pooled difference is the mean of the three lead days' paired differences,
+with one month resample drawn for all three (the three lead days' rows stand for the same months).
+Pooling gives the study its best chance of resolving anything with 24 months. The page also draws
+every lead day on its own (1, 2, 3, 5, 7, and 9), and labels those exploratory.
 
-1. **P1:** F1 minus F0. Does total cloud help beyond the radiation and temperature a forecast
-   already supplies?
-2. **P2:** F2 minus F1. Do the cloud layers help beyond total cloud?
-3. **P3:** F6 minus F2. Does any other free variable help beyond the cloud layers?
+Five contrasts on the PV target are planned, each a treatment minus a reference, so a negative
+difference is a gain.
 
-The family-wise level of 5% becomes 0.833% per contrast (a 99.17% interval). A contrast "rules out
-a gain larger than the smallest effect" when its lower bound lies above minus the smallest effect.
-Every other number is exploratory: the other lead days (2, 5, 7, and 9), the rungs F3 to F5 one by
-one, the contrasts against FP, the CAMS target, the regime and season splits, and the drop-one
-runs. The page labels them exploratory and does not correct them.
+1. **P1:** F1 minus F0, on the IFS rows. Does total cloud help beyond the radiation and temperature
+   a forecast already supplies?
+2. **P2:** F2 minus F1, on the IFS rows. Do the cloud layers help beyond total cloud?
+3. **P3:** F6 minus F2, on the IFS rows. Does any other IFS variable help beyond the cloud layers?
+4. **P4:** FB minus F0, on the blend rows (below). What does a second forecast add to the minimal
+   IFS set?
+5. **P5:** F6B minus F6, on the blend rows. What does a second forecast add once every IFS variable
+   is present? P5 is the IFS counterpart of the ERA5 study's P4, which is the gain from the MARS-only
+   variables on top of about 29 other variables at the same hour.
 
-**Decision rule for the variables to request, fixed before any result.** A contrast is a gain when,
-at lead days 1 and 3 on the PV target at both hyperparameter settings, its whole adjusted interval
-lies below minus the smallest effect. It is no gain when the whole interval lies above minus the
-smallest effect at both lead days. Otherwise it is unresolved.
+**The verdict of a planned contrast is a function, applied by the report script.** The family-wise
+level of 5% over five contrasts gives 1% per contrast, a 99% interval, from 10,000 month resamples.
+At each of the two hyperparameter settings, the verdict is `gain` if the interval's upper bound is
+below minus the smallest effect (0.1 points of capacity), `no gain` if the lower bound is above
+minus the smallest effect, and `unresolved` otherwise. The combined verdict is `gain` or `no gain`
+only if both settings return it, and `unresolved` otherwise
+(`era5_ladder.contrast_verdict` and `combine_planned` have the same form). A null is worded as
+"nothing found beyond IFS's own radiation", because IFS's radiation already integrates IFS's own
+cloud, so P1 and P2 are small by construction.
 
-- **A gain in P1** recommends asking Dynamical.org to ingest total cloud, which the open-data feed
-  already carries and the production pipeline currently leaves out.
-- **A gain in P2 or a gain in F3 (direct beam) read as an exploratory check** recommends a second
-  IFS feed, because the open-data feed carries no cloud layers or direct radiation.
-- **A gain in P3** names the groups that carry it through the drop-one runs. The page lists them,
-  and marks each group as available from the open-data feed or not.
-- **No gain, or unresolved:** the production forecast changes nothing, and the page says how much
-  more history would resolve the contrast.
+**Power.** The two usable eras hold 24 whole months, so perhaps 150 to 250 independent weather
+episodes. The ERA5 study's P1 interval had a half-width of about 0.08 points from about 80 months,
+so expect half-widths of 0.15 to 0.3 points here at forecast lead, and "unresolved" is a likely
+result. Before any fit the report prints the width that a planned interval would have, from the
+ERA5 losses cut to the same months, and says that this understates the width at lead. If the width
+exceeds 0.2 points, the page states that the study can rule out only gains larger than the width. A
+99% interval from 24 resampled months undercovers, so the page says the intervals are approximate.
+
+**Every other number is exploratory:** the single lead days, the rungs F3 to F5 one by one, the
+contrasts against FP, the CAMS target, the regime and season splits, the drop-one runs, and the
+comparison with ERA5. The report counts the exploratory intervals, and the page says that about 1 in
+20 with no real effect behind it reaches statistical significance, that the intervals share months
+so spurious results cluster, and that the page does not correct for them.
+
+## Decisions and their rules
+
+**Each rule is a formula, fixed before any result, that the report script applies.** "Agree" always
+means both hyperparameter settings return the verdict.
+
+- **Which variables to ask Dynamical.org to add.** A group's gain is read from the planned
+  contrasts where one exists (total cloud: P1; the other free variables: P3) and from the drop-one
+  runs of F6 otherwise. P1 `gain` recommends total cloud, which the open-data feed carries and the
+  production pipeline leaves out. P3 `gain` recommends the open-data variables that the drop-one
+  runs find to carry it. The priority list below ranks them.
+- **Whether the production forecast needs a second IFS feed.** P2 `gain`, or a drop-one run of
+  F6 that finds a group the open-data feed lacks (cloud layers, direct radiation, boundary-layer
+  height) carrying a gain, recommends a second feed such as Open-Meteo. The drop-one part is
+  exploratory, and the page says so.
+- **Whether to ingest the MARS-only variables or another forecast.** The study cannot test the 12
+  MARS-only variables, because Open-Meteo does not serve them. The like-for-like comparison is the
+  gain from adding a second forecast to a rich IFS set (P5) against the gain from the 12 variables
+  on top of a rich ERA5 set (the ERA5 study's P4, main setting 0.13 points with 99.5% interval
+  [−0.18, −0.08], second setting 0.11 points with [−0.15, −0.06]). The outcome is `second_forecast`
+  if P5 is `gain`. The outcome is `mars_variables` if P5 is `no gain` and the ERA5 P4 interval is
+  wholly below −0.1 points at both settings. P4 is not, so the second outcome cannot occur, and the
+  page says that. Otherwise the outcome is `not_separated`. The page does not call P4 an upper
+  bound, because ERA5's analysis timing inflates it and the 13-column penalty deflates it, and it
+  says that AIFS Single's 6-hour radiation and 0.25° grid handicap the partner. The page does not
+  state costs as findings: the price of ECMWF's dissemination is unverified, and engineering
+  effort is not measured here.
+
+**Decisions 1 and 2 add variables to a production feed that already holds the four FP variables,**
+so the page also draws F1, F2, and F6 minus FP (exploratory) next to the planned contrasts.
 
 ## Controls
 
-- **Negative control:** F2 plus a permuted copy of the F3 to F6 variables
-  (`studies.blending.climatology_permutation`, over farm, month, and hour of day), at lead days 1
-  and 3. It shows what the extra columns produce from nothing. It is not strictly information
-  free, because it keeps each month-and-hour mean. The report prints the control's difference from
-  F2, and a planned gain smaller than that difference is not read as a gain.
-- **Positive control:** F2 plus CAMS global horizontal irradiance at the valid hour, which is the
-  observation. It must show a gain larger than 1 point of capacity. If it does not, the page states
-  that the instrument cannot detect a large effect, and reads every null as unresolved.
-- **Drop-one-group runs** from F6 (exploratory), at lead days 1 and 3.
+- **Negative controls, each at both settings:** F2 plus a permuted copy of the F3 to F6 columns
+  (`studies.blending.climatology_permutation`, over farm, month, and hour of day), the same columns
+  as F6; F0 plus a permuted copy of `cloud_cover`, to pad P1; and F1 plus permuted copies of the
+  three layers, to pad P2. The permuted columns keep each month-and-hour mean, so the controls are
+  not strictly information-free. The report prints each control's difference from its base arm.
+  A planned gain is also read as a difference from its control: P3 is `gain` only if F6 minus F2
+  and F6 minus the F2 control both meet the `gain` rule, and likewise P1 and P2.
+- **Positive control:** F2 plus CAMS global horizontal irradiance at the valid hour. It must show a
+  gain larger than 1 point of capacity. It cannot fail at the 0.1-point scale, so a pass shows only
+  that the instrument detects a large effect, and the page reads every null as "nothing found
+  beyond IFS's own radiation" and not as "no effect".
+- **Drop-one-group runs** from F6 (exploratory), at lead days 1, 2, and 3.
+
+## Rows for the second-forecast contrasts
+
+**P4 and P5 run on the blend rows: the IFS rows that AIFS Single also covers in one version
+era.** AIFS Single became operational on 2025-02-25 (checked in the Dynamical.org store's metadata
+before the fit), and the store's earlier runs are experimental versions, so the blend rows start in
+March 2025. The IFS era from 2024-12 to 2026-04 then leaves about 14 months in one era, with
+five-fold month blocks. F0 and F6 are refit on those rows for P4 and P5, so each blend contrast
+compares arms on identical rows, and the report prints the refit arms' errors beside the main
+ladder's.
+
+| Arm | Columns | Reads as |
+|---|---|---|
+| F0 | the minimal IFS set | the starting point |
+| FB | F0 plus AIFS Single's `shortwave_radiation` and `temperature_2m` at the same lead day | the minimal IFS set plus another forecast |
+| F6 | all 20 IFS variables | all the IFS variables |
+| F6B | F6 plus the partner's two variables | both routes together |
+
+- **The partner is AIFS Single** (ECMWF's machine-learned forecast), read from the Dynamical.org
+  store the blends page used. It supplies downward shortwave radiation and 2 m temperature from
+  the same 00 UTC run, so the lead day matches IFS's. Its radiation is a 6-hour mean, so each valid
+  hour reads the 6-hour window that contains it, and the page says so.
+- **ICON-EU is an optional second partner at lead days 1 and 2 only**, read from the Previous Runs
+  files if they cover the blend months at whole-day offsets. Otherwise the page says that ICON-EU
+  was not tested.
+- **FB has 2 more columns than F0.** The report prints FB's, F6B's, and every control's column list,
+  and a control gives F0 two permuted copies of the partner's variables, so a blend gain is read
+  against what two extra columns produce from nothing.
+- **The verdict is for AIFS Single at these lead days, not for forecasts in general.** The page
+  states the row count and the era restriction.
 
 ## Comparison with the ERA5 study
 
@@ -175,74 +252,30 @@ study's rows, folds, and eras, with the same feature set apart from the variable
 (ERA5's minimal set includes a clearness-index column that the IFS minimal set lacks), so the ERA5
 arms G0, G1, G2, and G9 are refit that way and the two sets of contrasts are labelled exploratory.
 The comparison shows whether the ERA5 screen and the forecast agree on these months. It does not
-prove that ERA5 results transfer to other months.
+prove that ERA5 results transfer to other months. ERA5's solar radiation comes from forecasts and
+its cloud fields from the analysis, so an ERA5 gain from cloud can include a timing advantage that
+the IFS contrast lacks, and the page says so.
 
-## Comparison with a second forecast: all IFS variables, or minimal IFS plus another forecast
+## The priority list of variables to ask Dynamical.org to add
 
-**This comparison asks whether the extra IFS variables are worth more than a second weather forecast.** The
-[blends page](../docs/studies/forecasts/blends-with-ens.md) found that adding one product to ECMWF's
-ensemble mean sometimes lowered the error. The production service can follow either route: ask
-Dynamical.org for more IFS fields, or add a second forecast to the minimal IFS set it already
-holds. The three arms below put the two routes on the same rows.
+**The page carries a priority list, built by a formula from the report.** A group is listed only if
+the open-data feed carries it (rechecked on a recent run), and it is ranked in this order:
 
-| Arm | Columns | Reads as |
-|---|---|---|
-| F0 | the minimal IFS set | the starting point |
-| FB (blend) | F0 plus the partner's `shortwave_radiation` and `temperature_2m` at the same lead day | the minimal IFS set plus another forecast |
-| F6 | all 20 IFS variables | all the relevant IFS variables |
-| F6B | F6 plus the partner's two variables | the ceiling that uses both routes |
+1. **A planned gain** (P1 or P3 returns `gain`), ordered by the size of the pooled gain.
+2. **An exploratory gain that both settings and each of lead days 1, 2, and 3 agree on**, whose
+   difference from its base arm is more negative than the matching negative control's difference
+   from the same base arm, ordered by size.
+3. **A group whose drop-one run raises the error of F6 by more than the F2 negative control's
+   difference**, even if its ladder step is small, because the ladder order can hide it.
+4. **Everything else is listed as "no gain shown"** with its interval.
 
-- **The partner is AIFS Single** (ECMWF's machine-learned forecast), read from the Dynamical.org
-  store the blends page used. It supplies downward shortwave radiation and 2 m temperature from
-  the same 00 UTC run, so the lead day matches IFS's, and its first run day is 2024-04-01. Its
-  radiation is a 6-hour mean, so each valid hour reads the 6-hour window that contains it, and the
-  page says so.
-- **ICON-EU is an optional second partner at lead days 1 and 3 only**, read from the Previous Runs
-  files, if the files cover the IFS months at whole-day offsets. If they do not, the page says that
-  ICON-EU was not tested.
-- **The rows are the intersection of the IFS rows and the partner's rows**, so F0 and F6 are
-  refit on them. Their errors can differ from the main ladder's, and the report prints both.
-- **FB is given the same number of columns as the partner adds to F0 (2), and a control gives F0 two
-  permuted copies of the partner's variables** (`studies.blending.climatology_permutation`), so a
-  blend gain is read against what two extra columns produce from nothing.
-- **The contrasts are exploratory, at lead days 1 and 3, on the PV target, at both hyperparameter
-  settings:** FB minus F0 (what the partner adds), F6 minus F0 (what the IFS variables add),
-  F6 minus FB (which route is better), and F6B minus F6 (whether the partner still adds anything
-  once every IFS variable is present). The page states the row count, the era restriction, and that
-  the verdict is for AIFS Single at these lead days, not for forecasts in general.
-
-**The decision rule for the third decision is fixed before any result.** The page draws three
-gains in points of capacity, each with its 95% interval: the ERA5 study's P4 (MARS-only variables,
-an upper bound), F6 minus F0 (free IFS variables), and FB minus F0 (a second forecast), the last two
-at lead days 1 and 3. The page states that the gains come from different rows and so are compared
-only as sizes. **Another forecast is the better use of engineering effort when FB minus F0 is a gain
-(its whole interval lies below minus the smallest effect at both lead days) and P4's upper-bound
-point estimate is no larger than that gain.** **The MARS-only variables are worth pricing when P4's
-upper-bound gain is larger than the partner's gain and the partner's gain is not a gain.**
-Otherwise the page says the evidence does not separate the routes. The page does not state costs
-as findings: the cost of ECMWF dissemination is unverified, and engineering effort is not measured
-here.
-
-**The page carries a priority list of the variables to ask Dynamical.org to add.** The list is the
-study's main deliverable for the production service, so the plan fixes how it is built. A variable
-or group is listed only if the open-data feed carries it (rechecked on a recent run), and it is
-ranked by the gain that its rung adds at lead days 1 and 3, in this order of evidence:
-
-1. **A planned gain.** The group's planned contrast is a gain by the rule above. Groups with a
-   planned gain come first, ordered by the size of the gain at lead day 1.
-2. **An exploratory gain that both hyperparameter settings and both lead days agree on**, and that
-   exceeds the negative control's difference from F2, ordered by size.
-3. **A group whose drop-one run costs the full set more than the negative control's difference**,
-   even if its ladder step is small, because the ladder order can hide it.
-4. **Everything else is listed as "no gain shown"** with its interval, so the reader sees what was
-   tested and found nothing.
-
-Each row of the list carries the variables in the group (with their ECMWF open-data names), the
-gain at lead days 1 and 3 with 95% intervals, the evidence class above, and whether the production
-ensemble feed already carries it. Where the groups share information (as ERA5's cloud and humidity
-fields did), the list says so and ranks the smallest set of variables that keeps the gain, from the
-drop-one runs. The page states that the ranking is for IFS at these lead days and months, and that
-Dynamical.org's ensemble fields can differ from Open-Meteo's high-resolution fields.
+Each row carries the variables in the group (with their ECMWF open-data names), the pooled gain
+with its 99% interval, the evidence class, and whether the production ensemble feed already
+carries it. Where groups share information (as ERA5's cloud and humidity fields did), the list says
+so and ranks the smallest set of variables that keeps the gain, from the drop-one runs. The page
+states that the ranking is for IFS at these lead days and months, that Dynamical.org's ensemble
+fields are regridded to 0.25° and so can differ from Open-Meteo's 9 km fields, and that only the
+variables' information, and not the 9 km resolution, can transfer.
 
 ## Page structure and figures
 
