@@ -2,6 +2,8 @@ from itertools import pairwise
 
 import pytest
 from studies.ifs_ladder import (
+    GROUP_CONTROL_RUNGS,
+    MISSING_BY_DESIGN,
     OPEN_DATA_AVAILABILITY,
     PRODUCTION_VARIABLES,
     RUNG_ADDITIONS,
@@ -12,6 +14,8 @@ from studies.ifs_ladder import (
     cloud_layers_control_features,
     drop_one_group_features,
     era5_comparison_features,
+    group_control_features,
+    later_groups_columns,
     later_groups_control_features,
     partner_control_features,
     positive_control_features,
@@ -85,3 +89,55 @@ def test_an_era5_arm_gets_the_shared_columns_and_prefixed_variables_without_deri
     assert columns[len(SHARED_FEATURES) :] == ("era5_ssrd", "era5_t2m", "era5_tcc")
     assert "era5_cape" in era5_comparison_features(rung="g9")
     assert "cape" not in era5_comparison_features(rung="g9")
+
+
+def test_the_rungs_are_the_plans_table():
+    assert RUNG_ADDITIONS == {
+        "f0": ("shortwave_radiation", "temperature_2m"),
+        "f1": ("cloud_cover",),
+        "f2": ("cloud_cover_low", "cloud_cover_mid", "cloud_cover_high"),
+        "f3": ("direct_radiation",),
+        "f4": ("dew_point_2m", "total_column_integrated_water_vapour", "boundary_layer_height"),
+        "f5": ("cape", "convective_inhibition", "visibility"),
+        "f6": (
+            "surface_temperature",
+            "snow_depth",
+            "snowfall",
+            "precipitation",
+            "surface_pressure",
+            "wind_speed_10m",
+            "wind_gusts_10m",
+        ),
+    }
+    assert PRODUCTION_VARIABLES == (
+        "dew_point_2m",
+        "surface_pressure",
+        "precipitation",
+        "wind_speed_10m",
+    )
+    assert SHARED_FEATURES[-1] == "era_code"
+    assert MISSING_BY_DESIGN == ("convective_inhibition",)
+    assert {name for name, state in OPEN_DATA_AVAILABILITY.items() if state == "not carried"} == {
+        "cloud_cover_low",
+        "cloud_cover_mid",
+        "cloud_cover_high",
+        "direct_radiation",
+        "boundary_layer_height",
+    }
+
+
+def test_a_group_control_pads_f2_with_only_that_groups_permuted_variables():
+    for rung in GROUP_CONTROL_RUNGS:
+        control = group_control_features(rung=rung)
+        base = rung_features(rung="f2")
+
+        assert control[: len(base)] == base
+        assert control[len(base) :] == tuple(f"{name}_shuffled" for name in RUNG_ADDITIONS[rung])
+        assert len(control) == len(base) + len(RUNG_ADDITIONS[rung])
+        # Every permuted column exists in the later-groups control's permutation.
+        assert set(control[len(base) :]) <= {f"{name}_shuffled" for name in later_groups_columns()}
+
+
+def test_a_rung_without_a_group_control_is_refused():
+    with pytest.raises(ValueError, match="no group control"):
+        group_control_features(rung="f6")

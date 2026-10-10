@@ -110,8 +110,12 @@ Both targets are scored with `absolute_error_capped_fraction_of_capacity`, as in
   per farm and fold and seed.
 - **Eras and folds.** IFS cycle 49r1 went live on 2024-11-12 and cycle 50r1 on 2026-05-12. The
   study drops the two straddling part-months (2024-11 and 2026-05), adds an era feature, and drops
-  the third era (2026-06 onwards), which is too short to form folds. Two eras remain: 2024-04 to
-  2024-10 (7 months) and 2024-12 to 2026-04 (17 months). Folds come from
+  the third era (2026-06 onwards), which is too short to form folds. Two eras remain. The
+  first runs from the archive's first servable day, 2024-03-15, to 2024-10: 8 months, the first a
+  17-day part-month whose length differs by lead day (it falls from 17 days at lead day 1 to 9 days
+  at lead day 9). The second runs from 2024-12 to 2026-04 (17 months). The two eras hold 25 months
+  in all. The part-month stays in because dropping it leaves no fold rotation that covers every
+  calendar month for every farm (one farm holds only 18 months). Folds come from
   `studies.cross_validation.cut_eras`, with the fold offsets found by `search_fold_offsets` and
   confirmed by `raise_on_uncovered_months`, so that no calendar month is absent from the training
   rows of a fold that holds it out. **The folds are assigned once, on all rows, before any
@@ -123,13 +127,23 @@ Both targets are scored with `absolute_error_capped_fraction_of_capacity`, as in
   clearness index, as in the ERA5 study.
 - **Second hyperparameter setting** (`SENSITIVITY_HYPER_PARAMETERS`) on every planned arm.
 - **Radiation of exactly −1 W/m² is clipped to 0**, as the dataset's README warns.
+- **Hour convention.** A row's time ends its hour. IFS radiation, precipitation, and snowfall are
+  means or totals over the hour ending at the valid time, and gusts are the maximum over that
+  hour, so those columns are used as served. Every other IFS variable (the cloud covers, dew
+  point, temperature, pressure, boundary-layer height, column water vapour, CAPE, convective
+  inhibition, visibility, skin temperature, snow depth, and wind speed) is a value at one instant,
+  so it is the mean of its values at lead hours `24 L + h − 1` and `24 L + h`, as the ERA5 study
+  averaged ERA5's snapshots over the hour's two ends. Hour 0 reads the last lead hour of the
+  previous day of the same run. A missing neighbour makes the value missing, and the hour is
+  dropped like any other hour with a missing IFS value.
 
 ## Planned contrasts (written before any result exists)
 
 **Lead days 1, 2, and 3 are pooled into one planned contrast each.** The lead days are separate
-XGBoost models, so the pooled difference is the mean of the three lead days' paired differences,
-with one month resample drawn for all three (the three lead days' rows stand for the same months).
-Pooling gives the study its best chance of resolving anything with 24 months. The page also draws
+XGBoost models, so the pooled difference is the equal-weight mean of the three lead days' paired
+differences over the (farm, hour) rows that all three lead days hold, with one month resample drawn
+for all three. A pooled contrast is computed only if all three lead days were fitted.
+Pooling gives the study its best chance of resolving anything with 25 months. The page also draws
 every lead day on its own (1, 2, 3, 5, 7, and 9), and labels those exploratory.
 
 Five contrasts on the PV target are planned, each a treatment minus a reference, so a negative
@@ -155,13 +169,13 @@ only if both settings return it, and `unresolved` otherwise
 "nothing found beyond IFS's own radiation", because IFS's radiation already integrates IFS's own
 cloud, so P1 and P2 are small by construction.
 
-**Power.** The two usable eras hold 24 whole months, so perhaps 150 to 250 independent weather
-episodes. The ERA5 study's P1 interval had a half-width of about 0.08 points from about 80 months,
+**Power.** The two usable eras hold 25 months, one of them a part-month, so perhaps 150 to 250
+independent weather episodes. The ERA5 study's P1 interval had a half-width of about 0.08 points from about 80 months,
 so expect half-widths of 0.15 to 0.3 points here at forecast lead, and "unresolved" is a likely
 result. Before any fit the report prints the width that a planned interval would have, from the
 ERA5 losses cut to the same months, and says that this understates the width at lead. If the width
 exceeds 0.2 points, the page states that the study can rule out only gains larger than the width. A
-99% interval from 24 resampled months undercovers, so the page says the intervals are approximate.
+99% interval from about 25 resampled months undercovers, so the page says the intervals are approximate.
 
 **Every other number is exploratory:** the single lead days, the rungs F3 to F5 one by one, the
 contrasts against FP, the CAMS target, the regime and season splits, the drop-one runs, and the
@@ -203,9 +217,12 @@ so the page also draws F1, F2, and F6 minus FP (exploratory) next to the planned
 
 - **Negative controls, each at both settings:** F2 plus a permuted copy of the F3 to F6 columns
   (`studies.blending.climatology_permutation`, over farm, month, and hour of day), the same columns
-  as F6; F0 plus a permuted copy of `cloud_cover`, to pad P1; and F1 plus permuted copies of the
-  three layers, to pad P2. The permuted columns keep each month-and-hour mean, so the controls are
-  not strictly information-free. The report prints each control's difference from its base arm.
+  as F6; F0 plus a permuted copy of `cloud_cover`, to pad P1; F1 plus permuted copies of the
+  three layers, to pad P2; and, for the exploratory steps to F3, F4, and F5, F2 plus permuted
+  copies of only that group's columns (1, 3, and 3 columns), so each group's step is read against
+  a control with the same number of added columns. The step to F6 is read against the P3 control,
+  the only control that holds it. The permuted columns keep each month-and-hour mean, so the
+  controls are not strictly information-free. The report prints each control's difference from its base arm.
   A planned gain is also read as a difference from its control: P3 is `gain` only if F6 minus F2
   and F6 minus the F2 control both meet the `gain` rule, and likewise P1 and P2.
 - **Positive control:** F2 plus CAMS global horizontal irradiance at the valid hour. It must show a
@@ -236,8 +253,13 @@ ladder's.
   (`data/studies/per_study/nwp_forecast_comparison/aifs_blends/solar_aifs_inputs.parquet` for lead
   days 1 and 2, and `.../aifs_extra_days/solar_aifs_inputs.parquet` for lead day 3). The build
   asserts that each row's AIFS `init_time` is the 00 UTC run `L` days before the valid day. It supplies downward shortwave radiation and 2 m temperature from
-  the same 00 UTC run, so the lead day matches IFS's. Its radiation is a 6-hour mean, so each valid
-  hour reads the 6-hour window that contains it, and the page says so.
+  the same 00 UTC run, so the lead day matches IFS's. AIFS Single publishes radiation as 6-hour
+  means. The partner columns are the forecast comparison's hourly values, rebuilt from those means
+  through the clear-sky index using the 6-hour steps on either side of the hour of the same run,
+  and its temperature is interpolated linearly to the hour's midpoint. The page says so. The
+  partner is an area value on AIFS's 0.25° grid and IFS is a point value from Open-Meteo's 9 km
+  grid, which handicaps the partner further. The partner files hold only the daylight hours 05 to
+  20 UTC, so `checks.md` counts the hours each condition removes from the blend rows.
 - **ICON-EU is an optional second partner at lead days 1 and 2 only**, read from the Previous Runs
   files if they cover the blend months at whole-day offsets. Otherwise the page says that ICON-EU
   was not tested.
@@ -287,8 +309,9 @@ sentences, and the headline figure above the fold. The take-home message is gene
 variables help a solar PV forecast, and how far ahead), and it says what it means for the
 Flexpectation project.
 
-1. **Headline.** The planned contrasts (P1 to P3) at lead days 1 and 3, with the adjusted and 95%
-   intervals, and the smallest effect marked. Directly under the figure, the priority list of the
+1. **Headline.** The five planned contrasts (P1 to P5) pooled over lead days 1 to 3 at the main
+   setting, with the adjusted and 95% intervals, the second setting as a hollow point, and the
+   smallest effect marked. Directly under the figure, the priority list of the
    variables to ask Dynamical.org to add.
 2. **What the forecasts look like.** Three days chosen by a stated rule (the clearest, the most
    variable, and the dullest by the CAMS clear-sky index of the valid day), at one farm: IFS cloud
@@ -303,8 +326,8 @@ Flexpectation project.
 5. **Controls.** The negative and positive controls at lead days 1 and 3, beside F0 and F6.
 6. **The leaderboard.** Every rung's error by lead day, with intervals.
 7. **ERA5 against IFS.** The contrasts that both studies share, side by side.
-8. **Regimes and seasons.** The difference in error between F6 and F0 by ERA5 cloud regime (clear,
-   broken, overcast) and by season, exploratory.
+8. **Regimes, seasons, and hours of day.** The difference in error between F6 and F0 by ERA5 cloud
+   regime (clear, broken, overcast), by season, and by hour of day, exploratory.
 9. **Drop-one-group.** Error added when each group is removed from F6, exploratory.
 10. **Variables or another forecast.** The three gains of the third decision's rule beside each
     other, then the error of F0, FB, F6, and F6B at lead days 1 and 3 with
@@ -321,7 +344,8 @@ reader, then a one-rule-per-pass sweep) before the figure is first rendered.
   the CAMS irradiance already in the dataset. Whether Open-Meteo's `direct_radiation` is native
   IFS output or derived is unchecked
   (`studies.served_column_checks.check_direct_is_not_a_separation_model`
-  is run on it before the fit), and the page states the result.
+  is run on it at build time and the result goes into `checks.md`), and the page states the
+  result.
 - **Code.** A new folder `studies/ifs_solar_variables/` holds `ifs_ladder_arms.py`,
   `ifs_ladder_build_dataset.py`, `ifs_ladder_fit.py`, `ifs_ladder_report.py`,
   `ifs_ladder_charts.py`, and a README. Code both studies need goes into
@@ -336,14 +360,14 @@ reader, then a one-rule-per-pass sweep) before the figure is first rendered.
 ## What the study cannot say
 
 - It does not test the 12 MARS-only IFS variables. Only the ERA5 study speaks to them.
+- It does not test ICON-EU, and the page says so.
 - It uses one run a day (00 UTC) of the deterministic 9 km forecast. The production feed is the
   ensemble on a 0.25° grid with 3-hourly output, so the study says nothing about ensemble members,
   the regridding, or the output step. Resolution is the one property that transfers, because the
   ensemble has run at 9 km since cycle 48r1.
 - The history is 2.6 years with two model cycles, and the two eras differ in source as well as in
-  cycle, so intervals are wide and a result can change with a new cycle. An exploratory check
-  scores the newest cycle on 2026-06, the one month the targets cover after 2026-05, with a model
-  trained on the second era.
+  cycle, so intervals are wide and a result can change with a new cycle. The third era (2026-06
+  onwards) is too short for folds and is not scored, so no check scores the newest cycle.
 - Open-Meteo's hourly values beyond 90 hours are interpolated, not native model output.
 - Downward long-wave radiation, which the production feed carries, is not available here, so cloud
   gains may be overstated against the production set.

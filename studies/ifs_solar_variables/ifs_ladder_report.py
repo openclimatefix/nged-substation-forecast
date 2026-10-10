@@ -2,10 +2,12 @@
 
 One-off throwaway script for the study planned in
 <https://github.com/openclimatefix/nged-substation-forecast/pull/1137>. It reads the per-row losses
-that `ifs_ladder_fit.py` saved and refits nothing. It writes `report.md` and four parquet tables
-(`leaderboard`, `contrasts`, `splits`, and `decisions`) into
-`data/studies/per_study/ifs_solar_variables/results/`. The chart script reads the tables. Every
-number on the page comes from `report.md`.
+that `ifs_ladder_fit.py` saved and refits nothing. It writes `report.md` and seven parquet tables
+(`leaderboard`, `contrasts`, `splits`, `farms`, `planned_verdicts`, `priority_list`, and
+`decisions`) into `data/studies/per_study/ifs_solar_variables/results/`. The chart script reads
+the tables. Every number on the page comes from `report.md`. With `--width-preview-only` it reads
+only the ERA5 study's losses and writes `width_preview.md`, so that the width a planned interval
+would have is stated before any IFS fit exists.
 
 **Planned contrasts are P1 to P5, written into the plan before any result existed** (see
 `ifs_ladder_arms.PLANNED_CONTRASTS`). P1 to P3 are pooled over lead days 1 to 3 on the ladder
@@ -17,10 +19,11 @@ resamples, and its verdict is `gain`, `no gain`, or `unresolved` by the formula 
 the treatment's columns, and a gain stands only if it is also a gain over the control.
 
 **Pooling lead days.** The lead days are separate XGBoost models. The pooled difference is the mean
-of the differences over all the rows of lead days 1 to 3, which weights each lead day by its row
-count, and one month resample is shared by the three lead days because each lead day's rows get a
-`site` key of their own (`A-L1`, `A-L2`, and so on; `studies.ifs_decisions.stack_lead_days`). The
-report also prints the unweighted mean of the lead days' differences beside each pooled one.
+of the differences over the farm-hours that all of lead days 1, 2, and 3 hold, so it is the
+equal-weight mean of the three lead days' differences. One month resample is shared by the three
+lead days because each lead day's rows get a `site` key of their own (`A-L1`, `A-L2`, and so on;
+`studies.ifs_decisions.stack_lead_days`). A pooled scope raises if any of the three lead days is
+missing.
 
 **Every other number is exploratory**: the single lead days, the rungs one by one, the contrasts
 against the production reference, the CAMS target, the splits, the drop-one runs, and the
@@ -35,6 +38,7 @@ results table. Open-data availability is a constant in `studies.ifs_ladder`.
 Run it with `uv run python studies/ifs_solar_variables/ifs_ladder_report.py`.
 """
 
+import argparse
 import json
 import logging
 import sys
@@ -49,6 +53,9 @@ from ifs_ladder_arms import (
     BLEND_LEAD_DAYS,
     CONTROL_CLOUD_COVER_ARM,
     CONTROL_CLOUD_LAYERS_ARM,
+    CONTROL_CONVECTION_ARM,
+    CONTROL_DIRECT_ARM,
+    CONTROL_HUMIDITY_ARM,
     CONTROL_LATER_GROUPS_ARM,
     CONTROL_PARTNER_FULL_ARM,
     CONTROL_PARTNER_MINIMAL_ARM,
@@ -77,7 +84,9 @@ from ifs_ladder_arms import (
     lead_day_dataset_path,
     report_paths,
     results_path,
+    width_preview_path,
 )
+from ifs_ladder_days import WEATHER_LEAD_DAYS, chosen_days, month_lines
 from studies.bootstrap import (
     MIN_MONTHS_FOR_INTERVAL,
     N_BOOTSTRAP_RESAMPLES,
@@ -100,6 +109,8 @@ from studies.era5_ladder import (
 )
 from studies.guards import refuse_to_overwrite
 from studies.ifs_decisions import (
+    NEAR_LINE_SHARE,
+    SETTINGS_THAT_MUST_AGREE,
     EvidenceClassType,
     VerdictType,
     combine_verdicts,
@@ -108,6 +119,7 @@ from studies.ifs_decisions import (
     evidence_class,
     exploratory_gain,
     gain_after_control,
+    is_near_line,
     priority_order,
     second_feed_recommended,
     second_forecast_or_mars_variables,
@@ -122,7 +134,7 @@ from studies.ifs_ladder import (
     RUNGS,
     RungType,
 )
-from studies.ifs_lead_days import LEAD_DAYS
+from studies.ifs_lead_days import DROPPED_MONTHS, LAST_ERA_MONTH_EXCLUSIVE, LEAD_DAYS
 from studies.sources import ERA5_LADDER_RESULTS_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -167,6 +179,9 @@ CONTROL_BASES: Final[tuple[tuple[str, str, str], ...]] = (
     (CONTROL_CLOUD_COVER_ARM, "f0", "ladder"),
     (CONTROL_CLOUD_LAYERS_ARM, "f1", "ladder"),
     (CONTROL_LATER_GROUPS_ARM, "f2", "ladder"),
+    (CONTROL_DIRECT_ARM, "f2", "ladder"),
+    (CONTROL_HUMIDITY_ARM, "f2", "ladder"),
+    (CONTROL_CONVECTION_ARM, "f2", "ladder"),
     (POSITIVE_CONTROL_ARM, "f2", "ladder"),
     (CONTROL_PARTNER_MINIMAL_ARM, "f0", "blend"),
     (CONTROL_PARTNER_FULL_ARM, F6_ARM, "blend"),
@@ -191,6 +206,25 @@ PLANNED_COVERS_SEVERAL_GROUPS: Final[frozenset[RungType]] = frozenset({"f3", "f4
 
 REGIME_COLUMN: Final[str] = "regime_era5"
 """The regime column of the splits, from ERA5 total cloud cover."""
+
+ERA5_ADJUSTED_LEVEL_PERCENT: Final[float] = 99.5
+"""The coverage of the ERA5 study's adjusted interval, which is Bonferroni-adjusted for ten."""
+
+PLAN_ERA5_P4_PRIMARY_UPPER: Final[float] = -0.000827
+"""The upper bound of the ERA5 study's P4 adjusted interval at the main setting in the plan."""
+
+WIDTH_WARNING: Final[float] = 0.002
+"""A planned interval wider than this fraction of capacity (0.2 points) triggers a caveat."""
+
+FIRST_IFS_MONTH: Final[str] = "2024-03"
+"""The first month with IFS runs, a part-month."""
+
+GROUP_CONTROLS: Final[dict[str, str]] = {
+    "f3": CONTROL_DIRECT_ARM,
+    "f4": CONTROL_HUMIDITY_ARM,
+    "f5": CONTROL_CONVECTION_ARM,
+}
+"""The control of each exploratory rung that has one of its own; each pads `f2`."""
 
 
 # ---------------------------------------------------------------------------------------------
@@ -244,15 +278,40 @@ class Fits:
         }
 
     def pooled(self, *, view: str, target: str, lead_days: Sequence[int]) -> pl.DataFrame | None:
-        """Return the stacked losses of the lead days that were fitted, or `None` if none was."""
+        """Return the stacked losses of the lead days, or `None` if none was fitted.
+
+        Args:
+            view: `ladder` or `blend`.
+            target: The target.
+            lead_days: The lead days to stack.
+
+        Returns:
+            `stack_lead_days`'s result for the lead days, or `None` if none was fitted.
+
+        Raises:
+            ValueError: If some but not all of the lead days were fitted, because a pooled
+                contrast over a subset would be published as the pooled contrast.
+        """
         fitted = self.get(view=view, target=target, lead_days=lead_days)
-        return stack_lead_days(losses_by_lead_day=fitted) if fitted else None
+        if not fitted:
+            return None
+        missing = sorted(set(lead_days) - set(fitted))
+        if missing:
+            msg = (
+                f"{view} {target}: lead days {missing} are not fitted, so lead days "
+                f"{list(lead_days)} cannot be pooled"
+            )
+            raise ValueError(msg)
+        return stack_lead_days(losses_by_lead_day=fitted)
 
 
 def has_arms(*, losses: pl.DataFrame, setting: str, arms: Sequence[str]) -> bool:
-    """Say whether every named arm was fitted at a setting."""
-    present = set(losses.filter(pl.col("setting") == setting)["arm"].unique().to_list())
-    return set(arms) <= present
+    """Say whether every named arm was fitted at a setting, at every lead day the losses hold."""
+    in_setting = losses.filter(pl.col("setting") == setting)
+    by_day = in_setting.group_by("lead_day").agg(pl.col("arm").unique())
+    return by_day.height == losses["lead_day"].n_unique() and all(
+        set(arms) <= set(found) for found in by_day["arm"].to_list()
+    )
 
 
 # ---------------------------------------------------------------------------------------------
@@ -317,6 +376,7 @@ def contrast_row(
         "verdict_95": contrast_verdict(
             lower=interval["lower_95"], upper=interval["upper_95"], smallest_effect=smallest
         ),
+        "near_line": is_near_line(lower=interval["lower_95"], upper=interval["upper_95"]),
         "seed_spread": interval["seed_spread"],
         "n_rows": interval["n_rows"],
         "n_months": interval["n_months"],
@@ -529,6 +589,14 @@ def era5_p4_rows() -> list[dict[str, object]]:
     table = pl.read_parquet(ERA5_LADDER_RESULTS_DIR / ERA5_P4_RESULTS_NAME).filter(
         (pl.col("label") == "P4") & (pl.col("target") == "pv") & pl.col("planned")
     )
+    primary_upper = table.filter(pl.col("setting") == PRIMARY_SETTING)["upper_adjusted"].to_list()
+    if not primary_upper or abs(primary_upper[0] - PLAN_ERA5_P4_PRIMARY_UPPER) > 5e-7:
+        _LOG.warning(
+            "the ERA5 study's P4 primary upper bound is %s, not the plan's %s: the plan's text "
+            "about the third decision must be rechecked",
+            primary_upper,
+            PLAN_ERA5_P4_PRIMARY_UPPER,
+        )
     return [
         {
             "target": "pv",
@@ -547,6 +615,7 @@ def era5_p4_rows() -> list[dict[str, object]]:
             "upper_adjusted": row["upper_adjusted"],
             "verdict_adjusted": None,
             "verdict_95": None,
+            "near_line": False,
             "seed_spread": row["seed_spread"],
             "n_rows": row["n_rows"],
             "n_months": row["n_months"],
@@ -734,17 +803,18 @@ def step_uppers(*, contrasts: pl.DataFrame, treatment: str, reference: str) -> l
 
 
 def gain_interval(
-    *, contrasts: pl.DataFrame, rung: RungType, planned_label: str
+    *, contrasts: pl.DataFrame, rung: RungType, evidence: EvidenceClassType
 ) -> tuple[float | None, float | None, str]:
-    """Return the interval of a group's gain, positive for a gain, and the level it is read at.
+    """Return the interval of the quantity that ranks a group, positive for a gain, and its level.
 
-    Total cloud and the cloud layers read their planned contrast's 99% interval. The other groups
-    read the 95% interval of their drop-one run, which is exploratory.
+    Total cloud and the cloud layers read their planned contrast's 99% interval. A group in the
+    exploratory class reads the 95% interval of its pooled ladder step. Every other group reads the
+    95% interval of its drop-one run, which is exploratory.
 
     Args:
         contrasts: The contrast table.
         rung: The group's rung.
-        planned_label: `P1` for total cloud, `P2` for the layers, and `P3` for the rest.
+        evidence: The group's evidence class.
 
     Returns:
         The lower and upper bounds of the gain, and `99%` or `95%`. Bounds are `None` if the
@@ -763,6 +833,18 @@ def gain_interval(
         if row is None:
             return None, None, level
         return -float(row["upper_adjusted"]), -float(row["lower_adjusted"]), level  # ty: ignore[invalid-argument-type]
+    if evidence == "exploratory gain":
+        treatment, reference = GROUP_STEPS[rung]
+        step = one_row(
+            contrasts=contrasts,
+            family="step",
+            treatment=treatment,
+            reference=reference,
+            setting=PRIMARY_SETTING,
+        )
+        if step is None:
+            return None, None, "95%"
+        return -float(step["upper_95"]), -float(step["lower_95"]), "95%"  # ty: ignore[invalid-argument-type]
     row = one_row(
         contrasts=contrasts,
         family="drop_one",
@@ -777,6 +859,12 @@ def gain_interval(
 
 def group_evidence(*, contrasts: pl.DataFrame, verdicts: pl.DataFrame) -> pl.DataFrame:
     """Build the priority list's rows: each group's evidence class, gain, and availability.
+
+    A group's step is read against a negative control with as many added columns as the step. `f1`
+    and `f2` have the controls of P1 and P2. `f3`, `f4`, and `f5` have a control that pads `f2`
+    with only that group's permuted variables. `f6` has the P3 control, which pads `f2` with all
+    the variables of `f3` to `f6` (14 columns against the step's 7), the only control the ladder
+    holds for it.
 
     Args:
         contrasts: The contrast table.
@@ -795,6 +883,7 @@ def group_evidence(*, contrasts: pl.DataFrame, verdicts: pl.DataFrame) -> pl.Dat
     matching_control = {
         "f1": (CONTROL_CLOUD_COVER_ARM, "f0"),
         "f2": (CONTROL_CLOUD_LAYERS_ARM, "f1"),
+        **{rung: (control, "f2") for rung, control in GROUP_CONTROLS.items()},
     }
     classes: dict[str, EvidenceClassType] = {}
     gains: dict[str, float] = {}
@@ -822,7 +911,12 @@ def group_evidence(*, contrasts: pl.DataFrame, verdicts: pl.DataFrame) -> pl.Dat
             complete
             and step is not None
             and group_control is not None
-            and exploratory_gain(uppers=uppers, difference=step, control_difference=group_control)
+            and exploratory_gain(
+                uppers=uppers,
+                difference=step,
+                control_difference=group_control,
+                smallest_effect=SMALLEST_EFFECT["pv"],
+            )
         )
         has_drop_one = (
             drop is not None
@@ -835,14 +929,20 @@ def group_evidence(*, contrasts: pl.DataFrame, verdicts: pl.DataFrame) -> pl.Dat
             has_exploratory_gain=bool(has_exploratory),
             has_drop_one_gain=bool(has_drop_one),
         )
-        if rung == "f1" and step is not None:
+        if classes[rung] == "exploratory gain" and step is not None:
             gains[rung] = -step
-        elif rung in PLANNED_COVERS_SEVERAL_GROUPS and drop is not None:
+        elif (
+            classes[rung] in ("planned gain", "drop-one gain")
+            and rung in PLANNED_COVERS_SEVERAL_GROUPS
+            and drop is not None
+        ):
             gains[rung] = drop
         else:
             gains[rung] = -step if step is not None else 0.0
         interval_lower, interval_upper, level = gain_interval(
-            contrasts=contrasts, rung=rung, planned_label=planned_label
+            contrasts=contrasts,
+            rung=rung,
+            evidence=classes[rung],
         )
         details[rung] = {
             "gain_lower": interval_lower,
@@ -850,6 +950,7 @@ def group_evidence(*, contrasts: pl.DataFrame, verdicts: pl.DataFrame) -> pl.Dat
             "gain_interval_level": level,
             "step_difference": step,
             "drop_one_raise": drop,
+            "control_arm": control_arm,
             "control_difference": group_control,
             "f2_control_difference": control_difference,
             "step_bounds_found": len(uppers),
@@ -1019,13 +1120,19 @@ def split_rows(*, fits: Fits) -> pl.DataFrame:
 
     Returns:
         One row per (split, group, contrast).
+
+    Raises:
+        ValueError: If the losses or the frame of any of lead days 1 to 3 is missing.
     """
     parts = []
     for lead_day in PLANNED_LEAD_DAYS:
         losses = fits.losses.get(("ladder", "pv", lead_day))
         dataset = fits.datasets.get(lead_day)
         if losses is None or dataset is None:
-            continue
+            msg = (
+                f"the splits pool lead days {PLANNED_LEAD_DAYS}, but lead day {lead_day} is missing"
+            )
+            raise ValueError(msg)
         extra = dataset.select(
             "site",
             "time",
@@ -1038,8 +1145,6 @@ def split_rows(*, fits: Fits) -> pl.DataFrame:
                 extra, on=["site", "time"], how="inner"
             )
         )
-    if not parts:
-        return pl.DataFrame()
     stacked = stack_lead_days(losses_by_lead_day={int(p["lead_day"][0]): p for p in parts})
     rows: list[dict[str, object]] = []
     for split in (REGIME_COLUMN, "season", "hour_of_day"):
@@ -1076,12 +1181,25 @@ def split_rows(*, fits: Fits) -> pl.DataFrame:
     return pl.DataFrame(rows, infer_schema_length=None)
 
 
+def ifs_months() -> list[str]:
+    """Return the `%Y-%m` months the IFS rows can hold: every month with runs and in an era."""
+    months: list[str] = []
+    year, month = int(FIRST_IFS_MONTH[:4]), int(FIRST_IFS_MONTH[5:])
+    while f"{year}-{month:02d}" < LAST_ERA_MONTH_EXCLUSIVE:
+        label = f"{year}-{month:02d}"
+        if label not in DROPPED_MONTHS:
+            months.append(label)
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+    return months
+
+
 def width_check(*, months: Sequence[str]) -> list[dict[str, object]]:
     """Return the width a planned interval would have, from the ERA5 losses cut to the same months.
 
     The ERA5 arms stand in for the IFS arms: `g1` minus `g0` for P1, and `g9` minus `g2` for P3.
     ERA5 is an analysis, so its errors are smaller than a forecast's, and the width understates
-    the width at lead.
+    the width at lead. Only the columns the interval needs are read, because the file holds
+    millions of rows.
 
     Args:
         months: The `%Y-%m` months of the IFS rows.
@@ -1090,8 +1208,11 @@ def width_check(*, months: Sequence[str]) -> list[dict[str, object]]:
         One row per ERA5 contrast with the 99% interval's bounds and width, in fractions of
         capacity.
     """
-    losses = pl.read_parquet(ERA5_LADDER_RESULTS_DIR / ERA5_LOSSES_NAME).filter(
-        (pl.col("setting") == PRIMARY_SETTING) & pl.col("month").is_in(list(months))
+    losses = (
+        pl.scan_parquet(ERA5_LADDER_RESULTS_DIR / ERA5_LOSSES_NAME)
+        .filter((pl.col("setting") == PRIMARY_SETTING) & pl.col("month").is_in(list(months)))
+        .select("site", "time", "seed", "month", "arm", "setting", METRIC)
+        .collect()
     )
     rows: list[dict[str, object]] = []
     for treatment, reference in (("g1", "g0"), ("g9", "g2")):
@@ -1115,6 +1236,35 @@ def width_check(*, months: Sequence[str]) -> list[dict[str, object]]:
             }
         )
     return rows
+
+
+def render_widths(*, widths: Sequence[Mapping[str, object]]) -> list[str]:
+    """Render the width a planned interval would have, and what the page says about it."""
+    lines = [
+        "### Width a planned interval would have, from the ERA5 losses cut to the same months",
+        "",
+    ]
+    lines.extend(
+        f"- ERA5 `{width['treatment']}` minus `{width['reference']}` on {width['n_months']} "
+        f"months: {ADJUSTED_LEVEL_PERCENT:g}% interval "
+        f"{interval(width['lower'], width['upper'])} points, width "  # ty: ignore[invalid-argument-type]
+        f"{points(width['width'])} points."  # ty: ignore[invalid-argument-type]
+        for width in widths
+    )
+    if widths:
+        wide = max(float(w["width"]) for w in widths) > WIDTH_WARNING  # ty: ignore[invalid-argument-type]
+        lines.append(
+            "- The widest of these "
+            + (
+                f"exceeds {WIDTH_WARNING * PERCENTAGE_POINTS:g} points, so a contrast with no real "
+                "effect cannot return `no gain`, and the study can rule out only gains larger "
+                "than about half this width."
+                if wide
+                else f"is at most {WIDTH_WARNING * PERCENTAGE_POINTS:g} points."
+            )
+            + " ERA5 is an analysis, so this understates the width at forecast lead."
+        )
+    return lines
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1174,7 +1324,7 @@ def render_leaderboard(*, board: pl.DataFrame) -> str:
                     "arm",
                     f"mean absolute error ({unit})",
                     "95% interval",
-                    "rows (all seeds' rows)",
+                    "rows (per seed)",
                     "months",
                 ],
             ),
@@ -1223,6 +1373,32 @@ def render_contrasts(*, contrasts: pl.DataFrame, families: Sequence[str]) -> str
                 rows.append(cells)
             parts += [f"### {family}, {target} target", "", table(rows=rows, header=header), ""]
     return "\n".join(parts)
+
+
+def render_era5_p4(*, contrasts: pl.DataFrame) -> str:
+    """Render the ERA5 study's P4 at the ERA5 study's own adjusted level, not this study's."""
+    rows = [
+        [
+            row["setting"],
+            f"{row['treatment']} minus {row['reference']}",
+            points(row["difference"], signed=True),
+            interval(row["lower_adjusted"], row["upper_adjusted"]),
+            interval(row["lower_95"], row["upper_95"]),
+            str(row["n_months"]),
+        ]
+        for row in contrasts.filter(pl.col("family") == "era5_p4").iter_rows(named=True)
+    ]
+    return table(
+        rows=rows,
+        header=[
+            "setting",
+            "arms",
+            "difference (points)",
+            f"{ERA5_ADJUSTED_LEVEL_PERCENT:g}% interval (the ERA5 study's adjusted interval)",
+            "95% interval",
+            "months",
+        ],
+    )
 
 
 def render_planned_verdicts(*, verdicts: pl.DataFrame) -> str:
@@ -1298,20 +1474,23 @@ def render_controls(*, contrasts: pl.DataFrame) -> list[str]:
             ],
         )
     )
-    positive = one_row(
-        contrasts=contrasts,
-        family="control",
-        treatment=POSITIVE_CONTROL_ARM,
-        reference="f2",
-        setting=PRIMARY_SETTING,
-    )
-    if positive is not None:
+    for setting in (PRIMARY_SETTING, SENSITIVITY_SETTING):
+        positive = one_row(
+            contrasts=contrasts,
+            family="control",
+            treatment=POSITIVE_CONTROL_ARM,
+            reference="f2",
+            setting=setting,
+        )
+        if positive is None:
+            continue
         passed = float(positive["upper_95"]) < -POSITIVE_CONTROL_MINIMUM_GAIN  # ty: ignore[invalid-argument-type]
         lines += [
             "",
             (
                 "**Positive control** (`f2` plus CAMS irradiance at the valid hour), pooled lead "
-                f"days 1 to 3, main setting: {points(positive['difference'], signed=True)} points "  # ty: ignore[invalid-argument-type]
+                f"days 1 to 3, {setting} setting: "
+                f"{points(positive['difference'], signed=True)} points "  # ty: ignore[invalid-argument-type]
                 f"{interval(positive['lower_95'], positive['upper_95'])}. It must lower the "  # ty: ignore[invalid-argument-type]
                 f"error by more than {POSITIVE_CONTROL_MINIMUM_GAIN * PERCENTAGE_POINTS:g} point: "
                 f"**{'passed' if passed else 'FAILED'}**. A pass shows only that the instrument "
@@ -1407,34 +1586,64 @@ def render_arms(*, fits: Fits) -> list[str]:
     return lines
 
 
-def lead_day_mean_differences(*, fits: Fits, planned: PlannedContrast) -> list[float]:
-    """Return a planned contrast's mean difference at each planned lead day, main setting.
+def lead_day_mean_differences(
+    *, fits: Fits, planned: PlannedContrast
+) -> dict[int, tuple[float, int]]:
+    """Return a planned contrast's mean difference and row count at each planned lead day.
+
+    The rows are the farm-hours that every planned lead day holds, the rows the pooled contrast
+    uses, at the main setting.
 
     Args:
         fits: Every fit.
         planned: The contrast.
 
     Returns:
-        The mean paired difference at each of lead days 1 to 3 that was fitted.
+        For each of lead days 1 to 3, the mean paired difference and the number of farm-hours, or
+        an empty dictionary if the lead days were not fitted.
     """
-    differences: list[float] = []
+    pooled = fits.pooled(view=planned.view, target="pv", lead_days=PLANNED_LEAD_DAYS)
+    if pooled is None:
+        return {}
+    in_setting = pooled.filter(pl.col("setting") == PRIMARY_SETTING)
+    result: dict[int, tuple[float, int]] = {}
     for lead_day in PLANNED_LEAD_DAYS:
-        losses = fits.losses.get((planned.view, "pv", lead_day))
-        if losses is None:
-            continue
-        in_setting = losses.filter(pl.col("setting") == PRIMARY_SETTING)
+        day = in_setting.filter(pl.col("lead_day") == lead_day)
         paired, _ = paired_differences(
-            losses=in_setting,
-            treatment=planned.treatment,
-            reference=planned.reference,
-            metric=METRIC,
+            losses=day, treatment=planned.treatment, reference=planned.reference, metric=METRIC
         )
-        differences.append(float(paired.mean()))
-    return differences
+        rows = day.filter(pl.col("arm") == planned.treatment).height // len(SEEDS)
+        result[lead_day] = (float(paired.mean()), rows)
+    return result
+
+
+def near_line_without_second_setting(*, contrasts: pl.DataFrame) -> pl.DataFrame:
+    """List the exploratory contrasts near the 5% line that have no second-setting run.
+
+    Args:
+        contrasts: The contrast table.
+
+    Returns:
+        The (target, scope, treatment, reference) of each such contrast at the primary setting.
+    """
+    key = ["target", "scope", "treatment", "reference"]
+    second = contrasts.filter(pl.col("setting") == SENSITIVITY_SETTING).select(key)
+    return (
+        contrasts.filter(
+            (pl.col("setting") == PRIMARY_SETTING) & pl.col("near_line").fill_null(False)
+        )
+        .filter(~pl.col("planned"))
+        .select(key)
+        .join(second, on=key, how="anti")
+    )
 
 
 def render_settings(
-    *, fits: Fits, widths: Sequence[Mapping[str, object]], contrasts: pl.DataFrame
+    *,
+    fits: Fits,
+    widths: Sequence[Mapping[str, object]],
+    contrasts: pl.DataFrame,
+    splits: pl.DataFrame,
 ) -> list[str]:
     """Render the settings and derived numbers the page quotes."""
     lines = [
@@ -1458,6 +1667,10 @@ def render_settings(
         (
             "- ERA5 cloud regimes: clear below total cloud cover "
             f"{TOTAL_CLOUD_COVER_THRESHOLDS[0]}, overcast from {TOTAL_CLOUD_COVER_THRESHOLDS[1]}."
+        ),
+        (
+            "- Era 3 (2026-06 onwards) is too short to cut into folds, so it is dropped and no "
+            "check scores the newest model cycle."
         ),
     ]
     devices = sorted({str(info["device"]) for info in fits.arms.values()})
@@ -1487,7 +1700,7 @@ def render_settings(
             continue
         day = min(d for _, d in views)
         arms = fits.arms[(planned.view, "pv", day)]["arms"]  # ty: ignore[invalid-assignment]
-        if planned.treatment in arms and planned.reference in arms:
+        if all(name in arms for name in (planned.treatment, planned.reference, planned.control)):
             lines.append(
                 f"- {planned.label}: `{planned.treatment}` has {len(arms[planned.treatment])} "
                 f"columns, `{planned.reference}` has {len(arms[planned.reference])}, and its "
@@ -1501,44 +1714,42 @@ def render_settings(
             treatment=planned.treatment,
             reference=planned.reference,
         )
-        if pooled is not None and len(by_day) == len(PLANNED_LEAD_DAYS):
+        if pooled is not None and by_day:
             lines.append(
-                f"- {planned.label}: the lead days' differences are "
-                f"{', '.join(points(value, signed=True) for value in by_day)} points; their "
-                f"unweighted mean is {points(sum(by_day) / len(by_day), signed=True)}, against the "
-                f"pooled (row-weighted) {points(pooled, signed=True)}."
+                f"- {planned.label}: pooled over the farm-hours that lead days 1, 2, and 3 all "
+                f"hold ({', '.join(f'{rows:,}' for _, rows in by_day.values())} farm-hours per "
+                "lead day), the lead days' differences are "
+                f"{', '.join(points(value, signed=True) for value, _ in by_day.values())} points; "
+                "their equal-weight mean is "
+                f"{points(sum(v for v, _ in by_day.values()) / len(by_day), signed=True)}, and "
+                f"the pooled difference is {points(pooled, signed=True)}."
             )
-    lines += [
-        "",
-        "### Width a planned interval would have, from the ERA5 losses cut to the same months",
-    ]
-    lines.append("")
-    for width in widths:
-        lines.append(
-            f"- ERA5 `{width['treatment']}` minus `{width['reference']}` on {width['n_months']} "
-            f"months: {ADJUSTED_LEVEL_PERCENT:g}% interval "
-            f"{interval(width['lower'], width['upper'])} points, width "  # ty: ignore[invalid-argument-type]
-            f"{points(width['width'])} points."  # ty: ignore[invalid-argument-type]
-        )
-    if widths:
-        wide = max(float(w["width"]) for w in widths) > 2 * SMALLEST_EFFECT["pv"]  # ty: ignore[invalid-argument-type]
-        lines.append(
-            "- The widest of these "
-            + (
-                "exceeds 0.2 points, so the page states that the study can rule out only gains "
-                "larger than the width."
-                if wide
-                else "is at most 0.2 points."
-            )
-            + " ERA5 is an analysis, so this understates the width at forecast lead."
-        )
+    lines += ["", *render_widths(widths=widths), ""]
     exploratory = contrasts.filter(~pl.col("planned"))
-    lines.append(
-        f"- Exploratory intervals computed: {exploratory.height} (at 95%, one per contrast, scope, "
-        "and setting). About 1 in 20 with no real effect behind it reaches statistical "
-        "significance at the 5% level, the intervals share months so that spurious results "
-        "cluster, and the report applies no correction."
+    split_intervals = (
+        splits.filter(pl.col("difference").is_not_null()).height if not splits.is_empty() else 0
     )
+    lines.append(
+        f"- Exploratory intervals computed: {exploratory.height + split_intervals} "
+        f"({exploratory.height} contrast intervals, one per contrast, scope, and setting, and "
+        f"{split_intervals} split intervals), all at 95%. About 1 in 20 with no real effect "
+        "behind it reaches statistical significance at the 5% level, the intervals share "
+        "months so that spurious results cluster, and the report applies no correction."
+    )
+    near = near_line_without_second_setting(contrasts=contrasts)
+    if near.is_empty():
+        lines.append("- No exploratory result near the 5% line lacks a second-setting run.")
+    else:
+        lines.append(
+            f"- {near.height} exploratory results are near the 5% line (a bound within "
+            f"{NEAR_LINE_SHARE:g} of the interval's width from zero) and have no second-setting "
+            "run. Fit them with `--sensitivity-arms` before the page reads them:"
+        )
+        lines += [
+            f"  - {row['target']} target, {row['scope']}: `{row['treatment']}` minus "
+            f"`{row['reference']}`"
+            for row in near.iter_rows(named=True)
+        ]
     return lines
 
 
@@ -1580,15 +1791,21 @@ def render_splits(*, splits: pl.DataFrame) -> str:
 
 
 def render_farms(*, farms: pl.DataFrame) -> str:
-    """Render each farm's mean absolute error for the minimal and full arms at every lead day."""
-    subset = farms.filter(pl.col("arm").is_in(["f0", F6_ARM]))
+    """Render each farm's mean absolute error for F0, F1, F2, F6, and FP at every lead day."""
+    subset = farms.filter(pl.col("arm").is_in(["f0", "f1", "f2", F6_ARM, PRODUCTION_ARM]))
     rows = [
         [str(row["lead_day"]), row["arm"], row["site"], points(row["value"]), f"{row['n_rows']:,}"]
         for row in subset.iter_rows(named=True)
     ]
     return table(
         rows=rows,
-        header=["lead day", "arm", "farm", "mean absolute error (% of capacity)", "rows"],
+        header=[
+            "lead day",
+            "arm",
+            "farm",
+            "mean absolute error (% of capacity)",
+            "rows (all three seeds)",
+        ],
     )
 
 
@@ -1597,6 +1814,9 @@ def render_decisions(
 ) -> list[str]:
     """Render the three decisions."""
     uppers = third.era5_p4_uppers
+    mars_can_occur = len(uppers) == SETTINGS_THAT_MUST_AGREE and all(
+        upper < -SMALLEST_EFFECT["pv"] for upper in uppers
+    )
     return [
         "## Decisions",
         "",
@@ -1612,15 +1832,24 @@ def render_decisions(
             f"- **{'Second feed recommended' if needs_second else 'No second feed recommended'}.** "
             "The rule: P2 is a gain after its control, or the drop-one run of the cloud layers "
             "or direct radiation finds the group carrying a gain. The drop-one part is "
-            "exploratory."
+            "exploratory. Boundary-layer height, the third variable the open-data feed lacks, "
+            "sits in a group with carried variables, so no drop-one run isolates it and the "
+            "rule cannot test it."
         ),
         "",
         "### Variables or another forecast",
         "",
         f"- P5 final verdict after its control: {third.p5_final_verdict}.",
-        "- ERA5 P4 adjusted upper bounds at the two settings (points): "
+        f"- ERA5 P4 {ERA5_ADJUSTED_LEVEL_PERCENT:g}% upper bounds (the ERA5 study's own adjusted "
+        "level) at the two settings, sorted by setting name (points): "
         + ", ".join(points(upper, signed=True) for upper in uppers)
         + ".",
+        (
+            f"- `mars_variables` {'can' if mars_can_occur else 'cannot'} occur: it needs both ERA5 "
+            "P4 upper bounds below minus the smallest effect "
+            f"({points(-SMALLEST_EFFECT['pv'], signed=True)} points). The page says so."
+        ),
+        "- ICON-EU was not tested.",
         (
             f"- **Outcome: {third.outcome}.** The rule: `second_forecast` if P5 is a gain; "
             "`mars_variables` if P5 is no gain and the ERA5 P4 interval lies wholly below minus "
@@ -1646,6 +1875,7 @@ def render_report(
     splits: pl.DataFrame,
     farms: pl.DataFrame,
     widths: Sequence[Mapping[str, object]],
+    day_lines: Sequence[str],
 ) -> str:
     """Assemble the report text."""
     parts = [
@@ -1656,7 +1886,11 @@ def render_report(
         build_notes,
         "## Settings and derived numbers the page quotes",
         "",
-        *render_settings(fits=fits, widths=widths, contrasts=contrasts),
+        *render_settings(fits=fits, widths=widths, contrasts=contrasts, splits=splits),
+        "",
+        "### Months of the days the weather and prediction figures draw",
+        "",
+        *day_lines,
         "",
         *render_decisions(
             verdicts=verdicts, evidence=evidence, third=third, needs_second=needs_second
@@ -1686,9 +1920,15 @@ def render_report(
                 "era5",
             ],
         ),
-        "### ERA5 study P4 (the ERA5 study's own planned contrast)",
+        "### ERA5 study P4 (the ERA5 study's own planned contrast, at its own interval level)",
         "",
-        render_contrasts(contrasts=contrasts, families=["era5_p4"]),
+        (
+            f"The ERA5 study adjusted for ten planned contrasts, so its interval covers "
+            f"{ERA5_ADJUSTED_LEVEL_PERCENT:g}%, not the {ADJUSTED_LEVEL_PERCENT:g}% of this "
+            "study's intervals."
+        ),
+        "",
+        render_era5_p4(contrasts=contrasts),
         "## Contrasts by cloud regime, season, and hour of day (exploratory)",
         "",
         render_splits(splits=splits),
@@ -1703,8 +1943,36 @@ def render_report(
     return "\n".join(parts) + "\n"
 
 
+def write_width_preview() -> int:
+    """Write the width a planned interval would have, from the ERA5 losses alone."""
+    path = width_preview_path()
+    refuse_to_overwrite(paths=[path])
+    months = ifs_months()
+    lines = [
+        "# Width a planned interval would have, before any IFS fit",
+        "",
+        (
+            f"The IFS rows can hold {len(months)} months, {months[0]} to {months[-1]}, less "
+            f"{sorted(DROPPED_MONTHS)}."
+        ),
+        "",
+        *render_widths(widths=width_check(months=months)),
+    ]
+    path.write_text("\n".join(lines) + "\n")
+    _LOG.info("wrote %s", path)
+    return 0
+
+
 def main() -> int:
     """Score the saved fits and write the report and tables."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--width-preview-only",
+        action="store_true",
+        help="Read only the ERA5 losses and write width_preview.md, before any IFS fit exists.",
+    )
+    if parser.parse_args().width_preview_only:
+        return write_width_preview()
     paths = report_paths()
     refuse_to_overwrite(paths=list(paths))
     fits = Fits()
@@ -1724,6 +1992,13 @@ def main() -> int:
     splits = split_rows(fits=fits)
     first_dataset = fits.datasets[min(fits.datasets)]
     widths = width_check(months=first_dataset["month"].unique().to_list())
+    near_dataset = fits.datasets.get(WEATHER_LEAD_DAYS[0])
+    far_dataset = fits.datasets.get(WEATHER_LEAD_DAYS[1])
+    if near_dataset is None or far_dataset is None:
+        day_lines = ["- The frames of lead days 1 and 7 are missing, so no days were chosen."]
+    else:
+        weather_days, farm_days = chosen_days(near=near_dataset, far=far_dataset)
+        day_lines = month_lines(weather_days=weather_days, farm_days=farm_days)
 
     board.write_parquet(paths.leaderboard)
     contrasts.write_parquet(paths.contrasts)
@@ -1753,6 +2028,7 @@ def main() -> int:
             splits=splits,
             farms=farms,
             widths=widths,
+            day_lines=day_lines,
         )
     )
     evidence.write_parquet(paths.priority_list)

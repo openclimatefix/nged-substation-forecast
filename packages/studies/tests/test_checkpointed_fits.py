@@ -1,3 +1,4 @@
+import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -97,3 +98,61 @@ def test_a_busy_machine_is_refused_unless_the_caller_ignores_the_load(
 def test_the_device_is_the_callers_choice_when_the_caller_makes_one():
     assert checkpointed_fits.choose_device(requested="cpu") == "cpu"
     assert checkpointed_fits.choose_device(requested="cuda") == "cuda"
+
+
+def _stamp(
+    path: Path, *, arms: dict[str, tuple[str, ...]] | None = None, device: str = "cpu"
+) -> str:
+    return checkpointed_fits.run_stamp(
+        dataset_path=path, arms=arms or {"a": ("x", "y")}, device=device
+    )
+
+
+def test_a_stamp_changes_with_the_dataset_file_the_arm_columns_or_the_device(tmp_path: Path):
+    dataset = tmp_path / "data.parquet"
+    dataset.write_bytes(b"1234")
+    base = _stamp(dataset)
+
+    assert _stamp(dataset) == base
+    assert _stamp(dataset, arms={"a": ("y", "x")}) != base
+    assert _stamp(dataset, arms={"a": ("x", "y"), "b": ("x",)}) != base
+    assert _stamp(dataset, device="cuda") != base
+    dataset.write_bytes(b"12345")
+    assert _stamp(dataset) != base
+
+
+def test_a_dataset_rewritten_with_the_same_size_changes_the_stamp_through_its_modification_time(
+    tmp_path: Path,
+):
+    dataset = tmp_path / "data.parquet"
+    dataset.write_bytes(b"1234")
+    base = _stamp(dataset)
+    os.utime(dataset, ns=(1, 1))
+
+    assert _stamp(dataset) != base
+
+
+def test_a_fresh_directory_is_stamped_and_the_same_stamp_is_accepted_again(tmp_path: Path):
+    directory = tmp_path / "parts"
+
+    checkpointed_fits.claim_checkpoint_dir(checkpoint_dir=directory, stamp="abc")
+    checkpointed_fits.claim_checkpoint_dir(checkpoint_dir=directory, stamp="abc")
+
+    assert (directory / checkpointed_fits.STAMP_NAME).read_text().strip() == "abc"
+
+
+def test_a_directory_with_a_different_stamp_is_refused(tmp_path: Path):
+    directory = tmp_path / "parts"
+    checkpointed_fits.claim_checkpoint_dir(checkpoint_dir=directory, stamp="abc")
+
+    with pytest.raises(RuntimeError, match="move the directory"):
+        checkpointed_fits.claim_checkpoint_dir(checkpoint_dir=directory, stamp="other")
+
+
+def test_a_directory_with_checkpoints_and_no_stamp_is_refused(tmp_path: Path):
+    directory = tmp_path / "parts"
+    directory.mkdir()
+    (directory / "group_0.parquet").write_bytes(b"")
+
+    with pytest.raises(RuntimeError, match="no stamp"):
+        checkpointed_fits.claim_checkpoint_dir(checkpoint_dir=directory, stamp="abc")

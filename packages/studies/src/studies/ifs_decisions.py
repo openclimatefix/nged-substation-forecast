@@ -11,9 +11,10 @@ gain.** `contrast_verdict` reads one interval against the smallest effect worth 
 planned gain stand only if the same gain also shows against the negative control that has the same
 columns.
 
-**Lead days are pooled by stacking.** The lead days are separate XGBoost models whose rows stand
-for the same months, so `stack_lead_days` gives each lead day's rows a `site` key of their own and
-lets one month resample serve all of them.
+**Lead days are pooled by stacking.** The lead days are separate XGBoost models, so
+`stack_lead_days` keeps only the (farm, hour) rows that every lead day holds, gives each lead day's
+rows a `site` key of their own, and lets one month resample serve all of them. Each lead day then
+holds the same rows, and the pooled difference is the equal-weight mean of the lead days.
 """
 
 from collections.abc import Mapping, Sequence
@@ -41,6 +42,9 @@ EVIDENCE_CLASSES: Final[tuple[EvidenceClassType, ...]] = (
 SETTINGS_THAT_MUST_AGREE: Final[int] = 2
 """How many hyperparameter settings a verdict needs, all returning it."""
 
+NEAR_LINE_SHARE: Final[float] = 0.2
+"""A 95% bound within this share of the interval's width from zero is near the 5% line."""
+
 LEAD_DAY_SITE_SEPARATOR: Final[str] = "-L"
 """Joins a farm label and a lead day in a stacked `site` key, as in `A-L1`."""
 
@@ -65,6 +69,22 @@ def contrast_verdict(*, lower: float, upper: float, smallest_effect: float) -> V
     if lower > -smallest_effect:
         return "no gain"
     return "unresolved"
+
+
+def is_near_line(*, lower: float, upper: float) -> bool:
+    """Say whether a 95% interval has a bound within `NEAR_LINE_SHARE` of its width from zero.
+
+    A result near the line needs a run at the second hyperparameter setting before it is read.
+
+    Args:
+        lower: The interval's lower bound.
+        upper: The interval's upper bound.
+
+    Returns:
+        Whether the bound nearer zero is at most `NEAR_LINE_SHARE` times the width from zero.
+    """
+    width = upper - lower
+    return min(abs(lower), abs(upper)) <= NEAR_LINE_SHARE * width
 
 
 def combine_verdicts(*, verdicts: Sequence[VerdictType]) -> VerdictType:
@@ -149,7 +169,11 @@ def second_feed_recommended(
 
 
 def exploratory_gain(
-    *, uppers: Sequence[float], difference: float, control_difference: float
+    *,
+    uppers: Sequence[float],
+    difference: float,
+    control_difference: float,
+    smallest_effect: float,
 ) -> bool:
     """Say whether an exploratory gain holds at every setting and lead day and beats the control.
 
@@ -158,13 +182,16 @@ def exploratory_gain(
             hyperparameter setting and lead day that must agree.
         difference: The group's pooled difference from its base arm.
         control_difference: The negative control's pooled difference from the same base arm.
+        smallest_effect: The smallest improvement worth acting on, a positive number.
 
     Returns:
-        Whether there is at least one bound, every bound is below zero, and the group's difference
-        is more negative than the control's.
+        Whether there is at least one bound, every bound is below minus the smallest effect, and the
+        group's difference is more negative than the control's.
     """
     return (
-        len(uppers) > 0 and all(upper < 0.0 for upper in uppers) and difference < control_difference
+        len(uppers) > 0
+        and all(upper < -smallest_effect for upper in uppers)
+        and difference < control_difference
     )
 
 
@@ -237,14 +264,15 @@ def stack_lead_days(*, losses_by_lead_day: Mapping[int, pl.DataFrame]) -> pl.Dat
 
     Each lead day's rows get a `site` key of the form `A-L1`, so that the same farm and hour at
     two lead days are two rows, and the bootstrap resamples whole months over all the lead days at
-    once. The pooled mean is a mean over the stacked rows, so it weights each lead day by its row
-    count.
+    once. Only the (`site`, `time`) rows that every lead day holds are kept, so each lead day has
+    the same number of rows and the pooled mean is the equal-weight mean of the lead days.
 
     Args:
         losses_by_lead_day: Each lead day's per-row losses, carrying `site`.
 
     Returns:
-        The stacked losses, with the relabelled `site` and a `lead_day` column.
+        The stacked losses of the rows common to all the lead days, with the relabelled `site` and
+        a `lead_day` column.
 
     Raises:
         ValueError: If no lead day is given, or a lead day's `site` already holds the separator.
@@ -252,13 +280,22 @@ def stack_lead_days(*, losses_by_lead_day: Mapping[int, pl.DataFrame]) -> pl.Dat
     if not losses_by_lead_day:
         msg = "no lead days to stack"
         raise ValueError(msg)
+    common = pl.concat(
+        [losses.select("site", "time").unique() for losses in losses_by_lead_day.values()]
+    )
+    common = (
+        common.group_by("site", "time")
+        .agg(held=pl.len())
+        .filter(pl.col("held") == len(losses_by_lead_day))
+        .select("site", "time")
+    )
     parts: list[pl.DataFrame] = []
     for lead_day, losses in sorted(losses_by_lead_day.items()):
-        if losses["site"].str.contains(LEAD_DAY_SITE_SEPARATOR).any():
+        if losses["site"].str.contains(LEAD_DAY_SITE_SEPARATOR, literal=True).any():
             msg = f"a site label already holds {LEAD_DAY_SITE_SEPARATOR!r}: lead day {lead_day}"
             raise ValueError(msg)
         parts.append(
-            losses.with_columns(
+            losses.join(common, on=["site", "time"], how="semi").with_columns(
                 site=pl.col("site") + f"{LEAD_DAY_SITE_SEPARATOR}{lead_day}",
                 lead_day=pl.lit(lead_day, dtype=pl.Int8),
             )

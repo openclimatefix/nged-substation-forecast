@@ -10,6 +10,21 @@ from the run that began at 00 UTC `L` days before that day, at lead `24 L + h` h
 hour of one day therefore comes from one run, and a day-ahead decision made in the morning of the
 day before (lead day 1) is the case the production service meets.
 
+**A value at the end of the hour is averaged with the value an hour earlier.** A row's `time` ends
+its hour. Radiation, precipitation, and snowfall are means or totals over the hour ending at the
+valid time, and gusts are the maximum over that hour, so those columns are used as they are. Every
+other variable is a value at one instant, so the join replaces it by the mean of its values at
+lead hours `24 L + h - 1` and `24 L + h` of the same run, as the ERA5 study averaged ERA5's
+snapshots over the hour's two ends. Hour 0 therefore reads the last lead hour of the previous day
+of the same run. A missing neighbour makes the averaged value missing. Night labels are absent from
+the rows, so the hour-ending convention of `studies.ifs_single_runs` names the same run as the
+label's own day.
+
+**The first era starts in the middle of March 2024.** The archive's first run is on 2024-03-14, so
+the first era runs from 2024-03-15 to 2024-10: 8 months, the first of them a part-month of 17 days
+at lead day 1 whose length falls with the lead day. The two eras hold 25 months. Dropping the part
+month leaves no fold rotation that covers every calendar month for every farm.
+
 **The IFS cycle changed twice in the archive.** Cycle 49r1 went live on 2024-11-12 and cycle 50r1
 on 2026-05-12, and Open-Meteo labels the runs before 2024-11-12 as 49r1 hindcasts. The study
 therefore drops the two months that straddle the changes, labels the two eras that hold whole
@@ -29,6 +44,31 @@ LEAD_DAYS: Final[tuple[int, ...]] = (1, 2, 3, 5, 7, 9)
 """The lead days the study scores. Lead day 10 holds one hour of the run, so it is not used."""
 
 HOURS_PER_DAY: Final[int] = 24
+
+INSTANTANEOUS_VARIABLES: Final[frozenset[str]] = frozenset(
+    {
+        "cloud_cover",
+        "cloud_cover_low",
+        "cloud_cover_mid",
+        "cloud_cover_high",
+        "dew_point_2m",
+        "temperature_2m",
+        "surface_pressure",
+        "boundary_layer_height",
+        "total_column_integrated_water_vapour",
+        "cape",
+        "convective_inhibition",
+        "visibility",
+        "surface_temperature",
+        "snow_depth",
+        "wind_speed_10m",
+    }
+)
+"""The variables that are values at one instant, averaged over the hour's two ends by the join.
+
+Radiation, precipitation, snowfall, and gusts are means, totals, or maxima over the hour ending at
+the valid time, so they are not listed.
+"""
 
 DROPPED_MONTHS: Final[frozenset[str]] = frozenset({"2024-11", "2026-05"})
 """The months that straddle a change of IFS cycle, as `%Y-%m`."""
@@ -53,7 +93,9 @@ def join_forecast_at_lead_day(
 
     Returns:
         The rows that have a forecast, with the forecast variables and `lead_hours` joined on.
-        A row whose run is missing from `forecasts` is dropped.
+        A row whose run is missing from `forecasts` is dropped. Each variable of
+        `INSTANTANEOUS_VARIABLES` is the mean of its values at lead hours `24 * lead_day + h - 1`
+        and `24 * lead_day + h`, and is missing if either value is.
 
     Raises:
         ValueError: If `lead_day` is not positive, or a run in the forecasts does not start at
@@ -66,6 +108,22 @@ def join_forecast_at_lead_day(
     if run_hours != [0]:
         msg = f"the forecasts must all start at 00 UTC, got hours {sorted(run_hours)}"
         raise ValueError(msg)
+    forecasts = forecasts.drop("valid_time")
+    instantaneous = [name for name in forecasts.columns if name in INSTANTANEOUS_VARIABLES]
+    earlier = forecasts.select(
+        "site",
+        "init_time",
+        (pl.col("lead_hours") + 1).alias("lead_hours"),
+        *(pl.col(name).alias(f"{name}__earlier") for name in instantaneous),
+    )
+    forecasts = (
+        forecasts.join(earlier, on=["site", "init_time", "lead_hours"], how="left")
+        .with_columns(
+            ((pl.col(name) + pl.col(f"{name}__earlier")) / 2.0).alias(name)
+            for name in instantaneous
+        )
+        .drop(f"{name}__earlier" for name in instantaneous)
+    )
     keyed = rows.with_columns(
         valid_time=pl.col("time").dt.replace_time_zone(None),
         # The hour is Int8, so it is widened before the sum: 120 + 13 would wrap to -123 in Int8.
@@ -76,11 +134,19 @@ def join_forecast_at_lead_day(
         )
     )
     joined = keyed.join(
-        forecasts.drop("valid_time"),
+        forecasts,
         on=["site", "init_time", "lead_hours"],
         how="inner",
     )
     return joined.with_columns(lead_day=pl.lit(lead_day, dtype=pl.Int8))
+
+
+def _kept_months(*, rows: pl.DataFrame) -> pl.DataFrame:
+    """Drop the months that straddle a cycle change or follow the last one."""
+    return rows.filter(
+        ~pl.col("month").is_in(sorted(DROPPED_MONTHS))
+        & (pl.col("month") < LAST_ERA_MONTH_EXCLUSIVE)
+    )
 
 
 def with_ifs_eras(*, rows: pl.DataFrame, fold_offsets: Mapping[int, int]) -> pl.DataFrame:
@@ -93,10 +159,7 @@ def with_ifs_eras(*, rows: pl.DataFrame, fold_offsets: Mapping[int, int]) -> pl.
     Returns:
         The kept rows with `era_code`, `era`, and `fold`.
     """
-    kept = rows.filter(
-        ~pl.col("month").is_in(sorted(DROPPED_MONTHS))
-        & (pl.col("month") < LAST_ERA_MONTH_EXCLUSIVE)
-    )
+    kept = _kept_months(rows=rows)
     return cut_eras(
         frame=kept, first_months=FIRST_MONTHS_AFTER_FIRST_ERA, fold_offsets=fold_offsets
     )
@@ -114,10 +177,7 @@ def find_fold_offsets(*, rows: pl.DataFrame) -> Mapping[int, int]:
     Raises:
         ValueError: If no rotation covers every calendar month.
     """
-    kept = rows.filter(
-        ~pl.col("month").is_in(sorted(DROPPED_MONTHS))
-        & (pl.col("month") < LAST_ERA_MONTH_EXCLUSIVE)
-    )
+    kept = _kept_months(rows=rows)
     designs = search_fold_offsets(frame=kept, first_months=FIRST_MONTHS_AFTER_FIRST_ERA)
     if not designs:
         msg = "no fold rotation leaves every calendar month in the training rows of a fold"

@@ -29,8 +29,10 @@ and an hour of day (`studies.blending.climatology_permutation`), and every arm o
 same permuted values.
 
 The script refuses to overwrite a losses file. A fit that is killed resumes from its checkpoint
-groups when it is run again with the same arguments; move or delete a `.parts` directory whenever
-the frame or an arm's columns change.
+groups when it is run again with the same arguments. Each `.parts` directory carries a stamp file
+holding a hash of the dataset file's size and modification time, the arms' column lists, and the
+device, and the script raises if a directory's stamp differs from the current one: move the
+directory then. `--arms` raises on a name that is not an arm of the fit.
 
 Run it with `uv run python studies/ifs_solar_variables/ifs_ladder_fit.py --lead-days 1 2 3`.
 Check that no other XGBoost run is using the CPU first. The script prints the load average and
@@ -68,7 +70,13 @@ from ifs_ladder_arms import (
 )
 from studies.arm_runner import Job
 from studies.blending import PERMUTED_SUFFIX, climatology_permutation
-from studies.checkpointed_fits import choose_device, fit_in_groups, refuse_if_machine_is_busy
+from studies.checkpointed_fits import (
+    choose_device,
+    claim_checkpoint_dir,
+    fit_in_groups,
+    refuse_if_machine_is_busy,
+    run_stamp,
+)
 from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
     SENSITIVITY_HYPER_PARAMETERS,
@@ -230,24 +238,31 @@ def run_fit(
 
     Raises:
         ValueError: If `only_arms` names an arm this fit does not hold.
+        RuntimeError: If the checkpoint directory was written for another dataset file, arm
+            columns, or device.
     """
     arms = arm_features(view=key.view, target=key.target, lead_day=key.lead_day)
     if only_arms is not None:
         unknown = sorted(set(only_arms) - set(arms))
-        arms = {name: features for name, features in arms.items() if name in only_arms}
-        if not arms:
-            msg = f"none of {unknown} is an arm of {key}"
+        if unknown:
+            msg = f"{unknown} are not arms of {key}; its arms are {sorted(arms)}"
             raise ValueError(msg)
+        arms = {name: features for name, features in arms.items() if name in only_arms}
     refuse_to_overwrite(paths=[results_path(key=key), arms_path(key=key)])
     frame = load_frame(key=key)
     raise_if_columns_missing(frame=frame, arms=arms)
     view = target_view(frame=frame, target=key.target)
     jobs = jobs_for(key=key, arms=arms, extra_sensitivity_arms=extra_sensitivity_arms)
     _LOG.info("%s: %d rows, %d arms, %d jobs", key, view.height, len(arms), len(jobs))
+    checkpoint_dir = checkpoint_dir_for(key=key)
+    claim_checkpoint_dir(
+        checkpoint_dir=checkpoint_dir,
+        stamp=run_stamp(dataset_path=dataset_path_for(key=key), arms=arms, device=device),
+    )
     losses = fit_in_groups(
         dataset=view,
         jobs=jobs,
-        checkpoint_dir=checkpoint_dir_for(key=key),
+        checkpoint_dir=checkpoint_dir,
         max_workers=max_workers,
         device=device,
     )

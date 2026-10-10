@@ -11,6 +11,7 @@ from studies.ifs_decisions import (
     evidence_class,
     exploratory_gain,
     gain_after_control,
+    is_near_line,
     priority_order,
     second_feed_recommended,
     second_forecast_or_mars_variables,
@@ -61,6 +62,10 @@ def test_a_missing_second_setting_leaves_the_verdict_unresolved():
     assert combine_verdicts(verdicts=[]) == "unresolved"
 
 
+def test_three_settings_are_not_two_and_leave_the_verdict_unresolved():
+    assert combine_verdicts(verdicts=["gain"] * 3) == "unresolved"
+
+
 def test_a_gain_that_is_not_a_gain_over_the_control_becomes_unresolved():
     assert gain_after_control(versus_reference="gain", versus_control="unresolved") == "unresolved"
     assert gain_after_control(versus_reference="gain", versus_control="no gain") == "unresolved"
@@ -96,6 +101,16 @@ def test_the_era5_p4_interval_that_reaches_minus_0_08_points_does_not_separate_t
     # capacity, which is above minus the smallest effect of 0.1 points.
     outcome = second_forecast_or_mars_variables(
         second_forecast_verdict="no gain", mars_uppers=[-0.0008, -0.0006], smallest_effect=SMALLEST
+    )
+
+    assert outcome == "not_separated"
+
+
+def test_a_mars_upper_bound_exactly_on_minus_the_smallest_effect_does_not_separate_the_routes():
+    outcome = second_forecast_or_mars_variables(
+        second_forecast_verdict="no gain",
+        mars_uppers=[-SMALLEST, -SMALLEST],
+        smallest_effect=SMALLEST,
     )
 
     assert outcome == "not_separated"
@@ -144,24 +159,48 @@ def test_no_gain_in_the_layers_or_any_missing_group_recommends_no_second_feed():
     )
 
 
-def test_an_exploratory_gain_needs_every_bound_below_zero_and_a_difference_beating_the_control():
+def test_an_exploratory_gain_needs_every_bound_below_minus_the_smallest_effect_and_the_control():
     assert exploratory_gain(
-        uppers=[-0.1, -0.2, -0.05, -0.3], difference=-0.002, control_difference=0.001
+        uppers=[-0.1, -0.2, -0.05, -0.3],
+        difference=-0.002,
+        control_difference=0.001,
+        smallest_effect=SMALLEST,
     )
 
 
-def test_a_single_bound_at_or_above_zero_removes_an_exploratory_gain():
-    assert not exploratory_gain(uppers=[-0.1, 0.0], difference=-0.002, control_difference=0.001)
-    assert not exploratory_gain(uppers=[-0.1, 0.05], difference=-0.002, control_difference=0.001)
+def test_a_bound_on_minus_the_smallest_effect_or_above_removes_an_exploratory_gain():
+    for bad in (-SMALLEST, -0.0005, 0.0, 0.05):
+        assert not exploratory_gain(
+            uppers=[-0.1, bad],
+            difference=-0.002,
+            control_difference=0.001,
+            smallest_effect=SMALLEST,
+        )
+
+
+def test_a_gain_smaller_than_the_smallest_effect_is_not_an_exploratory_gain():
+    assert not exploratory_gain(
+        uppers=[-0.0002] * 6,
+        difference=-0.0005,
+        control_difference=0.0004,
+        smallest_effect=SMALLEST,
+    )
 
 
 def test_no_bounds_is_not_an_exploratory_gain():
-    assert not exploratory_gain(uppers=[], difference=-0.002, control_difference=0.001)
+    assert not exploratory_gain(
+        uppers=[], difference=-0.002, control_difference=0.001, smallest_effect=SMALLEST
+    )
 
 
 def test_a_difference_no_better_than_the_control_is_not_an_exploratory_gain():
-    assert not exploratory_gain(uppers=[-0.1], difference=-0.0004, control_difference=-0.0004)
-    assert not exploratory_gain(uppers=[-0.1], difference=-0.0002, control_difference=-0.0004)
+    for difference in (-0.0004, -0.0002):
+        assert not exploratory_gain(
+            uppers=[-0.1],
+            difference=difference,
+            control_difference=-0.0004,
+            smallest_effect=SMALLEST,
+        )
 
 
 def test_removing_a_group_matters_if_the_error_rises_by_more_than_the_control_changed_it():
@@ -290,7 +329,7 @@ def test_stacking_keeps_the_same_farm_hour_at_two_lead_days_as_two_rows():
     assert stacked.select("site", "time", "seed").is_duplicated().sum() == 0
 
 
-def test_a_stacked_paired_difference_is_the_mean_over_all_the_lead_days_rows():
+def test_a_stacked_paired_difference_is_the_equal_weight_mean_of_the_lead_days():
     first = pl.concat(
         [
             _losses(sites=["A", "B"], errors=[1.0, 2.0]),
@@ -309,10 +348,12 @@ def test_a_stacked_paired_difference_is_the_mean_over_all_the_lead_days_rows():
         losses=stacked, treatment="f2", reference="f1", metric="error"
     )
 
-    # Lead day 1 differences are -0.5 and -1.5, and lead day 2's is -2.0: the mean of the three
-    # rows is -4 / 3, which differs from the mean of the two lead days' means, -1.5.
-    assert differences.shape == (1, 3)
-    assert differences.mean() == pytest.approx(-4.0 / 3.0)
+    # Farm B's hour is missing at lead day 2, so it is dropped at lead day 1 too. Each lead day's
+    # difference for farm A is -0.5 and -2.0, and the mean of the two is -1.25. Keeping farm B
+    # would weight the lead days by their rows and give -4 / 3.
+    assert stacked["site"].unique().sort().to_list() == ["A-L1", "A-L2"]
+    assert differences.shape == (1, 2)
+    assert differences.mean() == pytest.approx(-1.25)
     assert set(months) == {"2025-03"}
 
 
@@ -321,3 +362,19 @@ def test_stacking_refuses_nothing_to_stack_and_a_label_that_holds_the_separator(
         stack_lead_days(losses_by_lead_day={})
     with pytest.raises(ValueError, match="already holds"):
         stack_lead_days(losses_by_lead_day={1: _losses(sites=["A-L1"], errors=[1.0])})
+
+
+def test_a_bound_within_a_fifth_of_the_width_from_zero_is_near_the_line():
+    assert is_near_line(lower=-0.9, upper=0.1)
+    assert is_near_line(lower=0.02, upper=1.0)
+    assert is_near_line(lower=-1.0, upper=-0.1)
+
+
+def test_an_interval_far_from_zero_on_both_sides_is_not_near_the_line():
+    assert not is_near_line(lower=-0.5, upper=0.5)
+    assert not is_near_line(lower=0.5, upper=1.5)
+
+
+def test_the_near_line_boundary_is_inclusive():
+    assert is_near_line(lower=0.2, upper=1.2)
+    assert not is_near_line(lower=0.2001, upper=1.2001)

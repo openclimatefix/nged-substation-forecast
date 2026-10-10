@@ -23,6 +23,7 @@ from studies.ifs_ladder import (
     cloud_layers_control_features,
     drop_one_group_features,
     era5_comparison_features,
+    group_control_features,
     later_groups_columns,
     later_groups_control_features,
     partner_control_features,
@@ -139,6 +140,12 @@ CONTROL_PARTNER_MINIMAL_ARM: Final[str] = "control_f0_partner"
 """The arm `f0` plus two permuted partner columns, which pads contrast P4."""
 CONTROL_PARTNER_FULL_ARM: Final[str] = "control_f6_partner"
 """The arm `f6` plus two permuted partner columns, which pads contrast P5."""
+CONTROL_DIRECT_ARM: Final[str] = "control_f2_direct"
+"""The arm `f2` plus a permuted copy of direct radiation, which pads the step to `f3`."""
+CONTROL_HUMIDITY_ARM: Final[str] = "control_f2_humidity"
+"""The arm `f2` plus permuted copies of the `f4` variables, which pads the step to `f4`."""
+CONTROL_CONVECTION_ARM: Final[str] = "control_f2_convection"
+"""The arm `f2` plus permuted copies of the `f5` variables, which pads the step to `f5`."""
 POSITIVE_CONTROL_ARM: Final[str] = "positive_control"
 """The output-target arm given `f2` and CAMS global irradiance."""
 DROP_PREFIX: Final[str] = "drop_"
@@ -152,9 +159,19 @@ CONTROL_ARMS: Final[tuple[str, ...]] = (
     CONTROL_LATER_GROUPS_ARM,
     CONTROL_PARTNER_MINIMAL_ARM,
     CONTROL_PARTNER_FULL_ARM,
+    CONTROL_DIRECT_ARM,
+    CONTROL_HUMIDITY_ARM,
+    CONTROL_CONVECTION_ARM,
     POSITIVE_CONTROL_ARM,
 )
 """Every control arm."""
+
+GROUP_CONTROL_ARMS: Final[dict[str, str]] = {
+    "f3": CONTROL_DIRECT_ARM,
+    "f4": CONTROL_HUMIDITY_ARM,
+    "f5": CONTROL_CONVECTION_ARM,
+}
+"""The control of each exploratory rung `f3` to `f5`, by the rung it pads."""
 
 
 class PlannedContrast(NamedTuple):
@@ -259,11 +276,29 @@ ARM_LABELS: Final[dict[str, str]] = {
     CONTROL_LATER_GROUPS_ARM: "Control: F2 + shuffled F3 to F6",
     CONTROL_PARTNER_MINIMAL_ARM: "Control: F0 + shuffled AIFS Single",
     CONTROL_PARTNER_FULL_ARM: "Control: F6 + shuffled AIFS Single",
+    CONTROL_DIRECT_ARM: "Control: F2 + shuffled direct radiation",
+    CONTROL_HUMIDITY_ARM: "Control: F2 + shuffled F4 variables",
+    CONTROL_CONVECTION_ARM: "Control: F2 + shuffled F5 variables",
     POSITIVE_CONTROL_ARM: "Positive control: F2 + CAMS",
     **{f"{DROP_PREFIX}{rung}": f"F6 without {GROUP_NAMES[rung]}" for rung in RUNGS[1:]},
     **{f"{ERA5_PREFIX}{rung}": f"ERA5 {rung.upper()}" for rung in ERA5_COMPARISON_RUNGS},
 }
 """The words each arm carries on a chart and in the report."""
+
+
+IFS_FIGURE_NUMBERS: Final[dict[str, int]] = {
+    "headline": 1,
+    "weather": 2,
+    "lead_day_skill": 3,
+    "models_work": 4,
+    "controls": 5,
+    "leaderboard": 6,
+    "era5_against_ifs": 7,
+    "regimes": 8,
+    "drop_one": 9,
+    "variables_or_forecast": 10,
+}
+"""The page's figure numbers by figure name, in the order of the plan's page structure."""
 
 
 class FitKey(NamedTuple):
@@ -341,6 +376,11 @@ class ReportPaths(NamedTuple):
     decisions: Path
 
 
+def width_preview_path() -> Path:
+    """Return where the width preview, which needs no IFS fit, is written."""
+    return RESULTS_DIR / "width_preview.md"
+
+
 def report_paths() -> ReportPaths:
     """Return the report's output paths."""
     return ReportPaths(
@@ -378,6 +418,8 @@ def _ladder_pv_arms(*, lead_day: int) -> dict[str, tuple[str, ...]]:
         arms[CONTROL_CLOUD_COVER_ARM] = cloud_cover_control_features()
         arms[CONTROL_CLOUD_LAYERS_ARM] = cloud_layers_control_features()
         arms[CONTROL_LATER_GROUPS_ARM] = later_groups_control_features()
+        for rung, control in GROUP_CONTROL_ARMS.items():
+            arms[control] = group_control_features(rung=rung)  # ty: ignore[invalid-argument-type]
         arms[POSITIVE_CONTROL_ARM] = positive_control_features()
     if lead_day in DROP_ONE_LEAD_DAYS:
         for rung in RUNGS[1:]:

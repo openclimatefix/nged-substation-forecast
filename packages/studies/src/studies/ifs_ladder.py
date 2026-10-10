@@ -123,6 +123,32 @@ def later_groups_control_features() -> tuple[str, ...]:
     return (*rung_features(rung="f2"), *permuted(columns=later_groups_columns()))
 
 
+GROUP_CONTROL_RUNGS: Final[tuple[RungType, ...]] = ("f3", "f4", "f5")
+"""The exploratory rungs that get a control of their own: each pads `f2` with only its variables."""
+
+
+def group_control_features(*, rung: RungType) -> tuple[str, ...]:
+    """Return `f2` and permuted copies of one exploratory rung's variables only.
+
+    The control has as many added columns as the rung, so the rung's step is read against a control
+    with the same number of columns. The permuted copies are the ones made for the later-groups
+    control, whose columns move together, so each subset is a permuted copy of its own columns.
+
+    Args:
+        rung: One of `GROUP_CONTROL_RUNGS`.
+
+    Returns:
+        The columns of `f2` and the permuted copies of the rung's variables.
+
+    Raises:
+        ValueError: If `rung` is not in `GROUP_CONTROL_RUNGS`.
+    """
+    if rung not in GROUP_CONTROL_RUNGS:
+        msg = f"{rung} has no group control; the rungs that do are {GROUP_CONTROL_RUNGS}"
+        raise ValueError(msg)
+    return (*rung_features(rung="f2"), *permuted(columns=RUNG_ADDITIONS[rung]))
+
+
 def cloud_cover_control_features() -> tuple[str, ...]:
     """Return `f0` and a permuted copy of total cloud cover: as many columns as `f1`."""
     return (*rung_features(rung="f0"), *permuted(columns=RUNG_ADDITIONS["f1"]))

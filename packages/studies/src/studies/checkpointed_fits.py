@@ -8,15 +8,19 @@ the moment the group finishes. A rerun reads the groups that exist and fits only
 
 **A group's file name holds a hash of its job names, and the file's own (arm, setting) pairs are
 checked against the group**, so a rerun with different arms refits rather than reuses. A checkpoint
-is matched by arm and setting names only, so the caller moves or deletes the checkpoint directory
-whenever the dataset or an arm's columns change.
+is matched by arm and setting names only, so `claim_checkpoint_dir` writes a stamp file into the
+directory holding a hash of the dataset file's size and modification time, the arms' column lists,
+and the device. A directory whose stamp differs from the current one raises, and the caller moves
+the directory.
 """
 
 import hashlib
+import json
 import logging
 import os
 import shutil
 import subprocess
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Final
 
@@ -67,6 +71,62 @@ def refuse_if_machine_is_busy(*, ignore: bool) -> None:
     if load > MAX_LOAD_PER_CORE and not ignore:
         msg = f"load per core is {load:.2f}, above {MAX_LOAD_PER_CORE}; stop the other job first"
         raise RuntimeError(msg)
+
+
+STAMP_NAME: Final[str] = "stamp.txt"
+"""The file in a checkpoint directory that holds the stamp of the run that wrote it."""
+
+
+def run_stamp(*, dataset_path: Path, arms: Mapping[str, Sequence[str]], device: str) -> str:
+    """Return a hash of what a checkpointed fit depends on beyond its job names.
+
+    Args:
+        dataset_path: The dataset file the fit reads. Its size and modification time are hashed.
+        arms: Each arm's name and column list.
+        device: XGBoost's device.
+
+    Returns:
+        A hexadecimal digest that changes if the dataset file, any arm's columns, or the device
+        changes.
+    """
+    status = dataset_path.stat()
+    payload = json.dumps(
+        {
+            "size": status.st_size,
+            "modified": status.st_mtime_ns,
+            "arms": {name: list(columns) for name, columns in sorted(arms.items())},
+            "device": device,
+        },
+        sort_keys=True,
+    )
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def claim_checkpoint_dir(*, checkpoint_dir: Path, stamp: str) -> None:
+    """Create the checkpoint directory with its stamp, or check an existing directory's stamp.
+
+    Args:
+        checkpoint_dir: Where the fit's groups checkpoint their losses.
+        stamp: `run_stamp`'s result for this run.
+
+    Raises:
+        RuntimeError: If the directory holds checkpoints written by a run with a different stamp,
+            or checkpoints and no stamp at all.
+    """
+    stamp_path = checkpoint_dir / STAMP_NAME
+    if stamp_path.exists():
+        if stamp_path.read_text().strip() != stamp:
+            msg = (
+                f"{checkpoint_dir} was written for a different dataset file, arm columns, or "
+                "device; move the directory so that the fit starts afresh"
+            )
+            raise RuntimeError(msg)
+        return
+    if checkpoint_dir.exists() and any(checkpoint_dir.iterdir()):
+        msg = f"{checkpoint_dir} holds checkpoints and no stamp; move the directory"
+        raise RuntimeError(msg)
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    stamp_path.write_text(stamp + "\n")
 
 
 def job_labels(*, group: list[Job]) -> list[str]:

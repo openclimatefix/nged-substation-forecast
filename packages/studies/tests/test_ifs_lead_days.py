@@ -1,10 +1,12 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import polars as pl
 import pytest
+from studies.cross_validation import calendar_month_coverage, raise_on_uncovered_months
 from studies.ifs_lead_days import (
     PARTNER_COLUMNS,
     blend_month_folds,
+    find_fold_offsets,
     join_aifs_partner,
     join_forecast_at_lead_day,
     raise_unless_same_folds,
@@ -32,6 +34,7 @@ def _forecasts(inits: list[datetime], hours: list[int]) -> pl.DataFrame:
             "lead_hours": lead,
             # Encode the run's day and the lead in the value, so a wrong join shows in the number.
             "cloud_cover": float(init.day * 1000 + lead),
+            "shortwave_radiation": float(init.day * 1000 + lead),
         }
         for init in inits
         for lead in hours
@@ -47,7 +50,9 @@ def test_a_lead_day_one_row_takes_the_run_of_the_day_before_at_lead_24_plus_hour
 
     joined = join_forecast_at_lead_day(rows=rows, forecasts=forecasts, lead_day=1)
 
-    assert joined["cloud_cover"].to_list() == [9 * 1000 + 24 + 13]
+    # An instantaneous variable is the mean of its values at leads 36 and 37; radiation is as is.
+    assert joined["cloud_cover"].to_list() == [9 * 1000 + 36.5]
+    assert joined["shortwave_radiation"].to_list() == [9 * 1000 + 37]
     assert joined["lead_hours"].to_list() == [37]
 
 
@@ -59,7 +64,29 @@ def test_a_long_lead_day_does_not_overflow_the_hour_of_day():
     joined = join_forecast_at_lead_day(rows=rows, forecasts=forecasts, lead_day=5)
 
     assert joined["lead_hours"].to_list() == [133]
-    assert joined["cloud_cover"].to_list() == [5 * 1000 + 133]
+    assert joined["shortwave_radiation"].to_list() == [5 * 1000 + 133]
+
+
+def test_hour_zero_averages_with_the_previous_days_last_lead_hour_of_the_same_run():
+    rows = _rows([datetime(2025, 3, 10, 0, tzinfo=UTC)])
+    forecasts = _forecasts([datetime(2025, 3, 9), datetime(2025, 3, 8)], list(range(80)))
+
+    joined = join_forecast_at_lead_day(rows=rows, forecasts=forecasts, lead_day=1)
+
+    assert joined["lead_hours"].to_list() == [24]
+    assert joined["cloud_cover"].to_list() == [9 * 1000 + 23.5]
+
+
+def test_a_missing_neighbouring_lead_makes_an_instantaneous_value_missing_and_keeps_the_row():
+    rows = _rows([datetime(2025, 3, 10, 13, tzinfo=UTC)])
+    forecasts = _forecasts([datetime(2025, 3, 9)], list(range(80))).filter(
+        pl.col("lead_hours") != 36
+    )
+
+    joined = join_forecast_at_lead_day(rows=rows, forecasts=forecasts, lead_day=1)
+
+    assert joined["cloud_cover"].to_list() == [None]
+    assert joined["shortwave_radiation"].to_list() == [9 * 1000 + 37]
 
 
 def test_the_run_day_crosses_a_month_end_correctly():
@@ -68,7 +95,7 @@ def test_the_run_day_crosses_a_month_end_correctly():
 
     joined = join_forecast_at_lead_day(rows=rows, forecasts=forecasts, lead_day=2)
 
-    assert joined["cloud_cover"].to_list() == [30 * 1000 + 48 + 6]
+    assert joined["shortwave_radiation"].to_list() == [30 * 1000 + 48 + 6]
 
 
 def test_a_row_whose_run_is_missing_is_dropped():
@@ -220,6 +247,32 @@ def test_the_partner_join_drops_runs_before_the_operational_era_and_missing_valu
     assert joined["time"].dt.day().to_list() == [5]
 
 
+def test_the_partner_join_keeps_the_first_operational_run_and_drops_a_missing_temperature():
+    first_day = datetime(2025, 3, 2, 12, tzinfo=UTC)
+    no_temperature = datetime(2025, 3, 6, 12, tzinfo=UTC)
+    midnight = datetime(2025, 3, 8, 0, tzinfo=UTC)
+    rows = _lead_rows([t.replace(tzinfo=None) for t in (first_day, no_temperature, midnight)])
+    partner = _partner(
+        rows=[
+            (first_day, datetime(2025, 3, 1, tzinfo=UTC), 100.0),
+            (no_temperature, datetime(2025, 3, 5, tzinfo=UTC), 200.0),
+            (midnight, datetime(2025, 3, 7, tzinfo=UTC), 300.0),
+        ],
+        lead_day=1,
+    ).with_columns(
+        pl.when(pl.col("time").dt.day() == 6)
+        .then(None)
+        .otherwise(pl.col("aifs_single_day1_temp"))
+        .alias("aifs_single_day1_temp")
+    )
+
+    joined = join_aifs_partner(rows=rows, partner=partner, lead_day=1)
+
+    # The run on exactly 2025-03-01 is kept, the null temperature is dropped, and the 00:00 label
+    # reads the run of the day before its own day, so its run on 2025-03-07 is the label-day run.
+    assert joined["time"].dt.day().to_list() == [2, 8]
+
+
 def test_the_partner_join_refuses_a_site_and_time_held_twice():
     time = datetime(2025, 4, 10, 12, tzinfo=UTC)
     init = datetime(2025, 4, 9, tzinfo=UTC)
@@ -256,3 +309,60 @@ def test_blend_folds_refuse_too_few_months_and_a_month_with_no_fold():
         blend_month_folds(months=["2025-03", "2025-04"])
     with pytest.raises(ValueError, match="no fold for"):
         with_blend_folds(rows=pl.DataFrame({"month": ["2025-03"]}), month_folds={"2025-04": 0})
+
+
+def test_the_first_partial_month_stays_in_the_first_era():
+    rows = pl.DataFrame(
+        {
+            "site": ["A"] * 3,
+            "month": ["2024-03", "2024-10", "2024-12"],
+            "time": [datetime(2025, 1, 1)] * 3,
+        }
+    )
+
+    labelled = with_ifs_eras(rows=rows, fold_offsets={0: 0, 1: 0})
+
+    assert labelled.filter(pl.col("month") == "2024-03")["era_code"].to_list() == [0]
+
+
+def _monthly_rows(*, first: str, last: str, sites: list[str]) -> pl.DataFrame:
+    months = []
+    year, month = int(first[:4]), int(first[5:])
+    while f"{year}-{month:02d}" <= last:
+        months.append(f"{year}-{month:02d}")
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+    return pl.DataFrame(
+        {
+            "site": [site for site in sites for _ in months],
+            "month": [m for _ in sites for m in months],
+            "time": [
+                datetime(int(m[:4]), int(m[5:]), 15, 12) + timedelta(hours=hour)
+                for _ in sites
+                for m in months
+                for hour in (0,)
+            ],
+        }
+    )
+
+
+def test_find_fold_offsets_ignores_the_dropped_months_and_returns_a_covering_design():
+    rows = _monthly_rows(first="2024-03", last="2026-06", sites=["A", "B"])
+    without = rows.filter(~pl.col("month").is_in(["2024-11", "2026-05", "2026-06"]))
+
+    offsets = find_fold_offsets(rows=rows)
+
+    assert offsets == find_fold_offsets(rows=without)
+    assert set(offsets) == {0, 1}
+    # The design leaves no calendar month untrained once the eras are cut with it.
+    folded = with_ifs_eras(rows=rows, fold_offsets=offsets)
+    raise_on_uncovered_months(coverage=calendar_month_coverage(frame=folded))
+
+
+def test_find_fold_offsets_raises_when_no_rotation_covers_every_calendar_month(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr("studies.ifs_lead_days.search_fold_offsets", lambda **_: [])
+    rows = _monthly_rows(first="2024-03", last="2026-04", sites=["A"])
+
+    with pytest.raises(ValueError, match="no fold rotation"):
+        find_fold_offsets(rows=rows)
