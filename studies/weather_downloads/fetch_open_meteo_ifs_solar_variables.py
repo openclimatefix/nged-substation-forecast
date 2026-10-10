@@ -6,11 +6,11 @@ variables help predict solar farm output. ERA5 is a reanalysis, so the follow-up
 ladder on past IFS forecasts at matched lead times. `fetch_open_meteo_single_runs.py` already holds
 the radiation, temperature, and wind of the same runs for nine sites. This script fetches 21
 variables for the six solar farms only, from the same 00 UTC run of every day, in one request per
-run. Seventeen are new (three cloud layers, total cloud, diffuse radiation, dew point, pressure,
+run. Sixteen are new (three cloud layers, total cloud, dew point, pressure,
 boundary-layer height, total column water vapour, CAPE, convective inhibition, visibility, skin
 temperature, snow depth, snowfall, precipitation, and wind gust). Four repeat the sibling's
 (`shortwave_radiation`, `direct_radiation`, `temperature_2m`, and `wind_speed_10m`), so that the
-validation can check the radiation parts against each other, and so that this product stands alone.
+validation can compare direct with shortwave radiation, and so that this product stands alone.
 
 **Reused machinery.** The request, retry, and refusal handling and the small helpers are imported
 from `fetch_open_meteo_single_runs.py`. The month-file, ledger, and combine functions are copies of
@@ -94,7 +94,6 @@ VARIABLES: Final[dict[str, tuple[str, float, float]]] = {
     "cloud_cover_high": ("%", 0.0, 100.0),
     "shortwave_radiation": ("W/m²", -1.0, 1200.0),
     "direct_radiation": ("W/m²", -1.0, 1100.0),
-    "diffuse_radiation": ("W/m²", -1.0, 800.0),
     "temperature_2m": ("°C", -25.0, 45.0),
     "dew_point_2m": ("°C", -30.0, 30.0),
     "surface_pressure": ("hPa", 900.0, 1100.0),
@@ -110,18 +109,18 @@ VARIABLES: Final[dict[str, tuple[str, float, float]]] = {
     "wind_speed_10m": ("km/h", 0.0, 200.0),
     "wind_gusts_10m": ("km/h", 0.0, 300.0),
 }
-"""The 21 variables requested, each with the unit the API must report and a plausible range.
+"""The 20 variables requested, each with the unit the API must report and a plausible range.
 
 The names are Open-Meteo's. Each name was probed on 2026-10-10 against the Single Runs API for the
 runs of 2024-04-10 and 2025-06-15 and returned 241 hourly values. `cloud_base`, `albedo`,
 `freezing_level_height`, and `lifted_index` returned only nulls and are not requested.
-`direct_radiation` and `diffuse_radiation` are the two parts of the shortwave radiation."""
+`diffuse_radiation` is not requested: the API derives it as shortwave minus direct radiation, so
+it adds no information and goes negative where direct exceeds shortwave."""
 
 LEAD_ZERO_NULL_VARIABLES: Final[frozenset[str]] = frozenset(
     {
         "shortwave_radiation",
         "direct_radiation",
-        "diffuse_radiation",
         "snowfall",
         "precipitation",
         "wind_gusts_10m",
@@ -135,12 +134,12 @@ MAY_BE_NULL_VARIABLES: Final[frozenset[str]] = frozenset({"convective_inhibition
 EXPECTED_SITES: Final[int] = 6
 
 RADIATION_TOLERANCE: Final[float] = 5.0
-"""How far, in W/m², direct plus diffuse radiation may differ from shortwave radiation."""
+"""How far, in W/m², direct radiation may exceed shortwave radiation before the row is counted."""
 
 DEW_POINT_TOLERANCE: Final[float] = 0.5
 """How far, in °C, the dew point may exceed the air temperature before the row is counted."""
 
-MAX_CROSS_CHECK_SHARE: Final[float] = 0.001
+MAX_CROSS_CHECK_SHARE: Final[float] = 0.02
 """The share of rows that may break a relation between variables before validation fails."""
 
 
@@ -479,8 +478,10 @@ def cross_check_failures(*, frame: pl.DataFrame) -> dict[str, int]:
 
     Returns:
         The number of rows breaking each relation. The relations are direct radiation no larger
-        than shortwave radiation, direct plus diffuse radiation within a tolerance of shortwave
-        radiation, and dew point no higher than air temperature, each with a tolerance.
+        than shortwave radiation and dew point no higher than air temperature, each with a
+        tolerance. At leads beyond about 100 h, where the output steps coarsen, a few rows have
+        direct radiation above shortwave radiation, so the check counts them and fails only if
+        they exceed `MAX_CROSS_CHECK_SHARE`.
 
     Raises:
         RuntimeError: If more than `MAX_CROSS_CHECK_SHARE` of the rows break a relation.
@@ -489,14 +490,6 @@ def cross_check_failures(*, frame: pl.DataFrame) -> dict[str, int]:
     failures = {
         "direct_above_shortwave": radiation.filter(
             pl.col("direct_radiation") > pl.col("shortwave_radiation") + RADIATION_TOLERANCE
-        ).height,
-        "parts_differ_from_shortwave": radiation.filter(
-            (
-                pl.col("direct_radiation")
-                + pl.col("diffuse_radiation")
-                - pl.col("shortwave_radiation")
-            ).abs()
-            > RADIATION_TOLERANCE
         ).height,
         "dew_point_above_temperature": frame.filter(
             pl.col("dew_point_2m") > pl.col("temperature_2m") + DEW_POINT_TOLERANCE
@@ -553,7 +546,7 @@ def _write_docs(
         lineage_filenames=["lineage.json"],
         columns=columns,
         missing_value_convention=(
-            "Polars null. `shortwave_radiation`, `direct_radiation`, `diffuse_radiation`, "
+            "Polars null. `shortwave_radiation`, `direct_radiation`, "
             "`snowfall`, `precipitation`, and `wind_gusts_10m` are null at `lead_hours` 0 because "
             "a mean or accumulation over the hour ending at the run time has no data yet. "
             "`convective_inhibition` is null wherever it is undefined, which is most hours. A run "
@@ -563,7 +556,7 @@ def _write_docs(
         gotchas=[
             (
                 "**The same runs as `ECMWF-IFS-SINGLE-RUNS`.** That product holds radiation, "
-                "temperature, and wind for nine sites. This product holds 21 variables for the six "
+                "temperature, and wind for nine sites. This product holds 20 variables for the six "
                 "solar sites, and four of them (`shortwave_radiation`, `direct_radiation`, "
                 "`temperature_2m`, `wind_speed_10m`) repeat that product's. To join the two on "
                 "(`site`, `init_time`, `valid_time`), drop the four from one side first."
@@ -590,7 +583,9 @@ def _write_docs(
             ),
             (
                 "**Not requested.** `cloud_base`, `albedo`, `freezing_level_height`, and "
-                "`lifted_index` returned only nulls on 2026-10-10. `relative_humidity_2m` follows "
+                "`lifted_index` returned only nulls on 2026-10-10, and `diffuse_radiation` is "
+                "derived as shortwave minus direct radiation and goes negative where direct "
+                "exceeds shortwave. `relative_humidity_2m` follows "
                 "from temperature and dew point."
             ),
         ],
