@@ -44,7 +44,8 @@ rounds, to check the plumbing, and is not a result.
   ramp and export-capped hours removed. The target is the shared rows' `power_mw`.
 - **Power after `final_test_start` (2026-07-01) is never read**, because `studies.power.scan_power`
   stops there, so the rows from that date are dropped and the study has 18 usable months.
-  Phase 1 screens 2024-12 to 2025-09 (10 months), and P2 is scored on 2025-10 to 2026-06 without 2026-01 (8 months).
+  Phase 1 screens 2024-12 to 2025-09 (10 months). P2 is scored on 2025-10 to 2026-06 without
+  2026-01 (8 months).
 - **CAMS's publication delay.** The study assumes CAMS irradiance reaches a forecast two whole days
   late, so PC's windows cover days 2 to 8 (power to satellite) and days 2 to 31 (satellite to
   forecast), counted back from the latest whole day. The assumption comes from the CAMS
