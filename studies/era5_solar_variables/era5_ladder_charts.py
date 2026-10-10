@@ -131,10 +131,10 @@ SERIES_PANELS: Final[tuple[tuple[str, tuple[str, ...], str], ...]] = (
 """The variable groups of figure 2 as (panel title, columns, unit)."""
 
 DISPLAY_NAMES: Final[dict[str, str]] = {
-    "ssrd": "ERA5 ssrd",
-    "ssrdc": "ERA5 ssrdc (clear sky)",
-    "cams_ghi_w_m2": "CAMS GHI",
-    "fdir": "ERA5 fdir (direct)",
+    "ssrd": "ERA5 downward solar radiation (ssrd)",
+    "ssrdc": "ERA5 clear-sky radiation (ssrdc)",
+    "cams_ghi_w_m2": "CAMS global horizontal irradiance",
+    "fdir": "ERA5 direct radiation (fdir)",
     "tcc": "Total",
     "lcc": "Low",
     "mcc": "Medium",
@@ -178,6 +178,21 @@ ARM_LABEL_EXPRESSION: Final[str] = (
 """The Vega expression that turns the arm names `g0`, `g1`, `g2`, and `g9` into words."""
 
 
+ARM_KEY_LINES: Final[tuple[str, ...]] = (
+    "G0 uses sun position, ERA5 downward solar radiation, and air temperature. G1 adds total cloud",
+    "cover. G2 adds low, mid, and high cloud cover. G9 adds every ERA5 variable studied.",
+)
+"""Two subtitle lines saying what the arms named in a chart contain, for a figure read alone."""
+
+CLEARNESS_KEY: Final[str] = (
+    "Clearness index: irradiance divided by the irradiance at the top of the atmosphere."
+)
+"""The subtitle line that defines the clearness index."""
+
+SETTINGS_PHRASE: Final[str] = "main hyperparameter setting"
+"""The one name of the first hyperparameter setting, used in every figure."""
+
+
 def _scale(*, target: TargetType) -> float:
     """Return what turns the metric into the chart's unit: percentage points, or clearness index."""
     return 100.0 if target == "pv" else 1.0
@@ -190,7 +205,7 @@ def _error_unit(*, target: TargetType) -> str:
 
 def _difference_unit(*, target: TargetType) -> str:
     """Return the unit of a difference in the mean absolute error."""
-    return "points of capacity" if target == "pv" else "clearness index"
+    return "percentage points of capacity" if target == "pv" else "clearness index"
 
 
 def _domain(*, values: Sequence[float]) -> list[float]:
@@ -354,7 +369,9 @@ def figure_1_headline(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMix
                 f"Thick line: {ADJUSTED_LEVEL_PERCENT:.1f}% interval, adjusted for the ten "
                 "planned contrasts."
             ),
-            "Dashed rules: no difference, and the smallest improvement worth acting on.",
+            "Dashed rules: no difference, and the smallest improvement worth acting on",
+            "(0.1 percentage points of capacity, or 0.01 clearness index).",
+            *ARM_KEY_LINES,
             "All rows are planned: written into the study plan before any result existed.",
         ],
         figure_planning=None,
@@ -412,11 +429,10 @@ def figure_2_leaderboard(
         title=f"Error and correlation of every arm for {TARGET_NAMES[target]}",
         subtitle=[
             scope,
-            "Dot: estimate at the first hyperparameter setting. Line: 95% interval.",
-            (
-                "The arms share their rows, so these intervals overlap more than the paired "
-                "differences of figure 1 do."
-            ),
+            f"Dot: estimate at the {SETTINGS_PHRASE}. Line: 95% interval.",
+            "Each row is one set of input variables, scored on the same hours, so these",
+            "intervals overlap more than the paired differences of the headline figure do.",
+            *ARM_KEY_LINES,
             "All rows are exploratory.",
         ],
         figure_planning=None,
@@ -449,7 +465,7 @@ def _split_panel(
     domain = _domain(values=[0.0, *selected["lower"].to_list(), *selected["upper"].to_list()])
     axis_scale = alt.Scale(domain=domain, nice=False, zero=False)
     title = (
-        f"Mean absolute error minus the minimal set's ({_difference_unit(target=target)}; "
+        f"Mean absolute error minus G0's ({_difference_unit(target=target)}; "
         "more negative is better)"
     )
     y = alt.Y("label:N", sort=list(order), title=None, axis=alt.Axis(labelLimit=LABEL_WIDTH_PX))
@@ -523,7 +539,8 @@ def figure_regimes(
         subtitle=[
             scope,
             "Dot: estimate. Line: 95% interval from resampling whole months.",
-            "Dashed rule: no difference.",
+            "Dashed rule: no difference. Each row is an arm minus G0, the minimal set.",
+            *ARM_KEY_LINES,
             *([] if regime_note is None else [regime_note]),
             "All rows are exploratory and are not corrected for multiple comparisons.",
         ],
@@ -552,8 +569,9 @@ def figure_drop_one(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
         if selected.is_empty():
             continue
         rows = selected.select(
-            label=pl.col("treatment").str.replace(DROP_PREFIX, "").str.to_uppercase()
-            + pl.lit("'s additions removed"),
+            label=pl.lit("Without ")
+            + pl.col("treatment").str.replace(DROP_PREFIX, "").str.to_uppercase()
+            + pl.lit("'s variables"),
             value=pl.col("difference") * scale,
             lower=pl.col("lower_95") * scale,
             upper=pl.col("upper_95") * scale,
@@ -577,7 +595,8 @@ def figure_drop_one(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
             scope,
             "Dot: estimate. Line: 95% interval from resampling whole months.",
             "Dashed rule: no difference.",
-            "A group counts as useful only if the ladder (figure 7) and this figure agree.",
+            "A group counts as useful only if the leaderboard and this figure agree.",
+            *ARM_KEY_LINES,
             "All rows are exploratory and are not corrected for multiple comparisons.",
         ],
         figure_planning=None,
@@ -697,8 +716,8 @@ def figure_12_importance(
         dot_interval_panel(
             rows=models,
             order=model_order,
-            x_title="Share of total gain (%); cloud covers are tcc, lcc, mcc, hcc",
-            panel_title="ssrd and the cloud covers as variables are added",
+            x_title="Share of total gain (%); cloud covers are total, low, mid, and high",
+            panel_title="Downward solar radiation and the cloud covers, as variables are added",
             colour=TARGET_COLOURS[target],
             reference_rules=(),
         ),
@@ -711,7 +730,10 @@ def figure_12_importance(
             scope,
             "Dot: mean over refits. Line: range over refits (folds and seeds).",
             f"Dashed rule, first panel: the largest shuffled copy's share ({noise_line:.1f}%).",
-            "Gain is measured on the training data and splits credit between correlated columns.",
+            "Share of total gain: how much of the model's fit a column accounts for.",
+            "Shuffled copies are the same columns shuffled across hours, so they show the share",
+            "that noise alone earns. Gain is measured on the training data and splits credit",
+            "between correlated columns.",
             "Descriptive only: the planned contrasts decide whether a variable helps.",
         ],
         figure_planning=None,
@@ -835,7 +857,8 @@ def figure_3_days(
                 scope,
                 (
                     "Three days at one farm, chosen by the CAMS clear-sky index of its daylight "
-                    "hours: the highest mean, the highest spread, and the lowest mean."
+                    "hours: the clearest (highest mean), the most variable (highest spread), and "
+                    "the dullest (lowest mean)."
                 ),
                 f"Only days with at least {MIN_DAYLIGHT_HOURS} kept hours count.",
             ],
@@ -912,6 +935,7 @@ def figure_4_cloud_against_clearness(
             scope,
             "Line: mean clearness index in each 0.05-wide band of cloud cover.",
             "Band: 10th to 90th percentile.",
+            CLEARNESS_KEY,
         ],
         figure_planning=None,
     )
@@ -944,7 +968,7 @@ def figure_5_where_ssrd_misses(
         .mark_line(color=ocf.BRAND_ORANGE, strokeWidth=1.5, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("hour_of_day:Q", title="Hour of day (UTC)", scale=alt.Scale(domain=[0, 24])),
-            y=alt.Y("gap:Q", title="ERA5 ssrd minus CAMS (W m⁻²)"),
+            y=alt.Y("gap:Q", title="ERA5 downward solar radiation minus CAMS irradiance (W m⁻²)"),
         ),
         days=days,
     )
@@ -989,10 +1013,11 @@ def figure_5_where_ssrd_misses(
         title="Where ERA5's downward solar radiation differs from CAMS",
         subtitle=[
             scope,
-            "Top: the gap on the three days of figure 2. Positive means ERA5 is brighter.",
+            "Top: the gap on three days (clearest, most variable, dullest).",
+            "Positive means ERA5 is brighter.",
             (
-                "Bottom: each dot is the mean gap over one tenth of the kept hours, ranked by the "
-                "variable named above the panel."
+                "Bottom: hours sorted by the variable named above each panel and split into ten "
+                "equal groups. Each dot is one group's mean gap."
             ),
         ],
         figure_planning=None,
@@ -1013,7 +1038,7 @@ def figure_6_cloud_water(*, dataset: pl.DataFrame, scope: str) -> alt.TopLevelMi
     if not needed <= set(dataset.columns):
         _LOG.info("figure 5 skipped: the frame lacks %s", sorted(needed - set(dataset.columns)))
         return None
-    names = ["Low cloud under 0.2", "Low cloud 0.2 to 0.6", "Low cloud 0.6 or more"]
+    names = ["Low cloud under 20%", "Low cloud 20 to 60%", "Low cloud 60% or more"]
     rows = dataset.filter(pl.col("cams_clearness_index").is_not_null()).with_columns(
         water=pl.col("tclw") + pl.col("tciw"),
         low_cloud=pl.when(pl.col("lcc") < 0.2)
@@ -1066,6 +1091,7 @@ def figure_6_cloud_water(*, dataset: pl.DataFrame, scope: str) -> alt.TopLevelMi
                 "Each dot: the mean over one fifteenth of the hours in its low-cloud group, "
                 "ranked by cloud water."
             ),
+            CLEARNESS_KEY,
         ],
         figure_planning=None,
     )
@@ -1183,15 +1209,15 @@ def figure_7_models_work(
         chart=figure(
             panels=[timeline, error],
             number=6,
-            title="Out-of-fold output on three days at every farm, and each farm's error",
+            title="Predictions on months the models never saw, three days at every farm",
             subtitle=[
                 scope,
                 (
-                    "Top: measured output and the predictions of the minimal and the full set, on "
-                    "three days chosen for each farm by the rule of figure 2."
+                    "Top: measured output and the predictions of G0 and G9, on three days chosen "
+                    "for each farm (the clearest, most variable, and dullest)."
                 ),
-                "Those days are never the days of figures 2 and 5.",
-                "Bottom: each farm's mean absolute error for four arms.",
+                "Bottom: each farm's mean absolute error for G0, G1, G2, and G9.",
+                *ARM_KEY_LINES,
                 "Output is a percentage of each farm's own capacity.",
             ],
             figure_planning=None,
@@ -1236,7 +1262,10 @@ def figure_11_hour_and_worst_days(
                 x=alt.X(
                     "hour:Q", title="Hour of day (UTC)", axis=alt.Axis(format="d", tickMinStep=1)
                 ),
-                y=alt.Y("value:Q", title=f"Mean absolute error ({_error_unit(target=target)})"),
+                y=alt.Y(
+                    "value:Q",
+                    title=f"Mean absolute error ({_error_unit(target=target)}; smaller is better)",
+                ),
                 color=alt.Color("treatment:N", scale=arm_scale, legend=legend),
             )
             .properties(width=PLOT_WIDTH_PX, height=120, title=_title(PANEL_TITLES[target]))
@@ -1281,6 +1310,7 @@ def figure_11_hour_and_worst_days(
                     "Bottom: the 20 farm-days with the largest error for the minimal set, "
                     "labelled by rank, month, and farm."
                 ),
+                *ARM_KEY_LINES,
                 "All rows are exploratory.",
             ],
             figure_planning=None,
@@ -1289,9 +1319,9 @@ def figure_11_hour_and_worst_days(
 
 
 PROBABILISTIC_MEASURES: Final[tuple[tuple[str, str, str], ...]] = (
-    ("crps", "CRPS", "smaller is better"),
+    ("crps", "Continuous ranked probability score (CRPS)", "smaller is better"),
     ("width_80", "Mean width of the 10 to 90% interval", "narrower is better"),
-    ("coverage_80", "Coverage of the 10 to 90% interval", "no direction"),
+    ("coverage_80", "Coverage of the 10 to 90% interval", "the target is 80% for both arms"),
 )
 """The measure key in the report's table, its words, and which direction is better."""
 
@@ -1363,12 +1393,15 @@ def figure_13_probabilistic(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMi
     return figure(
         panels=panels,
         number=13,
-        title="Do any inputs sharpen the XGBoost uncertainty estimate?",
+        title="Do any inputs help the XGBoost model say how uncertain it is?",
         subtitle=[
             scope,
             "Dot: estimate. Line: 95% interval from resampling whole months.",
-            "Dashed rule: no difference. Primary hyperparameter setting only.",
-            "A better median narrows the interval too, so read width beside the negative control.",
+            "Dashed rule: no difference. Main hyperparameter setting only.",
+            "A more accurate forecast also narrows the interval, so compare with the control.",
+            "Negative control: G2 plus shuffled copies of the other variables. MARS-only: 12 IFS",
+            "variables that are not in the free open data.",
+            *ARM_KEY_LINES,
             "All rows are exploratory and are not corrected for multiple comparisons.",
         ],
         figure_planning=None,
@@ -1406,8 +1439,8 @@ def figure_13b_reliability(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMix
             alt.Chart(selected)
             .mark_line(point=True, aria=False)
             .encode(  # ty: ignore[unresolved-attribute]
-                x=alt.X("level:Q", title="Quantile level the model aimed at"),
-                y=alt.Y("value:Q", title="Share of outcomes below"),
+                x=alt.X("level:Q", title="Quantile level aimed at"),
+                y=alt.Y("value:Q", title="Share of outcomes below that quantile"),
                 color=alt.Color("arm:N", title="Arm"),
             )
         )
@@ -1424,7 +1457,7 @@ def figure_13b_reliability(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMix
             scope,
             "Each line is one arm. The dashed diagonal is perfect calibration.",
             "Above the diagonal means outcomes fall below the quantile more often than intended.",
-            "Exploratory. Primary hyperparameter setting only.",
+            "Exploratory. Main hyperparameter setting only.",
         ],
         figure_planning=None,
     )
@@ -1490,9 +1523,9 @@ def figure_13c_coverage_and_width(*, rows: pl.DataFrame, scope: str) -> alt.TopL
         title="Coverage against interval width",
         subtitle=[
             scope,
-            "Circle: the quantile model. Diamond: a constant interval holding 80% of its errors.",
-            "A model that helps with uncertainty sits left of the diamonds at a similar height.",
-            "Exploratory. Primary hyperparameter setting only.",
+            "Circle: the quantile fit. Diamond: a fixed-width interval holding 80% of errors.",
+            "An arm that helps with uncertainty sits left of the diamonds at a similar height.",
+            "Exploratory. Main hyperparameter setting only.",
         ],
         figure_planning=None,
     )
@@ -1536,7 +1569,7 @@ def figure_14_aerosol_conditions(
                     rows=rows,
                     x_title=(
                         f"{words}, G10 minus G9 ({_difference_unit(target=target)}; "
-                        "more negative is a gain)"
+                        "more negative is better)"
                     ),
                     panel_title=f"{PANEL_TITLES[target]}: {words}",
                     colour=TARGET_COLOURS[target],
@@ -1550,10 +1583,12 @@ def figure_14_aerosol_conditions(
         title="Whether CAMS aerosol helps in cloud-free and dusty hours",
         subtitle=[
             scope,
-            "Dot: estimate. Line: 95% interval from resampling whole months. Primary setting.",
+            "Dot: estimate. Line: 95% interval from resampling whole months. Main setting.",
             "Dashed rule: no difference. Labels give distinct days (d) and months (mo).",
-            "The reading rule needs 20 days and 12 months, and the page states its outcome.",
-            "Exploratory. EAC4 is a reanalysis, so a forecast would gain less.",
+            "The reading rule needs 20 days and 12 months; with fewer, G10 cannot be assessed.",
+            "Aerosol: CAMS EAC4 reanalysis. High dust: dust optical depth in the top 5% of hours.",
+            "Exploratory. A reanalysis knows the dust plume, so a forecast would gain less.",
+            *ARM_KEY_LINES,
         ],
         figure_planning=None,
     )
@@ -1602,7 +1637,8 @@ def main() -> int:
     last = dataset["time"].max()
     scope = (
         "Six NGED solar farms, daylight hours, "
-        f"{first.strftime('%B %Y')} to {last.strftime('%B %Y')}."  # ty: ignore[unresolved-attribute]
+        f"{first.strftime('%B %Y')} to {last.strftime('%B %Y')}. "  # ty: ignore[unresolved-attribute]
+        "ERA5: ECMWF's reanalysis of past weather. CAMS: satellite irradiance service."
     )
 
     weather_days = choose_days(

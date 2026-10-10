@@ -312,7 +312,10 @@ def fit_one_view(
                 msg = f"{path.name} holds {held}, expected {labels}"
                 raise RuntimeError(msg)
             _LOG.info(
-                "group %d of %d: reading %s", start // JOBS_PER_CHECKPOINT + 1, len(jobs), path.name
+                "checkpoint group %d (of %d jobs): reading %s",
+                start // JOBS_PER_CHECKPOINT + 1,
+                len(jobs),
+                path.name,
             )
         else:
             part = run_all(dataset=view, jobs=group, max_workers=max_workers, device=device)
