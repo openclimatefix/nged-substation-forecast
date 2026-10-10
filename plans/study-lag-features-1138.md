@@ -447,7 +447,7 @@ maintainer's request, in the longer-lead sweep only.
 (M2); rebuilding the shared rows in the build script instead of importing another study folder
 (M3); `cut_eras` for the global folds (M4); the positive control's pass criterion and a known date
 off the era boundaries (M5); N2 drawn outside the target row's fold, and N2-k for a wide X (S1,
-S2); the reproduction check retargeted to the ENS-mean B0 on the CPU with a per-row loss checksum
+S2); the reproduction check retargeted to the ENS-mean B0 (later simplified to a GPU-only check within 0.03 points of the published error)
 (S3); the device text (S4); the compute rows and the double-counted global arms (S5); stage-1
 predictions at every daylight hour (S6); stale text (S7); the exploratory list (S8); the window
 function's scope (S9); the global scaling rule (S10); the word "fingerprint" kept for plant
