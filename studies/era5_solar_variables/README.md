@@ -23,13 +23,15 @@ result calls for.
 |---|---|
 | `era5_ladder_arms.py` | The arms, targets, planned contrasts, and paths that every other script imports |
 | `era5_ladder_build_dataset.py` | Joins output, CAMS, and every downloaded ERA5 variable into one hourly frame holding all six farms. Run it with `uv run --with netcdf4`. `--through-rung g2` builds from the variables downloaded so far, `--keep-zero-hours-with-snow` builds the snow variant, and the full build adds the EAC4 aerosol columns whenever the aerosol download exists |
-| `era5_ladder_fit.py` | Fits every arm out of fold for both targets. `--view aerosol` fits the aerosol view, and `--view extra_sensitivity --sensitivity-arms ...` adds the second hyperparameter setting for arms whose contrasts lie near the 5% line. It checkpoints every 4 arm-settings into a `losses_<...>.parts` directory and resumes from it, and a checkpoint is matched by arm and setting names only, so move or delete a `.parts` directory whenever the dataset or an arm's columns change. After a restart that follows a finished target, move that target's `losses_` and `arms_` files to `superseded/` first, because the script refuses to overwrite them |
+| `era5_ladder_fit.py` | Fits every arm out of fold for both targets. `--view aerosol` fits the aerosol view, and `--view extra_sensitivity --sensitivity-arms ...` adds the second hyperparameter setting for arms whose contrasts lie near the 5% line. It checkpoints every 4 arm-settings into a `losses_<...>.parts` directory and resumes from it, and a checkpoint is matched by arm and setting names only, so move or delete a `.parts` directory whenever the dataset, an arm's columns, or `QUANTILE_ARMS` change. After a restart that follows a finished target, move that target's `losses_` and `arms_` files to `superseded/` first, because the script refuses to overwrite them |
 | `era5_ladder_importance.py` | Refits `g0`, `g2`, `g9`, and `g9` with shuffled copies of the `g3` to `g9` columns, and saves each column's share of XGBoost's total gain (`importance_<variant>_through_<rung>.parquet`). It needs a GPU slot from the study coordinator |
 | `era5_ladder_report.py` | Reads the saved losses and writes `report.md` and the interval tables, each named for the variant and the highest rung |
 | `era5_ladder_charts.py` | Draws the page's figures into `docs/studies/assets/` |
 
-The ERA5 variables come from `studies/weather_downloads/fetch_era5_solar_variables.py`, and the
-aerosol from `fetch_cams_eac4_aod.py`. The tested machinery is `studies.era5_ladder` and
+The ERA5 variables come from Google's ARCO-ERA5 copy through
+`studies/weather_downloads/fetch_era5_solar_arco.py` (`fetch_era5_solar_variables.py` fetches the
+same variables from the Climate Data Store, and `validate_era5_solar_variables.py` compares the
+two), and the aerosol from `fetch_cams_eac4_aod.py`. The tested machinery is `studies.era5_ladder` and
 `studies.correlation`.
 
 ## The arms
