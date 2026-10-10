@@ -354,7 +354,9 @@ def accumulation_to_hourly_rate(*, variable: str) -> pl.Expr:
 
     ERA5 stores radiation in joules per square metre over the hour, so dividing by the seconds in
     the hour gives watts per square metre. Precipitation and snowfall are stored in metres of water
-    over the hour, which becomes millimetres per hour.
+    over the hour, which becomes millimetres per hour. Float32 rounding leaves some accumulations a
+    fraction of a unit below zero (down to -0.25 joules per square metre), so the rate is clipped at
+    zero.
 
     Args:
         variable: The ERA5 short name of an accumulation, such as `ssrd` or `tp`.
@@ -369,8 +371,8 @@ def accumulation_to_hourly_rate(*, variable: str) -> pl.Expr:
         msg = f"{variable!r} is not an accumulation: {ACCUMULATED_VARIABLES}"
         raise ValueError(msg)
     if variable in ("tp", "sf"):
-        return pl.col(variable) * MILLIMETRES_PER_METRE
-    return pl.col(variable) / SECONDS_PER_HOUR
+        return (pl.col(variable) * MILLIMETRES_PER_METRE).clip(lower_bound=0.0)
+    return (pl.col(variable) / SECONDS_PER_HOUR).clip(lower_bound=0.0)
 
 
 def ratio_index(

@@ -134,6 +134,17 @@ def test_an_hours_accumulation_becomes_its_mean_rate():
     assert converted["sf"].to_list() == pytest.approx([2.0, 0.0])
 
 
+def test_a_slightly_negative_accumulation_is_clipped_to_zero():
+    frame = pl.DataFrame({"ssrdc": [-0.25 * 3600.0, 3600.0], "tp": [-1e-9, 0.001]})
+
+    converted = frame.select(
+        accumulation_to_hourly_rate(variable="ssrdc"), accumulation_to_hourly_rate(variable="tp")
+    )
+
+    assert converted["ssrdc"].to_list() == [0.0, 1.0]
+    assert converted["tp"].to_list() == pytest.approx([0.0, 1.0])
+
+
 def test_an_instantaneous_variable_is_not_converted_as_an_accumulation():
     with pytest.raises(ValueError, match="not an accumulation"):
         accumulation_to_hourly_rate(variable="cape")
