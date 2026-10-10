@@ -5,10 +5,10 @@ description: >-
   chart drawn in this repository — a study page, a dashboard, a notebook, or anywhere else: the
   OCF-brand palette (`plotting.ocf_theme`), colour before shape, sizing a chart to a docs page's text
   column, hour-of-day axes, exporting and optimising SVG, and the extra care an NGED metered
-  generator's time series needs so it cannot be re-identified. Load before drawing any chart in this repository, whether or
-  not the chart is for a study. Load the bundled `dataviz` skill too: this skill supplements it and
-  does not repeat its form heuristic, its six accessibility checks, its palette-validation script,
-  or its interaction rules.
+  generator's time series needs so it cannot be re-identified. Load before drawing any chart in
+  this repository, whether or not the chart is for a study. Load the bundled `dataviz` skill too:
+  this skill supplements it and does not repeat its form heuristic, its six accessibility checks,
+  its palette-validation script, or its interaction rules.
 ---
 
 # Charting in this repository
