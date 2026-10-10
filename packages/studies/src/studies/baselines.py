@@ -45,7 +45,7 @@ Four baselines:
 """
 
 from datetime import datetime, timedelta
-from typing import Final
+from typing import Final, Literal
 
 import numpy as np
 import polars as pl
@@ -372,3 +372,81 @@ def shrunk_persistence(*, frame: pl.DataFrame, persisted: str) -> pl.DataFrame:
                 .drop("climate")
             )
     return pl.concat(parts).sort("row").drop("row")
+
+
+WindowStatistic = Literal["mean", "min", "max", "median", "p90"]
+"""The statistics `same_clock_hour_window` takes over the days in its window."""
+
+WINDOW_QUANTILE: Final[float] = 0.9
+"""The quantile the `p90` window statistic takes, by linear interpolation."""
+
+
+def same_clock_hour_window(
+    *,
+    keys: pl.DataFrame,
+    hourly: pl.DataFrame,
+    day: int,
+    first_days_back: int,
+    last_days_back: int,
+    statistic: WindowStatistic,
+    min_count: int,
+) -> pl.Series:
+    """Return a statistic of the same clock hour over a window of whole days before the issue day.
+
+    **Day 1 back is the latest whole day before the issue day**, the day `diurnal_persistence`
+    reads, so day `j` back is `24 * (day + j)` hours before the target hour. The issue day itself
+    is never read, because a 09:00 UTC issue has not seen the issue day's later hours. Reading is
+    strict: an hour that is missing, or null, counts as absent, and there is no fallback to an
+    earlier day. Repeated `(site, time)` rows in `hourly` count once, as their mean.
+
+    Args:
+        keys: One row per scored row, with `site` and `time`, in the order to return.
+        hourly: The hourly power, with `site`, `time`, and `power_mw`.
+        day: The band's day, as for `diurnal_persistence`.
+        first_days_back: The nearest day of the window, at least 1.
+        last_days_back: The furthest day of the window, at least `first_days_back`.
+        statistic: What to take over the days of the window that hold the hour.
+        min_count: The fewest days of the window that must hold the hour.
+
+    Returns:
+        The statistic, null where fewer than `min_count` days hold the hour.
+
+    Raises:
+        ValueError: If the window starts before day 1, ends before it starts, or `min_count` is
+            below 1.
+    """
+    if first_days_back < 1 or last_days_back < first_days_back or min_count < 1:
+        msg = (
+            f"need 1 <= first_days_back <= last_days_back and min_count >= 1, got "
+            f"{first_days_back}, {last_days_back}, {min_count}"
+        )
+        raise ValueError(msg)
+    aggregates = {
+        "mean": pl.col("power_mw").mean(),
+        "min": pl.col("power_mw").min(),
+        "max": pl.col("power_mw").max(),
+        "median": pl.col("power_mw").median(),
+        "p90": pl.col("power_mw").quantile(WINDOW_QUANTILE, interpolation="linear"),
+    }
+    observed = (
+        hourly.select("site", pl.col("time").alias("lag_time"), "power_mw")
+        .drop_nulls()
+        .group_by("site", "lag_time")
+        .agg(pl.col("power_mw").mean())
+    )
+    window = (
+        keys.select("site", "time")
+        .with_row_index("row")
+        .join(pl.DataFrame({"days_back": range(first_days_back, last_days_back + 1)}), how="cross")
+        .with_columns(lag_time=pl.col("time") - pl.duration(days=day + pl.col("days_back")))
+        .join(observed, on=["site", "lag_time"], how="inner")
+        .group_by("row")
+        .agg(value=aggregates[statistic], n_days=pl.len())
+        .filter(pl.col("n_days") >= min_count)
+    )
+    return (
+        keys.select("site")
+        .with_row_index("row")
+        .join(window, on="row", how="left", maintain_order="left")["value"]
+        .alias(statistic)
+    )
