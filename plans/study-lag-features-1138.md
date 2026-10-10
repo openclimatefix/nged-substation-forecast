@@ -20,7 +20,7 @@ phases are two views of one table of out-of-fold losses**, produced by the exist
 
 - **Phase 1, a broad shallow sweep:** 18 fitted arms (14 lag ideas, the baseline, two controls, and
   an interpolation bound), plus post-model corrections that need no fitting. Each arm is scored as
-  its own absolute error on the first 13 calendar months, with no pairwise comparison and no
+  its own absolute error on the first 10 calendar months, with no pairwise comparison and no
   significance claim. The page shows one ranked chart. The sweep generates hypotheses.
 - **Phase 2, a rigorous comparison:** five planned paired contrasts, fixed before any fit, one of
   which names "the best sweep arm", chosen by a rule written before the sweep. Phase 2 adds the
@@ -71,8 +71,10 @@ the diff review, the mutation pass (the package changes), and the prose reviews 
 **Recommendation: no, for this study.** The target use is utility-scale plants; the
 `openclimatefix/uk_pv` data is domestic rooftop PV, whose failures and soiling average out across
 many small systems. It would also need a second weather download, and whether its time coverage
-overlaps the ENS archive is unchecked. The shared rows hold **21 scored months** (December 2024 to
-September 2026, with January 2026 dropped), 35,263 rows, and 4,246 to 6,976 rows per plant. The 6
+overlaps the ENS archive is unchecked. The shared rows hold 35,263 rows over 21 months (December 2024 to
+September 2026, with January 2026 dropped), but the power record that lags are read from ends at
+2026-07-01 (`studies.power.scan_power` stops at the final-test date, which the study does not
+open), so **18 scored months** (2024-12 to 2026-06, without 2026-01) remain, and 4,246 to 6,976 rows per plant. The 6
 plants sit in one 25 km box, so the effective sample size is weather episodes (months), not plants.
 An effect is detected only if it is large; a null is read as "an effect as large as X is not
 excluded", and a positive control sized to realistic soiling losses measures the detection limit.
@@ -133,7 +135,7 @@ untested.
 
 All arms are fitted per plant, at lead-day 1, at the primary hyperparameter setting, with three
 seeds and all five folds, through `run_all`, point model only (the exceptions are in Phase 2).
-Phase 1 reads these losses on the first 13 calendar months (2024-12 to 2025-12) and nothing else.
+Phase 1 reads these losses on the first 10 calendar months (2024-12 to 2025-09) and nothing else.
 Every window below is anchored at the issue day and reads nothing after the issue time.
 
 | Family | Arm (extra columns) |
@@ -162,7 +164,7 @@ stage-1 prediction comes from a model that saw its own hour. Stage 1 predicts th
 lag hour's weather at the target's lead day, available at the issue time.
 
 **The shortlist rule, fixed before any fit:** X is the arm with the lowest phase-1 mean absolute
-error, over the 13 screening months, among IM, CTX7, W7, Q30, CK, TF, AN, PC, S3, RP, and KS. The
+error, over the 10 screening months, among IM, CTX7, W7, Q30, CK, TF, AN, PC, S3, RP, and KS. The
 excluded arms are B0, L1, L2, S2, N1, and N2 (phase 2 carries those regardless), T1 (an
 interpolation bound), the persistence references and the
 post-model corrections R1s, R2, R4 and R5 (none is fitted, so none has a sensitivity setting or
@@ -225,8 +227,8 @@ quantile model), and the global-only arms. Phase 2 carries X.
 - **Positive control:** the same pipeline on a synthetic target in which power after a known date
   is multiplied by (1 − s), applied to the hourly power table before the lags are built, for s of
   2%, 5% and 10%. The known date is not an era boundary (2025-10, 2026-02), because B0 carries
-  `era_code` and could learn a shift there. B0 and L1, per-plant, lead-day 1, primary setting, one
-  seed. "Recovers" means L1 minus B0 at the primary setting has a 99% interval wholly below zero and
+  `era_code` and could learn a shift there. B0 and L1, per-plant, lead-day 1, primary setting, three
+  seeds (`out_of_fold_losses` always fits all three). "Recovers" means L1 minus B0 at the primary setting has a 99% interval wholly below zero and
   a point estimate at least 2% of B0's mean absolute error; the smallest s that L1 recovers is the
   detection limit at the primary setting.
 - **Null and level-only controls:** N2 keeps neither the plant's level nor yesterday's weather, so
@@ -240,10 +242,13 @@ All at lead-day 1, at both hyperparameter settings, with 99% intervals (Bonferro
 through `bootstrap_difference_at_level`), judged with the existing `bracket_verdict` and
 `combine_setting_verdicts`.
 
-- **P1:** L1 minus B0, mean absolute error, per-plant, all 21 months.
-- **P2:** X minus L1, mean absolute error, per-plant, on the months after 2025-12 only (8 months
-  the sweep never screened, at any plant), where X is the shortlist rule's arm. These 8 months are
-  the third era of the weather forecast product (from 2026-02), so P2 tests X on that era alone.
+- **P1:** L1 minus B0, mean absolute error, per-plant, all 18 months.
+- **P2:** X minus L1, mean absolute error, per-plant, on the months after 2025-09 only (8 months,
+  2025-10 to 2026-06 without 2026-01, that the sweep never screened at any plant), where X is the
+  shortlist rule's arm. These months span the second and third eras of the weather forecast product
+  (from 2025-10 and 2026-02) and hold no summer, so a summer-only effect cannot be tested by P2.
+  A split leaving 10 months to screen and 8 to test was chosen because the minimum for an interval
+  is 6 months.
 - **P3:** S2 minus L2, mean absolute error, per-plant, all months (both arms carry lagged-weather
   information; the two-step design is the question).
 - **P4:** CRPS of L1 minus CRPS of B0, per-plant, all months.
@@ -380,8 +385,8 @@ the docs-link checker.
 
 ## Risks and open questions
 
-1. **Sample:** 21 scored months at 6 plants in one 25 km box. P2 rests on 8 months, all in one era
-   of the weather forecast product. Intervals from a percentile bootstrap over 21 month clusters
+1. **Sample:** 18 scored months at 6 plants in one 25 km box. P2 rests on 8 months in two eras of
+   the weather forecast product with no summer. Intervals from a percentile bootstrap over 18 month clusters
    tend to under-cover, plants are pooled and weighted by row count, and the test does not cover
    differences between plants. The page says all of this. No new PV data.
 2. **Power-data latency:** the study assumes observed power up to the forecast's issue time (up to
@@ -407,7 +412,7 @@ request reverses the suggestion to run only five arms.
 
 **Correctness review.** Accepted: the global fit leaking through neighbouring plants (now solved by
 a fleet-wide fold); `power_mw` as the per-plant target and capacity-normalised global inputs; N1
-drawn from days 8 to 28 before the issue day; no purge; normalised CRPS; the data facts (21 months,
+drawn from days 8 to 28 before the issue day; no purge; normalised CRPS; the data facts (18 usable months,
 7 missing runs, the empty 2024-11-12 split removed); stage-1 predictions that withhold the hour's
 own fold, and lagged weather at the target's lead day; the minimum-count rule and lags from the full
 cleaned table; P3 as S2 minus L2; 99% intervals; a threshold for the CRPS contrast; a multiplicative
