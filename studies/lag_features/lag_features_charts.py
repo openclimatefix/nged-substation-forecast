@@ -282,6 +282,7 @@ def _intervals_chart(
     legend_title: str | None,
     verdicts: pl.DataFrame | None = None,
     x_domain: list[float] | None = None,
+    width_offset: int = 260,
 ) -> alt.LayerChart:
     """Draw dots with interval lines against a zero rule, one row per `y` value.
 
@@ -295,6 +296,8 @@ def _intervals_chart(
         verdicts: Optional rows with the `y` column, `verdict` and `x` (where the text starts),
             drawn as a text mark to the right of each row's interval.
         x_domain: Optional lower and upper end of the x axis.
+        width_offset: How much narrower than the text column the plot area is drawn, to leave room
+            for the row labels and so that the whole figure is as wide as its caption.
 
     Returns:
         The layered chart.
@@ -329,7 +332,7 @@ def _intervals_chart(
             )
         )
         layers = layers + words
-    return layers.properties(width=CONTENT_WIDTH_PX - 260, height=200)
+    return layers.properties(width=CONTENT_WIDTH_PX - width_offset, height=200)
 
 
 def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
@@ -420,6 +423,7 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
                 legend_title="Hyperparameter setting",
                 verdicts=verdicts,
                 x_domain=domain,
+                width_offset=205,
             )
         ],
         number=1,
@@ -450,7 +454,7 @@ def data_figure(
         share=pl.col("power_mw") / pl.col("effective_capacity_mw"),
         lag_share=pl.col("lag_d1") / pl.col("effective_capacity_mw"),
     )
-    sample = frame.sample(n=min(6000, frame.height), seed=0)
+    sample = frame.sample(n=min(2000, frame.height), seed=0)
     forecast = (
         alt.Chart(sample)
         .mark_circle(size=6, opacity=0.35, aria=False)
@@ -459,7 +463,7 @@ def data_figure(
             y=alt.Y("share:Q", title="Measured power (share of capacity)"),
             color=alt.Color("site:N", legend=alt.Legend(title="Plant")),
         )
-        .properties(width=CONTENT_WIDTH_PX - 80, height=PANEL_HEIGHT_PX)
+        .properties(width=CONTENT_WIDTH_PX - 52, height=PANEL_HEIGHT_PX)
     )
     lag = (
         alt.Chart(sample)
@@ -471,13 +475,13 @@ def data_figure(
             y=alt.Y("share:Q", title="Measured power (share of capacity)"),
             color="site:N",
         )
-        .properties(width=CONTENT_WIDTH_PX - 80, height=PANEL_HEIGHT_PX)
+        .properties(width=CONTENT_WIDTH_PX - 52, height=PANEL_HEIGHT_PX)
     )
     title = "Measured power against forecast irradiance, and against the lag"
     subtitle = [
         (
             "One dot is one daylight hour at one of six solar plants. The forecasts are "
-            "day-ahead, and the dots are a random sample of 6,000 hours."
+            "day-ahead, and the dots are a random sample of 2,000 hours."
         ),
         (
             "The lag is the power at the same clock hour on the latest whole day before the "
@@ -553,6 +557,7 @@ def control_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         colour="series",
         shape="series",
         legend_title=None,
+        width_offset=174,
     )
     controls = _intervals_chart(
         data=pairs,
@@ -561,6 +566,7 @@ def control_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         colour="series",
         shape="series",
         legend_title=None,
+        width_offset=174,
     )
     claim(
         holds=bool((control["upper"] >= 0).all()),
@@ -681,7 +687,7 @@ def models_work_figure(
                 x=alt.X(
                     "day:Q", title="Day of the chosen week (1 to 7)", scale=alt.Scale(domain=[1, 8])
                 ),
-                y=alt.Y("value:Q", title="Power (share of capacity)"),
+                y=alt.Y("value:Q", title=None),
                 color=alt.Color(
                     "series:N",
                     scale=alt.Scale(
@@ -692,13 +698,13 @@ def models_work_figure(
                 ),
                 row=alt.Row("site:N", title=f"Plant ({rule} week)"),
             )
-            .properties(width=CONTENT_WIDTH_PX - 140, height=70)
+            .properties(width=CONTENT_WIDTH_PX - 110, height=70)
         )
     title = "Day-ahead forecasts against measured power in three weeks chosen by rule"
     subtitle = [
         (
-            "Each row is one plant, and each group of six rows is one week. Black: measured "
-            "power. Blue: B0's forecast of that power. Orange: L1's forecast of that power."
+            "Each row is one plant, and each group of six rows is one week. Power is a share of "
+            "capacity. Black: measured power. Blue: B0's forecast of that power. Orange: L1's forecast of that power."
         ),
         forecasts_statement(runs="one of three training runs (fitting seeds)"),
         (
@@ -715,7 +721,6 @@ def models_work_figure(
             title,
             *subtitle,
             "Day of the chosen week (1 to 7)",
-            "Power (share of capacity)",
             "Series: Measured, B0, L1",
         ],
     )
@@ -766,7 +771,7 @@ def sweep_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     rule = (
         alt.Chart(pl.DataFrame({"x": [baseline]})).mark_rule(color=ocf.BRAND_ORANGE).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )
-    panels = [(bars + rule).properties(width=CONTENT_WIDTH_PX - 180, height=420)]
+    panels = [(bars + rule).properties(width=CONTENT_WIDTH_PX - 195, height=420)]
     crps_title = (
         "Continuous ranked probability score (CRPS), approximated from nine quantiles "
         "(% of capacity; smaller is better)"
@@ -780,7 +785,7 @@ def sweep_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
                 y=alt.Y("label:N", sort=crps_rows["label"].to_list(), title=None),
                 x=alt.X("crps:Q", title=crps_title),
             )
-            .properties(width=CONTENT_WIDTH_PX - 180, height=110)
+            .properties(width=CONTENT_WIDTH_PX - 195, height=110)
         )
         panels.append(crps_bars)
     fitted = phase1.filter(pl.col("fitted")).sort("error")
@@ -888,8 +893,8 @@ def by_lead_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     gain_colour = alt.Color(
         "arm:N",
         scale=alt.Scale(
-            domain=gain_arms,
-            range=[ARM_COLOURS[a] for a in ("L1", "W7", "Q30", "T1", "N2")],
+            domain=["B0", *gain_arms, "climatology"],
+            range=[ARM_COLOURS[a] for a in ("B0", "L1", "W7", "Q30", "T1", "N2", "climatology")],
         ),
         legend=alt.Legend(title="Arm"),
     )
@@ -915,14 +920,7 @@ def by_lead_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("lead:N", sort=order, title=x_title),
             y=alt.Y("error:Q", title=level_title),
-            color=alt.Color(
-                "arm:N",
-                scale=alt.Scale(
-                    domain=["B0", "L1", "climatology"],
-                    range=[ARM_COLOURS["B0"], ARM_COLOURS["L1"], ARM_COLOURS["climatology"]],
-                ),
-                legend=alt.Legend(title="Arm"),
-            ),
+            color=gain_colour,
         )
     )
     longest = int(by_lead["lead_day"].max())  # ty: ignore[invalid-argument-type]
@@ -983,8 +981,8 @@ def by_lead_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     )
     return figure(
         panels=[
-            (gain_lines + gain_bars).properties(width=CONTENT_WIDTH_PX - 100, height=180),
-            level_lines.properties(width=CONTENT_WIDTH_PX - 100, height=180),
+            (gain_lines + gain_bars).properties(width=CONTENT_WIDTH_PX - 57, height=180),
+            level_lines.properties(width=CONTENT_WIDTH_PX - 57, height=180),
         ],
         number=6,
         title=title,
@@ -1024,7 +1022,7 @@ def coverage_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | Non
             y=alt.Y("coverage:Q", title="Share inside the 10% to 90% interval"),
             color=colours,
         )
-    ).properties(width=CONTENT_WIDTH_PX - 100, height=160)
+    ).properties(width=CONTENT_WIDTH_PX - 52, height=160)
     nominal = (
         alt.Chart(pl.DataFrame({"y": [0.8]}))
         .mark_rule(color=ocf.BLACK_1, strokeDash=[4, 3])
@@ -1039,7 +1037,7 @@ def coverage_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | Non
             y=alt.Y("width:Q", title="Mean interval width (percentage points of capacity)"),
             color=colours,
         )
-    ).properties(width=CONTENT_WIDTH_PX - 100, height=160)
+    ).properties(width=CONTENT_WIDTH_PX - 52, height=160)
     overall = coverage.filter(pl.col("sky") == "all")
     claim(
         holds=bool((overall["coverage"] < NOMINAL_COVERAGE).all()),
@@ -1203,7 +1201,7 @@ def lag_construction_figure(
         ],
     )
     return figure(
-        panels=[(band + mean + lines).properties(width=CONTENT_WIDTH_PX - 100, height=260)],
+        panels=[(band + mean + lines).properties(width=CONTENT_WIDTH_PX - 51, height=260)],
         number=8,
         title=title,
         subtitle=subtitle,
@@ -1264,10 +1262,12 @@ def withheld_folds_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart
                     domain=[ROLE_TRAINED, ROLE_SCORED, ROLE_PREDICTED],
                     range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_PURPLE],
                 ),
-                legend=alt.Legend(title="What the first-stage model does with the month"),
+                legend=alt.Legend(
+                    title="The first-stage model", titleLimit=0, labelLimit=0, columns=1
+                ),
             ),
         )
-        .properties(width=CONTENT_WIDTH_PX - 120, height=150)
+        .properties(width=CONTENT_WIDTH_PX - 96, height=150)
     )
     title = "The first-stage forecasts never train on the months they are scored on"
     subtitle = [
@@ -1296,7 +1296,7 @@ def withheld_folds_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart
             title,
             *subtitle,
             "Calendar month of the plant's rows",
-            "What the first-stage model does with the month",
+            "The first-stage model",
             f"Legend: {ROLE_TRAINED}, {ROLE_SCORED}, {ROLE_PREDICTED}",
         ],
     )
@@ -1335,7 +1335,8 @@ def by_plant_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
             y=alt.Y("label:N", sort=order, title=None),
             color=alt.Color(
                 "gain:Q",
-                title=gain_title,
+                title=["Error minus B0's at the plant", "(percentage points of capacity)"],
+                legend=alt.Legend(titleLimit=0),
                 scale=alt.Scale(scheme="redblue", reverse=True, domainMid=0),
             ),
         )
@@ -1365,7 +1366,7 @@ def by_plant_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         lines=[title, *subtitle, "Plant", gain_title],
     )
     return figure(
-        panels=[(heat + labels).properties(width=CONTENT_WIDTH_PX - 220, height=380)],
+        panels=[(heat + labels).properties(width=CONTENT_WIDTH_PX - 163, height=380)],
         number=10,
         title=title,
         subtitle=subtitle,
@@ -1400,7 +1401,7 @@ def monthly_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
                 legend=alt.Legend(title="Arm minus B0"),
             ),
         )
-        .properties(width=CONTENT_WIDTH_PX - 100, height=220)
+        .properties(width=CONTENT_WIDTH_PX - 57, height=220)
     )
     title = "Month by month, the paired difference from B0 at the day-ahead lead"
     subtitle = [
@@ -1449,10 +1450,12 @@ def scope_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
                 scale=alt.Scale(
                     domain=["per-plant", "global"], range=[ocf.DATA_BLUE, ocf.DATA_PURPLE]
                 ),
-                legend=alt.Legend(title="One model per plant, or one global model"),
+                legend=alt.Legend(
+                    title="One model per plant, or one global model", titleLimit=0, labelLimit=0
+                ),
             ),
         )
-        .properties(width=CONTENT_WIDTH_PX - 120, height=120)
+        .properties(width=CONTENT_WIDTH_PX - 57, height=120)
     )
     wide = scopes.pivot(on="scope", index="arm", values="error")
     claim(
@@ -1503,7 +1506,13 @@ def fingerprint_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     )
     x_title = "Mean absolute error (% of capacity; smaller is better)"
     chart = _intervals_chart(
-        data=sweep, y="arm", x_title=x_title, colour="group", shape="group", legend_title="Training"
+        data=sweep,
+        y="arm",
+        x_title=x_title,
+        colour="group",
+        shape="group",
+        legend_title="Training",
+        width_offset=181,
     )
     errors = {row["arm"]: float(row["difference"]) for row in sweep.iter_rows(named=True)}
     seen_gain = errors["G-B0"] - errors["G-FP"]
@@ -1559,7 +1568,7 @@ def importance_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | N
         .mark_rect()
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("label:N", title="Arm"),
-            y=alt.Y("group:N", title=None),
+            y=alt.Y("group:N", title=None, axis=alt.Axis(labelLimit=0)),
             color=alt.Color(
                 "share:Q", title="Mean share of split gain", scale=alt.Scale(scheme="blues")
             ),
@@ -1594,7 +1603,7 @@ def importance_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | N
         lines=[title, *subtitle, "Arm", "Mean share of split gain"],
     )
     return figure(
-        panels=[(heat + labels).properties(width=CONTENT_WIDTH_PX - 220, height=300)],
+        panels=[(heat + labels).properties(width=CONTENT_WIDTH_PX - 217, height=300)],
         number=14,
         title=title,
         subtitle=subtitle,
@@ -1658,7 +1667,7 @@ def followup_controls_figure(*, tables: Path, text: FigureText) -> alt.VConcatCh
                 domain=["Wholly below zero", "Includes zero"],
                 range=[1.0, 0.3],
             ),
-            legend=alt.Legend(title="Arm's 99% interval for its gain over B0"),
+            legend=alt.Legend(title="Arm's 99% interval", titleLimit=0, labelLimit=0),
         ),
     )
     rules = (
@@ -1703,11 +1712,11 @@ def followup_controls_figure(*, tables: Path, text: FigureText) -> alt.VConcatCh
             x_title,
             "Control (planted-loss test): Month-level, Plant steps",
             "Shift (planted loss): 5%, 10%",
-            "Arm's 99% interval for its gain over B0: wholly below zero, includes zero",
+            "Arm's 99% interval: wholly below zero, includes zero",
         ],
     )
     return figure(
-        panels=[(rules + dots).properties(width=CONTENT_WIDTH_PX - 120, height=240)],
+        panels=[(rules + dots).properties(width=CONTENT_WIDTH_PX - 42, height=240)],
         number="A",
         title=title,
         subtitle=subtitle,
@@ -1777,7 +1786,7 @@ def followup_long_leads_figure(*, tables: Path, text: FigureText) -> alt.VConcat
         zero = (
             alt.Chart(pl.DataFrame({"y": [0.0]})).mark_rule(color=ocf.BLACK_1).encode(y="y:Q")  # ty: ignore[unresolved-attribute]
         )
-        return (zero + lines + bars).properties(width=CONTENT_WIDTH_PX - 120, height=200)
+        return (zero + lines + bars).properties(width=CONTENT_WIDTH_PX - 58, height=200)
 
     by_lead_diff = {(row["lead_day"], row["arm"]): row for row in leads.iter_rows(named=True)}
     for lead in (7, 10, 14):
@@ -1885,7 +1894,7 @@ def followup_unselected_figure(*, tables: Path, text: FigureText) -> alt.VConcat
         y=y, yOffset=y_offset, x="difference:Q", color=colour, shape=shape
     )
     zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color=ocf.BLACK_1).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
-    chart = (zero + lines + dots).properties(width=CONTENT_WIDTH_PX - 260, height=44 * len(order))
+    chart = (zero + lines + dots).properties(width=CONTENT_WIDTH_PX - 176, height=44 * len(order))
     overall = rows.filter(pl.col("era") == "2025-10 onwards (8 months)").sort("difference")
     top_three = set(overall["arm"].head(3).to_list())
     claim(
@@ -1958,7 +1967,7 @@ def followup_hit_rate_figure(*, tables: Path, text: FigureText) -> alt.VConcatCh
                 legend=alt.Legend(title="B0 (no lag) or L1 (one lag)"),
             ),
         )
-        .properties(width=CONTENT_WIDTH_PX - 120, height=240)
+        .properties(width=CONTENT_WIDTH_PX - 53, height=240)
     )
     low, high = float(hits["level"].min()), float(hits["level"].max())  # ty: ignore[invalid-argument-type]
     claim(
