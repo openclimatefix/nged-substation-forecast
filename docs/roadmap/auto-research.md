@@ -106,8 +106,8 @@ grade-school-math accuracy from 77.0% to 85.0%.
 **Debate between agents bears on how agents here could critique each other's work.** Arithmetic and
 word-problem accuracy resemble the reasoning a session does when checking feature-engineering logic,
 so Du et al.'s result suggests that a second agent's critique can catch errors here, subject to the
-caution above about older LLMs. The proposed design adds that critique as an [optional
-review](#two-modes-of-work) before the screening harness scores an implementation.
+caution above about older LLMs. The proposed design adds that critique as a [review of every
+substantial change](#two-modes-of-work) before the screening harness scores the change.
 
 ### Google's ERA: a tree search over code variants
 
@@ -322,11 +322,18 @@ that would take two months to test: "What's the two day version of testing the s
 worker then builds the idea step by step, validates each step, and runs the smallest test that shows
 whether the idea is worth continuing before building the rest.
 
-**An optional, cheaper reviewer can read each diff before the harness scores it.** The reviewer is a
-fresh agent, given the written idea and the diff but not the worker's reasoning, so the worker's
-rationale cannot anchor the review. The reviewer checks that the diff implements the idea, that no
-feature uses data from after the forecast was made, and that the code has no plain bug. This review
-saves wasted screening runs. The mandatory reviews come later, on the finalists only, as [After a
+**The research lead decides which implementations need a review before the harness scores them, and
+every substantial change gets one.** A small diff, such as a new calendar feature or a changed
+XGBoost setting, goes straight to the harness. A substantial change, such as a new module, a new
+upstream data product, or a change to how the pipeline joins data or trains, always gets a review.
+The review exists so that a good idea is not abandoned because its one implementation was broken,
+since a broken implementation is one source of the variance between implementations that [Ning et
+al.](#one-implementation-is-weak-evidence-about-an-idea) measured. The review is not the defence
+against cheating. The reviewer is a fresh agent, given the written idea and the diff but not the
+worker's reasoning, so the worker's rationale cannot anchor the review. The reviewer checks that the
+diff implements the idea, that no feature uses data from after the forecast was made, and that the
+code has no plain bug. The reviewer's findings go back to the worker to fix before the harness
+scores the implementation. The mandatory reviews come later, on the finalists only, as [After a
 session](#after-a-session) describes.
 
 ### Several implementations of one idea
