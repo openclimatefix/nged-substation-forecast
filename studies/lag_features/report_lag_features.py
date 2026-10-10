@@ -47,13 +47,18 @@ from build_lag_frame import (
     LAG_FEATURES_DIR,
     POSITIVE_CONTROL_SHIFTS,
     RATIO_TEMPLATE,
+    SWEEP_ARMS,
     WEATHER_PRODUCTS,
     WeatherProduct,
     output_paths,
+    run_suffix,
+    scored_months,
+    shifted_months,
+    smoke_subsample,
     write_parquet_atomic,
 )
 from fit_lag_arms import INTERVAL_ARMS, METRIC, SCREENING_MONTHS, SHORTLIST_CANDIDATES
-from studies.baselines import climatology
+from studies.baselines import climatology, issue_time
 from studies.bootstrap import (
     MIN_MONTHS_FOR_INTERVAL,
     BootstrapInterval,
@@ -130,6 +135,13 @@ needs quantiles, is scored on CRPS in its own table."""
 
 R1_SHRINKAGE: Final[float] = 0.5
 """R1s moves the ratio this share of the way from 1 to its value."""
+
+PROBE_DAYS: Final[int] = 10
+PROBE_ROWS_PER_DAY: Final[int] = 20
+PROBE_SEED: Final[int] = 1138
+PROBE_RELATIVE_TOLERANCE: Final[float] = 1e-9
+"""The anchor probes rebuild 20 rows on each of 10 seeded target days (about 200 rows) and compare
+at a tight relative tolerance."""
 
 R5_WINDOW_DAYS: Final[int] = 30
 R5_MIN_EVENTS: Final[int] = 10
@@ -312,7 +324,7 @@ def planned_lines(*, losses: pl.DataFrame, chosen: str) -> tuple[list[str], pl.D
         "|---|---|---|---|---|---|---|",
     ]
     records = []
-    notes = []
+    warnings = []
     combined: dict[str, str] = {}
     for planned in planned_contrasts(chosen=chosen):
         verdicts = {}
@@ -362,7 +374,7 @@ def planned_lines(*, losses: pl.DataFrame, chosen: str) -> tuple[list[str], pl.D
                 f"{verdicts[setting]} |"
             )
             if interval["n_months"] < MIN_MONTHS_FOR_INTERVAL:
-                notes.append(
+                warnings.append(
                     f"- {planned.name} at the {setting} setting rests on {interval['n_months']} "
                     f"months, fewer than the {MIN_MONTHS_FOR_INTERVAL} that count as evidence."
                 )
@@ -371,8 +383,7 @@ def planned_lines(*, losses: pl.DataFrame, chosen: str) -> tuple[list[str], pl.D
             combined[planned.name] = final
             lines.append(f"| **{planned.name} verdict, both settings** | | | | | | **{final}** |")
     table = pl.DataFrame(records)
-    notes += [
-        "",
+    combination = [
         "How the two settings' verdicts combine (the table lists every pair the rule handles):",
         "",
         "| Primary setting | Sensitivity setting | Combined |",
@@ -389,7 +400,14 @@ def planned_lines(*, losses: pl.DataFrame, chosen: str) -> tuple[list[str], pl.D
                 combined, default=None, return_dtype=pl.String
             )
         )
-    return [*lines, "", *dict.fromkeys(notes)], table
+    unique_warnings = list(dict.fromkeys(warnings))
+    return [
+        *lines,
+        "",
+        *([*unique_warnings, ""] if unique_warnings else []),
+        *combination,
+        "",
+    ], table
 
 
 # --- Reference arms -----------------------------------------------------------------------------
@@ -578,6 +596,97 @@ def _residual_events(
     )
 
 
+def _r5_quantiles(*, rows: pl.DataFrame, events: pl.DataFrame) -> np.ndarray:
+    """Return R5's residual quantiles for each row: its tercile's residuals over the last 30 days.
+
+    Args:
+        rows: Rows with `site`, `tercile` and `asof` (the latest whole day before the issue).
+        events: `_residual_events`' result.
+
+    Returns:
+        An array of shape (rows, levels), NaN where fewer than `R5_MIN_EVENTS` residuals exist.
+    """
+    quantiles = np.full((rows.height, len(QUANTILE_LEVELS)), np.nan)
+    starts = rows["asof"].to_numpy()
+    for (site, tercile), group in events.group_by("site", "tercile"):
+        ordered = group.sort("date")
+        dates = ordered["date"].to_numpy()
+        values = ordered["residual"].to_numpy()
+        mask = ((rows["site"] == site) & (rows["tercile"] == tercile)).to_numpy()
+        for index in np.flatnonzero(mask):
+            last = np.searchsorted(dates, starts[index], side="right")
+            first = np.searchsorted(
+                dates, starts[index] - np.timedelta64(R5_WINDOW_DAYS, "D"), side="right"
+            )
+            if last - first >= R5_MIN_EVENTS:
+                quantiles[index] = np.quantile(values[first:last], QUANTILE_LEVELS)
+    return quantiles
+
+
+def r5_anchor_probe(
+    *, frame: pl.DataFrame, hours: pl.DataFrame, predictions: pl.DataFrame
+) -> list[str]:
+    """Rebuild R5's residual quantiles for sampled rows from stage-1 inputs cut at the issue time.
+
+    The terciles' boundaries are a statistic of every hour with a stage-1 input and are held fixed.
+
+    Args:
+        frame: The lead-day 1 frame, with `fold`, `nwp_ghi` and `clear_sky_w_m2`.
+        hours: The stage-1 hours.
+        predictions: The stage-1 predictions.
+
+    Returns:
+        A report line giving the rows compared.
+
+    Raises:
+        ValueError: If a quantile changes when every hour after the issue time is removed.
+    """
+    cuts = _forecast_index_cuts(hours=hours)
+    keyed = frame.select(
+        "site",
+        "time",
+        "fold",
+        tercile=_tercile(index=pl.col("nwp_ghi") / pl.col("clear_sky_w_m2"), cuts=cuts),
+        asof=(pl.col("time") - pl.duration(minutes=30)).dt.date()
+        - pl.duration(days=FULL_SWEEP_LEAD_DAY + 1),
+        issue=issue_time(
+            day_start=(pl.col("time") - pl.duration(minutes=30)).dt.truncate("1d"),
+            day=FULL_SWEEP_LEAD_DAY,
+        ),
+    )
+    issues = keyed["issue"].unique().sort().sample(n=PROBE_DAYS, seed=PROBE_SEED)
+    compared = 0
+    for issue in issues:
+        day_rows = keyed.filter(pl.col("issue") == issue)
+        sample = day_rows.sample(n=min(PROBE_ROWS_PER_DAY, day_rows.height), seed=PROBE_SEED)
+        for fold in sample["fold"].unique().to_list():
+            rows = sample.filter(pl.col("fold") == fold)
+            full = _r5_quantiles(
+                rows=rows,
+                events=_residual_events(hours=hours, predictions=predictions, fold=fold, cuts=cuts),
+            )
+            cut = _r5_quantiles(
+                rows=rows,
+                events=_residual_events(
+                    hours=hours.filter(pl.col("time") <= issue),
+                    predictions=predictions.filter(pl.col("time") <= issue),
+                    fold=fold,
+                    cuts=cuts,
+                ),
+            )
+            if not np.allclose(full, cut, rtol=PROBE_RELATIVE_TOLERANCE, atol=0, equal_nan=True):
+                msg = f"R5's quantiles change when stage-1 inputs after {issue} are removed"
+                raise ValueError(msg)
+            compared += rows.height
+    return [
+        (
+            f"- R5 anchor probe: {compared} seeded random rows on {PROBE_DAYS} target days; the "
+            "residual quantiles equal the full build when every stage-1 hour after the issue "
+            "time is removed, nulls included."
+        )
+    ]
+
+
 def r5_losses(
     *, frame: pl.DataFrame, hours: pl.DataFrame, predictions: pl.DataFrame, losses: pl.DataFrame
 ) -> pl.DataFrame:
@@ -617,20 +726,7 @@ def r5_losses(
     for fold in range(N_FOLDS):
         events = _residual_events(hours=hours, predictions=predictions, fold=fold, cuts=cuts)
         rows = keyed.filter(pl.col("fold") == fold)
-        quantiles = np.full((rows.height, len(QUANTILE_LEVELS)), np.nan)
-        starts = rows["asof"].to_numpy()
-        for (site, tercile), group in events.group_by("site", "tercile"):
-            ordered = group.sort("date")
-            dates = ordered["date"].to_numpy()
-            values = ordered["residual"].to_numpy()
-            mask = ((rows["site"] == site) & (rows["tercile"] == tercile)).to_numpy()
-            for index in np.flatnonzero(mask):
-                last = np.searchsorted(dates, starts[index], side="right")
-                first = np.searchsorted(
-                    dates, starts[index] - np.timedelta64(R5_WINDOW_DAYS, "D"), side="right"
-                )
-                if last - first >= R5_MIN_EVENTS:
-                    quantiles[index] = np.quantile(values[first:last], QUANTILE_LEVELS)
+        quantiles = _r5_quantiles(rows=rows, events=events)
         usable = ~np.isnan(quantiles[:, 0])
         parts.append(
             rows.with_columns(
@@ -677,7 +773,7 @@ def phase1_lines(
         losses=losses,
         scope=f"lead{FULL_SWEEP_LEAD_DAY}",
         setting="primary",
-        arms=tuple(losses["arm"].unique().to_list()),
+        arms=SWEEP_ARMS,
         months="screening",
     )
     both = pl.concat(
@@ -801,8 +897,27 @@ def exploratory_lines(*, losses: pl.DataFrame, chosen: str) -> tuple[list[str], 
     return [*lines, ""], pl.DataFrame(records)
 
 
+def read_frame(*, path: Path, smoke: bool) -> pl.DataFrame:
+    """Read a built frame, subsampled as a smoke run subsamples it.
+
+    Args:
+        path: The frame's parquet file.
+        smoke: Whether the run being reported is a smoke run.
+
+    Returns:
+        The frame.
+    """
+    frame = pl.read_parquet(path)
+    return smoke_subsample(frame=frame) if smoke else frame
+
+
 def longer_lead_table(
-    *, losses: pl.DataFrame, root: Path, product: WeatherProduct, lead_days: tuple[int, ...]
+    *,
+    losses: pl.DataFrame,
+    root: Path,
+    product: WeatherProduct,
+    lead_days: tuple[int, ...],
+    smoke: bool,
 ) -> tuple[list[str], pl.DataFrame]:
     """Tabulate each arm's error and gain over B0 at every lead-day, with the no-fit references.
 
@@ -811,6 +926,7 @@ def longer_lead_table(
         root: The output root.
         product: The weather product.
         lead_days: The lead-days.
+        smoke: Whether the run being reported is a smoke run.
 
     Returns:
         The report lines, and a table with one row per (lead-day, arm).
@@ -819,7 +935,7 @@ def longer_lead_table(
     for lead in lead_days:
         scope = f"lead{lead}"
         path = output_paths(root=root, product=product, lead_days=(lead,))[f"day{lead}"]
-        frame = pl.read_parquet(path)
+        frame = read_frame(path=path, smoke=smoke)
         fitted = subset(
             losses=losses,
             scope=scope,
@@ -923,6 +1039,18 @@ def control_lines(*, losses: pl.DataFrame) -> tuple[list[str], pl.DataFrame]:
             f"{'yes' if verdict == 'helps' else verdict} |"
         )
     table = pl.DataFrame(records)
+    shifted = shifted_months()
+    scored = scored_months()
+    screening = [m for m in scored if m in SCREENING_MONTHS]
+    lines += [
+        "",
+        (
+            f"The control shifts {len(shifted & set(scored))} of the {len(scored)} scored months: "
+            f"{len(shifted & set(screening))} of the {len(screening)} screening months and "
+            f"{len(shifted & set(scored)) - len(shifted & set(screening))} of the "
+            f"{len(scored) - len(screening)} later months."
+        ),
+    ]
     if not table.is_empty() and table["recovers"].any():
         smallest = table.filter(pl.col("recovers"))["shift"].min()
         lines += ["", f"The smallest shift L1 recovers, the detection limit, is {smallest:.0%}."]
@@ -1205,7 +1333,7 @@ def by_plant_lines(*, losses: pl.DataFrame) -> tuple[list[str], pl.DataFrame]:
         losses=losses,
         scope=f"lead{FULL_SWEEP_LEAD_DAY}",
         setting="primary",
-        arms=tuple(losses["arm"].unique().to_list()),
+        arms=SWEEP_ARMS,
     )
     table = scoped.group_by("arm", "site").agg(error=pl.col(METRIC).mean()).sort("arm", "site")
     lines = ["| Arm (exploratory) | Plant | Mean absolute error (pp) |", "|---|---|---|"]
@@ -1325,7 +1453,7 @@ def _save_table(*, frame: pl.DataFrame, tables: Path, name: str) -> None:
 
 
 def ens_mean_sections(
-    *, root: Path, product: WeatherProduct, tables: Path, losses: pl.DataFrame
+    *, root: Path, product: WeatherProduct, tables: Path, losses: pl.DataFrame, smoke: bool
 ) -> list[str]:
     """Build the sections that exist only for the ENS-mean run: phase 1, phase 2 and the rest.
 
@@ -1334,6 +1462,7 @@ def ens_mean_sections(
         product: The weather product (`ens_mean`).
         tables: The directory to write the tables into.
         losses: The combined losses.
+        smoke: Whether the run being reported is a smoke run.
 
     Returns:
         The sections' markdown lines.
@@ -1344,12 +1473,13 @@ def ens_mean_sections(
     def save(frame: pl.DataFrame, name: str) -> None:
         _save_table(frame=frame, tables=tables, name=name)
 
-    checkpoints = directory / "checkpoints"
+    checkpoints = directory / f"checkpoints{run_suffix(smoke=smoke)}"
     chosen = json.loads((checkpoints / "shortlist.json").read_text())["x"]
-    frame = pl.read_parquet(
-        output_paths(root=root, product=product, lead_days=(FULL_SWEEP_LEAD_DAY,))[
+    frame = read_frame(
+        path=output_paths(root=root, product=product, lead_days=(FULL_SWEEP_LEAD_DAY,))[
             f"day{FULL_SWEEP_LEAD_DAY}"
-        ]
+        ],
+        smoke=smoke,
     )
     derived = pl.read_parquet(checkpoints / "stage1_columns.parquet")
     frame = frame.join(derived, on=["site", "time"], how="left", maintain_order="left")
@@ -1360,6 +1490,9 @@ def ens_mean_sections(
     save(planned_table, "planned")
     explore, explore_table = exploratory_lines(losses=losses, chosen=chosen)
     save(explore_table, "exploratory")
+    probe_file = checkpoints / "stage1_probe.md"
+    if probe_file.exists():
+        lines += ["## Stage-1 anchor probe", "", probe_file.read_text()]
     lines += ["## Phase 1: the sweep, screening months 2024-12 to 2025-09", "", *phase1]
     lines += ["", "## Phase 2: the five planned contrasts", "", *planned]
     lines += ["## Exploratory contrasts at lead-day 1", "", *explore]
@@ -1378,13 +1511,19 @@ def ens_mean_sections(
             title=f"Global, {setting} setting (exploratory)",
         )
     lines += ens_mean_descriptive_sections(
-        root=root, product=product, tables=tables, losses=losses, chosen=chosen
+        root=root, product=product, tables=tables, losses=losses, chosen=chosen, smoke=smoke
     )
     return lines
 
 
 def ens_mean_descriptive_sections(
-    *, root: Path, product: WeatherProduct, tables: Path, losses: pl.DataFrame, chosen: str
+    *,
+    root: Path,
+    product: WeatherProduct,
+    tables: Path,
+    losses: pl.DataFrame,
+    chosen: str,
+    smoke: bool,
 ) -> list[str]:
     """Build the descriptive and post-model sections of the ENS-mean run.
 
@@ -1394,17 +1533,19 @@ def ens_mean_descriptive_sections(
         tables: The directory to write the tables into.
         losses: The combined losses.
         chosen: The shortlist rule's arm.
+        smoke: Whether the run being reported is a smoke run.
 
     Returns:
         The sections' markdown lines.
     """
     directory = root / product
     paths = output_paths(root=root, product=product, lead_days=())
-    checkpoints = directory / "checkpoints"
-    frame = pl.read_parquet(
-        output_paths(root=root, product=product, lead_days=(FULL_SWEEP_LEAD_DAY,))[
+    checkpoints = directory / f"checkpoints{run_suffix(smoke=smoke)}"
+    frame = read_frame(
+        path=output_paths(root=root, product=product, lead_days=(FULL_SWEEP_LEAD_DAY,))[
             f"day{FULL_SWEEP_LEAD_DAY}"
-        ]
+        ],
+        smoke=smoke,
     )
     lines: list[str] = []
 
@@ -1432,7 +1573,11 @@ def ens_mean_descriptive_sections(
     hours = pl.read_parquet(paths["stage1"])
     stage1 = pl.read_parquet(checkpoints / "stage1_predictions.parquet")
     r5 = r5_losses(frame=frame, hours=hours, predictions=stage1, losses=losses)
-    r5_text = r5_lines(r5=r5)
+    r5_text = [
+        *r5_lines(r5=r5),
+        *r5_anchor_probe(frame=frame, hours=hours, predictions=stage1),
+        "",
+    ]
     r4_text, r4_table = r4_lines(directory=checkpoints)
     save(r4_table, "r4")
     r5_table = pl.DataFrame(
@@ -1456,29 +1601,32 @@ def ens_mean_descriptive_sections(
     return lines
 
 
-def report_text(*, root: Path, product: WeatherProduct, tables: Path) -> str:
+def report_text(*, root: Path, product: WeatherProduct, tables: Path, smoke: bool) -> str:
     """Build the whole report and save the tables the charts read.
 
     Args:
         root: The output root.
         product: The weather product.
         tables: The directory to write the tables into.
+        smoke: Whether to report a smoke run, whose files carry a `_smoke` suffix.
 
     Returns:
         The report's markdown.
     """
     directory = root / product
-    losses = pl.read_parquet(directory / f"losses_{product}.parquet")
+    losses = pl.read_parquet(directory / f"losses_{product}{run_suffix(smoke=smoke)}.parquet")
     paths = output_paths(root=root, product=product, lead_days=())
     lines = [f"# Lag features: report for the weather product `{product}`", ""]
     lines += ["## Build report", "", paths["report"].read_text()]
     if product == "ens_mean":
-        lines += ens_mean_sections(root=root, product=product, tables=tables, losses=losses)
+        lines += ens_mean_sections(
+            root=root, product=product, tables=tables, losses=losses, smoke=smoke
+        )
         lead_days = ENS_MEAN_LEAD_DAYS
     else:
         lead_days = IFS_LEAD_DAYS
     longer, longer_table = longer_lead_table(
-        losses=losses, root=root, product=product, lead_days=lead_days
+        losses=losses, root=root, product=product, lead_days=lead_days, smoke=smoke
     )
     _save_table(frame=longer_table, tables=tables, name="by_lead")
     lines += ["## Error and gain over B0 by lead-day (exploratory)", "", *longer]
@@ -1490,17 +1638,21 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--weather-product", choices=WEATHER_PRODUCTS, default="ens_mean")
     parser.add_argument("--output-root", type=Path, default=LAG_FEATURES_DIR)
+    parser.add_argument("--smoke", action="store_true", help="Report a `--smoke` fit's output.")
     arguments = parser.parse_args()
     product: WeatherProduct = arguments.weather_product
+    suffix = run_suffix(smoke=arguments.smoke)
     directory = arguments.output_root / product
-    path = directory / f"report_{product}.md"
-    final_tables = directory / f"tables_{product}"
+    path = directory / f"report_{product}{suffix}.md"
+    final_tables = directory / f"tables_{product}{suffix}"
     refuse_to_overwrite(paths=[path, final_tables])
-    partial_tables = directory / f"tables_{product}.partial"
+    partial_tables = directory / f"tables_{product}{suffix}.partial"
     if partial_tables.exists():
         shutil.rmtree(partial_tables)
     partial_tables.mkdir()
-    text = report_text(root=arguments.output_root, product=product, tables=partial_tables)
+    text = report_text(
+        root=arguments.output_root, product=product, tables=partial_tables, smoke=arguments.smoke
+    )
     partial_tables.rename(final_tables)
     partial = path.with_name(path.name + ".partial")
     partial.write_text(text)

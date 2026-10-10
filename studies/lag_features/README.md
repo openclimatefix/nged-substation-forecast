@@ -43,7 +43,11 @@ boosting rounds, writes `checkpoints_smoke/` and `losses_<product>_smoke.parquet
 
 - **The lag source** is NGED's hourly power with the multi-day zero runs, meter spikes, commissioning
   ramp and export-capped hours removed. The target is the shared rows' `power_mw`.
-- **Nothing at or after `final_test_start` (2026-07-01) reaches a fit.** `studies.power.scan_power`
+- **Only the reproduction check reads rows at or after `final_test_start` (2026-07-01).** It refits
+  the ENS-mean B0 on all 35,263 shared rows, including the 5,144 from that date, because the
+  published number includes them; B0 reads no power. The CPU leg must give 8.766% and the saved CPU
+  losses' per-row loss checksum, and the GPU leg is reported against the published 8.771% without
+  an assertion. **Nothing else at or after the date reaches a fit.** `studies.power.scan_power`
   stops there, the builder drops the shared rows and the stage-1 hours from that date, and the
   build and fit scripts assert that no training row is at or after it. The study has 18 usable
   months.
@@ -72,7 +76,7 @@ boosting rounds, writes `checkpoints_smoke/` and `losses_<product>_smoke.parquet
   prediction.
 - **N2** draws 16 independent same-clock-hour lags from months outside the row's fold; N2-k reads the
   first `k` of them. A month in no fold is allowed.
-- **The sweep arms with `{fold}` columns** are the two-step arms S2 and S3 only; stage 1 uses the
+- **The arms with `{fold}` columns** are S2, S3 and KS; stage 1 uses the
   primary setting and seed 0.
 - **Positive control**: power is scaled by one minus the shift in a seeded random half of the
   calendar months (2019-09 to 2026-06), so no tree can learn the shift from the date. The library
@@ -94,8 +98,11 @@ boosting rounds, writes `checkpoints_smoke/` and `losses_<product>_smoke.parquet
 - `lag_frame_<product>_day<N>.parquet`: one lead-day's rows, with `fold`, the target, capacity, B0's
   columns and every arm's columns (`{fold}` columns are added by the fit script).
 - `stage1_hours_<product>.parquet`: every daylight hour the stage-1 models predict.
-- `positive_control_<product>_s<percent>.parquet`: the frames with power scaled after 2025-06-01.
+- `positive_control_<product>_s<percent>.parquet`: the frames with power scaled by one minus the
+  shift in 9 of the 18 scored months and a random half of the other months.
 - `losses_<product>.parquet`: per-row losses of every fit, with `actual` and `prediction` in the
   target's units (fractions of capacity in the `global` and `lopo` scopes).
 - `checkpoints/`: one file per (scope, setting, arm), the stage-1 columns and predictions, the
-  shortlist rule's X, and the saved 10% and 90% quantile predictions.
+  shortlist rule's X, the nine saved quantiles of B0 and L1, the importance refit's gain shares, the
+  stage-1 anchor probe's result, and `run_manifest.json` (the device, the mode and a SHA-256 of
+  every built frame, checked on a resume).

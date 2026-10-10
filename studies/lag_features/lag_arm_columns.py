@@ -50,6 +50,11 @@ SATELLITE_POWER_DAYS: Final[int] = 7
 SATELLITE_POWER_MIN_DAYS: Final[int] = 4
 """PC's power-to-satellite window, and the fewest of its days that must hold the hour."""
 
+CAMS_AVAILABLE_THROUGH_DAYS_BEFORE_ISSUE: Final[int] = 3
+"""The assumption the leak probe tests PC against, stated apart from `SATELLITE_LAG_DAYS`: at an
+issue on day `I`, CAMS irradiance is available for whole days up to day `I - 3` and no later
+(published two days late, and the publication hour may fall after the 09:00 issue)."""
+
 ANALOGUE_DAYS: Final[int] = 30
 ANALOGUE_COUNT: Final[int] = 5
 ANALOGUE_MIN: Final[int] = 3

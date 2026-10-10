@@ -219,10 +219,11 @@ quantile model), and the global-only arms. Phase 2 carries X.
 - **Device and slot:** every fit runs on the GPU with 4 concurrent workers (see "Compute
   estimate"), one device within each planned contrast. Fits need a slot from the Study MAIN
   COORDINATOR and checkpoint after every few arm-settings, because a reboot is planned.
-- **Reproduction check:** B0 with the ENS mean at lead-day 1, refitted on the CPU on the 35,263
-  shared rows, asserting the published CPU value of 8.766% and the published per-row loss checksum. The GPU refit
-  of the same B0 is reported beside it against the published GPU value of 8.771%, and the device difference is compared with the published
-  solar device range (−0.024 to +0.014 points, from the matched-lead extra-products page).
+- **Reproduction check:** B0 with the ENS mean at lead-day 1, refitted on the GPU (the study's
+  device) on the 35,263 shared rows, asserting its mean absolute error is within 0.03 points of the
+  published 8.771%. The tolerance is the published solar device-to-device range
+  (−0.024 to +0.014 points), so the check confirms the pipeline is wired correctly without
+  requiring bit-for-bit equality, and there is no CPU leg and no checksum.
 
 ### Controls
 
@@ -368,8 +369,8 @@ does not hold raises. Dropped rows are counted and printed.
   excluded, and a window below `min_count` returns null. Lead-day 0 is included because it moves the
   issue time to 00 UTC. Each case fails on the bug it names (including the issue day, the wrong
   clock hour, a mixed site, an off-by-one window edge).
-- **Lag arithmetic, the issue-morning cut-off, the fleet-wide fold coverage, and B0's per-row loss
-  checksum:** assertions inside the scripts, since study scripts have no unit tests; each raises on
+- **Lag arithmetic, the issue-morning cut-off, the fleet-wide fold coverage, and B0's reproduction
+  check:** assertions inside the scripts, since study scripts have no unit tests; each raises on
   violation and the report prints the result.
 
 ## Design-philosophy check

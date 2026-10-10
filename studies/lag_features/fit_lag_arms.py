@@ -32,10 +32,12 @@ overwrite it.
 fit at once, each on `THREADS_PER_FIT` cores. A run writes `checkpoints/run_manifest.json` with its
 device, and a resume on another device raises, because one device must serve each planned contrast.
 
-**Smoke test.** `--smoke` fits B0 and S2, one global model, one leave-one-plant-out model, the
-interval model and the importance refit on 150 rows per plant from folds 0 and 1, with 20 boosting
-rounds, to check the plumbing. It writes `checkpoints_smoke/` and `losses_<product>_smoke.parquet`,
-and is not a result.
+**Smoke test.** `--smoke` runs the real path (the sweep with batching, the shortlist, phase 2, the
+controls, the longer leads, the intervals, the importance refit and the global and
+leave-one-plant-out fits) on 20 seeded random rows of each plant's month, with 20 boosting rounds,
+to check the plumbing in a few minutes. It writes `checkpoints_smoke/` and
+`losses_<product>_smoke.parquet`, and is not a result. `report_lag_features.py --smoke` and
+`lag_features_charts.py --smoke` read its output.
 
 Run it with `uv run python studies/lag_features/fit_lag_arms.py`.
 """
@@ -80,13 +82,15 @@ from build_lag_frame import (
     extra_columns_of,
     final_test_cutoff,
     output_paths,
+    run_suffix,
     shared_rows,
+    smoke_subsample,
     target_date,
     weather_table,
     write_parquet_atomic,
 )
 from studies.arm_runner import Job, run_all
-from studies.baselines import same_clock_hour_window
+from studies.baselines import issue_time, same_clock_hour_window
 from studies.cross_validation import (
     N_FOLDS,
     PRIMARY_HYPER_PARAMETERS,
@@ -144,9 +148,13 @@ usable."""
 WIDE_X_COLUMNS: Final[int] = 3
 """If X adds more columns than this, N2-k is fitted with as many random lags as X adds."""
 
-REPRODUCTION_MAE_PERCENT: Final[float] = 8.771
-"""The published mean absolute error of the ENS-mean B0 at lead-day 1 on the 35,263 shared rows, in
-percentage points of capacity."""
+REPRODUCTION_CPU_MAE_PERCENT: Final[float] = 8.766
+"""The mean absolute error of the matched-lead study's saved CPU losses for the ENS-mean B0 at
+lead-day 1 on the 35,263 shared rows, in percentage points of capacity."""
+
+REPRODUCTION_GPU_MAE_PERCENT: Final[float] = 8.771
+"""The published GPU refit's mean absolute error for the same arm. The check reports a GPU leg's
+difference from it and does not assert it, because a GPU fit is not bit-identical."""
 
 REPRODUCTION_TOLERANCE_PERCENT: Final[float] = 0.0005
 """How far a refit's mean may differ from the published figure, which is quoted to 3 decimals."""
@@ -194,12 +202,6 @@ RATIO_WINDOW: Final[tuple[int, int]] = (7, 5)
 
 SMOKE_ROUNDS: Final[int] = 20
 """The boosting rounds a smoke test uses in place of the settings' own."""
-
-SMOKE_ROWS_PER_FOLD: Final[int] = 150
-"""The rows per plant and fold a smoke test keeps."""
-
-SMOKE_ARMS: Final[tuple[str, ...]] = ("B0", "S2")
-"""The arms a smoke test fits; S2 exercises the `{fold}` columns and the quantile path."""
 
 
 class Context(NamedTuple):
@@ -310,9 +312,11 @@ def _daily_residual_features(*, residual: pl.DataFrame) -> pl.DataFrame:
         residual.group_by("site", "date")
         .agg(
             n_hours=pl.len(),
-            resid=(pl.col("observed_mw") - pl.col("predicted_mw")).mean(),
-            observed_energy=pl.col("observed_mw").sum(),
-            predicted_energy=pl.col("predicted_mw").sum(),
+            resid=(
+                pl.col("observed_mw").cast(pl.Float64) - pl.col("predicted_mw").cast(pl.Float64)
+            ).mean(),
+            observed_energy=pl.col("observed_mw").cast(pl.Float64).sum(),
+            predicted_energy=pl.col("predicted_mw").cast(pl.Float64).sum(),
         )
         .with_columns(
             resid=pl.when(pl.col("n_hours") >= MIN_RESIDUAL_HOURS).then(pl.col("resid")),
@@ -324,9 +328,11 @@ def _daily_residual_features(*, residual: pl.DataFrame) -> pl.DataFrame:
             ),
         )
     )
+    last = daily["date"].max()
     grid = (
         daily.group_by("site")
-        .agg(date=pl.date_ranges(pl.col("date").min(), pl.col("date").max(), interval="1d"))
+        .agg(first=pl.col("date").min())
+        .select("site", date=pl.date_ranges(pl.col("first"), pl.lit(last), interval="1d"))
         .explode("date")
     )
     full = grid.join(daily, on=["site", "date"], how="left").sort("site", "date")
@@ -423,6 +429,88 @@ def stage1_columns(
         }
         out = out.with_columns(**derived)
     return out
+
+
+STAGE1_PROBE_DAYS: Final[int] = 10
+STAGE1_PROBE_ROWS_PER_DAY: Final[int] = 20
+STAGE1_PROBE_SEED: Final[int] = 1138
+STAGE1_PROBE_RELATIVE_TOLERANCE: Final[float] = 1e-9
+"""The stage-1 anchor probe rebuilds 20 rows on each of 10 seeded target days (about 200 rows)."""
+
+
+def stage1_anchor_probe(
+    *,
+    frame: pl.DataFrame,
+    hours: pl.DataFrame,
+    predictions: pl.DataFrame,
+    derived: pl.DataFrame,
+) -> list[str]:
+    """Rebuild sampled rows' stage-1 columns from inputs cut at the issue time, and compare.
+
+    The columns checked are S2's lag prediction and residual, S3's residual means, and the ratios
+    R1s and R2 read. The prediction at the target hour itself is not checked, because the forecast
+    of the target hour is available at the issue time by design.
+
+    Args:
+        frame: The lead-day 1 frame, with `lag_d1`.
+        hours: The stage-1 hours.
+        predictions: The stage-1 predictions.
+        derived: `stage1_columns`' result for every row of `frame`.
+
+    Returns:
+        A report line giving the rows and columns compared.
+
+    Raises:
+        ValueError: If a column changes when every hour after the issue time is removed.
+    """
+    keyed = frame.select(
+        "site",
+        "time",
+        "lag_d1",
+        issue=issue_time(
+            day_start=(pl.col("time") - pl.duration(minutes=30)).dt.truncate("1d"),
+            day=FULL_SWEEP_LEAD_DAY,
+        ),
+    )
+    columns = [c for c in derived.columns if c not in {"site", "time"} and "stage1_target" not in c]
+    issues = keyed["issue"].unique().sort().sample(n=STAGE1_PROBE_DAYS, seed=STAGE1_PROBE_SEED)
+    compared = 0
+    for issue in issues:
+        day_rows = keyed.filter(pl.col("issue") == issue)
+        sample = day_rows.sample(
+            n=min(STAGE1_PROBE_ROWS_PER_DAY, day_rows.height), seed=STAGE1_PROBE_SEED
+        ).sort("site", "time")
+        rebuilt = stage1_columns(
+            frame=sample,
+            hours=hours.filter(pl.col("time") <= issue),
+            predictions=predictions.filter(pl.col("time") <= issue),
+        )
+        full = sample.select("site", "time").join(derived, on=["site", "time"], how="left")
+        for column in columns:
+            both = full.select("site", "time", full=pl.col(column)).join(
+                rebuilt.select("site", "time", cut=pl.col(column)), on=["site", "time"]
+            )
+            different = both.filter(
+                (pl.col("full").is_null() != pl.col("cut").is_null())
+                | (
+                    (pl.col("full") - pl.col("cut")).abs()
+                    > STAGE1_PROBE_RELATIVE_TOLERANCE * (1 + pl.col("full").abs())
+                )
+            ).height
+            if different:
+                msg = (
+                    f"{column} changes on {different} rows when every stage-1 hour after {issue} "
+                    "is removed, so it reads the future"
+                )
+                raise ValueError(msg)
+        compared += sample.height
+    return [
+        (
+            f"- stage-1 anchor probe: {compared} seeded random rows on {STAGE1_PROBE_DAYS} target "
+            f"days; all {len(columns)} stage-1 columns equal the full build when every stage-1 "
+            "hour after the issue time is removed, nulls included."
+        )
+    ]
 
 
 # --- Fitting and checkpoints -----------------------------------------------------------------
@@ -1008,10 +1096,8 @@ def sweep_fits(*, context: Context) -> list[Fit]:
         context: The run's context.
 
     Returns:
-        The fits. B0, L1 and N2 carry their quantile models (S2 in a smoke test).
+        The fits. B0, L1 and N2 carry their quantile models.
     """
-    quantile_arms = ("S2",) if context.smoke else SWEEP_QUANTILE_ARMS
-    arms = SMOKE_ARMS if context.smoke else SWEEP_ARMS
     fits = [
         Fit(
             "lead1",
@@ -1019,9 +1105,9 @@ def sweep_fits(*, context: Context) -> list[Fit]:
             FULL_SWEEP_LEAD_DAY,
             arm,
             "primary",
-            arm in quantile_arms,
+            arm in SWEEP_QUANTILE_ARMS,
         )
-        for arm in arms
+        for arm in SWEEP_ARMS
     ]
     return sorted(fits, key=lambda fit: fit.quantiles)
 
@@ -1100,7 +1186,7 @@ def longer_lead_fits(*, lead_days: tuple[int, ...], arms: tuple[str, ...]) -> li
 
 
 def read_lead_frames(
-    *, root: Path, product: WeatherProduct, lead_days: tuple[int, ...]
+    *, root: Path, product: WeatherProduct, lead_days: tuple[int, ...], smoke: bool
 ) -> dict[str, pl.DataFrame]:
     """Read the built frame of each lead-day.
 
@@ -1108,12 +1194,14 @@ def read_lead_frames(
         root: The output root.
         product: The weather product.
         lead_days: The lead-days.
+        smoke: Whether to subsample each frame as a smoke run does.
 
     Returns:
         The frames, keyed `lead<N>`.
     """
     paths = output_paths(root=root, product=product, lead_days=lead_days)
-    return {f"lead{lead}": pl.read_parquet(paths[f"day{lead}"]) for lead in lead_days}
+    frames = {f"lead{lead}": pl.read_parquet(paths[f"day{lead}"]) for lead in lead_days}
+    return {key: smoke_subsample(frame=frame) if smoke else frame for key, frame in frames.items()}
 
 
 def lead1_dataset(*, context: Context, root: Path, product: WeatherProduct) -> pl.DataFrame:
@@ -1140,33 +1228,19 @@ def lead1_dataset(*, context: Context, root: Path, product: WeatherProduct) -> p
         write_parquet_atomic(
             frame=predictions, path=context.checkpoint_dir / "stage1_predictions.parquet"
         )
-        write_parquet_atomic(
-            frame=stage1_columns(frame=frame, hours=hours, predictions=predictions),
-            path=derived_path,
+        built = stage1_columns(frame=frame, hours=hours, predictions=predictions)
+        probe = stage1_anchor_probe(
+            frame=frame, hours=hours, predictions=predictions, derived=built
         )
+        (context.checkpoint_dir / "stage1_probe.md").write_text("\n".join(probe) + "\n")
+        write_parquet_atomic(frame=built, path=derived_path)
     dataset = frame.join(
         pl.read_parquet(derived_path), on=["site", "time"], how="left", maintain_order="left"
     )
+    if context.smoke:
+        dataset = smoke_subsample(frame=dataset)
     raise_on_uncovered_months(coverage=calendar_month_coverage(frame=dataset))
     return dataset
-
-
-def smoke_subsample(*, dataset: pl.DataFrame) -> pl.DataFrame:
-    """Keep `SMOKE_ROWS_PER_FOLD` rows per plant from each of folds 0 and 1.
-
-    Args:
-        dataset: The lead-day 1 frame.
-
-    Returns:
-        The site-sorted subsample.
-    """
-    return (
-        dataset.filter(pl.col("fold") < 2)
-        .sort("site", "fold", "time")
-        .group_by("site", "fold", maintain_order=True)
-        .head(SMOKE_ROWS_PER_FOLD)
-        .sort("site", "time")
-    )
 
 
 def run_ens_mean(*, context: Context, root: Path, product: WeatherProduct) -> list[pl.DataFrame]:
@@ -1181,20 +1255,6 @@ def run_ens_mean(*, context: Context, root: Path, product: WeatherProduct) -> li
         Every (scope, setting, arm) result, in the order fitted.
     """
     dataset = lead1_dataset(context=context, root=root, product=product)
-    if context.smoke:
-        frames = {"lead1": smoke_subsample(dataset=dataset), "global": pooled_frame(frame=dataset)}
-        lead = FULL_SWEEP_LEAD_DAY
-        smoke_global = [
-            Fit("global", "global", lead, "B0", "primary", False, True),
-            Fit("global", "global", lead, "G-FP", "primary", False, True),
-            Fit("global", "lopo", lead, "G-FP", "primary", False, lopo=True),
-        ]
-        for arm in ("B0", "S2"):
-            fit_intervals(context=context, dataset=frames["lead1"], arm=arm)
-            fit_importance(context=context, dataset=frames["lead1"], arm=arm)
-        return fit_all(
-            context=context, frames=frames, fits=sweep_fits(context=context) + smoke_global
-        )
     frames = {"lead1": dataset}
     results = fit_all(context=context, frames=frames, fits=sweep_fits(context=context))
     sweep = pl.concat(results, how="vertical_relaxed")
@@ -1207,12 +1267,15 @@ def run_ens_mean(*, context: Context, root: Path, product: WeatherProduct) -> li
         fit_intervals(context=context, dataset=dataset, arm=arm)
 
     other_leads = tuple(lead for lead in ENS_MEAN_LEAD_DAYS if lead != FULL_SWEEP_LEAD_DAY)
-    frames |= read_lead_frames(root=root, product=product, lead_days=other_leads)
+    frames |= read_lead_frames(
+        root=root, product=product, lead_days=other_leads, smoke=context.smoke
+    )
     frames["global"] = pooled_frame(frame=dataset)
     paths = output_paths(root=root, product=product, lead_days=())
     for shift in POSITIVE_CONTROL_SHIFTS:
         percent = f"{round(shift * 100):02d}"
-        frames[f"control{percent}"] = pl.read_parquet(paths[f"control{percent}"])
+        control = pl.read_parquet(paths[f"control{percent}"])
+        frames[f"control{percent}"] = smoke_subsample(frame=control) if context.smoke else control
     fits = phase2_fits(chosen=chosen, chosen_global=chosen_global) + longer_lead_fits(
         lead_days=other_leads, arms=LONGER_LEAD_ARMS
     )
@@ -1233,7 +1296,9 @@ def run_ifs_single(*, context: Context, root: Path, product: WeatherProduct) -> 
     Returns:
         The results, in the order fitted.
     """
-    frames = read_lead_frames(root=root, product=product, lead_days=IFS_LEAD_DAYS)
+    frames = read_lead_frames(
+        root=root, product=product, lead_days=IFS_LEAD_DAYS, smoke=context.smoke
+    )
     fits = longer_lead_fits(lead_days=IFS_LEAD_DAYS, arms=REPLICATE_ARMS)
     return fit_all(context=context, frames=frames, fits=fits)
 
@@ -1311,28 +1376,17 @@ def published_checksum() -> str | None:
     return loss_checksum(losses=saved)
 
 
-def workers_for(*, device: str, max_workers: int) -> int:
-    """Return how many plants the reproduction check's fit on a device runs at once.
-
-    Args:
-        device: `cpu` or `cuda`.
-        max_workers: The run's `--max-workers`.
-
-    Returns:
-        `max_workers`, capped at `CPU_REPRODUCTION_WORKERS` on the CPU.
-    """
-    return min(max_workers, CPU_REPRODUCTION_WORKERS) if device == "cpu" else max_workers
-
-
 def reproduction_check(
     *, root: Path, device: DeviceType, max_workers: int, expected_checksum: str | None
 ) -> int:
     """Refit the ENS-mean B0 at lead-day 1 on the shared rows and compare it with the published run.
 
-    The CPU refit must give `REPRODUCTION_MAE_PERCENT` (and the per-row loss checksum of the
-    matched-lead study's saved losses, or `expected_checksum` if given). If
-    `device` is `cuda`, a GPU refit is reported beside it, so the device difference can be set
-    against the published solar device range.
+    The CPU refit must give `REPRODUCTION_CPU_MAE_PERCENT` and the per-row loss checksum of the
+    matched-lead study's saved CPU losses (or `expected_checksum` if given). If `device` is `cuda`,
+    a GPU refit is reported beside it with its differences from the CPU refit and from
+    `REPRODUCTION_GPU_MAE_PERCENT`, which is not asserted. The refit uses all 35,263 shared rows,
+    including the 5,144 from `final_test_start` on, because the published number includes them; B0
+    reads no power, and nothing else at or after `final_test_start` reaches a fit.
 
     Args:
         root: The output root, where `reproduction_check.md` is written.
@@ -1382,39 +1436,67 @@ def reproduction_check(
             f"{losses.select('site', 'time').n_unique()} rows; per-row loss checksum `{checksum}`."
         )
         if fitted_on == "cpu":
-            if abs(means["cpu"] - REPRODUCTION_MAE_PERCENT) > REPRODUCTION_TOLERANCE_PERCENT:
+            if abs(means["cpu"] - REPRODUCTION_CPU_MAE_PERCENT) > REPRODUCTION_TOLERANCE_PERCENT:
                 msg = (
                     f"CPU refit gives {means['cpu']:.4f}%, "
-                    f"not the published {REPRODUCTION_MAE_PERCENT}%"
+                    f"not the saved CPU losses' {REPRODUCTION_CPU_MAE_PERCENT}%"
                 )
                 raise ValueError(msg)
             if checksum_to_match is not None and checksum != checksum_to_match:
                 msg = f"CPU refit's per-row loss checksum {checksum} is not {checksum_to_match}"
                 raise ValueError(msg)
     if "cuda" in means:
-        lines.append(f"- GPU minus CPU: {means['cuda'] - means['cpu']:+.3f} points.")
+        lines.append(
+            f"- GPU minus CPU: {means['cuda'] - means['cpu']:+.3f} points; GPU minus the published "
+            f"GPU figure {REPRODUCTION_GPU_MAE_PERCENT}%: "
+            f"{means['cuda'] - REPRODUCTION_GPU_MAE_PERCENT:+.3f} points (reported, not asserted)."
+        )
     report.write_text("\n".join(lines) + "\n")
     sys.stdout.write("\n".join(lines) + "\n")
     return 0
 
 
-def check_manifest(*, directory: Path, device: str, smoke: bool) -> None:
-    """Write the run manifest, or raise if a resumed run's device or mode differs from it.
+def input_fingerprint(*, root: Path, product: WeatherProduct) -> dict[str, str]:
+    """Return the SHA-256 of each built frame a run fits on.
+
+    Args:
+        root: The output root.
+        product: The weather product.
+
+    Returns:
+        The digest of each lead-day-1 (or, for IFS HRES, lead-day 1 and 2) frame, and for the ENS
+        mean the stage-1 hours and the positive-control frames, by file name.
+    """
+    if product == "ens_mean":
+        paths = output_paths(root=root, product=product, lead_days=(FULL_SWEEP_LEAD_DAY,))
+        files = [paths[key] for key in paths if key != "report"]
+    else:
+        paths = output_paths(root=root, product=product, lead_days=IFS_LEAD_DAYS)
+        files = [paths[f"day{day}"] for day in IFS_LEAD_DAYS]
+    return {file.name: hashlib.sha256(file.read_bytes()).hexdigest() for file in sorted(files)}
+
+
+def check_manifest(*, directory: Path, device: str, smoke: bool, inputs: dict[str, str]) -> None:
+    """Write the run manifest, or raise if a resumed run's device, mode or inputs differ from it.
 
     Args:
         directory: The checkpoint directory.
         device: The run's device.
         smoke: Whether the run is a smoke test.
+        inputs: `input_fingerprint`'s result.
 
     Raises:
-        ValueError: If the checkpoints came from another device or mode.
+        ValueError: If the checkpoints came from another device, mode or set of built frames.
     """
     path = directory / "run_manifest.json"
-    current = {"device": device, "smoke": smoke}
+    current = {"device": device, "smoke": smoke, "inputs": inputs}
     if path.exists():
         saved = json.loads(path.read_text())
         if saved != current:
-            msg = f"{directory} holds a run with {saved}, not {current}: use a new --output-root"
+            msg = (
+                f"{directory} holds a run with another device, mode or set of input frames "
+                f"({saved}), not {current}: use a new --output-root"
+            )
             raise ValueError(msg)
         return
     path.write_text(json.dumps(current))
@@ -1444,12 +1526,17 @@ def main() -> int:
             expected_checksum=arguments.expected_checksum,
         )
     directory = arguments.output_root / product
-    suffix = "_smoke" if arguments.smoke else ""
+    suffix = run_suffix(smoke=arguments.smoke)
     final = directory / f"losses_{product}{suffix}.parquet"
     refuse_to_overwrite(paths=[final])
     checkpoints = directory / f"checkpoints{suffix}"
     checkpoints.mkdir(parents=True, exist_ok=True)
-    check_manifest(directory=checkpoints, device=arguments.device, smoke=arguments.smoke)
+    check_manifest(
+        directory=checkpoints,
+        device=arguments.device,
+        smoke=arguments.smoke,
+        inputs=input_fingerprint(root=arguments.output_root, product=product),
+    )
     context = Context(
         checkpoint_dir=checkpoints,
         device=arguments.device,

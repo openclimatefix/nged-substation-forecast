@@ -40,7 +40,7 @@ import argparse
 import logging
 import sys
 from collections.abc import Sequence
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from typing import Final, Literal
 
@@ -48,6 +48,7 @@ import numpy as np
 import polars as pl
 from contracts.config_schemas import load_cv_config
 from lag_arm_columns import (
+    CAMS_AVAILABLE_THROUGH_DAYS_BEFORE_ISSUE,
     DAILY_FEATURE_COLUMNS,
     SATELLITE_LAG_DAYS,
     LagInputs,
@@ -325,7 +326,8 @@ DRIFT_START: Final[datetime] = datetime(2024, 3, 1, tzinfo=UTC)
 """T1 counts days from this date."""
 
 HALF: Final[float] = 0.5
-"""The share of calendar months the positive control shifts, on average."""
+"""The share of calendar months the positive control shifts: exactly half of the scored months, and
+on average half of the others."""
 
 POSITIVE_CONTROL_SEED: Final[int] = 1138
 """Seeds which calendar months the positive control shifts."""
@@ -336,6 +338,10 @@ POSITIVE_CONTROL_LAST_MONTH: Final[str] = "2026-06"
 
 POSITIVE_CONTROL_SHIFTS: Final[tuple[float, ...]] = (0.02, 0.05, 0.10)
 """The fractions of power lost in a shifted month: 2%, 5% and 10%."""
+
+LEAK_PROBE_RELATIVE_TOLERANCE: Final[float] = 1e-9
+"""A probe column differs if it moves by more than this times one plus its own size. A clean build
+differs by none of it."""
 
 LAG_TOLERANCE_MW: Final[float] = 1e-4
 """How far a strict lag may differ from `diurnal_persistence`'s Float32 value and still agree."""
@@ -427,27 +433,61 @@ def final_test_cutoff() -> datetime:
     return datetime.combine(load_cv_config(CV_CONFIG_PATH).final_test_start, time.min, tzinfo=UTC)
 
 
-def shifted_months() -> frozenset[str]:
-    """Return the calendar months in which the positive control scales power down.
+def month_labels(*, first: str, last: str) -> list[str]:
+    """Return every `%Y-%m` label from `first` to `last` inclusive.
 
-    A random half of the months, drawn from a seeded generator, so the shift is not a function of
-    `era_code` or `day_of_year`, which a tree could otherwise learn without any lag.
+    Args:
+        first: The first month.
+        last: The last month.
 
     Returns:
-        The `%Y-%m` labels of the shifted months.
+        The labels, in order.
     """
-    months = (
+    return (
         pl.date_range(
-            date.fromisoformat(f"{POSITIVE_CONTROL_FIRST_MONTH}-01"),
-            date.fromisoformat(f"{POSITIVE_CONTROL_LAST_MONTH}-01"),
+            date.fromisoformat(f"{first}-01"),
+            date.fromisoformat(f"{last}-01"),
             interval="1mo",
             eager=True,
         )
         .dt.strftime("%Y-%m")
         .to_list()
     )
-    draws = np.random.default_rng(POSITIVE_CONTROL_SEED).random(len(months)) < HALF
-    return frozenset(month for month, shifted in zip(months, draws, strict=True) if shifted)
+
+
+def scored_months() -> list[str]:
+    """Return the 18 calendar months the study scores: 2024-12 to 2026-06 without 2026-01."""
+    return [
+        month
+        for month in month_labels(first="2024-12", last=POSITIVE_CONTROL_LAST_MONTH)
+        if month not in DROPPED_MONTHS
+    ]
+
+
+def shifted_months() -> frozenset[str]:
+    """Return the calendar months in which the positive control scales power down.
+
+    Exactly half of the scored months (9 of 18), chosen by a seeded permutation, are shifted, so
+    the shift is balanced where it is scored. Every other month, which only the lags read, is
+    shifted or not by an independent draw from the same generator. The shift is therefore not a
+    function of `era_code` or `day_of_year`, which a tree could otherwise learn without any lag.
+
+    Returns:
+        The `%Y-%m` labels of the shifted months.
+    """
+    rng = np.random.default_rng(POSITIVE_CONTROL_SEED)
+    scored = scored_months()
+    chosen = rng.permutation(len(scored))[: len(scored) // 2]
+    shifted = {scored[index] for index in chosen}
+    others = [
+        month
+        for month in month_labels(
+            first=POSITIVE_CONTROL_FIRST_MONTH, last=POSITIVE_CONTROL_LAST_MONTH
+        )
+        if month not in scored
+    ]
+    draws = rng.random(len(others)) < HALF
+    return frozenset(shifted | {month for month, drawn in zip(others, draws, strict=True) if drawn})
 
 
 def shifted_power(*, shift: float) -> pl.Expr:
@@ -1005,7 +1045,10 @@ def leak_probe(
         cut = LagInputs(
             hourly=inputs.hourly.filter(pl.col("time") <= issue),
             clear_sky=inputs.clear_sky,
-            cams=inputs.cams.filter(pl.col("time") <= issue),
+            cams=inputs.cams.filter(
+                (pl.col("time") - pl.duration(minutes=30)).dt.date()
+                <= (issue - timedelta(days=CAMS_AVAILABLE_THROUGH_DAYS_BEFORE_ISSUE)).date()
+            ),
             daily=daily_features(
                 hourly=inputs.hourly.filter(pl.col("time") <= issue),
                 clear_sky=inputs.clear_sky,
@@ -1028,7 +1071,10 @@ def leak_probe(
             )
             different = both.filter(
                 (pl.col("full").is_null() != pl.col("cut").is_null())
-                | ((pl.col("full") - pl.col("cut")).abs() > LAG_TOLERANCE_MW * 10)
+                | (
+                    (pl.col("full") - pl.col("cut")).abs()
+                    > LEAK_PROBE_RELATIVE_TOLERANCE * (1 + pl.col("full").abs())
+                )
             ).height
             if different:
                 msg = (
@@ -1045,6 +1091,37 @@ def leak_probe(
             f"({names}) equal the full build, nulls included."
         )
     ]
+
+
+SMOKE_ROWS_PER_SITE_MONTH: Final[int] = 20
+"""A smoke run keeps this many seeded random rows of each plant's month, in every frame."""
+
+
+def smoke_subsample(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Keep `SMOKE_ROWS_PER_SITE_MONTH` seeded random rows of each plant's month.
+
+    The fit, report and chart scripts apply the same subsample under `--smoke`, so each reads the
+    rows the smoke fit scored.
+
+    Args:
+        frame: A built frame with `site`, `month` and `time`.
+
+    Returns:
+        The site-sorted subsample, which keeps every plant's every month.
+    """
+    return (
+        frame.with_columns(
+            _rank=pl.int_range(pl.len()).shuffle(seed=NULL_CONTROL_SEED).over("site", "month")
+        )
+        .filter(pl.col("_rank") < SMOKE_ROWS_PER_SITE_MONTH)
+        .drop("_rank")
+        .sort("site", "time")
+    )
+
+
+def run_suffix(*, smoke: bool) -> str:
+    """Return the suffix that keeps a smoke run's outputs apart from a real run's."""
+    return "_smoke" if smoke else ""
 
 
 def write_parquet_atomic(*, frame: pl.DataFrame, path: Path) -> None:
@@ -1244,8 +1321,8 @@ def main() -> int:
                 write_parquet_atomic(frame=control, path=paths[f"control{round(shift * 100):02d}"])
                 report += [
                     (
-                        f"### Positive control, {shift:.0%} of power lost in a random half of the "
-                        f"calendar months ({len(shifted_months())} months shifted)"
+                        f"### Positive control, {shift:.0%} of power lost in 9 of the 18 scored "
+                        "months and a random half of the other months"
                     ),
                     "",
                     *control_lines,

@@ -46,6 +46,8 @@ from build_lag_frame import (
     WEATHER_PRODUCTS,
     WeatherProduct,
     output_paths,
+    run_suffix,
+    smoke_subsample,
 )
 from studies.charts import CONTENT_WIDTH_PX, figure
 from studies.guards import refuse_to_overwrite
@@ -81,6 +83,20 @@ ARM_COLOURS: Final[dict[str, str]] = {
 """One colour per arm of the by-lead figure. Climatology is grey, which is not a data colour."""
 
 
+def read_frame(*, path: Path, smoke: bool) -> pl.DataFrame:
+    """Read a built frame, subsampled as a smoke run subsamples it.
+
+    Args:
+        path: The frame's parquet file.
+        smoke: Whether the output being drawn is a smoke run's.
+
+    Returns:
+        The frame.
+    """
+    frame = pl.read_parquet(path)
+    return smoke_subsample(frame=frame) if smoke else frame
+
+
 class FigureText:
     """Collects the text of every figure for the text reviews."""
 
@@ -109,7 +125,15 @@ class FigureText:
 
 
 def _intervals_chart(
-    *, data: pl.DataFrame, y: str, x_title: str, colour: str, shape: str, legend_title: str | None
+    *,
+    data: pl.DataFrame,
+    y: str,
+    x_title: str,
+    colour: str,
+    shape: str,
+    legend_title: str | None,
+    verdicts: pl.DataFrame | None = None,
+    x_domain: list[float] | None = None,
 ) -> alt.LayerChart:
     """Draw dots with interval lines against a zero rule, one row per `y` value.
 
@@ -120,6 +144,9 @@ def _intervals_chart(
         colour: The column giving the colour field.
         shape: The column giving the shape field.
         legend_title: The legend's title, or `None` for no legend (a chart of one series).
+        verdicts: Optional rows with the `y` column, `verdict` and `x` (where the text starts),
+            drawn as a text mark to the right of each row's interval.
+        x_domain: Optional lower and upper end of the x axis.
 
     Returns:
         The layered chart.
@@ -127,8 +154,12 @@ def _intervals_chart(
     base = alt.Chart(data)
     rule = alt.Chart(pl.DataFrame({"zero": [0.0]})).mark_rule(color=ocf.BLACK_1).encode(x="zero:Q")  # ty: ignore[unresolved-attribute]
     lines = base.mark_rule(aria=False).encode(  # ty: ignore[unresolved-attribute]
-        y=alt.Y(f"{y}:N", title=None, sort=None),
-        x=alt.X("lower:Q", title=x_title),
+        y=alt.Y(f"{y}:N", title=None, sort=None, axis=alt.Axis(labelLimit=0)),
+        x=alt.X(
+            "lower:Q",
+            title=x_title,
+            scale=alt.Undefined if x_domain is None else alt.Scale(domain=x_domain),
+        ),
         x2="upper:Q",
         color=alt.Color(
             f"{colour}:N", legend=None if legend_title is None else alt.Legend(title=legend_title)
@@ -140,7 +171,17 @@ def _intervals_chart(
         color=f"{colour}:N",
         shape=alt.Shape(f"{shape}:N", legend=None),
     )
-    return (rule + lines + dots).properties(width=CONTENT_WIDTH_PX - 260, height=200)
+    layers = rule + lines + dots
+    if verdicts is not None:
+        words = (
+            alt.Chart(verdicts)
+            .mark_text(align="left", dx=8, fontSize=11, aria=False, color=ocf.BLACK_1)
+            .encode(  # ty: ignore[unresolved-attribute]
+                y=alt.Y(f"{y}:N", sort=None), x="x:Q", text="verdict:N"
+            )
+        )
+        layers = layers + words
+    return layers.properties(width=CONTENT_WIDTH_PX - 260, height=200)
 
 
 def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
@@ -154,7 +195,8 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         The figure.
     """
     planned = pl.read_parquet(tables / "planned.parquet")
-    rows = planned.with_columns(
+    primary = planned.filter(pl.col("setting") == "primary").select(
+        "contrast",
         label=pl.col("contrast")
         + ": "
         + pl.col("treatment")
@@ -164,12 +206,23 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         + pl.col("reference")
         + " "
         + (pl.col("reference_value") * PERCENTAGE_POINTS).round(2).cast(pl.String)
-        + "%), "
-        + pl.col("combined_verdict").fill_null("not both settings"),
+        + "%)",
+    )
+    rows = planned.join(primary, on="contrast").with_columns(
         difference=pl.col("difference") * PERCENTAGE_POINTS,
         lower=pl.col("lower") * PERCENTAGE_POINTS,
         upper=pl.col("upper") * PERCENTAGE_POINTS,
     )
+    span = float(rows["upper"].max()) - float(rows["lower"].min())  # ty: ignore[invalid-argument-type]
+    verdicts = (
+        rows.group_by("label", maintain_order=True)
+        .agg(
+            verdict=pl.col("combined_verdict").first().fill_null("not both settings"),
+            x=pl.col("upper").max(),
+        )
+        .with_columns(x=pl.col("x") + 0.02 * span)
+    )
+    domain = [float(rows["lower"].min()) - 0.05 * span, float(rows["upper"].max()) + 0.55 * span]  # ty: ignore[invalid-argument-type]
     x_title = (
         "Change in error, treatment minus reference (percentage points of capacity; "
         "more negative is better)"
@@ -181,7 +234,10 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
             "approximated from nine quantiles (0.1 to 0.9)."
         ),
         "Dot: estimate. Line: 99% interval from resampling whole months. Zero: no change.",
-        "Each row names its reference arm's own error, and the verdict from both settings.",
+        (
+            "Each row names its reference arm's own error. The words at the right of a row give "
+            "the verdict from both settings."
+        ),
         "All rows are planned: written into the study plan before any result existed.",
     ]
     text.add(
@@ -198,6 +254,8 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
                 colour="setting",
                 shape="setting",
                 legend_title="Hyperparameter setting",
+                verdicts=verdicts,
+                x_domain=domain,
             )
         ],
         number=1,
@@ -207,19 +265,23 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     )
 
 
-def data_figure(*, root: Path, product: WeatherProduct, text: FigureText) -> alt.VConcatChart:
+def data_figure(
+    *, root: Path, product: WeatherProduct, text: FigureText, smoke: bool
+) -> alt.VConcatChart:
     """Figure 2: forecast irradiance against power, and the lag against the target.
 
     Args:
         root: The output root.
         product: The weather product.
         text: The text collector.
+        smoke: Whether to read a smoke run's subsampled frame.
 
     Returns:
         The figure.
     """
-    frame = pl.read_parquet(
-        output_paths(root=root, product=product, lead_days=(FULL_SWEEP_LEAD_DAY,))["day1"]
+    frame = read_frame(
+        path=output_paths(root=root, product=product, lead_days=(FULL_SWEEP_LEAD_DAY,))["day1"],
+        smoke=smoke,
     ).with_columns(
         share=pl.col("power_mw") / pl.col("effective_capacity_mw"),
         lag_share=pl.col("lag_d1") / pl.col("effective_capacity_mw"),
@@ -381,7 +443,7 @@ def _week_starts(*, losses: pl.DataFrame) -> dict[str, datetime]:
 
 
 def models_work_figure(
-    *, root: Path, product: WeatherProduct, text: FigureText
+    *, root: Path, product: WeatherProduct, text: FigureText, smoke: bool
 ) -> alt.VConcatChart:
     """Figure 4: out-of-fold predictions against measured power for three weeks.
 
@@ -389,11 +451,14 @@ def models_work_figure(
         root: The output root.
         product: The weather product.
         text: The text collector.
+        smoke: Whether the output being drawn is a smoke run's.
 
     Returns:
         The figure.
     """
-    losses = pl.read_parquet(root / product / f"losses_{product}.parquet").filter(
+    losses = pl.read_parquet(
+        root / product / f"losses_{product}{run_suffix(smoke=smoke)}.parquet"
+    ).filter(
         (pl.col("scope") == "lead1")
         & (pl.col("setting") == "primary")
         & (pl.col("seed") == 0)
@@ -740,7 +805,7 @@ def coverage_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | Non
 
 
 def lag_construction_figure(
-    *, root: Path, product: WeatherProduct, text: FigureText
+    *, root: Path, product: WeatherProduct, text: FigureText, smoke: bool
 ) -> alt.VConcatChart:
     """Figure 8: how every lag column is built for one example target day.
 
@@ -751,13 +816,15 @@ def lag_construction_figure(
         root: The output root.
         product: The weather product.
         text: The text collector.
+        smoke: Whether the output being drawn is a smoke run's.
 
     Returns:
         The figure.
     """
     lag_columns = [f"lag_d{day}" for day in range(1, 8)]
-    frame = pl.read_parquet(
-        output_paths(root=root, product=product, lead_days=(FULL_SWEEP_LEAD_DAY,))["day1"]
+    frame = read_frame(
+        path=output_paths(root=root, product=product, lead_days=(FULL_SWEEP_LEAD_DAY,))["day1"],
+        smoke=smoke,
     ).with_columns(
         day=(pl.col("time") - pl.duration(minutes=30)).dt.date(),
         share=pl.col("power_mw") / pl.col("effective_capacity_mw"),
@@ -1160,17 +1227,20 @@ def main() -> int:
     parser.add_argument("--weather-product", choices=WEATHER_PRODUCTS, default="ens_mean")
     parser.add_argument("--output-root", type=Path, default=LAG_FEATURES_DIR)
     parser.add_argument("--text-only", action="store_true", help="Write the figure text and stop.")
+    parser.add_argument("--smoke", action="store_true", help="Draw a `--smoke` run's output.")
     arguments = parser.parse_args()
     product: WeatherProduct = arguments.weather_product
+    smoke: bool = arguments.smoke
+    suffix = run_suffix(smoke=smoke)
     root: Path = arguments.output_root
     directory = root / product
-    tables = directory / f"tables_{product}"
+    tables = directory / f"tables_{product}{suffix}"
     text = FigureText()
     figures = {
         "1_headline": headline_figure(tables=tables, text=text),
-        "2_data": data_figure(root=root, product=product, text=text),
+        "2_data": data_figure(root=root, product=product, text=text, smoke=smoke),
         "3_controls": control_figure(tables=tables, text=text),
-        "4_models_work": models_work_figure(root=root, product=product, text=text),
+        "4_models_work": models_work_figure(root=root, product=product, text=text, smoke=smoke),
         "5_sweep": sweep_figure(tables=tables, text=text),
         "6_by_lead": by_lead_figure(tables=tables, text=text),
     }
@@ -1179,18 +1249,20 @@ def main() -> int:
         "14_importance": importance_figure(tables=tables, text=text),
     }
     figures |= {name: chart for name, chart in optional.items() if chart is not None}
-    figures["8_lag_construction"] = lag_construction_figure(root=root, product=product, text=text)
+    figures["8_lag_construction"] = lag_construction_figure(
+        root=root, product=product, text=text, smoke=smoke
+    )
     figures["9_withheld_folds"] = withheld_folds_figure(tables=tables, text=text)
     figures["10_by_plant"] = by_plant_figure(tables=tables, text=text)
     figures["11_monthly"] = monthly_figure(tables=tables, text=text)
     figures["12_per_plant_vs_global"] = scope_figure(tables=tables, text=text)
     figures["13_fingerprint"] = fingerprint_figure(tables=tables, text=text)
-    text_path = directory / f"figure_text_{product}.txt"
+    text_path = directory / f"figure_text_{product}{suffix}.txt"
     text.write(path=text_path)
     _LOG.info("wrote %s", text_path)
     if arguments.text_only:
         return 0
-    output = directory / f"figures_{product}"
+    output = directory / f"figures_{product}{suffix}"
     output.mkdir(exist_ok=True)
     refuse_to_overwrite(paths=[output / f"{name}.svg" for name in figures])
     for name, chart in figures.items():
