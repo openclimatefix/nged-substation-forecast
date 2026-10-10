@@ -18,7 +18,7 @@ output path carries the product name, and no script overwrites a finished output
 | `lag_arm_columns.py` | Imported by the builder: the columns of IM, TF, AN, PC, CK, RP and DT, and the anchor assertions. |
 | `fit_lag_arms.py` | Fits stage 1, every arm, the shortlist rule, phase 2, the global and leave-one-plant-out fits, the positive controls and the longer leads, with checkpoints. |
 | `report_lag_features.py` | Prints every table the page quotes into `report_<product>.md` and saves `tables_<product>/*.parquet`. |
-| `lag_features_charts.py` | Draws the figures from those tables, and writes `figure_text_<product>.txt` for the text reviews first (`--text-only`). |
+| `lag_features_charts.py` | Draws the figures from those tables, and writes `figure_text_<product>.txt` for the text reviews first (`--text-only`). Each title states a finding taken from the saved tables, and the script raises if a table no longer supports it. A full render also writes svgo-optimised SVGs to `docs/studies/assets/lag_features_figure_<n>.svg` (`lag_features_followup_figure_<letter>.svg` for `--followups`). |
 
 ## Commands that run the study end to end
 
