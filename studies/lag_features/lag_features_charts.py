@@ -16,23 +16,42 @@ counts days 1 to 7.
 **Lead-day 0 is labelled "not usable for its early hours in a live service" wherever it is drawn**,
 because a 00 UTC run is published after its first hours have passed.
 
-The figures:
+The figures, numbered in the order the page tells the story (figures 8, 10, 13 and 17 are the post
+hoc follow-ups, drawn by `--followups`):
 
-1. The planned contrasts with their 99% intervals, at both hyperparameter settings (the headline).
+1. The planned contrasts with their 99% intervals (the headline).
 2. The data: forecast irradiance against measured power, and the lag against the target.
-3. The techniques with known answers: the positive control, and the controls beside L1.
-4. The XGBoost models work: three weeks of out-of-fold predictions, and each plant's error.
-5. The sweep, ranked, with the no-fit references.
-6. Results: gain over B0 against lead-day with climatology drawn, the monthly paired differences,
-   the interval coverage and width, and global against per-plant error.
+3. How each lag column is built for one example day.
+4. The stage-1 folds that two-step arms withhold.
+5. Three weeks of out-of-fold forecasts against measured power.
+6. Each arm's error at each plant.
+7. The planted power loss: L1 and the random-day controls.
+8. The planted power loss for every arm, against the oracle (follow-up).
+9. The screen of every lag idea in the screening months.
+10. The 8 months not used for screening (follow-up).
+11. The month-by-month paired differences.
+12. Error and gain by lead-day.
+13. Long leads with the climatology blends (follow-up).
+14. One shared model against one model per plant.
+15. The paired gain from plant information in one shared model.
+16. The coverage and width of the 10% to 90% interval.
+17. The quantile hit rates (follow-up).
+18. The feature importance.
+
+Each figure has a title and a short subtitle above the plot, and a small grey footnote under it
+that carries the arm key, the planned, exploratory or post hoc label and the definitions. A full
+render publishes each figure, optimised with svgo, as
+`docs/studies/assets/lag_features_figure_<n>.svg`.
 
 Run it with `uv run python studies/lag_features/lag_features_charts.py`.
 """
 
 import argparse
 import logging
+import math
 import subprocess
 import sys
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Final
@@ -52,7 +71,8 @@ from build_lag_frame import (
 )
 from contracts.settings import PROJECT_ROOT
 from fit_lag_arms import verify_manifest_inputs
-from studies.charts import CONTENT_WIDTH_PX, figure
+from report_lag_features import EXPLORATORY_LEVEL, METRIC, fingerprint_losses, paired_interval
+from studies.charts import CONTENT_WIDTH_PX, Panel, wrapped
 from studies.guards import refuse_to_overwrite
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -245,6 +265,74 @@ def claim(*, holds: bool, what: str) -> None:
         raise ValueError(msg)
 
 
+FOOTNOTE_COLOUR: Final[str] = "#5C5C5C"
+"""The footnote's grey, dark enough to read at 10 px on the cream background."""
+
+FOOTNOTE_CHARACTERS: Final[int] = 125
+"""The characters a 10 px footnote line holds across the text column."""
+
+TITLE_CHARACTERS: Final[int] = 72
+"""The characters a figure title's line holds before wrapping (as `studies.charts.figure`)."""
+
+
+def figure(
+    *,
+    panels: Sequence[Panel],
+    number: int,
+    title: str,
+    subtitle: Sequence[str],
+    footnote: Sequence[str] = (),
+    independent_colour: bool = False,
+) -> alt.VConcatChart:
+    """Stack panels under a caption, with a small grey footnote under the panels.
+
+    The caption (title and a short subtitle) sits above the plot, and the footnote carries the arm
+    key, the planned or post hoc label, and the definitions, so a screenshot stands alone while
+    the chart comes first.
+
+    Args:
+        panels: The panels, drawn one above the other.
+        number: The figure's number on the page.
+        title: The finding the figure shows.
+        subtitle: Short lines naming what is plotted, its unit, which direction is better, and what
+            the marks and intervals mean.
+        footnote: Paragraphs of the arm key, labels and definitions.
+        independent_colour: Whether each panel draws its own colour scale and legend.
+
+    Returns:
+        The figure.
+    """
+    caption = alt.TitleParams(
+        wrapped(text=f"Figure {number}: {title}", width=TITLE_CHARACTERS),
+        subtitle=[line for text in subtitle for line in wrapped(text=text)],
+        anchor="start",
+        offset=14,
+        subtitleColor=ocf.BLACK_1,
+        subtitlePadding=6,
+    )
+    note = alt.TitleParams(
+        [line for text in footnote for line in wrapped(text=text, width=FOOTNOTE_CHARACTERS)],
+        orient="bottom",
+        anchor="start",
+        fontSize=10,
+        fontWeight="normal",
+        color=FOOTNOTE_COLOUR,
+        offset=14,
+        lineHeight=13,
+    )
+    inner = (
+        alt.vconcat(*panels, spacing=24)
+        .properties(title=caption)
+        .resolve_scale(color="independent" if independent_colour else "shared", shape="shared")
+    )
+    return (
+        alt.vconcat(inner)
+        .properties(title=note)
+        .configure_view(stroke=None)
+        .configure_legend(orient="bottom", direction="horizontal")
+    )
+
+
 class FigureText:
     """Collects the text of every figure for the text reviews."""
 
@@ -268,7 +356,10 @@ class FigureText:
         Args:
             path: The file to write.
         """
-        blocks = [f"Figure {key}\n" + "\n".join(lines) for key, lines in self.entries.items()]
+        blocks = [
+            f"Figure {key}\n" + "\n".join(lines)
+            for key, lines in sorted(self.entries.items(), key=lambda entry: int(entry[0]))
+        ]
         path.write_text("\n\n".join(blocks) + "\n")
 
 
@@ -387,30 +478,43 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     title = "No planned contrast found lagged power changing day-ahead error significantly"
     subtitle = [
         (
-            "Lagged power means a lag: the power at the same clock hour on an earlier whole day. "
-            "Day-ahead means lead-day 1, the forecast for the day after the day it is issued. "
-            "An arm is one forecast configuration. Each planned contrast, P1 to P5, is a "
-            "treatment arm minus a reference arm."
+            "Change in error when the treatment arm replaces the reference arm, in percentage "
+            "points of capacity; more negative is better. Mean absolute error, except P4, which "
+            "is CRPS."
         ),
         (
             "P1: L1 minus B0. P2: AN minus L1, on the last 8 months only. P3: S2 minus L2. "
-            "P4: L1 minus B0 scored on the continuous ranked probability score (CRPS), "
-            "approximated from nine quantiles (0.1 to 0.9). P5: L1 minus B0 in one XGBoost model "
-            "shared by all plants. The other rows are scored on mean absolute error."
+            "P4: L1 minus B0 on CRPS. P5: L1 minus B0 in one XGBoost model shared by all plants."
         ),
         (
-            "Dot: estimate. Line: 99% interval from resampling whole months. Zero: no change. "
-            "Each row names its reference arm's own error. The words at the right of a row give "
-            "the verdict from both settings."
+            "Dot: estimate at each hyperparameter setting. Line: 99% interval from resampling "
+            "whole months. Zero: no change. The words at the right of a row give the verdict "
+            "from both settings."
         ),
-        f"Dots and lines are drawn at both settings. {SHARED_TERMS['setting']}",
+    ]
+    footnote = [
+        (
+            "Lagged power means a lag: the power at the same clock hour on an earlier whole day. "
+            "Day-ahead means lead-day 1, the forecast for the day after the day it is issued. "
+            "An arm is one forecast configuration. Each planned contrast, P1 to P5, is a "
+            "treatment arm minus a reference arm. Each row names its reference arm's own error. "
+            "CRPS is the continuous ranked probability score, approximated from nine quantiles "
+            "(0.1 to 0.9)."
+        ),
+        SHARED_TERMS["setting"],
         arm_key("B0", "L1", "L2", "S2", "AN"),
         "All rows are planned: written into the study plan before any result existed.",
     ]
     text.add(
         figure_id="1",
         plots="The five planned contrasts, both settings",
-        lines=[title, *subtitle, x_title, "Hyperparameter setting: primary, sensitivity"],
+        lines=[
+            title,
+            *subtitle,
+            *footnote,
+            x_title,
+            "Hyperparameter setting: primary, sensitivity",
+        ],
     )
     return figure(
         panels=[
@@ -429,7 +533,7 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         number=1,
         title=title,
         subtitle=subtitle,
-        figure_planning=None,
+        footnote=footnote,
     )
 
 
@@ -489,12 +593,14 @@ def data_figure(
             "forecast."
         ),
     ]
+    footnote: list[str] = []
     text.add(
         figure_id="2",
         plots="Forecast irradiance vs power; lag vs power, six plants",
         lines=[
             title,
             *subtitle,
+            *footnote,
             "Forecast global horizontal irradiance (W/m²)",
             "Measured power (share of capacity)",
             "Power at the same hour two days earlier (share of capacity)",
@@ -502,7 +608,7 @@ def data_figure(
         ],
     )
     return figure(
-        panels=[forecast, lag], number=2, title=title, subtitle=subtitle, figure_planning=None
+        panels=[forecast, lag], number=2, title=title, subtitle=subtitle, footnote=footnote
     )
 
 
@@ -512,7 +618,7 @@ against the baseline (the column-count bias plus the noise floor)."""
 
 
 def control_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
-    """Figure 3: which synthetic level shifts L1 recovers, and the controls beside L1.
+    """Figure 7: which synthetic level shifts L1 recovers, and the controls beside L1.
 
     Args:
         tables: The report's tables directory.
@@ -586,35 +692,51 @@ def control_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     subtitle = [
         (
             "Top: the forecasts are re-fitted on a synthetic target in which measured power is "
-            f"cut by {shifts}. The cut applies in 9 of the 18 scored months, chosen at random "
-            "with a fixed seed, and in a random half of the other months. A forecast that used "
-            "the lag well would gain more the bigger the cut. The interval is 99%, as for the "
-            "planned contrasts."
+            f"cut by {shifts}, in 9 of the 18 scored months (chosen at random with a fixed seed) "
+            "and in a random half of the other months. A lag that worked would gain more the "
+            "bigger the cut. Change in error, L1 minus B0, in percentage points of capacity; "
+            "more negative is better. Interval: 99%, as for the planned contrasts."
         ),
         (
             "Bottom: the change in error from L1 compared with two random-day lags, and from a "
             "random-day lag compared with B0 (the change from adding any extra column). "
-            "The interval is 95%, as for every exploratory contrast."
+            "Interval: 95%, as for every exploratory contrast."
         ),
+    ]
+    footnote = [
         (
             "Dot: estimate. Line: interval from resampling whole months. Zero: no change. "
-            "Months being scored are the months the fitted forecasts are tested on. "
-            "All rows are exploratory."
+            "Months being scored are the months the fitted forecasts are tested on."
         ),
+        "All rows are exploratory.",
         arm_key("B0", "L1", "N1", "N2"),
     ]
     text.add(
-        figure_id="3",
+        figure_id="7",
         plots="Positive-control recovery; paired differences of L1, N1, N2 and B0",
-        lines=[title, *subtitle, top_title, bottom_title],
+        lines=[title, *subtitle, *footnote, top_title, bottom_title],
     )
     return figure(
-        panels=[recovered, controls], number=3, title=title, subtitle=subtitle, figure_planning=None
+        panels=[recovered, controls], number=7, title=title, subtitle=subtitle, footnote=footnote
     )
+
+
+WEEK_MINIMUM_SHARE: Final[float] = 0.7
+"""The share of a week's daylight hours every plant must have scored for the week to be drawn."""
+
+DAYS_PER_WEEK: Final[int] = 7
+"""A drawn week has data on every one of its days."""
+
+GAP_HOURS: Final[int] = 2
+"""A line breaks where consecutive rows of a series are more than this many hours apart."""
 
 
 def _week_starts(*, losses: pl.DataFrame) -> dict[str, datetime]:
     """Pick the three weeks drawn: the sunniest, most variable and cloudiest.
+
+    A week qualifies when it has seven days with data, six plants, and every plant has scored at
+    least `WEEK_MINIMUM_SHARE` of the daylight hours any plant scored in the week, so that no
+    plant's row is nearly empty. The daylight hours are the distinct times with a scored row.
 
     Args:
         losses: Lead-day 1 B0 losses carrying `actual`.
@@ -622,13 +744,30 @@ def _week_starts(*, losses: pl.DataFrame) -> dict[str, datetime]:
     Returns:
         The first day of each rule's week.
     """
+    hours = losses.with_columns(week=pl.col("time").dt.truncate("1w"))
+    daylight_hours = hours.group_by("week").agg(
+        daylight_hours=pl.col("time").n_unique(), days=pl.col("time").dt.date().n_unique()
+    )
     weekly = (
-        losses.with_columns(week=pl.col("time").dt.truncate("1w"))
-        .group_by("week", "site")
-        .agg(mean=(pl.col("actual") / pl.col("effective_capacity_mw")).mean())
+        hours.group_by("week", "site")
+        .agg(
+            mean=(pl.col("actual") / pl.col("effective_capacity_mw")).mean(),
+            scored_hours=pl.col("time").n_unique(),
+        )
+        .join(daylight_hours, on="week")
         .group_by("week")
-        .agg(level=pl.col("mean").mean(), spread=pl.col("mean").std(), n=pl.len())
-        .filter(pl.col("n") >= 6)
+        .agg(
+            level=pl.col("mean").mean(),
+            spread=pl.col("mean").std(),
+            n=pl.len(),
+            worst_share=(pl.col("scored_hours") / pl.col("daylight_hours")).min(),
+            days=pl.col("days").first(),
+        )
+        .filter(
+            (pl.col("n") >= 6)
+            & (pl.col("worst_share") >= WEEK_MINIMUM_SHARE)
+            & (pl.col("days") == DAYS_PER_WEEK)
+        )
     )
     return {
         "sunniest": weekly.sort("level")["week"][-1],
@@ -640,7 +779,7 @@ def _week_starts(*, losses: pl.DataFrame) -> dict[str, datetime]:
 def models_work_figure(
     *, root: Path, product: WeatherProduct, text: FigureText, smoke: bool
 ) -> alt.VConcatChart:
-    """Figure 4: out-of-fold predictions against measured power for three weeks.
+    """Figure 5: out-of-fold predictions against measured power for three weeks.
 
     Args:
         root: The output root.
@@ -674,20 +813,35 @@ def models_work_figure(
             series=pl.lit("Measured"), value=pl.col("measured")
         )
         forecasts = week.with_columns(series=pl.col("arm"), value=pl.col("predicted"))
-        stacked = pl.concat(
-            [
-                measured.select("site", "day", "series", "value"),
-                forecasts.select("site", "day", "series", "value"),
-            ]
+        stacked = (
+            pl.concat(
+                [
+                    measured.select("site", "time", "day", "series", "value"),
+                    forecasts.select("site", "time", "day", "series", "value"),
+                ]
+            )
+            .sort("site", "series", "time")
+            .with_columns(
+                segment=(
+                    (pl.col("time").diff().over("site", "series") > pl.duration(hours=GAP_HOURS))
+                    .fill_null(value=False)
+                    .cum_sum()
+                    .over("site", "series")
+                )
+            )
         )
         panels.append(
             alt.Chart(stacked)
             .mark_line(aria=False, strokeWidth=1.2)
             .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X(
-                    "day:Q", title="Day of the chosen week (1 to 7)", scale=alt.Scale(domain=[1, 8])
+                    "day:Q",
+                    title="Day of the chosen week (1 to 7)",
+                    scale=alt.Scale(domain=[1, 8]),
+                    axis=alt.Axis(values=list(range(1, 8)), format="d"),
                 ),
                 y=alt.Y("value:Q", title=None),
+                detail="segment:N",
                 color=alt.Color(
                     "series:N",
                     scale=alt.Scale(
@@ -704,36 +858,48 @@ def models_work_figure(
     subtitle = [
         (
             "Each row is one plant, and each group of six rows is one week. Power is a share of "
-            "capacity. Black: measured power. Blue: B0's forecast of that power. "
+            "capacity (vertical axis). Black: measured power. Blue: B0's forecast of that power. "
             "Orange: L1's forecast of that power."
         ),
+        (
+            "Each day is its own line, so no line runs across a night or a gap of more than "
+            f"{GAP_HOURS} hours."
+        ),
+    ]
+    footnote = [
         forecasts_statement(runs="one of three training runs (fitting seeds)"),
         (
-            "Weeks are chosen by rule, not by eye, from the weeks with data for all six plants: "
-            "the sunniest (highest mean power across plants), the most variable between plants, "
-            "and the cloudiest (lowest mean power)."
+            "Weeks are chosen by rule, not by eye, from the weeks in which every plant has at "
+            f"least {WEEK_MINIMUM_SHARE:.0%} of the week's daylight hours scored: the sunniest "
+            "(highest mean power across plants), the most variable between plants, and the "
+            "cloudiest (lowest mean power)."
         ),
         arm_key("B0", "L1"),
     ]
     text.add(
-        figure_id="4",
+        figure_id="5",
         plots="Three weeks of B0 and L1 forecasts against measured power",
         lines=[
             title,
             *subtitle,
+            *footnote,
             "Day of the chosen week (1 to 7)",
             "Series: Measured, B0, L1",
         ],
     )
-    return figure(panels=panels, number=4, title=title, subtitle=subtitle, figure_planning=None)
+    return figure(panels=panels, number=5, title=title, subtitle=subtitle, footnote=footnote)
 
 
 NO_FIT_COLOUR: Final[str] = ocf.ENSEMBLE_LINE
 """Arms that need no fit are grey, which is not a data colour."""
 
 
+OFF_AXIS_RATIO: Final[float] = 1.25
+"""An arm whose error is more than this multiple of B0's is left off the screen figure's axis."""
+
+
 def sweep_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
-    """Figure 5: the sweep ranked, with the no-fit references and the CRPS corrections.
+    """Figure 9: the sweep ranked, with the no-fit references and the CRPS corrections.
 
     Args:
         tables: The report's tables directory.
@@ -752,43 +918,64 @@ def sweep_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         .otherwise(pl.lit("No fit")),
     )
     baseline = float(phase1.filter(pl.col("arm") == "B0")["error"][0])
-    order = phase1.sort("error")["label"].to_list()
     error_title = "Mean absolute error (% of capacity; smaller is better)"
-    bars = (
-        alt.Chart(phase1)
-        .mark_bar()
-        .encode(  # ty: ignore[unresolved-attribute]
-            y=alt.Y("label:N", sort=order, title=None),
-            x=alt.X("error:Q", title=error_title),
-            color=alt.Color(
-                "kind:N",
-                scale=alt.Scale(
-                    domain=["Fitted XGBoost arm", "No fit"], range=[ocf.DATA_BLUE, NO_FIT_COLOUR]
-                ),
-                legend=alt.Legend(title="Arm"),
-            ),
-        )
+    off_axis = phase1.filter(pl.col("error") > baseline * OFF_AXIS_RATIO).sort("error")
+    on_axis = phase1.filter(pl.col("error") <= baseline * OFF_AXIS_RATIO)
+    order = on_axis.sort("error")["label"].to_list()
+    domain = [
+        math.floor(float(on_axis["lower"].min()) * 2) / 2,  # ty: ignore[invalid-argument-type]
+        math.ceil(float(on_axis["upper"].max()) * 2) / 2,  # ty: ignore[invalid-argument-type]
+    ]
+    off_axis_text = ", ".join(
+        f"{row['label']} {row['error']:.1f}%" for row in off_axis.iter_rows(named=True)
+    )
+    x_scale = alt.Scale(domain=domain, zero=False)
+    colour = alt.Color(
+        "kind:N",
+        scale=alt.Scale(
+            domain=["Fitted XGBoost arm", "No fit"], range=[ocf.DATA_BLUE, NO_FIT_COLOUR]
+        ),
+        legend=alt.Legend(title="Arm"),
+    )
+    y = alt.Y("label:N", sort=order, title=None, axis=alt.Axis(labelLimit=0))
+    base = alt.Chart(on_axis)
+    lines = base.mark_rule(aria=False).encode(  # ty: ignore[unresolved-attribute]
+        y=y, x=alt.X("lower:Q", title=error_title, scale=x_scale), x2="upper:Q", color=colour
+    )
+    dots = base.mark_point(filled=True, size=60, aria=False).encode(  # ty: ignore[unresolved-attribute]
+        y=y, x=alt.X("error:Q", scale=x_scale), color=colour
     )
     rule = (
-        alt.Chart(pl.DataFrame({"x": [baseline]})).mark_rule(color=ocf.BRAND_ORANGE).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+        alt.Chart(pl.DataFrame({"x": [baseline]}))
+        .mark_rule(color=ocf.BRAND_ORANGE)
+        .encode(x=alt.X("x:Q", scale=x_scale))  # ty: ignore[unresolved-attribute]
     )
-    panels = [(bars + rule).properties(width=CONTENT_WIDTH_PX - 195, height=420)]
+    panels = [(rule + lines + dots).properties(width=CONTENT_WIDTH_PX - 195, height=440)]
     crps_title = (
         "Continuous ranked probability score (CRPS), approximated from nine quantiles "
         "(% of capacity; smaller is better)"
     )
     crps_rows = _crps_rows(tables=tables)
     if not crps_rows.is_empty():
-        crps_bars = (
+        crps_domain = [
+            math.floor(float(crps_rows["crps"].min()) * 10) / 10 - 0.1,  # ty: ignore[invalid-argument-type]
+            math.ceil(float(crps_rows["crps"].max()) * 10) / 10 + 0.1,  # ty: ignore[invalid-argument-type]
+        ]
+        crps_dots = (
             alt.Chart(crps_rows)
-            .mark_bar(color=ocf.DATA_BLUE)
+            .mark_point(filled=True, size=60, color=ocf.DATA_BLUE, aria=False)
             .encode(  # ty: ignore[unresolved-attribute]
-                y=alt.Y("label:N", sort=crps_rows["label"].to_list(), title=None),
-                x=alt.X("crps:Q", title=crps_title),
+                y=alt.Y(
+                    "label:N",
+                    sort=crps_rows["label"].to_list(),
+                    title=None,
+                    axis=alt.Axis(labelLimit=0),
+                ),
+                x=alt.X("crps:Q", title=crps_title, scale=alt.Scale(domain=crps_domain)),
             )
             .properties(width=CONTENT_WIDTH_PX - 195, height=110)
         )
-        panels.append(crps_bars)
+        panels.append(crps_dots)
     fitted = phase1.filter(pl.col("fitted")).sort("error")
     best = str(fitted["label"][0])
     b0_row = phase1.filter(pl.col("arm") == "B0").row(0, named=True)
@@ -808,35 +995,43 @@ def sweep_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     arms_drawn = [*phase1.sort("error")["arm"].to_list(), "R5"]
     subtitle = [
         (
-            "A screen, not a test: the 95% intervals of the arms overlap B0's, so no arm is shown "
-            "to beat B0. Top: mean absolute error of each arm at lead-day 1 (the forecast for the "
-            "day after the day it is issued) over the first 10 of the 18 scored months."
+            "Mean absolute error of each arm at lead-day 1 over the first 10 of the 18 scored "
+            "months, % of capacity; smaller is better. Dot: estimate. Line: 95% interval from "
+            "resampling whole months. Orange line: B0's error."
         ),
         (
-            "Orange line: B0's error. Grey bars need no fit. Blue bars are XGBoost models fitted "
-            "per plant, out-of-fold (each made by a model that never trained on that month), "
-            "with three training runs (seeds)."
+            "A screen, not a test: the intervals of the arms overlap B0's, so no arm is shown to "
+            "beat B0. Blue: XGBoost models fitted per plant. Grey: no fit."
         ),
         (
-            "Bottom: R4 and R5 are scored on CRPS, the continuous ranked probability score, which "
-            "compares the whole forecast distribution with the measured power. Each is drawn "
-            "beside B0 on the same rows, with one training run."
+            "Bottom: R4 and R5 on CRPS, the continuous ranked probability score, which compares "
+            "the whole forecast distribution with the measured power. Each is drawn beside B0 on "
+            "the same rows."
+        ),
+    ]
+    footnote = [
+        f"Off the axis: {off_axis_text}.",
+        (
+            "Lead-day 1 is the forecast for the day after the day it is issued. Out-of-fold "
+            "means each forecast is made by a model that never trained on that month. The "
+            "fitted arms use three training runs (seeds); the CRPS panel uses one."
         ),
         "All rows are exploratory. No pairwise comparison is made here.",
         arm_key(*arms_drawn),
     ]
     text.add(
-        figure_id="5",
+        figure_id="9",
         plots="Every arm's screening-month error, ranked; CRPS of R4 and R5 beside B0",
         lines=[
             title,
             *subtitle,
+            *footnote,
             error_title,
             crps_title,
             "Arm: Fitted XGBoost arm, No fit",
         ],
     )
-    return figure(panels=panels, number=5, title=title, subtitle=subtitle, figure_planning=None)
+    return figure(panels=panels, number=9, title=title, subtitle=subtitle, footnote=footnote)
 
 
 def _crps_rows(*, tables: Path) -> pl.DataFrame:
@@ -866,7 +1061,7 @@ def _crps_rows(*, tables: Path) -> pl.DataFrame:
 
 
 def by_lead_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
-    """Figure 6: each arm's gain over B0 against lead-day, and the error of B0 and climatology.
+    """Figure 12: each arm's gain over B0 against lead-day, and the error of B0 and climatology.
 
     Args:
         tables: The report's tables directory.
@@ -953,28 +1148,36 @@ def by_lead_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     title = f"At lead-day {longest}, B0 is worse than climatology and a random-day lag gains too"
     subtitle = [
         (
-            "Top: each arm's mean absolute error minus B0's at the same lead-day. Below zero beats "
-            "B0. Line: 95% interval from resampling whole months."
+            "Top: each arm's mean absolute error minus B0's at the same lead-day, in percentage "
+            "points of capacity; below zero beats B0. Line: 95% interval from resampling whole "
+            "months."
         ),
         (
-            "Bottom: the mean absolute error of B0, L1, and climatology. Lead-day is the number of "
-            "days between the weather forecast run and the target day."
+            "Bottom: the mean absolute error of B0, L1, and climatology, in percentage points "
+            "of capacity; smaller is better."
         ),
         (
             "A random-day lag (N2) gains at the longest lead too, so part of the lag arms' "
-            "long-lead gain is not specific to recent days. "
-            f"{SHARED_TERMS['ENS mean']} Fits are per plant, at the primary (default XGBoost) "
-            "setting. All rows are exploratory."
+            "long-lead gain is not specific to recent days."
+        ),
+    ]
+    footnote = [
+        (
+            "Lead-day is the number of days between the weather forecast run and the target "
+            f"day. {SHARED_TERMS['ENS mean']} Fits are per plant, at the primary (default "
+            "XGBoost) setting."
         ),
         f"{LEAD_ZERO_TICK}: lead-day 0 is not usable for its early hours in a live service.",
+        "All rows are exploratory.",
         arm_key("B0", "L1", "W7", "Q30", "T1", "N2", "climatology"),
     ]
     text.add(
-        figure_id="6",
+        figure_id="12",
         plots="Gain over B0 against lead-day; error of B0, L1 and climatology",
         lines=[
             title,
             *subtitle,
+            *footnote,
             x_title,
             gain_title,
             level_title,
@@ -985,15 +1188,15 @@ def by_lead_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
             (gain_lines + gain_bars).properties(width=CONTENT_WIDTH_PX - 57, height=180),
             level_lines.properties(width=CONTENT_WIDTH_PX - 57, height=180),
         ],
-        number=6,
+        number=12,
         title=title,
         subtitle=subtitle,
-        figure_planning=None,
+        footnote=footnote,
     )
 
 
 def coverage_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | None:
-    """Figure 7: the share of rows inside the 10% to 90% interval, and its width.
+    """Figure 16: the share of rows inside the 10% to 90% interval, and its width.
 
     Args:
         tables: The report's tables directory.
@@ -1054,22 +1257,28 @@ def coverage_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | Non
         f"{NOMINAL_COVERAGE:.0%}, with and without the lag"
     )
     subtitle = [
-        forecasts_statement(runs="one training run (fitting seed)"),
         (
-            "Top: the share of hours whose measured power falls between the forecast's "
-            "10% and 90% quantiles. Dashed line: the nominal 80%. Bottom: the mean distance "
-            "between those quantiles. Forecast sky is the weather forecast's clear-sky index: its "
-            "irradiance relative to clear sky."
+            "Top: the share of hours whose measured power falls between the forecast's 10% and "
+            "90% quantiles (dashed line: the nominal 80%). Bottom: the mean distance between "
+            "those quantiles, in percentage points of capacity."
         ),
+        (
+            "Forecast sky is the weather forecast's clear-sky index: its irradiance relative to "
+            "clear sky."
+        ),
+    ]
+    footnote = [
+        forecasts_statement(runs="one training run (fitting seed)"),
         "Descriptive: no planned contrast rests on this figure.",
         arm_key("B0", "L1"),
     ]
     text.add(
-        figure_id="7",
+        figure_id="16",
         plots="Coverage and width of the 10% to 90% interval for B0 and L1",
         lines=[
             title,
             *subtitle,
+            *footnote,
             "Share inside the 10% to 90% interval",
             "Mean interval width (percentage points of capacity)",
             "B0 (no lag) or L1 (one lag)",
@@ -1077,17 +1286,17 @@ def coverage_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | Non
     )
     return figure(
         panels=[share + nominal, width],
-        number=7,
+        number=16,
         title=title,
         subtitle=subtitle,
-        figure_planning=None,
+        footnote=footnote,
     )
 
 
 def lag_construction_figure(
     *, root: Path, product: WeatherProduct, text: FigureText, smoke: bool
 ) -> alt.VConcatChart:
-    """Figure 8: how every lag column is built for one example target day.
+    """Figure 3: how every lag column is built for one example target day.
 
     The day is the plant-day, over all plants, with the most hours that hold all seven lags, and
     among those the highest mean power, so a rule and not an eye picks it.
@@ -1177,14 +1386,16 @@ def lag_construction_figure(
             f"One example target day at plant {chosen['site']}, at the day-ahead lead (the "
             "forecast for the day after the day it is issued). Each line or band is read at the "
             "same clock hour as the target hour, on an earlier whole day before the forecast "
-            "was issued."
+            "was issued. Power is a share of capacity."
         ),
         (
-            "Black line: the measured power on the target day. Orange line: L1, the latest whole "
-            "day before the forecast was issued (day 1 back). Blue lines: CTX7's other six daily "
-            "lags (days 2 to 7 back). Green band: W7's minimum to maximum over days 1 to 7 back. "
+            "Black: the measured power on the target day. Orange: L1, the latest whole day "
+            "before the forecast was issued (day 1 back). Blue: CTX7's other six daily lags "
+            "(days 2 to 7 back). Green band: W7's minimum to maximum over days 1 to 7 back. "
             "Green dashed line: W7's mean over those days."
         ),
+    ]
+    footnote = [
         (
             "The example is chosen by rule, not by eye: the plant-day with the most hours that "
             "hold all seven lags, then the most power."
@@ -1192,32 +1403,33 @@ def lag_construction_figure(
         arm_key("L1", "CTX7", "W7"),
     ]
     text.add(
-        figure_id="8",
+        figure_id="3",
         plots="Power, L1, CTX7 lags and the W7 band for one example target day",
         lines=[
             title,
             *subtitle,
+            *footnote,
             "Hour of the day (UTC, hour midpoint)",
             "Power (share of capacity)",
         ],
     )
     return figure(
         panels=[(band + mean + lines).properties(width=CONTENT_WIDTH_PX - 51, height=260)],
-        number=8,
+        number=3,
         title=title,
         subtitle=subtitle,
-        figure_planning=None,
+        footnote=footnote,
     )
 
 
 ROLE_TRAINED: Final[str] = "Trained on"
 ROLE_SCORED: Final[str] = "Skipped (scored block)"
 ROLE_PREDICTED: Final[str] = "Skipped (predicted hours' block)"
-"""The three things a first-stage model does with a month, as Figure 9's legend names them."""
+"""The three things a first-stage model does with a month, as Figure 4's legend names them."""
 
 
 def withheld_folds_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
-    """Figure 9: which months the two-step arms' stage-1 models withhold, drawn as months.
+    """Figure 4: which months the two-step arms' stage-1 models withhold, drawn as months.
 
     For scored fold `k`, a stage-1 prediction for an hour in fold `j` comes from a model that
     withheld folds `k` and `j`. The panel draws the months one plant has, for the hours of the
@@ -1288,24 +1500,25 @@ def withheld_folds_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart
             "An hour outside every block is predicted by a first-stage model that skips only the "
             "scored block."
         ),
-        arm_key("S2", "S3", "KS"),
     ]
+    footnote = [arm_key("S2", "S3", "KS")]
     text.add(
-        figure_id="9",
+        figure_id="4",
         plots="Which months the stage-1 models withhold, per scored fold",
         lines=[
             title,
             *subtitle,
+            *footnote,
             "Calendar month of the plant's rows",
             "The first-stage model",
             f"Legend: {ROLE_TRAINED}, {ROLE_SCORED}, {ROLE_PREDICTED}",
         ],
     )
-    return figure(panels=[chart], number=9, title=title, subtitle=subtitle, figure_planning=None)
+    return figure(panels=[chart], number=4, title=title, subtitle=subtitle, footnote=footnote)
 
 
 def by_plant_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
-    """Figure 10: each arm's error at each plant, and its difference from B0 there.
+    """Figure 6: each arm's error at each plant, and its difference from B0 there.
 
     Args:
         tables: The report's tables directory.
@@ -1345,33 +1558,45 @@ def by_plant_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     labels = (
         alt.Chart(rows)
         .mark_text(fontSize=9, aria=False)
-        .encode(x="site:N", y=alt.Y("label:N", sort=order), text="text:N")  # ty: ignore[unresolved-attribute]
+        .encode(  # ty: ignore[unresolved-attribute]
+            x="site:N",
+            y=alt.Y("label:N", sort=order),
+            text="text:N",
+            color=alt.condition(
+                "abs(datum.gain) > 0.3", alt.value("white"), alt.value(ocf.BLACK_1)
+            ),
+        )
     )
     title = "Each arm's error at each plant, and its gain over B0 there"
     subtitle = [
         (
-            "Cell text: mean absolute error at lead-day 1 (the forecast for the day after the "
-            "day it is issued), % of capacity, smaller is better, all months, per-plant fits."
+            "Cell text: mean absolute error at lead-day 1, % of capacity, smaller is better, all "
+            "months, per-plant fits."
         ),
         (
             "Cell colour: the arm's error minus B0's at the same plant, in percentage points of "
-            "capacity (blue is better than B0). AN is the arm the screening rule picked from the "
-            "first 10 months."
+            "capacity (blue is better than B0)."
+        ),
+    ]
+    footnote = [
+        (
+            "Lead-day 1 is the forecast for the day after the day it is issued. AN is the arm "
+            "the screening rule picked from the first 10 months."
         ),
         "All rows are exploratory.",
         arm_key(*arm_order),
     ]
     text.add(
-        figure_id="10",
+        figure_id="6",
         plots="Per-plant error of every arm",
-        lines=[title, *subtitle, "Plant", gain_title],
+        lines=[title, *subtitle, *footnote, "Plant", gain_title],
     )
     return figure(
         panels=[(heat + labels).properties(width=CONTENT_WIDTH_PX - 163, height=380)],
-        number=10,
+        number=6,
         title=title,
         subtitle=subtitle,
-        figure_planning=None,
+        footnote=footnote,
     )
 
 
@@ -1408,26 +1633,29 @@ def monthly_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     subtitle = [
         (
             "Each bar: the mean over plants, training runs (seeds), and hours of one arm's mean "
-            "absolute error minus B0's in one calendar month, at lead-day 1 (the forecast for "
-            "the day after the day it is issued)."
+            "absolute error minus B0's in one calendar month, in percentage points of capacity; "
+            "below zero beats B0."
         ),
+    ]
+    footnote = [
         (
-            "Per-plant fits, primary (default XGBoost) setting. Below zero beats B0. "
-            "AN is the arm the screening rule picked from the first 10 months. "
-            "All rows are exploratory."
+            "Lead-day 1 is the forecast for the day after the day it is issued. Fits are per "
+            "plant at the primary (default XGBoost) setting. AN is the arm the screening rule "
+            "picked from the first 10 months."
         ),
+        "All rows are exploratory.",
         arm_key("B0", "L1", "AN"),
     ]
     text.add(
         figure_id="11",
         plots="Monthly paired differences of L1 and AN from B0",
-        lines=[title, *subtitle, "Calendar month", difference_title],
+        lines=[title, *subtitle, *footnote, "Calendar month", difference_title],
     )
-    return figure(panels=[chart], number=11, title=title, subtitle=subtitle, figure_planning=None)
+    return figure(panels=[chart], number=11, title=title, subtitle=subtitle, footnote=footnote)
 
 
 def scope_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
-    """Figure 12: B0 and L1 fitted per plant against fitted as one global model.
+    """Figure 14: B0 and L1 fitted per plant against fitted as one global model.
 
     Args:
         tables: The report's tables directory.
@@ -1439,13 +1667,21 @@ def scope_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     scopes = pl.read_parquet(tables / "scope_comparison.parquet").with_columns(
         error=pl.col("error") * PERCENTAGE_POINTS
     )
+    domain = [
+        math.floor(float(scopes["error"].min()) * 10) / 10 - 0.1,  # ty: ignore[invalid-argument-type]
+        math.ceil(float(scopes["error"].max()) * 10) / 10 + 0.1,  # ty: ignore[invalid-argument-type]
+    ]
     chart = (
         alt.Chart(scopes)
-        .mark_bar()
+        .mark_point(filled=True, size=120, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("arm:N", title=None),
             yOffset="scope:N",
-            x=alt.X("error:Q", title="Mean absolute error (% of capacity; smaller is better)"),
+            x=alt.X(
+                "error:Q",
+                title="Mean absolute error (% of capacity; smaller is better)",
+                scale=alt.Scale(domain=domain, zero=False),
+            ),
             color=alt.Color(
                 "scope:N",
                 scale=alt.Scale(
@@ -1466,58 +1702,110 @@ def scope_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     title = "A shared XGBoost model scored worse than one XGBoost model per plant (descriptive)"
     subtitle = [
         (
-            "Mean absolute error at lead-day 1 (the forecast for the day after the day it is "
-            "issued) on the hours that both the per-plant and the shared XGBoost models score, "
-            "at the primary (default XGBoost) setting. The shared (global) model is given no "
-            "information about which plant a row belongs to."
+            "Mean absolute error at lead-day 1 on the hours that both the per-plant and the "
+            "shared XGBoost models score, % of capacity; smaller is better."
         ),
         (
-            "The two versions split the months into held-out blocks differently, so this "
-            "comparison is descriptive. The fingerprint figure compares shared models with each "
-            "other. Its intervals are 95%."
+            "The shared (global) model is given no information about which plant a row belongs "
+            "to. The two versions split the months into held-out blocks differently, so this "
+            "comparison is descriptive."
+        ),
+    ]
+    footnote = [
+        (
+            "Lead-day 1 is the forecast for the day after the day it is issued. Both versions "
+            "use the primary (default XGBoost) setting. The fingerprint figure compares shared "
+            "models with each other."
         ),
         "All rows are exploratory.",
         arm_key("B0", "L1"),
     ]
     text.add(
-        figure_id="12",
+        figure_id="14",
         plots="Per-plant against global error of B0 and L1",
-        lines=[title, *subtitle, "Mean absolute error (% of capacity; smaller is better)"],
+        lines=[
+            title,
+            *subtitle,
+            *footnote,
+            "Mean absolute error (% of capacity; smaller is better)",
+        ],
     )
-    return figure(panels=[chart], number=12, title=title, subtitle=subtitle, figure_planning=None)
+    return figure(panels=[chart], number=14, title=title, subtitle=subtitle, footnote=footnote)
 
 
-def fingerprint_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
-    """Figure 13: the global fingerprint mini-sweep, with the leave-one-plant-out fits.
+FINGERPRINT_PAIRS: Final[tuple[tuple[str, str], ...]] = (
+    ("G-ID", "G-B0"),
+    ("G-FP", "G-B0"),
+    ("G-L1", "G-B0"),
+    ("LOPO G-FP", "LOPO G-B0"),
+    ("LOPO G-L1", "LOPO G-B0"),
+)
+"""The paired differences the fingerprint figure draws, each a model given something against the
+same model given nothing."""
+
+
+def fingerprint_figure(
+    *, root: Path, product: WeatherProduct, tables: Path, text: FigureText, smoke: bool
+) -> alt.VConcatChart:
+    """Figure 15: the shared model's paired gain from plant information, seen and unseen plants.
 
     Args:
+        root: The output root.
+        product: The weather product.
         tables: The report's tables directory.
         text: The text collector.
+        smoke: Whether the output being drawn is a smoke run's.
 
     Returns:
         The figure.
     """
     sweep = pl.read_parquet(tables / "fingerprint.parquet").with_columns(
-        difference=pl.col("error") * PERCENTAGE_POINTS,
-        lower=pl.col("lower") * PERCENTAGE_POINTS,
-        upper=pl.col("upper") * PERCENTAGE_POINTS,
-        group=pl.when(pl.col("arm").str.starts_with("LOPO"))
-        .then(pl.lit("Leave one plant out"))
-        .otherwise(pl.lit("All plants in training")),
+        difference=pl.col("error") * PERCENTAGE_POINTS
     )
-    x_title = "Mean absolute error (% of capacity; smaller is better)"
+    sweep_losses = fingerprint_losses(
+        losses=pl.read_parquet(
+            root / product / f"losses_{product}{run_suffix(smoke=smoke)}.parquet"
+        )
+    )
+    error_of = {row["arm"]: float(row["difference"]) for row in sweep.iter_rows(named=True)}
+    records = []
+    for treatment, reference in FINGERPRINT_PAIRS:
+        interval = paired_interval(
+            scoped=sweep_losses.filter(pl.col("arm").is_in([treatment, reference])),
+            treatment=treatment,
+            reference=reference,
+            metric=METRIC,
+            level=EXPLORATORY_LEVEL,
+        )
+        if interval is None:
+            continue
+        records.append(
+            {
+                "label": (
+                    f"{treatment} minus {reference} "
+                    f"({error_of[treatment]:.2f}% and {error_of[reference]:.2f}%)"
+                ),
+                "difference": interval["difference"] * PERCENTAGE_POINTS,
+                "lower": interval["lower_95"] * PERCENTAGE_POINTS,
+                "upper": interval["upper_95"] * PERCENTAGE_POINTS,
+                "group": "Leave one plant out"
+                if treatment.startswith("LOPO")
+                else "All plants in training",
+            }
+        )
+    paired = pl.DataFrame(records)
+    x_title = "Change in error (percentage points of capacity; more negative is better)"
     chart = _intervals_chart(
-        data=sweep,
-        y="arm",
+        data=paired,
+        y="label",
         x_title=x_title,
         colour="group",
         shape="group",
         legend_title="Training",
-        width_offset=181,
+        width_offset=300,
     )
-    errors = {row["arm"]: float(row["difference"]) for row in sweep.iter_rows(named=True)}
-    seen_gain = errors["G-B0"] - errors["G-FP"]
-    unseen_gain = errors["LOPO G-B0"] - errors["LOPO G-FP"]
+    seen_gain = error_of["G-B0"] - error_of["G-FP"]
+    unseen_gain = error_of["LOPO G-B0"] - error_of["LOPO G-FP"]
     claim(
         holds=seen_gain > unseen_gain > 0,
         what="the fingerprint's gain is positive and smaller for an unseen plant",
@@ -1527,29 +1815,45 @@ def fingerprint_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     )
     subtitle = [
         (
-            "Every row is one XGBoost model shared by all plants, scored by mean absolute error "
-            "at lead-day 1 (the forecast for the day after the day it is issued). The "
-            "fingerprint (G-FP) describes each plant by its transfer ratio (TF), clipping "
-            "ceiling (CK), and daily shape. An unseen plant is a plant left out of training "
-            "(the leave-one-plant-out, LOPO, rows)."
+            "Change in error of a shared XGBoost model given plant information, compared with "
+            "the same model given none (G-B0), in percentage points of capacity; more negative "
+            "is better. Dot: estimate. Line: 95% interval from resampling whole months."
         ),
         (
-            "A post hoc decomposition in the follow-up report attributes the gain to the transfer "
-            "ratio, and finds the clipping ceiling does not help a plant the model has not seen."
+            "Each row label gives the two models' mean absolute errors (% of capacity). Orange: "
+            "the scored plant was in training. Purple: the scored plant was left out of "
+            "training, an unseen plant."
         ),
-        "Dot: estimate. Line: 95% interval from resampling whole months. All rows are exploratory.",
+        (
+            "A post hoc decomposition in the follow-up report attributes the gain to the "
+            "transfer ratio and finds the clipping ceiling does not help an unseen plant."
+        ),
+    ]
+    footnote = [
+        (
+            "The fingerprint (G-FP) describes each plant by its transfer ratio (TF), clipping "
+            "ceiling (CK), and daily shape. Lead-day 1 is the forecast for the day after the "
+            "day it is issued."
+        ),
+        "All rows are exploratory.",
         arm_key("G-B0", "G-ID", "G-L1", "G-FP", "LOPO", "TF", "CK"),
     ]
     text.add(
-        figure_id="13",
+        figure_id="15",
         plots="Errors of G-B0, G-ID, G-L1, G-FP and the leave-one-plant-out fits",
-        lines=[title, *subtitle, x_title, "Training: All plants in training, Leave one plant out"],
+        lines=[
+            title,
+            *subtitle,
+            *footnote,
+            x_title,
+            "Training: All plants in training, Leave one plant out",
+        ],
     )
-    return figure(panels=[chart], number=13, title=title, subtitle=subtitle, figure_planning=None)
+    return figure(panels=[chart], number=15, title=title, subtitle=subtitle, footnote=footnote)
 
 
 def importance_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | None:
-    """Figure 14: each arm's share of total gain by feature group, descriptive only.
+    """Figure 18: each arm's share of total gain by feature group, descriptive only.
 
     Args:
         tables: The report's tables directory.
@@ -1578,37 +1882,44 @@ def importance_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | N
     labels = (
         alt.Chart(shares)
         .mark_text(fontSize=9, aria=False)
-        .encode(x="label:N", y="group:N", text="text:N")  # ty: ignore[unresolved-attribute]
+        .encode(  # ty: ignore[unresolved-attribute]
+            x="label:N",
+            y="group:N",
+            text="text:N",
+            color=alt.condition("datum.share > 0.5", alt.value("white"), alt.value(ocf.BLACK_1)),
+        )
     )
     title = "Where each arm's trees split, by feature group (descriptive)"
     subtitle = [
         (
+            "Each cell is the feature group's share of the arm's total split gain, averaged over "
+            "plants and folds."
+        ),
+        (
             "Gain here is XGBoost's split importance: how much a column's splits reduce the "
             "training loss. Split gain is not the error gain over B0 shown in the other figures."
         ),
+    ]
+    footnote = [
         (
-            "Each cell is the feature group's share of the arm's total split gain, averaged over "
-            "plants and folds. The split gains come from a separate refit of each arm as a "
-            "single-value (not quantile) XGBoost model."
-        ),
-        (
-            "Gain is measured on training rows. Gain also divides credit between correlated "
-            "columns by chance."
+            "The split gains come from a separate refit of each arm as a single-value (not "
+            "quantile) XGBoost model. Gain is measured on training rows. Gain also divides "
+            "credit between correlated columns by chance."
         ),
         "Importance is never evidence that an input helps; the planned contrasts are the evidence.",
         arm_key(*sorted(shares["arm"].unique().to_list())),
     ]
     text.add(
-        figure_id="14",
+        figure_id="18",
         plots="Share of total split gain by feature group for B0, L1, L2, S2 and AN",
-        lines=[title, *subtitle, "Arm", "Mean share of split gain"],
+        lines=[title, *subtitle, *footnote, "Arm", "Mean share of split gain"],
     )
     return figure(
         panels=[(heat + labels).properties(width=CONTENT_WIDTH_PX - 217, height=300)],
-        number=14,
+        number=18,
         title=title,
         subtitle=subtitle,
-        figure_planning=None,
+        footnote=footnote,
     )
 
 
@@ -1625,7 +1936,7 @@ KIND_LABELS: Final[dict[str, str]] = {"month": "Month-level", "step": "Plant ste
 
 
 def followup_controls_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
-    """Follow-up figure A: the share of the oracle's gain each arm recovers, in both controls.
+    """Figure 8: the share of the oracle's gain each arm recovers, in both controls.
 
     Args:
         tables: The follow-ups' tables directory.
@@ -1685,31 +1996,34 @@ def followup_controls_figure(*, tables: Path, text: FigureText) -> alt.VConcatCh
     title = "Multi-day and satellite inputs recover more of a planted power loss than one day's lag"
     subtitle = [
         (
-            "The oracle is B0 given the true shift factor, the most any lag feature could gain. "
             "Each dot is one arm in one control at one shift size: its error gain over B0 "
-            "divided by the oracle's gain."
+            "divided by the oracle's gain (0: none, 1: all of it). The oracle is B0 given the "
+            "true shift factor, the most any lag feature could gain."
         ),
         (
-            "A control is a planted-loss test: the forecasts are re-fitted on a synthetic target "
-            "in which measured power is cut by the shift (5% or 10%). In the month-level "
+            "Dashed lines: no gain (0) and the oracle's gain (1). Faint dots: zero lies inside "
+            "the arm's 99% interval, so the gain is not clearly different from none. No dot is "
+            "drawn where the oracle's own 99% interval includes zero."
+        ),
+    ]
+    footnote = [
+        (
+            "A control is a planted-loss test: the forecasts are re-fitted on a synthetic "
+            "target in which measured power is cut by the shift (5% or 10%). In the month-level "
             "control, the cut applies in 9 of the 18 scored months and a random half of the "
             "others. In the plant-steps control, each plant's power is cut for a random 4 to 12 "
             "weeks."
         ),
-        (
-            "Dashed lines: no gain (0) and the oracle's gain (1). Faint dots: zero lies inside the "
-            "arm's 99% interval, so the gain is not clearly different from none."
-        ),
-        "No dot is drawn where the oracle's own 99% interval includes zero.",
         POST_HOC,
         arm_key("B0", *order),
     ]
     text.add(
-        figure_id="A",
+        figure_id="8",
         plots="Share of the oracle's gain recovered, per arm, control and shift",
         lines=[
             title,
             *subtitle,
+            *footnote,
             x_title,
             "Control (planted-loss test): Month-level, Plant steps",
             "Shift (planted loss): 5%, 10%",
@@ -1718,11 +2032,10 @@ def followup_controls_figure(*, tables: Path, text: FigureText) -> alt.VConcatCh
     )
     return figure(
         panels=[(rules + dots).properties(width=CONTENT_WIDTH_PX - 42, height=240)],
-        number="A",
+        number=8,
         title=title,
         subtitle=subtitle,
-        figure_planning=None,
-        label="Follow-up figure",
+        footnote=footnote,
     )
 
 
@@ -1747,7 +2060,7 @@ LAG_ARMS: Final[tuple[str, ...]] = ("W7", "Q30", "N2", "N2-3")
 
 
 def followup_long_leads_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
-    """Follow-up figure B: the long-lead gains over B0, with climatology and its blends drawn.
+    """Figure 13: the long-lead gains over B0, with climatology and its blends drawn.
 
     Args:
         tables: The follow-ups' tables directory.
@@ -1804,37 +2117,43 @@ def followup_long_leads_figure(*, tables: Path, text: FigureText) -> alt.VConcat
     title = "Blending B0 with climatology lowers long-lead error more than any lag arm shown does"
     subtitle = [
         (
-            "Top: arms that use climatology, shown as the error minus B0's. The climatology of "
-            "every top-panel arm is the median power of the plant's calendar month and hour from "
-            "months outside the scored block (out-of-fold). Those months include months after the "
-            "target day, which a live service would not have."
+            "Top: arms that use climatology. Bottom: lag arms. Error minus B0's in percentage "
+            "points of capacity; negative beats B0. Line: 95% interval from resampling whole "
+            "months. Zero is B0."
         ),
         (
             "Adding climatology as a column (CL) leaves the 95% interval across zero at every "
             "lead-day shown, so CL does not clearly beat B0."
         ),
         (
-            "Bottom: lag arms. W7 and Q30 read recent days. N2 reads one random day from months "
-            "not being scored, and N2-3 reads three such days, giving N2-3 as many columns as "
-            "W7. N2 and N2-3 therefore show what a lag with no recent information gains. "
-            "Line: 95% interval from resampling whole months. Zero is B0."
+            "The climatology of every top-panel arm comes from months that include later ones, "
+            "which a live service would not have."
+        ),
+    ]
+    footnote = [
+        (
+            "Climatology is the median power of the plant's calendar month and hour from months "
+            "outside the scored block (out-of-fold). W7 and Q30 read recent days. N2 reads one "
+            "random day from months not being scored, and N2-3 reads three such days, giving "
+            "N2-3 as many columns as W7. N2 and N2-3 therefore show what a lag with no recent "
+            "information gains."
         ),
         POST_HOC,
         arm_key("CL", "W7+CL", "B0xCL", "W7xCL", "climatology", "W7", "Q30", "N2", "N2-3"),
     ]
     text.add(
-        figure_id="B",
+        figure_id="13",
         plots="Long-lead gain over B0, climatology arms and lag arms",
-        lines=[title, *subtitle, x_title, y_title, "Arm"],
+        lines=[title, *subtitle, *footnote, x_title, y_title, "Arm"],
     )
     return figure(
         panels=[panel(CLIMATOLOGY_ARMS), panel(LAG_ARMS)],
-        number="B",
+        number=13,
         title=title,
         subtitle=subtitle,
-        figure_planning=None,
-        label="Follow-up figure",
-    ).resolve_scale(color="independent")
+        footnote=footnote,
+        independent_colour=True,
+    )
 
 
 ERA_COLOURS: Final[dict[str, str]] = {
@@ -1846,7 +2165,7 @@ ERA_COLOURS: Final[dict[str, str]] = {
 
 
 def followup_unselected_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
-    """Follow-up figure C: every arm's gain over B0 on the 8 months the sweep never screened.
+    """Figure 10: every arm's gain over B0 on the 8 months the sweep never screened.
 
     Args:
         tables: The follow-ups' tables directory.
@@ -1907,14 +2226,20 @@ def followup_unselected_figure(*, tables: Path, text: FigureText) -> alt.VConcat
     )
     subtitle = [
         (
-            "Mean absolute error minus B0's at lead-day 1 (the forecast for the day after the day "
-            "it is issued), per-plant fits, primary (default XGBoost) setting. Dot: estimate. "
-            "Line: 95% interval from resampling whole months. Zero is B0."
+            "Mean absolute error minus B0's at lead-day 1, per-plant fits, in percentage points "
+            "of capacity; negative beats B0. Dot: estimate. Line: 95% interval from resampling "
+            "whole months. Zero is B0."
         ),
         (
-            f"{SHARED_TERMS['era']} The black rows use all 8 months. The study has no 2026-01, "
-            "so the later era starts at 2026-02. An era of fewer than 6 months has a wide "
-            "interval."
+            "Black rows use all 8 months; blue and orange rows split them by era. An era of "
+            "fewer than 6 months has a wide interval."
+        ),
+    ]
+    footnote = [
+        (
+            f"{SHARED_TERMS['era']} The study has no 2026-01, so the later era starts at "
+            "2026-02. Lead-day 1 is the forecast for the day after the day it is issued. "
+            "The primary hyperparameter setting is the default XGBoost setting."
         ),
         (
             "The screening rule picked AN from the first 10 months, so AN's row here is out of "
@@ -1924,22 +2249,27 @@ def followup_unselected_figure(*, tables: Path, text: FigureText) -> alt.VConcat
         arm_key("B0", *overall["arm"].to_list()),
     ]
     text.add(
-        figure_id="C",
+        figure_id="10",
         plots="Per-arm gain over B0 on the unselected months, by era",
-        lines=[title, *subtitle, x_title, "Months: all 8, 2025-10 to 2025-12, 2026-02 onwards"],
+        lines=[
+            title,
+            *subtitle,
+            *footnote,
+            x_title,
+            "Months: all 8, 2025-10 to 2025-12, 2026-02 onwards",
+        ],
     )
     return figure(
         panels=[chart],
-        number="C",
+        number=10,
         title=title,
         subtitle=subtitle,
-        figure_planning=None,
-        label="Follow-up figure",
+        footnote=footnote,
     )
 
 
 def followup_hit_rate_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
-    """Follow-up figure D: the share of rows at or below each quantile, against the quantile level.
+    """Figure 17: the share of rows at or below each quantile, against the quantile level.
 
     Args:
         tables: The follow-ups' tables directory.
@@ -1983,27 +2313,32 @@ def followup_hit_rate_figure(*, tables: Path, text: FigureText) -> alt.VConcatCh
         f"{high:.0%} quantiles"
     )
     subtitle = [
-        forecasts_statement(runs="one training run (fitting seed)", rows="all 18 scored months"),
         (
-            "A calibrated forecast has, say, 10% of hours at or below its 10% quantile. "
-            "Dashed line: a calibrated forecast. Above the dashed line the quantile is too high, "
-            "and below the dashed line the quantile is too low."
+            "Share of hours with measured power at or below each quantile of the forecast, "
+            "against the quantile's level. Dashed line: a calibrated forecast, which has 10% of "
+            "hours at or below its 10% quantile."
         ),
+        (
+            "Above the dashed line the quantile is too high, and below the dashed line the "
+            "quantile is too low."
+        ),
+    ]
+    footnote = [
+        forecasts_statement(runs="one training run (fitting seed)", rows="all 18 scored months"),
         POST_HOC,
         arm_key("B0", "L1"),
     ]
     text.add(
-        figure_id="D",
+        figure_id="17",
         plots="Quantile hit rate against level for B0 and L1",
-        lines=[title, *subtitle, x_title, y_title, "B0 (no lag) or L1 (one lag)"],
+        lines=[title, *subtitle, *footnote, x_title, y_title, "B0 (no lag) or L1 (one lag)"],
     )
     return figure(
         panels=[diagonal + lines],
-        number="D",
+        number=17,
         title=title,
         subtitle=subtitle,
-        figure_planning=None,
-        label="Follow-up figure",
+        footnote=footnote,
     )
 
 
@@ -2074,10 +2409,10 @@ def draw_followups(*, root: Path, smoke: bool, text_only: bool) -> int:
     tables = directory / f"tables_followups_ens_mean{suffix}"
     text = FigureText()
     figures = {
-        "A_controls": followup_controls_figure(tables=tables, text=text),
-        "B_long_leads": followup_long_leads_figure(tables=tables, text=text),
-        "C_unselected_months": followup_unselected_figure(tables=tables, text=text),
-        "D_hit_rates": followup_hit_rate_figure(tables=tables, text=text),
+        "8_controls_all_arms": followup_controls_figure(tables=tables, text=text),
+        "13_long_leads": followup_long_leads_figure(tables=tables, text=text),
+        "10_unselected_months": followup_unselected_figure(tables=tables, text=text),
+        "17_hit_rates": followup_hit_rate_figure(tables=tables, text=text),
     }
     text_path = directory / f"figure_text_followups_ens_mean{suffix}.txt"
     text.write(path=text_path)
@@ -2087,7 +2422,7 @@ def draw_followups(*, root: Path, smoke: bool, text_only: bool) -> int:
     render_figures(
         figures=figures,
         output=directory / f"figures_followups_ens_mean{suffix}",
-        asset_prefix=None if smoke else "lag_features_followup_figure_",
+        asset_prefix=None if smoke else "lag_features_figure_",
     )
     return 0
 
@@ -2118,24 +2453,26 @@ def main() -> int:
     figures = {
         "1_headline": headline_figure(tables=tables, text=text),
         "2_data": data_figure(root=root, product=product, text=text, smoke=smoke),
-        "3_controls": control_figure(tables=tables, text=text),
-        "4_models_work": models_work_figure(root=root, product=product, text=text, smoke=smoke),
-        "5_sweep": sweep_figure(tables=tables, text=text),
-        "6_by_lead": by_lead_figure(tables=tables, text=text),
+        "7_controls": control_figure(tables=tables, text=text),
+        "5_three_weeks": models_work_figure(root=root, product=product, text=text, smoke=smoke),
+        "9_screen": sweep_figure(tables=tables, text=text),
+        "12_by_lead": by_lead_figure(tables=tables, text=text),
     }
     optional = {
-        "7_coverage": coverage_figure(tables=tables, text=text),
-        "14_importance": importance_figure(tables=tables, text=text),
+        "16_coverage": coverage_figure(tables=tables, text=text),
+        "18_importance": importance_figure(tables=tables, text=text),
     }
     figures |= {name: chart for name, chart in optional.items() if chart is not None}
-    figures["8_lag_construction"] = lag_construction_figure(
+    figures["3_lag_construction"] = lag_construction_figure(
         root=root, product=product, text=text, smoke=smoke
     )
-    figures["9_withheld_folds"] = withheld_folds_figure(tables=tables, text=text)
-    figures["10_by_plant"] = by_plant_figure(tables=tables, text=text)
+    figures["4_withheld_folds"] = withheld_folds_figure(tables=tables, text=text)
+    figures["6_by_plant"] = by_plant_figure(tables=tables, text=text)
     figures["11_monthly"] = monthly_figure(tables=tables, text=text)
-    figures["12_per_plant_vs_global"] = scope_figure(tables=tables, text=text)
-    figures["13_fingerprint"] = fingerprint_figure(tables=tables, text=text)
+    figures["14_per_plant_vs_global"] = scope_figure(tables=tables, text=text)
+    figures["15_fingerprint"] = fingerprint_figure(
+        root=root, product=product, tables=tables, text=text, smoke=smoke
+    )
     text_path = directory / f"figure_text_{product}{suffix}.txt"
     text.write(path=text_path)
     _LOG.info("wrote %s", text_path)
