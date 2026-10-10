@@ -18,8 +18,8 @@ ensemble forecast (ENS), reading the matched-lead study's inputs that are alread
 two views of one table of out-of-fold losses**, produced by the existing `run_all` and
 `out_of_fold_losses`, so nothing is fitted twice.
 
-- **Phase 1, a broad shallow sweep:** 14 fitted ideas for lagged or lag-derived inputs (plus one
-  that needs no fitting), each scored as its own absolute error on the first 13 calendar months,
+- **Phase 1, a broad shallow sweep:** 18 fitted ideas for lagged or lag-derived inputs (plus four
+  post-model corrections that need no fitting), each scored as its own absolute error on the first 13 calendar months,
   with no pairwise comparison and no significance claim. The page shows one ranked chart. The sweep
   generates hypotheses.
 - **Phase 2, a rigorous comparison:** five planned paired contrasts, fixed before any fit, one of
@@ -129,16 +129,16 @@ Phase 1 reads these losses on the first 13 calendar months (2024-12 to 2025-12) 
 | Family | Arm (extra columns) |
 |---|---|
 | Reference | B0 baseline (0); no-ML persistence and diurnal persistence (existing columns) |
-| Single lag | L1 latest whole day, same clock hour (1); L7 seven separate lags, days 1 to 7 (7) |
-| Lag with weather | L2 L1 plus the forecast irradiance and temperature at the lag hour, from the target's lead day (3) |
+| Single lag | L1 latest whole day, same clock hour (1); IM the issue morning: observed energy in the hours ending at or before 09:00 UTC on the issue day, its ratio to the forecast irradiance over the same hours, and the hour count (3) |
+| Lag with weather | L2 L1 plus the forecast irradiance and temperature at the lag hour, from the target's lead day (3); CTX7 raw context: lags and lag-hour forecast irradiance for days 1 to 7 (14) |
 | Weekly statistics | W7 minimum, maximum, mean of the same clock hour over the latest 7 whole days, at least 5 present (3) |
-| Slow trackers | Q30 the 30-day 90th percentile and median of the same clock hour, and the slope of the daily peak over 30 days (3) |
-| Daily summary | DS yesterday's peak power, total energy, and mean clear-sky index (3) |
+| Slow trackers | Q30 the 30-day 90th percentile and median of the same clock hour (2); CK the clipping ceiling: expanding 99.5th percentile and 60-day maximum of hourly power, and the share of clear hours near the ceiling (3) |
+| Transfer function | TF the 30-day ratio of power to forecast irradiance at the same clock hour (hours above 50 W m⁻², at least 15 days present), and that ratio times the target's forecast irradiance (2); AN the analogue ensemble: the mean, forecast clear-sky index, and spread of the observed power (rescaled by clear-sky irradiance) on the 5 days in the last 30 whose forecast clear-sky index was closest to the target's (3); PC the 7-day ratio of power to satellite irradiance (CAMS, assumed published 2 days late) and the 30-day ratio of satellite to forecast irradiance, study-only because the live service does not ingest CAMS (2) |
 | Two-step | S2 stage-1 prediction at the target hour and the lag hour, the observed lag, and their difference (4); S3 mean stage-1 residual over the last 1, 7, and 30 days (3) |
-| Cross-plant | FL the mean of the other plants' lag at the same hour, over whichever are present (1) |
-| Drift without lags | T1 days since 2024-03-01 (1): lets trees learn drift, the alternative explanation of any lag gain |
-| Post-model | R1 the baseline's out-of-fold prediction multiplied by the last 7 days' observed-over-predicted energy ratio (no fit; computed in the report from the stage-1 columns) |
-| Combination | KS the kitchen sink: L1, W7, Q30, S3, FL (about 14) |
+| Cross-plant | RP the plant's 7-day capacity-normalised energy divided by the mean of the other plants', which isolates a plant-specific fault from shared weather (2, with a 1-day version) |
+| Interpolation bound | T1 days since 2024-03-01 (1): month-block folds interleave, so trees can interpolate a test month's level from months on both sides, including future months; its gain is what interpolation buys, never drift a live forecast could use |
+| Post-model (no fit; computed in the report from the stage-1 columns) | R1s the baseline's prediction times the last 7 days' observed-over-predicted energy ratio, shrunk halfway to 1; R2 the same with a per-clock-hour 30-day ratio; R4 predictions and upper quantiles clamped at CK's ceiling; R5 the baseline's point forecast plus the quantiles of stage-1 residuals over the last 30 days within the target's forecast clear-sky tercile, scored on CRPS against the baseline's quantile model |
+| Combination | KS the kitchen sink: L1, IM, W7, Q30, TF, S3, RP (about 16) |
 | Controls | N1 one observed hour from days 8 to 28 before the issue day at the same clock hour, never the L1 day (1); N2 a lag from a uniformly random observed day of the whole record, the true null (1) |
 
 **Two-step arms use the existing `{fold}` column pattern.** Stage-1 predictions are written as
@@ -163,6 +163,17 @@ regardless). Phase 2 carries X.
   nine quantiles (0.1 to 0.9)". A B0-versus-L1 figure shows the share of rows inside the 10% to 90%
   interval against a nominal 80%, and the interval width in clear, mixed and cloudy hours (by the
   forecast clear-sky index). This wrapper is the only quantile code written for the study.
+- **Global fingerprint mini-sweep (purpose: a "fingerprint" of each system for a model trained on
+  many systems):** G-B0 (B0's columns), G-ID (G-B0 plus an integer plant code, the in-sample upper
+  bound for any static fingerprint), G-L1, and G-FP (G-B0 plus the fingerprint pack: TF, CK, and the
+  diurnal centroid shift and shoulder share DT, computed over the 30 days before the issue day).
+  A per-plant model already knows its own plant, so a fingerprint can only help there where the
+  property changes; the global scope is the only place it is tested. G-FP close to G-ID, which is
+  close to per-plant B0, shows the features carry plant identity. A leave-one-plant-out run
+  (exploratory; the plant's scored months withheld at all plants) of G-B0, G-L1, and G-FP tests
+  whether a fingerprint helps a plant the model has never seen. Six plants cannot show that a
+  fingerprint scales to hundreds of systems, because trees cannot interpolate between five points,
+  and the page says so. Global-only arms stay out of the per-plant shortlist rule.
 - **Global scope:** B0, L1 and X at lead-day 1, one XGBoost model across the 6 plants with no plant
   identifier, coordinates or capacity column. The plants are pooled into one site-sorted frame
   whose `fold` is one fleet-wide assignment (`assign_folds` over a constant grouping), so every fold
@@ -252,15 +263,16 @@ though another job already held it at 99% utilisation, so that comparison is con
 
 | Stage | Fits | Single-fit time |
 |---|---|---|
-| Primary sweep, point model: 14 arms x 6 plants x 5 folds x 3 seeds | 1,260 | about 20 min (wider arms are slower) |
+| Primary sweep, point model: 18 arms x 6 plants x 5 folds x 3 seeds | 1,620 | about 30 min (wider arms are slower) |
 | Sensitivity setting, point model: 7 arms | 630 | about 12 min |
 | Quantile models, primary: B0, L1, X, N2 | 360 | about 40 min |
 | Quantile models, sensitivity: B0, L1 | 180 | about 30 min |
 | Global scope: B0, L1, X, both settings; quantiles for B0 and L1 | 90 | about 16 min |
+| Global fingerprint mini-sweep (G-B0, G-ID, G-L1, G-FP; one setting, three seeds; plus leave-one-plant-out) | about 150 | about 8 min |
 | Longer leads: 6 arms x 7 extra lead-days (0, 2, 3, 5, 7, 10, 14) x 6 plants x 5 folds x 3 seeds | 3,780 | about 45 min |
 | Stage-1 models, positive control, IFS HRES replicate | about 800 | about 12 min |
 
-**Total: about 3 h of single-fit time, so about 30 to 40 min of wall time with 6 fits running at
+**Total: about 3.3 h of single-fit time, so about 30 to 40 min of wall time with 6 fits running at
 once on an idle machine, and about 1.5 h while the machine is as busy as it is now (load average
 6).** The benchmark is repeated on the idle machine before any fit, and these numbers are then
 revised.
@@ -366,6 +378,15 @@ at the target's lead day; the minimum-count rule and lags from the full cleaned 
 minus L2; 99% intervals; a threshold for the CRPS contrast; a multiplicative positive control
 applied before the lags; script assertions; the "partly identify the plant" wording; the
 ENS rerun; the cleaning caveat; the interval caveats. Modified: the single device.
+
+**Ideas review (the maintainer asked for more calibration and fingerprint ideas).** Accepted: AN, TF,
+IM, RP (replacing the fleet mean), CK, PC (study-only), CTX7 (replacing L7), the post-model
+corrections R1s, R2, R4 and R5, and the global fingerprint mini-sweep with G-ID as the in-sample
+upper bound and a leave-one-plant-out run (reinstated as exploratory because it is the only test
+of in-context learning); DS dropped; the slope dropped from Q30; T1 relabelled as an interpolation
+bound. Left for a follow-up: rain-wash features (an ENS precipitation extract; a null is likely
+uninformative), snow, a temperature-coefficient fingerprint, aerosol optical depth as a feature,
+and sequence models.
 
 **Simplicity review 2.** Accepted: no padding (inert); phases as two views of one loss table; the
 `{fold}` pattern for two-step arms; quantile models for B0, L1, X, and N2 only, with Y dropped
