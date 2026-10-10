@@ -177,6 +177,27 @@ def _check_block(*, block: dict[str, Any], position: int, n_blocks: int) -> None
             raise RuntimeError(msg)
 
 
+def _request_url(*, sites: pl.DataFrame, init_time: datetime, variables: tuple[str, ...]) -> str:
+    """Return the request URL for one run. It carries coordinates and the key, so never log it.
+
+    Args:
+        sites: The site list with `latitude` and `longitude`.
+        init_time: The run's start, as a naive UTC datetime.
+        variables: The Open-Meteo variable names to request.
+
+    Returns:
+        The URL.
+    """
+    return (
+        f"{SINGLE_RUNS_URL}"
+        f"?latitude={','.join(str(value) for value in sites['latitude'])}"
+        f"&longitude={','.join(str(value) for value in sites['longitude'])}"
+        f"&run={init_time.strftime('%Y-%m-%dT%H:%M')}&forecast_hours={LEADS_PER_RUN}"
+        f"&hourly={','.join(variables)}&models={MODELS_PARAMETER}&timezone=UTC"
+        f"&cell_selection=nearest&apikey={_require_api_key()}"
+    )
+
+
 def fetch_run(*, sites: pl.DataFrame, run_date: date) -> pl.DataFrame:
     """Fetch every lead of one run for every site, in one request, and check it is complete.
 
@@ -194,15 +215,17 @@ def fetch_run(*, sites: pl.DataFrame, run_date: date) -> pl.DataFrame:
         RuntimeError: If the response is out of position, in unexpected units, or refused.
     """
     init_time = _run_time(run_date=run_date)
-    request = (
-        f"{SINGLE_RUNS_URL}"
-        f"?latitude={','.join(str(value) for value in sites['latitude'])}"
-        f"&longitude={','.join(str(value) for value in sites['longitude'])}"
-        f"&run={init_time.strftime('%Y-%m-%dT%H:%M')}&forecast_hours={LEADS_PER_RUN}"
-        f"&hourly={','.join(VARIABLES)}&models={MODELS_PARAMETER}&timezone=UTC"
-        f"&cell_selection=nearest&apikey={_require_api_key()}"
-    )
-    payload = _get_json(url=request)
+    request = _request_url(sites=sites, init_time=init_time, variables=tuple(VARIABLES))
+    try:
+        payload = _get_json(url=request)
+    except RuntimeError as failure:
+        if "attempts" not in str(failure):
+            raise
+        # For a run the archive lacks, the API answers a long request with HTTP 200 and a plain-text
+        # error, which is not JSON. A one-variable request gets the usual HTTP 400, so ask that to
+        # tell a missing run from a failing connection.
+        _get_json(url=_request_url(sites=sites, init_time=init_time, variables=("cloud_cover",)))
+        raise
     time.sleep(REQUEST_SLEEP_SECONDS)
     blocks = payload if isinstance(payload, list) else [payload]
     if len(blocks) != sites.height:
