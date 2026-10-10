@@ -1071,9 +1071,11 @@ def figure_where_ssrd_misses(
                 scale=alt.Scale(domain=DAY_HOUR_DOMAIN),
                 axis=alt.Axis(values=HOUR_TICKS),
             ),
-            y=alt.Y("gap:Q", title="ERA5 minus CAMS (W m⁻²)"),
+            y=alt.Y("gap:Q", title=None),
         ),
         days=days,
+    ).properties(
+        title=_title("Gap on three days: ERA5's solar radiation minus CAMS's irradiance (W m⁻²)")
     )
     summaries = []
     for name, title in present:
@@ -1100,7 +1102,7 @@ def figure_where_ssrd_misses(
             )
             .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X("x:Q", title=None, scale=alt.Scale(zero=False)),
-                y=alt.Y("mean_gap:Q", title="Gap (W m⁻²)"),
+                y=alt.Y("mean_gap:Q", title=None),
             )
             .properties(width=PLOT_WIDTH_PX // 2 - 40, height=110)
             .facet(
@@ -1108,6 +1110,9 @@ def figure_where_ssrd_misses(
                 columns=2,
             )
             .resolve_scale(x="independent")
+            .properties(
+                title=_title("Mean gap in each tenth of the hours, by each variable (W m⁻²)")
+            )
         )
         panels.append(binned)
     return figure(
