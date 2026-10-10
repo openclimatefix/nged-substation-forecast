@@ -26,7 +26,7 @@ stretch, the validation window, that the training never saw.** A training stretc
 validation window is called a fold. The leaderboard, the table that ranks every experiment, scores
 every experiment on the same fold. The agent never sees the leaderboard fold's validation window.
 The agent scores ideas on earlier folds. The maintainer then scores the best implementation of each
-of the most promising ideas on the leaderboard, and re-implements the ideas that survive.
+of the most promising ideas on the leaderboard fold, and re-implements the ideas that survive.
 
 **Each attempt at an idea is kept as a git branch, a separate copy of the code where a change can be
 tried without touching the reviewed code on `main`.** A change reaches `main` only through a pull
@@ -83,11 +83,10 @@ individual human reviewers agreed with each other.** [Lu et al.
 (2024)](https://arxiv.org/abs/2408.06292)'s AI Scientist generates an idea, writes code, runs the
 experiment, writes the result up as a paper, and then runs an automated peer review. The review
 alone costs $0.25 to $0.50 in application programming interface (API) calls per paper. F1 measures
-agreement with a conference's accept-or-reject decisions, and higher is better. On papers submitted
-to NeurIPS, a large machine-learning conference, the AI Scientist's automated reviewer reaches an F1
-score of 0.57 against a human baseline of 0.49. That automated reviewer's scores correlate more
-closely with the average human reviewer's score than individual human reviewers' scores correlate
-with each other.
+agreement with accept-or-reject decisions, and higher is better. The AI Scientist's automated
+reviewer reaches an F1 score of 0.57 against a human baseline of 0.49 from NeurIPS, a large
+machine-learning conference. That automated reviewer's scores correlate more closely with the
+average human reviewer's score than individual human reviewers' scores correlate with each other.
 
 **In the proposed design, agent reviews look for broken and leaky implementations before the
 implementations are scored. What certifies a finding is a reviewed re-implementation, scored on a
@@ -222,13 +221,12 @@ leaderboard like any other experiment.** The person writing the pull request rea
 implementation's diff, writes the idea up, and re-implements the idea through the usual review. No
 code the agent writes is merged into `main`. The re-implementation discards the agent's code. A
 score that came from a bug or from an edited metric therefore ends in a wasted re-implementation
-rather than a false result on the leaderboard. A leak that is part of the idea itself, such as a
-feature built on data from after the forecast was made, would survive a faithful re-implementation.
-Two finalist reviews therefore read every finalist for lookahead, the use of data that would not
-exist when the forecast is made, before the finalist is scored, as [From a session's results to a
-shipped improvement](#from-a-sessions-results-to-a-shipped-improvement) describes. The person
-re-implementing reads the diff again before porting the idea, and the pipeline's own guard sets
-leaky power lags to null.
+rather than a false result on the leaderboard. A leak that is part of the idea itself would survive
+a faithful re-implementation. Two finalist reviews therefore read every finalist for lookahead, the
+use of data that would not exist when the forecast is made, before the finalist is scored, as [From
+a session's results to a shipped improvement](#from-a-sessions-results-to-a-shipped-improvement)
+describes. The person re-implementing reads the diff again before porting the idea, and the
+pipeline's own guard sets leaky power lags to null.
 
 **The design guards against one risk above the others: selection bias on the leaderboard's
 validation window.** The only leaderboard fold, `mid_2025_to_mid_2026`, trains on data up to
@@ -242,10 +240,10 @@ recommendation in [issue #960 (Design rolling-origin CV folds, assuming at least
 retraining)](https://github.com/openclimatefix/nged-substation-forecast/issues/960) makes the same
 split for the leaderboard as a whole.
 
-**File permissions stop the agent reading the validation window by accident.** The design does not
-rely on the permissions, or on anything else, to stop a determined agent from cheating. The
-re-implementation discards the agent's code, and the finalist reviews and the person re-implementing
-each finalist read each finalist's diff first.
+**File permissions stop the agent reading the validation window by accident, but do not try to stop
+a determined agent from working around the permissions.** A determined agent's code still never
+reaches the leaderboard unread: the re-implementation discards the agent's code, and the finalist
+reviews and the person re-implementing each finalist read each finalist's diff first.
 
 ### Which Unix user runs what
 
@@ -264,21 +262,21 @@ the research Unix user and the truncated power copy for
 auto-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1093) tracks the
 setup. The one-off setup is:
 
-1. Create the `researcher` user, with its own Claude login and no AWS credentials or credentials for
-   NGED's S3 bucket, so `researcher` cannot read the raw files NGED delivers.
+1. Create the `researcher` user, with its own Claude login and no AWS credentials, including those
+   for NGED's S3 bucket, so `researcher` cannot read the raw files NGED delivers.
 2. Give `researcher` its own clone of this repository, which can pull from GitHub but holds no token
    to push.
 3. Write two copies into a data folder `researcher` owns: the cleaned power table (NGED's
    half-hourly power, with a flag on each row the cleaning rules reject), truncated at 2025-07-01,
    and the `TimeSeriesMetadata` table, which holds each series' location and type but no power. The
-   two copies need rewriting when the leaderboard fold changes, when a cleaning rule changes, or
-   when a series joins the `TimeSeriesMetadata` table.
+   power copy needs rewriting when the leaderboard fold changes or a cleaning rule changes, and both
+   copies need rewriting when a series joins the `TimeSeriesMetadata` table.
 4. Give `researcher` read-only access to the weather data, which holds no power observations.
 5. Deny `researcher` read access to the maintainer's MLflow store, and to everything else in the
    maintainer's data folder: the full power tables, the maintainer's forecasts and leaderboard
    metrics, the study outputs that hold derived power, and the `effective_capacity` table. The
-   `effective_capacity` table holds each series' 99th percentile (P99) of power over the full
-   history, validation window included. The leaderboard divides each error by that P99.
+   `effective_capacity` table holds each series' 99th percentile (P99) of absolute power over the
+   full history, validation window included. The leaderboard divides each error by that P99.
 
 **The maintainer's MLflow store is off limits because it holds every experiment's score on the
 validation window.** Reading those scores would let the research lead steer towards ideas that did
@@ -461,8 +459,8 @@ validate on different windows.
 1. Fetch the session's branches, and merge the hypothesis store into `main` by pull request.
 2. Choose the finalists from the index.
 3. For each finalist, have two fresh Opus agents review the diff of the idea's best-screening
-   implementation adversarially, one after the other. Opus is the largest of Anthropic's three tiers
-   of Claude model, after Haiku and Sonnet.
+   implementation adversarially, one after the other. Opus is the most capable of Anthropic's three
+   tiers of Claude model, above Sonnet and Haiku.
 4. Run each finalist that passes review through the cross-validation pipeline on the leaderboard
    fold, as the maintainer's own user. The agent never sees these scores.
 5. Re-implement each idea that survives in a reviewed pull request, scored on the leaderboard as
@@ -479,12 +477,12 @@ more scrutiny.
 re-implementing.** The finalist's experiment stays out of production, because promotion is a
 deliberate act the maintainer takes on a re-implementation only.
 
-**Running a finalist's branch gives the agent's code the full power data. The maintainer extends the
-same trust to any pull request run before review.** The two finalist reviews are the check on that
-step.
+**Running a finalist's branch gives the agent's code the full power data, the same access the
+maintainer gives any pull request run before review.** The two finalist reviews are the check on
+that step.
 
 **The finalist reviews go to the finalists because choosing the top-ranked implementations
-concentrates bugs among the finalists.** Choosing the top few of many implementations also tends to
+concentrates bugs among the finalists.** Choosing the top few of many implementations tends to
 choose the implementations whose bugs happened to raise the score, whether or not any agent meant to
 cheat. A bug in an implementation that ranks low, and that the research lead judged too small to
 review, wastes one screening run or loses one implementation of an idea. A bug in a finalist wastes
@@ -508,14 +506,16 @@ itself.** If the two rankings disagree often, the screening harness or its folds
   includes checking that `researcher` cannot read the new folder.
 - **No file permission hides what the public repository says.** Docs pages, study write-ups, and
   pull-request bodies can quote scores on the validation window, so the research-lead skill tells
-  the agent not to read study write-ups, leaderboard numbers, or pull-request discussions of scores.
+  the agent not to read validation-window scores in docs pages, study write-ups, or pull-request
+  bodies.
 - **A good idea can be abandoned because its implementation was broken.** The research lead can
   misjudge a substantial change as small and skip its review. Implementing an idea a second time
   when the idea's score is close to another idea's score, as [Several implementations of one
   idea](#several-implementations-of-one-idea) describes, limits the damage.
 - **A broken or leaky implementation can win the screening.** The finalist reviews and the
-  re-implementation stand between that implementation and the leaderboard, so the damage is wasted
-  effort, not a false result.
+  re-implementation stand between that implementation and the leaderboard, so a broken
+  implementation wastes effort rather than producing a false result. A leak that is part of the idea
+  itself survives the re-implementation, and only reading the diff can catch that leak.
 - **Two reviewers from the same family of LLMs can share a blind spot and miss the same subtle
   leak.** Three measures reduce that risk: stripping comments for the second reviewer, scrutinising
   unusually large gains, and the reviewed re-implementation.
