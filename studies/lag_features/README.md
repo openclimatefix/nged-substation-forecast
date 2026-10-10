@@ -35,9 +35,10 @@ uv run python studies/lag_features/fit_lag_arms.py --weather-product ifs_single 
 uv run python studies/lag_features/report_lag_features.py --weather-product ifs_single
 ```
 
-The fit script needs a compute slot. `--smoke` fits B0 and S2, one global model, one
-leave-one-plant-out model, the interval model and the importance refit on a few hundred rows with 20
-boosting rounds, writes `checkpoints_smoke/` and `losses_<product>_smoke.parquet`, and is not a result.
+The fit script needs a compute slot. `--smoke` runs the real path on 20 seeded random rows of each
+plant's month with 20 boosting rounds, writes `checkpoints_smoke/` and
+`losses_<product>_smoke.parquet`, and is not a result. `report_lag_features.py --smoke` and
+`lag_features_charts.py --smoke` read its output.
 
 ## Choices the plan did not settle
 
@@ -53,14 +54,13 @@ boosting rounds, writes `checkpoints_smoke/` and `losses_<product>_smoke.parquet
   months.
   Phase 1 screens 2024-12 to 2025-09 (10 months). P2 is scored on 2025-10 to 2026-06 without
   2026-01 (8 months).
-- **CAMS's publication delay.** The study assumes CAMS irradiance reaches a forecast two whole days
-  late, so PC's windows start three whole days back from the issue day and cover days 3 to 9
-  (power to satellite) and days 3 to 32 (satellite to forecast). The assumption comes from the CAMS
-  documentation, which says the radiation service provides data with up to 2 days of delay
-  ([Copernicus radiation service in a nutshell](https://atmosphere.copernicus.eu/sites/default/files/2020-03/Copernicus_radiation_service_in_nutshell_v11.pdf),
-  [CAMS solar radiation time-series](https://www.ecmwf.int/node/37329)). Some CAMS pages describe
-  the service as available to the previous day. The 2-day gap is therefore an assumption, and
-  the shorter delay would let PC read one more day.
+- **CAMS's latency.** Since February 2026 CAMS's point service has a latency of one day (see
+  [CAMS: use the point
+  API](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#cams-use-the-point-api-not-the-gridded-product)),
+  so at 09:00 UTC the whole previous day is available. PC's windows therefore cover days 1 to 7
+  (power to satellite) and days 1 to 30 (satellite to forecast) before the issue day, and the leak
+  probe fails a window that reads the issue day. Before February 2026 the real latency was longer,
+  so the backtest reads CAMS slightly fresher than the service then offered.
 - **Power-data latency is ignored** by design: PV power can be had within minutes, so IM reads every
   hour that ended by 09:00 UTC on the issue day.
 - **IM's forecast irradiance** is the same run's lead-day 0 value of the issue-morning hours.
@@ -78,9 +78,9 @@ boosting rounds, writes `checkpoints_smoke/` and `losses_<product>_smoke.parquet
   first `k` of them. A month in no fold is allowed.
 - **The arms with `{fold}` columns** are S2, S3 and KS; stage 1 uses the
   primary setting and seed 0.
-- **Positive control**: power is scaled by one minus the shift in a seeded random half of the
-  calendar months (2019-09 to 2026-06), so no tree can learn the shift from the date. The library
-  fits all three seeds.
+- **Positive control**: power is scaled by one minus the shift in exactly 9 of the 18 scored months,
+  chosen by a seeded permutation, and in a seeded random half of the other calendar months (2019-09
+  to 2026-06), so no tree can learn the shift from the date. The library fits all three seeds.
 - **The interval figure and R4** use the nine saved quantiles of B0 and L1 (`intervals__B0`,
   `intervals__L1` checkpoints), from seed 0 only, sorted within each row.
 - **Feature importance** comes from a separate refit (`importance__<arm>` checkpoints) of B0, L1, L2,

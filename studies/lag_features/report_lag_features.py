@@ -55,9 +55,16 @@ from build_lag_frame import (
     scored_months,
     shifted_months,
     smoke_subsample,
+    target_date,
     write_parquet_atomic,
 )
-from fit_lag_arms import INTERVAL_ARMS, METRIC, SCREENING_MONTHS, SHORTLIST_CANDIDATES
+from fit_lag_arms import (
+    INTERVAL_ARMS,
+    METRIC,
+    SCREENING_MONTHS,
+    SHORTLIST_CANDIDATES,
+    verify_manifest_inputs,
+)
 from studies.baselines import climatology, issue_time
 from studies.bootstrap import (
     MIN_MONTHS_FOR_INTERVAL,
@@ -647,8 +654,7 @@ def r5_anchor_probe(
         "time",
         "fold",
         tercile=_tercile(index=pl.col("nwp_ghi") / pl.col("clear_sky_w_m2"), cuts=cuts),
-        asof=(pl.col("time") - pl.duration(minutes=30)).dt.date()
-        - pl.duration(days=FULL_SWEEP_LEAD_DAY + 1),
+        asof=target_date(lead_day=FULL_SWEEP_LEAD_DAY),
         issue=issue_time(
             day_start=(pl.col("time") - pl.duration(minutes=30)).dt.truncate("1d"),
             day=FULL_SWEEP_LEAD_DAY,
@@ -717,8 +723,7 @@ def r5_losses(
         "cap_mw",
         "effective_capacity_mw",
         target_tercile_index=pl.col("nwp_ghi") / pl.col("clear_sky_w_m2"),
-        asof=(pl.col("time") - pl.duration(minutes=30)).dt.date()
-        - pl.duration(days=FULL_SWEEP_LEAD_DAY + 1),
+        asof=target_date(lead_day=FULL_SWEEP_LEAD_DAY),
     ).join(base.select("site", "time", "seed", "prediction", "actual"), on=["site", "time"])
     cuts = _forecast_index_cuts(hours=hours)
     keyed = keyed.with_columns(tercile=_tercile(index=pl.col("target_tercile_index"), cuts=cuts))
@@ -1646,6 +1651,7 @@ def main() -> int:
     path = directory / f"report_{product}{suffix}.md"
     final_tables = directory / f"tables_{product}{suffix}"
     refuse_to_overwrite(paths=[path, final_tables])
+    verify_manifest_inputs(root=arguments.output_root, product=product, smoke=arguments.smoke)
     partial_tables = directory / f"tables_{product}{suffix}.partial"
     if partial_tables.exists():
         shutil.rmtree(partial_tables)

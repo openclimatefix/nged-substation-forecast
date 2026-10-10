@@ -16,8 +16,10 @@ column read the record, and each has its own guard in `window_anchor_lines`:
   09:00 UTC, which is the issue time itself.
 
 **The CAMS satellite irradiance arm (PC) is study-only unless it wins.** The live service does not
-ingest CAMS. The study assumes CAMS publishes two days late, so PC's windows start three whole days
-back (the CAMS documentation says up to 2 days; see the README).
+ingest CAMS. Since February 2026 CAMS's point service has a latency of one day, so at 09:00 UTC the
+whole previous day is available and PC's windows start one whole day back. Before February 2026 the
+latency was longer, so the backtest reads CAMS slightly fresher than the service then offered (see
+the README).
 """
 
 from typing import Final, NamedTuple
@@ -42,18 +44,19 @@ TRANSFER_DAYS: Final[int] = 30
 TRANSFER_MIN_DAYS: Final[int] = 15
 """TF's window, and the fewest of its days that must hold the hour."""
 
-SATELLITE_LAG_DAYS: Final[int] = 3
-"""CAMS is assumed published two days late, so the latest whole day it has seen at the issue time
-ends two days before the issue day, and the satellite windows start three whole days back."""
+SATELLITE_LAG_DAYS: Final[int] = 1
+"""CAMS's point service has had a latency of one day since February 2026, so at the 09:00 UTC issue
+the whole previous day is available and the satellite windows start one whole day back (days 1 to 7
+and 1 to 30 before the issue day)."""
 
 SATELLITE_POWER_DAYS: Final[int] = 7
 SATELLITE_POWER_MIN_DAYS: Final[int] = 4
 """PC's power-to-satellite window, and the fewest of its days that must hold the hour."""
 
-CAMS_AVAILABLE_THROUGH_DAYS_BEFORE_ISSUE: Final[int] = 3
+CAMS_AVAILABLE_THROUGH_DAYS_BEFORE_ISSUE: Final[int] = 1
 """The assumption the leak probe tests PC against, stated apart from `SATELLITE_LAG_DAYS`: at an
-issue on day `I`, CAMS irradiance is available for whole days up to day `I - 3` and no later
-(published two days late, and the publication hour may fall after the 09:00 issue)."""
+issue on day `I`, CAMS irradiance is available for whole days up to day `I - 1` and no later, so a
+window that peeks at day `I` fails the probe."""
 
 ANALOGUE_DAYS: Final[int] = 30
 ANALOGUE_COUNT: Final[int] = 5
@@ -475,8 +478,8 @@ def satellite_ratios(
 ) -> pl.DataFrame:
     """Return PC: power to satellite irradiance over 7 days, and satellite to forecast over 30.
 
-    The satellite irradiance is assumed published two days late, so both windows start
-    `SATELLITE_LAG_DAYS` (3) whole days back: days 3 to 9 and days 3 to 32.
+    The satellite irradiance has a latency of one day, so both windows start `SATELLITE_LAG_DAYS`
+    (1) whole day back: days 1 to 7 and days 1 to 30 before the issue day.
 
     Args:
         rows: Rows with `site` and `time`.

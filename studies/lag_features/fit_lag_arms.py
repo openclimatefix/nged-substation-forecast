@@ -10,7 +10,7 @@ One-off throwaway script for the study in
 1. Stage 1. One XGBoost model per plant and per pair of withheld folds predicts power from the
    baseline arm B0's seven columns, so that each prediction withholds both the scored fold and the
    predicted hour's own fold (an hour outside the shared rows withholds the scored fold alone). The
-   predictions give the two-step arms S2 and S3, and the ratio R1 uses, their `{fold}` columns.
+   predictions give the `{fold}` columns of S2, S3 and KS, and the ratios that R1s and R2 use.
 2. The sweep: every arm of `SWEEP_ARMS` at lead-day 1, per plant, at the primary setting, three
    seeds, five folds. B0, L1, and N2 are fitted with their quantile models at once.
 3. The shortlist rule picks X from the sweep's losses on the screening months.
@@ -149,17 +149,6 @@ REPRODUCTION_TOLERANCE_PERCENT: Final[float] = 0.03
 
 WIDE_X_COLUMNS: Final[int] = 3
 """If X adds more columns than this, N2-k is fitted with as many random lags as X adds."""
-
-REPRODUCTION_CPU_MAE_PERCENT: Final[float] = 8.766
-"""The mean absolute error of the matched-lead study's saved CPU losses for the ENS-mean B0 at
-lead-day 1 on the 35,263 shared rows, in percentage points of capacity."""
-
-REPRODUCTION_GPU_MAE_PERCENT: Final[float] = 8.771
-"""The published GPU refit's mean absolute error for the same arm. The check reports a GPU leg's
-difference from it and does not assert it, because a GPU fit is not bit-identical."""
-
-REPRODUCTION_TOLERANCE_PERCENT: Final[float] = 0.0005
-"""How far a refit's mean may differ from the published figure, which is quoted to 3 decimals."""
 
 PHASE2_POINT_ARMS: Final[tuple[str, ...]] = ("B0", "L1", "L2", "S2", "X", "N1", "N2")
 """The arms fitted at both hyperparameter settings; `X` stands for the shortlist rule's arm."""
@@ -1390,11 +1379,11 @@ def reproduction_check(*, root: Path, device: DeviceType, max_workers: int) -> i
     )
     heading = "# Reproduction check: ENS-mean B0 at lead-day 1 on the shared rows"
     text = f"{heading}\n\n{line}"
-    report.write_text(text + "\n")
     sys.stdout.write(text + "\n")
     if abs(mean - REPRODUCTION_MAE_PERCENT) > REPRODUCTION_TOLERANCE_PERCENT:
         msg = f"the refit gives {mean:.4f}%, not the published {REPRODUCTION_MAE_PERCENT}%"
         raise ValueError(msg)
+    report.write_text(text + "\n")
     return 0
 
 
@@ -1406,11 +1395,12 @@ def input_fingerprint(*, root: Path, product: WeatherProduct) -> dict[str, str]:
         product: The weather product.
 
     Returns:
-        The digest of each lead-day-1 (or, for IFS HRES, lead-day 1 and 2) frame, and for the ENS
-        mean the stage-1 hours and the positive-control frames, by file name.
+        The digest of each lead-day frame (every lead-day of the ENS mean, or lead-days 1 and 2
+        for IFS HRES), and for the ENS mean the stage-1 hours and the positive-control frames, by
+        file name.
     """
     if product == "ens_mean":
-        paths = output_paths(root=root, product=product, lead_days=(FULL_SWEEP_LEAD_DAY,))
+        paths = output_paths(root=root, product=product, lead_days=ENS_MEAN_LEAD_DAYS)
         files = [paths[key] for key in paths if key != "report"]
     else:
         paths = output_paths(root=root, product=product, lead_days=IFS_LEAD_DAYS)
@@ -1442,6 +1432,26 @@ def check_manifest(*, directory: Path, device: str, smoke: bool, inputs: dict[st
             raise ValueError(msg)
         return
     path.write_text(json.dumps(current))
+
+
+def verify_manifest_inputs(*, root: Path, product: WeatherProduct, smoke: bool) -> None:
+    """Raise if the built frames on disk are not the ones the fit that wrote the losses read.
+
+    Args:
+        root: The output root.
+        product: The weather product.
+        smoke: Whether the fit was a smoke run.
+
+    Raises:
+        ValueError: If the manifest's input digests differ from the frames' own, so a report or
+            chart would describe other frames than the ones fitted.
+    """
+    path = root / product / f"checkpoints{run_suffix(smoke=smoke)}" / "run_manifest.json"
+    saved = json.loads(path.read_text())["inputs"]
+    current = input_fingerprint(root=root, product=product)
+    if saved != current:
+        msg = f"the built frames differ from the ones {path} records the fit as reading"
+        raise ValueError(msg)
 
 
 def main() -> int:

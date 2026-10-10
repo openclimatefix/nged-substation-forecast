@@ -1259,6 +1259,14 @@ def main() -> int:
     raw = raw_hourly_power()
     report = [f"## Frames built for the weather product `{product}`", ""]
     report += [f"Shared rows: {shared.height} (the published count {PUBLISHED_ROW_COUNT}).", ""]
+    report += [
+        (
+            "PC reads CAMS irradiance one whole day behind the issue day, the latency of CAMS's "
+            "point service since February 2026. Before then the real latency was longer, so the "
+            "backtest reads CAMS slightly fresher than the service then offered."
+        ),
+        "",
+    ]
 
     for lead_day in lead_days:
         if product != "ens_mean":

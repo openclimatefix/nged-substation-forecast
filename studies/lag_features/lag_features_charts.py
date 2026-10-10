@@ -49,6 +49,7 @@ from build_lag_frame import (
     run_suffix,
     smoke_subsample,
 )
+from fit_lag_arms import verify_manifest_inputs
 from studies.charts import CONTENT_WIDTH_PX, figure
 from studies.guards import refuse_to_overwrite
 
@@ -195,18 +196,20 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         The figure.
     """
     planned = pl.read_parquet(tables / "planned.parquet")
-    primary = planned.filter(pl.col("setting") == "primary").select(
+    primary = planned.filter(pl.col("setting") == "primary")
+    missing = set(planned["contrast"].to_list()) - set(primary["contrast"].to_list())
+    if missing:
+        msg = f"contrasts {sorted(missing)} have no primary-setting row; Figure 1 cannot label them"
+        raise ValueError(msg)
+    primary = primary.select(
         "contrast",
-        label=pl.col("contrast")
-        + ": "
-        + pl.col("treatment")
-        + " minus "
-        + pl.col("reference")
-        + " ("
-        + pl.col("reference")
-        + " "
-        + (pl.col("reference_value") * PERCENTAGE_POINTS).round(2).cast(pl.String)
-        + "%)",
+        label=pl.Series(
+            [
+                f"{row['contrast']}: {row['treatment']} minus {row['reference']} "
+                f"({row['reference']} {row['reference_value'] * PERCENTAGE_POINTS:.2f}%)"
+                for row in primary.iter_rows(named=True)
+            ]
+        ),
     )
     rows = planned.join(primary, on="contrast").with_columns(
         difference=pl.col("difference") * PERCENTAGE_POINTS,
@@ -568,7 +571,7 @@ def sweep_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     rule = (
         alt.Chart(pl.DataFrame({"x": [baseline]})).mark_rule(color=ocf.BRAND_ORANGE).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )
-    panels = [(bars + rule).properties(width=CONTENT_WIDTH_PX - 120, height=420)]
+    panels = [(bars + rule).properties(width=CONTENT_WIDTH_PX - 180, height=420)]
     crps_title = "CRPS approximated from nine quantiles (% of capacity; smaller is better)"
     crps_rows = _crps_rows(tables=tables)
     if not crps_rows.is_empty():
@@ -579,7 +582,7 @@ def sweep_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
                 y=alt.Y("label:N", sort=crps_rows["label"].to_list(), title=None),
                 x=alt.X("crps:Q", title=crps_title),
             )
-            .properties(width=CONTENT_WIDTH_PX - 120, height=110)
+            .properties(width=CONTENT_WIDTH_PX - 180, height=110)
         )
         panels.append(crps_bars)
     title = "A screen of the lag ideas, ranked by error, to generate hypotheses"
@@ -1235,6 +1238,7 @@ def main() -> int:
     root: Path = arguments.output_root
     directory = root / product
     tables = directory / f"tables_{product}{suffix}"
+    verify_manifest_inputs(root=root, product=product, smoke=smoke)
     text = FigureText()
     figures = {
         "1_headline": headline_figure(tables=tables, text=text),
