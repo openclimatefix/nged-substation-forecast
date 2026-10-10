@@ -37,16 +37,20 @@ from typing import Final, NamedTuple
 import numpy as np
 import polars as pl
 from build_lag_frame import (
+    ARM_LABELS,
+    CLOCK_RATIO_TEMPLATE,
     ENS_MEAN_LEAD_DAYS,
     FULL_SWEEP_LEAD_DAY,
+    GLOBAL_ONLY_ARMS,
     IFS_LEAD_DAYS,
     LAG_FEATURES_DIR,
     POSITIVE_CONTROL_SHIFTS,
+    RATIO_TEMPLATE,
     WEATHER_PRODUCTS,
     WeatherProduct,
     output_paths,
 )
-from fit_lag_arms import METRIC, SCREENING_MONTHS, SHORTLIST_EXCLUDED
+from fit_lag_arms import METRIC, SCREENING_MONTHS, SHORTLIST_CANDIDATES
 from studies.baselines import climatology
 from studies.bootstrap import (
     MIN_MONTHS_FOR_INTERVAL,
@@ -59,7 +63,7 @@ from studies.bootstrap import (
     combine_setting_verdicts,
     paired_differences,
 )
-from studies.cross_validation import SEEDS, clamp_to_cap
+from studies.cross_validation import N_FOLDS, QUANTILE_LEVELS, SEEDS, clamp_to_cap, crps
 from studies.guards import refuse_to_overwrite
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -95,6 +99,8 @@ CLEAR_SKY_CLASSES: Final[dict[str, tuple[float, float]]] = {
 
 EXPLORATORY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("S2", "L1"),
+    ("IM", "L1"),
+    ("KS", "L1"),
     ("L2", "L1"),
     ("L1", "N1"),
     ("L1", "N2"),
@@ -110,10 +116,24 @@ REFERENCE_ARMS: Final[tuple[str, ...]] = (
     "persistence",
     "diurnal_persistence",
     "climatology",
-    "R1",
+    "R1s",
+    "R2",
+    "R4",
 )
-"""The no-fit references: persistence and diurnal persistence at the lead-day, climatology, and R1
-(B0's prediction times the last 7 days' observed-over-predicted stage-1 energy ratio)."""
+"""The no-fit references scored on point error: persistence and diurnal persistence at the
+lead-day, climatology, and three post-model corrections of B0's prediction. R1s multiplies it by the
+last 7 days' observed-over-predicted stage-1 energy ratio, shrunk halfway to 1. R2 multiplies it by
+the same ratio taken per clock hour over 30 days. R4 clamps it at CK's expanding ceiling. R5, which
+needs quantiles, is scored on CRPS in its own table."""
+
+R1_SHRINKAGE: Final[float] = 0.5
+"""R1s moves the ratio this share of the way from 1 to its value."""
+
+R5_WINDOW_DAYS: Final[int] = 30
+R5_MIN_EVENTS: Final[int] = 10
+"""R5 reads the stage-1 residuals of the last 30 whole days, and needs at least 10."""
+
+SEED_ORDER: Final[tuple[int, ...]] = SEEDS
 
 
 MONTH_LABELS: Final[dict[str, str]] = {
@@ -350,9 +370,7 @@ def reference_losses(*, frame: pl.DataFrame, lead_day: int, losses: pl.DataFrame
         parts.append(
             base.with_columns(prediction=prediction, arm=pl.lit(name)),
         )
-    ratio_path_frame = _r1_prediction(frame=ordered, losses=losses, lead_day=lead_day)
-    if ratio_path_frame is not None:
-        parts.append(ratio_path_frame)
+    parts.extend(_post_model_predictions(frame=ordered, losses=losses, lead_day=lead_day))
     seeds = pl.DataFrame({"seed": list(SEEDS)}, schema={"seed": pl.Int32})
     out = []
     for part in parts:
@@ -380,35 +398,200 @@ def reference_losses(*, frame: pl.DataFrame, lead_day: int, losses: pl.DataFrame
     return scored
 
 
-def _r1_prediction(
+def _post_model_predictions(
     *, frame: pl.DataFrame, losses: pl.DataFrame, lead_day: int
-) -> pl.DataFrame | None:
-    """Return R1's prediction rows, or `None` where the stage-1 ratio is not available.
+) -> list[pl.DataFrame]:
+    """Return the prediction rows of R1s, R2 and R4, which correct B0's prediction without a fit.
 
     Args:
-        frame: The lead-day's frame, sorted by site and time.
+        frame: The lead-day's frame, sorted by site and time, with the stage-1 ratio columns and
+            `ck_expanding_p995` where the lead-day has them.
         losses: The combined losses, holding B0's lead-day 1 predictions at the primary setting.
         lead_day: The lead-day.
 
     Returns:
-        B0's out-of-fold prediction times the last 7 days' energy ratio of the row's scored fold
-        (1 where the ratio is missing), per seed, labelled `R1`.
+        One frame per correction, per seed, labelled `R1s`, `R2` and `R4`; empty where the
+        lead-day's frame lacks the stage-1 columns.
     """
     if lead_day != FULL_SWEEP_LEAD_DAY or "energy_ratio_7d_fold0" not in frame.columns:
-        return None
-    ratio = pl.coalesce(
-        pl.when(pl.col("fold") == fold).then(pl.col(f"energy_ratio_7d_fold{fold}"))
-        for fold in range(5)
-    ).fill_null(1.0)
+        return []
+
+    def by_fold(template: str) -> pl.Expr:
+        return pl.coalesce(
+            pl.when(pl.col("fold") == fold).then(pl.col(template.format(fold=fold)))
+            for fold in range(N_FOLDS)
+        )
+
+    corrections = {
+        "R1s": 1.0 + R1_SHRINKAGE * (by_fold(RATIO_TEMPLATE).fill_null(1.0) - 1.0),
+        "R2": by_fold(CLOCK_RATIO_TEMPLATE).fill_null(1.0),
+    }
     base = subset(losses=losses, scope=f"lead{lead_day}", setting="primary", arms=("B0",)).select(
-        "site", "time", "month", "seed", "prediction"
+        "site", "time", "seed", "prediction"
     )
-    return (
-        frame.select("site", "time", "power_mw", "cap_mw", "effective_capacity_mw", ratio=ratio)
-        .join(base, on=["site", "time"])
-        .with_columns(prediction=pl.col("prediction") * pl.col("ratio"), arm=pl.lit("R1"))
-        .drop("ratio")
+    keyed = frame.select(
+        "site",
+        "time",
+        "month",
+        "power_mw",
+        "cap_mw",
+        "effective_capacity_mw",
+        "ck_expanding_p995",
+        **{f"factor_{name}": expr for name, expr in corrections.items()},
+    ).join(base, on=["site", "time"])
+    parts = [
+        keyed.with_columns(
+            prediction=pl.col("prediction") * pl.col(f"factor_{name}"), arm=pl.lit(name)
+        )
+        for name in corrections
+    ]
+    parts.append(
+        keyed.with_columns(
+            prediction=pl.min_horizontal(
+                pl.col("prediction"), pl.col("ck_expanding_p995").fill_null(float("inf"))
+            ),
+            arm=pl.lit("R4"),
+        )
     )
+    return [
+        part.select(
+            "site",
+            "time",
+            "month",
+            "power_mw",
+            "cap_mw",
+            "effective_capacity_mw",
+            "seed",
+            "prediction",
+            "arm",
+        )
+        for part in parts
+    ]
+
+
+def _residual_events(*, hours: pl.DataFrame, predictions: pl.DataFrame, fold: int) -> pl.DataFrame:
+    """Return the stage-1 residuals of one scored fold, with each hour's sky class.
+
+    Args:
+        hours: The stage-1 hours, with `observed_mw`, `nwp_ghi` and `clear_sky_w_m2`.
+        predictions: `fit_lag_arms.stage1_predictions`' result.
+        fold: The scored fold whose stage-1 models made the predictions.
+
+    Returns:
+        `site`, `date`, `tercile` (0 to 2 by forecast clear-sky index) and `residual` (observed
+        minus predicted, in megawatts).
+    """
+    index = pl.col("nwp_ghi") / pl.col("clear_sky_w_m2")
+    events = (
+        hours.select("site", "time", "observed_mw", "nwp_ghi", "clear_sky_w_m2")
+        .join(
+            predictions.select("site", "time", predicted=pl.col(f"stage1_pred_fold{fold}")),
+            on=["site", "time"],
+        )
+        .filter(pl.col("clear_sky_w_m2") > 0)
+        .drop_nulls("observed_mw")
+        .with_columns(
+            index=index,
+            date=(pl.col("time") - pl.duration(minutes=30)).dt.date(),
+            residual=pl.col("observed_mw") - pl.col("predicted"),
+        )
+    )
+    cuts = events["index"].quantile(1 / 3), events["index"].quantile(2 / 3)
+    return events.with_columns(
+        tercile=pl.when(pl.col("index") < cuts[0])
+        .then(0)
+        .when(pl.col("index") < cuts[1])
+        .then(1)
+        .otherwise(2)
+    ).select("site", "date", "tercile", "residual")
+
+
+def r5_losses(
+    *, frame: pl.DataFrame, hours: pl.DataFrame, predictions: pl.DataFrame, losses: pl.DataFrame
+) -> pl.DataFrame:
+    """Score R5 on CRPS: B0's point forecast plus the last 30 days' stage-1 residual quantiles.
+
+    The residuals are those within the target's forecast clear-sky tercile (the terciles of the
+    forecast clear-sky index over every hour with a stage-1 prediction), over the 30 whole days
+    ending at the latest whole day before the issue time.
+
+    Args:
+        frame: The lead-day 1 frame, with `fold`, `nwp_ghi` and `clear_sky_w_m2`.
+        hours: The stage-1 hours.
+        predictions: The stage-1 predictions.
+        losses: The combined losses, with B0's quantile run at the primary setting.
+
+    Returns:
+        Rows of `arm` `R5` and `B0` with `CRPS_METRIC`, on the rows where R5 has at least
+        `R5_MIN_EVENTS` residuals, per seed.
+    """
+    base = subset(
+        losses=losses, scope=f"lead{FULL_SWEEP_LEAD_DAY}", setting="primary", arms=("B0",)
+    ).filter(pl.col("with_quantiles"))
+    keyed = frame.select(
+        "site",
+        "time",
+        "fold",
+        "month",
+        "cap_mw",
+        "effective_capacity_mw",
+        target_tercile_index=pl.col("nwp_ghi") / pl.col("clear_sky_w_m2"),
+        asof=(pl.col("time") - pl.duration(minutes=30)).dt.date()
+        - pl.duration(days=FULL_SWEEP_LEAD_DAY + 1),
+    ).join(base.select("site", "time", "seed", "prediction", "actual"), on=["site", "time"])
+    all_index = hours.filter(pl.col("clear_sky_w_m2") > 0).select(
+        index=pl.col("nwp_ghi") / pl.col("clear_sky_w_m2")
+    )["index"]
+    cuts = (all_index.quantile(1 / 3), all_index.quantile(2 / 3))
+    keyed = keyed.with_columns(
+        tercile=pl.when(pl.col("target_tercile_index") < cuts[0])
+        .then(0)
+        .when(pl.col("target_tercile_index") < cuts[1])
+        .then(1)
+        .otherwise(2)
+    )
+    parts = []
+    for fold in range(N_FOLDS):
+        events = _residual_events(hours=hours, predictions=predictions, fold=fold)
+        rows = keyed.filter(pl.col("fold") == fold)
+        quantiles = np.full((rows.height, len(QUANTILE_LEVELS)), np.nan)
+        starts = rows["asof"].to_numpy()
+        for (site, tercile), group in events.group_by("site", "tercile"):
+            ordered = group.sort("date")
+            dates = ordered["date"].to_numpy()
+            values = ordered["residual"].to_numpy()
+            mask = ((rows["site"] == site) & (rows["tercile"] == tercile)).to_numpy()
+            for index in np.flatnonzero(mask):
+                last = np.searchsorted(dates, starts[index], side="right")
+                first = np.searchsorted(
+                    dates, starts[index] - np.timedelta64(R5_WINDOW_DAYS, "D"), side="right"
+                )
+                if last - first >= R5_MIN_EVENTS:
+                    quantiles[index] = np.quantile(values[first:last], QUANTILE_LEVELS)
+        usable = ~np.isnan(quantiles[:, 0])
+        parts.append(
+            rows.with_columns(
+                **{
+                    f"q{level_index}": pl.Series(quantiles[:, level_index])
+                    for level_index in range(len(QUANTILE_LEVELS))
+                }
+            ).filter(pl.Series(usable))
+        )
+    scored = pl.concat(parts)
+    forecast = (
+        scored["prediction"].to_numpy()[:, None]
+        + scored.select([f"q{i}" for i in range(len(QUANTILE_LEVELS))]).to_numpy()
+    )
+    capped = clamp_to_cap(prediction=forecast, cap_mw=scored["cap_mw"])
+    r5 = scored.with_columns(
+        arm=pl.lit("R5"),
+        score=pl.Series(crps(actual=scored["actual"].to_numpy(), quantiles=capped))
+        / scored["effective_capacity_mw"].cast(pl.Float64),
+    ).select("site", "time", "month", "seed", "arm", **{CRPS_METRIC: pl.col("score")})
+    b0 = base.join(r5.select("site", "time", "seed"), on=["site", "time", "seed"]).select(
+        "site", "time", "month", "seed", "arm", CRPS_METRIC
+    )
+    return pl.concat([r5, b0])
 
 
 # --- Tables ---------------------------------------------------------------------------------
@@ -457,15 +640,15 @@ def phase1_lines(
     table = pl.DataFrame(records).sort("error")
     lines = [
         (
-            "The shortlist rule (the arm with the lowest error among fitted arms other than "
-            f"{', '.join(SHORTLIST_EXCLUDED)}) chose **X = {chosen}**."
+            "The shortlist rule (the arm with the lowest error among "
+            f"{', '.join(SHORTLIST_CANDIDATES)}) chose **X = {chosen}**."
         ),
         "",
         "| Arm | Mean absolute error (pp of capacity) | 95% interval (pp) | Rows | Months |",
         "|---|---|---|---|---|",
     ]
     lines += [
-        f"| {row['arm']}{' (no fit)' if not row['fitted'] else ''} | "
+        f"| {named(row['arm'])}{' (no fit)' if not row['fitted'] else ''} | "
         f"{row['error'] * PERCENTAGE_POINTS:.3f} | "
         f"[{row['lower'] * PERCENTAGE_POINTS:.3f}, {row['upper'] * PERCENTAGE_POINTS:.3f}] | "
         f"{row['n_rows']} | {row['n_months']} |"
@@ -498,14 +681,14 @@ def absolute_lines(*, losses: pl.DataFrame, scope: str, setting: str, title: str
     for arm in sorted(scoped["arm"].unique().to_list()):
         interval = bootstrap_absolute(losses=scoped, arm=arm, metric=METRIC)
         lines.append(
-            f"| {arm} | {interval['value'] * PERCENTAGE_POINTS:.3f} | "
+            f"| {named(arm)} | {interval['value'] * PERCENTAGE_POINTS:.3f} | "
             f"[{interval['lower_95'] * PERCENTAGE_POINTS:.3f}, "
             f"{interval['upper_95'] * PERCENTAGE_POINTS:.3f}] | {interval['n_rows']} |"
         )
     return [*lines, ""]
 
 
-def exploratory_lines(*, losses: pl.DataFrame) -> list[str]:
+def exploratory_lines(*, losses: pl.DataFrame, chosen: str) -> list[str]:
     """Tabulate the exploratory paired contrasts at lead-day 1, primary setting.
 
     Args:
@@ -518,7 +701,9 @@ def exploratory_lines(*, losses: pl.DataFrame) -> list[str]:
         "| Contrast (exploratory) | Difference (pp) | 95% interval (pp) |",
         "|---|---|---|",
     ]
-    for treatment, reference in EXPLORATORY_CONTRASTS:
+    wide_nulls = sorted(a for a in losses["arm"].unique().to_list() if a.startswith("N2-"))
+    pairs = (*EXPLORATORY_CONTRASTS, *((chosen, null) for null in wide_nulls))
+    for treatment, reference in pairs:
         scoped = subset(
             losses=losses,
             scope=f"lead{FULL_SWEEP_LEAD_DAY}",
@@ -616,7 +801,7 @@ def longer_lead_table(
             f"{row['difference_upper'] * PERCENTAGE_POINTS:+.3f}]"
         )
         lines.append(
-            f"| {label} | {row['arm']} | {row['error'] * PERCENTAGE_POINTS:.3f} | {diff} | "
+            f"| {label} | {named(row['arm'])} | {row['error'] * PERCENTAGE_POINTS:.3f} | {diff} | "
             f"{interval} | {row['n_rows']} |"
         )
     return [*lines, ""], table
@@ -723,6 +908,147 @@ def interval_lines(*, directory: Path) -> tuple[list[str], pl.DataFrame]:
     return [*lines, ""], summary
 
 
+FINGERPRINT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("G-ID", "G-B0"),
+    ("G-L1", "G-B0"),
+    ("G-FP", "G-B0"),
+    ("G-FP", "G-ID"),
+    ("LOPO G-L1", "LOPO G-B0"),
+    ("LOPO G-FP", "LOPO G-B0"),
+)
+"""Exploratory (treatment, reference) pairs of the global fingerprint mini-sweep. G-ID is the
+in-sample upper bound for any static fingerprint, and the `LOPO` arms never saw the scored plant."""
+
+
+def fingerprint_losses(*, losses: pl.DataFrame) -> pl.DataFrame:
+    """Relabel the global and leave-one-plant-out fits as the fingerprint mini-sweep's arms.
+
+    Args:
+        losses: The combined losses.
+
+    Returns:
+        The primary-setting global fits (B0 as `G-B0`, L1 as `G-L1`, plus `G-ID` and `G-FP`) and
+        the leave-one-plant-out fits (as `LOPO G-B0`, `LOPO G-L1`, `LOPO G-FP`), all with scope
+        `fingerprint`.
+    """
+    names = {"B0": "G-B0", "L1": "G-L1"}
+    pooled = subset(
+        losses=losses,
+        scope="global",
+        setting="primary",
+        arms=("B0", "L1", *GLOBAL_ONLY_ARMS),
+    ).with_columns(arm=pl.col("arm").replace(names))
+    left_out = subset(
+        losses=losses, scope="lopo", setting="primary", arms=("B0", "L1", "G-FP")
+    ).with_columns(arm="LOPO " + pl.col("arm").replace({**names, "G-FP": "G-FP"}))
+    return pl.concat([pooled, left_out], how="diagonal_relaxed").with_columns(
+        scope=pl.lit("fingerprint")
+    )
+
+
+def fingerprint_lines(*, losses: pl.DataFrame) -> tuple[list[str], pl.DataFrame]:
+    """Tabulate the global fingerprint mini-sweep: absolute errors, then paired contrasts.
+
+    Args:
+        losses: The combined losses.
+
+    Returns:
+        The report lines, and the table of absolute errors.
+    """
+    sweep = fingerprint_losses(losses=losses)
+    if sweep.is_empty():
+        return [], pl.DataFrame()
+    records = []
+    lines = [
+        "| Arm (exploratory) | Mean absolute error (pp of capacity) | 95% interval (pp) | Rows |",
+        "|---|---|---|---|",
+    ]
+    for arm in sorted(sweep["arm"].unique().to_list()):
+        interval = bootstrap_absolute(losses=sweep, arm=arm, metric=METRIC)
+        records.append(
+            {
+                "arm": arm,
+                "error": interval["value"],
+                "lower": interval["lower_95"],
+                "upper": interval["upper_95"],
+            }
+        )
+        lines.append(
+            f"| {arm} | {interval['value'] * PERCENTAGE_POINTS:.3f} | "
+            f"[{interval['lower_95'] * PERCENTAGE_POINTS:.3f}, "
+            f"{interval['upper_95'] * PERCENTAGE_POINTS:.3f}] | {interval['n_rows']} |"
+        )
+    lines += [
+        "",
+        "| Contrast (exploratory) | Difference (pp) | 95% interval (pp) |",
+        "|---|---|---|",
+    ]
+    for treatment, reference in FINGERPRINT_CONTRASTS:
+        scoped = sweep.filter(pl.col("arm").is_in([treatment, reference]))
+        interval = paired_interval(
+            scoped=scoped,
+            treatment=treatment,
+            reference=reference,
+            metric=METRIC,
+            level=EXPLORATORY_LEVEL,
+        )
+        if interval is not None:
+            lines.append(
+                f"| {treatment} − {reference} | "
+                f"{interval['difference'] * PERCENTAGE_POINTS:+.3f} | "
+                f"[{interval['lower_95'] * PERCENTAGE_POINTS:+.3f}, "
+                f"{interval['upper_95'] * PERCENTAGE_POINTS:+.3f}] |"
+            )
+    return [*lines, ""], pl.DataFrame(records)
+
+
+def r5_lines(*, r5: pl.DataFrame) -> list[str]:
+    """Tabulate R5's CRPS against B0's quantile model on the same rows.
+
+    Args:
+        r5: `r5_losses`' result.
+
+    Returns:
+        The report lines.
+    """
+    interval = paired_interval(
+        scoped=r5, treatment="R5", reference="B0", metric=CRPS_METRIC, level=EXPLORATORY_LEVEL
+    )
+    if interval is None:
+        return []
+    absolute = {
+        arm: bootstrap_absolute(losses=r5, arm=arm, metric=CRPS_METRIC) for arm in ("R5", "B0")
+    }
+    return [
+        "| Arm (exploratory) | CRPS approximated from nine quantiles (pp of capacity) | Rows |",
+        "|---|---|---|",
+        *(
+            f"| {arm} | {value['value'] * PERCENTAGE_POINTS:.3f} | {value['n_rows']} |"
+            for arm, value in absolute.items()
+        ),
+        "",
+        (
+            f"R5 minus B0: {interval['difference'] * PERCENTAGE_POINTS:+.3f} pp, 95% interval "
+            f"[{interval['lower_95'] * PERCENTAGE_POINTS:+.3f}, "
+            f"{interval['upper_95'] * PERCENTAGE_POINTS:+.3f}] pp, on {interval['n_rows']} rows "
+            f"per seed where at least {R5_MIN_EVENTS} residuals exist."
+        ),
+        "",
+    ]
+
+
+def named(arm: str) -> str:
+    """Return how a table names an arm, with `ARM_LABELS` applied.
+
+    Args:
+        arm: The arm.
+
+    Returns:
+        The label, or the arm itself.
+    """
+    return ARM_LABELS.get(arm, arm)
+
+
 def report_text(*, root: Path, product: WeatherProduct) -> str:
     """Build the whole report and save the tables the charts read.
 
@@ -763,7 +1089,7 @@ def report_text(*, root: Path, product: WeatherProduct) -> str:
             coverage_table.write_parquet(tables / "coverage.parquet")
         lines += ["## Phase 1: the sweep, screening months 2024-12 to 2025-12", "", *phase1]
         lines += ["", "## Phase 2: the five planned contrasts", "", *planned]
-        lines += ["## Exploratory contrasts at lead-day 1", "", *exploratory_lines(losses=losses)]
+        lines += ["## Exploratory contrasts at lead-day 1", "", *exploratory_lines(losses=losses, chosen=chosen)]
         lines += ["## Absolute errors over all months", ""]
         for setting in ("primary", "sensitivity"):
             lines += absolute_lines(
@@ -774,6 +1100,14 @@ def report_text(*, root: Path, product: WeatherProduct) -> str:
             )
         lines += ["## Coverage and width of the 10% to 90% interval (descriptive)", "", *coverage]
         lines += ["## Positive control", "", *controls]
+        fingerprint, fingerprint_table = fingerprint_lines(losses=losses)
+        if not fingerprint_table.is_empty():
+            fingerprint_table.write_parquet(tables / "fingerprint.parquet")
+        lines += ["## Global fingerprint mini-sweep (exploratory)", "", *fingerprint]
+        hours = pl.read_parquet(paths["stage1"])
+        stage1 = pl.read_parquet(directory / "checkpoints" / "stage1_predictions.parquet")
+        r5 = r5_losses(frame=frame, hours=hours, predictions=stage1, losses=losses)
+        lines += ["## R5: residual quantiles added to B0 (exploratory)", "", *r5_lines(r5=r5)]
         lead_days = ENS_MEAN_LEAD_DAYS
     else:
         lead_days = IFS_LEAD_DAYS

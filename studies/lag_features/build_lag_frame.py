@@ -66,7 +66,7 @@ from studies.baselines import issue_time, same_clock_hour_window
 from studies.commissioning import drop_commissioning_ramp
 from studies.cross_validation import cut_eras
 from studies.export_cap import with_export_cap
-from studies.guards import refuse_to_overwrite
+from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.power import CV_CONFIG_PATH
 from studies.pv_dataset import drop_outages_and_spikes, pv_sites, solar_hourly_power
 from studies.sources import (
@@ -156,6 +156,9 @@ B0_COLUMNS: Final[tuple[str, ...]] = (
 """The baseline arm B0: hour of day, day of year, era, the sun's elevation and azimuth, and the
 product's global horizontal irradiance and 2 m air temperature at its own lead."""
 
+CALENDAR_AND_SUN_COLUMNS: Final[tuple[str, ...]] = B0_COLUMNS[:5]
+"""B0's columns that come with the shared rows rather than from the weather product."""
+
 STAGE1_TARGET_TEMPLATE: Final[str] = "stage1_target_fold{fold}"
 STAGE1_LAG_TEMPLATE: Final[str] = "stage1_lag_fold{fold}"
 RESIDUAL_LAG_TEMPLATE: Final[str] = "resid_lag_fold{fold}"
@@ -177,6 +180,17 @@ W7_COLUMNS: Final[tuple[str, ...]] = ("week_min", "week_max", "week_mean")
 Q30_COLUMNS: Final[tuple[str, ...]] = ("q30_p90", "q30_median")
 RP_COLUMNS: Final[tuple[str, ...]] = ("rp_7d", "rp_1d")
 """Column groups several arms share."""
+
+N2_DRAWS: Final[int] = 16
+"""How many random lags N2's family draws per row: N2 reads the first, and N2-k the first `k`.
+Sixteen
+is the most columns any shortlist candidate adds (KS adds 16)."""
+
+N2_WIDE_COLUMNS: Final[tuple[str, ...]] = (
+    "null_lag_random",
+    *(f"null_lag_random_{draw}" for draw in range(2, N2_DRAWS + 1)),
+)
+"""Every random-lag column the frame holds. N2-k reads the first `k`."""
 
 EXTRA_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
     "B0": (),
@@ -213,16 +227,22 @@ EXTRA_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
     ),
     "N1": ("null_lag_8_to_28",),
     "N2": ("null_lag_random",),
+    "N2-wide": N2_WIDE_COLUMNS,
     "G-ID": ("plant_code",),
     "G-FP": (*TF_COLUMNS, *CK_COLUMNS, *DT_COLUMNS),
 }
 """Each fitted arm's columns beyond B0's seven. A `{fold}` is filled with the scored fold. The two
 arms named `G-` are fitted only as one model across the plants."""
 
+FRAME_ONLY_ARMS: Final[tuple[str, ...]] = ("N2-wide",)
+"""Arms that only name columns the frame must hold; N2-k is fitted from them when X is wide."""
+
 GLOBAL_ONLY_ARMS: Final[tuple[str, ...]] = ("G-ID", "G-FP")
 """Arms fitted only in the global scope; they stay out of the per-plant shortlist rule."""
 
-SWEEP_ARMS: Final[tuple[str, ...]] = tuple(a for a in EXTRA_COLUMNS if a not in GLOBAL_ONLY_ARMS)
+SWEEP_ARMS: Final[tuple[str, ...]] = tuple(
+    a for a in EXTRA_COLUMNS if a not in GLOBAL_ONLY_ARMS and a not in FRAME_ONLY_ARMS
+)
 """Every fitted arm of the lead-day 1 per-plant sweep."""
 
 LONGER_LEAD_ARMS: Final[tuple[str, ...]] = ("B0", "L1", "W7", "Q30", "T1", "N2")
@@ -277,13 +297,11 @@ any day of the record."""
 REQUIRED_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
     "weather": ("nwp_ghi", "nwp_temp"),
     "target": (TARGET,),
-    "L1 lag": ("lag_d1",),
-    "L2 and S2 lag-hour weather": ("lag_nwp_ghi", "lag_nwp_temp"),
-    "N1 lag": ("null_lag_8_to_28",),
-    "N2 lag": ("null_lag_random",),
+    "L1 strict lag": ("lag_d1",),
 }
-"""The columns a row must hold to be kept, by requirement. A requirement applies only if the
-frame builds its column."""
+"""The row set: the shared rows minus those where B0's columns or L1's strict lag are null. Every
+other arm's columns may be null, which XGBoost routes natively, and no row is dropped for them. B0's
+calendar and sun columns are non-null on every shared row, which `build_frame` checks."""
 
 LAG_SOURCE_START_DAYS: Final[int] = 30
 """How many days before the first row the lag source is read from, for the 30-day windows."""
@@ -445,10 +463,9 @@ def _random_hours(
         rng: The generator both draws use.
 
     Returns:
-        N1's lag and N2's lag per row, NaN where no draw exists. N1 is the first present hour, in
-        a random order, among days `NULL_LAG_FIRST_DAY` to `NULL_LAG_LAST_DAY` before the issue
-        day. N2 is the same clock hour on a uniformly random day of the whole record, never the
-        row's own day.
+        N1's lag per row, and N2's draws (`_random_other_fold_lags`), NaN where none exists. N1 is
+        the first present hour, in a random order, among days `NULL_LAG_FIRST_DAY` to
+        `NULL_LAG_LAST_DAY` before the issue day.
     """
     days = range(NULL_LAG_FIRST_DAY, NULL_LAG_LAST_DAY + 1)
     matrix = np.column_stack(
@@ -472,26 +489,52 @@ def _random_hours(
     first_present = (~np.isnan(shuffled)).argmax(axis=1)
     n1 = shuffled[np.arange(rows.height), first_present]
 
-    n2 = np.full(rows.height, np.nan)
-    keyed = hourly.with_columns(clock=pl.col("time").dt.time())
-    pool = {
-        (site, clock): group.sort("time")
-        for (site, clock), group in keyed.group_by("site", "clock")
+    return n1, _random_other_fold_lags(rows=rows, hourly=hourly, rng=rng)
+
+
+def _random_other_fold_lags(
+    *, rows: pl.DataFrame, hourly: pl.DataFrame, rng: np.random.Generator
+) -> np.ndarray:
+    """Draw N2's random same-clock-hour lags from months outside each row's own fold.
+
+    A candidate hour is the same clock hour at the same plant on any day of the record whose month
+    does not lie in the row's fold (a month in no fold is allowed), so a draw can never be the
+    row's own day or a neighbour in its own test months.
+
+    Args:
+        rows: Rows with `site`, `time`, `month` and `fold`.
+        hourly: The lag source.
+        rng: The random generator.
+
+    Returns:
+        An array of shape (rows, `N2_DRAWS`) of independent draws, NaN where no candidate exists.
+    """
+    month_folds = rows.select("site", "month", "fold").unique(subset=["site", "month"])
+    pool = (
+        hourly.with_columns(
+            month=pl.col("time").dt.strftime("%Y-%m"), clock=pl.col("time").dt.time()
+        )
+        .join(month_folds, on=["site", "month"], how="left")
+        .with_columns(fold=pl.col("fold").fill_null(-1))
+        .sort("site", "time")
+    )
+    sources = {
+        (site, clock): (group["power_mw"].to_numpy(), group["fold"].to_numpy())
+        for (site, clock), group in pool.group_by("site", "clock")
     }
-    row_keys = rows.with_columns(clock=pl.col("time").dt.time()).select("site", "clock", "time")
-    for (site, clock), group in row_keys.with_row_index("row").group_by("site", "clock"):
-        source = pool.get((site, clock))
+    draws = np.full((rows.height, N2_DRAWS), np.nan)
+    keyed = rows.select("site", "fold", clock=pl.col("time").dt.time()).with_row_index("row")
+    for (site, clock, fold), group in keyed.group_by("site", "clock", "fold"):
+        source = sources.get((site, clock))
         if source is None:
             continue
-        times, values = source["time"].to_numpy(), source["power_mw"].to_numpy()
-        own = np.searchsorted(times, group["time"].to_numpy())
-        own_present = (own < len(times)) & (
-            times[np.minimum(own, len(times) - 1)] == group["time"].to_numpy()
-        )
-        draw = rng.integers(0, np.maximum(len(times) - own_present.astype(int), 1))
-        draw = draw + (own_present & (draw >= own))
-        n2[group["row"].to_numpy()] = values[np.minimum(draw, len(times) - 1)]
-    return n1, n2
+        values, folds = source
+        candidates = np.flatnonzero(folds != fold)
+        if len(candidates) == 0:
+            continue
+        chosen = rng.integers(0, len(candidates), size=(group.height, N2_DRAWS))
+        draws[group["row"].to_numpy()] = values[candidates[chosen]]
+    return draws
 
 
 def _same_hour_columns(
@@ -629,9 +672,9 @@ def lag_columns(
             lead_day=lead_day,
             rng=np.random.default_rng(NULL_CONTROL_SEED),
         )
-        drawn = {
-            "null_lag_8_to_28": pl.Series(n1).fill_nan(None),
-            "null_lag_random": pl.Series(n2).fill_nan(None),
+        drawn = {"null_lag_8_to_28": pl.Series(n1).fill_nan(None)} | {
+            name: pl.Series(n2[:, index]).fill_nan(None)
+            for index, name in enumerate(N2_WIDE_COLUMNS)
         }
         out = out.with_columns(**{name: drawn[name] for name in drawn if name in needed})
     return out, morning_latest
@@ -702,6 +745,20 @@ def assert_lag_arithmetic(*, frame: pl.DataFrame, lead_day: int, raw: pl.DataFra
     return lines
 
 
+def extra_columns_of(*, arm: str) -> tuple[str, ...]:
+    """Return an arm's columns beyond B0's, resolving the dynamic arm `N2-<k>`.
+
+    Args:
+        arm: A key of `EXTRA_COLUMNS`, or `N2-<k>` for `k` random lags.
+
+    Returns:
+        The columns; for `N2-<k>`, the first `k` of `N2_WIDE_COLUMNS`.
+    """
+    if arm.startswith("N2-") and arm != "N2-wide":
+        return N2_WIDE_COLUMNS[: int(arm.removeprefix("N2-"))]
+    return EXTRA_COLUMNS[arm]
+
+
 def arms_columns_table(*, arms: Sequence[str]) -> list[str]:
     """Return a markdown table of each arm's full column list.
 
@@ -746,6 +803,7 @@ def build_frame(
     weather = weather_table(product=product, lead_day=lead_day)
     cutoff = datetime.combine(load_cv_config(CV_CONFIG_PATH).final_test_start, time.min, tzinfo=UTC)
     rows = shared.join(weather, on=["site", "time"], how="left").sort("site", "time")
+    check_no_missing(frame=rows, columns=CALENDAR_AND_SUN_COLUMNS)
     after_cutoff = rows.filter(pl.col("time") >= cutoff).height
     rows = rows.filter(pl.col("time") < cutoff)
     if shift:
@@ -851,6 +909,7 @@ def stage1_hours(
             "day_of_year",
             "solar_elevation_deg",
             "solar_azimuth_deg",
+            "clear_sky_w_m2",
         ],
     )
     month = pl.col("time").dt.strftime("%Y-%m")
@@ -922,6 +981,10 @@ def main() -> int:
     lead_days = tuple(arguments.lead_days or default_days)
     paths = output_paths(root=arguments.output_root, product=product, lead_days=lead_days)
     refuse_to_overwrite(paths=paths.values())
+    control_month = f"{POSITIVE_CONTROL_DATE:%Y-%m}"
+    if control_month in NWP_ERA_START_MONTHS or POSITIVE_CONTROL_DATE.day != 1:
+        msg = "the positive control's date must be the start of a month that is not an era start"
+        raise ValueError(msg)
 
     shared = shared_rows()
     hourly = lag_source_hourly()
@@ -936,7 +999,7 @@ def main() -> int:
             arms = REPLICATE_ARMS
         else:
             arms = (
-                (*SWEEP_ARMS, *GLOBAL_ONLY_ARMS)
+                (*SWEEP_ARMS, *GLOBAL_ONLY_ARMS, *FRAME_ONLY_ARMS)
                 if lead_day == FULL_SWEEP_LEAD_DAY
                 else LONGER_LEAD_ARMS
             )

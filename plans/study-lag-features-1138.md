@@ -143,7 +143,7 @@ Every window below is anchored at the issue day and reads nothing after the issu
 | Lag with weather | L2 L1 plus the forecast irradiance and temperature at the lag hour, from the target's lead day (3); CTX7 raw context: lags and lag-hour forecast irradiance for days 1 to 7 (14) |
 | Weekly statistics | W7 minimum, maximum, mean of the same clock hour over the 7 whole days before the issue day, at least 5 present (3) |
 | Slow trackers | Q30 the 30-day 90th percentile and median of the same clock hour (2); CK the clipping ceiling: expanding 99.5th percentile and 60-day maximum of hourly power, and the share of clear hours near the ceiling (3) |
-| Transfer function | TF the 30-day ratio of power to forecast irradiance at the same clock hour (hours above 50 W m⁻², at least 15 days present), and that ratio times the target's forecast irradiance (2); AN the analogue ensemble: the mean, forecast clear-sky index, and spread of the observed power (rescaled by clear-sky irradiance) on the 5 days in the last 30 whose forecast clear-sky index was closest to the target's (3); PC the ratio of power to satellite irradiance (CAMS) over days 2 to 8 before the issue day, and the ratio of satellite to forecast irradiance over days 2 to 31 (the 2-day gap assumes CAMS is published 2 days late; 2) |
+| Transfer function | TF the 30-day ratio of power to forecast irradiance at the same clock hour (hours above 50 W m⁻², at least 15 days present), and that ratio times the target's forecast irradiance (2); AN the analogue ensemble: the mean, forecast clear-sky index, and spread of the observed power (rescaled by clear-sky irradiance) on the 5 days in the last 30 whose forecast clear-sky index was closest to the target's (3); PC the ratio of power to satellite irradiance (CAMS) over days 2 to 8 before the issue day, and the ratio of satellite to forecast irradiance over days 2 to 31 (the 2-day gap assumes CAMS is published 2 days late, to be checked; a gain would justify ingesting CAMS into the live system; 2) |
 | Two-step | S2 stage-1 prediction at the target hour and the lag hour, the observed lag, and their difference (4); S3 mean stage-1 residual over the last 1, 7, and 30 whole days before the issue day (3) |
 | Cross-plant | RP the plant's 7-day capacity-normalised energy divided by the mean of the other plants', which isolates a plant-specific fault from shared weather (2, with a 1-day version) |
 | Interpolation bound | T1 days since 2024-03-01 (1): month-block folds interleave, so trees can interpolate a test month's level from months on both sides, including future months; its gain is what interpolation buys, never drift a live forecast could use |
@@ -162,9 +162,9 @@ stage-1 prediction comes from a model that saw its own hour. Stage 1 predicts th
 lag hour's weather at the target's lead day, available at the issue time.
 
 **The shortlist rule, fixed before any fit:** X is the arm with the lowest phase-1 mean absolute
-error, over the 13 screening months, among IM, CTX7, W7, Q30, CK, TF, AN, S3, RP, and KS. The
+error, over the 13 screening months, among IM, CTX7, W7, Q30, CK, TF, AN, PC, S3, RP, and KS. The
 excluded arms are B0, L1, L2, S2, N1, and N2 (phase 2 carries those regardless), T1 (an
-interpolation bound), PC (study-only, so a win could not ship), the persistence references and the
+interpolation bound), the persistence references and the
 post-model corrections R1s, R2, R4 and R5 (none is fitted, so none has a sensitivity setting or
 quantile model), and the global-only arms. Phase 2 carries X.
 
@@ -384,14 +384,17 @@ the docs-link checker.
    of the weather forecast product. Intervals from a percentile bootstrap over 21 month clusters
    tend to under-cover, plants are pooled and weighted by row count, and the test does not cover
    differences between plants. The page says all of this. No new PV data.
-2. **Issue-morning arm (IM):** it assumes NGED telemetry for the hour ending 09:00 UTC is in hand at
-   09:00 UTC, as the persistence baseline already assumes, but a lag feature makes the assumption
-   load-bearing. The page says so. Question for the maintainer: is that telemetry latency realistic?
+2. **Power-data latency:** the study assumes observed power up to the forecast's issue time (up to
+   09:00 UTC on the issue day for IM). The live system currently receives NGED power with a lag of
+   at least 6 hours, which the maintainer has asked the study to ignore, because PV power can be
+   obtained with a delay of minutes. The page states that IM and the shorter-lag arms need that
+   faster feed, while lags of a day or more are unaffected.
 3. **Unequal column widths:** padding is inert, so phase-2 contrasts compare arms of different
    widths. N2 measures the bias of one extra column, and N2-k that of a wide X. The maintainer has
    accepted the departure from the `study` skill's equal-count rule; the page says why.
-4. **Shortlist:** PC is excluded from eligibility as X because a win could not ship; it is still
-   fitted and shown in the sweep.
+4. **CAMS ingestion:** PC is eligible as X. A gain from PC would justify ingesting CAMS into the live
+   system, and the page states the CAMS publication delay (assumed 2 days, to be verified against
+   CAMS's documentation before the first fit) that the arm depends on.
 
 ## Triage of the reviews
 
@@ -435,6 +438,6 @@ S2); the reproduction check retargeted to the ENS-mean B0 on the CPU with a per-
 predictions at every daylight hour (S6); stale text (S7); the exploratory list (S8); the window
 function's scope (S9); the global scaling rule (S10); the word "fingerprint" kept for plant
 properties only (S11); lead-day availability (S12); the charts (S13); the ENS departure (S14); the
-one-era note on P2 (S15); the window anchors (S16). Open questions answered: PC is excluded from
-eligibility as X; IM's telemetry assumption is stated as a risk; N2-k is fitted for a wide X; the
+one-era note on P2 (S15); the window anchors (S16). Open questions answered: PC is eligible as X (the
+maintainer would consider ingesting CAMS); IM's power-latency assumption is stated as a risk; N2-k is fitted for a wide X; the
 reproduction target is the ENS-mean B0; P2's single era is stated as a limitation.

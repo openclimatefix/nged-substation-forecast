@@ -526,6 +526,7 @@ def _window_hourly(*, missing_day_index: int | None) -> pl.DataFrame:
 @pytest.mark.parametrize(
     ("day", "first", "last", "statistic", "min_count", "missing_day_index", "expected"),
     [
+        (0, 1, 1, "mean", 1, None, 1112.0),
         (1, 1, 1, "mean", 1, None, 1012.0),
         (2, 1, 1, "mean", 1, None, 912.0),
         (1, 1, 3, "mean", 1, None, 912.0),

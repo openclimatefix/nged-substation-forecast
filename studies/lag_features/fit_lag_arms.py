@@ -39,6 +39,7 @@ Run it with `uv run python studies/lag_features/fit_lag_arms.py`.
 
 import argparse
 import concurrent.futures
+import hashlib
 import json
 import logging
 import sys
@@ -51,7 +52,6 @@ from build_lag_frame import (
     B0_COLUMNS,
     CLOCK_RATIO_TEMPLATE,
     ENS_MEAN_LEAD_DAYS,
-    EXTRA_COLUMNS,
     FULL_SWEEP_LEAD_DAY,
     GLOBAL_ONLY_ARMS,
     IFS_LEAD_DAYS,
@@ -71,8 +71,11 @@ from build_lag_frame import (
     TARGET,
     WEATHER_PRODUCTS,
     WeatherProduct,
+    extra_columns_of,
     output_paths,
+    shared_rows,
     target_date,
+    weather_table,
 )
 from studies.arm_runner import Job, run_all
 from studies.baselines import same_clock_hour_window
@@ -105,10 +108,33 @@ SCREENING_MONTHS: Final[tuple[str, ...]] = (
 )
 """Phase 1 reads the first 13 calendar months, 2024-12 to 2025-12, and nothing else."""
 
-SHORTLIST_EXCLUDED: Final[tuple[str, ...]] = ("B0", "L1", "L2", "S2", "N1", "N2")
-"""**The shortlist rule, fixed before any fit:** X is the fitted sweep arm with the lowest phase-1
-mean absolute error over `SCREENING_MONTHS`, other than these six (phase 2 carries those
-regardless). Phase 2 carries X."""
+SHORTLIST_CANDIDATES: Final[tuple[str, ...]] = (
+    "IM",
+    "CTX7",
+    "W7",
+    "Q30",
+    "CK",
+    "TF",
+    "AN",
+    "S3",
+    "RP",
+    "KS",
+)
+"""**The shortlist rule, fixed before any fit:** X is the candidate with the lowest phase-1 mean
+absolute error over `SCREENING_MONTHS`. The excluded arms are B0, L1, L2, S2, N1 and N2 (phase 2
+carries those regardless), T1 (an interpolation bound), PC (study-only, so a win could not ship),
+the references and post-model corrections (none is fitted), and the global-only arms. Phase 2
+carries X."""
+
+WIDE_X_COLUMNS: Final[int] = 3
+"""If X adds more columns than this, N2-k is fitted with as many random lags as X adds."""
+
+REPRODUCTION_MAE_PERCENT: Final[float] = 8.771
+"""The published mean absolute error of the ENS-mean B0 at lead-day 1 on the 35,263 shared rows, in
+percentage points of capacity."""
+
+REPRODUCTION_TOLERANCE_PERCENT: Final[float] = 0.0005
+"""How far a refit's mean may differ from the published figure, which is quoted to 3 decimals."""
 
 PHASE2_POINT_ARMS: Final[tuple[str, ...]] = ("B0", "L1", "L2", "S2", "X", "N1", "N2")
 """The arms fitted at both hyperparameter settings; `X` stands for the shortlist rule's arm."""
@@ -194,7 +220,7 @@ def features_of(*, arm: str) -> tuple[str, ...]:
     Returns:
         B0's columns followed by the arm's own.
     """
-    return (*B0_COLUMNS, *EXTRA_COLUMNS[arm])
+    return (*B0_COLUMNS, *extra_columns_of(arm=arm))
 
 
 # --- Stage 1 ------------------------------------------------------------------------------------
@@ -654,9 +680,9 @@ def shortlist(*, losses: pl.DataFrame) -> str:
         losses: The lead-day 1 sweep's primary-setting losses.
 
     Returns:
-        X: the arm with the lowest phase-1 mean absolute error, other than `SHORTLIST_EXCLUDED`.
+        X: the arm with the lowest phase-1 mean absolute error, other than `SHORTLIST_CANDIDATES`.
     """
-    candidates = phase1_table(losses=losses).filter(~pl.col("arm").is_in(SHORTLIST_EXCLUDED))
+    candidates = phase1_table(losses=losses).filter(pl.col("arm").is_in(SHORTLIST_CANDIDATES))
     return str(candidates["arm"][0])
 
 
@@ -792,6 +818,12 @@ def phase2_fits(*, chosen: str) -> list[Fit]:
         Fit("lead1", scope, lead, arm, "sensitivity", arm in QUANTILE_SENSITIVITY_ARMS)
         for arm in named(PHASE2_POINT_ARMS)
     ]
+    width = len(extra_columns_of(arm=chosen))
+    if width > WIDE_X_COLUMNS:
+        fits += [
+            Fit("lead1", scope, lead, f"N2-{width}", setting, quantiles=False)
+            for setting in ("primary", "sensitivity")
+        ]
     fits += [
         Fit("global", "global", lead, arm, setting, arm in GLOBAL_QUANTILE_ARMS, pooled=True)
         for setting in ("primary", "sensitivity")
@@ -869,6 +901,7 @@ def lead1_dataset(*, context: Context, root: Path, product: WeatherProduct) -> p
             hyper_parameters=settings_for(context=context)["primary"],
             device=context.device,
         )
+        predictions.write_parquet(context.checkpoint_dir / "stage1_predictions.parquet")
         stage1_columns(frame=frame, hours=hours, predictions=predictions).write_parquet(
             derived_path
         )
@@ -997,16 +1030,102 @@ def combine(*, results: list[pl.DataFrame]) -> pl.DataFrame:
     ).sort("scope", "setting", "arm", "site", "time", "seed")
 
 
+def loss_checksum(*, losses: pl.DataFrame) -> str:
+    """Return a checksum of the per-row losses, in a fixed row order.
+
+    Args:
+        losses: Per-row losses with `site`, `time`, `seed` and `METRIC`.
+
+    Returns:
+        The SHA-256 hex digest of the sorted per-row loss values' bytes.
+    """
+    ordered = losses.sort("site", "time", "seed")
+    return hashlib.sha256(ordered[METRIC].cast(pl.Float64).to_numpy().tobytes()).hexdigest()
+
+
+def reproduction_check(
+    *, root: Path, device: DeviceType, max_workers: int, expected_checksum: str | None
+) -> int:
+    """Refit the ENS-mean B0 at lead-day 1 on the shared rows and compare it with the published run.
+
+    The CPU refit must give `REPRODUCTION_MAE_PERCENT` (and `expected_checksum`, if given). If
+    `device` is `cuda`, a GPU refit is reported beside it, so the device difference can be set
+    against the published solar device range.
+
+    Args:
+        root: The output root, where `reproduction_check.md` is written.
+        device: The device of the second refit; `cpu` runs the CPU refit alone.
+        max_workers: How many plants fit at once.
+        expected_checksum: The published per-row loss checksum, or `None` to print it only.
+
+    Returns:
+        0 on success.
+
+    Raises:
+        ValueError: If the CPU refit's mean or checksum differs from the published one.
+    """
+    report = root / "ens_mean" / "reproduction_check.md"
+    refuse_to_overwrite(paths=[report])
+    frame = (
+        shared_rows()
+        .join(
+            weather_table(product="ens_mean", lead_day=FULL_SWEEP_LEAD_DAY),
+            on=["site", "time"],
+            how="left",
+        )
+        .sort("site", "time")
+    )
+    job: Job = ("B0", "primary", TARGET, features_of(arm="B0"), PRIMARY_HYPER_PARAMETERS, False)
+    lines = ["# Reproduction check: ENS-mean B0 at lead-day 1 on the shared rows", ""]
+    means = {}
+    for fitted_on in dict.fromkeys(("cpu", device)):
+        losses = run_all(dataset=frame, jobs=[job], max_workers=max_workers, device=fitted_on)
+        means[fitted_on] = float(losses.select(pl.col(METRIC).mean()).item()) * 100
+        checksum = loss_checksum(losses=losses)
+        lines.append(
+            f"- {fitted_on}: mean absolute error {means[fitted_on]:.3f}% of capacity on "
+            f"{losses.select('site', 'time').n_unique()} rows; per-row loss checksum `{checksum}`."
+        )
+        if fitted_on == "cpu":
+            if abs(means["cpu"] - REPRODUCTION_MAE_PERCENT) > REPRODUCTION_TOLERANCE_PERCENT:
+                msg = (
+                    f"CPU refit gives {means['cpu']:.4f}%, "
+                    f"not the published {REPRODUCTION_MAE_PERCENT}%"
+                )
+                raise ValueError(msg)
+            if expected_checksum is not None and checksum != expected_checksum:
+                msg = f"CPU refit's per-row loss checksum {checksum} is not {expected_checksum}"
+                raise ValueError(msg)
+    if "cuda" in means:
+        lines.append(f"- GPU minus CPU: {means['cuda'] - means['cpu']:+.3f} points.")
+    report.write_text("\n".join(lines) + "\n")
+    sys.stdout.write("\n".join(lines) + "\n")
+    return 0
+
+
 def main() -> int:
     """Run the plan for one weather product and write the combined losses."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--weather-product", choices=WEATHER_PRODUCTS, default="ens_mean")
     parser.add_argument("--output-root", type=Path, default=LAG_FEATURES_DIR)
-    parser.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
-    parser.add_argument("--max-workers", type=int, default=6)
+    parser.add_argument("--device", choices=("cpu", "cuda"), default="cuda")
+    parser.add_argument("--max-workers", type=int, default=4)
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument(
+        "--reproduction-check",
+        action="store_true",
+        help="Refit the ENS-mean B0 at lead-day 1 on the CPU (and on --device) and stop.",
+    )
+    parser.add_argument("--expected-checksum", default=None, help="The published checksum.")
     arguments = parser.parse_args()
     product: WeatherProduct = arguments.weather_product
+    if arguments.reproduction_check:
+        return reproduction_check(
+            root=arguments.output_root,
+            device=arguments.device,
+            max_workers=arguments.max_workers,
+            expected_checksum=arguments.expected_checksum,
+        )
     directory = arguments.output_root / product
     final = directory / f"losses_{product}.parquet"
     refuse_to_overwrite(paths=[final])
