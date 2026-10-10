@@ -153,3 +153,10 @@ a
   7.4% of capacity for solar against 7.7% for ECMWF ENS's mean, and 5.75% for wind at 10 m, level
   with ECMWF ENS's mean. The comparison is descriptive and uses stitched series that carry no run
   time.
+
+- [Does lagged power improve a day-ahead solar power forecast?](forecasts/lag-features.md) — at 6
+  solar plants over 18 months, giving an XGBoost model the plant's own power from an earlier day
+  changed the day-ahead error by −0.001 points of capacity [−0.075, +0.073] against a baseline of
+  8.93, so none of the five planned comparisons found a gain. A single lag cannot detect a planted
+  power loss that arms using weekly statistics or satellite irradiance partly recover, and at lead
+  days 10 to 14 blending the baseline with climatology beat every lag arm.
