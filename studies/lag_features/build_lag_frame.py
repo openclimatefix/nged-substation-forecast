@@ -935,7 +935,11 @@ def main() -> int:
         if product != "ens_mean":
             arms = REPLICATE_ARMS
         else:
-            arms = SWEEP_ARMS if lead_day == FULL_SWEEP_LEAD_DAY else LONGER_LEAD_ARMS
+            arms = (
+                (*SWEEP_ARMS, *GLOBAL_ONLY_ARMS)
+                if lead_day == FULL_SWEEP_LEAD_DAY
+                else LONGER_LEAD_ARMS
+            )
         frame, lines = build_frame(
             product=product,
             lead_day=lead_day,

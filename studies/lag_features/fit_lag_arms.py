@@ -49,9 +49,11 @@ import numpy as np
 import polars as pl
 from build_lag_frame import (
     B0_COLUMNS,
+    CLOCK_RATIO_TEMPLATE,
     ENS_MEAN_LEAD_DAYS,
     EXTRA_COLUMNS,
     FULL_SWEEP_LEAD_DAY,
+    GLOBAL_ONLY_ARMS,
     IFS_LEAD_DAYS,
     LAG_FEATURES_DIR,
     LONGER_LEAD_ARMS,
@@ -73,9 +75,11 @@ from build_lag_frame import (
     target_date,
 )
 from studies.arm_runner import Job, run_all
+from studies.baselines import same_clock_hour_window
 from studies.cross_validation import (
     N_FOLDS,
     PRIMARY_HYPER_PARAMETERS,
+    SEEDS,
     SENSITIVITY_HYPER_PARAMETERS,
     DeviceType,
     HyperParameters,
@@ -85,6 +89,7 @@ from studies.cross_validation import (
     fit_one_fold,
     out_of_fold_losses,
     raise_on_uncovered_months,
+    score_prediction,
 )
 from studies.guards import refuse_to_overwrite
 
@@ -123,6 +128,10 @@ GLOBAL_ARMS: Final[tuple[str, ...]] = ("B0", "L1", "X")
 GLOBAL_QUANTILE_ARMS: Final[tuple[str, ...]] = ("B0", "L1")
 """Arms whose global quantile models are fitted, at both settings."""
 
+LEAVE_ONE_PLANT_OUT_ARMS: Final[tuple[str, ...]] = ("B0", "L1", "G-FP")
+"""Arms fitted leaving each plant out in turn (exploratory). In the global scope, `B0` and `L1` are
+the plan's G-B0 and G-L1, and `G-ID` and `G-FP` add the plant code and the fingerprint pack."""
+
 CONTROL_ARMS: Final[tuple[str, ...]] = ("B0", "L1")
 """The positive control's arms, at the primary setting."""
 
@@ -134,6 +143,10 @@ MIN_RESIDUAL_HOURS: Final[int] = 3
 
 RESIDUAL_WINDOWS: Final[tuple[tuple[int, int], ...]] = ((1, 1), (7, 5), (30, 20))
 """S3's windows: the number of whole days, and the fewest of them that must hold a residual."""
+
+CLOCK_RATIO_DAYS: Final[int] = 30
+CLOCK_RATIO_MIN_DAYS: Final[int] = 15
+"""R2's per-clock-hour ratio of observed to predicted power over 30 days, at least 15 present."""
 
 RATIO_WINDOW: Final[tuple[int, int]] = (7, 5)
 """R1's energy ratio is taken over 7 whole days, at least 5 of which hold both energies."""
@@ -331,6 +344,23 @@ def stage1_columns(
             .rename({"predicted": "predicted_mw"})
             .with_columns(date=(pl.col("time") - pl.duration(minutes=30)).dt.date())
         )
+        clock_ratio = same_clock_hour_window(
+            keys=keys,
+            hourly=residual.select("site", "time", power_mw=pl.col("observed_mw")),
+            day=lead_day,
+            first_days_back=1,
+            last_days_back=CLOCK_RATIO_DAYS,
+            statistic="mean",
+            min_count=CLOCK_RATIO_MIN_DAYS,
+        ) / same_clock_hour_window(
+            keys=keys,
+            hourly=residual.select("site", "time", power_mw=pl.col("predicted_mw")),
+            day=lead_day,
+            first_days_back=1,
+            last_days_back=CLOCK_RATIO_DAYS,
+            statistic="mean",
+            min_count=CLOCK_RATIO_MIN_DAYS,
+        )
         rolled = _daily_residual_features(residual=residual).rename({"date": "asof_date"})
         joined = keys.join(rolled, on=["site", "asof_date"], how="left", maintain_order="left")
         derived = {
@@ -338,6 +368,7 @@ def stage1_columns(
             STAGE1_LAG_TEMPLATE.format(fold=fold): lag_prediction["predicted"],
             RESIDUAL_LAG_TEMPLATE.format(fold=fold): keys["lag_d1"] - lag_prediction["predicted"],
             RATIO_TEMPLATE.format(fold=fold): joined["energy_ratio_7d"],
+            CLOCK_RATIO_TEMPLATE.format(fold=fold): clock_ratio,
             **{
                 template.format(fold=fold): joined[f"resid_mean_{days}d"]
                 for template, (days, _) in zip(
@@ -377,6 +408,7 @@ def fit_arm(
     setting: str,
     quantiles: bool,
     pooled: bool = False,
+    lopo: bool = False,
 ) -> pl.DataFrame:
     """Fit one arm at one setting, or read it back if a checkpoint holds it.
 
@@ -389,6 +421,7 @@ def fit_arm(
         setting: `primary` or `sensitivity`.
         quantiles: Whether to fit the quantile models too.
         pooled: Whether `dataset` is one pooled model's frame (fitted as a single `site_rows`).
+        lopo: Whether to fit the pooled frame leaving each plant out in turn (exploratory).
 
     Returns:
         The arm's per-row losses with `arm`, `setting`, `scope`, `lead_day`, `with_quantiles`,
@@ -401,6 +434,20 @@ def fit_arm(
         return pl.read_parquet(kind_path)
     hyper_parameters = settings_for(context=context)[setting]
     features = features_of(arm=arm)
+    if lopo:
+        annotated = leave_one_plant_out(
+            context=context, dataset=dataset, arm=arm, hyper_parameters=hyper_parameters
+        ).with_columns(
+            arm=pl.lit(arm),
+            setting=pl.lit(setting),
+            scope=pl.lit(scope),
+            lead_day=pl.lit(lead_day, dtype=pl.Int32),
+            with_quantiles=pl.lit(value=False),
+        )
+        partial = kind_path.with_suffix(".partial")
+        annotated.write_parquet(partial)
+        partial.replace(kind_path)
+        return annotated
     if pooled:
         losses = out_of_fold_losses(
             site_rows=dataset,
@@ -434,6 +481,65 @@ def fit_arm(
     partial.replace(kind_path)
     _LOG.info("saved %s", kind_path.name)
     return annotated
+
+
+def leave_one_plant_out(
+    *, context: Context, dataset: pl.DataFrame, arm: str, hyper_parameters: HyperParameters
+) -> pl.DataFrame:
+    """Predict each plant from a model that never saw the plant, withholding the scored months.
+
+    For plant `p` and fold `k`, the model trains on the other plants' rows outside fold `k` (the
+    fleet-wide fold, so the scored months are withheld at every plant), and predicts plant `p`'s
+    rows in fold `k`.
+
+    Args:
+        context: The run's context.
+        dataset: The pooled, capacity-normalised frame from `pooled_frame`.
+        arm: The arm.
+        hyper_parameters: The setting to fit at.
+
+    Returns:
+        One row per (plant, time, seed) with the losses `score_prediction` gives, `actual` and
+        `prediction`, in fractions of capacity.
+    """
+    features = features_of(arm=arm)
+    sites = sorted(dataset["site"].unique().to_list())
+
+    def one_plant(site: str) -> pl.DataFrame:
+        parts = []
+        for fold in sorted(dataset["fold"].unique().to_list()):
+            train = dataset.filter(
+                (pl.col("site") != site) & (pl.col("fold") != fold) & ~pl.col("constrained")
+            )
+            test = dataset.filter((pl.col("site") == site) & (pl.col("fold") == fold))
+            if test.is_empty() or train.is_empty():
+                continue
+            fold_features = [name.format(fold=fold) for name in features]
+            for seed in SEEDS:
+                point, _ = fit_one_fold(
+                    train=train,
+                    test=test,
+                    features=fold_features,
+                    target=TARGET,
+                    hyper_parameters=hyper_parameters,
+                    seed=seed,
+                    with_quantiles=False,
+                    device=context.device,
+                )
+                prediction = test.select("site", "time").with_columns(
+                    seed=pl.lit(seed, dtype=pl.Int32), prediction=pl.Series(point, dtype=pl.Float64)
+                )
+                scored = score_prediction(rows=test, prediction=prediction, target=TARGET)
+                parts.append(
+                    scored.join(prediction, on=["site", "time", "seed"]).join(
+                        test.select("site", "time", actual=pl.col(TARGET).cast(pl.Float64)),
+                        on=["site", "time"],
+                    )
+                )
+        return pl.concat(parts)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=context.max_workers) as pool:
+        return pl.concat(list(pool.map(one_plant, sites)))
 
 
 INTERVAL_ARMS: Final[tuple[str, ...]] = ("B0", "L1")
@@ -607,6 +713,7 @@ class Fit(NamedTuple):
     setting: str
     quantiles: bool
     pooled: bool = False
+    lopo: bool = False
 
 
 def fit_all(
@@ -632,6 +739,7 @@ def fit_all(
             setting=fit.setting,
             quantiles=fit.quantiles,
             pooled=fit.pooled,
+            lopo=fit.lopo,
         )
         for fit in fits
     ]
@@ -688,6 +796,14 @@ def phase2_fits(*, chosen: str) -> list[Fit]:
         Fit("global", "global", lead, arm, setting, arm in GLOBAL_QUANTILE_ARMS, pooled=True)
         for setting in ("primary", "sensitivity")
         for arm in named(GLOBAL_ARMS)
+    ]
+    fits += [
+        Fit("global", "global", lead, arm, "primary", quantiles=False, pooled=True)
+        for arm in GLOBAL_ONLY_ARMS
+    ]
+    fits += [
+        Fit("global", "lopo", lead, arm, "primary", quantiles=False, lopo=True)
+        for arm in LEAVE_ONE_PLANT_OUT_ARMS
     ]
     for shift in POSITIVE_CONTROL_SHIFTS:
         percent = f"{round(shift * 100):02d}"
@@ -795,7 +911,12 @@ def run_ens_mean(*, context: Context, root: Path, product: WeatherProduct) -> li
     dataset = lead1_dataset(context=context, root=root, product=product)
     if context.smoke:
         frames = {"lead1": smoke_subsample(dataset=dataset), "global": pooled_frame(frame=dataset)}
-        smoke_global = [Fit("global", "global", FULL_SWEEP_LEAD_DAY, "B0", "primary", False, True)]
+        lead = FULL_SWEEP_LEAD_DAY
+        smoke_global = [
+            Fit("global", "global", lead, "B0", "primary", False, True),
+            Fit("global", "global", lead, "G-FP", "primary", False, True),
+            Fit("global", "lopo", lead, "G-FP", "primary", False, lopo=True),
+        ]
         fit_intervals(context=context, dataset=frames["lead1"], arm="B0")
         return fit_all(
             context=context, frames=frames, fits=sweep_fits(context=context) + smoke_global
@@ -861,7 +982,7 @@ def combine(*, results: list[pl.DataFrame]) -> pl.DataFrame:
         One frame; for a (scope, setting, arm) fitted with and without quantiles, only the run with
         quantiles, whose point model is the same fit.
     """
-    stacked = pl.concat(results, how="vertical_relaxed")
+    stacked = pl.concat(results, how="diagonal_relaxed")
     quantile_keys = (
         stacked.filter(pl.col("with_quantiles")).select("scope", "setting", "arm").unique()
     )
@@ -872,7 +993,7 @@ def combine(*, results: list[pl.DataFrame]) -> pl.DataFrame:
                 quantile_keys, on=["scope", "setting", "arm"], how="anti"
             ),
         ],
-        how="vertical_relaxed",
+        how="diagonal_relaxed",
     ).sort("scope", "setting", "arm", "site", "time", "seed")
 
 
