@@ -342,8 +342,11 @@ sets out the rule and the products the rule covers.
 
 ## Charts
 
-**A study page is mostly figures: the figures carry the argument, and the text only explains
-them.** The maintainer asked for this directly. Both the page's concept and its vertical space
+**A study page is figure-led: the figures carry the whole story, and the text only explains
+them.** The maintainer asked for this directly, and on 2026-10-10 asked for every study to take
+this form. The first figure is visible above the fold, and prose is kept to the minimum the figures
+need: a reader who looks only at the figures and their bolded leads follows the study from the
+question to the answer. Both the page's concept and its vertical space
 belong largely to the figures, so a reader who scrolls past the text still follows the story. The
 figures are mostly time series, with scatter plots, distributions, and other data graphics where
 they show the point better. They step the reader through the processing, in the order the method
@@ -414,22 +417,23 @@ Every study page follows the structure of an academic paper, in this order:
 
 1. **Title.** An `h1` that states the finding, scoped to the products tested. A page that ranks
    products in answer to a question may instead title itself with that question.
-2. **Summary.** A one-paragraph **bottom line** directly under the title, in plain words: a bold
-   sentence stating the answer to the study's main question, then one or two sentences on what
-   would change the answer and what the study did not test. Then come the question-and-answer
-   bullets described below, the headline figure (the leaderboard and then the paired contrasts,
-   where the study ranks products), and scoped take-home bullets, one per use of the data. The
-   Summary bullets are the only place a recommendation appears without its evidence.
+2. **Summary.** A **bottom line** of at most two sentences directly under the title, in plain
+   words: a bold sentence stating the answer to the study's main question, then one sentence on
+   what would change the answer or what the study did not test. **The headline figure follows the
+   bottom line at once, so that it is visible above the fold, without scrolling, when a reader
+   lands on the page.** Where the study ranks products, the headline figure is the leaderboard
+   or the paired contrasts. Then come the question-and-answer bullets described below, and scoped
+   take-home bullets, one per use of the data. The Summary bullets are the only place a
+   recommendation appears without its evidence.
 
-   **The Summary opens by answering each question the study asks, in plain words.** Write one short
-   bolded bullet per question, such as "Can an unmetered battery be identified?", with the answer
-   on the same line ("Mostly no, apart from simulated cases"). Under each question, give three to
-   six bullets of the findings that support the answer. Each finding names what was tested, the
-   number with its scope, and the baseline it was compared with. A reader who knows none of the
-   study's terms must be able to follow the Summary. Define each term at first use, or leave the
-   term out. Label every provisional number "(provisional)". Close the question-and-answer bullets
-   with one bullet saying what the data and methods used can and cannot support, before the
-   headline figure.
+   **The Summary answers each question the study asks, in plain words, in the fewest words that
+   work.** Write one short bolded bullet per question, such as "Can an unmetered battery be
+   identified?", with the answer on the same line ("Mostly no, apart from simulated cases"). Give
+   at most two sentences under it, naming what was tested, the number with its scope, the baseline
+   it was compared with, and the figure that shows it. A reader who knows none of the study's terms
+   must be able to follow the Summary. Define each term at first use, or leave the term out. Label
+   every provisional number "(provisional)". Close the question-and-answer bullets with one bullet
+   saying what the data and methods used can and cannot support.
 
 3. **The AI disclaimer** (below).
 4. **Key findings.** The finer conclusions, one bolded sentence each, each linking to its results
