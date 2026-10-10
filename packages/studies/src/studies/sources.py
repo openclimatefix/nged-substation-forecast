@@ -497,6 +497,7 @@ merged. `UKV-CEDA`, `-part2` and `-part3` hold the 00, 06, 12, and 18 UTC runs t
 REANALYSIS_PRODUCT_NAMES: Final[tuple[str, ...]] = (
     "CAMS",
     "CAMS_public_points",
+    "CAMS_EAC4_AOD",
     "CERRA",
     "ERA5",
     "ERA5-WIND-2019-2023",
@@ -597,6 +598,11 @@ def site_points_dir_for(*, product: str) -> Path:
 ERA5_PRODUCT_DIR: Final[Path] = product_dir_for(product="ERA5")
 """ERA5, fetched from Open-Meteo's mirror and from the Copernicus Climate Data Store."""
 
+ERA5_SOLAR_VARIABLES_DIR: Final[Path] = ERA5_PRODUCT_DIR / "solar_variables"
+"""The ERA5 cloud, water, humidity, snow and other fields that might explain the sunlight reaching a
+panel, over the same 20 cells and hours as `ERA5_PRODUCT_DIR / "beam_diffuse"`: one parquet per
+variable."""
+
 ERA5_SITE_POINTS_DIR: Final[Path] = site_points_dir_for(product="ERA5")
 """ERA5's per-site frames: the irradiance and the wind at each site's coordinates."""
 
@@ -608,6 +614,9 @@ CAMS_PRODUCT_DIR: Final[Path] = product_dir_for(product="CAMS")
 
 CAMS_PUBLIC_POINTS_DIR: Final[Path] = product_dir_for(product="CAMS_public_points")
 """The CAMS irradiance at public points: the single-site solar BMUs and a coarse GB grid."""
+
+CAMS_EAC4_AOD_PRODUCT_DIR: Final[Path] = product_dir_for(product="CAMS_EAC4_AOD")
+"""The CAMS global reanalysis (EAC4) aerosol optical depth at 550 nm, 3-hourly, over a box."""
 
 CAMS_SITE_POINTS_DIR: Final[Path] = site_points_dir_for(product="CAMS")
 """The CAMS irradiance at each site's coordinates."""
