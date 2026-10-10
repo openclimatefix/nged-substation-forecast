@@ -66,6 +66,7 @@ from era5_ladder_arms import (
     arms_path,
     checks_path,
     dataset_path,
+    importance_path,
     report_paths,
     results_path,
 )
@@ -101,6 +102,9 @@ PERCENTAGE_POINTS: Final[float] = 100.0
 
 PRINT_DECIMALS: Final[int] = 3
 """How many decimals a table prints, so a chart and the page quote the same digits."""
+
+MIN_HOURS_FOR_WORST_DAY: Final[int] = 6
+"""A farm-day needs this many kept hours to be listed, so one stray hour is not a day."""
 
 WORST_DAY_COUNT: Final[int] = 20
 """How many of the minimal arm's worst farm-days the report lists."""
@@ -727,8 +731,13 @@ def worst_days(*, losses: pl.DataFrame, dataset: pl.DataFrame, target: TargetTyp
                 pl.col(name).mean().alias(f"mean_{name}")
                 for name in ("sd", "tcc")
                 if name in dataset.columns
-            )
+            ),
+            hours=pl.len(),
+            mean_output_pct=(pl.col("power_mw") / pl.col("effective_capacity_mw")).mean()
+            * PERCENTAGE_POINTS,
+            mean_clear_sky_index=pl.col("cams_clear_sky_index").mean(),
         )
+        .filter(pl.col("hours") >= MIN_HOURS_FOR_WORST_DAY)
     )
     return (
         daily.join(context, on=["site", "day"])
@@ -835,7 +844,11 @@ def render_worst_days(*, worst: pl.DataFrame) -> str:
         The markdown table. Errors are in the target's own unit: percentage points of capacity for
         the output target, and clearness index for the CAMS target.
     """
-    context = [name for name in ("mean_sd", "mean_tcc") if name in worst.columns]
+    context = [
+        name
+        for name in ("hours", "mean_output_pct", "mean_clear_sky_index", "mean_sd", "mean_tcc")
+        if name in worst.columns
+    ]
     rows = []
     for row in worst.iter_rows(named=True):
         factor = scale(target=row["target"])
@@ -847,7 +860,9 @@ def render_worst_days(*, worst: pl.DataFrame) -> str:
                 f"{row['g0'] * factor:.{PRINT_DECIMALS}f}",
                 f"{row['g9'] * factor:.{PRINT_DECIMALS}f}",
                 *(
-                    "n/a" if row[name] is None else f"{row[name]:.{PRINT_DECIMALS}f}"
+                    "n/a"
+                    if row[name] is None
+                    else (f"{row[name]}" if name == "hours" else f"{row[name]:.{PRINT_DECIMALS}f}")
                     for name in context
                 ),
             ]
@@ -1323,6 +1338,70 @@ def render_aerosol_decision(*, conditions: pl.DataFrame) -> list[str]:
     ]
 
 
+IMPORTANCE_TOP_COLUMNS: Final[int] = 12
+"""How many columns of the full arm's importance the report lists, best first."""
+
+
+def render_importance(*, through_rung: RungType, variant: str) -> str:
+    """Render the full arm's XGBoost importance and the shuffled-copy noise line, per target.
+
+    The share is each column's gain as a fraction of the model's total gain, averaged over farms,
+    folds, and seeds. The importance of an XGBoost model is descriptive and not a test: correlated
+    columns split the credit among themselves. The noise line is the largest share that any shuffled
+    copy of a variable takes in the arm that holds both a variable and its shuffled copy.
+
+    Args:
+        through_rung: The highest rung of the build.
+        variant: The build variant.
+
+    Returns:
+        The markdown, empty if the importance file does not exist.
+    """
+    path = importance_path(variant=variant, through_rung=through_rung)
+    if not path.exists():
+        return ""
+    shares = pl.read_parquet(path)
+    parts: list[str] = []
+    for target in TARGETS:
+        full = (
+            shares.filter((pl.col("target") == target) & (pl.col("arm") == "g9"))
+            .group_by("column")
+            .agg(share=pl.col("share").mean())
+            .sort("share", descending=True)
+        )
+        noise = (
+            shares.filter(
+                (pl.col("target") == target)
+                & (pl.col("arm") == "g9_with_shuffled")
+                & pl.col("column").str.ends_with("_noise")
+            )
+            .group_by("column")
+            .agg(share=pl.col("share").mean())
+            .sort("share", descending=True)
+        )
+        if full.is_empty() or noise.is_empty():
+            continue
+        parts += [
+            f"### {target} target: share of the full arm's gain, mean over farms, folds, and seeds",
+            "",
+            table(
+                header=["column", "share of gain (%)"],
+                rows=[
+                    [row["column"], f"{row['share'] * PERCENTAGE_POINTS:.2f}"]
+                    for row in full.head(IMPORTANCE_TOP_COLUMNS).iter_rows(named=True)
+                ],
+            ),
+            "",
+            (
+                f"Noise line: the largest shuffled copy takes {noise['share'][0] * 100:.2f}% "
+                f"({noise['column'][0]}), and the shuffled copies together take "
+                f"{noise['share'].sum() * 100:.2f}%."
+            ),
+            "",
+        ]
+    return "\n".join(parts)
+
+
 def render_splits(*, splits: pl.DataFrame) -> str:
     """Render the regime, season, and hour-of-day contrasts as markdown, one table per target.
 
@@ -1537,6 +1616,14 @@ def render_report(
             "## Contrasts by cloud regime, season, and UTC hour of day (exploratory)",
             "",
             render_splits(splits=splits),
+        ]
+    importance_text = render_importance(through_rung=through_rung, variant=variant)
+    if importance_text:
+        parts += [
+            "",
+            "## XGBoost importance of the full arm (descriptive)",
+            "",
+            importance_text,
         ]
     if not probabilistic.is_empty():
         parts += [

@@ -161,7 +161,10 @@ ROW_HEIGHT_PX: Final[int] = 26
 """The height of one row of a dot-and-interval panel."""
 
 DAY_PANEL_WIDTH_PX: Final[int] = 130
-"""The width of one day in a three-day small multiple."""
+"""The width of one day in a small multiple that also has a farm label column."""
+
+WIDE_DAY_PANEL_WIDTH_PX: Final[int] = 190
+"""The width of one day in a three-day small multiple, so the three days fill the text column."""
 
 DAY_PANEL_HEIGHT_PX: Final[int] = 80
 """The height of one variable's row in a three-day small multiple."""
@@ -791,7 +794,7 @@ def choose_days(
 
 def _day_facets(*, chart: alt.Chart, days: pl.DataFrame) -> alt.FacetChart:
     """Facet a line chart into one column per chosen day."""
-    return chart.properties(width=DAY_PANEL_WIDTH_PX, height=DAY_PANEL_HEIGHT_PX).facet(
+    return chart.properties(width=WIDE_DAY_PANEL_WIDTH_PX, height=DAY_PANEL_HEIGHT_PX).facet(
         column=alt.Column("day_label:N", sort=days["day_label"].to_list(), title=None)
     )
 
@@ -845,7 +848,7 @@ def figure_3_days(
                         domain=[DISPLAY_NAMES[column] for column in columns],
                         range=list(SERIES_COLOURS)[: len(columns)],
                     ),
-                    legend=alt.Legend(title=title, orient="top"),
+                    legend=alt.Legend(title=title, orient="top", columns=2, labelLimit=300),
                 ),
             )
         )
