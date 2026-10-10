@@ -205,11 +205,12 @@ determined agent from cheating, because the re-implementation discards the agent
 adversarial reviews and the person re-implementing all read each finalist's diff first.
 
 **Five roles and objects recur below.** The *research lead* is an LLM session that decides what to
-try next. A *worker* is a separate LLM session that implements one idea once, on its own git branch.
-The *screening harness* is the one command every worker uses to score an implementation. The
-*hypothesis store* is the written record of every idea, every implementation, and every score. The
-*finalists* are the few top-ranked ideas the maintainer chooses, after a session, to review
-adversarially and then score on the leaderboard fold.
+try next, and which implementations need a review before screening. A *worker* is a separate LLM
+session that implements one idea once, on its own git branch. The *screening harness* is the one
+command every worker uses to score an implementation. The *hypothesis store* is the written record
+of every idea, every implementation, and every score. The *finalists* are the few top-ranked ideas
+the maintainer chooses, after a session, to review adversarially and then score on the leaderboard
+fold.
 
 ### Who runs what
 
@@ -326,15 +327,15 @@ whether the idea is worth continuing before building the rest.
 every substantial change gets one.** A small diff, such as a new calendar feature or a changed
 XGBoost setting, goes straight to the harness. A substantial change, such as a new module, a new
 upstream data product, or a change to how the pipeline joins data or trains, always gets a review.
-The review exists so that a good idea is not abandoned because its one implementation was broken,
-since a broken implementation is one source of the variance between implementations that [Ning et
-al.](#one-implementation-is-weak-evidence-about-an-idea) measured. The review is not the defence
-against cheating. The reviewer is a fresh agent, given the written idea and the diff but not the
-worker's reasoning, so the worker's rationale cannot anchor the review. The reviewer checks that the
-diff implements the idea, that no feature uses data from after the forecast was made, and that the
-code has no plain bug. The reviewer's findings go back to the worker to fix before the harness
-scores the implementation. The mandatory reviews come later, on the finalists only, as [After a
-session](#after-a-session) describes.
+The review exists so that a good idea is not abandoned because its one implementation was broken.
+[Ning et al.](#one-implementation-is-weak-evidence-about-an-idea) found that how an idea happens to
+be implemented moves its score far more than re-running the implementation does, and a broken
+implementation is the extreme case. The reviewer is a fresh agent, given the written idea and the
+diff but not the worker's reasoning, so the worker's rationale cannot anchor the review. The
+reviewer checks that the diff implements the idea, that no feature uses data from after the forecast
+was made, and that the code has no plain bug. The reviewer's findings go back to the worker to fix
+before the harness scores the implementation. The mandatory reviews come later, on the finalists
+only, as [After a session](#after-a-session) describes.
 
 ### Several implementations of one idea
 
@@ -428,8 +429,9 @@ step.
 
 **The mandatory reviews go to the finalists because selection concentrates bugs there.** Choosing
 the top few of many implementations also tends to choose the implementations whose bugs happened to
-raise the score, whether or not any agent meant to cheat. A bug in an implementation that ranks low
-wastes one screening run. A bug in a finalist wastes a look at the validation window and a
+raise the score, whether or not any agent meant to cheat. A bug in an implementation that ranks low,
+and that the research lead judged too small to review, wastes one screening run or loses one
+implementation of an idea. A bug in a finalist wastes a look at the validation window and a
 re-implementation, and a leak in the idea itself could survive into the re-implementation. Reviewing
 only the finalists also keeps the number of Opus reviews small.
 
@@ -450,6 +452,10 @@ itself.** If the two rankings disagree often, the screening harness or its folds
 - **No file permission hides what the public repository says.** Docs pages, study write-ups, and
   pull-request bodies can quote scores on the validation window, so the research-lead skill tells
   the agent not to read them.
+- **A good idea can be abandoned because its implementation was broken.** The research lead can
+  misjudge a substantial change as small and skip its review. Implementing a close idea a second
+  time, as [Several implementations of one idea](#several-implementations-of-one-idea) describes,
+  limits the damage.
 - **A broken or leaky implementation can win the screening.** The finalist reviews and the
   re-implementation stand between that implementation and the leaderboard, so the damage is wasted
   effort, not a false result.
