@@ -1,0 +1,4449 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../solar-bmu-census/">
+      
+      
+        <link rel="next" href="../battery-pv-separation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Can solar be separated from an aggregate Balancing Mechanism Unit? - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#a-solar-plant-model-fitted-to-four-hour-changes-recovers-solar-from-synthetic-aggregates-of-real-bmus-and-finds-a-cloud-correlated-component-in-9-of-25-aggregate-bmus" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Can solar be separated from an aggregate Balancing Mechanism Unit?
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/weather-products-survey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products surveyed for the weather-product studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/manual-heuristic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The manual heuristic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/gb-battery-scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How GB batteries schedule themselves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/gb-price-data-and-ancillary-markets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GB electricity prices, free and when each is known
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ensemble-archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The ensemble weather archive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solar-bmu-census/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How many Balancing Mechanism Units in Great Britain are solar?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-site-solar-bmus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single-site solar BMUs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simulated-plants-return-their-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simulated plants return their parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#capacity-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capacity recovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-a-synthetic-aggregate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building a synthetic aggregate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#three-methods-step-by-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three methods, step by step
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-each-method-recovers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each method recovers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-it-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where it fails
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#detection-and-parameter-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detection and parameter errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#real-aggregate-bmus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real aggregate BMUs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discussion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discussion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../battery-pv-separation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unmetered-battery-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can a primary substation's half-hourly flow reveal an unmetered battery?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../embedded-battery-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indgen-inddem-and-gsp-take/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_9" id="__nav_8_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/reanalysis-wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CERRA and NORA3 describe past wind better than ERA5?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/cerra-wind-levels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending CERRA's wind heights beat one height?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/cerra-wind-direction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CERRA's wind direction add to its wind speed?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/era5-solar-variables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which ERA5 variables help predict solar farm output?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/ukv-ceda-vs-era5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CEDA's UKV or ERA5 describe past wind and temperature better?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/ukv-ceda-vs-openmeteo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_10" id="__nav_8_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/ens-horizons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/matched-lead-extra-products/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extra weather products in the day-ahead lead comparison: how they are read, and their results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/blends-with-ens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which single weather forecast should be added to ECMWF's ensemble mean first?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/ukv-ceda-blends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does adding UKV from CEDA to ECMWF's ensemble mean lower the error at lead days 1 to 4?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/ensemble-means/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an ML experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/backup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backing up the workstation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-cleaning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning the trial-area telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/auto-research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments run by an LLM agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending the training history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-site-solar-bmus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single-site solar BMUs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simulated-plants-return-their-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simulated plants return their parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#capacity-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capacity recovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-a-synthetic-aggregate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building a synthetic aggregate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#three-methods-step-by-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three methods, step by step
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-each-method-recovers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each method recovers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-it-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where it fails
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#detection-and-parameter-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detection and parameter errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#real-aggregate-bmus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real aggregate BMUs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discussion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discussion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="a-solar-plant-model-fitted-to-four-hour-changes-recovers-solar-from-synthetic-aggregates-of-real-bmus-and-finds-a-cloud-correlated-component-in-9-of-25-aggregate-bmus">A solar-plant model fitted to four-hour changes recovers solar from synthetic aggregates of real BMUs, and finds a cloud-correlated component in 9 of 25 aggregate BMUs</h1>
+<p><strong>This study asks whether the solar part of an aggregate balancing mechanism unit (BMU) can be
+separated from its other generation and demand, using satellite irradiance from the Copernicus
+Atmosphere Monitoring Service (CAMS).</strong> Elexon registers an aggregate BMU for a supplier or for a
+virtual lead party, and the BMU can pool many sites of many technologies. No public source says
+which technologies, so the <a href="../solar-bmu-census/">solar BMU census</a> could only bound the solar
+capacity of its 26 aggregate BMUs from their output. This study builds aggregates whose answer is
+known, by adding the real output of solar BMUs to the real output of BMUs that hold no solar, and
+scores several methods against the known solar part. It then applies the best method to the 25 real
+aggregate BMUs that have output. The controls are 81 real non-solar BMUs, the 11 real single-site
+solar BMUs, and 25 solar-free replicas of the aggregates. A replica is an aggregate's mean output
+for each month, half-hour of day, and day type, so it has the demand's daily shape and no cloud.</p>
+<p><strong>A solar-plant model fitted to the four-hour changes in an aggregate's output recovers the solar
+part beside wind or gas.</strong> On synthetic aggregates, in the 24 detected aggregates with a solar share
+of 25% or 50% beside wind or gas, the fitted series misses a median of 12.0% of the solar part's
+99th-percentile output and recovers a median of 0.89 of its energy. The fitted tilt, azimuth, ratio
+of panel (direct-current, DC) to inverter (alternating-current, AC) rating, and capacity are close
+to a reference fit to the solar half alone. Beside a battery or pumped storage, no method separates
+the solar part reliably.</p>
+<p><strong>On the real aggregate BMUs, only the cloud-driven part of the fit is evidence of solar.</strong> A
+calendar replica explains as much of the output changes as the solar fit does, so the share of
+variance explained, which first suggested solar in 20 of 25 aggregates, mostly measures the demand's
+daily cycle. A cloud-correlated component appears in 9 of the 25 aggregate BMUs, and those 9 hold
+1,139 MW of the fitted 1,163 MW AC capacity. The component is consistent with embedded solar, it is
+larger in winter than in summer, and this study has no ground truth for it.</p>
+<p><img alt="Figure 1: A physical plant fitted to changes recovers the solar part of a synthetic aggregate" src="../assets/solar_disaggregation_physical_fit_summer.svg" /></p>
+<ul>
+<li><strong>To find out whether an aggregate BMU holds solar, compare the cloud increment of its fit with
+  the increment of its calendar replica.</strong> The cloud increment is the share of four-hour changes
+  that a fit with CAMS all-sky irradiance explains, minus the share that a fit with clear-sky
+  irradiance explains (<a href="#real-aggregate-bmus">Figure 19</a>).</li>
+<li><strong>To estimate the solar capacity of an aggregate, use the physical fit, and read the result as
+  credible only for the 9 BMUs with a cloud increment above their replicas'</strong> (<a href="#real-aggregate-bmus">Figure
+  22</a>).</li>
+<li><strong>To estimate the solar part of an aggregate beside wind or gas, use the physical fit, and treat
+  the result as unreliable beside batteries and pumped storage</strong> (<a href="#where-it-fails">Figure 16</a>).</li>
+<li><strong>Do not scale the envelope of an aggregate's output by a clear-day shape to estimate its solar
+  capacity</strong>, because on aggregates with no solar it returns a mean of 83 MW of "solar" per 100 MW
+  (<a href="#controls">Controls</a>).</li>
+</ul>
+<blockquote>
+<p><strong>How this page was made.</strong> The research question came from a human. Everything else — the code
+behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
+AI model (for this page, Claude Sonnet 5.5). Several independent Claude reviewers have checked the
+method, the evidence, and the prose adversarially.</p>
+</blockquote>
+<h2 id="key-findings">Key findings</h2>
+<ul>
+<li><strong>A free orientation predicts a single-site solar BMU's held-out output better than a fixed or
+  tracking plant</strong>, by 1.30 percentage points of capacity against a fixed 30°, south-facing plant (a
+  contrast fixed before any result, <a href="#single-site-solar-bmus">Figure 5</a>). The fitted tilts are 1° to
+  16° and three sites sit at the 90° (due east) azimuth bound, so the orientation is a description
+  of the output, not a measured property of the panels.</li>
+<li><strong>Capacity is the weakest of the four fitted parameters at single sites.</strong> At the 6 sites where
+  the output clips at the inverter limit, the fit's AC capacity is within 22.0% of Generation
+  Capacity (the capacity registered with Elexon) on average and the largest output is within 3.5%
+  (planned).</li>
+<li><strong>Simulated plants return their parameters</strong>, with a +9.6° bias in tilt (<a href="#simulated-plants-return-their-parameters">Figure
+  6</a>).</li>
+<li><strong>The planned calendar-baseline separation recovers the shape of the solar part and a mean of 0.41
+  of its energy.</strong> It beats the census's envelope method by 121 percentage points of error
+  (planned).</li>
+<li><strong>A physical fit to four-hour changes is the best of the methods tested</strong>, and it is post hoc.
+  Beside wind or gas it recovers a median of 0.89 of the energy, and its AC capacity is a median of
+  0.93 of the capacity the same fit gives the solar half alone, at a 50% solar share, and 0.76 at
+  10% (<a href="#capacity-recovery">Figure 8</a>).</li>
+<li><strong>Weather-correlated output from other generation biases the calendar method's level.</strong> Daily wind
+  and clearness correlate at −0.36 over the study window. Differencing reduces that bias beside wind
+  and gas, and reverses its sign when a demand term rises on dull days.</li>
+<li><strong>On real aggregate BMUs the share of variance explained cannot tell solar from demand.</strong> The
+  aggregates and their calendar replicas both explain a median 0.61 of the changes. The cloud
+  increment separates 9 aggregate BMUs from their replicas, and is a fragile statistic.</li>
+<li><strong>Priors on tilt, azimuth, and DC:AC ratio help the azimuth only</strong> (exploratory, <a href="#detection-and-parameter-errors">Figure
+  18</a>).</li>
+</ul>
+<h2 id="introduction">Introduction</h2>
+<p><strong>The problem is to split one metered series into a solar part and everything else.</strong> Under the
+Balancing and Settlement Code (BSC) a supplier's Base BMU (the BMU that holds a supplier's
+customers' demand) nets all the embedded generation behind it, and there is no technology field. The
+first figure shows the problem with known answers. A solar part and a non-solar part, each a real
+BMU's output, add to an aggregate. A method sees only the aggregate and the weather.</p>
+<p><img alt="Figure 2: A synthetic aggregate is the sum of a real solar BMU and a real wind BMU" src="../assets/solar_disaggregation_problem.svg" /></p>
+<p><strong>This study answers four planned questions, and everything else is exploratory or post hoc.</strong> The
+plan fixed these contrasts before any result existed:</p>
+<ul>
+<li><strong>P1:</strong> does a physical fit recover a single-site solar BMU's AC capacity better than the envelope
+  methods?</li>
+<li><strong>P2:</strong> does a free orientation fit hold-out data better than a fixed or tracking plant?</li>
+<li><strong>P3:</strong> does a calendar-baseline separation recover the solar part of a synthetic sum better than
+  the envelope-scaled curve?</li>
+<li><strong>P4:</strong> does the calendar-baseline separation find under 2% false solar in an aggregate with no
+  solar?</li>
+</ul>
+<p>Six analyses were added after the first results, and the page labels them post hoc or exploratory:
+the physical fit to changes, the difference separation, the dull-day demand control, the priors, the
+detection statistics, and the calendar replicas. Two choices also differ from the plan: the primary
+irradiance for synthetic aggregates is the mean of the 3 grid points nearest the solar sites'
+centroid, not the supply point group's points with the solar sites' own points removed, and the
+planned cosine-of-zenith comparison was replaced by clear-sky irradiance. No correction is made for
+multiple comparisons.</p>
+<h2 id="data-and-methods">Data and methods</h2>
+<p><strong>The data are public.</strong> Settled half-hourly output (Elexon report B1610) for 1,705 BMUs, the
+register of BMUs, and CAMS global horizontal irradiance at 27 points (hourly, kept where the
+reliability flag is at least 0.9). Wind at 100 m and temperature at 2 m from ERA5 come through
+Open-Meteo, at 18 grid points, and serve only as controls. Public BMU names and megawatts are shown.</p>
+<p><strong>The forward model turns irradiance into a plant's power.</strong> CAMS gives hourly global irradiance.
+The forward model splits each hour across its two half-hours by the cosine of the zenith angle,
+splits global into beam and diffuse light with the Erbs correlation, transposes it to the panel
+plane assuming diffuse light is equal from all of the sky (an isotropic sky), scales by an effective
+DC capacity, and clips smoothly at the AC capacity. Four parameters are fitted: tilt, azimuth, DC:AC
+ratio, and AC capacity.</p>
+<p><img alt="Figure 3: The forward model turns CAMS irradiance into a plant's output in five steps" src="../assets/solar_disaggregation_forward_model_summer.svg" /></p>
+<h2 id="results">Results</h2>
+<h3 id="single-site-solar-bmus">Single-site solar BMUs</h3>
+<p><strong>A free-orientation plant follows the real output of known solar BMUs through a summer and a winter
+week.</strong> The 11 single-site BMUs are the known-answer case for the parameters.</p>
+<p><img alt="Figure 4: Fitted plants follow two pure-PV BMUs through a summer and a winter week" src="../assets/solar_disaggregation_fit_weeks.svg" /></p>
+<p><strong>A free orientation holds out better than a fixed or a tracking plant.</strong> Over four contiguous folds
+of three months, the free fit's mean error on held-out months is 8.32% of Generation Capacity,
+against 9.62% for a fixed plant and 10.97% for a tracker. The paired difference is −1.30 points (95%
+interval −1.97 to −0.70) against the fixed plant and −2.66 (−3.44 to −1.76) against the tracker
+(planned P2). Free orientation wins at 10 of 11 BMUs and in 4 of 4 folds. The fitted tilts are low,
+1° to 16°, which is implausible for fixed-tilt farms in Great Britain and may reflect the irradiance
+model. Three sites fit at the 90° azimuth bound with a tilt of 1° to 5°, where the azimuth has no
+meaning. Cleve Hill is reported to use an east-west layout, which one panel plane cannot represent.
+The skill is real, and the fitted orientation describes the output, not the panels.</p>
+<p><img alt="Figure 5: A free orientation predicts held-out months better than a fixed or tracking plant" src="../assets/solar_disaggregation_heldout.svg" /></p>
+<h3 id="simulated-plants-return-their-parameters">Simulated plants return their parameters</h3>
+<p><strong>A simulation with a different irradiance chain recovers the parameters, with a tilt bias.</strong> The
+simulation uses the Direct Insolation Simulation Code (DISC) beam model, the Hay-Davies sky, a
+temperature derate, and real residuals shifted in time. Over 44 simulated plants, azimuth is
+recovered to a mean absolute error of 2.7°, DC:AC ratio to 0.05, and AC capacity to 1.5%. Tilt is
+recovered with a correlation of 0.98 and a bias of +9.6°.</p>
+<p><img alt="Figure 6: Fitted tilt, azimuth, and DC:AC ratio follow the known values of simulated plants" src="../assets/solar_disaggregation_parameter_recovery.svg" /></p>
+<p><strong>Capacity is where a single-site fit is weakest, because the fit sits below the site's peak
+output.</strong> At the 6 sites where the output clips at the inverter limit, the fit's AC capacity has a
+mean absolute error of 22.0% of Generation Capacity, against 3.5% for the largest output (planned
+P1). Over all 11 sites the errors are 21.1% and 5.4%, and the physical fit is worse than every
+comparator, by 15.7 points [7.7, 25.6] against the largest output. At all 11 sites the fitted AC
+capacity is below the 99th percentile of the site's own output, which no inverter can be, for
+example Litchardon (23.2 MW against 33.2 MW) and Cleve Hill's T_CLVHS-2 (143.8 against 162.0). The
+robust loss treats the plant's real peaks as outliers, and the smooth clip stays below its limit.
+The fitted "AC capacity" is therefore a fit parameter and not the inverter rating. Two sites also
+disagree with the other public registers (Litchardon and Bishampton, whose Generation Capacity
+exceeds their capacity in the Low Carbon Contracts Company and Renewable Energy Planning Database
+registers).</p>
+<p><img alt="Figure 7: The fitted AC capacity of single-site BMUs against their Generation Capacity" src="../assets/solar_disaggregation_site_capacity.svg" /></p>
+<h3 id="capacity-recovery">Capacity recovery</h3>
+<p><strong>On synthetic aggregates (built in the next section), the fitted AC capacity beside wind or gas is
+a median of 0.93 of the reference at a 50% solar share, 0.87 at 25%, and 0.76 at 10%.</strong> The
+reference is the capacity the same fit gives the solar half alone, so the ratio isolates the error
+that the other generation adds. Beside pumped storage and batteries the fit recovers a median of
+only 0.24 to 0.44 of the reference. The GB mean of 18 CAMS points, which the real aggregates could
+use without knowing where their sites are, gives almost the same ratios (0.91, 0.84, and 0.70 beside
+wind or gas).</p>
+<p><img alt="Figure 8: Fitted AC capacity against the reference capacity of the synthetic aggregates" src="../assets/solar_disaggregation_capacity_recovery.svg" /></p>
+<h3 id="building-a-synthetic-aggregate">Building a synthetic aggregate</h3>
+<p><strong>A synthetic aggregate is a real solar BMU plus a real non-solar BMU, each scaled so the total's
+99th percentile is 100 MW.</strong> The solar share is 0, 10%, 25%, or 50% of that 100 MW. The solar halves
+are Burwell (T_BURWS-1), Bishampton (C__ESTAT019), Litchardon (C__LSTAT020), and the three together.
+The non-solar halves are offshore wind (T_HOWBO-1), a gas peaker (T_PEHE-1), baseload gas
+(T_HUMR-1), pumped storage (T_DINO-4), and two batteries (T_LKSDB-1 and E_DOLLB-1). That makes 72
+aggregates with solar and 24 without.</p>
+<p><img alt="Figure 9: A synthetic aggregate is built from two real series" src="../assets/solar_disaggregation_build.svg" /></p>
+<h3 id="three-methods-step-by-step">Three methods, step by step</h3>
+<p><strong>The methods see the aggregate and a regional irradiance, and nothing else.</strong> The regressor is the
+mean CAMS irradiance at the three grid points nearest the solar sites' centroid, which the real
+aggregates cannot use, so the page also reports the GB mean of 18 points. Each method turns the
+regressor into basis curves: the output of 1 MW of AC capacity facing east, south, west, or tracking
+the sun.</p>
+<p><img alt="Figure 10: The aggregate and the basis curves are the only inputs to the separation" src="../assets/solar_disaggregation_method_inputs.svg" /></p>
+<p><strong>The calendar-baseline separation recovers the shape of the solar part and too little of its
+level.</strong> The calendar-baseline separation fits non-negative weights on the four basis curves plus a
+calendar baseline (half-hour of day, day type, and two annual harmonics). Cloud is what identifies
+the solar part, because the baseline cannot follow day-to-day swings.</p>
+<p><img alt="Figure 11: The calendar-baseline separation recovers the solar shape but too little level" src="../assets/solar_disaggregation_calendar_separation_summer.svg" /></p>
+<p><strong>The difference separation fits the same curves to the change in output over four hours.</strong>
+Differencing removes any output that moves more slowly than that, so the wind's multi-day swings
+stop biasing the level beside wind and gas (post hoc).</p>
+<p><img alt="Figure 12: Fitting changes over four hours recovers more of the solar part" src="../assets/solar_disaggregation_difference_separation_summer.svg" /></p>
+<p><strong>The physical fit replaces the four fixed curves with one plant whose tilt, azimuth, DC:AC ratio,
+and capacity are fitted to the same four-hour changes</strong> (Figure 1, post hoc). The fit starts from
+the difference separation's capacity and from nine starting orientations, and is robust to outliers
+(a soft L1 loss). A pair of changes is used only when its two stamps are exactly four hours apart.</p>
+<p><strong>The three parts add up to the aggregate by construction.</strong> The calendar baseline absorbs demand's
+regular daily pattern, and the residual holds the wind's weather-driven swings.</p>
+<p><img alt="Figure 13: The recovered solar, the calendar baseline, and the residual add up to the aggregate" src="../assets/solar_disaggregation_decomposition.svg" /></p>
+<h3 id="what-each-method-recovers">What each method recovers</h3>
+<p><strong>Over a year, the calendar-baseline separation recovers a mean of 0.41 of the solar energy, and the
+physical fit recovers most of it beside wind or gas, a mean of 0.77.</strong> The energy ratio is the
+recovered energy divided by the true energy.</p>
+<p><img alt="Figure 14: Daily solar energy recovered by each method against the true energy, by month" src="../assets/solar_disaggregation_year.svg" /></p>
+<p><strong>Beside wind, the physical fit lies on the 1:1 line; beside a battery, none of the methods does.</strong></p>
+<p><img alt="Figure 15: Recovered solar lies on the 1:1 line beside wind and falls off it beside a battery" src="../assets/solar_disaggregation_scatter.svg" /></p>
+<p><strong>The planned calendar-baseline separation beats the census's envelope method by 121 points of error
+(planned P3).</strong> The planned calendar-baseline separation's mean error is 24.8% of the solar part's
+99th percentile [20.6, 28.3], against 146.2% [106.2, 176.5] for the envelope-scaled curve the census
+used. The envelope method scales the upper envelope of an aggregate's output by a clear-day shape.
+The census built it to bound a BMU's solar capacity from above, so this contrast shows only that the
+envelope method is the wrong tool for an estimate. The paired difference is −121.3 points [−149.7,
+−84.3] (planned P3). Clear-sky irradiance, which carries no cloud, is worse by 25.9 points [22.2,
+29.4], so cloud is what gives the method its skill. Using the GB mean of 18 CAMS points instead of
+the nearest three raises the error by 0.69 points. Giving the method the true non-solar part (an
+oracle baseline) would improve it by 10.7 points, which bounds what a better baseline could gain.</p>
+<h3 id="where-it-fails">Where it fails</h3>
+<p><strong>Beside a battery or pumped storage, no method separates the solar part.</strong> A battery that charges
+when solar output is high moves with the sun, so its output is partly indistinguishable from solar.
+The physical fit's median error is 22.3% of the solar part's 99th percentile beside batteries,
+against 12.0% beside wind or gas, and the recovered energy falls to 0.44. Beside pumped storage the
+fit detects solar in none of the 12 aggregates.</p>
+<p><img alt="Figure 16: Beside a battery that charges from the sun, no method separates the solar part" src="../assets/solar_disaggregation_battery_week.svg" /></p>
+<h3 id="detection-and-parameter-errors">Detection and parameter errors</h3>
+<p><strong>On synthetic aggregates the variance explained detects solar only when it is at least a quarter of
+the aggregate.</strong> The statistic is the share of the variance of four-hour changes that the fitted
+plant explains. Its threshold is the largest value across the 24 aggregates without solar, 0.00017.
+The 24 aggregates without solar are six distinct non-solar series, each seen under four skies, so
+the false-positive rate is zero by construction and rests on six series. The fit detects solar in 0%
+of aggregates at a 10% share, 50% at 25%, and 79% at 50% (post hoc). The non-solar halves have
+almost no daily cycle, so the variance explained is valid on synthetic aggregates and not valid on
+real aggregates (next section).</p>
+<p><img alt="Figure 17: The fit detects a solar share of a quarter or more of the aggregate" src="../assets/solar_disaggregation_detection.svg" /></p>
+<p><strong>Beside wind or gas, the fitted tilt, azimuth, and DC:AC ratio are close to the reference fits.</strong>
+In the 25% and 50% detected aggregates the median errors against the direct fit to the solar half
+are 4.5° in tilt, 20.3° in azimuth, 0.03 in DC:AC ratio, and 10.8% in capacity. Beside batteries,
+where only 7 aggregates are detected, the median errors are 10.2°, 47.5°, 0.17, and 50.5%. With the
+GB mean sky, beside wind or gas, the errors are 6.2°, 25.6°, 0.12, and 12.3%.</p>
+<p><img alt="Figure 18: Fitted parameters are close to the reference beside wind or gas and far from it beside batteries" src="../assets/solar_disaggregation_parameter_errors.svg" /></p>
+<p><strong>Priors on the parameters help the azimuth and nothing else (exploratory).</strong> A Gaussian prior
+centred on a 30° tilt, a south azimuth, and a DC:AC ratio of 1.3 lowers the median azimuth error
+beside wind or gas from 28.4° (no prior) to 23.1° (loose) and 17.7° (tight), and raises the median
+capacity error from 13.7% to 14.2% and 15.8%. Detection, series error, and the battery results do
+not change. The loose prior has standard deviations of 20°, 40°, and 0.3. The tight prior has 10°,
+15°, and 0.15. The robust loss is linear beyond its scale, so the priors act more weakly than their
+stated standard deviations where the data's noise is large.</p>
+<h3 id="controls">Controls</h3>
+<p><strong>Two controls bound the false-alarm rate of the separations.</strong> On aggregates with no solar, the
+census's envelope method returns a mean of 82.9 MW of "solar" per 100 MW and none of the 24 stay
+under the 2 MW limit. The planned calendar separation finds a mean of 0.38 MW of false solar in 24
+aggregates without solar, and 22 of 24 stay under the 2 MW limit (planned P4). When a demand term
+that rises on dull days is added, it finds a mean of 4.6 MW and only 12 of 24 stay under the limit.
+The difference separation finds none in either case. Beside that demand term, the energy the
+difference separation recovers falls from 0.60 to 0.45 of the true energy and the physical fit's
+from 0.77 to 0.53 (the physical-fit row with the dull-day demand has 12 scenarios, and the other
+rows 36), so differencing reverses the bias of the dull-day demand and does not remove it.</p>
+<h3 id="real-aggregate-bmus">Real aggregate BMUs</h3>
+<p><strong>On real aggregates the share of variance explained cannot separate solar from demand.</strong> The
+aggregates explain a median 0.61 of their four-hour changes and their calendar replicas explain
+0.61. A replica is the aggregate's mean output for each month, half-hour of day, and day type
+(weekday, Saturday, or Sunday), so it has the demand's daily shape and no cloud. A fit with
+clear-sky irradiance, which also has no cloud, explains a median 0.66. The 81 non-solar BMUs score
+about zero because they have no daily cycle, so the non-solar controls say nothing about a BMU whose
+output is mostly demand.</p>
+<p><strong>The cloud increment separates 9 aggregate BMUs from their replicas.</strong> The increment is the
+variance explained with all-sky irradiance minus the variance explained with clear-sky irradiance.
+With the regional irradiance of each BMU's grid supply point group, 9 aggregate BMUs have an
+increment of 0.086 to 0.194, and the other 16 have −0.05 or less except for two at about zero. On
+the GB mean sky, which the replicas and the non-solar controls use, the same 9 aggregates and one
+more (V__NFLEX003) have an increment of 0.025 to 0.136, and their replicas are all negative (−0.076
+to −0.005). The 81 non-solar controls reach 0.022 on that sky, apart from the 10 nuclear BMUs (0.026
+to 0.728), whose clear-sky fits explain a negative share and so make the increment large without any
+cloud. The 0.022 line was chosen after seeing the data, and no control was fitted on the regional
+sky.</p>
+<p><strong>A placebo sky and a season split test where the increment comes from.</strong> The placebo permutes whole
+days within each calendar month (20 permutations), so the sky keeps its seasonal level and daily
+shape and loses the link to the real day's cloud. For all 9 aggregates the placebo increment is
+negative (95th percentile −0.117 to −0.043), against a real increment of 0.086 to 0.194, so the
+increment depends on the real day's cloud. The increment is larger in winter (0.13 to 0.34) than in
+summer (0.06 to 0.16) for all 9 aggregates, although winter solar output is weaker. A
+cloud-correlated demand, such as lighting and heating, would also behave this way, so the component
+is not shown to be solar (post hoc).</p>
+<p><strong>The cloud increment is small even for real solar.</strong> The 11 known solar BMUs have a median
+increment of 0.024 on the GB mean sky (range −0.009 to 0.076), and the 9 aggregates' increments are
+larger than any known-solar case the study produced. The increment is a difference of two in-sample
+squared-error shares, each unbounded below, so a degenerate clear-sky fit inflates it. A
+cloud-correlated demand, such as lighting and heating, would also raise it.</p>
+<p><img alt="Figure 19: The cloud increment separates nine aggregate BMUs from their calendar replicas" src="../assets/solar_disaggregation_real_controls.svg" /></p>
+<p><strong>On the 9 BMUs the fitted plant follows the output in summer, and the fitted orientation is
+south-facing.</strong> The 6 largest supplier BMUs have a tilt of 18° to 35°, an azimuth of 175° to 186°,
+and a DC:AC ratio of 1.1 to 1.2. The 16 other aggregate BMUs mostly fit a ratio of 2.2 and show no
+cloud signal, so the page reads their fits as daily shape.</p>
+<p><img alt="Figure 20: Fitted solar and the other output of three supplier BMUs in a summer week" src="../assets/solar_disaggregation_real_weeks_summer.svg" /></p>
+<p><img alt="Figure 21: Fitted solar and the other output of two supplier BMUs in a winter week" src="../assets/solar_disaggregation_real_weeks_winter.svg" /></p>
+<p><strong>The 9 BMUs with a cloud signal hold about 1.1 GW of fitted solar AC capacity.</strong> The physical fit's
+AC capacity is 1,138.5 MW for these 9 and 24.6 MW for the other 16, against 1,031.3 MW for the
+difference separation on the same 9. The census's envelope bound for all 25 BMUs is 781.0 MW, and
+their Generation Capacity is 1,802.8 MW. One BMU, 2__HTGPL000, has a Generation Capacity of 912.5 MW
+and a fitted 240.4 MW. The fitted plants produce 1,693.3 GWh of solar per year in total. On the
+synthetic aggregates the fit's capacity is a median of 0.87 to 0.93 of the reference beside wind and
+gas and 0.24 to 0.44 beside storage, and the reference itself sits below the site's peak output.
+Nothing here shows which way the error runs for a supplier BMU that nets demand: when a supplier BMU
+is the non-solar half of a synthetic aggregate, the calendar separation returns 2 to 13 times the
+added solar energy. There is no ground truth for these BMUs.</p>
+<p><img alt="Figure 22: Estimated solar capacity of the aggregate BMUs by method" src="../assets/solar_disaggregation_real_capacity.svg" /></p>
+<h2 id="discussion">Discussion</h2>
+<p><strong>The evidence supports carrying forward the physical fit to changes, judged by the cloud increment,
+and it shows that batteries need an explicit model.</strong> The physical fit needs no labelled training
+data, and it recovered most of the solar part beside wind and gas. Four design lessons carry over.</p>
+<ul>
+<li><strong>Fit changes, not levels.</strong> Weather-correlated output (wind, dull-day demand) biases a level fit
+  and mostly cancels in four-hour differences beside wind and gas.</li>
+<li><strong>Judge a detection against a control with the same daily shape.</strong> A control with no daily cycle
+  flatters any statistic that fits the sun's daily rise.</li>
+<li><strong>Expect little orientation information.</strong> Aggregate BMUs with no cloud signal fit at the
+  parameter bounds, and the fitted tilts of real solar BMUs are 1° to 16°.</li>
+<li><strong>Model batteries explicitly.</strong> A battery that charges when solar output is high looks like a
+  solar plant with the opposite sign on cloud.</li>
+</ul>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li><strong>Single-site capacity from the fit is worse than the largest output</strong> (22.0% against 3.5% at the
+  6 sites where output clips), so capacity from an aggregate carries at least that error. The fitted
+  AC capacity sits below the 99th percentile of output at all 11 solar BMUs, so it is a fit
+  parameter and not an inverter rating.</li>
+<li><strong>Tilt has a +9.6° bias in simulation</strong>, and the DC capacity is an effective scale.</li>
+<li><strong>8 of the 11 solar BMUs are hybrids</strong>, so their output includes battery effects.</li>
+<li><strong>The physical-fit results on synthetic aggregates have no month bootstrap</strong>, only the spread over
+  scenarios.</li>
+<li><strong>The cloud increment is a weak, fragile detector.</strong> It is a difference of two in-sample shares
+  and no placebo-sky test is in the planned set. On the synthetic aggregates it exceeds its no-solar
+  threshold in at most 21% of aggregates without dull-day demand (GB mean sky, 50% share) and in
+  none with the regional sky. Its value for real solar BMUs is small. Its use on the real aggregates
+  rests on the replicas and on the contrast with the known solar BMUs.</li>
+<li><strong>The non-solar controls and the replicas use the GB mean sky</strong>, and the headline count of 9 uses
+  the regional sky. On the GB mean sky the count is 10.</li>
+<li><strong>The supplier BMU results have no ground truth</strong>, and the dull-day demand control is a single toy
+  confound.</li>
+<li><strong>The synthetic aggregates pick their regional irradiance points from the solar half's true
+  location</strong>, an advantage that the real aggregates do not have. The GB mean sky removes it, at a
+  small cost.</li>
+<li><strong>The simulation's noise and the timestamp-shift scan move by rows, not by clock time</strong>, so near
+  the gaps left by unreliable CAMS hours they shift by more than a half-hour.</li>
+<li><strong>The envelope numbers recomputed here (781.0 and 954.6 MW) differ slightly from the census's.</strong></li>
+<li><strong>The code was first run during exploration</strong>, before its code review.</li>
+<li><strong>Primary-substation data from NGED was not used.</strong></li>
+</ul>
+<h2 id="scope">Scope</h2>
+<p><strong>This study separates solar from aggregate BMUs using public data. It does not use NGED's private
+data and does not forecast.</strong></p>
+<h2 id="data-and-code-availability">Data and code availability</h2>
+<p>The scripts are in <code>studies/solar_disaggregation/</code>, the shared machinery in
+<code>packages/studies/src/studies/</code> (<code>pv_physics.py</code>, <code>pv_fit.py</code>, <code>pv_separation.py</code>), and the results
+under <code>data/studies/per_study/solar_disaggregation/</code>, which are not committed.</p>
+<h2 id="reproducing">Reproducing</h2>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/solar_disaggregation/stage1_single_sites.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/solar_disaggregation/stage1b_synthetic_recovery.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/solar_disaggregation/fetch_weather_covariates.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/solar_disaggregation/stage2_synthetic_separation.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/solar_disaggregation/stage2b_level_and_shape.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/solar_disaggregation/stage2c_physical_fit_to_aggregates.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/solar_disaggregation/stage3_real_aggregates.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/solar_disaggregation/stage3b_real_controls.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/solar_disaggregation/stage3c_placebo_sky.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/solar_disaggregation/walkthrough_series.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/solar_disaggregation/disaggregation_report.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/solar_disaggregation/disaggregation_charts.py
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

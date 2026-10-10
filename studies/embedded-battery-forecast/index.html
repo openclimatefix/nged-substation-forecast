@@ -1,0 +1,4523 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../unmetered-battery-capacity/">
+      
+      
+        <link rel="next" href="../indgen-inddem-and-gsp-take/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan? - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#how-well-can-an-embedded-batterys-output-be-forecast-and-how-many-of-ngeds-batteries-have-a-published-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan?
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/weather-products-survey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products surveyed for the weather-product studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/manual-heuristic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The manual heuristic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/gb-battery-scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How GB batteries schedule themselves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/gb-price-data-and-ancillary-markets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GB electricity prices, free and when each is known
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ensemble-archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The ensemble weather archive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solar-bmu-census/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How many Balancing Mechanism Units in Great Britain are solar?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solar-bmu-disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../battery-pv-separation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unmetered-battery-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can a primary substation's half-hourly flow reveal an unmetered battery?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan?
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#xgboost-is-slightly-overconfident" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        XGBoost is slightly overconfident
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#without-the-batterys-own-fpn-every-xgboost-forecast-is-level-with-the-climatology-or-worse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Without the battery's own FPN, every XGBoost forecast is level with the climatology or worse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-day-ahead-price-improves-xgboost-a-little-not-enough-to-beat-the-climatology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The day-ahead price improves XGBoost a little, not enough to beat the climatology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-price-forecast-at-0600-recovers-about-a-quarter-of-the-actual-prices-gain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A price forecast at 06:00 recovers about a quarter of the actual price's gain
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-lead-parties-fpns-help-a-little" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other lead parties' FPNs help a little
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-batteries-idle-until-spring-do-not-explain-why-xgboost-fails-to-beat-the-climatology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two batteries idle until spring do not explain why XGBoost fails to beat the climatology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged-battery-a-is-also-level-with-the-climatology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NGED battery A is also level with the climatology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-registers-list-8-embedded-storage-bmus-against-176-storage-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The registers list 8 embedded storage BMUs against 176 storage rows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discussion-what-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discussion: what to use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indgen-inddem-and-gsp-take/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_9" id="__nav_8_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/reanalysis-wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CERRA and NORA3 describe past wind better than ERA5?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/cerra-wind-levels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending CERRA's wind heights beat one height?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/cerra-wind-direction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CERRA's wind direction add to its wind speed?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/era5-solar-variables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which ERA5 variables help predict solar farm output?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/ukv-ceda-vs-era5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CEDA's UKV or ERA5 describe past wind and temperature better?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/ukv-ceda-vs-openmeteo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_10" id="__nav_8_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/ens-horizons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/matched-lead-extra-products/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extra weather products in the day-ahead lead comparison: how they are read, and their results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/blends-with-ens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which single weather forecast should be added to ECMWF's ensemble mean first?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/ukv-ceda-blends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does adding UKV from CEDA to ECMWF's ensemble mean lower the error at lead days 1 to 4?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/ensemble-means/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an ML experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/backup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backing up the workstation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-cleaning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning the trial-area telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/auto-research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments run by an LLM agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending the training history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#xgboost-is-slightly-overconfident" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        XGBoost is slightly overconfident
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#without-the-batterys-own-fpn-every-xgboost-forecast-is-level-with-the-climatology-or-worse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Without the battery's own FPN, every XGBoost forecast is level with the climatology or worse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-day-ahead-price-improves-xgboost-a-little-not-enough-to-beat-the-climatology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The day-ahead price improves XGBoost a little, not enough to beat the climatology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-price-forecast-at-0600-recovers-about-a-quarter-of-the-actual-prices-gain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A price forecast at 06:00 recovers about a quarter of the actual price's gain
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-lead-parties-fpns-help-a-little" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other lead parties' FPNs help a little
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-batteries-idle-until-spring-do-not-explain-why-xgboost-fails-to-beat-the-climatology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two batteries idle until spring do not explain why XGBoost fails to beat the climatology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged-battery-a-is-also-level-with-the-climatology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NGED battery A is also level with the climatology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-registers-list-8-embedded-storage-bmus-against-176-storage-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The registers list 8 embedded storage BMUs against 176 storage rows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discussion-what-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discussion: what to use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="how-well-can-an-embedded-batterys-output-be-forecast-and-how-many-of-ngeds-batteries-have-a-published-plan">How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan?</h1>
+<p><strong>For 35 large embedded batteries from October 2025 to August 2026, no forecast we built from the
+day-ahead price, the calendar, and the battery's own metered output beat a 56-day trailing
+climatology at 18:00 the day before (provisional).</strong> The climatology is the spread of the
+battery's own output at the same time of day over the previous 56 days, on days of the same type,
+and it is a loose forecast: its middle value is wrong by 15.5% of the battery's 99th-percentile
+output on an average half-hour. An XGBoost forecast that adapts as fast as the climatology was not
+tested, nor were domestic batteries, batteries below 1 MW (most of the connected batteries in the
+distribution network of National Grid Electricity Distribution, NGED), or any input that only NGED
+holds.</p>
+<h2 id="summary">Summary</h2>
+<p><strong>All numbers on this page are provisional until the maintainer has reviewed the page.</strong> The page
+asks four questions. Differences are in points of p99 (1% of a battery's own 99th-percentile
+output); a negative difference in "first minus second" means the first forecast's error is
+lower, so "worse by X" next to a positive number means the first forecast's error is higher by X;
+square brackets give a 95% interval. The terms are defined after the bullets.</p>
+<ul>
+<li><strong>Can a battery with a published plan be forecast day ahead? Not better than the
+  climatology.</strong><ul>
+<li>Tested: XGBoost, a machine-learning library, given the actual day-ahead price at 18:00 the
+  day before, for 35 Balancing Mechanism Units (BMUs, the units in which a battery's output
+  is notified, metered, and settled with the system operator), against the climatology (D1).</li>
+<li>Its CRPS was 12.05 points of p99 against 11.99 for the climatology: a difference of +0.066
+  points [-0.075, +0.216], not statistically significant at the 5% level (provisional).</li>
+<li>A forecast built the same way but given the price of another day, a negative control, scored
+  worse than one given the real price by 0.139 points (D2: difference -0.139 [-0.173, -0.105],
+  1.1% of the CRPS of XGBoost given another day's price; provisional).</li>
+<li>A price forecast available at 06:00 the day before improved XGBoost over another day's price
+  by 0.035 points (D3: difference -0.035 [-0.062, -0.011]), but XGBoost given it was worse than
+  the climatology by 0.195 points [+0.080, +0.331] (provisional).</li>
+<li>An improvement over the climatology larger than 0.14 points, 1.1% of the climatology's CRPS,
+  is excluded at both XGBoost hyperparameter settings tested (0.075 at the first setting
+  alone), because it lies outside the 95% interval (provisional).</li>
+<li>For individual batteries, 18 of 35 have a positive point estimate of improvement, with a
+  median skill of +0.001 (a CRPS 0.1% below the climatology's). Two batteries with exactly
+  zero output until spring 2026 do much worse (provisional).</li>
+</ul>
+</li>
+<li><strong>Can a battery without a published plan be forecast? We could test one battery, with the same
+  answer.</strong><ul>
+<li>Tested: the same XGBoost forecast for one NGED battery, called battery A, against the
+  climatology at 18:00 the day before (D5).</li>
+<li>Its CRPS was 10.06 points of p99 against 9.98: a difference of +0.079 points [-0.068,
+  +0.228], not statistically significant at the 5% level. An improvement larger than 0.10
+  points, 1.0% of the climatology's CRPS, is excluded at both settings (provisional).</li>
+<li>One battery cannot show how the answer varies, and its meter may include site load.</li>
+</ul>
+</li>
+<li><strong>Does the published plan of another company's battery help? A little, and only if that plan is
+  public at gate closure.</strong><ul>
+<li>A Final Physical Notification (FPN) is the output that a BMU files with the system operator
+  for each half-hour, final at gate closure, 1 hour before the half-hour.</li>
+<li>Tested: for the 35 BMUs 1 hour ahead, XGBoost given the FPNs of other lead parties' batteries
+  against XGBoost given the FPNs of another day (D4). A lead party is the company that trades
+  for a BMU.</li>
+<li>The gain was 0.159 points (difference -0.159 [-0.203, -0.113]), 1.3% of the CRPS of XGBoost
+  given another day's FPNs (provisional).</li>
+<li>The battery's own FPN lowers the CRPS by 3.2 points relative to XGBoost given no FPN, and
+  other lead parties' FPNs lower it by 0.17 points, which is 5.2% of the own FPN's gain (95%
+  interval 2.0% to 7.5% when lead parties are resampled as well as months; provisional). The
+  study plan named a tenth as the share below which the fleet's FPNs "say little".</li>
+<li>XGBoost given others' FPNs was not significantly better than the climatology (-0.120 points
+  [-0.283, +0.073]; exploratory).</li>
+</ul>
+</li>
+<li><strong>How many of NGED's batteries have an FPN? The registers list 8 BMUs against 176 storage rows,
+  and cannot say how many rows the 8 BMUs stand for.</strong><ul>
+<li>NGED's Embedded Capacity Register (ECR) lists 176 connected storage rows of 50 kW or more in
+  NGED's four licence areas (the regions in which NGED operates), and 141 rows are under 1 MW.</li>
+<li>The BMU register lists 8 embedded storage BMUs in NGED's four grid supply point groups
+  (sets of substations where the transmission network meets NGED's distribution network). The
+  ratio of 8 BMUs to 176 rows is 4.5%, a ratio of two registers' counts and not a match rate
+  (5 of the 8 have at least 95% of the year's settled output, 2.8%; provisional).</li>
+<li>Comparing names and capacities matched none of the 8 BMUs to an ECR row, and one BMU may
+  stand for several rows or for none.</li>
+</ul>
+</li>
+<li><strong>What the methods can and cannot support.</strong> The study measures month-resampled differences in
+  CRPS for 35 BMUs of about 50 MW over 11 scored months. The study supports claims about those
+  batteries in that period. The study does not support claims about batteries below 1 MW, about
+  other periods, or about a battery whose meter includes site load. The forecasts also assume
+  that the battery's own output is known at the issue time (see "Data and methods").</li>
+</ul>
+<p><strong>Terms.</strong> A forecast here is 13 quantiles for each half-hour. A quantile is a value that the
+outcome falls below with a stated probability, so the outcome exceeds the 10th quantile (p10) nine
+times in ten. The score is the CRPS, the continuous ranked probability score: the weighted sum, over
+the 13 quantiles, of a pinball loss, a penalty that grows with the distance between the outcome and
+the quantile, so a forecast scores well only if it is sharp (narrow) and honest about its spread.
+Smaller is better. A CRPS "skill" is one minus the ratio of a forecast's CRPS to the climatology's,
+so +0.01 means a CRPS 1% lower. A "point of p99" is 1% of a battery's own 99th-percentile absolute
+output, so batteries of different sizes compare, and a negative difference favours the first
+forecast in "first minus second". Square brackets give a 95% interval. A difference is statistically
+significant at the 5% level when its interval does not contain zero, and is "excluded" when it lies
+outside the interval. The five planned contrasts are D1 to D5: <strong>D1</strong> XGBoost given the actual price
+minus the climatology; <strong>D2</strong> XGBoost given the actual price minus XGBoost given another day's
+price, both at 18:00 the day before; <strong>D3</strong> XGBoost given a forecast price minus XGBoost given
+another day's price, at 06:00 the day before; <strong>D4</strong> XGBoost given other lead parties' FPNs minus
+XGBoost given the same lead parties' FPNs of another day, 1 hour ahead; <strong>D5</strong> D1 for NGED battery
+A. The <em>lead time</em> of a forecast is the time from its issue to the half-hour it describes.</p>
+<p><img alt="Figure 1: planned contrasts" src="../assets/embedded_battery_forecast_headline.svg" /></p>
+<p><strong>Take-home bullets, one per use of the data:</strong></p>
+<ul>
+<li><strong>For a day-ahead forecast of a large embedded battery, use the 56-day climatology as the
+  baseline.</strong> No XGBoost forecast tested beat it.</li>
+<li><strong>For a forecast 1 hour ahead, the battery's own FPN is the input that matters,</strong> if it is
+  public at gate closure. Other lead parties' FPNs give 5.2% of the own FPN's CRPS gain.</li>
+<li><strong>For NGED's planning, treat the share of connected batteries with an FPN as unknown but
+  probably small.</strong> The registers list 8 BMUs against 176 storage rows, and 141 of the rows are
+  under 1 MW.</li>
+</ul>
+<blockquote>
+<p><strong>How this page was made.</strong> The research question came from a human. Everything else — the code
+behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
+AI model (for this page, Claude Sonnet 5.5, Claude Sonnet 5, and Claude Opus 5.5). Several
+independent Claude reviewers have checked the method, the evidence, and the prose
+adversarially.</p>
+</blockquote>
+<h2 id="key-findings">Key findings</h2>
+<ul>
+<li><strong>The day-ahead price's gain over another day's price (D2) survives resampling the 12 lead
+  parties as well as the months: [-0.209, -0.069].</strong> See
+  <a href="#the-day-ahead-price-improves-xgboost-a-little-not-enough-to-beat-the-climatology">the price</a>.</li>
+<li><strong>A price forecast at 06:00 recovers about a quarter of the actual price's gain, and its
+  significance does not survive resampling lead parties.</strong> See
+  <a href="#a-price-forecast-at-0600-recovers-about-a-quarter-of-the-actual-prices-gain">the forecast price</a>.</li>
+<li><strong>Dropping the idle months of two batteries does not rescue them, and removing them leaves D1
+  not significant.</strong> See
+  <a href="#two-batteries-idle-until-spring-do-not-explain-why-xgboost-fails-to-beat-the-climatology">the idle batteries</a>.</li>
+<li><strong>XGBoost is slightly overconfident (its p10 to p90 band covers 76.5% of outcomes), and about
+  half of the climatology's lower-tail miss is ties at exactly zero.</strong> See
+  <a href="#xgboost-is-slightly-overconfident">the calibration</a>.</li>
+</ul>
+<h2 id="introduction">Introduction</h2>
+<p><strong>Planning a distribution network needs a half-hourly forecast of what embedded batteries will do
+tomorrow, and few of NGED's connected batteries publish their own plan.</strong> A BMU files an FPN, and
+most embedded batteries are not BMUs, so a forecaster of a non-BMU battery sees only prices, the
+calendar, the weather, and the battery's own recent output. The <a href="../battery-pv-separation/">battery and solar separation
+study</a> used after-the-event inputs throughout, so that study gives only an
+upper limit on what a forecast could achieve, because it used inputs that a forecaster would not
+have at the time. This study measures forecasts built at three issue times, with
+one assumption stated under "Data and methods". Part A forecasts 35 battery BMUs, which have
+public output, prices, and FPNs. Part B forecasts NGED battery A, which has no FPN, and says what
+Part A can and cannot transfer. A census counts how many connected batteries are BMUs; its result
+is in the last Results section.</p>
+<table>
+<thead>
+<tr>
+<th>Issue time</th>
+<th>When</th>
+<th>Price input</th>
+<th>FPN</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>06:00 the day before</td>
+<td>06:00 UTC, before the day-ahead auction result is out</td>
+<td>A forecast of the day-ahead price</td>
+<td>None exists yet</td>
+</tr>
+<tr>
+<td>18:00 the day before</td>
+<td>18:00 UTC, after the result</td>
+<td>The actual price</td>
+<td>Exists, but a public copy at 18:00 is not available</td>
+</tr>
+<tr>
+<td>Gate closure</td>
+<td>1 hour before the half-hour</td>
+<td>The actual price</td>
+<td>Own and others' final FPNs, for BMUs</td>
+</tr>
+</tbody>
+</table>
+<p>The day-ahead auction is the N2EX auction, whose hourly prices NESO (the National Energy System
+Operator) republishes. Results are public by 10:00 UK time on the day before.</p>
+<h2 id="data-and-methods">Data and methods</h2>
+<p><strong>The testbed is every embedded battery BMU with enough public data.</strong> A BMU is in the testbed if
+its type is embedded and at least 95% of the year's half-hours are present in both Elexon's settled
+output and the half-hourly FPN file: 35 BMUs, with a median generation capacity of 49 MW, run by 12
+lead parties. One lead party runs 14 of the 35, and 3 of the 35 sit in NGED's grid supply point
+groups. Of the 8 embedded storage BMUs in those groups, 5 have a full year of settled output, and
+the testbed also needs a full year of FPNs, which leaves 3. In D4 a battery's neighbours are the
+testbed batteries of other lead parties, wherever they are. A lead party is the trading
+counterparty, not necessarily the party that schedules the battery, so some neighbours may share the
+target's scheduler.</p>
+<p><img alt="Figure 2: one week of a public battery's output and the day-ahead price" src="../assets/embedded_battery_forecast_example_week.svg" /></p>
+<p><strong>The forecast is 13 quantiles for each half-hour, never a Gaussian.</strong> A battery's output is bounded
+and has three modes: charging hard, idle at exactly zero, and exporting hard, so a Gaussian would
+put its probability where the battery rarely is. The 13 levels are p1, p2, p5, p10, p20, p35, p50,
+p65, p80, p90, p95, p98, and p99. Each forecast is sorted to repair quantile crossing (a model
+sometimes returns a higher quantile below a lower one) and clipped to the 0.1st and 99.9th
+percentile of the battery's output on the training months.</p>
+<p><strong>The score is the CRPS, approximated from the 13 quantiles, and the CRPS skill is positive when a
+forecast beats the climatology.</strong> The CRPS is the weighted sum of pinball losses (a pinball loss
+penalises an outcome above a quantile in proportion to the quantile's level, and an outcome below
+it in proportion to one minus the level), in points of p99. The approximation does not cover the
+tails beyond p1 and p99. The skill is one minus the ratio of a forecast's CRPS to the
+climatology's, and 0.01 means a CRPS 1% lower.</p>
+<p><strong>Four kinds of forecast are compared.</strong> The climatology is described at the top of the page. The
+<em>persistence plus past errors</em> forecast adds the training months' error quantiles to the latest
+observed output at the same time of day. The <em>rank rule</em> places charging and export at the
+cheapest and dearest hours of the day, then adds error quantiles by schedule state. The XGBoost
+quantile model (<code>reg:quantileerror</code> at the 13 levels, XGBoost 3.4.1) is given 13 columns:
+half-hour of day, day of week, the price, its rank within the day, the day's mean price and range,
+the rank rule's value, the persistence value, the climatology's median, and four slots for FPNs.
+A slot with no source holds that slot's value from 7 days earlier (for NGED battery A, the
+climatology's median from 7 days earlier). <code>colsample_bytree</code> is set to 1, so every fit sees all
+13 columns. Each choice of inputs, such as "given another day's price", is called an arm on this
+page.</p>
+<p><strong>The price inputs bracket what a price forecast could deliver.</strong> <em>Actual</em> is the N2EX price. At
+06:00 the actual price is not yet public, so XGBoost given it at 06:00 is a "perfect-price
+forecast", an upper limit on what a price forecast could deliver. <em>A week earlier</em> is the price at
+the same hour 7 days before. <em>Forecast</em> is an XGBoost model of the price, given the latest wind
+forecast that NESO had published, through Elexon's data portal, before the issue time, the calendar,
+and the earlier prices, fitted out of fold. <em>Another day's</em> is the price of a different day of the
+same calendar month and day type. It is the negative control: it keeps the price's typical daily
+shape and removes the target day's decisions.</p>
+<p><strong>Apart from the perfect-price forecast at 06:00, only prices that are public at the issue time
+enter the forecasts.</strong> The auction prices each hour of the UK day, midnight to midnight UK time.
+In summer UK clocks are one hour ahead of UTC, so the hour 23:00 to 24:00 UTC already belongs to
+the next UK day, and its price is not public until 10:00 UTC on the target day itself, which the
+study uses as a safe reading of Nord Pool's 10:00. A forecast issued before then replaces that
+hour's price, and the day's rank, mean, range, and rank-rule value, with the price at the same
+hour a week earlier. The perfect-price forecast at 06:00 keeps every hour, because that forecast
+is an upper bound.</p>
+<p><strong>The battery's own output is assumed known in real time.</strong> Elexon publishes settled output
+about 7 days after the half-hour, so a forecaster using public data alone would have neither the
+persistence value nor the latest week of the climatology. The study assumes the network operator
+reads each battery's output from its own telemetry, as NGED does for NGED battery A. That
+assumption helps every forecast here, so a forecaster using public data alone would do no better
+than these results.</p>
+<p><strong>Every forecast is scored on the same 16,080 half-hours per battery, from 1 October 2025 to 31
+August 2026, with month-block folds and month-resampled intervals.</strong> The data run from September
+2025, so the climatology has at least 28 days of history at the start of scoring (56 days from
+late October). The folds are four contiguous blocks of three whole months, so the first holds two
+scored months, and there are 11 scored months. A fold is one block of months held out for
+testing: each forecast of a month comes from a model fitted on the other three blocks, which is
+what "fitted out of fold" means. Training on months later than the test month is acceptable here,
+because no input to a forecast uses the target day's own history after the issue time (the
+climatology, persistence and prices are built only from data public at the issue time, and the
+price forecast is itself fitted without the held-out block), and because the target's own
+months are never in training. It could still let XGBoost learn behaviour that only appears
+later in the year, which favours XGBoost and so makes the D1 result conservative.</p>
+<p><strong>Each 95% interval resamples whole calendar months and one of 3 fitting seeds, so it covers
+month-to-month weather and the seed, not differences between batteries.</strong> Resampling means drawing
+months at random with replacement 2,000 times and recomputing the difference, with the same months
+for both forecasts of a contrast. A fitting seed is the random number that sets XGBoost's row
+subsampling, and a hyperparameter setting is one fixed choice of XGBoost's tuning values (tree
+depth, learning rate, and so on). A second XGBoost hyperparameter setting is run for every planned
+contrast, and the bound that holds at both settings is quoted.</p>
+<p><strong>Only D1 to D5 were planned; every other number is exploratory, and no correction is made for
+multiple comparisons across the five planned contrasts.</strong> A planned contrast was written into the
+study plan before any result existed, and any comparison added after the first run is post hoc. An
+exploratory row with no real effect has a nominal 5% chance of reaching statistical significance
+at the 5% level. The number of such spurious rows is unknown, because the number of rows with no
+real effect is unknown. The rows share months, so spurious results cluster.</p>
+<p><strong>A known-answer check on 40 synthetic batteries shows that the pipeline finds a price effect
+where one exists and none where none exists.</strong> For 20 batteries that follow the optimal schedule
+for the real price, XGBoost given the actual price beat XGBoost given another day's price by 5.006
+points [-5.303, -4.652] (all 20 batteries significant). For 20 price-blind batteries the
+difference was 0.000 points [-0.016, +0.013] (1 of 20 significant, with at most 2 allowed).
+Figure 3 shows each battery. The positive control is about 35 times the real effect (D2), so the
+positive control shows that the pipeline works, not that the pipeline would detect an effect of
+D2's size against a real battery's noise.</p>
+<p><img alt="Figure 3: the known-answer check" src="../assets/embedded_battery_forecast_known_answer.svg" /></p>
+<p><strong>Amendments after the first science review are post hoc.</strong> The study plan scores every
+half-hour. After the review, three readings were added beside it: the fits with each battery's
+idle lead-in dropped, the contrasts with the two batteries that have an idle lead-in removed, and
+an interval that resamples the lead parties as well as the months. A calendar month is idle when
+at least 99% of its present half-hours are exactly zero, and the idle lead-in is the run of idle
+months at the start of a battery's series. The published-price rule above was added by the same
+review.</p>
+<h2 id="results">Results</h2>
+<h3 id="xgboost-is-slightly-overconfident">XGBoost is slightly overconfident</h3>
+<p><img alt="Figure 4: the two forecasts as fans over one week" src="../assets/embedded_battery_forecast_fans.svg" /></p>
+<p><strong>XGBoost's p10 to p90 band covers 76.5% of outcomes against the nominal 80%, and its p1 to p99 band
+covers 96.3% against 98%.</strong> The climatology's p10 to p90 band covers 77.6% and is 6.2 points of p99
+wider (48.5 against 42.3). At the lower end, 2.9% of outcomes fall strictly below the climatology's
+p1, and another 2.95% equal it, almost all of them exactly zero outputs of the two batteries that
+were idle until spring 2026. About half of the climatology's lower-tail miss is therefore ties at
+exactly zero. Figure 5 counts a tie as half, and on that count XGBoost is the better calibrated in
+the lower tail even though its p10 to p90 band, at 76.5%, is too narrow.</p>
+<p><img alt="Figure 5: reliability at 18:00 the day before" src="../assets/embedded_battery_forecast_reliability.svg" /></p>
+<h3 id="without-the-batterys-own-fpn-every-xgboost-forecast-is-level-with-the-climatology-or-worse">Without the battery's own FPN, every XGBoost forecast is level with the climatology or worse</h3>
+<p><img alt="Figure 6: CRPS by forecast and issue time" src="../assets/embedded_battery_forecast_leaderboards.svg" /></p>
+<p><strong>At 18:00 the day before, XGBoost given the actual price scores 12.05 points of p99 against
+11.99 for the climatology.</strong> The rank rule scores 12.74 and persistence 17.45. At 06:00, XGBoost
+given the forecast price scores 12.18, which is 0.195 points [+0.080, +0.331] worse than the
+climatology (exploratory). One hour ahead, with no FPN, XGBoost scores 12.00 against 11.95 for the
+climatology (+0.048 [-0.097, +0.211], exploratory). Only XGBoost given the battery's own FPN beats
+the climatology (see "Other lead parties' FPNs help a little").</p>
+<p><img alt="Figure 7: CRPS skill against the climatology by lead time" src="../assets/embedded_battery_forecast_skill_by_lead.svg" /></p>
+<p><strong>Across lead times, the XGBoost forecasts' skill stays within about 0.03 of zero.</strong> It is
+statistically significant at the 5% level and positive in 1 of 12 six-hour bins, and significant
+and negative in 5 (Figure 7; exploratory).</p>
+<p><img alt="Figure 8: each battery's skill at 18:00 the day before" src="../assets/embedded_battery_forecast_per_battery.svg" /></p>
+<p><strong>For individual batteries, 18 of 35 have a positive point estimate of skill at 18:00 the day
+before, with a median of +0.001, and two batteries are far below zero.</strong> No per-battery test was
+run, so these are point estimates (Figure 8).</p>
+<h3 id="the-day-ahead-price-improves-xgboost-a-little-not-enough-to-beat-the-climatology">The day-ahead price improves XGBoost a little, not enough to beat the climatology</h3>
+<p><strong>The real price beats another day's price by 0.139 points (D2), and the second setting agrees
+(-0.136 [-0.170, -0.104]).</strong> The D2 gain is 1.1% of the CRPS of XGBoost given another day's price.
+The price from a week earlier recovers almost none of it (-0.012 [-0.029, +0.004], exploratory),
+so the gain is the target day's price and not the month's typical shape.</p>
+<p><strong>D1 compares this XGBoost model with a baseline that adapts every day, so D1 does not measure
+what public inputs could carry in principle.</strong> D1 is +0.066 points [-0.075, +0.216] at the first
+setting and -0.002 [-0.138, +0.153] at the second. The climatology adapts every day. XGBoost is
+fitted once per three-month fold, and some of the fold's training months are later than the month
+it is tested on.</p>
+<h3 id="a-price-forecast-at-0600-recovers-about-a-quarter-of-the-actual-prices-gain">A price forecast at 06:00 recovers about a quarter of the actual price's gain</h3>
+<p><strong>The price forecast's mean absolute error is £14.92 per MWh against £22.29 for the price a week
+earlier (ratio 0.669).</strong> The ratio is below the 0.8 that the study plan set as the mark of a weak
+price forecast. The forecast is worse than the week-earlier price in January 2026 (£22.89 against
+£17.43) and February 2026 (£12.63 against £11.25).</p>
+<p><strong>Given the forecast price, XGBoost gains 0.035 points over another day's price, about a quarter
+of the 0.144 that the actual price gains at 06:00.</strong> D3 is -0.035 points [-0.062, -0.011] (second
+setting -0.044), 0.3% of the CRPS of XGBoost given another day's price, and XGBoost given the
+forecast price is still 0.195 points worse than the climatology. The perfect price at 06:00 gives
+-0.144 [-0.181, -0.108] against another day's price (exploratory).</p>
+<h3 id="other-lead-parties-fpns-help-a-little">Other lead parties' FPNs help a little</h3>
+<p><strong>Others' FPNs improve the forecast 1 hour ahead by 0.159 points over another day's FPNs (D4), and
+by 0.168 points over no FPN, while the battery's own FPN improves it by 3.205 points over no FPN
+(all three exploratory except D4).</strong> The share recovered is the ratio of the last two gains,
+0.168 to 3.205: 5.2% [4.1%, 6.2%] with months resampled, and 2.0% to 7.5% with lead parties
+resampled too. Leaving out the five batteries whose FPN is exactly zero in at least 80% of
+half-hours changes the share to 5.1%. D4's 0.159 is a different comparison, so 0.159 over 3.205
+(5.0%) is not the share.</p>
+<p><strong>The D4 gain survives a negative control and the removal of the largest lead party.</strong> XGBoost
+given another day's FPNs of the same other lead parties gains 0.009 points over no FPN, far below
+D4's 0.159. Leaving out the largest lead party (14 batteries) from the neighbour set gives -0.157
+[-0.202, -0.111] (exploratory). FPNs of the same lead party, for the 29 batteries that have another
+unit of their own party, give -0.607 points [-0.715, -0.490] (4.8%) against no FPN (exploratory).</p>
+<p><strong>The battery's own FPN is worth far more: a CRPS skill of +0.264 against the climatology, if
+Elexon publishes the FPN at gate closure.</strong> The skill is positive for 32 of 35 batteries
+(exploratory). A forecaster has the own FPN only if Elexon makes the FPN public at gate closure,
+which the study did not verify.</p>
+<h3 id="two-batteries-idle-until-spring-do-not-explain-why-xgboost-fails-to-beat-the-climatology">Two batteries idle until spring do not explain why XGBoost fails to beat the climatology</h3>
+<p><strong>Two batteries of one lead party have exactly zero metered output until March or April 2026.</strong>
+The data cannot tell switched off from not yet commissioned. Dropping their idle lead-in from
+training and scoring leaves D1 at +0.068 points [-0.060, +0.202]. Removing both batteries leaves D1
+at +0.007 [-0.094, +0.104] at the first setting and -0.066 [-0.162, +0.030] at the second, still
+not statistically significant at the 5% level (post hoc). D2, D3, and D4 move by at most 0.010
+points under either reading. Dropping the idle months does not rescue the two batteries: their
+skill against the climatology stays near -0.2. With four three-month folds, a battery that starts
+in spring has 2 or 3 working months to train on, while the climatology needs 56 days.</p>
+<p><img alt="Figure 9: D1 to D4 under four ways of choosing the rows or the interval" src="../assets/embedded_battery_forecast_sensitivity.svg" /></p>
+<p><strong>Resampling the 12 lead parties as well as the months widens every interval.</strong> D2 is [-0.209,
+-0.069] and D4 is [-0.236, -0.064], so both stay below zero. D1 is [-0.098, +0.360] and D3 is
+[-0.069, +0.009], so D3 crosses zero (post hoc; the intervals rest on 12 lead parties, one of
+which runs 14 batteries). The per-party means of D3 have both signs, so the D3 result is specific
+to these 35 batteries in this year.</p>
+<h3 id="nged-battery-a-is-also-level-with-the-climatology">NGED battery A is also level with the climatology</h3>
+<p><img alt="Figure 10: NGED battery A over seven numbered days" src="../assets/embedded_battery_forecast_nged_week.svg" /></p>
+<p><strong>D5 is +0.079 points [-0.068, +0.228], and the second setting gives +0.017 [-0.104, +0.140].</strong>
+An improvement larger than 0.068 points is excluded at the first setting and 0.104 at the second.
+With the fleet's FPNs as inputs 1 hour ahead, XGBoost's CRPS is 9.92 against 9.95 for the
+climatology, and improves on XGBoost given another day's FPNs by 0.123 points (difference
+-0.123 [-0.160, -0.087]; exploratory).</p>
+<h3 id="the-registers-list-8-embedded-storage-bmus-against-176-storage-rows">The registers list 8 embedded storage BMUs against 176 storage rows</h3>
+<p><img alt="Figure 11: connected storage rows by size class" src="../assets/embedded_battery_forecast_census.svg" /></p>
+<p><strong>NGED's Embedded Capacity Register lists 176 connected storage rows of 50 kW or more, 141 of them
+under 1 MW, with a total export capacity of 699 MW.</strong> A row is one connection entry in the register.
+The BMU register lists 8 embedded storage BMUs in NGED's four grid supply point groups, 4.5% of the
+176 rows, and 5 of the 8 have at least 95% of the year's settled output (2.8%). Comparing names and
+capacities matched none of the 8 BMUs to a row, and one BMU may stand for several rows or for none,
+so the share of rows with an FPN is not known from these registers. It is probably small, because
+141 of the 176 rows are under 1 MW. The census finds no storage BMU in NGED's grid supply point
+groups that matches NGED battery A by name or capacity, so NGED battery A is very probably not a
+BMU. The counts and their method are in <a href="../../background/gb-battery-scheduling/#how-many-batteries-are-connected-in-ngeds-area">the background page on battery
+scheduling</a>.</p>
+<h2 id="discussion-what-to-use">Discussion: what to use</h2>
+<ul>
+<li><strong>For a day-ahead forecast of the large batteries tested, and of NGED battery A, the
+  climatology is the baseline to beat.</strong> The XGBoost forecasts are level with the climatology in
+  CRPS, slightly sharper, and better calibrated in the lower tail when ties at exactly zero
+  count as half (Figure 5). Below 1 MW the climatology is
+  a starting point, not a tested result.</li>
+<li><strong>For NGED's planning, a forecast that needs the battery's own FPN applies to few batteries.</strong>
+  The own FPN lowered the CRPS by 3.2 points 1 hour ahead (27% of the CRPS of XGBoost given no
+  FPN), FPNs of the same lead party by 0.6 points (4.8%), and others' FPNs by 0.16 points (1.3%).</li>
+<li><strong>What would change these answers:</strong> an XGBoost model that adapts as fast as the climatology
+  (see Limitations), more than 11 scored months, and an FPN archive.</li>
+<li><strong>Archiving FPNs as they are filed would allow a test of early FPN versions as a day-ahead
+  input.</strong> Elexon's public API keeps only the final version, so this study has no day-ahead FPN
+  forecast.</li>
+</ul>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li><strong>The testbed is large batteries.</strong> The 35 BMUs have a median capacity of 49 MW, while the
+  median connected storage row in the ECR is 0.19 MW and 141 of 176 rows are below 1 MW. A result
+  for the testbed need not hold for small batteries.</li>
+<li><strong>Part A may not transfer to Part B.</strong> A BMU is dispatched through the Balancing Mechanism,
+  which a non-BMU battery is not, and NGED battery A is one battery whose meter may include site
+  load.</li>
+<li><strong>Eleven scored months are the sample.</strong> Every interval rests on 11 months, and one lead party
+  runs 14 of 35 batteries.</li>
+<li><strong>The FPN is assumed public at gate closure.</strong> The API keeps only the final version, and the
+  minute at which Elexon publishes it is unverified.</li>
+<li><strong>XGBoost was not given the climatology's adaptivity.</strong> The XGBoost model sees the climatology
+  only through its median and is retrained once per three-month fold, so a battery that changes
+  behaviour mid-year handicaps it. An XGBoost model that adapts as fast as the climatology was not
+  tested. Dropping the idle lead-in leaves the two idle batteries' skill near -0.2, so the idle
+  months do not explain D1.</li>
+<li><strong>The simple forecasts are crude.</strong> The persistence forecast adds a residual spread to a weakly
+  correlated centre, and the rank rule pools residuals across the day. Neither result shows that
+  recent output or the price rank carries no information. The 1-hour-ahead XGBoost model with no
+  FPN sees one lag of the battery's output, so it says nothing about real-time telemetry.</li>
+<li><strong>The score ignores the tails beyond p1 and p99.</strong></li>
+<li><strong>The census compares two registers.</strong> The registers match none of the 8 BMUs to an ECR row by
+  name and capacity. The ECR copy is the August 2026 workbook, and it was not compared with NGED's
+  portal version.</li>
+<li><strong>Fits ran on the CPU</strong> with two hyperparameter settings and three seeds. The deterministic
+  forecasts hold no random draw, so the seed term of their intervals is zero.</li>
+<li><strong>The another-day arms draw from the whole calendar month,</strong> future days included, so they know
+  the month's price level in advance, which suits a negative control.</li>
+</ul>
+<h2 id="scope">Scope</h2>
+<p>The study says nothing about batteries below 1 MW, domestic batteries, the frequency-response
+contracts that batteries hold, state of charge, any input that only NGED holds (such as metered
+flows at the primary substation), forecasts beyond one day ahead, or any period other than
+September 2025 to August 2026 (scored from October 2025).</p>
+<h2 id="data-and-code-availability">Data and code availability</h2>
+<p><strong>Inputs.</strong> The N2EX day-ahead prices are NESO open data. Elexon supplies the settled output
+(B1610), the FPNs, the BMU register, and the wind forecast that NESO publishes through it. The
+Embedded Capacity Register is NGED's workbook, marked shared and not open, so only a holder of the
+workbook can rerun the census; this page carries only counts from it. NGED battery A's series is
+private, and the page shows it only as a fraction of its own p99, on days numbered 1 to 7. The
+code is under <code>studies/embedded_battery_forecast/</code> and <code>packages/studies/</code>, at the commit of the
+pull request that added this page. XGBoost 3.4.1 runs the <code>reg:quantileerror</code> objective, and the
+hyperparameters are <code>PRIMARY_HYPER_PARAMETERS</code> and <code>SENSITIVITY_HYPER_PARAMETERS</code> in
+<code>studies.cross_validation</code>.</p>
+<h2 id="reproducing-the-figures">Reproducing the figures</h2>
+<p>The report that compares the earlier fits, which treated the whole UTC day's prices as public,
+reads fits archived from the first run,
+which a clean checkout does not hold, so a clean checkout cannot rebuild that comparison table.
+Every other step below rebuilds from the inputs.</p>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">OMP_NUM_THREADS</span><span class="o">=</span><span class="m">2</span>
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/embedded_battery_forecast/census_report.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/embedded_battery_forecast/forecast_inputs.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/embedded_battery_forecast/forecast_synthetic.py<span class="w"> </span>primary
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/embedded_battery_forecast/forecast_price_model.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/embedded_battery_forecast/forecast_bmus.py<span class="w"> </span>primary
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/embedded_battery_forecast/forecast_bmus.py<span class="w"> </span>sensitivity
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/embedded_battery_forecast/forecast_nged_battery_a.py<span class="w"> </span>primary
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/embedded_battery_forecast/forecast_nged_battery_a.py<span class="w"> </span>sensitivity
+<span class="nv">FIT_VARIANT</span><span class="o">=</span>idle_dropped<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/embedded_battery_forecast/forecast_bmus.py<span class="w"> </span>primary
+<span class="nv">FIT_VARIANT</span><span class="o">=</span>idle_dropped<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/embedded_battery_forecast/forecast_bmus.py<span class="w"> </span>sensitivity
+<span class="nv">FIT_VARIANT</span><span class="o">=</span>idle_dropped<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/embedded_battery_forecast/forecast_report.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/embedded_battery_forecast/forecast_report.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/embedded_battery_forecast/forecast_charts.py
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

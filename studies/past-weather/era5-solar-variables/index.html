@@ -1,0 +1,4562 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../cerra-wind-direction/">
+      
+      
+        <link rel="next" href="../blending/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Which ERA5 variables help predict solar farm output? - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#era5s-other-variables-cut-the-error-of-same-hour-solar-farm-output-estimates-by-about-12" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Which ERA5 variables help predict solar farm output?
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/weather-products-survey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products surveyed for the weather-product studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/manual-heuristic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The manual heuristic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/gb-battery-scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How GB batteries schedule themselves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/gb-price-data-and-ancillary-markets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GB electricity prices, free and when each is known
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ensemble-archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The ensemble weather archive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solar-bmu-census/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How many Balancing Mechanism Units in Great Britain are solar?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solar-bmu-disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../battery-pv-separation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../unmetered-battery-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can a primary substation's half-hourly flow reveal an unmetered battery?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../embedded-battery-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../indgen-inddem-and-gsp-take/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8_9" id="__nav_8_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reanalysis-wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CERRA and NORA3 describe past wind better than ERA5?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cerra-wind-levels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending CERRA's wind heights beat one height?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cerra-wind-direction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CERRA's wind direction add to its wind speed?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which ERA5 variables help predict solar farm output?
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which ERA5 variables help predict solar farm output?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-data-and-their-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The data and their issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-xgboost-models-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The XGBoost models work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#every-variable-set-scored-on-the-same-hours" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every variable set scored on the same hours
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gain-is-similar-in-every-season-and-era5-cloud-regime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The gain is similar in every season and ERA5 cloud regime
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#removing-one-group-raises-the-error-little" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removing one group raises the error little
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gain-changes-with-the-hour-of-the-day" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The gain changes with the hour of the day
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#which-variables-the-xgboost-model-leans-on" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which variables the XGBoost model leans on
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-extra-variables-do-not-improve-the-uncertainty-estimates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The extra variables do not improve the uncertainty estimates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aerosol-adds-little-and-dusty-hours-are-too-few-to-say" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aerosol adds little, and dusty hours are too few to say
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-cloud-variables-can-add-to-era5s-solar-radiation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why cloud variables can add to ERA5's solar radiation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discussion-what-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discussion: what to use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ukv-ceda-vs-era5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CEDA's UKV or ERA5 describe past wind and temperature better?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ukv-ceda-vs-openmeteo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_10" id="__nav_8_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/ens-horizons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/matched-lead-extra-products/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extra weather products in the day-ahead lead comparison: how they are read, and their results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/blends-with-ens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which single weather forecast should be added to ECMWF's ensemble mean first?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/ukv-ceda-blends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does adding UKV from CEDA to ECMWF's ensemble mean lower the error at lead days 1 to 4?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/ensemble-means/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an ML experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/backup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backing up the workstation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/data-cleaning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning the trial-area telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/auto-research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments run by an LLM agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending the training history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-data-and-their-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The data and their issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-xgboost-models-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The XGBoost models work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#every-variable-set-scored-on-the-same-hours" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every variable set scored on the same hours
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gain-is-similar-in-every-season-and-era5-cloud-regime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The gain is similar in every season and ERA5 cloud regime
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#removing-one-group-raises-the-error-little" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removing one group raises the error little
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gain-changes-with-the-hour-of-the-day" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The gain changes with the hour of the day
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#which-variables-the-xgboost-model-leans-on" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which variables the XGBoost model leans on
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-extra-variables-do-not-improve-the-uncertainty-estimates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The extra variables do not improve the uncertainty estimates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aerosol-adds-little-and-dusty-hours-are-too-few-to-say" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aerosol adds little, and dusty hours are too few to say
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-cloud-variables-can-add-to-era5s-solar-radiation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why cloud variables can add to ERA5's solar radiation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discussion-what-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discussion: what to use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="era5s-other-variables-cut-the-error-of-same-hour-solar-farm-output-estimates-by-about-12">ERA5's other variables cut the error of same-hour solar farm output estimates by about 12%</h1>
+<p><strong>Giving an XGBoost model every ERA5 weather variable, instead of only solar radiation, temperature,
+and sun position, cut its error in estimating the output of six Lincolnshire solar farms by about
+12%.</strong> XGBoost is a gradient-boosted tree model. ERA5 is the European Centre for Medium-Range
+Weather Forecasts' (ECMWF) estimate of past weather, called a reanalysis. The XGBoost model's
+estimate of output is not a forecast, because the model sees ERA5's weather for the same hour as the
+output it estimates. Total cloud cover and the three cloud-layer covers give about half of the 12%
+gain. The cloud groups are largely interchangeable with the other variables. How the gain splits
+between the groups therefore depends on the order in which the study added them. ERA5's cloud fields
+come from its analysis, which has absorbed observations made after the short forecasts that give
+ERA5's solar radiation started. Part of the gain from the cloud fields may therefore be a timing
+advantage that a real forecast lacks. The page does not say that a forecast would gain as much. A
+follow-up study tests whether a forecast does, using forecasts from ECMWF's Integrated Forecasting
+System (IFS) at the lead times a live forecast would use.</p>
+<p><img alt="Figure 1: Change in error from adding ERA5 variables, for each of the ten planned
+contrasts" src="../../assets/era5_solar_variables_headline.svg" /></p>
+<p><strong>Every number on this page is a mean absolute error in percentage points of a farm's capacity, and
+a negative difference is a gain.</strong> An error is a mean absolute error as a percentage of a farm's
+capacity. A difference of 0.1 is 0.1 percentage points of capacity, called "points". A bracket holds
+a 95% interval from resampling whole months, unless the text says 99.5%, the level adjusted for the
+ten planned contrasts. A contrast is planned if the study plan named it before any result existed.
+The smallest improvement worth acting on is 0.1 points for output and 0.01 for the clearness index
+from the Copernicus Atmosphere Monitoring Service (CAMS), a second target explained below. G0 is the
+minimal variable set. G1 adds total cloud cover, G2 adds the three cloud layers, and G9 adds every
+ERA5 variable studied. P0 is G9 minus G0, P1 is G1 minus G0, P2 is G2 minus G0, P3 is G9 minus G2,
+and P4 is G9 minus G9 without 12 variables that we call MARS-only, defined below.</p>
+<ul>
+<li><strong>Which ERA5 variables help estimate solar farm output?</strong> Cloud cover first, then the later groups
+  in smaller steps.
+  Adding total cloud cover (G1) lowers the error from 9.22% to 8.89% of capacity (−0.32 points,
+  99.5% interval [−0.41, −0.25]). Adding the cloud layers as well (G2) lowers the error by 0.59
+  points [−0.72, −0.48], or 6.4%. Adding every variable (G9) lowers the error by 1.14 points [−1.31,
+  −0.98], or 12.4%. All three planned contrasts, P1, P2, and P0, beat the smallest improvement worth
+  acting on (Figure 1). The full set lowers the error at every farm, by 9% to 15% (Figure 6).</li>
+<li><strong>Do the ERA5 variables beyond the cloud layers help?</strong> Yes, but the credit cannot be split
+  cleanly.
+  Going from G2 to G9 lowers the error by a further 0.55 points (95% interval [−0.65, −0.46]). Cloud
+  water and cloud base height give the largest single step (0.33 points). The later groups each
+  change the error by between +0.03 points (snow and albedo, which make the error worse) and −0.07
+  points. Removing any one group from the full set raises the error by at most 0.07 points, probably
+  because the groups carry overlapping information (Figures 7 and 10).</li>
+<li><strong>Is it worth fetching the 12 MARS-only variables?</strong> Unresolved.
+  ERA5 provides all 12 through the Climate Data Store. For ECMWF's operational IFS forecast, we
+  found them in its Meteorological Archival and Retrieval System (MARS) and not in its free
+  open-data feed or in Open-Meteo's, although we did not check every variable (see Discussion). The
+  study trained every planned contrast at two XGBoost tuning settings, a main setting and a second,
+  more heavily regularised setting. The rule fixed before the results was to recommend a pilot fetch
+  if the 99.5% interval of P4 lay wholly below −0.1 points at both settings, and to recommend
+  against if it lay wholly above. The 12 variables lower the error by 0.13 points (99.5% interval
+  [−0.18, −0.08]) at the main setting and by 0.11 points ([−0.15, −0.06]) at the second setting.
+  Both intervals straddle −0.1, so the rule gives no recommendation. The gain is about the size of
+  the threshold, so settling the question would need a much longer record than the study has. The
+  follow-up IFS study compares this gain with the gain from adding a second weather model's
+  forecast.</li>
+<li><strong>Does the gain hold on the satellite irradiance target?</strong> In relative terms, yes.
+  The second target is the CAMS clearness index: irradiance from the CAMS satellite service divided
+  by the irradiance at the top of the atmosphere. The CAMS irradiance is a satellite-derived
+  estimate with its own errors, so this target measures agreement with CAMS and not accuracy. The
+  full set lowers the CAMS error by 14.5%, against 12.4% for output. The CAMS verdicts look weaker
+  only because the smallest improvement worth acting on for the CAMS target (0.01) is about 10% of
+  the CAMS error, while the smallest improvement for output (0.1 points) is about 1% of the output
+  error.</li>
+<li><strong>Does aerosol help?</strong> Not detectably. Across all hours, the data rule out a gain of 0.1 points.
+  In clear and dusty hours, where aerosol should matter most, the hours are too few to show whether
+  aerosol helps.</li>
+<li><strong>Does the extra detail help the XGBoost model say how uncertain it is?</strong> Not by the test fixed in
+  advance.
+  A second XGBoost model fits the 10% to 90% quantiles, giving an interval that should hold 80% of
+  outcomes. The intervals contain fewer outcomes as variables are added, and at the same coverage
+  one fixed-width interval is no wider than the quantile fits' intervals. A score for the whole
+  predicted distribution (CRPS) improves, in line with the better central estimate.</li>
+<li><strong>What can the study support?</strong> Statements about ERA5 at six farms in one county from September
+  2019 to June 2026. Three limits matter most. ERA5 is not a forecast, the farms share weather, and
+  the order in which variables were added affects how credit is split.</li>
+</ul>
+<blockquote>
+<p><strong>How this page was made.</strong> The research question came from a human. Everything else — the code
+behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's AI
+model (for this page, Claude Sonnet 5.5, Claude Sonnet 5, and Claude Opus 5.5). Several independent
+Claude reviewers have checked the method, the evidence, and the prose adversarially.</p>
+</blockquote>
+<h2 id="key-findings">Key findings</h2>
+<ul>
+<li><strong>Under the order the variables were added in, cloud cover, cloud layers, and cloud water carry
+  about 0.9 of the 1.14 points of gain.</strong> The cloud groups are largely interchangeable with the
+  other variables, so the split depends on the order. Humidity and haze (G7) add 0.04 points beyond
+  G0 to G6, and snow and albedo (G8) make the error 0.03 points worse [0.01, 0.04] (<a href="#every-variable-set-scored-on-the-same-hours">Figure
+  7</a>).</li>
+<li><strong>As a share of the error, the full set's gain is largest from 13 to 17 UTC.</strong> The gain from cloud
+  water and cloud base steps up between the labels 09 and 10 UTC, where ERA5's cloud fields move to
+  the next analysis window. That step is one candidate explanation for part of the gain, a timing
+  advantage of a reanalysis. On the output target the full set is worse than the minimal set at low
+  sun, and the penalty does not appear on the CAMS target (<a href="#the-gain-changes-with-the-hour-of-the-day">Figure
+  11</a>).</li>
+<li><strong>Twenty-nine columns of shuffled weather made the error 0.11 points worse.</strong> Wide variable sets
+  start at a disadvantage, so their gains are probably understated (<a href="#every-variable-set-scored-on-the-same-hours">Figure
+  7</a>).</li>
+<li><strong>Adding CAMS irradiance to the output target lowers the error by 3.65 points [−3.84, −3.45].</strong>
+  This positive control shows that the study's method can detect a large effect. ERA5's other
+  variables recover a minority of what CAMS's satellite-derived irradiance adds (<a href="#every-variable-set-scored-on-the-same-hours">Figure
+  7</a>).</li>
+<li><strong>The gain is similar in every season and in every regime of ERA5's total cloud cover</strong> (11% to
+  14% of the error at the farms' output). Regimes defined from CAMS's clear-sky index differ more
+  (<a href="#the-gain-is-similar-in-every-season-and-era5-cloud-regime">Figure 8</a>).</li>
+<li><strong>Aerosol from the CAMS global reanalysis (EAC4) changes the error by −0.03 points [−0.05,
+  +0.00].</strong> Across all hours, a gain of 0.1 points is ruled out at the 95% level (<a href="#aerosol-adds-little-and-dusty-hours-are-too-few-to-say">Figure
+  14</a>).</li>
+<li><strong>The quantile intervals are too narrow in both tails, and the extra variables narrow them
+  further</strong> (<a href="#the-extra-variables-do-not-improve-the-uncertainty-estimates">Figure 13</a>).</li>
+</ul>
+<h2 id="introduction">Introduction</h2>
+<p><strong>The question is which ERA5 variables, beyond solar radiation and temperature, help estimate how
+much power a solar farm produces.</strong> Whoever runs a forecast service chooses which weather variables
+to ingest, and each adds engineering effort. ERA5 is an easier place to screen the variables than an
+archive of past forecasts, because it has hourly values for every variable over the whole study
+period, from September 2019 to June 2026, and an archive of past forecasts has far fewer years. This
+study tests 32 ERA5 single-level variables beyond solar radiation and temperature. The study adds
+them in groups, in a fixed order (the "ladder"). It credits each group with the drop in error when
+the group is added, called the group's "step".</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Adds</th>
+<th>ERA5 variables</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>G0</td>
+<td>the minimal set (9 columns)</td>
+<td>downward solar radiation (<code>ssrd</code>), 2 m air temperature (<code>t2m</code>), sun position, two top-of-atmosphere fluxes, hour of day, day of year, and ERA5's clearness index (<code>ssrd</code> over the top-of-atmosphere flux)</td>
+</tr>
+<tr>
+<td>G1</td>
+<td>total cloud</td>
+<td><code>tcc</code></td>
+</tr>
+<tr>
+<td>G2</td>
+<td>cloud layers</td>
+<td><code>lcc</code>, <code>mcc</code>, <code>hcc</code></td>
+</tr>
+<tr>
+<td>G3</td>
+<td>clear-sky irradiance</td>
+<td><code>ssrdc</code>, and the clear-sky index derived from it</td>
+</tr>
+<tr>
+<td>G4</td>
+<td>cloud water and base</td>
+<td><code>tclw</code>, <code>tciw</code>, <code>tcslw</code>, <code>cbh</code></td>
+</tr>
+<tr>
+<td>G5</td>
+<td>direct beam</td>
+<td><code>fdir</code>, <code>cdir</code></td>
+</tr>
+<tr>
+<td>G6</td>
+<td>wind and thermal radiation</td>
+<td><code>u10</code>, <code>v10</code>, <code>strd</code></td>
+</tr>
+<tr>
+<td>G7</td>
+<td>humidity and haze</td>
+<td><code>d2m</code>, <code>tcwv</code>, <code>blh</code></td>
+</tr>
+<tr>
+<td>G8</td>
+<td>snow and albedo</td>
+<td><code>sd</code>, <code>sf</code>, <code>asn</code>, <code>fal</code></td>
+</tr>
+<tr>
+<td>G9</td>
+<td>all other ERA5 variables</td>
+<td><code>tp</code>, <code>tcrw</code>, <code>tcsw</code>, <code>cape</code>, <code>cin</code>, <code>skt</code>, <code>tco3</code>, <code>uvb</code>, <code>i10fg</code>, <code>sp</code>, <code>deg0l</code></td>
+</tr>
+<tr>
+<td>G10</td>
+<td>aerosol (not ERA5)</td>
+<td>CAMS global reanalysis (EAC4) aerosol optical depth at 550 nm, total and dust</td>
+</tr>
+</tbody>
+</table>
+<p>Each group includes every group above it. The 12 MARS-only variables are <code>ssrdc</code>, <code>cdir</code>, <code>tclw</code>,
+<code>tciw</code>, <code>tcslw</code>, <code>cbh</code>, <code>tcrw</code>, <code>tcsw</code>, <code>tco3</code>, <code>uvb</code>, <code>fal</code>, and <code>deg0l</code>. ERA5 provides all 12
+through the Climate Data Store. We call them MARS-only because, for ECMWF's operational IFS
+forecast, we found them in its MARS archive and not in its free open-data feed or in Open-Meteo's.</p>
+<h2 id="data-and-methods">Data and methods</h2>
+<p><strong>The XGBoost model estimates output in an hour from ERA5's values for the same hour, so the page
+measures how well ERA5 describes past sunshine at the farms, with no lead time.</strong> ERA5 is read at
+the grid cell nearest to each farm. The rows are 126,229 daylight farm-hours at six farms, from
+September 2019 to June 2026. A daylight hour is one with the sun's top-of-atmosphere horizontal flux
+above 50 W m⁻². Hours in which either half-hour of output is exactly zero are dropped. That rule
+uses measured output, so it also drops hours with a fully snow-covered panel, and the study does not
+count how many hours it drops. Rows per farm range from 5,539 to 27,012, so the pooled error weights
+each farm by its rows.</p>
+<p><strong>Output is each farm's hourly output as a fraction of its capacity, which is the 99th percentile of
+the farm's metered output and not its nameplate rating.</strong> Predictions are clipped to the farm's
+export cap. Hours that the network operator constrained are scored but left out of training. The
+second target is the CAMS clearness index. CAMS irradiance is hour-ending and in UTC, like ERA5's
+accumulations. Every variable set is scored on exactly the same hours, except that the aerosol
+comparison uses only the hours that the CAMS global reanalysis (EAC4) covers.</p>
+<p><strong>One XGBoost model per farm is fitted for each variable set.</strong> Each farm's own span is cut into
+five contiguous blocks of whole months, so a month is never in the training and test sets together.
+Each XGBoost model trains on the other four blocks. The error is the mean absolute error as a
+percentage of the farm's capacity, from three fitting seeds that vary the rows each tree samples.</p>
+<p><strong>An interval comes from resampling whole months, paired across variable sets, because neighbouring
+farms share their weather.</strong> Each resample draws one of the three seeds. There are 10,000 resamples
+for the planned contrasts and 2,000 for the exploratory contrasts. A result is "statistically
+significant at the 5% level" when its 95% interval excludes zero. The intervals cover the
+month-to-month weather and the fitting seed, not differences between farms.</p>
+<p><strong>For uncertainty, a second XGBoost model per variable set fits nine quantiles, from 10% to 90%.</strong>
+The variable sets are G0, G2, G9, G9 without the MARS-only variables, the negative control, and the
+aerosol comparison, at the main tuning setting only.</p>
+<p><strong>Planned means written into the study plan before any result existed.</strong> The plan named ten
+contrasts (P0 to P4 on each target) and a decision rule for the MARS-only variables. The ten planned
+contrasts are shown at the 99.5% level, adjusted for ten contrasts, and at 95%. A planned verdict
+needs both tuning settings to agree. Every other number is exploratory. An exploratory row with no
+real effect behind it has a 5% chance of reaching statistical significance. The number of
+exploratory rows with no real effect is unknown, the rows share months so spurious results cluster,
+and the page does not correct for multiple comparisons.</p>
+<p><strong>The controls are a negative control and a positive control, and a second XGBoost tuning setting
+checks the result.</strong> The negative control adds 29 shuffled copies of the G3 to G9 variables to G2,
+keeping each month's mean at each hour. The positive control adds CAMS irradiance to G2 on the
+output target, a column that must help. The main tuning setting uses trees of depth 6, a learning
+rate of 0.05, and 500 rounds. The second setting uses depth 4, a learning rate of 0.03, and 1,200
+rounds, with a stronger penalty on small leaves and on large weights. Neither setting is tuned.</p>
+<p><strong>ERA5 hour conventions.</strong> Accumulations (solar radiation, thermal radiation, precipitation) are
+means over the hour ending at the label. Instantaneous variables are averaged over the labels H−1
+and H so the hour matches. All times are UTC.</p>
+<h2 id="results">Results</h2>
+<h3 id="the-data-and-their-issues">The data and their issues</h3>
+<p><strong>ERA5's cloud fields and CAMS's irradiance agree on the shape of a day and disagree in detail.</strong>
+Figure 2 draws ERA5's irradiance, cloud, and cloud water beside CAMS's irradiance on three days at
+one farm. The days are the clearest, the most variable, and the dullest by CAMS's clear-sky index,
+which is CAMS's irradiance divided by CAMS's irradiance for a cloudless sky.</p>
+<p><img alt="Figure 2: ERA5 variables and CAMS irradiance on three
+days" src="../../assets/era5_solar_variables_days.svg" /></p>
+<p><strong>ERA5's solar radiation differs from CAMS's irradiance in ways that depend on cloud.</strong> On the
+clearest day ERA5 is slightly darker than CAMS, and on the dullest day ERA5 is brighter. Binned by
+ERA5's cloud liquid water and the other cloud variables, the gap is mixed: in the hours with the
+most cloud liquid water, ERA5 is darker than CAMS. CAMS is a satellite estimate, so a gap is a
+disagreement and not necessarily an ERA5 error. Figures 3 to 5 show where ERA5's solar radiation
+differs from CAMS, and how CAMS's clearness index falls with ERA5's cloud cover and cloud water.</p>
+<p><img alt="Figure 3: CAMS clearness index against each ERA5 cloud
+cover" src="../../assets/era5_solar_variables_cloud_against_clearness.svg" /></p>
+<p><img alt="Figure 4: Where ERA5's downward solar radiation differs from
+CAMS" src="../../assets/era5_solar_variables_where_ssrd_misses.svg" /></p>
+<p><img alt="Figure 5: CAMS clearness index against ERA5 cloud water, by low-cloud
+cover" src="../../assets/era5_solar_variables_cloud_water.svg" /></p>
+<h3 id="the-xgboost-models-work">The XGBoost models work</h3>
+<p><strong>Predictions follow the measured output on months the XGBoost models never saw.</strong> Figure 6 draws
+three days at every farm, chosen separately for each farm as the clearest, most variable, and
+dullest by CAMS's clear-sky index. The bottom panel gives each farm's error for four variable sets.
+The farms are labelled A to F, and the full set has the lowest error at every farm. The clearest day
+at a farm can be a winter day, so its output can peak well below capacity.</p>
+<p><img alt="Figure 6: Predictions on months the XGBoost models never saw, three days at every
+farm" src="../../assets/era5_solar_variables_models_work.svg" /></p>
+<h3 id="every-variable-set-scored-on-the-same-hours">Every variable set scored on the same hours</h3>
+<p><strong>The leaderboard shows the ladder, both controls, and the drop-one runs on the farms' output.</strong> The
+leaderboard's intervals overlap more than the paired differences of Figure 1 do, because every
+variable set's error rises and falls with the weather.</p>
+<p><img alt="Figure 7: Error and correlation of every variable set for the solar farms'
+output" src="../../assets/era5_solar_variables_leaderboard_pv.svg" /></p>
+<p><img alt="Figure 7b: Error and correlation of every variable set for the CAMS clearness
+index" src="../../assets/era5_solar_variables_leaderboard_cams.svg" /></p>
+<h3 id="the-gain-is-similar-in-every-season-and-era5-cloud-regime">The gain is similar in every season and ERA5 cloud regime</h3>
+<p><strong>The full set lowers the error by 11% to 14% of the farms' output error in every season and in
+every regime of ERA5's total cloud cover.</strong> Clear, broken, and overcast hours gain 13.7%, 11.2%, and
+13.1% of their error. Regimes defined from CAMS's clear-sky index differ more: broken skies gain
+9.0% and overcast skies 16.8%.</p>
+<p><img alt="Figure 8: Change in error by sky regime from ERA5's total cloud
+cover" src="../../assets/era5_solar_variables_regimes.svg" /></p>
+<p><img alt="Figure 8b: Change in error by sky regime from CAMS's clear-sky
+index" src="../../assets/era5_solar_variables_regimes_cams.svg" /></p>
+<p><img alt="Figure 9: Change in error by season" src="../../assets/era5_solar_variables_seasons.svg" /></p>
+<p><img alt="Figure 9b: Change in error by season and sky
+regime" src="../../assets/era5_solar_variables_regimes_by_season.svg" /></p>
+<h3 id="removing-one-group-raises-the-error-little">Removing one group raises the error little</h3>
+<p><strong>Removing any one group from the full set raises the error by at most 0.07 points on output,
+probably because the groups overlap.</strong> Removing the last group (G9, 0.07), cloud water and base (G4,
+0.06), or wind and thermal radiation (G6, 0.06) raises the error most. By the rule fixed in the
+plan, a group is useful only if both its step in the ladder and its drop-one run show a gain. At the
+main tuning setting, the useful groups are the cloud layers, cloud water and base, wind and thermal
+radiation, humidity and haze, and the remaining ERA5 variables. Total cloud, clear-sky irradiance,
+and the direct beam are not useful once the other groups are present. At the second setting,
+removing total cloud raises the error by 0.02 points [0.01, 0.04]. Snow and albedo make the error
+worse. The credit moves if the order of the ladder changes, so only the planned contrasts are firm,
+and these group-level statements are exploratory.</p>
+<p><img alt="Figure 10: Change in error when one group of variables is removed from the full
+set" src="../../assets/era5_solar_variables_drop_one.svg" /></p>
+<h3 id="the-gain-changes-with-the-hour-of-the-day">The gain changes with the hour of the day</h3>
+<p><strong>As a share of the error, the full set's gain is largest from 13 to 17 UTC, and the gain from cloud
+water and cloud base steps up between the labels 09 and 10 UTC.</strong> At the farms' output, the G4 step
+is 1.4% of the error at 09 UTC [95% interval −0.21 to −0.02 points] and 3.8% at 10 UTC [−0.51 to
+−0.25 points], so the two intervals do not overlap. On the CAMS target the step is 2.7% at 09 UTC
+and 4.9% at 10 UTC. In summer, when the sun is high at 09 UTC, the output step is from 1.9% to 4.2%.
+The full set lowers the error by 8.1% at 09 UTC and by 14% to 15% from 13 to 17 UTC.</p>
+<p><strong>On the output target, the full set is worse than the minimal set at low sun.</strong> It is worse by 0.13
+to 0.17 points at 05, 06, 19, and 20 UTC. At the same hours, 29 shuffled columns make the error
+worse by 0.05 to 0.11 points, so extra columns explain part of that penalty but not all of it. The
+cloud-water step alone makes 05 UTC worse by 0.10 points. The penalty does not appear on the CAMS
+target, where the full set is better at every hour from 06 to 20 UTC and indistinguishable at 05
+UTC. The penalty is therefore more likely to come from the farms' low-sun output than from ERA5.</p>
+<p><strong>The step is one candidate explanation among three, and the page does not establish any of them.</strong>
+ERA5 builds its cloud, humidity, and wind fields from the analysis, whose window changes between 09
+and 10 UTC. Each instantaneous value at label H is the mean of the raw values at H−1 and H, so label
+10 is the first label that holds data from the new analysis window. ERA5 builds solar radiation from
+forecasts started at 06 and 18 UTC. A step between the labels 09 and 10 UTC is what a timing
+advantage of the analysis fields would produce. A second explanation is that solar radiation at
+labels 07 to 18 UTC comes from the 06 UTC forecast at steps 1 to 12, so the afternoon values are
+later steps of that forecast and their error may grow. A third is that cloud types vary with the
+time of day. Total cloud and the cloud layers (G2 minus G0) are also analysis fields, and their gain
+rises smoothly from 09 to 11 UTC with no step. A refit with the instantaneous fields taken at label
+H−1 only would test the timing explanation, because the step should then move one label later. That
+refit was not run.</p>
+<p><img alt="Figure 11: The gain from the extra variables by hour of
+day" src="../../assets/era5_solar_variables_hour_of_day.svg" /></p>
+<h3 id="which-variables-the-xgboost-model-leans-on">Which variables the XGBoost model leans on</h3>
+<p><strong>ERA5's solar radiation takes about two thirds of the full set's importance, then the ultraviolet
+flux (7.2%), the direct beam (5.2%), and rain water (1.9%).</strong> Three of the six most important
+variables are MARS-only: the ultraviolet flux, rain water, and the forecast albedo. The ultraviolet
+flux and the forecast albedo come from the same forecast as solar radiation, so those two variables
+have no timing advantage. The importance of an XGBoost model is descriptive, because correlated
+variables share the credit. The largest shuffled copy takes 0.09%, so the 12 most important
+variables are well above that noise line.</p>
+<p><img alt="Figure 12: XGBoost importance of the full set, the solar farms'
+output" src="../../assets/era5_solar_variables_importance_pv.svg" /></p>
+<p><img alt="Figure 12b: XGBoost importance of the full set, CAMS clearness
+index" src="../../assets/era5_solar_variables_importance_cams.svg" /></p>
+<h3 id="the-extra-variables-do-not-improve-the-uncertainty-estimates">The extra variables do not improve the uncertainty estimates</h3>
+<p><strong>The quantile fits' 10% to 90% intervals contain 72% to 76% of outcomes, against the 80% they aim
+for.</strong> The full set's intervals are 17% narrower than the minimal set's, and contain 72.8% of
+outcomes against 75.9%. At that coverage, one fixed-width interval from the same errors is 21.4
+points of capacity wide. The full set's quantile fit is 22.9 points wide, so the fixed-width
+interval is 0.934 of its width (0.995 for the minimal set). The fixed-width interval is fitted on
+the errors it is scored on, which flatters it slightly. The ratio nevertheless falls as variables
+are added. The extra variables therefore do not help the XGBoost model estimate its own uncertainty
+by this test.</p>
+<p><strong>The comparison matches average width and average coverage only, so it cannot show whether the
+intervals adapt across hours.</strong> The continuous ranked probability score (CRPS) scores a whole
+predicted distribution, and a lower score is better. The CRPS falls from 6.32 to 5.65 points of
+capacity, in line with the better central estimate.</p>
+<p><img alt="Figure 13: Do any inputs help the XGBoost model say how uncertain it
+is?" src="../../assets/era5_solar_variables_probabilistic.svg" /></p>
+<p><img alt="Figure 13b: Are the predicted quantiles
+calibrated?" src="../../assets/era5_solar_variables_reliability.svg" /></p>
+<p><img alt="Figure 13c: Coverage against interval
+width" src="../../assets/era5_solar_variables_coverage_and_width.svg" /></p>
+<h3 id="aerosol-adds-little-and-dusty-hours-are-too-few-to-say">Aerosol adds little, and dusty hours are too few to say</h3>
+<p><strong>On the hours that the CAMS global reanalysis covers, aerosol changes the error by −0.03 points
+[−0.05, +0.00].</strong> Across all hours, a gain of 0.1 points is ruled out at the 95% level. In clear and
+dusty hours (55 days in 27 months), the interval is −0.26 to +0.29 points, so the study cannot say
+whether aerosol helps there. The aerosol reading rule needed at least 20 days in 12 months and an
+interval wholly below −0.1 points at both settings, and the outcome is "not shown". In dusty hours,
+aerosol moves the mean signed error from +0.83 to −0.08 points, so aerosol removes an over-estimate
+without lowering the mean absolute error. The CAMS target's gain of 0.001 is partly circular,
+because CAMS's irradiance is built with CAMS's aerosol analyses.</p>
+<p><img alt="Figure 14: Whether CAMS aerosol helps in cloud-free and dusty
+hours" src="../../assets/era5_solar_variables_aerosol_conditions.svg" /></p>
+<h2 id="why-cloud-variables-can-add-to-era5s-solar-radiation">Why cloud variables can add to ERA5's solar radiation</h2>
+<p><strong>A literature search done for this study found four pieces of evidence on why ERA5's other
+variables can add to its own solar radiation.</strong> The first concerns the radiation scheme. ERA5 runs
+IFS cycle 41r2 (<a href="https://doi.org/10.1002/qj.3803">Hersbach et al. (2020)</a>), whose radiation scheme
+sees only a monthly aerosol climatology (<a href="https://doi.org/10.1029/97JD01864">Tegen et al. (1997)</a>).
+The scheme corrects its fluxes between hourly radiation calls for the sun's movement but not for
+changing cloud (<a href="https://doi.org/10.1002/2015MS000455">Hogan and Bozzo (2015)</a>).</p>
+<p><strong>The second is a cloud-dependent bias, and the third is the study's own seam check.</strong> At European
+stations, ERA5 overestimates irradiance under cloud and slightly underestimates it under clear sky,
+and the bias grows when irradiance is turned into PV output (<a href="https://doi.org/10.1016/j.solener.2018.02.059">Urraca et al.
+(2018a)</a>; <a href="https://doi.org/10.1016/j.solener.2018.10.065">Urraca et al.
+(2018b)</a>). In this study, ERA5's downloaded cloud,
+humidity, and wind fields change at the analysis window boundaries, so they appear to come from the
+analysis. The analysis saw later observations than the 06 and 18 UTC forecasts that give solar
+radiation.</p>
+<p><strong>The fourth is a published precedent on forecasts.</strong> The most similar study the search found
+post-processed a regional weather model's irradiance forecasts at Dutch stations, using the same
+weather model's cloud, cloud water, humidity, and direct radiation. That study raised the
+root-mean-square-error skill by 2% to 3% in winter and by 7.5% to 10% in summer and autumn (<a href="https://doi.org/10.1016/j.solener.2019.08.044">Bakker
+et al. (2019)</a>). The result is on forecasts, so it is
+evidence that the effect can survive without a reanalysis's timing advantage. The search found no
+paper that corrected ERA5 irradiance over Europe with humidity predictors.</p>
+<h2 id="discussion-what-to-use">Discussion: what to use</h2>
+<ul>
+<li><strong>Ingest total cloud cover first, and the cloud layers second, when choosing variables for a
+  forecast of solar output.</strong> Total cloud cover alone gives 0.32 points. The cloud layers give
+  another 0.27 points. Once every other group is present, removing total cloud cover raises the
+  error by only 0.01 to 0.02 points. Cloud water and cloud base height give a further 0.33 points
+  but are MARS-only. The cloud layers are in Open-Meteo's IFS service, and the page did not find
+  them in ECMWF's free open-data feed. Whether a forecast gains the same is untested here, and the
+  follow-up IFS study tests that question.</li>
+<li><strong>Do not decide on the 12 MARS-only variables from this page.</strong> The gain of 0.11 to 0.13 points is
+  real and may or may not exceed 0.1 points. The question is whether another weather model's
+  forecast would give more, and the follow-up IFS study measures that.</li>
+<li><strong>Check which groups a forecast supplier can deliver before ranking them.</strong> On 2026-10-10, ECMWF's
+  <a href="https://www.ecmwf.int/en/forecasts/datasets/open-data">free open-data page</a> listed total cloud
+  cover, 2 m dew point, total column water vapour, 10 m wind, skin temperature, snow depth,
+  precipitation, and downward solar and thermal radiation. It did not list the cloud layers, the
+  cloud water and cloud base height, the direct beam, the clear-sky radiation, or the boundary layer
+  height. <a href="https://open-meteo.com/en/docs/ecmwf-api">Open-Meteo's IFS service</a> lists total and
+  layered cloud cover, direct radiation, boundary layer height, and total column water vapour. It
+  does not list the clear-sky radiation, the cloud water, or the cloud base height. The "not listed"
+  entries were not rechecked against ECMWF's full parameter table, ECMWF's open-data list may have
+  widened since, and the page did not check every MARS-only variable against each service.</li>
+<li><strong>The study found no gain from reanalysis aerosol.</strong> EAC4 is a reanalysis of past aerosol, which
+  is less uncertain than a forecast of aerosol, so a forecast would be unlikely to gain more.</li>
+</ul>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li><strong>ERA5 is not a forecast.</strong> Part of the gain from cloud, humidity, and wind variables may come
+  from those fields having seen later observations than solar radiation. The hour-of-day figure fits
+  that reading but does not prove it. ERA5 uses IFS cycle 41r2, which is not the cycle of the 2026
+  operational forecast.</li>
+<li><strong>The order in which variables were added sets how credit is split.</strong> A group that comes later
+  gets only what the earlier groups missed.</li>
+<li><strong>Extra columns make the error worse.</strong> Twenty-nine shuffled columns made the error 0.11 points
+  worse, so the wide sets' gains are probably understated. Informative but correlated columns may
+  make the error worse by less than shuffled ones.</li>
+<li><strong>Six farms in one county share weather.</strong> The sample size is months of weather. The intervals
+  cover that, not differences between farms or regions.</li>
+<li><strong>The hours with a zero half-hour are dropped, and the page does not count them.</strong> The rule uses
+  measured output, so it removes some low-sun hours and may remove some clear-day hours. A variant
+  that keeps those hours when the ground is snow-covered was not run, so the snow and albedo
+  variables are untested where they would matter.</li>
+<li><strong>Some worst days look like output faults.</strong> Eight of the worst 20 days at the minimal set are at
+  one farm in March 2025, and several are clear days with almost no output. Such days add noise to
+  every variable set, and the contrasts are paired, so the contrasts stand. The study's generated
+  report lists those days.</li>
+<li><strong>Some second-setting runs were added after the first results.</strong> Every planned contrast ran at
+  both settings, as planned. For exploratory rows, the second setting was run after the first
+  results, for rows on either target whose 95% interval ended within a fifth of its width of zero, a
+  rule written in an early version of the plan.</li>
+<li><strong>The aerosol rows end in December 2025,</strong> when the CAMS global reanalysis ends, so the aerosol
+  comparison covers fewer months than the rest.</li>
+<li><strong>The correlation in the leaderboard is dominated by the daily cycle.</strong> On the farms' output,
+  every variable set except the positive control sits between 0.88 and 0.91, so the correlation is a
+  weak guide.</li>
+</ul>
+<h2 id="scope">Scope</h2>
+<p><strong>The page says nothing about forecast skill, other regions, wind, or any lead time.</strong> The study
+tests ERA5 only, and the CAMS global reanalysis's aerosol only for the hours that reanalysis covers.</p>
+<h2 id="data-and-code-availability">Data and code availability</h2>
+<p><strong>ERA5 comes from Google's ARCO-ERA5 copy and from the Copernicus Climate Data Store, and the two
+agreed to floating-point rounding on the variables and months checked.</strong> CAMS irradiance and the
+CAMS global reanalysis aerosol come from the Copernicus Atmosphere Data Store. The page contains
+modified Copernicus Climate Change Service information (ERA5) and modified Copernicus Atmosphere
+Monitoring Service information (CAMS irradiance and the CAMS global reanalysis). The farms' output
+is private to National Grid Electricity Distribution (NGED) and appears only as fractions of each
+farm's capacity under labels A to F. The code is in <code>studies/era5_solar_variables/</code> and
+<code>packages/studies/</code>. XGBoost runs on a graphics processing unit with <code>colsample_bytree=1</code> and the
+settings in "Data and methods".</p>
+<h2 id="reproducing-the-figures">Reproducing the figures</h2>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </span>netCDF4<span class="w"> </span>python<span class="w"> </span>studies/weather_downloads/fetch_era5_solar_variables.py<span class="w"> </span>--tier<span class="w"> </span>tier1a
+uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </span>zarr<span class="w"> </span>--with<span class="w"> </span>gcsfs<span class="w"> </span>python<span class="w"> </span>studies/weather_downloads/fetch_era5_solar_arco.py<span class="w"> </span>--tier<span class="w"> </span>tier1b
+uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </span>zarr<span class="w"> </span>--with<span class="w"> </span>gcsfs<span class="w"> </span>python<span class="w"> </span>studies/weather_downloads/fetch_era5_solar_arco.py<span class="w"> </span>--tier<span class="w"> </span>tier2
+uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </span>zarr<span class="w"> </span>--with<span class="w"> </span>gcsfs<span class="w"> </span>python<span class="w"> </span>studies/weather_downloads/fetch_era5_solar_arco.py<span class="w"> </span>--tier<span class="w"> </span>tier3
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/weather_downloads/fetch_cams_eac4_aod.py
+uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </span>netcdf4<span class="w"> </span>python<span class="w"> </span>studies/era5_solar_variables/era5_ladder_build_dataset.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/era5_solar_variables/era5_ladder_fit.py<span class="w"> </span>--view<span class="w"> </span>both<span class="w"> </span>--max-workers<span class="w"> </span><span class="m">8</span>
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/era5_solar_variables/era5_ladder_fit.py<span class="w"> </span>--view<span class="w"> </span>extra_sensitivity<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--sensitivity-arms<span class="w"> </span>drop_g1<span class="w"> </span>drop_g2<span class="w"> </span>drop_g3<span class="w"> </span>drop_g7<span class="w"> </span>drop_g8<span class="w"> </span>g7<span class="w"> </span>g8<span class="w"> </span>--max-workers<span class="w"> </span><span class="m">8</span>
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/era5_solar_variables/era5_ladder_importance.py<span class="w"> </span>--through-rung<span class="w"> </span>g9
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/era5_solar_variables/era5_ladder_report.py
+uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </span>vl-convert-python<span class="w"> </span>python<span class="w"> </span>studies/era5_solar_variables/era5_ladder_charts.py
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,4746 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../ukv-ceda-vs-era5/">
+      
+      
+        <link rel="next" href="../../forecasts/ens-horizons/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts? - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#an-xgboost-model-of-wind-power-trained-on-cedas-archive-of-ukv-loses-accuracy-on-open-meteos-wind-speeds-and-for-solar-power-the-result-is-unresolved" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/weather-products-survey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products surveyed for the weather-product studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/manual-heuristic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The manual heuristic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/gb-battery-scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How GB batteries schedule themselves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/gb-price-data-and-ancillary-markets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GB electricity prices, free and when each is known
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ensemble-archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The ensemble weather archive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solar-bmu-census/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How many Balancing Mechanism Units in Great Britain are solar?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solar-bmu-disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../battery-pv-separation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../unmetered-battery-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can a primary substation's half-hourly flow reveal an unmetered battery?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../embedded-battery-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../indgen-inddem-and-gsp-take/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8_9" id="__nav_8_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reanalysis-wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CERRA and NORA3 describe past wind better than ERA5?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cerra-wind-levels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending CERRA's wind heights beat one height?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cerra-wind-direction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CERRA's wind direction add to its wind speed?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../era5-solar-variables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which ERA5 variables help predict solar farm output?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ukv-ceda-vs-era5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CEDA's UKV or ERA5 describe past wind and temperature better?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-xgboost-models-track-measured-power-at-every-farm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The XGBoost models track measured power at every farm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-archives-agree-closely-at-lead-0-and-drift-apart-with-cedas-lead" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The archives agree closely at lead 0 and drift apart with CEDA's lead
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#open-meteos-10-m-wind-speed-is-about-3-below-cedas-and-steps-up-in-two-spans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open-Meteo's 10 m wind speed is about 3% below CEDA's, and steps up in two spans
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#open-meteo-builds-its-hourly-irradiance-differently-after-the-2026-upgrade-and-in-low-sun" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open-Meteo builds its hourly irradiance differently after the 2026 upgrade and in low sun
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wind-power-ceda-is-0270-points-worse-once-the-two-spans-are-dropped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wind power: CEDA is 0.270 points worse once the two spans are dropped
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#solar-power-ceda-is-0212-points-worse-before-the-2026-upgrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solar power: CEDA is 0.212 points worse before the 2026 upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#an-xgboost-model-trained-on-cedas-wind-loses-0441-points-on-open-meteos-wind-mostly-because-open-meteos-speeds-are-lower" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An XGBoost model trained on CEDA's wind loses 0.441 points on Open-Meteo's wind, mostly because Open-Meteo's speeds are lower
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-solar-transfer-penalty-is-unresolved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The solar transfer penalty is unresolved
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#controls-a-refit-on-the-cpu-and-xgboost-models-given-shuffled-weather" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Controls: a refit on the CPU and XGBoost models given shuffled weather
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-second-setting-the-eras-the-seasons-and-the-farms-leave-the-readings-as-they-are" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The second setting, the eras, the seasons, and the farms leave the readings as they are
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discussion-what-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discussion: what to use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_10" id="__nav_8_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/ens-horizons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/matched-lead-extra-products/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extra weather products in the day-ahead lead comparison: how they are read, and their results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/blends-with-ens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which single weather forecast should be added to ECMWF's ensemble mean first?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/ukv-ceda-blends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does adding UKV from CEDA to ECMWF's ensemble mean lower the error at lead days 1 to 4?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/ensemble-means/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an ML experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/backup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backing up the workstation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/data-cleaning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning the trial-area telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/auto-research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments run by an LLM agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending the training history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-xgboost-models-track-measured-power-at-every-farm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The XGBoost models track measured power at every farm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-archives-agree-closely-at-lead-0-and-drift-apart-with-cedas-lead" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The archives agree closely at lead 0 and drift apart with CEDA's lead
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#open-meteos-10-m-wind-speed-is-about-3-below-cedas-and-steps-up-in-two-spans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open-Meteo's 10 m wind speed is about 3% below CEDA's, and steps up in two spans
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#open-meteo-builds-its-hourly-irradiance-differently-after-the-2026-upgrade-and-in-low-sun" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open-Meteo builds its hourly irradiance differently after the 2026 upgrade and in low sun
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wind-power-ceda-is-0270-points-worse-once-the-two-spans-are-dropped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wind power: CEDA is 0.270 points worse once the two spans are dropped
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#solar-power-ceda-is-0212-points-worse-before-the-2026-upgrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solar power: CEDA is 0.212 points worse before the 2026 upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#an-xgboost-model-trained-on-cedas-wind-loses-0441-points-on-open-meteos-wind-mostly-because-open-meteos-speeds-are-lower" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An XGBoost model trained on CEDA's wind loses 0.441 points on Open-Meteo's wind, mostly because Open-Meteo's speeds are lower
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-solar-transfer-penalty-is-unresolved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The solar transfer penalty is unresolved
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#controls-a-refit-on-the-cpu-and-xgboost-models-given-shuffled-weather" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Controls: a refit on the CPU and XGBoost models given shuffled weather
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-second-setting-the-eras-the-seasons-and-the-farms-leave-the-readings-as-they-are" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The second setting, the eras, the seasons, and the farms leave the readings as they are
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discussion-what-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discussion: what to use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="an-xgboost-model-of-wind-power-trained-on-cedas-archive-of-ukv-loses-accuracy-on-open-meteos-wind-speeds-and-for-solar-power-the-result-is-unresolved">An XGBoost model of wind power trained on CEDA's archive of UKV loses accuracy on Open-Meteo's wind speeds, and for solar power the result is unresolved</h1>
+<p><strong>This study asks whether two archives of UKV, the Met Office's weather model for the United
+Kingdom, give the same forecasts of wind and solar power.</strong> These are the two archives of UKV that
+the project can read. One archive comes from CEDA (the Centre for Environmental Data Analysis), a UK
+data centre, and holds UKV from September 2019. The other archive comes from Open-Meteo, a public
+weather-data service, and its own UKV downloader starts in August 2024. The two archives overlap for
+23 whole months. Each month holds hourly values at the metered wind and solar farms.</p>
+<p><strong>The archive matters because a power forecast learns from archived weather.</strong> The project's
+forecasts of wind and solar power are machine-learning models. Each forecasting model is trained on
+a history of archived weather matched to a farm's measured power, and then predicts power from
+whichever weather values it is given. A forecast trained on CEDA's longer history and then given
+Open-Meteo's values meets inputs that its training never showed it, and this page calls that use
+"mixing the two archives". Every forecast in the study is an XGBoost model, one kind of
+machine-learning model.</p>
+<p><strong>At the start of each run of the weather model (lead 0), the two archives hold almost the same
+weather.</strong> Air temperature differs by about a tenth of a degree, and Open-Meteo's wind speed is
+about 3% lower than CEDA's. Even at lead 0, Open-Meteo's value is closest to the nearest CEDA grid
+cell's at only 27% of hours for wind speed, so the two archives are not one analysis sampled at one
+cell. CEDA's archive holds 6-hourly runs read at leads 0 to 5 hours, while Open-Meteo's holds only
+the start of each run. CEDA's values for the later hours of each run drift away from Open-Meteo's.</p>
+<p><strong>Forecasts of wind-farm and solar-farm power have a larger error when built on CEDA's archive than
+when built on Open-Meteo's, and most of that gap sits in CEDA's later hours.</strong> The gap over all
+hours therefore sets CEDA's forecasts at leads 1 to 5 against Open-Meteo's lead-0 analysis as much
+as it measures a difference between the two archives. Errors are in points, percentage points of a
+farm's capacity. For wind, the gap over all hours is clear under both of the study's XGBoost
+settings only after the study drops two spans, 2024-11-07 to 2024-11-30 and 2025-01-16 to
+2025-02-18. In those spans Open-Meteo's wind speed is about 6% above CEDA's, for a reason the study
+could not find. Dropping the spans is a post hoc decision, made after the forecasts were first
+trained. At lead 0 the wind gap lies inside the margin, the smallest difference the study counted as
+clear (0.16 points for wind), again only after the drop. The solar gap is read on the months before
+the Met Office's UKV upgrade of 21 January 2026 (PS47). At lead 0 two versions of the solar forecast
+disagree: one trained on months from both sides of the upgrade, and one trained on months before the
+upgrade alone.</p>
+<p><strong>A wind forecast loses accuracy when it is trained on CEDA's archive and then given Open-Meteo's
+wind speeds, because the forecast under-predicts when the speeds are 3% lower.</strong> That loss, the
+transfer penalty, holds whether or not the two spans are dropped, and a simple rescaling of the
+speeds removes most of the loss. For solar power the loss could not be resolved: the study measured
+no solar penalty, and the readings were too uncertain to rule a penalty out.</p>
+<p><strong>By the rules the study plan fixed before any result, a wind forecast trained on CEDA's history
+should not be given Open-Meteo's values, and solar is treated the same way by the plan's default for
+a result too uncertain to call.</strong> The study holds the length of the training history equal in both
+archives. The study therefore measured only the accuracy lost by mixing the archives, and not the
+accuracy that CEDA's extra history of about 5 years might add. These readings apply the plan's rules
+and commit the project to nothing. The page below gives every number with its interval, and does not
+compare CEDA's archive with the Met Office's own live feed.</p>
+<p><img alt="Figure 1: Moving a CEDA-trained XGBoost model onto Open-Meteo's values shows a penalty for wind
+and is unresolved for solar. Power errors differ for wind once two spans are dropped, and differ for
+solar before the 2026 upgrade (PS47)" src="../../assets/ukv_ceda_vs_openmeteo/fig01_headline.svg" /></p>
+<p><strong>Every difference on the page is CEDA's error minus Open-Meteo's, so a positive number means CEDA's
+is larger.</strong> Each bracket holds a 95% interval from resampling whole calendar months and one of
+three fitting seeds (the table below defines a fitting seed). The plan fixed three contrasts, P1 to
+P3 in the table below, before any result existed. A contrast is the difference between two XGBoost
+models' errors. Every other comparison is exploratory. The table defines the terms the page uses
+from here on.</p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CEDA archive, Open-Meteo archive</td>
+<td>Two copies of UKV's output, a 2 km weather model of the United Kingdom. CEDA's holds the runs that start at 00, 06, 12, and 18 UTC (Coordinated Universal Time). Open-Meteo's serves each hour's freshest analysis, the weather model's estimate of the weather at the start of a run</td>
+</tr>
+<tr>
+<td>Lead</td>
+<td>Hours since a run of the weather model started. CEDA's values for an hour come from the latest run, so their lead is 0 to 5 hours. Open-Meteo's are always lead 0</td>
+</tr>
+<tr>
+<td>XGBoost model</td>
+<td>A machine-learning model (gradient-boosted decision trees) trained for each wind or solar farm to predict its measured power from weather and calendar inputs</td>
+</tr>
+<tr>
+<td>Arm</td>
+<td>One XGBoost model set-up being compared, such as the XGBoost models trained and scored on CEDA's values</td>
+</tr>
+<tr>
+<td>Plan</td>
+<td>The study's written plan, which fixed the contrasts, the margins, and the reading rules before any power result existed. Its history is in <a href="https://github.com/openclimatefix/nged-substation-forecast/pull/1053">pull request #1053</a></td>
+</tr>
+<tr>
+<td>Fitting seed</td>
+<td>The random number that starts an XGBoost training run. Every arm is fitted with three seeds, so an interval includes the spread the seed alone causes</td>
+</tr>
+<tr>
+<td>Fold</td>
+<td>A block of whole calendar months held out of training. Each hour is forecast by an XGBoost model trained on the other folds, so every error is measured on months that XGBoost model never trained on</td>
+</tr>
+<tr>
+<td>Spans</td>
+<td>The UTC days 2024-11-07 to 2024-11-30 and 2025-01-16 to 2025-02-18, in which Open-Meteo's 10 m wind speed is about 6% above CEDA's instead of about 3% below. Every wind arm drops the spans</td>
+</tr>
+<tr>
+<td>Points of capacity</td>
+<td>Mean absolute error as a percentage of each farm's capacity, so 0.27 points on a 100 MW farm is 0.27 MW</td>
+</tr>
+<tr>
+<td>Margin</td>
+<td>The smallest difference the study counted as clear, fixed before any result: 0.16 points for wind and 0.06 for solar</td>
+</tr>
+<tr>
+<td>P1 (planned)</td>
+<td>Wind power: the XGBoost model given CEDA's 10 m wind minus the model given Open-Meteo's, each trained and scored on its own archive</td>
+</tr>
+<tr>
+<td>P2 (planned)</td>
+<td>Solar power: the same contrast for global irradiance and temperature, read on era 0</td>
+</tr>
+<tr>
+<td>P3 (planned)</td>
+<td>Transfer penalty: the XGBoost model trained on CEDA's values and scored on Open-Meteo's values, minus the model trained and scored on Open-Meteo's. Only a positive penalty counts</td>
+</tr>
+<tr>
+<td>Era 0, era 1</td>
+<td>Before and after the Met Office's UKV upgrade of 21 January 2026 (PS47). Era 0 is 2024-09 to 2025-12 and era 1 is 2026-02 to 2026-08</td>
+</tr>
+<tr>
+<td>Primary, second setting</td>
+<td>Two fixed, untuned choices of the XGBoost model's tree depth, learning rate, and number of boosting rounds (the number of trees). Two settings guard against a verdict that holds for one choice alone, so a verdict stands only if both settings agree</td>
+</tr>
+<tr>
+<td>Differ, interchangeable, unresolved</td>
+<td>The three readings of P1 and P2. "Differ": the interval excludes zero and the estimate lies beyond the margin. "Interchangeable": the whole interval lies inside the margin. Any other result is "unresolved"</td>
+</tr>
+<tr>
+<td>Penalty, no penalty, unresolved</td>
+<td>The three readings of P3, read one-sided: a penalty needs the interval above zero and the estimate beyond the margin, and no penalty needs the upper bound below the margin</td>
+</tr>
+<tr>
+<td>Planned, post hoc, exploratory</td>
+<td>Planned comparisons were written into the study plan before any result existed. A post hoc decision was made after a result existed, such as dropping the two wind spans after the first fit. Every other comparison, including every comparison labelled exploratory, is one of many. About one in 20 comparisons with no real effect reaches statistical significance at the 5% level by chance</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>How this page was made.</strong> The research question came from a human. Everything else — the code
+behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
+AI model (for this page, Claude Opus 5, Claude Opus 5.5, Claude Sonnet 5, and Claude Sonnet 5.5).
+Separate Claude reviewers, each starting without the author's context, then checked the work
+adversarially: two reviews of the plan, one of the code, three of the science, one of the diff,
+and a prose review in four pass groups. Four isolated Claude readers, two on an earlier draft and
+two on this version, read the page as first-time readers.</p>
+</blockquote>
+<h2 id="key-findings">Key findings</h2>
+<ul>
+<li><strong>The mean absolute difference in the two archives' temperature is 0.098 K at lead 0 and 0.557 K
+  at lead 5,</strong> and the 10 m wind speed, wind direction, and irradiance also agree most closely at
+  lead 0 and drift apart with CEDA's lead. Even at lead 0, Open-Meteo's wind speed is closest to the
+  nearest CEDA cell's at only 27% of hours, so the two archives are not one analysis sampled at one
+  cell (<a href="#the-archives-agree-closely-at-lead-0-and-drift-apart-with-cedas-lead">the model-free
+  comparison</a>).</li>
+<li><strong>Open-Meteo's 10 m wind speed is about 3% below CEDA's at lead 0, and in two spans (2024-11-07 to
+  2024-11-30 and 2025-01-16 to 2025-02-18) it is about 6% above,</strong> so every wind arm drops the spans
+  and the three months they empty (<a href="#open-meteos-10-m-wind-speed-is-about-3-below-cedas-and-steps-up-in-two-spans">the step in the served
+  wind</a>).</li>
+<li><strong>Open-Meteo builds its hourly irradiance from a snapshot with a zenith-angle scaling that CEDA's
+  raw snapshot lacks, and the scaling matches before the 2026 upgrade but not after it,</strong> so the
+  solar contrasts are planned on era 0 only (<a href="#open-meteo-builds-its-hourly-irradiance-differently-after-the-2026-upgrade-and-in-low-sun">the irradiance
+  construction</a>).</li>
+<li><strong>Wind power (P1): CEDA's error is larger by +0.270 points [+0.209, +0.333] once the two spans are
+  dropped,</strong> a post hoc data decision. The planned scope kept the spans, and the first run read
+  +0.162 [+0.080, +0.241], which is unresolved because the second setting disagrees. At lead 0 the
+  gap is +0.030 [-0.043, +0.122] after the drop, which lies inside the 0.16-point margin, and -0.051
+  [-0.166, +0.055] in the first run, which does not and so reads "unresolved". Most of the gap over
+  all hours is CEDA's leads 1 to 5 against Open-Meteo's lead-0 analysis (<a href="#wind-power-ceda-is-0270-points-worse-once-the-two-spans-are-dropped">wind
+  P1</a>).</li>
+<li><strong>Solar power (P2, era 0): CEDA's error is larger by +0.212 points [+0.109, +0.332], and at lead 0
+  the two fits disagree:</strong> -0.028 [-0.117, +0.086] when trained on both eras and +0.127 [+0.021,
+  +0.257] when trained on era 0 alone. As for wind, the gap over all hours sets CEDA's leads 1 to 5
+  against Open-Meteo's lead-0 analysis (<a href="#solar-power-ceda-is-0212-points-worse-before-the-2026-upgrade">solar
+  P2</a>).</li>
+<li><strong>Wind transfer penalty (P3): +0.441 points [+0.286, +0.600], and +0.313 [+0.163, +0.459] in the
+  first run that kept the spans.</strong> The penalty is a level bias of about 2.4 points of capacity that
+  the speed offset mostly explains, and rescaling Open-Meteo's speed leaves +0.142 [+0.066, +0.217]
+  (<a href="#an-xgboost-model-trained-on-cedas-wind-loses-0441-points-on-open-meteos-wind-mostly-because-open-meteos-speeds-are-lower">the transfer
+  penalty</a>).</li>
+<li><strong>Solar transfer penalty (P3): unresolved, with a largest upper bound of +0.125 points.</strong> Three of
+  the four readings are unresolved on their own, and the solar result is treated as a penalty only
+  by the plan's default rule for an unresolved result. The study measured no solar penalty (<a href="#the-solar-transfer-penalty-is-unresolved">solar
+  P3</a>).</li>
+<li><strong>The GPU-against-CPU refit sets the noise floor at about 0.05 points,</strong> and the shuffled-weather
+  pair is not a clean null, a comparison that should show no difference: the shuffled CEDA arm minus
+  the shuffled Open-Meteo arm reads -0.249 points [-0.522, +0.021] for wind, so the control does not
+  size the noise of the pipeline (<a href="#controls-a-refit-on-the-cpu-and-xgboost-models-given-shuffled-weather">controls and
+  noise</a>).</li>
+<li><strong>By the plan's rule the training-history reading is "do not mix the two archives" for wind and,
+  by default, for solar,</strong> within this study's scope and with the licence left to the maintainer
+  (<a href="#discussion-what-to-use">discussion</a>). The Open-Meteo history that rule recommends contains the
+  two dropped spans. The study did not measure what CEDA's extra history of about 5 years would add.</li>
+</ul>
+<h2 id="introduction">Introduction</h2>
+<p><strong>The weather-driven forecasts of wind and solar power in Flexpectation, this project, learn from a
+history of past weather, and UKV is one weather product that history can read.</strong> The Met Office runs
+UKV every few hours. Two archives of its output are available to the project. CEDA's archive reaches
+back to September 2019, which covers the whole record of the network operator's power data.
+Open-Meteo's archive serves the freshest analysis for each hour and starts its own UKV downloader on
+12 August 2024.  The CEDA download notes record that CEDA's archive differs statistically from the
+live feed. The earlier <a href="../ukv-ceda-vs-era5/">CEDA-against-ERA5 study</a> used CEDA's archive alone.
+That study compared CEDA's UKV with ERA5, an estimate of past weather from the European Centre for
+Medium-Range Weather Forecasts. This study measures how different the two archives are, in
+temperature, wind, and irradiance, and in the power forecasts that the project cares about.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>CEDA archive</th>
+<th>Open-Meteo archive</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Source</td>
+<td>The Met Office's UKV files at CEDA</td>
+<td>Open-Meteo's mirror of UKV</td>
+</tr>
+<tr>
+<td>Grid</td>
+<td>2 km, read at the cell nearest each farm</td>
+<td>2 km, served for each farm's coordinates</td>
+</tr>
+<tr>
+<td>Runs and leads</td>
+<td>6-hourly runs, read at leads 0 to 5 hours</td>
+<td>The freshest analysis for each hour (lead 0)</td>
+</tr>
+<tr>
+<td>History used here</td>
+<td>2019-09 onward, 23 whole months overlap Open-Meteo</td>
+<td>2024-08-12 onward (earlier values are a backfill from an unnamed source)</td>
+</tr>
+<tr>
+<td>Wind speed unit</td>
+<td>m/s</td>
+<td>km/h, converted here to m/s</td>
+</tr>
+<tr>
+<td>Irradiance</td>
+<td>One downward shortwave field, an instantaneous snapshot</td>
+<td>An hourly value built from the snapshot at the hour's end</td>
+</tr>
+<tr>
+<td>Licence</td>
+<td>Creative Commons Attribution-NonCommercial-ShareAlike 4.0</td>
+<td>Open-Meteo's terms</td>
+</tr>
+</tbody>
+</table>
+<p><strong>This study compares CEDA's archive with Open-Meteo's UKV and not with the Met Office's own live
+feed.</strong> An earlier check of Open-Meteo's irradiance against the Met Office's files, for hours since
+12 August 2024, found Open-Meteo's irradiance within 0.55 W m⁻² of the Met Office's files. The
+project has not checked Open-Meteo's wind and temperature against those files. A separate pilot of
+the live feed is in progress, and its result may differ from this page's. The page promises no
+further study.</p>
+<h2 id="data-and-methods">Data and methods</h2>
+<p><strong>The study compares the two archives at the project's metered generators, in two ways: directly,
+and through the power forecasts that an XGBoost model makes.</strong> The metered generators are three
+wind farms, labelled W1 to W3, and six solar farms, labelled A to F. Both sets sit in one box in
+Lincolnshire. The labels come from a fixed permutation, and the page gives no farm's name,
+identifier, or coordinates.</p>
+<p><strong>The study's months are 2024-09 to 2025-12 (era 0, 16 months) and 2026-02 to 2026-08 (era 1, 7
+months).</strong> Two months, 2024-08 and 2026-09, hold fewer than 25 days of Open-Meteo's data, and
+2026-01 holds the upgrade of 21 January 2026, so the study drops those three months from every arm.
+The only change of UKV's physics inside the overlap that the study identified is that upgrade
+(PS47). The earlier upgrades, PS43 in December 2019, PS44 (whose date the project could not find),
+and PS45 in May 2022, precede Open-Meteo's UKV, so the study cannot test those upgrades. A move to
+new computers in May 2025 (PS46) lies inside era 0. The model-free tables read before and after PS46
+without attributing a difference to PS46.</p>
+<p><strong>The rows are decided by the target and by availability, never by either archive's value, with one
+exception that the next paragraph states.</strong> An hour stays only if the farm's power exists and both
+archives hold every column an arm reads. An hour whose latest CEDA run is missing or partial is
+dropped and never filled from an older run, because filling from an older run would change the
+hour's lead. The wind rows drop every hour that holds an exactly zero half-hour, and the solar rows
+drop the commissioning ramp, as the CEDA-against-ERA5 study did. The solar rows also carry that
+study's export-cap flag, which excludes the hours the network operator curtailed from training and
+still scores those hours. Every arm drops the 94 hours from 2024-11-09 to 2024-11-13 that
+Open-Meteo's earlier extract lacks, and the 26 hours with a null wind direction.</p>
+<p><strong>The exception is two spans in which Open-Meteo's 10 m wind speed is built differently, which every
+wind arm drops, and the plan did not make that drop.</strong> The plan's scope for wind was all rows, and
+the first fit kept the spans. The first fit found that Open-Meteo's speed against CEDA's at lead 0
+reads about 0.97 in most months and higher in three of them. The lineage check (committed as
+<code>ukv_ceda_vs_openmeteo_wind_steps.py</code>) found two spans with sharp edges, the UTC days 2024-11-07 to
+2024-11-30 and 2025-01-16 to 2025-02-18. The edges were set from the served series, from the ratio
+of Open-Meteo's speed to CEDA's and not from any power result, at the resolution of whole UTC days.
+A few hours at each edge in which the series did not change are dropped too. Every wind arm drops
+whole any month that loses more than a quarter of its rows to the spans: 2024-11, 2025-01, and
+2025-02 lose 84%, 52%, and 65%. The drop is a post hoc data decision, made after the first fit. The
+page reports both runs for the wind contrasts. The wind rows fall to 40,287 farm-hours, which is 13
+months of era 0 and 7 of era 1. The solar rows keep all 23 months, because none of the solar inputs
+steps in the spans.</p>
+<p><strong>Open-Meteo's values are converted to match CEDA's, and a guard checks each conversion at lead 0,
+where both archives are the same UKV analysis.</strong></p>
+<ul>
+<li><strong>Wind speed</strong> is divided by 3.6, because Open-Meteo serves km/h. The guard stops the build if the
+  median ratio of the two archives' speeds leaves 0.9 to 1.1, and a test shows that a factor of 3.6
+  fails the guard.</li>
+<li><strong>Temperature</strong> is the mean of the instants at the two ends of each hour, for both archives,
+  because each hour of solar power ends at the time that labels the hour.</li>
+<li><strong>Irradiance</strong> needs more care. Open-Meteo's hourly value is UKV's snapshot at the hour's end
+  multiplied by the ratio of the hour's mean cosine of the sun's zenith angle to the cosine at the
+  hour's end. The study applies the same ratio to CEDA's snapshot, because CEDA's raw snapshot reads
+  36% high at 06 UTC and 23% low at 18 UTC against Open-Meteo's value. The guard requires the median
+  ratio of CEDA's rebuilt value to Open-Meteo's to stay within 0.97 to 1.03 at every hour of day in
+  era 0.</li>
+</ul>
+<p><strong>Every wind farm and every solar farm gets one XGBoost model per archive, trained on that farm's
+own history.</strong> The wind arms read the archive's 10 m wind speed and the sine and cosine of its 10 m
+wind direction, plus the hour of day, the day of the year, and the era (6 columns each). CEDA has no
+100 m wind, so the matched 10 m pair is the only wind pair both archives can serve. The solar arms
+read the archive's global irradiance and temperature, the sun's zenith angle and azimuth, the
+extraterrestrial flux, the hour of day, the day of the year, and the era (8 columns each). Beam and
+diffuse irradiance cannot enter, because CEDA holds one shortwave field. XGBoost's column
+subsampling is off, so a pair of arms with equal columns cannot win on a column count. Each hour is
+predicted by an XGBoost model that did not train on that hour's fold, so every error is out of fold.
+The folds are blocks of whole calendar months cut inside each era and rotated so that every calendar
+month that occurs in two years has a training row. Each arm is fitted at both settings with three
+seeds on a graphics processing unit (GPU), and one wind arm is refitted on the central processing
+unit (CPU) to measure the difference between the two processors.</p>
+<p><strong>The transfer scoring uses one fitted XGBoost model to score several sets of input values, so that
+the transfer penalty needs no second fit.</strong> The model trained on CEDA's values predicts each
+held-out fold from CEDA's values, from Open-Meteo's values under CEDA's column names, and from a few
+partial swaps, in which only some of CEDA's columns are replaced by Open-Meteo's. The CEDA-trained
+model's predictions on CEDA's own values are the arm P1 reads, and its predictions on Open-Meteo's
+values are the transfer arm P3 reads.</p>
+<p><strong>The solar contrasts are planned on era 0, and each is fitted twice.</strong> The solar planned contrasts
+(P2 and P3 for solar) are read on the 16 months of era 0, because Open-Meteo builds its hourly
+irradiance differently after the upgrade (see the irradiance section below). One fit trains on the
+rows of both eras and is scored on era 0. The other fit trains on era 0 alone, so that the
+construction that differs after the upgrade cannot reach the fit. A solar verdict stands only if all
+four readings agree (two fits at two settings), and otherwise the verdict is "unresolved". The wind
+contrasts read all 20 months left after the drop of the spans. The restriction of the solar
+contrasts to era 0 was decided from the irradiance guard before any power fit. The fit trained on
+era 0 alone adds 24 fit-sets, each fit-set being one arm at one setting at one farm, so the study
+has 78 fit-sets in all, plus 3 on the CPU.</p>
+<p><strong>The margins are those of the <a href="../ukv-ceda-vs-era5/">CEDA-against-ERA5 study</a>, and this overlap may
+be too short to resolve differences as small as the margins.</strong> The margins, 0.16 points for wind and
+0.06 for solar, were fixed before any result, and that study took the margins from the half-widths
+of earlier pages' intervals. The plan stated that "interchangeable" for P2 was probably out of
+reach, because the half-widths of those earlier intervals were 0.17 to 0.24 points and the solar
+margin is 0.06. For solar P3 the plan recorded an interval half-width of 0.057, below the margin, so
+"no penalty" was reachable. Each interval resamples whole calendar months, paired across arms, and
+one of the three fitting seeds, 2,000 times. An interval covers month-to-month weather and the seed,
+and not differences between farms.</p>
+<h2 id="results">Results</h2>
+<h3 id="the-xgboost-models-track-measured-power-at-every-farm">The XGBoost models track measured power at every farm</h3>
+<p><strong>Before any contrast, Figures 2 and 3 show that the XGBoost models forecast measured power
+sensibly.</strong> Each panel draws the out-of-fold prediction from the CEDA-trained and the
+Open-Meteo-trained model against the measured power, in three weeks chosen by a stated rule: the
+week of highest mean output, the week of the largest hour-to-hour spread, and the week of lowest
+mean output. The wind weeks are in September 2025 (the first two) and October 2025, and the solar
+weeks are in March 2025 (the first two) and August 2025. A reader might not expect those months,
+because the rule ranks weeks by the mean share of capacity over hours with data, so gaps,
+curtailment, and commissioning drops move the ranking. The mean absolute error of the models on the
+planned scope is about 7.8% to 8.0% of capacity for wind and about 8.5% to 9.1% for solar (Figure
+11). An XGBoost model given weather shuffled within each month and hour has an error of 19.357% for
+wind and 14.236% for solar on era 0, so the models use the weather they are given.</p>
+<p><img alt="Figure 2: Out-of-fold wind power in three weeks chosen by rule" src="../../assets/ukv_ceda_vs_openmeteo/fig02_wind_weeks.svg" /></p>
+<p><img alt="Figure 3: Out-of-fold solar power in three weeks chosen by rule" src="../../assets/ukv_ceda_vs_openmeteo/fig03_solar_weeks.svg" /></p>
+<h3 id="the-archives-agree-closely-at-lead-0-and-drift-apart-with-cedas-lead">The archives agree closely at lead 0 and drift apart with CEDA's lead</h3>
+<p><strong>The model-free comparison, which differences the two archives' values at the nine generator sites
+with no forecast, finds the closest agreement at lead 0.</strong> At lead 0, where both archives are the
+same analysis, the mean absolute difference in air temperature is 0.098 K [0.088, 0.109] and the
+correlation is 0.9997. The difference grows with CEDA's lead to 0.557 K [0.502, 0.611] at lead 5
+(correlation 0.9919). The 10 m wind speed follows the same pattern: 0.190 m/s [0.185, 0.195] at lead
+0 and 0.519 m/s [0.499, 0.540] at lead 5, with a correlation of 0.9944 at lead 0. The 10 m wind
+direction differs by 2.580 degrees [2.393, 2.752] at lead 0 and 8.783 degrees [7.972, 9.668] at lead
+5, in hours when CEDA's speed exceeds 2 m/s. At lead 0 CEDA's direction is 1.898 degrees [1.754,
+2.044] lower than Open-Meteo's, a small rotation of about 1.8 degrees in era 0 [1.612, 1.955] and
+2.2 in era 1 [2.119, 2.279]. Figure 4 draws the four variables by lead. The intervals resample whole
+months, and every comparison in this section is exploratory.</p>
+<p><img alt="Figure 4: The two archives agree most closely at lead 0 and drift apart with CEDA's lead" src="../../assets/ukv_ceda_vs_openmeteo/fig04_leads.svg" /></p>
+<p><strong>Even at lead 0, Open-Meteo does not serve the nearest CEDA cell's value.</strong> The nearest of the nine
+CEDA cells around a site has the value closest to Open-Meteo's at only 27% of lead-0 hours for wind
+speed and 47% for temperature, against 11% by chance. So even at lead 0 the two archives are not one
+analysis sampled at one cell. The archives differ in how their values are interpolated or in which
+grid they read.</p>
+<p><strong>Month by month, the irradiance difference rises after the 2026 upgrade.</strong> Figure 5 draws the
+monthly mean absolute difference with the 2026 upgrade marked. The other three variables show no
+step that stands out from their month-to-month swings, which is a reading of the chart and not a
+test. The before-and-after comparisons at May 2025 (PS46) are labelled as not an isolated PS46
+effect, because the two comparisons also differ in the months they hold.</p>
+<p><img alt="Figure 5: Month by month, any step in the difference between the archives shows" src="../../assets/ukv_ceda_vs_openmeteo/fig05_months.svg" /></p>
+<h3 id="open-meteos-10-m-wind-speed-is-about-3-below-cedas-and-steps-up-in-two-spans">Open-Meteo's 10 m wind speed is about 3% below CEDA's, and steps up in two spans</h3>
+<p><strong>At lead 0, Open-Meteo's 10 m wind speed averages 4.052 m/s against CEDA's 4.196 m/s, a difference
+of +0.144 m/s [+0.137, +0.152] in CEDA minus Open-Meteo.</strong> The median ratio of Open-Meteo's speed to
+CEDA's is 0.968 outside the two spans described below. The monthly median stays between 0.960 and
+0.974 in each of the 20 months outside the spans, so the offset is a level difference between the
+archives and not noise. The offset reappears in the power forecasts as the wind transfer penalty.</p>
+<p><strong>In two spans with sharp edges the ratio rises to 1.063, and the step is in Open-Meteo's served
+series.</strong> The spans are the UTC days 2024-11-07 to 2024-11-30 and 2025-01-16 to 2025-02-18. In the
+spans the median ratio of Open-Meteo's speed to CEDA's is 1.063 against 0.968 outside, on 1,944 and
+22,761 site-hours at lead 0. CEDA's speed against ERA5's stays steady across the months while
+Open-Meteo's against ERA5's rises in the spans (2024-11: 0.774 for Open-Meteo against 0.754 for
+CEDA), which puts the step in Open-Meteo's archive. The ratio of Open-Meteo's 100 m speed to its 10
+m speed falls from 1.945 to 1.789 in the spans, so the 10 m speed rose relative to the 100 m speed.
+Three other quantities do not step: Open-Meteo's temperature offset (CEDA minus Open-Meteo, -0.009 K
+inside the spans against -0.022 K outside), wind-direction difference (-1.0 against -2.0 degrees,
+CEDA minus Open-Meteo), and irradiance ratio (0.999 against 1.000). The <code>combined.parquet</code> file that
+the study reads equals the <code>site_points/</code> extract that the other studies read in all 3,894 rows they
+share inside the spans, so the step is in what Open-Meteo served and not in this study's file. The
+cause of the step in Open-Meteo's 10 m speed is unknown.</p>
+<p><img alt="Figure 6: Open-Meteo's 10 m wind speed steps up against CEDA's in two spans" src="../../assets/ukv_ceda_vs_openmeteo/fig06_wind_step.svg" /></p>
+<p><strong>The wind P1 verdict depends on dropping the spans, and the wind P3 verdict does not.</strong> The first
+fit, which kept the spans, is the planned scope, and the page reports it beside the rerun. The first
+run read wind P1 as +0.162 [+0.080, +0.241] at the primary setting and +0.146 [+0.073, +0.216] at
+the second, which is "unresolved" because only the primary setting reads "differ". The study dropped
+the spans after the first fit and refitted every arm. The rerun reads +0.270 [+0.209, +0.333] and
++0.243 [+0.192, +0.294], "differ" at both settings. The wind P1 verdict therefore depends on a data
+decision made after the planned fit. The wind P3 verdict does not: the first run read +0.313
+[+0.163, +0.459] and +0.275 [+0.135, +0.422], a penalty at both settings, and the rerun's penalty is
+larger. Inside the spans the sign of the speed difference reverses (CEDA minus Open-Meteo is -0.251
+m/s at lead 0), so keeping the spans blurred the transfer penalty. The step is a risk to every wind
+result on the page. The Limitations section states that risk.</p>
+<h3 id="open-meteo-builds-its-hourly-irradiance-differently-after-the-2026-upgrade-and-in-low-sun">Open-Meteo builds its hourly irradiance differently after the 2026 upgrade and in low sun</h3>
+<p><strong>CEDA's raw snapshot and Open-Meteo's hourly irradiance differ by up to 36% by hour of day, and
+rebuilding CEDA's snapshot as Open-Meteo builds its value removes the difference before PS47.</strong> At
+lead 0 in era 0, the median ratio of CEDA's rebuilt irradiance to Open-Meteo's is 1.005 at 06 UTC,
+1.000 at 12 UTC, and 0.996 at 18 UTC. The raw snapshot's ratios are 1.355, 1.011, and 0.774. After
+the upgrade the rebuilt ratios are 1.111, 1.000, and 0.864 (the raw ratios are 1.517, 1.010, and
+0.663), so Open-Meteo builds its hourly value some other way. The mean absolute difference at lead 0
+is 8.005 W m⁻² [6.416, 9.231] in era 0 and 22.939 W m⁻² [19.970, 25.770] in era 1. For this reason
+the solar contrasts are planned on era 0 and the solar comparisons on era 1 are exploratory, with
+the note "irradiance construction differs after PS47 (ratio 1.11 at 06 UTC, 0.86 at 18 UTC)".</p>
+<p><img alt="Figure 7: Before PS47 CEDA's rebuilt snapshot matches Open-Meteo's irradiance, and after it does not" src="../../assets/ukv_ceda_vs_openmeteo/fig07_irradiance_ratio.svg" /></p>
+<p><strong>The rebuild also fails in low sun in both eras, and the mismatch after PS47 is not confined to low
+sun.</strong> By the sun's elevation, the median rebuilt ratio in era 0 is 0.008 up to 2 degrees, 0.681
+from 2 to 5 degrees, 0.975 from 5 to 10 degrees, and 1.000 above 10 degrees. In era 1 the median
+ratio is 1.003, 1.004, and 1.000 for the three bins above 10 degrees, but the 10th to 90th
+percentile of the ratio is 0.823 to 1.210 from 10 to 20 degrees, against 0.941 to 1.058 in era 0.
+Restricting the solar contrasts to hours with the sun above 5 degrees barely moves them (P2 on era 0
+reads +0.227 [+0.115, +0.365] against +0.212 [+0.109, +0.332]).</p>
+<h3 id="wind-power-ceda-is-0270-points-worse-once-the-two-spans-are-dropped">Wind power: CEDA is 0.270 points worse once the two spans are dropped</h3>
+<p><strong>Over all hours and with the two spans dropped, the XGBoost model given CEDA's 10 m wind has a mean
+absolute error larger than the model given Open-Meteo's by 0.270 points of capacity [+0.209,
++0.333] at the primary setting and 0.243 [+0.192, +0.294] at the second (P1).</strong> Both readings are
+"differ": the intervals exclude zero and the estimates exceed the 0.16-point margin. The planned
+scope kept the spans, and there the first run read +0.162 [+0.080, +0.241] and +0.146 [+0.073,
++0.216], which is "unresolved". Dropping the spans is the post hoc data decision described under
+the methods, so the "differ" reading is not a planned result. The two models' own errors are 8.032%
+[7.074, 9.083] for CEDA and 7.763% [6.805, 8.823] for Open-Meteo at the primary setting.</p>
+<p><strong>The gap is mostly CEDA's lead, because the gap grows from +0.030 at lead 0 to +0.536 at lead 5.</strong>
+Figure 8 draws the contrasts by CEDA lead. Every comparison by lead is an exploratory subset of the
+fit. At lead 0 the gap is +0.030 [-0.043, +0.122] at the primary setting and +0.006 [-0.069, +0.085]
+at the second, and both intervals lie inside the margin. That reading is "interchangeable" only on
+the rerun's rows, after the post hoc drop of the spans. The first run read -0.051 [-0.166, +0.055]
+and -0.069 [-0.166, +0.025], which is "unresolved" at both settings. The gap is +0.135, +0.162,
++0.318, and +0.437 at leads 1 to 4 and +0.536 [+0.383, +0.682] at lead 5. A CEDA-trained XGBoost
+model is trained on all leads and so scores the lead-0 subset with an XGBoost model that also
+learned from leads 1 to 5, which the page notes under Limitations. A lead of 0 hours is the case in
+which both archives are the same analysis, so P1 over all hours measures CEDA's 6-hourly archive
+against Open-Meteo's hourly analysis as much as it measures a difference between the two products.</p>
+<p><strong>A row's lead is its UTC hour modulo 6, so lead and time of day cannot be separated.</strong> After the 12
+UTC run the gap at the primary setting is +0.270 [-0.052, +0.584] at 13 UTC, +0.509 [+0.176, +0.909]
+at 14 UTC, +0.749 [+0.318, +1.198] at 15 UTC, +1.108 [+0.709, +1.534] at 16 UTC, and +1.124 [+0.799,
++1.483] at 17 UTC, and the other three runs give smaller gaps (exploratory, from the saved losses of
+the rerun).</p>
+<p><img alt="Figure 8: Wind gaps between the archives grow with CEDA's lead, and the solar fits
+disagree at lead 0" src="../../assets/ukv_ceda_vs_openmeteo/fig08_contrasts_by_lead.svg" /></p>
+<h3 id="solar-power-ceda-is-0212-points-worse-before-the-2026-upgrade">Solar power: CEDA is 0.212 points worse before the 2026 upgrade</h3>
+<p><strong>On era 0, the XGBoost model given CEDA's irradiance and temperature has a larger error than the
+model given Open-Meteo's by 0.212 points [+0.109, +0.332] at the primary setting and 0.246 [+0.127,
++0.393] at the second (P2, planned), and the fit trained on era 0 alone agrees (+0.256 [+0.173,
++0.360] and +0.251 [+0.155, +0.360]).</strong> The verdict is "differ", because all four readings agree. At
+CEDA lead 0 the two fits disagree. The fit trained on both eras reads -0.028 [-0.117, +0.086], which
+is "unresolved", and the fit trained on era 0 alone reads +0.127 [+0.021, +0.257], which is "differ"
+(its second setting reads +0.085 [-0.098, +0.270]). The gap grows to +0.330 [+0.086, +0.609] at lead
+5 in the fit trained on both eras (the solar transfer section gives a probable mechanism). On era 1,
+the exploratory comparison reads +0.267 [+0.098, +0.452] with the note about Open-Meteo's irradiance
+construction.</p>
+<h3 id="an-xgboost-model-trained-on-cedas-wind-loses-0441-points-on-open-meteos-wind-mostly-because-open-meteos-speeds-are-lower">An XGBoost model trained on CEDA's wind loses 0.441 points on Open-Meteo's wind, mostly because Open-Meteo's speeds are lower</h3>
+<p><strong>When the XGBoost model trained on CEDA's wind is given Open-Meteo's wind and scored on the same
+hours, its error is larger than the Open-Meteo-trained model's by 0.441 points [+0.286, +0.600] at
+the primary setting and 0.408 [+0.242, +0.574] at the second (P3, planned).</strong> Both readings are
+"penalty". The penalty is +0.474 [+0.279, +0.661] in era 0 and +0.375 [+0.122, +0.651] in era 1, and
++0.648 [+0.352, +0.881] from October to March against +0.298 [+0.145, +0.469] from April to
+September (all exploratory). At lead 0 the penalty is +0.384 [+0.208, +0.571], so unlike P1 the
+penalty does not shrink at lead 0. The penalty is +0.313 [+0.163, +0.459] in the first run that kept
+the spans, and +0.250 [+0.086, +0.416] at lead 0 in that run.</p>
+<p><strong>The penalty is a level bias.</strong> Figure 9 draws each wind arm's mean signed error, which is the
+prediction minus the measured power as a share of capacity. The CEDA-trained model on CEDA's wind
+has a mean signed error of -0.974 points, the Open-Meteo-trained model on Open-Meteo's wind has
+-0.914, and the CEDA-trained model on Open-Meteo's wind has -3.327. The CEDA-trained model
+under-predicts by about 2.4 points more when it is given speeds that are 3% lower, which is what a
+lower input speed produces on the steep part of a power curve. Swapping only the direction, which
+differs by about 2 degrees, adds +0.023 points [+0.009, +0.037], so the direction carries almost
+none of the penalty.</p>
+<p><img alt="Figure 9: A CEDA-trained wind model under-predicts by about 2.4 points more when
+given Open-Meteo's wind" src="../../assets/ukv_ceda_vs_openmeteo/fig09_signed_errors.svg" /></p>
+<p><strong>Rescaling Open-Meteo's speed to CEDA's level removes most of the penalty and leaves +0.142 points
+[+0.066, +0.217] (exploratory).</strong> The calibrator test scores the CEDA-trained model on Open-Meteo's
+speed multiplied by each site's median ratio of CEDA's to Open-Meteo's speed at lead-0 instants,
+learned on the training folds only. The penalty falls from +0.441 to +0.142, which is still
+statistically significant at the 5% level. The mean signed error rises from -3.327 to -1.555 points.
+Under the plan's reading rule that residual is "unresolved" and not "no penalty": the estimate is
+below the 0.16-point margin and its upper bound is above it. A rescale therefore absorbs most of the
+level bias and not all of the penalty. The study tested no other calibrator and no calibrator for
+solar.</p>
+<p><img alt="Figure 10: Most of the wind transfer penalty is the speed level: rescaling
+Open-Meteo's speed removes most of it" src="../../assets/ukv_ceda_vs_openmeteo/fig10_controls.svg" /></p>
+<h3 id="the-solar-transfer-penalty-is-unresolved">The solar transfer penalty is unresolved</h3>
+<p><strong>For solar power on era 0, the transfer penalty reads +0.014 points [-0.042, +0.071] at the primary
+setting and +0.012 [-0.047, +0.067] at the second in the fit trained on both eras, so P3 is
+"unresolved" for solar.</strong> The fit trained on era 0 alone reads +0.061 [+0.010, +0.115] at the
+primary setting, which is a penalty by the rule, and +0.054 [-0.012, +0.125] at the second, which is
+unresolved. A verdict stands only if all four readings agree, so the verdict is "unresolved". The
+largest upper bound across the four readings is +0.125 points, against absolute errors of 8.5% to
+8.9%. By the plan's rule an unresolved reading is treated as a penalty, and the page states that the
+solar penalty is a default and not a measured penalty.</p>
+<p><strong>The extra era-1 rows did not hurt either solar model on era 0, and at lead 0 the era-0 fit's
+penalty does not come from the input values.</strong> On era 0, the Open-Meteo-trained model scores 8.52%
+when trained on both eras and 8.67% when trained on era 0 alone, and the CEDA-trained model scored
+on Open-Meteo's inputs scores 8.53% and 8.73%, so the extra era-1 rows did not hurt either model on
+era 0. At CEDA lead 0 the era-0-trained CEDA model scores 8.96% on CEDA's inputs and 8.95% on
+Open-Meteo's, so at lead 0 its penalty does not come from the input values. The lead-0 penalty
+probably comes from what training on CEDA's leads 1 to 5 taught the model, and the lead-0 penalty is
+part of the transfer penalty and not a separate effect (exploratory). The page did not run the check
+that would test that explanation, which adds the lead as an input to the XGBoost model.</p>
+<p><strong>Irradiance, not temperature, carries the difference between the two archives' solar inputs.</strong>
+Scored on Open-Meteo's irradiance alone the CEDA-trained model's error is -0.216 points [-0.352,
+-0.115] below its error on CEDA's, and scored on Open-Meteo's temperature alone it is +0.017
+[-0.001, +0.036] above, so irradiance and not temperature carries the difference. Open-Meteo's
+lead-0 irradiance replaces CEDA's irradiance at leads 1 to 5, so a lower error is the expected sign.
+All solar results rest on the two fits. The all-months fit gives a penalty of +0.103 [+0.027,
++0.190] with the note about the irradiance construction after PS47, which supports the default rule.</p>
+<h3 id="controls-a-refit-on-the-cpu-and-xgboost-models-given-shuffled-weather">Controls: a refit on the CPU and XGBoost models given shuffled weather</h3>
+<p><strong>The GPU-against-CPU refit sets the noise floor at about ±0.05 points, and the shuffled-weather
+pair is not a clean null.</strong> The refit of the Open-Meteo wind arm on the CPU reads -0.007 [-0.050,
++0.022] against the GPU fit. Each archive's weather columns were also shuffled within a site, a
+month, and an hour of day, under its own permutation. The shuffled CEDA arm minus the shuffled
+Open-Meteo arm reads -0.249 points [-0.522, +0.021] for wind and -0.068 [-0.248, +0.119] for solar
+on era 0, neither statistically significant. The shuffled arms' errors are 19.357% and 19.606% for
+wind and 14.236% and 14.304% for solar on era 0, far above the real arms' 7.7% to 8.9%. The shuffle
+keeps each archive's monthly-hourly distribution, including Open-Meteo's lower speed level and
+CEDA's lead-dependent spread, so the two shuffled arms are not equally informative by construction.
+The shuffled-weather control does not size the noise of the pipeline. Figure 11 draws every arm's
+absolute error and its interval.</p>
+<p><img alt="Figure 11: Every XGBoost model's error is within about half a point of the others'" src="../../assets/ukv_ceda_vs_openmeteo/fig11_absolute_errors.svg" /></p>
+<h3 id="the-second-setting-the-eras-the-seasons-and-the-farms-leave-the-readings-as-they-are">The second setting, the eras, the seasons, and the farms leave the readings as they are</h3>
+<p><strong>The second hyperparameter setting gives the same verdict as the primary setting for wind P1, wind
+P3, and solar P2.</strong> Wind P1 reads "differ" at both settings (+0.270 and +0.243), and wind P3 reads
+"penalty" at both (+0.441 and +0.408). Solar P3 is unresolved because its four readings disagree.</p>
+<p><strong>The exploratory splits by era, season, and farm agree in sign.</strong> Wind P1 is +0.254 [+0.176,
++0.330] in era 0 and +0.300 [+0.209, +0.403] in era 1, +0.315 [+0.209, +0.414] from October to March
+and +0.239 [+0.176, +0.310] from April to September, and +0.262 [+0.172, +0.342], +0.242 [+0.128,
++0.351], and +0.308 [+0.169, +0.444] at W1, W2, and W3. Wind P3 at the three farms reads +0.392
+[+0.218, +0.565], +0.514 [+0.331, +0.693], and +0.410 [+0.049, +0.746]. The comparison "without
+2025-01" repeats the planned comparison for wind, because the wind rows hold no January 2025. For
+solar P2 that comparison reads +0.234 [+0.141, +0.335] over all 23 months and both eras, with the
+note about the irradiance construction after PS47, which is not the era-0 planned scope. Every one
+of these comparisons is one of many exploratory comparisons.</p>
+<h2 id="discussion-what-to-use">Discussion: what to use</h2>
+<p><strong>This section reads the evidence as the plan's rules fix it, and it commits the project to
+nothing.</strong> The rules came before any result: a P3 reading of "penalty" or "unresolved" means do not
+mix the two archives, and "no penalty" would have allowed an XGBoost model trained on CEDA's history
+to be given Open-Meteo's values.</p>
+<ul>
+<li><strong>Wind, training on CEDA's history and serving Open-Meteo's UKV:</strong> the rule says train on
+  Open-Meteo's history only (from August 2024) for wind, because P3 is a penalty at both settings
+  (+0.441 and +0.408). A calibrator is an alternative only where a calibrator test shows that the
+  calibrator absorbs the penalty. A speed rescale left +0.142 [+0.066, +0.217], which reads
+  "unresolved" under the plan's rule, and the decision is unchanged. The study holds both XGBoost
+  models to the same months of training rows, so the study does not weigh CEDA's extra history of
+  about 5 years against the mismatch. What would change the wind reading: a test of CEDA's longer
+  history against Open-Meteo's, a longer overlap, a calibrator that removes the remaining penalty,
+  or a reading of Open-Meteo's wind against the Met Office's files that explains the 3% offset and
+  the two spans. The Open-Meteo history that the rule recommends contains the two spans this study
+  dropped (2024-11-07 to 2024-11-30 and 2025-01-16 to 2025-02-18), and the unnamed backfill before
+  12 August 2024. An XGBoost model trained on that history has to drop or correct the spans.</li>
+<li><strong>Solar, the same question:</strong> the reading is "unresolved", so by the plan's default rule solar is
+  treated like wind and the two archives are not mixed until a longer overlap exists. The study did
+  not measure a solar penalty. The largest upper bound across its readings is +0.125 points, against
+  absolute errors of 8.5% to 8.9%.</li>
+<li><strong>Comparing the archives' own accuracy:</strong> P1 and P2 over all hours say that CEDA's 6-hourly
+  archive, read at its latest run, gives a larger power error than Open-Meteo's hourly analysis. The
+  lead-0 comparisons say that the wind gap is mostly the lead once the spans are dropped (+0.030
+  [-0.043, +0.122]). The solar fits disagree at lead 0 (-0.028 [-0.117, +0.086] and +0.127 [+0.021,
+  +0.257]). The page does not say that either archive is the better product.</li>
+<li><strong>The licence:</strong> CEDA's catalogue record gives the Creative Commons Attribution-NonCommercial-
+  ShareAlike 4.0 licence, so whether the main work's use of CEDA's UKV as training history is
+  non-commercial is a decision for the maintainer.</li>
+<li><strong>The Met Office's live feed:</strong> this study did not compare it with CEDA's archive, and a pilot of
+  the feed is in progress, so the page makes no statement about the live feed.</li>
+</ul>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li><strong>The comparison is between CEDA's archive and Open-Meteo's UKV, a proxy for the live feed.</strong> Only
+  Open-Meteo's irradiance has been checked against the Met Office's files. Open-Meteo's wind and
+  temperature have not been checked, and the 3% speed offset and the two spans may come from
+  Open-Meteo's processing and not from UKV. Interpolation from the native grid is one candidate for
+  the offset, because the nearest CEDA cell matches Open-Meteo's value at only 27% of lead-0 hours.</li>
+<li><strong>The two spans were found from the served series and dropped.</strong> The edges are whole UTC days, a
+  few hours at each edge in which the series did not change are dropped, and the choice rests on
+  Open-Meteo's ratio to CEDA's and not on a power result. The first run, which kept the spans and is
+  the planned scope, read wind P1 as unresolved. The page cannot rule out that further spans exist
+  at a smaller size.</li>
+<li><strong>Leads beyond 5 hours are untested.</strong> A live service would feed forecasts at leads of hours to
+  days. A lead-0 analysis is the least noisy input an XGBoost model could meet, so the transfer
+  penalty probably understates the effect for solar. For wind the speed scale would carry over.</li>
+<li><strong>The lead-0 comparisons are scoring subsets.</strong> The XGBoost models are trained on all leads, so
+  the lead-0 comparisons do not show how an XGBoost model trained only on lead 0 would do.</li>
+<li><strong>The overlap is 23 months, and the planned solar contrasts rest on 16.</strong> The era-1 comparisons
+  rest on 7 months and have approximate intervals. The intervals cover month-to-month weather and
+  the seed. The study covers three wind farms and six solar farms in one box in Lincolnshire.</li>
+<li><strong>Open-Meteo's irradiance construction changes after PS47, and the rebuild fails in low sun in
+  both eras.</strong> The solar results hold for the era before the upgrade only. The rebuild is unreliable
+  below about 10 degrees of sun elevation, and excluding the low sun barely moves P2.</li>
+<li><strong>The <code>effective_capacity</code> table behind every figure is the CEDA-against-ERA5 study's table,</strong>
+  at Delta version 1, as that study's build stamp records.</li>
+<li><strong>Beam and diffuse irradiance, 100 m wind, and the Met Office's stations are not compared,</strong> and
+  the study has no station check. Open-Meteo's UKV at the stations was not downloaded.</li>
+<li><strong>About one exploratory comparison in 20 with no real effect reaches statistical significance at
+  the 5% level by chance,</strong> and the report holds many exploratory comparisons over shared months.
+  The page quotes an exploratory label only with its scope.</li>
+</ul>
+<h2 id="scope">Scope</h2>
+<p><strong>The study covers temperature, 10 m wind, and global horizontal irradiance at nine generators, over
+23 months.</strong> The study does not cover other variables that the main forecast reads (such as
+pressure, dew point, and precipitation), other weather products, other regions, or forecasts at
+leads beyond 5 hours. The study does not compare the archives with measurements of the weather, and
+it does not say which archive is closer to what happened.</p>
+<h2 id="data-and-code-availability">Data and code availability</h2>
+<p><strong>CEDA's UKV archive is public to registered users under the Creative Commons
+Attribution-NonCommercial-ShareAlike 4.0 licence, and Open-Meteo's historical-forecast archive is
+public.</strong> The power data, the farm locations, and the frames and per-row losses are private. The
+scores and charts on this page carry no UKV values. The code is in <code>studies/past_weather/</code> and
+<code>packages/studies/</code> at the commit that merged this page. The XGBoost version is 3.4.1, the device is
+an NVIDIA RTX A6000, and the two settings are those of the CEDA-against-ERA5 study. The source for
+CEDA's data is <a href="https://catalogue.ceda.ac.uk/uuid/f47bc62786394626b665e23b658d385f">Met Office (2016): NWP-UKV: Met Office UK Atmospheric High Resolution Model
+data</a>, Centre for Environmental
+Data Analysis.</p>
+<h2 id="reproducing-the-figures">Reproducing the figures</h2>
+<p>Each script's output folder is write-once, so move an earlier output to a <code>superseded/</code> subfolder of
+<code>data/studies/per_study/ukv_ceda_vs_openmeteo/</code> before a re-run. The build reads the
+CEDA-against-ERA5 study's frames and Open-Meteo's previous-runs file, which
+<code>studies/weather_downloads/</code> fetches.</p>
+<p><strong>No command below regenerates the first run, which kept the two spans.</strong> The extra-reads script and
+the headline figure read that run from <code>superseded/first_run/</code>. To rebuild it, check out the scripts
+at commit <code>22c2faf6</code>, run their build, compare, and fit steps, and move the folder's outputs to
+<code>superseded/first_run/</code> before running the commands below.</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/past_weather/ukv_ceda_vs_openmeteo_build.py<span class="w"> </span>--check-only<span class="w">   </span><span class="c1"># must exit 0</span>
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/past_weather/ukv_ceda_vs_openmeteo_build.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/past_weather/ukv_ceda_vs_openmeteo_compare.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/past_weather/ukv_ceda_vs_openmeteo_wind_steps.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/past_weather/ukv_ceda_vs_openmeteo_fit.py<span class="w"> </span>--verified<span class="w"> </span>--device<span class="w"> </span>cuda
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/past_weather/ukv_ceda_vs_openmeteo_extra_reads.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/past_weather/ukv_ceda_vs_openmeteo_charts.py
+</code></pre></div>
+<p>Then optimise each figure in <code>docs/studies/assets/ukv_ceda_vs_openmeteo/</code> with
+<code>npx svgo@4 --multipass --precision=1 --final-newline</code>. After a review, <code>fit.py --report-only</code>
+rebuilds the intervals and the reports from the saved losses.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

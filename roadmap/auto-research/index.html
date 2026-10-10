@@ -1,0 +1,4663 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../engineering-health/">
+      
+      
+        <link rel="next" href="../forecast-building-blocks/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Experiments run by an LLM agent - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#experiments-run-by-an-llm-agent-auto-research" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Experiments run by an LLM agent
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/weather-products-survey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products surveyed for the weather-product studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/manual-heuristic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The manual heuristic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/gb-battery-scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How GB batteries schedule themselves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/gb-price-data-and-ancillary-markets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GB electricity prices, free and when each is known
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ensemble-archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The ensemble weather archive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/solar-bmu-census/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How many Balancing Mechanism Units in Great Britain are solar?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/solar-bmu-disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/battery-pv-separation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/unmetered-battery-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can a primary substation's half-hourly flow reveal an unmetered battery?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/embedded-battery-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/indgen-inddem-and-gsp-take/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_9" id="__nav_8_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/reanalysis-wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CERRA and NORA3 describe past wind better than ERA5?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/cerra-wind-levels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending CERRA's wind heights beat one height?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/cerra-wind-direction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CERRA's wind direction add to its wind speed?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/era5-solar-variables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which ERA5 variables help predict solar farm output?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/ukv-ceda-vs-era5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CEDA's UKV or ERA5 describe past wind and temperature better?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/ukv-ceda-vs-openmeteo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_10" id="__nav_8_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/forecasts/ens-horizons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/forecasts/matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/forecasts/matched-lead-extra-products/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extra weather products in the day-ahead lead comparison: how they are read, and their results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/forecasts/blends-with-ens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which single weather forecast should be added to ECMWF's ensemble mean first?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/forecasts/ukv-ceda-blends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does adding UKV from CEDA to ECMWF's ensemble mean lower the error at lead days 1 to 4?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/forecasts/ensemble-means/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an ML experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/backup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backing up the workstation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-cleaning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning the trial-area telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments run by an LLM agent
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments run by an LLM agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-energy-forecasting-suits-automated-research" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why energy forecasting suits automated research
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-experiment-platform-provides-and-the-leaderboard-query-it-lacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the experiment platform provides, and the leaderboard query it lacks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#published-evidence-on-research-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published evidence on research agents
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Published evidence on research agents">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agents-that-generate-rank-and-critique-ideas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agents that generate, rank, and critique ideas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#googles-era-a-tree-search-over-code-variants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Google's ERA: a tree search over code variants
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-implementation-is-weak-evidence-about-an-idea" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One implementation is weak evidence about an idea
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#coding-agents-change-experiments-without-saying-so" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coding agents change experiments without saying so
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-score-that-guides-a-search-should-not-also-confirm-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The score that guides a search should not also confirm the result
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proposed-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Proposed design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-idea-to-score-step-by-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From idea to score, step by step
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-modes-of-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two modes of work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workers-change-the-pipeline-the-output-is-fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workers change the pipeline; the output is fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#an-llm-research-lead-decides-what-to-try-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An LLM research lead decides what to try next
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-research-lead-the-submit-command-and-the-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The research lead, the submit command, and the review
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#protecting-the-evaluation-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protecting the evaluation code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ranking-and-steering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranking and steering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recording-what-was-learned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recording what was learned
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-stops-the-research-lead-cheating" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What stops the research lead cheating
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending the training history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-energy-forecasting-suits-automated-research" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why energy forecasting suits automated research
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-experiment-platform-provides-and-the-leaderboard-query-it-lacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the experiment platform provides, and the leaderboard query it lacks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#published-evidence-on-research-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published evidence on research agents
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Published evidence on research agents">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agents-that-generate-rank-and-critique-ideas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agents that generate, rank, and critique ideas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#googles-era-a-tree-search-over-code-variants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Google's ERA: a tree search over code variants
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-implementation-is-weak-evidence-about-an-idea" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One implementation is weak evidence about an idea
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#coding-agents-change-experiments-without-saying-so" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coding agents change experiments without saying so
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-score-that-guides-a-search-should-not-also-confirm-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The score that guides a search should not also confirm the result
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proposed-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Proposed design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-idea-to-score-step-by-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From idea to score, step by step
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-modes-of-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two modes of work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workers-change-the-pipeline-the-output-is-fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workers change the pipeline; the output is fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#an-llm-research-lead-decides-what-to-try-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An LLM research lead decides what to try next
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-research-lead-the-submit-command-and-the-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The research lead, the submit command, and the review
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#protecting-the-evaluation-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protecting the evaluation code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ranking-and-steering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranking and steering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recording-what-was-learned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recording what was learned
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-stops-the-research-lead-cheating" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What stops the research lead cheating
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="experiments-run-by-an-llm-agent-auto-research">Experiments run by an LLM agent ("auto-research")</h1>
+<blockquote>
+<p><strong>Status: 🚧 Planned.</strong> The infrastructure — the leaderboard query, a leaderboard score over 3–10
+day lead times, the research repository and hypothesis store, the scored checkout and leakage
+test, the research-lead session and review step, and the trusted submit command — is planned for
+v0.3, alongside the leaderboard. The experiments themselves run in v0.5, alongside the rest of the
+<a href="../xgboost-improvements/">XGBoost improvements</a>. Gated on <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/958">issue #958 (Protect the leaderboard
+scorer for autonomous
+research)</a>, and should
+follow <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/960">issue #960 (Design rolling-origin CV folds, assuming at least monthly
+retraining)</a>. The
+infrastructure is tracked in <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/1031">issue #1031 (Tracking: infrastructure for safe experiments run by an
+LLM agent
+(auto-research))</a>, and the
+experiments in <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/1038">issue #1038 (Run ideas through the LLM agent, and decide which ideas go to the
+agent)</a>. Neither the
+infrastructure nor the search is built yet.</p>
+</blockquote>
+<p><strong>We plan to have a large language model (LLM) agent run some or all of the <a href="../xgboost-improvements/">XGBoost
+improvements</a> backlog as a search: implement each idea, score it, and
+combine the ideas that help.</strong> Larger ideas from other roadmap pages, such as a new estimator of
+generator capacity, may also go to the agent. Each idea becomes an experiment: a variant of
+Flexpectation's forecasting pipeline, usually of the XGBoost forecasting model, scored the same way
+as every other variant. The leaderboard is the table that ranks those experiments. The champion is
+the experiment currently promoted to production. The agent works in the style of <a href="https://github.com/karpathy/autoresearch">Karpathy's
+autoresearch</a>, running experiments and reading the
+leaderboard with no human in the loop.</p>
+<p><strong>Which of the XGBoost ideas go to the agent is not yet decided, but the maintainer leans towards
+screening every idea.</strong> Most of the ideas are quick to implement and quick to run, so the agent can
+screen every idea in a reasonable time. The <a href="#open-questions">open questions</a> below discuss what an
+exhaustive search changes. The options are:</p>
+<ul>
+<li>every idea, screened and combined by the agent;</li>
+<li>some of the ideas, with the rest tested by hand in the usual way;</li>
+<li>a broad-but-shallow screen of every idea by the agent, after which a person chooses the ideas for
+  the deeper look.</li>
+</ul>
+<p>The design below works for all three options. Under the third option, a person makes the research
+lead's choice of which ideas to deepen. <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/1038">Issue #1038 (Run ideas through the LLM agent, and decide
+which ideas go to the
+agent)</a> tracks that decision
+and the experiments.</p>
+<p><strong>An agent session is judged on whether a finding moves the leaderboard, not on whether the finding
+is publishable.</strong> A result reaching production has to beat the champion on the honest scorer planned
+in <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/958">issue #958 (Protect the leaderboard scorer for autonomous
+research)</a>. The honest scorer
+runs from the reviewed <code>main</code> branch as the maintainer's Unix user. Issue #958 also plans for agent
+sessions to run as a separate Unix user barred from the validation data the scorer holds back.</p>
+<h2 id="why-energy-forecasting-suits-automated-research">Why energy forecasting suits automated research</h2>
+<p><strong>Energy forecasting has an advantage over the fields some research agents are built for: a genuine
+check on results that the system being judged does not control.</strong> Two of the research agents
+reviewed <a href="#agents-that-generate-rank-and-critique-ideas">below</a>, the AI Scientist and Co-Scientist,
+judge whether a result is good by a simulated review or a tournament run by the system's own agents.
+A promoted forecasting model is instead checked against power measured at the substation after the
+forecast was made, both in a held-back historical window and in <a href="../live-service/#production-monitoring">live
+monitoring</a>.</p>
+<p><strong>Live monitoring is the check a session cannot game, even a session that has read the held-back
+validation data.</strong> A session that has read the held-back validation data could game the
+historical-window check but not live monitoring. Issue #958 plans to stop a session reading the
+held-back validation data. The <a href="#protecting-the-evaluation-code">proposed design</a> sets out the part
+of the plan in issue #958 that is still undecided.</p>
+<p><strong>Data is comparatively plentiful and each experiment is cheap.</strong> Once the training-history
+extension for the European Centre for Medium-Range Weather Forecasts (ECMWF) ensemble (<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/959">issue #959
+(Extend ECMWF ENS training
+history)</a>) lands, each series
+will have several full years of half-hourly data. Each small experiment is an XGBoost training run
+scored against a fixed fold. That run is cheap and fast compared with a wet-lab experiment or a
+large pretraining run for a neural network. That combination is why an autonomous research session
+is worth building here, even though a 2026 survey of the obstacles across scientific discovery,
+embodied artificial intelligence (AI), and software engineering (<a href="https://arxiv.org/abs/2609.11873">Duan et al.,
+2026</a>) finds genuine recursive self-improvement still blocked in
+most domains.</p>
+<h2 id="what-the-experiment-platform-provides-and-the-leaderboard-query-it-lacks">What the experiment platform provides, and the leaderboard query it lacks</h2>
+<p><strong>The experiment platform was designed to support an agent from day one.</strong> The pipeline runs on
+Dagster, experiments are registered programmatically rather than through the Dagster user interface
+(UI), MLflow records every run's metrics in a form a program can read, and a manual retirement job
+prunes experiments nobody needs any more.</p>
+<p><strong>The one piece the platform lacks for an agent to read results is a machine-readable leaderboard
+query.</strong> That query is a thin, typed Python surface answering "fetch the aggregate leaderboard
+metrics for experiment X" and "rank every experiment by metric Y", so the agent reads results
+without scraping a UI. The visual leaderboard (<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/4">issue #4 (Create "visual leaderboard" script using
+Altair &amp; display it in
+MLFlow)</a>) needs the same query
+underneath it. Writing the query as a reusable function, rather than burying the query in the chart
+script, leaves the agent's surface at a few lines of code once the agent is built. <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/1032">Issue #1032 (Add
+a typed Python query for leaderboard metrics: fetch one experiment, rank all by a
+metric)</a> tracks the query.</p>
+<p><strong>MLflow's own Model Context Protocol (MCP) server does not serve this need.</strong> MCP is the standard
+interface through which an AI agent calls a tool. The server's tools are generated by capturing the
+stdout of a curated subset of MLflow command-line interface (CLI) commands, so a client receives
+rendered text tables rather than structured data. And the two run-reading tools the server exposes
+(<code>list_runs</code>, <code>describe_run</code>) accept neither a filter nor an <code>order_by</code>. Ranking N experiments
+therefore takes N+1 round trips of text to parse — precisely the operation a leaderboard exists to
+perform.</p>
+<h2 id="published-evidence-on-research-agents">Published evidence on research agents</h2>
+<p><strong>Treat the older results below with caution, because LLMs have improved very quickly and the LLMs
+available in 2026 are far more capable than the LLMs these papers tested.</strong> <a href="https://arxiv.org/abs/2305.14325">Du et al.
+(2023)</a> and <a href="https://arxiv.org/abs/2408.06292">Lu et al. (2024)</a>
+measured LLMs that are now several generations old. A gain from debate or from an automated reviewer
+on a 2023 LLM may be smaller, or absent, on a 2026 LLM that already gets most of those answers
+right. <a href="https://arxiv.org/abs/2509.06503">Aygün et al. (2025)</a> saw the same effect in their own
+results: on one task, GPT-5's single attempt was already good enough that the tree search made
+little difference, and Aygün et al. expect more tasks to saturate as LLMs improve. The papers'
+methods and failure modes carry over more reliably than their numbers do.</p>
+<h3 id="agents-that-generate-rank-and-critique-ideas">Agents that generate, rank, and critique ideas</h3>
+<p><strong>The AI Scientist's automated reviewer agreed with the average human reviewer more closely than
+individual human reviewers agreed with each other.</strong> <a href="https://arxiv.org/abs/2408.06292">Lu et al.
+(2024)</a>'s AI Scientist generates an idea, writes code, runs the
+experiment, writes the result up as a paper, and then runs an automated peer review. The review
+alone costs $0.25 to $0.50 in application programming interface (API) calls per paper. The AI
+Scientist's automated reviewer reaches an F1 score of 0.57 against a human NeurIPS baseline of 0.49.
+That automated reviewer's scores correlate more closely with the average human reviewer's score than
+individual human reviewers' scores correlate with each other.</p>
+<p><strong>For deciding whether a finding is real, the proposed design relies on a scorer the search cannot
+edit, and on an evaluation the search does not steer on. Agents review each other's code to catch
+broken implementations and lookahead before the scorer runs.</strong> Adversarial review can be a large
+part of the answer to "is this finding real". But an autonomous session here has a stronger check
+available than a simulated paper review: a scorer and a certifying evaluation outside the search's
+control.</p>
+<p><strong>Co-Scientist's hypotheses kept improving as its tournament between agents ran more rounds.</strong>
+<a href="https://arxiv.org/abs/2502.18864">Gottweis et al. (2025)</a>'s Co-Scientist ranks candidate hypotheses
+through an Elo-rated tournament between specialised agents (generation, reflection, ranking,
+evolution, proximity, and meta-review). Across 203 research goals, hypothesis quality (measured by
+Elo rating) kept rising through more tournament rounds rather than plateauing quickly. That rise is
+evidence that spending more compute on ranking and revision continues to improve the hypotheses.</p>
+<p><strong>Co-Scientist's tournament is one concrete answer to the breadth-versus-depth question, and the
+proposed design answers the question differently.</strong> In Co-Scientist, breadth comes from generating
+many hypotheses up front, depth comes from repeated tournament rounds against the current top of the
+ranking, and the balance between breadth and depth emerges from running more rounds. The <a href="#an-llm-research-lead-decides-what-to-try-next">proposed
+design</a> below sets the balance with an LLM research
+lead that screens broadly and then goes deeper.</p>
+<p><strong>A few rounds of debate between separate instances of a language model beat both a single instance
+and simple majority voting.</strong> <a href="https://arxiv.org/abs/2305.14325">Du et al. (2023)</a> show that three
+agents debating over two rounds raised arithmetic accuracy from 67.0% to 81.8%, and
+grade-school-math accuracy from 77.0% to 85.0%.</p>
+<p><strong>Debate between agents bears on how agents here could critique each other's work.</strong> Arithmetic and
+word-problem accuracy resemble the reasoning a session does when checking feature-engineering logic,
+so Du et al.'s result suggests that a second agent's critique can catch errors here, subject to the
+caution above about older LLMs. The proposed design adds that critique as a <a href="#the-research-lead-the-submit-command-and-the-review">review before
+training</a>.</p>
+<h3 id="googles-era-a-tree-search-over-code-variants">Google's ERA: a tree search over code variants</h3>
+<p><strong>Google's Empirical Research Assistance (ERA) system searches a tree of code variants against a
+fixed score, and two of its tasks are time-series forecasting benchmarks close to Flexpectation's.</strong>
+<a href="https://arxiv.org/abs/2509.06503">Aygün et al. (2025)</a> have an LLM rewrite code to improve a
+quality score, and choose which candidate to extend next with an upper-confidence-bound rule applied
+across the whole tree. Research ideas enter the prompt, either written by the user or summarised
+from papers. On 16 Kaggle Playground competitions, the tree search beat both a single LLM call and
+the best of 1,000 LLM calls, and also beat AIDE, an earlier agent for machine-learning engineering.
+Aygün et al. report that the score typically stops improving after 300 to 1,000 nodes of the tree.</p>
+<p><strong>On the GIFT-Eval time-series benchmark, ERA's solutions converged on gradient boosting and beat
+every entry on the 18 May 2025 leaderboard.</strong> The benchmark spans 28 datasets across 7 domains. The
+entries ERA beat included foundation models, deep-learning models, and standard time-series methods.</p>
+<p><strong>ERA's COVID-19 hospitalisation forecasts beat the CovidHub Ensemble on a probabilistic score, in a
+comparison that favoured ERA.</strong> The forecasts were for weekly COVID-19 hospitalisations in the USA,
+scored on weighted interval score (WIS). Aygün et al. ran the study retrospectively over the 2024/25
+season, selecting a forecasting model each week on the preceding 6 weeks. ERA's retrospective
+forecasting model averaged a WIS of 26 against the CovidHub Ensemble's 29. The comparison favours
+ERA, because the retrospective study used the hospitalisation data available on 1 May 2025 for the
+whole season, whereas the ensemble forecast in real time from the data available each week.</p>
+<p><strong>ERA's gains often came from recombining known methods, which matches Flexpectation's backlog of
+known ideas.</strong> In the COVID-19 task, a separate retrospective 3-week comparison of forecasting
+strategies found 14 strategies that beat the CovidHub Ensemble. Of those 14 strategies, 10 were
+recombinations of two existing methods. In ERA's single-cell genomics task, Aygün et al. prompted
+the search with each of the 55 pairs of 11 methods. Of the 55 recombinations, 24 beat both of their
+parent methods.</p>
+<h3 id="one-implementation-is-weak-evidence-about-an-idea">One implementation is weak evidence about an idea</h3>
+<p><strong>How a coding agent happens to implement an idea moves the score far more than re-running the
+implementation does.</strong> <a href="https://arxiv.org/abs/2607.26587">Ning et al. (2026)</a> froze written
+descriptions of candidate ideas and had coding agents implement each idea three times, in fresh
+sessions, across 13 tabular tasks and 2 agent setups. Variance between implementations of the same
+idea was more than 5 times the variance between re-runs of one implementation in one setup, and more
+than 10 times in the other. The idea that won on a single implementation lost on the mean of the
+other two implementations in 25.6% and 43.6% of comparisons in the two setups (10 and 17 of 39
+comparisons, each comparison being one of the 13 tasks with one of its 3 implementations held out;
+95% intervals 7.7–46.2% and 20.5–66.7%).</p>
+<p><strong>Keeping the best of several implementations is right for the forecast that ships, but wrong for
+judging the idea.</strong> Ning et al. draw this distinction: the maximum score finds a good artifact, but
+the maximum can favour ideas whose implementations vary more. A search that uses a single
+implementation's score to decide which idea to build on next is crediting the idea. The score
+therefore has to cover several implementations wherever the decision is close.</p>
+<h3 id="coding-agents-change-experiments-without-saying-so">Coding agents change experiments without saying so</h3>
+<p><strong>An agent that implements both the baseline and the new method can quietly change either one.</strong> <a href="https://arxiv.org/abs/2409.04109">Si
+et al. (2024)</a> built an execution agent as a side experiment to a
+human study of LLM-generated research ideas. On 2 sets of 30 ideas, about safety prompting and about
+factuality prompting, the agent produced code that ran for 17 and 18 ideas respectively. But Si et
+al. found the automated experiments could be misleading, because the agent often skipped or modified
+steps in the baselines or the proposed methods, and in some cases defined the metric functions
+incorrectly. One baseline the agent wrote was a five-keyword filter that any LLM-based method would
+beat.</p>
+<h3 id="the-score-that-guides-a-search-should-not-also-confirm-the-result">The score that guides a search should not also confirm the result</h3>
+<p><strong>He et al. argue that a search steered by a score overfits to that score, so a separate, protected
+evaluation has to certify the result.</strong> <a href="https://arxiv.org/abs/2608.09855">He et al. (2026)</a> argue,
+in a position paper with a simulated physics demonstration, that automated research should be
+organised like coverage-guided fuzz testing of software. A cheap signal of intermediate progress
+guides the choice of the next experiment. A validator the search cannot query adaptively determines
+whether a result counts as a discovery. The <a href="../metrics-and-leaderboard/#fold-hygiene-selection-bias-and-a-final-test-window">selection-bias
+section</a> of the
+leaderboard design names the risk of scoring hundreds of experiments on one fold. He et al.'s
+separation addresses that risk.</p>
+<h2 id="proposed-design">Proposed design</h2>
+<h3 id="from-idea-to-score-step-by-step">From idea to score, step by step</h3>
+<p><strong>One idea passes through ten steps on its way from the research lead's choice to a score on the
+leaderboard.</strong> The sections below describe each step in detail, and <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/1031">issue #1031 (Tracking:
+infrastructure for safe experiments run by an LLM agent
+(auto-research))</a> tracks the
+work to build the infrastructure behind those steps.</p>
+<ol>
+<li>The research lead, an LLM session that decides what to try next, chooses an idea and the existing
+   implementation to build on, and writes the idea down.</li>
+<li>The research lead launches a worker, a separate session of Claude Code, Anthropic's coding agent,
+   in the worker's own git worktree. The worker implements the idea on a branch of a private
+   research repository, and may train and score freely on the training window while doing so.</li>
+<li>The worker pushes the implementation to the research repository, and the research lead submits
+   the implementation's commit to the trusted submit command. The submit command is a small Python
+   command in this repository, and runs as the maintainer's Unix user.</li>
+<li>The submit command rejects the implementation if the diff touches any of the protected paths,
+   which hold the evaluation code.</li>
+<li>The submit command launches a fresh reviewer agent, which reads the written idea and the diff.
+   The submit command relays the reviewer's findings to the worker and counts the rounds, up to a
+   cap, and each revised commit goes back through step 4. An implementation the reviewer still
+   rejects is recorded as failed review and never trained.</li>
+<li>The submit command builds the scored checkout: the implementation's commit, with every protected
+   path restored from the commit of <code>main</code> the session started from, in a directory the worker
+   cannot write.</li>
+<li>The submit command trains the implementation on data truncated at the fold's training end, and
+   runs inference over the validation window. The implementation's code runs as the restricted
+   research user, never as the maintainer. How the research user's code gets power observed inside
+   the validation window is still open, as <a href="#protecting-the-evaluation-code">Protecting the evaluation
+   code</a> explains.</li>
+<li>The submit command runs the leakage test. The test re-runs the implementation on data perturbed
+   after sampled cut-off times, and rejects the implementation if any forecast initialised at or
+   before a cut-off changes.</li>
+<li>The scorer, run from <code>main</code> as the maintainer, scores the forecasts and refuses a forecast that
+   leaves out any row of an eligible series. The submit command logs the score and the review
+   verdict to MLflow, with the idea the implementation implements and the implementation's commit
+   hash.</li>
+<li>The submit command records the score and the review verdict in the hypothesis store. The
+    research lead reads the result and returns to step 1.</li>
+</ol>
+<h3 id="two-modes-of-work">Two modes of work</h3>
+<p><strong>The design has two modes: a search over small ideas, and one long agent session per large idea.</strong>
+A small idea is a <a href="../xgboost-improvements/#tier-1-config-level-changes-hours-each">Tier 1</a> or <a href="../xgboost-improvements/#tier-2-low-effort-feature-engineering-about-a-day-each">Tier
+2</a> entry in the
+XGBoost backlog, such as a calendar feature or an XGBoost setting, which a worker can implement in
+one session. A large idea is a research project lasting days: a new estimator of the effective
+capacity of metered generators, a detector of switching events, a full differentiable-physics
+forecaster, or a method for disaggregating unmetered generation. A large idea usually adds a new
+upstream data product or a new forecaster, so a search over many quick variants does not suit the
+large idea. Tier 3 and Tier 4 entries go to whichever mode fits each entry. In the long-session
+mode, the worker trains and scores freely on the training window during development. The review, the
+leakage test, and the honest scorer apply to the implementation the session submits.</p>
+<p><strong>A large idea is built in small steps, each validated before the next, and the review of a large
+idea's plan asks for the smallest test of the idea first.</strong> Building a complex pipeline in one
+session is risky, because a failure at the end says little about which step was wrong. Before a
+worker builds a large idea, the research lead launches a fresh reviewer to read the worker's plan.
+The reviewer asks the question John Jumper put to the AlphaFold team when someone proposed an idea
+that would take two months to test: "What's the two day version of testing the same idea?" (<a href="https://www.nobelprize.org/prizes/chemistry/2024/jumper/1925168-interview-transcript/">Jumper,
+2024</a>). The
+worker then builds the idea step by step, validates each step, and runs the smallest test that shows
+whether the idea is worth continuing before building the rest.</p>
+<p><strong>Both modes build nodes, and share the protections, the review, and the record described below.</strong> A
+node is one implementation of an idea: a commit in the research repository, built on its parent
+node's commit.</p>
+<h3 id="workers-change-the-pipeline-the-output-is-fixed">Workers change the pipeline; the output is fixed</h3>
+<p><strong>A worker may change any part of the pipeline except a short list of protected paths, and every
+worker must end with the same output.</strong> That output is a parquet file of <code>PowerForecast</code> rows for
+the fold. The planned submit command will score the file the worker hands over by running
+<code>scripts/forecasting/score_study.py</code> from the <code>main</code> checkout as the maintainer's Unix user. An
+extension point narrower than the whole pipeline could not express the large ideas above. Each
+implementation must also run end to end from the raw power, weather, and time-series metadata
+tables, so that the leakage test below can re-run the implementation on perturbed copies of those
+tables.</p>
+<h3 id="an-llm-research-lead-decides-what-to-try-next">An LLM research lead decides what to try next</h3>
+<p><strong>An LLM research lead prioritises the ideas, screens them broadly and shallowly, and then goes
+deeper on the promising ones, in repeated rounds.</strong> The research lead works in four steps, and steps
+2 and 3 repeat as rounds:</p>
+<ol>
+<li>Prioritise the ideas, starting from the order in which <a href="../xgboost-improvements/">XGBoost
+   improvements</a> lists the ideas.</li>
+<li>Implement each chosen idea once, and score the implementation.</li>
+<li>Read the scores and the hypothesis store, then choose which ideas or combinations to explore
+   further, and which ideas get a second or third implementation.</li>
+<li>Repeat from step 2 on the chosen subset.</li>
+</ol>
+<p>The four steps are the maintainer's current best guess at how to sequence the search. ERA's
+upper-confidence-bound rule is one tool the research lead can use to choose which node to extend.
+The same rule is also a baseline against which to measure the research lead's choices.</p>
+<h3 id="the-research-lead-the-submit-command-and-the-review">The research lead, the submit command, and the review</h3>
+<p><strong>The design splits into an agent loop, which reuses Claude Code, and a small trusted submit
+command, which no agent can touch.</strong> The agent loop is the research lead choosing ideas, launching
+workers, and reading results. The agent loop is a standard harness, so the design does not build an
+agent loop. The research lead is itself a Claude Code session, run interactively or through the
+<a href="https://code.claude.com/docs/en/agent-sdk">Claude Agent SDK</a>, which packages Claude Code as a
+Python library. For each node the research lead chooses, the research lead launches a worker in the
+worker's own git worktree to implement one idea on top of the parent node's code. <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/1036">Issue #1036 (Set
+up the auto-research research lead session and review
+step)</a> tracks the
+research-lead session.</p>
+<p><strong>The trusted submit command runs as the maintainer's Unix user in a process no agent can reach, and
+is the only process that trains and runs inference for a scored node.</strong> The research lead submits a
+node by calling one narrow command, such as <code>submit_node &lt;commit&gt;</code>, through a <code>sudo</code> rule, the same
+pattern <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/958">issue #958 (Protect the leaderboard scorer for autonomous
+research)</a> uses for
+<code>scripts/forecasting/score_study.py</code>. The submit command is plain Python in this repository, tested
+with the rest of the code. The submit command does every step the agents must not control: launching
+the review, building the scored checkout, training the node and running inference, running the
+leakage test, handing the predictions to the scorer, logging to MLflow, preserving each scored
+commit, and opening the hypothesis-store pull request. <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/1037">Issue #1037 (Build the trusted submit
+command for auto-research)</a>
+tracks the submit command.</p>
+<p><strong>No agent trains or predicts for a scored run, and the worker's code never runs as the maintainer's
+user.</strong> The submit command executes the worker's code as a subprocess running as the restricted
+research user, because the worker's code is untrusted. A worker may still train and score freely on
+the training window while developing an idea, but those runs never reach the leaderboard. Workers
+never report their own scores. Every node is logged as an MLflow run under a <code>study/</code>-prefixed
+experiment name, so the search is visible on the leaderboard but outside every promotion path. The
+<code>score_study.py</code> script uses the same prefix for every autonomous study. Only the maintainer's user
+can write to the MLflow tracking store. The research user reads the store through the leaderboard
+query.</p>
+<p><strong>The trusted checks do not live in a Claude Code mod.</strong> A mod is a JavaScript or TypeScript plugin
+that runs inside a Claude Code session's process, with the session's permissions. A mod holding the
+trusted checks would sit inside the trust boundary the checks exist to guard, because the research
+lead's session could edit the mod's source or tamper with the mod's state. A mod could still draw a
+live pane of the search tree, with each node's score and review verdict, for a person watching an
+interactive research-lead session. That pane is optional and can wait until the search runs.</p>
+<p><strong>A fresh reviewer agent reads every implementation before the implementation trains a forecasting
+model.</strong> The submit command, not the research lead, launches the reviewer, so no agent can skip the
+review. The reviewer is given the written idea and the worker's diff, but not the worker's
+reasoning, so the worker's rationale cannot anchor the review. The reviewer checks four properties:
+that the diff implements the idea the worker was given, against the <a href="#coding-agents-change-experiments-without-saying-so">silent changes Si et al.
+found</a>; that no feature uses data from after
+the forecast was made; that the pipeline does not refit on power observed inside the validation
+window; and that the code has no plain bug. The reviewer's findings go back to the worker for a
+capped number of rounds. An implementation the reviewer still rejects after the last round is
+recorded in the hypothesis store as failed review, and is not trained. Issue #1036 also tracks the
+review step.</p>
+<p><strong>A review does not guarantee a correct implementation, but makes it less likely that a good idea is
+discarded because one implementation was broken.</strong> A broken implementation is one source of the
+variance between implementations that <a href="#one-implementation-is-weak-evidence-about-an-idea">Ning et
+al.</a> measured. The diff itself can try to
+persuade the reviewer, through code comments or docstrings, so the score depends on the leakage test
+and the row-set refusal, not on the review.</p>
+<h3 id="protecting-the-evaluation-code">Protecting the evaluation code</h3>
+<p><strong>The submit command builds the scored run's checkout itself, so a worker's edits to its own copy of
+a protected file change nothing in the scored run.</strong> The submit command checks out the node's
+commit, restores every protected path from the commit of <code>main</code> the session started from, removing
+any file the node added under a protected path, and places the checkout in a directory the worker's
+Unix user cannot write. The setup step records that commit's hash in a file only the maintainer's
+user can write, and checks that the commit is on this repository's <code>main</code>. The restore and the
+protected-path check both use the recorded hash, never a branch in the research repository, which
+every agent can push to. <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/1035">Issue #1035 (Build the scored checkout and leakage test for
+auto-research)</a> tracks the
+scored checkout and the leakage test. The protected paths are:</p>
+<ul>
+<li><code>conf/cv/</code>, which defines the cross-validation folds;</li>
+<li><code>power_schemas.py</code> and <code>config_schemas.py</code> under <code>packages/contracts/src/contracts/</code>, which define
+  the schemas of the raw power data, the time-series metadata, the forecast output, and the
+  cross-validation folds;</li>
+<li><code>metrics.py</code> under <code>packages/ml_core/src/ml_core/</code>, which computes the scores;</li>
+<li><code>cv_helpers.py</code> under the same directory, which turns fold dates into training and validation
+  windows and computes which series are eligible;</li>
+<li><code>features/_lags.py</code> under the same directory, which builds the lag features and holds the function
+  that nulls any power lag the forecast could not have known at its initialisation time.</li>
+</ul>
+<p>The rest of <code>packages/contracts/</code> stays open, so that a worker can add a field to <code>AllFeatures</code> for
+a new feature, or a schema for a new data product, in the way the codebase expects. The scorer
+validates the forecast against the copy of every schema on <code>main</code>. The submit command also rejects,
+and logs, any diff that touches a protected path, measured against the recorded commit, so that an
+implementation is never scored on evaluation code its author did not expect.</p>
+<p><strong>The restored files guarantee only that the protected code is present, not that the worker's code
+calls the protected code.</strong> A worker may stop calling <code>cv_helpers.py</code> and write its own eligibility
+filter, write a new lag module that nulls nothing, or point the workspace in <code>pyproject.toml</code> at a
+modified copy of <code>ml_core</code>. The worker's code also runs in the same Python process as the protected
+code, so the worker's code could replace the lag-nullification function in memory. Two checks cover
+behaviour instead. The <code>metrics</code> asset's row-key refusal stops a worker dropping hard rows or hard
+series from the forecast. The asset refuses a study whose row keys differ from the reference
+experiment's (see <a href="../../ml_experimentation/cross-validation-folds/#what-the-metrics-asset-refuses-to-score">What the <code>metrics</code> asset refuses to
+score</a>).
+The leakage test stops lookahead.</p>
+<p><strong>The submit command, not the worker's code, truncates the training data at the fold's <code>train_end</code>,
+and the leakage test re-runs the pipeline on perturbed data.</strong> The leakage test samples cut-off
+times at random after <code>train_end</code>, and never discloses the cut-offs to any agent. For each cut-off,
+the test perturbs every power observation, every weather-forecast run published, and every
+time-stamped metadata row after the cut-off. The test re-runs the worker's whole pipeline from the
+perturbed raw tables, including any upstream data product the worker added, and rejects the node if
+any forecast initialised at or before the cut-off changes by more than a declared tolerance. The
+tolerance allows for training that is not bit-for-bit deterministic. The test also checks that the
+pipeline's unperturbed output equals the rows handed to the scorer, so the tested code and the
+scored code are the same code. Each node therefore takes one scored run plus one run per sampled
+cut-off, so the number of cut-offs trades the test's power against the time each node takes.</p>
+<p><strong>Every run in the leakage test, and the scored run, starts from a clean sandbox, so the runs share
+no state.</strong> Without a clean sandbox, the unperturbed run could cache its forecasts on disk and the
+perturbed runs could read the cache back, so the forecasts would not change even though the code
+looks ahead. The submit command runs each run in a fresh sandbox with no writable directory shared
+between runs, and stops every research-user process before the next run starts. The submit command
+copies the predictions into a directory only the maintainer's user can write before the equality
+check, so no process left running can rewrite the predictions before the scorer reads them.</p>
+<p><strong>The leakage test does not stop a pipeline refitting on power observed inside the validation window
+before each initialisation time.</strong> Refitting before each forecast uses no data from the future, so
+the leakage test passes. But a forecasting model that retrains before every forecast is not scored
+the same way as a champion trained once at <code>train_end</code>. The reviewer checks for refitting, and a
+retraining cadence is an idea to declare and score openly, not to slip into an implementation.</p>
+<p><strong>A worker's prediction code needs power observed inside the validation window, and issue #958 plans
+to bar the research sessions' Unix user from reading that window.</strong> Forecasting a validation row
+needs power observed before that row's initialisation time, and those observations lie inside the
+validation window. Two options remain open. A harness running as the maintainer's user could stage,
+for each initialisation time, only the power observed before that time, and run the worker's code as
+the research user against the staged copy. Or the design could accept that a session sees in-window
+power, and rely on a separate certifying window and on live monitoring to catch any gaming. The
+choice between the two options belongs in issue #958.</p>
+<p><strong>A guard inside the worker's Claude Code session adds no protection beyond the submit command's
+checks.</strong> A worker can bypass a deny rule in <code>.claude/settings.json</code> with a shell command, and can
+edit the <code>.claude/settings.json</code> in its own worktree to remove a deny rule or a <code>PreToolUse</code> hook. A
+Claude Code mod handling tool-call events would add JavaScript or TypeScript code that runs with the
+user's permissions. A deny rule is still worth having to save a worker from wasting a run on an edit
+the submit command would reject.</p>
+<h3 id="ranking-and-steering">Ranking and steering</h3>
+<p><strong>Ideas are ranked on the mean score across their implementations, and an idea is implemented a
+second and third time only when its score is close to a competitor's or the idea is a finalist.</strong>
+Ranking on the mean is the policy <a href="#one-implementation-is-weak-evidence-about-an-idea">Ning et al.</a>
+propose for crediting an idea rather than one implementation of the idea. Ning et al. did not test
+that policy inside a search like this one.</p>
+<p><strong>The search steers on the leaderboard's headline score, normalised mean absolute error (NMAE) (<a href="../xgboost-improvements/#how-each-win-is-evaluated">How
+each win is evaluated</a>), over forecast lead times
+of 3 to 10 days.</strong> The scorer does not yet report that band. <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/1033">Issue #1033 (Report NMAE over 3–10 day
+lead times as a leaderboard horizon
+slice)</a> adds the band. Using
+the leaderboard's own score means the search and the leaderboard cannot disagree about which
+experiment is best.</p>
+<p><strong>Whether tail skill should steer the search instead of NMAE is open.</strong> Tail skill would be scored
+by <a href="../metrics-and-leaderboard/#tail-exceedance-metrics-scoring-the-question-nged-actually-asks">threshold-weighted continuous ranked probability
+score</a>
+(CRPS).</p>
+<p><strong>The recommendation in <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/960">issue #960 (Design rolling-origin CV folds, assuming at least monthly
+retraining)</a> already
+separates steering from certifying.</strong> Steering on the headline score is the goal-oriented
+optimisation He et al. criticise, so the protection this design relies on is the separate certifying
+evaluation, not the steering signal. The recommendation in issue #960 is a "discovery lane" that
+ranks ideas cheaply by cross-validation over whole-month blocks, and a rolling-origin evaluation
+that confirms the winners. Issue #960 says the discovery lane and the rolling-origin evaluation can
+both be designed and built against the current single fold, <code>mid_2025_to_mid_2026</code>, without waiting
+for more history. Until the design in issue #960 lands, the search would steer on the same fold on
+which promotion is decided. The only protection against selection bias would then be the planned
+<a href="../metrics-and-leaderboard/#fold-hygiene-selection-bias-and-a-final-test-window">Ladder guard</a>,
+which publishes a new best only when the new best beats the standing best by a declared margin. The
+scale of search this page proposes is a reason to build the design in issue #960 before the search
+runs.</p>
+<h3 id="recording-what-was-learned">Recording what was learned</h3>
+<p><strong>Every implementation is kept as a branch in a separate research repository, which starts as a
+private mirror of this repository.</strong> Before each session, the submit command's setup step copies the
+latest <code>main</code> into the research repository, so every session starts from the current reviewed code
+and the champion's configuration. Each node is a branch created from its parent node's commit, so a
+child node inherits every change its parent made. A worker pushes node branches to the research
+repository only. The submit command also pushes each scored commit to a branch under <code>scored/</code>,
+which a branch ruleset stops any agent's token from force-pushing or deleting, so the code behind
+every score survives. The node's MLflow run records the commit hash, so every score links to the
+exact code behind the score. Old branches stay pinned to the commit they started from and are never
+updated after a refactor, which is the rule <code>studies/</code> already follows. <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/1034">Issue #1034 (Set up the
+auto-research repository and hypothesis
+store)</a> tracks the research
+repository and the hypothesis store.</p>
+<p><strong>A separate repository keeps the workers' credentials away from this repository without per-branch
+rules on this repository.</strong> Workers, reviewers, and the research lead hold a token for the research
+repository only. The submit command runs as the maintainer's user and is the only automated process
+holding a token for this repository. A separate repository also keeps hundreds of node branches out
+of the branch list people work from.</p>
+<p><strong>A structured hypothesis store records what each idea taught the project, in a form a person can
+read.</strong> The store holds one Markdown file per idea under <code>studies/auto_research/</code> on <code>main</code>, with
+the same fields in every file:</p>
+<ul>
+<li>the hypothesis;</li>
+<li>each implementation, with its commit in the research repository and its MLflow run;</li>
+<li>each implementation's score, and the spread between implementations;</li>
+<li>the reviewer's verdict on each implementation;</li>
+<li>the idea's status: worth deepening, or abandoned;</li>
+<li>the reason for abandoning the idea, where the idea was abandoned.</li>
+</ul>
+<p>Within a session, the submit command writes each implementation's commit, MLflow run, score, and
+review verdict into the store, and the research lead writes the hypothesis, the status, and the
+reason for abandoning an idea. The submit command and the research lead both write to the session's
+branch in the research repository. At the end of the session, the submit command regenerates every
+implementation entry, score, and review verdict from MLflow, and opens one pull request carrying the
+updated store into this repository. The maintainer merges the pull request. A new session starts
+only after the previous session's pull request has merged, so every session reads every earlier
+finding. No worker, reviewer, or research-lead agent holds write access to <code>main</code>.</p>
+<p><strong>The store carries aggregate scores only, because a per-series score could identify a metered
+generator.</strong> A person curates the findings worth publishing into <code>docs/</code>, the way studies are
+written up today.</p>
+<p><strong>A winning idea reaches production as a reviewed re-implementation, never as merged agent code.</strong>
+The person writing the pull request adds the research repository as a git remote, reads the winning
+node's diff against the commit the session started from, writes the idea up as a specification, and
+re-implements the idea in a reviewed pull request, as <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/958">issue #958 (Protect the leaderboard scorer
+for autonomous research)</a>
+requires of every autonomous study.</p>
+<h3 id="what-stops-the-research-lead-cheating">What stops the research lead cheating</h3>
+<p><strong>The research lead never computes, reports, or writes a score, and never touches the evaluation
+code or <code>main</code>, so every route to a better-looking result runs into a check the research lead does
+not control.</strong> The research lead runs as the same restricted research user as the workers, and holds
+a token for the research repository only. Each route meets at least one check:</p>
+<ul>
+<li><strong>Reporting a score the implementation did not earn.</strong> No agent computes or reports a score: the
+  submit command trains the implementation, the scorer computes the score, and MLflow records the
+  score. Only the maintainer's user can write to MLflow. When the submit command opens the session's
+  hypothesis-store pull request, the submit command regenerates every implementation entry, score,
+  and review verdict from MLflow, so an edit to those entries on the session's branch never reaches
+  <code>main</code>.</li>
+<li><strong>Skipping or steering the review.</strong> The submit command, not the research lead, launches the
+  reviewer, and the reviewer's instructions live in this repository. The research lead supplies only
+  the written idea. A worker's diff can still try to persuade the reviewer, which is why no score
+  depends on the review alone.</li>
+<li><strong>Editing the evaluation code, the submit command, or the scorer.</strong> The submit command and the
+  scorer run from this repository as the maintainer's user. The scored checkout restores every
+  protected path, and the submit command rejects a diff that touches a protected path.</li>
+<li><strong>Training on the validation window, or looking ahead in time.</strong> The submit command truncates the
+  training data at the fold's training end. The leakage test, run in clean sandboxes at undisclosed
+  cut-offs, rejects an implementation whose forecasts change when data from after the forecast's
+  initialisation time is perturbed. The reviewer checks for refitting inside the validation window,
+  which the leakage test cannot see.</li>
+<li><strong>Dropping hard rows or hard series.</strong> The scorer's row-set refusal rejects a forecast whose row
+  keys <code>(time_series_id, power_fcst_init_time, valid_time, ensemble_member)</code> differ from the
+  reference experiment's for the fold.</li>
+<li><strong>Hiding failed attempts.</strong> The submit command records every submission, including rejected
+  submissions, in MLflow and in the hypothesis store, so the record of every submission does not
+  depend on the research lead. Which implementations are submitted at all does depend on the
+  research lead.</li>
+<li><strong>Promoting a winner straight into production.</strong> No agent can write to <code>main</code>, and a winning idea
+  reaches production only as a reviewed re-implementation.</li>
+</ul>
+<p><strong>Three risks remain, and none of the three is cheating in the sense the checks above catch.</strong> A
+search that tries hundreds of ideas on one fold will overfit that fold however honestly the search
+runs. The defence is the separate certifying evaluation in <a href="#ranking-and-steering">Ranking and
+steering</a>. A research session sees power observed inside the validation
+window, so the research lead could steer workers towards ideas that suit what the research lead has
+seen. The certifying window and live monitoring are meant to catch that steering. And the LLM may
+know what happened during the evaluation period from its own training data, an open question raised
+<a href="#open-questions">below</a>.</p>
+<h2 id="open-questions">Open questions</h2>
+<p><strong>None of the papers this page reviews tests how well an LLM research lead chooses what to try
+next.</strong> ERA's upper-confidence-bound rule selects which node to extend, and Co-Scientist's
+tournament ranks hypotheses that already exist. He et al. propose an intermediate signal of progress
+that guides the choice of the next experiment, but test the proposal only in a simulated physics
+environment. Internal discussion has raised the idea that this choice is the crucial component of an
+autonomous research loop. The idea comes from self-driving-lab practice in materials science, not
+from a paper this project has reviewed directly, and is worth checking against the self-driving-lab
+literature before the design relies on the idea.</p>
+<p><strong>An exhaustive search over the small ideas would make the research lead's choice matter less.</strong>
+Most entries on the <a href="../xgboost-improvements/">XGBoost improvements</a> page are quick to implement and
+quick to run, so the maintainer leans towards screening every entry rather than letting the research
+lead choose which entries to try. The research lead's choices would then matter for the order of
+work, for which combinations to try, for which ideas get a second or third implementation, and for
+the large ideas. A worker writing the implementation of one node while the previous node trains
+would shorten the search. That overlap is future work.</p>
+<p><strong>The LLM may already know what happened during the evaluation period.</strong> An LLM trained on text
+written after the start of a validation window may know about events inside the window, such as a
+heatwave or a change in electricity prices, and propose ideas that exploit that knowledge. The
+<code>mid_2025_to_mid_2026</code> fold overlaps the training data of current LLMs. It is not yet settled
+whether the overlap matters for ideas about feature engineering, and whether the certifying window
+should postdate the LLM's training data.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

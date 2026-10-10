@@ -1,0 +1,4791 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../battery-pv-separation/">
+      
+      
+        <link rel="next" href="../embedded-battery-forecast/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>How well can a primary substation's half-hourly flow reveal an unmetered battery? - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#simulated-unmetered-batteries-above-10-to-20-of-peak-flow-are-found-real-ones-mostly-not" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              How well can a primary substation's half-hourly flow reveal an unmetered battery?
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/weather-products-survey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products surveyed for the weather-product studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/manual-heuristic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The manual heuristic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/gb-battery-scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How GB batteries schedule themselves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/gb-price-data-and-ancillary-markets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GB electricity prices, free and when each is known
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ensemble-archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The ensemble weather archive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solar-bmu-census/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How many Balancing Mechanism Units in Great Britain are solar?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solar-bmu-disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../battery-pv-separation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can a primary substation's half-hourly flow reveal an unmetered battery?
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can a primary substation's half-hourly flow reveal an unmetered battery?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data and methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-five-tests-from-simulated-to-real-batteries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The five tests, from simulated to real batteries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-estimator-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the estimator works
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-data-looks-like" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the data looks like
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-positive-control-passes-its-pre-set-rule-but-its-intervals-are-too-narrow-on-calendar-replicas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The positive control passes its pre-set rule, but its intervals are too narrow on calendar replicas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#with-no-battery-added-3-of-36-blocks-are-flagged-all-for-one-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With no battery added, 3 of 36 blocks are flagged, all for one series
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#for-a-battery-following-the-estimators-own-rule-the-90-power-interval-holds-the-true-power-from-a-5-share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For a battery following the estimator's own rule, the 90% power interval holds the true power from a 5% share
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batteries-following-other-dispatch-rules-are-found-less-often-and-sized-wrongly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batteries following other dispatch rules are found less often and sized wrongly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-simulated-domestic-fleet-is-found-only-through-its-homes-on-the-agile-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A simulated domestic fleet is found only through its homes on the Agile tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#real-public-batteries-added-to-nged-flows-are-mostly-not-detected-or-sized" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real public batteries added to NGED flows are mostly not detected or sized
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged-battery-a-is-not-detected-inside-its-bulk-supply-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NGED battery A is not detected inside its bulk supply point
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-screen-of-the-eight-primaries-cannot-find-a-battery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The screen of the eight primaries cannot find a battery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-grid-estimators-intervals-are-too-narrow-and-the-differentiable-estimators-are-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The grid estimator's intervals are too narrow, and the differentiable estimator's are not
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-wider-prior-gives-the-same-verdicts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A wider prior gives the same verdicts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../embedded-battery-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indgen-inddem-and-gsp-take/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_9" id="__nav_8_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/reanalysis-wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CERRA and NORA3 describe past wind better than ERA5?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/cerra-wind-levels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending CERRA's wind heights beat one height?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/cerra-wind-direction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CERRA's wind direction add to its wind speed?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/era5-solar-variables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which ERA5 variables help predict solar farm output?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/ukv-ceda-vs-era5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CEDA's UKV or ERA5 describe past wind and temperature better?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/ukv-ceda-vs-openmeteo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_10" id="__nav_8_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/ens-horizons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/matched-lead-extra-products/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extra weather products in the day-ahead lead comparison: how they are read, and their results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/blends-with-ens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which single weather forecast should be added to ECMWF's ensemble mean first?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/ukv-ceda-blends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does adding UKV from CEDA to ECMWF's ensemble mean lower the error at lead days 1 to 4?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/ensemble-means/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an ML experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/backup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backing up the workstation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-cleaning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning the trial-area telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/auto-research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments run by an LLM agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending the training history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data and methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-five-tests-from-simulated-to-real-batteries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The five tests, from simulated to real batteries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-estimator-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the estimator works
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-data-looks-like" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the data looks like
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-positive-control-passes-its-pre-set-rule-but-its-intervals-are-too-narrow-on-calendar-replicas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The positive control passes its pre-set rule, but its intervals are too narrow on calendar replicas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#with-no-battery-added-3-of-36-blocks-are-flagged-all-for-one-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With no battery added, 3 of 36 blocks are flagged, all for one series
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#for-a-battery-following-the-estimators-own-rule-the-90-power-interval-holds-the-true-power-from-a-5-share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For a battery following the estimator's own rule, the 90% power interval holds the true power from a 5% share
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batteries-following-other-dispatch-rules-are-found-less-often-and-sized-wrongly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batteries following other dispatch rules are found less often and sized wrongly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-simulated-domestic-fleet-is-found-only-through-its-homes-on-the-agile-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A simulated domestic fleet is found only through its homes on the Agile tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#real-public-batteries-added-to-nged-flows-are-mostly-not-detected-or-sized" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real public batteries added to NGED flows are mostly not detected or sized
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged-battery-a-is-not-detected-inside-its-bulk-supply-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NGED battery A is not detected inside its bulk supply point
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-screen-of-the-eight-primaries-cannot-find-a-battery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The screen of the eight primaries cannot find a battery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-grid-estimators-intervals-are-too-narrow-and-the-differentiable-estimators-are-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The grid estimator's intervals are too narrow, and the differentiable estimator's are not
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-wider-prior-gives-the-same-verdicts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A wider prior gives the same verdicts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="simulated-unmetered-batteries-above-10-to-20-of-peak-flow-are-found-real-ones-mostly-not">Simulated unmetered batteries above 10% to 20% of peak flow are found; real ones mostly not</h1>
+<p><strong>Bottom line: estimating the size of an unmetered battery from substation data mostly fails
+today.</strong> Better models of demand and generation should help detection. They would not fix sizing
+unless the real battery's behaviour is also modelled. We have not tested this.</p>
+<p><strong>This study asks whether the half-hourly electricity flow of a primary substation can reveal the
+power in megawatts (MW) and the energy capacity in megawatt-hours (MWh) of a battery that nobody
+meters.</strong> National Grid Electricity Distribution (NGED) needs that answer for the storage behind its
+substations. An estimator assumes that a battery follows a daily schedule set by public signals (the
+day-ahead electricity price, a half-hourly retail price, or the fixed windows of home-battery
+tariffs): it charges at the cheap times and discharges at the dear ones. The estimator tries many
+battery sizes, keeps the sizes whose schedule makes the flow match the measured flow, and reports a
+probability distribution (the <em>posterior</em>) for the battery's power and energy. The page tests the
+estimator on simulated batteries with a known answer, and then on real batteries. All numbers in the
+Summary are provisional until the remaining reviews finish.</p>
+<p><strong>The Summary uses these terms.</strong></p>
+<ul>
+<li><strong>Primary, bulk supply point, and grid supply point.</strong> A <em>primary</em> is a substation that steps
+  voltage down for local distribution. A <em>bulk supply point</em> and a <em>grid supply point</em> are larger
+  substations above the primaries. The study labels the series S1 to S8, BSP1, BSP2, and GSP1. Rungs
+  1 to 4 use 9 series (7 primaries, S4 excluded, BSP2, and GSP1), and the screen of the primaries
+  uses all 8 primaries, S4 included. The labels are the study's own, not NGED's names.</li>
+<li><strong>Flow series and sum.</strong> A <em>flow series</em> is one substation's half-hourly flow. A <em>sum</em> is one
+  battery (simulated or real) added to one flow series in one 3-month block, which the estimator
+  then fits.</li>
+<li><strong>Peak flow and share.</strong> <em>Peak flow</em> is a series' 99th-percentile flow, the flow exceeded in 1% of
+  half-hours. A battery's <em>share</em> is its power as a percentage of the peak flow.</li>
+<li>
+<p><strong>Detection score and flagged.</strong> The <em>detection score</em> is a log Bayes factor: the log of how many
+  times better the flow fits with a battery than without one, after a penalty for the battery's
+  extra fitted quantities (power, usable energy, and efficiency). A block is <em>flagged</em> when its
+  detection score is higher than in 95% of the blocks of the other series that have no battery.
+  The penalty makes a block with no battery score below zero, because the fit with a battery then
+  gains little and pays the penalty. A score counts as big when it beats the threshold, which is the
+  95th percentile of the scores of no-battery blocks (-2.5 to -3.6). Flagged therefore means "scores
+  higher than almost all batteryless blocks" and not "has positive evidence of a battery".</p>
+</li>
+<li>
+<p><strong>Can a simulated battery of known dispatch be found, and from what size? Yes if it follows the
+  rule the estimator assumes, from a 10% share (58% of sums flagged) to a 20% share (94%)
+  (provisional).</strong></p>
+<ul>
+<li><strong>What was tested.</strong> A <em>merchant battery</em> charges when the day-ahead price is low and
+  discharges when it is high. The study added 756 simulated merchant batteries to 9 NGED flow
+  series (7 primaries, 1 bulk supply point, and 1 grid supply point), each in four 3-month
+  blocks. <em>In-family</em> means the battery follows exactly the dispatch rule that the estimator
+  assumes.</li>
+<li><strong>The result (provisional).</strong> In-family batteries were flagged in 18% of sums at a 5% share,
+  58% at 10%, 94% at 20%, and 100% at 40%.</li>
+<li><strong>The baseline (provisional).</strong> The threshold targets a false-alarm rate of 5%. With no
+  battery added, 3 of 36 blocks (8.3%, 95% interval 1.8% to 22.5%) were flagged, all of them one
+  series (GSP1). Every rate above therefore includes that 8.3%, which is the false-alarm
+  baseline for all 9 series. Without GSP1 the same thresholds flagged 0 of 32 no-battery blocks.</li>
+<li><strong>Other dispatch rules are found less often (provisional).</strong> A battery that charges in each
+  day's cheapest half-hours and discharges in the dearest was flagged in 44% of sums at a 10%
+  share and 83% at 20%. A battery that follows a noisy copy of the price was flagged in 8% at
+  10% and 52% at 40%.</li>
+</ul>
+</li>
+<li><strong>Can a real battery added to NGED flows be found? Mostly no (provisional).</strong><ul>
+<li><strong>What was tested.</strong> The study took the metered output of 23 real public batteries and fleets
+  (from Elexon), scaled each to shares of 5% to 40%, and added it to the same 9 series: 3,312
+  sums. The 23 are 8 single batteries and 15 fleets of 2, 4, or 8 batteries.</li>
+<li><strong>The result (provisional).</strong> Without GSP1 (whose false alarms would inflate the rates), 0 of
+  736 sums were flagged at shares of 5% and 10%, 1 of 736 at 20%, and 50 of 736 (6.8%, 95%
+  interval 5.1% to 8.9%) at 40%. The baseline without GSP1 is 0 of 32 no-battery blocks, so no
+  baseline needs subtracting, and 6.8% at 40% is above that baseline. It counts as a weak
+  detection at the largest share, and not as a size or as proof, because the target false-alarm
+  rate is 5% and the measured rate with GSP1 is 8.3%.</li>
+<li><strong>One real battery in a real flow (provisional).</strong> NGED battery A, a battery that NGED meters,
+  was put back into the flow of the bulk supply point it connects to, at up to 11 times its
+  metered output (as metered it is 3.2% of that flow's peak flow, and at 11 times 35.5%): 0 of
+  20 blocks were flagged.</li>
+<li><strong>Demand the estimator cannot explain hides batteries (provisional).</strong> A <em>calendar replica</em> is
+  a series rebuilt as the mean of its own month, half-hour of the day, and day type, so it keeps
+  the daily and seasonal shape and almost none of the random noise. On replicas of all 9
+  series, the real public batteries were flagged in 71% of sums at a 10% share and 84% at 40%,
+  against a threshold built from the replicas' own no-battery blocks. On the real flows
+  (without GSP1) the same batteries were flagged in 0% and 6.8%.</li>
+<li><strong>Two limits on that point (provisional).</strong> A replica has an artificially perfect demand
+  model, so 71% and 84% are an upper bound and not a forecast of what a realistic demand model
+  would give. The study did not test a realistic demand model. Better demand modelling alone
+  would not fix sizing either: on the replicas the power is still sized at about 6% of the
+  registered power, because real dispatch differs from the assumed schedule.</li>
+</ul>
+</li>
+<li><strong>Can a battery's MW and MWh be estimated, and how reliable are the intervals? Not for real
+  batteries (provisional).</strong><ul>
+<li><strong>What was tested.</strong> The 90% interval for power from every sum above. <em>Interval coverage</em> is
+  the share of intervals that hold the true value: a 90% interval should hold the true value 90%
+  of the time. Holding it more often means the interval is too wide, and less often means it is
+  too narrow.</li>
+<li><strong>In-family batteries (provisional).</strong> The 90% power interval held the true power in 100% of
+  sums at shares of 5% to 20% and 99% at 40%. Pooled over simulated merchant batteries and
+  simulated home-battery fleets, which enter here and whose intervals mostly miss (0% to 36% of
+  sums), it held the true power in 68.9% of sums, short of the 80% that planned contrast C2
+  required in the study plan. Merchant batteries alone held it in 90% of sums over all seven
+  shares, and in 99% to 100% at shares of 5% to 40%.</li>
+<li><strong>Other dispatch rules (provisional).</strong> At 10%, 20%, and 40% shares the 90% power interval
+  held the truth in 90%, 60%, and 26% of sums for the cheapest-and-dearest rule, and in 65%,
+  33%, and 6% for the noisy price. The median absolute power error was about 30% for the
+  cheapest-and-dearest rule and 61% to 76% for the noisy price.</li>
+<li><strong>Real batteries (provisional).</strong> At a 40% share the 90% power interval held the truth in 6%
+  of sums. The power estimate rose from 2.6% of peak flow with no battery to 4.1% with a 40%
+  battery.</li>
+<li><strong>Small batteries (provisional).</strong> The estimator reports about 2.6% of peak flow with no
+  battery at all, a bias. Below a 2% share the estimate is 2.8% to 3.2%, no different from the
+  estimate with no battery. A small reported MW is therefore the bias, not a battery.</li>
+</ul>
+</li>
+<li><strong>Can the screen of the eight primaries say any primary holds a battery? No (provisional).</strong><ul>
+<li><strong>What was tested.</strong> The screen tests whether the real tariff-and-price <em>templates</em> (the
+  schedules a battery would follow) fit a primary better than 12 control copies of the same
+  templates with the tariff windows moved by 1 to 3 hours or the prices taken from another
+  week. A copy with the wrong times should fit no better if no battery follows the real times.</li>
+<li><strong>The result (provisional).</strong> The real templates ranked first for none of the eight primaries.
+  The screen cannot tell a battery from none. A <em>lane</em> is one series with its four blocks added
+  together. A lane with a simulated battery ranked the real templates first in 1 of 54 lanes
+  (1.9%). A <em>template</em> is the schedule the battery is assumed to follow, and a <em>control copy</em> is
+  that schedule moved to the wrong times. With 13 sets in all (the real one and 12 copies), a
+  screen with no information would rank the real set first in 1 of 13 lanes (7.7%).</li>
+<li><strong>A price-only version (provisional).</strong> Restricted to price-shifted copies, a screen added
+  after the study's first scientific review ranked the real templates first in 53 of 54
+  simulated lanes, 30 of 36 real-battery lanes at a 40% share, and 0 of 9 lanes with no battery
+  (95% interval 0% to 34%). By the price-only screen, no primary ranks first. That means the
+  screen found no sign of a battery, which is not the same as showing that no primary holds one.</li>
+</ul>
+</li>
+<li><strong>Does fitting the battery by gradient descent on a graphics card beat a grid search over battery
+  sizes? Its intervals hold the truth far more often, but its medians are no more accurate
+  (provisional).</strong><ul>
+<li><strong>What was tested.</strong> The study has two estimators. The <em>differentiable estimator</em> adjusts a
+  battery's power, usable duration, and efficiency continuously by gradient descent on a
+  graphics processing unit (GPU). The <em>grid search</em> tries a fixed grid of durations and
+  efficiencies. Both fitted the same 756 in-family sums.</li>
+<li><strong>Coverage (provisional).</strong> At a 40% share the 90% power interval held the truth in 99% of
+  sums for the differentiable estimator and 11% for the grid search.</li>
+<li><strong>Accuracy (provisional).</strong> The differentiable estimator's absolute relative power error was
+  0.04 higher on average than the grid search's (95% interval -0.03 to +0.14), where 0.04 means
+  4% of the true power, so its medians are no more accurate.</li>
+</ul>
+</li>
+<li><strong>What the methods can and cannot support.</strong> The methods support saying that a battery that
+  follows the assumed rule is detectable from a share of 10% of peak flow (58% of sums flagged), and
+  that for such a battery at shares of 5% to 40% the 90% power interval holds the true power
+  slightly more often than 90%. They do not support sizing a real battery, or saying that a primary
+  holds no battery: the study covers 9 series from one year, the thresholds rest on 36 no-battery
+  blocks, and one series (GSP1) false-alarms in every comparison.</li>
+</ul>
+<p><img alt="Figure 1: Simulated batteries are found above a size; real public batteries mostly are
+not" src="../assets/unmetered_battery_capacity_headline.svg" /></p>
+<ul>
+<li><strong>What to use this for: reading a detection.</strong> A detection of a battery in a primary's flow means
+  that a battery or a load follows the day-ahead price, and does not give a size. It was reliable
+  only for simulated batteries at a share of 10% to 20% of peak flow or more, and most reliably when
+  the battery's dispatch resembles the dispatch the estimator assumes (provisional).</li>
+<li><strong>What to use this for: planning.</strong> For a real battery, planning should rely on connection records
+  and metering. NGED's Embedded Capacity Register omits storage below 50 kilowatts (kW) and gives no
+  MWh, so planning should treat unregistered batteries as uncertainty near the evening peak and at
+  the edges of the tariff windows. A longer record, a battery-free reference series, or a known
+  battery inside a primary would change this advice.</li>
+<li><strong>What to use this for: demand modelling.</strong> Demand that the estimator cannot explain hides real
+  batteries: on calendar replicas 71% and 84% of real-battery sums were flagged at 10% and 40%
+  shares, against 0% and 6.8% on real flows (provisional). A better demand model is worth trying for
+  detection, but the 71% and 84% are an upper bound from a perfect demand model, the study did not
+  test a realistic one, and sizing would still be off (about 6% of registered power).</li>
+<li><strong>What to use this for: intervals.</strong> No MW or MWh interval for a real battery should be published
+  from this estimator: the 90% power interval held the truth in 26% of sums for the
+  cheapest-and-dearest rule at a 40% share, and in 6% for real public batteries (provisional).</li>
+</ul>
+<blockquote>
+<p><strong>How this page was made.</strong> The research question came from a human. Everything else — the code
+behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
+AI model (for this page, Claude Sonnet 5.5). Two independent Claude reviewers have checked the
+design and the results adversarially, and a third has reviewed the code; the prose and persona
+reviews are still to come, as the <a href="#limitations">Limitations</a> say.</p>
+</blockquote>
+<h2 id="key-findings">Key findings</h2>
+<ul>
+<li><strong>The positive control passes its pre-set rule, but its intervals are too narrow on calendar
+  replicas</strong> (<a href="#the-positive-control-passes-its-pre-set-rule-but-its-intervals-are-too-narrow-on-calendar-replicas">Figure
+  10</a>).</li>
+<li><strong>The posterior beats a model-free step statistic for power and for energy, for in-family
+  batteries only</strong> (<a href="#for-a-battery-following-the-estimators-own-rule-the-90-power-interval-holds-the-true-power-from-a-5-share">Figure
+  12</a>).</li>
+<li><strong>A simulated domestic fleet is found only through its homes on the Agile tariff</strong> (<a href="#a-simulated-domestic-fleet-is-found-only-through-its-homes-on-the-agile-tariff">Figure
+  14</a>).</li>
+<li><strong>Planned contrast C5 passes, but the pass is no evidence that a fleet is identified as its
+  coincident peak</strong> (<a href="#real-public-batteries-added-to-nged-flows-are-mostly-not-detected-or-sized">Figure
+  15</a>).</li>
+<li><strong>The estimator reports about 2.6% of peak flow where no battery exists</strong> (<a href="#for-a-battery-following-the-estimators-own-rule-the-90-power-interval-holds-the-true-power-from-a-5-share">Figure
+  12</a>).</li>
+<li><strong>A second setting, with wider priors, gives the same verdicts</strong> (<a href="#a-wider-prior-gives-the-same-verdicts">the second
+  setting</a>).</li>
+</ul>
+<h2 id="introduction">Introduction</h2>
+<p><strong>NGED needs to know how much storage sits behind its primaries, and no meter reports that storage
+for homes and small businesses.</strong> NGED's Embedded Capacity Register lists storage of 50 kW and above
+with no energy capacity in MWh, and is silent below 50 kW. The <a href="../battery-pv-separation/">battery and solar
+study</a> showed why the half-hourly flow is hard to use: a battery schedule
+that is free to take any shape absorbs demand noise as readily as a real battery's swings, so its
+residual falls by the same amount for real output and for calendar replicas with no battery. This
+study therefore gives the battery no free shape. Each battery's schedule is simulated from a public
+signal, and only the power, usable duration, and efficiency are fitted.</p>
+<p><strong>Frequency excursions are too rare to move half-hourly means, so grid frequency is not used as a
+signal.</strong> In the Elexon data for September 2025 to August 2026 the half-hourly minimum frequency
+fell below 49.7 Hz in 6 half-hours on 4 days, after 188 faulty readings of exactly 0 Hz are dropped.
+Batteries in frequency services may also follow 4-hour availability blocks that the estimator does
+not model. The 4-hour pattern is a hypothesis, not a finding: the study did not check the pattern in
+any battery's output.</p>
+<h2 id="data-and-methods">Data and methods</h2>
+<p><strong>The study year is September 2025 to August 2026, split into four 3-month blocks.</strong> The 9
+demand-like series are 7 NGED primaries metered in MW (labelled S1 to S3 and S5 to S8), 1 bulk
+supply point (BSP2), and 1 grid supply point (GSP1). The primary S4 is a net exporter at the median,
+so S4's flow is not demand-like and rungs 1 to 4 leave S4 out. The screen of rung 5 includes S4, so
+the screen covers eight primaries. BSP1 appears only in rung 4. A primary metered in MVA is out of
+scope, because MVA (megavolt-amperes) has no sign. NGED labels its primary series "Disaggregated
+Demand", and its definition of that label is unverified. A series with embedded generation added
+back would change what the solar columns mean.</p>
+<h3 id="the-five-tests-from-simulated-to-real-batteries">The five tests, from simulated to real batteries</h3>
+<p><strong>The study is a ladder of five rungs, and each rung makes the truth harder to match with the
+estimator's assumptions.</strong> Later sections refer to the rungs by number.</p>
+<ol>
+<li><strong>Rung 1:</strong> a simulated merchant battery that follows the day-ahead price in the estimator's own
+   way (the in-family best case), added to each demand-like series at seven shares from 0.5% to 40%
+   of its 99th-percentile flow. Rung 1b uses two simulated dispatch rules from outside that family.</li>
+<li><strong>Rung 2:</strong> a simulated fleet of home batteries on the four tariffs.</li>
+<li><strong>Rung 3:</strong> 23 real public batteries and fleets, added to the series: 8 single batteries (4
+   named, and the 4 with the smallest registered power that were present in at least 95% of
+   half-hours) and 15 fleets of 2, 4, or 8 batteries (5 of each size). The five kinds of unit are
+   the named batteries, the smallest batteries, and the fleets of 2, 4, and 8.</li>
+<li><strong>Rung 4:</strong> NGED battery A inside the flow of the bulk supply point BSP1 at multiples 0, 1, 2, 4,
+   and 11 of its metered output. Multiple 0 adds the battery's metered output back to the metered
+   flow, which cancels the battery's own effect, as a matched null, and multiple 1 is the flow as
+   metered.</li>
+<li><strong>Rung 5:</strong> the eight primaries as they are.</li>
+</ol>
+<p><strong>Battery sizes are shares of a series' 99th-percentile flow, and the noise unit makes them
+comparable.</strong> The <em>residual</em> is what is left of a series' flow after the fitted baseline and solar
+are removed. The noise unit is <code>sigma_step</code>, the robust standard deviation of the half-hour changes
+of that residual with no battery, in MW: the size of a typical random half-hour jump. A battery's
+power divided by <code>sigma_step</code> says how many such jumps it is worth, which is how large it is
+against the noise of the series it sits in.</p>
+<p><strong>A planned contrast was written into the plan before any result existed, and every other number is
+exploratory.</strong> The five planned contrasts are C1 (false alarms), C2 (calibration: do intervals hold
+the truth as often as they claim), C3 (the posterior against a <em>step statistic</em>, a model-free
+estimate of power from the largest half-hour jumps in the residual), C4 (energy estimated separately
+from power), and C5 (whether the estimate for a fleet of real batteries is closer to its <em>coincident
+peak</em>, the largest summed output of the fleet in any half-hour, than to its <em>registered power</em>, the
+sum of the capacities the batteries are registered with). <strong>A cluster bootstrap puts intervals on
+the mean errors, and the Clopper-Pearson intervals on rates are too narrow.</strong> A <em>cluster bootstrap</em>
+(2,000 resamples) puts an interval on the mean errors of C3, C4, and C5 and on the grid-estimator
+difference by redrawing whole demand series and whole batteries, so that sums from one series stay
+together. A <em>Clopper-Pearson interval</em> is an exact 95% interval for a rate such as 18 flagged in
+100. Every rate and coverage carries a Clopper-Pearson interval, computed on sums. Those intervals
+treat sums as independent, but sums share series and blocks (the 108 sums at one share of rung 1 are
+3 durations on the same 36 series-blocks), so they are too narrow. These intervals do not cover the
+month-to-month weather, so a detection rate is read per block and per season. <strong>Analyses written
+after results existed are marked post hoc, and the page does not correct for multiple comparisons.</strong>
+A <em>post hoc</em> analysis was written after results on the same series existed; the sections for rung
+1b, the calendar-replica rung 3, the price-only screen, the season split, the rates without GSP1 or
+without S2 and S6, and the clean positive control's rule are post hoc, and each says so. An
+exploratory comparison with no real effect has a nominal 5% chance of being statistically
+significant at the 5% level. The number of exploratory comparisons with no real effect is unknown.
+The page does not correct for multiple comparisons.</p>
+<h3 id="how-the-estimator-works">How the estimator works</h3>
+<p><strong>The estimator describes the primary's flow as a baseline, solar, and a few batteries whose
+schedules follow public signals.</strong> Three signals schedule the batteries, and a baseline absorbs the
+rest:</p>
+<ul>
+<li><strong>A merchant battery</strong> follows the N2EX day-ahead price, through a day-by-day linear programme (an
+  optimisation of charge and discharge against the price, with a state-of-charge limit and a cap of
+  1 or 2 cycles a day).</li>
+<li><strong>A home-battery fleet</strong> follows fixed tariff windows (Intelligent Octopus Go 23:30 to 05:30,
+  Octopus Go 00:30 to 05:30, and Octopus Flux with cheap import 02:00 to 05:00 and high export 16:00
+  to 19:00) or the Octopus Agile half-hourly price for the East Midlands.</li>
+<li><strong>A commercial and industrial battery</strong> discharges across the weekday red band (16:00 to 19:00,
+  when distribution charges are highest), an assumption not checked against NGED's charging
+  statement.</li>
+<li><strong>A baseline</strong> of one daily profile per month and four solar fleet curves absorbs the demand that
+  the batteries and solar do not explain.</li>
+</ul>
+<p><strong>The estimator reports, for each class, a probability distribution for the power, the usable
+energy, and the round-trip efficiency.</strong> Figure 2 follows one simulated sum from its inputs to the
+posterior, and then repeats the last two steps for a real public battery.</p>
+<p><img alt="Figure 2: A simulated in-family battery is sized well; a real public battery's power is
+underestimated" src="../assets/unmetered_battery_capacity_worked_example.svg" /></p>
+<p><strong>The battery is differentiable, so a graphics card fits a sum in 1 to 2 seconds.</strong> The estimator
+reads each price-taking battery's schedule between precomputed linear-programme schedules (3,800 of
+them for the merchant battery, called the <em>stack</em>) and passes the schedule through a smooth
+state-of-charge recurrence. It then fits the power, duration, efficiency, and cycle-cap weight (the
+mix of a cap of 1 and a cap of 2 charge cycles a day) by gradient descent (the PyTorch optional
+<code>gpu</code> dependency group of <code>packages/studies</code>, with a fused Triton kernel for the recurrence),
+polishes the fit, and approximates the posterior around the optimum (a Laplace approximation). The
+three starts of the gradient descent agree in all but 2 of 5,868 sums with an interval. <strong>Tempering
+the likelihood by the residual's autocorrelation widens every interval.</strong> The likelihood is raised
+to the power <code>1 / tau</code>, where <code>tau</code> is the integrated autocorrelation time of the residual, roughly
+the number of consecutive half-hours that carry one half-hour's worth of information. Neighbouring
+half-hours are correlated, so the data hold less information than their count suggests, and this
+<em>tempering</em> widens every interval to match. The differentiable estimator fitted rung 1's 792 sums,
+including its 36 with no battery, in 1,554 seconds and rung 3's 3,312 sums in 7,392 seconds on one
+RTX A6000 shared with one or two other fits.</p>
+<p><img alt="Figure 3: The differentiable battery follows the price through precomputed dispatches and fits
+only a few numbers" src="../assets/unmetered_battery_capacity_dispatch.svg" /></p>
+<p><strong>A detection is a detection score above a threshold.</strong> The statistic compares the Laplace evidence
+of the statistical model with batteries against the statistical model with none. Both evidences are
+tempered by the same factor <code>1 / tau</code>, with <code>tau</code> taken from the model with batteries, so the
+statistic does not change with the unit of power. The threshold for a series is the 95th percentile
+of the other 8 series' statistics on blocks with no added battery, so no series sets its own
+threshold. The statistic is calibrated only empirically, against 36 null blocks from one year.</p>
+<p><strong>A coverage plot says whether an interval means what it says.</strong> Figure 4 shows how to read a
+coverage plot.</p>
+<p><img alt="Figure 4: A coverage plot shows whether an interval means what it
+says" src="../assets/unmetered_battery_capacity_coverage.svg" /></p>
+<p><strong>A positive control checks that the estimator can succeed where success is possible, and its pass
+rule was fixed before its run.</strong> The control adds 10 simulated merchant batteries, with
+durations and efficiencies between those of the precomputed schedules, at a 40% share to calendar
+replicas of 7 series in all 4 blocks (280 fits). The rule: the 90% interval must hold both the true
+power and the true energy in at least two thirds of the 280 fits (187).</p>
+<h2 id="what-the-data-looks-like">What the data looks like</h2>
+<p><strong>The primaries differ in level, noise, and daily shape.</strong> Figure 5 shows two weeks of each primary,
+and Figure 6 shows the mean daily profile and the mean half-hour change. Primaries are substations,
+so they are shown in MW under their study labels.</p>
+<p><img alt="Figure 5: The primaries differ in level, noise, and daily
+shape" src="../assets/unmetered_battery_capacity_primaries.svg" /></p>
+<p><img alt="Figure 6: Daily shapes dwarf a battery; some primaries step near 05:30, the end of the cheap
+windows" src="../assets/unmetered_battery_capacity_profiles.svg" /></p>
+<p><strong>The two prices share a daily shape, and Agile's cheap slots move from day to day.</strong></p>
+<p><img alt="Figure 7: The two prices share a daily shape, and Agile's cheap slots move from day to
+day" src="../assets/unmetered_battery_capacity_prices.svg" /></p>
+<p><strong>A real battery of a few percent of a bulk supply point's flow is hard to see by eye.</strong> As metered,
+NGED battery A's 99th-percentile output is 3.2% of BSP1's 99th-percentile flow. The half-hour
+changes of NGED battery A correlate at -0.29 with BSP1's flow over the study year, and at 0.07 or
+less with every primary and the other supply points. A correlation of -0.29 against 0.07 or less
+elsewhere singles out BSP1, so the pattern fits a connection to BSP1. The correlation is an
+indication, not a connection record. Figure 8 normalises both series by their own 99th percentile
+and numbers the days.</p>
+<p><img alt="Figure 8: A real battery of a few percent of a bulk supply point's flow is hard to see by
+eye" src="../assets/unmetered_battery_capacity_battery_a_in_bsp.svg" /></p>
+<p><strong>A simulated battery is visible by eye at a 40% share and invisible at 2%.</strong></p>
+<p><img alt="Figure 9: A simulated battery is visible by eye at a 40% share and invisible at
+2%" src="../assets/unmetered_battery_capacity_visibility.svg" /></p>
+<h2 id="results">Results</h2>
+<h3 id="the-positive-control-passes-its-pre-set-rule-but-its-intervals-are-too-narrow-on-calendar-replicas">The positive control passes its pre-set rule, but its intervals are too narrow on calendar replicas</h3>
+<p><strong>The positive control passes the rule committed before its run, but its intervals fall short of
+their nominal level on calendar replicas.</strong> The 90% interval holds both the merchant power and the
+merchant energy in 202 of 280 replica fits (72.1%), against the 187 the rule required. The 10
+simulated batteries are fresh draws, with durations and efficiencies between those of the
+precomputed schedules, on 7 series no earlier diagnostic touched, in all 4 blocks, at a 40% share.
+On the replicas the 90% power interval holds the truth in 77.9% of fits and the energy interval in
+74.3%. Coverage varies by truth: both intervals hold in 39% of the fits of the worst of the 10
+batteries and in 93% of the best, and in December to February the power interval holds in 60.0% of
+fits. The median absolute power error is 0.36%. The rule is lenient for a nominal 90% interval,
+because two independent 90% intervals hold both truths in 81% of fits.</p>
+<p><strong>On real demand the same truths are covered in 280 of 280 fits, because the tempering widens the
+intervals.</strong> The 90% power interval's width is 10% to 107% of the true power (median 31%). The
+median power estimate is 2.2% low, and 18.2% low on GSP1. The truths are dispatched by the same
+linear programme that the estimator interpolates, at a 40% share only, with usable durations of 1.65
+to 1.94 hours. The control therefore tests the interpolation between precomputed schedules, and does
+not test the estimator on a real dispatch. The rule was written after an earlier control had been
+tuned and scored on the same series, so the rule is post hoc. The control replaces that earlier
+control, which the <a href="#limitations">Limitations</a> describe.</p>
+<p><img alt="Figure 10: The positive control passes its rule, but its intervals are narrower than 90% on
+replicas" src="../assets/unmetered_battery_capacity_positive_control.svg" /></p>
+<h3 id="with-no-battery-added-3-of-36-blocks-are-flagged-all-for-one-series">With no battery added, 3 of 36 blocks are flagged, all for one series</h3>
+<p><strong>The false-alarm rate is 8.3% against a nominal 5%, and all three false alarms are GSP1's, in
+September to November, December to February, and March to May.</strong> Planned contrast C1 holds: a
+one-sided exact binomial test against 5% gives p = 0.268. The test rejects only at 5 or more flags
+in 36 blocks (p = 0.032), and 4 flags (11.1%) give p = 0.104. <strong>GSP1's no-battery scores sit just
+above the threshold set by the other series, so GSP1's false alarms inflate every detection rate.</strong>
+GSP1's null log Bayes factors (-2.1, -2.1, -3.2, and -4.1 in the four blocks) lie just above the
+threshold built from the other 8 series (-3.2), and GSP1's baseline of false alarms therefore sits
+in every detection rate below, including the rates at the smallest shares. Rebuilding the thresholds
+without GSP1 flags 4 of the other 32 null blocks (12.5%), in S3 and S2, so the threshold's
+false-alarm rate is uncertain by several percentage points with 36 null blocks. The thresholds range
+from -2.5 to -3.6.</p>
+<p><img alt="Figure 11: With no battery added, 3 of 36 blocks are flagged, all of them
+GSP1" src="../assets/unmetered_battery_capacity_false_alarms.svg" /></p>
+<h3 id="for-a-battery-following-the-estimators-own-rule-the-90-power-interval-holds-the-true-power-from-a-5-share">For a battery following the estimator's own rule, the 90% power interval holds the true power from a 5% share</h3>
+<p><strong>For a simulated merchant battery that follows the estimator's own dispatch rule, the 90% power
+interval holds the truth in 100% of sums at shares of 5% to 20%, and the posterior beats a step
+statistic.</strong> The 50% interval, which should hold the truth in 50% of sums, holds it in 90%, 91%, and
+87% of sums at shares of 5%, 10%, and 20%, so it is too wide there. Planned contrast C2 fails when
+pooled over rungs 1 and 2: the 90% interval holds the power in 68.9% of sums (at least 80% was
+required). The pooled figure hides the spread by rung and share. <strong>Below a 2% share the estimator
+reports its own bias, about 2.6% of peak flow, and not a battery.</strong> Below a 2% share the posterior
+is the same as with no battery: its median sits at 2.8% to 3.2% of the 99th percentile at shares of
+0.5% to 2%, against 2.6% with none (the prior's median is 13.5%). The estimator therefore has a
+bias: it reports a merchant battery of about 2.6% of the 99th-percentile flow where none exists, so
+a small reported power near that value is the bias and not a battery. <strong>The posterior beats the step
+statistic for power and for energy, for in-family batteries only.</strong> Planned contrasts C3 and C4 hold
+in the family: the mean difference in relative power error (the error as a fraction of the true
+power; posterior minus step statistic) is -0.39 (95% interval -0.45 to -0.33), and in relative
+energy error (posterior minus a rule of 2 hours times the power) -0.61 (-0.77 to -0.46). Both are
+statistically significant at the 5% level, for in-family batteries only. The summed flow pins down
+the duration: the 90% width of the duration is 0.29 to 0.35 of its prior width at a 10% share, and
+0.08 to 0.09 at 40%.</p>
+<p><img alt="Figure 12: The 90% interval for a simulated merchant battery holds the truth from a 5% share; a
+domestic fleet's does not" src="../assets/unmetered_battery_capacity_calibration.svg" /></p>
+<h3 id="batteries-following-other-dispatch-rules-are-found-less-often-and-sized-wrongly">Batteries following other dispatch rules are found less often and sized wrongly</h3>
+<p><strong>The rank-rule battery is flagged about as often as an in-family battery, the noisy-price battery
+far less often, and both are sized wrongly.</strong> This analysis is post hoc: it was added after the
+first science review. The rank rule charges in each day's cheapest and discharges in its dearest
+half-hours. The noisy price adds independent noise of standard deviation 0.2 to the price before the
+dispatch. The rank rule is flagged in 44%, 83%, and 100% of sums at shares of 10%, 20%, and 40%. Its
+90% power interval holds the truth in only 90%, 60%, and 26%, and its median absolute power error
+stays near 30%. The noisy price is flagged in 8%, 24%, and 52%, with 90% intervals holding the truth
+in 65%, 33%, and 6%, and a median absolute power error of 61% to 76%. At least half of the in-family
+sums are flagged from a battery of 4 noise units, the rank-rule sums from 8, and the noisy-price
+sums at no size we tested. Without GSP1 the three families reach half at 4, 4, and 16 noise units.</p>
+<p><img alt="Figure 13: Outside the estimator's family, large batteries are flagged less often and sized
+wrongly" src="../assets/unmetered_battery_capacity_outside_family.svg" /></p>
+<h3 id="a-simulated-domestic-fleet-is-found-only-through-its-homes-on-the-agile-tariff">A simulated domestic fleet is found only through its homes on the Agile tariff</h3>
+<p><strong>The fixed tariff windows are not identifiable, because the monthly baseline absorbs a schedule
+that repeats every day.</strong> Detections of a simulated fleet come from the Agile unit, whose schedule
+follows a price that changes daily. The fleet is flagged in 31% of sums at a 20% share and 75% at
+40%, and in 8% (GSP1's false alarms) at shares of 10% and below. Moving the windows one hour early
+lowers the flags from 11 to 7 of 36 at a 20% share and from 27 to 25 at 40%, and moving the prices
+as well brings the flags to 2 of 36 at every share. The fitted power of each of the three
+fixed-window classes sits at 79% to 95% of the scale of its prior (20% of the 99th-percentile flow),
+and not at zero, so a fleet's summed power is the prior's scale. The Agile class's own 90% interval
+holds its simulated homes' rated power in 94% to 100% of sums at shares of 10% and above, so the
+Agile class is both detected and sized. The 90% interval of the whole fleet's power holds the truth
+in 0% to 36% of sums (planned contrast C2 for fleets fails), because the fixed-window classes add
+the prior's power to the sum.</p>
+<p><img alt="Figure 14: A simulated domestic fleet is found only through its Agile homes, and not below a 20%
+share" src="../assets/unmetered_battery_capacity_fleets.svg" /></p>
+<h3 id="real-public-batteries-added-to-nged-flows-are-mostly-not-detected-or-sized">Real public batteries added to NGED flows are mostly not detected or sized</h3>
+<p><strong>Adding a real public battery to a primary barely moves the estimate, and flags it only at the
+largest share.</strong> The posterior median of the merchant power, as a share of the series'
+99th-percentile flow, is 2.7%, 2.8%, 3.2%, and 4.1% with a real battery of 5%, 10%, 20%, and 40%,
+against 2.6% with none. GSP1 is flagged in all 69 of its sums in the three blocks where it
+false-alarms (23 batteries and fleets times 3 blocks), at every share, which is the false-alarm
+baseline shown in Figure 11. Without GSP1, 0 of 736 sums are flagged at shares of 5% and 10%, 1 of
+736 at 20%, and 50 of 736 (6.8%, 95% interval 5.1% to 8.9%) at 40%, of which 24 of 184 (13%) fall in
+June to August. These intervals treat sums as independent, but the 23 batteries and fleets share 36
+series-blocks at each share, so they are too narrow. <strong>The coverage is set by the series and block,
+not by the battery.</strong> The 90% power interval holds the truth in the same 6% of sums at a 40% share
+for each of the five kinds of real battery or fleet. The series and block, not the battery,
+therefore set the coverage.</p>
+<p><strong>On calendar replicas the real batteries are flagged, but sized at about 6% of their registered
+power.</strong> This section is post hoc: it was added after the first science review. On replicas, with a
+threshold from the replicas' own 36 no-battery blocks, 71% of sums are flagged at a 10% share and
+84% at 40%, and the median log Bayes factor rises from -13.5 with none to -5.9 and +4.6. The
+posterior median stays at 6.3% and 6.1% of the registered power. Demand noise therefore hides a real
+battery from detection. A dispatch outside the estimator's family prevents the sizing: the day-ahead
+component that the estimator models is about 6% of the real batteries' registered power.</p>
+<p><strong>Planned contrast C5 passes, but the pass is no evidence that a fleet is identified as its
+coincident peak.</strong> The contrast is degenerate: the posterior median lies below the coincident peak
+in 82.1% of the 2,160 fleet sums and below the registered sum in 92.9%, so its pass is no evidence
+that a fleet is identified as its coincident peak.</p>
+<p><img alt="Figure 15: Real public batteries added to NGED demand are mostly not
+recovered" src="../assets/unmetered_battery_capacity_real_batteries.svg" /></p>
+<h3 id="nged-battery-a-is-not-detected-inside-its-bulk-supply-point">NGED battery A is not detected inside its bulk supply point</h3>
+<p><strong>NGED battery A is not detected in the flow of BSP1 at any multiple of its metered output up to
+11.</strong> The log Bayes factor stays between -5.0 and -3.2, below the threshold of -2.7, and 0 of 20
+blocks are flagged, including the matched null with the battery's metered output added back
+(multiple 0). The threshold is the 95th percentile of the other series' null blocks, because BSP1
+has none. The matched null is a null only if BSP1's meter captures the battery fully: the half-hour
+changes of NGED battery A and of BSP1 correlate at -0.29 at lag 0 and at +0.13 at lags of one
+half-hour either way. At 11 times its output the battery is 35.5% of BSP1's 99th-percentile flow and
+about 6 noise units. At that size 56% of in-family sums and 45% of rank-rule sums are flagged in
+rungs 1 and 1b, so the non-detection is informative. The posterior median power lies between 0.7 and
+1.8 times the battery's metered 99th-percentile output at every multiple, against a truth of 0 to 11
+times. The result is for one site.</p>
+<p><img alt="Figure 16: NGED battery A is not detected inside its bulk supply point, even at 11 times its
+output" src="../assets/unmetered_battery_capacity_battery_a.svg" /></p>
+<h3 id="the-screen-of-the-eight-primaries-cannot-find-a-battery">The screen of the eight primaries cannot find a battery</h3>
+<p><strong>The 13-set screen asks whether the real template set (the schedules a battery would follow) ranks
+first among 13 sets, and it does for none of the eight primaries.</strong> The 12 other sets are control
+copies: a copy with the tariff windows or the prices moved to the wrong times should fit a primary
+no better than the real set unless a battery follows the real times. The 12 control sets move the
+tariff windows by 1 to 3 hours in either direction and take the prices from 6 other weeks. The
+control sets are not exchangeable with the real set, so 1 in 13 is not the chance rate. Run on 54
+simulated lanes, the real set ranks first in 1 (1.9%), no more often than 1 in 13 (7.7%), so the
+13-set screen cannot tell a battery from none. <strong>A price-only screen, added after the first review,
+finds simulated batteries but ranks no primary first.</strong> The price-only screen, added after the first
+review, is post hoc. That screen compares the real set with its 6 price-shifted rivals alone. It
+ranks the real set first in 53 of 54 simulated merchant lanes, in 0 of 9 lanes with no battery (95%
+interval 0% to 34%), and in 30 of 36 lanes holding a real public battery at a 40% share. By that
+screen no primary of the eight ranks first. S7, which the register lists with no connected storage,
+ranks second of 7, and S1 and S2, the two primaries the register lists with connected storage, rank
+fifth and third. The table gives each primary's result, and whether NGED's register lists connected
+storage of 50 kW or more at the primary.</p>
+<table>
+<thead>
+<tr>
+<th>Primary</th>
+<th>Rank of the real set among 13</th>
+<th>Rank among the 7 price-differing sets</th>
+<th>Register</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S1</td>
+<td>8</td>
+<td>5</td>
+<td>connected storage</td>
+</tr>
+<tr>
+<td>S2</td>
+<td>6</td>
+<td>3</td>
+<td>connected storage</td>
+</tr>
+<tr>
+<td>S3</td>
+<td>9</td>
+<td>6</td>
+<td>no storage</td>
+</tr>
+<tr>
+<td>S4</td>
+<td>6</td>
+<td>3</td>
+<td>no storage</td>
+</tr>
+<tr>
+<td>S5</td>
+<td>6</td>
+<td>3</td>
+<td>no storage</td>
+</tr>
+<tr>
+<td>S6</td>
+<td>7</td>
+<td>4</td>
+<td>no storage</td>
+</tr>
+<tr>
+<td>S7</td>
+<td>5</td>
+<td>2</td>
+<td>no storage</td>
+</tr>
+<tr>
+<td>S8</td>
+<td>6</td>
+<td>3</td>
+<td>accepted storage</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="Figure 17: The 13-set primary screen cannot find a battery, and by the price-only screen no
+primary stands out" src="../assets/unmetered_battery_capacity_screen.svg" /></p>
+<h3 id="the-grid-estimators-intervals-are-too-narrow-and-the-differentiable-estimators-are-not">The grid estimator's intervals are too narrow, and the differentiable estimator's are not</h3>
+<p><strong>The grid estimator places the duration and the efficiency on a fixed grid, and its intervals miss
+the truth when the truth lies between grid points.</strong> On the same 756 rung 1 sums, its 90% power
+interval holds the truth in 11.1% of sums at a 40% share, against 99.1% for the differentiable
+estimator. The grid estimator's own positive control failed. Its medians are no more accurate than
+the differentiable estimator's: the mean difference in absolute relative power error (differentiable
+minus grid) is +0.04 (95% interval -0.03 to +0.14).</p>
+<p><img alt="Figure 18: At a 40% share the grid estimator's 90% interval holds the truth in 11% of sums; the
+differentiable estimator's in 99%" src="../assets/unmetered_battery_capacity_grid.svg" /></p>
+<h3 id="a-wider-prior-gives-the-same-verdicts">A wider prior gives the same verdicts</h3>
+<p><strong>The second setting gives the same verdicts.</strong> The second setting doubles the spread of the
+duration priors and widens the efficiency prior. C1 is 3 of 36 again, all GSP1's, and C2 pooled is
+67.2% (power, 90% interval). C3 is -0.39 (-0.45 to -0.33), and C4 is -0.70 (-0.86 to -0.54).
+In-family sums are flagged in 16%, 52%, and 94% at shares of 5%, 10%, and 20%, against 18%, 58%, and
+94% in the main setting.</p>
+<h2 id="limitations">Limitations</h2>
+<p><strong>The scripts have had one diff review, the page has had two science reviews, and a mutation pass
+strengthened the tests of the battery templates and the template posterior.</strong> Three readers who
+knew none of the study's terms and a prose review checked the page for clarity.</p>
+<p><strong>An earlier positive control is not an independent test.</strong> The first control failed when the
+battery's schedule was itself fitted. The fine linear-programme stack was then refined until the
+control passed, using diagnostics from a scored block, so that pass was not independent. The clean
+control replaces it, with a rule fixed before the run, on 7 series no diagnostic had touched. The
+first control had passed in 2 of 3 scored blocks, on one truth near a node of the stack.</p>
+<p><strong>Removing the two series used for tuning lowers the in-family detection rate at a 10% share from
+58% to 51%.</strong> Tuning used S6 in September to November and S2 in all blocks only. Removing S2 and S6
+also changes the 90% power coverage from 90% to 89%. The 90% and 89% are pooled over all seven
+shares, including the shares of 2% and below where coverage is 57% to 94%. The 100% in the in-family
+section is at shares of 5% to 20% only, so the 100% and the 90% are both right.</p>
+<p><strong>The thresholds rest on 36 no-battery blocks from one year, and one series false-alarms.</strong> GSP1's
+no-battery blocks score above the threshold from the other series in three of four blocks.
+Rebuilding the thresholds without GSP1 flags 4 of the other 32 blocks.</p>
+<p><strong>The estimator reports a power where none exists.</strong> With no battery added, the posterior median
+merchant power is 2.6% of the 99th-percentile flow, and an unidentified power returns the prior's
+scale (20% of the 99th-percentile flow) and not zero, so the fixed-window classes of a fleet sit at
+79% to 95% of that scale.</p>
+<p><strong>Other limits.</strong></p>
+<ul>
+<li>The half-normal prior for a class's power scales with the 99th percentile of the flow series
+  including the battery, so at large shares the battery widens its own prior.</li>
+<li>The energy reference for a real battery is a lower bound on its capacity.</li>
+<li>The simulated batteries follow a perfect-foresight daily linear programme. Real batteries also
+  earn from frequency response, the Balancing Mechanism, and intraday trading, none of which the
+  estimator represents.</li>
+<li>The 90% intervals are conservative on real demand and too narrow on calendar replicas, because the
+  tempering by the residual's autocorrelation sets their width and not the data.</li>
+<li>The domestic durations and the red band are unverified, and the definition of "Disaggregated
+  Demand" is unverified.</li>
+<li>Pooled rates and coverages carry Clopper-Pearson intervals that treat sums as independent.</li>
+<li>The false-alarm test of planned contrast C1 rejects only at 5 or more flags in 36 blocks.</li>
+</ul>
+<p><strong>What is not tested.</strong> A real domestic fleet (the study found no metered one), electric-vehicle
+chargers on the same tariff edges, the 4-hour availability blocks of frequency services, a battery
+behind the meter, a primary metered in MVA, a primary outside NGED's East Midlands licence area, a
+year other than September 2025 to August 2026, and whether MWh is identified separately from MW for
+any real battery.</p>
+<h2 id="scope">Scope</h2>
+<p><strong>The page covers 9 demand-like series from one year and says nothing about other electricity
+networks.</strong> The page answers how well the half-hourly flow reveals a battery under the estimator
+described, and does not estimate how much storage NGED's primaries hold.</p>
+<h2 id="data-and-code-availability">Data and code availability</h2>
+<p><strong>The prices and the public batteries' outputs are public.</strong> Contains Balancing Mechanism Reporting
+Service (BMRS) data © Elexon Limited, copyright and database right 2026. The N2EX day-ahead prices
+are National Energy System Operator (NESO) data under the NESO Open Data Licence, and the East
+Midlands Agile rates come from Octopus Energy's public API. NGED's primary and bulk supply point
+telemetry and the Embedded Capacity Register extract are private, and no generator's name,
+identifier, or coordinates appear on this page. The scripts are in
+<code>studies/unmetered_battery_capacity/</code>, the shared machinery is in <code>packages/studies/src/studies/</code>,
+and the results are under <code>data/studies/per_study/unmetered_battery_capacity/</code>, which are not
+committed. The estimator runs on PyTorch with a Triton kernel on one RTX A6000.</p>
+<h2 id="reproducing-the-figures">Reproducing the figures</h2>
+<p>Set <code>OMP_NUM_THREADS=2</code> for each command, and run the stack builds with <code>OMP_NUM_THREADS=1</code>.</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/market_downloads/fetch_agile.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/convert_register.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_inputs.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_stacks.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_stacks.py<span class="w"> </span>coarse
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_templates.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_positive_control_clean.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_rung1.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_rung1b.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_rung2.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_rung3.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_rung3_replica.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_rung4.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_rung5.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_screen_power.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_sensitivity.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_grid_comparison.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_report.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_charts_data.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_charts_explainers.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/unmetered_battery_capacity/capacity_charts_results.py
+</code></pre></div>
+<p>The numbers that the figure scripts derive are written to <code>report_figures_explainers.md</code> and
+<code>report_figures_results.md</code> beside the report. The helper modules <code>capacity_inputs.py</code>,
+<code>capacity_runs.py</code>, and <code>capacity_report_tools.py</code> hold shared code and are not run on their own.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,4968 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../solar-bmu-disaggregation/">
+      
+      
+        <link rel="next" href="../unmetered-battery-capacity/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Can solar be separated from a battery in an aggregate Balancing Mechanism Unit? - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#separating-solar-from-a-battery-works-on-simple-synthetic-aggregates-overshoots-once-demand-is-added-and-is-not-validated-on-real-aggregate-balancing-mechanism-units" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/weather-products-survey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products surveyed for the weather-product studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/manual-heuristic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The manual heuristic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/gb-battery-scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How GB batteries schedule themselves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/gb-price-data-and-ancillary-markets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GB electricity prices, free and when each is known
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ensemble-archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The ensemble weather archive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solar-bmu-census/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How many Balancing Mechanism Units in Great Britain are solar?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solar-bmu-disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#terms-used-on-this-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Terms used on this page
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#historical-separation-versus-forecasting-a-battery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Historical separation versus forecasting a battery
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#experiments-simplest-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Experiments, simplest first
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Experiments, simplest first">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rung-1-one-real-battery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 1: one real battery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-2-price-alone-predicts-a-little-of-a-batterys-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 2: price alone predicts a little of a battery's output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-3-integrating-output-gives-a-state-of-charge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 3: integrating output gives a state of charge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-4-price-regressors-on-synthetic-solar-plus-battery-aggregates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 4: price regressors on synthetic solar-plus-battery aggregates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-5-structured-schedules-do-not-beat-unconstrained-price-regressors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 5: structured schedules do not beat unconstrained price regressors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-6-solar-and-a-battery-fitted-together" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 6: solar and a battery fitted together
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-6-half-or-double-the-true-battery-power" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 6: half or double the true battery power
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-7-the-real-aggregate-bmus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 7: the real aggregate BMUs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-7b-the-same-fit-with-the-solar-studys-calendar-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 7b: the same fit with the solar study's calendar baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-7c-known-answer-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 7c: known-answer test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-7c-cost-sensitivity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 7c: cost sensitivity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discussion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discussion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unmetered-battery-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can a primary substation's half-hourly flow reveal an unmetered battery?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../embedded-battery-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indgen-inddem-and-gsp-take/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_9" id="__nav_8_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/reanalysis-wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CERRA and NORA3 describe past wind better than ERA5?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/cerra-wind-levels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending CERRA's wind heights beat one height?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/cerra-wind-direction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CERRA's wind direction add to its wind speed?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/era5-solar-variables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which ERA5 variables help predict solar farm output?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/ukv-ceda-vs-era5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CEDA's UKV or ERA5 describe past wind and temperature better?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../past-weather/ukv-ceda-vs-openmeteo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_10" id="__nav_8_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/ens-horizons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/matched-lead-extra-products/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extra weather products in the day-ahead lead comparison: how they are read, and their results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/blends-with-ens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which single weather forecast should be added to ECMWF's ensemble mean first?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/ukv-ceda-blends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does adding UKV from CEDA to ECMWF's ensemble mean lower the error at lead days 1 to 4?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecasts/ensemble-means/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an ML experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/backup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backing up the workstation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-cleaning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning the trial-area telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/auto-research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments run by an LLM agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending the training history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#terms-used-on-this-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Terms used on this page
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#historical-separation-versus-forecasting-a-battery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Historical separation versus forecasting a battery
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#experiments-simplest-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Experiments, simplest first
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Experiments, simplest first">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rung-1-one-real-battery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 1: one real battery
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-2-price-alone-predicts-a-little-of-a-batterys-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 2: price alone predicts a little of a battery's output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-3-integrating-output-gives-a-state-of-charge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 3: integrating output gives a state of charge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-4-price-regressors-on-synthetic-solar-plus-battery-aggregates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 4: price regressors on synthetic solar-plus-battery aggregates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-5-structured-schedules-do-not-beat-unconstrained-price-regressors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 5: structured schedules do not beat unconstrained price regressors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-6-solar-and-a-battery-fitted-together" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 6: solar and a battery fitted together
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-6-half-or-double-the-true-battery-power" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 6: half or double the true battery power
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-7-the-real-aggregate-bmus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 7: the real aggregate BMUs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-7b-the-same-fit-with-the-solar-studys-calendar-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 7b: the same fit with the solar study's calendar baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-7c-known-answer-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 7c: known-answer test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rung-7c-cost-sensitivity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rung 7c: cost sensitivity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#discussion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discussion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="separating-solar-from-a-battery-works-on-simple-synthetic-aggregates-overshoots-once-demand-is-added-and-is-not-validated-on-real-aggregate-balancing-mechanism-units">Separating solar from a battery works on simple synthetic aggregates, overshoots once demand is added, and is not validated on real aggregate Balancing Mechanism Units</h1>
+<p><strong>This study asks whether public prices, and then an explicit model of the battery's state of
+charge, can fix the failure the <a href="../solar-bmu-disaggregation/">solar disaggregation study</a> found.</strong>
+That study separated the solar part of an aggregate beside wind or gas, and found that none of the
+methods it tried separated the solar part beside a battery or pumped storage. Here each step adds
+one complication, and the page shows the simple step working before the harder one. The steps are
+called rungs. A Balancing Mechanism Unit (BMU) is the unit that Elexon, the settlement body, meters
+in the Balancing Mechanism, the market in which the system operator buys changes to generation and
+demand close to delivery. A BMU can be a power station, a battery, or an aggregate of embedded
+generation held by a supplier. Two background pages explain <a href="../../background/gb-battery-scheduling/">how batteries in Great Britain (GB)
+schedule themselves</a> and <a href="../../background/gb-price-data-and-ancillary-markets/">GB electricity prices</a>.</p>
+<p><strong>A joint model of solar and a battery recovers the solar part of a simple synthetic aggregate
+when it is given the battery's true power. Once a demand-like part is added, the joint model
+overshoots the solar capacity and falsely detects solar, and for the 25 real aggregate BMUs it
+gives no validated solar capacity.</strong> A synthetic aggregate is a real solar BMU's output plus a
+real battery BMU's output, each rescaled. The joint model fits solar and a battery together, as a
+linear programme: an optimisation that chooses the solar weights and the battery's charge and
+discharge schedule that leave the least unexplained output. The tests below measure the solar error,
+which is the mean absolute error of the recovered solar over daylight half-hours, as a percentage
+of the true solar part's 99th-percentile output (written "p99").</p>
+<ul>
+<li><strong>With no demand-like part (rung 6), the joint model nearly halves the solar error.</strong> A solar-only
+  fit has a solar error of 27.2%, the joint model 14.8%, and the same solar model given the true
+  battery's output 14.0%. Of the 12.4-point gain of the joint model over the solar-only fit, 9.9
+  points come from a new solar model that uses four fleet curves (typical output shapes of
+  east-facing, south-facing, west-facing, and sun-tracking solar arrays), and 2.5 points come from
+  the battery model. Given half or double the true battery power, the joint model's solar error is
+  15.7% and 16.2%: worse than at the true power, and still better than the 17.3% of the same solar
+  model with no battery (<a href="#rung-6-half-or-double-the-true-battery-power">rung 6, half or double the true battery
+  power</a>).</li>
+<li><strong>With a demand-like part (rung 7c), the model's gain shrinks and it overshoots the capacity.</strong>
+  Giving the joint model the battery's true power lowers the solar error by 0 to 1.4 points against
+  no battery. The same step raises the fitted capacity from 0.86 to 1.02 times the capacity of the
+  same model fitted to the solar part alone, to 1.17 to 1.50 times, and up to 1.98 times at an
+  assumed 200 MW. In 35 of 48 synthetic aggregates with no solar, the model fits more than 1 MW of
+  solar at the true power. These false alarms rest on the assumption that the demand-like parts hold
+  no solar (<a href="#rung-7c-known-answer-test">known-answer test</a>).</li>
+<li><strong>For the 25 real aggregate BMUs, this study establishes no solar capacity.</strong> With a
+  calendar baseline (a seasonal and time-of-day baseline, as in the solar study) and a battery with
+  a state-of-charge limit, the joint model fits 1,154 to 1,217 MW of alternating-current (AC) solar
+  capacity at assumed battery powers from 0 to 200 MW (<a href="#rung-7b-the-same-fit-with-the-solar-studys-calendar-baseline">rung
+  7b</a>). That narrow range is not
+  evidence of correctness, for the three reasons below.</li>
+</ul>
+<p><strong>Three tests in rungs 7b and 7c show why the narrow range is not evidence of correctness.</strong></p>
+<ul>
+<li><strong>The linear programme causes part of the stability.</strong> The programme charges a throughput cost
+  of 0.1 per megawatt of battery charge or discharge, against 1 per megawatt of unexplained output.
+  At 200 MW the median BMU's fit is exact in every half-hour, and the total moves between 1,150 and
+  1,165 MW as the throughput cost changes from 0.08 to 0.3 per megawatt. At the highest throughput
+  cost the battery is unused, and the answer reverts to the no-battery 1,160 MW
+  (<a href="#rung-7c-cost-sensitivity">cost sensitivity</a>).</li>
+<li><strong>Part of the fitted capacity could be shape rather than cloud.</strong> A calendar replica is a BMU's
+  mean output for each month, half-hour of the day, and day type, which has the mean solar shape and
+  no cloud. Replicas fit 216 MW of solar with no battery and 426 MW at 200 MW, which is 19% and 37%
+  of the real-output totals (1,160 and 1,154 MW). Up to a third of the fitted capacity could
+  therefore come from shape (<a href="#rung-7b-the-same-fit-with-the-solar-studys-calendar-baseline">rung
+  7b</a>).</li>
+<li><strong>The synthetic aggregates do not behave like the real BMUs.</strong> On the synthetic aggregates the
+  fitted capacity rises steeply with the assumed battery power, from 0.96 to 1.98 times the
+  reference for one demand-like part and solar size. On the real BMUs the total is flat, from 1,154
+  to 1,217 MW. The synthetic aggregates' bias at the true power therefore cannot be carried over to
+  the real BMUs, whose true battery power is unknown, and this study cannot say how biased the real
+  total is.</li>
+</ul>
+<p><strong>Neither this fit nor the solar study's gives a validated total, and their agreement at about 1,160
+MW is not a confirmation.</strong> The two capacity measures differ: on the synthetic aggregates of rung 6
+the fleet-curve fit given the true battery fits 1.13 times the direct physical fit to the solar
+part. The solar study's own methods are not validated beside a battery either. On the rung 7c
+synthetic aggregates its difference separation (a fit of the fleet curves to four-hour changes, then
+the baseline) fits 1.34 to 1.60 times the reference capacity, and the solar study found that its
+physical fit recovers 0.24 to 0.44 of the reference beside storage, against 0.93 beside wind or gas.
+What would establish the capacity is set out in the <a href="#discussion">Discussion</a>.</p>
+<p><img alt="Figure 1: Given the battery's true power, the joint model separates solar from the battery on
+clear days, but misses the cloud on the cloudy last
+day" src="../assets/battery_pv_separation_rung6_story.svg" /></p>
+<ul>
+<li><strong>To separate solar from a battery whose true power is known, model the battery explicitly with a
+  state-of-charge limit.</strong> Within the fleet-curve solar model, the battery model closes 2.5 of the
+  3.3 points between a fit with no battery (17.3%) and a fit given the true battery (14.0%)
+  (<a href="#rung-6-solar-and-a-battery-fitted-together">rung 6</a>). Unconstrained price regressors (price
+  columns that each get a free coefficient) cut the solar error by 8.5 points, but a wrong-week
+  control gains 4.9 of those points. Under rung 4's variance rule, they falsely detect solar in 6
+  of 16 battery-only aggregates
+  (<a href="#rung-4-price-regressors-on-synthetic-solar-plus-battery-aggregates">rung 4</a>). Within the
+  same fleet-curve solar model, the battery constraint recovers solar 1.5 points [1.1, 1.9] better
+  than the two price columns do (post hoc, <a href="#rung-6-solar-and-a-battery-fitted-together">rung 6</a>).
+  The joint model with rung 3's drift-inflated energy capacity falsely detects no solar in 16
+  battery-only aggregates, but with half that capacity or with 2 hours of energy it detects solar
+  in 8 and 4 of the 16 at a 1 MW threshold
+  (<a href="#rung-6-solar-and-a-battery-fitted-together">rung 6</a>).</li>
+<li><strong>Do not trust a structured schedule built from prices to beat unconstrained price regressors.</strong> A
+  rank rule (charge in the cheapest <a href="../../background/gb-battery-scheduling/#price-rank">price ranks</a>
+  of each day and discharge in the dearest) and a linear programme each recover the solar about 7
+  points worse than unconstrained price regressors
+  (<a href="#rung-5-structured-schedules-do-not-beat-unconstrained-price-regressors">rung 5</a>).</li>
+<li><strong>Do not quote a solar capacity for an aggregate BMU without saying which model, which capacity
+  measure, and which battery size were assumed.</strong> Without a calendar baseline, the fitted capacity
+  of the nine cloud-signal BMUs (the nine aggregate BMUs whose fit in the solar study shows a
+  cloud-correlated component) falls from 262.4 MW with no battery to 98.6 MW with a 200 MW battery
+  (<a href="#rung-7-the-real-aggregate-bmus">rung 7</a>). With the baseline they are 1,146 MW with no battery
+  and 1,129 MW with a 200 MW battery
+  (<a href="#rung-7b-the-same-fit-with-the-solar-studys-calendar-baseline">rung 7b</a>).</li>
+</ul>
+<blockquote>
+<p><strong>How this page was made.</strong> The research question came from a human. Everything else — the code
+behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
+AI model (for this page, Claude Sonnet 5.5).</p>
+</blockquote>
+<h2 id="terms-used-on-this-page">Terms used on this page</h2>
+<ul>
+<li><strong>Rung:</strong> one step of the study, each adding one complication. <strong>Arm:</strong> one variant of the fit,
+  labelled A0 to A9 and B1 to B8 for contrasts between arms. A0 is a solar-only fit, A1 adds
+  price regressors, A3 is handed the true battery's output (an oracle), and A0b, A1b, and A3b are
+  the same three fits with the joint model's solar model. A8 is the joint model given the true
+  battery's power and rung 3's energy capacity. A8h and A8d use half and double that energy
+  capacity, and A9 uses 2 hours of energy.</li>
+<li><strong>Joint model and linear programme:</strong> the joint model fits solar and a battery together by linear
+  programming, which finds the solar weights and the battery schedule that leave the least
+  unexplained output (the residual).</li>
+<li><strong>Synthetic aggregate:</strong> a real solar BMU's output plus a real battery BMU's output, each scaled
+  to a stated p99, as in the solar study. <strong>Demand-like half:</strong> a third part added in rung 7c, the
+  output of a real aggregate BMU in which the solar study found no cloud signal. <strong>Solar half:</strong>
+  the solar part of a synthetic aggregate.</li>
+<li><strong>Calendar baseline and calendar replica:</strong> the baseline is the solar study's seasonal and
+  time-of-day design, fitted beside solar. A replica is a BMU's mean output for each month,
+  half-hour, and day type.</li>
+<li><strong>Variance rule and capacity rule:</strong> the two ways to count a false alarm on a battery-only
+  aggregate. The variance rule is rung 4's, and the capacity rule is rung 6's.</li>
+<li><strong>Regional sky and GB-mean sky:</strong> the two forms of the CAMS irradiance input, defined in rung 4.</li>
+</ul>
+<h2 id="historical-separation-versus-forecasting-a-battery">Historical separation versus forecasting a battery</h2>
+<p><strong>A historical separation may use any quantity that is known after the event, and a forecast may use
+only what is known at its issue time.</strong> The table says which input is known when. This study uses
+after-the-event inputs throughout, so its results bound what a forecast could achieve and do not
+show that a forecast achieves it.</p>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Known after the event</th>
+<th>Known the day before</th>
+<th>Known an hour before</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Metered output of the battery (the target)</td>
+<td>Yes, about 5 working days later</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Metered output of an aggregate BMU (the target of rung 7)</td>
+<td>Yes, about 5 working days later</td>
+<td>No</td>
+<td>Past values only</td>
+</tr>
+<tr>
+<td>Copernicus Atmosphere Monitoring Service (CAMS) satellite irradiance</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Day-ahead price</td>
+<td>Yes</td>
+<td>Yes, after about 10:00 on the day before</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Intraday market index</td>
+<td>Yes</td>
+<td>No</td>
+<td>Partly (only trades so far)</td>
+</tr>
+<tr>
+<td>System price and net imbalance volume</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Accepted balancing volumes</td>
+<td>Yes</td>
+<td>No</td>
+<td>Partly (acceptances already issued)</td>
+</tr>
+<tr>
+<td>The battery's planned output</td>
+<td>Yes</td>
+<td>Partly (planned outputs are submitted the day before; source not checked)</td>
+<td>Yes (fixed at the deadline an hour before)</td>
+</tr>
+<tr>
+<td>Grid frequency</td>
+<td>Yes</td>
+<td>No</td>
+<td>Past values only</td>
+</tr>
+<tr>
+<td>Response and reserve auction results</td>
+<td>Yes</td>
+<td>Yes, after the 14:00 auction</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Demand and wind forecasts</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Energy capacity and efficiency</td>
+<td>Never observed</td>
+<td>Never observed</td>
+<td>Never observed</td>
+</tr>
+</tbody>
+</table>
+<p><strong>A forecast would have to predict the unknown inputs first.</strong> The unknown inputs are the day-ahead
+price before the auction, the system price, the frequency, the accepted balancing volumes, and the
+battery's planned output. A forecast would also replace CAMS satellite irradiance with a numerical
+weather prediction.</p>
+<h2 id="experiments-simplest-first">Experiments, simplest first</h2>
+<p><strong>Each rung adds one complication and scores itself against a known answer where one exists.</strong> The
+page labels every contrast planned, post hoc, or exploratory, and uses these conventions:</p>
+<ul>
+<li><strong>A planned contrast</strong> was written into the study plan before any result existed. The plan holds
+  only B1 to B4.</li>
+<li><strong>A post hoc contrast</strong> was written after results were seen. B5 to B8 were written before the
+  rung that tests each of them ran, but after rung 4's results and outside the plan, so they are
+  treated as post hoc. So are the capacity rule that rung 6 uses to pass B4, and the contrasts that
+  involve A1b, an arm added at a reviewer's request to test a stated claim.</li>
+<li><strong>An exploratory contrast</strong> was computed without a stated hypothesis.</li>
+<li><strong>Errors</strong> are percentages of a series' own p99. The solar error is the mean absolute error of the
+  recovered solar over daylight half-hours, as a percentage of the true solar part's p99.</li>
+<li><strong>Numbers in square brackets</strong> are 95% intervals from resampling whole calendar months, or whole
+  aggregates where the text says so.</li>
+<li><strong>Public BMU names and megawatts</strong> are shown.</li>
+</ul>
+<h3 id="rung-1-one-real-battery">Rung 1: one real battery</h3>
+<p>The four batteries in this study are Lakeside, Dollymans, Thurrock, and Ocker Hill, all public
+BMUs.</p>
+<p><strong>Lakeside charged when the day-ahead price was low and exported when it was high.</strong> Over the year,
+its mean output was −15.6 MW in the cheapest third of each day's half-hours, −3.5 MW in the middle
+third, and 14.9 MW in the dearest third. In the cheapest third it charged in 56% of half-hours and
+discharged in 15%. In the dearest third the shares were 25% and 47%.</p>
+<p><strong>Output correlates most with the price at a shift of 0 half-hours, and the neighbouring shifts are
+nearly as high.</strong> The correlation of Lakeside's output with the day-ahead price is 0.236 at a shift
+of 0 half-hours. The correlation peaks at a shift of 0 for all four batteries, at 0.21 to 0.27, and
+a shift of one half-hour lowers it by 0.004 to 0.014.</p>
+<p><strong>The planned output and the accepted balancing volumes explain most of a battery's output.</strong> <a href="../../background/gb-battery-scheduling/">How
+GB batteries schedule themselves</a> shows the decomposition of
+metered output into planned output, accepted balancing volume, and a remainder (Figure P2 there).
+Over the year, the planned output alone explains 29.2% to 36.3% of the variance of output across the
+four batteries. The planned output plus the accepted volumes explains 81.4% to 97.2%. The remainder
+has a standard deviation of 3.91 to 10.33 MW.</p>
+<p><img alt="Figure 2: Lakeside charged when the day-ahead price was low and exported when it was high" src="../assets/battery_pv_separation_rung1_week.svg" /></p>
+<h3 id="rung-2-price-alone-predicts-a-little-of-a-batterys-output">Rung 2: price alone predicts a little of a battery's output</h3>
+<p><strong>Knowing the day's price ranking lowers a battery's prediction error, but only slightly.</strong> The
+prediction fits the mean output of each half-hour of the day, then adds the day-ahead price rank and
+price level. A half-hour's <a href="../../background/gb-battery-scheduling/#price-rank">price rank</a> is its
+place in that day's cheapest-to-dearest order. Four held-out 3-month blocks score each fit. Pooled
+over the four batteries, the price rank lowers the error from 21.30% to 20.72% of p99, a change of
+−0.58 points [−0.89, −0.29]. The price-rank gain is planned contrast B1, which claimed that adding
+the price rank and level to the time of day lowers the held-out error. B1 is met pooled, and met
+for three of the four batteries; Dollymans' interval, −0.28 [−0.72, 0.23], includes zero. A
+gradient-boosted tree does no better than the price rank (exploratory, 0.08 points [−0.35, 0.63]
+worse than the rank).</p>
+<p><strong>The plan's contrast B2 was not run.</strong> B2 claimed that a state-of-charge fit beats a price-only fit
+one step ahead. No state-of-charge predictor of output was built, so B2 has no result.</p>
+<p><img alt="Figure 3: Knowing the day's price ranking lowers a battery's prediction error, but only slightly" src="../assets/battery_pv_separation_rung2_prediction.svg" /></p>
+<h3 id="rung-3-integrating-output-gives-a-state-of-charge">Rung 3: integrating output gives a state of charge</h3>
+<p><strong>Adding up a battery's output gives a state of charge that rises and falls with it, and slow drift
+inflates the energy capacity that the year-long fit needs.</strong> Each half-hour that exports x MWh
+removes x divided by the efficiency from the cells, and each half-hour that imports y MWh adds y
+times the efficiency. The fit searches the one-way efficiency from 0.80 to 0.98 and takes the
+smallest energy capacity that keeps the path between empty and full. For Lakeside the fit gives an
+efficiency of 0.935 (round trip 0.874) and a capacity of 514 MWh, which is 5.23 hours at p99 power.
+The capacity is not identified, because many pairs of efficiency and capacity keep the path inside
+its bounds: with the efficiency fixed at 0.92 the same method gives 3,136 MWh, and at 0.85 it gives
+17,136 MWh.</p>
+<p><img alt="Figure 4: Adding up a battery's output gives a state of charge that rises and falls with it" src="../assets/battery_pv_separation_rung3_week.svg" /></p>
+<p><strong>The four batteries fit one-way efficiencies of 0.922 to 0.935 and whole-year capacities of 5.0 to
+9.0 hours at p99 power, and drift inflates those capacities.</strong> Each 3-month block fitted alone gives
+2.7 to 5.1 hours, and the largest range of the path within any single week (post hoc) is 2.5 to 4.0
+hours. For Lakeside, the blocks give 261 to 287 MWh against 514 MWh for the year. The path sits
+within 2% of a bound in 0.2% to 0.5% of the year. Drift here means that small errors accumulate
+over a year into a path that wanders, so the fit needs a larger capacity to keep the path inside
+its bounds. This study cannot say whether the cause is a varying efficiency or energy that the
+metering does not capture.</p>
+<p><strong>No check of the state of charge here is independent of the fit.</strong> No state of charge is
+published. A path that stays inside its bounds is true by construction of the fit. The fitted
+efficiency also agrees with the square root of energy exported over energy imported (0.921 to
+0.935) by construction.</p>
+<h3 id="rung-4-price-regressors-on-synthetic-solar-plus-battery-aggregates">Rung 4: price regressors on synthetic solar-plus-battery aggregates</h3>
+<p><strong>A solar-only fit to a solar-plus-battery sum recovers only a small part of the solar.</strong> Each
+synthetic aggregate (built <a href="../solar-bmu-disaggregation/#building-a-synthetic-aggregate">as in the solar
+study</a>) is a real solar half plus a
+real battery half. The solar halves are Burwell, Bishampton, Litchardon, and the three together.
+The battery halves are the four batteries above. Each half is scaled to its own p99, the solar half
+to the solar share times 100 MW and the battery half to one minus the share times 100 MW. The
+aggregate's own p99 is therefore not exactly 100 MW. The solar share is 0%, 10%, 25%, or 50%. Every
+arm (one variant of the fit) fits the solar study's physical plant (tilt, azimuth, ratio of
+direct-current (DC) to alternating-current (AC) rating, and AC capacity) to 4-hour changes. A 4-hour
+change is a half-hour's output minus the output 4 hours earlier. Differencing removes the slowly
+varying part of demand and keeps the changes that follow the sun and cloud. The arms differ only in
+their extra regressors. Figure 5 shows a week with a 25% solar share.</p>
+<p><strong>Every arm uses CAMS irradiance in one of two forms, the regional sky or the GB-mean sky.</strong> The
+regional sky is the irradiance at the solar half's own location, which real aggregates cannot use.
+The GB-mean sky is the mean of 18 CAMS points across Great Britain. The text gives regional-sky
+results unless it says otherwise.</p>
+<p><img alt="Figure 5: A solar-only fit to a solar-plus-battery sum recovers only a small part of the solar" src="../assets/battery_pv_separation_rung4_a0.svg" /></p>
+<table>
+<thead>
+<tr>
+<th>Arm</th>
+<th>Extra regressors</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A0</td>
+<td>None (solar only)</td>
+</tr>
+<tr>
+<td>A1</td>
+<td>Day-ahead price minus the day's mean; within-day rank of the day-ahead price</td>
+</tr>
+<tr>
+<td>A2</td>
+<td>The two of A1, plus system price minus day-ahead price</td>
+</tr>
+<tr>
+<td>A3</td>
+<td>The true battery output (an oracle, the upper bound)</td>
+</tr>
+<tr>
+<td>A4</td>
+<td>The two of A1, taken from 7 days earlier (a wrong-week control)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Price regressors recover more of the solar, but the fitted battery follows the real battery only
+loosely.</strong> The two fits with prices cannot reproduce the battery's sharp swings, and the oracle in
+Figure 7 shows how much better the solar looks when the true battery is known.</p>
+<p><img alt="Figure 6: Price regressors recover more of the solar, but the fitted battery output follows the
+real battery only loosely" src="../assets/battery_pv_separation_rung4_prices.svg" /></p>
+<p><img alt="Figure 7: Given the true battery output, the fit recovers the solar closely, which is the upper bound" src="../assets/battery_pv_separation_rung4_oracle.svg" /></p>
+<p><strong>Price regressors cut the solar error by 8.5 points, and prices from another week cut it by 4.9.</strong>
+Pooled over the 16 aggregates of each share, the solar series error is 27.2% for A0, 18.7% for A1,
+18.1% for A2, 13.8% for the oracle A3, and 22.4% for the control A4. The planned contrast B3 claimed
+that A1 recovers solar better than A0. A1 minus A0 is −8.5 points [−10.9, −5.9]: met. The control A4
+minus A0 is −4.9 [−6.3, −3.4] (exploratory). More than half of A1's gain therefore comes from
+regressors that carry no information about the right week. Intervals resample whole aggregates, and
+the four solar halves make them wide. For Ocker Hill alone, the control gains at least as much as
+the prices do (A1 minus A4 is +1.0 points [0.0, 2.0]).</p>
+<p><img alt="Figure 8: Price regressors cut the solar error by about 8 percentage points of p99, and wrong-week
+prices by about 5" src="../assets/battery_pv_separation_rung4_error.svg" /></p>
+<p><strong>The recovered solar energy rises from about a quarter to about three quarters of the truth.</strong>
+The energy ratio (recovered energy over true energy) is 0.24 for A0, 0.76 for A1, 0.94 for A3, and
+0.50 for A4.</p>
+<p><img alt="Figure 9: Price regressors lift the recovered solar energy from about a quarter to about three quarters" src="../assets/battery_pv_separation_rung4_ratios.svg" /></p>
+<p><strong>The price regressors raise false alarms under the variance rule, and the planned false-alarm
+control B4 fails.</strong> The variance rule counts a battery-only aggregate (solar share 0%) as a false
+alarm when the fitted plant explains more of the 4-hour changes than it does in any of A0's own 16
+battery-only aggregates, a threshold measured on the same aggregates (in-sample). The in-sample
+threshold deviates from the plan, which set B4's threshold from the solar study's threshold. The
+rule gives A0 zero false alarms by construction. Even the wrong-week control A4 fails in 8 of 16. A1
+raises 6 of 16 false alarms on the regional sky and 12 of 16 on the GB-mean sky, where its solar
+error is lower (17.8% against 18.7%). The control A4 raises 8 and 16. B4 claimed that A1's count
+would not exceed A0's: not met.</p>
+<h3 id="rung-5-structured-schedules-do-not-beat-unconstrained-price-regressors">Rung 5: structured schedules do not beat unconstrained price regressors</h3>
+<p><strong>One structured battery schedule, with a single free coefficient, recovers the solar about 7 points
+worse than unconstrained price regressors.</strong> The hypothesis was that A1's several free columns
+absorb the repeating time-of-day shape of every day, and that one schedule built from physical rules
+would keep the gain with fewer false alarms. The schedules are a rank rule (A5: charge in the 4
+cheapest half-hours of the day and discharge in the 4 dearest, for a 2-hour battery) and a linear
+programme (A6: a daily price-taker with one-way efficiency 0.92, state of charge between 5% and 95%,
+and at most 1 cycle a day). Each also has a wrong-week control (A5c and A6c). Figure 10 shows the
+schedules for 2 days.</p>
+<p><img alt="Figure 10: A real battery trades in small steps; price-only schedules use full power in blocks" src="../assets/battery_pv_separation_rung5_schedules.svg" /></p>
+<p><strong>The fitted battery contribution is about a fifth of the true battery and follows the true battery
+no better than unconstrained price regressors.</strong> The fitted coefficient is a mean of 0.20 of the
+battery's true p99 output for A6 and 0.18 for A5.</p>
+<p><img alt="Figure 11: Price-only schedules fit the real battery at about a fifth of its size" src="../assets/battery_pv_separation_rung5_contribution.svg" /></p>
+<p><strong>The solar error is 25.4% for A6 and 25.7% for A5, against 18.7% for A1 (regional sky).</strong> The post
+hoc contrast B5 claimed that A6 recovers solar at least as well as A1. A6 minus A1 is +6.7 points
+[4.5, 8.6]: not met. Post hoc contrast B6 had two parts and no pass rule. The first part is the
+price-specific gain. A6 minus A6c is −0.3 points [−0.5, −0.2], so the gain specific to the right
+week's prices is small. The wrong-week controls reach 25.8%.</p>
+<p><img alt="Figure 12: A structured schedule recovers solar 7 points worse than price regressors" src="../assets/battery_pv_separation_rung5_error.svg" /></p>
+<p><strong>Structured schedules raise fewer false alarms than unconstrained regressors on the regional sky,
+but not on the GB-mean sky.</strong> The second part of B6 counts false alarms under the variance rule. A5
+and A6 each have 3 of 16 false alarms on the regional sky, against 6 for A1 and 0 for A0 by
+construction. On the GB-mean sky the counts are 12 for A5, 8 for A6, and 12 for A1. B6 is read as
+not met. That reading was chosen after the numbers were seen, because the right-week gain of 0.3
+points is small and the false-alarm counts remain above A0's 0.</p>
+<p><img alt="Figure 13: Structured schedules raise fewer false alarms on the regional sky" src="../assets/battery_pv_separation_rung5_false_alarms.svg" /></p>
+<p>Exploratory longer batteries help a little: a 4-hour linear programme (A6_4h) gives 23.1%, against
+25.4% for the 2-hour version.</p>
+<h3 id="rung-6-solar-and-a-battery-fitted-together">Rung 6: solar and a battery fitted together</h3>
+<p><strong>Fitting solar and a battery together, with the battery's state of charge limited, recovers the
+solar nearly as well as the oracle on synthetic aggregates with no demand-like half.</strong> The model
+writes the aggregate as solar plus a battery. Solar is a non-negative sum of four fleet curves
+(east, south, west, and tracker). The battery is a free charge and discharge schedule within a power
+limit, an energy capacity, and a one-way efficiency of 0.92, fitted by linear programming in windows
+of about 4 weeks. A throughput cost of 0.1 per megawatt of charge or discharge, against 1 per
+megawatt of residual (unexplained output), stops the battery charging and discharging
+simultaneously. Arm A8 gives the model the true battery's power and rung 3's whole-year capacity,
+which drift inflates. Arms A8h and A8d use half and double that energy capacity, and A9 uses the
+true power with 2 hours of energy. Figure 1 (at the top of this page) shows one week of one
+synthetic aggregate. The fit follows the clear days and misses the cloud on the last, cloudy day.</p>
+<p><img alt="Figure 14: The fitted state of charge follows the state of charge integrated from the true
+battery's output (rung 3)" src="../assets/battery_pv_separation_rung6_soc.svg" /></p>
+<p><strong>On the regional sky the joint model has a solar error of 14.8% (A8) and 14.6% (A9), against 27.2%
+for the solar-only fit.</strong> The post hoc contrast B7 claimed that A8 recovers solar better than
+A0, and B8 made the same claim for A9. B7 (A8 minus A0) is −12.4 points [−15.6, −9.1] and B8 (A9
+minus A0) is −12.6 [−15.7, −9.3]: both met.</p>
+<p><strong>An energy capacity above rung 3's whole-year fit hurts, and half of it does not.</strong> A battery with
+double the energy capacity is worse (A8d, 16.3%), and half that capacity is slightly better (A8h,
+14.3%). Half of A8's whole-year capacity is close to the 3-month block fits of rung 3, which may be
+why A8h does best.</p>
+<p><img alt="Figure 15: The joint model recovers solar nearly as well as the oracle and better than price regressors" src="../assets/battery_pv_separation_rung6_error.svg" /></p>
+<p><strong>Within the fleet-curve solar model, the battery model closes 2.5 of the 3.3 points between a fit
+with no battery and a fit given the true battery.</strong> A0b is the fleet-curve solar fit with no battery
+(17.3%), and A3b is the fleet-curve fit given the true battery's output, removed from the aggregate
+(14.0%). A8 (14.8%) is 0.8 points [0.5, 1.2] above A3b, a like-for-like gap (exploratory). A8 minus
+A0b is −2.5 points [−2.9, −2.1] (exploratory). The oracle A3 of 13.8% uses rung 4's physical plant,
+which is a different solar model. The battery model's own contribution is largest at a 10% solar
+share (−3.8 points) and shrinks to −0.9 at 50%. At a 10% share A0b fits under the 2 MW detection
+threshold in 4 of 16 aggregates. In 2 of those 16 A0b fits no solar at all, so A0b's correlation
+with the true solar there is undefined (NaN).</p>
+<p><strong>Of the 3.9 points between A1 (18.7%) and A8 (14.8%), 2.4 come from the fleet-curve solar model and
+1.5 from the battery constraint.</strong> The intermediate arm A1b, the fleet-curve solar fit with A1's two
+price columns as free signed regressors, splits the gap. The arms A1, A0b, and A8 differ in both the
+solar model and the battery treatment, so no single contrast separates price regressors from the
+battery model. A1b has a solar error of 16.3%, against 17.3% for A0b and 14.8% for A8. The price
+columns therefore gain 1.0 point over A0b (A1b minus A0b is −1.0 [−1.3, −0.8], post hoc), and the
+battery constraint gains a further 1.5 points (A8 minus A1b is −1.5 [−1.9, −1.1], post hoc). Moving
+A1's price columns onto the fleet-curve solar model lowers A1's error by 2.4 points (A1b minus A1
+is −2.4 [−3.8, −1.1], post hoc).</p>
+<p><strong>The recovered battery output is close to the true output, and the state of charge only partly.</strong>
+Over the 48 aggregates with solar, A8's battery output differs from the true output by 3.08% of the
+battery's p99 (correlation 0.96). The correlation with the state of charge that rung 3 integrates
+from the true battery's output is 0.50 for A8, 0.73 for A8h, 0.31 for A8d, and 0.77 for A9. A8h and
+A9 correlate better than A8 with that path, which fits the explanation that A8's energy capacity is
+inflated by drift.</p>
+<p><strong>On synthetic aggregates with no demand-like half, the fitted solar AC capacity of A8 and A9 is 14%
+to 28% above the true capacity.</strong> The ratio of fitted to true solar AC capacity is 1.18 for A8 and
+1.14 for A9 on the regional sky, and 1.28 for A8 and 1.21 for A9 on the GB-mean sky. A3b, with the
+true battery removed, has 1.13 on the regional sky, so most of the bias is already in the
+fleet-curve solar model. The energy ratio is 1.03 for A8 pooled and 1.09 at a 50% share.</p>
+<p><strong>With rung 3's energy capacity or more, the joint model fits no solar on battery-only aggregates
+under the capacity rule, and with less it fits up to 1.7 MW.</strong> The capacity rule was set post hoc
+for B4 when rung 6 was specified. It counts a fitted solar capacity above 2 MW (2% of the
+aggregate's p99) as detected solar. A8, A8d, A0b, A1b, and A3b fit 0.00 MW in all 16 battery-only
+aggregates (0 of 16 false alarms each). A8h and A9 fit at most 1.72 MW and 1.46 MW, just under the
+threshold, so none counts as a detection: B4 is met for the joint model. The zero false alarms of A8
+rest on rung 3's whole-year energy capacity, which drift inflates. At a threshold of 1 MW, A8h has 8
+of 16 false alarms and A9 has 4 of 16, and at 2 MW neither has any.</p>
+<p><strong>Under the variance rule too, the fleet-curve arms with no battery, or with a battery at least as
+large as rung 3's, stay at 0 of 16.</strong> The variance rule is rung 4's, and it counts a fit of 0 MW as
+undetected. It differs from the capacity rule, so the 0 of 16 under the capacity rule does not
+compare with A1's 6 of 16 under the variance rule. Under the variance rule, A8h has 14 of 16 false
+alarms and A9 has 4 of 16. Five fleet-curve arms stay at 0 of 16: A0b and A1b (no battery), A3b (the
+true battery removed), and A8 and A8d (a battery at least as large as rung 3's). A battery smaller
+than rung 3's is where the joint model starts to fit solar that is not there, at most 1.7% of the
+aggregate's p99 for the arms that stay under the 2 MW threshold.</p>
+<p><img alt="Figure 16: On battery-only aggregates the joint model fits no solar with rung 3's energy capacity
+or more, and under 2 MW with less" src="../assets/battery_pv_separation_rung6_false_alarms.svg" /></p>
+<h3 id="rung-6-half-or-double-the-true-battery-power">Rung 6: half or double the true battery power</h3>
+<p><strong>Half or double the true battery power is worse than the true power, and both still beat a fit with
+no battery.</strong> Rungs 7 and 7b must assume a battery power, because the real BMUs' batteries are
+unknown. This run (post hoc) refits A8 on the regional sky with the power and the energy capacity
+both multiplied by 0.5 (A8_p05) and by 2 (A8_p2), which keeps the duration. The pooled solar error
+is 15.7% [13.9, 18.2] for A8_p05 and 16.2% [14.3, 18.3] for A8_p2, against 14.8% [12.7, 17.4] for A8
+and 17.3% [15.6, 19.5] for the no-battery fit A0b. Against A8, A8_p05 is 0.9 points worse [0.6, 1.2]
+and A8_p2 is 1.4 points worse [0.9, 1.8]. The wrong power raises the solar error most at a 10% solar
+share (1.3 and 2.8 points) and not at all at 50%. The energy ratio is 0.92 for A8_p05 and 0.90 for
+A8_p2, against 1.03 for A8. The pooled AC capacity ratio is 1.01 and 1.02, against 1.18 for A8. The
+pooled value hides a low ratio at a 10% share (0.82 and 0.74) and a high one at 50% (1.17 and 1.24).
+No battery-only aggregate has more than 1 MW of fitted solar under any of the five arms (0 of 16 at
+1 MW and at 2 MW).</p>
+<h3 id="rung-7-the-real-aggregate-bmus">Rung 7: the real aggregate BMUs</h3>
+<p><strong>On the 25 real aggregate BMUs the battery size is not identified, and the fitted solar capacity
+depends on it.</strong> The BMUs are supplier and virtual BMUs, registered by electricity suppliers and by
+virtual lead parties, that hold the embedded generation and demand of many small sites. The solar
+study could not tell solar from batteries in them. This rung fits each BMU's real output with rung
+6's joint model for an assumed battery power between 0 and 200 MW, with 2 hours of energy. A power
+of 0 is solar only. The sky is the mean of the three CAMS grid points nearest to the centroid of the
+BMU's grid supply point group, because the solar location of a real aggregate is unknown. The model
+has no calendar baseline, and the solar study's fits had one. Rung 7b below adds the baseline.</p>
+<p><strong>A smaller residual is not evidence that a battery exists.</strong> The residual falls steadily as the
+assumed battery grows, for real output and for calendar replicas alike. The median over BMUs is 0.29
+of its value at 0 MW for a 50 MW battery for real output, and 0.28 for replicas. No ground truth
+exists.</p>
+<p><strong>Allowing a larger battery cuts the fitted solar capacity of the biggest BMUs.</strong> Only
+2__ATGPL000 and 2__HTGPL000 fall to about 0 MW at 200 MW. The BMU 2__LTGPL000, which has the largest
+fitted capacity at no battery, falls from 109.7 to 56.9 MW.</p>
+<p><img alt="Figure 17: Without a calendar baseline, allowing a larger battery cuts the fitted solar capacity
+of the biggest BMUs" src="../assets/battery_pv_separation_rung7_capacity.svg" /></p>
+<p><strong>Allowing a 50 MW battery cuts the fitted solar peak of 2__ATGPL000, the BMU with the
+second-largest fitted capacity at no battery, from 62 MW to 46 MW.</strong> At that size the fitted battery
+runs at its ±50 MW power limit in 3.9% of the half-hours of the year.</p>
+<p><img alt="Figure 18: Without a calendar baseline, allowing a 50 MW battery cuts the fitted solar peak of
+2__ATGPL000 from 62 MW to 46 MW" src="../assets/battery_pv_separation_rung7_week.svg" /></p>
+<p><strong>The fitted solar capacity of the 25 BMUs is between 161 and 323 MW at every assumed battery power
+from 0 to 200 MW, far below the solar study's 1,089 to 1,163 MW.</strong> The totals differ in kind as well
+as in size, because this fit has no calendar baseline. The maximum, 322.7 MW, is at 5 MW, which the
+table omits: the total is 316.5, 322.0, 322.7, and 319.0 MW at 0, 2, 5, and 10 MW.</p>
+<table>
+<thead>
+<tr>
+<th>Assumed battery power (MW)</th>
+<th>0</th>
+<th>10</th>
+<th>50</th>
+<th>200</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fitted solar capacity, 25 BMUs, real output (MW)</td>
+<td>316.5</td>
+<td>319.0</td>
+<td>275.3</td>
+<td>161.0</td>
+</tr>
+<tr>
+<td>Fitted solar capacity, 25 BMUs, calendar replicas (MW)</td>
+<td>281.6</td>
+<td>283.2</td>
+<td>227.5</td>
+<td>143.1</td>
+</tr>
+<tr>
+<td>Fitted solar capacity, nine cloud-signal BMUs, real output (MW)</td>
+<td>262.4</td>
+<td>253.1</td>
+<td>208.7</td>
+<td>98.6</td>
+</tr>
+<tr>
+<td>Fitted solar capacity, nine cloud-signal BMUs, replicas (MW)</td>
+<td>226.2</td>
+<td>217.7</td>
+<td>160.8</td>
+<td>80.7</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="Figure 19: Without a calendar baseline, the fitted solar capacity of the 25 BMUs is 161 to 323 MW
+at every battery size tried (0 to 200 MW)" src="../assets/battery_pv_separation_rung7_total.svg" /></p>
+<p><strong>The replicas also fit solar, so the model is not isolating the cloud signal.</strong> A replica contains
+the mean solar shape and no cloud, so a replica that fits solar shows that the fit works from the
+daily shape, not that the fit invents solar from nothing. The replicas fit 226.2 MW over the nine
+cloud-signal BMUs with no battery. The gap between real output and replica, the part that follows
+the real weather, is 36.1 MW over those nine BMUs at no battery and 17.9 MW at 200 MW.</p>
+<h3 id="rung-7b-the-same-fit-with-the-solar-studys-calendar-baseline">Rung 7b: the same fit with the solar study's calendar baseline</h3>
+<p><strong>With a calendar baseline, the joint model's total fitted solar over the 25 BMUs is 1,154 to 1,217
+MW at every assumed battery power.</strong> Rung 7 had no baseline, so its solar part absorbed every
+regular daily and seasonal shape of a BMU's output. Rung 7b fits each BMU's output as the sum of
+solar, a calendar baseline, and a battery. Solar is the four fleet curves under the same regional
+CAMS sky. The baseline is the solar study's seasonal design (an indicator for each local half-hour
+of the day and day type, plus two annual harmonics for each half-hour) with free signed
+coefficients. A linear programme cannot hold the small ridge penalty the solar study put on that
+baseline, so this fit puts a small absolute penalty on the coefficients instead (0.001 per unit of
+coefficient, against 1 per megawatt of residual). The battery is rung 7's, with an assumed power
+from 0 to 200 MW and 2 hours of energy.</p>
+<table>
+<thead>
+<tr>
+<th>Assumed battery power (MW)</th>
+<th>0</th>
+<th>5</th>
+<th>20</th>
+<th>50</th>
+<th>100</th>
+<th>200</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fitted solar capacity, 25 BMUs, real output (MW)</td>
+<td>1,160</td>
+<td>1,198</td>
+<td>1,217</td>
+<td>1,216</td>
+<td>1,202</td>
+<td>1,154</td>
+</tr>
+<tr>
+<td>Fitted solar capacity, 25 BMUs, calendar replicas (MW)</td>
+<td>216</td>
+<td>239</td>
+<td>265</td>
+<td>304</td>
+<td>366</td>
+<td>426</td>
+</tr>
+<tr>
+<td>Fitted solar capacity, nine cloud-signal BMUs, real output (MW)</td>
+<td>1,146</td>
+<td>1,171</td>
+<td>1,182</td>
+<td>1,173</td>
+<td>1,161</td>
+<td>1,129</td>
+</tr>
+<tr>
+<td>Fitted solar capacity, nine cloud-signal BMUs, replicas (MW)</td>
+<td>213</td>
+<td>223</td>
+<td>245</td>
+<td>282</td>
+<td>341</td>
+<td>403</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="Figure 20: With a calendar baseline, the fitted solar capacity of the 25 BMUs stays near 1,160 MW" src="../assets/battery_pv_separation_rung7b_total.svg" /></p>
+<p><strong>With a calendar baseline, the fitted total is a conditional fit, not a check on the solar
+study.</strong> The total is 1,160 MW with no battery, and it stays between 1,154 and 1,217 MW across the
+assumed battery sizes. The solar study's totals are 1,163 MW from its physical fit and 1,089 MW from
+its difference separation (a fit of the fleet curves to four-hour changes, then the baseline). The
+two capacity measures differ: on the synthetic aggregates of rung 6, the fleet-curve fit given the
+true battery fits 1.13 times the direct physical fit to the solar half, and the solar study found
+that its physical fit recovers 0.24 to 0.44 of the reference capacity beside storage, against 0.93
+beside wind or gas. The match of 1,160 MW with 1,163 MW is therefore not evidence that either total
+is right, and no ground truth exists.</p>
+<p><strong>With the baseline, the fitted solar of the largest BMUs no longer falls to zero as the battery
+grows.</strong> The nine cloud-signal BMUs hold 1,146 MW at no battery and 1,129 MW at 200 MW, against 262
+MW and 99 MW in rung 7 without the baseline. That fourfold difference shows that the fitted
+capacity depends on the model, not only on the data. 2__ATGPL000 stays at 271 to 277 MW, and
+2__HTGPL000 ends at 216 MW at 200 MW (255 MW with no battery). In rung 7, without the baseline,
+both fell to about 0 MW at 200 MW. At 50 MW, the fitted battery runs at its limit in 0.7% of
+2__ATGPL000's half-hours, against 3.9% in rung 7.</p>
+<p><img alt="Figure 21: With a calendar baseline, the four largest BMUs' fitted solar capacity barely moves" src="../assets/battery_pv_separation_rung7b_per_bmu.svg" /></p>
+<p><strong>Part of the fitted solar could be daily and seasonal shape that a calendar replica also
+produces, and that part grows with the assumed battery.</strong> A replica has no cloud, so solar fitted to
+a replica is shape alone. The replicas total 216 MW at no battery, which is 19% of the real output's
+1,160 MW, and 426 MW at 200 MW, which is 37% of the real output's 1,154 MW. A fifth to over a third
+of the fitted capacity could therefore be shape. The gap between real output and replicas falls
+from 944 MW at no battery to 728 MW at 200 MW.</p>
+<p><strong>The residual falls with the assumed battery power for real output and for replicas alike, so the
+battery size is not identified.</strong> The fit alone cannot separate the cloud-driven part from shape.
+The median over BMUs of the residual is 0.30 of its no-battery value at 50 MW for both.</p>
+<h3 id="rung-7c-known-answer-test">Rung 7c: known-answer test</h3>
+<p><strong>On synthetic aggregates with a demand-like half, the joint model overshoots the solar capacity at
+the true battery power, and by more at larger assumed powers.</strong> Each synthetic aggregate is a solar
+half (25 or 50 MW p99), a battery half, and a demand-like half: the real output, or the calendar
+replica, of one of three aggregate BMUs, scaled to a 50 MW p99. The solar study found no cloud
+signal in those three BMUs, and this test assumes they hold no solar. The assumption was not tested:
+rung 7b fits real output of one of them, V__NFLEX003, with 7.6 MW of solar and no battery, and 18.4
+MW at 100 MW. The battery half has a p99 of 100 MW minus the solar half's: 75 MW beside 25 MW of
+solar, 50 MW beside 50 MW, and 100 MW with no solar. Rung 7b's model is fitted to 48 aggregates per
+row (4 solar halves, 4 batteries, and 3 demand-like BMUs). Those 48 aggregates share their 4 solar
+halves, 4 batteries, and 3 demand-like BMUs, so the intervals understate the uncertainty. This run
+is post hoc. Capacity is a ratio over the same model fitted to the solar half alone (the fleet-curve
+reference), which is what the model fits with no battery or demand-like half to confuse it.</p>
+<table>
+<thead>
+<tr>
+<th>Capacity over the fleet-curve reference</th>
+<th>0 MW</th>
+<th>20 MW</th>
+<th>50 MW</th>
+<th>100 MW</th>
+<th>200 MW</th>
+<th>True power</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Real demand-like half, 25 MW solar</td>
+<td>0.96</td>
+<td>1.10</td>
+<td>1.35</td>
+<td>1.69</td>
+<td>1.98</td>
+<td>1.50</td>
+</tr>
+<tr>
+<td>Real demand-like half, 50 MW solar</td>
+<td>1.02</td>
+<td>1.18</td>
+<td>1.30</td>
+<td>1.43</td>
+<td>1.56</td>
+<td>1.30</td>
+</tr>
+<tr>
+<td>Replica demand-like half, 25 MW solar</td>
+<td>0.86</td>
+<td>0.93</td>
+<td>1.14</td>
+<td>1.42</td>
+<td>1.72</td>
+<td>1.26</td>
+</tr>
+<tr>
+<td>Replica demand-like half, 50 MW solar</td>
+<td>0.93</td>
+<td>1.06</td>
+<td>1.17</td>
+<td>1.32</td>
+<td>1.44</td>
+<td>1.17</td>
+</tr>
+</tbody>
+</table>
+<p>In the last column the assumed power is the battery half's true power, which is 75 MW for the rows
+with 25 MW of solar and 50 MW for the rows with 50 MW of solar. The last column therefore differs
+from the 100 MW column.</p>
+<p><strong>The two capacity measures are biased in the same direction.</strong> With no battery assumed, the fitted
+capacity is 0.86 to 1.02 times the fleet-curve reference. At the true power, the fitted capacity
+over the direct physical fit to the solar half is 1.11 to 1.44 times, against 1.17 to 1.50 times
+over the fleet-curve reference. At 100 and 200 MW the fleet-curve ratio is 1.32 to 1.98. The solar
+series error is 14.5% to 16.8% at the true power and rises to 16.9% to 24.3% at 200 MW. Recovered
+solar energy over true energy is 0.97 to 1.22 at the true power. The solar study's difference
+separation, which has no battery, fits 1.34 to 1.60 times the fleet-curve reference.</p>
+<p><strong>With no solar present, the model fits more than 1 MW of solar in most sums once the assumed
+battery power is large.</strong> The sums with no solar have a 100 MW battery half, so their true power is
+100 MW. With a real demand-like half, the false alarms above 1 MW are 11 of 48 at 0 MW, 26 of 48 at
+50 MW, and 35 of 48 at the true power; 45 of 48 at 200 MW. With the demand-like half taken as a
+calendar replica, the false alarms are 38 of 48 at the true power. The false alarms at 0 MW, which
+are 11 of 48 for a real demand-like half against 5 of 48 for a replica, are consistent with some of
+the demand-like halves holding solar.</p>
+<p><img alt="Figure 22: On synthetic aggregates with a known answer, the fitted solar capacity grows with the
+assumed battery power" src="../assets/battery_pv_separation_rung7c_known_answer.svg" /></p>
+<p><strong>On these sums, giving the joint model the battery's true power lowers the solar error by 0 to 1.4
+points and raises the fitted capacity.</strong> Against no battery, the solar series error at the true
+power is 16.7% against 16.7% (real demand-like half, 25 MW solar), 14.5% against 15.4%, 16.8%
+against 17.8%, and 14.9% against 16.3%. The same step raises the fitted capacity from 0.86 to 1.02
+times the fleet-curve reference to 1.17 to 1.50 times. Rung 6 recovered solar from sums with no
+demand-like half. The joint model's gain shown there is therefore not shown to survive a demand-like
+half. The real BMUs differ from these sums in a second way: the real total is flat from 1,154 to
+1,217 MW as the assumed power rises, while the capacity of the sums rises steeply.</p>
+<h3 id="rung-7c-cost-sensitivity">Rung 7c: cost sensitivity</h3>
+<p><strong>The fitted total stays between 1,150 and 1,220 MW at every throughput cost that uses the battery,
+and the stability is partly the linear programme's.</strong> The linear programme charges 0.1 per megawatt
+of battery throughput, against 1 per megawatt of residual. At 200 MW and a throughput cost of 0.3
+or less, the median share of half-hours that the fit reproduces exactly is 100%. Many solutions
+therefore fit equally well, and the two weights in the objective settle which one the solver
+returns. This run (post hoc) refits rung 7b's model at 50 and 200 MW with the throughput cost
+changed from 0.08 to 1 per megawatt. At the highest throughput cost (1 per megawatt) the battery is
+not used, the median residual stays at 0.92 of its no-battery value at 50 MW and 0.95 at 200 MW, and
+the total reverts to the no-battery 1,160 MW. The calendar replicas' totals are cost-sensitive: at
+200 MW they are 341 MW at a throughput cost of 0.3 against 426 MW at 0.1, and at 50 MW they are 269
+MW against 304 MW.</p>
+<p><strong>The two solar-cost settings are not informative.</strong> The run also charged 0.01 and 0.05 per
+megawatt of fitted solar capacity, and the total moved by at most 1 MW. That cost is charged once
+per megawatt of capacity, against a residual summed over about 17,500 half-hours, so it is too
+small to move the fit. The result says nothing about whether the total is robust to a prior on the
+capacity.</p>
+<p><img alt="Figure 23: At every cost setting tried, the fitted solar capacity of the 25 BMUs stays at 1,150 to
+1,220 MW" src="../assets/battery_pv_separation_rung7c_costs.svg" /></p>
+<h2 id="discussion">Discussion</h2>
+<p><strong>The evidence supports a joint model with an explicit battery for simple synthetic aggregates when
+the battery's power is known. It supports no solar capacity for the 25 real aggregate BMUs, so the
+capacity answer is not established by this study.</strong> The summary at the top of the page gives the
+results. Two lessons carry over:</p>
+<ul>
+<li><strong>Judge any separation against a control with the same daily shape, and against a synthetic
+  aggregate with a known answer.</strong> The calendar replicas of rung 7 and the wrong-week prices of
+  rung 4 each show how much a method fits without the signal, and rung 7c shows a bias that no
+  replica can.</li>
+<li><strong>Report the model, the capacity measure, and the battery size that a result assumes.</strong> Without a
+  calendar baseline, the fitted solar capacity of 2__ATGPL000 and 2__HTGPL000 falls to about 0 MW
+  with a 200 MW battery. With the baseline, it stays at 271 MW and 216 MW (from 255 MW).</li>
+</ul>
+<p><strong>A ground truth would establish the capacity.</strong> An aggregate BMU whose solar and battery are
+metered separately would let the fit be scored against a known answer on real data, rather than on
+synthetic aggregates. Short of that, a better real-aggregate result would need at least three inputs
+this study did not use. A demand model would describe the non-solar part of a supplier BMU, which is
+mostly demand. Planned-output data for the BMU (its physical notification) would say what the
+battery intended, leaving the remainder. Response-contract data would explain the frequency-driven
+remainder (Figure P3 of <a href="../../background/gb-battery-scheduling/">how GB batteries schedule
+themselves</a>).</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li><strong>The scripts were first run during exploration, before their code review.</strong> No separate diff
+  review of the page and its scripts has been done yet, and the mutation-testing pass of
+  <code>packages/studies</code> is pending.</li>
+<li><strong>The contrasts are labelled planned, post hoc, or exploratory, and no correction is made for
+  multiple comparisons.</strong> The planned contrasts are B1, B3, and B4 (variance rule). The post hoc
+  contrasts are B5 to B8, B4 (capacity rule), and those involving A1b. The plan's B2 was not run,
+  because no state-of-charge predictor of output was built. Each rung's section gives the results.</li>
+<li><strong>Four batteries and one year in Coordinated Universal Time (UTC) are the whole sample</strong>, with
+  four solar halves, so the intervals of rungs 4 to 6 resample only four solar halves or 16
+  aggregates and are wide. The intervals of rung 7c resample 48 aggregates as if independent,
+  although the aggregates share 4 solar halves, 4 batteries, and 3 demand-like BMUs.</li>
+<li><strong>Rung 3's energy capacities are inflated by slow drift</strong>, so A8's capacity, and every cycle count
+  computed from it, is biased. The solar capacity of A8 and A9 is biased high by 14% to 28% on the
+  synthetic aggregates of rung 6. The false alarms that A8 does not raise rest on this inflated
+  capacity.</li>
+<li><strong>The solar halves are real BMUs</strong>, and the solar study found that 8 of its 11 solar BMUs are
+  hybrids, so a solar half may already include battery effects.</li>
+<li><strong>The joint model's best arms are told the true battery's power.</strong> A8 also takes its energy
+  capacity from rung 3's fit to the same battery, an advantage that a real aggregate does not give.</li>
+<li><strong>The regional irradiance for synthetic aggregates is picked from the solar half's true
+  location</strong>, an advantage that the real aggregates do not have. The GB-mean sky removes it, and
+  raises the false-alarm counts of the unconstrained price regressors.</li>
+<li><strong>State of charge is never observed</strong>, so no check on it is independent of the fit.</li>
+<li><strong>Response-contract blocks are candidates</strong>, matched by identifier only (see <a href="../../background/gb-battery-scheduling/">how GB batteries
+  schedule themselves</a>).</li>
+<li><strong>The four batteries are all registered in the Balancing Mechanism.</strong> Batteries that trade in
+  other markets are not seen in the price-response data.</li>
+<li><strong>Rung 7c's demand-like halves come from three BMUs, half of them as real output and half as
+  calendar replicas, and are assumed to hold no solar.</strong> A real aggregate's demand, with its own
+  weather dependence, may bias the capacity differently. Rung 7c is post hoc. The solar-cost
+  settings of the cost-sensitivity run are too small to test anything.</li>
+<li><strong>A battery assumed where none is present was not tested.</strong> Every synthetic aggregate holds a
+  battery, so the study does not show whether an assumed but absent battery inflates or deflates
+  the fitted capacity of the 25 real BMUs, whose batteries are unknown.</li>
+<li><strong>Rungs 7 and 7b have no ground truth.</strong> Adding the calendar baseline raises the total from
+  316.5 MW to 1,160 MW, close to the solar study's totals, and that agreement does not show the
+  total is right.</li>
+<li><strong>Rung 7b penalises the baseline coefficients with an absolute penalty</strong>, where the solar study
+  used a ridge penalty, and the effect of that difference was not tested. Rung 6's synthetic
+  aggregates had no calendar baseline, so they do not measure the capacity bias of rung 7b's fit.
+  Rung 7c measures it, with demand-like halves from only three BMUs.</li>
+</ul>
+<h2 id="scope">Scope</h2>
+<p><strong>Two related questions are separate studies and are not answered here.</strong> The first asks how well an
+embedded battery can be forecast, and the second asks how to estimate the size of an unmetered
+battery from an aggregate. The scripts for a private case study of one battery in NGED's telemetry
+(<code>nged_battery_a*.py</code>) are in the repository. The case study's figures and report are unpublished
+and wait for those two studies.</p>
+<h2 id="data-and-code-availability">Data and code availability</h2>
+<p><strong>The prices and metered data are public.</strong> Contains Balancing Mechanism Reporting Service (BMRS)
+data © Elexon Limited, copyright and database right 2026. National Energy System Operator (NESO)
+data, including the N2EX day-ahead prices and the auction results, is published under the NESO Open
+Data Licence. CAMS irradiance comes through the solar study. The market datasets sit under
+<code>data/studies/downloads/market/</code>, each folder with a README that gives its column meanings and time
+conventions.</p>
+<p>The scripts are in <code>studies/battery_pv_separation/</code>. The shared machinery is in
+<code>packages/studies/src/studies/</code> (<code>battery_dispatch.py</code>, <code>battery_joint_lp.py</code>, <code>pv_fit.py</code>), and the
+results are under <code>data/studies/per_study/battery_pv_separation/</code>, which are not committed.</p>
+<h2 id="reproducing">Reproducing</h2>
+<p>The market datasets under <code>data/studies/downloads/market/</code> must be on disk first. Then run the
+scripts in this order. Set <code>OMP_NUM_THREADS=2</code> for each command.</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_primer.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung1.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung2.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung3.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung4.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung4_summary.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung5.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung5_summary.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung6.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung6_summary.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung7.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung7_summary.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung7b.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung7b_summary.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung6_wrong_power.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung6_wrong_power_summary.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung7c_costs.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung7c_costs_summary.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung7c_known_answer.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_rung7c_known_answer_summary.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_report.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_charts_primer.py<span class="w">  </span><span class="c1"># writes docs/background/assets/</span>
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_charts.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_charts_rung5.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_charts_rung6.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_charts_rung7.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_charts_rung7b.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/battery_pv_separation/battery_charts_rung7c.py
+</code></pre></div>
+<p>The helper modules <code>battery_inputs.py</code> and <code>battery_synthetic.py</code> hold the shared loading and the
+synthetic aggregates, and are not run on their own.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
