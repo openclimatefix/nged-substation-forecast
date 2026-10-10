@@ -503,24 +503,40 @@ WINDOW_TARGET_DAY_INDEX = 12
 """The target day, as a day index from `DAY`; the fixture holds days 0 to 13."""
 
 
-def _window_hourly(*, missing_day_index: int | None) -> pl.DataFrame:
+def _window_hourly(
+    *,
+    missing_day_index: int | None,
+    null_day_index: int | None = None,
+    bump: dict[int, float] | None = None,
+    duplicate_day_index: int | None = None,
+) -> pl.DataFrame:
     """Return hourly power whose value names its site, day and clock hour.
 
     The value is `10000 * site + 100 * day index + clock hour`, so any wrong day, hour or site shows
     in the result, and the days after the target day hold values a future read would pick up.
+    `null_day_index` keeps that day's rows but with null power, `bump` adds an amount to a day's
+    values (making the days' values asymmetric), and `duplicate_day_index` repeats that day's rows.
     """
+    extra = bump or {}
     rows = [
         (
             site,
             DAY + timedelta(days=day_index, hours=hour),
-            10000.0 * site_id + 100 * day_index + hour,
+            None
+            if day_index == null_day_index
+            else 10000.0 * site_id + 100 * day_index + hour + extra.get(day_index, 0.0),
         )
         for site_id, site in enumerate(["A", "B"])
         for day_index in range(14)
         for hour in range(10, 15)
         if day_index != missing_day_index
+        for _ in range(2 if day_index == duplicate_day_index else 1)
     ]
-    return pl.DataFrame(rows, schema=["site", "time", "power_mw"], orient="row")
+    return pl.DataFrame(
+        rows,
+        schema={"site": pl.String, "time": pl.Datetime("us", "UTC"), "power_mw": pl.Float64},
+        orient="row",
+    )
 
 
 @pytest.mark.parametrize(
@@ -601,3 +617,59 @@ def test_a_window_that_could_read_the_issue_day_or_is_empty_is_refused(
             statistic="mean",
             min_count=min_count,
         )
+
+
+@pytest.mark.parametrize(
+    ("statistic", "expected"),
+    [("mean", 932.0), ("median", 912.0), ("min", 812.0), ("max", 1072.0), ("p90", 1040.0)],
+)
+def test_each_statistic_is_what_it_names_on_asymmetric_days(statistic: str, expected: float):
+    target = DAY + timedelta(days=WINDOW_TARGET_DAY_INDEX, hours=12)
+
+    window = same_clock_hour_window(
+        keys=pl.DataFrame({"site": ["A"], "time": [target]}),
+        hourly=_window_hourly(missing_day_index=None, bump={10: 60.0}),
+        day=1,
+        first_days_back=1,
+        last_days_back=3,
+        statistic=statistic,  # ty: ignore[invalid-argument-type]
+        min_count=1,
+    )
+
+    assert window.to_list() == pytest.approx([expected])
+
+
+def test_a_day_whose_row_has_null_power_does_not_count_towards_the_minimum():
+    target = DAY + timedelta(days=WINDOW_TARGET_DAY_INDEX, hours=12)
+    keys = pl.DataFrame({"site": ["A"], "time": [target]})
+    hourly = _window_hourly(missing_day_index=None, null_day_index=9)
+
+    def window(min_count: int) -> list[float | None]:
+        return same_clock_hour_window(
+            keys=keys,
+            hourly=hourly,
+            day=1,
+            first_days_back=1,
+            last_days_back=3,
+            statistic="mean",
+            min_count=min_count,
+        ).to_list()
+
+    assert window(3) == [None]
+    assert window(2) == pytest.approx([(1012.0 + 812.0) / 2])
+
+
+def test_repeated_site_time_rows_count_once_towards_the_minimum():
+    target = DAY + timedelta(days=WINDOW_TARGET_DAY_INDEX, hours=12)
+
+    window = same_clock_hour_window(
+        keys=pl.DataFrame({"site": ["A"], "time": [target]}),
+        hourly=_window_hourly(missing_day_index=8, duplicate_day_index=10),
+        day=1,
+        first_days_back=1,
+        last_days_back=3,
+        statistic="mean",
+        min_count=3,
+    )
+
+    assert window.to_list() == [None]

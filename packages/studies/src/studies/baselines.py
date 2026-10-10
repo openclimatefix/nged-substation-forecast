@@ -397,7 +397,7 @@ def same_clock_hour_window(
     reads, so day `j` back is `24 * (day + j)` hours before the target hour. The issue day itself
     is never read, because a 09:00 UTC issue has not seen the issue day's later hours. Reading is
     strict: an hour that is missing, or null, counts as absent, and there is no fallback to an
-    earlier day.
+    earlier day. Repeated `(site, time)` rows in `hourly` count once, as their mean.
 
     Args:
         keys: One row per scored row, with `site` and `time`, in the order to return.
@@ -428,7 +428,12 @@ def same_clock_hour_window(
         "median": pl.col("power_mw").median(),
         "p90": pl.col("power_mw").quantile(WINDOW_QUANTILE, interpolation="linear"),
     }
-    observed = hourly.select("site", pl.col("time").alias("lag_time"), "power_mw").drop_nulls()
+    observed = (
+        hourly.select("site", pl.col("time").alias("lag_time"), "power_mw")
+        .drop_nulls()
+        .group_by("site", "lag_time")
+        .agg(pl.col("power_mw").mean())
+    )
     window = (
         keys.select("site", "time")
         .with_row_index("row")
