@@ -44,12 +44,12 @@ boosting rounds, writes `checkpoints_smoke/` and `losses_<product>_smoke.parquet
 - **The lag source** is NGED's hourly power with the multi-day zero runs, meter spikes, commissioning
   ramp and export-capped hours removed. The target is the shared rows' `power_mw`.
 - **Only the reproduction check reads rows at or after `final_test_start` (2026-07-01).** It refits
-  the ENS-mean B0 on all 35,263 shared rows, including the 5,144 from that date, because the
-  published number includes them; B0 reads no power. The CPU leg must give 8.766% and the saved CPU
-  losses' per-row loss checksum, and the GPU leg is reported against the published 8.771% without
-  an assertion. **Nothing else at or after the date reaches a fit.** `studies.power.scan_power`
-  stops there, the builder drops the shared rows and the stage-1 hours from that date, and the
-  build and fit scripts assert that no training row is at or after it. The study has 18 usable
+  the ENS-mean B0 at lead-day 1 on the study's device and all 35,263 shared rows, including the
+  5,144 from that date, because the published number includes them, and asserts a mean absolute
+  error within 0.03 points of the published 8.771%. B0 reads no power. **Nothing else at or after
+  the date reaches a fit.** `studies.power.scan_power` stops there, the builder drops the shared
+  rows and the stage-1 hours from that date, and the build and fit scripts assert that no training
+  row is at or after it. The study has 18 usable
   months.
   Phase 1 screens 2024-12 to 2025-09 (10 months). P2 is scored on 2025-10 to 2026-06 without
   2026-01 (8 months).

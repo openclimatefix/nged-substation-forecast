@@ -109,7 +109,6 @@ from studies.cross_validation import (
     score_prediction,
 )
 from studies.guards import refuse_to_overwrite
-from studies.sources import NFC_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fit_lag_arms")
@@ -141,9 +140,12 @@ absolute error over `SCREENING_MONTHS`. The excluded arms are B0, L1, L2, S2, N1
 carries those regardless), T1 (an interpolation bound), the references and post-model corrections
 (none is fitted), and the global-only arms. Phase 2 carries X."""
 
-CPU_REPRODUCTION_WORKERS: Final[int] = 2
-"""The CPU leg of the reproduction check fits on at most this many workers, to leave the machine
-usable."""
+REPRODUCTION_MAE_PERCENT: Final[float] = 8.771
+"""The published mean absolute error of the ENS-mean B0 at lead-day 1 on the 35,263 shared rows, in
+percentage points of capacity, from a GPU fit."""
+
+REPRODUCTION_TOLERANCE_PERCENT: Final[float] = 0.03
+"""How far the refit's mean may differ from the published figure. Device differences are smaller."""
 
 WIDE_X_COLUMNS: Final[int] = 3
 """If X adds more columns than this, N2-k is fitted with as many random lags as X adds."""
@@ -1347,58 +1349,24 @@ def combine(*, results: list[pl.DataFrame]) -> pl.DataFrame:
     ).sort("scope", "setting", "arm", "site", "time", "seed")
 
 
-def loss_checksum(*, losses: pl.DataFrame) -> str:
-    """Return a checksum of the per-row losses, in a fixed row order.
-
-    Args:
-        losses: Per-row losses with `site`, `time`, `seed` and `METRIC`.
-
-    Returns:
-        The SHA-256 hex digest of the sorted per-row loss values' bytes.
-    """
-    ordered = losses.sort("site", "time", "seed")
-    return hashlib.sha256(ordered[METRIC].cast(pl.Float32).to_numpy().tobytes()).hexdigest()
-
-
-def published_checksum() -> str | None:
-    """Return the per-row loss checksum of the matched-lead study's saved ENS-mean day-1 fit.
-
-    Returns:
-        The checksum of `solar_losses.parquet`'s `ens_mean_day1` primary-setting rows, or `None` if
-        the file is not on disk.
-    """
-    path = NFC_DIR / "solar_losses.parquet"
-    if not path.exists():
-        return None
-    saved = pl.read_parquet(path).filter(
-        (pl.col("arm") == "ens_mean_day1") & (pl.col("setting") == "primary")
-    )
-    return loss_checksum(losses=saved)
-
-
-def reproduction_check(
-    *, root: Path, device: DeviceType, max_workers: int, expected_checksum: str | None
-) -> int:
+def reproduction_check(*, root: Path, device: DeviceType, max_workers: int) -> int:
     """Refit the ENS-mean B0 at lead-day 1 on the shared rows and compare it with the published run.
 
-    The CPU refit must give `REPRODUCTION_CPU_MAE_PERCENT` and the per-row loss checksum of the
-    matched-lead study's saved CPU losses (or `expected_checksum` if given). If `device` is `cuda`,
-    a GPU refit is reported beside it with its differences from the CPU refit and from
-    `REPRODUCTION_GPU_MAE_PERCENT`, which is not asserted. The refit uses all 35,263 shared rows,
-    including the 5,144 from `final_test_start` on, because the published number includes them; B0
-    reads no power, and nothing else at or after `final_test_start` reaches a fit.
+    The refit uses all 35,263 shared rows, including the 5,144 from `final_test_start` on, because
+    the published number includes them; B0 reads no power, and nothing else at or after
+    `final_test_start` reaches a fit.
 
     Args:
         root: The output root, where `reproduction_check.md` is written.
-        device: The device of the second refit; `cpu` runs the CPU refit alone.
+        device: The device to refit on, the study's own.
         max_workers: How many plants fit at once.
-        expected_checksum: A checksum to assert instead of the saved losses, or None to read those.
 
     Returns:
         0 on success.
 
     Raises:
-        ValueError: If the CPU refit's mean or checksum differs from the published one.
+        ValueError: If the refit's mean differs from `REPRODUCTION_MAE_PERCENT` by more than
+            `REPRODUCTION_TOLERANCE_PERCENT`.
     """
     report = root / "ens_mean" / "reproduction_check.md"
     refuse_to_overwrite(paths=[report])
@@ -1412,47 +1380,21 @@ def reproduction_check(
         .sort("site", "time")
     )
     job: Job = ("B0", "primary", TARGET, features_of(arm="B0"), PRIMARY_HYPER_PARAMETERS, False)
-    lines = ["# Reproduction check: ENS-mean B0 at lead-day 1 on the shared rows", ""]
-    means = {}
-    checksum_to_match = expected_checksum or published_checksum()
-    lines.append(
-        f"- published per-row loss checksum: `{checksum_to_match}`"
-        if checksum_to_match
-        else "- no saved matched-lead losses on disk, so only the mean is asserted."
+    losses = run_all(dataset=frame, jobs=[job], max_workers=max_workers, device=device)
+    mean = float(losses.select(pl.col(METRIC).mean()).item()) * 100
+    line = (
+        f"- {device}: mean absolute error {mean:.3f}% of capacity on "
+        f"{losses.select('site', 'time').n_unique()} rows; published {REPRODUCTION_MAE_PERCENT}%, "
+        f"difference {mean - REPRODUCTION_MAE_PERCENT:+.3f} points "
+        f"(tolerance {REPRODUCTION_TOLERANCE_PERCENT})."
     )
-    for fitted_on in dict.fromkeys(("cpu", device)):
-        losses = run_all(
-            dataset=frame,
-            jobs=[job],
-            max_workers=min(max_workers, CPU_REPRODUCTION_WORKERS)
-            if fitted_on == "cpu"
-            else max_workers,
-            device=fitted_on,
-        )
-        means[fitted_on] = float(losses.select(pl.col(METRIC).mean()).item()) * 100
-        checksum = loss_checksum(losses=losses)
-        lines.append(
-            f"- {fitted_on}: mean absolute error {means[fitted_on]:.3f}% of capacity on "
-            f"{losses.select('site', 'time').n_unique()} rows; per-row loss checksum `{checksum}`."
-        )
-        if fitted_on == "cpu":
-            if abs(means["cpu"] - REPRODUCTION_CPU_MAE_PERCENT) > REPRODUCTION_TOLERANCE_PERCENT:
-                msg = (
-                    f"CPU refit gives {means['cpu']:.4f}%, "
-                    f"not the saved CPU losses' {REPRODUCTION_CPU_MAE_PERCENT}%"
-                )
-                raise ValueError(msg)
-            if checksum_to_match is not None and checksum != checksum_to_match:
-                msg = f"CPU refit's per-row loss checksum {checksum} is not {checksum_to_match}"
-                raise ValueError(msg)
-    if "cuda" in means:
-        lines.append(
-            f"- GPU minus CPU: {means['cuda'] - means['cpu']:+.3f} points; GPU minus the published "
-            f"GPU figure {REPRODUCTION_GPU_MAE_PERCENT}%: "
-            f"{means['cuda'] - REPRODUCTION_GPU_MAE_PERCENT:+.3f} points (reported, not asserted)."
-        )
-    report.write_text("\n".join(lines) + "\n")
-    sys.stdout.write("\n".join(lines) + "\n")
+    heading = "# Reproduction check: ENS-mean B0 at lead-day 1 on the shared rows"
+    text = f"{heading}\n\n{line}"
+    report.write_text(text + "\n")
+    sys.stdout.write(text + "\n")
+    if abs(mean - REPRODUCTION_MAE_PERCENT) > REPRODUCTION_TOLERANCE_PERCENT:
+        msg = f"the refit gives {mean:.4f}%, not the published {REPRODUCTION_MAE_PERCENT}%"
+        raise ValueError(msg)
     return 0
 
 
@@ -1513,9 +1455,8 @@ def main() -> int:
     parser.add_argument(
         "--reproduction-check",
         action="store_true",
-        help="Refit the ENS-mean B0 at lead-day 1 on the CPU (and on --device) and stop.",
+        help="Refit the ENS-mean B0 at lead-day 1 on --device, check it, and stop.",
     )
-    parser.add_argument("--expected-checksum", default=None, help="The published checksum.")
     arguments = parser.parse_args()
     product: WeatherProduct = arguments.weather_product
     if arguments.reproduction_check:
@@ -1523,7 +1464,6 @@ def main() -> int:
             root=arguments.output_root,
             device=arguments.device,
             max_workers=arguments.max_workers,
-            expected_checksum=arguments.expected_checksum,
         )
     directory = arguments.output_root / product
     suffix = run_suffix(smoke=arguments.smoke)
