@@ -4,11 +4,11 @@ description: >-
   This project's own charting rules, on top of the bundled `dataviz` skill's general method, for any
   chart drawn in this repository — a study page, a dashboard, a notebook, or anywhere else: the
   OCF-brand palette (`plotting.ocf_theme`), colour before shape, sizing a chart to a docs page's text
-  column, exporting and optimising SVG, and the extra care an NGED metered generator's time series
-  needs so it cannot be re-identified. Load before drawing any chart in this repository, whether or
-  not the chart is for a study. Load the bundled `dataviz` skill too: this skill supplements it and
-  does not repeat its form heuristic, its six accessibility checks, its palette-validation script,
-  or its interaction rules.
+  column, hour-of-day axes, exporting and optimising SVG, and the extra care an NGED metered
+  generator's time series needs so it cannot be re-identified. Load before drawing any chart in
+  this repository, whether or not the chart is for a study. Load the bundled `dataviz` skill too:
+  this skill supplements it and does not repeat its form heuristic, its six accessibility checks,
+  its palette-validation script, or its interaction rules.
 ---
 
 # Charting in this repository
@@ -58,6 +58,21 @@ text is legible in the built site, not only in the SVG.
 **Write SVG, then optimise it, and check the render before committing.** `CLAUDE.md`'s "Chart
 images" section has the full rule: run the export through `npx svgo@4 --multipass --precision=1
 --final-newline`, and look at every chart rendered to PNG before committing it.
+
+## Axes
+
+**Label an hour-of-day axis at human divisions: 0, 6, 12, 18, and 24, or 6, 12, and 18.** A reader
+finds 6, 12, and 18 o'clock at once, and cannot find 5, 10, and 15. In Altair, set
+`axis=alt.Axis(values=[6, 12, 18])` on the `x` encoding, because Vega-Lite's automatic ticks pick
+steps of 2, 5, or 10 and `tickCount` is only a hint. The same holds for any other cyclic unit with a
+familiar rhythm, such as months labelled at the quarter starts.
+
+**Clip an hour-of-day axis to the hours that hold data.** A chart of solar output or irradiance has
+no data at night, and the empty hours squeeze the plotted series into the middle of the panel. Round
+the range of the plotted data out to human divisions, such as 6 to 18 for a few chosen days, or 4 to
+20 for a chart that must hold midsummer, labelled at 4, 8, 12, 16, and 20. Do not leave the axis at
+0 to 24. Give the domain explicitly with `scale=alt.Scale(domain=[6, 18])`, set `clip=True` on the
+mark so nothing is drawn outside it, and say in the subtitle that daylight hours only are drawn.
 
 ## Self-contained charts
 
