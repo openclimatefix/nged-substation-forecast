@@ -719,6 +719,15 @@ ERA5_LADDER_INPUTS_DIR: Final[Path] = ERA5_LADDER_DIR / "inputs"
 ERA5_LADDER_RESULTS_DIR: Final[Path] = ERA5_LADDER_DIR / "results"
 """The ladder study's out-of-fold losses, report, and interval tables."""
 
+IFS_LADDER_DIR: Final[Path] = study_dir_for(study="ifs_solar_variables")
+"""The IFS solar-variables study's folder."""
+
+IFS_LADDER_INPUTS_DIR: Final[Path] = IFS_LADDER_DIR / "inputs"
+"""The lead-day frames, the blend frame, and the checks that the build script writes."""
+
+IFS_LADDER_RESULTS_DIR: Final[Path] = IFS_LADDER_DIR / "results"
+"""The IFS study's out-of-fold losses, report, and interval tables."""
+
 ENS_FORECAST_HORIZONS_DIR: Final[Path] = study_dir_for(study="ens_forecast_horizons")
 """The ENS forecast-horizons study's results. Its member extract is in `ENS_PRODUCT_DIR`."""
 

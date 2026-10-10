@@ -3,8 +3,12 @@ from datetime import UTC, datetime
 import polars as pl
 import pytest
 from studies.ifs_lead_days import (
+    PARTNER_COLUMNS,
+    blend_month_folds,
+    join_aifs_partner,
     join_forecast_at_lead_day,
     raise_unless_same_folds,
+    with_blend_folds,
     with_ifs_eras,
 )
 
@@ -45,6 +49,17 @@ def test_a_lead_day_one_row_takes_the_run_of_the_day_before_at_lead_24_plus_hour
 
     assert joined["cloud_cover"].to_list() == [9 * 1000 + 24 + 13]
     assert joined["lead_hours"].to_list() == [37]
+
+
+def test_a_long_lead_day_does_not_overflow_the_hour_of_day():
+    # Int8 holds at most 127, so 24 * 5 + 13 computed in Int8 would wrap to a negative lead.
+    rows = _rows([datetime(2025, 3, 10, 13, tzinfo=UTC)])
+    forecasts = _forecasts([datetime(2025, 3, 5)], list(range(241)))
+
+    joined = join_forecast_at_lead_day(rows=rows, forecasts=forecasts, lead_day=5)
+
+    assert joined["lead_hours"].to_list() == [133]
+    assert joined["cloud_cover"].to_list() == [5 * 1000 + 133]
 
 
 def test_the_run_day_crosses_a_month_end_correctly():
@@ -132,3 +147,112 @@ def test_identical_folds_across_lead_days_pass():
     frame = pl.DataFrame({"site": ["A"], "time": [time], "fold": [1]})
 
     raise_unless_same_folds(frames=[frame, frame])
+
+
+def _partner(
+    *, rows: list[tuple[datetime, datetime | None, float | None]], lead_day: int
+) -> pl.DataFrame:
+    prefix = f"aifs_single_day{lead_day}"
+    return pl.DataFrame(
+        {
+            "site": ["A"] * len(rows),
+            "time": [time for time, _, _ in rows],
+            f"{prefix}_ghi": [ghi for _, _, ghi in rows],
+            f"{prefix}_temp": [10.0 if ghi is not None else None for _, _, ghi in rows],
+            f"{prefix}_init_time": [init for _, init, _ in rows],
+        },
+        schema_overrides={f"{prefix}_init_time": pl.Datetime("ns", "UTC")},
+    ).with_columns(pl.col("time").dt.cast_time_unit("us"))
+
+
+def _lead_rows(times: list[datetime]) -> pl.DataFrame:
+    return _rows(times).with_columns(pl.col("time").dt.replace_time_zone("UTC"))
+
+
+def test_the_partner_join_keeps_the_run_issued_lead_days_before_and_renames_its_columns():
+    time = datetime(2025, 4, 10, 12, tzinfo=UTC)
+    rows = _lead_rows([datetime(2025, 4, 10, 12)])
+    partner = _partner(rows=[(time, datetime(2025, 4, 8, tzinfo=UTC), 300.0)], lead_day=2)
+
+    joined = join_aifs_partner(rows=rows, partner=partner, lead_day=2)
+
+    assert joined.columns[-2:] == list(PARTNER_COLUMNS)
+    assert joined[PARTNER_COLUMNS[0]].to_list() == [300.0]
+    assert joined[PARTNER_COLUMNS[1]].to_list() == [10.0]
+
+
+def test_the_partner_join_refuses_a_run_from_the_wrong_day():
+    time = datetime(2025, 4, 10, 12, tzinfo=UTC)
+    rows = _lead_rows([datetime(2025, 4, 10, 12)])
+    partner = _partner(rows=[(time, datetime(2025, 4, 9, tzinfo=UTC), 300.0)], lead_day=2)
+
+    with pytest.raises(ValueError, match="not the 00 UTC run 2 days before"):
+        join_aifs_partner(rows=rows, partner=partner, lead_day=2)
+
+
+def test_the_partner_join_refuses_a_run_that_does_not_start_at_midnight():
+    time = datetime(2025, 4, 10, 12, tzinfo=UTC)
+    rows = _lead_rows([datetime(2025, 4, 10, 12)])
+    partner = _partner(rows=[(time, datetime(2025, 4, 9, 12, tzinfo=UTC), 300.0)], lead_day=1)
+
+    with pytest.raises(ValueError, match="00 UTC run 1 days"):
+        join_aifs_partner(rows=rows, partner=partner, lead_day=1)
+
+
+def test_the_partner_join_drops_runs_before_the_operational_era_and_missing_values():
+    early = datetime(2025, 2, 27, 12, tzinfo=UTC)
+    late = datetime(2025, 3, 5, 12, tzinfo=UTC)
+    missing = datetime(2025, 3, 6, 12, tzinfo=UTC)
+    rows = _lead_rows(
+        [early.replace(tzinfo=None), late.replace(tzinfo=None), missing.replace(tzinfo=None)]
+    )
+    partner = _partner(
+        rows=[
+            (early, datetime(2025, 2, 26, tzinfo=UTC), 100.0),
+            (late, datetime(2025, 3, 4, tzinfo=UTC), 200.0),
+            (missing, None, None),
+        ],
+        lead_day=1,
+    )
+
+    joined = join_aifs_partner(rows=rows, partner=partner, lead_day=1)
+
+    assert joined["time"].dt.day().to_list() == [5]
+
+
+def test_the_partner_join_refuses_a_site_and_time_held_twice():
+    time = datetime(2025, 4, 10, 12, tzinfo=UTC)
+    init = datetime(2025, 4, 9, tzinfo=UTC)
+    partner = _partner(rows=[(time, init, 300.0), (time, init, 301.0)], lead_day=1)
+
+    with pytest.raises(ValueError, match="twice"):
+        join_aifs_partner(rows=_lead_rows([datetime(2025, 4, 10, 12)]), partner=partner, lead_day=1)
+
+
+def test_the_blend_folds_depend_on_the_set_of_months_alone_not_their_order_or_repeats():
+    months = [f"2025-{month:02d}" for month in range(3, 13)] + ["2026-01", "2026-02", "2026-03"]
+
+    folds = blend_month_folds(months=months)
+    shuffled = blend_month_folds(months=[*reversed(months), *months])
+
+    assert folds == shuffled
+    assert [folds[month] for month in sorted(folds)] == sorted(folds.values())
+    assert set(folds.values()) == {0, 1, 2, 3, 4}
+
+
+def test_a_lead_day_missing_a_month_still_gets_the_months_fold_from_the_shared_map():
+    months = [f"2025-{month:02d}" for month in range(3, 13)] + ["2026-01", "2026-02", "2026-03"]
+    folds = blend_month_folds(months=months)
+    rows = pl.DataFrame({"site": ["A", "A"], "month": ["2025-04", "2026-03"]})
+
+    folded = with_blend_folds(rows=rows, month_folds=folds)
+
+    assert folded["fold"].to_list() == [folds["2025-04"], folds["2026-03"]]
+    assert folded["fold"].dtype == pl.Int32
+
+
+def test_blend_folds_refuse_too_few_months_and_a_month_with_no_fold():
+    with pytest.raises(ValueError, match="cannot fill"):
+        blend_month_folds(months=["2025-03", "2025-04"])
+    with pytest.raises(ValueError, match="no fold for"):
+        with_blend_folds(rows=pl.DataFrame({"month": ["2025-03"]}), month_folds={"2025-04": 0})

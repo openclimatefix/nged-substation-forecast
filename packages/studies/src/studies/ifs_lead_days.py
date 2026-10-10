@@ -18,12 +18,12 @@ the folds inside each era.
 """
 
 from collections.abc import Mapping, Sequence
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Final
 
 import polars as pl
 
-from studies.cross_validation import cut_eras, search_fold_offsets
+from studies.cross_validation import N_FOLDS, cut_eras, search_fold_offsets
 
 LEAD_DAYS: Final[tuple[int, ...]] = (1, 2, 3, 5, 7, 9)
 """The lead days the study scores. Lead day 10 holds one hour of the run, so it is not used."""
@@ -68,7 +68,8 @@ def join_forecast_at_lead_day(
         raise ValueError(msg)
     keyed = rows.with_columns(
         valid_time=pl.col("time").dt.replace_time_zone(None),
-        lead_hours=(HOURS_PER_DAY * lead_day + pl.col("time").dt.hour()).cast(pl.Int32),
+        # The hour is Int8, so it is widened before the sum: 120 + 13 would wrap to -123 in Int8.
+        lead_hours=HOURS_PER_DAY * lead_day + pl.col("time").dt.hour().cast(pl.Int32),
     ).with_columns(
         init_time=(pl.col("valid_time").dt.truncate("1d") - timedelta(days=lead_day)).cast(
             forecasts.schema["init_time"]
@@ -143,3 +144,101 @@ def raise_unless_same_folds(*, frames: Sequence[pl.DataFrame]) -> None:
     if not clashes.is_empty():
         msg = f"{clashes.height} (site, time) rows carry different folds at different lead days"
         raise ValueError(msg)
+
+
+AIFS_FIRST_OPERATIONAL_INIT: Final[datetime] = datetime(2025, 3, 1, tzinfo=UTC)
+"""The first run of AIFS Single that the blend rows keep.
+
+AIFS Single became operational on 2025-02-25, and the Dynamical.org store's earlier runs are
+experimental versions, so the blend rows start with the runs of the first whole month after.
+"""
+
+PARTNER_COLUMNS: Final[tuple[str, str]] = ("partner_shortwave_radiation", "partner_temperature_2m")
+"""The second forecast's radiation and temperature, under names that do not carry the lead day."""
+
+
+def join_aifs_partner(*, rows: pl.DataFrame, partner: pl.DataFrame, lead_day: int) -> pl.DataFrame:
+    """Join AIFS Single's radiation and temperature at one lead day onto the lead day's rows.
+
+    A row is kept only if AIFS Single has both values for it and its run is on or after
+    `AIFS_FIRST_OPERATIONAL_INIT`.
+
+    Args:
+        rows: The lead day's rows, carrying `site` and `time` (UTC).
+        partner: One row per (`site`, `time`) with `aifs_single_day{lead_day}_ghi`, `_temp`, and
+            `_init_time`, the run that supplied the values.
+        lead_day: The whole number of days between the run's day and the valid day.
+
+    Returns:
+        The kept rows with the two `PARTNER_COLUMNS` joined on.
+
+    Raises:
+        ValueError: If a run is not the 00 UTC run `lead_day` days before the row's valid day, or
+            `partner` holds a (site, time) twice.
+    """
+    prefix = f"aifs_single_day{lead_day}"
+    columns = {f"{prefix}_ghi": PARTNER_COLUMNS[0], f"{prefix}_temp": PARTNER_COLUMNS[1]}
+    if partner.select("site", "time").is_duplicated().any():
+        msg = "the partner frame holds a (site, time) twice"
+        raise ValueError(msg)
+    kept = partner.select("site", "time", f"{prefix}_init_time", *columns).drop_nulls(
+        subset=[f"{prefix}_init_time", *columns]
+    )
+    expected = pl.col("time").dt.truncate("1d") - timedelta(days=lead_day)
+    wrong = kept.filter(
+        pl.col(f"{prefix}_init_time").dt.cast_time_unit("us") != expected.dt.cast_time_unit("us")
+    )
+    if not wrong.is_empty():
+        msg = (
+            f"{wrong.height} rows carry an AIFS Single run that is not the 00 UTC run "
+            f"{lead_day} days before the valid day"
+        )
+        raise ValueError(msg)
+    recent = kept.filter(pl.col(f"{prefix}_init_time") >= AIFS_FIRST_OPERATIONAL_INIT)
+    return rows.join(
+        recent.drop(f"{prefix}_init_time").rename(columns), on=["site", "time"], how="inner"
+    )
+
+
+def blend_month_folds(*, months: Sequence[str]) -> dict[str, int]:
+    """Cut the blend rows' months into `N_FOLDS` contiguous blocks, the same for every farm.
+
+    The folds depend on the months alone, so every lead day that holds a month gives it the same
+    fold, whatever other months its rows lack.
+
+    Args:
+        months: The `%Y-%m` months of the blend rows at any lead day.
+
+    Returns:
+        Each month's fold. The first months fall in fold 0.
+
+    Raises:
+        ValueError: If there are fewer months than folds.
+    """
+    ordered = sorted(set(months))
+    if len(ordered) < N_FOLDS:
+        msg = f"{len(ordered)} months cannot fill {N_FOLDS} folds"
+        raise ValueError(msg)
+    return {month: index * N_FOLDS // len(ordered) for index, month in enumerate(ordered)}
+
+
+def with_blend_folds(*, rows: pl.DataFrame, month_folds: Mapping[str, int]) -> pl.DataFrame:
+    """Give each row the fold of its month.
+
+    Args:
+        rows: Rows carrying `month`.
+        month_folds: `blend_month_folds`'s result.
+
+    Returns:
+        The rows with an Int32 `fold`.
+
+    Raises:
+        ValueError: If a row's month has no fold.
+    """
+    unknown = sorted(set(rows["month"].unique().to_list()) - set(month_folds))
+    if unknown:
+        msg = f"no fold for the months {unknown}"
+        raise ValueError(msg)
+    return rows.with_columns(
+        fold=pl.col("month").replace_strict(dict(month_folds), return_dtype=pl.Int32)
+    )
