@@ -145,7 +145,7 @@ the arms that question needs.
 """
 
 ARM_LABELS: Final[dict[str, str]] = {
-    "g0": "G0 minimal (ssrd, t2m)",
+    "g0": "G0 minimal (radiation, temperature)",
     "g1": "G1 + total cloud",
     "g2": "G2 + cloud layers",
     "g3": "G3 + clear-sky irradiance",
@@ -160,8 +160,8 @@ ARM_LABELS: Final[dict[str, str]] = {
     "g9_aerosol_rows": "G9 on aerosol rows",
     NEGATIVE_CONTROL_ARM: "Negative control",
     POSITIVE_CONTROL_ARM: "Positive control (+ CAMS)",
-    KNOWN_ANSWER_ARM: "ssrd and sun only",
-    **{f"{DROP_PREFIX}{rung}": f"G9 without {rung.upper()}'s additions" for rung in RUNGS[1:]},
+    KNOWN_ANSWER_ARM: "Solar radiation and sun position only",
+    **{f"{DROP_PREFIX}{rung}": f"G9 without the variables {rung.upper()} adds" for rung in RUNGS[1:]},
 }
 """The words each arm carries on a chart and in the report."""
 

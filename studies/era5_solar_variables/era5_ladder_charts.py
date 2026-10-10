@@ -183,17 +183,50 @@ ARM_LABEL_EXPRESSION: Final[str] = (
 
 
 ARM_KEY_LINES: Final[tuple[str, ...]] = (
-    "G0 uses sun position, ERA5 downward solar radiation, and air temperature. G1 adds total cloud",
-    "cover. G2 adds low, mid, and high cloud cover. G9 adds every ERA5 variable studied.",
+    "A variable set is the list of inputs the XGBoost model is given. G0: sun position, ERA5 solar",
+    "radiation (ssrd), and air temperature (t2m). Each group adds to the one before.",
+    "G1: total cloud cover. G2: low, mid, and high cloud cover. G3: clear-sky radiation.",
+    "G4: cloud water and cloud base height. G5: direct beam. G6: wind and thermal radiation.",
+    "G7: humidity and haze. G8: snow and albedo. G9 (the full set): all other ERA5 variables.",
+    "G10: G9 plus CAMS aerosol.",
 )
-"""Two subtitle lines saying what the arms named in a chart contain, for a figure read alone."""
+"""Subtitle lines saying what every variable set named in a chart contains."""
+
+SHORT_ARM_KEY_LINES: Final[tuple[str, ...]] = (
+    "A variable set is the list of inputs the XGBoost model is given. G0: sun position, ERA5 solar",
+    "radiation, and air temperature. G1 adds total cloud cover, G2 adds low, mid, and high cloud",
+    "cover, and G9 adds every other ERA5 variable studied.",
+)
+"""Subtitle lines for a figure that names only G0, G1, G2, and G9."""
+
+CLEAR_SKY_INDEX_KEY: Final[str] = (
+    "Clear-sky index: measured irradiance divided by the irradiance expected under a cloudless sky."
+)
+"""The subtitle line that defines the clear-sky index."""
+
+EXPLORATORY_KEY: Final[str] = (
+    "Exploratory: not named in the study plan before any result existed, and not corrected "
+    "for multiple comparisons."
+)
+"""The subtitle line that says what an exploratory row is."""
+
+MARS_KEY: Final[str] = (
+    "MARS-only: 12 ERA5 variables that neither ECMWF's free forecast feed nor Open-Meteo serves."
+)
+"""The subtitle line that defines the MARS-only variables."""
+
+CONTROL_KEY: Final[tuple[str, ...]] = (
+    "Negative control: G2 plus shuffled copies of the other variables, which carry no information.",
+    "Positive control: G2 plus CAMS irradiance, which is the answer.",
+)
+"""Subtitle lines that define the two controls."""
 
 CLEARNESS_KEY: Final[str] = (
     "Clearness index: irradiance divided by the irradiance at the top of the atmosphere."
 )
 """The subtitle line that defines the clearness index."""
 
-SETTINGS_PHRASE: Final[str] = "main hyperparameter setting"
+SETTINGS_PHRASE: Final[str] = "main XGBoost tuning setting"
 """The one name of the first hyperparameter setting, used in every figure."""
 
 
@@ -341,7 +374,7 @@ def figure_1_headline(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMix
                 pl.col("label"),
                 pl.col("treatment").str.to_uppercase(),
                 pl.when(pl.col("reference") == MARS_FREE_ARM)
-                .then(pl.lit("G9 (no MARS-only)"))
+                .then(pl.lit("G9 without MARS-only"))
                 .otherwise(pl.col("reference").str.to_uppercase()),
             ),
             value=pl.col("difference") * scale,
@@ -375,8 +408,11 @@ def figure_1_headline(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMix
             ),
             "Dashed rules: no difference, and the smallest improvement worth acting on",
             "(0.1 percentage points of capacity, or 0.01 clearness index).",
-            *ARM_KEY_LINES,
-            "MARS-only: 12 variables that ECMWF's forecasts offer only through its MARS archive.",
+            "Each row is the error with the first variable set minus the error with the second.",
+            "P4: G9 minus G9 without the MARS-only variables. Error: mean absolute error.",
+            *SHORT_ARM_KEY_LINES,
+            MARS_KEY,
+            CLEARNESS_KEY,
             "All rows are planned: written into the study plan before any result existed.",
         ],
         figure_planning=None,
@@ -435,10 +471,14 @@ def figure_2_leaderboard(
         subtitle=[
             scope,
             f"Dot: estimate at the {SETTINGS_PHRASE}. Line: 95% interval.",
-            "Each row is one set of input variables, scored on the same hours, so these",
-            "intervals overlap more than the paired differences of the headline figure do.",
+            "Each row is one variable set, scored on the same hours, so these intervals overlap",
+            "more than the paired differences between rows would.",
+            "Correlation: Pearson, of the prediction with the measured value.",
             *ARM_KEY_LINES,
-            "All rows are exploratory.",
+            *CONTROL_KEY,
+            MARS_KEY,
+            *([CLEARNESS_KEY] if target == "cams" else []),
+            EXPLORATORY_KEY,
         ],
         figure_planning=None,
     )
@@ -544,10 +584,13 @@ def figure_regimes(
         subtitle=[
             scope,
             "Dot: estimate. Line: 95% interval from resampling whole months.",
-            "Dashed rule: no difference. Each row is an arm minus G0, the minimal set.",
+            "Dashed rule: no difference. Each row is one group of hours. Each colour is the error",
+            "with a variable set minus the error with G0, the minimal set. Error: mean absolute",
+            "error.",
             *ARM_KEY_LINES,
             *([] if regime_note is None else [regime_note]),
-            "All rows are exploratory and are not corrected for multiple comparisons.",
+            CLEARNESS_KEY,
+            EXPLORATORY_KEY,
         ],
         figure_planning=None,
     )
@@ -599,14 +642,46 @@ def figure_drop_one(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
         subtitle=[
             scope,
             "Dot: estimate. Line: 95% interval from resampling whole months.",
-            "Dashed rule: no difference.",
-            "A group counts as useful only if the leaderboard and this figure agree.",
+            "Dashed rule: no difference. Each row is the error of the full set (G9) without the",
+            "variables that one group adds, minus the error of the full set. Error: mean absolute",
+            "error. Positive means the group helped.",
             *ARM_KEY_LINES,
-            "All rows are exploratory and are not corrected for multiple comparisons.",
+            CLEARNESS_KEY,
+            EXPLORATORY_KEY,
         ],
         figure_planning=None,
     )
 
+
+COLUMN_WORDS: Final[dict[str, str]] = {
+    "ssrd": "Solar radiation (ssrd)",
+    "ssrdc": "Clear-sky radiation (ssrdc)",
+    "uvb": "Ultraviolet radiation (uvb)",
+    "fdir": "Direct radiation (fdir)",
+    "cdir": "Clear-sky direct radiation (cdir)",
+    "tcrw": "Rain water in the column (tcrw)",
+    "tcsw": "Snow water in the column (tcsw)",
+    "tclw": "Cloud liquid water (tclw)",
+    "tciw": "Cloud ice water (tciw)",
+    "tcc": "Total cloud cover (tcc)",
+    "lcc": "Low cloud cover (lcc)",
+    "mcc": "Mid cloud cover (mcc)",
+    "hcc": "High cloud cover (hcc)",
+    "cbh": "Cloud base height (cbh)",
+    "blh": "Boundary layer height (blh)",
+    "fal": "Forecast albedo (fal)",
+    "tcwv": "Water vapour in the column (tcwv)",
+    "tp": "Precipitation (tp)",
+    "u10": "East wind at 10 m (u10)",
+    "v10": "North wind at 10 m (v10)",
+    "cape": "Convective energy (cape)",
+    "sp": "Surface pressure (sp)",
+    "t2m": "Air temperature (t2m)",
+    "solar_azimuth_deg": "Sun azimuth",
+    "clearness_index": "Clearness index of ERA5 radiation",
+    "clear_sky_index": "Clear-sky index of ERA5 radiation",
+}
+"""What each column is called on the importance figure, with its ERA5 short name in brackets."""
 
 SHUFFLED_SUFFIX: Final[str] = "_noise"
 """What `era5_ladder_importance.py` appends to a shuffled copy's column name."""
@@ -669,7 +744,11 @@ def figure_12_importance(
     full = refit_means(arm=SHUFFLED_ARM, grouped=pl.col("column")).filter(
         ~pl.col("label").str.ends_with(SHUFFLED_SUFFIX)
     )
-    top = full.sort("value", descending=True).head(TOP_COLUMNS)
+    top = (
+        full.sort("value", descending=True)
+        .head(TOP_COLUMNS)
+        .with_columns(label=pl.col("label").replace(COLUMN_WORDS))
+    )
     # The noise line is the largest shuffled copy's share in one refit of one farm, averaged.
     noise_line = float(
         in_target.filter(
@@ -729,11 +808,14 @@ def figure_12_importance(
     ]
     return figure(
         panels=panels,
-        number=12,
+        number=12 if target == "pv" else "12b",
         title=f"What the XGBoost models used, {PANEL_TITLES[target]}",
         subtitle=[
             scope,
-            "Dot: mean over refits. Line: range over refits (folds and seeds).",
+            "Each XGBoost model was refitted on different blocks of months and with different",
+            "random starts. Dot: mean over the refits. Line: their range.",
+            "clearness_index: ERA5 solar radiation divided by the sun's top-of-atmosphere flux (an",
+            "input, not the CAMS target).",
             f"Dashed rule, first panel: the largest shuffled copy's share ({noise_line:.1f}%).",
             "Share of total gain: how much of the model's fit a column accounts for.",
             "Shuffled copies are the same columns shuffled across hours, so they show the share",
@@ -865,7 +947,8 @@ def figure_3_days(
                     "hours: the clearest (highest mean), the most variable (highest spread), and "
                     "the dullest (lowest mean)."
                 ),
-                f"Only days with at least {MIN_DAYLIGHT_HOURS} kept hours count.",
+                CLEAR_SKY_INDEX_KEY,
+                f"Only days with at least {MIN_DAYLIGHT_HOURS} daylight hours in the rows count.",
             ],
             figure_planning=None,
         )
@@ -1002,7 +1085,7 @@ def figure_5_where_ssrd_misses(
             )
             .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X("x:Q", title=None, scale=alt.Scale(zero=False)),
-                y=alt.Y("mean_gap:Q", title="ERA5 ssrd minus CAMS (W m⁻²)"),
+                y=alt.Y("mean_gap:Q", title="ERA5 solar radiation minus CAMS (W m⁻²)"),
             )
             .properties(width=PLOT_WIDTH_PX // 2 - 40, height=110)
             .facet(
@@ -1018,11 +1101,12 @@ def figure_5_where_ssrd_misses(
         title="Where ERA5's downward solar radiation differs from CAMS",
         subtitle=[
             scope,
-            "Top: the gap on three days (clearest, most variable, dullest).",
-            "Positive means ERA5 is brighter.",
+            "Top: the gap on the clearest, most variable, and dullest days at one farm, chosen by",
+            "the CAMS clear-sky index. Positive means ERA5 is brighter.",
+            CLEAR_SKY_INDEX_KEY,
             (
                 "Bottom: hours sorted by the variable named above each panel and split into ten "
-                "equal groups. Each dot is one group's mean gap."
+                "groups of equal numbers of hours. Each dot is one group's mean gap."
             ),
         ],
         figure_planning=None,
@@ -1146,7 +1230,14 @@ def predictions_for_days(
         )
         for arm in ("g0", "g9")
     ]
-    return pl.concat([measured, *predicted])
+    long = pl.concat([measured, *predicted]).sort("site", "day_label", "series", "hour_of_day")
+    # A run of hours is one line, so a gap in the kept hours breaks the line instead of joining it.
+    return long.with_columns(
+        segment=(pl.col("hour_of_day").diff().over("site", "day_label", "series") > 1)
+        .fill_null(False)
+        .cum_sum()
+        .over("site", "day_label", "series")
+    )
 
 
 def figure_7_models_work(
@@ -1177,13 +1268,14 @@ def figure_7_models_work(
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("hour_of_day:Q", title="Hour of day (UTC)", scale=alt.Scale(domain=[0, 24])),
             y=alt.Y("value:Q", title="% of capacity"),
+            detail="segment:N",
             color=alt.Color(
                 "series:N",
                 scale=alt.Scale(
                     domain=["Measured", ARM_LABELS["g0"], ARM_LABELS["g9"]],
                     range=[ocf.TEXT, ARM_COLOURS["g0"], ARM_COLOURS["g9"]],
                 ),
-                legend=alt.Legend(title=None, orient="top"),
+                legend=alt.Legend(title=None, orient="top", labelLimit=300),
             ),
         )
         .properties(width=DAY_PANEL_WIDTH_PX, height=60)
@@ -1221,8 +1313,10 @@ def figure_7_models_work(
                     "Top: measured output and the predictions of G0 and G9, on three days chosen "
                     "for each farm (the clearest, most variable, and dullest)."
                 ),
-                "Bottom: each farm's mean absolute error for G0, G1, G2, and G9.",
-                *ARM_KEY_LINES,
+                "Bottom: each farm's mean absolute error for G0, G1, G2, and G9. The days are",
+                "chosen by the CAMS clear-sky index.",
+                CLEAR_SKY_INDEX_KEY,
+                *SHORT_ARM_KEY_LINES,
                 "Output is a percentage of each farm's own capacity.",
             ],
             figure_planning=None,
@@ -1282,7 +1376,7 @@ def figure_11_hour_of_day(*, splits: pl.DataFrame, scope: str) -> alt.TopLevelMi
         base = alt.Chart(rows).encode(
             x=alt.X(
                 "hour:Q",
-                title="Hour of day (UTC, the hour the value is labelled with)",
+                title="Hour of day (UTC; the label of the hour that ends at that time)",
                 axis=alt.Axis(format="d", tickMinStep=1),
                 scale=alt.Scale(domain=[4, 21]),
             ),
@@ -1295,7 +1389,9 @@ def figure_11_hour_of_day(*, splits: pl.DataFrame, scope: str) -> alt.TopLevelMi
             ),
         )
         band = base.mark_area(opacity=0.18, aria=False).encode(  # ty: ignore[unresolved-attribute]
-            y=alt.Y("relative_lower:Q", title="Change in error (% of the reference's error)"),
+            y=alt.Y(
+                "relative_lower:Q", title="Change in mean absolute error (% of the second set's)"
+            ),
             y2="relative_upper:Q",
         )
         line = base.mark_line(point=True, strokeWidth=1.5, aria=False).encode(  # ty: ignore[unresolved-attribute]
@@ -1325,15 +1421,15 @@ def figure_11_hour_of_day(*, splits: pl.DataFrame, scope: str) -> alt.TopLevelMi
             title="The gain from the extra variables by hour of day",
             subtitle=[
                 scope,
-                "Line: the arm's error minus the reference arm's, as a percentage of the",
-                "reference's error. Band: 95% interval from resampling whole months.",
-                "Below the dashed line is a gain.",
-                "Dotted line: between 09 and 10 UTC, where ERA5's cloud fields move to the next",
-                "analysis window.",
+                "Line: the mean absolute error with the first variable set minus the error with",
+                "the second, as a percentage of the second's error. Band: 95% interval from",
+                "resampling whole months. Below the dashed line is a gain.",
+                "Dotted line: between 09 and 10 UTC, where ERA5's cloud fields switch to the next",
+                "assimilation window (the span of observations that fixes them).",
                 *ARM_KEY_LINES,
-                "G3 adds clear-sky irradiance. G4 adds cloud water and cloud base height.",
-                "All rows are exploratory. An hour with too few months for an interval",
-                "is not drawn.",
+                CLEARNESS_KEY,
+                "An hour with too few months for an interval is not drawn.",
+                EXPLORATORY_KEY,
             ],
             figure_planning=None,
         )
@@ -1419,12 +1515,17 @@ def figure_13_probabilistic(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMi
         subtitle=[
             scope,
             "Dot: estimate. Line: 95% interval from resampling whole months.",
-            "Dashed rule: no difference. Main hyperparameter setting only.",
-            "A more accurate forecast also narrows the interval, so compare with the control.",
-            "Negative control: G2 plus shuffled copies of the other variables. MARS-only: 12 IFS",
-            "variables that are not in the free open data.",
+            "Dashed rule: no difference. Main XGBoost tuning setting only. Each row is the score",
+            "with the first variable set minus the score with the second.",
+            "The XGBoost model predicts a 10 to 90% interval that should hold 80% of outcomes. A",
+            "more accurate forecast also narrows it, so compare with the control.",
+            "Coverage: the share of outcomes inside the interval. Neither sign is better; the",
+            "target is 80%. CRPS scores the whole predicted distribution.",
             *ARM_KEY_LINES,
-            "All rows are exploratory and are not corrected for multiple comparisons.",
+            CONTROL_KEY[0],
+            MARS_KEY,
+            CLEARNESS_KEY,
+            EXPLORATORY_KEY,
         ],
         figure_planning=None,
     )
@@ -1441,7 +1542,7 @@ def figure_13b_reliability(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMix
         The figure, or `None` if the table holds no reliability rows.
     """
     reliability = rows.filter(pl.col("kind") == "reliability").with_columns(
-        level=pl.col("group").cast(pl.Float64)
+        level=pl.col("group").cast(pl.Float64), arm=pl.col("arm").replace(ARM_LABELS)
     )
     if reliability.is_empty():
         return None
@@ -1477,9 +1578,14 @@ def figure_13b_reliability(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMix
         title="Are the predicted quantiles calibrated?",
         subtitle=[
             scope,
-            "Each line is one arm. The dashed diagonal is perfect calibration.",
-            "Above the diagonal means outcomes fall below the quantile more often than intended.",
-            "Exploratory. Main hyperparameter setting only.",
+            "For each hour the XGBoost model predicts the value that the outcome should fall below",
+            "10%, 20%, and so on up to 90% of the time. Each line is one variable set. The dashed",
+            "diagonal is a perfect match. Above the diagonal means outcomes fall below the",
+            "predicted value more often than intended.",
+            "Main XGBoost tuning setting only.",
+            *ARM_KEY_LINES,
+            CLEARNESS_KEY,
+            EXPLORATORY_KEY,
         ],
         figure_planning=None,
     )
@@ -1549,10 +1655,15 @@ def figure_13c_coverage_and_width(*, rows: pl.DataFrame, scope: str) -> alt.TopL
         title="Coverage against interval width",
         subtitle=[
             scope,
-            "Circle: the quantile fit. Diamond: one fixed-width interval, from the same arm's",
-            "errors, that holds the same share of outcomes as the circle.",
-            "A quantile fit that helps with uncertainty sits left of its diamond.",
-            "Exploratory. Main hyperparameter setting only.",
+            "The XGBoost model predicts a 10 to 90% interval that should hold 80% of outcomes.",
+            "Circle: that predicted interval. Diamond: one fixed-width interval, from the same",
+            "variable set's errors, that holds the same share of outcomes as the circle. A",
+            "narrower interval at the same share is better, so a set that helps with uncertainty",
+            "sits left of its diamond.",
+            *ARM_KEY_LINES,
+            *CONTROL_KEY[:1],
+            MARS_KEY,
+            "Main XGBoost tuning setting only. " + EXPLORATORY_KEY,
         ],
         figure_planning=None,
     )
@@ -1615,13 +1726,18 @@ def figure_14_aerosol_conditions(
         title="Whether CAMS aerosol helps in cloud-free and dusty hours",
         subtitle=[
             scope,
-            "Dot: estimate. Line: 95% interval from resampling whole months. Main setting.",
-            "Dashed rules: no difference, and (on the error panels) the smallest improvement",
-            "worth acting on. Labels give distinct days (d) and months (mo).",
-            "The reading rule needs 20 days and 12 months; with fewer, G10 cannot be assessed.",
-            "Aerosol: CAMS EAC4 reanalysis. High dust: dust optical depth in the top 5% of hours.",
-            "Exploratory. A reanalysis knows the dust plume, so a forecast would gain less.",
+            "Dot: estimate. Line: 95% interval from resampling whole months. Main XGBoost tuning",
+            "setting. Dashed rules: no difference, and (on the error panels) the smallest",
+            "improvement worth acting on (0.1 percentage points). Labels give distinct days (d)",
+            "and months (mo). A row is assessed only with at least 20 days in 12 months.",
+            "Aerosol: optical depth from CAMS's EAC4 reanalysis (a CAMS global atmosphere record).",
+            "Clear: ERA5 total cloud cover below 0.2. Dusty: dust optical depth in the top 5% of",
+            "hours. Clean: total aerosol optical depth below its median. CRPS scores the whole",
+            "predicted distribution; error is the mean absolute error.",
+            "A reanalysis knows the dust plume, so a forecast would gain less.",
             *ARM_KEY_LINES,
+            CLEARNESS_KEY,
+            EXPLORATORY_KEY,
         ],
         figure_planning=None,
     )
@@ -1691,7 +1807,14 @@ def main() -> int:
             name=f"leaderboard_{target}",
         )
     for name, chart in (
-        ("days", figure_3_days(dataset=dataset, days=weather_days, scope=scope)),
+        (
+            "days",
+            figure_3_days(
+                dataset=dataset,
+                days=weather_days,
+                scope=scope.replace("Six NGED solar farms", "One NGED solar farm"),
+            ),
+        ),
         ("cloud_against_clearness", figure_4_cloud_against_clearness(dataset=dataset, scope=scope)),
         (
             "where_ssrd_misses",
