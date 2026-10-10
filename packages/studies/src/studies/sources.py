@@ -478,6 +478,7 @@ NWP_PRODUCT_NAMES: Final[tuple[str, ...]] = (
     "ECMWF-AIFS",
     "ECMWF-AIFS-ENS",
     "ECMWF-IFS-SINGLE-RUNS",
+    "ECMWF-IFS-SINGLE-RUNS-SOLAR",
     "GEFS",
     "GFS",
     "OPEN-METEO-ENSEMBLE-MEANS",
@@ -640,6 +641,11 @@ ECMWF_IFS_HRES_PRODUCT_DIR: Final[Path] = product_dir_for(product="ECMWF-IFS-HRE
 
 ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR: Final[Path] = product_dir_for(product="ECMWF-IFS-SINGLE-RUNS")
 """Open-Meteo's Single Runs archive of ECMWF's high-resolution forecast."""
+
+ECMWF_IFS_SINGLE_RUNS_SOLAR_PRODUCT_DIR: Final[Path] = product_dir_for(
+    product="ECMWF-IFS-SINGLE-RUNS-SOLAR"
+)
+"""Open-Meteo's Single Runs archive of ECMWF's high-resolution forecast: the solar variables."""
 
 ECMWF_AIFS_PRODUCT_DIR: Final[Path] = product_dir_for(product="ECMWF-AIFS")
 """ECMWF's AIFS Single forecast."""
