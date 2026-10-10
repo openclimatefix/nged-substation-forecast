@@ -190,9 +190,10 @@ implementation's diff, writes the idea up, and re-implements the idea through th
 code the agent writes is merged into `main`. The re-implementation discards the agent's code, so a
 score that came from a bug or from an edited metric ends in a wasted re-implementation rather than a
 false result on the leaderboard. An idea that is leaky in itself, such as a feature built on data
-from after the forecast was made, would survive a faithful re-implementation, so the person
-re-implementing reads the diff for lookahead before porting the idea, and the pipeline's own guard
-nulls leaky power lags.
+from after the forecast was made, would survive a faithful re-implementation, so two adversarial
+reviews read every finalist's diff for lookahead before the finalist is scored, the person
+re-implementing reads the diff again before porting the idea, and the pipeline's own guard nulls
+leaky power lags.
 
 **The design guards against one risk above the others: selection bias on the leaderboard's
 validation window.** The only leaderboard fold, `mid_2025_to_mid_2026`, trains on data up to
@@ -200,15 +201,15 @@ validation window.** The only leaderboard fold, `mid_2025_to_mid_2026`, trains o
 ideas on that validation window, the window would have helped choose the shortlist, and the
 re-implementations' leaderboard scores would come out too high even if the agent behaved honestly.
 The agent therefore never reads power observed after 2025-06-30. The design does not try to stop a
-determined agent from cheating, because the re-implementation discards the agent's code and the
-person re-implementing reads the diff before porting the idea.
+determined agent from cheating, because the re-implementation discards the agent's code, and two
+adversarial reviews and the person re-implementing all read each finalist's diff first.
 
 **Five roles and objects recur below.** The *research lead* is an LLM session that decides what to
 try next. A *worker* is a separate LLM session that implements one idea once, on its own git branch.
 The *screening harness* is the one command every worker uses to score an implementation. The
 *hypothesis store* is the written record of every idea, every implementation, and every score. The
-*finalists* are the few top-ranked ideas the maintainer chooses, after a session, to score on the
-leaderboard fold.
+*finalists* are the few top-ranked ideas the maintainer chooses, after a session, to review
+adversarially and then score on the leaderboard fold.
 
 ### Who runs what
 
@@ -262,6 +263,9 @@ skill. A session works in rounds:
 4. The worker writes the code, commits the code, and scores the commit with the screening harness.
 5. The research lead reads the new scores, writes up what the round showed, and chooses the next
    round: which ideas to deepen, which to combine, which to implement again, and which to abandon.
+
+**The research-lead skill frames each round as finding out which ideas are real, not as raising a
+score.** An abandoned idea, and why the idea was abandoned, is a finding in its own right.
 
 **ERA's upper-confidence-bound rule is one tool the research lead can use to choose which
 implementation to extend, and a baseline against which to measure the research lead's choices.** The
@@ -324,10 +328,6 @@ rationale cannot anchor the review. The reviewer checks that the diff implements
 feature uses data from after the forecast was made, and that the code has no plain bug. This review
 saves wasted screening runs. The mandatory reviews come later, on the finalists only, as [After a
 session](#after-a-session) describes.
-
-**The research-lead skill frames each round as finding out which ideas are real, not as raising a
-score.** The hypothesis store records an abandoned idea, with the reason for abandoning the idea, as
-a finding in its own right.
 
 ### Several implementations of one idea
 
@@ -406,8 +406,8 @@ the same split for the leaderboard as a whole.
    the diff, not the worker's reasoning, and hunts for lookahead, an edited metric or fold, dropped
    rows, a refit on validation-window power, and an implementation that does not match the idea.
    Give the second reviewer the diff with its comments stripped, so a comment arguing that a feature
-   is safe cannot steer both reviews. A gain much larger than the idea's peers is a reason for more
-   scrutiny.
+   is safe cannot steer both reviews. A gain much larger than the gains of the other finalists is a
+   reason for more scrutiny.
 4. Run each finalist that passes review through the cross-validation pipeline on the leaderboard
    fold as the maintainer's own user, and retire the experiment once the decision is made. A
    finalist that won the screening but loses on the validation window is probably not worth
@@ -420,10 +420,11 @@ the maintainer gives any pull request run before review.** The two reviews are t
 step.
 
 **The mandatory reviews go to the finalists because selection concentrates bugs there.** Choosing
-the top few of hundreds of implementations also chooses the implementations whose bugs happened to
+the top few of many implementations also tends to choose the implementations whose bugs happened to
 raise the score, whether or not any agent meant to cheat. A bug in an implementation that ranks low
-wastes one screening run; a bug in a finalist would become a false result. Reviewing only the
-finalists also keeps the number of Opus reviews small.
+wastes one screening run. A bug in a finalist wastes a look at the validation window and a
+re-implementation, and a leak in the idea itself could survive into the re-implementation. Reviewing
+only the finalists also keeps the number of Opus reviews small.
 
 **Comparing the screening ranking with the leaderboard ranking of the finalists tests the screening
 itself.** If the two rankings disagree often, the screening harness or its folds need changing.
