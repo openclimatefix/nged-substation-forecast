@@ -342,21 +342,40 @@ sets out the rule and the products the rule covers.
 
 ## Charts
 
-**A study page is figure-led: the figures carry the whole story, and the text only explains
-them.** The maintainer asked for this form on 2026-10-10 for every study. The first figure is
-visible without scrolling, when a reader lands on the page. Prose is limited to a bolded lead and a
-caption for each figure, plus the few sentences a figure cannot carry. A reader who looks only at
-the figures and their bolded leads follows the study from the question to the answer. The
-figures are mostly time series, with scatter plots, distributions, and other data graphics where
-they show the point better. They step the reader through the processing, in the order the method
-runs, so that the reader understands the problem, the method, and why the method works by looking.
+**A study page is figure-led: it reads like a hybrid of an academic paper and the notebook a data
+scientist would write, and the figures tell the whole story.** The maintainer asked for this form
+on 2026-10-10 for every study. Readers are short of time, so the page works at three depths.
+
+- **In about a minute, without scrolling:** a few sentences of take-home message, then the first
+  figure carrying the study's main result. The take-home message is usually the take-home
+  message for the Flexpectation project. A study of a general question, such as which weather
+  variables help a solar power forecast, gives a general take-home message about solar power
+  forecasting.
+- **In a few minutes:** concise bullets with the other main take-home messages, then the figures
+  and their bolded leads, skimmed in order.
+- **In full:** the prose that supports the figures and fills the gaps they cannot express.
+
+**After the headline figure, the rest of the page tells the story from the start, as figures.**
+The reader is very busy and very sceptical, and wants to see from the figures alone that the data
+are sound and that each technique works.
+
+1. **Start with simple plots of what the data look like.** Point out any issues in them, such as
+   gaps, steps, or a variable that behaves differently from its neighbours.
+2. **Next, explain the techniques, and prove each one with a figure.** Show how a known-answer
+   case is built (for example, which real series were added together to make a synthetic
+   aggregate), show each processing step's output, and draw the recovered quantity beside the
+   truth. Show the controls in the same figures, so the reader sees that the technique can fail
+   and does not.
+3. **Finish with the more complex techniques and the more interesting results**, built on the
+   earlier figures. Apply the method to real data with no answer key only after the known-answer
+   proof.
+
 Plan the page as that sequence of figures first, then write the few sentences each figure needs.
-Where a study separates, estimates, or recovers a quantity, the sequence starts from the raw
-inputs, shows how a known-answer case is built (for example, which real series were added together
-to make a synthetic aggregate), shows each processing step's output, and compares the recovered
-quantity with the truth drawn beside it. Only then does it apply the method to real data with no
-answer key. Keep a figure's explanation to a short bolded lead and a few sentences; move anything
-longer to "Data and methods" or "Limitations".
+The figures are mostly time series, with scatter plots, distributions, and other data graphics
+where they show the point better. Keep a figure's explanation to a short bolded lead and a few
+sentences, and move anything longer to "Data and methods" or "Limitations". Prose is minimal: it
+supports the figures and fills the gaps the figures cannot express, and a paragraph that a figure
+already tells is deleted.
 
 **Load the `dataviz` skill before drawing any chart, then apply the rules below on top of it.** Put
 plenty of charts in every study page, because many technical readers look at the charts before
@@ -364,8 +383,17 @@ reading any text. Each chart, with its title, subtitle, axis labels, and legend,
 the story without the prose around it.
 
 - **A headline chart opens every page**, directly under the bottom line and before the disclaimer,
-  showing the headline result with its 95% intervals. Every section whose claim rests on a number
-  gets a chart too.
+  showing the headline result with its 95% intervals. It is Figure 1 and previews the answer; the
+  figures that prove how the study got there follow it in the story order above. Every section
+  whose claim rests on a number gets a chart too.
+- **Every figure stands alone, so that someone could screenshot it and share it on Slack.** The
+  title, subtitle, axis titles, and legend give everything needed to read the figure: what is
+  plotted and in which unit, which direction is better, what each colour or line means, the scope,
+  and what an interval or a reference line shows. Where a figure explains its colours in text
+  above the plot instead of in a legend, colour each phrase the same colour as the line or mark it
+  names: write "our solar power forecast" in the forecast's colour and "CAMS irradiance" in the
+  colour of the CAMS line, so the eye finds the matching text at once. Use a legend where the
+  series are too many for text, and never leave a colour unexplained.
 - **Where a study ranks products, Figure 1 is a leaderboard.** The leaderboard shows each
   product's own mean absolute error on the rows every product shares, sorted best first, with its
   95% interval, "smaller is better" in the axis text, and the unit. The paired contrasts follow
@@ -416,14 +444,17 @@ Every study page follows the structure of an academic paper, in this order:
 
 1. **Title.** An `h1` that states the finding, scoped to the products tested. A page that ranks
    products in answer to a question may instead title itself with that question.
-2. **Summary.** A **bottom line** of at most two sentences directly under the title, in plain
-   words: a bold sentence stating the answer to the study's main question, then one sentence on
-   what would change the answer or what the study did not test. **The headline figure follows the
-   bottom line at once, so that it is visible above the fold, without scrolling, when a reader
-   lands on the page.** Where the study ranks products, the headline figure is the leaderboard
-   or the paired contrasts. The question-and-answer bullets described below come after the
-   figure, followed by scoped take-home bullets, one per use of the data. The Summary bullets are
-   the only place a recommendation appears without its evidence.
+2. **Summary.** A **bottom line** of a few sentences directly under the title, in plain words: a
+   bold sentence stating the answer to the study's main question, then one or two sentences on
+   what the answer means for the Flexpectation project (or, for a study of a general question, for
+   solar power or wind forecasting). One more sentence says what would change the answer or what
+   the study did not test. The bottom line and the first figure fit on one screen. **The headline
+   figure follows the bottom line at once, so that it is visible above the fold, without
+   scrolling, when a reader lands on the page, and it carries the study's main result.** Where the
+   study ranks products, the headline figure is the leaderboard or the paired contrasts. The
+   question-and-answer bullets described below come after the figure, each concise, followed by
+   scoped take-home bullets, one per use of the data. The Summary bullets are the only place a
+   recommendation appears without its evidence.
 
    **The Summary answers each question the study asks, in plain words and in at most two sentences
    per question.** Write one short bolded bullet per question, such as "Can an unmetered battery be
@@ -445,8 +476,10 @@ Every study page follows the structure of an academic paper, in this order:
    product was read or scored. No result appears here, and no heading states a finding. Where a
    shared methods page exists for a family of studies, this section holds only what is specific to
    the study and links the shared page for the rest.
-7. **Results.** One section per finding, each with its chart, and "The XGBoost models work" first.
-   Each heading states a result.
+7. **Results.** The story in the order set out under "Charts": the data and their issues first,
+   then the techniques with their known-answer proofs ("The XGBoost models work" comes before any
+   contrast that rests on them), then the more complex techniques and results. One section per
+   finding, each with its figure, and each heading states a result.
 8. **Discussion: what to use.** A recommendation for each use of the data, limited to what the
    evidence supports, with what would change each one. The Discussion does not repeat the Summary's
    bullets.
