@@ -70,6 +70,14 @@ _LOG: Final[logging.Logger] = logging.getLogger("report_followups2")
 POST_HOC: Final[str] = "Post hoc: written after the first run's results were known."
 """The line under every section heading."""
 
+BORDERLINE_PP: Final[float] = 0.01
+"""A 99% bound this close to zero (percentage points), in either bootstrap stream, is called
+borderline: the call depends on the random draws."""
+
+ROLE_EIGHT: Final[str] = "the largest-error plant-month of the 8 unselected months"
+ROLE_WINDOW: Final[str] = "the largest-error plant-month of the window"
+"""How the plant-months removed are named in published text, with no plant letter or month."""
+
 REVIEWED_ARMS: Final[tuple[str, ...]] = ("PC", "W7", "TF", "AN", "L1", "Q30")
 """The arms the plant-month analysis tabulates."""
 
@@ -186,6 +194,7 @@ def month_bootstrap(
     data: Aligned,
     statistic: Callable[[dict[str, np.ndarray]], float],
     levels: tuple[float, ...] = (EXPLORATORY_LEVEL,),
+    stream: int = 0,
 ) -> dict[str, float]:
     """Bound a statistic by resampling whole months and a seed, as `studies.bootstrap` does.
 
@@ -193,13 +202,15 @@ def month_bootstrap(
         data: The aligned series.
         statistic: A function of the resampled series (each shape (rows,)) returning a number.
         levels: The coverages, in percent.
+        stream: 0 for the study's bootstrap stream, or another number for a second, independent
+            stream, which shows how far a bound near zero depends on the random draws.
 
     Returns:
         `value` (on every row and seed), and `lower_<level>` and `upper_<level>` for each level.
     """
     months = np.unique(data.month, return_inverse=True)[1]
     rows_by_month = [np.flatnonzero(months == index) for index in range(months.max() + 1)]
-    generator = np.random.default_rng(BOOTSTRAP_SEED)
+    generator = np.random.default_rng(BOOTSTRAP_SEED + stream)
     n_seeds = next(iter(data.values.values())).shape[0]
     resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
     for resample in range(N_BOOTSTRAP_RESAMPLES):
@@ -216,7 +227,12 @@ def month_bootstrap(
 
 
 def mean_difference(
-    *, data: Aligned, treatment: str, reference: str, levels: tuple[float, ...] = (95.0,)
+    *,
+    data: Aligned,
+    treatment: str,
+    reference: str,
+    levels: tuple[float, ...] = (95.0,),
+    stream: int = 0,
 ) -> dict[str, float]:
     """Bound the mean of a paired difference between two series.
 
@@ -225,6 +241,7 @@ def mean_difference(
         treatment: The series compared.
         reference: The series it is compared with.
         levels: The coverages, in percent.
+        stream: The bootstrap stream, as `month_bootstrap` takes it.
 
     Returns:
         `month_bootstrap`'s result for the mean of treatment minus reference.
@@ -233,6 +250,7 @@ def mean_difference(
         data=data,
         statistic=lambda d: float((d[treatment] - d[reference]).mean()),
         levels=levels,
+        stream=stream,
     )
 
 
@@ -544,43 +562,76 @@ def plant_month_section(
         "all 18 months": scored_months(),
     }
     gains, cells = [], []
+    eight = windows["8 unselected months"]
+    eight_site, eight_month, eight_error, eight_next = dominant_plant_month(b0=b0, months=eight)
     lines = [
         (
-            "Post hoc. The plant-month excluded in each window is the one with the largest mean "
-            "B0 error in that window (plants are the anonymised letters). Intervals are 95% and "
-            "99%, from resampling whole months and a seed."
+            "Post hoc. The rule is applied once: the plant-month with the largest mean B0 error "
+            "among the 8 unselected months, chosen without reference to any arm. It is removed in "
+            "both windows, and the 18-month window also removes its own largest-error "
+            "plant-month, alone and together with the first. Intervals are 95% and 99%, from "
+            "resampling whole months and a seed. A 99% bound within "
+            f"{BORDERLINE_PP:g} points of zero in either of two independent bootstrap streams is "
+            "marked borderline at 99%, and the row's call is then neither significant nor not."
         ),
         "",
     ]
+    audit = [
+        (
+            f"- {ROLE_EIGHT}: plant {eight_site}, {eight_month}, B0 error "
+            f"{eight_error * PERCENTAGE_POINTS:.2f}% of capacity (the next largest is "
+            f"{eight_next * PERCENTAGE_POINTS:.2f}%)."
+        )
+    ]
     for window, months in windows.items():
-        site, month, error, runner_up = dominant_plant_month(b0=b0, months=months)
-        lines += [
-            (
-                f"**{window}:** the excluded plant-month is plant {site}, {month}, with a mean B0 "
-                f"error of {error * PERCENTAGE_POINTS:.2f}% of capacity (the next largest is "
-                f"{runner_up * PERCENTAGE_POINTS:.2f}%)."
-            ),
-            "",
-        ]
+        own_site, own_month, own_error, own_next = dominant_plant_month(b0=b0, months=months)
         scoped = aligned.in_months(months=months)
-        without = scoped.where(keep=~((scoped.site == site) & (scoped.month == month)))
+        is_eight = (scoped.site == eight_site) & (scoped.month == eight_month)
+        is_own = (scoped.site == own_site) & (scoped.month == own_month)
+        variants = [("all rows", scoped)]
+        if (own_site, own_month) == (eight_site, eight_month):
+            variants.append(
+                (f"without {ROLE_EIGHT} (also the window's own)", scoped.where(keep=~is_eight))
+            )
+        else:
+            audit.append(
+                f"- {ROLE_WINDOW} ({window}): plant {own_site}, {own_month}, B0 error "
+                f"{own_error * PERCENTAGE_POINTS:.2f}% of capacity (the next largest is "
+                f"{own_next * PERCENTAGE_POINTS:.2f}%)."
+            )
+            variants += [
+                (f"without {ROLE_EIGHT}", scoped.where(keep=~is_eight)),
+                (f"without {ROLE_WINDOW}", scoped.where(keep=~is_own)),
+                ("without both", scoped.where(keep=~(is_eight | is_own))),
+            ]
         for arm in REVIEWED_ARMS:
-            for label, data in (("all rows", scoped), (f"without {site} {month}", without)):
+            for label, data in variants:
                 interval = mean_difference(
                     data=data, treatment=arm, reference="B0", levels=(95.0, 99.0)
                 )
+                other = mean_difference(
+                    data=data, treatment=arm, reference="B0", levels=(99.0,), stream=1
+                )
+                bounds = [
+                    interval["lower_99"],
+                    interval["upper_99"],
+                    other["lower_99"],
+                    other["upper_99"],
+                ]
+                borderline = any(abs(b) * PERCENTAGE_POINTS < BORDERLINE_PP for b in bounds)
                 gains.append(
                     {
                         "window": window,
                         "arm": arm,
                         "rows": label,
-                        "excluded_site": site,
-                        "excluded_month": month,
                         "difference": interval["value"],
                         "lower_95": interval["lower_95"],
                         "upper_95": interval["upper_95"],
                         "lower_99": interval["lower_99"],
                         "upper_99": interval["upper_99"],
+                        "lower_99_stream2": other["lower_99"],
+                        "upper_99_stream2": other["upper_99"],
+                        "borderline_99": borderline,
                         "n_rows": data.n_rows,
                     }
                 )
@@ -593,6 +644,8 @@ def plant_month_section(
             "Difference to B0 (pp)",
             "95% interval (pp)",
             "99% interval (pp)",
+            "99% interval, second stream (pp)",
+            "99% call",
             "Rows per seed",
         ],
         rows=[
@@ -603,11 +656,19 @@ def plant_month_section(
                 _pp(r["difference"]),
                 _interval(r["lower_95"], r["upper_95"]),
                 _interval(r["lower_99"], r["upper_99"]),
+                _interval(r["lower_99_stream2"], r["upper_99_stream2"]),
+                "borderline at 99%" if r["borderline_99"] else "",
                 str(r["n_rows"]),
             ]
             for r in gain_table.iter_rows(named=True)
         ],
     )
+    lines += [
+        "Audit, not for publication (the plant-months removed, by role):",
+        "",
+        *audit,
+        "",
+    ]
     # Per plant-month paired differences.
     scoped8 = aligned.in_months(months=windows["8 unselected months"])
     for arm in REVIEWED_ARMS:
@@ -692,7 +753,7 @@ def screening_section(*, lead1: pl.DataFrame) -> tuple[list[str], pl.DataFrame]:
     without = data.where(keep=~((data.site == site) & (data.month == month)))
     records = []
     for arm in arms:
-        for label, subset in (("all rows", data), (f"without {site} {month}", without)):
+        for label, subset in (("all rows", data), (f"without {ROLE_WINDOW}", without)):
             interval = mean_difference(data=subset, treatment=arm, reference="B0")
             records.append(
                 {
@@ -709,11 +770,12 @@ def screening_section(*, lead1: pl.DataFrame) -> tuple[list[str], pl.DataFrame]:
         (
             "Post hoc. The paired version of the first report's screen: each fitted arm minus B0 "
             "on the 10 screening months, at lead-day 1 and the primary setting, with a 95% "
-            "interval from resampling whole months and a seed. The plant-month excluded in the "
-            f"second set of rows is plant {site}, {month}, the one with the largest mean B0 error "
-            f"in the screening months ({error * PERCENTAGE_POINTS:.2f}% of capacity; the next "
-            f"largest is {runner_up * PERCENTAGE_POINTS:.2f}%). The no-fit arms are not in the "
-            "saved losses."
+            "interval from resampling whole months and a seed. The second set of rows removes "
+            f"{ROLE_WINDOW} (the one with the largest mean B0 error in the screening months). "
+            "The no-fit arms are not in the saved losses. Audit, not for publication: the "
+            f"plant-month removed is plant {site}, {month}, at "
+            f"{error * PERCENTAGE_POINTS:.2f}% of capacity (the next largest is "
+            f"{runner_up * PERCENTAGE_POINTS:.2f}%)."
         ),
         "",
         *_table(
@@ -750,6 +812,9 @@ def equivalence_section(*, root: Path, suffix: str) -> tuple[list[str], pl.DataF
         root / PRODUCT / f"tables_{PRODUCT}{suffix}" / "planned.parquet"
     ).with_columns(
         threshold=0.02 * pl.col("reference_value"),
+        metric=pl.when(pl.col("contrast") == "P4")
+        .then(pl.lit("continuous ranked probability score"))
+        .otherwise(pl.lit("mean absolute error")),
     )
     table = planned.with_columns(
         excludes_threshold_gain=pl.col("lower") > -pl.col("threshold"),
@@ -766,6 +831,7 @@ def equivalence_section(*, root: Path, suffix: str) -> tuple[list[str], pl.DataF
         *_table(
             header=[
                 "Contrast",
+                "Metric",
                 "Setting",
                 "Reference value (pp)",
                 "Threshold, 2% (pp)",
@@ -777,6 +843,7 @@ def equivalence_section(*, root: Path, suffix: str) -> tuple[list[str], pl.DataF
             rows=[
                 [
                     f"{r['contrast']}: {r['treatment']} minus {r['reference']}",
+                    r["metric"],
                     r["setting"],
                     _pp(r["reference_value"], signed=False),
                     _pp(r["threshold"], signed=False),
@@ -861,6 +928,11 @@ def climatology_section(
             pl.col("arm").is_in(["B0", "W7"])
         )
         past = past_only_climatology(rows=frame, hourly=hourly)
+        if lead == FULL_SWEEP_LEAD_DAY:
+            missing = frame.select("site", "time").join(
+                past.filter(pl.col("past_climatology").is_null()).select("site", "time"),
+                on=["site", "time"],
+            )
         existing = pl.DataFrame({"existing": climatology(frame=frame)}).with_columns(
             frame.select("site", "time")
         )
@@ -953,6 +1025,20 @@ def climatology_section(
             )
     table = pl.DataFrame(records)
     counts = pl.DataFrame(count_rows)
+    first_record = hourly.group_by("site").agg(first=pl.col("time").min()).sort("first")
+    late_site = first_record.row(-1, named=True)
+    missing_total = missing.height
+    missing_late = missing.filter(pl.col("site") == late_site["site"]).height
+    earlier_years = hourly.select(
+        pl.col("time").dt.year().min().alias("first"), pl.col("time").dt.year().max().alias("last")
+    ).row(0, named=True)
+    most_earlier = int(
+        hourly.with_columns(year=pl.col("time").dt.year(), month=pl.col("time").dt.month())
+        .group_by("site", "month")
+        .agg(years=pl.col("year").n_unique())
+        .select(pl.col("years").max())
+        .item()
+    )
     lines = [
         (
             "Post hoc. The saved climatology baseline is the median over the other folds' months "
@@ -962,6 +1048,17 @@ def climatology_section(
             "holds the month and hour. Every arm is scored on the rows where both exist, so each "
             "lead-day's arms share the same rows. The blends are 50/50 with a saved B0 or W7 "
             "prediction. Intervals are 95%, from resampling whole months and a seed."
+        ),
+        "",
+        (
+            "**The two climatologies differ in history depth as well as in look-ahead.** The "
+            f"past-only climatology reads the plant's record from {earlier_years['first']} "
+            f"(up to {most_earlier - 1} earlier years of the same calendar month), whereas the "
+            "saved climatology reads only the 18-month record of the study, so the gap between "
+            "them mixes the look-ahead with the depth of history. At lead-day 1, "
+            f"{missing_total} of {counts['rows'][0]} rows have no past-only value, and "
+            f"{missing_late} of those fall on the plant whose record starts in "
+            f"{late_site['first']:%B %Y}."
         ),
         "",
         *_table(
@@ -1006,8 +1103,12 @@ FINGERPRINT_PAIRS: Final[tuple[tuple[str, str], ...]] = (
     ("LOPO G-FP", "LOPO G-B0"),
     ("LOPO G-FPnoCK", "LOPO G-B0"),
     ("LOPO G-L1", "LOPO G-B0"),
+    ("G-FP", "G-FPnoCK"),
+    ("LOPO G-FP", "LOPO G-FPnoCK"),
 )
-"""The paired differences of the fingerprint figure, each against the shared model given nothing."""
+"""The paired differences of the fingerprint figure. The first eight are each against the shared
+model given nothing; the last two compare G-FP with G-FPnoCK, so the clipping ceiling's own effect
+is measured directly, for plants in training and for a plant left out."""
 
 
 def fingerprint_section(*, first_path: Path, follow_path: Path) -> tuple[list[str], pl.DataFrame]:
@@ -1225,7 +1326,9 @@ def hit_rate_lines(*, root: Path) -> tuple[list[str], pl.DataFrame]:
 # --- Round 2's fits ------------------------------------------------------------------------------
 
 
-def fit_sections(*, first_path: Path, fit_path: Path) -> tuple[list[str], dict[str, pl.DataFrame]]:
+def fit_sections(  # noqa: PLR0912
+    *, first_path: Path, fit_path: Path
+) -> tuple[list[str], dict[str, pl.DataFrame]]:
     """Report the four fit blocks, or say that the fits have not run.
 
     Args:
@@ -1258,7 +1361,11 @@ def fit_sections(*, first_path: Path, fit_path: Path) -> tuple[list[str], dict[s
         ("N2-3", "B0"),
         ("W7", "B0"),
         ("W7", "N2-3"),
+        ("AN", "N2-3"),
         ("N2-3", "N2"),
+        ("PC", "N2-2"),
+        ("TF", "N2-2"),
+        ("Q30", "N2-2"),
     ):
         interval = paired_interval(
             scoped=pool.filter(pl.col("arm").is_in([treatment, reference])),
@@ -1345,6 +1452,30 @@ def fit_sections(*, first_path: Path, fit_path: Path) -> tuple[list[str], dict[s
                         "upper": interval["upper_95"],
                     }
                 )
+    for arm in ("PC", "W7", "TF"):
+        with_year = wide(losses=lead1.drop("scope"), names={"B0": "b0_with", arm: "arm_with"})
+        without_year = wide(
+            losses=nulls.drop("scope"),
+            names={"B0-noDOY": "b0_without", f"{arm}-noDOY": "arm_without"},
+        ).drop("month")
+        joined = with_year.join(without_year, on=["site", "time", "seed"], how="inner")
+        data = Aligned(frame=joined, names=["b0_with", "arm_with", "b0_without", "arm_without"])
+        interval = month_bootstrap(
+            data=data,
+            statistic=lambda d: float(
+                ((d["arm_with"] - d["b0_with"]) - (d["arm_without"] - d["b0_without"])).mean()
+            ),
+        )
+        doy_rows.append(
+            {
+                "comparison": (
+                    f"({arm} minus B0) minus ({arm}-noDOY minus B0-noDOY), paired by row and seed"
+                ),
+                "difference": interval["value"],
+                "lower": interval["lower_95"],
+                "upper": interval["upper_95"],
+            }
+        )
     tables["day_of_year"] = pl.DataFrame(doy_rows)
     lines += [
         "### Day-of-year test at lead-day 1",

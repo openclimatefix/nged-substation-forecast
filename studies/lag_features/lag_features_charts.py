@@ -123,9 +123,9 @@ ARM_KEY: Final[dict[str, str]] = {
     "Q30": "the 30-day 90th percentile and median of the same hour",
     "CTX7": "seven separate daily lags and their weather forecasts",
     "AN": (
-        "the analogue ensemble: the mean, clear-sky index and spread of the power, rescaled by "
-        "clear-sky irradiance, on the 5 of the last 30 days whose forecast clear-sky index was "
-        "closest to the target's"
+        "the analogue ensemble: the mean, the forecast clear-sky index and the spread of the "
+        "power (rescaled by clear-sky irradiance) on the 5 of the last 30 days whose forecast "
+        "clear-sky index was closest to the target's"
     ),
     "TF": "the 30-day ratio of power to forecast irradiance (the transfer ratio)",
     "PC": (
@@ -741,6 +741,10 @@ def control_figure(*, tables: Path, followup_tables: Path, text: FigureText) -> 
             "Months being scored are the months the fitted forecasts are tested on."
         ),
         "All rows are exploratory.",
+        (
+            "Oracle rows are post hoc, from round 1's rebuilt month-level control; L1 rows are "
+            "the first run's."
+        ),
         arm_key("B0", "L1", "N1", "N2"),
     ]
     text.add(
@@ -1025,7 +1029,6 @@ def sweep_figure(*, tables: Path, tables2: Path, text: FigureText) -> alt.VConca
     without = contrasts.filter((pl.col("arm") == best["arm"]) & (pl.col("rows") != "all rows")).row(
         0, named=True
     )
-    excluded = str(without["rows"]).removeprefix("without ")
     no_fit = phase1.filter(~pl.col("fitted") & (pl.col("arm") != "B0")).sort("error")
     b0_error = float(phase1.filter(pl.col("arm") == "B0")["error"][0])
     no_fit_text = ", ".join(
@@ -1050,8 +1053,8 @@ def sweep_figure(*, tables: Path, tables2: Path, text: FigureText) -> alt.VConca
     ]
     footnote = [
         (
-            f"Without the plant-month with the largest B0 error ({excluded}), {best['arm']}'s "
-            f"difference is {without['difference']:+.2f} points, 95% "
+            "Without the plant-month with the largest B0 error (one plant in one month), "
+            f"{best['arm']}'s difference is {without['difference']:+.2f} points, 95% "
             f"interval [{without['lower']:+.2f}, {without['upper']:+.2f}]."
         ),
         (
@@ -1063,7 +1066,14 @@ def sweep_figure(*, tables: Path, tables2: Path, text: FigureText) -> alt.VConca
             "means each forecast is made by a model that never trained on that month. The "
             "fitted arms use three training runs (seeds); the CRPS panel uses one."
         ),
-        "All rows are exploratory.",
+        (
+            "The screening losses are exploratory; this paired analysis is post hoc, written "
+            "after the first run's results were known."
+        ),
+        (
+            f"With {plotted.height} rows, about {max(1, round(0.05 * plotted.height))} could "
+            "reach significance at the 5% level by chance."
+        ),
         arm_key(*arms_drawn),
     ]
     text.add(
@@ -1435,7 +1445,7 @@ def lag_construction_figure(
     title = "How each lag column is read for one target day"
     subtitle = [
         (
-            f"One example target day at plant {chosen['site']}, at the day-ahead lead (the "
+            "One example target day at one plant, at the day-ahead lead (the "
             "forecast for the day after the day it is issued). Each line or band is read at the "
             "same clock hour as the target hour, on an earlier whole day before the forecast "
             "was issued. Power is a share of capacity."
@@ -1538,8 +1548,8 @@ def withheld_folds_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart
     subtitle = [
         (
             "Some arms feed a first-stage XGBoost forecast into a second XGBoost model. Each row "
-            "is one scored block of months (a fold). Each cell is one month of plant "
-            f"{site}, coloured by whether the first-stage XGBoost model trained on that month "
+            "is one scored block of months (a fold). Each cell is one month of one plant, "
+            "coloured by whether the first-stage XGBoost model trained on that month "
             "or skipped that month."
         ),
         (
@@ -1821,12 +1831,16 @@ def fingerprint_figure(*, tables2: Path, text: FigureText) -> alt.VConcatChart:
         legend_title="Training",
         width_offset=300,
     )
-    gain = {row["treatment"]: -float(row["difference"]) for row in pairs.iter_rows(named=True)}
+    pair = {(row["treatment"], row["reference"]): row for row in pairs.iter_rows(named=True)}
+    seen = pair[("G-FP", "G-FPnoCK")]
+    unseen = pair[("LOPO G-FP", "LOPO G-FPnoCK")]
     claim(
-        holds=gain["G-FP"] > gain["LOPO G-FP"] > 0
-        and gain["LOPO G-FPnoCK"] >= gain["LOPO G-FP"]
-        and gain["G-FP"] >= gain["G-FPnoCK"],
-        what="the clipping ceiling helps seen plants but not unseen plants",
+        holds=float(seen["difference"]) < 0 <= float(unseen["difference"]),
+        what="the clipping ceiling lowers error for seen plants and does not for unseen plants",
+    )
+    claim(
+        holds=all(float(pair[(t, "G-B0")]["difference"]) < 0 for t in ("G-ID", "G-ID+TF", "G-FP")),
+        what="plant information lowers the shared model's error",
     )
     title = (
         "Plant information lowers a shared model's error; the clipping ceiling does not help "
@@ -1844,9 +1858,11 @@ def fingerprint_figure(*, tables2: Path, text: FigureText) -> alt.VConcatChart:
             "training, an unseen plant."
         ),
         (
-            f"With the clipping ceiling (G-FP) the gain is {gain['G-FP']:.2f} points for seen "
-            f"plants and {gain['LOPO G-FP']:.2f} for unseen plants; without it (G-FPnoCK) the "
-            f"gains are {gain['G-FPnoCK']:.2f} and {gain['LOPO G-FPnoCK']:.2f}."
+            "The last two rows compare G-FP with G-FPnoCK directly: adding the clipping ceiling "
+            f"changes error by {seen['difference']:+.2f} points "
+            f"[{seen['lower']:+.2f}, {seen['upper']:+.2f}] for seen plants and "
+            f"{unseen['difference']:+.2f} [{unseen['lower']:+.2f}, {unseen['upper']:+.2f}] for "
+            "unseen plants."
         ),
     ]
     footnote = [

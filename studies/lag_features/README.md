@@ -129,16 +129,22 @@ four small fit blocks. Everything is post hoc and sits under `ens_mean/followups
 checkpoints and manifest, so no earlier output is written.
 
 ```bash
-# No fit, no GPU: reads only saved files and takes about two minutes.
+# No fit, no GPU: reads only saved files and takes about three minutes.
 uv run python studies/lag_features/report_followups2.py
-# The fit blocks (1,080 fits), after a review of the scripts:
+# Already built; skip when the frames exist:
 uv run python studies/lag_features/followup2_frames.py
 uv run python studies/lag_features/build_lag_frame.py --weather-product ifs_single
+# The fit blocks (1,080 fits):
 uv run python studies/lag_features/fit_followups2.py --dry-run
 uv run python studies/lag_features/fit_followups2.py --device cuda --max-workers 4
-# Re-run the report once the fits exist (delete the `_nofit` report and tables first):
+# Afterwards, move the `_nofit` report and tables to `followups2/superseded/`, then re-run the
+# report so it fills the fit sections and verifies the manifest:
 uv run python studies/lag_features/report_followups2.py
 ```
+
+`render_figures` refuses to overwrite, so re-rendering any figure needs the old raw SVGs (under
+`figures_ens_mean/` and `followups/figures_followups_ens_mean/`) and the published
+`docs/studies/assets/lag_features_figure_<n>.svg` moved to `superseded/` first.
 
 | Script | What it does |
 |---|---|
