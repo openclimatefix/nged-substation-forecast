@@ -50,6 +50,7 @@ from era5_ladder_arms import (
     SMALLEST_EFFECT,
     TARGETS,
     FitKey,
+    ReportPaths,
     TargetType,
     dataset_path,
     importance_path,
@@ -1287,6 +1288,225 @@ def figure_11_hour_and_worst_days(
     )
 
 
+PROBABILISTIC_MEASURES: Final[tuple[tuple[str, str, str], ...]] = (
+    ("crps", "CRPS", "smaller is better"),
+    ("width_80", "Mean width of the 10 to 90% interval", "narrower is better"),
+    ("coverage_80", "Coverage of the 10 to 90% interval", "no direction"),
+)
+"""The measure key in the report's table, its words, and which direction is better."""
+
+CONTRAST_LABELS: Final[dict[tuple[str, str], str]] = {
+    ("g2", "g0"): "G2 minus G0",
+    ("g9", "g2"): "G9 minus G2",
+    ("g9", "negative_control"): "G9 minus negative control",
+    ("g9", "g9_without_mars_only"): "G9 minus no MARS-only",
+    ("g10", "g9_aerosol_rows"): "G10 minus G9 (aerosol rows)",
+}
+"""The words for each probabilistic contrast, by (treatment, reference)."""
+
+CONDITION_LABELS: Final[dict[str, str]] = {
+    "clear": "Clear",
+    "clear_and_dusty": "Clear and dusty",
+    "dusty": "Dusty, any sky",
+    "clear_and_clean": "Clear and clean",
+}
+"""The words for each aerosol condition."""
+
+
+def figure_13_probabilistic(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMixin | None:
+    """Draw the exploratory probabilistic contrasts: one panel per target and measure.
+
+    Args:
+        rows: The report's probabilistic table.
+        scope: The line naming the farms, hours, and span.
+
+    Returns:
+        The figure, or `None` if the table holds no contrast.
+    """
+    contrasts = rows.filter(pl.col("kind") == "contrast")
+    panels: list[Panel] = []
+    for target in TARGETS:
+        for measure, words, direction in PROBABILISTIC_MEASURES:
+            selected = contrasts.filter(
+                (pl.col("target") == target) & (pl.col("measure") == measure)
+            )
+            if selected.is_empty():
+                continue
+            factor = 100.0 if measure == "coverage_80" else _scale(target=target)
+            unit = (
+                "percentage points" if measure == "coverage_80" else _difference_unit(target=target)
+            )
+            labelled = selected.with_columns(
+                label=pl.struct("treatment", "reference").map_elements(
+                    lambda pair: CONTRAST_LABELS.get(
+                        (pair["treatment"], pair["reference"]),
+                        f"{pair['treatment']} - {pair['reference']}",
+                    ),
+                    return_dtype=pl.String,
+                )
+            )
+            panels.append(
+                dot_interval_panel(
+                    rows=labelled.select(
+                        "label",
+                        value=pl.col("difference") * factor,
+                        lower=pl.col("lower_95") * factor,
+                        upper=pl.col("upper_95") * factor,
+                    ),
+                    x_title=f"Treatment minus reference ({unit}; {direction})",
+                    panel_title=f"{PANEL_TITLES[target]}: {words}",
+                    colour=TARGET_COLOURS[target],
+                )
+            )
+    if not panels:
+        return None
+    return figure(
+        panels=panels,
+        number=13,
+        title="Do any inputs sharpen the XGBoost uncertainty estimate?",
+        subtitle=[
+            scope,
+            "Dot: estimate. Line: 95% interval from resampling whole months.",
+            "Dashed rule: no difference. Primary hyperparameter setting only.",
+            "A better median narrows the interval too, so read width beside the negative control.",
+            "All rows are exploratory and are not corrected for multiple comparisons.",
+        ],
+        figure_planning=None,
+    )
+
+
+def figure_13b_reliability(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMixin | None:
+    """Draw the share of outcomes at or below each quantile, per arm, against the nominal level.
+
+    Args:
+        rows: The report's probabilistic table.
+        scope: The line naming the farms, hours, and span.
+
+    Returns:
+        The figure, or `None` if the table holds no reliability rows.
+    """
+    reliability = rows.filter(pl.col("kind") == "reliability").with_columns(
+        level=pl.col("group").cast(pl.Float64)
+    )
+    if reliability.is_empty():
+        return None
+    panels: list[Panel] = []
+    for target in TARGETS:
+        selected = reliability.filter(pl.col("target") == target)
+        if selected.is_empty():
+            continue
+        diagonal = (
+            alt.Chart(pl.DataFrame({"level": [0.0, 1.0], "value": [0.0, 1.0]}))
+            .mark_line(color=ocf.TEXT, strokeDash=[4, 3], aria=False)
+            .encode(  # ty: ignore[unresolved-attribute]
+                x=alt.X("level:Q", scale=alt.Scale(domain=[0, 1])), y="value:Q"
+            )
+        )
+        lines = (
+            alt.Chart(selected)
+            .mark_line(point=True, aria=False)
+            .encode(  # ty: ignore[unresolved-attribute]
+                x=alt.X("level:Q", title="Quantile level the model aimed at"),
+                y=alt.Y("value:Q", title="Share of outcomes below"),
+                color=alt.Color("arm:N", title="Arm"),
+            )
+        )
+        panels.append(
+            alt.layer(diagonal, lines).properties(
+                width=PLOT_WIDTH_PX, height=220, title=_title(PANEL_TITLES[target])
+            )
+        )
+    return figure(
+        panels=panels,
+        number="13b",
+        title="Are the predicted quantiles calibrated?",
+        subtitle=[
+            scope,
+            "Each line is one arm. The dashed diagonal is perfect calibration.",
+            "Above the diagonal means outcomes fall below the quantile more often than intended.",
+            "Exploratory. Primary hyperparameter setting only.",
+        ],
+        figure_planning=None,
+    )
+
+
+def figure_14_aerosol_conditions(
+    *, conditions: pl.DataFrame, scope: str
+) -> alt.TopLevelMixin | None:
+    """Draw G10 minus G9 in each aerosol condition, with the event counts in the labels.
+
+    Args:
+        conditions: The report's aerosol-condition table.
+        scope: The line naming the farms, hours, and span.
+
+    Returns:
+        The figure, or `None` if no condition has an interval.
+    """
+    panels: list[Panel] = []
+    for target in TARGETS:
+        for measure, words in (("mean_absolute_error", "Mean absolute error"), ("crps", "CRPS")):
+            selected = conditions.filter(
+                (pl.col("target") == target)
+                & (pl.col("measure") == measure)
+                & (pl.col("setting") == PRIMARY_SETTING)
+                & pl.col("lower_95").is_not_null()
+            )
+            if selected.is_empty():
+                continue
+            scale = _scale(target=target)
+            rows = selected.select(
+                label=pl.col("condition").replace(CONDITION_LABELS)
+                + pl.format(" ({} d, {} mo)", pl.col("days"), pl.col("months")),
+                value=pl.col("difference") * scale,
+                lower=pl.col("lower_95") * scale,
+                upper=pl.col("upper_95") * scale,
+            )
+            panels.append(
+                dot_interval_panel(
+                    rows=rows,
+                    x_title=(
+                        f"{words}, G10 minus G9 ({_difference_unit(target=target)}; "
+                        "more negative is a gain)"
+                    ),
+                    panel_title=f"{PANEL_TITLES[target]}: {words}",
+                    colour=TARGET_COLOURS[target],
+                )
+            )
+    if not panels:
+        return None
+    return figure(
+        panels=panels,
+        number=14,
+        title="Whether CAMS aerosol helps in cloud-free and dusty hours",
+        subtitle=[
+            scope,
+            "Dot: estimate. Line: 95% interval from resampling whole months. Primary setting.",
+            "Dashed rule: no difference. Labels give distinct days (d) and months (mo).",
+            "The reading rule needs 20 days and 12 months. The report states its outcome.",
+            "Exploratory. EAC4 is a reanalysis, so a forecast would gain less.",
+        ],
+        figure_planning=None,
+    )
+
+
+def draw_uncertainty_and_aerosol_figures(*, paths: ReportPaths, scope: str) -> None:
+    """Draw figures 13, 13b, and 14 from the report's tables, for those whose table exists."""
+    if paths.probabilistic.exists():
+        probabilistic = pl.read_parquet(paths.probabilistic)
+        for name, chart in (
+            ("probabilistic", figure_13_probabilistic(rows=probabilistic, scope=scope)),
+            ("reliability", figure_13b_reliability(rows=probabilistic, scope=scope)),
+        ):
+            if chart is not None:
+                save(chart=chart, name=name)
+    if paths.aerosol_conditions.exists():
+        aerosol_chart = figure_14_aerosol_conditions(
+            conditions=pl.read_parquet(paths.aerosol_conditions), scope=scope
+        )
+        if aerosol_chart is not None:
+            save(chart=aerosol_chart, name="aerosol_conditions")
+
+
 def main() -> int:
     """Draw every figure whose inputs exist."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1409,6 +1629,7 @@ def main() -> int:
             )
     else:
         _LOG.info("no %s yet, so figure 12 is skipped", importance_file.name)
+    draw_uncertainty_and_aerosol_figures(paths=paths, scope=scope)
     figure_11 = figure_11_hour_and_worst_days(splits=splits, worst=worst, scope=scope)
     if figure_11 is not None:
         save(chart=figure_11, name="hour_and_worst_days")
