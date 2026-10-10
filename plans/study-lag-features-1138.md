@@ -152,6 +152,26 @@ and all arms are scored on the same test rows (a row needs the lag, so rows with
 lag hour, such as the first 8 days after a gap, are dropped for every arm, B0 included). The
 number of rows lost to this is printed in the report.
 
+### Probabilistic output (added at the maintainer's request)
+
+Every arm also fits the quantile model that `fit_one_fold` already offers (`with_quantiles=True`,
+the nine levels 0.1 to 0.9 in `QUANTILE_LEVELS`), on the same columns and the same rows as its
+point model. Quantiles are sorted to remove crossing and held to the export cap. The scores,
+all per row and normalised by the row's own capacity:
+
+- **CRPS** from the nine quantiles (`studies.cross_validation.crps`), the headline probabilistic
+  score, in percentage points of capacity, smaller is better.
+- **Coverage and width of the 10% to 90% interval:** the share of rows inside it (nominal 80%),
+  and its mean width. A lag could help by narrowing the interval where the lag shows the weather
+  forecast is behaving, or by widening it where the lag disagrees with the forecast; coverage shows
+  whether the narrower interval is still honest.
+- **Reliability:** the share of rows below each of the nine quantiles, per arm.
+- **Sharpness by condition:** interval width in clear, mixed, and cloudy hours (by the IFS cloud
+  cover forecast), to show where the lags change the uncertainty.
+
+Intervals on CRPS differences use the same paired month-and-seed bootstrap
+(`bootstrap_difference` on the CRPS column).
+
 ### Metric, intervals, controls
 
 - **Metric:** mean absolute error in percentage points of capacity, each row normalised by its own
@@ -177,8 +197,8 @@ reads.
 - **P3:** S2 minus the better of L1 and L2, chosen by the primary-setting point estimate, with the
   choice written to the report before the contrast is computed (does the two-step design help?).
 - **P4:** L1 minus N1 (is any gain more than the lag column count produces from noise?).
-- **P5:** the claim that lags help the global XGBoost model more than the per-plant one, judged by
-  the difference of P1 between the two scopes.
+- **P5:** CRPS of L1 minus CRPS of B0 (do lags improve the probabilistic forecast?), per-plant and
+  global, at lead-day 1.
 
 Five planned contrasts, so no multiple-comparison correction is made and the page says so (six
 would need a Bonferroni 99.17% interval). **Decision rule, fixed before any result:** a lag "helps"
@@ -190,7 +210,9 @@ prints, because a wider arm keeps a small edge (about 0.4% of error on synthetic
 `colsample_bytree=1`.
 
 A verdict needs the primary and sensitivity settings to agree. Every other number is exploratory
-and labelled so (W7 minus L1, since the issue asks about weekly statistics but the arm is not one of the
+and labelled so (the claim that lags help the global XGBoost model more than the per-plant one,
+judged by the difference of P1 between the two scopes; CRPS for every other contrast; coverage and
+sharpness, which are descriptive; W7 minus L1, since the issue asks about weekly statistics but the arm is not one of the
 five; day-0 and day-2 reads of the contrasts, the unseen-plant fit, the seasonal split
 into summer and winter, importances, any analysis added after the first run is post hoc).
 
@@ -318,7 +340,11 @@ the docs-link checker (the CI steps the skill's set omits).
    is planned.
 4b. **GPU:** XGBoost fits on the GPU if `nvidia-smi` shows one, one device per planned contrast, and
    one refit of an arm on both devices gives the noise floor.
-5. **Cost:** about 6 arms x 2 scopes x 2 settings x 3 seeds x 3 lead days x folds, with S2 about
+5. **Probabilistic contrast:** making the CRPS contrast planned (P5) forced the global-vs-per-plant
+   claim to become exploratory, because six planned contrasts would need a 99.17% interval.
+   Recommendation: keep this arrangement. The alternative is six planned contrasts with the
+   stricter interval.
+6. **Cost:** about 6 arms x 2 scopes x 2 settings x 3 seeds x 3 lead days x folds, with S2 about
    4x; a rough estimate is a few hundred GPU-minutes. No money is spent; no data is ordered.
 
 ## Reviews
