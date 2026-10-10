@@ -231,8 +231,11 @@ ladder's.
 | F6 | all 20 IFS variables | all the IFS variables |
 | F6B | F6 plus the partner's two variables | both routes together |
 
-- **The partner is AIFS Single** (ECMWF's machine-learned forecast), read from the Dynamical.org
-  store the blends page used. It supplies downward shortwave radiation and 2 m temperature from
+- **The partner is AIFS Single** (ECMWF's machine-learned forecast), read from the site-level
+  columns the matched-lead and blends studies already built from the Dynamical.org store
+  (`data/studies/per_study/nwp_forecast_comparison/aifs_blends/solar_aifs_inputs.parquet` for lead
+  days 1 and 2, and `.../aifs_extra_days/solar_aifs_inputs.parquet` for lead day 3). The build
+  asserts that each row's AIFS `init_time` is the 00 UTC run `L` days before the valid day. It supplies downward shortwave radiation and 2 m temperature from
   the same 00 UTC run, so the lead day matches IFS's. Its radiation is a 6-hour mean, so each valid
   hour reads the 6-hour window that contains it, and the page says so.
 - **ICON-EU is an optional second partner at lead days 1 and 2 only**, read from the Previous Runs
