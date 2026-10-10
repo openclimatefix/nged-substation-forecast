@@ -223,6 +223,27 @@ Otherwise the page says the evidence does not separate the routes. The page does
 as findings: the cost of ECMWF dissemination is unverified, and engineering effort is not measured
 here.
 
+**The page carries a priority list of the variables to ask Dynamical.org to add.** The list is the
+study's main deliverable for the production service, so the plan fixes how it is built. A variable
+or group is listed only if the open-data feed carries it (rechecked on a recent run), and it is
+ranked by the gain that its rung adds at lead days 1 and 3, in this order of evidence:
+
+1. **A planned gain.** The group's planned contrast is a gain by the rule above. Groups with a
+   planned gain come first, ordered by the size of the gain at lead day 1.
+2. **An exploratory gain that both hyperparameter settings and both lead days agree on**, and that
+   exceeds the negative control's difference from F2, ordered by size.
+3. **A group whose drop-one run costs the full set more than the negative control's difference**,
+   even if its ladder step is small, because the ladder order can hide it.
+4. **Everything else is listed as "no gain shown"** with its interval, so the reader sees what was
+   tested and found nothing.
+
+Each row of the list carries the variables in the group (with their ECMWF open-data names), the
+gain at lead days 1 and 3 with 95% intervals, the evidence class above, and whether the production
+ensemble feed already carries it. Where the groups share information (as ERA5's cloud and humidity
+fields did), the list says so and ranks the smallest set of variables that keeps the gain, from the
+drop-one runs. The page states that the ranking is for IFS at these lead days and months, and that
+Dynamical.org's ensemble fields can differ from Open-Meteo's high-resolution fields.
+
 ## Page structure and figures
 
 The page follows the study skill's figure-led form. It opens with the title, a bottom line of a few
@@ -231,7 +252,8 @@ variables help a solar PV forecast, and how far ahead), and it says what it mean
 Flexpectation project.
 
 1. **Headline.** The planned contrasts (P1 to P3) at lead days 1 and 3, with the adjusted and 95%
-   intervals, and the smallest effect marked.
+   intervals, and the smallest effect marked. Directly under the figure, the priority list of the
+   variables to ask Dynamical.org to add.
 2. **What the forecasts look like.** Three days chosen by a stated rule (the clearest, the most
    variable, and the dullest by the CAMS clear-sky index of the valid day), at one farm: IFS cloud
    covers and radiation at lead days 1 and 7 against the CAMS observation. A series of one farm's
