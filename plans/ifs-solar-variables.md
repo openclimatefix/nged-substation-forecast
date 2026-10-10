@@ -17,7 +17,9 @@ asks of a reanalysis. ERA5 is not a forecast, so a positive ERA5 result does not
 at a lead time, and a negative ERA5 result may reflect ERA5's age. The follow-up asks the question
 of the forecast data that the NGED service would receive.
 
-**Two decisions depend on the answer, and the plan states a rule for each.**
+**Three decisions depend on the answer, and the plan states a rule for each.** The third is the
+main one: whether engineering effort should go into ingesting the variables that only ECMWF's MARS
+archive serves, or into ingesting another forecast.
 
 - **Which variables to ask Dynamical.org to add.** Dynamical.org supplies IFS ensemble forecasts
   to the production pipeline, and it can add only fields that ECMWF's free open-data feed carries.
@@ -28,8 +30,11 @@ of the forecast data that the NGED service would receive.
 - **Whether the production forecast needs a second IFS feed.** A second feed such as Open-Meteo is
   needed only if the groups that help are ones the open-data feed does not carry.
 
-The study does not test the 12 MARS-only variables, because Open-Meteo does not serve them. The
-ERA5 study's planned contrast P4 stays the only evidence on those.
+- **Whether to ingest the MARS-only variables or another forecast.** The study cannot test the 12
+  MARS-only variables, because Open-Meteo does not serve them. The ERA5 study's planned contrast P4
+  is the only evidence on those, and ERA5 is a reanalysis, so P4 is an upper bound on the gain at
+  any lead. The comparison section below measures what a second forecast adds on the same
+  target, and the page sets the two gains side by side.
 
 ## Why this design
 
@@ -206,6 +211,18 @@ holds. The three arms below put the two routes on the same rows.
   once every IFS variable is present). The page states the row count, the era restriction, and that
   the verdict is for AIFS Single at these lead days, not for forecasts in general.
 
+**The decision rule for the third decision is fixed before any result.** The page draws three
+gains in points of capacity, each with its 95% interval: the ERA5 study's P4 (MARS-only variables,
+an upper bound), F6 minus F0 (free IFS variables), and FB minus F0 (a second forecast), the last two
+at lead days 1 and 3. The page states that the gains come from different rows and so are compared
+only as sizes. **Another forecast is the better use of engineering effort when FB minus F0 is a gain
+(its whole interval lies below minus the smallest effect at both lead days) and P4's upper-bound
+point estimate is no larger than that gain.** **The MARS-only variables are worth pricing when P4's
+upper-bound gain is larger than the partner's gain and the partner's gain is not a gain.**
+Otherwise the page says the evidence does not separate the routes. The page does not state costs
+as findings: the cost of ECMWF dissemination is unverified, and engineering effort is not measured
+here.
+
 ## Page structure and figures
 
 The page follows the study skill's figure-led form. It opens with the title, a bottom line of a few
@@ -231,7 +248,8 @@ Flexpectation project.
 8. **Regimes and seasons.** The difference in error between F6 and F0 by ERA5 cloud regime (clear,
    broken, overcast) and by season, exploratory.
 9. **Drop-one-group.** Error added when each group is removed from F6, exploratory.
-10. **Variables or another forecast.** The error of F0, FB, F6, and F6B at lead days 1 and 3 with
+10. **Variables or another forecast.** The three gains of the third decision's rule beside each
+    other, then the error of F0, FB, F6, and F6B at lead days 1 and 3 with
     intervals, and the contrasts FB minus F0, F6 minus F0, and F6 minus FB, exploratory.
 
 Each figure carries the text it needs to be read alone, and its text is reviewed (a first-stumble
