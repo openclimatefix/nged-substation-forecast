@@ -156,6 +156,14 @@ ARM_KEY: Final[dict[str, str]] = {
         "the median power of the plant's calendar month and hour, from months outside the scored "
         "block, with no fit"
     ),
+    "climatology (uses later months)": (
+        "the median power of the plant's calendar month and hour from the other blocks of "
+        "months, later months included, with no fit"
+    ),
+    "past-only climatology": (
+        "the median power of the plant's same calendar month and hour in earlier years only, "
+        "from its record since 2019, with no fit"
+    ),
     "persistence": "the last observed hour's power when the forecast was issued, with no fit",
     "diurnal_persistence": (
         "the power at the target's hour on the last whole day before the issue day, with no fit"
@@ -1117,18 +1125,24 @@ def _crps_rows(*, tables: Path) -> pl.DataFrame:
     return pl.concat(parts).select("label", "crps") if parts else pl.DataFrame()
 
 
-def by_lead_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
+SAVED_CLIMATOLOGY: Final[str] = "climatology (uses later months)"
+PAST_CLIMATOLOGY: Final[str] = "past-only climatology"
+"""The two climatologies of Figure 12's bottom panel."""
+
+
+def by_lead_figure(*, tables: Path, tables2: Path, text: FigureText) -> alt.VConcatChart:
     """Figure 12: each arm's gain over B0 against lead-day, and the error of B0 and climatology.
 
     Args:
         tables: The report's tables directory.
+        tables2: The round-2 report's tables directory.
         text: The text collector.
 
     Returns:
         The figure.
     """
     by_lead = pl.read_parquet(tables / "by_lead.parquet").with_columns(
-        arm=pl.col("arm").replace(ARM_LABELS),
+        arm=pl.col("arm").replace({**ARM_LABELS, "climatology": SAVED_CLIMATOLOGY}),
         lead=pl.col("lead_day").cast(pl.String).replace({"0": LEAD_ZERO_TICK}),
         error=pl.col("error") * PERCENTAGE_POINTS,
         gain=pl.col("difference_to_b0") * PERCENTAGE_POINTS,
@@ -1144,10 +1158,13 @@ def by_lead_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     gain_colour = alt.Color(
         "arm:N",
         scale=alt.Scale(
-            domain=["B0", *gain_arms, "climatology"],
-            range=[ARM_COLOURS[a] for a in ("B0", "L1", "W7", "Q30", "T1", "N2", "climatology")],
+            domain=["B0", *gain_arms, SAVED_CLIMATOLOGY, PAST_CLIMATOLOGY],
+            range=[
+                *(ARM_COLOURS[a] for a in ("B0", "L1", "W7", "Q30", "T1", "N2", "climatology")),
+                ocf.DATA_BLUE_LIGHT,
+            ],
         ),
-        legend=alt.Legend(title="Arm"),
+        legend=alt.Legend(title="Arm", columns=3, labelLimit=0, titleLimit=0),
     )
     gain_x = alt.X(
         "lead_day:Q",
@@ -1171,7 +1188,23 @@ def by_lead_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         .mark_rule(aria=False)
         .encode(x=gain_x, y="lower:Q", y2="upper:Q", color=gain_colour)  # ty: ignore[unresolved-attribute]
     )
-    levels = by_lead.filter(pl.col("arm").is_in(["B0", "L1", "climatology"]))
+    past = (
+        pl.read_parquet(tables2 / "climatology_past_only.parquet")
+        .filter(pl.col("arm") == PAST_CLIMATOLOGY)
+        .with_columns(
+            error=pl.col("error") * PERCENTAGE_POINTS,
+            difference=pl.col("difference") * PERCENTAGE_POINTS,
+            upper=pl.col("upper") * PERCENTAGE_POINTS,
+        )
+    )
+    levels = pl.concat(
+        [
+            by_lead.filter(pl.col("arm").is_in(["B0", "L1", SAVED_CLIMATOLOGY])).select(
+                "lead_day", "arm", "error"
+            ),
+            past.select("lead_day", "arm", "error"),
+        ]
+    )
     level_lines = (
         alt.Chart(levels)
         .mark_line(point=True, aria=False)
@@ -1188,18 +1221,10 @@ def by_lead_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         holds=best_gain["lead_day"] == longest,
         what="the largest gain over B0 is at the longest lead",
     )
-    levels = by_lead.filter(pl.col("lead_day").is_in([10, longest]))
+    last = past.filter(pl.col("lead_day") == longest).row(0, named=True)
     claim(
-        holds=bool(
-            all(
-                levels.filter((pl.col("lead_day") == lead) & (pl.col("arm") == "B0"))["error"][0]
-                > levels.filter((pl.col("lead_day") == lead) & (pl.col("arm") == "climatology"))[
-                    "error"
-                ][0]
-                for lead in (10, longest)
-            )
-        ),
-        what="B0 is worse than climatology at lead-days 10 and the longest",
+        holds=float(last["upper"]) < 0,
+        what="B0's error is above the earlier-years climatology's at the longest lead",
     )
     claim(
         holds=bool(
@@ -1207,7 +1232,10 @@ def by_lead_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         ),
         what="the random-day null also gains at the longest lead",
     )
-    title = f"At lead-day {longest}, B0 is worse than climatology and a random-day lag gains too"
+    title = (
+        f"At lead-day {longest}, B0's error is {abs(last['difference']):.1f} points above the "
+        "earlier-years climatology's, and a random-day lag gains too"
+    )
     subtitle = [
         (
             "Top: each arm's mean absolute error minus B0's at the same lead-day, in percentage "
@@ -1215,8 +1243,12 @@ def by_lead_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
             "months."
         ),
         (
-            "Bottom: the mean absolute error of B0, L1, and climatology, in percentage points "
-            "of capacity; smaller is better."
+            "Bottom: the mean absolute error of B0, L1, and two climatologies, in percentage "
+            "points of capacity; smaller is better. The earlier-years climatology is drawn at "
+            f"lead-days 1, 7, 10, and 14 only, on the {last['n_rows']} rows (at lead-day "
+            f"{longest}) where it exists; its difference to B0 at lead-day {longest} is "
+            f"{last['difference']:+.2f} points, 95% interval "
+            f"[{last['lower'] * PERCENTAGE_POINTS:+.2f}, {last['upper']:+.2f}]."
         ),
         (
             "A random-day lag (N2) gains at the longest lead too, so part of the lag arms' "
@@ -1230,8 +1262,14 @@ def by_lead_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
             f"({PRIMARY_SETTING})."
         ),
         f"{LEAD_ZERO_TICK}: lead-day 0 is not usable for its early hours in a live service.",
-        "All rows are exploratory.",
-        arm_key("B0", "L1", "W7", "Q30", "T1", "N2", "climatology"),
+        (
+            "The saved climatology reads other blocks of months, later months included, so a "
+            "live service could not make it. The earlier-years climatology reads earlier years "
+            "only. The earlier-years rows are post hoc, written after the first run's results "
+            "were known."
+        ),
+        "All other rows are exploratory.",
+        arm_key("B0", "L1", "W7", "Q30", "T1", "N2", SAVED_CLIMATOLOGY, PAST_CLIMATOLOGY),
     ]
     text.add(
         figure_id="12",
@@ -1835,15 +1873,15 @@ def fingerprint_figure(*, tables2: Path, text: FigureText) -> alt.VConcatChart:
     seen = pair[("G-FP", "G-FPnoCK")]
     unseen = pair[("LOPO G-FP", "LOPO G-FPnoCK")]
     claim(
-        holds=float(seen["difference"]) < 0 <= float(unseen["difference"]),
-        what="the clipping ceiling lowers error for seen plants and does not for unseen plants",
+        holds=float(unseen["lower"]) > 0,
+        what="the clipping ceiling's 95% interval is above zero for unseen plants",
     )
     claim(
         holds=all(float(pair[(t, "G-B0")]["difference"]) < 0 for t in ("G-ID", "G-ID+TF", "G-FP")),
         what="plant information lowers the shared model's error",
     )
     title = (
-        "Plant information lowers a shared model's error; the clipping ceiling does not help "
+        "Plant information lowers a shared model's error; the clipping ceiling raises it for "
         "unseen plants"
     )
     subtitle = [
@@ -2053,9 +2091,9 @@ def followup_controls_figure(*, tables2: Path, text: FigureText) -> alt.VConcatC
             "A control is a planted-loss test: the forecasts are re-fitted on a synthetic "
             "target in which measured power is cut by the shift (5% or 10%). In the month-level "
             "control, the cut applies in 9 of the 18 scored months and a random half of the "
-            "others. In the plant-steps control, each plant's power is cut for a random 4 to 12 "
-            "weeks. An arm's standing gain on the unshifted data is subtracted so that it is "
-            "not counted as recovery."
+            "others, and it shifts all plants in the same months. In the plant-steps control, "
+            "each plant's power is cut for a random 4 to 12 weeks. An arm's standing gain on the "
+            "unshifted data is subtracted so that it is not counted as recovery."
         ),
         POST_HOC,
         arm_key("B0", *order),
@@ -2219,11 +2257,14 @@ ERA_COLOURS: Final[dict[str, str]] = {
 """The unselected months and each forecast-product era."""
 
 
-def followup_unselected_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
+def followup_unselected_figure(
+    *, tables: Path, tables2: Path, text: FigureText
+) -> alt.VConcatChart:
     """Figure 10: every arm's gain over B0 on the 8 months the sweep never screened.
 
     Args:
         tables: The follow-ups' tables directory.
+        tables2: The round-2 report's tables directory.
         text: The text collector.
 
     Returns:
@@ -2276,6 +2317,29 @@ def followup_unselected_figure(*, tables: Path, text: FigureText) -> alt.VConcat
         holds=top_three == {"PC", "W7", "TF"} and "AN" not in top_three,
         what="PC, W7 and TF gained most and AN did not",
     )
+    gains = pl.read_parquet(tables2 / "plant_month_gains.parquet").filter(
+        (pl.col("window") == "8 unselected months") & pl.col("arm").is_in(["PC", "W7", "TF"])
+    )
+    all_rows = {
+        r["arm"]: r for r in gains.filter(pl.col("rows") == "all rows").iter_rows(named=True)
+    }
+    without = {
+        r["arm"]: r for r in gains.filter(pl.col("rows") != "all rows").iter_rows(named=True)
+    }
+    claim(
+        holds=all(
+            abs(without[a]["difference"]) < 0.5 * abs(all_rows[a]["difference"])
+            for a in ("PC", "W7")
+        )
+        and all(without[a]["lower_95"] < 0 < without[a]["upper_95"] for a in without),
+        what="most of PC's and W7's gain comes from one plant-month and the rest includes zero",
+    )
+    concentration = (
+        "Most of PC's and W7's gain on these months comes from one plant in one month; without "
+        f"it the 8-month gains are PC {without['PC']['difference'] * PERCENTAGE_POINTS:+.3f}, "
+        f"W7 {without['W7']['difference'] * PERCENTAGE_POINTS:+.3f}, TF "
+        f"{without['TF']['difference'] * PERCENTAGE_POINTS:+.3f} (95% intervals include zero)."
+    )
     title = (
         "On the 8 months not used for screening, PC, W7, and TF gained most over B0, but AN did not"
     )
@@ -2300,6 +2364,7 @@ def followup_unselected_figure(*, tables: Path, text: FigureText) -> alt.VConcat
             "The screening rule picked AN from the first 10 months, so AN's row here is out of "
             "sample."
         ),
+        concentration,
         POST_HOC,
         arm_key("B0", *overall["arm"].to_list()),
     ]
@@ -2483,7 +2548,9 @@ def draw_followups(*, root: Path, smoke: bool, text_only: bool) -> int:
     figures = {
         "8_controls_all_arms": followup_controls_figure(tables2=tables2, text=text),
         "13_long_leads": followup_long_leads_figure(tables=tables, text=text),
-        "10_unselected_months": followup_unselected_figure(tables=tables, text=text),
+        "10_unselected_months": followup_unselected_figure(
+            tables=tables, tables2=tables2, text=text
+        ),
         "17_hit_rates": followup_hit_rate_figure(tables=tables, text=text),
     }
     text_path = directory / f"figure_text_followups_ens_mean{suffix}.txt"
@@ -2530,7 +2597,7 @@ def main() -> int:
         "7_controls": control_figure(tables=tables, followup_tables=followup_tables, text=text),
         "5_three_weeks": models_work_figure(root=root, product=product, text=text, smoke=smoke),
         "9_screen": sweep_figure(tables=tables, tables2=tables2, text=text),
-        "12_by_lead": by_lead_figure(tables=tables, text=text),
+        "12_by_lead": by_lead_figure(tables=tables, tables2=tables2, text=text),
     }
     optional = {
         "16_coverage": coverage_figure(tables=tables, text=text),
