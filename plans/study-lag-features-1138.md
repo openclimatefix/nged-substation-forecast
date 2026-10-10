@@ -145,7 +145,7 @@ Every window below is anchored at the issue day and reads nothing after the issu
 | Lag with weather | L2 L1 plus the forecast irradiance and temperature at the lag hour, from the target's lead day (3); CTX7 raw context: lags and lag-hour forecast irradiance for days 1 to 7 (14) |
 | Weekly statistics | W7 minimum, maximum, mean of the same clock hour over the 7 whole days before the issue day, at least 5 present (3) |
 | Slow trackers | Q30 the 30-day 90th percentile and median of the same clock hour (2); CK the clipping ceiling: expanding 99.5th percentile and 60-day maximum of hourly power, and the share of clear hours near the ceiling (3) |
-| Transfer function | TF the 30-day ratio of power to forecast irradiance at the same clock hour (hours above 50 W m⁻², at least 15 days present), and that ratio times the target's forecast irradiance (2); AN the analogue ensemble: the mean, forecast clear-sky index, and spread of the observed power (rescaled by clear-sky irradiance) on the 5 days in the last 30 whose forecast clear-sky index was closest to the target's (3); PC the ratio of power to satellite irradiance (CAMS) over days 3 to 9 before the issue day, and the ratio of satellite to forecast irradiance over days 3 to 32 (the 3-day gap is a conservative reading of CAMS's documented delay of up to 2 days, to be checked; a gain would justify ingesting CAMS into the live system; 2) |
+| Transfer function | TF the 30-day ratio of power to forecast irradiance at the same clock hour (hours above 50 W m⁻², at least 15 days present), and that ratio times the target's forecast irradiance (2); AN the analogue ensemble: the mean, forecast clear-sky index, and spread of the observed power (rescaled by clear-sky irradiance) on the 5 days in the last 30 whose forecast clear-sky index was closest to the target's (3); PC the ratio of power to satellite irradiance (CAMS) over days 1 to 7 before the issue day, and the ratio of satellite to forecast irradiance over days 1 to 30 (since February 2026 CAMS's point service has a latency of 1 day: at 09:00 UTC it serves every interval through the end of the previous day, as [the data-sources roadmap](docs/roadmap/data-sources.md) records, so the whole of day 1 is available; a gain would justify ingesting CAMS into the live system; 2) |
 | Two-step | S2 stage-1 prediction at the target hour and the lag hour, the observed lag, and their difference (4); S3 mean stage-1 residual over the last 1, 7, and 30 whole days before the issue day (3) |
 | Cross-plant | RP the plant's 7-day capacity-normalised energy divided by the mean of the other plants', which isolates a plant-specific fault from shared weather (2, with a 1-day version) |
 | Interpolation bound | T1 days since 2024-03-01 (1): month-block folds interleave, so trees can interpolate a test month's level from months on both sides, including future months; its gain is what interpolation buys, never drift a live forecast could use |
@@ -407,8 +407,10 @@ the docs-link checker.
    widths. N2 measures the bias of one extra column, and N2-k that of a wide X. The maintainer has
    accepted the departure from the `study` skill's equal-count rule; the page says why.
 4. **CAMS ingestion:** PC is eligible as X. A gain from PC would justify ingesting CAMS into the live
-   system, and the page states the CAMS publication delay (assumed 2 days, to be verified against
-   CAMS's documentation before the first fit) that the arm depends on.
+   system. The arm depends on CAMS's 1-day latency (documented in the data-sources roadmap, and
+   shorter than the 2 days older third-party documentation gives); in the study's history before
+   February 2026 CAMS's latency was longer, so the backtest reads CAMS slightly fresher than the
+   service then offered, and the page says so.
 
 ## Triage of the reviews
 
