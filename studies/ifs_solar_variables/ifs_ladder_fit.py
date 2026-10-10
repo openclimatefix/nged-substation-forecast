@@ -22,7 +22,8 @@ and temperature, on the blend rows of lead days 1 to 3, and their padding contro
 **The hyperparameter settings.** Every arm is fitted at `PRIMARY_HYPER_PARAMETERS`. The arms of
 `SENSITIVITY_ARMS` (the arms of the planned contrasts, the controls, and `f3` to `f5`) are also
 fitted at `SENSITIVITY_HYPER_PARAMETERS` at the planned lead days. `--sensitivity-arms` adds more.
-Column subsampling is off, so an arm with more columns has no advantage from the count.
+Column subsampling is off, so an arm with more columns gets no free win from column subsampling.
+Extra columns can still change the error, which the negative controls measure.
 
 **The controls' permuted columns are made once per fit**, among the rows that share a farm, a month,
 and an hour of day (`studies.blending.climatology_permutation`), and every arm of the fit reads the

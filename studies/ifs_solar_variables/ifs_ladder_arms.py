@@ -181,8 +181,9 @@ class PlannedContrast(NamedTuple):
         label: The contrast's name on the page, `P1` to `P5`.
         treatment: The arm whose error is compared.
         reference: The arm it is compared against.
-        control: The negative control with the treatment's columns and the new information
-            removed. The contrast stands only if the treatment also beats the control.
+        control: The negative control with the treatment's columns, with the new variables
+            replaced by permuted copies. The contrast stands only if the treatment also beats the
+            control.
         view: The rows the contrast is read on.
         question: What the contrast asks, in words.
     """

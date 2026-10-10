@@ -1,8 +1,9 @@
 """Run a study's XGBoost fits in checkpointed groups, so a reboot costs one group, not the run.
 
 Written for the IFS solar-variables study planned in
-<https://github.com/openclimatefix/nged-substation-forecast/pull/1137>, and the same code as the
-ERA5 variable ladder's `era5_ladder_fit.py` uses. A fit script gives `fit_in_groups` its jobs
+<https://github.com/openclimatefix/nged-substation-forecast/pull/1137>. It holds the checkpoint
+loop of the ERA5 variable ladder's `era5_ladder_fit.py`, moved into the package with tests; the
+ERA5 fit script keeps its own copy. A fit script gives `fit_in_groups` its jobs
 (`studies.arm_runner.Job`), and the function writes each group's per-row losses to a checkpoint file
 the moment the group finishes. A rerun reads the groups that exist and fits only the others.
 

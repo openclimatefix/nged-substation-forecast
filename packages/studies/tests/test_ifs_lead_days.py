@@ -3,7 +3,9 @@ from datetime import UTC, datetime, timedelta
 import polars as pl
 import pytest
 from studies.cross_validation import calendar_month_coverage, raise_on_uncovered_months
+from studies.ifs_ladder import rung_variables
 from studies.ifs_lead_days import (
+    INSTANTANEOUS_VARIABLES,
     PARTNER_COLUMNS,
     blend_month_folds,
     find_fold_offsets,
@@ -366,3 +368,15 @@ def test_find_fold_offsets_raises_when_no_rotation_covers_every_calendar_month(
 
     with pytest.raises(ValueError, match="no fold rotation"):
         find_fold_offsets(rows=rows)
+
+
+def test_every_variable_but_the_hourly_means_totals_and_maxima_is_averaged_over_the_hour():
+    hourly = {
+        "shortwave_radiation",
+        "direct_radiation",
+        "precipitation",
+        "snowfall",
+        "wind_gusts_10m",
+    }
+
+    assert set(INSTANTANEOUS_VARIABLES) == set(rung_variables(rung="f6")) - hourly

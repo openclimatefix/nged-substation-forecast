@@ -178,8 +178,9 @@ BLEND_KEY: Final[str] = (
 """The subtitle line that defines the blend arms."""
 
 NEGATIVE_CONTROL_KEY: Final[str] = (
-    "Negative control: the arm's columns, with the new variables replaced by shuffled copies that "
-    "carry no new information."
+    "Negative control: the arm's columns, with the new variables replaced by copies shuffled among "
+    "the hours that share a farm, a month, and an hour of day, so only each month's mean at each "
+    "hour survives."
 )
 """The subtitle line that defines a negative control."""
 

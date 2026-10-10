@@ -108,8 +108,9 @@ def gain_after_control(
 ) -> VerdictType:
     """Let a planned gain stand only if it also shows against the negative control.
 
-    The control has the treatment's columns with the new variables' information removed, so a gain
-    over the reference that is not also a gain over the control may come from the extra columns.
+    The control has the treatment's columns with the new variables replaced by permuted copies, so
+    a gain over the reference that is not also a gain over the control may come from the extra
+    columns.
 
     Args:
         versus_reference: The combined verdict of treatment minus reference.

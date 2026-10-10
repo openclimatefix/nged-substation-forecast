@@ -86,7 +86,8 @@ A re-run refuses to overwrite a result. Move the old one into a `superseded/` fo
   be covered by any fold design. November occurs in 2025 only in the ladder rows, and ten calendar
   months occur once in the blend rows. `checks.md` counts those cells.
 - **No column is subsampled.** XGBoost runs with `colsample_bytree=1`, so an arm with more columns
-  has no advantage from the count.
+  gets no free win from column subsampling. Extra columns can still change the error, which the
+  negative controls measure.
 - **Lead days 1 to 3 are pooled in the planned contrasts** over the farm-hours that all three hold,
   by giving each lead day's rows a farm key of its own (`A-L1`, `A-L2`, ...), so that one month
   resample serves all three. The report raises if any of the three lead days is missing.

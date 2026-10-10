@@ -123,6 +123,9 @@ def test_the_rungs_are_the_plans_table():
         "cloud_cover_high",
         "direct_radiation",
         "boundary_layer_height",
+        "cape",
+        "convective_inhibition",
+        "visibility",
     }
 
 

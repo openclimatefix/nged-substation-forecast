@@ -10,8 +10,9 @@ below it.** `RUNG_ADDITIONS` is the single copy of the list. `rung_features`,
 arms, and the negative controls cannot disagree about which variable belongs to which group.
 
 **Every negative control has the columns of the arm it pads, with the new variables replaced by
-permuted copies of themselves**, so a control and the arm it is read against differ in information
-and never in the number of columns.
+permuted copies of themselves**, so a control and the arm it is read against differ in the values of
+those columns and never in the number of columns. The permuted columns keep each month's mean at
+each hour, and extra columns can make the error worse, as the ERA5 study found.
 """
 
 from typing import Final, Literal
@@ -187,7 +188,7 @@ def era5_comparison_features(*, rung: Era5RungType) -> tuple[str, ...]:
     )
 
 
-OpenDataType = Literal["carried", "not carried", "unchecked"]
+OpenDataType = Literal["carried", "not carried"]
 """Whether ECMWF's free open-data feed carries a variable."""
 
 OPEN_DATA_AVAILABILITY: Final[dict[str, OpenDataType]] = {
@@ -201,30 +202,29 @@ OPEN_DATA_AVAILABILITY: Final[dict[str, OpenDataType]] = {
     "dew_point_2m": "carried",
     "total_column_integrated_water_vapour": "carried",
     "boundary_layer_height": "not carried",
-    "cape": "carried",
-    "convective_inhibition": "unchecked",
-    "visibility": "unchecked",
+    "cape": "not carried",
+    "convective_inhibition": "not carried",
+    "visibility": "not carried",
     "surface_temperature": "carried",
-    "snow_depth": "unchecked",
-    "snowfall": "unchecked",
+    "snow_depth": "carried",
+    "snowfall": "carried",
     "precipitation": "carried",
     "surface_pressure": "carried",
     "wind_speed_10m": "carried",
-    "wind_gusts_10m": "unchecked",
+    "wind_gusts_10m": "carried",
 }
-"""Whether the open-data feed carries each variable, as the plan states it.
+"""Whether the open-data feed carries each variable.
 
-The plan records that the feed carries total column water vapour, CAPE, skin temperature, and total
-cloud cover, and carries no cloud layers, direct radiation, or boundary-layer height. The production
-ensemble feed's variables are carried by definition. The plan does not state the rest, so they are
-`unchecked`. The plan's statement dates from 2026-10-09 and asks for a recheck on a recent run
-before a page assigns classes.
+The feed carries most-unstable CAPE (`mucape`), not the surface-based CAPE that Open-Meteo serves
+as `cape`, so `cape` is `not carried`. The availability was read from the index files of ECMWF's
+open-data 00 UTC run of 2026-10-09 at step 24, for both the high-resolution (oper) and ensemble
+(enfo) streams.
 """
 
 OPEN_DATA_CHECK_NOTE: Final[str] = (
-    "Open-data availability is the plan's statement of 2026-10-09; variables the plan does not "
-    "state are marked unchecked, and the availability must be rechecked on a recent run before "
-    "the page assigns classes."
+    "Open-data availability was read from the index files of ECMWF's open-data 00 UTC run of "
+    "2026-10-09 at step 24, for both the high-resolution (oper) and ensemble (enfo) streams. The "
+    "feed carries most-unstable CAPE (mucape), not the CAPE Open-Meteo serves."
 )
 """The sentence the report prints beside the availability table."""
 

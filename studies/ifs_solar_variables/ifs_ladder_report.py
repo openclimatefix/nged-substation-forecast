@@ -931,11 +931,7 @@ def group_evidence(*, contrasts: pl.DataFrame, verdicts: pl.DataFrame) -> pl.Dat
         )
         if classes[rung] == "exploratory gain" and step is not None:
             gains[rung] = -step
-        elif (
-            classes[rung] in ("planned gain", "drop-one gain")
-            and rung in PLANNED_COVERS_SEVERAL_GROUPS
-            and drop is not None
-        ):
+        elif rung in PLANNED_COVERS_SEVERAL_GROUPS and drop is not None:
             gains[rung] = drop
         else:
             gains[rung] = -step if step is not None else 0.0
@@ -977,10 +973,7 @@ def group_evidence(*, contrasts: pl.DataFrame, verdicts: pl.DataFrame) -> pl.Dat
                 "not_carried": ", ".join(
                     name for name in variables if OPEN_DATA_AVAILABILITY[name] == "not carried"
                 ),
-                "unchecked": ", ".join(
-                    name for name in variables if OPEN_DATA_AVAILABILITY[name] == "unchecked"
-                ),
-                "in_open_data": "carried" in availability or "unchecked" in availability,
+                "in_open_data": "carried" in availability,
                 "in_production_feed": ", ".join(
                     name for name in variables if name in PRODUCTION_FEED_VARIABLES
                 ),
@@ -1520,7 +1513,6 @@ def render_priority(*, evidence: pl.DataFrame) -> list[str]:
                         f"({row['gain_interval_level']})"
                     ),
                     row["carried"] or "none",
-                    row["unchecked"] or "none",
                     row["not_carried"] or "none",
                     row["in_production_feed"] or "none",
                     points(row["drop_one_raise"], signed=True),
@@ -1534,7 +1526,6 @@ def render_priority(*, evidence: pl.DataFrame) -> list[str]:
                 "evidence class",
                 "gain with interval (points; positive is a gain)",
                 "carried by open data",
-                "open data unchecked",
                 "not carried",
                 "in the production feed",
                 "drop-one: error added (points)",
@@ -1646,6 +1637,13 @@ def render_settings(
     splits: pl.DataFrame,
 ) -> list[str]:
     """Render the settings and derived numbers the page quotes."""
+    planned_months = (
+        contrasts.filter(pl.col("family") == "planned")
+        .group_by("label")
+        .agg(pl.col("n_months").max())
+        .sort("label")
+    )
+    months_text = ", ".join(f"{label} {months}" for label, months in planned_months.iter_rows())
     lines = [
         f"- Hyperparameters, main setting: {dict(PRIMARY_HYPER_PARAMETERS)}.",
         f"- Hyperparameters, second setting: {dict(SENSITIVITY_HYPER_PARAMETERS)}.",
@@ -1657,8 +1655,8 @@ def render_settings(
         ),
         (
             f"- Planned family: {PLANNED_CONTRAST_COUNT} contrasts at a 5% family-wise level, so "
-            f"each interval covers {ADJUSTED_LEVEL_PERCENT:g}%. Intervals from about 24 resampled "
-            "months undercover, so they are approximate."
+            f"each interval covers {ADJUSTED_LEVEL_PERCENT:g}%. The intervals resample whole "
+            f"months ({months_text}), and so few months undercover, so they are approximate."
         ),
         (
             f"- Smallest effects: {SMALLEST_EFFECT['pv'] * PERCENTAGE_POINTS:g} points of capacity "
