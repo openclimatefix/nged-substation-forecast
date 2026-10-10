@@ -63,19 +63,20 @@ the real path on 20 seeded random rows of each plant's month with 20 boosting ro
 | Script | What it does |
 |---|---|
 | `followup_frames.py` | Builds the control frames, the long-lead frames with the climatology columns, and the PC2 frame, with the anchor assertions and leak probes. |
-| `fit_followups.py` | Fits the follow-up arms (4,350 fits: `--dry-run` prints the count by group) and scores the no-fit climatology blends. |
+| `fit_followups.py` | Fits the follow-up arms (4,800 fits: `--dry-run` prints the count by group) and scores the no-fit climatology blends. |
 | `report_followups.py` | Prints the follow-up tables and the no-fit analyses into `report_followups_ens_mean.md`. |
 
 **What the follow-ups add.**
 
 - **Positive controls that can be passed.** The oracle O (B0 plus the true shift factor) and the
-  arms W7, Q30, TF, AN and PC in the month-level control at 5% and 10%, and a second control with
+  arms L1, W7, Q30, TF, AN and PC in the month-level control at 5% and 10%, and a second control with
   plant-specific persistent steps (8 steps of 4 to 12 weeks per plant, from three months before the
   scored period) for O, L1, W7, Q30, TF and AN. "Recovers" is a 99% interval wholly below zero and
   the share of the oracle's gain recovered, not the 2% rule. B0 is fitted on every control frame
-  too, which the 2,160 fits the review counted leave out (360 more fits).
-- **Long leads** (lead-days 7, 10, 14): CL (B0 plus the out-of-fold climatology), W7+CL, N2-3, the
-  sensitivity setting at days 10 and 14, and the no-fit 50/50 blends of B0 and W7 with climatology.
+  too, which the 2,160 fits the review counted leave out (360 more fits). The month-level control
+  also fits L1 (180 more).
+- **Long leads** (lead-days 7, 10, 14): CL (B0 plus the out-of-fold climatology), W7+CL, N2 (refit),
+  N2-3, the sensitivity setting at days 10 and 14, and the no-fit 50/50 blends of B0 and W7 with climatology.
 - **PC2**: PC with a 2-day CAMS latency (windows days 2 to 8 and 2 to 31) at lead-day 1.
 - **Fingerprint decomposition** (global scope, the first run's fleet-wide folds): G-ID+TF,
   G-FPnoCK (G-FP without CK), leave-one-plant-out of G-FPnoCK, and per-plant B0 on the fleet-wide
@@ -85,15 +86,29 @@ the real path on 20 seeded random rows of each plant's month with 20 boosting ro
   hindsight per-plant-month scaling bound on the real data and the controls; and the month-cluster
   t-interval beside the bootstrap interval for P1 to P5.
 
+**Notes on the long-lead nulls.** The first run's N2 came from a build whose draw order was not
+fixed and cannot be regenerated, so the follow-ups refit N2 on the fixed seeded draw and the report
+prints both realisations. N2 at long leads is not a pure null: it samples the plant's own same-hour
+power from other months, later ones included, so it acts as a weak climatology. W7 against N2-3,
+which has W7's width, is the fair test. CL and W7+CL read later months too, which a live service
+would not have, so they are labelled "(uses later months)".
+
+**The follow-up smoke runs need the first run's smoke outputs.** `fit_followups.py --smoke` and
+`report_followups.py --smoke` read the first run's smoke losses, report and checkpoints, so first
+run `build_lag_frame.py`, `followup_frames.py` and `fit_lag_arms.py --smoke` and its
+`report_lag_features.py --smoke` into a scratch `--output-root`. A missing file raises with that
+instruction.
+
 **Choices the brief did not settle.**
 
-- **R1s** needs no fit and is not scored on the controls.
+- **R1s** needs no fit and is not scored on the controls, in the plan or here.
 - **The climatology column** is a `{fold}` column: for a scored fold, a training row reads the
   median over the folds outside both its own and the scored fold. It uses other folds' months,
   including later ones, as the published climatology baseline does.
 - **Overlapping steps** do not compound: the factor is one minus the shift while any step covers
   the hour.
-- **The hindsight scale** is each plant-month's measured energy over its predicted energy.
+- **The hindsight scale** is each plant-month's measured energy over its export-capped predicted
+  energy (`actual + signed_error_capped_mw`), and the rescaled forecast is capped again.
 - **The leak probe** runs on the 10% control of each kind, on lead-day 14 and on PC2, because the
   other frames share their code. The probe cuts PC2's CAMS at two days before the issue day.
 - **The first report's interval count** reads the difference tables outside the planned contrasts

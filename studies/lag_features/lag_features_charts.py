@@ -1389,7 +1389,8 @@ def followup_long_leads_figure(*, tables: Path, text: FigureText) -> alt.VConcat
         (
             "Top: arms that use climatology. CL adds the out-of-fold climatology to B0 as a "
             "column, B0xCL and W7xCL blend the forecast half and half with it, with no fit, and "
-            "climatology is the no-fit forecast itself."
+            "climatology is the no-fit forecast itself. They read later months, which a live "
+            "service would not have."
         ),
         (
             "Bottom: W7, Q30, and two nulls that read random days (N2, and N2-3 as wide as W7). "
@@ -1409,7 +1410,7 @@ def followup_long_leads_figure(*, tables: Path, text: FigureText) -> alt.VConcat
         subtitle=subtitle,
         figure_planning=None,
         label="Follow-up figure",
-    )
+    ).resolve_scale(color="independent")
 
 
 ERA_COLOURS: Final[dict[str, str]] = {
@@ -1445,14 +1446,32 @@ def followup_unselected_figure(*, tables: Path, text: FigureText) -> alt.VConcat
         label=pl.col("label").cast(pl.Enum(order)), era=pl.col("era").cast(pl.String)
     ).sort("label")
     x_title = "Error minus B0's (pp of capacity; negative beats B0)"
-    chart = _intervals_chart(
-        data=rows,
-        y="label",
-        x_title=x_title,
-        colour="era",
-        shape="era",
-        legend_title="Months",
-    ).properties(height=26 * len(order))
+    eras = list(ERA_COLOURS)
+    colour = alt.Color(
+        "era:N",
+        scale=alt.Scale(domain=eras, range=list(ERA_COLOURS.values())),
+        legend=alt.Legend(title="Months"),
+    )
+    shape = alt.Shape(
+        "era:N",
+        scale=alt.Scale(domain=eras, range=["circle", "square", "triangle-up"]),
+        legend=alt.Legend(title="Months"),
+    )
+    y = alt.Y("label:N", sort=order, title=None, axis=alt.Axis(labelLimit=0))
+    y_offset = alt.YOffset("era:N", scale=alt.Scale(domain=eras))
+    base = alt.Chart(rows)
+    lines = base.mark_rule(aria=False).encode(  # ty: ignore[unresolved-attribute]
+        y=y,
+        yOffset=y_offset,
+        x=alt.X("lower:Q", title=x_title),
+        x2="upper:Q",
+        color=colour,
+    )
+    dots = base.mark_point(filled=True, size=50, aria=False).encode(  # ty: ignore[unresolved-attribute]
+        y=y, yOffset=y_offset, x="difference:Q", color=colour, shape=shape
+    )
+    zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color=ocf.BLACK_1).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+    chart = (zero + lines + dots).properties(width=CONTENT_WIDTH_PX - 260, height=44 * len(order))
     title = "Each arm's gain over B0 on the 8 months the sweep never screened"
     subtitle = [
         (
@@ -1460,8 +1479,8 @@ def followup_unselected_figure(*, tables: Path, text: FigureText) -> alt.VConcat
             "by forecast-product era. Dot: estimate. Line: 95% interval from resampling months."
         ),
         (
-            "AN was chosen as X on the first 10 months, so its row here is out of sample. An era "
-            "of fewer than 6 months has a weak interval. Zero is B0."
+            "AN was picked by the screening rule on the first 10 months, so its row here is out of "
+            "sample. An era of fewer than 6 months has a weak interval. Zero is B0."
         ),
         POST_HOC,
     ]

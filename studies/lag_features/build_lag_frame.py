@@ -265,10 +265,15 @@ LONGER_LEAD_ARMS: Final[tuple[str, ...]] = ("B0", "L1", "W7", "Q30", "T1", "N2")
 REPLICATE_ARMS: Final[tuple[str, ...]] = ("B0", "L1")
 """The arms fitted with IFS HRES, as an exploratory replicate."""
 
-ARM_LABELS: Final[dict[str, str]] = {"T1": "T1 (interpolation bound)"}
+ARM_LABELS: Final[dict[str, str]] = {
+    "T1": "T1 (interpolation bound)",
+    "CL": "CL (uses later months)",
+    "W7+CL": "W7+CL (uses later months)",
+}
 """How a table or chart names an arm whose bare name would mislead. T1 gives trees the date, and
 month-block folds interleave, so its gain is what interpolating between months buys, never drift
-a live forecast could use."""
+a live forecast could use. CL and W7+CL (the post hoc follow-ups) read the plant's other folds'
+months, later ones included, which a live service would not have."""
 
 POWER_COLUMN_PREFIXES: Final[tuple[str, ...]] = (
     "power_mw",

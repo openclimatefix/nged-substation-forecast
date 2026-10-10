@@ -329,7 +329,7 @@ labelled so on the page; the published planned contrasts P1 to P5 are unchanged 
 
 - **Positive controls that can be passed:** an oracle arm (B0 plus the true shift factor) at 5% and
   10%, to separate a pipeline defect from a weak feature; the same month-level control on W7, Q30,
-  TF, AN and PC (and R1s, which needs no fit); and a second, more physical control with
+  TF, AN and PC (R1s is not scored on the controls); and a second, more physical control with
   plant-specific persistent steps (random start, 4 to 12 weeks, at 5% and 10%) for the oracle, L1,
   W7, Q30, TF and AN. "Recovers" is judged by whether the 99% interval lies wholly below zero and
   by the share of the oracle's gain recovered, because the 2% rule cannot be met by an ideal

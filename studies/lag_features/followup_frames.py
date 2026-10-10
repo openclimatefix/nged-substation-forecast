@@ -67,8 +67,8 @@ PRODUCT: Final[WeatherProduct] = "ens_mean"
 CONTROL_SHIFTS: Final[tuple[float, ...]] = (0.05, 0.10)
 """The shifts of the follow-up positive controls, 5% and 10%; the 2% rule fails below 10%."""
 
-MONTH_CONTROL_ARMS: Final[tuple[str, ...]] = ("B0", "O", "W7", "Q30", "TF", "AN", "PC")
-"""The arms of the month-level control: B0, the oracle, and the arms the review asked to test."""
+MONTH_CONTROL_ARMS: Final[tuple[str, ...]] = ("B0", "O", "L1", "W7", "Q30", "TF", "AN", "PC")
+"""The arms of the month-level control: B0, the oracle, L1, and the arms the review named."""
 
 STEP_CONTROL_ARMS: Final[tuple[str, ...]] = ("B0", "O", "L1", "W7", "Q30", "TF", "AN")
 """The arms of the plant-specific control."""

@@ -30,6 +30,7 @@ Run it with `uv run python studies/lag_features/fit_followups.py`.
 
 import argparse
 import hashlib
+import json
 import logging
 import sys
 from pathlib import Path
@@ -68,8 +69,9 @@ from studies.guards import refuse_to_overwrite
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fit_followups")
 
-LONG_LEAD_ARMS: Final[tuple[str, ...]] = ("CL", "W7+CL", "N2-3")
-"""The arms fitted at each long lead, point model, primary setting."""
+LONG_LEAD_ARMS: Final[tuple[str, ...]] = ("CL", "W7+CL", "N2", "N2-3")
+"""The arms fitted at each long lead, point model, primary setting. N2 is refitted because the
+first run's N2 came from a build whose draw order was not fixed and cannot be regenerated."""
 
 LONG_LEAD_SENSITIVITY_LEADS: Final[tuple[int, ...]] = (10, 14)
 """The long leads that also get the sensitivity setting."""
@@ -165,31 +167,68 @@ def fit_count_lines(*, fits: list[Fit]) -> list[str]:
     return lines
 
 
-def input_files(*, root: Path) -> list[Path]:
+def first_run_losses_path(*, root: Path, smoke: bool) -> Path:
+    """Return the first run's losses file, which the blends and the report read.
+
+    Args:
+        root: The output root.
+        smoke: Whether the follow-up run is a smoke run, which reads the first run's smoke losses.
+
+    Returns:
+        The path.
+    """
+    return root / PRODUCT / f"losses_{PRODUCT}{run_suffix(smoke=smoke)}.parquet"
+
+
+def input_files(*, root: Path, smoke: bool) -> list[Path]:
     """Return every file the follow-up fits read.
 
     Args:
         root: The output root.
+        smoke: Whether the run is a smoke run.
 
     Returns:
-        The follow-up frames and the first run's lead-day 1 frame.
+        The follow-up frames, the first run's lead-day 1 frame and the first run's losses.
     """
     first = output_paths(root=root, product=PRODUCT, lead_days=(FULL_SWEEP_LEAD_DAY,))
-    return [*(frame_path(root=root, name=name) for name in frame_names()), first["day1"]]
+    return [
+        *(frame_path(root=root, name=name) for name in frame_names()),
+        first["day1"],
+        first_run_losses_path(root=root, smoke=smoke),
+    ]
 
 
-def input_digests(*, root: Path) -> dict[str, str]:
+def verify_followup_manifest(*, root: Path, smoke: bool) -> None:
+    """Raise if the files on disk are not the ones the follow-up fits read.
+
+    Args:
+        root: The output root.
+        smoke: Whether the follow-up fit was a smoke run.
+
+    Raises:
+        ValueError: If the manifest's input digests differ from the files' own, so a report would
+            describe other frames or losses than the ones fitted.
+    """
+    path = followup_dir(root=root) / f"checkpoints{run_suffix(smoke=smoke)}" / "run_manifest.json"
+    saved = json.loads(path.read_text())["inputs"]
+    if saved != input_digests(root=root, smoke=smoke):
+        msg = f"the input files differ from the ones {path} records the fit as reading"
+        raise ValueError(msg)
+
+
+def input_digests(*, root: Path, smoke: bool) -> dict[str, str]:
     """Return the SHA-256 of every file the follow-up fits read.
 
     Args:
         root: The output root.
+        smoke: Whether the run is a smoke run.
 
     Returns:
         The digests by file name.
     """
     return {
         file.name: hashlib.sha256(file.read_bytes()).hexdigest()
-        for file in sorted(input_files(root=root))
+        for file in sorted(input_files(root=root, smoke=smoke))
     }
 
 
@@ -278,6 +317,28 @@ def blend_losses(*, root: Path, frames: dict[str, pl.DataFrame], smoke: bool) ->
     return pl.concat(parts)
 
 
+def require_first_run(*, root: Path, smoke: bool) -> None:
+    """Fail early, with the fix, if the first run's files are missing.
+
+    Args:
+        root: The output root.
+        smoke: Whether the run is a smoke run, which needs the first run's smoke losses.
+
+    Raises:
+        FileNotFoundError: Naming the missing file. A smoke run needs the first run's own smoke
+            outputs in the same `--output-root`: build the first run's frames there, then run
+            `fit_lag_arms.py --smoke`, then this script.
+    """
+    missing = [path for path in input_files(root=root, smoke=smoke) if not path.exists()]
+    if missing:
+        hint = (
+            " (run build_lag_frame.py, followup_frames.py and, for --smoke, "
+            "fit_lag_arms.py --smoke into this --output-root first)"
+        )
+        msg = f"missing input {missing[0]}{hint}"
+        raise FileNotFoundError(msg)
+
+
 def main() -> int:
     """Fit the follow-ups and write their losses."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -293,6 +354,7 @@ def main() -> int:
         return 0
     root: Path = arguments.output_root
     suffix = run_suffix(smoke=arguments.smoke)
+    require_first_run(root=root, smoke=arguments.smoke)
     directory = followup_dir(root=root)
     final = directory / f"losses_followups_{PRODUCT}{suffix}.parquet"
     refuse_to_overwrite(paths=[final])
@@ -302,7 +364,7 @@ def main() -> int:
         directory=checkpoints,
         device=arguments.device,
         smoke=arguments.smoke,
-        inputs=input_digests(root=root),
+        inputs=input_digests(root=root, smoke=arguments.smoke),
     )
     context = Context(
         checkpoint_dir=checkpoints,

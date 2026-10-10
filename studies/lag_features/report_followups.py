@@ -38,6 +38,7 @@ from typing import Final, NamedTuple
 import numpy as np
 import polars as pl
 from build_lag_frame import (
+    ARM_LABELS,
     FULL_SWEEP_LEAD_DAY,
     LAG_FEATURES_DIR,
     SWEEP_ARMS,
@@ -47,6 +48,7 @@ from build_lag_frame import (
     scored_months,
     write_parquet_atomic,
 )
+from fit_followups import verify_followup_manifest
 from fit_lag_arms import METRIC, QUANTILE_COLUMNS, QUANTILE_LEVELS
 from followup_frames import (
     CONTROL_SHIFTS,
@@ -91,6 +93,10 @@ MIN_MONTHS_FOR_T: Final[int] = 3
 
 INTERVAL_CELL: Final[re.Pattern[str]] = re.compile(r"^\[([+−-]?\d[\d.]*), ?([+−-]?\d[\d.]*)\]$")
 """A markdown table cell holding an interval such as `[-0.249, -0.140]`."""
+
+DUPLICATED_ARMS: Final[frozenset[str]] = frozenset({"N2 (first run)", "W7", "Q30", "climatology"})
+"""Long-lead arms whose intervals duplicate the first report's by-lead table, so the count of
+exploratory intervals does not count them twice."""
 
 NOT_EXPLORATORY_HEADINGS: Final[tuple[str, ...]] = (
     "Build report",
@@ -162,6 +168,28 @@ def _share(value: float | None) -> str:
     return "" if value is None else f"{value:.2f}"
 
 
+def require_same_rows(*, reference: pl.DataFrame, other: pl.DataFrame, name: str) -> None:
+    """Raise unless two sets of per-row losses cover the same (site, time) rows.
+
+    A follow-up arm is paired with an arm of the first run on its rows, so the two must hold the
+    same ones, or the paired difference would silently drop rows.
+
+    Args:
+        reference: Losses with `site` and `time`.
+        other: Losses with `site` and `time`.
+        name: What is being paired, for the message.
+
+    Raises:
+        ValueError: If the sets of rows differ.
+    """
+    keys = ["site", "time"]
+    a = reference.select(keys).unique().sort(keys)
+    b = other.select(keys).unique().sort(keys)
+    if not a.equals(b):
+        msg = f"{name}: the follow-up rows ({b.height}) differ from the first run's ({a.height})"
+        raise ValueError(msg)
+
+
 def _pp(value: float) -> str:
     """Format a fraction of capacity as signed percentage points."""
     return f"{value * PERCENTAGE_POINTS:+.3f}"
@@ -188,7 +216,7 @@ def contrast_table(*, rows: list[dict[str, object]], extra: list[str]) -> list[s
         "| "
         + " | ".join(
             [
-                *(str(row[name]) for name in extra),
+                *(str(ARM_LABELS.get(str(row[name]), row[name])) for name in extra),
                 _pp(float(row["difference"])),  # ty: ignore[invalid-argument-type]
                 f"[{_pp(float(row['lower']))}, {_pp(float(row['upper']))}]",  # ty: ignore[invalid-argument-type]
                 str(row["n_months"]),
@@ -357,15 +385,24 @@ def long_leads_section(
             smoke=smoke,
         )
         references = reference_losses(frame=frame, lead_day=lead, losses=first)
-        first_primary = subset(
-            losses=first,
-            scope=f"lead{lead}",
-            setting="primary",
-            arms=("B0", "N2", "W7", "Q30"),
-        ).select("site", "time", "month", "seed", "arm", METRIC)
+        first_primary = (
+            subset(
+                losses=first,
+                scope=f"lead{lead}",
+                setting="primary",
+                arms=("B0", "N2", "W7", "Q30"),
+            )
+            .select("site", "time", "month", "seed", "arm", METRIC)
+            .with_columns(arm=pl.col("arm").replace({"N2": "N2 (first run)"}))
+        )
         followed = follow.filter(
             (pl.col("scope") == f"fu_lead{lead}") & (pl.col("setting") == "primary")
         ).select("site", "time", "month", "seed", "arm", METRIC)
+        require_same_rows(
+            reference=first_primary.filter(pl.col("arm") == "B0"),
+            other=followed,
+            name=f"long lead {lead}",
+        )
         both = pl.concat(
             [first_primary, followed, references.filter(pl.col("arm") == "climatology")]
         )
@@ -376,19 +413,20 @@ def long_leads_section(
                 scoped=both,
                 treatment=arm,
                 reference="B0",
+                exploratory=arm not in DUPLICATED_ARMS,
             )
             if row is not None:
                 primary.append({"lead_day": lead, "arm": arm, **row})
         if lead in (10, 14):
-            first_sensitivity = subset(
-                losses=first, scope=f"lead{lead}", setting="sensitivity", arms=("B0",)
-            ).select("site", "time", "month", "seed", "arm", METRIC)
             followed_sensitivity = follow.filter(
                 (pl.col("scope") == f"fu_lead{lead}") & (pl.col("setting") == "sensitivity")
             ).select("site", "time", "month", "seed", "arm", METRIC)
-            both_sensitivity = pl.concat([first_sensitivity, followed_sensitivity]).unique(
-                subset=["site", "time", "seed", "arm"]
+            require_same_rows(
+                reference=first_primary.filter(pl.col("arm") == "B0"),
+                other=followed_sensitivity,
+                name=f"long lead {lead} sensitivity",
             )
+            both_sensitivity = followed_sensitivity
             for arm in sorted(set(both_sensitivity["arm"].unique().to_list()) - {"B0"}):
                 row = contrast(
                     ledger=ledger,
@@ -396,6 +434,7 @@ def long_leads_section(
                     scoped=both_sensitivity,
                     treatment=arm,
                     reference="B0",
+                    exploratory=arm not in DUPLICATED_ARMS,
                 )
                 if row is not None:
                     sensitivity.append({"lead_day": lead, "arm": arm, **row})
@@ -406,6 +445,20 @@ def long_leads_section(
             "climatology as a column; B0xCL and W7xCL are 50/50 blends of the saved predictions "
             "with climatology, with no fit; N2-3 is a null as wide as W7; `climatology` is the "
             "no-fit forecast itself."
+        ),
+        "",
+        (
+            "**N2 appears twice.** `N2 (first run)` is the first run's column, which came from a "
+            "build whose draw order was not fixed and cannot be regenerated. `N2` is the refit on "
+            "the fixed seeded draw. N2 at long leads is not a pure null: it samples the plant's "
+            "own power at the same hour from other months, later ones included, so it acts as a "
+            "weak climatology. W7 against N2-3, which has W7's width, is the fair test."
+        ),
+        "",
+        (
+            "**CL and W7+CL read later months.** Their climatology comes from the plant's other "
+            "folds, which include months after the row; a live service would have only past "
+            "years' months."
         ),
         "",
         "**Primary setting**",
@@ -440,6 +493,7 @@ def pc2_section(
     pc2 = follow.filter(
         (pl.col("scope") == "fu_lead1_pc2") & (pl.col("setting") == "primary")
     ).select("site", "time", "month", "seed", "arm", METRIC)
+    require_same_rows(reference=base.filter(pl.col("arm") == "B0"), other=pc2, name="PC2")
     both = pl.concat([base, pc2])
     records = []
     for months, label in (("all", "all 18 months"), ("later", "the 8 unselected months")):
@@ -619,10 +673,19 @@ def hit_rate_section(*, root: Path, smoke: bool) -> tuple[list[str], pl.DataFram
         The report lines and a table with one row per (arm, month, level), month `all` for overall.
     """
     records = []
+    flags = read_frame(
+        path=output_paths(root=root, product=PRODUCT, lead_days=(FULL_SWEEP_LEAD_DAY,))["day1"],
+        smoke=smoke,
+    ).select("site", "time", "constrained")
+    excluded = 0
     for arm in ("B0", "L1"):
-        rows = pl.read_parquet(
+        every = pl.read_parquet(
             root / PRODUCT / f"checkpoints{run_suffix(smoke=smoke)}" / f"intervals__{arm}.parquet"
         )
+        rows = every.join(flags, on=["site", "time"], how="left").filter(
+            ~pl.col("constrained").fill_null(value=False)
+        )
+        excluded = every.height - rows.height
         for level, column in zip(QUANTILE_LEVELS, QUANTILE_COLUMNS, strict=True):
             hit = pl.col("actual") <= pl.col(column)
             records.append(
@@ -655,7 +718,9 @@ def hit_rate_section(*, root: Path, smoke: bool) -> tuple[list[str], pl.DataFram
         (
             "Post hoc. The share of rows with the measured power at or below each predicted "
             "quantile, one fitting seed, per-plant fits at lead-day 1. A calibrated model's share"
-            " equals its level. By-month shares are in `hit_rates.parquet`."
+            " equals its level. Export-constrained hours are excluded (the last arm's "
+            f"{excluded} rows), because the cap, not the weather, set their power. By-month "
+            "shares are in `hit_rates.parquet`."
         ),
         "",
         "| Level | B0 | L1 |",
@@ -767,45 +832,87 @@ def count_lines(
 # --- 8. Hindsight scaling bound -----------------------------------------------------------------
 
 
+HINDSIGHT_VARIANTS: Final[dict[str, str]] = {
+    "energy": "B0 rescaled to the month's energy",
+    "minimum error": "B0 rescaled to minimise the month's error",
+}
+"""The two hindsight scalings: the scale that matches each plant-month's measured energy, and the
+scale that minimises its mean absolute error. The second bounds a slow calibration more tightly."""
+
+MINIMUM_ERROR_SCALES: Final[np.ndarray] = np.arange(0.6, 1.5, 0.005)
+"""The scales the minimum-error variant searches, in steps of 0.5%."""
+
+
+def _minimum_error_scale(*, actual: np.ndarray, predicted: np.ndarray) -> float:
+    """Return the scale that minimises the mean absolute error of `scale * predicted`."""
+    errors = np.abs(actual[:, None] - predicted[:, None] * MINIMUM_ERROR_SCALES[None, :]).mean(
+        axis=0
+    )
+    return float(MINIMUM_ERROR_SCALES[errors.argmin()])
+
+
 def hindsight_losses(*, losses: pl.DataFrame, frame: pl.DataFrame) -> pl.DataFrame:
     """Score B0 after a per-(plant, month, seed) rescaling fitted in hindsight, and B0 itself.
 
-    The scale for a plant, month and seed is the sum of the measured power over the sum of the
-    predicted power, so the rescaled forecast matches each plant-month's measured energy exactly.
-    No forecast could know that scale in advance, so the result is a bound on what any slow
-    calibration of B0 could gain.
+    The prediction rescaled is the export-capped one (`actual + signed_error_capped_mw`), and the
+    rescaled forecast is capped again when scored. The `energy` scale of a plant, month and seed
+    is the measured power's sum over the capped prediction's sum, so each plant-month's energy
+    matches. The `minimum error` scale is the one that minimises that plant-month's mean absolute
+    error, on a grid. No forecast could know either scale in advance, so each result is a bound on
+    what a slow calibration of B0 could gain.
 
     Args:
-        losses: B0's per-row losses, with `prediction`, in one scope and setting.
+        losses: B0's per-row losses, with `actual` and `signed_error_capped_mw`.
         frame: The frame the losses were fitted on, for the cap and the capacity.
 
     Returns:
-        Per-row losses for `B0` and `B0 rescaled in hindsight`, as `paired_interval` reads them.
+        Per-row losses for `B0` and for each variant of `HINDSIGHT_VARIANTS`, as `paired_interval`
+        reads them.
     """
     base = losses.filter(pl.col("arm") == "B0").select(
-        "site", "time", "month", "seed", "prediction", "actual"
-    )
-    scale = base.group_by("site", "month", "seed").agg(
-        scale=pl.col("actual").sum() / pl.col("prediction").sum()
-    )
-    scaled = (
-        base.join(scale, on=["site", "month", "seed"])
-        .with_columns(prediction=pl.col("prediction") * pl.col("scale"))
-        .select("site", "time", "seed", "prediction")
+        "site",
+        "time",
+        "month",
+        "seed",
+        "actual",
+        prediction=pl.col("actual") + pl.col("signed_error_capped_mw"),
     )
     rows = frame.select(
         "site", "time", "month", "fold", "constrained", "effective_capacity_mw", "cap_mw", TARGET
     )
-    scored = score_prediction(rows=rows, prediction=scaled, target=TARGET).select(
-        "site", "time", "month", "seed", METRIC
-    )
     plain = losses.filter(pl.col("arm") == "B0").select("site", "time", "month", "seed", METRIC)
-    return pl.concat(
-        [
-            plain.with_columns(arm=pl.lit("B0")),
-            scored.with_columns(arm=pl.lit("B0 rescaled in hindsight")),
-        ]
+    parts = [plain.with_columns(arm=pl.lit("B0"))]
+    energy = base.group_by("site", "month", "seed").agg(
+        scale=pl.col("actual").sum() / pl.col("prediction").sum()
     )
+    scales = {
+        "energy": energy,
+        "minimum error": pl.DataFrame(
+            [
+                {
+                    "site": site,
+                    "month": month,
+                    "seed": seed,
+                    "scale": _minimum_error_scale(
+                        actual=group["actual"].to_numpy(), predicted=group["prediction"].to_numpy()
+                    ),
+                }
+                for (site, month, seed), group in base.group_by("site", "month", "seed")
+            ],
+            schema={"site": pl.String, "month": pl.String, "seed": pl.Int32, "scale": pl.Float64},
+        ),
+    }
+    for variant, label in HINDSIGHT_VARIANTS.items():
+        scaled = (
+            base.join(scales[variant], on=["site", "month", "seed"])
+            .with_columns(prediction=pl.col("prediction") * pl.col("scale"))
+            .select("site", "time", "seed", "prediction")
+        )
+        scored = score_prediction(rows=rows, prediction=scaled, target=TARGET).select(
+            "site", "time", "month", "seed", METRIC
+        )
+        parts.append(scored.with_columns(arm=pl.lit(label)))
+    return pl.concat(parts)
 
 
 def hindsight_section(
@@ -851,24 +958,28 @@ def hindsight_section(
     records = []
     for label, losses, frame in datasets:
         both = hindsight_losses(losses=losses, frame=frame)
-        row = contrast(
-            ledger=ledger,
-            source="hindsight scaling",
-            scoped=both,
-            treatment="B0 rescaled in hindsight",
-            reference="B0",
-        )
-        if row is not None:
-            records.append({"dataset": label, **row})
+        for variant_label in HINDSIGHT_VARIANTS.values():
+            row = contrast(
+                ledger=ledger,
+                source="hindsight scaling",
+                scoped=both,
+                treatment=variant_label,
+                reference="B0",
+                exploratory=False,
+            )
+            if row is not None:
+                records.append({"dataset": label, "scaling": variant_label, **row})
     lines = [
         (
-            "Post hoc. B0's forecast after multiplying each plant-month's predictions by that "
-            "month's measured-over-predicted energy, fitted on the same rows. No forecast could "
-            "know that scale in advance; the difference bounds what any slow calibration could "
-            "gain."
+            "Post hoc. B0's export-capped forecast after multiplying each plant-month's "
+            "predictions by a scale fitted on the same rows: either the scale that matches the "
+            "month's measured energy, or the scale that minimises its mean absolute error. No "
+            "forecast could know either scale in advance; the difference bounds what any slow "
+            "calibration could gain. Compare the review's figure of -0.356 pp on the unshifted "
+            "data with the first two rows: the scale the review used is not recorded."
         ),
         "",
-        *contrast_table(rows=records, extra=["dataset"]),
+        *contrast_table(rows=records, extra=["dataset", "scaling"]),
     ]
     return lines, pl.DataFrame(records)
 
@@ -938,6 +1049,7 @@ def t_interval_section(
                     "contrast": planned.name,
                     "setting": setting,
                     "months": len(per_month),
+                    "published_difference": interval["difference"],
                     "difference": centre,
                     "bootstrap_lower": interval["lower_95"],
                     "bootstrap_upper": interval["upper_95"],
@@ -953,13 +1065,13 @@ def t_interval_section(
         ),
         "",
         (
-            "| Contrast | Setting | Months | Difference (pp) | Bootstrap interval (pp) "
-            "| t-interval (pp) |"
+            "| Contrast | Setting | Months | Published difference (pp) | Mean of the monthly means "
+            "(pp, the t-interval's centre) | Bootstrap interval (pp) | t-interval (pp) |"
         ),
-        "|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|",
         *(
             f"| {row['contrast']} | {row['setting']} | {row['months']} | "
-            f"{_pp(row['difference'])} | "
+            f"{_pp(row['published_difference'])} | {_pp(row['difference'])} | "
             f"[{_pp(row['bootstrap_lower'])}, {_pp(row['bootstrap_upper'])}] | "
             f"[{_pp(row['t_lower'])}, {_pp(row['t_upper'])}] |"
             for row in table.iter_rows(named=True)
@@ -1051,6 +1163,7 @@ def main() -> int:
     path = directory / f"report_followups_{PRODUCT}{suffix}.md"
     final_tables = directory / f"tables_followups_{PRODUCT}{suffix}"
     refuse_to_overwrite(paths=[path, final_tables])
+    verify_followup_manifest(root=root, smoke=arguments.smoke)
     partial_tables = directory / f"tables_followups_{PRODUCT}{suffix}.partial"
     if partial_tables.exists():
         shutil.rmtree(partial_tables)

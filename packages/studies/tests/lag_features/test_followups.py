@@ -107,7 +107,7 @@ def test_a_pooled_arm_is_15_fits_and_a_per_plant_arm_90():
 
     assert {fit_followups.fits_in(fit=fit) for fit in pooled} == {15}
     assert {fit_followups.fits_in(fit=fit) for fit in per_plant} == {90}
-    assert sum(fit_followups.fits_in(fit=fit) for fit in fits) == 4350
+    assert sum(fit_followups.fits_in(fit=fit) for fit in fits) == 4800
 
 
 def test_no_followup_fit_names_an_arm_without_columns():
@@ -169,4 +169,30 @@ def test_the_interval_counts_split_wins_losses_and_zero_crossings():
         1,
         1,
         1,
+    )
+
+
+def test_the_month_level_control_fits_l1_and_n2_is_refitted_at_long_leads():
+    assert "L1" in followup_frames.MONTH_CONTROL_ARMS
+    assert "N2" in fit_followups.LONG_LEAD_ARMS
+
+
+def test_the_pairing_guard_raises_when_follow_up_rows_differ_from_the_first_runs():
+    first = pl.DataFrame({"site": ["A", "A"], "time": [1, 2]})
+    other = pl.DataFrame({"site": ["A"], "time": [1]})
+
+    with pytest.raises(ValueError, match="differ from the first run's"):
+        report_followups.require_same_rows(reference=first, other=other, name="test")
+    report_followups.require_same_rows(reference=first, other=first, name="test")
+
+
+def test_the_manifest_digests_include_the_first_runs_losses(tmp_path: Path):
+    with pytest.raises(FileNotFoundError, match="missing input"):
+        fit_followups.require_first_run(root=tmp_path, smoke=False)
+    losses = fit_followups.first_run_losses_path(root=tmp_path, smoke=False)
+
+    assert losses in fit_followups.input_files(root=tmp_path, smoke=False)
+    assert losses.name.endswith("_smoke.parquet") is False
+    assert fit_followups.first_run_losses_path(root=tmp_path, smoke=True).name.endswith(
+        "_smoke.parquet"
     )
