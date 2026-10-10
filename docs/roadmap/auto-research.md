@@ -318,11 +318,16 @@ that would take two months to test: "What's the two day version of testing the s
 worker then builds the idea step by step, validates each step, and runs the smallest test that shows
 whether the idea is worth continuing before building the rest.
 
-**An optional reviewer can read each diff before the harness scores it.** The reviewer is a fresh
-agent, given the written idea and the diff but not the worker's reasoning, so the worker's rationale
-cannot anchor the review. The reviewer checks that the diff implements the idea, that no feature
-uses data from after the forecast was made, and that the code has no plain bug. The review saves
-wasted screening runs. The review is not what makes a finding trustworthy: the re-implementation is.
+**An optional, cheaper reviewer can read each diff before the harness scores it.** The reviewer is a
+fresh agent, given the written idea and the diff but not the worker's reasoning, so the worker's
+rationale cannot anchor the review. The reviewer checks that the diff implements the idea, that no
+feature uses data from after the forecast was made, and that the code has no plain bug. This review
+saves wasted screening runs. The mandatory reviews come later, on the finalists only, as [After a
+session](#after-a-session) describes.
+
+**The research-lead skill frames each round as finding out which ideas are real, not as raising a
+score.** The hypothesis store records an abandoned idea, with the reason for abandoning the idea, as
+a finding in its own right.
 
 ### Several implementations of one idea
 
@@ -392,21 +397,33 @@ the same split for the leaderboard as a whole.
 
 ### After a session
 
-**The maintainer turns a session's results into shipped improvements in four steps:**
+**The maintainer turns a session's results into shipped improvements in five steps:**
 
 1. Fetch the session's branches, and merge the hypothesis store into `main` by pull request.
 2. Choose the finalists from the index.
-3. For each finalist, read the diff of the idea's best-screening implementation, then run that
-   branch through the cross-validation pipeline on the leaderboard fold as the maintainer's own
-   user, and retire the experiment once the decision is made. A finalist that won the screening but
-   loses on the validation window is probably not worth re-implementing. The agent never sees these
-   scores.
-4. Re-implement each idea that survives in a reviewed pull request, scored on the leaderboard as
+3. For each finalist, have two fresh Opus agents review the diff of the idea's best-screening
+   implementation adversarially, one after the other. Each reviewer is given the written idea and
+   the diff, not the worker's reasoning, and hunts for lookahead, an edited metric or fold, dropped
+   rows, a refit on validation-window power, and an implementation that does not match the idea.
+   Give the second reviewer the diff with its comments stripped, so a comment arguing that a feature
+   is safe cannot steer both reviews. A gain much larger than the idea's peers is a reason for more
+   scrutiny.
+4. Run each finalist that passes review through the cross-validation pipeline on the leaderboard
+   fold as the maintainer's own user, and retire the experiment once the decision is made. A
+   finalist that won the screening but loses on the validation window is probably not worth
+   re-implementing. The agent never sees these scores.
+5. Re-implement each idea that survives in a reviewed pull request, scored on the leaderboard as
    usual.
 
 **Running a finalist's branch gives the agent's code the full power data, which is the same trust
-the maintainer gives any pull request run before review.** Reading the diff first is the check on
-that step.
+the maintainer gives any pull request run before review.** The two reviews are the check on that
+step.
+
+**The mandatory reviews go to the finalists because selection concentrates bugs there.** Choosing
+the top few of hundreds of implementations also chooses the implementations whose bugs happened to
+raise the score, whether or not any agent meant to cheat. A bug in an implementation that ranks low
+wastes one screening run; a bug in a finalist would become a false result. Reviewing only the
+finalists also keeps the number of Opus reviews small.
 
 **Comparing the screening ranking with the leaderboard ranking of the finalists tests the screening
 itself.** If the two rankings disagree often, the screening harness or its folds need changing.
@@ -425,8 +442,12 @@ itself.** If the two rankings disagree often, the screening harness or its folds
 - **No file permission hides what the public repository says.** Docs pages, study write-ups, and
   pull-request bodies can quote scores on the validation window, so the research-lead skill tells
   the agent not to read them.
-- **A broken or leaky implementation can win the screening.** The damage is a wasted finalist score
-  or a wasted re-implementation, not a false result on the leaderboard.
+- **A broken or leaky implementation can win the screening.** The finalist reviews and the
+  re-implementation stand between that implementation and the leaderboard, so the damage is wasted
+  effort, not a false result.
+- **Two reviewers of the same model family can share a blind spot**, and miss the same subtle leak.
+  Stripping comments for the second reviewer, scrutinising unusually large gains, and the reviewed
+  re-implementation reduce that risk.
 - **The LLM may already know what happened during the validation window**, an open question below.
 
 ## Open questions
