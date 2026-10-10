@@ -11,10 +11,10 @@ per figure into `docs/studies/assets/`, named `era5_solar_variables_<name>.svg`.
 first rungs while the later variables are still downloading.
 
 **Every chart is anonymised.** Farms are labelled A to F, outputs are fractions of each farm's own
-capacity, no coordinate appears, and no calendar date appears on an axis. Figure 3 and figure 5
+capacity, no coordinate appears, and no calendar date appears on an axis. Figure 2 and figure 4
 draw public weather series on three days chosen on one farm, and draw no farm's output, so that no
-farm's output can be matched to a date through those series. Figure 7 draws every farm's output on
-days chosen separately for each farm, which are never the days of figures 3 and 5, and draws no
+farm's output can be matched to a date through those series. Figure 6 draws every farm's output on
+days chosen separately for each farm, which are never the days of figures 2 and 5, and draws no
 weather series. The month and year of each chosen day are printed to the log for the page's text,
 and the day of the month never is.
 
@@ -128,7 +128,7 @@ SERIES_PANELS: Final[tuple[tuple[str, tuple[str, ...], str], ...]] = (
     ("Cloud water", ("tclw", "tciw"), "kg m⁻²"),
     ("Cloud base", ("cbh",), "m"),
 )
-"""The variable groups of figure 3 as (panel title, columns, unit)."""
+"""The variable groups of figure 2 as (panel title, columns, unit)."""
 
 DISPLAY_NAMES: Final[dict[str, str]] = {
     "ssrd": "ERA5 ssrd",
@@ -154,7 +154,7 @@ CANDIDATES: Final[tuple[tuple[str, str], ...]] = (
     ("blh", "Boundary layer height (m)"),
     ("sd", "Snow depth (m of water)"),
 )
-"""The candidate variables figure 5 bins the ERA5-minus-CAMS gap against, with their titles."""
+"""The candidate variables figure 4 bins the ERA5-minus-CAMS gap against, with their titles."""
 
 ROW_HEIGHT_PX: Final[int] = 26
 """The height of one row of a dot-and-interval panel."""
@@ -408,7 +408,7 @@ def figure_2_leaderboard(
                 order=order,
             ),
         ],
-        number=2 if target == "pv" else "2b",
+        number=7 if target == "pv" else "7b",
         title=f"Error and correlation of every arm for {TARGET_NAMES[target]}",
         subtitle=[
             scope,
@@ -577,7 +577,7 @@ def figure_drop_one(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
             scope,
             "Dot: estimate. Line: 95% interval from resampling whole months.",
             "Dashed rule: no difference.",
-            "A group counts as useful only if the ladder (figure 2) and this figure agree.",
+            "A group counts as useful only if the ladder (figure 7) and this figure agree.",
             "All rows are exploratory and are not corrected for multiple comparisons.",
         ],
         figure_planning=None,
@@ -789,7 +789,7 @@ def figure_3_days(
     """
     needed = {name for _, columns, _ in SERIES_PANELS for name in columns}
     if not needed <= set(dataset.columns):
-        _LOG.info("figure 3 skipped: the frame lacks %s", sorted(needed - set(dataset.columns)))
+        _LOG.info("figure 2 skipped: the frame lacks %s", sorted(needed - set(dataset.columns)))
         return None
     rows = dataset.filter(pl.col("site") == days["site"][0]).with_columns(
         date=pl.col("time").dt.date()
@@ -829,7 +829,7 @@ def figure_3_days(
     return independent_colours(
         chart=figure(
             panels=panels,
-            number=3,
+            number=2,
             title="ERA5 variables and CAMS irradiance on three days",
             subtitle=[
                 scope,
@@ -865,7 +865,7 @@ def figure_4_cloud_against_clearness(
     """
     covers = ("tcc", "lcc", "mcc", "hcc")
     if not set(covers) <= set(dataset.columns):
-        _LOG.info("figure 4 skipped: the frame lacks the cloud covers")
+        _LOG.info("figure 3 skipped: the frame lacks the cloud covers")
         return None
     bins = 20
     long = pl.concat(
@@ -906,7 +906,7 @@ def figure_4_cloud_against_clearness(
     )
     return figure(
         panels=[faceted],
-        number=4,
+        number=3,
         title="CAMS clearness index against each ERA5 cloud cover",
         subtitle=[
             scope,
@@ -924,7 +924,7 @@ def figure_5_where_ssrd_misses(
 
     Args:
         dataset: The kept rows.
-        days: The chosen days of figure 3.
+        days: The chosen days of figure 2.
         scope: The line naming the farms, hours, and span.
 
     Returns:
@@ -932,7 +932,7 @@ def figure_5_where_ssrd_misses(
     """
     present = [(name, title) for name, title in CANDIDATES if name in dataset.columns]
     if not present:
-        _LOG.info("figure 5 skipped: the frame holds none of the candidate variables")
+        _LOG.info("figure 4 skipped: the frame holds none of the candidate variables")
         return None
     gap = dataset.with_columns(gap=pl.col("ssrd") - pl.col("cams_ghi_w_m2"))
     rows = gap.filter(pl.col("site") == days["site"][0]).with_columns(date=pl.col("time").dt.date())
@@ -985,11 +985,11 @@ def figure_5_where_ssrd_misses(
         panels.append(binned)
     return figure(
         panels=panels,
-        number=5,
+        number=4,
         title="Where ERA5's downward solar radiation differs from CAMS",
         subtitle=[
             scope,
-            "Top: the gap on the three days of figure 3. Positive means ERA5 is brighter.",
+            "Top: the gap on the three days of figure 2. Positive means ERA5 is brighter.",
             (
                 "Bottom: each dot is the mean gap over one tenth of the kept hours, ranked by the "
                 "variable named above the panel."
@@ -1011,7 +1011,7 @@ def figure_6_cloud_water(*, dataset: pl.DataFrame, scope: str) -> alt.TopLevelMi
     """
     needed = {"tclw", "tciw", "lcc"}
     if not needed <= set(dataset.columns):
-        _LOG.info("figure 6 skipped: the frame lacks %s", sorted(needed - set(dataset.columns)))
+        _LOG.info("figure 5 skipped: the frame lacks %s", sorted(needed - set(dataset.columns)))
         return None
     names = ["Low cloud under 0.2", "Low cloud 0.2 to 0.6", "Low cloud 0.6 or more"]
     rows = dataset.filter(pl.col("cams_clearness_index").is_not_null()).with_columns(
@@ -1058,7 +1058,7 @@ def figure_6_cloud_water(*, dataset: pl.DataFrame, scope: str) -> alt.TopLevelMi
     )
     return figure(
         panels=[chart],
-        number=6,
+        number=5,
         title="CAMS clearness index against ERA5 cloud water, by low-cloud cover",
         subtitle=[
             scope,
@@ -1131,7 +1131,7 @@ def figure_7_models_work(
     Args:
         dataset: The kept rows.
         losses: The output target's losses.
-        days: Each farm's chosen days, which exclude the days of figures 3 and 5.
+        days: Each farm's chosen days, which exclude the days of figures 2 and 5.
         splits: The report's split table, for each farm's error.
         scope: The line naming the farms, hours, and span.
 
@@ -1182,15 +1182,15 @@ def figure_7_models_work(
     return independent_colours(
         chart=figure(
             panels=[timeline, error],
-            number=7,
+            number=6,
             title="Out-of-fold output on three days at every farm, and each farm's error",
             subtitle=[
                 scope,
                 (
                     "Top: measured output and the predictions of the minimal and the full set, on "
-                    "three days chosen for each farm by the rule of figure 3."
+                    "three days chosen for each farm by the rule of figure 2."
                 ),
-                "Those days are never the days of figures 3 and 5.",
+                "Those days are never the days of figures 2 and 5.",
                 "Bottom: each farm's mean absolute error for four arms.",
                 "Output is a percentage of each farm's own capacity.",
             ],

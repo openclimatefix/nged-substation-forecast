@@ -427,17 +427,29 @@ so.
 
 ## Page structure
 
-**The page is figure-led, and the first figure sits above the fold.** The maintainer asked for this
-on
-2026-10-10. The page opens with the title, a bottom line of at most two sentences, and the headline
-figure, so a reader landing on the page sees the figure without scrolling. The Summary's
-question-and-answer bullets follow the figure, each bullet at most two sentences and each pointing
-at the figure that answers it. The AI disclaimer, Key findings, Introduction, Data and methods,
-Results, and Limitations follow. Prose stays at the minimum the figures need: every figure has a
-bolded one-sentence lead and a caption with the interval method, and a section has no paragraph
-that a figure already tells. The study skill's order puts the bottom line and bullets before the
-headline figure, and this page departs from that order for the maintainer's instruction. The
-Summary's questions are:
+**The page is figure-led, a hybrid of an academic paper and a data scientist's notebook, and the
+figures tell the whole story.** The maintainer asked for this form on 2026-10-10, and the study
+skill now describes it. Readers work at three depths, and the page serves each.
+
+- **In about a minute, without scrolling:** a title, a bottom line of a few sentences, and the
+  headline figure (figure 1). The take-home message is general, about solar power forecasting: which
+  weather-model variables help a solar farm forecast, and whether fetching the MARS-only variables
+  is worth it. It also says what it means for the Flexpectation project.
+- **In a few minutes:** the Summary's question-and-answer bullets, each at most two sentences and
+  each pointing at the figure that answers it, then the figures and their bolded leads in order.
+- **In full:** the AI disclaimer, Key findings, Introduction, Data and methods, Results, and
+  Limitations, with the minimum prose the figures need.
+
+**After the headline figure, the figures tell the story in a fixed order.** First, simple plots of
+what the data look like, with their issues (figures 2 to 5: three days of every variable, the cloud
+covers against a cloud index, where ERA5's `ssrd` misses CAMS, and cloud water against optical
+thickness). Then the proof that the technique works (figure 6: the XGBoost models track measured
+output; figure 7: the leaderboard with the negative and positive controls). Then the more complex
+results (the regime, season, drop-one, hour-of-day, importance, probabilistic, and aerosol figures,
+8 to 14). Every figure stands alone: the title, subtitle, axes, and legend say what is plotted,
+which direction is better, what each colour means, and the scope, and a figure that explains its
+colours in text colours each phrase in the colour of the line it names. The Summary's questions
+are:
 
 1. Do ERA5 variables beyond `ssrd`, `t2m`, and sun position help predict solar farm output, and by
    how much?
@@ -454,31 +466,31 @@ Summary's questions are:
 
 ## Figures, in page order
 
-The page is mostly figures, in the order below. Each has a bolded one-sentence lead and a few
-sentences of support. Every chart is anonymised: farms are A to F, outputs are normalised by
-capacity, and no coordinate
-appears. A dated per-farm series can identify a farm, so a series of output or of a farm's weather
-carries no calendar date on its axis (days are counted 1 to n, with the month and year given in the
-text), has `aria=False` on its marks, and shows the weather series without the farm's label. Figures
-3, 5, 7, and 11 follow this rule.
+The page is figure-led, and the figures appear in the order below. Each has a bolded one-sentence
+lead and a few sentences of support. Every chart is anonymised: farms are A to F, outputs are
+normalised by capacity, and no coordinate appears. A dated per-farm series can identify a farm, so
+a series of output or of a farm's weather carries no calendar date on its axis (days are counted
+1 to n, with the month and year given in the text), has `aria=False` on its marks, and shows the
+weather series without the farm's label. Figures 2, 4, 6, and 11 follow this rule.
 
 1. **Headline (top of page).** The planned contrasts P0 to P4 on both targets, at the adjusted
    level, with the smallest effect of interest marked.
-2. **The leaderboard.** Every rung's own mean absolute error with a 95% interval on the PV target
-   and the CAMS target, best first, with G0 and the two controls included. A second panel shows
-   Pearson correlation for every rung.
-3. **What the variables look like.** Three days at a farm, chosen by a stated rule (the clearest,
+2. **What the variables look like.** Three days at a farm, chosen by a stated rule (the clearest,
    the most variable, the dullest): stacked small multiples of `ssrd`, `ssrdc`, CAMS GHI, PV output,
    the cloud covers, `tclw` and `tciw`, `cbh`, and `fdir`. The time axis is shared.
-4. **Cloud covers against a cloud index.** CAMS clearness index (or PV output divided by its
+3. **Cloud covers against a cloud index.** CAMS clearness index (or PV output divided by its
    clear-sky expectation) plotted against `tcc`, and against `lcc`, `mcc`, and `hcc`.
-5. **Where ERA5's `ssrd` misses CAMS.** ERA5 minus CAMS GHI as a time series for the same days, then
+4. **Where ERA5's `ssrd` misses CAMS.** ERA5 minus CAMS GHI as a time series for the same days, then
    binned against each candidate variable (`tclw`, `tciw`, `cbh`, `tcwv`, `d2m`, `blh`, `sd`).
-   Figure 5 shows the scientific question directly, before any XGBoost model is fitted.
-6. **Cloud water against optical thickness.** `tclw + tciw` against CAMS clearness index, coloured
+   Figure 4 shows the scientific question directly, before any XGBoost model is fitted.
+5. **Cloud water against optical thickness.** `tclw + tciw` against CAMS clearness index, coloured
    by low-cloud cover.
-7. **The XGBoost models work.** Out-of-fold PV against measured for figure 3's three stated-rule
+6. **The XGBoost models work.** Out-of-fold PV against measured for figure 2's three stated-rule
    days at every farm, G0 against G9, and each rung's error per farm.
+7. **The leaderboard.** Every rung's own mean absolute error with a 95% interval on the PV target
+   and the CAMS target, best first, with G0 and the two controls included. A second panel shows
+   Pearson correlation for every rung. The controls sit here so a reader sees that the pipeline can
+   fail and does not, before the results that rest on it.
 8. **Weather regimes.** The difference in error between G9 and G0, between G1 and G0, and between G2
    and G0, split by regime: clear sky, broken cloud, and overcast. The primary panel splits by the
    ERA5 cloud cover `tcc` (clear below 0.2, overcast from 0.8), which
