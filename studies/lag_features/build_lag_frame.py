@@ -40,7 +40,7 @@ import argparse
 import logging
 import sys
 from collections.abc import Sequence
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, datetime, time
 from pathlib import Path
 from typing import Final, Literal
 
@@ -391,11 +391,11 @@ def daily_table(*, hourly: pl.DataFrame) -> pl.DataFrame:
         (megawatts per day), each null where the day is invalid.
     """
     sites = pv_sites()
-    clear_sky = hourly_clear_sky(
-        sites=sites,
-        first=hourly["time"].min() - timedelta(days=1),
-        last=hourly["time"].max() + timedelta(days=1),
-    )
+    span = hourly.select(
+        first=pl.col("time").min() - pl.duration(days=1),
+        last=pl.col("time").max() + pl.duration(days=1),
+    ).row(0, named=True)
+    clear_sky = hourly_clear_sky(sites=sites, first=span["first"], last=span["last"])
     grid = hourly_grid(hourly=hourly).join(clear_sky, on=["site", "time"], how="inner")
     daily = (
         grid.with_columns(date=(pl.col("time") - pl.duration(minutes=30)).dt.date())
@@ -436,7 +436,7 @@ def _peak_slopes(*, daily: pl.DataFrame) -> pl.DataFrame:
     parts = []
     for site, rows in daily.group_by("site", maintain_order=True):
         grid = rows.select(
-            date=pl.date_range(rows["date"].min(), rows["date"].max(), interval="1d")
+            date=pl.date_range(pl.col("date").min(), pl.col("date").max(), interval="1d")
         ).join(rows.select("date", "day_peak"), on="date", how="left")
         peaks = grid["day_peak"].to_numpy()
         slopes = np.full(len(peaks), np.nan)
@@ -838,12 +838,14 @@ def stage1_hours(
         ],
     )
     month = pl.col("time").dt.strftime("%Y-%m")
-    era = sum((month >= start).cast(pl.Int8) for start in NWP_ERA_START_MONTHS)
+    era = pl.lit(0, dtype=pl.Int8) + sum(
+        (month >= start).cast(pl.Int8) for start in NWP_ERA_START_MONTHS
+    )
     hours = (
         calendar.join(
             weather_table(product=product, lead_day=FULL_SWEEP_LEAD_DAY), on=["site", "time"]
         )
-        .with_columns(era_code=era.cast(pl.Int8))
+        .with_columns(era_code=era)
         .join(
             shared.select("site", "time", "fold", "constrained", TARGET, shared_era="era_code"),
             on=["site", "time"],
