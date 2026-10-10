@@ -157,6 +157,15 @@ CANDIDATES: Final[tuple[tuple[str, str], ...]] = (
 )
 """The candidate variables figure 4 bins the ERA5-minus-CAMS gap against, with their titles."""
 
+HOUR_TICKS: Final[tuple[int, ...]] = (6, 12, 18)
+"""Where an hour-of-day axis is labelled: the hours a reader finds at once."""
+
+DAY_HOUR_DOMAIN: Final[tuple[int, int]] = (6, 18)
+"""The hours a three-day figure draws, which hold every chosen day's daylight hours."""
+
+FARM_DAY_HOUR_DOMAIN: Final[tuple[int, int]] = (6, 18)
+"""The hours the per-farm days draw. A longer day is cut at its ends."""
+
 ROW_HEIGHT_PX: Final[int] = 26
 """The height of one row of a dot-and-interval panel."""
 
@@ -921,7 +930,10 @@ def figure_3_days(
             .mark_line(strokeWidth=1.5, aria=False)
             .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X(
-                    "hour_of_day:Q", title="Hour of day (UTC)", scale=alt.Scale(domain=[0, 24])
+                    "hour_of_day:Q",
+                    title="Hour of day (UTC)",
+                    scale=alt.Scale(domain=DAY_HOUR_DOMAIN),
+                    axis=alt.Axis(values=HOUR_TICKS),
                 ),
                 y=alt.Y("value:Q", title=unit),
                 color=alt.Color(
@@ -1055,7 +1067,12 @@ def figure_5_where_ssrd_misses(
         chart=alt.Chart(on_days)
         .mark_line(color=ocf.BRAND_ORANGE, strokeWidth=1.5, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("hour_of_day:Q", title="Hour of day (UTC)", scale=alt.Scale(domain=[0, 24])),
+            x=alt.X(
+                "hour_of_day:Q",
+                title="Hour of day (UTC)",
+                scale=alt.Scale(domain=DAY_HOUR_DOMAIN),
+                axis=alt.Axis(values=HOUR_TICKS),
+            ),
             y=alt.Y("gap:Q", title="ERA5 downward solar radiation minus CAMS irradiance (W m⁻²)"),
         ),
         days=days,
@@ -1264,9 +1281,14 @@ def figure_7_models_work(
     day_order = days["day_label"].unique(maintain_order=True).to_list()
     timeline = (
         alt.Chart(series)
-        .mark_line(strokeWidth=1.25, aria=False)
+        .mark_line(strokeWidth=1.25, aria=False, clip=True)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("hour_of_day:Q", title="Hour of day (UTC)", scale=alt.Scale(domain=[0, 24])),
+            x=alt.X(
+                "hour_of_day:Q",
+                title="Hour of day (UTC)",
+                scale=alt.Scale(domain=FARM_DAY_HOUR_DOMAIN),
+                axis=alt.Axis(values=HOUR_TICKS),
+            ),
             y=alt.Y("value:Q", title="% of capacity"),
             detail="segment:N",
             color=alt.Color(
@@ -1317,7 +1339,8 @@ def figure_7_models_work(
                 "chosen by the CAMS clear-sky index.",
                 CLEAR_SKY_INDEX_KEY,
                 *SHORT_ARM_KEY_LINES,
-                "Output is a percentage of each farm's own capacity.",
+                "Output is a percentage of each farm's own capacity. Hours before 06 and after",
+                "18 UTC are not drawn.",
             ],
             figure_planning=None,
         )
@@ -1377,7 +1400,7 @@ def figure_11_hour_of_day(*, splits: pl.DataFrame, scope: str) -> alt.TopLevelMi
             x=alt.X(
                 "hour:Q",
                 title="Hour of day (UTC; the label of the hour that ends at that time)",
-                axis=alt.Axis(format="d", tickMinStep=1),
+                axis=alt.Axis(values=HOUR_TICKS),
                 scale=alt.Scale(domain=[4, 21]),
             ),
             color=alt.Color(
