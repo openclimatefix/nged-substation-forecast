@@ -104,9 +104,9 @@ METRIC: Final[str] = "absolute_error_capped_fraction_of_capacity"
 
 SCREENING_MONTHS: Final[tuple[str, ...]] = (
     "2024-12",
-    *(f"2025-{month:02d}" for month in range(1, 13)),
+    *(f"2025-{month:02d}" for month in range(1, 10)),
 )
-"""Phase 1 reads the first 13 calendar months, 2024-12 to 2025-12, and nothing else."""
+"""Phase 1 reads the first 10 calendar months, 2024-12 to 2025-09, and nothing else."""
 
 SHORTLIST_CANDIDATES: Final[tuple[str, ...]] = (
     "IM",

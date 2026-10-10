@@ -10,7 +10,7 @@ reads, so a chart cannot disagree with the report).
 any fit, and are copied here in their plan wording:**
 
 - **P1:** L1 minus B0, mean absolute error, per-plant, all months.
-- **P2:** X minus L1, mean absolute error, per-plant, on the months after 2025-12 only, where X is
+- **P2:** X minus L1, mean absolute error, per-plant, on 2025-10 to 2026-06 only, where X is
   the shortlist rule's arm.
 - **P3:** S2 minus L2, mean absolute error, per-plant, all months.
 - **P4:** the continuous ranked probability score of L1 minus that of B0, per-plant, all months.
@@ -81,8 +81,8 @@ EXPLORATORY_LEVEL: Final[float] = 95.0
 HELPS_SHARE: Final[float] = 0.02
 """A contrast helps only if its point estimate is at least this share of the baseline's value."""
 
-P2_AFTER_MONTH: Final[str] = "2025-12"
-"""P2 reads only the months after this one, which the sweep's screening never saw."""
+P2_FIRST_MONTH: Final[str] = "2025-10"
+"""P2 reads only the months from this one on, which the sweep's screening never saw."""
 
 PERCENTAGE_POINTS: Final[float] = 100.0
 """Losses are fractions of capacity; every table prints percentage points."""
@@ -139,7 +139,7 @@ SEED_ORDER: Final[tuple[int, ...]] = SEEDS
 MONTH_LABELS: Final[dict[str, str]] = {
     "all": "all months",
     "screening": "the screening months",
-    "after": f"months after {P2_AFTER_MONTH}",
+    "after": f"months from {P2_FIRST_MONTH}",
 }
 """How a contrast's month selector reads in a table."""
 
@@ -173,7 +173,7 @@ def subset(
         scope: The scope, such as `lead1` or `global`.
         setting: `primary` or `sensitivity`.
         arms: The arms to keep.
-        months: `all`, `screening` (`SCREENING_MONTHS`), or `after` (months after `P2_AFTER_MONTH`).
+        months: `all`, `screening` (`SCREENING_MONTHS`), or `after` (months from `P2_FIRST_MONTH`).
 
     Returns:
         The matching rows.
@@ -184,7 +184,7 @@ def subset(
     if months == "screening":
         return kept.filter(pl.col("month").is_in(SCREENING_MONTHS))
     if months == "after":
-        return kept.filter(pl.col("month") > P2_AFTER_MONTH)
+        return kept.filter(pl.col("month") >= P2_FIRST_MONTH)
     return kept
 
 
@@ -1088,7 +1088,7 @@ def report_text(*, root: Path, product: WeatherProduct) -> str:
         coverage, coverage_table = interval_lines(directory=directory / "checkpoints")
         if not coverage_table.is_empty():
             coverage_table.write_parquet(tables / "coverage.parquet")
-        lines += ["## Phase 1: the sweep, screening months 2024-12 to 2025-12", "", *phase1]
+        lines += ["## Phase 1: the sweep, screening months 2024-12 to 2025-09", "", *phase1]
         lines += ["", "## Phase 2: the five planned contrasts", "", *planned]
         lines += [
             "## Exploratory contrasts at lead-day 1",

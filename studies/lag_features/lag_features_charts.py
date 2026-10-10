@@ -467,7 +467,7 @@ def sweep_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     )
     title = "A screen of the lag ideas, ranked by error, to generate hypotheses"
     subtitle = [
-        "Mean absolute error of each arm at lead-day 1 over the first 13 calendar months.",
+        "Mean absolute error of each arm at lead-day 1 over the first 10 calendar months.",
         "Orange line: B0, the baseline with no lag. Climatology, persistence and R1 need no fit.",
         "All rows are exploratory. No pairwise comparison is made here.",
     ]
