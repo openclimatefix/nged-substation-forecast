@@ -4,7 +4,6 @@ from pathlib import Path
 
 import polars as pl
 import pytest
-from studies import checkpointed_fits, ifs_lead_days
 from studies.cross_validation import search_fold_offsets
 from studies.ifs_decisions import stack_lead_days
 from studies.ifs_ladder import (
@@ -25,6 +24,8 @@ from studies.ifs_lead_days import (
     join_forecast_at_lead_day,
     raise_unless_same_folds,
 )
+
+from studies import checkpointed_fits, ifs_lead_days
 
 
 # --- ifs_decisions.stack_lead_days ---------------------------------------------------------------
@@ -48,7 +49,7 @@ def test_k_d29_the_stacked_lead_day_is_int8():
     assert stacked["lead_day"].dtype == pl.Int8
 
 
-# --- ifs_ladder ------------------------------------------------------------------------------------
+# --- ifs_ladder ----------
 def test_k_l4_l5_the_partner_arm_adds_the_partner_columns_and_its_control_permutes_them():
     for rung in ("f0", "f6"):
         assert with_partner_features(rung=rung) == (*rung_features(rung=rung), *PARTNER_COLUMNS)
@@ -81,14 +82,14 @@ def test_k_l17_l18_l19_the_plan_constants():
         "snowfall",
         "wind_gusts_10m",
     }
-    assert PRODUCTION_FEED_VARIABLES == {
+    assert {
         "shortwave_radiation",
         "temperature_2m",
         "dew_point_2m",
         "surface_pressure",
         "precipitation",
         "wind_speed_10m",
-    }
+    } == PRODUCTION_FEED_VARIABLES
     assert GROUP_CONTROL_RUNGS == ("f3", "f4", "f5")
 
 
@@ -162,7 +163,7 @@ def test_k_j9_j10_j11_two_farms_each_get_their_own_forecast_and_the_lead_day():
     assert joined["lead_day"].to_list() == [1, 1]
 
 
-# --- eras and folds --------------------------------------------------------------------------------
+# --- eras and folds ----------
 def _monthly_rows(*, first: str, last: str, sites: list[str]) -> pl.DataFrame:
     months = []
     year, month = int(first[:4]), int(first[5:])
@@ -239,7 +240,7 @@ def test_k_b4_thirteen_months_fall_in_blocks_of_3_3_2_3_2():
     assert [list(folds.values()).count(f) for f in range(5)] == [3, 3, 2, 3, 2]
 
 
-# --- checkpointed_fits stamps -----------------------------------------------------------------------
+# --- checkpointed_fits stamps ----------
 def _stamp(path: Path) -> str:
     return checkpointed_fits.run_stamp(dataset_path=path, arms={"a": ("x",)}, device="cpu")
 
