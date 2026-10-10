@@ -220,14 +220,15 @@ quantile model), and the global-only arms. Phase 2 carries X.
   estimate"), one device within each planned contrast. Fits need a slot from the Study MAIN
   COORDINATOR and checkpoint after every few arm-settings, because a reboot is planned.
 - **Reproduction check:** B0 with the ENS mean at lead-day 1, refitted on the CPU on the 35,263
-  shared rows, asserting the published 8.771% and the published per-row loss checksum. The GPU refit
-  of the same B0 is reported beside it, and the device difference is compared with the published
+  shared rows, asserting the published CPU value of 8.766% and the published per-row loss checksum. The GPU refit
+  of the same B0 is reported beside it against the published GPU value of 8.771%, and the device difference is compared with the published
   solar device range (−0.024 to +0.014 points, from the matched-lead extra-products page).
 
 ### Controls
 
 - **Positive control:** the same pipeline on a synthetic target in which power in a seeded random
-  half of the calendar months is multiplied by (1 − s), applied to the hourly power table before the
+  half of the scored months (exactly 9 of the 18, with the other calendar months drawn
+  independently) is multiplied by (1 − s), applied to the hourly power table before the
   lags are built, for s of 2%, 5% and 10%. Choosing months at random keeps every B0 column (the era
   code, the day of year) uninformative about which months are shifted, which a single step date
   would not. B0 and L1, per-plant, lead-day 1, primary setting, three
