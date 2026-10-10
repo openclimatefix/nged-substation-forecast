@@ -30,6 +30,7 @@ Run it with `uv run python studies/lag_features/report_lag_features.py`.
 import argparse
 import json
 import logging
+import shutil
 import sys
 from pathlib import Path
 from typing import Final, NamedTuple
@@ -49,8 +50,9 @@ from build_lag_frame import (
     WEATHER_PRODUCTS,
     WeatherProduct,
     output_paths,
+    write_parquet_atomic,
 )
-from fit_lag_arms import METRIC, SCREENING_MONTHS, SHORTLIST_CANDIDATES
+from fit_lag_arms import INTERVAL_ARMS, METRIC, SCREENING_MONTHS, SHORTLIST_CANDIDATES
 from studies.baselines import climatology
 from studies.bootstrap import (
     MIN_MONTHS_FOR_INTERVAL,
@@ -244,6 +246,35 @@ def setting_verdict(*, interval: BootstrapInterval, reference_value: float) -> s
     return "hurts" if verdict == "loses" else "unresolved"
 
 
+GAIN_VERDICTS: Final[frozenset[str]] = frozenset(
+    {"helps", "detectable gain below the 2% threshold"}
+)
+"""The verdicts at one setting that say the contrast's interval lies wholly below zero."""
+
+
+def combined_verdict(*, primary: str, sensitivity: str) -> str:
+    """Combine one contrast's verdicts at the two settings.
+
+    A gain at both settings stands as a gain. It "helps" only if both settings say so, and is
+    "detectable gain below the 2% threshold" if either setting's gain is below the threshold. Any
+    other pair of verdicts follows `combine_setting_verdicts`: the same verdict, or `unresolved`.
+
+    Args:
+        primary: The verdict at the primary setting.
+        sensitivity: The verdict at the sensitivity setting.
+
+    Returns:
+        The combined verdict.
+    """
+    if primary in GAIN_VERDICTS and sensitivity in GAIN_VERDICTS:
+        return (
+            "helps"
+            if primary == sensitivity == "helps"
+            else "detectable gain below the 2% threshold"
+        )
+    return combine_setting_verdicts(primary=primary, sensitivity=sensitivity)
+
+
 def planned_contrasts(*, chosen: str) -> list[Planned]:
     """Return the five planned contrasts, with X filled in.
 
@@ -282,6 +313,7 @@ def planned_lines(*, losses: pl.DataFrame, chosen: str) -> tuple[list[str], pl.D
     ]
     records = []
     notes = []
+    combined: dict[str, str] = {}
     for planned in planned_contrasts(chosen=chosen):
         verdicts = {}
         for setting in ("primary", "sensitivity"):
@@ -335,9 +367,29 @@ def planned_lines(*, losses: pl.DataFrame, chosen: str) -> tuple[list[str], pl.D
                     f"months, fewer than the {MIN_MONTHS_FOR_INTERVAL} that count as evidence."
                 )
         if len(verdicts) == len(("primary", "sensitivity")):
-            final = combine_setting_verdicts(**verdicts)
+            final = combined_verdict(**verdicts)
+            combined[planned.name] = final
             lines.append(f"| **{planned.name} verdict, both settings** | | | | | | **{final}** |")
-    return [*lines, "", *dict.fromkeys(notes)], pl.DataFrame(records)
+    table = pl.DataFrame(records)
+    notes += [
+        "",
+        "How the two settings' verdicts combine (the table lists every pair the rule handles):",
+        "",
+        "| Primary setting | Sensitivity setting | Combined |",
+        "|---|---|---|",
+        *(
+            f"| {first} | {second} | {combined_verdict(primary=first, sensitivity=second)} |"
+            for first in (*sorted(GAIN_VERDICTS), "unresolved", "hurts")
+            for second in (*sorted(GAIN_VERDICTS), "unresolved", "hurts")
+        ),
+    ]
+    if not table.is_empty():
+        table = table.with_columns(
+            combined_verdict=pl.col("contrast").replace_strict(
+                combined, default=None, return_dtype=pl.String
+            )
+        )
+    return [*lines, "", *dict.fromkeys(notes)], table
 
 
 # --- Reference arms -----------------------------------------------------------------------------
@@ -469,19 +521,44 @@ def _post_model_predictions(
     ]
 
 
-def _residual_events(*, hours: pl.DataFrame, predictions: pl.DataFrame, fold: int) -> pl.DataFrame:
+def _forecast_index_cuts(*, hours: pl.DataFrame) -> tuple[float, float]:
+    """Return the terciles of the forecast clear-sky index over every hour with a stage-1 input.
+
+    One set of cuts serves every fold and every target row, so a target and the residuals it is
+    matched to are classed by the same boundaries.
+
+    Args:
+        hours: The stage-1 hours, with `nwp_ghi` and `clear_sky_w_m2`.
+
+    Returns:
+        The lower and upper cut.
+    """
+    index = hours.filter(pl.col("clear_sky_w_m2") > 0).select(
+        index=pl.col("nwp_ghi") / pl.col("clear_sky_w_m2")
+    )["index"]
+    return float(index.quantile(1 / 3)), float(index.quantile(2 / 3))  # ty: ignore[invalid-argument-type]
+
+
+def _tercile(*, index: pl.Expr, cuts: tuple[float, float]) -> pl.Expr:
+    """Return 0, 1 or 2 for a forecast clear-sky index below, between or above the cuts."""
+    return pl.when(index < cuts[0]).then(0).when(index < cuts[1]).then(1).otherwise(2)
+
+
+def _residual_events(
+    *, hours: pl.DataFrame, predictions: pl.DataFrame, fold: int, cuts: tuple[float, float]
+) -> pl.DataFrame:
     """Return the stage-1 residuals of one scored fold, with each hour's sky class.
 
     Args:
         hours: The stage-1 hours, with `observed_mw`, `nwp_ghi` and `clear_sky_w_m2`.
         predictions: `fit_lag_arms.stage1_predictions`' result.
         fold: The scored fold whose stage-1 models made the predictions.
+        cuts: `_forecast_index_cuts`' result.
 
     Returns:
         `site`, `date`, `tercile` (0 to 2 by forecast clear-sky index) and `residual` (observed
         minus predicted, in megawatts).
     """
-    index = pl.col("nwp_ghi") / pl.col("clear_sky_w_m2")
     events = (
         hours.select("site", "time", "observed_mw", "nwp_ghi", "clear_sky_w_m2")
         .join(
@@ -491,19 +568,14 @@ def _residual_events(*, hours: pl.DataFrame, predictions: pl.DataFrame, fold: in
         .filter(pl.col("clear_sky_w_m2") > 0)
         .drop_nulls("observed_mw")
         .with_columns(
-            index=index,
+            index=pl.col("nwp_ghi") / pl.col("clear_sky_w_m2"),
             date=(pl.col("time") - pl.duration(minutes=30)).dt.date(),
             residual=pl.col("observed_mw") - pl.col("predicted"),
         )
     )
-    cuts = events["index"].quantile(1 / 3), events["index"].quantile(2 / 3)
-    return events.with_columns(
-        tercile=pl.when(pl.col("index") < cuts[0])
-        .then(0)
-        .when(pl.col("index") < cuts[1])
-        .then(1)
-        .otherwise(2)
-    ).select("site", "date", "tercile", "residual")
+    return events.with_columns(tercile=_tercile(index=pl.col("index"), cuts=cuts)).select(
+        "site", "date", "tercile", "residual"
+    )
 
 
 def r5_losses(
@@ -539,20 +611,11 @@ def r5_losses(
         asof=(pl.col("time") - pl.duration(minutes=30)).dt.date()
         - pl.duration(days=FULL_SWEEP_LEAD_DAY + 1),
     ).join(base.select("site", "time", "seed", "prediction", "actual"), on=["site", "time"])
-    all_index = hours.filter(pl.col("clear_sky_w_m2") > 0).select(
-        index=pl.col("nwp_ghi") / pl.col("clear_sky_w_m2")
-    )["index"]
-    cuts = (all_index.quantile(1 / 3), all_index.quantile(2 / 3))
-    keyed = keyed.with_columns(
-        tercile=pl.when(pl.col("target_tercile_index") < cuts[0])
-        .then(0)
-        .when(pl.col("target_tercile_index") < cuts[1])
-        .then(1)
-        .otherwise(2)
-    )
+    cuts = _forecast_index_cuts(hours=hours)
+    keyed = keyed.with_columns(tercile=_tercile(index=pl.col("target_tercile_index"), cuts=cuts))
     parts = []
     for fold in range(N_FOLDS):
-        events = _residual_events(hours=hours, predictions=predictions, fold=fold)
+        events = _residual_events(hours=hours, predictions=predictions, fold=fold, cuts=cuts)
         rows = keyed.filter(pl.col("fold") == fold)
         quantiles = np.full((rows.height, len(QUANTILE_LEVELS)), np.nan)
         starts = rows["asof"].to_numpy()
@@ -688,7 +751,7 @@ def absolute_lines(*, losses: pl.DataFrame, scope: str, setting: str, title: str
     return [*lines, ""]
 
 
-def exploratory_lines(*, losses: pl.DataFrame, chosen: str) -> list[str]:
+def exploratory_lines(*, losses: pl.DataFrame, chosen: str) -> tuple[list[str], pl.DataFrame]:
     """Tabulate the exploratory paired contrasts at lead-day 1, primary setting.
 
     Args:
@@ -696,12 +759,13 @@ def exploratory_lines(*, losses: pl.DataFrame, chosen: str) -> list[str]:
         chosen: The shortlist rule's arm, compared with N2-k where N2-k was fitted.
 
     Returns:
-        The report lines.
+        The report lines, and a table with one row per contrast.
     """
     lines = [
         "| Contrast (exploratory) | Difference (pp) | 95% interval (pp) |",
         "|---|---|---|",
     ]
+    records = []
     wide_nulls = sorted(a for a in losses["arm"].unique().to_list() if a.startswith("N2-"))
     pairs = (*EXPLORATORY_CONTRASTS, *((chosen, null) for null in wide_nulls))
     for treatment, reference in pairs:
@@ -719,13 +783,22 @@ def exploratory_lines(*, losses: pl.DataFrame, chosen: str) -> list[str]:
             level=EXPLORATORY_LEVEL,
         )
         if interval is not None:
+            records.append(
+                {
+                    "treatment": treatment,
+                    "reference": reference,
+                    "difference": interval["difference"],
+                    "lower": interval["lower_95"],
+                    "upper": interval["upper_95"],
+                }
+            )
             lines.append(
                 f"| {treatment} − {reference} | "
                 f"{interval['difference'] * PERCENTAGE_POINTS:+.3f} | "
                 f"[{interval['lower_95'] * PERCENTAGE_POINTS:+.3f}, "
                 f"{interval['upper_95'] * PERCENTAGE_POINTS:+.3f}] |"
             )
-    return [*lines, ""]
+    return [*lines, ""], pl.DataFrame(records)
 
 
 def longer_lead_table(
@@ -861,13 +934,17 @@ def control_lines(*, losses: pl.DataFrame) -> tuple[list[str], pl.DataFrame]:
 def interval_lines(*, directory: Path) -> tuple[list[str], pl.DataFrame]:
     """Tabulate the 10% to 90% interval's coverage and width for B0 and L1.
 
+    The interval is the saved quantiles' lowest and highest, which `fit_lag_arms` sorts within each
+    row and holds to the export cap.
+
     Args:
         directory: The checkpoint directory holding `intervals__<arm>.parquet`.
 
     Returns:
         The report lines, and a table with one row per (arm, sky).
     """
-    files = sorted(directory.glob("intervals__*.parquet"))
+    files = [directory / f"intervals__{arm}.parquet" for arm in INTERVAL_ARMS]
+    files = [file for file in files if file.exists()]
     if not files:
         return [], pl.DataFrame()
     rows = pl.concat([pl.read_parquet(f) for f in files]).with_columns(
@@ -887,9 +964,9 @@ def interval_lines(*, directory: Path) -> tuple[list[str], pl.DataFrame]:
         .group_by("arm", "sky")
         .agg(
             coverage=(
-                (pl.col("actual") >= pl.col("lower")) & (pl.col("actual") <= pl.col("upper"))
+                (pl.col("actual") >= pl.col("q0")) & (pl.col("actual") <= pl.col("q8"))
             ).mean(),
-            width=(pl.col("upper") - pl.col("lower")).mean(),
+            width=(pl.col("q8") - pl.col("q0")).mean(),
             n_rows=pl.len(),
         )
         .sort("arm", "sky")
@@ -1038,6 +1115,191 @@ def r5_lines(*, r5: pl.DataFrame) -> list[str]:
     ]
 
 
+def r4_lines(*, directory: Path) -> tuple[list[str], pl.DataFrame]:
+    """Score R4 on CRPS: B0's saved quantiles clamped at CK's ceiling, against the unclamped ones.
+
+    Args:
+        directory: The checkpoint directory holding `intervals__B0.parquet`.
+
+    Returns:
+        The report lines, and a table with one row per variant.
+    """
+    path = directory / "intervals__B0.parquet"
+    if not path.exists():
+        return [], pl.DataFrame()
+    rows = pl.read_parquet(path).drop_nulls("ceiling")
+    quantiles = rows.select([f"q{i}" for i in range(len(QUANTILE_LEVELS))]).to_numpy()
+    actual = rows["actual"].to_numpy()
+    clamped = np.minimum(quantiles, rows["ceiling"].to_numpy()[:, None])
+    scores = {
+        "B0": float(crps(actual=actual, quantiles=quantiles).mean()),
+        "R4": float(crps(actual=actual, quantiles=clamped).mean()),
+    }
+    lines = [
+        "| Arm (exploratory) | CRPS approximated from nine quantiles (pp of capacity) | Rows |",
+        "|---|---|---|",
+        *(
+            f"| {arm} | {value * PERCENTAGE_POINTS:.3f} | {rows.height} |"
+            for arm, value in scores.items()
+        ),
+        "",
+        "R4 clamps all nine quantiles at the expanding 99.5th percentile of power (CK); one seed.",
+        "",
+    ]
+    table = pl.DataFrame(
+        {"arm": list(scores), "crps": list(scores.values()), "n_rows": [rows.height] * len(scores)}
+    )
+    return lines, table
+
+
+def monthly_difference_lines(
+    *, losses: pl.DataFrame, chosen: str
+) -> tuple[list[str], pl.DataFrame]:
+    """Tabulate each month's paired difference of L1 and X from B0 at lead-day 1.
+
+    Args:
+        losses: The combined losses.
+        chosen: The shortlist rule's arm.
+
+    Returns:
+        The report lines, and a table with one row per (contrast, month).
+    """
+    scoped = subset(
+        losses=losses,
+        scope=f"lead{FULL_SWEEP_LEAD_DAY}",
+        setting="primary",
+        arms=("B0", "L1", chosen),
+    )
+    base = scoped.filter(pl.col("arm") == "B0").select(
+        "site", "time", "seed", "month", reference=pl.col(METRIC)
+    )
+    tables = [
+        scoped.filter(pl.col("arm") == arm)
+        .select("site", "time", "seed", treatment=pl.col(METRIC))
+        .join(base, on=["site", "time", "seed"])
+        .group_by("month")
+        .agg(difference=(pl.col("treatment") - pl.col("reference")).mean(), n_rows=pl.len())
+        .with_columns(contrast=pl.lit(f"{arm} minus B0"))
+        for arm in dict.fromkeys(("L1", chosen))
+    ]
+    table = pl.concat(tables).sort("contrast", "month")
+    lines = ["| Contrast (exploratory) | Month | Difference (pp) | Rows |", "|---|---|---|---|"]
+    lines += [
+        f"| {row['contrast']} | {row['month']} | {row['difference'] * PERCENTAGE_POINTS:+.3f} | "
+        f"{row['n_rows']} |"
+        for row in table.iter_rows(named=True)
+    ]
+    return [*lines, ""], table
+
+
+def by_plant_lines(*, losses: pl.DataFrame) -> tuple[list[str], pl.DataFrame]:
+    """Tabulate each arm's mean absolute error at each plant, lead-day 1, primary setting.
+
+    Args:
+        losses: The combined losses.
+
+    Returns:
+        The report lines, and a table with one row per (arm, plant).
+    """
+    scoped = subset(
+        losses=losses,
+        scope=f"lead{FULL_SWEEP_LEAD_DAY}",
+        setting="primary",
+        arms=tuple(losses["arm"].unique().to_list()),
+    )
+    table = scoped.group_by("arm", "site").agg(error=pl.col(METRIC).mean()).sort("arm", "site")
+    lines = ["| Arm (exploratory) | Plant | Mean absolute error (pp) |", "|---|---|---|"]
+    lines += [
+        f"| {named(row['arm'])} | {row['site']} | {row['error'] * PERCENTAGE_POINTS:.3f} |"
+        for row in table.iter_rows(named=True)
+    ]
+    return [*lines, ""], table
+
+
+def scope_lines(*, losses: pl.DataFrame) -> tuple[list[str], pl.DataFrame]:
+    """Tabulate B0 and L1 per plant against global, on the rows both scopes score.
+
+    The per-plant and global fits cut their folds differently, so the comparison is descriptive.
+
+    Args:
+        losses: The combined losses.
+
+    Returns:
+        The report lines, and a table with one row per (arm, scope).
+    """
+    parts = [
+        subset(losses=losses, scope=scope, setting="primary", arms=("B0", "L1"))
+        .select("site", "time", "seed", "arm", METRIC)
+        .with_columns(scope=pl.lit(scope))
+        for scope in (f"lead{FULL_SWEEP_LEAD_DAY}", "global")
+    ]
+    both = pl.concat(parts)
+    shared = (
+        both.group_by("site", "time", "seed")
+        .agg(n=pl.col("scope").n_unique())
+        .filter(pl.col("n") == 2 * 1)
+    )
+    table = (
+        both.join(shared.select("site", "time", "seed"), on=["site", "time", "seed"])
+        .group_by("arm", "scope")
+        .agg(error=pl.col(METRIC).mean(), n_rows=pl.len())
+        .with_columns(scope=pl.col("scope").replace({f"lead{FULL_SWEEP_LEAD_DAY}": "per-plant"}))
+        .sort("arm", "scope")
+    )
+    lines = ["| Arm (exploratory) | Scope | Mean absolute error (pp) | Rows |", "|---|---|---|---|"]
+    lines += [
+        f"| {row['arm']} | {row['scope']} | {row['error'] * PERCENTAGE_POINTS:.3f} | "
+        f"{row['n_rows']} |"
+        for row in table.iter_rows(named=True)
+    ]
+    return [*lines, ""], table
+
+
+def importance_lines(*, directory: Path) -> tuple[list[str], pl.DataFrame]:
+    """Tabulate each arm's share of total gain by feature group, from the importance refit.
+
+    Importance is descriptive, never evidence that an input helps: gain is measured on the
+    training rows and splits credit between correlated columns by whichever the greedy search
+    picks first. Each (plant, fold) model's shares sum to 1; the table gives the mean over those
+    models and their range, the variability across refits (the fold models share most of their
+    training months).
+
+    Args:
+        directory: The checkpoint directory holding `importance__<arm>.parquet`.
+
+    Returns:
+        The report lines, and a table with one row per (arm, group).
+    """
+    files = sorted(directory.glob("importance__*.parquet"))
+    if not files:
+        return [], pl.DataFrame()
+    models = (
+        pl.concat([pl.read_parquet(f) for f in files])
+        .group_by("arm", "site", "fold", "group")
+        .agg(share=pl.col("share").sum())
+    )
+    table = (
+        models.group_by("arm", "group")
+        .agg(
+            share=pl.col("share").mean(),
+            lowest=pl.col("share").min(),
+            highest=pl.col("share").max(),
+            n_models=pl.len(),
+        )
+        .sort("arm", "share", descending=[False, True])
+    )
+    lines = [
+        "| Arm (descriptive) | Feature group | Mean share of gain | Range across refits | Models |",
+        "|---|---|---|---|---|",
+    ]
+    lines += [
+        f"| {named(row['arm'])} | {row['group']} | {row['share']:.3f} | "
+        f"[{row['lowest']:.3f}, {row['highest']:.3f}] | {row['n_models']} |"
+        for row in table.iter_rows(named=True)
+    ]
+    return [*lines, ""], table
+
+
 def named(arm: str) -> str:
     """Return how a table names an arm, with `ARM_LABELS` applied.
 
@@ -1050,76 +1312,175 @@ def named(arm: str) -> str:
     return ARM_LABELS.get(arm, arm)
 
 
-def report_text(*, root: Path, product: WeatherProduct) -> str:
+def _save_table(*, frame: pl.DataFrame, tables: Path, name: str) -> None:
+    """Write a non-empty table the charts read, atomically.
+
+    Args:
+        frame: The table.
+        tables: The tables directory.
+        name: The file's stem.
+    """
+    if not frame.is_empty():
+        write_parquet_atomic(frame=frame, path=tables / f"{name}.parquet")
+
+
+def ens_mean_sections(
+    *, root: Path, product: WeatherProduct, tables: Path, losses: pl.DataFrame
+) -> list[str]:
+    """Build the sections that exist only for the ENS-mean run: phase 1, phase 2 and the rest.
+
+    Args:
+        root: The output root.
+        product: The weather product (`ens_mean`).
+        tables: The directory to write the tables into.
+        losses: The combined losses.
+
+    Returns:
+        The sections' markdown lines.
+    """
+    directory = root / product
+    lines: list[str] = []
+
+    def save(frame: pl.DataFrame, name: str) -> None:
+        _save_table(frame=frame, tables=tables, name=name)
+
+    checkpoints = directory / "checkpoints"
+    chosen = json.loads((checkpoints / "shortlist.json").read_text())["x"]
+    frame = pl.read_parquet(
+        output_paths(root=root, product=product, lead_days=(FULL_SWEEP_LEAD_DAY,))[
+            f"day{FULL_SWEEP_LEAD_DAY}"
+        ]
+    )
+    derived = pl.read_parquet(checkpoints / "stage1_columns.parquet")
+    frame = frame.join(derived, on=["site", "time"], how="left", maintain_order="left")
+    references = reference_losses(frame=frame, lead_day=FULL_SWEEP_LEAD_DAY, losses=losses)
+    phase1, phase1_table = phase1_lines(losses=losses, references=references, chosen=chosen)
+    save(phase1_table, "phase1")
+    planned, planned_table = planned_lines(losses=losses, chosen=chosen)
+    save(planned_table, "planned")
+    explore, explore_table = exploratory_lines(losses=losses, chosen=chosen)
+    save(explore_table, "exploratory")
+    lines += ["## Phase 1: the sweep, screening months 2024-12 to 2025-09", "", *phase1]
+    lines += ["", "## Phase 2: the five planned contrasts", "", *planned]
+    lines += ["## Exploratory contrasts at lead-day 1", "", *explore]
+    lines += ["## Absolute errors over all months (exploratory)", ""]
+    for setting in ("primary", "sensitivity"):
+        lines += absolute_lines(
+            losses=losses,
+            scope="lead1",
+            setting=setting,
+            title=f"Per-plant, {setting} setting (exploratory)",
+        )
+        lines += absolute_lines(
+            losses=losses,
+            scope="global",
+            setting=setting,
+            title=f"Global, {setting} setting (exploratory)",
+        )
+    lines += ens_mean_descriptive_sections(
+        root=root, product=product, tables=tables, losses=losses, chosen=chosen
+    )
+    return lines
+
+
+def ens_mean_descriptive_sections(
+    *, root: Path, product: WeatherProduct, tables: Path, losses: pl.DataFrame, chosen: str
+) -> list[str]:
+    """Build the descriptive and post-model sections of the ENS-mean run.
+
+    Args:
+        root: The output root.
+        product: The weather product (`ens_mean`).
+        tables: The directory to write the tables into.
+        losses: The combined losses.
+        chosen: The shortlist rule's arm.
+
+    Returns:
+        The sections' markdown lines.
+    """
+    directory = root / product
+    paths = output_paths(root=root, product=product, lead_days=())
+    checkpoints = directory / "checkpoints"
+    frame = pl.read_parquet(
+        output_paths(root=root, product=product, lead_days=(FULL_SWEEP_LEAD_DAY,))[
+            f"day{FULL_SWEEP_LEAD_DAY}"
+        ]
+    )
+    lines: list[str] = []
+
+    def save(frame: pl.DataFrame, name: str) -> None:
+        _save_table(frame=frame, tables=tables, name=name)
+
+    controls, control_table = control_lines(losses=losses)
+    save(control_table, "positive_control")
+    coverage, coverage_table = interval_lines(directory=checkpoints)
+    save(coverage_table, "coverage")
+    monthly, monthly_table = monthly_difference_lines(losses=losses, chosen=chosen)
+    save(monthly_table, "monthly_differences")
+    by_plant, by_plant_table = by_plant_lines(losses=losses)
+    save(by_plant_table, "by_plant")
+    scopes, scope_table = scope_lines(losses=losses)
+    save(scope_table, "scope_comparison")
+    lines += ["## Monthly paired differences from B0 (exploratory)", "", *monthly]
+    lines += ["## Error at each plant (exploratory)", "", *by_plant]
+    lines += ["## Per-plant against global (exploratory, folds differ)", "", *scopes]
+    lines += ["## Coverage and width of the 10% to 90% interval (descriptive)", "", *coverage]
+    lines += ["## Positive control", "", *controls]
+    fingerprint, fingerprint_table = fingerprint_lines(losses=losses)
+    save(fingerprint_table, "fingerprint")
+    lines += ["## Global fingerprint mini-sweep (exploratory)", "", *fingerprint]
+    hours = pl.read_parquet(paths["stage1"])
+    stage1 = pl.read_parquet(checkpoints / "stage1_predictions.parquet")
+    r5 = r5_losses(frame=frame, hours=hours, predictions=stage1, losses=losses)
+    r5_text = r5_lines(r5=r5)
+    r4_text, r4_table = r4_lines(directory=checkpoints)
+    save(r4_table, "r4")
+    r5_table = pl.DataFrame(
+        {
+            arm: [bootstrap_absolute(losses=r5, arm=arm, metric=CRPS_METRIC)["value"]]
+            for arm in ("R5", "B0")
+        }
+    ).transpose(include_header=True, column_names=["crps"], header_name="arm")
+    save(r5_table, "r5")
+    lines += ["## R4: B0's quantiles clamped at the ceiling (exploratory)", "", *r4_text]
+    lines += ["## R5: residual quantiles added to B0 (exploratory)", "", *r5_text]
+    importance, importance_table = importance_lines(directory=checkpoints)
+    save(importance_table, "importance")
+    lines += [
+        "## Feature importance from a separate refit (descriptive, not evidence)",
+        "",
+        *importance,
+    ]
+    fold_table = frame.select("site", "month", "fold").unique().sort("site", "month")
+    save(fold_table, "folds")
+    return lines
+
+
+def report_text(*, root: Path, product: WeatherProduct, tables: Path) -> str:
     """Build the whole report and save the tables the charts read.
 
     Args:
         root: The output root.
         product: The weather product.
+        tables: The directory to write the tables into.
 
     Returns:
         The report's markdown.
     """
     directory = root / product
     losses = pl.read_parquet(directory / f"losses_{product}.parquet")
-    tables = directory / f"tables_{product}"
-    tables.mkdir(exist_ok=True)
     paths = output_paths(root=root, product=product, lead_days=())
     lines = [f"# Lag features: report for the weather product `{product}`", ""]
     lines += ["## Build report", "", paths["report"].read_text()]
-
     if product == "ens_mean":
-        shortlist_file = directory / "checkpoints" / "shortlist.json"
-        chosen = json.loads(shortlist_file.read_text())["x"]
-        frame = pl.read_parquet(
-            output_paths(root=root, product=product, lead_days=(FULL_SWEEP_LEAD_DAY,))[
-                f"day{FULL_SWEEP_LEAD_DAY}"
-            ]
-        )
-        derived = pl.read_parquet(directory / "checkpoints" / "stage1_columns.parquet")
-        frame = frame.join(derived, on=["site", "time"], how="left", maintain_order="left")
-        references = reference_losses(frame=frame, lead_day=FULL_SWEEP_LEAD_DAY, losses=losses)
-        phase1, phase1_table = phase1_lines(losses=losses, references=references, chosen=chosen)
-        phase1_table.write_parquet(tables / "phase1.parquet")
-        planned, planned_table = planned_lines(losses=losses, chosen=chosen)
-        planned_table.write_parquet(tables / "planned.parquet")
-        controls, control_table = control_lines(losses=losses)
-        control_table.write_parquet(tables / "positive_control.parquet")
-        coverage, coverage_table = interval_lines(directory=directory / "checkpoints")
-        if not coverage_table.is_empty():
-            coverage_table.write_parquet(tables / "coverage.parquet")
-        lines += ["## Phase 1: the sweep, screening months 2024-12 to 2025-09", "", *phase1]
-        lines += ["", "## Phase 2: the five planned contrasts", "", *planned]
-        lines += [
-            "## Exploratory contrasts at lead-day 1",
-            "",
-            *exploratory_lines(losses=losses, chosen=chosen),
-        ]
-        lines += ["## Absolute errors over all months", ""]
-        for setting in ("primary", "sensitivity"):
-            lines += absolute_lines(
-                losses=losses, scope="lead1", setting=setting, title=f"Per-plant, {setting} setting"
-            )
-            lines += absolute_lines(
-                losses=losses, scope="global", setting=setting, title=f"Global, {setting} setting"
-            )
-        lines += ["## Coverage and width of the 10% to 90% interval (descriptive)", "", *coverage]
-        lines += ["## Positive control", "", *controls]
-        fingerprint, fingerprint_table = fingerprint_lines(losses=losses)
-        if not fingerprint_table.is_empty():
-            fingerprint_table.write_parquet(tables / "fingerprint.parquet")
-        lines += ["## Global fingerprint mini-sweep (exploratory)", "", *fingerprint]
-        hours = pl.read_parquet(paths["stage1"])
-        stage1 = pl.read_parquet(directory / "checkpoints" / "stage1_predictions.parquet")
-        r5 = r5_losses(frame=frame, hours=hours, predictions=stage1, losses=losses)
-        lines += ["## R5: residual quantiles added to B0 (exploratory)", "", *r5_lines(r5=r5)]
+        lines += ens_mean_sections(root=root, product=product, tables=tables, losses=losses)
         lead_days = ENS_MEAN_LEAD_DAYS
     else:
         lead_days = IFS_LEAD_DAYS
     longer, longer_table = longer_lead_table(
         losses=losses, root=root, product=product, lead_days=lead_days
     )
-    longer_table.write_parquet(tables / "by_lead.parquet")
+    _save_table(frame=longer_table, tables=tables, name="by_lead")
     lines += ["## Error and gain over B0 by lead-day (exploratory)", "", *longer]
     return "\n".join(lines) + "\n"
 
@@ -1131,10 +1492,19 @@ def main() -> int:
     parser.add_argument("--output-root", type=Path, default=LAG_FEATURES_DIR)
     arguments = parser.parse_args()
     product: WeatherProduct = arguments.weather_product
-    path = arguments.output_root / product / f"report_{product}.md"
-    refuse_to_overwrite(paths=[path])
-    text = report_text(root=arguments.output_root, product=product)
-    path.write_text(text)
+    directory = arguments.output_root / product
+    path = directory / f"report_{product}.md"
+    final_tables = directory / f"tables_{product}"
+    refuse_to_overwrite(paths=[path, final_tables])
+    partial_tables = directory / f"tables_{product}.partial"
+    if partial_tables.exists():
+        shutil.rmtree(partial_tables)
+    partial_tables.mkdir()
+    text = report_text(root=arguments.output_root, product=product, tables=partial_tables)
+    partial_tables.rename(final_tables)
+    partial = path.with_name(path.name + ".partial")
+    partial.write_text(text)
+    partial.replace(path)
     sys.stdout.write(text)
     return 0
 

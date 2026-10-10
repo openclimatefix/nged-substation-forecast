@@ -35,8 +35,9 @@ uv run python studies/lag_features/fit_lag_arms.py --weather-product ifs_single 
 uv run python studies/lag_features/report_lag_features.py --weather-product ifs_single
 ```
 
-The fit script needs a compute slot. `--smoke` fits two arms on a few hundred rows with 20 boosting
-rounds, to check the plumbing, and is not a result.
+The fit script needs a compute slot. `--smoke` fits B0 and S2, one global model, one
+leave-one-plant-out model, the interval model and the importance refit on a few hundred rows with 20
+boosting rounds, writes `checkpoints_smoke/` and `losses_<product>_smoke.parquet`, and is not a result.
 
 ## Choices the plan did not settle
 
@@ -49,8 +50,8 @@ rounds, to check the plumbing, and is not a result.
   Phase 1 screens 2024-12 to 2025-09 (10 months). P2 is scored on 2025-10 to 2026-06 without
   2026-01 (8 months).
 - **CAMS's publication delay.** The study assumes CAMS irradiance reaches a forecast two whole days
-  late, so PC's windows start three whole days back from the issue day and cover days 3 to 9 (power to satellite) and days 3 to 32
-  (satellite to forecast). The assumption comes from the CAMS
+  late, so PC's windows start three whole days back from the issue day and cover days 3 to 9
+  (power to satellite) and days 3 to 32 (satellite to forecast). The assumption comes from the CAMS
   documentation, which says the radiation service provides data with up to 2 days of delay
   ([Copernicus radiation service in a nutshell](https://atmosphere.copernicus.eu/sites/default/files/2020-03/Copernicus_radiation_service_in_nutshell_v11.pdf),
   [CAMS solar radiation time-series](https://www.ecmwf.int/node/37329)). Some CAMS pages describe
@@ -76,8 +77,17 @@ rounds, to check the plumbing, and is not a result.
 - **Positive control**: power is scaled by one minus the shift in a seeded random half of the
   calendar months (2019-09 to 2026-06), so no tree can learn the shift from the date. The library
   fits all three seeds.
-- **The interval figure** (`intervals__B0`, `intervals__L1` checkpoints) uses seed 0 only.
-- **Feature importance is not computed**: `out_of_fold_losses` does not return the boosters.
+- **The interval figure and R4** use the nine saved quantiles of B0 and L1 (`intervals__B0`,
+  `intervals__L1` checkpoints), from seed 0 only, sorted within each row.
+- **Feature importance** comes from a separate refit (`importance__<arm>` checkpoints) of B0, L1, L2,
+  S2 and X at the primary setting with seed 0, per plant and fold, point model. It is descriptive and
+  enters no planned contrast.
+- **The global X** skips arms whose columns carry a `{fold}` placeholder (S3 and KS), because stage-1
+  columns withhold the scored fold at one plant only.
+- **X's quantile run refits X's point model**, because `fit_one_fold` always fits both; the
+  quantile run's point losses replace the sweep's for that arm.
+- **Per-plant jobs are batched**: up to four arms share one `run_all` call, so the four workers stay
+  busy across arms, and each arm is still checkpointed alone.
 
 ## What each file holds
 
