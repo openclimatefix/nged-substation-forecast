@@ -299,7 +299,7 @@ def _scaled(*, hourly: pl.DataFrame, factor: pl.Expr) -> pl.DataFrame:
     return hourly.with_columns(power_mw=pl.col("power_mw") * factor).sort("site", "time")
 
 
-def _build_control(
+def build_control(
     *,
     name: str,
     arms: tuple[str, ...],
@@ -387,7 +387,7 @@ def main() -> int:
         arms = tuple(dict.fromkeys((REQUIRED_ARM, *served)))
         if name.startswith("control_month"):
             shift = int(name[-2:]) / 100
-            frame, lines = _build_control(
+            frame, lines = build_control(
                 name=name,
                 arms=arms,
                 factor=month_factor(shift=shift),
@@ -399,7 +399,7 @@ def main() -> int:
             )
         elif name.startswith("control_step"):
             shift = int(name[-2:]) / 100
-            frame, lines = _build_control(
+            frame, lines = build_control(
                 name=name,
                 arms=arms,
                 factor=step_factor(steps=steps, shift=shift),

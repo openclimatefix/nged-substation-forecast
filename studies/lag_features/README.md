@@ -122,6 +122,38 @@ instruction.
 figures read. `figures_followups_ens_mean/` and `figure_text_followups_ens_mean.txt`: the figures
 and their text.
 
+## Round 2: the second science review's follow-ups
+
+The second science review of the draft page led to a no-fit reanalysis of the saved losses and
+four small fit blocks. Everything is post hoc and sits under `ens_mean/followups2/`, with its own
+checkpoints and manifest, so no earlier output is written.
+
+```bash
+# No fit, no GPU: reads only saved files and takes about two minutes.
+uv run python studies/lag_features/report_followups2.py
+# The fit blocks (1,080 fits), after a review of the scripts:
+uv run python studies/lag_features/followup2_frames.py
+uv run python studies/lag_features/build_lag_frame.py --weather-product ifs_single
+uv run python studies/lag_features/fit_followups2.py --dry-run
+uv run python studies/lag_features/fit_followups2.py --device cuda --max-workers 4
+# Re-run the report once the fits exist (delete the `_nofit` report and tables first):
+uv run python studies/lag_features/report_followups2.py
+```
+
+| Script | What it does |
+|---|---|
+| `followup2_frames.py` | Builds the two step-control frames that hold PC's columns on the stepped power, with the anchor assertions and the leak probe on the 10% frame. |
+| `fit_followups2.py` | PC in the step control (180 fits), the width-matched nulls N2-2 and N2-3 (180), B0, PC, W7, and TF without `day_of_year` (360), and B0 and L1 with IFS HRES at lead-days 1 and 2 (360). `--dry-run`, `--smoke`, `--device`, and `--max-workers` as in round 1. |
+| `report_followups2.py` | Prints every number the page quotes into `report_followups2_ens_mean.md` (`..._nofit.md` before the fits) and saves `tables_followups2_ens_mean/`. |
+
+**The no-fit sections** are the positive-control shares corrected for each arm's standing gain, the
+hindsight monthly rescaling on the 8 unselected months and on all 18, the plant-month that
+dominates, the screening months' paired contrasts, the equivalence of each planned contrast against
+the 2% threshold, climatology from earlier years only, the fingerprint figure's extra rows, and the
+numbers the review asked for. The IFS HRES frames come from the existing `ifs_single` build
+option. The PC step-control fits use their own frames, because round 1's step frames lack PC's
+columns.
+
 ## Choices the plan did not settle
 
 - **The lag source** is NGED's hourly power with the multi-day zero runs, meter spikes, commissioning

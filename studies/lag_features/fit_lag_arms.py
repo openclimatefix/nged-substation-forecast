@@ -219,6 +219,11 @@ def settings_for(*, context: Context) -> dict[str, HyperParameters]:
     return {name: {**params, "num_boost_round": SMOKE_ROUNDS} for name, params in settings.items()}
 
 
+NO_DAY_OF_YEAR_SUFFIX: Final[str] = "-noDOY"
+"""An arm name ending in this is the arm refitted without the `day_of_year` column, which tests
+whether a month's anomaly transfers across years through the date (post hoc, round 2)."""
+
+
 def features_of(*, arm: str) -> tuple[str, ...]:
     """Return an arm's feature columns, `{fold}` placeholders unfilled.
 
@@ -226,9 +231,14 @@ def features_of(*, arm: str) -> tuple[str, ...]:
         arm: The arm.
 
     Returns:
-        B0's columns followed by the arm's own.
+        B0's columns followed by the arm's own. An arm named `<arm>-noDOY` has the columns of
+        `<arm>` without `day_of_year`.
     """
-    return (*B0_COLUMNS, *extra_columns_of(arm=arm))
+    base = arm.removesuffix(NO_DAY_OF_YEAR_SUFFIX)
+    columns = (*B0_COLUMNS, *extra_columns_of(arm=base))
+    if base == arm:
+        return columns
+    return tuple(column for column in columns if column != "day_of_year")
 
 
 # --- Stage 1 ------------------------------------------------------------------------------------
