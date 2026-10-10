@@ -172,6 +172,40 @@ arms G0, G1, G2, and G9 are refit that way and the two sets of contrasts are lab
 The comparison shows whether the ERA5 screen and the forecast agree on these months. It does not
 prove that ERA5 results transfer to other months.
 
+## Comparison with a second forecast: all IFS variables, or minimal IFS plus another forecast
+
+**This comparison asks whether the extra IFS variables are worth more than a second weather forecast.** The
+[blends page](../docs/studies/forecasts/blends-with-ens.md) found that adding one product to ECMWF's
+ensemble mean sometimes lowered the error. The production service can follow either route: ask
+Dynamical.org for more IFS fields, or add a second forecast to the minimal IFS set it already
+holds. The three arms below put the two routes on the same rows.
+
+| Arm | Columns | Reads as |
+|---|---|---|
+| F0 | the minimal IFS set | the starting point |
+| FB (blend) | F0 plus the partner's `shortwave_radiation` and `temperature_2m` at the same lead day | the minimal IFS set plus another forecast |
+| F6 | all 20 IFS variables | all the relevant IFS variables |
+| F6B | F6 plus the partner's two variables | the ceiling that uses both routes |
+
+- **The partner is AIFS Single** (ECMWF's machine-learned forecast), read from the Dynamical.org
+  store the blends page used. It supplies downward shortwave radiation and 2 m temperature from
+  the same 00 UTC run, so the lead day matches IFS's, and its first run day is 2024-04-01. Its
+  radiation is a 6-hour mean, so each valid hour reads the 6-hour window that contains it, and the
+  page says so.
+- **ICON-EU is an optional second partner at lead days 1 and 3 only**, read from the Previous Runs
+  files, if the files cover the IFS months at whole-day offsets. If they do not, the page says that
+  ICON-EU was not tested.
+- **The rows are the intersection of the IFS rows and the partner's rows**, so F0 and F6 are
+  refit on them. Their errors can differ from the main ladder's, and the report prints both.
+- **FB is given the same number of columns as the partner adds to F0 (2), and a control gives F0 two
+  permuted copies of the partner's variables** (`studies.blending.climatology_permutation`), so a
+  blend gain is read against what two extra columns produce from nothing.
+- **The contrasts are exploratory, at lead days 1 and 3, on the PV target, at both hyperparameter
+  settings:** FB minus F0 (what the partner adds), F6 minus F0 (what the IFS variables add),
+  F6 minus FB (which route is better), and F6B minus F6 (whether the partner still adds anything
+  once every IFS variable is present). The page states the row count, the era restriction, and that
+  the verdict is for AIFS Single at these lead days, not for forecasts in general.
+
 ## Page structure and figures
 
 The page follows the study skill's figure-led form. It opens with the title, a bottom line of a few
@@ -197,6 +231,8 @@ Flexpectation project.
 8. **Regimes and seasons.** The difference in error between F6 and F0 by ERA5 cloud regime (clear,
    broken, overcast) and by season, exploratory.
 9. **Drop-one-group.** Error added when each group is removed from F6, exploratory.
+10. **Variables or another forecast.** The error of F0, FB, F6, and F6B at lead days 1 and 3 with
+    intervals, and the contrasts FB minus F0, F6 minus F0, and F6 minus FB, exploratory.
 
 Each figure carries the text it needs to be read alone, and its text is reviewed (a first-stumble
 reader, then a one-rule-per-pass sweep) before the figure is first rendered.
