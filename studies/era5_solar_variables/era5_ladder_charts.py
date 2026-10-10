@@ -214,7 +214,7 @@ SHORT_ARM_KEY_LINES: Final[tuple[str, ...]] = (
 """Subtitle lines for a figure that names only G0, G1, G2, and G9."""
 
 CLEAR_SKY_INDEX_KEY: Final[str] = (
-    "Clear-sky index: measured irradiance divided by the irradiance expected under a cloudless sky."
+    "Clear-sky index: CAMS irradiance divided by CAMS's irradiance for a cloudless sky."
 )
 """The subtitle line that defines the clear-sky index."""
 
@@ -225,13 +225,14 @@ EXPLORATORY_KEY: Final[str] = (
 """The subtitle line that says what an exploratory row is."""
 
 MARS_KEY: Final[str] = (
-    "MARS-only: 12 ERA5 variables that neither ECMWF's free forecast feed nor Open-Meteo serves."
+    "MARS-only: 12 ERA5 variables that ECMWF's MARS archive serves and that we did not find in its"
+    " free open-data feed or in Open-Meteo's."
 )
 """The subtitle line that defines the MARS-only variables."""
 
 CONTROL_KEY: Final[tuple[str, ...]] = (
     "Negative control: G2 plus shuffled copies of the other variables, which carry no information.",
-    "Positive control: G2 plus CAMS irradiance, which is the answer.",
+    "Positive control: G2 plus CAMS's satellite-derived irradiance, a column that must help.",
 )
 """Subtitle lines that define the two controls."""
 
@@ -1767,7 +1768,7 @@ def figure_aerosol_conditions(*, conditions: pl.DataFrame, scope: str) -> alt.To
             "Clear: ERA5 total cloud cover below 0.2. Dusty: dust optical depth in the top 5% of",
             "hours. Clean: total aerosol optical depth below its median. CRPS scores the whole",
             "predicted distribution; error is the mean absolute error.",
-            "A reanalysis knows the dust plume, so a forecast would gain less.",
+            "EAC4 is a reanalysis of past aerosol, which is less uncertain than a forecast of it.",
             *ARM_KEY_LINES,
             CLEARNESS_KEY,
             EXPLORATORY_KEY,

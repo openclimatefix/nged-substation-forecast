@@ -1448,6 +1448,32 @@ def render_splits(*, splits: pl.DataFrame) -> str:
         return ""
     contrast_rows = splits.filter(pl.col("reference").is_not_null())
     parts: list[str] = []
+    farm_rows = splits.filter(
+        (pl.col("split") == "farm") & pl.col("treatment").is_in(["g0", "g1", "g2", "g9"])
+    )
+    for target in TARGETS:
+        farms = farm_rows.filter(pl.col("target") == target)
+        if farms.is_empty():
+            continue
+        wide = farms.pivot(on="treatment", index="group", values="value").sort("group")
+        arms_present = [arm for arm in ("g0", "g1", "g2", "g9") if arm in wide.columns]
+        factor = scale(target=target)
+        parts += [
+            f"### {target} target: mean absolute error by farm, primary setting (exploratory)",
+            "",
+            table(
+                header=["farm", *arms_present, "g9 minus g0 as % of g0"],
+                rows=[
+                    [
+                        row["group"],
+                        *(f"{row[arm] * factor:.3f}" for arm in arms_present),
+                        f"{(row['g9'] / row['g0'] - 1.0) * PERCENTAGE_POINTS:+.1f}",
+                    ]
+                    for row in wide.iter_rows(named=True)
+                ],
+            ),
+            "",
+        ]
     for target in TARGETS:
         subset = contrast_rows.filter(pl.col("target") == target)
         if subset.is_empty():
