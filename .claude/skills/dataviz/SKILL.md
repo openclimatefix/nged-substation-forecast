@@ -63,16 +63,16 @@ images" section has the full rule: run the export through `npx svgo@4 --multipas
 
 **Label an hour-of-day axis at human divisions: 0, 6, 12, 18, and 24, or 6, 12, and 18.** A reader
 finds 6, 12, and 18 o'clock at once, and cannot find 5, 10, and 15. In Altair, set
-`axis=alt.Axis(values=[6, 12, 18])` (or `tickCount` with a step that divides 24) on the `x`
-encoding, because Vega-Lite's automatic ticks pick steps of 5 or 10. The same holds for any other
-cyclic unit with a familiar rhythm, such as months labelled at the quarter starts.
+`axis=alt.Axis(values=[6, 12, 18])` on the `x` encoding, because Vega-Lite's automatic ticks pick
+steps of 2, 5, or 10 and `tickCount` is only a hint. The same holds for any other cyclic unit with a
+familiar rhythm, such as months labelled at the quarter starts.
 
 **Clip an hour-of-day axis to the hours that hold data.** A chart of solar output or irradiance has
 no data at night, and the empty hours squeeze the plotted series into the middle of the panel. Round
 the range of the plotted data out to human divisions, such as 6 to 18 for a few chosen days, or 4 to
-20 for a chart that must hold midsummer. Do not leave the axis at 0 to 24. Give the domain
-explicitly with `scale=alt.Scale(domain=[6, 18])`, and say in the subtitle that daylight hours only
-are drawn.
+20 for a chart that must hold midsummer, labelled at 4, 8, 12, 16, and 20. Do not leave the axis at
+0 to 24. Give the domain explicitly with `scale=alt.Scale(domain=[6, 18])`, set `clip=True` on the
+mark so nothing is drawn outside it, and say in the subtitle that daylight hours only are drawn.
 
 ## Self-contained charts
 
