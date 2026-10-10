@@ -6,14 +6,17 @@ scores below measure. A cross-validation (CV) fold is one train-and-validate spl
 history, identified by a ``fold_id``. MLflow is the experiment tracker the scores are logged to,
 and its leaderboard is the ranked comparison of one run's scores against another's.
 
-Four public functions, in the order the cross-validation Dagster assets call them.
+Four scoring functions, in the order the cross-validation Dagster assets call them.
 ``compute_effective_capacity`` derives the per-series denominator that normalised mean absolute
 error (NMAE) divides by. ``compute_metrics`` joins predictions to observed power and returns the
 tall ``Metrics`` frame. ``enrich_metrics_rows`` stamps the evaluation window and scope onto that
 frame once the calling asset knows the window and the scope. The enriched frame is what the asset
 writes to Delta. ``build_mlflow_aggregate_metrics`` takes the un-enriched frame that
 ``compute_metrics`` returned. That function reduces the frame to the flat key/value dictionary
-the MLflow leaderboard displays.
+the MLflow leaderboard displays. The ``require_*`` functions beside the four scoring functions
+refuse a group the scorer must not score: a window reaching ``final_test_start``, rows outside the
+fold's window, a study whose row keys differ from the reference experiment's, and a study that
+carries more than one model name.
 
 Every function here is pure: no Dagster, no MLflow, and no IO. Each function is therefore
 unit-testable on an in-memory frame. The asset that calls the function owns every read and write.
@@ -25,8 +28,9 @@ record the corners where a degenerate input needed a defined answer rather than 
 degenerate inputs are a single-member ensemble and a forecast with zero error.
 """
 
+import hashlib
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Final
 
 import patito as pt
@@ -48,6 +52,8 @@ from contracts.power_schemas import (
     TimeSeriesMetadata,
 )
 
+from ml_core.cv_helpers import date_to_utc_datetime
+
 
 class NoOverlappingActualsError(ValueError):
     """Raised by ``compute_metrics`` when no forecast row joins to any observed actual.
@@ -57,6 +63,269 @@ class NoOverlappingActualsError(ValueError):
     the whole fold is scored in one call: those series silently vanish from the inner join. Every
     other ``ValueError`` — a negative lead time, a missing capacity row — still propagates.
     """
+
+
+LIVE_FOLD_ID: Final[str] = "live"
+"""The ``fold_id`` under which the live service stores its forecasts in ``power_forecasts``.
+
+Live rows are forecasts of the future, not a held-out set, so the final-test date guard exempts
+them.
+"""
+
+ROW_KEY_COLUMNS: Final[tuple[str, ...]] = (
+    "time_series_id",
+    "power_fcst_init_time",
+    "valid_time",
+    "ensemble_member",
+)
+"""The columns that identify one forecast row: the primary key of `PowerForecast`.
+
+``ensemble_member`` is part of the key. The fair continuous ranked probability score (CRPS) is
+unbiased only for members drawn at random from the forecaster's belief. A study that chose its own
+member count could forecast with two members, one either side of the observation, and score a fair
+CRPS of zero while leaving the ensemble mean, and so every deterministic metric, unchanged. A study
+therefore carries the reference's ensemble-member labels, and so the reference's member count.
+"""
+
+
+COMPARABLE_KEY_COLUMNS: Final[tuple[str, ...]] = tuple(
+    column for column in ROW_KEY_COLUMNS if column != "ensemble_member"
+)
+"""The columns of ``ROW_KEY_COLUMNS`` that name the same forecast problem in any experiment.
+
+``row_key_fingerprint`` hashes these columns, so a reviewed experiment with 13 members and a
+reference with 51 members have the same fingerprint when they forecast the same series,
+initialisation times, and valid times.
+"""
+
+
+class FinalTestWindowError(ValueError):
+    """Raised when a window reaches ``final_test_start`` and ``NGED_FINAL_TEST=1`` is not set."""
+
+
+class RowsOutsideWindowError(ValueError):
+    """Raised when a forecast row's ``valid_time`` lies outside the fold's evaluation window."""
+
+
+class RowKeyMismatchError(ValueError):
+    """Raised when a study's forecast row keys differ from the reference experiment's."""
+
+
+def require_window_within_guard(
+    *,
+    window_end: datetime,
+    final_test_start: date,
+    fold_id: str,
+    final_test_enabled: bool,
+) -> None:
+    """Refuse a window that reaches ``final_test_start``, unless the maintainer allows it.
+
+    ``final_test_start`` is a guard rather than a sealed test year: the observations after that
+    date span a few months, not an independent year. The guard exists so that no experiment, and no
+    autonomous research session, scores on those observations without the maintainer's say-so.
+    Forecasts stored under ``LIVE_FOLD_ID`` are exempt, because live rows are forecasts of the
+    future and not a held-out set.
+
+    Args:
+        window_end: Inclusive end of the evaluation window.
+        final_test_start: First date of the guarded period.
+        fold_id: Fold identifier of the group being scored.
+        final_test_enabled: Whether the maintainer's environment variable ``NGED_FINAL_TEST=1``
+            is set. The caller reads the environment, so this function stays free of IO.
+
+    Raises:
+        FinalTestWindowError: If ``window_end`` is on or after ``final_test_start``,
+            ``final_test_enabled`` is False, and ``fold_id`` is not ``LIVE_FOLD_ID``.
+    """
+    if fold_id == LIVE_FOLD_ID or final_test_enabled:
+        return
+    if window_end >= date_to_utc_datetime(final_test_start):
+        raise FinalTestWindowError(
+            f"The window for fold {fold_id!r} ends at {window_end.isoformat()}, which reaches "
+            f"final_test_start={final_test_start}. Set NGED_FINAL_TEST=1 in the maintainer's "
+            "environment to score it."
+        )
+
+
+def require_valid_times_within_window(
+    *,
+    valid_time_min: datetime,
+    valid_time_max: datetime,
+    window_start: datetime,
+    window_end: datetime,
+    group_label: str,
+) -> None:
+    """Refuse forecast rows whose ``valid_time`` falls outside the fold's evaluation window.
+
+    ``compute_metrics`` joins forecasts to actuals on ``(time_series_id, valid_time)`` and never
+    filters to the window, so a forecast file carrying extra rows would be scored and then labelled
+    as the fold's window. In leaderboard scope this check, not the ``final_test_start`` guard, keeps
+    rows past ``val_end`` out of the score, because a leaderboard window ends before
+    ``final_test_start``.
+
+    Args:
+        valid_time_min: Earliest ``valid_time`` in the group.
+        valid_time_max: Latest ``valid_time`` in the group.
+        window_start: Inclusive start of the evaluation window.
+        window_end: Inclusive end of the evaluation window.
+        group_label: ``"{experiment_name}, {fold_id}"``, for the error message.
+
+    Raises:
+        RowsOutsideWindowError: If any row is before ``window_start`` or after ``window_end``.
+    """
+    if valid_time_min < window_start or valid_time_max > window_end:
+        raise RowsOutsideWindowError(
+            f"Group ({group_label}) has valid_time from {valid_time_min.isoformat()} to "
+            f"{valid_time_max.isoformat()}, outside the evaluation window "
+            f"{window_start.isoformat()} to {window_end.isoformat()}."
+        )
+
+
+def _distinct_series_ids(forecasts: pl.LazyFrame) -> list[int]:
+    """Return the sorted ``time_series_id`` values present in ``forecasts``."""
+    return sorted(
+        forecasts.select("time_series_id").unique().collect(engine="streaming")["time_series_id"]
+    )
+
+
+class MultipleModelNamesError(ValueError):
+    """Raised when a study's forecast rows carry more than one ``power_fcst_model_name``."""
+
+
+def require_single_model_name(*, study: pl.LazyFrame, group_label: str) -> None:
+    """Refuse a study whose rows carry more than one ``power_fcst_model_name``.
+
+    ``compute_metrics`` returns separate metric rows for each ``power_fcst_model_name``, and the
+    leaderboard number is the mean over all of those metric rows. A study that spreads the easy
+    forecast rows across several model names and keeps the hard forecast rows under a single model
+    name would therefore lower its mean error while still carrying
+    the reference's row keys. Spreading the members of one ensemble across model names would also
+    split that ensemble.
+
+    Args:
+        study: Lazy scan of the study's forecast rows, carrying ``power_fcst_model_name``.
+        group_label: Names the group in the error message.
+
+    Raises:
+        MultipleModelNamesError: If the rows hold zero or several distinct model names.
+    """
+    names = (
+        study.select("power_fcst_model_name")
+        .unique()
+        .collect(engine="streaming")["power_fcst_model_name"]
+        .to_list()
+    )
+    if len(names) != 1:
+        raise MultipleModelNamesError(
+            f"Group ({group_label}) must carry exactly one power_fcst_model_name; "
+            f"found {sorted(map(str, names))}."
+        )
+
+
+def require_same_row_keys(
+    *,
+    study: pl.LazyFrame,
+    reference: pl.LazyFrame,
+    group_label: str,
+    reference_label: str,
+    series_batch_size: int,
+) -> None:
+    """Refuse a study whose forecast row keys differ from the reference experiment's.
+
+    The keys are ``ROW_KEY_COLUMNS``. A study that omits a row the reference forecasts, or adds a
+    row the reference does not, cannot raise its score by abstaining on hard rows, by adding easy
+    series, by forecasting only at short lead times, or by choosing its own number of ensemble
+    members. The reference's own forecasts are trusted:
+    they come from a reviewed experiment.
+
+    The series sets are compared first. The keys are then compared in batches of
+    ``series_batch_size`` series, with a distinct-key anti-join in each direction, so peak memory
+    is one batch rather than a whole fold (a leaderboard fold is about 364 million rows).
+
+    Args:
+        study: Lazy scan of the study's forecast rows, carrying at least ``ROW_KEY_COLUMNS``.
+        reference: Lazy scan of the reference experiment's rows for the same fold and the same
+            ``valid_time`` filter, carrying at least ``ROW_KEY_COLUMNS``.
+        group_label: ``"{experiment_name}, {fold_id}"`` of the study, for the error message.
+        reference_label: The reference experiment's name, for the error message.
+        series_batch_size: How many ``time_series_id`` values to compare at once.
+
+    Raises:
+        RowKeyMismatchError: If the reference has no rows, the two series sets differ, or any
+            batch has a key present on one side only.
+    """
+    reference_ids = _distinct_series_ids(reference)
+    if not reference_ids:
+        raise RowKeyMismatchError(
+            f"Reference experiment {reference_label!r} has no forecast rows for group "
+            f"({group_label}). Materialise the reference experiment for this fold first."
+        )
+    study_ids = _distinct_series_ids(study)
+    if study_ids != reference_ids:
+        missing = sorted(set(reference_ids) - set(study_ids))
+        extra = sorted(set(study_ids) - set(reference_ids))
+        raise RowKeyMismatchError(
+            f"Group ({group_label}) forecasts different series from reference "
+            f"{reference_label!r}: missing {missing}, extra {extra}."
+        )
+    keys = list(ROW_KEY_COLUMNS)
+    for start in range(0, len(reference_ids), series_batch_size):
+        batch_ids = reference_ids[start : start + series_batch_size]
+        study_keys = (
+            study.filter(pl.col("time_series_id").is_in(batch_ids))
+            .select(keys)
+            .unique()
+            .collect(engine="streaming")
+        )
+        reference_keys = (
+            reference.filter(pl.col("time_series_id").is_in(batch_ids))
+            .select(keys)
+            .unique()
+            .collect(engine="streaming")
+        )
+        n_missing = reference_keys.join(study_keys, on=keys, how="anti").height
+        n_extra = study_keys.join(reference_keys, on=keys, how="anti").height
+        if n_missing or n_extra:
+            raise RowKeyMismatchError(
+                f"Group ({group_label}) differs from reference {reference_label!r} for series "
+                f"{batch_ids}: {n_missing} reference row keys are missing and {n_extra} study row "
+                f"keys are extra, on the columns {keys}."
+            )
+
+
+def row_key_fingerprint(*, forecasts: pl.LazyFrame, series_batch_size: int) -> str:
+    """Return a hash of the distinct ``COMPARABLE_KEY_COLUMNS`` keys in ``forecasts``.
+
+    Two experiments have the same fingerprint exactly when they forecast the same series, from the
+    same initialisation times, for the same valid times, however many ensemble members each holds
+    and in whatever row order. The ``metrics`` asset stamps the fingerprint on every leaderboard
+    fold run, so a reader can see whether two scores rest on the same forecast problem, and whether
+    a study was scored against a reference that has since changed.
+
+    The keys are hashed in batches of ``series_batch_size`` series, so peak memory is one batch.
+
+    Args:
+        forecasts: Lazy scan of one group's forecast rows, carrying ``COMPARABLE_KEY_COLUMNS``.
+        series_batch_size: How many ``time_series_id`` values to hash at once. The fingerprint
+            does not depend on it.
+
+    Returns:
+        A hexadecimal SHA-256 digest. The digest of no rows is the digest of the empty string.
+    """
+    keys = list(COMPARABLE_KEY_COLUMNS)
+    series_ids = _distinct_series_ids(forecasts)
+    digest = hashlib.sha256()
+    for start in range(0, len(series_ids), series_batch_size):
+        batch_ids = series_ids[start : start + series_batch_size]
+        batch = (
+            forecasts.filter(pl.col("time_series_id").is_in(batch_ids))
+            .select(keys)
+            .unique()
+            .sort(keys)
+            .collect(engine="streaming")
+        )
+        digest.update(batch.cast(pl.Int64).to_numpy().tobytes())
+    return digest.hexdigest()
 
 
 def compute_effective_capacity(

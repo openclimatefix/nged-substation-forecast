@@ -1,7 +1,7 @@
 """Tests for compute_effective_capacity(), compute_metrics(), build_mlflow_aggregate_metrics()."""
 
 import math
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import patito as pt
 import polars as pl
@@ -14,10 +14,19 @@ from contracts.power_schemas import (
     TimeSeriesMetadata,
 )
 from ml_core.metrics import (
+    FinalTestWindowError,
+    MultipleModelNamesError,
     NoOverlappingActualsError,
+    RowKeyMismatchError,
+    RowsOutsideWindowError,
     build_mlflow_aggregate_metrics,
     compute_effective_capacity,
     compute_metrics,
+    require_same_row_keys,
+    require_single_model_name,
+    require_valid_times_within_window,
+    require_window_within_guard,
+    row_key_fingerprint,
 )
 from polars.testing import assert_frame_equal
 
@@ -906,3 +915,234 @@ def test_build_mlflow_aggregate_metrics_parametric_sliced_keys():
     result = build_mlflow_aggregate_metrics(df)
     assert math.isclose(result["pinball_loss_p10__all__day_ahead"], 2.0, rel_tol=1e-5)
     assert not any(key.startswith("pinball_loss_p1_") for key in result)
+
+
+# ---------------------------------------------------------------------------
+# The scorer's refusals: the final-test date guard, the fold window, the reference row keys,
+# and the single model name
+# ---------------------------------------------------------------------------
+
+_FINAL_TEST_START = date(2026, 7, 1)
+_WINDOW_START = _utc(2025, 7, 1)
+_WINDOW_END = _utc(2026, 7, 1) - timedelta(seconds=1)
+
+
+@pytest.mark.parametrize(
+    ("window_end", "fold_id", "final_test_enabled", "refused"),
+    [
+        (_utc(2026, 6, 30, 23, 59), "mid_2025_to_mid_2026", False, False),
+        (_utc(2026, 7, 1), "mid_2025_to_mid_2026", False, True),
+        (_utc(2026, 9, 1), "mid_2025_to_mid_2026", False, True),
+        (_utc(2026, 9, 1), "mid_2025_to_mid_2026", True, False),
+        (_utc(2026, 9, 1), "live", False, False),
+    ],
+)
+def test_require_window_within_guard(
+    window_end: datetime, fold_id: str, final_test_enabled: bool, refused: bool
+) -> None:
+    def call() -> None:
+        require_window_within_guard(
+            window_end=window_end,
+            final_test_start=_FINAL_TEST_START,
+            fold_id=fold_id,
+            final_test_enabled=final_test_enabled,
+        )
+
+    if refused:
+        with pytest.raises(FinalTestWindowError, match="NGED_FINAL_TEST=1"):
+            call()
+    else:
+        call()
+
+
+@pytest.mark.parametrize(
+    ("valid_time_min", "valid_time_max", "refused"),
+    [
+        (_WINDOW_START, _WINDOW_END, False),
+        (_WINDOW_START - timedelta(seconds=1), _utc(2026, 6, 30), True),
+        (_utc(2025, 7, 1), _utc(2026, 7, 1), True),
+    ],
+)
+def test_require_valid_times_within_window(
+    valid_time_min: datetime, valid_time_max: datetime, refused: bool
+) -> None:
+    def call() -> None:
+        require_valid_times_within_window(
+            valid_time_min=valid_time_min,
+            valid_time_max=valid_time_max,
+            window_start=_WINDOW_START,
+            window_end=_WINDOW_END,
+            group_label="exp, fold",
+        )
+
+    if refused:
+        with pytest.raises(RowsOutsideWindowError, match="outside the evaluation window"):
+            call()
+    else:
+        call()
+
+
+def _row_key_frame(
+    *, series: dict[int, list[datetime]], members: tuple[int, ...] = (0,)
+) -> pl.LazyFrame:
+    """One row per series, valid time and member, initialised 30 minutes before the valid time."""
+    return pl.LazyFrame(
+        [
+            {
+                "time_series_id": time_series_id,
+                "power_fcst_init_time": valid_time - timedelta(minutes=30),
+                "valid_time": valid_time,
+                "ensemble_member": member,
+            }
+            for time_series_id, valid_times in series.items()
+            for valid_time in valid_times
+            for member in members
+        ]
+    )
+
+
+_TIMES = [_utc(2025, 8, 1, 6), _utc(2025, 8, 1, 6, 30), _utc(2025, 8, 1, 7)]
+
+
+def _check_row_keys(*, study: pl.LazyFrame, reference: pl.LazyFrame) -> None:
+    require_same_row_keys(
+        study=study,
+        reference=reference,
+        group_label="study/x, fold",
+        reference_label="reference",
+        series_batch_size=1,
+    )
+
+
+def test_require_same_row_keys_accepts_the_reference_keys_with_the_same_members() -> None:
+    reference = _row_key_frame(series={1: _TIMES, 2: _TIMES}, members=(0, 1, 2))
+
+    _check_row_keys(
+        study=_row_key_frame(series={1: _TIMES, 2: _TIMES}, members=(0, 1, 2)), reference=reference
+    )
+
+
+@pytest.mark.parametrize(
+    "study_members",
+    [(0,), (0, 1), (0, 1, 2, 3), (1, 2, 3)],
+    ids=["one", "fewer", "more", "shifted"],
+)
+def test_require_same_row_keys_refuses_a_different_set_of_ensemble_members(
+    study_members: tuple[int, ...],
+) -> None:
+    reference = _row_key_frame(series={1: _TIMES}, members=(0, 1, 2))
+
+    with pytest.raises(RowKeyMismatchError, match="ensemble_member"):
+        _check_row_keys(
+            study=_row_key_frame(series={1: _TIMES}, members=study_members), reference=reference
+        )
+
+
+@pytest.mark.parametrize(
+    ("study_series", "reference_series", "message"),
+    [
+        ({1: _TIMES}, {1: _TIMES, 2: _TIMES}, r"missing \[2\], extra \[\]"),
+        ({1: _TIMES, 2: _TIMES}, {1: _TIMES}, r"missing \[\], extra \[2\]"),
+    ],
+    ids=["omitted_series", "added_series"],
+)
+def test_require_same_row_keys_refuses_a_different_set_of_series(
+    study_series: dict[int, list[datetime]],
+    reference_series: dict[int, list[datetime]],
+    message: str,
+) -> None:
+    with pytest.raises(RowKeyMismatchError, match=message):
+        _check_row_keys(
+            study=_row_key_frame(series=study_series),
+            reference=_row_key_frame(series=reference_series),
+        )
+
+
+def test_require_same_row_keys_refuses_an_omitted_row_in_a_later_batch() -> None:
+    reference = _row_key_frame(series={1: _TIMES, 2: _TIMES})
+    study = _row_key_frame(series={1: _TIMES, 2: _TIMES[:-1]})
+
+    with pytest.raises(RowKeyMismatchError, match=r"series \[2\]: 1 reference row keys"):
+        _check_row_keys(study=study, reference=reference)
+
+
+def test_require_same_row_keys_refuses_an_added_row() -> None:
+    reference = _row_key_frame(series={1: _TIMES[:-1]})
+    study = _row_key_frame(series={1: _TIMES})
+
+    with pytest.raises(RowKeyMismatchError, match="1 study row keys are extra"):
+        _check_row_keys(study=study, reference=reference)
+
+
+def test_require_same_row_keys_refuses_a_reference_with_no_rows() -> None:
+    reference = _row_key_frame(series={1: _TIMES}).filter(pl.lit(False))
+
+    with pytest.raises(RowKeyMismatchError, match="Materialise the reference"):
+        _check_row_keys(study=_row_key_frame(series={1: _TIMES}), reference=reference)
+
+
+def _fingerprint(frame: pl.LazyFrame, series_batch_size: int = 1) -> str:
+    return row_key_fingerprint(forecasts=frame, series_batch_size=series_batch_size)
+
+
+def test_row_key_fingerprint_ignores_row_order_member_count_and_batch_size() -> None:
+    frame = _row_key_frame(series={1: _TIMES, 2: _TIMES}, members=(0, 1, 2))
+
+    reference = _fingerprint(frame)
+
+    assert _fingerprint(frame.reverse()) == reference
+    assert _fingerprint(_row_key_frame(series={1: _TIMES, 2: _TIMES}, members=(0,))) == reference
+    assert _fingerprint(frame, series_batch_size=5) == reference
+
+
+@pytest.mark.parametrize(
+    "other",
+    [
+        {1: _TIMES},
+        {1: _TIMES, 2: _TIMES[:-1]},
+        {1: _TIMES, 3: _TIMES},
+        {1: _TIMES, 2: [time + timedelta(hours=1) for time in _TIMES]},
+    ],
+    ids=["omitted_series", "omitted_row", "other_series", "other_valid_times"],
+)
+def test_row_key_fingerprint_changes_when_the_keys_change(other: dict[int, list[datetime]]) -> None:
+    reference = _fingerprint(_row_key_frame(series={1: _TIMES, 2: _TIMES}))
+
+    assert _fingerprint(_row_key_frame(series=other)) != reference
+
+
+def test_require_same_row_keys_refuses_a_study_that_drops_a_longer_lead_time() -> None:
+    reference = _row_key_frame(series={1: _TIMES}).with_columns(
+        power_fcst_init_time=pl.col("valid_time") - timedelta(hours=6)
+    )
+    reference = pl.concat([reference, _row_key_frame(series={1: _TIMES})])
+
+    with pytest.raises(RowKeyMismatchError, match="reference row keys are missing"):
+        _check_row_keys(study=_row_key_frame(series={1: _TIMES}), reference=reference)
+
+
+def test_require_same_row_keys_checks_every_series_in_a_batch() -> None:
+    reference = _row_key_frame(series={1: _TIMES, 2: _TIMES})
+    study = _row_key_frame(series={1: _TIMES, 2: _TIMES[:-1]})
+
+    with pytest.raises(RowKeyMismatchError, match=r"series \[1, 2\]"):
+        require_same_row_keys(
+            study=study,
+            reference=reference,
+            group_label="study/x, fold",
+            reference_label="reference",
+            series_batch_size=2,
+        )
+
+
+def test_require_single_model_name_refuses_a_study_with_two_model_names() -> None:
+    rows = pl.LazyFrame({"power_fcst_model_name": ["a", "b", "a"]})
+
+    with pytest.raises(MultipleModelNamesError, match=r"\['a', 'b'\]"):
+        require_single_model_name(study=rows, group_label="study/x, fold")
+
+
+def test_require_single_model_name_accepts_one_model_name() -> None:
+    require_single_model_name(
+        study=pl.LazyFrame({"power_fcst_model_name": ["a", "a"]}), group_label="study/x, fold"
+    )

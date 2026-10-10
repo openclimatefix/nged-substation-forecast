@@ -6,8 +6,9 @@ How to set hyperparameters and choose features for a forecasting experiment.
 
 ## Config files
 
-Each model family has a base YAML in `conf/model/`. Two exist today: `conf/model/xgboost.yaml` and
-`conf/model/manual_heuristic.yaml`. Each file has two required top-level keys:
+Each model family has a base YAML in `conf/model/`. Three exist today: `conf/model/xgboost.yaml`,
+`conf/model/manual_heuristic.yaml`, and `conf/model/climatology.yaml`. Each file has two required
+top-level keys:
 
 ```yaml
 # Identifies the BaseForecaster subclass to instantiate.

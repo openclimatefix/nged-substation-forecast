@@ -5,10 +5,11 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 > **Status legend** — ✅ Implemented · 🚧 Planned · 🔬 Research. The `Metrics` schema, the `metrics`
 > Dagster asset, the deterministic metrics (MAE, NMAE, RMSE, MBE), and the probabilistic metrics
 > (CRPS, spread-skill ratio, pinball loss, PICP, interval width — see the [evaluation-metrics
-> reference](../techniques/evaluation-metrics.md)) are ✅ implemented. The interactive leaderboard
-> visualisation is 🚧 planned. The implemented [cross-validation
-> protocol](../ml_experimentation/cross-validation-folds.md) has moved out of the roadmap. See the
-> [roadmap index](index.md) for status conventions. The 🚧 items are tracked under the v0.3 epic
+> reference](../techniques/evaluation-metrics.md)) are ✅ implemented, as are the `manual_heuristic`
+> and `climatology` baseline forecasters. The interactive leaderboard visualisation is 🚧 planned.
+> The implemented [cross-validation protocol](../ml_experimentation/cross-validation-folds.md) has
+> moved out of the roadmap. See the [roadmap index](index.md) for status conventions. The 🚧 items
+> are tracked under the v0.3 epic
 > [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6): baseline forecasters
 > [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) · probabilistic
 > evaluation [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225) · tail &
@@ -62,7 +63,7 @@ Issue: [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 `ManualHeuristicForecaster` is the first baseline in the codebase. Its leaderboard rows answer the
 question this project exists to answer: **do we beat the manual heuristic?** The climatology
-baseline, built next, gives XGBoost's numbers a further point of reference. The persistence baseline
+baseline gives XGBoost's numbers a further point of reference. The persistence baseline
 is deferred to the v0.9 nice-to-haves epic
 ([#361](https://github.com/openclimatefix/nged-substation-forecast/issues/361)).
 
@@ -266,8 +267,8 @@ is therefore how we measure the cross-over, not a number we can already assert. 
 the leaderboard while adding no skill over either bookend, and without these rows nobody would know.
 
 Side benefit: several more `BaseForecaster` implementations pressure-test the abstraction (the docs
-promise the interface is model-agnostic; today `XGBoostForecaster` and `ManualHeuristicForecaster`
-exercise it).
+promise the interface is model-agnostic; today `XGBoostForecaster`, `ManualHeuristicForecaster`, and
+`ClimatologyForecaster` exercise it).
 
 **How much the choice of reference moves the answer has been measured, and it argues for reading a
 win over either bookend as the optimistic end of the range.** [Nguyen and Müsgens
@@ -299,17 +300,17 @@ yardstick here; `manual_heuristic` is the point on it.
 
 ### Implementation details — baselines (deleted when they ship)
 
-One PR is next: `climatology` (PR C), tracked in
-[#1086](https://github.com/openclimatefix/nged-substation-forecast/issues/1086). The `persistence`
+The `persistence`
 baseline (PR B) is deferred to the v0.9 nice-to-haves epic
 ([#361](https://github.com/openclimatefix/nged-substation-forecast/issues/361)) and tracked in
-[#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087). PR
-A, the `manual_heuristic` baseline with its `baseline_forecasters` package and its feature engineer,
-has shipped. The metrics collapse below is its own issue under the v0.3 epic, and no baseline waits
-on the metrics collapse. The `manual_heuristic_holiday_aligned` variant (described under [A faithful
-replica and a "simple upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is
-deferred to the v0.9 epic and tracked in
-[#1088](https://github.com/openclimatefix/nged-substation-forecast/issues/1088).
+[#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087). The metrics
+collapse below is its own issue under the v0.3 epic, and no baseline waits on the metrics collapse.
+The `manual_heuristic_holiday_aligned` variant (described under [A faithful replica and a "simple
+upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is deferred to the v0.9 epic
+and tracked in [#1088](https://github.com/openclimatefix/nged-substation-forecast/issues/1088). This
+section is deleted when the metrics collapse ships. Before then, copy the PR B item into the body of
+[#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087), because the
+persistence design text exists only here.
 `manual_heuristic_calibrated` (described under [Calibrating the manual
 heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile), and tracked in
 [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)) is a further PR, on
@@ -377,12 +378,9 @@ collapse config and no designated point-forecast columns on `PowerForecast`. In
 
 **PR B — `PersistenceForecaster` (seasonal-naive).** This PR is deferred to the v0.9 epic and
 tracked in [#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087).
-`PersistenceForecaster` is the second forecaster to need `PowerLagsPerNwpRunFeatureEngineer`, so PR B
-first extracts that engineer from `manual_heuristic.py` into a shared module. The `meta.json`
-save/load round-trip (config dump, `trained_time_series_ids`, the fully-qualified `model_class`)
-becomes a shared helper in whichever of `persistence` and `climatology` lands second, and
-`climatology` lands first, so PR B extracts it. No `StatelessForecaster` base class until a
-third stateless model exists.
+`PersistenceForecaster` reuses `NwpRunRowsWithoutWeatherFeatureEngineer` and the shared `meta.json`
+helper, which the climatology PR extracted into `baseline_forecasters`. No `StatelessForecaster`
+base class until a third stateless model exists.
 
 - `MODEL_NAME = "persistence"`, `MODEL_VERSION = 1`. Config default
   `selected_features = {"power_lag_24h", "power_lag_48h", "power_lag_168h", "power_lag_336h"}`.
@@ -408,58 +406,6 @@ third stateless model exists.
   Fair CRPS is size-comparable so nothing is *wrong*, but state the caveat where the sanity numbers
   are read, backed by the per-series coverage counts in asset metadata.
 
-**PR C — `ClimatologyForecaster` (`climatology`; the pure probabilistic reference).** The calendar-
-only skill floor the NWP ensemble must clear at long horizons.
-
-- `MODEL_NAME = "climatology"`, `MODEL_VERSION = 1`.
-- `train()`: from the features frame take `(time_series_id, valid_time, power)` and **dedupe on
-  `(time_series_id, valid_time)` first** — bulk-mode `AllFeatures` repeats each target row once per
-  covering `(nwp_init_time, ensemble_member)` (~15× at a 15-day horizon), so without the dedupe the
-  per-cell samples would be weighted by NWP-run coverage rather than by calendar. Then, per
-  `(time_series_id, month, half-hour-of-day, is_weekend)` cell, store the empirical quantiles of
-  that cell's power samples. Cell keys derive from **local** (Europe/London) time computed inside
-  the forecaster from `valid_time`, aligning with the demand rhythm (and matching the `local_*` time
-  features). `save()` writes the lookup as one parquet + `meta.json`. The shared
-  save/load helper is extracted by whichever of `persistence` and `climatology` lands second, so
-  PR C neither waits for it nor builds it.
-- **Member emission — equiprobable levels, not the delivery levels.** Emit members at *equiprobable*
-  quantile levels `(i − 0.5)/m`, **not** at the tail-heavy `DELIVERY_QUANTILES` levels. Fair CRPS
-  and the per-run empirical delivery quantiles the metrics layer derives from members treat members
-  as an equiprobable sample. Feeding 13 members at the delivery levels in with equal weight would
-  put 7.7 % of the mass at `q(0.01)` and `q(0.02)`, i.e. an ensemble materially wider-tailed than
-  the climatology it represents, corrupting CRPS, PICP, and the derived delivery quantiles. The
-  delivery quantiles are still produced — by `compute_metrics`' per-run quantile aggregation, same
-  as every other model. Keep `m = 13`: over the ~14-month training window a weekend cell holds only
-  ~9–17 samples (weekday ~21–43), so quantile levels below ~0.06 are already min-sample
-  extrapolation and 51 members would be false precision plus ~4× more `power_forecasts` rows; only
-  raise it with empirical justification.
-- `predict()`: join the lookup onto the prediction rows by the cell keys (rows in an unseen cell
-  dropped with the count logged), then unpivot the quantile columns into `ensemble_member` rows.
-- **Why a distribution, not a mean:** a deterministic climatology forecast collapses CRPS to MAE, so
-  it could only be compared against the ML ensemble on point accuracy — the axis a squared-error
-  XGBoost is built to win. The claim we need to test is distributional: does the NWP-driven ensemble
-  know more about day 8–14 power than the plain seasonal/time-of-day distribution, or is it dressing
-  up climatology in weather-shaped clothing? (See [Probabilistic forecasting from NWP
-  ensembles](../techniques/probabilistic-forecasting.md#long-horizons-are-not-automatically-safe).)
-  Only a quantile/ensemble climatology answers that, via `crps__all__extended_range` head-to-head.
-  Caveat to record where that comparison is read: a *deterministic-quantile* ensemble slightly
-  out-scores an i.i.d. ensemble of the same size under fair CRPS (a known property of Ferro's
-  correction), so climatology carries a small structural edge in exactly this comparison — read a
-  near-tie as "the NWP ensemble is worth little out here", not as climatology winning outright.
-- Known limitation, documented not solved: small per-cell samples make the tail quantiles noisy;
-  pooling adjacent months is a possible refinement if the numbers look ragged.
-- Tests: hand-computed per-cell quantiles; the dedupe (a duplicated spine must not change the
-  quantiles); `save`/`load` round-trip; an integration smoke fold; CRPS flows over the members.
-- Ship-time triage: unblocks
-  [#354](https://github.com/openclimatefix/nged-substation-forecast/issues/354) (the dashboard
-  climatology reference band). As the last 🚧 baseline item that this arc builds, delete the whole
-  "Implementation details — baselines" section (summary → PR body), close #147, and update the
-  status banner plus the milestone section in [`docs/roadmap/index.md`](index.md) if the arc
-  changed. Before deleting the section, copy the PR B item into the body of
-  [#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087), because the
-  persistence design text exists only there. The `manual_heuristic_holiday_aligned` design text sits
-  outside the deleted section and stays on this page.
-
 **The recipe.** No open questions remain. Full write-up in [the manual heuristic
 forecast](../background/manual-heuristic-forecast.md); the implementation spec:
 
@@ -472,8 +418,7 @@ forecast](../background/manual-heuristic-forecast.md); the implementation spec:
   scaling. (So the holiday-aligned variant measures how much calendar awareness adds, rather than
   reimplementing a step the analogue method already takes.)
 
-**Cross-cutting.** (1) **Issue tracking:** PR C is tracked in
-[#1086](https://github.com/openclimatefix/nged-substation-forecast/issues/1086), PR B in
+**Cross-cutting.** (1) **Issue tracking:** PR B is tracked in
 [#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087), and
 `manual_heuristic_holiday_aligned` in
 [#1088](https://github.com/openclimatefix/nged-substation-forecast/issues/1088), so the two deferred
@@ -566,30 +511,23 @@ single answer. TS-Arena avoids reusing any fixed evaluation window at all ([Meye
 for the reason just given, and it is the live-monitoring check where our practice matches the
 TS-Arena pattern instead.
 
+**A narrow scoring guard works whether or not a final-test year is ever reserved.**
+`final_test_start` in `conf/cv/default.yaml` is a date later than every leaderboard fold's
+`val_end`. The `metrics` asset refuses to score a window reaching that date unless the maintainer's
+shell sets `NGED_FINAL_TEST=1`. `studies.power.scan_power` stops at the same date. The date alone
+does not reserve an independent final-test year or show that its observations were never used for
+training. Ahead of Dynamical.org's backfill, the date protects against an experiment, especially an
+unsupervised autonomous research session, scoring on later data without the maintainer's say-so. The
+other refusals of the `metrics` asset, and the `study/` experiment prefix, are described in [What
+the `metrics` asset refuses to
+score](../ml_experimentation/cross-validation-folds.md#what-the-metrics-asset-refuses-to-score).
+
 #### Implementation details — final-test window (deleted when it ships)
 
 **1. Document the caveat (immediately).** A short "Selection bias" subsection in
 `docs/ml_experimentation/cross-validation-folds.md` restating the paragraphs above.
 
-**2. Add a narrow scoring guard independently of the reservation decision (#958).** Add
-`FINAL_TEST_START` to the fold
-configuration in `conf/cv/default.yaml`, a single date near the end of the current archive. The
-`metrics` asset refuses to score any window reaching past `FINAL_TEST_START` unless
-`NGED_FINAL_TEST=1` is set in the environment — set only in the maintainer's own shell, never by an
-experiment or a study script. `packages/studies` has no shared power reader yet (every study script
-reads the Delta table directly today); create one, gated at the same date, as part of this step
-rather than assuming one already exists. A study script that still calls `scan_delta` directly
-bypasses the gate, so this guards only callers that route through the shared reader, not the data
-itself. Choose the cutoff so the full seasonal selection window remains available to ordinary
-runs, and verify that those runs still work without the override. This scoring cutoff alone does
-not reserve an independent final-test year or establish that its observations were never used for
-training. What it buys immediately, ahead of Dynamical.org's backfill, is a guard against an
-experiment — especially an unsupervised autonomous research session (see [Protect the leaderboard
-scorer for autonomous
-research](https://github.com/openclimatefix/nged-substation-forecast/issues/958)) — scoring on data
-past the cutoff without the maintainer's explicit say-so.
-
-**3. If adopted in #960, reserve a final-test window once a second, independent year of data exists
+**2. If adopted in #960, reserve a final-test window once a second, independent year of data exists
 — not by shrinking the fold that decides promotion.** (Jack's note: I'm not convinced we should do
 this yet. Even when we have several years of data, may still want to train on as much data as
 possible, and not to hold
@@ -622,12 +560,10 @@ keys have the same property if fold populations differ. When adding any fold, ei
 leaderboard fold emits an identical key set, or make the parent-run aggregation record its per-key
 denominator.
 
-**Verification.** For the narrow guard: the `metrics` asset raises on a window past
-`FINAL_TEST_START` with `NGED_FINAL_TEST` unset, and accepts it with the variable set; the study
-power reader returns no rows after `FINAL_TEST_START`. If the full reservation is adopted:
-`register_experiment_job` must never create a partition for the `final_test` fold in any run mode
-(extend `tests/test_register_experiment_job.py`); and once the disjoint year lands, score one
-existing experiment against the reserved window end-to-end and confirm the rows reach
+**Verification.** If the full reservation is adopted: `register_experiment_job` must never create a
+partition for the `final_test` fold in any run mode (extend
+`tests/test_register_experiment_job.py`); and once the disjoint year lands, score one existing
+experiment against the reserved window end-to-end and confirm the rows reach
 `forecast_metrics.delta` with the window label while nothing is logged to the leaderboard MLflow
 runs.
 

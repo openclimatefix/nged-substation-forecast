@@ -67,8 +67,8 @@ jobs:
       - name: Test (pytest)
         run: uv run --no-sync pytest
 
-      # Five hooks have no step above — trailing-whitespace, end-of-file-fixer, check-yaml,
-      # no-sphinx-roles, and lint-docstring-markdown — and the pymarkdown hook scans every tracked
+      # Six hooks have no step above — trailing-whitespace, end-of-file-fixer, check-yaml,
+      # no-sphinx-roles, lint-docstring-markdown, and import-linter — and the pymarkdown hook scans every tracked
       # markdown file, not the narrower set the step above passes it. Commit-time hooks are not
       # enough on their own: both failures in #812 landed from commits where the hooks never ran,
       # which is the state of a clone where `pre-commit install` was never run.

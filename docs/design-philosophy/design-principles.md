@@ -117,14 +117,22 @@ The code that implements the best-performing model in R&D *is* the code we deplo
 direction of travel: this is emphatically **not** "push the research notebook to production" — it is
 the opposite. Research runs on the production pipeline, so research code is held to production
 standards from the first experiment onwards. Exploratory notebooks are still allowed, but an idea
-becomes an *experiment* — a candidate that can enter the leaderboard, and therefore be promoted to
-production — only once it is implemented in the pipeline's own code, behind the same data contracts
-and tests as everything else. There is then no "now rewrite the research code for production" step,
-because there was never a second, scruffier implementation to rewrite (and this should *accelerate*
-research, not slow it down). This is also what makes a one-command promotion *safe* rather than
-merely fast: the model that won the leaderboard is, bit for bit, the model that serves, so there is
-no re-implementation whose divergence from the measured version can only be discovered in
-production.
+becomes an *experiment* — a candidate that can be promoted to production — only once it is
+implemented in the pipeline's own code, behind the same data contracts and tests as everything else.
+There is then no "now rewrite the research code for production" step, because there was never a
+second, scruffier implementation to rewrite (and this should *accelerate* research, not slow it
+down). This is also what makes a one-command promotion *safe* rather than merely fast: the model
+that won the leaderboard is, bit for bit, the model that serves, so there is no re-implementation
+whose divergence from the measured version can only be discovered in production.
+
+*Scope:* the rule governs reviewed research. An autonomous study is written by an agent in
+`studies/` and runs before anyone reviews it. Study code is therefore not held to production
+standards. For autonomous studies the rule becomes two narrower rules. All research has one scoring
+path: every leaderboard number, from a reviewed experiment or from a study, is produced by the
+`metrics` asset. A study's predictions reach the `metrics` asset only through
+`scripts/forecasting/score_study.py`. Research has one execution path to production: a study finding
+reaches production only as a written specification and a reviewed re-implementation, never as merged
+study code.
 
 *Without it:* research code is rewritten for production, the two implementations drift apart, and
 the deployed model no longer does what the winning experiment measured. And it takes *longer* to get

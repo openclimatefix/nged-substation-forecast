@@ -9,6 +9,7 @@ download/convert) are unit-tested in their own packages; here we exercise only t
 """
 
 import json
+import shutil
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -35,9 +36,10 @@ from dagster import (
     build_asset_context,
     materialize,
 )
+from deltalake import DeltaTable
 from dynamical_data.ecmwf_ens.download import _ECMWF_ENS_VARS_TO_DOWNLOAD, NwpRunNotYetAvailable
 from dynamical_data.ecmwf_ens.upstream_nulls import UpstreamNullRate
-from nged_data.storage import NoNewData, _ProcessedFileListing
+from nged_data.storage import DownloadedFilesError, _ProcessedFileListing
 
 from nged_substation_forecast.defs import assets
 from nged_substation_forecast.defs.assets import (
@@ -79,25 +81,44 @@ class _FakeGetResult:
     def __init__(self, data: _JsonBytes) -> None:
         self._data = data
 
-    def bytes(self) -> _JsonBytes:
+    async def bytes_async(self) -> _JsonBytes:
         return self._data
 
 
+_FIRST_LAST_MODIFIED = datetime(2026, 3, 26, 15, 0, tzinfo=UTC)
+"""The `LastModified` a file gets in the fake bucket unless a test gives it another."""
+
+
 class _FakeS3Store:
-    """Minimal ``obstore`` store stand-in serving a fixed set of NGED JSON files.
+    """Minimal ``obstore`` store stand-in serving a set of NGED JSON files that can grow.
 
     ``list_timeseries_json_files`` and ``download_and_parse_files`` only call ``.list()`` and
-    ``.get()``, so duck-typing those two methods lets the real asset body run offline.
+    ``.get_async()``, so duck-typing those two methods lets the real asset body run offline.
+    ``put`` adds or rewrites a file between runs, and ``requested_paths`` records every download.
     """
 
     def __init__(self, files: dict[str, _JsonBytes]) -> None:
-        self._files = files
+        self._files = {path: (data, _FIRST_LAST_MODIFIED) for path, data in files.items()}
+        self.requested_paths: list[str] = []
+        self.n_list_calls = 0
+
+    def put(
+        self, path: str, data: _JsonBytes, last_modified: datetime = _FIRST_LAST_MODIFIED
+    ) -> None:
+        self._files[path] = (data, last_modified)
 
     def list(self, prefix: str) -> _StoreListing:
-        return [[{"path": path, "size": len(data)} for path, data in self._files.items()]]
+        self.n_list_calls += 1
+        return [
+            [
+                {"path": path, "size": len(data), "last_modified": last_modified}
+                for path, (data, last_modified) in self._files.items()
+            ]
+        ]
 
-    def get(self, path: str) -> _FakeGetResult:
-        return _FakeGetResult(self._files[path])
+    async def get_async(self, path: str) -> _FakeGetResult:
+        self.requested_paths.append(path)
+        return _FakeGetResult(self._files[path][0])
 
 
 _CONTINUOUS_NWP_VALUES: dict[str, float] = {
@@ -234,8 +255,9 @@ def test_power_time_series_and_metadata_writes_power_when_the_metadata_upsert_fa
     monkeypatch: pytest.MonkeyPatch,
     dagster_instance: DagsterInstance,
 ) -> None:
-    """The headline property of #508: the metadata table is derived data NGED re-delivers,
-    so a fault in it must not stall the power stream until an operator intervenes.
+    """The headline property of #508: the metadata table is derived data, so a fault in it must
+    not stall the power stream until an operator intervenes. The downloaded-files list is still
+    written, so the next run does not download the same files again.
 
     Also asserts the degradation is *reported*, since a step that no longer fails no longer fires
     ``sentry_capture_failure``. The ``rust_panic`` case is why the guard catches
@@ -277,6 +299,9 @@ def test_power_time_series_and_metadata_writes_power_when_the_metadata_upsert_fa
     # `type(...) is`, not `isinstance`: under `isinstance` the `rust_panic` case would pass on a
     # `RuntimeError`, so a guard narrowed to `except Exception` would still look correct.
     assert type(reported[0][1]) is raised
+    assert pl.read_parquet(env / "NGED" / "list_of_downloaded_files.parquet").height == len(
+        _NGED_FILES
+    )
 
 
 def test_power_time_series_and_metadata_re_raises_a_cancelled_run(
@@ -353,39 +378,11 @@ def test_power_time_series_and_metadata_drops_and_reports_malformed_rows(
     assert metadata["n_implausible_power_rows_dropped"].value == 1
 
 
-def test_power_time_series_and_metadata_handles_no_new_data(
+def test_the_newest_data_less_file_of_a_series_sets_its_metadata(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
-    """``NoNewData`` from ``download_and_parse_files`` → the asset returns early, writes nothing."""
-    monkeypatch.setattr(
-        target=assets.Settings,
-        name="get_nged_s3_store",
-        value=lambda self: _FakeS3Store(_NGED_FILES),
-    )
-
-    calls = 0
-
-    def _raise_no_new_data(store: object, paths_df: object) -> None:
-        nonlocal calls
-        calls += 1
-        raise NoNewData
-
-    monkeypatch.setattr(target=assets, name="download_and_parse_files", value=_raise_no_new_data)
-
-    result = materialize([power_time_series_and_metadata], instance=dagster_instance)
-    assert result.success
-    assert not (env / "NGED" / "metadata.parquet").exists()
-    assert not (env / "NGED" / "power_time_series.delta").exists()
-    # Once, not retried: an hour in which NGED published nothing new is the common case, so
-    # `NoNewData` has to be caught ahead of the retry guard that wraps the same block.
-    assert calls == 1
-
-
-def test_the_newest_small_file_of_a_series_sets_its_metadata(
-    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
-) -> None:
-    """Series 10 has an older large file and a newer data-less file that carries NGED's note.
-    The size filter drops the newer file from the power download, but its metadata must win."""
+    """Series 10 has an older file with readings and a newer data-less file that carries NGED's
+    note. The data-less file adds no rows, but its metadata must win."""
     small_file = json.loads((_NGED_JSON_DIR / "TimeSeries_33_no_data.json").read_text())
     small_file.update(TimeSeriesID=10, Information="Invented fault note.")
     small_file_key = (
@@ -564,6 +561,369 @@ def test_power_time_series_and_metadata_does_not_retry_a_failure_after_the_write
     )
     assert not result.success
     assert calls == 1
+
+
+# --- the downloaded-files list -------------------------------------------------------------------
+
+_DELTA = "NGED/power_time_series.delta"
+_METADATA = "NGED/metadata.parquet"
+_DOWNLOADED_FILES = "NGED/list_of_downloaded_files.parquet"
+
+
+def _key(time_series_id: int, end_hours: int) -> str:
+    """The key of a 6-hour window ending `end_hours` after 2026-01-01 00:00 UTC."""
+    end_ms = int(datetime(2026, 1, 1, tzinfo=UTC).timestamp() * 1000) + end_hours * 3_600_000
+    return (
+        f"timeseries/{end_ms - 21_600_000}_{end_ms}/TimeSeries_{time_series_id}_"
+        "20260101T000000Z_20260101T060000Z.json"
+    )
+
+
+def _window_file(
+    time_series_id: int, end_hours: int, values: list[float], information: str | None = None
+) -> bytes:
+    """A real NGED file's metadata fields, with half-hourly readings ending at the window's end."""
+    file_contents = json.loads((_NGED_JSON_DIR / "TimeSeries_11.json").read_text())
+    end = datetime(2026, 1, 1, tzinfo=UTC) + timedelta(hours=end_hours)
+    fmt = "%Y-%m-%d %H:%M:%S%z"
+    file_contents.update(
+        TimeSeriesID=time_series_id,
+        Information=information,
+        data=[
+            {
+                "value": value,
+                "startTime": (end - timedelta(minutes=30 * (len(values) - i))).strftime(fmt),
+                "endTime": (end - timedelta(minutes=30 * (len(values) - i - 1))).strftime(fmt),
+            }
+            for i, value in enumerate(values)
+        ],
+    )
+    return json.dumps(file_contents).encode()
+
+
+def _data_less_file(time_series_id: int, information: str | None) -> bytes:
+    file_contents = json.loads((_NGED_JSON_DIR / "TimeSeries_33_no_data.json").read_text())
+    file_contents.update(TimeSeriesID=time_series_id, Information=information)
+    return json.dumps(file_contents).encode()
+
+
+def _use_store(monkeypatch: pytest.MonkeyPatch, store: _FakeS3Store) -> None:
+    monkeypatch.setattr(target=assets.Settings, name="get_nged_s3_store", value=lambda self: store)
+
+
+def _run(instance: DagsterInstance, *, succeeds: bool = True) -> ExecuteInProcessResult:
+    result = materialize(
+        [power_time_series_and_metadata], instance=instance, raise_on_error=succeeds
+    )
+    assert result.success == succeeds
+    return result
+
+
+def _power(root: Path) -> pl.DataFrame:
+    return pl.read_delta(str(root / _DELTA)).sort(PowerTimeSeries.columns_to_sort_by)
+
+
+def _stored_note(root: Path, series_id: int) -> str | None:
+    metadata = pl.read_parquet(root / _METADATA)
+    return metadata.filter(pl.col("time_series_id") == series_id)["information"][0]
+
+
+def _stored_power(root: Path, series_id: int) -> dict[datetime, float]:
+    power = _power(root).filter(pl.col("time_series_id") == series_id)
+    return dict(power.select("time", "power").rows())
+
+
+def _delta_version(root: Path) -> int:
+    return DeltaTable(str(root / _DELTA)).version()
+
+
+class _ReplayArms:
+    """Two ingests over identical buckets: the real one, and a reference that downloads everything.
+
+    The reference arm reads an empty downloaded-files list every run, so it downloads the whole
+    bucket each time.
+    """
+
+    def __init__(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, instance: DagsterInstance
+    ) -> None:
+        self.roots = {"once": tmp_path / "once", "reference": tmp_path / "reference"}
+        self.stores = {arm: _FakeS3Store({}) for arm in self.roots}
+        self._monkeypatch = monkeypatch
+        self._instance = instance
+        self._current_arm = ""
+        real_read = assets.read_downloaded_files
+
+        def read(**kwargs: Any) -> Any:
+            downloaded_files = real_read(**kwargs)
+            return (
+                downloaded_files.clear() if self._current_arm == "reference" else downloaded_files
+            )
+
+        monkeypatch.setattr(
+            target=assets.Settings,
+            name="get_nged_s3_store",
+            value=lambda settings: self.stores[self._current_arm],
+        )
+        monkeypatch.setattr(target=assets, name="read_downloaded_files", value=read)
+
+    def put(self, path: str, data: bytes, last_modified: datetime = _FIRST_LAST_MODIFIED) -> None:
+        for store in self.stores.values():
+            store.put(path, data, last_modified)
+
+    def run_and_compare(self, *, n_new_files: int) -> None:
+        """Run both arms, then check the downloads made and that the stored tables are equal."""
+        n_files_in_bucket = len(self.stores["once"]._files)
+        n_downloads = {}
+        for arm, root in self.roots.items():
+            self._current_arm = arm
+            self._monkeypatch.setenv("DATA_PATH_INTERNAL", str(root))
+            self._monkeypatch.setenv("DATA_PATH_DELIVERY", str(root))
+            n_before = len(self.stores[arm].requested_paths)
+            _run(self._instance)
+            n_downloads[arm] = len(self.stores[arm].requested_paths) - n_before
+        assert n_downloads == {"once": n_new_files, "reference": n_files_in_bucket}
+        assert _power(self.roots["once"]).equals(_power(self.roots["reference"]))
+        once_metadata, reference_metadata = (
+            pl.read_parquet(self.roots[arm] / _METADATA).sort("time_series_id")
+            for arm in ("once", "reference")
+        )
+        assert once_metadata.equals(reference_metadata)
+
+
+def test_the_downloaded_files_list_matches_a_download_everything_reference_on_every_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """The ingest that downloads each file once leaves the same power table and metadata parquet,
+    after every run, as an ingest that downloads every file in the bucket every run.
+
+    The two arms share the parsing code, so equality alone cannot catch a parsing bug. The
+    assertions on stored values below pin the outcomes the replay is designed around.
+    """
+    monkeypatch.setenv("LOCAL_ARTIFACTS_PATH", str(tmp_path))
+    arms = _ReplayArms(tmp_path, monkeypatch, dagster_instance)
+    put, run_and_compare = arms.put, arms.run_and_compare
+    once_root = arms.roots["once"]
+
+    # Run 1: the first run downloads the whole bucket, in both arms.
+    put(_key(10, 6), _window_file(10, 6, [1.0, 2.0]))
+    put(_key(11, 6), _window_file(11, 6, [3.0, 4.0]))
+    put(_key(12, 6), _window_file(12, 6, [5.0, 6.0], information="series 12 reporting"))
+    run_and_compare(n_new_files=3)
+
+    # Run 2: new windows for two series. Series 12 has gone quiet.
+    put(_key(10, 12), _window_file(10, 12, [7.0], information="series 10 note"))
+    put(_key(11, 12), _window_file(11, 12, [8.0]))
+    run_and_compare(n_new_files=2)
+
+    # Run 3: a back-fill 2 months before the data, with a different note, and a late file more
+    # than 3 days before the newest reading of its series.
+    put(_key(10, -24 * 60), _window_file(10, -24 * 60, [9.0], information="old back-fill note"))
+    put(_key(11, 12 - 24 * 4), _window_file(11, 12 - 24 * 4, [10.0]))
+    put(_key(10, 24), _window_file(10, 24, [11.0], information="series 10 newest note"))
+    run_and_compare(n_new_files=3)
+    assert _stored_note(once_root, 10) == "series 10 newest note"
+    old_time = datetime(2026, 1, 1, tzinfo=UTC) + timedelta(hours=12 - 24 * 4)
+    assert _stored_power(once_root, 11)[old_time - timedelta(minutes=30)] == 10.0
+
+    # Run 4: a file for series 10 that falls between two windows already downloaded, and a
+    # data-less file for the quiet series 12 carrying a new note.
+    put(_key(10, 18), _window_file(10, 18, [12.0], information="late-visible note"))
+    put(_key(12, 30), _data_less_file(12, "series 12 stopped reporting"))
+    run_and_compare(n_new_files=2)
+    assert _stored_note(once_root, 10) == "series 10 newest note"
+    assert _stored_note(once_root, 12) == "series 12 stopped reporting"
+
+    # Run 5: NGED rewrites series 11's newest key with one earlier reading and a new note.
+    n_readings_of_11 = len(_stored_power(once_root, 11))
+    put(
+        _key(11, 12),
+        _window_file(11, 12, [13.0, 8.0], information="rewritten note"),
+        last_modified=_FIRST_LAST_MODIFIED + timedelta(hours=1),
+    )
+    run_and_compare(n_new_files=1)
+    assert _stored_note(once_root, 11) == "rewritten note"
+    assert len(_stored_power(once_root, 11)) == n_readings_of_11 + 1
+
+    # Run 6: nothing new, so the arm with the list makes no request at all.
+    run_and_compare(n_new_files=0)
+
+
+def test_a_run_with_nothing_new_downloads_nothing_and_leaves_the_files_unchanged(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    store = _FakeS3Store(_NGED_FILES)
+    _use_store(monkeypatch, store)
+    _run(dagster_instance)
+    list_bytes = (env / _DOWNLOADED_FILES).read_bytes()
+    version = _delta_version(env)
+    n_requests = len(store.requested_paths)
+
+    result = _run(dagster_instance)
+
+    assert len(store.requested_paths) == n_requests
+    assert (env / _DOWNLOADED_FILES).read_bytes() == list_bytes
+    assert _delta_version(env) == version
+    metadata = {
+        k: v
+        for mat in result.asset_materializations_for_node("power_time_series_and_metadata")
+        for k, v in mat.metadata.items()
+    }
+    assert metadata["metadata_n_new_TimeSeriesIDs"].value == 0
+
+
+def test_an_hour_whose_new_files_add_no_rows_still_records_them(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """Without the record, the same data-less file would be downloaded every hour."""
+    store = _FakeS3Store(_NGED_FILES)
+    _use_store(monkeypatch, store)
+    _run(dagster_instance)
+    version = _delta_version(env)
+    data_less_key = _key(10, 100_000)
+    store.put(data_less_key, _data_less_file(10, "stopped reporting"))
+
+    _run(dagster_instance)
+    _run(dagster_instance)
+
+    assert store.requested_paths.count(data_less_key) == 1
+    assert _delta_version(env) == version
+
+
+def test_a_cancelled_run_is_not_swallowed_by_the_downloaded_files_write(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    _use_store(monkeypatch, _FakeS3Store(_NGED_FILES))
+
+    def cancel(**_: object) -> None:
+        raise DagsterExecutionInterruptedError
+
+    monkeypatch.setattr(target=assets, name="write_downloaded_files", value=cancel)
+
+    _run(dagster_instance, succeeds=False)
+
+
+def test_a_malformed_file_fails_the_run_without_a_retry_and_records_nothing(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    store = _FakeS3Store({**_NGED_FILES, _key(10, 100_000): b"{not json"})
+    _use_store(monkeypatch, store)
+
+    result = _run(dagster_instance, succeeds=False)
+
+    assert not (env / _DELTA).exists()
+    assert not (env / _METADATA).exists()
+    assert not (env / _DOWNLOADED_FILES).exists()
+    assert len(store.requested_paths) == len(store._files)
+    failures = [event for event in result.all_events if event.is_step_failure]
+    assert "NgedFileParseError" in str(failures[0].step_failure_data.error)
+
+
+def test_the_downloaded_files_list_is_never_ahead_of_the_rows(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    store = _FakeS3Store(_NGED_FILES)
+    _use_store(monkeypatch, store)
+    real_write = assets.write_power_time_series
+    monkeypatch.setattr(
+        target=assets,
+        name="write_power_time_series",
+        value=lambda **_: (_ for _ in ()).throw(RuntimeError("the append crashed")),
+    )
+
+    _run(dagster_instance, succeeds=False)
+    assert not (env / _DOWNLOADED_FILES).exists()
+
+    monkeypatch.setattr(target=assets, name="write_power_time_series", value=real_write)
+    _run(dagster_instance)
+    assert set(_power(env)["time_series_id"].unique().to_list()) == {10, 11}
+
+
+def test_a_failed_downloaded_files_write_is_reported_and_the_next_run_downloads_again(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    store = _FakeS3Store(_NGED_FILES)
+    _use_store(monkeypatch, store)
+    real_write = assets.write_downloaded_files
+
+    def boom(**_: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(target=assets, name="write_downloaded_files", value=boom)
+    reported: list[tuple[BaseException, list[str] | None]] = []
+    monkeypatch.setattr(
+        target=assets,
+        name="report_asset_degradation",
+        value=lambda asset_name, exc, fingerprint=None: reported.append((exc, fingerprint)),
+    )
+
+    _run(dagster_instance)
+
+    n_rows = _power(env).height
+    assert n_rows > 0
+    assert not (env / _DOWNLOADED_FILES).exists()
+    [(exc, fingerprint)] = reported
+    assert str(env / _DOWNLOADED_FILES) in str(exc)
+    assert fingerprint == ["downloaded_files_write_failed"]
+
+    monkeypatch.setattr(target=assets, name="write_downloaded_files", value=real_write)
+    _run(dagster_instance)
+
+    assert len(store.requested_paths) == 2 * len(_NGED_FILES)
+    assert _power(env).height == n_rows
+
+
+@pytest.mark.parametrize("rebuilt", [_DELTA, _METADATA], ids=["power_table", "metadata_table"])
+def test_a_rebuilt_table_downloads_the_whole_bucket_again(
+    rebuilt: str,
+    env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    dagster_instance: DagsterInstance,
+) -> None:
+    store = _FakeS3Store(_NGED_FILES)
+    _use_store(monkeypatch, store)
+    _run(dagster_instance)
+    expected_power = _power(env)
+    if rebuilt == _DELTA:
+        shutil.rmtree(env / rebuilt)
+    else:
+        (env / rebuilt).unlink()
+
+    _run(dagster_instance)
+
+    assert len(store.requested_paths) == 2 * len(_NGED_FILES)
+    assert _power(env).equals(expected_power)
+    assert set(pl.read_parquet(env / _METADATA)["time_series_id"].to_list()) == {10, 11}
+
+
+def test_a_corrupt_downloaded_files_list_stops_the_run_without_a_retry_or_a_listing(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    store = _FakeS3Store(_NGED_FILES)
+    _use_store(monkeypatch, store)
+    _run(dagster_instance)
+    (env / _DOWNLOADED_FILES).write_bytes(b"not a parquet file")
+    n_lists = store.n_list_calls
+    reads = 0
+    real_read = assets.read_downloaded_files
+
+    def counting_read(**kwargs: Any) -> Any:
+        nonlocal reads
+        reads += 1
+        return real_read(**kwargs)
+
+    monkeypatch.setattr(target=assets, name="read_downloaded_files", value=counting_read)
+
+    result = _run(dagster_instance, succeeds=False)
+
+    assert reads == 1
+    assert store.n_list_calls == n_lists
+    failures = [event for event in result.all_events if event.is_step_failure]
+    assert DownloadedFilesError.__name__ in str(failures[0].step_failure_data.error)
+
+
+def test_the_ingest_asset_is_limited_to_one_run_at_a_time() -> None:
+    assert power_time_series_and_metadata.op.pool == "NGED_INGEST"
 
 
 # --- h3_grid_weights -----------------------------------------------------------------------------
@@ -1470,6 +1830,7 @@ def _file_listing(
             {
                 "path": [f"p{i}" for i in range(n)],
                 "filesize_bytes": [1000 + i for i in range(n)],
+                "last_modified": [base] * n,
                 "time_series_id": ids,
                 "start_time": [base] * n,
                 "end_time": [base + timedelta(hours=i) for i in range(n)],

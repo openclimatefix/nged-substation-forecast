@@ -1,11 +1,11 @@
 # NGED JSON Data
 
 This package reads NGED's telemetry JSON files from S3 and parses them into the `PowerTimeSeries`
-and `TimeSeriesMetadata` schemas (see `contracts`). The metadata table is the only file this
-package owns and writes; the parsed power observations are handed back to the caller, which appends
-them to the `power_time_series` Delta table (see [Usage](#usage) below). `nged_data.storage`'s
-module docstring, below on this page, says which functions read that Delta table and which write the
-metadata table.
+and `TimeSeriesMetadata` schemas (see `contracts`). The metadata table and the downloaded-files
+list are the only files this package owns and writes; the parsed power observations are handed back
+to the caller, which appends them to the `power_time_series` Delta table (see [Usage](#usage)
+below). `nged_data.storage`'s module docstring, below on this page, says which functions read that
+Delta table and which write the metadata table.
 
 ## Public surface
 
@@ -15,22 +15,20 @@ nged_data.storage import list_timeseries_json_files`, etc.).
 
 - `nged_data.storage.list_timeseries_json_files(store)` — lists the timeseries JSON files on NGED's
   S3 bucket, parsing `time_series_id`, `start_time`, and `end_time` out of each file's path.
-- `nged_data.storage.remove_small_files_from_listing(file_listing, size_threshold_bytes=520)` —
-  drops files too small to carry any readings, so
-  `download_and_parse_files` never fetches and parses one only to discard the result.
-- `nged_data.storage.add_newest_file_of_each_series(all_files, new_files)` — adds the newest file
-  of every series, whatever its size, to the files chosen for download, so a series that stopped
-  reporting keeps current metadata (including NGED's `Information` note).
-- `nged_data.storage.download_and_parse_files(store, paths_df)` — downloads and parses each listed
-  file, returning a `DownloadAndParseResult` of `metadata` (`TimeSeriesMetadata`),
-  `power_time_series` (`PowerTimeSeries`), and `n_implausible_power_rows_dropped`. Raises
-  `NoNewData` if the listing was empty, or if every listed file's `data` field was null.
+- `nged_data.storage.read_downloaded_files(...)`, `write_downloaded_files(...)` — read and replace
+  the downloaded-files list, which records the bucket listing (path and `LastModified`) that the
+  ingest last processed in full.
+- `nged_data.storage.select_files_not_yet_downloaded(file_listing, downloaded_files)` — keeps the
+  listed files that the downloaded-files list lacks, so each file is downloaded once.
+- `nged_data.storage.download_and_parse_files(store, paths_df)` — downloads the listed files
+  concurrently, in chunks, and parses them in `end_time` order, returning a `DownloadAndParseResult`
+  of `metadata` (`TimeSeriesMetadata`), `power_time_series` (`PowerTimeSeries`), and
+  `n_implausible_power_rows_dropped`. When every file's `data` field was null, the power frame is
+  empty.
 - `nged_data.storage.select_new_rows(time_series, delta_path, storage_options=None)` — filters
-  `time_series` down to rows genuinely missing from the `power_time_series` Delta table at
-  `delta_path`. `PowerTimeSeries` rows are filtered by existence, an anti-join on `(time_series_id,
-  time)`, so a reading is kept regardless of arrival order. The file listing that
-  `list_timeseries_json_files` returns is filtered by comparing each file's `end_time` against its
-  series' on-disk high-water mark, loosened by a lookback margin so a late file is still downloaded.
+  `PowerTimeSeries` rows down to those missing from the `power_time_series` Delta table at
+  `delta_path`, by an anti-join on `(time_series_id, time)`, so a reading is kept regardless of
+  arrival order.
 - `nged_data.storage.time_series_coverage(delta_path, storage_options=None)` — the earliest and
   latest observation `time` on disk for each `time_series_id` in the `power_time_series` Delta
   table.

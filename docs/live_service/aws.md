@@ -1074,6 +1074,8 @@ concurrency:
     # Caps how many `ecmwf_ens` partitions run at once. The limit applies to every pool,
     # because Dagster's YAML takes no per-pool limits — those are set with
     # `dagster instance concurrency set <pool> <n>` and live in the instance database.
+    # The `NGED_INGEST` pool needs a limit of 1, so run
+    # `dagster instance concurrency set NGED_INGEST 1` once the instance exists.
     default_limit: 4
 
 run_monitoring:

@@ -8,12 +8,12 @@ the logic stays fast to unit-test and the assets stay readable.
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Final
+from typing import Final, NamedTuple, Self
 
 import mlflow
 import patito as pt
 import polars as pl
-from contracts.config_schemas import load_cv_config
+from contracts.config_schemas import STUDY_EXPERIMENT_PREFIX, load_cv_config
 from contracts.ml_schemas import EligibleTimeSeries, EvalScopeType, Metrics
 from contracts.power_schemas import (
     EffectiveCapacity,
@@ -52,6 +52,11 @@ from ml_core.metrics import (
     compute_effective_capacity,
     compute_metrics,
     enrich_metrics_rows,
+    require_same_row_keys,
+    require_single_model_name,
+    require_valid_times_within_window,
+    require_window_within_guard,
+    row_key_fingerprint,
 )
 from ml_core.mlflow_runs import (
     get_or_create_experiment,
@@ -60,7 +65,9 @@ from ml_core.mlflow_runs import (
     load_experiment_forecaster,
 )
 from ml_core.repro import ABSENT, MlflowTags, StageType, TableNameType, provenance_tags
+from mlflow.tracking import MlflowClient
 from nged_data.storage import coverage_from_power, scan_cleaned_power, time_series_coverage
+from pydantic import model_validator
 
 from nged_substation_forecast.defs._engineering_inputs import (
     MAX_NWP_LEAD,
@@ -694,17 +701,66 @@ class MetricsConfig(Config):
     """Which evaluation scope this run produces.
 
     - ``"leaderboard"``: logs per-fold + aggregate metrics to the golden leaderboard MLflow
-      experiments (canonical complete-window folds only).
+      experiments (canonical complete-window folds only). The population filter may not
+      set ``valid_time_min`` or ``valid_time_max`` in this scope, because a trimmed window would be
+      scored under the full fold's label.
     - ``"ad_hoc"``: writes to ``forecast_metrics`` Delta only; no MLflow logging.
     """
+
+    @model_validator(mode="after")
+    def _refuse_trimmed_leaderboard_window(self) -> Self:
+        """Reject a ``valid_time`` bound on the population filter in leaderboard scope."""
+        trimmed = (
+            self.population_filter.valid_time_min is not None
+            or self.population_filter.valid_time_max is not None
+        )
+        if self.evaluation_scope == "leaderboard" and trimmed:
+            raise ValueError(
+                "population_filter.valid_time_min/max trims the window, so it is only allowed "
+                'with evaluation_scope="ad_hoc".'
+            )
+        return self
+
+
+FINAL_TEST_ENV_VAR: Final[str] = "NGED_FINAL_TEST"
+"""The environment variable that lets ``metrics`` score a window reaching ``final_test_start``.
+
+Only the maintainer's own shell sets it to ``"1"``; an experiment or a study never does.
+"""
+
+
+class _EvalWindow(NamedTuple):
+    """The inclusive evaluation window of one metrics group, and the label stamped on its rows."""
+
+    start: datetime
+    end: datetime
+    label: str
+
+
+def _final_test_enabled() -> bool:
+    """Return whether the maintainer's environment allows scoring past ``final_test_start``."""
+    return os.environ.get(FINAL_TEST_ENV_VAR) == "1"
+
+
+def _valid_time_extent(group_scan: pl.LazyFrame) -> tuple[datetime, datetime]:
+    """Return the earliest and latest ``valid_time`` of a forecast group, by a streaming scan."""
+    bounds = group_scan.select(
+        valid_time_min=pl.col("valid_time").min(), valid_time_max=pl.col("valid_time").max()
+    ).collect(engine="streaming")
+    valid_time_min = bounds["valid_time_min"][0]
+    valid_time_max = bounds["valid_time_max"][0]
+    # groups is derived from a non-empty forecast scan, so min/max are always non-null datetimes.
+    assert isinstance(valid_time_min, datetime)
+    assert isinstance(valid_time_max, datetime)
+    return valid_time_min, valid_time_max
 
 
 def _resolve_eval_window(
     evaluation_scope: EvalScopeType,
     fold_id: str,
     group_scan: pl.LazyFrame,
-) -> tuple[datetime, datetime, str]:
-    """Return ``(window_start, window_end, window_label)`` for a metrics group.
+) -> _EvalWindow:
+    """Return the evaluation window of a metrics group.
 
     For ``"leaderboard"`` scope the bounds come from the fold config; for ``"ad_hoc"``
     they are the observed ``valid_time`` extent of the forecast group.
@@ -718,25 +774,82 @@ def _resolve_eval_window(
             ``"ad_hoc"`` branch — the group is never materialised here.
 
     Returns:
-        ``(window_start, window_end, window_label)`` — the inclusive evaluation window bounds
-        and a human-readable label (``fold_id`` for leaderboard; ``"ad_hoc"`` otherwise).
+        The inclusive window bounds and a human-readable label (``fold_id`` for leaderboard;
+        ``"ad_hoc"`` otherwise).
     """
     if evaluation_scope == "leaderboard":
         fold = _cv_config.get_fold(fold_id)
-        return (
-            date_to_utc_datetime(fold.val_start),
-            date_to_utc_datetime(fold.val_end, end_of_day=True),
-            fold_id,
+        return _EvalWindow(
+            start=date_to_utc_datetime(fold.val_start),
+            end=date_to_utc_datetime(fold.val_end, end_of_day=True),
+            label=fold_id,
         )
-    bounds = group_scan.select(
-        window_start=pl.col("valid_time").min(), window_end=pl.col("valid_time").max()
-    ).collect(engine="streaming")
-    window_start = bounds["window_start"][0]
-    window_end = bounds["window_end"][0]
-    # groups is derived from a non-empty forecast scan, so min/max are always non-null datetimes.
-    assert isinstance(window_start, datetime)
-    assert isinstance(window_end, datetime)
-    return window_start, window_end, "ad_hoc"
+    valid_time_min, valid_time_max = _valid_time_extent(group_scan)
+    return _EvalWindow(start=valid_time_min, end=valid_time_max, label="ad_hoc")
+
+
+def _validate_group(
+    *,
+    exp_name: str,
+    fold_id: str,
+    group_scan: pl.LazyFrame,
+    scan: pt.LazyFrame[PowerForecast],
+    evaluation_scope: EvalScopeType,
+) -> _EvalWindow:
+    """Refuse a group the scorer must not score, and return its evaluation window.
+
+    The ``metrics`` asset calls this function for every group before scoring any group, so a
+    refusal on a later group never leaves
+    an earlier group's ``forecast_metrics`` rows or MLflow runs behind.
+
+    Four checks, each raising. The final-test date guard applies to every scope. In leaderboard
+    scope every row's ``valid_time`` must also lie inside the fold's window. A ``study/``
+    experiment in leaderboard scope must additionally carry exactly the reference experiment's row
+    keys for the fold, so it cannot abstain on hard rows, and a single ``power_fcst_model_name``,
+    so it cannot down-weight them by spreading rows across model names.
+
+    Args:
+        exp_name: Experiment name of the group.
+        fold_id: Fold identifier of the group.
+        group_scan: Lazy scan of this group's forecast rows.
+        scan: Typed lazy scan of the whole ``power_forecasts`` table, from which the reference
+            experiment's rows are read.
+        evaluation_scope: ``"leaderboard"`` or ``"ad_hoc"``.
+
+    Returns:
+        The group's evaluation window.
+    """
+    window = _resolve_eval_window(evaluation_scope, fold_id, group_scan)
+    require_window_within_guard(
+        window_end=window.end,
+        final_test_start=_cv_config.final_test_start,
+        fold_id=fold_id,
+        final_test_enabled=_final_test_enabled(),
+    )
+    if evaluation_scope != "leaderboard":
+        return window
+    valid_time_min, valid_time_max = _valid_time_extent(group_scan)
+    group_label = f"{exp_name}, {fold_id}"
+    require_valid_times_within_window(
+        valid_time_min=valid_time_min,
+        valid_time_max=valid_time_max,
+        window_start=window.start,
+        window_end=window.end,
+        group_label=group_label,
+    )
+    if exp_name.startswith(STUDY_EXPERIMENT_PREFIX):
+        require_single_model_name(study=group_scan, group_label=group_label)
+        reference = PopulationFilter(
+            experiment_name=_cv_config.reference_experiment_name, fold_id=fold_id
+        ).apply(scan)
+        require_same_row_keys(
+            study=group_scan,
+            reference=reference,
+            group_label=group_label,
+            reference_label=_cv_config.reference_experiment_name,
+            series_batch_size=_METRICS_SERIES_BATCH_SIZE,
+        )
+    return window
 
 
 _METRICS_SERIES_BATCH_SIZE: Final[int] = 4
@@ -778,6 +891,246 @@ def _group_scan(
     )
 
 
+FINGERPRINT_TAG: Final[str] = "row_key_fingerprint"
+"""The MLflow fold-run tag holding ``row_key_fingerprint`` of the group's forecast rows."""
+
+REFERENCE_FINGERPRINT_TAG: Final[str] = "reference_row_key_fingerprint"
+"""The MLflow fold-run tag holding the reference experiment's fingerprint for the same fold."""
+
+MATCHES_REFERENCE_TAG: Final[str] = "row_keys_match_reference"
+"""``"true"`` when the group and the reference experiment forecast the same series, initialisation
+times, and valid times, so their scores rest on the same forecast problem; otherwise ``"false"``.
+A reviewed experiment that differs from the reference is scored and tagged, never refused."""
+
+STALE_TAG: Final[str] = "stale_against_reference"
+"""``"true"`` on a study's fold run once the reference experiment's series, initialisation times, or
+valid times have changed since the study was scored. A change in the reference's ensemble members
+alone is not detected, because ``row_key_fingerprint`` ignores ``ensemble_member``. An unfiltered
+``metrics`` run sets the tag on every study it skips."""
+
+PAIRED_METRIC_PREFIX: Final[str] = "vs_reference__"
+"""Prefix of the metric keys that hold a study's score minus the reference's, on a study fold run.
+The reference is scored in the same ``metrics`` run, so both scores share one snapshot of the
+observed power and of ``effective_capacity``."""
+
+
+def _reference_fingerprint(scan: pt.LazyFrame[PowerForecast], fold_id: str) -> str:
+    """Return the row-key fingerprint of the reference experiment's rows for ``fold_id``."""
+    reference = PopulationFilter(
+        experiment_name=_cv_config.reference_experiment_name, fold_id=fold_id
+    ).apply(scan)
+    return row_key_fingerprint(forecasts=reference, series_batch_size=_METRICS_SERIES_BATCH_SIZE)
+
+
+def _fingerprint_tags(*, group_scan: pl.LazyFrame, reference_fingerprint: str) -> MlflowTags:
+    """Return the fold-run tags that say which forecast problem a group scored."""
+    fingerprint = row_key_fingerprint(
+        forecasts=group_scan, series_batch_size=_METRICS_SERIES_BATCH_SIZE
+    )
+    return {
+        FINGERPRINT_TAG: fingerprint,
+        REFERENCE_FINGERPRINT_TAG: reference_fingerprint,
+        MATCHES_REFERENCE_TAG: str(fingerprint == reference_fingerprint).lower(),
+    }
+
+
+def _log_paired_difference(
+    *,
+    exp_name: str,
+    fold_id: str,
+    study_metrics: dict[str, float],
+    reference_metrics: dict[str, float],
+) -> None:
+    """Log a study's score minus the reference's, key by key, on the study's fold run."""
+    experiment_id = get_or_create_experiment(exp_name)
+    run_id = get_or_create_fold_run(experiment_id, get_or_create_parent_run(experiment_id), fold_id)
+    differences = {
+        f"{PAIRED_METRIC_PREFIX}{key}": value - reference_metrics[key]
+        for key, value in study_metrics.items()
+        if key in reference_metrics
+    }
+    with mlflow.start_run(run_id=run_id):
+        mlflow.log_metrics(differences)
+
+
+def _tag_stale_studies(
+    *, skipped_groups: list[tuple[str, str]], scan: pt.LazyFrame[PowerForecast]
+) -> None:
+    """Tag each skipped study's fold run stale or current against the reference's row keys.
+
+    A study's fold run holds the study's own fingerprint, which equalled the reference's when the
+    study was scored, because a study is scored only when its row keys match the reference's. The
+    study is stale when the reference's fingerprint for the fold has since changed. A group with no
+    fold run was never scored and is left alone.
+    """
+    client = MlflowClient()
+    reference_fingerprints: dict[str, str] = {}
+    for exp_name, fold_id in skipped_groups:
+        experiment = mlflow.get_experiment_by_name(exp_name)
+        if experiment is None:
+            continue
+        runs = client.search_runs(
+            experiment_ids=[experiment.experiment_id],
+            filter_string=f"tags.cv_role = 'fold' and tags.fold_id = '{fold_id}'",
+            max_results=1,
+        )
+        if not runs:
+            continue
+        if fold_id not in reference_fingerprints:
+            reference_fingerprints[fold_id] = _reference_fingerprint(scan, fold_id)
+        scored_against = runs[0].data.tags.get(FINGERPRINT_TAG)
+        stale = scored_against != reference_fingerprints[fold_id]
+        client.set_tag(runs[0].info.run_id, STALE_TAG, str(stale).lower())
+
+
+def _group_has_rows(scan: pt.LazyFrame[PowerForecast], exp_name: str, fold_id: str) -> bool:
+    """Return whether ``power_forecasts`` holds any row for the group."""
+    return _group_scan(scan, exp_name, fold_id).head(1).collect(engine="streaming").height > 0
+
+
+def _split_off_studies(
+    groups: list[tuple[str, str]],
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """Split ``groups`` into the reviewed groups and the ``study/`` groups, in that order."""
+    studies = [group for group in groups if group[0].startswith(STUDY_EXPERIMENT_PREFIX)]
+    return [group for group in groups if group not in studies], studies
+
+
+def _with_reference_groups(
+    *,
+    groups: list[tuple[str, str]],
+    scan: pt.LazyFrame[PowerForecast],
+    evaluation_scope: EvalScopeType,
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """Add the reference experiment's group for every study fold, and put studies last.
+
+    A study is scored beside the reference experiment in the same run, so the two scores share one
+    snapshot of the observed power and of ``effective_capacity``. The population filter names only
+    the study, so the added group is read from the whole table. A reference with no rows for the
+    fold is not added, because the study's own check then refuses it by name.
+
+    Args:
+        groups: The ``(experiment_name, fold_id)`` groups the population filter matched.
+        scan: Typed lazy scan of the whole ``power_forecasts`` table.
+        evaluation_scope: Reference groups are added in ``"leaderboard"`` scope only.
+
+    Returns:
+        The groups to score, reviewed groups first and studies last, and the reference groups that
+        were added.
+    """
+    if evaluation_scope != "leaderboard":
+        return groups, []
+    wanted = {
+        (_cv_config.reference_experiment_name, fold_id)
+        for exp_name, fold_id in groups
+        if exp_name.startswith(STUDY_EXPERIMENT_PREFIX)
+    } - set(groups)
+    added = sorted(group for group in wanted if _group_has_rows(scan, *group))
+    ordered = sorted(
+        [*groups, *added], key=lambda group: (group[0].startswith(STUDY_EXPERIMENT_PREFIX), group)
+    )
+    return ordered, added
+
+
+def _scoring_provenance(
+    *,
+    metrics_provenance: MlflowTags,
+    scan: pt.LazyFrame[PowerForecast],
+    group_scan: pl.LazyFrame,
+    exp_name: str,
+    fold_id: str,
+    evaluation_scope: EvalScopeType,
+    reference_fingerprints: dict[str, str],
+) -> MlflowTags:
+    """Return the tags for one group's fold run: the run's provenance and its row-key fingerprints.
+
+    ``reference_fingerprints`` caches the reference's fingerprint per fold, so the reference is
+    hashed once per fold in a run.
+    """
+    if evaluation_scope != "leaderboard":
+        return metrics_provenance
+    if fold_id not in reference_fingerprints:
+        reference_fingerprints[fold_id] = _reference_fingerprint(scan, fold_id)
+    tags = {
+        **metrics_provenance,
+        **_fingerprint_tags(
+            group_scan=group_scan, reference_fingerprint=reference_fingerprints[fold_id]
+        ),
+    }
+    if exp_name.startswith(STUDY_EXPERIMENT_PREFIX):
+        tags[STALE_TAG] = "false"
+    return tags
+
+
+def _compare_with_reference(
+    *,
+    exp_name: str,
+    fold_id: str,
+    fold_metrics_by_group: dict[tuple[str, str], dict[str, float]],
+) -> None:
+    """Log a just-scored study's score minus the reference's, when the reference was also scored."""
+    reference_metrics = fold_metrics_by_group.get((_cv_config.reference_experiment_name, fold_id))
+    if exp_name.startswith(STUDY_EXPERIMENT_PREFIX) and reference_metrics is not None:
+        _log_paired_difference(
+            exp_name=exp_name,
+            fold_id=fold_id,
+            study_metrics=fold_metrics_by_group[(exp_name, fold_id)],
+            reference_metrics=reference_metrics,
+        )
+
+
+def _read_scoring_inputs(
+    settings: Settings,
+) -> tuple[
+    pt.LazyFrame[PowerTimeSeries], pt.DataFrame[TimeSeriesMetadata], pt.DataFrame[EffectiveCapacity]
+]:
+    """Read the observed power, the metadata table, and the effective capacity that scoring joins.
+
+    Args:
+        settings: Supplies the storage options and the paths of the three inputs.
+
+    Returns:
+        The lazy observed power, the validated metadata table, and the validated effective
+        capacity, in that order.
+
+    Raises:
+        FileNotFoundError: If the ``effective_capacity`` Delta table does not exist.
+    """
+    storage_options = settings.storage_options
+    actuals_lf = scan_cleaned_power(settings.cleaned_power_time_series_data_path, storage_options)
+    # allow_superfluous_columns because the parquet also carries h3_res_5 and other geo columns.
+    metadata_df = TimeSeriesMetadata.validate(
+        pl.read_parquet(settings.metadata_path, storage_options=typeddict_to_dict(storage_options)),
+        allow_superfluous_columns=True,
+    )
+    # The full-history effective capacity is the NMAE denominator (a declared dep of this asset).
+    if not delta_table_exists(settings.effective_capacity_data_path, storage_options):
+        raise FileNotFoundError(
+            f"effective_capacity Delta not found at {settings.effective_capacity_data_path}; "
+            "materialise the effective_capacity asset before running metrics."
+        )
+    capacity_df = EffectiveCapacity.validate(
+        pl.read_delta(
+            settings.effective_capacity_data_path,
+            storage_options=typeddict_to_dict(storage_options),
+        )
+    )
+    return actuals_lf, metadata_df, capacity_df
+
+
+def _log_parent_aggregates(
+    experiment_fold_metrics: dict[str, dict[str, list[float]]], metrics_provenance: MlflowTags
+) -> None:
+    """Log each experiment's mean-across-folds metrics to its MLflow parent run."""
+    for exp_name, fold_metrics in experiment_fold_metrics.items():
+        experiment_id = get_or_create_experiment(exp_name)
+        parent_run_id = get_or_create_parent_run(experiment_id)
+        parent_metric_dict = {k: sum(v) / len(v) for k, v in fold_metrics.items()}
+        with mlflow.start_run(run_id=parent_run_id):
+            mlflow.set_tags(metrics_provenance)
+            mlflow.log_metrics(parent_metric_dict)
+
+
 def _series_ids_in_group(group_scan: pl.LazyFrame) -> list[int]:
     """Return the sorted ``time_series_id`` values present in one forecast group.
 
@@ -813,6 +1166,7 @@ def _score_forecast_group(
     actuals_lf: pt.LazyFrame[PowerTimeSeries],
     metadata_df: pt.DataFrame[TimeSeriesMetadata],
     capacity_df: pt.DataFrame[EffectiveCapacity],
+    window: _EvalWindow,
     evaluation_scope: EvalScopeType,
     metrics_path: str,
     now: datetime,
@@ -846,6 +1200,7 @@ def _score_forecast_group(
         metadata_df: Substation metadata used to join ``time_series_type`` onto each metric row.
         capacity_df: Per-series effective capacity used as the NMAE denominator inside
             ``compute_metrics()``; must cover every scored series.
+        window: The group's evaluation window, from ``_validate_group``; stamped on every row.
         evaluation_scope: ``"leaderboard"`` logs per-fold metrics to MLflow; ``"ad_hoc"``
             skips MLflow entirely.
         metrics_path: Local path or remote URI of the ``forecast_metrics`` Delta table.
@@ -886,9 +1241,6 @@ def _score_forecast_group(
         )
     per_series_metrics = Metrics.validate(pl.concat(batch_metrics), allow_superfluous_columns=True)
 
-    window_start, window_end, window_label = _resolve_eval_window(
-        evaluation_scope, fold_id, group_scan
-    )
     mlflow_run_id: str | None = None
     if evaluation_scope == "leaderboard":
         experiment_id = get_or_create_experiment(exp_name)
@@ -899,9 +1251,9 @@ def _score_forecast_group(
         per_series_metrics,
         exp_name,
         evaluation_scope,
-        window_start,
-        window_end,
-        window_label,
+        window.start,
+        window.end,
+        window.label,
         now,
         mlflow_run_id,
     )
@@ -951,6 +1303,30 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     and has none for them. Use ``evaluation_scope="ad_hoc"`` to score live or dev-fold rows: it
     takes the window from the rows themselves.
 
+    Every group is checked before any group is scored, and each check raises. A window that reaches
+    ``final_test_start`` in the CV config is refused unless ``NGED_FINAL_TEST=1`` is set in the
+    environment of the maintainer's shell; live rows are exempt. In leaderboard scope, every row's
+    ``valid_time`` must lie inside the fold's window.
+
+    Experiments whose name starts with ``study/`` hold forecasts submitted through
+    ``scripts/forecasting/score_study.py``. In leaderboard scope each study experiment must carry
+    exactly the row keys ``(time_series_id, power_fcst_init_time, valid_time, ensemble_member)`` of
+    the CV config's ``reference_experiment_name`` for the same fold, so a study cannot abstain on
+    hard rows or choose its own ensemble members, and a
+    single ``power_fcst_model_name``, so a study cannot down-weight hard rows by spreading rows
+    across model names. A run whose population filter names no ``experiment_name`` skips study
+    experiments, naming them in a warning and in the ``skipped_study_experiments`` output metadata;
+    a run whose population filter names a study's ``experiment_name`` scores that study.
+
+    In leaderboard scope, a run that scores a study also scores the reference experiment's group for
+    the same fold, so the study and the reference share one snapshot of the observed power and of
+    the effective capacity. The study's fold run then holds each score minus the reference's, under
+    the ``vs_reference__`` metric prefix. Every fold run is tagged with ``row_key_fingerprint``, the
+    reference's fingerprint for the fold, and ``row_keys_match_reference``. A reviewed experiment
+    whose row keys differ from the reference's is tagged, not refused. A run that skips studies tags
+    each skipped study's fold run ``stale_against_reference``, ``"true"`` when the reference's
+    fingerprint has changed since the study was scored.
+
     Args:
         context: Dagster execution context; used for logging and ``add_output_metadata``.
         config: Population filter and evaluation scope for this materialisation. Defaults to
@@ -994,6 +1370,20 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     # window to be scored against; skip them rather than fail the whole run on the first one. Ad-hoc
     # scope takes its window from the rows themselves and is the supported way to score live output
     # or dev folds.
+    # `study/` experiments hold forecasts submitted through scripts/forecasting/score_study.py, each
+    # checked against the reference experiment when it is scored. An unfiltered run skips them: a
+    # study goes stale when the reference is re-materialised, and one stale study must not stop the
+    # reviewed experiments being scored. A run that names a study's `experiment_name` scores it.
+    skipped_study_experiments: list[str] = []
+    skipped_study_groups: list[tuple[str, str]] = []
+    if config.population_filter.experiment_name is None:
+        groups, skipped_study_groups = _split_off_studies(groups)
+        skipped_study_experiments = sorted({exp for exp, _ in skipped_study_groups})
+        if skipped_study_experiments:
+            context.log.warning(
+                f"Skipping {skipped_study_experiments} — study experiments are scored only when "
+                "the population filter names their experiment_name."
+            )
     skipped_fold_ids: list[str] = []
     if config.evaluation_scope == "leaderboard":
         configured_fold_ids = set(_cv_config.leaderboard_fold_ids)
@@ -1006,33 +1396,42 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
                 "from the forecast rows themselves."
             )
             groups = [group for group in groups if group[1] in configured_fold_ids]
+            skipped_study_groups = [g for g in skipped_study_groups if g[1] in configured_fold_ids]
+
+    groups, reference_groups_added = _with_reference_groups(
+        groups=groups, scan=scan, evaluation_scope=config.evaluation_scope
+    )
 
     if not groups:
         context.log.warning("No forecasts matched the population filter — nothing to score.")
         context.add_output_metadata(
-            {"n_rows_written": 0, "n_groups": 0, "skipped_fold_ids": str(skipped_fold_ids)}
+            {
+                "n_rows_written": 0,
+                "n_groups": 0,
+                "skipped_fold_ids": str(skipped_fold_ids),
+                "skipped_study_experiments": str(skipped_study_experiments),
+            }
         )
         return
 
-    actuals_lf = scan_cleaned_power(settings.cleaned_power_time_series_data_path, storage_options)
-    # allow_superfluous_columns because the parquet also carries h3_res_5 and other geo columns.
-    metadata_df = TimeSeriesMetadata.validate(
-        pl.read_parquet(settings.metadata_path, storage_options=typeddict_to_dict(storage_options)),
-        allow_superfluous_columns=True,
-    )
+    # Refuse every group the scorer must not score before scoring any, so a refusal never leaves an
+    # earlier group's rows or MLflow runs behind.
+    windows = {
+        (exp_name, fold_id): _validate_group(
+            exp_name=exp_name,
+            fold_id=fold_id,
+            group_scan=_group_scan(
+                scan if (exp_name, fold_id) in reference_groups_added else pruned_scan,
+                exp_name,
+                fold_id,
+            ),
+            scan=scan,
+            evaluation_scope=config.evaluation_scope,
+        )
+        for exp_name, fold_id in groups
+    }
 
-    # The full-history effective capacity is the NMAE denominator (a declared dep of this asset).
-    if not delta_table_exists(settings.effective_capacity_data_path, storage_options):
-        raise FileNotFoundError(
-            f"effective_capacity Delta not found at {settings.effective_capacity_data_path}; "
-            "materialise the effective_capacity asset before running metrics."
-        )
-    capacity_df = EffectiveCapacity.validate(
-        pl.read_delta(
-            settings.effective_capacity_data_path,
-            storage_options=typeddict_to_dict(storage_options),
-        )
-    )
+    actuals_lf, metadata_df, capacity_df = _read_scoring_inputs(settings)
 
     if_local_path_then_make_parent_dir(settings.forecast_metrics_data_path)
     now = datetime.now(UTC)
@@ -1053,35 +1452,56 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     # e.g. {"xgboost_baseline": {"rmse__all": [0.42, 0.39], "rmse__pv": [0.31, 0.28]}}
     # After the loop, each list is averaged and logged to the experiment's MLflow parent run.
     experiment_fold_metrics: dict[str, dict[str, list[float]]] = {}
+    fold_metrics_by_group: dict[tuple[str, str], dict[str, float]] = {}
+    reference_fingerprints: dict[str, str] = {}
 
     for exp_name, fold_id in groups:
+        group_scan = _group_scan(
+            scan if (exp_name, fold_id) in reference_groups_added else pruned_scan,
+            exp_name,
+            fold_id,
+        )
+        group_provenance = _scoring_provenance(
+            metrics_provenance=metrics_provenance,
+            scan=scan,
+            group_scan=group_scan,
+            exp_name=exp_name,
+            fold_id=fold_id,
+            evaluation_scope=config.evaluation_scope,
+            reference_fingerprints=reference_fingerprints,
+        )
         n_rows, fold_metric_dict = _score_forecast_group(
             exp_name,
             fold_id,
-            _group_scan(pruned_scan, exp_name, fold_id),
+            group_scan,
             actuals_lf,
             metadata_df,
             capacity_df,
+            windows[(exp_name, fold_id)],
             config.evaluation_scope,
             settings.forecast_metrics_data_path,
             now,
             storage_options,
-            provenance=metrics_provenance,
+            provenance=group_provenance,
         )
         total_rows += n_rows
         if fold_metric_dict is not None:
-            exp_metrics = experiment_fold_metrics.setdefault(exp_name, {})
-            for key, value in fold_metric_dict.items():
-                exp_metrics.setdefault(key, []).append(value)
+            fold_metrics_by_group[(exp_name, fold_id)] = fold_metric_dict
+            _compare_with_reference(
+                exp_name=exp_name, fold_id=fold_id, fold_metrics_by_group=fold_metrics_by_group
+            )
+            # A reference scored only to be compared with a study leaves its parent run alone: the
+            # parent run averages over the folds of this run, and this run holds one fold.
+            if (exp_name, fold_id) not in reference_groups_added:
+                exp_metrics = experiment_fold_metrics.setdefault(exp_name, {})
+                for key, value in fold_metric_dict.items():
+                    exp_metrics.setdefault(key, []).append(value)
 
     if config.evaluation_scope == "leaderboard":
-        for exp_name, fold_metrics in experiment_fold_metrics.items():
-            experiment_id = get_or_create_experiment(exp_name)
-            parent_run_id = get_or_create_parent_run(experiment_id)
-            parent_metric_dict = {k: sum(v) / len(v) for k, v in fold_metrics.items()}
-            with mlflow.start_run(run_id=parent_run_id):
-                mlflow.set_tags(metrics_provenance)
-                mlflow.log_metrics(parent_metric_dict)
+        _log_parent_aggregates(experiment_fold_metrics, metrics_provenance)
+
+    if config.evaluation_scope == "leaderboard":
+        _tag_stale_studies(skipped_groups=skipped_study_groups, scan=scan)
 
     context.add_output_metadata(
         {
@@ -1090,5 +1510,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             "evaluation_scope": config.evaluation_scope,
             "groups": str(groups),
             "skipped_fold_ids": str(skipped_fold_ids),
+            "skipped_study_experiments": str(skipped_study_experiments),
+            "reference_groups_added": str(reference_groups_added),
         }
     )

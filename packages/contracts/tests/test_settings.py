@@ -43,6 +43,9 @@ def test_paths_derive_from_data_root():
         == "/srv/data/NGED/cleaned_power_time_series.delta"
     )
     assert settings.metadata_path == "/srv/data/NGED/metadata.parquet"
+    assert (
+        settings.list_of_downloaded_files_path == "/srv/data/NGED/list_of_downloaded_files.parquet"
+    )
     assert settings.h3_grid_weights_path == "/srv/data/h3_grid_weights.parquet"
 
 
@@ -77,7 +80,10 @@ def test_delivery_fields_are_exactly_the_known_delivery_tables():
     managed_data_table_fields = {
         name
         for name in Settings.model_fields
-        if (name.endswith("_data_path") or name in {"metadata_path", "h3_grid_weights_path"})
+        if (
+            name.endswith("_data_path")
+            or name in {"metadata_path", "list_of_downloaded_files_path", "h3_grid_weights_path"}
+        )
         and name not in local_artifact_fields
     }
     for field_name in managed_data_table_fields:

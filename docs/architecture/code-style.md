@@ -61,8 +61,8 @@ gets read before any Python is written or edited. Change a rule here and nowhere
       typed, so spend the extra words. Check each word in a name against the other meanings this
       project already gives it: "grid" can mean the H3 cells, gridded weather data, or a set of
       forecast rows; "model" can mean a weather model, an XGBoost model, or a Patito model; "run"
-      can mean an NWP run or a Dagster run. `PowerLagsPerNwpRunFeatureEngineer` is the right shape
-      of name, and `GridEngineer` is not.
+      can mean an NWP run or a Dagster run. `NwpRunRowsWithoutWeatherFeatureEngineer` is the right
+      shape of name, and `GridEngineer` is not.
 
 ## Type hints and signatures
 
@@ -333,8 +333,8 @@ after the confusing failure:
 - **Every forecasting model subclasses `BaseForecaster`** (`packages/ml_core`), which fixes `train`
   / `predict` / `save` / `load` and carries a `feature_engineer` strategy object. A model that needs
   a different view of the data supplies a different `FeatureEngineer` rather than changing the
-  shared feature pipeline. `XGBoostForecaster` and `ManualHeuristicForecaster` are the
-  implementations so far.
+  shared feature pipeline. `XGBoostForecaster`, `ManualHeuristicForecaster`, and
+  `ClimatologyForecaster` are the implementations so far.
 - **Use MLflow for experiment tracking.**
 - **Choosing an optimisation tool: convex estimation subproblems → CVXPY; learning shapes, or
   anything needing posteriors → PyTorch.** "Non-convex" comes in grades, and the grade decides the

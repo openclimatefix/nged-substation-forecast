@@ -92,11 +92,11 @@ $$ \mathrm{MBE} = \frac{1}{T} \sum_t \left( \bar{x}_t - y_t \right) $$
 ## Probabilistic metrics
 
 These probabilistic metrics score the ensemble **before** the mean collapse, which is why we pay 51×
-inference cost. A recurring caveat: of everything below, **only CRPS is fair across ensemble sizes**
-— PICP, pinball loss, interval width, and (residually) the spread-skill ratio all shift with the
-member count $m$, because empirical quantiles from few members are systematically too narrow. When
-comparing models with different ensemble sizes (e.g. the 51-member ML models against
-`manual_heuristic`'s 13 historical analogues), lean on CRPS.
+inference cost. A recurring caveat: of everything below, **only CRPS is fair across ensemble sizes,
+for members drawn at random from one forecaster's belief** — PICP, pinball loss, interval width, and
+(residually) the spread-skill ratio all shift with the member count $m$, because empirical quantiles
+from few members are systematically too narrow. When comparing models with different ensemble sizes
+(e.g. the 51-member ML models against `manual_heuristic`'s 13 historical analogues), lean on CRPS.
 
 ### CRPS (continuous ranked probability score)
 
@@ -255,7 +255,10 @@ roughly ±0.005 depending on the forecast distribution's shape; the central band
 
 PICP alone is also **gameable**: an absurdly wide band hits any coverage target for free. It must
 always be read alongside a sharpness measure — which is what interval width is for (and the proper
-scores, CRPS and pinball, punish over-widening automatically).
+scores, CRPS and pinball, punish over-widening automatically when the members are drawn at random).
+A submitter who chooses both the member count and the member values can drive fair CRPS to zero,
+with two members either side of the observation. The leaderboard scorer therefore requires a study
+to carry the reference's ensemble-member labels, which fixes the member count.
 
 ### Interval width
 

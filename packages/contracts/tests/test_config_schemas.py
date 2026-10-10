@@ -10,6 +10,9 @@ from contracts.config_schemas import (
 )
 from contracts.settings import PROJECT_ROOT
 
+_FINAL_TEST_START = date(2030, 1, 1)
+_REFERENCE_EXPERIMENT_NAME = "reference"
+
 
 def _two_fold_config() -> CvConfig:
     return CvConfig(
@@ -28,7 +31,9 @@ def _two_fold_config() -> CvConfig:
                 val_start=date(2023, 1, 1),
                 val_end=date(2023, 12, 31),
             ),
-        ]
+        ],
+        final_test_start=_FINAL_TEST_START,
+        reference_experiment_name=_REFERENCE_EXPERIMENT_NAME,
     )
 
 
@@ -61,7 +66,9 @@ def test_cv_config_valid():
                 val_start=date(2023, 1, 1),
                 val_end=date(2023, 12, 31),
             ),
-        ]
+        ],
+        final_test_start=_FINAL_TEST_START,
+        reference_experiment_name=_REFERENCE_EXPERIMENT_NAME,
     )
     assert len(config.folds) == 2
     assert config.min_training_months == 6
@@ -79,6 +86,8 @@ def test_cv_config_custom_min_training_months():
             )
         ],
         min_training_months=3,
+        final_test_start=_FINAL_TEST_START,
+        reference_experiment_name=_REFERENCE_EXPERIMENT_NAME,
     )
     assert config.min_training_months == 3
 
@@ -128,7 +137,9 @@ def test_cv_config_leaderboard_fold_ids_excludes_dev_folds():
                 val_start=date(2022, 1, 1),
                 val_end=date(2022, 1, 31),
             ),
-        ]
+        ],
+        final_test_start=_FINAL_TEST_START,
+        reference_experiment_name=_REFERENCE_EXPERIMENT_NAME,
     )
     assert config.fold_ids == ["2022", "smoke_test"]
     assert config.leaderboard_fold_ids == ["2022"]
@@ -168,7 +179,11 @@ def test_class_target_and_import_class_round_trip():
 
 def test_class_target_accepts_an_instance():
     """An instance names its class, so a resolved config object can be tagged directly."""
-    config = CvConfig(folds=[])
+    config = CvConfig(
+        folds=[],
+        final_test_start=_FINAL_TEST_START,
+        reference_experiment_name=_REFERENCE_EXPERIMENT_NAME,
+    )
 
     assert class_target(config) == class_target(CvConfig)
 
@@ -217,3 +232,48 @@ def test_import_class_rejects_a_missing_attribute():
 def test_import_class_rejects_a_non_class_attribute():
     with pytest.raises(ValueError, match="is not a class"):
         import_class("contracts.config_schemas.load_cv_config")
+
+
+def test_cv_config_rejects_a_final_test_start_inside_a_leaderboard_fold() -> None:
+    fold = CvFoldConfig(
+        fold_id="2022",
+        train_start=date(2020, 1, 1),
+        train_end=date(2021, 12, 31),
+        val_start=date(2022, 1, 1),
+        val_end=date(2022, 12, 31),
+    )
+
+    with pytest.raises(ValueError, match="must be later than the val_end"):
+        CvConfig(
+            folds=[fold],
+            final_test_start=date(2022, 12, 31),
+            reference_experiment_name=_REFERENCE_EXPERIMENT_NAME,
+        )
+
+
+def test_cv_config_allows_a_dev_fold_to_end_after_final_test_start() -> None:
+    dev_fold = CvFoldConfig(
+        fold_id="smoke_test",
+        leaderboard=False,
+        train_start=date(2020, 1, 1),
+        train_end=date(2021, 12, 31),
+        val_start=date(2022, 1, 1),
+        val_end=date(2022, 12, 31),
+    )
+
+    config = CvConfig(
+        folds=[dev_fold],
+        final_test_start=date(2022, 1, 1),
+        reference_experiment_name=_REFERENCE_EXPERIMENT_NAME,
+    )
+
+    assert config.final_test_start == date(2022, 1, 1)
+
+
+def test_cv_config_rejects_a_study_as_the_reference_experiment() -> None:
+    with pytest.raises(ValueError, match="must not start with"):
+        CvConfig(
+            folds=[],
+            final_test_start=_FINAL_TEST_START,
+            reference_experiment_name="study/anything",
+        )

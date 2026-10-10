@@ -146,3 +146,14 @@ def test_list_promotable_runs_orders_before_limiting(
     monkeypatch.setattr(MlflowClient, "search_runs", search_one_run)
 
     assert [run.run_id for run in list_promotable_runs()] == [older.info.run_id]
+
+
+def test_list_promotable_runs_omits_study_experiments(mlflow_tracking: None) -> None:
+    reviewed = get_or_create_experiment("reviewed_experiment")
+    reviewed_fold = get_or_create_fold_run(reviewed, get_or_create_parent_run(reviewed), "2022")
+    study = get_or_create_experiment("study/some_study")
+    get_or_create_fold_run(study, get_or_create_parent_run(study), "2022")
+
+    runs = list_promotable_runs()
+
+    assert [run.run_id for run in runs] == [reviewed_fold]

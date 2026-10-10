@@ -75,6 +75,26 @@ so it loses its leading underscore on the way. A script never mutates `sys.path`
 another script by path. No two scripts under `studies/` share a basename, because every study folder
 is on pytest's path. `packages/studies/tests/test_study_boundaries.py` enforces all of this.
 
+**A study's leaderboard number comes only from `scripts/forecasting/score_study.py`.** Run the
+script on the study's predictions file (a parquet file of `PowerForecast` rows) and quote the number
+from the `forecast_metrics` row that the `metrics` asset writes under the experiment name
+`study/<study name>`. Never quote a leaderboard skill number computed by the study's own scoring
+code. The script logs every attempt, refused ones included. Do not retry a submission to find a
+lucky score, because each attempt raises the `study_submission_number` that the next scored fold run
+carries. Quote an absolute skill number from a `forecast_metrics` row. Quote a skill number against
+the reference from the `vs_reference__` metrics on the study's MLflow fold run, which the `metrics`
+asset computes in the same run as the reference's own scores. Never edit the scorer files in a
+study: `packages/ml_core/src/ml_core/metrics.py`, `packages/ml_core/src/ml_core/cv_helpers.py`,
+`src/nged_substation_forecast/defs/cv_assets.py`, `scripts/forecasting/score_study.py`, and
+`conf/cv/`. The script refuses a file whose row keys differ from the reference experiment's for the
+fold, so the file must hold exactly the reference's series, initialisation times, valid times, and
+ensemble members, with none missing and none extra. Read observed power through
+`studies.power.scan_power`, which stops at `final_test_start` and so includes the whole validation
+year. The `metrics` asset refuses to score a window that reaches that date unless the maintainer
+sets `NGED_FINAL_TEST=1`. The script checks which rows the file holds, not how the forecast was
+made. The study itself must therefore fit only on observations up to the fold's `train_end`, and use
+observations after `train_end` only as lags earlier than each forecast's initialisation time.
+
 **A study script is not unit-tested as a whole, so its check is its own output.** Every table the
 page quotes is printed by a committed script into a `report.md`, never transcribed by hand, and
 every number on the page is checked against that report. A number from a diagnostic run during
@@ -322,9 +342,11 @@ sets out the rule and the products the rule covers.
 
 ## Charts
 
-**A study page is mostly figures: the figures carry the argument, and the text only explains
-them.** The maintainer asked for this directly. Both the page's concept and its vertical space
-belong largely to the figures, so a reader who scrolls past the text still follows the story. The
+**A study page is figure-led: the figures carry the whole story, and the text only explains
+them.** The maintainer asked for this form on 2026-10-10 for every study. The first figure is
+visible without scrolling, when a reader lands on the page. Prose is limited to a bolded lead and a
+caption for each figure, plus the few sentences a figure cannot carry. A reader who looks only at
+the figures and their bolded leads follows the study from the question to the answer. The
 figures are mostly time series, with scatter plots, distributions, and other data graphics where
 they show the point better. They step the reader through the processing, in the order the method
 runs, so that the reader understands the problem, the method, and why the method works by looking.
@@ -341,7 +363,7 @@ plenty of charts in every study page, because many technical readers look at the
 reading any text. Each chart, with its title, subtitle, axis labels, and legend, tells its part of
 the story without the prose around it.
 
-- **A headline chart opens every page**, directly under the summary and before the disclaimer,
+- **A headline chart opens every page**, directly under the bottom line and before the disclaimer,
   showing the headline result with its 95% intervals. Every section whose claim rests on a number
   gets a chart too.
 - **Where a study ranks products, Figure 1 is a leaderboard.** The leaderboard shows each
@@ -394,22 +416,23 @@ Every study page follows the structure of an academic paper, in this order:
 
 1. **Title.** An `h1` that states the finding, scoped to the products tested. A page that ranks
    products in answer to a question may instead title itself with that question.
-2. **Summary.** A one-paragraph **bottom line** directly under the title, in plain words: a bold
-   sentence stating the answer to the study's main question, then one or two sentences on what
-   would change the answer and what the study did not test. Then come the question-and-answer
-   bullets described below, the headline figure (the leaderboard and then the paired contrasts,
-   where the study ranks products), and scoped take-home bullets, one per use of the data. The
-   Summary bullets are the only place a recommendation appears without its evidence.
+2. **Summary.** A **bottom line** of at most two sentences directly under the title, in plain
+   words: a bold sentence stating the answer to the study's main question, then one sentence on
+   what would change the answer or what the study did not test. **The headline figure follows the
+   bottom line at once, so that it is visible above the fold, without scrolling, when a reader
+   lands on the page.** Where the study ranks products, the headline figure is the leaderboard
+   or the paired contrasts. The question-and-answer bullets described below come after the
+   figure, followed by scoped take-home bullets, one per use of the data. The Summary bullets are
+   the only place a recommendation appears without its evidence.
 
-   **The Summary opens by answering each question the study asks, in plain words.** Write one short
-   bolded bullet per question, such as "Can an unmetered battery be identified?", with the answer
-   on the same line ("Mostly no, apart from simulated cases"). Under each question, give three to
-   six bullets of the findings that support the answer. Each finding names what was tested, the
-   number with its scope, and the baseline it was compared with. A reader who knows none of the
-   study's terms must be able to follow the Summary. Define each term at first use, or leave the
-   term out. Label every provisional number "(provisional)". Close the question-and-answer bullets
-   with one bullet saying what the data and methods used can and cannot support, before the
-   headline figure.
+   **The Summary answers each question the study asks, in plain words and in at most two sentences
+   per question.** Write one short bolded bullet per question, such as "Can an unmetered battery be
+   identified?", with the answer on the same line ("Mostly no, apart from simulated cases"). Under
+   each answer, name what was tested, the number with its scope, the baseline it was compared
+   with, and the figure that shows it. A reader who knows none of the study's terms
+   must be able to follow the Summary. Define each term at first use, or leave the term out. Label
+   every provisional number "(provisional)". Close the question-and-answer bullets with one bullet
+   saying what the data and methods used can and cannot support.
 
 3. **The AI disclaimer** (below).
 4. **Key findings.** The finer conclusions, one bolded sentence each, each linking to its results
@@ -560,7 +583,10 @@ with the page's chart renders:
   page.
 - **The evidence:** a reviewer who checks every number, every "beats", every "best", every causal
   "because", and every chart title against the report and the saved losses, computing what the
-  report does not print.
+  report does not print. Where the page quotes a leaderboard skill number, the reviewer also checks
+  that the number traces to a `forecast_metrics` row that the `metrics` asset wrote for a
+  `scripts/forecasting/score_study.py` submission, and that the study's training data ended at the
+  fold's `train_end`.
 
 The personas earn their place. On the two weather-product pages, the builder reviewers found that
 ICON global's wind steps look like an artefact of how the archive serves its grid cells rather than
