@@ -116,15 +116,15 @@ SHORTLIST_CANDIDATES: Final[tuple[str, ...]] = (
     "CK",
     "TF",
     "AN",
+    "PC",
     "S3",
     "RP",
     "KS",
 )
 """**The shortlist rule, fixed before any fit:** X is the candidate with the lowest phase-1 mean
 absolute error over `SCREENING_MONTHS`. The excluded arms are B0, L1, L2, S2, N1 and N2 (phase 2
-carries those regardless), T1 (an interpolation bound), PC (study-only, so a win could not ship),
-the references and post-model corrections (none is fitted), and the global-only arms. Phase 2
-carries X."""
+carries those regardless), T1 (an interpolation bound), the references and post-model corrections
+(none is fitted), and the global-only arms. Phase 2 carries X."""
 
 WIDE_X_COLUMNS: Final[int] = 3
 """If X adds more columns than this, N2-k is fitted with as many random lags as X adds."""

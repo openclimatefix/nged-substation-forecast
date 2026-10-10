@@ -693,6 +693,7 @@ def exploratory_lines(*, losses: pl.DataFrame, chosen: str) -> list[str]:
 
     Args:
         losses: The combined losses.
+        chosen: The shortlist rule's arm, compared with N2-k where N2-k was fitted.
 
     Returns:
         The report lines.
@@ -1089,7 +1090,11 @@ def report_text(*, root: Path, product: WeatherProduct) -> str:
             coverage_table.write_parquet(tables / "coverage.parquet")
         lines += ["## Phase 1: the sweep, screening months 2024-12 to 2025-12", "", *phase1]
         lines += ["", "## Phase 2: the five planned contrasts", "", *planned]
-        lines += ["## Exploratory contrasts at lead-day 1", "", *exploratory_lines(losses=losses, chosen=chosen)]
+        lines += [
+            "## Exploratory contrasts at lead-day 1",
+            "",
+            *exploratory_lines(losses=losses, chosen=chosen),
+        ]
         lines += ["## Absolute errors over all months", ""]
         for setting in ("primary", "sensitivity"):
             lines += absolute_lines(

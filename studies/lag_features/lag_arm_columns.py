@@ -15,8 +15,9 @@ column read the record, and each has its own guard in `window_anchor_lines`:
 - **The issue morning** (`issue_morning`) reads the hours of the issue day that end at or before
   09:00 UTC, which is the issue time itself.
 
-**The CAMS satellite irradiance arm (PC) is study-only.** The live service does not ingest CAMS, and
-the study assumes CAMS publishes two days late, so PC's windows start two whole days back.
+**The CAMS satellite irradiance arm (PC) is study-only unless it wins.** The live service does not
+ingest CAMS. The study assumes CAMS publishes two days late, so PC's windows start two whole days
+back (the CAMS documentation says up to 2 days; see the README).
 """
 
 from typing import Final, NamedTuple
