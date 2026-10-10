@@ -751,7 +751,8 @@ def window_anchor_lines(
         if not gap.is_empty():
             _require(name="IM", lead_day=lead_day, smallest=gap.min())
             lines.append(
-                f"| `im_energy`, `im_ratio`, `im_hours` | the issue day's hours to 09:00 UTC | {gap.min()} |"
+                "| `im_energy`, `im_ratio`, `im_hours` | the issue day's hours to 09:00 UTC | "
+                f"{gap.min()} |"
             )
     return [
         (
