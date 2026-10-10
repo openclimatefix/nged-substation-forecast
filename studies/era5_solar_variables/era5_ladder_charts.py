@@ -816,7 +816,7 @@ def figure_importance(*, shares: pl.DataFrame, target: TargetType, scope: str) -
     return figure(
         panels=panels,
         number=12 if target == "pv" else "12b",
-        title=f"What the XGBoost models used, {PANEL_TITLES[target]}",
+        title=f"XGBoost importance of the full set, {TARGET_NAMES[target]}",
         subtitle=[
             scope,
             "Each XGBoost model was refitted on different blocks of months and with different",
@@ -1071,7 +1071,7 @@ def figure_where_ssrd_misses(
                 scale=alt.Scale(domain=DAY_HOUR_DOMAIN),
                 axis=alt.Axis(values=HOUR_TICKS),
             ),
-            y=alt.Y("gap:Q", title="ERA5 downward solar radiation minus CAMS irradiance (W m⁻²)"),
+            y=alt.Y("gap:Q", title="ERA5 minus CAMS (W m⁻²)"),
         ),
         days=days,
     )
@@ -1100,7 +1100,7 @@ def figure_where_ssrd_misses(
             )
             .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X("x:Q", title=None, scale=alt.Scale(zero=False)),
-                y=alt.Y("mean_gap:Q", title="ERA5 solar radiation minus CAMS (W m⁻²)"),
+                y=alt.Y("mean_gap:Q", title="Gap (W m⁻²)"),
             )
             .properties(width=PLOT_WIDTH_PX // 2 - 40, height=110)
             .facet(
@@ -1121,8 +1121,9 @@ def figure_where_ssrd_misses(
             CLEAR_SKY_INDEX_KEY,
             (
                 "Bottom: hours sorted by the variable named above each panel and split into ten "
-                "groups of equal numbers of hours. Each dot is one group's mean gap."
+                "groups of equal numbers of hours."
             ),
+            "Each dot is one group's mean gap (ERA5's solar radiation minus CAMS's irradiance).",
         ],
         figure_planning=None,
     )
@@ -1173,7 +1174,7 @@ def figure_cloud_water(*, dataset: pl.DataFrame, scope: str) -> alt.TopLevelMixi
                 "water:Q",
                 title="ERA5 cloud liquid plus ice water (kg m⁻²)",
                 scale=alt.Scale(type="symlog", constant=0.01),
-                axis=alt.Axis(values=[0, 0.01, 0.03, 0.1, 0.3, 1]),
+                axis=alt.Axis(values=[0, 0.01, 0.03, 0.1, 0.3, 1], format=".2~f"),
             ),
             y=alt.Y("mean_index:Q", title="CAMS clearness index"),
             color=alt.Color(
@@ -1585,7 +1586,7 @@ def figure_reliability(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMixin |
             .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X("level:Q", title="Quantile level aimed at"),
                 y=alt.Y("value:Q", title="Share of outcomes below that quantile"),
-                color=alt.Color("arm:N", title=None),
+                color=alt.Color("arm:N", title=None, legend=alt.Legend(labelLimit=320)),
             )
         )
         panels.append(
@@ -1666,7 +1667,9 @@ def figure_coverage_and_width(*, rows: pl.DataFrame, scope: str) -> alt.TopLevel
                 base.mark_point(filled=True, size=80, aria=False).encode(  # ty: ignore[unresolved-attribute]
                     x=alt.X("width:Q"),
                     y=alt.Y("coverage:Q"),
-                    color=alt.Color("arm:N", title="Variable set"),
+                    color=alt.Color(
+                        "arm:N", title="Variable set", legend=alt.Legend(labelLimit=320)
+                    ),
                 ),
             ).properties(width=PLOT_WIDTH_PX, height=220, title=_title(PANEL_TITLES[target]))
         )
@@ -1872,7 +1875,7 @@ def main() -> int:
                 8,
                 "regime_era5",
                 SKY_REGIMES,
-                "Contrasts by sky regime, from ERA5 total cloud cover",
+                "Change in error by sky regime from ERA5's total cloud cover",
                 era5_note,
                 "regimes",
             ),
@@ -1880,16 +1883,16 @@ def main() -> int:
                 "8b",
                 "regime_cams",
                 SKY_REGIMES,
-                "Contrasts by sky regime, from the CAMS clear-sky index",
+                "Change in error by sky regime from CAMS's clear-sky index",
                 cams_note,
                 "regimes_cams",
             ),
-            (9, "season", SEASONS, "Contrasts by season", None, "seasons"),
+            (9, "season", SEASONS, "Change in error by season", None, "seasons"),
             (
                 "9b",
                 "regime_cams_by_season",
                 seasons_by_regime,
-                "Contrasts by season and sky regime",
+                "Change in error by season and sky regime",
                 cams_note,
                 "regimes_by_season",
             ),

@@ -28,10 +28,11 @@ result calls for.
 | `era5_ladder_report.py` | Reads the saved losses and writes `report.md` and the interval tables, each named for the variant and the highest rung |
 | `era5_ladder_charts.py` | Draws the page's figures into `docs/studies/assets/` |
 
-The ERA5 variables come from Google's ARCO-ERA5 copy through
-`studies/weather_downloads/fetch_era5_solar_arco.py` (`fetch_era5_solar_variables.py` fetches the
-same variables from the Climate Data Store, and `validate_era5_solar_variables.py` compares the
-two), and the aerosol from `fetch_cams_eac4_aod.py`. The tested machinery is `studies.era5_ladder` and
+The ERA5 variables come from two sources. `studies/weather_downloads/fetch_era5_solar_variables.py
+--tier tier1a` fetches the cloud covers from the Climate Data Store, and
+`studies/weather_downloads/fetch_era5_solar_arco.py --tier tier1b`, `--tier tier2`, and `--tier
+tier3` fetch the other variables from Google's ARCO-ERA5 copy. `validate_era5_solar_variables.py`
+checks the Climate Data Store tables. The aerosol comes from `fetch_cams_eac4_aod.py`. The tested machinery is `studies.era5_ladder` and
 `studies.correlation`.
 
 ## The arms

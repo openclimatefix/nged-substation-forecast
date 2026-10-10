@@ -13,6 +13,7 @@ Run commands (from `studies/weather_downloads/`):
     uv run --with zarr --with gcsfs python fetch_era5_solar_arco.py --check-month 2025-06
     uv run --with zarr --with gcsfs python fetch_era5_solar_arco.py --tier tier1b
     uv run --with zarr --with gcsfs python fetch_era5_solar_arco.py --tier tier2
+    uv run --with zarr --with gcsfs python fetch_era5_solar_arco.py --tier tier3
 """
 
 import argparse

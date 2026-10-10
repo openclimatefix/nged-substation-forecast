@@ -160,7 +160,7 @@ ARM_LABELS: Final[dict[str, str]] = {
     "g9_aerosol_rows": "G9 on aerosol rows",
     NEGATIVE_CONTROL_ARM: "Negative control",
     POSITIVE_CONTROL_ARM: "Positive control (+ CAMS)",
-    KNOWN_ANSWER_ARM: "Solar radiation and sun position only",
+    KNOWN_ANSWER_ARM: "Solar radiation, sun only",
     **{
         f"{DROP_PREFIX}{rung}": f"G9 without the variables {rung.upper()} adds"
         for rung in RUNGS[1:]

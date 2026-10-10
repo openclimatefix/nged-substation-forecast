@@ -75,16 +75,28 @@ from era5_ladder_arms import (
 )
 from studies.bootstrap import (
     MIN_MONTHS_FOR_INTERVAL,
+    N_BOOTSTRAP_RESAMPLES,
     BootstrapInterval,
     bootstrap_absolute,
     bootstrap_difference,
     bootstrap_difference_at_level,
 )
 from studies.correlation import pooled_correlation_interval
-from studies.cross_validation import QUANTILE_LEVELS
+from studies.cross_validation import (
+    N_FOLDS,
+    PRIMARY_HYPER_PARAMETERS,
+    QUANTILE_LEVELS,
+    SEEDS,
+    SENSITIVITY_HYPER_PARAMETERS,
+)
 from studies.era5_ladder import (
+    AEROSOL_COLUMNS,
     AEROSOL_CONDITIONS,
     CLEAR_SKY_INDEX_THRESHOLDS,
+    MARS_ONLY_VARIABLES,
+    MIN_AEROSOL_DAYS,
+    MIN_AEROSOL_MONTHS,
+    MIN_EXTRATERRESTRIAL_W_M2,
     RUNGS,
     RungType,
     aerosol_condition_flags,
@@ -1531,6 +1543,97 @@ def render_aerosol_conditions(*, conditions: pl.DataFrame) -> str:
     )
 
 
+def render_settings(
+    *,
+    contrasts: pl.DataFrame,
+    arms_json: dict[TargetType, dict[str, object]],
+    dataset: pl.DataFrame,
+) -> str:
+    """Render the settings and the derived numbers that the page quotes, as markdown.
+
+    Args:
+        contrasts: The contrast table.
+        arms_json: Each target's arms and their columns.
+        dataset: The kept rows.
+
+    Returns:
+        The markdown, with one bullet per setting or derived number.
+    """
+    pv_arms: dict[str, list[str]] = arms_json["pv"]["arms"]  # ty: ignore[invalid-assignment]
+    smallest_pv = SMALLEST_EFFECT["pv"] * PERCENTAGE_POINTS
+    extra_columns = len(pv_arms[NEGATIVE_CONTROL_ARM]) - len(pv_arms["g2"])
+    lines = [
+        f"- Hyperparameters, main setting: {dict(PRIMARY_HYPER_PARAMETERS)}.",
+        f"- Hyperparameters, second setting: {dict(SENSITIVITY_HYPER_PARAMETERS)}.",
+        "- Both settings use `colsample_bytree=1`, which the code leaves unset.",
+        f"- Folds per farm: {N_FOLDS} contiguous blocks of whole months. Seeds: {len(SEEDS)}.",
+        (
+            f"- Resamples: {PLANNED_RESAMPLES:,} for planned contrasts, "
+            f"{N_BOOTSTRAP_RESAMPLES:,} for the others, each drawing one seed and whole months."
+        ),
+        (
+            "- Daylight hours need a top-of-atmosphere horizontal flux above "
+            f"{MIN_EXTRATERRESTRIAL_W_M2:g} W m⁻²."
+        ),
+        (
+            "- Effective capacity is the 99th percentile of a farm's metered output "
+            "(`studies.pv_dataset`)."
+        ),
+        (
+            f"- Smallest effects: {smallest_pv:g} points of capacity on output, "
+            f"{SMALLEST_EFFECT['cams']:g} on the clearness index."
+        ),
+        (
+            "- Near-the-line rule for a second-setting run: a bound of the 95% interval within "
+            f"{NEAR_LINE_SHARE:g} of the interval's width from zero."
+        ),
+        (
+            f"- Aerosol reading rule: at least {MIN_AEROSOL_DAYS} days in {MIN_AEROSOL_MONTHS} "
+            f"months, and an interval wholly below minus {smallest_pv:g} points at both settings."
+        ),
+        f"- MARS-only variables ({len(MARS_ONLY_VARIABLES)}): {', '.join(MARS_ONLY_VARIABLES)}.",
+        (
+            f"- Columns: `g0` {len(pv_arms['g0'])}, `g2` {len(pv_arms['g2'])}, `g9` "
+            f"{len(pv_arms['g9'])}, negative control {len(pv_arms[NEGATIVE_CONTROL_ARM])}, so the "
+            f"negative control adds {extra_columns} shuffled columns to `g2`."
+        ),
+        (
+            f"- Rows: {dataset.height:,}, from {dataset['time'].min():%B %Y} to "
+            f"{dataset['time'].max():%B %Y}."
+        ),
+    ]
+    if AEROSOL_COLUMNS[0] in dataset.columns:
+        covered = dataset.filter(pl.col(AEROSOL_COLUMNS[0]).is_not_null())
+        lines.append(
+            f"- Rows with CAMS aerosol: {covered.height:,}, from {covered['time'].min():%B %Y} to "
+            f"{covered['time'].max():%B %Y}."
+        )
+    primary = contrasts.filter(
+        (pl.col("target") == "pv") & (pl.col("setting") == PRIMARY_SETTING)
+    ).with_columns(key=pl.format("{}-{}", pl.col("treatment"), pl.col("reference")))
+    difference = dict(zip(primary["key"].to_list(), primary["difference"].to_list(), strict=True))
+    needed = ("g9-g0", "g2-g0", "g1-g0", "g2-g1", "g4-g3", "g4-g0")
+    if all(name in difference for name in needed):
+        total = difference["g9-g0"]
+        cloud_steps = difference["g1-g0"] + difference["g2-g1"] + difference["g4-g3"]
+        lines += [
+            (
+                "- Share of the full set's gain from total and layered cloud cover (`g2` minus "
+                f"`g0`): {difference['g2-g0'] / total * PERCENTAGE_POINTS:.0f}%."
+            ),
+            (
+                "- Share from the G1, G2, and G4 steps together: "
+                f"{cloud_steps / total * PERCENTAGE_POINTS:.0f}% ({-cloud_steps:.2f} of "
+                f"{-total:.2f} points). The G3 step is left out."
+            ),
+            (
+                "- Share of the gain at `g4` (`g4` minus `g0`): "
+                f"{difference['g4-g0'] / total * PERCENTAGE_POINTS:.0f}%."
+            ),
+        ]
+    return "\n".join(lines)
+
+
 def render_report(
     *,
     variant: str,
@@ -1544,6 +1647,7 @@ def render_report(
     aerosol_conditions: pl.DataFrame,
     probabilistic: pl.DataFrame,
     splits: pl.DataFrame,
+    dataset: pl.DataFrame,
 ) -> str:
     """Assemble the report text."""
     parts = [
@@ -1570,6 +1674,12 @@ def render_report(
             for arm, columns in info["arms"].items()  # ty: ignore[unresolved-attribute]
         )
         parts.append("")
+    parts += [
+        "## Settings and derived numbers the page quotes",
+        "",
+        render_settings(contrasts=contrasts, arms_json=arms_json, dataset=dataset),
+        "",
+    ]
     near = near_line_without_second_setting(contrasts=contrasts)
     if not near.is_empty():
         second = contrasts.filter(pl.col("setting") == SENSITIVITY_SETTING)
@@ -1787,6 +1897,7 @@ def main() -> int:
         aerosol_conditions=aerosol_conditions,
         probabilistic=probabilistic,
         splits=splits,
+        dataset=dataset,
     )
     paths.report.write_text(report)
     _LOG.info("wrote %s", paths.report)
