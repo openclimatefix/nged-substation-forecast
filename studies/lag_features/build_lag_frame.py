@@ -268,6 +268,7 @@ FRAME_KEY_COLUMNS: Final[tuple[str, ...]] = (
     "cap_mw",
     "constrained",
     "effective_capacity_mw",
+    "clear_sky_w_m2",
 )
 """The columns every frame carries besides the arms' features."""
 

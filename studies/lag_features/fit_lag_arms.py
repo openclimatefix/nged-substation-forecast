@@ -38,6 +38,7 @@ Run it with `uv run python studies/lag_features/fit_lag_arms.py`.
 """
 
 import argparse
+import concurrent.futures
 import json
 import logging
 import sys
@@ -79,6 +80,7 @@ from studies.cross_validation import (
     DeviceType,
     HyperParameters,
     calendar_month_coverage,
+    clamp_to_cap,
     cut_eras,
     fit_one_fold,
     out_of_fold_losses,
@@ -434,6 +436,94 @@ def fit_arm(
     return annotated
 
 
+INTERVAL_ARMS: Final[tuple[str, ...]] = ("B0", "L1")
+"""The arms whose 10% and 90% quantile predictions are saved, to measure coverage and width."""
+
+INTERVAL_SEED: Final[int] = 0
+"""The one seed the saved quantile predictions come from; coverage and width are descriptive."""
+
+LOWER_LEVEL_INDEX: Final[int] = 0
+UPPER_LEVEL_INDEX: Final[int] = 8
+"""The positions of the 0.1 and 0.9 levels in `studies.cross_validation.QUANTILE_LEVELS`."""
+
+
+def _plant_intervals(
+    *, rows: pl.DataFrame, arm: str, hyper_parameters: HyperParameters, device: DeviceType
+) -> pl.DataFrame:
+    """Predict one plant's 10% and 90% quantiles out of fold, with `INTERVAL_SEED`.
+
+    Args:
+        rows: One plant's rows.
+        arm: The arm.
+        hyper_parameters: The setting to fit at.
+        device: XGBoost's device.
+
+    Returns:
+        `site`, `time`, `month`, the actual power, the two quantiles held to the export cap, and
+        the columns that classify the forecast sky, all as fractions of the plant's capacity.
+    """
+    parts = []
+    for fold in sorted(rows["fold"].unique().to_list()):
+        test = rows.filter(pl.col("fold") == fold)
+        train = rows.filter((pl.col("fold") != fold) & ~pl.col("constrained"))
+        _, quantiles = fit_one_fold(
+            train=train,
+            test=test,
+            features=[name.format(fold=fold) for name in features_of(arm=arm)],
+            target=TARGET,
+            hyper_parameters=hyper_parameters,
+            seed=INTERVAL_SEED,
+            with_quantiles=True,
+            device=device,
+        )
+        if quantiles is None:
+            msg = "quantile models were requested but not returned"
+            raise ValueError(msg)
+        capped = clamp_to_cap(prediction=quantiles, cap_mw=test["cap_mw"])
+        capacity = test["effective_capacity_mw"].cast(pl.Float64)
+        parts.append(
+            test.select("site", "time", "month", "nwp_ghi", "clear_sky_w_m2").with_columns(
+                actual=test[TARGET].cast(pl.Float64) / capacity,
+                lower=pl.Series(capped[:, LOWER_LEVEL_INDEX]) / capacity,
+                upper=pl.Series(capped[:, UPPER_LEVEL_INDEX]) / capacity,
+            )
+        )
+    return pl.concat(parts)
+
+
+def fit_intervals(*, context: Context, dataset: pl.DataFrame, arm: str) -> pl.DataFrame:
+    """Return an arm's out-of-fold 10% and 90% quantile predictions, or read back a checkpoint.
+
+    Args:
+        context: The run's context.
+        dataset: The lead-day 1 frame.
+        arm: The arm.
+
+    Returns:
+        `_plant_intervals`' result for every plant, labelled with the arm.
+    """
+    path = context.checkpoint_dir / f"intervals__{arm}.parquet"
+    if path.exists():
+        return pl.read_parquet(path)
+    hyper_parameters = settings_for(context=context)["primary"]
+    sites = sorted(dataset["site"].unique().to_list())
+    with concurrent.futures.ThreadPoolExecutor(max_workers=context.max_workers) as pool:
+        parts = list(
+            pool.map(
+                lambda site: _plant_intervals(
+                    rows=dataset.filter(pl.col("site") == site),
+                    arm=arm,
+                    hyper_parameters=hyper_parameters,
+                    device=context.device,
+                ),
+                sites,
+            )
+        )
+    result = pl.concat(parts).with_columns(arm=pl.lit(arm))
+    result.write_parquet(path)
+    return result
+
+
 def phase1_table(*, losses: pl.DataFrame) -> pl.DataFrame:
     """Rank the sweep's arms by mean absolute error on the screening months.
 
@@ -651,7 +741,7 @@ def lead1_dataset(*, context: Context, root: Path, product: WeatherProduct) -> p
         product: The weather product.
 
     Returns:
-        The frame, shortened to a few rows in a smoke test.
+        The frame.
     """
     paths = output_paths(root=root, product=product, lead_days=(FULL_SWEEP_LEAD_DAY,))
     frame = pl.read_parquet(paths[f"day{FULL_SWEEP_LEAD_DAY}"])
@@ -669,16 +759,26 @@ def lead1_dataset(*, context: Context, root: Path, product: WeatherProduct) -> p
     dataset = frame.join(
         pl.read_parquet(derived_path), on=["site", "time"], how="left", maintain_order="left"
     )
-    if context.smoke:
-        return (
-            dataset.filter(pl.col("fold") < 2)
-            .sort("site", "fold", "time")
-            .group_by("site", "fold", maintain_order=True)
-            .head(SMOKE_ROWS_PER_FOLD)
-            .sort("site", "time")
-        )
     raise_on_uncovered_months(coverage=calendar_month_coverage(frame=dataset))
     return dataset
+
+
+def smoke_subsample(*, dataset: pl.DataFrame) -> pl.DataFrame:
+    """Keep `SMOKE_ROWS_PER_FOLD` rows per plant from each of folds 0 and 1.
+
+    Args:
+        dataset: The lead-day 1 frame.
+
+    Returns:
+        The site-sorted subsample.
+    """
+    return (
+        dataset.filter(pl.col("fold") < 2)
+        .sort("site", "fold", "time")
+        .group_by("site", "fold", maintain_order=True)
+        .head(SMOKE_ROWS_PER_FOLD)
+        .sort("site", "time")
+    )
 
 
 def run_ens_mean(*, context: Context, root: Path, product: WeatherProduct) -> list[pl.DataFrame]:
@@ -693,10 +793,15 @@ def run_ens_mean(*, context: Context, root: Path, product: WeatherProduct) -> li
         Every (scope, setting, arm) result, in the order fitted.
     """
     dataset = lead1_dataset(context=context, root=root, product=product)
+    if context.smoke:
+        frames = {"lead1": smoke_subsample(dataset=dataset), "global": pooled_frame(frame=dataset)}
+        smoke_global = [Fit("global", "global", FULL_SWEEP_LEAD_DAY, "B0", "primary", False, True)]
+        fit_intervals(context=context, dataset=frames["lead1"], arm="B0")
+        return fit_all(
+            context=context, frames=frames, fits=sweep_fits(context=context) + smoke_global
+        )
     frames = {"lead1": dataset}
     results = fit_all(context=context, frames=frames, fits=sweep_fits(context=context))
-    if context.smoke:
-        return results
     sweep = pl.concat(results, how="vertical_relaxed")
     chosen = shortlist(losses=sweep)
     _write_shortlist(directory=context.checkpoint_dir, sweep=sweep, chosen=chosen)
