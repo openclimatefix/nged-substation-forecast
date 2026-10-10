@@ -13,8 +13,8 @@ lagged power, but no study gives an XGBoost model lagged power next to weather.
 
 ## Planned solution
 
-A two-phase study on the 6 NGED utility-scale solar plants, driven by ECMWF IFS HRES (Open-Meteo
-Single Runs), reading the matched-lead study's inputs that are already on disk. **Both phases are
+A two-phase study on the 6 NGED utility-scale solar plants, driven by the mean of ECMWF's 51-member
+ensemble forecast (ENS), reading the matched-lead study's inputs that are already on disk. **Both phases are
 two views of one table of out-of-fold losses**, produced by the existing `run_all` and
 `out_of_fold_losses`, so nothing is fitted twice.
 
@@ -82,14 +82,20 @@ regions are untested.
 - **Rows and weather:** the matched-lead inputs on disk under
   `data/studies/per_study/nwp_forecast_comparison/`: `original/solar_forecast_inputs.parquet`
   joined on `(site, time)` to `leads_day10d/solar_extra_lead_inputs.parquet`
-  (`ifs_single_day{1,2}_{ghi,temp}` and `ifs_single_day0_{ghi,temp}` for the stage-1 models).
+  (`ifs_single_day{1,2}_{ghi,temp}` for the IFS HRES replicate). The ENS mean's
+  `ens_mean_day<N>_{ghi,temp}` columns, for `N` in 0 to 3 in the first file and 5, 7, 10, 14 in the
+  `leads_day10*` files, are the primary weather.
   Folds and `era_code` come from `nwp_forecast_comparison.rows()` and are joined, never recomputed
   after any row drop. The baseline arm has seven columns: hour of day, day of year, an era code, the
   sun's elevation and azimuth, and the product's global horizontal irradiance and 2 m air
   temperature at its own lead.
 - **Origin convention:** the existing one (`baselines.issue_time`): runs are issued at 09:00 UTC on
-  the run's own day for lead-days 1 and 2. Lead-day 1, the day-ahead lead the live service uses, is
-  the headline. Lead-day 0 is not run: its early hours are not a forecast anyone could have used.
+  the run's own day for every lead-day from 1. Lead-day 1, the day-ahead lead the live service uses,
+  is the headline. Lead-day 0 is not run: its early hours are not a forecast anyone could have
+  used. **The weather product is the ENS mean** (`ens_mean_day<N>_ghi` and `_temp`), the live
+  service's input and the more accurate of the two products available (8.79 against 9.76 points at
+  day 1). IFS HRES (`ifs_single_day<N>_*`, days 1 and 2 only) is an exploratory replicate of B0 and
+  L1.
 - **Targets and scaling:** per-plant fits use `power_mw` as the target, exactly as the published
   arm does, so `out_of_fold_losses` and `clamp_to_cap` work unchanged. The global fit divides
   `power_mw`, `cap_mw`, and every power-derived input by `effective_capacity_mw`, then sets
@@ -162,7 +168,16 @@ regardless). Phase 2 carries X.
   is a set of calendar months at every plant and training excludes all plants' rows in the scored
   months by construction. The two IFS grid cells partly identify the plant, which the page says.
   Both settings, three seeds; quantiles for B0 and L1.
-- **Lead-day 2:** B0 and L1, point model, primary setting, three seeds, exploratory.
+- **Longer leads, to day 14 (exploratory):** NGED want forecasts to at least day 10 and perhaps day
+  14. B0, L1, W7, Q30, T1, and N2 are fitted at lead-days 2, 3, 5, 7, 10, and 14 (the days for
+  which the ENS mean's irradiance and temperature columns exist on the shared rows), point model,
+  primary setting, three seeds. The lag of a lead-day-`N` target is still `24 (N + 1)` hours, and
+  every window or percentile is anchored at the issue day, not the target day, so at day 14 the
+  one-lag arm reads power 15 days old and the weekly window covers days 15 to 21 before the target.
+  Each lead-day has its own row set (a row needs that lead's columns and every arm's lag at that
+  lead), and arms within a lead-day share rows. The figure of each arm's gain over B0 against lead
+  also draws the climatology baseline (`baselines.climatology`), because at day 14 climatology
+  beats the ENS mean and slow trackers are the lag ideas that could still help.
 - **No purge.** A training row whose input is a test label does not put that label in the model's
   output path, and B0 already trains next to test-month boundaries. The page says so in one
   sentence.
@@ -202,9 +217,8 @@ its 99% interval lies wholly below zero and its point estimate is at least 2% of
 value of that metric (about 0.2 points for mean absolute error, the smallest effect worth acting
 on, and about five times the 0.4% bias of a wider arm); a smaller gain is reported as detectable but
 not worth the complexity. Every other number is exploratory and labelled so: the sweep, S2 minus L1,
-N1 and N2 comparisons, lead-day 2, global against per-plant, coverage and sharpness (descriptive),
-an ENS-mean rerun of B0 and L1 (the live service's input; the columns are on the same rows, point
-model only), and any analysis added after the first run (post hoc).
+N1 and N2 comparisons, lead-days 2 to 14, global against per-plant, coverage and sharpness (descriptive),
+the IFS HRES replicate of B0 and L1, lead-days 2 to 14, and any analysis added after the first run (post hoc).
 
 ### Charts (the story, as figures)
 
@@ -242,10 +256,13 @@ though another job already held it at 99% utilisation, so that comparison is con
 | Quantile models, primary: B0, L1, X, N2 | 360 | about 40 min |
 | Quantile models, sensitivity: B0, L1 | 180 | about 30 min |
 | Global scope: B0, L1, X, both settings; quantiles for B0 and L1 | 90 | about 16 min |
-| Stage-1 models, positive control, lead-day 2, ENS-mean rerun | about 800 | about 12 min |
+| Longer leads: 6 arms x 6 lead-days x 6 plants x 5 folds x 3 seeds | 3,240 | about 40 min |
+| Stage-1 models, positive control, IFS HRES replicate | about 800 | about 12 min |
 
-**Total: about 2.2 h of single-fit time, so about 25 to 30 min of wall time with 6 fits running at
-once on an idle machine, and about 1 h while the machine is as busy as it is now (load average 6).**
+**Total: about 2.9 h of single-fit time, so about 30 to 40 min of wall time with 6 fits running at
+once on an idle machine, and about 1.5 h while the machine is as busy as it is now (load average
+6).** The benchmark is repeated on the idle machine before any fit, and these numbers are then
+revised.
 Run on the GPU, the same fits would take roughly 3 to 7 times longer on the contended GPU; an
 uncontended GPU may still lose at these sizes because the launch overhead dominates, so the plan
 uses CPU and the GPU only for the reproduction check.
@@ -323,11 +340,10 @@ the docs-link checker.
    a percentile bootstrap over 21 month clusters tend to under-cover, plants are pooled and
    weighted by row count, and the test does not cover differences between plants. The page says
    all three. No new PV data.
-2. **Baseline product:** IFS HRES via Open-Meteo scores 9.76 points at day 1 against 8.79 for the
-   ENS mean, so a lag may correct this product's own errors. The exploratory ENS-mean rerun
-   addresses that. Question for the maintainer: should it be a planned contrast instead?
-3. **Device:** the plan uses CPU for every fit, since the GPU was slower in the benchmark. Question
-   for the maintainer: is a GPU run wanted anyway?
+2. **Baseline product (settled):** the ENS mean is primary, as the live service's input. IFS HRES is
+   an exploratory replicate.
+3. **Device (settled):** a CPU-versus-GPU benchmark runs on the idle machine before any fit, and
+   the faster device is used for every fit, one device within each planned contrast.
 4. **Unequal column widths:** padding is inert, so phase-2 contrasts compare arms of different
    widths, with N2 measuring the bias. The `study` skill asks for equal counts; the departure is
    deliberate and the page says why.
