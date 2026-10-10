@@ -16,7 +16,7 @@ column read the record, and each has its own guard in `window_anchor_lines`:
   09:00 UTC, which is the issue time itself.
 
 **The CAMS satellite irradiance arm (PC) is study-only unless it wins.** The live service does not
-ingest CAMS. The study assumes CAMS publishes two days late, so PC's windows start two whole days
+ingest CAMS. The study assumes CAMS publishes two days late, so PC's windows start three whole days
 back (the CAMS documentation says up to 2 days; see the README).
 """
 
@@ -42,8 +42,9 @@ TRANSFER_DAYS: Final[int] = 30
 TRANSFER_MIN_DAYS: Final[int] = 15
 """TF's window, and the fewest of its days that must hold the hour."""
 
-SATELLITE_LAG_DAYS: Final[int] = 2
-"""CAMS is assumed published two days late, so the satellite windows start two whole days back."""
+SATELLITE_LAG_DAYS: Final[int] = 3
+"""CAMS is assumed published two days late, so the latest whole day it has seen at the issue time
+ends two days before the issue day, and the satellite windows start three whole days back."""
 
 SATELLITE_POWER_DAYS: Final[int] = 7
 SATELLITE_POWER_MIN_DAYS: Final[int] = 4
@@ -125,7 +126,10 @@ def clear_sky_table(*, hourly: pl.DataFrame, sites: pl.DataFrame) -> pl.DataFram
 
 
 def _date_grid(*, frame: pl.DataFrame) -> pl.DataFrame:
-    """Return every date between each plant's first and last date.
+    """Return every date from each plant's first date to the last date of any plant.
+
+    A plant's grid runs to the common last date, so a feature looked up at a date after the plant's
+    own last reading is null by its window's rule, whether or not later data exists.
 
     Args:
         frame: Rows with `site` and `date`.
@@ -133,9 +137,11 @@ def _date_grid(*, frame: pl.DataFrame) -> pl.DataFrame:
     Returns:
         `site` and `date`, one row per plant and day.
     """
+    last = frame["date"].max()
     return (
         frame.group_by("site")
-        .agg(date=pl.date_ranges(pl.col("date").min(), pl.col("date").max(), interval="1d"))
+        .agg(first=pl.col("date").min())
+        .select("site", date=pl.date_ranges(pl.col("first"), pl.lit(last), interval="1d"))
         .explode("date")
     )
 
@@ -209,6 +215,12 @@ def daily_features(
             shoulder_energy=pl.col("power_mw")
             .filter(pl.col("clear_sky_w_m2") < SHOULDER_CLEAR_SKY_SHARE * pl.col("day_cs_max"))
             .sum(),
+            shoulder_hours=pl.col("power_mw")
+            .filter(
+                (pl.col("clear_sky_w_m2") < SHOULDER_CLEAR_SKY_SHARE * pl.col("day_cs_max"))
+                & present
+            )
+            .len(),
         )
         .with_columns(
             valid=(pl.col("clear_sky") > 0)
@@ -226,7 +238,7 @@ def daily_features(
                 pl.col("moment_power") / pl.col("energy")
                 - pl.col("moment_clear_sky") / pl.col("observed_clear_sky")
             ),
-            shoulder_share=pl.when("shape_valid").then(
+            shoulder_share=pl.when(pl.col("shape_valid") & (pl.col("shoulder_hours") > 0)).then(
                 pl.col("shoulder_energy") / pl.col("energy")
             ),
         )
@@ -459,7 +471,7 @@ def satellite_ratios(
     """Return PC: power to satellite irradiance over 7 days, and satellite to forecast over 30.
 
     The satellite irradiance is assumed published two days late, so both windows start
-    `SATELLITE_LAG_DAYS` whole days back.
+    `SATELLITE_LAG_DAYS` (3) whole days back: days 3 to 9 and days 3 to 32.
 
     Args:
         rows: Rows with `site` and `time`.
@@ -643,7 +655,9 @@ def clipping_share(
         .cast(pl.Float64),
     )
     full = (
-        _date_grid(frame=counts).join(counts, on=["site", "date"], how="left").sort("site", "date")
+        daily.select("site", "date")
+        .join(counts, on=["site", "date"], how="left")
+        .sort("site", "date")
     )
     rolled = full.with_columns(
         near_sum=pl.col("near")

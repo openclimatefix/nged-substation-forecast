@@ -40,7 +40,7 @@ import argparse
 import logging
 import sys
 from collections.abc import Sequence
-from datetime import UTC, datetime, time
+from datetime import UTC, date, datetime, time
 from pathlib import Path
 from typing import Final, Literal
 
@@ -324,11 +324,18 @@ NULL_CONTROL_SEED: Final[int] = 1138
 DRIFT_START: Final[datetime] = datetime(2024, 3, 1, tzinfo=UTC)
 """T1 counts days from this date."""
 
-POSITIVE_CONTROL_DATE: Final[datetime] = datetime(2025, 6, 1, tzinfo=UTC)
-"""From this date, the positive control multiplies power by one minus the shift."""
+HALF: Final[float] = 0.5
+"""The share of calendar months the positive control shifts, on average."""
+
+POSITIVE_CONTROL_SEED: Final[int] = 1138
+"""Seeds which calendar months the positive control shifts."""
+
+POSITIVE_CONTROL_FIRST_MONTH: Final[str] = "2019-09"
+POSITIVE_CONTROL_LAST_MONTH: Final[str] = "2026-06"
+"""The calendar months the positive control draws a shifted or unshifted state for."""
 
 POSITIVE_CONTROL_SHIFTS: Final[tuple[float, ...]] = (0.02, 0.05, 0.10)
-"""The fractions of power lost after `POSITIVE_CONTROL_DATE`: 2%, 5% and 10%."""
+"""The fractions of power lost in a shifted month: 2%, 5% and 10%."""
 
 LAG_TOLERANCE_MW: Final[float] = 1e-4
 """How far a strict lag may differ from `diurnal_persistence`'s Float32 value and still agree."""
@@ -411,15 +418,64 @@ def raw_hourly_power() -> pl.DataFrame:
     return solar_hourly_power(sites=pv_sites()).select("site", "time", "power_mw")
 
 
+def final_test_cutoff() -> datetime:
+    """Return midnight UTC at the start of `final_test_start`, which no study may train on or read.
+
+    Returns:
+        The cut-off `studies.power.scan_power` applies.
+    """
+    return datetime.combine(load_cv_config(CV_CONFIG_PATH).final_test_start, time.min, tzinfo=UTC)
+
+
+def shifted_months() -> frozenset[str]:
+    """Return the calendar months in which the positive control scales power down.
+
+    A random half of the months, drawn from a seeded generator, so the shift is not a function of
+    `era_code` or `day_of_year`, which a tree could otherwise learn without any lag.
+
+    Returns:
+        The `%Y-%m` labels of the shifted months.
+    """
+    months = (
+        pl.date_range(
+            date.fromisoformat(f"{POSITIVE_CONTROL_FIRST_MONTH}-01"),
+            date.fromisoformat(f"{POSITIVE_CONTROL_LAST_MONTH}-01"),
+            interval="1mo",
+            eager=True,
+        )
+        .dt.strftime("%Y-%m")
+        .to_list()
+    )
+    draws = np.random.default_rng(POSITIVE_CONTROL_SEED).random(len(months)) < HALF
+    return frozenset(month for month, shifted in zip(months, draws, strict=True) if shifted)
+
+
+def shifted_power(*, shift: float) -> pl.Expr:
+    """Return `power_mw` multiplied by `1 - shift` in the positive control's shifted months.
+
+    Args:
+        shift: The fraction of power lost; 0 returns `power_mw` unchanged.
+
+    Returns:
+        The expression, over a frame with `time` and `power_mw`.
+    """
+    if not shift:
+        return pl.col(TARGET)
+    in_shifted_month = (
+        pl.col("time").dt.offset_by("-30m").dt.strftime("%Y-%m").is_in(sorted(shifted_months()))
+    )
+    return pl.when(in_shifted_month).then(pl.col(TARGET) * (1.0 - shift)).otherwise(pl.col(TARGET))
+
+
 def lag_source_hourly(*, shift: float = 0.0) -> pl.DataFrame:
     """Return the cleaned hourly power every lag and window reads.
 
     Removes the multi-day zero runs and meter spikes, the commissioning ramp, and the hours the
-    export cap held down. Optionally multiplies power from `POSITIVE_CONTROL_DATE` by `1 - shift`,
+    export cap held down. Optionally multiplies power in `shifted_months()` by `1 - shift`,
     which is the positive control's level shift, applied before any lag is built.
 
     Args:
-        shift: The fraction of power lost from `POSITIVE_CONTROL_DATE`; 0 for the real record.
+        shift: The fraction of power lost in a shifted month; 0 for the real record.
 
     Returns:
         One row per `(site, time)` with `power_mw`.
@@ -432,9 +488,7 @@ def lag_source_hourly(*, shift: float = 0.0) -> pl.DataFrame:
     return capped.select(
         "site",
         "time",
-        power_mw=pl.when(pl.col("time") >= POSITIVE_CONTROL_DATE)
-        .then(pl.col("power_mw") * (1.0 - shift))
-        .otherwise(pl.col("power_mw")),
+        power_mw=shifted_power(shift=shift),
     ).sort("site", "time")
 
 
@@ -801,18 +855,14 @@ def build_frame(
         The frame, and report lines giving the row counts and each requirement's drop count.
     """
     weather = weather_table(product=product, lead_day=lead_day)
-    cutoff = datetime.combine(load_cv_config(CV_CONFIG_PATH).final_test_start, time.min, tzinfo=UTC)
+    cutoff = final_test_cutoff()
     rows = shared.join(weather, on=["site", "time"], how="left").sort("site", "time")
     check_no_missing(frame=rows, columns=CALENDAR_AND_SUN_COLUMNS)
     after_cutoff = rows.filter(pl.col("time") >= cutoff).height
     rows = rows.filter(pl.col("time") < cutoff)
     if shift:
-        shifted = (
-            pl.when(pl.col("time") >= POSITIVE_CONTROL_DATE)
-            .then(pl.col(TARGET) * (1.0 - shift))
-            .otherwise(pl.col(TARGET))
-        )
-        rows = rows.with_columns(**{TARGET: shifted.cast(pl.Float64)})
+        rows = rows.with_columns(**{TARGET: shifted_power(shift=shift).cast(pl.Float64)})
+    assert_before_cutoff(frame=rows, name="the frame's rows")
     built, morning_latest = lag_columns(
         rows=rows,
         inputs=inputs,
@@ -885,6 +935,134 @@ def lag_inputs(*, hourly: pl.DataFrame) -> LagInputs:
     return LagInputs(hourly=hourly, clear_sky=clear_sky, cams=cams, daily=daily)
 
 
+LEAK_PROBE_DAYS: Final[int] = 10
+LEAK_PROBE_ROWS_PER_DAY: Final[int] = 20
+LEAK_PROBE_SEED: Final[int] = 1138
+"""The leak probe rebuilds the columns of 20 seeded random rows on each of 10 seeded random target
+days, 200 rows in all, from inputs cut at each day's issue time."""
+
+LEAK_PROBE_SKIPPED: Final[tuple[str, ...]] = ("null_lag_8_to_28", *N2_WIDE_COLUMNS)
+"""The random-lag controls, whose draws depend on how many rows are drawn together, and N2, which
+reads the whole record by design."""
+
+
+def leak_probe(
+    *,
+    frame: pl.DataFrame,
+    inputs: LagInputs,
+    weather: pl.DataFrame,
+    weather_lead0: pl.DataFrame | None,
+    arms: Sequence[str],
+    lead_day: int,
+) -> list[str]:
+    """Rebuild sampled rows' columns from inputs cut at their issue time, and compare.
+
+    The anchor assertions in `lag_arm_columns.window_anchor_lines` check arithmetic on the build's
+    own timestamps. This probe checks the result: if any column read an hour after the issue time,
+    removing every such hour changes the column.
+
+    Args:
+        frame: The built lead-day frame.
+        inputs: The inputs the frame was built from.
+        weather: The lead-day's weather, for the lag hours.
+        weather_lead0: The lead-day 0 weather, for IM.
+        arms: The arms the frame serves.
+        lead_day: The lead-day.
+
+    Returns:
+        Report lines giving the rows and columns compared.
+
+    Raises:
+        ValueError: If a rebuilt column differs from the full build's.
+    """
+    columns = [
+        c
+        for arm in dict.fromkeys(arms)
+        for c in extra_columns_of(arm=arm)
+        if "{fold}" not in c and c in frame.columns and c not in LEAK_PROBE_SKIPPED
+    ]
+    columns = list(dict.fromkeys(columns))
+    keyed = frame.with_columns(
+        issue=issue_time(
+            day_start=(pl.col("time") - pl.duration(minutes=30)).dt.truncate("1d"), day=lead_day
+        )
+    )
+    issues = (
+        keyed["issue"]
+        .unique()
+        .sort()
+        .sample(n=min(LEAK_PROBE_DAYS, keyed["issue"].n_unique()), seed=LEAK_PROBE_SEED)
+    )
+    compared = 0
+    for issue in issues:
+        sample = (
+            keyed.filter(pl.col("issue") == issue).sample(
+                n=LEAK_PROBE_ROWS_PER_DAY, seed=LEAK_PROBE_SEED, shuffle=True
+            )
+            if keyed.filter(pl.col("issue") == issue).height > LEAK_PROBE_ROWS_PER_DAY
+            else keyed.filter(pl.col("issue") == issue)
+        ).sort("site", "time")
+        cut = LagInputs(
+            hourly=inputs.hourly.filter(pl.col("time") <= issue),
+            clear_sky=inputs.clear_sky,
+            cams=inputs.cams.filter(pl.col("time") <= issue),
+            daily=daily_features(
+                hourly=inputs.hourly.filter(pl.col("time") <= issue),
+                clear_sky=inputs.clear_sky,
+                capacity=pv_sites().select("site", "effective_capacity_mw"),
+            ),
+        )
+        rebuilt, _ = lag_columns(
+            rows=sample.select("site", "time", "month", "fold", "nwp_ghi", "nwp_temp"),
+            inputs=cut,
+            weather=weather.filter(pl.col("time") <= issue),
+            weather_lead0=None
+            if weather_lead0 is None
+            else weather_lead0.filter(pl.col("time") <= issue),
+            lead_day=lead_day,
+            arms=arms,
+        )
+        for column in columns:
+            both = sample.select("site", "time", full=pl.col(column)).join(
+                rebuilt.select("site", "time", cut=pl.col(column)), on=["site", "time"]
+            )
+            different = both.filter(
+                (pl.col("full").is_null() != pl.col("cut").is_null())
+                | ((pl.col("full") - pl.col("cut")).abs() > LAG_TOLERANCE_MW * 10)
+            ).height
+            if different:
+                msg = (
+                    f"lead-day {lead_day}: {column} changes on {different} rows when every input "
+                    f"after the issue time is removed (issue {issue}), so it reads the future"
+                )
+                raise ValueError(msg)
+        compared += sample.height
+    names = ", ".join(f"`{c}`" for c in columns)
+    return [
+        (
+            f"- lead-day {lead_day}: leak probe: {compared} seeded random rows on {len(issues)} "
+            f"target days rebuilt from inputs cut at the issue time; all {len(columns)} columns "
+            f"({names}) equal the full build, nulls included."
+        )
+    ]
+
+
+def assert_before_cutoff(*, frame: pl.DataFrame, name: str) -> None:
+    """Raise if any row is at or after the final-test cut-off.
+
+    Args:
+        frame: A frame with `time`.
+        name: What the frame holds, for the message.
+
+    Raises:
+        ValueError: If a row is at or after `final_test_cutoff()`.
+    """
+    late = frame.filter(pl.col("time") >= final_test_cutoff()).height
+    if late:
+        msg = f"{late} of {name} are at or after final_test_start, which no fit may read"
+        raise ValueError(msg)
+
+
 def stage1_hours(
     *, product: WeatherProduct, shared: pl.DataFrame, hourly: pl.DataFrame
 ) -> pl.DataFrame:
@@ -928,8 +1106,10 @@ def stage1_hours(
         )
         .join(hourly.rename({"power_mw": "observed_mw"}), on=["site", "time"], how="left")
         .drop_nulls(subset=list(B0_COLUMNS))
+        .filter(pl.col("time") < final_test_cutoff())
         .sort("site", "time")
     )
+    assert_before_cutoff(frame=hours, name="the stage-1 hours")
     disagree = hours.filter(
         pl.col("shared_era").is_not_null() & (pl.col("shared_era") != pl.col("era_code"))
     ).height
@@ -981,10 +1161,6 @@ def main() -> int:
     lead_days = tuple(arguments.lead_days or default_days)
     paths = output_paths(root=arguments.output_root, product=product, lead_days=lead_days)
     refuse_to_overwrite(paths=paths.values())
-    control_month = f"{POSITIVE_CONTROL_DATE:%Y-%m}"
-    if control_month in NWP_ERA_START_MONTHS or POSITIVE_CONTROL_DATE.day != 1:
-        msg = "the positive control's date must be the start of a month that is not an era start"
-        raise ValueError(msg)
 
     shared = shared_rows()
     hourly = lag_source_hourly()
@@ -1012,6 +1188,15 @@ def main() -> int:
             weather_lead0=weather_lead0,
         )
         assertion_lines = assert_lag_arithmetic(frame=frame, lead_day=lead_day, raw=raw)
+        if product == "ens_mean" and lead_day == FULL_SWEEP_LEAD_DAY:
+            assertion_lines += leak_probe(
+                frame=frame,
+                inputs=inputs,
+                weather=weather_table(product=product, lead_day=lead_day),
+                weather_lead0=weather_lead0,
+                arms=arms,
+                lead_day=lead_day,
+            )
         paths[f"day{lead_day}"].parent.mkdir(parents=True, exist_ok=True)
         frame.write_parquet(paths[f"day{lead_day}"])
         report += [
@@ -1045,8 +1230,8 @@ def main() -> int:
                 control.write_parquet(paths[f"control{round(shift * 100):02d}"])
                 report += [
                     (
-                        f"### Positive control, {shift:.0%} of power lost from "
-                        f"{POSITIVE_CONTROL_DATE:%Y-%m-%d}"
+                        f"### Positive control, {shift:.0%} of power lost in a random half of the "
+                        f"calendar months ({len(shifted_months())} months shifted)"
                     ),
                     "",
                     *control_lines,

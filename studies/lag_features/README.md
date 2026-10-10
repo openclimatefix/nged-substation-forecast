@@ -42,13 +42,15 @@ rounds, to check the plumbing, and is not a result.
 
 - **The lag source** is NGED's hourly power with the multi-day zero runs, meter spikes, commissioning
   ramp and export-capped hours removed. The target is the shared rows' `power_mw`.
-- **Power after `final_test_start` (2026-07-01) is never read**, because `studies.power.scan_power`
-  stops there, so the rows from that date are dropped and the study has 18 usable months.
+- **Nothing at or after `final_test_start` (2026-07-01) reaches a fit.** `studies.power.scan_power`
+  stops there, the builder drops the shared rows and the stage-1 hours from that date, and the
+  build and fit scripts assert that no training row is at or after it. The study has 18 usable
+  months.
   Phase 1 screens 2024-12 to 2025-09 (10 months). P2 is scored on 2025-10 to 2026-06 without
   2026-01 (8 months).
 - **CAMS's publication delay.** The study assumes CAMS irradiance reaches a forecast two whole days
-  late, so PC's windows cover days 2 to 8 (power to satellite) and days 2 to 31 (satellite to
-  forecast), counted back from the latest whole day. The assumption comes from the CAMS
+  late, so PC's windows start three whole days back from the issue day and cover days 3 to 9 (power to satellite) and days 3 to 32
+  (satellite to forecast). The assumption comes from the CAMS
   documentation, which says the radiation service provides data with up to 2 days of delay
   ([Copernicus radiation service in a nutshell](https://atmosphere.copernicus.eu/sites/default/files/2020-03/Copernicus_radiation_service_in_nutshell_v11.pdf),
   [CAMS solar radiation time-series](https://www.ecmwf.int/node/37329)). Some CAMS pages describe
@@ -71,7 +73,9 @@ rounds, to check the plumbing, and is not a result.
   first `k` of them. A month in no fold is allowed.
 - **The sweep arms with `{fold}` columns** are the two-step arms S2 and S3 only; stage 1 uses the
   primary setting and seed 0.
-- **Positive control**: the library fits all three seeds, so the plan's "one seed" is three.
+- **Positive control**: power is scaled by one minus the shift in a seeded random half of the
+  calendar months (2019-09 to 2026-06), so no tree can learn the shift from the date. The library
+  fits all three seeds.
 - **The interval figure** (`intervals__B0`, `intervals__L1` checkpoints) uses seed 0 only.
 - **Feature importance is not computed**: `out_of_fold_losses` does not return the boosters.
 
