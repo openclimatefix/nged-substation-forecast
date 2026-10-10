@@ -322,6 +322,29 @@ does not return the boosters.
 4 workers using 4 cores, 1 GB of GPU memory). On the 8-core CPU budget the same work would take
 about 1.8 h.
 
+## Follow-ups after the first science review (post hoc)
+
+The first Opus science review of the results asked for re-runs and analyses. All are post hoc and
+labelled so on the page; the published planned contrasts P1 to P5 are unchanged and not re-run.
+
+- **Positive controls that can be passed:** an oracle arm (B0 plus the true shift factor) at 5% and
+  10%, to separate a pipeline defect from a weak feature; the same month-level control on W7, Q30,
+  TF, AN and PC (and R1s, which needs no fit); and a second, more physical control with
+  plant-specific persistent steps (random start, 4 to 12 weeks, at 5% and 10%) for the oracle, L1,
+  W7, Q30, TF and AN. "Recovers" is judged by whether the 99% interval lies wholly below zero and
+  by the share of the oracle's gain recovered, because the 2% rule cannot be met by an ideal
+  estimator below 10%.
+- **Long leads:** a no-fit 50/50 blend of B0 and climatology; a CL arm (B0 plus the out-of-fold
+  climatology as a column) and W7+CL at days 7, 10 and 14; N2-3, a width-matched null for W7; and the
+  sensitivity setting for B0, N2, W7 and Q30 at days 10 and 14.
+- **PC with a 2-day latency** (days 2 to 8 and 2 to 31) at lead-day 1, because 3 of the 8 later
+  months fall before CAMS's February 2026 latency cut.
+- **Fingerprint decomposition:** G-ID+TF, G-FP without CK, leave-one-plant-out of G-FP without CK,
+  and per-plant B0 on the fleet-wide folds so global against per-plant is paired.
+- **No-fit analyses:** every arm's gain over B0 on the 8 months the sweep never screened, split by
+  forecast-product era; per-quantile hit rates; the count of exploratory intervals; the hindsight
+  per-plant-month scaling bound.
+
 ## Walk through
 
 **The happy path.** `build_lag_frame.py` rebuilds the shared rows and folds (`cut_eras`), joins the
