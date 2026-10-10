@@ -59,6 +59,7 @@ from era5_ladder_arms import (
 )
 from studies.charts import LABEL_WIDTH_PX, PLOT_WIDTH_PX, Panel, figure
 from studies.era5_ladder import (
+    AEROSOL_COLUMNS,
     CLEAR_SKY_INDEX_THRESHOLDS,
     DERIVED_BY_RUNG,
     RUNG_ADDITIONS,
@@ -337,7 +338,7 @@ def figure_1_headline(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMix
                 pl.col("label"),
                 pl.col("treatment").str.to_uppercase(),
                 pl.when(pl.col("reference") == MARS_FREE_ARM)
-                .then(pl.lit(ARM_LABELS[MARS_FREE_ARM]))
+                .then(pl.lit("G9 (no MARS-only)"))
                 .otherwise(pl.col("reference").str.to_uppercase()),
             ),
             value=pl.col("difference") * scale,
@@ -372,6 +373,7 @@ def figure_1_headline(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMix
             "Dashed rules: no difference, and the smallest improvement worth acting on",
             "(0.1 percentage points of capacity, or 0.01 clearness index).",
             *ARM_KEY_LINES,
+            "MARS-only: 12 variables that ECMWF's forecasts offer only through its MARS archive.",
             "All rows are planned: written into the study plan before any result existed.",
         ],
         figure_planning=None,
@@ -824,7 +826,7 @@ def figure_3_days(
                 "day_label",
                 "hour_of_day",
                 series=pl.lit(DISPLAY_NAMES[column]),
-                value=pl.col(column),
+                value=pl.col(column).cast(pl.Float64),
             )
             .filter(pl.col("value").is_not_null() & pl.col("value").is_not_nan())
             for column in columns
@@ -1225,93 +1227,110 @@ def figure_7_models_work(
     )
 
 
-def figure_11_hour_and_worst_days(
-    *, splits: pl.DataFrame, worst: pl.DataFrame | None, scope: str
-) -> alt.TopLevelMixin | None:
-    """Draw error by hour of day for the minimal and full arms, and the minimal arm's worst days.
+HOUR_SERIES: Final[tuple[tuple[str, str, str], ...]] = (
+    ("g2", "g0", "Cloud layers: G2 - G0"),
+    ("g4", "g3", "Cloud water: G4 - G3"),
+    ("g9", "g0", "All variables: G9 - G0"),
+)
+"""The (treatment, reference) arms and the words for each line of figure 11."""
+
+HOUR_STEP_AFTER: Final[int] = 9
+"""The UTC hour after which ERA5's cloud fields come from the next analysis window."""
+
+
+def figure_11_hour_of_day(*, splits: pl.DataFrame, scope: str) -> alt.TopLevelMixin | None:
+    """Draw how much each variable group lowers the error at each UTC hour of the day.
 
     Args:
         splits: The report's split table.
-        worst: The worst farm-days table, or `None`.
         scope: The line naming the farms, hours, and span.
 
     Returns:
-        The figure, or `None` if the splits hold no hour-of-day rows for both arms.
+        The figure, or `None` if the splits hold no hour-of-day contrasts.
     """
     if splits.is_empty():
         return None
     hours = splits.filter(
-        (pl.col("split") == "hour_of_day") & pl.col("treatment").is_in(["g0", "g9"])
-    ).with_columns(hour=pl.col("group").cast(pl.Int64))
-    if hours.is_empty() or "g9" not in hours["treatment"].to_list():
+        (pl.col("split") == "hour_of_day_contrast") & pl.col("difference").is_not_null()
+    ).with_columns(
+        hour=pl.col("group").cast(pl.Int64),
+        series=pl.format("{}-{}", pl.col("treatment"), pl.col("reference")),
+        relative=pl.col("difference") / pl.col("reference_value") * 100.0,
+        relative_lower=pl.col("lower_95") / pl.col("reference_value") * 100.0,
+        relative_upper=pl.col("upper_95") / pl.col("reference_value") * 100.0,
+    )
+    if hours.is_empty():
         return None
-    arm_scale = alt.Scale(domain=["g0", "g9"], range=[ARM_COLOURS["g0"], ARM_COLOURS["g9"]])
-    legend = alt.Legend(
-        title=None,
-        labelExpr="datum.value == 'g0' ? 'G0 minimal' : 'G9 everything'",
-        orient="top",
+    names = {f"{treatment}-{reference}": words for treatment, reference, words in HOUR_SERIES}
+    colours = {
+        f"{treatment}-{reference}": colour
+        for (treatment, reference, _), colour in zip(HOUR_SERIES, SERIES_COLOURS, strict=False)
+    }
+    hours = hours.filter(pl.col("series").is_in(list(names)))
+    colour_scale = alt.Scale(domain=list(names), range=[colours[name] for name in names])
+    label_expression = " : ".join(
+        f"datum.value == '{key}' ? '{words}'" for key, words in names.items()
     )
     panels: list[Panel] = []
     for target in TARGETS:
-        scale = _scale(target=target)
-        rows = hours.filter(pl.col("target") == target).with_columns(value=pl.col("value") * scale)
-        panels.append(
-            alt.Chart(rows)
-            .mark_line(point=True, strokeWidth=1.5, aria=False)
-            .encode(  # ty: ignore[unresolved-attribute]
-                x=alt.X(
-                    "hour:Q", title="Hour of day (UTC)", axis=alt.Axis(format="d", tickMinStep=1)
-                ),
-                y=alt.Y(
-                    "value:Q",
-                    title=f"Mean absolute error ({_error_unit(target=target)}; smaller is better)",
-                ),
-                color=alt.Color("treatment:N", scale=arm_scale, legend=legend),
-            )
-            .properties(width=PLOT_WIDTH_PX, height=120, title=_title(PANEL_TITLES[target]))
-        )
-    if worst is not None and not worst.is_empty():
-        pv_worst = worst.filter(pl.col("target") == "pv")
-        rows = pv_worst.with_columns(
-            label=pl.format(
-                "{} {}: farm {}",
-                pl.int_range(1, pv_worst.height + 1),
-                pl.col("month"),
-                pl.col("site"),
+        rows = hours.filter(pl.col("target") == target)
+        if rows.is_empty():
+            continue
+        base = alt.Chart(rows).encode(
+            x=alt.X(
+                "hour:Q",
+                title="Hour of day (UTC, the hour the value is labelled with)",
+                axis=alt.Axis(format="d", tickMinStep=1),
+                scale=alt.Scale(domain=[4, 21]),
             ),
-            g0=pl.col("g0") * 100.0,
-            g9=pl.col("g9") * 100.0,
+            color=alt.Color(
+                "series:N",
+                scale=colour_scale,
+                legend=alt.Legend(
+                    title=None, labelExpr=f"{label_expression} : datum.value", orient="top"
+                ),
+            ),
         )
-        order = rows["label"].to_list()
-        long = rows.unpivot(on=["g0", "g9"], index="label", variable_name="arm", value_name="value")
+        band = base.mark_area(opacity=0.18, aria=False).encode(  # ty: ignore[unresolved-attribute]
+            y=alt.Y("relative_lower:Q", title="Change in error (% of the reference's error)"),
+            y2="relative_upper:Q",
+        )
+        line = base.mark_line(point=True, strokeWidth=1.5, aria=False).encode(  # ty: ignore[unresolved-attribute]
+            y="relative:Q"
+        )
+        zero = (
+            alt.Chart(pl.DataFrame({"y": [0.0]}))
+            .mark_rule(color=ocf.TEXT, strokeDash=[4, 3], aria=False)
+            .encode(y="y:Q")  # ty: ignore[unresolved-attribute]
+        )
+        step = (
+            alt.Chart(pl.DataFrame({"x": [HOUR_STEP_AFTER + 0.5]}))
+            .mark_rule(color=ocf.TEXT, strokeDash=[1, 3], aria=False)
+            .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+        )
         panels.append(
-            alt.Chart(long)
-            .mark_point(filled=True, size=60, opacity=1, aria=False)
-            .encode(  # ty: ignore[unresolved-attribute]
-                x=alt.X("value:Q", title="Mean absolute error on the day (% of capacity)"),
-                y=alt.Y("label:N", sort=order, title=None),
-                color=alt.Color("arm:N", scale=arm_scale, legend=legend),
-            )
-            .properties(
-                width=PLOT_WIDTH_PX,
-                height=ROW_HEIGHT_PX * len(order),
-                title=_title("The minimal set's worst 20 farm-days"),
+            (band + line + zero + step).properties(
+                width=PLOT_WIDTH_PX, height=150, title=_title(PANEL_TITLES[target])
             )
         )
+    if not panels:
+        return None
     return independent_colours(
         chart=figure(
             panels=panels,
             number=11,
-            title="Error by hour of day, and the minimal set's worst farm-days",
+            title="The gain from the extra variables by hour of day",
             subtitle=[
                 scope,
-                "Top: mean absolute error by hour of day, all farms.",
-                (
-                    "Bottom: the 20 farm-days with the largest error for the minimal set, "
-                    "labelled by rank, month, and farm."
-                ),
+                "Line: the arm's error minus the reference arm's, as a percentage of the",
+                "reference's error. Band: 95% interval from resampling whole months.",
+                "Below the dashed line is a gain.",
+                "Dotted line: between 09 and 10 UTC, where ERA5's cloud fields move to the next",
+                "analysis window.",
                 *ARM_KEY_LINES,
-                "All rows are exploratory.",
+                "G3 adds clear-sky irradiance. G4 adds cloud water and cloud base height.",
+                "All rows are exploratory. An hour with too few months for an interval",
+                "is not drawn.",
             ],
             figure_planning=None,
         )
@@ -1441,7 +1460,7 @@ def figure_13b_reliability(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMix
             .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X("level:Q", title="Quantile level aimed at"),
                 y=alt.Y("value:Q", title="Share of outcomes below that quantile"),
-                color=alt.Color("arm:N", title="Arm"),
+                color=alt.Color("arm:N", title=None),
             )
         )
         panels.append(
@@ -1492,10 +1511,14 @@ def figure_13c_coverage_and_width(*, rows: pl.DataFrame, scope: str) -> alt.TopL
             "arm", coverage=pl.col("value") * 100.0
         )
         reference = rows.filter(
-            (pl.col("target") == target) & (pl.col("kind") == "residual_reference")
+            (pl.col("target") == target) & (pl.col("kind") == "residual_reference_matched")
         ).select("arm", reference_width=pl.col("value") * factor)
-        points = width.join(coverage, on="arm").join(reference, on="arm")
-        base = alt.Chart(points.with_columns(nominal=pl.lit(80.0)))
+        points = (
+            width.join(coverage, on="arm")
+            .join(reference, on="arm")
+            .with_columns(arm=pl.col("arm").replace(ARM_LABELS))
+        )
+        base = alt.Chart(points)
         panels.append(
             alt.layer(
                 base.mark_point(shape="diamond", size=60, color=ocf.TEXT, aria=False).encode(  # ty: ignore[unresolved-attribute]
@@ -1505,8 +1528,8 @@ def figure_13c_coverage_and_width(*, rows: pl.DataFrame, scope: str) -> alt.TopL
                         scale=alt.Scale(zero=False),
                     ),
                     y=alt.Y(
-                        "nominal:Q",
-                        title="Coverage of the 10 to 90% interval (%)",
+                        "coverage:Q",
+                        title="Share of outcomes inside the 10 to 90% interval (%)",
                         scale=alt.Scale(zero=False),
                     ),
                 ),
@@ -1523,8 +1546,9 @@ def figure_13c_coverage_and_width(*, rows: pl.DataFrame, scope: str) -> alt.TopL
         title="Coverage against interval width",
         subtitle=[
             scope,
-            "Circle: the quantile fit. Diamond: a fixed-width interval holding 80% of errors.",
-            "An arm that helps with uncertainty sits left of the diamonds at a similar height.",
+            "Circle: the quantile fit. Diamond: one fixed-width interval, from the same arm's",
+            "errors, that holds the same share of outcomes as the circle.",
+            "A quantile fit that helps with uncertainty sits left of its diamond.",
             "Exploratory. Main hyperparameter setting only.",
         ],
         figure_planning=None,
@@ -1573,6 +1597,11 @@ def figure_14_aerosol_conditions(
                     ),
                     panel_title=f"{PANEL_TITLES[target]}: {words}",
                     colour=TARGET_COLOURS[target],
+                    reference_rules=(
+                        (0.0, -SMALLEST_EFFECT[target] * scale)
+                        if measure == "mean_absolute_error"
+                        else (0.0,)
+                    ),
                 )
             )
     if not panels:
@@ -1584,7 +1613,8 @@ def figure_14_aerosol_conditions(
         subtitle=[
             scope,
             "Dot: estimate. Line: 95% interval from resampling whole months. Main setting.",
-            "Dashed rule: no difference. Labels give distinct days (d) and months (mo).",
+            "Dashed rules: no difference, and (on the error panels) the smallest improvement",
+            "worth acting on. Labels give distinct days (d) and months (mo).",
             "The reading rule needs 20 days and 12 months; with fewer, G10 cannot be assessed.",
             "Aerosol: CAMS EAC4 reanalysis. High dust: dust optical depth in the top 5% of hours.",
             "Exploratory. A reanalysis knows the dust plume, so a forecast would gain less.",
@@ -1594,7 +1624,9 @@ def figure_14_aerosol_conditions(
     )
 
 
-def draw_uncertainty_and_aerosol_figures(*, paths: ReportPaths, scope: str) -> None:
+def draw_uncertainty_and_aerosol_figures(
+    *, paths: ReportPaths, scope: str, aerosol_scope: str
+) -> None:
     """Draw figures 13, 13b, and 14 from the report's tables, for those whose table exists."""
     if paths.probabilistic.exists():
         probabilistic = pl.read_parquet(paths.probabilistic)
@@ -1607,7 +1639,7 @@ def draw_uncertainty_and_aerosol_figures(*, paths: ReportPaths, scope: str) -> N
                 save(chart=chart, name=name)
     if paths.aerosol_conditions.exists():
         aerosol_chart = figure_14_aerosol_conditions(
-            conditions=pl.read_parquet(paths.aerosol_conditions), scope=scope
+            conditions=pl.read_parquet(paths.aerosol_conditions), scope=aerosol_scope
         )
         if aerosol_chart is not None:
             save(chart=aerosol_chart, name="aerosol_conditions")
@@ -1627,7 +1659,6 @@ def main() -> int:
     board = pl.read_parquet(paths.leaderboard)
     contrasts = pl.read_parquet(paths.contrasts)
     splits = pl.read_parquet(paths.splits) if paths.splits.exists() else pl.DataFrame()
-    worst = pl.read_parquet(paths.worst_days) if paths.worst_days.exists() else None
     pv_losses = pl.read_parquet(
         results_path(
             key=FitKey(variant=variant, through_rung=through_rung, target="pv", view="ladder")
@@ -1736,10 +1767,16 @@ def main() -> int:
             )
     else:
         _LOG.info("no %s yet, so figure 12 is skipped", importance_file.name)
-    draw_uncertainty_and_aerosol_figures(paths=paths, scope=scope)
-    figure_11 = figure_11_hour_and_worst_days(splits=splits, worst=worst, scope=scope)
+    aerosol_rows = dataset.filter(pl.col(AEROSOL_COLUMNS[0]).is_not_null())
+    aerosol_scope = scope.replace(
+        f"{first.strftime('%B %Y')} to {last.strftime('%B %Y')}",  # ty: ignore[unresolved-attribute]
+        f"{aerosol_rows['time'].min().strftime('%B %Y')} "  # ty: ignore[unresolved-attribute]
+        f"to {aerosol_rows['time'].max().strftime('%B %Y')}",  # ty: ignore[unresolved-attribute]
+    )
+    draw_uncertainty_and_aerosol_figures(paths=paths, scope=scope, aerosol_scope=aerosol_scope)
+    figure_11 = figure_11_hour_of_day(splits=splits, scope=scope)
     if figure_11 is not None:
-        save(chart=figure_11, name="hour_and_worst_days")
+        save(chart=figure_11, name="hour_of_day")
     return 0
 
 

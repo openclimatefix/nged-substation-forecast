@@ -39,9 +39,11 @@ separate agent session) checked which IFS products the project can get:
 
 **ERA5 is a screen, not the training source, and a result transfers to the IFS only in part.** ERA5
 was produced with a frozen 2016 version of the IFS weather model (cycle 41r2), and its hourly
-fields come from short forecasts. ERA5's `ssrd` comes from the same radiation scheme and the same
-clouds as its cloud variables, so the cloud variables are largely redundant with `ssrd`, and a gain
-can come only from radiation-scheme error. A day-3 IFS forecast at 9 km has a different error
+fields come from short forecasts or from the analysis. ERA5's `ssrd` comes from the 06 and 18 UTC
+forecasts, and the downloaded cloud, humidity, and wind fields show seams at the 4D-Var analysis
+window boundaries (09 to 10 and 21 to 22 UTC), so they come from the analysis trajectory, which
+saw later observations than `ssrd` did. A gain from those fields can therefore come from
+radiation-scheme error and from that timing advantage, which a forecast does not have. A day-3 IFS forecast at 9 km has a different error
 structure, and its cloud layers may carry local information that ERA5's 31 km fields lack. A gain in
 ERA5 therefore justifies a matched-lead IFS test and a limited MARS pilot fetch, and does not
 justify adopting a variable. A null in ERA5 weakens the case for fetching the MARS-only variables
@@ -309,10 +311,12 @@ CAMS aerosol product McClear uses (EAC4 or the operational analysis) is unverifi
   using `studies.hourly_means.hourly_from_snapshots(slot_offsets_minutes=(-60, 0))`. A test checks
   that each ladder variable has exactly one class.
 - **Seam checks:** the fetch checks the hour-of-day profile of the mean absolute hour-to-hour change
-  for steps at three families of seams. Accumulations change forecast run at 07 and 19 UTC. Cloud
-  and cloud-water fields (from the 06 and 18 UTC forecasts) change at 06/07 and 18/19 UTC. Analysed
-  fields (`t2m`, `d2m`, `u10`, `v10`, `sp`, `skt`, `tcwv`, `sd`) change at the 4D-Var
-  (four-dimensional variational assimilation) window boundaries of 09 and 21 UTC.
+  for steps at two families of seams. Accumulations (`ssrd`, `strd`, `tp`) change forecast run at
+  06/07 and 18/19 UTC. The downloaded cloud, cloud-water, humidity, and wind fields (`tcc`, `lcc`,
+  `tclw`, `tciw`, `tcwv`, `d2m`, `u10`) change at the 4D-Var (four-dimensional variational
+  assimilation) window boundaries of 09/10 and 21/22 UTC, so they are analysis fields. The first
+  science review found this after the run, and the hour-of-day contrasts (figure 11) test whether
+  the gain steps at 09/10 UTC.
 - **Pairing guard:** before each contrast the code raises unless both arms hold the identical set of
   (site, time, seed) rows, because `paired_differences` inner-joins silently. Every arm runs on the
   same device, and the per-arm error table records which device.

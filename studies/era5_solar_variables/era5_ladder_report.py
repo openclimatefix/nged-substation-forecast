@@ -108,6 +108,16 @@ WORST_DAY_COUNT: Final[int] = 20
 SPLIT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (("g1", "g0"), ("g2", "g0"), ("g9", "g0"))
 """The (treatment, reference) contrasts the regime and season splits show."""
 
+HOUR_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("g2", "g0"),
+    ("g4", "g3"),
+    ("g9", "g0"),
+)
+"""The (treatment, reference) contrasts the hour-of-day split shows, one interval per UTC hour."""
+
+HOUR_BY_SEASON_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (("g4", "g3"),)
+"""The contrasts split by UTC hour within each season, which separate the hour from the season."""
+
 PROBABILISTIC_METRICS: Final[dict[str, str]] = {
     "crps": "crps_floored_fraction_of_capacity",
     "coverage_80": "covered_80",
@@ -126,7 +136,8 @@ PROBABILISTIC_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 
 NO_GAIN_BEYOND_EFFECT: Final[str] = "rules out a gain larger than the smallest effect"
 GAIN_NOT_EXCLUDED: Final[str] = "does not rule out a gain larger than the smallest effect"
-IMPROVES: Final[str] = "improves; a gain larger than the smallest effect is not ruled out"
+IMPROVES_BEYOND_EFFECT: Final[str] = "improves by more than the smallest effect"
+IMPROVES: Final[str] = "improves; whether the gain exceeds the smallest effect is unresolved"
 IMPROVES_BY_LESS_THAN_EFFECT: Final[str] = "improves, by less than the smallest effect"
 WORSENS: Final[str] = "worsens"
 UNRESOLVED: Final[str] = "unresolved"
@@ -136,7 +147,9 @@ RULES_OUT_LARGE_GAIN: Final[frozenset[str]] = frozenset(
 )
 """The verdicts that each rule out a gain larger than the smallest effect."""
 
-LARGE_GAIN_POSSIBLE: Final[frozenset[str]] = frozenset({IMPROVES, GAIN_NOT_EXCLUDED})
+LARGE_GAIN_POSSIBLE: Final[frozenset[str]] = frozenset(
+    {IMPROVES_BEYOND_EFFECT, IMPROVES, GAIN_NOT_EXCLUDED}
+)
 """The verdicts that each leave a gain larger than the smallest effect possible."""
 
 
@@ -152,7 +165,9 @@ def combine_planned(*, primary: str, sensitivity: str) -> str:
         sensitivity: The verdict at the second setting.
 
     Returns:
-        The shared verdict if the two are equal. Otherwise `rules out a gain larger than the
+        The shared verdict if the two are equal. `improves; whether the gain exceeds the smallest
+        effect is unresolved` if one setting shows a gain beyond the smallest effect and the other
+        leaves that unresolved. Otherwise `rules out a gain larger than the
         smallest effect` if both rule it out, `does not rule out a gain larger than the smallest
         effect` if both leave it possible, and `unresolved` if they disagree on that.
     """
@@ -161,6 +176,8 @@ def combine_planned(*, primary: str, sensitivity: str) -> str:
     pair = {primary, sensitivity}
     if pair <= RULES_OUT_LARGE_GAIN:
         return NO_GAIN_BEYOND_EFFECT
+    if pair == {IMPROVES_BEYOND_EFFECT, IMPROVES}:
+        return IMPROVES
     if pair <= LARGE_GAIN_POSSIBLE:
         return GAIN_NOT_EXCLUDED
     return UNRESOLVED
@@ -177,12 +194,16 @@ def contrast_verdict(*, lower: float, upper: float, smallest_effect: float) -> s
         smallest_effect: The smallest improvement worth acting on, in the same unit.
 
     Returns:
-        `improves` if the interval is below zero and reaches past the smallest effect, and
-        `improves, by less than the smallest effect` if it is below zero and does not. `worsens`
-        if it is above zero. Otherwise `rules out a gain larger than the smallest effect` if the
-        lower bound is above minus the smallest effect, and `does not rule out a gain larger than
-        the smallest effect` if it is not.
+        `improves by more than the smallest effect` if the whole interval lies below minus the
+        smallest effect. `improves, by less than the smallest effect` if the whole interval lies
+        between minus the smallest effect and zero. `improves; whether the gain exceeds the
+        smallest effect is unresolved` if the interval lies below zero and straddles minus the
+        smallest effect. `worsens` if it is above zero. Otherwise `rules out a gain larger than the
+        smallest effect` if the lower bound is above minus the smallest effect, and `does not rule
+        out a gain larger than the smallest effect` if it is not.
     """
+    if upper < -smallest_effect:
+        return IMPROVES_BEYOND_EFFECT
     if upper < 0.0:
         return IMPROVES_BY_LESS_THAN_EFFECT if lower > -smallest_effect else IMPROVES
     if lower > 0.0:
@@ -422,6 +443,9 @@ def contrast_row(
         n_resamples=PLANNED_RESAMPLES if planned else None,
     )
     smallest = SMALLEST_EFFECT[target]
+    reference_mean = float(
+        in_setting.filter(pl.col("arm") == reference).select(pl.col(METRIC).mean()).item()
+    )
     return {
         "target": target,
         "family": family,
@@ -431,6 +455,8 @@ def contrast_row(
         "setting": setting,
         "planned": planned,
         "difference": interval["difference"],
+        "reference_mean": reference_mean,
+        "relative_difference": interval["difference"] / reference_mean,
         "lower_95": interval["lower_95"],
         "upper_95": interval["upper_95"],
         "lower_adjusted": adjusted_lower,
@@ -578,18 +604,24 @@ def split_rows(
     arms = set(in_setting["arm"].unique().to_list())
     contrasts = [(t, r) for t, r in SPLIT_CONTRASTS if t in arms and r in arms]
     rows: list[dict[str, object]] = []
-    groupings: list[tuple[str, tuple[str, ...]]] = [
-        ("regime_cams", ("regime_cams",)),
-        ("season", ("season",)),
-        ("regime_cams_by_season", ("season", "regime_cams")),
+    hour_contrasts = [(t, r) for t, r in HOUR_CONTRASTS if t in arms and r in arms]
+    hour_by_season_contrasts = [
+        (t, r) for t, r in HOUR_BY_SEASON_CONTRASTS if t in arms and r in arms
+    ]
+    groupings: list[tuple[str, tuple[str, ...], list[tuple[str, str]]]] = [
+        ("regime_cams", ("regime_cams",), contrasts),
+        ("season", ("season",), contrasts),
+        ("regime_cams_by_season", ("season", "regime_cams"), contrasts),
+        ("hour_of_day_contrast", ("hour_of_day",), hour_contrasts),
+        ("hour_by_season_contrast", ("season", "hour_of_day"), hour_by_season_contrasts),
     ]
     if "regime_era5" in in_setting.columns:
-        groupings.append(("regime_era5", ("regime_era5",)))
-    for split, columns in groupings:
+        groupings.append(("regime_era5", ("regime_era5",), contrasts))
+    for split, columns, split_contrasts in groupings:
         known = in_setting.filter(pl.all_horizontal(pl.col(name).is_not_null() for name in columns))
         for key, subset in known.group_by(*columns, maintain_order=True):
             group = " / ".join(str(part) for part in key)
-            for treatment, reference in contrasts:
+            for treatment, reference in split_contrasts:
                 rows.append(
                     _split_contrast(
                         subset=subset,
@@ -645,6 +677,9 @@ def _split_contrast(
         "upper_95": None,
         "n_rows": subset.filter(pl.col("arm") == treatment).height,
         "n_months": n_months,
+        "reference_value": float(
+            subset.filter(pl.col("arm") == reference).select(pl.col(METRIC).mean()).item()
+        ),
     }
     if n_months < MIN_MONTHS_FOR_INTERVAL:
         return row
@@ -762,6 +797,7 @@ def render_contrasts(*, contrasts: pl.DataFrame, target: TargetType, planned: bo
         "contrast",
         "setting",
         f"difference ({unit})",
+        "difference as % of the reference's error",
         "95% interval",
         f"{ADJUSTED_LEVEL_PERCENT:.3f}% interval" if planned else "near the 5% line",
         "verdict" if planned else "months",
@@ -780,6 +816,7 @@ def render_contrasts(*, contrasts: pl.DataFrame, target: TargetType, planned: bo
                 f"{row['label']} ({row['treatment']} minus {row['reference']})",
                 row["setting"],
                 f"{row['difference'] * factor:+.{PRINT_DECIMALS}f}",
+                f"{row['relative_difference'] * PERCENTAGE_POINTS:+.1f}",
                 interval_text(lower=row["lower_95"], upper=row["upper_95"], factor=factor),
                 fourth,
                 last,
@@ -951,6 +988,23 @@ def probabilistic_rows(
                 - float(shares.quantile(0.1, interpolation="linear") or 0.0),
             }
         )
+    # The same interval, but holding as many outcomes as the arm's quantile interval did, so the two
+    # widths answer for the same coverage.
+    for arm in arms:
+        errors = in_setting.filter(pl.col("arm") == arm)
+        shares = errors["signed_error_capped_mw"] / errors["effective_capacity_mw"]
+        coverage = float(errors[PROBABILISTIC_METRICS["coverage_80"]].mean())  # ty: ignore[invalid-argument-type]
+        upper = float(shares.quantile(0.5 + coverage / 2, interpolation="linear") or 0.0)
+        lower = float(shares.quantile(0.5 - coverage / 2, interpolation="linear") or 0.0)
+        rows.append(
+            {
+                "target": target,
+                "kind": "residual_reference_matched",
+                "arm": arm,
+                "measure": "width_80",
+                "value": upper - lower,
+            }
+        )
     for treatment, reference in PROBABILISTIC_CONTRASTS:
         if treatment not in arms or reference not in arms:
             continue
@@ -996,9 +1050,10 @@ def probabilistic_rows(
     return pl.DataFrame(rows, infer_schema_length=None)
 
 
-def reference_key(*, arm: str) -> tuple[str, str, None, str]:
+def reference_key(*, arm: str, matched: bool = False) -> tuple[str, str, None, str]:
     """Return the key of an arm's constant-interval reference width in the long frame."""
-    return ("residual_reference", arm, None, "width_80")
+    kind = "residual_reference_matched" if matched else "residual_reference"
+    return (kind, arm, None, "width_80")
 
 
 def render_probabilistic(*, rows: pl.DataFrame) -> str:
@@ -1021,6 +1076,7 @@ def render_probabilistic(*, rows: pl.DataFrame) -> str:
             for row in subset.filter(pl.col("kind") != "contrast").iter_rows(named=True)
         }
         arms = sorted({key[1] for key in values}, key=_arm_order)
+        matched_width = {arm: values[reference_key(arm=arm, matched=True)]["value"] for arm in arms}
         parts += [f"### {target} target: scores by arm", ""]
         parts.append(
             table(
@@ -1029,7 +1085,8 @@ def render_probabilistic(*, rows: pl.DataFrame) -> str:
                     "CRPS",
                     "coverage of the 10-90 interval (%)",
                     "mean width",
-                    "width of one constant interval from the arm's own errors",
+                    "width of one constant interval holding 80% of the arm's errors",
+                    "width of one constant interval holding the arm's own coverage",
                 ],
                 rows=[
                     [
@@ -1039,6 +1096,7 @@ def render_probabilistic(*, rows: pl.DataFrame) -> str:
                             for m in measures
                         ),
                         f"{values[reference_key(arm=arm)]['value'] * unit['width_80']:.3f}",
+                        f"{matched_width[arm] * unit['width_80']:.3f}",
                     ]
                     for arm in arms
                 ],
@@ -1085,7 +1143,14 @@ def render_probabilistic(*, rows: pl.DataFrame) -> str:
             parts += ["", f"### {target} target: scores by ERA5 cloud regime", ""]
             parts.append(
                 table(
-                    header=["arm", "regime", "CRPS", "coverage (%)", "mean width", "rows"],
+                    header=[
+                        "arm",
+                        "regime",
+                        "CRPS",
+                        "coverage (%)",
+                        "mean width",
+                        "row-seed pairs",
+                    ],
                     rows=[
                         [
                             arm,
@@ -1258,6 +1323,65 @@ def render_aerosol_decision(*, conditions: pl.DataFrame) -> list[str]:
     ]
 
 
+def render_splits(*, splits: pl.DataFrame) -> str:
+    """Render the regime, season, and hour-of-day contrasts as markdown, one table per target.
+
+    Args:
+        splits: The splits table, with contrast rows carrying `difference` and an interval.
+
+    Returns:
+        The markdown, empty if there are no contrast rows.
+    """
+    if splits.is_empty():
+        return ""
+    contrast_rows = splits.filter(pl.col("reference").is_not_null())
+    parts: list[str] = []
+    for target in TARGETS:
+        subset = contrast_rows.filter(pl.col("target") == target)
+        if subset.is_empty():
+            continue
+        factor = scale(target=target)
+        parts += [
+            f"### {target} target: contrasts by split group, primary setting (exploratory)",
+            "",
+            table(
+                header=[
+                    "split",
+                    "group",
+                    "contrast",
+                    "difference",
+                    "difference as % of the reference's error",
+                    "95% interval",
+                    "months",
+                ],
+                rows=[
+                    [
+                        row["split"],
+                        row["group"],
+                        f"{row['treatment']} minus {row['reference']}",
+                        "n/a"
+                        if row["difference"] is None
+                        else f"{row['difference'] * factor:+.3f}",
+                        "n/a"
+                        if row["difference"] is None
+                        else (
+                            f"{row['difference'] / row['reference_value'] * PERCENTAGE_POINTS:+.1f}"
+                        ),
+                        "n/a"
+                        if row["difference"] is None
+                        else interval_text(
+                            lower=row["lower_95"], upper=row["upper_95"], factor=factor
+                        ),
+                        str(row["n_months"]),
+                    ]
+                    for row in subset.iter_rows(named=True)
+                ],
+            ),
+            "",
+        ]
+    return "\n".join(parts)
+
+
 def render_aerosol_conditions(*, conditions: pl.DataFrame) -> str:
     """Render the aerosol-condition table, with the event counts that let a reader discount it."""
     if conditions.is_empty():
@@ -1319,6 +1443,7 @@ def render_report(
     worst: pl.DataFrame,
     aerosol_conditions: pl.DataFrame,
     probabilistic: pl.DataFrame,
+    splits: pl.DataFrame,
 ) -> str:
     """Assemble the report text."""
     parts = [
@@ -1405,6 +1530,13 @@ def render_report(
             "## Worst farm-days of the minimal arm (exploratory)",
             "",
             render_worst_days(worst=worst),
+        ]
+    if not splits.is_empty():
+        parts += [
+            "",
+            "## Contrasts by cloud regime, season, and UTC hour of day (exploratory)",
+            "",
+            render_splits(splits=splits),
         ]
     if not probabilistic.is_empty():
         parts += [
@@ -1526,8 +1658,9 @@ def main() -> int:
     worst = stack_nonempty(frames=worst_frames)
     aerosol_conditions = stack_nonempty(frames=condition_frames)
     probabilistic = stack_nonempty(frames=probabilistic_frames)
+    splits = stack_nonempty(frames=split_frames)
     for frame, path in (
-        (stack_nonempty(frames=split_frames), paths.splits),
+        (splits, paths.splits),
         (worst, paths.worst_days),
         (aerosol_conditions, paths.aerosol_conditions),
         (probabilistic, paths.probabilistic),
@@ -1545,6 +1678,7 @@ def main() -> int:
         worst=worst,
         aerosol_conditions=aerosol_conditions,
         probabilistic=probabilistic,
+        splits=splits,
     )
     paths.report.write_text(report)
     _LOG.info("wrote %s", paths.report)
