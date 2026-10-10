@@ -402,8 +402,8 @@ the story without the prose around it.
   plots. Then run the two reviews the page gets, in order: a first-stumble reader (a fresh Opus
   reviewer who sees only that text and says where it cannot tell what a figure plots, in which
   unit, which direction is better, or what a colour means), and a `prose-review` sweep of the text,
-  one rule per pass. Fix the chart script, and only then render. The reviewer then checks the renders for
-  truncated labels and overlaps, which the text review cannot see.
+  one rule per pass. Fix the chart script, and only then render. The reviewer then checks the
+  renders for truncated labels and overlaps, which the text review cannot see.
 - **Where a study ranks products, Figure 1 is a leaderboard.** The leaderboard shows each
   product's own mean absolute error on the rows every product shares, sorted best first, with its
   95% interval, "smaller is better" in the axis text, and the unit. The paired contrasts follow
