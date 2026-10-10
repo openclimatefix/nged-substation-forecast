@@ -206,7 +206,7 @@ answer different questions:
 |---|---|---|
 | Granularity | Coarse: per-`time_series_type` + `"all"` aggregates | Full cube: per `time_series_id` × slice × fold × scope |
 | Volume | Tens of scalars per run | Thousands of rows per experiment |
-| Consumers | Leaderboard UI, sorting/grouping, auto-research | Dashboards, drill-down analysis |
+| Consumers | Leaderboard UI, sorting/grouping | Dashboards, drill-down analysis |
 | Shape | Key→value metric store | Queryable table (Polars/SQL) |
 
 MLflow is the leaderboard; the Delta table is the analysis cube. The aggregates are intentionally
