@@ -704,7 +704,8 @@ def models_work_figure(
     subtitle = [
         (
             "Each row is one plant, and each group of six rows is one week. Power is a share of "
-            "capacity. Black: measured power. Blue: B0's forecast of that power. Orange: L1's forecast of that power."
+            "capacity. Black: measured power. Blue: B0's forecast of that power. "
+            "Orange: L1's forecast of that power."
         ),
         forecasts_statement(runs="one of three training runs (fitting seeds)"),
         (
