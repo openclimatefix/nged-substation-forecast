@@ -18,6 +18,7 @@ from studies.era5_ladder import (
     accumulation_to_hourly_rate,
     aerosol_condition_flags,
     aerosol_hour_ending_mean,
+    aerosol_trial_recommendation,
     drop_one_group_features,
     gain_shares,
     mars_fetch_recommendation,
@@ -430,3 +431,24 @@ def test_aerosol_conditions_refuse_rows_with_a_missing_input():
 
     with pytest.raises(ValueError, match="non-null"):
         aerosol_condition_flags(frame=frame)
+
+
+@pytest.mark.parametrize(
+    ("uppers", "days", "months", "expected"),
+    [
+        ([-0.002, -0.0015], 30, 14, "trial_worth_running"),
+        ([-0.002, -0.0005], 30, 14, "not_shown"),
+        ([-0.001, -0.002], 30, 14, "not_shown"),
+        ([-0.002, -0.002], 19, 14, "cannot_be_assessed"),
+        ([-0.002, -0.002], 20, 11, "cannot_be_assessed"),
+        ([-0.002], 30, 14, "cannot_be_assessed"),
+        ([-0.002, -0.002], 20, 12, "trial_worth_running"),
+    ],
+)
+def test_the_aerosol_rule_needs_enough_events_and_both_settings_to_agree(
+    uppers: list[float], days: int, months: int, expected: str
+):
+    assert (
+        aerosol_trial_recommendation(uppers=uppers, smallest_effect=0.001, days=days, months=months)
+        == expected
+    )

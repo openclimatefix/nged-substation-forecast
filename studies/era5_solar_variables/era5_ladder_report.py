@@ -84,6 +84,7 @@ from studies.era5_ladder import (
     RUNGS,
     RungType,
     aerosol_condition_flags,
+    aerosol_trial_recommendation,
     mars_fetch_recommendation,
     raise_unless_same_rows,
     season_of_month,
@@ -933,6 +934,22 @@ def probabilistic_rows(
             }
             for level in QUANTILE_LEVELS
         )
+    # A single interval from the arm's own out-of-fold errors needs no second model, so it is the
+    # reference a regime-aware quantile model has to beat.
+    for arm in arms:
+        errors = in_setting.filter(pl.col("arm") == arm)
+        capacity = errors["effective_capacity_mw"]
+        shares = errors["signed_error_capped_mw"] / capacity
+        rows.append(
+            {
+                "target": target,
+                "kind": "residual_reference",
+                "arm": arm,
+                "measure": "width_80",
+                "value": float(shares.quantile(0.9, interpolation="linear") or 0.0)
+                - float(shares.quantile(0.1, interpolation="linear") or 0.0),
+            }
+        )
     for treatment, reference in PROBABILISTIC_CONTRASTS:
         if treatment not in arms or reference not in arms:
             continue
@@ -978,6 +995,11 @@ def probabilistic_rows(
     return pl.DataFrame(rows, infer_schema_length=None)
 
 
+def reference_key(*, arm: str) -> tuple[str, str, None, str]:
+    """Return the key of an arm's constant-interval reference width in the long frame."""
+    return ("residual_reference", arm, None, "width_80")
+
+
 def render_probabilistic(*, rows: pl.DataFrame) -> str:
     """Render the arm scores, the contrasts, the reliability table, and the regime scores."""
     if rows.is_empty():
@@ -1001,7 +1023,13 @@ def render_probabilistic(*, rows: pl.DataFrame) -> str:
         parts += [f"### {target} target: scores by arm", ""]
         parts.append(
             table(
-                header=["arm", "CRPS", "coverage of the 10-90 interval (%)", "mean width"],
+                header=[
+                    "arm",
+                    "CRPS",
+                    "coverage of the 10-90 interval (%)",
+                    "mean width",
+                    "width of one constant interval from the arm's own errors",
+                ],
                 rows=[
                     [
                         arm,
@@ -1009,6 +1037,7 @@ def render_probabilistic(*, rows: pl.DataFrame) -> str:
                             f"{values[('arm', arm, None, m)]['value'] * unit[m]:.{PRINT_DECIMALS}f}"
                             for m in measures
                         ),
+                        f"{values[reference_key(arm=arm)]['value'] * unit['width_80']:.3f}",
                     ]
                     for arm in arms
                 ],
@@ -1178,6 +1207,53 @@ def aerosol_condition_rows(
                 }
             )
     return pl.DataFrame(rows, infer_schema_length=None)
+
+
+def _points_interval(*, row: dict[str, object]) -> str:
+    """Return a row's 95% interval in points of capacity."""
+    return interval_text(
+        lower=float(row["lower_95"]),  # ty: ignore[invalid-argument-type]
+        upper=float(row["upper_95"]),  # ty: ignore[invalid-argument-type]
+        factor=PERCENTAGE_POINTS,
+    )
+
+
+def render_aerosol_decision(*, conditions: pl.DataFrame) -> list[str]:
+    """State the pre-specified aerosol rule's outcome from the clear-and-dusty PV rows.
+
+    Args:
+        conditions: The aerosol-condition rows of every target and setting.
+
+    Returns:
+        Report lines giving the event counts, each setting's interval, and the rule's outcome.
+    """
+    rows = conditions.filter(
+        (pl.col("target") == "pv")
+        & (pl.col("condition") == "clear_and_dusty")
+        & (pl.col("measure") == "mean_absolute_error")
+    )
+    if rows.is_empty():
+        return []
+    days = int(rows["days"].max())  # ty: ignore[invalid-argument-type]
+    months = int(rows["months"].max())  # ty: ignore[invalid-argument-type]
+    with_interval = rows.filter(pl.col("upper_95").is_not_null())
+    outcome = aerosol_trial_recommendation(
+        uppers=with_interval["upper_95"].to_list(),
+        smallest_effect=SMALLEST_EFFECT["pv"],
+        days=days,
+        months=months,
+    )
+    return [
+        "",
+        "### Outcome of the aerosol reading rule (PV target, clear and dusty hours)",
+        "",
+        f"- Distinct days: {days}. Calendar months: {months}.",
+        *(
+            f"- {row['setting']} setting: G10 minus G9 {_points_interval(row=row)} points."
+            for row in with_interval.iter_rows(named=True)
+        ),
+        f"- Outcome: **{outcome.replace('_', ' ')}**.",
+    ]
 
 
 def render_aerosol_conditions(*, conditions: pl.DataFrame) -> str:
@@ -1350,6 +1426,7 @@ def render_report(
             ),
             "",
             render_aerosol_conditions(conditions=aerosol_conditions),
+            *render_aerosol_decision(conditions=aerosol_conditions),
         ]
     return "\n".join(parts) + "\n"
 

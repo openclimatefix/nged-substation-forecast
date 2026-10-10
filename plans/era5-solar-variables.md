@@ -106,79 +106,94 @@ label of an hour ending at H. The aerosol join interpolates linearly in time to 
 H, takes the mean of the two, and reads the EAC4 cell nearest each farm. The aerosol download is
 about 4 MB in total.
 
-## Aerosol in unusual conditions: cloud-free skies and Saharan dust
+## Aerosol in unusual conditions: cloud-free skies and high dust
 
 **A yearly mean error can hide the days that matter most to a trader, so G10 gets its own
 conditional analysis.** One badly forecast day can cost an energy trader more than the year's gains.
-Saharan dust is the clearest case: on a cloud-free day with a dust plume overhead, irradiance is
-lower than a clear-sky forecast expects, and the error is large and one-signed. Such days are a few
-percent of hours, so their effect on a yearly mean is small. The analysis below is pre-specified,
-which means its conditions, metrics, and reading rule are fixed here before any G10 result exists.
-It is not one of the ten planned contrasts, so the page labels every number in it exploratory, with
-95% intervals and no correction for multiple comparisons. The page states the number of conditions
-(four), so a reader can discount.
+Dust is the clearest case: on a cloud-free day with a dust plume overhead, irradiance is lower than
+a clear-sky forecast expects, and the error is large and one-signed. Days like that are a few
+percent of hours, so they barely move a yearly mean. The analysis below is pre-specified, which
+means its conditions, measures, and reading rule are fixed here before any G10 result exists. The
+analysis is not one of the ten planned contrasts, so the page labels every number in it
+exploratory, with 95% intervals and no correction for multiple comparisons.
 
-**Four conditions, defined from variables the forecast would also have.** All use the G10 rows
-(daylight hours that EAC4 covers) and both targets, with PV primary.
+**Four conditions, each defined from variables a forecast would also carry.** All four use the G10
+rows (daylight hours that EAC4 covers) and both targets, with PV primary.
 
 - **Clear:** ERA5 `tcc` below 0.2, the primary regime threshold used elsewhere in the study.
 - **Clear and dusty:** clear, and `duaod550` at or above its 95th percentile over the G10 rows
-  (pooled over the six farms, which share two to four EAC4 cells).
+  (pooled over the six farms, which share two to four EAC4 cells). Dust over Great Britain is
+  mostly Saharan, but the condition measures only high modelled dust optical depth, and the
+  Saharan origin is unverified.
 - **Dusty, any sky:** `duaod550` at or above its 95th percentile, whatever the cloud.
-- **Clear and clean:** clear, and `aod550` below its median over the G10 rows. This is the
-  reference, where aerosol should add nothing, so a gain here would point at an artefact of the
-  extra columns, not at aerosol.
+- **Clear and clean:** clear, and `aod550` below its median over the G10 rows. In clean, cloud-free
+  air the extra aerosol columns have the least to say, so the page reports this condition as
+  context. A gain here would mean aerosol helps in general, not only in dust.
 
-**The contrast is G10 minus G9 on the aerosol rows, in each condition, and four numbers describe
-each condition.** Treatment minus reference, so negative is a gain.
+**The contrast is G10 minus G9 on the aerosol rows, in each condition.** The sign is treatment
+minus reference, so a negative difference is a gain. Four measures describe each condition.
 
-- **Mean absolute error**, the study's metric, with a month-resampled 95% interval.
-- **The 95th percentile of the farm-day mean absolute error**, which measures how bad the bad days
-  are.
-- **The worst farm-day mean absolute error.**
-- **The mean signed error** (prediction minus measurement), which shows whether dust makes the model
-  over-forecast.
+- **Mean absolute error**, the study's metric, with a month-resampled 95% interval at each
+  hyperparameter setting.
+- **The 95th percentile of the farm-day mean absolute error**, and **the worst farm-day mean
+  absolute error.** Each arm's bad days are its own, so the difference compares the two models'
+  tails and not the same days. The page says so.
+- **The mean signed error** (prediction minus measurement), which shows whether dust makes the
+  XGBoost model over-forecast.
+- **CRPS, interval coverage, and interval width** from the quantile fits (next section), at the
+  primary setting only, with an interval for CRPS and a difference of means for the other two.
 
 **The page counts the events before it reads any number.** For each condition the page prints the
 hours, the farm-days, the calendar months with at least one hour (months are the resampling unit),
-and the distinct days on which any farm met it, without dates on a farm's axis. The 95th percentile
-of `duaod550` is by construction 5% of hours, but dust arrives in episodes, so the number of
-independent events can be a handful. A condition that spans fewer than 6 calendar months
-(`MIN_MONTHS_FOR_INTERVAL`) gets its mean and signed error but no interval, and the page says that
-G10 cannot be assessed there. A condition with an interval wholly below zero is described as "a gain
-in these conditions", never as a production recommendation, because EAC4 is a reanalysis and a
-production forecast would receive CAMS forecast aerosol.
+and the distinct days on which any farm met the condition, without dates on a farm's axis. The 95th
+percentile of `duaod550` is by construction 5% of hours, but dust arrives in episodes, so the
+number of independent events can be a handful. A condition spanning fewer than 6 calendar months
+(`MIN_MONTHS_FOR_INTERVAL`) gets its means but no interval. The reading rule below needs at least 20
+distinct days and 12 calendar months (`MIN_AEROSOL_DAYS`, `MIN_AEROSOL_MONTHS`), and below those
+counts the page reports that G10 cannot be assessed in clear and dusty hours.
 
-**Reading rule, fixed now.** G10 is worth a production trial of a day-1 to day-3 CAMS aerosol
-feature only if, on the PV target at both hyperparameter settings, the clear-and-dusty interval for
-mean absolute error lies wholly below minus the smallest effect (0.1 percentage points of capacity)
-and the clear-and-clean reference does not. Anything else is reported as not shown. The other
-metrics inform the discussion and do not decide.
+**Reading rule, fixed now.** A day-1 to day-3 CAMS aerosol feature is worth a production trial only
+if, on the PV target at both hyperparameter settings, the whole 95% interval of G10 minus G9 in
+clear and dusty hours lies below minus the smallest effect (0.1 percentage points of capacity), and
+the condition meets the counts above. The report prints the outcome (`trial worth running`, `not
+shown`, or `cannot be assessed`, from `aerosol_trial_recommendation`). This single interval, on one
+measure, one target, and one condition, is the only deciding number in the aerosol analysis. Every
+other interval in it is context.
 
-**Two limits the page states.** EAC4 is a reanalysis, so it knows the dust plume's actual position;
-a CAMS forecast issued the day before places the plume less well, so the gain here is an upper bound
-on what the forecast would give. And the CAMS-irradiance target contains CAMS aerosol by
+**The page counts its intervals.** The condition analysis holds 16 intervals on mean absolute
+error (4 conditions, 2 targets, 2 settings) and 8 on CRPS (4 conditions, 2 targets, primary
+setting). The probabilistic contrasts below add 30. The page states the total, 54 at most, so a
+reader can discount.
+
+**Three limits the page states.** First, EAC4 is a reanalysis, so it knows the dust plume's actual
+position, and a CAMS forecast issued the day before places the plume less well. The gain here is
+an upper bound on what the forecast would give. Second, EAC4 assimilates satellite aerosol optical
+depth mainly where the sky is clear, so the clear-sky subset is where the gap between reanalysis
+and forecast is likely widest. Third, the CAMS-irradiance target contains CAMS aerosol by
 construction (see Targets), so a gain on the CAMS target in dusty conditions is expected and says
 little about PV.
 
 ## Probabilistic scores (exploratory, pre-specified)
 
 **The point fits rank the arms, and a quantile fit on a few arms asks a second question: does an
-input help the model say how uncertain it is?** For an electricity-network forecast, a narrow
-interval that covers the outcome is worth more than a small error on an average day, and a variable
-can sharpen the interval without moving the median. Mean absolute error from the point model stays
-the only planned ranking, and nothing in the ten planned contrasts, the Bonferroni level, or the
-MARS decision rule changes. The quantile fit is a second XGBoost model (`reg:quantileerror`, the
-nine levels 0.1 to 0.9 that `studies.cross_validation.QUANTILE_LEVELS` already holds) fitted beside
-the point model on the same rows, folds, seeds, and columns. The point model is unchanged by it, so
-each arm's point predictions are the same with or without the quantile fit.
+input help the XGBoost model say how uncertain it is?** For an electricity-network forecast, a
+narrow interval that covers the outcome is worth more than a small error on an average day, and a
+variable can sharpen the interval without moving the median. Mean absolute error from the point
+model stays the only planned ranking, and nothing in the ten planned contrasts, the Bonferroni
+level, or the MARS decision rule changes. The quantile fit is a second XGBoost model
+(`reg:quantileerror`, the nine levels 0.1 to 0.9 that `studies.cross_validation.QUANTILE_LEVELS`
+already holds) fitted beside the point model on the same rows, folds, seeds, and columns. The point
+model is fitted first with the same parameters, so each arm's point predictions are the same with
+or without the quantile fit.
 
 **Quantile fits cover the arms the questions need, at the primary setting only.** They are G0, G2,
 G9, G9 without the 12 MARS-only variables (`g9_without_mars_only`), and the negative control, on
 both targets, plus `g9_aerosol_rows` and G10 in the aerosol view. A multi-quantile fit builds one
 tree per level, so each of these fits costs about nine times a point fit. Fitting every arm would
-add 12 to 25 hours, and the five arms plus the two aerosol arms add an estimated 4 to 8 hours
-(estimates from the superseded G0 to G2 timings; the real time is recorded in the report).
+add 12 to 25 hours, and these arms add an estimated 4 to 8 hours (estimated from the superseded
+G0 to G2 timings; the report records the real time). The second hyperparameter setting is not run
+for the quantile fits, so every probabilistic result is labelled "primary setting only" and none
+of them carries a verdict.
 
 **The scores come from the quantiles after repairing them in three ways, identically for every
 arm.** Each row's quantiles are sorted (XGBoost's multi-quantile head can cross), held at or below
@@ -187,27 +202,36 @@ negative. Every score is divided by the row's own capacity (PV) or reported in i
 before averaging.
 
 - **Continuous ranked probability score (CRPS)**, approximated from the nine levels as the existing
-  `crps` does, on the repaired quantiles.
-- **Pinball loss at 0.1 and 0.9.**
+  `crps` does, on the repaired quantiles. The approximation leaves out the tails beyond the 0.1 and
+  0.9 levels, so the score is a truncated one.
 - **Coverage of the 0.1 to 0.9 interval** (nominal 80%) and its **mean width**.
+- **A constant-width reference:** the width of one interval that holds 80% of the arm's own
+  out-of-fold point errors (the 0.1 to 0.9 range of the signed error), which needs no second model.
 - **A reliability table:** the share of outcomes at or below each of the nine quantile levels.
 - **The same scores by ERA5 cloud regime** (the primary `tcc` split of the regime panel).
 
-**Four contrasts, each on both targets, with 95% intervals from the same month-resampled paired
+**Five contrasts, each on both targets, with 95% intervals from the same month-resampled paired
 bootstrap, labelled exploratory.** They are G2 minus G0, G9 minus G2, G9 minus the negative control,
-and P4 (G9 minus G9 without the MARS-only variables), each on CRPS, and each also on interval width
-and coverage as differences of means. In the aerosol analysis, G10 minus G9 on the aerosol rows is
-also scored on CRPS, width, and coverage in the four conditions. The page states the number of
-probabilistic contrasts, so a reader can discount.
+P4 (G9 minus G9 without the MARS-only variables), and G10 minus G9 on the aerosol rows. Each is
+scored on CRPS, and also on interval width and on coverage as differences of means, which is 30
+intervals in all. The page counts them with the aerosol intervals, as above.
 
-**A claim that an input "helps the model estimate its own uncertainty" needs narrower intervals at
-the same coverage, measured against the negative control.** CRPS mostly follows the median, so an
-input that improves the median also improves CRPS. The negative control's permuted columns keep each
-month-and-hour mean, which carries seasonal spread, so the control is the reference for any spread
-claim: the page reports G9 against the control, not only G9 against G0. A difference in coverage of
-about one point may be resolvable. Tail quantiles beyond 0.1 and 0.9 and dust-episode spread are
-not, because the independent weather episodes number in the dozens and the six farms share their
-weather. The page says so.
+**A claim that an input "helps the model estimate its own uncertainty" has to clear three bars.**
+CRPS and interval width both fall when the median improves, so neither shows better uncertainty
+estimation alone.
+
+- **Narrower intervals at the same coverage:** the 95% interval of the coverage difference lies
+  within plus or minus 2 percentage points, and the width difference lies below zero.
+- **Narrower than the negative control:** the control's permuted columns keep each month-and-hour
+  mean, which carries seasonal spread, so the page reports G9 against the control as well as G9
+  against G0.
+- **Narrower than the constant-width reference:** the quantile model's mean width at the same
+  coverage is below the constant interval from the arm's own errors, so the width gain does not
+  come from a better median alone.
+
+A coverage difference of about one point may be resolvable. The tail quantiles beyond 0.1 and 0.9
+and dust-episode spread are not, because the independent weather episodes number in the dozens and
+the six farms share their weather. The page says so.
 
 **Gain importance still comes from the point booster.** The quantile model is not used for the
 importance figure.
@@ -335,7 +359,9 @@ reference, so a negative difference is a gain), with a smallest effect of intere
 result (0.1 percentage points of capacity for PV, 0.01 for the clearness index).
 
 **Every other number is exploratory:** each rung against G0, each rung against the one below it, the
-drop-one-group runs, the per-farm numbers, and the regime and season splits. The page labels those
+drop-one-group runs, the per-farm numbers, the regime and season splits, the aerosol analysis in
+unusual conditions (with its pre-specified reading rule), and the probabilistic scores. The page
+labels those
 numbers exploratory and does not correct those numbers for multiple comparisons.
 
 ## Controls
@@ -414,7 +440,7 @@ findings, Introduction, Data and methods, Results, and Limitations. The Summary'
 3. Is fetching the 12 MARS-only IFS variables worth it (planned contrast P4 and its decision rule)?
 4. Does the answer on ERA5 carry over to IFS forecasts, and what would a matched-lead follow-up
    need?
-5. Does CAMS aerosol help under cloud-free skies and Saharan dust, where a yearly mean error can
+5. Does CAMS aerosol help under cloud-free skies and high dust, where a yearly mean error can
    hide a costly bad day (the pre-specified conditional analysis)?
 6. Do any inputs help an XGBoost model estimate its own uncertainty, measured as narrower intervals
    at the same coverage than the negative control (the exploratory probabilistic scores)?
@@ -454,12 +480,6 @@ text), has `aria=False` on its marks, and shows the weather series without the f
     mean. Both thresholds are fixed before any result. Exploratory.
 9. **Seasons.** The same differences by season (winter, spring, summer, autumn), and for the
    clear-sky, broken-cloud, and overcast regimes within each season. Exploratory.
-    - **Probabilistic scores.** For G0, G2, G9, G9 without the MARS-only variables, and the
-      negative control: CRPS, interval coverage and width, and a reliability chart of the share of
-      outcomes below each quantile level. Exploratory, pre-specified.
-    - **Aerosol in unusual conditions.** G10 minus G9 on the aerosol rows in the four conditions of
-      the aerosol section, with the four metrics, CRPS, interval width and coverage, and the event
-      counts. Exploratory, pre-specified.
 10. **Drop-one-group.** Error added when each group is removed from G9.
 11. **Hour of day and snow.** Error by hour of day for G0 against G9, and the worst 20 days for G0
     with what G9 changed on them, anonymised by farm label.
@@ -469,6 +489,13 @@ text), has `aria=False` on its marks, and shows the weather series without the f
     the share of `ssrd` and of the cloud covers moves from G0 to G2 to G9, as a bar for each model.
     Importance is descriptive, and the caption says that gain splits credit between correlated
     columns.
+13. **Probabilistic scores.** For G0, G2, G9, G9 without the MARS-only variables, and the negative
+    control: interval coverage against mean width, the constant-width reference, and a reliability
+    chart of the share of outcomes below each quantile level. Exploratory, pre-specified, primary
+    setting only.
+14. **Aerosol in unusual conditions.** G10 minus G9 on the aerosol rows in the four conditions of
+    the aerosol section, for mean absolute error and CRPS, with the event counts beside each bar
+    and the outcome of the reading rule stated. Exploratory, pre-specified.
 
 ## Data and code
 
@@ -523,9 +550,12 @@ text), has `aria=False` on its marks, and shows the weather series without the f
   coordinator's session), then
 the build, fit, importance, report, and chart scripts, each with at least one fresh Opus review
 before it runs (done for the first four, the importance script still to write and review), a run on
-rungs G0 to G2, the full run once the data arrives, the first Opus science review, charts and draft
+rungs G0 to G2, the full run once the data arrives (point fits for every arm, quantile fits for the
+seven arms in `QUANTILE_ARMS`, the aerosol view, and the importance refit, each after the
+coordinator grants a GPU slot), the first Opus science review, charts and draft
 page, the second Opus science review, the diff review, a mutation pass because `packages/studies`
-changes (`era5_ladder`, `correlation`), the prose review and persona reviews, and merge.
+changes (`era5_ladder`, `correlation`, `cross_validation`'s `probabilistic_scores`), the prose
+review and persona reviews, and merge.
 
 ## Tests for the new `packages/studies` functions
 
@@ -541,6 +571,12 @@ changes (`era5_ladder`, `correlation`), the prose review and persona reviews, an
 - **Regime and correlation functions:** `sky_regime` returns each regime at and between its
   thresholds, and `pooled_correlation_interval` returns the known correlation of a constructed pair.
   Tests run with `--run-studies`.
+- **Aerosol conditions:** `aerosol_condition_flags` applies each condition's own threshold, and
+  raises on a null input. `aerosol_trial_recommendation` returns each of its three outcomes at the
+  boundaries of the day, month, and smallest-effect thresholds.
+- **Probabilistic scores:** `probabilistic_scores` sorts crossing quantiles, holds them at the cap,
+  floors them at zero, and divides each row's scores by its own capacity (in
+  `test_cross_validation.py`).
 - **Importance summary:** gains scaled to sum to 1 per model, and a column the model never split on
   gets a share of 0 rather than going missing. The grouping of columns by rung is in the chart
   script and is checked by looking at the figure.

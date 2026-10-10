@@ -485,6 +485,49 @@ def aerosol_condition_flags(*, frame: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+MIN_AEROSOL_DAYS: Final[int] = 20
+"""The fewest distinct days a condition needs before the aerosol rule reads its interval."""
+
+MIN_AEROSOL_MONTHS: Final[int] = 12
+"""The fewest calendar months a condition needs before the aerosol rule reads its interval."""
+
+AEROSOL_SETTINGS_REQUIRED: Final[int] = 2
+"""How many hyperparameter settings must agree before the aerosol rule recommends a trial."""
+
+AerosolTrialType = Literal["trial_worth_running", "not_shown", "cannot_be_assessed"]
+"""The three outcomes of the aerosol reading rule."""
+
+
+def aerosol_trial_recommendation(
+    *, uppers: Sequence[float], smallest_effect: float, days: int, months: int
+) -> AerosolTrialType:
+    """Apply the pre-specified rule for trialling a CAMS aerosol feature in production.
+
+    The rule reads the clear-and-dusty condition on the PV target. G10 minus G9 has to be a gain
+    larger than the smallest effect of interest at every setting, which means each setting's whole
+    interval lies below minus the smallest effect, and the condition has to hold enough independent
+    days and months for an interval resampled by month to mean anything.
+
+    Args:
+        uppers: The upper bound of the interval of G10 minus G9, one per hyperparameter setting.
+        smallest_effect: The smallest effect of interest as a positive fraction of capacity.
+        days: The number of distinct days on which any farm met the condition.
+        months: The number of calendar months holding at least one such hour.
+
+    Returns:
+        `cannot_be_assessed` if the condition is too thin or a setting is missing,
+        `trial_worth_running` if every interval lies wholly below minus the smallest effect, and
+        `not_shown` otherwise.
+    """
+    if days < MIN_AEROSOL_DAYS or months < MIN_AEROSOL_MONTHS:
+        return "cannot_be_assessed"
+    if len(uppers) < AEROSOL_SETTINGS_REQUIRED:
+        return "cannot_be_assessed"
+    if all(upper < -smallest_effect for upper in uppers):
+        return "trial_worth_running"
+    return "not_shown"
+
+
 def season_of_month(*, month_number: pl.Expr) -> pl.Expr:
     """Return the meteorological season of a calendar month number.
 
