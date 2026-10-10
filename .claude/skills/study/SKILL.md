@@ -343,11 +343,10 @@ sets out the rule and the products the rule covers.
 ## Charts
 
 **A study page is figure-led: the figures carry the whole story, and the text only explains
-them.** The maintainer asked for this directly, and on 2026-10-10 asked for every study to take
-this form. The first figure is visible above the fold, and prose is kept to the minimum the figures
-need: a reader who looks only at the figures and their bolded leads follows the study from the
-question to the answer. Both the page's concept and its vertical space
-belong largely to the figures, so a reader who scrolls past the text still follows the story. The
+them.** The maintainer asked for this form on 2026-10-10 for every study. The first figure is
+visible without scrolling, when a reader lands on the page. Prose is limited to a bolded lead and a
+caption for each figure, plus the few sentences a figure cannot carry. A reader who looks only at
+the figures and their bolded leads follows the study from the question to the answer. The
 figures are mostly time series, with scatter plots, distributions, and other data graphics where
 they show the point better. They step the reader through the processing, in the order the method
 runs, so that the reader understands the problem, the method, and why the method works by looking.
@@ -364,7 +363,7 @@ plenty of charts in every study page, because many technical readers look at the
 reading any text. Each chart, with its title, subtitle, axis labels, and legend, tells its part of
 the story without the prose around it.
 
-- **A headline chart opens every page**, directly under the summary and before the disclaimer,
+- **A headline chart opens every page**, directly under the bottom line and before the disclaimer,
   showing the headline result with its 95% intervals. Every section whose claim rests on a number
   gets a chart too.
 - **Where a study ranks products, Figure 1 is a leaderboard.** The leaderboard shows each
@@ -422,15 +421,15 @@ Every study page follows the structure of an academic paper, in this order:
    what would change the answer or what the study did not test. **The headline figure follows the
    bottom line at once, so that it is visible above the fold, without scrolling, when a reader
    lands on the page.** Where the study ranks products, the headline figure is the leaderboard
-   or the paired contrasts. Then come the question-and-answer bullets described below, and scoped
-   take-home bullets, one per use of the data. The Summary bullets are the only place a
-   recommendation appears without its evidence.
+   or the paired contrasts. The question-and-answer bullets described below come after the
+   figure, followed by scoped take-home bullets, one per use of the data. The Summary bullets are
+   the only place a recommendation appears without its evidence.
 
-   **The Summary answers each question the study asks, in plain words, in the fewest words that
-   work.** Write one short bolded bullet per question, such as "Can an unmetered battery be
-   identified?", with the answer on the same line ("Mostly no, apart from simulated cases"). Give
-   at most two sentences under it, naming what was tested, the number with its scope, the baseline
-   it was compared with, and the figure that shows it. A reader who knows none of the study's terms
+   **The Summary answers each question the study asks, in plain words and in at most two sentences
+   per question.** Write one short bolded bullet per question, such as "Can an unmetered battery be
+   identified?", with the answer on the same line ("Mostly no, apart from simulated cases"). Under
+   each answer, name what was tested, the number with its scope, the baseline it was compared
+   with, and the figure that shows it. A reader who knows none of the study's terms
    must be able to follow the Summary. Define each term at first use, or leave the term out. Label
    every provisional number "(provisional)". Close the question-and-answer bullets with one bullet
    saying what the data and methods used can and cannot support.
