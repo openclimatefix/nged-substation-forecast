@@ -13,7 +13,11 @@ from studies.ifs_ladder import (
     cloud_cover_control_features,
     cloud_layers_control_features,
     drop_one_group_features,
+    ens_minimal_features,
+    ens_partner_control_features,
+    ens_with_partner_features,
     era5_comparison_features,
+    f0_with_ens_features,
     group_control_features,
     later_groups_columns,
     later_groups_control_features,
@@ -24,6 +28,7 @@ from studies.ifs_ladder import (
     rung_variables,
     with_partner_features,
 )
+from studies.ifs_lead_days import ENS_COLUMNS, PARTNER_COLUMNS
 
 
 def test_the_full_set_holds_the_twenty_variables_of_the_plan():
@@ -144,3 +149,24 @@ def test_a_group_control_pads_f2_with_only_that_groups_permuted_variables():
 def test_a_rung_without_a_group_control_is_refused():
     with pytest.raises(ValueError, match="no group control"):
         group_control_features(rung="f6")
+
+
+def test_the_ensemble_mean_arm_swaps_ifs_radiation_and_temperature_for_the_ensemble_mean():
+    columns = ens_minimal_features()
+
+    assert columns == (*SHARED_FEATURES, *ENS_COLUMNS)
+    assert "shortwave_radiation" not in columns
+    assert "temperature_2m" not in columns
+    assert len(columns) == len(rung_features(rung="f0"))
+
+
+def test_the_ensemble_mean_arms_add_the_partner_its_permuted_copy_and_the_ensemble_mean_to_f0():
+    base = ens_minimal_features()
+
+    assert ens_with_partner_features() == (*base, *PARTNER_COLUMNS)
+    assert ens_partner_control_features() == (
+        *base,
+        *(f"{name}_shuffled" for name in PARTNER_COLUMNS),
+    )
+    assert len(ens_partner_control_features()) == len(ens_with_partner_features())
+    assert f0_with_ens_features() == (*rung_features(rung="f0"), *ENS_COLUMNS)

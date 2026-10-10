@@ -205,10 +205,11 @@ means both hyperparameter settings return the verdict.
   if P5 is `gain`. The outcome is `mars_variables` if P5 is `no gain` and the ERA5 P4 interval is
   wholly below −0.1 points at both settings. P4 is not, so the second outcome cannot occur, and the
   page says that. Otherwise the outcome is `not_separated`. The page does not call P4 an upper
-  bound, because ERA5's analysis timing inflates it and the 13-column penalty deflates it, and it
-  says that AIFS Single's 6-hour radiation and 0.25° grid handicap the partner. The page does not
-  state costs as findings: the price of ECMWF's dissemination is unverified, and engineering
-  effort is not measured here.
+  bound, because ERA5's analysis timing inflates it and the 13-column penalty deflates it. The page
+  does not call AIFS Single handicapped by its 6-hour radiation and 0.25° grid: on the blend rows
+  its raw radiation error against CAMS irradiance is lower than the 9 km IFS run's at every lead
+  day. The page does not state costs as findings: the price of ECMWF's dissemination is unverified,
+  and engineering effort is not measured here.
 
 **Decisions 1 and 2 add variables to a production feed that already holds the four FP variables,**
 so the page also draws F1, F2, and F6 minus FP (exploratory) next to the planned contrasts.
@@ -258,7 +259,8 @@ ladder's.
   through the clear-sky index using the 6-hour steps on either side of the hour of the same run,
   and its temperature is interpolated linearly to the hour's midpoint. The page says so. The
   partner is an area value on AIFS's 0.25° grid and IFS is a point value from Open-Meteo's 9 km
-  grid, which handicaps the partner further. The partner files hold only the daylight hours 05 to
+  grid, and on the blend rows the partner's raw radiation error against CAMS irradiance is lower
+  than the 9 km IFS run's at every lead day. The partner files hold only the daylight hours 05 to
   20 UTC, so `checks.md` counts the hours each condition removes from the blend rows.
 - **ICON-EU is an optional second partner at lead days 1 and 2 only**, read from the Previous Runs
   files if they cover the blend months at whole-day offsets. Otherwise the page says that ICON-EU
@@ -371,6 +373,35 @@ reader, then a one-rule-per-pass sweep) before the figure is first rendered.
 - Open-Meteo's hourly values beyond 90 hours are interpolated, not native model output.
 - Downward long-wave radiation, which the production feed carries, is not available here, so cloud
   gains may be overstated against the production set.
+
+## Post hoc analyses added after the first science review
+
+The first scientific review found no leakage, but it found that the P4 and P5 gains (about 1 point)
+describe the reference they were added to: Open-Meteo's 9 km deterministic IFS point radiation. The
+production service reads the IFS ensemble mean. The report therefore adds the analyses below. All
+are **post hoc and exploratory**: they were chosen after seeing results, they carry no planned
+status, and the report counts their intervals with the other exploratory intervals.
+
+- **The production-relevant contrast.** On the blend rows, `e_a` (the shared columns, the IFS
+  ensemble mean's radiation and temperature, and AIFS Single's) minus `e0` (the same without AIFS
+  Single), with its padding control `control_e0_partner`, and `f0_e` (F0 plus the ensemble mean)
+  minus `f0`. Both are read pooled over lead days 1 to 3 at both settings with 95% and 99%
+  intervals, and by the plan's verdict formula for information, beside the ERA5 study's P4.
+- **The by-fold and without-winter-fold reading.** P4 and P5 by blend fold, and pooled and by lead
+  day without the fold that holds the blend rows' only winter months, whose models train on no
+  winter month.
+- **The drop-one runs at the second setting.** `drop_f2` and `drop_f4` at the second setting, so
+  that the drop-one rule is applied at both settings and a group counts as a drop-one gain only if
+  both agree.
+- **The raw-error table.** The raw mean absolute error in W m-2 of the 9 km IFS radiation, AIFS
+  Single's, and the ensemble mean's against CAMS irradiance at lead days 1 to 3, and the ladder's
+  F0 against the blend refit of F0 on the same rows.
+
+**The pre-registered formula for the third decision stands.** Its outcome is reported as the
+formula gives it, and a scope paragraph follows it: P5 adds the second forecast to a single 9 km
+point forecast, the ERA5 study's P4 adds MARS-only variables to a reanalysis, and neither is the
+production gain. The page says whether the routes are separated for the production service from the
+post hoc `e_a` minus `e0` interval and the smallest effect.
 
 ## The five complexity triggers (for sizing)
 

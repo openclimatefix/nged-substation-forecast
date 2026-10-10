@@ -22,7 +22,11 @@ from studies.ifs_ladder import (
     cloud_cover_control_features,
     cloud_layers_control_features,
     drop_one_group_features,
+    ens_minimal_features,
+    ens_partner_control_features,
+    ens_with_partner_features,
     era5_comparison_features,
+    f0_with_ens_features,
     group_control_features,
     later_groups_columns,
     later_groups_control_features,
@@ -50,11 +54,24 @@ TARGETS: Final[tuple[TargetType, ...]] = ("pv", "cams")
 TARGET_COLUMNS: Final[dict[TargetType, str]] = {"pv": "power_mw", "cams": "cams_clearness_index"}
 """The column each target's XGBoost models predict."""
 
-ViewType = Literal["ladder", "blend"]
-"""Which rows a fit uses: every kept row, or the blend rows that AIFS Single also covers."""
+ViewType = Literal["ladder", "blend", "ens", "extra_sensitivity"]
+"""Which rows and arms a fit uses.
 
-VIEWS: Final[tuple[ViewType, ...]] = ("ladder", "blend")
+`ladder` fits every kept row. `blend` fits the blend rows that AIFS Single also covers. `ens` fits
+the post hoc production-relevant arms on the same blend rows with the IFS ensemble mean added.
+`extra_sensitivity` fits further ladder arms at the second hyperparameter setting only.
+"""
+
+VIEWS: Final[tuple[ViewType, ...]] = ("ladder", "blend", "ens", "extra_sensitivity")
 """The views, in the order the fit script runs them."""
+
+VIEW_FILE_STEMS: Final[dict[ViewType, str]] = {
+    "ladder": "ladder",
+    "blend": "blend",
+    "ens": "ens",
+    "extra_sensitivity": "ladder_extra",
+}
+"""The word that names a view in its losses and arms files."""
 
 METRIC: Final[str] = "absolute_error_capped_fraction_of_capacity"
 """The loss column the study ranks on.
@@ -121,6 +138,22 @@ ERA5_LOSSES_NAME: Final[str] = "losses_main_through_g9_pv_ladder.parquet"
 
 ERA5_DATASET_NAME: Final[str] = "dataset_main_through_g9.parquet"
 """The ERA5 study's built frame, which supplies the rows."""
+
+E0_ARM: Final[str] = "e0"
+"""The post hoc arm given the shared columns and the IFS ensemble mean's two variables."""
+E_A_ARM: Final[str] = "e_a"
+"""The post hoc arm `e0` plus AIFS Single's radiation and temperature."""
+CONTROL_E0_PARTNER_ARM: Final[str] = "control_e0_partner"
+"""The post hoc arm `e0` plus two permuted partner columns, which pads `e_a`."""
+F0_E_ARM: Final[str] = "f0_e"
+"""The post hoc arm `f0` plus the IFS ensemble mean's radiation and temperature."""
+POST_HOC_ARMS: Final[tuple[str, ...]] = (
+    E0_ARM,
+    E_A_ARM,
+    CONTROL_E0_PARTNER_ARM,
+    F0_E_ARM,
+)
+"""The arms of the `ens` view, all added after the first scientific review (post hoc)."""
 
 F6_ARM: Final[str] = "f6"
 """The arm given every IFS variable."""
@@ -240,6 +273,51 @@ PLANNED_CONTRASTS: Final[tuple[PlannedContrast, ...]] = (
 )
 """The planned contrasts as data, written before any result. A negative difference is a gain."""
 
+
+class PostHocContrast(NamedTuple):
+    """One post hoc production-relevant contrast, added after the first scientific review.
+
+    Attributes:
+        label: The contrast's name on the page.
+        treatment: The arm whose error is compared.
+        reference: The arm it is compared against, possibly fitted in the `blend` view.
+        control: The negative control with the treatment's columns, or `None` if the contrast
+            has none.
+        question: What the contrast asks, in words.
+    """
+
+    label: str
+    treatment: str
+    reference: str
+    control: str | None
+    question: str
+
+
+POST_HOC_CONTRASTS: Final[tuple[PostHocContrast, ...]] = (
+    PostHocContrast(
+        label="E-A",
+        treatment=E_A_ARM,
+        reference=E0_ARM,
+        control=CONTROL_E0_PARTNER_ARM,
+        question="What does AIFS Single add to the IFS ensemble mean the production service reads?",
+    ),
+    PostHocContrast(
+        label="F0-E",
+        treatment=F0_E_ARM,
+        reference="f0",
+        control=None,
+        question="What does the IFS ensemble mean add to the minimal 9 km IFS set?",
+    ),
+)
+"""The production-relevant contrasts. All are post hoc and exploratory.
+
+The reference `f0` of the second contrast is fitted in the `blend` view, on the same rows as the
+arms of the `ens` view.
+"""
+
+DROP_ONE_SECOND_SETTING_ARMS: Final[tuple[str, ...]] = ("drop_f2", "drop_f4")
+"""The drop-one arms fitted at the second setting by default, which the priority list needs."""
+
 SENSITIVITY_ARMS: Final[tuple[str, ...]] = (
     "f0",
     "f1",
@@ -277,6 +355,10 @@ ARM_LABELS: Final[dict[str, str]] = {
     CONTROL_LATER_GROUPS_ARM: "Control: F2 + shuffled F3 to F6",
     CONTROL_PARTNER_MINIMAL_ARM: "Control: F0 + shuffled AIFS Single",
     CONTROL_PARTNER_FULL_ARM: "Control: F6 + shuffled AIFS Single",
+    E0_ARM: "E0 IFS ensemble mean (radiation, temperature)",
+    E_A_ARM: "E-A E0 + AIFS Single",
+    CONTROL_E0_PARTNER_ARM: "Control: E0 + shuffled AIFS Single",
+    F0_E_ARM: "F0-E F0 + IFS ensemble mean",
     CONTROL_DIRECT_ARM: "Control: F2 + shuffled direct radiation",
     CONTROL_HUMIDITY_ARM: "Control: F2 + shuffled F4 variables",
     CONTROL_CONVECTION_ARM: "Control: F2 + shuffled F5 variables",
@@ -326,6 +408,14 @@ def blend_dataset_path() -> Path:
     return INPUTS_DIR / "dataset_blend.parquet"
 
 
+def ens_dataset_path() -> Path:
+    """Return where the blend rows with the IFS ensemble mean's columns added are written.
+
+    The rows, folds, and every other column are those of `blend_dataset_path`.
+    """
+    return INPUTS_DIR / "dataset_blend_ens.parquet"
+
+
 def checks_path() -> Path:
     """Return where the build's checks are written."""
     return INPUTS_DIR / "checks.md"
@@ -335,12 +425,15 @@ def dataset_path_for(*, key: FitKey) -> Path:
     """Return the frame a fit reads."""
     if key.view == "blend":
         return blend_dataset_path()
+    if key.view == "ens":
+        return ens_dataset_path()
     return lead_day_dataset_path(lead_day=key.lead_day)
 
 
 def results_path(*, key: FitKey) -> Path:
     """Return where one fit's per-row losses are written."""
-    return RESULTS_DIR / f"losses_{key.view}_lead_day_{key.lead_day}_{key.target}.parquet"
+    stem = VIEW_FILE_STEMS[key.view]
+    return RESULTS_DIR / f"losses_{stem}_lead_day_{key.lead_day}_{key.target}.parquet"
 
 
 def checkpoint_dir_for(*, key: FitKey) -> Path:
@@ -350,7 +443,8 @@ def checkpoint_dir_for(*, key: FitKey) -> Path:
 
 def arms_path(*, key: FitKey) -> Path:
     """Return where the JSON naming each arm's columns, the device, and the settings is written."""
-    return RESULTS_DIR / f"arms_{key.view}_lead_day_{key.lead_day}_{key.target}.json"
+    stem = VIEW_FILE_STEMS[key.view]
+    return RESULTS_DIR / f"arms_{stem}_lead_day_{key.lead_day}_{key.target}.json"
 
 
 class ReportPaths(NamedTuple):
@@ -403,10 +497,11 @@ def permutation_groups(*, view: ViewType) -> list[tuple[str, ...]]:
         view: The rows of the fit.
 
     Returns:
-        For the ladder view, total cloud, the three layers, and the `f3` to `f6` variables, as three
-        groups with three permutations. For the blend view, the partner's two variables.
+        For the ladder views, total cloud, the three layers, and the `f3` to `f6` variables, as
+        three groups with three permutations. For the blend and ensemble views, the partner's two
+        variables.
     """
-    if view == "blend":
+    if view in ("blend", "ens"):
         return [("partner_shortwave_radiation", "partner_temperature_2m")]
     return [RUNG_ADDITIONS["f1"], RUNG_ADDITIONS["f2"], later_groups_columns()]
 
@@ -448,9 +543,25 @@ def arm_features(
         blend view holds only the output target, and the CAMS target holds only `CAMS_ARMS`.
 
     Raises:
-        ValueError: If the blend view is asked of the CAMS target or of a lead day without blend
-            rows.
+        ValueError: If the blend or ensemble view is asked of the CAMS target or of a lead day
+            without blend rows, or the extra-sensitivity view of the CAMS target or of a lead day
+            outside the planned lead days.
     """
+    if view == "ens":
+        if target != "pv" or lead_day not in BLEND_LEAD_DAYS:
+            msg = f"the ens view holds the pv target at lead days {BLEND_LEAD_DAYS} only"
+            raise ValueError(msg)
+        return {
+            E0_ARM: ens_minimal_features(),
+            E_A_ARM: ens_with_partner_features(),
+            CONTROL_E0_PARTNER_ARM: ens_partner_control_features(),
+            F0_E_ARM: f0_with_ens_features(),
+        }
+    if view == "extra_sensitivity":
+        if target != "pv" or lead_day not in PLANNED_LEAD_DAYS:
+            msg = f"the extra_sensitivity view holds the pv target at lead days {PLANNED_LEAD_DAYS}"
+            raise ValueError(msg)
+        return _ladder_pv_arms(lead_day=lead_day)
     if view == "blend":
         if target != "pv" or lead_day not in BLEND_LEAD_DAYS:
             msg = f"the blend view holds the pv target at lead days {BLEND_LEAD_DAYS} only"
@@ -481,9 +592,14 @@ def settings_for(
         extra: Further arms to fit at both settings.
 
     Returns:
-        The primary setting, and the second setting as well for the arms of `SENSITIVITY_ARMS`
-        and `extra` at the planned lead days (and in the blend view).
+        The second setting alone in the extra-sensitivity view, and both settings in the `ens`
+        view. Otherwise the primary setting, and the second setting as well for the arms of
+        `SENSITIVITY_ARMS` and `extra` at the planned lead days (and in the blend view).
     """
+    if view == "extra_sensitivity":
+        return [SENSITIVITY_SETTING]
+    if view == "ens":
+        return [PRIMARY_SETTING, SENSITIVITY_SETTING]
     both = (arm in SENSITIVITY_ARMS or arm in extra) and (
         view == "blend" or lead_day in PLANNED_LEAD_DAYS
     )
@@ -491,8 +607,12 @@ def settings_for(
 
 
 def fit_keys() -> list[FitKey]:
-    """List every fit: each lead day's ladder view on both targets, and the blend view's output."""
+    """List every fit: the ladder on both targets, then the output target of the other views."""
     keys = [FitKey(view="ladder", lead_day=day, target="pv") for day in LEAD_DAYS]
     keys += [FitKey(view="ladder", lead_day=day, target="cams") for day in LEAD_DAYS]
     keys += [FitKey(view="blend", lead_day=day, target="pv") for day in BLEND_LEAD_DAYS]
+    keys += [FitKey(view="ens", lead_day=day, target="pv") for day in BLEND_LEAD_DAYS]
+    keys += [
+        FitKey(view="extra_sensitivity", lead_day=day, target="pv") for day in PLANNED_LEAD_DAYS
+    ]
     return keys

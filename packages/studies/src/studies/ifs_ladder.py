@@ -21,7 +21,7 @@ from studies.blending import PERMUTED_SUFFIX
 from studies.era5_ladder import SHARED_FEATURES as ERA5_SHARED_FEATURES
 from studies.era5_ladder import RungType as Era5RungType
 from studies.era5_ladder import rung_variables as era5_rung_variables
-from studies.ifs_lead_days import PARTNER_COLUMNS
+from studies.ifs_lead_days import ENS_COLUMNS, PARTNER_COLUMNS
 
 RungType = Literal["f0", "f1", "f2", "f3", "f4", "f5", "f6"]
 """The IFS rungs."""
@@ -88,6 +88,30 @@ def production_features() -> tuple[str, ...]:
 def with_partner_features(*, rung: RungType) -> tuple[str, ...]:
     """Return a rung's columns and the second forecast's radiation and temperature."""
     return (*rung_features(rung=rung), *PARTNER_COLUMNS)
+
+
+def ens_minimal_features() -> tuple[str, ...]:
+    """Return the shared columns and the ensemble mean's radiation and temperature.
+
+    The arm has the columns of `f0` with IFS's own radiation and temperature replaced by the
+    ensemble mean's, which is what the production service reads.
+    """
+    return (*SHARED_FEATURES, *ENS_COLUMNS)
+
+
+def ens_with_partner_features() -> tuple[str, ...]:
+    """Return the ensemble-mean arm's columns and the partner's radiation and temperature."""
+    return (*ens_minimal_features(), *PARTNER_COLUMNS)
+
+
+def ens_partner_control_features() -> tuple[str, ...]:
+    """Return the ensemble-mean arm's columns and permuted copies of the partner's two variables."""
+    return (*ens_minimal_features(), *permuted(columns=PARTNER_COLUMNS))
+
+
+def f0_with_ens_features() -> tuple[str, ...]:
+    """Return the columns of `f0` and the ensemble mean's radiation and temperature."""
+    return (*rung_features(rung="f0"), *ENS_COLUMNS)
 
 
 def drop_one_group_features(*, dropped: RungType) -> tuple[str, ...]:

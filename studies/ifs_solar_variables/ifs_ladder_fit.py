@@ -19,9 +19,20 @@ exploratory and fits only `CAMS_ARMS`, with a capacity of 1, no export cap, and 
 hour. The `blend` view fits the minimal and full IFS arms with and without AIFS Single's radiation
 and temperature, on the blend rows of lead days 1 to 3, and their padding controls.
 
+**Two views were added after the first scientific review, and both are post hoc.** The `ens` view
+fits `e0`, `e_a`, `control_e0_partner`, and `f0_e` (`ifs_ladder_arms.POST_HOC_ARMS`), the arms that
+add AIFS Single, or the IFS ensemble mean the production service reads, to the blend rows. It reads
+`dataset_blend_ens.parquet`, fits lead days 1 to 3 on the output target at both settings, and
+writes `losses_ens_lead_day_{L}_pv.parquet`. The `extra_sensitivity` view fits the arms named by
+`--sensitivity-arms` (by default `drop_f2` and `drop_f4`) at the second setting only, on the
+ladder rows of lead days 1 to 3, and writes `losses_ladder_extra_lead_day_{L}_pv.parquet`, so that
+the drop-one rule can be applied at both settings. `--dry-run` prints each fit's jobs and exits
+before any fit, and without reading a dataset.
+
 **The hyperparameter settings.** Every arm is fitted at `PRIMARY_HYPER_PARAMETERS`. The arms of
 `SENSITIVITY_ARMS` (the arms of the planned contrasts, the controls, and `f3` to `f5`) are also
-fitted at `SENSITIVITY_HYPER_PARAMETERS` at the planned lead days. `--sensitivity-arms` adds more.
+fitted at `SENSITIVITY_HYPER_PARAMETERS` at the planned lead days. `--sensitivity-arms` adds more in
+the `ladder` and `blend` views.
 Column subsampling is off, so an arm with more columns gets no free win from column subsampling.
 Extra columns can still change the error, which the negative controls measure.
 
@@ -50,6 +61,7 @@ from typing import Final
 
 import polars as pl
 from ifs_ladder_arms import (
+    DROP_ONE_SECOND_SETTING_ARMS,
     METRIC,
     PERMUTATION_GROUPING,
     PERMUTATION_SEED,
@@ -57,6 +69,7 @@ from ifs_ladder_arms import (
     RESULTS_DIR,
     SENSITIVITY_SETTING,
     TARGET_COLUMNS,
+    VIEWS,
     FitKey,
     TargetType,
     ViewType,
@@ -114,7 +127,7 @@ def load_frame(*, key: FitKey) -> pl.DataFrame:
         The fit's rows sorted by farm and time, with a permuted copy of every control column.
     """
     frame = pl.read_parquet(dataset_path_for(key=key))
-    if key.view == "blend":
+    if key.view in ("blend", "ens"):
         frame = frame.filter(pl.col("lead_day") == key.lead_day)
     return climatology_permutation(
         frame=frame.sort("site", "time"),
@@ -190,6 +203,28 @@ def raise_if_columns_missing(*, frame: pl.DataFrame, arms: dict[str, tuple[str, 
     check_no_missing(frame=frame, columns=sorted(needed - allowed))
 
 
+def describe_jobs(*, key: FitKey, arms: dict[str, tuple[str, ...]], jobs: list[Job]) -> list[str]:
+    """Return one line per job and a heading line, for `--dry-run`.
+
+    Args:
+        key: Which fit.
+        arms: Each arm's name and columns.
+        jobs: The fits that would be run.
+
+    Returns:
+        The heading, naming the fit and its two output files, then one line per (arm, setting)
+        with its column count.
+    """
+    lines = [
+        (
+            f"{key.view} view, lead day {key.lead_day}, {key.target} target: {len(jobs)} jobs "
+            f"-> {results_path(key=key).name}, {arms_path(key=key).name}"
+        )
+    ]
+    lines += [f"  {name} at {setting}: {len(arms[name])} columns" for name, setting, *_ in jobs]
+    return lines
+
+
 def write_arms(
     *, arms: dict[str, tuple[str, ...]], key: FitKey, device: DeviceType, rows: int, jobs: list[Job]
 ) -> None:
@@ -227,6 +262,7 @@ def run_fit(
     extra_sensitivity_arms: tuple[str, ...],
     device: DeviceType,
     max_workers: int,
+    dry_run: bool,
 ) -> None:
     """Fit one lead day, target, and view, and write its losses and arms.
 
@@ -236,6 +272,7 @@ def run_fit(
         extra_sensitivity_arms: Further arms to fit at both settings.
         device: XGBoost's device.
         max_workers: How many (arm, farm) fits run at once.
+        dry_run: Whether to print the jobs and return before reading a dataset or fitting.
 
     Raises:
         ValueError: If `only_arms` names an arm this fit does not hold.
@@ -249,11 +286,15 @@ def run_fit(
             msg = f"{unknown} are not arms of {key}; its arms are {sorted(arms)}"
             raise ValueError(msg)
         arms = {name: features for name, features in arms.items() if name in only_arms}
+    jobs = jobs_for(key=key, arms=arms, extra_sensitivity_arms=extra_sensitivity_arms)
+    if dry_run:
+        for line in describe_jobs(key=key, arms=arms, jobs=jobs):
+            print(line)
+        return
     refuse_to_overwrite(paths=[results_path(key=key), arms_path(key=key)])
     frame = load_frame(key=key)
     raise_if_columns_missing(frame=frame, arms=arms)
     view = target_view(frame=frame, target=key.target)
-    jobs = jobs_for(key=key, arms=arms, extra_sensitivity_arms=extra_sensitivity_arms)
     _LOG.info("%s: %d rows, %d arms, %d jobs", key, view.height, len(arms), len(jobs))
     checkpoint_dir = checkpoint_dir_for(key=key)
     claim_checkpoint_dir(
@@ -280,20 +321,35 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--lead-days", type=int, nargs="*", default=None, help="Fit only these.")
     parser.add_argument("--arms", nargs="*", default=None, help="Fit only these arms.")
-    parser.add_argument("--view", choices=("ladder", "blend"), default="ladder")
+    parser.add_argument("--view", choices=VIEWS, default="ladder")
     parser.add_argument(
         "--target", choices=("pv", "cams", "both"), default="both", help="Ladder view only."
     )
-    parser.add_argument("--sensitivity-arms", nargs="*", default=[])
+    parser.add_argument(
+        "--sensitivity-arms",
+        nargs="*",
+        default=None,
+        help="Arms to fit at both settings; in the extra_sensitivity view, the arms to fit at the "
+        f"second setting (default {' '.join(DROP_ONE_SECOND_SETTING_ARMS)}).",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print each fit's jobs and exit before reading a dataset or fitting.",
+    )
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
     parser.add_argument("--max-workers", type=int, default=DEFAULT_WORKERS)
     parser.add_argument("--ignore-load", action="store_true")
     arguments = parser.parse_args()
 
-    refuse_if_machine_is_busy(ignore=arguments.ignore_load)
-    device = choose_device(requested=arguments.device)
-    _LOG.info("fitting on %s", device)
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    dry_run: bool = arguments.dry_run
+    if dry_run:
+        device: DeviceType = "cpu"
+    else:
+        refuse_if_machine_is_busy(ignore=arguments.ignore_load)
+        device = choose_device(requested=arguments.device)
+        _LOG.info("fitting on %s", device)
+        RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     view: ViewType = arguments.view
     keys = [
@@ -306,14 +362,21 @@ def main() -> int:
     if not keys:
         msg = "no fit matches --view, --lead-days, and --target"
         raise ValueError(msg)
-    extra = (*arguments.sensitivity_arms,)
+    named: tuple[str, ...] | None = (
+        None if arguments.sensitivity_arms is None else tuple(arguments.sensitivity_arms)
+    )
+    extra = () if view == "extra_sensitivity" or named is None else named
+    only_arms = arguments.arms
+    if view == "extra_sensitivity" and only_arms is None:
+        only_arms = list(DROP_ONE_SECOND_SETTING_ARMS if named is None else named)
     for key in keys:
         run_fit(
             key=key,
-            only_arms=arguments.arms,
+            only_arms=only_arms,
             extra_sensitivity_arms=extra,
             device=device,
             max_workers=arguments.max_workers,
+            dry_run=dry_run,
         )
     return 0
 

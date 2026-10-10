@@ -45,6 +45,17 @@ the hour's midpoint, both from the same run. A blend row also needs a row of tha
 partner columns exist only for the daylight hours 05 to 20 UTC, so `checks.md` counts the hours
 lost to each condition.
 
+**The IFS ensemble mean's columns are added to the blend rows after the first scientific review**
+(post hoc; `dataset_blend_ens.parquet`). The production service reads the IFS ensemble mean, so the
+forecast comparison's 6-hourly ensemble-mean radiation and temperature (`ens_mean6_day{L}_ghi` and
+`_temp`, rebuilt hourly through the clear-sky index like the AIFS Single columns) are joined on as
+`ens_shortwave_radiation` and `ens_temperature_2m`. The join adds columns only: the file holds the
+rows, folds, and every other column of `dataset_blend.parquet`, and the build asserts that. Each
+ensemble-mean run is asserted to be the 00 UTC run `L` days before the valid day, and `checks.md`
+counts the blend rows that lack the two columns. The build refuses to overwrite `checks.md`, so
+`--ens-only` writes the new frame from the existing `dataset_blend.parquet` and appends that
+section to the existing `checks.md`.
+
 **The direct-radiation check.** The build runs
 `studies.served_column_checks.check_direct_is_not_a_separation_model` on the lead-day-1 frame and
 records the outcome in `checks.md` rather than stopping, because the frame carries IFS radiation
@@ -54,9 +65,11 @@ only at the hours that survive the filters above.
 
 Anonymised: farms carry only the letters A to F, and no coordinate is read.
 
-Run it with `uv run python studies/ifs_solar_variables/ifs_ladder_build_dataset.py`.
+Run it with `uv run python studies/ifs_solar_variables/ifs_ladder_build_dataset.py`, or with
+`--ens-only` to add the ensemble-mean frame to a build that already exists.
 """
 
+import argparse
 import logging
 import sys
 from datetime import timedelta
@@ -70,6 +83,7 @@ from ifs_ladder_arms import (
     INPUTS_DIR,
     blend_dataset_path,
     checks_path,
+    ens_dataset_path,
     lead_day_dataset_path,
 )
 from studies.cross_validation import calendar_month_coverage, raise_on_uncovered_months
@@ -86,11 +100,13 @@ from studies.ifs_ladder import (
 from studies.ifs_lead_days import (
     AIFS_FIRST_OPERATIONAL_INIT,
     DROPPED_MONTHS,
+    ENS_COLUMNS,
     LEAD_DAYS,
     PARTNER_COLUMNS,
     blend_month_folds,
     find_fold_offsets,
     join_aifs_partner,
+    join_ens_mean,
     join_forecast_at_lead_day,
     raise_unless_same_folds,
     with_blend_folds,
@@ -344,6 +360,79 @@ def blend_frame(
     return folded, counts
 
 
+ENS_CHECKS_HEADING: Final[str] = "## IFS ensemble-mean columns of the blend rows (post hoc)"
+"""The heading of the `checks.md` section about the ensemble-mean columns."""
+
+
+def add_ens_mean(*, blend: pl.DataFrame) -> pl.DataFrame:
+    """Add the IFS ensemble mean's radiation and temperature to the blend rows.
+
+    Args:
+        blend: The blend rows of lead days 1 to 3, sorted by lead day, farm, and time.
+
+    Returns:
+        The blend rows with the two `ENS_COLUMNS` added. A row the forecast comparison lacks gets
+        missing values. Every other column and every row is unchanged.
+
+    Raises:
+        ValueError: If an ensemble-mean run is not the 00 UTC run `L` days before the valid day,
+            or the join changed the rows.
+    """
+    parts = [
+        join_ens_mean(
+            rows=blend.filter(pl.col("lead_day") == lead_day),
+            partner=read_partner(lead_day=lead_day),
+            lead_day=lead_day,
+        )
+        for lead_day in BLEND_LEAD_DAYS
+    ]
+    joined = pl.concat(parts)
+    if not joined.select(blend.columns).equals(blend):
+        msg = "adding the ensemble mean changed the blend rows"
+        raise ValueError(msg)
+    return joined
+
+
+def ens_checks(*, blend_ens: pl.DataFrame) -> str:
+    """Return the `checks.md` section counting the blend rows that lack the ensemble-mean columns.
+
+    Args:
+        blend_ens: The blend rows with the ensemble-mean columns.
+
+    Returns:
+        The markdown section.
+    """
+    lines = [
+        ENS_CHECKS_HEADING,
+        "",
+        (
+            "The columns are the forecast comparison's 6-hourly IFS ensemble mean, rebuilt hourly "
+            "through the clear-sky index. Each run is asserted to be the 00 UTC run `L` days "
+            "before the valid day, and the rows, folds, and every other column equal those of "
+            "`dataset_blend.parquet`: asserted."
+        ),
+        "",
+        "| lead day | blend rows | rows lacking the ensemble mean | share |",
+        "|---|---|---|---|",
+    ]
+    for lead_day in BLEND_LEAD_DAYS:
+        day = blend_ens.filter(pl.col("lead_day") == lead_day)
+        missing = day.filter(pl.any_horizontal(pl.col(name).is_null() for name in ENS_COLUMNS))
+        lines.append(
+            f"| {lead_day} | {day.height:,} | {missing.height:,} | "
+            f"{missing.height / max(day.height, 1):.4f} |"
+        )
+    total = blend_ens.filter(pl.any_horizontal(pl.col(name).is_null() for name in ENS_COLUMNS))
+    lines += [
+        "",
+        (
+            f"Blend rows lacking the ensemble mean, all lead days: {total.height:,} of "
+            f"{blend_ens.height:,}. The `ens` fits refuse to start if this is not zero."
+        ),
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def direct_radiation_check(*, frame: pl.DataFrame) -> str:
     """Run the separation-model check on the IFS direct radiation and say how it came out.
 
@@ -543,11 +632,45 @@ def build_checks(
     return "\n".join(lines) + "\n"
 
 
+def build_ens_only() -> int:
+    """Write the ensemble-mean frame from the existing blend frame and append its checks.
+
+    Returns:
+        The process exit code.
+
+    Raises:
+        FileNotFoundError: If the blend frame or `checks.md` does not exist yet.
+        ValueError: If `checks.md` already holds the ensemble-mean section.
+    """
+    refuse_to_overwrite(paths=[ens_dataset_path()])
+    if not blend_dataset_path().exists() or not checks_path().exists():
+        msg = "--ens-only needs the blend frame and checks.md of a finished build"
+        raise FileNotFoundError(msg)
+    existing = checks_path().read_text()
+    if ENS_CHECKS_HEADING in existing:
+        msg = f"{checks_path()} already holds the ensemble-mean section"
+        raise ValueError(msg)
+    blend_ens = add_ens_mean(blend=pl.read_parquet(blend_dataset_path()))
+    blend_ens.write_parquet(ens_dataset_path())
+    checks_path().write_text(existing.rstrip("\n") + "\n\n" + ens_checks(blend_ens=blend_ens))
+    _LOG.info("wrote the ensemble-mean frame and appended its checks")
+    return 0
+
+
 def main() -> int:
     """Build every frame and write it with its checks."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--ens-only",
+        action="store_true",
+        help="Write only dataset_blend_ens.parquet and append its checks to checks.md.",
+    )
+    if parser.parse_args().ens_only:
+        return build_ens_only()
     outputs = [
         *(lead_day_dataset_path(lead_day=day) for day in LEAD_DAYS),
         blend_dataset_path(),
+        ens_dataset_path(),
         checks_path(),
     ]
     refuse_to_overwrite(paths=outputs)
@@ -572,10 +695,12 @@ def main() -> int:
     direct_check = direct_radiation_check(frame=frames[LEAD_DAYS[0]])
     _LOG.info("direct-radiation check: %s", direct_check)
 
+    blend_ens = add_ens_mean(blend=blend)
     for lead_day, frame in frames.items():
         frame.write_parquet(lead_day_dataset_path(lead_day=lead_day))
     blend.write_parquet(blend_dataset_path())
-    checks_path().write_text(
+    blend_ens.write_parquet(ens_dataset_path())
+    checks_text = (
         build_checks(
             frames=frames,
             counts=counts,
@@ -586,8 +711,11 @@ def main() -> int:
             fold_offsets=dict(offsets),
             direct_check=direct_check,
         )
+        + "\n"
+        + ens_checks(blend_ens=blend_ens)
     )
-    _LOG.info("wrote %d lead-day frames, the blend frame, and the checks", len(frames))
+    checks_path().write_text(checks_text)
+    _LOG.info("wrote %d lead-day frames, the blend frames, and the checks", len(frames))
     return 0
 
 

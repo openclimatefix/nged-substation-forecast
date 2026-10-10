@@ -216,6 +216,9 @@ experimental versions, so the blend rows start with the runs of the first whole 
 PARTNER_COLUMNS: Final[tuple[str, str]] = ("partner_shortwave_radiation", "partner_temperature_2m")
 """The second forecast's radiation and temperature, under names that do not carry the lead day."""
 
+ENS_COLUMNS: Final[tuple[str, str]] = ("ens_shortwave_radiation", "ens_temperature_2m")
+"""The IFS ensemble mean's radiation and temperature, under names that do not carry the lead day."""
+
 
 def join_aifs_partner(*, rows: pl.DataFrame, partner: pl.DataFrame, lead_day: int) -> pl.DataFrame:
     """Join AIFS Single's radiation and temperature at one lead day onto the lead day's rows.
@@ -258,6 +261,58 @@ def join_aifs_partner(*, rows: pl.DataFrame, partner: pl.DataFrame, lead_day: in
     return rows.join(
         recent.drop(f"{prefix}_init_time").rename(columns), on=["site", "time"], how="inner"
     )
+
+
+def join_ens_mean(*, rows: pl.DataFrame, partner: pl.DataFrame, lead_day: int) -> pl.DataFrame:
+    """Join the IFS ensemble mean's radiation and temperature at one lead day onto the rows.
+
+    The ensemble mean is the forecast comparison's 6-hourly ensemble mean, rebuilt hourly through
+    the clear-sky index like the AIFS Single columns. Unlike `join_aifs_partner`, this is a left
+    join that adds columns and never drops or reorders a row, so the result holds exactly the rows
+    it was given, and a row the partner lacks gets missing values.
+
+    Args:
+        rows: One lead day's rows, carrying `site` and `time`, with no repeated (site, time).
+        partner: The forecast comparison's site-level frame for the lead day.
+        lead_day: The whole number of days between the run's day and the valid day.
+
+    Returns:
+        `rows` with the two `ENS_COLUMNS` added.
+
+    Raises:
+        ValueError: If a run is not the 00 UTC run `lead_day` days before the row's valid day, the
+            partner holds a (site, time) twice, or `rows` holds one twice.
+    """
+    prefix = f"ens_mean6_day{lead_day}"
+    columns = {f"{prefix}_ghi": ENS_COLUMNS[0], f"{prefix}_temp": ENS_COLUMNS[1]}
+    if partner.select("site", "time").is_duplicated().any():
+        msg = "the partner frame holds a (site, time) twice"
+        raise ValueError(msg)
+    if rows.select("site", "time").is_duplicated().any():
+        msg = "the rows hold a (site, time) twice"
+        raise ValueError(msg)
+    kept = partner.select("site", "time", f"{prefix}_init_time", *columns).filter(
+        pl.col(f"{prefix}_init_time").is_not_null()
+    )
+    expected = pl.col("time").dt.truncate("1d") - timedelta(days=lead_day)
+    wrong = kept.filter(
+        pl.col(f"{prefix}_init_time").dt.cast_time_unit("us") != expected.dt.cast_time_unit("us")
+    )
+    if not wrong.is_empty():
+        msg = (
+            f"{wrong.height} rows carry an ensemble-mean run that is not the 00 UTC run "
+            f"{lead_day} days before the valid day"
+        )
+        raise ValueError(msg)
+    joined = rows.join(
+        kept.drop(f"{prefix}_init_time").rename(columns), on=["site", "time"], how="left"
+    )
+    if joined.height != rows.height or not joined.select("site", "time").equals(
+        rows.select("site", "time")
+    ):
+        msg = "joining the ensemble mean changed the rows"
+        raise ValueError(msg)
+    return joined
 
 
 def blend_month_folds(*, months: Sequence[str]) -> dict[str, int]:

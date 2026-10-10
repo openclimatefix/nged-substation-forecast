@@ -5,11 +5,13 @@ import pytest
 from studies.cross_validation import calendar_month_coverage, raise_on_uncovered_months
 from studies.ifs_ladder import rung_variables
 from studies.ifs_lead_days import (
+    ENS_COLUMNS,
     INSTANTANEOUS_VARIABLES,
     PARTNER_COLUMNS,
     blend_month_folds,
     find_fold_offsets,
     join_aifs_partner,
+    join_ens_mean,
     join_forecast_at_lead_day,
     raise_unless_same_folds,
     with_blend_folds,
@@ -380,3 +382,85 @@ def test_every_variable_but_the_hourly_means_totals_and_maxima_is_averaged_over_
     }
 
     assert set(INSTANTANEOUS_VARIABLES) == set(rung_variables(rung="f6")) - hourly
+
+
+def _ens_partner(
+    *, rows: list[tuple[datetime, datetime | None, float | None]], lead_day: int
+) -> pl.DataFrame:
+    prefix = f"ens_mean6_day{lead_day}"
+    return pl.DataFrame(
+        {
+            "site": ["A"] * len(rows),
+            "time": [time for time, _, _ in rows],
+            f"{prefix}_ghi": [ghi for _, _, ghi in rows],
+            f"{prefix}_temp": [8.0 if ghi is not None else None for _, _, ghi in rows],
+            f"{prefix}_init_time": [init for _, init, _ in rows],
+        },
+        schema_overrides={f"{prefix}_init_time": pl.Datetime("ns", "UTC")},
+    ).with_columns(pl.col("time").dt.cast_time_unit("us"))
+
+
+def test_the_ensemble_mean_join_adds_its_two_columns_and_keeps_every_row_in_order():
+    first, second, third = (datetime(2025, 4, 10, hour, tzinfo=UTC) for hour in (9, 12, 15))
+    rows = _lead_rows(
+        [datetime(2025, 4, 10, 9), datetime(2025, 4, 10, 12), datetime(2025, 4, 10, 15)]
+    )
+    run = datetime(2025, 4, 8, tzinfo=UTC)
+    # The partner lacks the middle row, and holds the other two in the opposite order.
+    partner = _ens_partner(rows=[(third, run, 250.0), (first, run, 150.0)], lead_day=2)
+
+    joined = join_ens_mean(rows=rows, partner=partner, lead_day=2)
+
+    assert joined.columns[-2:] == list(ENS_COLUMNS)
+    assert joined["time"].to_list() == rows["time"].to_list()
+    assert joined[ENS_COLUMNS[0]].to_list() == [150.0, None, 250.0]
+    assert joined[ENS_COLUMNS[1]].to_list() == [8.0, None, 8.0]
+    assert second not in partner["time"].to_list()
+
+
+def test_a_partner_row_with_no_run_gives_missing_values_and_is_not_checked_for_its_run():
+    time = datetime(2025, 4, 10, 12, tzinfo=UTC)
+    rows = _lead_rows([datetime(2025, 4, 10, 12)])
+    partner = _ens_partner(rows=[(time, None, None)], lead_day=1)
+
+    joined = join_ens_mean(rows=rows, partner=partner, lead_day=1)
+
+    assert joined[ENS_COLUMNS[0]].to_list() == [None]
+    assert joined.height == 1
+
+
+def test_the_ensemble_mean_join_refuses_a_run_from_the_wrong_day():
+    time = datetime(2025, 4, 10, 12, tzinfo=UTC)
+    rows = _lead_rows([datetime(2025, 4, 10, 12)])
+    partner = _ens_partner(rows=[(time, datetime(2025, 4, 9, tzinfo=UTC), 300.0)], lead_day=2)
+
+    with pytest.raises(ValueError, match="00 UTC run 2 days before"):
+        join_ens_mean(rows=rows, partner=partner, lead_day=2)
+
+
+def test_the_ensemble_mean_join_refuses_a_run_that_does_not_start_at_midnight():
+    time = datetime(2025, 4, 10, 12, tzinfo=UTC)
+    rows = _lead_rows([datetime(2025, 4, 10, 12)])
+    partner = _ens_partner(rows=[(time, datetime(2025, 4, 9, 12, tzinfo=UTC), 300.0)], lead_day=1)
+
+    with pytest.raises(ValueError, match="00 UTC run"):
+        join_ens_mean(rows=rows, partner=partner, lead_day=1)
+
+
+def test_the_ensemble_mean_join_refuses_a_site_and_time_held_twice():
+    time = datetime(2025, 4, 10, 12, tzinfo=UTC)
+    run = datetime(2025, 4, 9, tzinfo=UTC)
+    rows = _lead_rows([datetime(2025, 4, 10, 12)])
+
+    with pytest.raises(ValueError, match="partner frame holds"):
+        join_ens_mean(
+            rows=rows,
+            partner=_ens_partner(rows=[(time, run, 1.0), (time, run, 2.0)], lead_day=1),
+            lead_day=1,
+        )
+    with pytest.raises(ValueError, match="rows hold"):
+        join_ens_mean(
+            rows=pl.concat([rows, rows]),
+            partner=_ens_partner(rows=[(time, run, 1.0)], lead_day=1),
+            lead_day=1,
+        )

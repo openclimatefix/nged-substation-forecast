@@ -56,6 +56,7 @@ from ifs_ladder_arms import (
     IFS_FIGURE_NUMBERS,
     PLANNED_CONTRASTS,
     POSITIVE_CONTROL_ARM,
+    POST_HOC_CONTRASTS,
     PRIMARY_SETTING,
     PRODUCTION_ARM,
     SENSITIVITY_SETTING,
@@ -1286,6 +1287,39 @@ def figure_drop_one(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
     )
 
 
+POST_HOC_LABELS: Final[dict[str, str]] = {
+    "E-A": "E-A: AIFS added to the ensemble mean",
+    "F0-E": "F0-E: ensemble mean added to F0",
+}
+"""The label of each post hoc production-relevant contrast on the figure."""
+
+
+def production_relevant_rows(*, contrasts: pl.DataFrame) -> pl.DataFrame | None:
+    """Return the post hoc production-relevant contrasts as chart rows, or `None` if not fitted.
+
+    Args:
+        contrasts: The report's contrast table.
+
+    Returns:
+        One row per post hoc contrast, pooled over lead days 1 to 3 at the main setting, with the
+        99% interval as the thick line, or `None` if the table holds no post hoc rows.
+    """
+    pairs = [(contrast.treatment, contrast.reference) for contrast in POST_HOC_CONTRASTS]
+    found = contrasts.filter(
+        (pl.col("family") == "post_hoc")
+        & (pl.col("scope") == "pooled 1-3")
+        & (pl.col("setting") == PRIMARY_SETTING)
+    )
+    if found.height != len(pairs):
+        return None
+    rows = pick(contrasts=contrasts, family="post_hoc", pairs=pairs, scope="pooled 1-3")
+    return contrast_rows(
+        rows=rows,
+        label=pl.Series([POST_HOC_LABELS[contrast.label] for contrast in POST_HOC_CONTRASTS]),
+        adjusted=True,
+    )
+
+
 def figure_variables_or_forecast(
     *, contrasts: pl.DataFrame, board: pl.DataFrame, blend_span: str, scope: str
 ) -> alt.TopLevelMixin:
@@ -1320,9 +1354,9 @@ def figure_variables_or_forecast(
         how="diagonal_relaxed",
     )
     gain_labels = [
-        "P4: second forecast added to the minimal IFS set",
-        "P5: second forecast added to all 20 IFS variables",
-        "ERA5 study's P4: 12 MARS-only variables added to the rest",
+        "P4: AIFS added to F0",
+        "P5: AIFS added to F6",
+        "ERA5 P4: MARS-only added to G9",
     ]
     gain_rows = contrast_rows(rows=gains, label=pl.Series(gain_labels), adjusted=True)
     arms = [
@@ -1351,6 +1385,17 @@ def figure_variables_or_forecast(
             reference_rules=(0.0, -smallest),
         )
     ]
+    production = production_relevant_rows(contrasts=contrasts)
+    if production is not None:
+        panels.append(
+            dot_interval_panel(
+                rows=production,
+                x_title=x_title,
+                panel_title="Panel 2: a second forecast added to the ensemble mean (post hoc)",
+                colour=ocf.DATA_BLUE,
+                reference_rules=(0.0, -smallest),
+            )
+        )
     for lead_day in (1, 3):
         errors = board.filter(
             (pl.col("view") == "blend")
@@ -1389,12 +1434,22 @@ def figure_variables_or_forecast(
         subtitle=[
             scope,
             (
+                "P4 and P5 add a second forecast to a single deterministic 9 km point forecast. "
+                "The production service reads the IFS ensemble mean"
+                + (", which panel 2 uses." if production is not None else ".")
+            ),
+            (
                 f"Dot: estimate at the {SETTINGS_PHRASE}. Thin line: 95% interval from resampling "
                 f"whole months. Thick line: {ADJUSTED_LEVEL_PERCENT:g}% interval (the ERA5 study's "
                 f"own is 99.5%). Dashed rules: no difference, and the smallest improvement worth "
                 "acting on (0.1 points of capacity)."
             ),
-            "Panel 1 and the last panel are differences. The error panels show each set's error.",
+            (
+                "The difference panels (the first"
+                + (" two" if production is not None else "")
+                + " and the last) show a set's error minus the reference's. The error panels show "
+                "each set's error."
+            ),
             f"The IFS rows are only the months AIFS Single also covers, {blend_span}.",
             (
                 "MARS-only: 12 ERA5 variables that ECMWF's MARS archive serves and that Open-Meteo "
@@ -1407,7 +1462,21 @@ def figure_variables_or_forecast(
             LEAD_DAY_KEY,
             PLANNED_KEY,
             EXPLORATORY_KEY,
-            "Panel 1 is planned. The error panels and the last panel are exploratory.",
+            *(
+                (
+                    (
+                        "Panel 1 is planned. Panel 2 is post hoc: it was added after a first "
+                        "scientific review."
+                    ),
+                    (
+                        "E0: shared columns and the IFS ensemble mean's radiation and "
+                        "temperature. E-A: E0 plus AIFS Single. F0-E: F0 plus the ensemble mean."
+                    ),
+                )
+                if production is not None
+                else ("Panel 1 is planned.",)
+            ),
+            "The error panels and the last panel are exploratory.",
         ],
         figure_planning=None,
     )

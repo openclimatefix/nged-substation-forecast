@@ -7,12 +7,21 @@ from studies.ifs_decisions import (
     EvidenceClassType,
     combine_verdicts,
     contrast_verdict,
+    display_class,
+    drop_one_gain_at_settings,
+    drop_one_margin,
     drop_one_matters,
     evidence_class,
     exploratory_gain,
     gain_after_control,
+    half_width_allows_no_gain,
     is_near_line,
+    mean_absolute_error_on_common_rows,
+    mean_paired_difference_by,
+    merge_extra_arms,
+    percentage_rise,
     priority_order,
+    production_scope_sentence,
     second_feed_recommended,
     second_forecast_or_mars_variables,
     stack_lead_days,
@@ -378,3 +387,172 @@ def test_an_interval_far_from_zero_on_both_sides_is_not_near_the_line():
 def test_the_near_line_boundary_is_inclusive():
     assert is_near_line(lower=0.2, upper=1.2)
     assert not is_near_line(lower=0.2001, upper=1.2001)
+
+
+def test_a_group_counts_as_a_drop_one_gain_only_if_every_setting_agrees():
+    assert drop_one_gain_at_settings(raises=[0.0004, 0.0005], control_differences=[0.0001, 0.0001])
+    # The main setting passes and the second fails: the group is not a gain.
+    assert not drop_one_gain_at_settings(
+        raises=[0.0004, 0.0001], control_differences=[0.0001, 0.0003]
+    )
+    # The main setting fails and the second passes: also not a gain.
+    assert not drop_one_gain_at_settings(
+        raises=[0.0001, 0.0004], control_differences=[0.0003, 0.0001]
+    )
+
+
+def test_the_drop_one_rule_with_only_the_main_setting_reads_that_setting_alone():
+    assert drop_one_gain_at_settings(raises=[0.0004], control_differences=[0.0001])
+    assert not drop_one_gain_at_settings(raises=[0.0001], control_differences=[0.0004])
+
+
+def test_the_drop_one_rule_with_no_setting_fitted_is_not_a_gain():
+    assert not drop_one_gain_at_settings(raises=[], control_differences=[])
+
+
+def test_the_drop_one_rule_refuses_raises_and_controls_of_different_lengths():
+    with pytest.raises(ValueError, match="control differences"):
+        drop_one_gain_at_settings(raises=[0.0004, 0.0004], control_differences=[0.0001])
+
+
+def test_the_drop_one_margin_is_the_raise_less_the_control_floored_at_zero():
+    assert drop_one_margin(raise_in_error=0.00036, control_difference=0.00035) == pytest.approx(
+        0.00001
+    )
+    # A control that lowered the error counts as zero, so the margin is the whole raise.
+    assert drop_one_margin(raise_in_error=0.0003, control_difference=-0.001) == pytest.approx(
+        0.0003
+    )
+    assert drop_one_margin(raise_in_error=0.0001, control_difference=0.0003) < 0
+
+
+def test_the_drop_one_margin_agrees_with_the_drop_one_rule_at_the_boundary():
+    assert drop_one_margin(raise_in_error=0.0003, control_difference=0.0003) == 0
+    assert not drop_one_matters(raise_in_error=0.0003, control_difference=0.0003)
+
+
+def test_total_cloud_wholly_on_the_gain_side_but_short_of_the_smallest_effect_is_unresolved():
+    label = display_class(evidence="no gain shown", gain_lower=0.0004, smallest_effect=SMALLEST)
+
+    assert label == "unresolved at the smallest effect"
+
+
+def test_a_gain_interval_reaching_the_smallest_effect_exactly_is_still_unresolved():
+    label = display_class(evidence="no gain shown", gain_lower=SMALLEST, smallest_effect=SMALLEST)
+
+    assert label == "unresolved at the smallest effect"
+
+
+def test_an_interval_beyond_the_smallest_effect_or_not_wholly_a_gain_keeps_its_class():
+    assert (
+        display_class(evidence="no gain shown", gain_lower=0.0015, smallest_effect=SMALLEST)
+        == "no gain shown"
+    )
+    assert (
+        display_class(evidence="no gain shown", gain_lower=0.0, smallest_effect=SMALLEST)
+        == "no gain shown"
+    )
+    assert (
+        display_class(evidence="no gain shown", gain_lower=-0.0004, smallest_effect=SMALLEST)
+        == "no gain shown"
+    )
+    assert (
+        display_class(evidence="no gain shown", gain_lower=None, smallest_effect=SMALLEST)
+        == "no gain shown"
+    )
+
+
+def test_only_the_no_gain_shown_class_is_relabelled():
+    for evidence in ("planned gain", "exploratory gain", "drop-one gain"):
+        assert display_class(evidence=evidence, gain_lower=0.0004, smallest_effect=SMALLEST) == (
+            evidence
+        )
+
+
+def test_the_production_scope_sentence_differs_for_each_verdict():
+    sentences = {
+        verdict: production_scope_sentence(verdict=verdict)
+        for verdict in ("gain", "no gain", "unresolved", None)
+    }
+
+    assert len(set(sentences.values())) == 4
+    assert "separates the routes in favour of a second forecast" in sentences["gain"]
+    assert "does not separate the routes" in sentences["no gain"]
+    assert "not separated" in sentences["unresolved"]
+    assert "not yet fitted" in sentences[None]
+
+
+def test_a_zero_centred_interval_is_no_gain_only_below_the_smallest_effect_half_width():
+    assert half_width_allows_no_gain(half_width=0.0009, smallest_effect=SMALLEST)
+    assert not half_width_allows_no_gain(half_width=SMALLEST, smallest_effect=SMALLEST)
+    assert not half_width_allows_no_gain(half_width=0.0017, smallest_effect=SMALLEST)
+
+
+def test_the_raw_error_uses_only_rows_where_every_forecast_and_the_truth_are_present():
+    frame = pl.DataFrame(
+        {
+            "a": [110.0, 120.0, None, 500.0],
+            "b": [100.0, float("nan"), 130.0, 100.0],
+            "truth": [100.0, 100.0, 100.0, 100.0],
+        }
+    )
+
+    errors = mean_absolute_error_on_common_rows(
+        frame=frame, forecast_columns=["a", "b"], truth_column="truth"
+    )
+
+    # Only rows 0 and 3 hold everything. Using each column's own rows would give a = 210 / 3.
+    assert errors == {"a": pytest.approx((10.0 + 400.0) / 2), "b": pytest.approx(0.0)}
+
+
+def test_the_percentage_rise_is_relative_to_the_first_value():
+    assert percentage_rise(first=50.0, last=63.0) == pytest.approx(26.0)
+    assert percentage_rise(first=63.0, last=50.0) < 0
+
+
+def _fold_losses() -> pl.DataFrame:
+    rows = []
+    for seed in (0, 1):
+        for index, fold in enumerate([0, 0, 0, 1]):
+            for arm, value in (("ref", 0.10), ("trt", 0.10 - 0.02 * (fold + 1) - 0.001 * seed)):
+                rows.append(
+                    {
+                        "site": "A",
+                        "time": datetime(2025, 3, 1 + index),
+                        "seed": seed,
+                        "fold": fold,
+                        "arm": arm,
+                        "metric": value,
+                    }
+                )
+    return pl.DataFrame(rows)
+
+
+def test_the_difference_by_fold_is_the_mean_over_rows_and_seeds_of_each_fold_alone():
+    by_fold = mean_paired_difference_by(
+        losses=_fold_losses(), treatment="trt", reference="ref", metric="metric", by="fold"
+    )
+
+    assert by_fold["fold"].to_list() == [0, 1]
+    # Fold 0 has three rows per seed and fold 1 one, so a mean of the two folds' means would differ.
+    assert by_fold["difference"].to_list() == pytest.approx([-0.02 - 0.0005, -0.04 - 0.0005])
+    assert by_fold["rows"].to_list() == [6, 2]
+
+
+def test_extra_arms_are_stacked_under_the_main_columns():
+    main = pl.DataFrame({"arm": ["f6"], "setting": ["sensitivity"], "x": [1.0]})
+    extra = pl.DataFrame({"x": [2.0], "setting": ["sensitivity"], "arm": ["drop_f2"]})
+
+    merged = merge_extra_arms(main=main, extra=extra)
+
+    assert merged.columns == ["arm", "setting", "x"]
+    assert merged["arm"].to_list() == ["f6", "drop_f2"]
+    assert merged["x"].to_list() == [1.0, 2.0]
+
+
+def test_extra_arms_that_repeat_a_fit_already_in_the_main_losses_are_refused():
+    main = pl.DataFrame({"arm": ["f6", "drop_f2"], "setting": ["primary", "primary"], "x": [1, 2]})
+    extra = pl.DataFrame({"arm": ["drop_f2"], "setting": ["primary"], "x": [3]})
+
+    with pytest.raises(ValueError, match="repeat fits"):
+        merge_extra_arms(main=main, extra=extra)

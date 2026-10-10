@@ -55,12 +55,15 @@ from ifs_ladder_arms import (
     CONTROL_CLOUD_LAYERS_ARM,
     CONTROL_CONVECTION_ARM,
     CONTROL_DIRECT_ARM,
+    CONTROL_E0_PARTNER_ARM,
     CONTROL_HUMIDITY_ARM,
     CONTROL_LATER_GROUPS_ARM,
     CONTROL_PARTNER_FULL_ARM,
     CONTROL_PARTNER_MINIMAL_ARM,
     DROP_ONE_LEAD_DAYS,
     DROP_PREFIX,
+    E0_ARM,
+    E_A_ARM,
     ERA5_COMPARISON_LEAD_DAY,
     ERA5_LOSSES_NAME,
     ERA5_P4_RESULTS_NAME,
@@ -72,6 +75,7 @@ from ifs_ladder_arms import (
     PLANNED_LEAD_DAYS,
     PLANNED_RESAMPLES,
     POSITIVE_CONTROL_ARM,
+    POST_HOC_CONTRASTS,
     PRIMARY_SETTING,
     PRODUCTION_ARM,
     SENSITIVITY_SETTING,
@@ -81,6 +85,7 @@ from ifs_ladder_arms import (
     TargetType,
     arms_path,
     checks_path,
+    ens_dataset_path,
     lead_day_dataset_path,
     report_paths,
     results_path,
@@ -115,12 +120,20 @@ from studies.ifs_decisions import (
     VerdictType,
     combine_verdicts,
     contrast_verdict,
-    drop_one_matters,
+    display_class,
+    drop_one_gain_at_settings,
+    drop_one_margin,
     evidence_class,
     exploratory_gain,
     gain_after_control,
+    half_width_allows_no_gain,
     is_near_line,
+    mean_absolute_error_on_common_rows,
+    mean_paired_difference_by,
+    merge_extra_arms,
+    percentage_rise,
     priority_order,
+    production_scope_sentence,
     second_feed_recommended,
     second_forecast_or_mars_variables,
     stack_lead_days,
@@ -185,6 +198,7 @@ CONTROL_BASES: Final[tuple[tuple[str, str, str], ...]] = (
     (POSITIVE_CONTROL_ARM, "f2", "ladder"),
     (CONTROL_PARTNER_MINIMAL_ARM, "f0", "blend"),
     (CONTROL_PARTNER_FULL_ARM, F6_ARM, "blend"),
+    (CONTROL_E0_PARTNER_ARM, E0_ARM, "ens"),
 )
 """Each control, the arm it pads, and the rows it is read on."""
 
@@ -213,11 +227,27 @@ ERA5_ADJUSTED_LEVEL_PERCENT: Final[float] = 99.5
 PLAN_ERA5_P4_PRIMARY_UPPER: Final[float] = -0.000827
 """The upper bound of the ERA5 study's P4 adjusted interval at the main setting in the plan."""
 
-WIDTH_WARNING: Final[float] = 0.002
-"""A planned interval wider than this fraction of capacity (0.2 points) triggers a caveat."""
-
 FIRST_IFS_MONTH: Final[str] = "2024-03"
 """The first month with IFS runs, a part-month."""
+
+POST_HOC_NOT_FITTED: Final[str] = "post hoc analysis not yet fitted"
+"""What a post hoc section prints when the losses it needs have not been fitted."""
+
+WINTER_MONTH_NUMBERS: Final[frozenset[str]] = frozenset({"12", "01", "02"})
+"""The calendar months, as the `%m` part of a `%Y-%m` label, that count as winter."""
+
+LOW_SUN_HOURS: Final[tuple[int, ...]] = (6, 7, 19, 20)
+"""The UTC hours of day at which the full set is worse than the minimal set in the ERA5 study."""
+
+RAW_RADIATION_COLUMNS: Final[dict[str, str]] = {
+    "shortwave_radiation": "Open-Meteo IFS 9 km",
+    "partner_shortwave_radiation": "AIFS Single",
+    "ens_shortwave_radiation": "IFS ensemble mean",
+}
+"""The radiation columns of the blend frame with ensemble mean, by the name the report prints."""
+
+CAMS_IRRADIANCE_COLUMN: Final[str] = "cams_ghi_w_m2"
+"""The CAMS irradiance the raw radiation errors are scored against."""
 
 GROUP_CONTROLS: Final[dict[str, str]] = {
     "f3": CONTROL_DIRECT_ARM,
@@ -255,16 +285,35 @@ class Fits:
         self.losses: dict[tuple[str, str, int], pl.DataFrame] = {}
         self.arms: dict[tuple[str, str, int], dict[str, object]] = {}
         self.datasets: dict[int, pl.DataFrame] = {}
-        for view, days in (("ladder", LEAD_DAYS), ("blend", BLEND_LEAD_DAYS)):
+        self.blend_ens: pl.DataFrame | None = (
+            pl.read_parquet(ens_dataset_path()) if ens_dataset_path().exists() else None
+        )
+        self.missing_post_hoc: list[str] = []
+        for view, days in (
+            ("ladder", LEAD_DAYS),
+            ("blend", BLEND_LEAD_DAYS),
+            ("ens", BLEND_LEAD_DAYS),
+        ):
             for target in ("pv", "cams"):
                 for lead_day in days:
                     key = FitKey(view=view, lead_day=lead_day, target=target)
                     losses = read_losses(key=key)
+                    if losses is None and view == "ens" and target == "pv":
+                        self.missing_post_hoc.append(results_path(key=key).name)
                     if losses is not None:
                         self.losses[(view, target, lead_day)] = losses
                         self.arms[(view, target, lead_day)] = json.loads(
                             arms_path(key=key).read_text()
                         )
+        for lead_day in PLANNED_LEAD_DAYS:
+            key = FitKey(view="extra_sensitivity", lead_day=lead_day, target="pv")
+            extra = read_losses(key=key)
+            if extra is None:
+                self.missing_post_hoc.append(results_path(key=key).name)
+            elif ("ladder", "pv", lead_day) in self.losses:
+                self.losses[("ladder", "pv", lead_day)] = merge_extra_arms(
+                    main=self.losses[("ladder", "pv", lead_day)], extra=extra
+                )
         for lead_day in LEAD_DAYS:
             if lead_day_dataset_path(lead_day=lead_day).exists():
                 self.datasets[lead_day] = pl.read_parquet(lead_day_dataset_path(lead_day=lead_day))
@@ -276,6 +325,39 @@ class Fits:
             for day in lead_days
             if (view, target, day) in self.losses
         }
+
+    def ens_with_f0(self, *, lead_days: Sequence[int]) -> pl.DataFrame | None:
+        """Return the stacked `ens` view losses with the blend view's `f0` added.
+
+        The `ens` view and the `blend` view are fitted on the same rows, so `f0_e` and `f0` can be
+        contrasted once the two fits' losses sit in one frame.
+
+        Args:
+            lead_days: The lead days to stack.
+
+        Returns:
+            The stacked losses, or `None` if no `ens` lead day was fitted.
+
+        Raises:
+            ValueError: If some but not all of the lead days were fitted in either view.
+        """
+        ens = self.get(view="ens", target="pv", lead_days=lead_days)
+        if not ens:
+            return None
+        blend = self.get(view="blend", target="pv", lead_days=lead_days)
+        missing = sorted(set(lead_days) - set(ens)) + sorted(set(lead_days) - set(blend))
+        if missing:
+            msg = f"lead days {missing} are not fitted in the ens or the blend view"
+            raise ValueError(msg)
+        return stack_lead_days(
+            losses_by_lead_day={
+                day: pl.concat(
+                    [ens[day], blend[day].filter(pl.col("arm") == "f0").select(ens[day].columns)],
+                    how="vertical_relaxed",
+                )
+                for day in lead_days
+            }
+        )
 
     def pooled(self, *, view: str, target: str, lead_days: Sequence[int]) -> pl.DataFrame | None:
         """Return the stacked losses of the lead days, or `None` if none was fitted.
@@ -330,8 +412,9 @@ def contrast_row(
     reference: str,
     setting: str,
     planned: bool,
+    adjusted: bool = False,
 ) -> dict[str, object]:
-    """Return one contrast's difference with its 95% interval and, if planned, its 99% interval.
+    """Return one contrast's difference with its 95% interval and, if asked, its 99% interval.
 
     The difference is the treatment's error minus the reference's, so a negative value is a gain.
 
@@ -344,7 +427,10 @@ def contrast_row(
         treatment: The arm whose error is compared.
         reference: The arm it is compared against.
         setting: The hyperparameter setting.
-        planned: Whether the plan named the contrast before any result existed.
+        planned: Whether the plan named the contrast before any result existed. A planned contrast
+            always gets the adjusted interval.
+        adjusted: Whether to add the adjusted interval to a contrast that is not planned, as the
+            post hoc production-relevant contrasts do.
 
     Returns:
         The contrast's table row.
@@ -381,7 +467,7 @@ def contrast_row(
         "n_rows": interval["n_rows"],
         "n_months": interval["n_months"],
     }
-    if planned:
+    if planned or adjusted:
         lower, upper = bootstrap_difference_at_level(
             losses=in_setting,
             treatment=treatment,
@@ -418,6 +504,7 @@ def add_pairs(
     scope: str,
     pairs: Sequence[tuple[str, str]],
     planned: bool = False,
+    adjusted: bool = False,
     labels: Mapping[tuple[str, str], str] | None = None,
 ) -> None:
     """Append the contrast rows of some (treatment, reference) pairs at every setting fitted.
@@ -430,6 +517,7 @@ def add_pairs(
         scope: The scope label.
         pairs: The (treatment, reference) pairs.
         planned: Whether these are the planned contrasts.
+        adjusted: Whether to add the adjusted interval to contrasts that are not planned.
         labels: A label for each pair, if not `treatment - reference`.
     """
     if losses is None:
@@ -449,6 +537,7 @@ def add_pairs(
                     reference=reference,
                     setting=setting,
                     planned=planned,
+                    adjusted=adjusted,
                 )
             )
 
@@ -485,6 +574,118 @@ def planned_rows(*, fits: Fits) -> list[dict[str, object]]:
             pairs=[(planned.treatment, planned.control)],
             planned=True,
             labels={(planned.treatment, planned.control): f"{planned.label} vs control"},
+        )
+    return rows
+
+
+def winter_folds(*, losses: pl.DataFrame) -> list[int]:
+    """Return the folds that hold a December, January, or February month.
+
+    Args:
+        losses: A fit's per-row losses, carrying `fold` and `month` (`%Y-%m`).
+
+    Returns:
+        The sorted fold numbers. The blend rows' folds are blocks of whole months, so a fold that
+        holds a winter month trains on no winter month of the other folds' years.
+    """
+    winter = losses.filter(pl.col("month").str.slice(5, 2).is_in(list(WINTER_MONTH_NUMBERS)))
+    return sorted(winter["fold"].unique().to_list())
+
+
+def without_winter(*, losses: pl.DataFrame, folds: Sequence[int]) -> pl.DataFrame:
+    """Return the losses of the folds that hold no winter month."""
+    return losses.filter(~pl.col("fold").is_in(list(folds)))
+
+
+def blend_without_winter_rows(*, fits: Fits) -> list[dict[str, object]]:
+    """Compute P4 and P5 again without the folds that hold the blend rows' winter months.
+
+    Args:
+        fits: Every fit.
+
+    Returns:
+        The rows, each at 95%, pooled over lead days 1 to 3 and at each lead day alone.
+    """
+    reference = fits.get(view="blend", target="pv", lead_days=BLEND_LEAD_DAYS)
+    if not reference:
+        return []
+    folds = winter_folds(losses=pl.concat(reference.values()))
+    pairs = [(planned.treatment, planned.reference) for planned in PLANNED_CONTRASTS[3:]]
+    labels = {(p.treatment, p.reference): p.label for p in PLANNED_CONTRASTS[3:]}
+    rows: list[dict[str, object]] = []
+    scopes: list[tuple[str, Sequence[int]]] = [
+        ("pooled 1-3 without winter fold", BLEND_LEAD_DAYS),
+        *((f"lead day {day} without winter fold", (day,)) for day in BLEND_LEAD_DAYS),
+    ]
+    for scope, days in scopes:
+        pooled = fits.pooled(view="blend", target="pv", lead_days=days)
+        if pooled is None:
+            continue
+        add_pairs(
+            rows=rows,
+            losses=without_winter(losses=pooled, folds=folds),
+            target="pv",
+            family="blend_no_winter",
+            scope=scope,
+            pairs=pairs,
+            labels=labels,
+        )
+    return rows
+
+
+def post_hoc_rows(*, fits: Fits) -> list[dict[str, object]]:
+    """Compute the production-relevant contrasts, which were added after the first review.
+
+    Each is pooled over lead days 1 to 3 on the blend rows, at every setting fitted, with the 95%
+    and the 99% interval. Contrasts are labelled post hoc and counted as exploratory.
+
+    Args:
+        fits: Every fit.
+
+    Returns:
+        The rows of family `post_hoc`, of `post_hoc_control` (each treatment minus its padding
+        control), and of `control` for the ensemble-mean arm's control, or no rows if the `ens`
+        view was not fitted.
+    """
+    rows: list[dict[str, object]] = []
+    scopes: list[tuple[str, Sequence[int]]] = [
+        ("pooled 1-3", BLEND_LEAD_DAYS),
+        *((f"lead day {day}", (day,)) for day in BLEND_LEAD_DAYS),
+    ]
+    for scope, days in scopes:
+        losses = fits.ens_with_f0(lead_days=days)
+        if losses is None:
+            continue
+        adjusted = scope == "pooled 1-3"
+        for contrast in POST_HOC_CONTRASTS:
+            add_pairs(
+                rows=rows,
+                losses=losses,
+                target="pv",
+                family="post_hoc",
+                scope=scope,
+                pairs=[(contrast.treatment, contrast.reference)],
+                adjusted=adjusted,
+                labels={(contrast.treatment, contrast.reference): contrast.label},
+            )
+            if contrast.control is not None:
+                add_pairs(
+                    rows=rows,
+                    losses=losses,
+                    target="pv",
+                    family="post_hoc_control",
+                    scope=scope,
+                    pairs=[(contrast.treatment, contrast.control)],
+                    adjusted=adjusted,
+                    labels={(contrast.treatment, contrast.control): f"{contrast.label} vs control"},
+                )
+        add_pairs(
+            rows=rows,
+            losses=losses,
+            target="pv",
+            family="control",
+            scope=scope,
+            pairs=[(CONTROL_E0_PARTNER_ARM, E0_ARM)],
         )
     return rows
 
@@ -567,6 +768,7 @@ def exploratory_rows(*, fits: Fits) -> list[dict[str, object]]:
                 scope=scope,
                 pairs=[(control, base) for control, base, view in CONTROL_BASES if view == "blend"],
             )
+    rows += blend_without_winter_rows(fits=fits)
     comparison = fits.pooled(view="ladder", target="pv", lead_days=(ERA5_COMPARISON_LEAD_DAY,))
     add_pairs(
         rows=rows,
@@ -761,17 +963,50 @@ def final_verdict(*, verdicts: pl.DataFrame, label: str) -> VerdictType:
 
 
 def pooled_difference(
-    *, contrasts: pl.DataFrame, family: str, treatment: str, reference: str
+    *,
+    contrasts: pl.DataFrame,
+    family: str,
+    treatment: str,
+    reference: str,
+    setting: str = PRIMARY_SETTING,
+    scope: str = "pooled 1-3",
 ) -> float | None:
-    """Return a contrast's pooled difference at the primary setting, or `None` if not computed."""
+    """Return a contrast's difference at one setting, or `None` if it was not computed."""
     row = one_row(
         contrasts=contrasts,
         family=family,
         treatment=treatment,
         reference=reference,
-        setting=PRIMARY_SETTING,
+        setting=setting,
+        scope=scope,
     )
     return None if row is None else float(row["difference"])  # ty: ignore[invalid-argument-type]
+
+
+def drop_one_by_lead_day(*, contrasts: pl.DataFrame, rung: RungType, setting: str) -> str:
+    """Return a group's drop-one raise at each planned lead day, for the report to print.
+
+    Args:
+        contrasts: The contrast table.
+        rung: The group's rung.
+        setting: The hyperparameter setting.
+
+    Returns:
+        The values in points, such as `L1 -0.003, L2 -0.005, L3 +0.116`, or `n/a` if none exist.
+    """
+    parts = []
+    for day in PLANNED_LEAD_DAYS:
+        value = pooled_difference(
+            contrasts=contrasts,
+            family="drop_one",
+            treatment=f"{DROP_PREFIX}{rung}",
+            reference=F6_ARM,
+            setting=setting,
+            scope=f"lead day {day}",
+        )
+        if value is not None:
+            parts.append(f"L{day} {points(value, signed=True)}")
+    return ", ".join(parts) if parts else "n/a"
 
 
 def step_uppers(*, contrasts: pl.DataFrame, treatment: str, reference: str) -> list[float]:
@@ -807,9 +1042,10 @@ def gain_interval(
 ) -> tuple[float | None, float | None, str]:
     """Return the interval of the quantity that ranks a group, positive for a gain, and its level.
 
-    Total cloud and the cloud layers read their planned contrast's 99% interval. A group in the
-    exploratory class reads the 95% interval of its pooled ladder step. Every other group reads the
-    95% interval of its drop-one run, which is exploratory.
+    Total cloud, and the cloud layers unless the layers' class comes from their drop-one run, read
+    their planned contrast's 99% interval. A group in the exploratory class reads the 95% interval
+    of its pooled ladder step. Every other group reads the 95% interval of its drop-one run, which
+    is exploratory.
 
     Args:
         contrasts: The contrast table.
@@ -820,7 +1056,7 @@ def gain_interval(
         The lower and upper bounds of the gain, and `99%` or `95%`. Bounds are `None` if the
         contrast was not computed.
     """
-    if rung in ("f1", "f2"):
+    if rung == "f1" or (rung == "f2" and evidence != "drop-one gain"):
         treatment, reference = GROUP_STEPS[rung]
         row = one_row(
             contrasts=contrasts,
@@ -866,13 +1102,18 @@ def group_evidence(*, contrasts: pl.DataFrame, verdicts: pl.DataFrame) -> pl.Dat
     the variables of `f3` to `f6` (14 columns against the step's 7), the only control the ladder
     holds for it.
 
+    The drop-one rule is applied at every setting at which both the group's drop-one run and the
+    later-groups control were fitted, and the group counts as a drop-one gain only if all of them
+    agree. The row's `drop_one_settings` says whether that was both settings or the main one alone.
+
     Args:
         contrasts: The contrast table.
         verdicts: The planned verdict table.
 
     Returns:
         One row per group, in priority order, with its class, pooled gain, and the open-data
-        status of its variables.
+        status of its variables. `rank` is the position among all groups, and `rank_in_table` the
+        position within the table that prints the group.
     """
     control_difference = pooled_difference(
         contrasts=contrasts,
@@ -899,6 +1140,26 @@ def group_evidence(*, contrasts: pl.DataFrame, verdicts: pl.DataFrame) -> pl.Dat
             treatment=f"{DROP_PREFIX}{rung}",
             reference=F6_ARM,
         )
+        drop_raises: list[float] = []
+        drop_controls: list[float] = []
+        for setting in (PRIMARY_SETTING, SENSITIVITY_SETTING):
+            raised = pooled_difference(
+                contrasts=contrasts,
+                family="drop_one",
+                treatment=f"{DROP_PREFIX}{rung}",
+                reference=F6_ARM,
+                setting=setting,
+            )
+            later_control = pooled_difference(
+                contrasts=contrasts,
+                family="control",
+                treatment=CONTROL_LATER_GROUPS_ARM,
+                reference="f2",
+                setting=setting,
+            )
+            if raised is not None and later_control is not None:
+                drop_raises.append(raised)
+                drop_controls.append(later_control)
         control_arm, control_base = matching_control.get(rung, (CONTROL_LATER_GROUPS_ARM, "f2"))
         group_control = pooled_difference(
             contrasts=contrasts, family="control", treatment=control_arm, reference=control_base
@@ -918,10 +1179,8 @@ def group_evidence(*, contrasts: pl.DataFrame, verdicts: pl.DataFrame) -> pl.Dat
                 smallest_effect=SMALLEST_EFFECT["pv"],
             )
         )
-        has_drop_one = (
-            drop is not None
-            and control_difference is not None
-            and drop_one_matters(raise_in_error=drop, control_difference=control_difference)
+        has_drop_one = drop_one_gain_at_settings(
+            raises=drop_raises, control_differences=drop_controls
         )
         classes[rung] = evidence_class(
             planned_verdict=planned_verdict if rung != "f2" else None,
@@ -931,7 +1190,9 @@ def group_evidence(*, contrasts: pl.DataFrame, verdicts: pl.DataFrame) -> pl.Dat
         )
         if classes[rung] == "exploratory gain" and step is not None:
             gains[rung] = -step
-        elif rung in PLANNED_COVERS_SEVERAL_GROUPS and drop is not None:
+        elif (
+            classes[rung] == "drop-one gain" or rung in PLANNED_COVERS_SEVERAL_GROUPS
+        ) and drop is not None:
             gains[rung] = drop
         else:
             gains[rung] = -step if step is not None else 0.0
@@ -940,7 +1201,42 @@ def group_evidence(*, contrasts: pl.DataFrame, verdicts: pl.DataFrame) -> pl.Dat
             rung=rung,
             evidence=classes[rung],
         )
+        margin = (
+            None
+            if drop is None or control_difference is None
+            else drop_one_margin(raise_in_error=drop, control_difference=control_difference)
+        )
         details[rung] = {
+            "display_class": display_class(
+                evidence=classes[rung],
+                gain_lower=interval_lower if rung in ("f1", "f2") else None,
+                smallest_effect=SMALLEST_EFFECT["pv"],
+            ),
+            "drop_one_settings": (
+                "not fitted"
+                if not drop_raises
+                else "both settings"
+                if len(drop_raises) == SETTINGS_THAT_MUST_AGREE
+                else "main setting only"
+            ),
+            "drop_one_margin": margin,
+            "drop_one_by_lead_day": drop_one_by_lead_day(
+                contrasts=contrasts, rung=rung, setting=PRIMARY_SETTING
+            ),
+            "drop_one_raise_second": pooled_difference(
+                contrasts=contrasts,
+                family="drop_one",
+                treatment=f"{DROP_PREFIX}{rung}",
+                reference=F6_ARM,
+                setting=SENSITIVITY_SETTING,
+            ),
+            "f2_control_difference_second": pooled_difference(
+                contrasts=contrasts,
+                family="control",
+                treatment=CONTROL_LATER_GROUPS_ARM,
+                reference="f2",
+                setting=SENSITIVITY_SETTING,
+            ),
             "gain_lower": interval_lower,
             "gain_upper": interval_upper,
             "gain_interval_level": level,
@@ -955,13 +1251,17 @@ def group_evidence(*, contrasts: pl.DataFrame, verdicts: pl.DataFrame) -> pl.Dat
             "planned_verdict": planned_verdict,
         }
     rows = []
+    in_table_count = {True: 0, False: 0}
     for rank, name in enumerate(priority_order(classes=classes, gains=gains), start=1):
         rung = cast("RungType", name)
+        listed = "carried" in [OPEN_DATA_AVAILABILITY[v] for v in RUNG_ADDITIONS[rung]]
+        in_table_count[listed] += 1
         variables = RUNG_ADDITIONS[rung]
         availability = [OPEN_DATA_AVAILABILITY[name] for name in variables]
         rows.append(
             {
                 "rank": rank,
+                "rank_in_table": in_table_count[listed],
                 "rung": rung,
                 "group": GROUP_NAMES[rung],
                 "evidence_class": classes[rung],
@@ -1241,21 +1541,25 @@ def render_widths(*, widths: Sequence[Mapping[str, object]]) -> list[str]:
         f"- ERA5 `{width['treatment']}` minus `{width['reference']}` on {width['n_months']} "
         f"months: {ADJUSTED_LEVEL_PERCENT:g}% interval "
         f"{interval(width['lower'], width['upper'])} points, width "  # ty: ignore[invalid-argument-type]
-        f"{points(width['width'])} points."  # ty: ignore[invalid-argument-type]
+        f"{points(width['width'])} points, half-width "  # ty: ignore[invalid-argument-type]
+        f"{points(float(width['width']) / 2)} points."  # ty: ignore[invalid-argument-type]
         for width in widths
     )
     if widths:
-        wide = max(float(w["width"]) for w in widths) > WIDTH_WARNING  # ty: ignore[invalid-argument-type]
+        half_widths = [float(w["width"]) / 2 for w in widths]  # ty: ignore[invalid-argument-type]
+        smallest = SMALLEST_EFFECT["pv"]
+        allowed = all(
+            half_width_allows_no_gain(half_width=half_width, smallest_effect=smallest)
+            for half_width in half_widths
+        )
         lines.append(
-            "- The widest of these "
-            + (
-                f"exceeds {WIDTH_WARNING * PERCENTAGE_POINTS:g} points, so a contrast with no real "
-                "effect cannot return `no gain`, and the study can rule out only gains larger "
-                "than about half this width."
-                if wide
-                else f"is at most {WIDTH_WARNING * PERCENTAGE_POINTS:g} points."
-            )
-            + " ERA5 is an analysis, so this understates the width at forecast lead."
+            "- A contrast with no real effect returns `no gain` only if its "
+            f"{ADJUSTED_LEVEL_PERCENT:g}% half-width is below {smallest * PERCENTAGE_POINTS:g} "
+            f"points. The planned half-widths here are {points(min(half_widths))} to "
+            f"{points(max(half_widths))} points, so a contrast with no real effect "
+            + ("can" if allowed else "cannot always")
+            + " return `no gain`. ERA5 is an analysis, so this understates the width at forecast "
+            "lead."
         )
     return lines
 
@@ -1334,7 +1638,7 @@ def render_contrasts(*, contrasts: pl.DataFrame, families: Sequence[str]) -> str
             subset = contrasts.filter((pl.col("family") == family) & (pl.col("target") == target))
             if subset.is_empty():
                 continue
-            planned = bool(subset["planned"][0])
+            planned = bool(subset["lower_adjusted"].is_not_null().any())
             unit = "points of capacity" if target == "pv" else "clearness index"
             header = [
                 "contrast",
@@ -1361,7 +1665,7 @@ def render_contrasts(*, contrasts: pl.DataFrame, families: Sequence[str]) -> str
                 if planned:
                     cells[5:5] = [
                         interval(row["lower_adjusted"], row["upper_adjusted"], target=target),
-                        str(row["verdict_adjusted"]),
+                        "n/a" if row["verdict_adjusted"] is None else str(row["verdict_adjusted"]),
                     ]
                 rows.append(cells)
             parts += [f"### {family}, {target} target", "", table(rows=rows, header=header), ""]
@@ -1494,8 +1798,13 @@ def render_controls(*, contrasts: pl.DataFrame) -> list[str]:
 
 
 def render_priority(*, evidence: pl.DataFrame) -> list[str]:
-    """Render the priority list and the groups the open-data feed lacks."""
-    listed = evidence.filter(pl.col("in_open_data"))
+    """Render the priority list and the groups the open-data feed lacks.
+
+    Ranks count from 1 within each of the two tables. The class column holds the label from
+    `studies.ifs_decisions.display_class`, and the gain column holds the drop-one raise for a group
+    whose class comes from its drop-one run, and the ladder step otherwise.
+    """
+    listed = evidence.filter(pl.col("in_open_data")).sort("rank_in_table")
     return [
         OPEN_DATA_CHECK_NOTE,
         "",
@@ -1504,9 +1813,9 @@ def render_priority(*, evidence: pl.DataFrame) -> list[str]:
         table(
             rows=[
                 [
-                    str(row["rank"]),
+                    str(row["rank_in_table"]),
                     f"{row['group']} ({row['rung'].upper()})",
-                    row["evidence_class"],
+                    row["display_class"],
                     (
                         f"{points(row['gain'], signed=True)} "
                         f"{interval(row['gain_lower'], row['gain_upper'])} "
@@ -1521,7 +1830,7 @@ def render_priority(*, evidence: pl.DataFrame) -> list[str]:
                 for row in listed.iter_rows(named=True)
             ],
             header=[
-                "rank",
+                "rank in this table",
                 "group",
                 "evidence class",
                 "gain with interval (points; positive is a gain)",
@@ -1538,22 +1847,579 @@ def render_priority(*, evidence: pl.DataFrame) -> list[str]:
         table(
             rows=[
                 [
+                    str(row["rank_in_table"]),
                     f"{row['group']} ({row['rung'].upper()})",
-                    row["evidence_class"],
+                    row["display_class"],
                     points(row["gain"], signed=True),
                     row["not_carried"],
                 ]
-                for row in evidence.filter(~pl.col("in_open_data")).iter_rows(named=True)
+                for row in evidence.filter(~pl.col("in_open_data"))
+                .sort("rank_in_table")
+                .iter_rows(named=True)
             ],
-            header=["group", "evidence class", "gain (points)", "variables"],
+            header=["rank in this table", "group", "evidence class", "gain (points)", "variables"],
         ),
         "",
         (
             "The ranking is for IFS at lead days 1 to 3 and these months. The drop-one runs "
             "remove whole groups, so the report does not find the smallest set of variables "
-            "that keeps a gain."
+            "that keeps a gain. A group's gain is its drop-one raise when its class comes from "
+            "the drop-one run, and its ladder step otherwise."
         ),
     ]
+
+
+def render_drop_one_rule(*, evidence: pl.DataFrame) -> list[str]:
+    """Render the drop-one rule group by group, at each setting fitted, and what it implies.
+
+    Args:
+        evidence: The priority list's rows.
+
+    Returns:
+        The table of raises, controls, margins, and per-lead-day values, then the lines about F4,
+        the cloud layers, and the settings the rule was applied at.
+    """
+    rows = [
+        [
+            f"{row['group']} ({row['rung'].upper()})",
+            points(row["drop_one_raise"], signed=True),
+            points(row["f2_control_difference"], signed=True),
+            points(row["drop_one_margin"], signed=True),
+            points(row["drop_one_raise_second"], signed=True),
+            points(row["f2_control_difference_second"], signed=True),
+            row["drop_one_settings"],
+            row["drop_one_by_lead_day"],
+            row["evidence_class"],
+        ]
+        for row in evidence.sort("rung").iter_rows(named=True)
+    ]
+    lines = [
+        "### The drop-one rule, group by group",
+        "",
+        (
+            "A group passes the rule at a setting if removing it from the full set raises the "
+            "error by more than the negative control that pads F2 with the later groups' permuted "
+            "variables (0 if the control lowered the error). The margin is the raise minus the "
+            "larger of the control and zero. The group counts as a drop-one gain only if it "
+            "passes at every setting at which it was fitted. All values are in points of "
+            "capacity, pooled over lead days 1 to 3 unless a lead day is named."
+        ),
+        "",
+        table(
+            rows=rows,
+            header=[
+                "group",
+                "raise, main setting",
+                "control, main setting",
+                "margin, main setting",
+                "raise, second setting",
+                "control, second setting",
+                "rule applied at",
+                "raise by lead day, main setting",
+                "evidence class",
+            ],
+        ),
+        "",
+    ]
+    f4 = evidence.filter(pl.col("rung") == "f4")
+    if f4.height and f4["drop_one_margin"][0] is not None:
+        margin = float(f4["drop_one_margin"][0])
+        lines.append(
+            f"- F4 {'passes' if margin > 0 else 'fails'} the drop-one rule at the main setting by "
+            f"{points(margin, signed=True)} points; its raise by lead day is "
+            f"{f4['drop_one_by_lead_day'][0]}."
+        )
+    f2 = evidence.filter(pl.col("rung") == "f2")
+    if f2.height and f2["drop_one_raise"][0] is not None:
+        raised = float(f2["drop_one_raise"][0])
+        smallest = SMALLEST_EFFECT["pv"]
+        lines.append(
+            f"- Removing the cloud layers raises the full set's error by {points(raised)} points "
+            f"(main setting), against the smallest effect of {points(smallest)} points: it "
+            f"{'reaches' if raised > smallest else 'does not reach'} the smallest effect."
+        )
+    applied = sorted({str(value) for value in evidence["drop_one_settings"].to_list()})
+    groups_by_setting = {
+        setting: ", ".join(
+            f"`{rung}`"
+            for rung in evidence.filter(pl.col("drop_one_settings") == setting)
+            .sort("rung")["rung"]
+            .to_list()
+        )
+        for setting in applied
+    }
+    lines.append(
+        "- The rule was applied at: "
+        + "; ".join(f"{setting} ({groups})" for setting, groups in groups_by_setting.items())
+        + "."
+    )
+    if "both settings" not in applied:
+        lines.append(
+            "- The second-setting drop-one runs are absent, so the rule was applied at the main "
+            "setting only."
+        )
+    return lines
+
+
+def render_against_production(*, contrasts: pl.DataFrame) -> list[str]:
+    """Render F1 minus FP and F2 minus FP with 95% intervals, the contrasts against production."""
+    lines = [
+        "### Total cloud and the cloud layers against the production reference (exploratory)",
+        "",
+    ]
+    for treatment in ("f1", "f2"):
+        for setting in (PRIMARY_SETTING, SENSITIVITY_SETTING):
+            row = one_row(
+                contrasts=contrasts,
+                family="against_production",
+                treatment=treatment,
+                reference=PRODUCTION_ARM,
+                setting=setting,
+            )
+            if row is not None:
+                lines.append(
+                    f"- {treatment.upper()} minus FP, pooled over lead days 1 to 3, {setting} "
+                    f"setting: {points(row['difference'], signed=True)} points, 95% interval "  # ty: ignore[invalid-argument-type]
+                    f"{interval(row['lower_95'], row['upper_95'])}."  # ty: ignore[invalid-argument-type]
+                )
+    return lines
+
+
+def render_low_sun(*, splits: pl.DataFrame) -> list[str]:
+    """Render the full set minus the minimal set at the low-sun hours, with 95% intervals."""
+    lines = ["### The low-sun penalty (F6 minus F0 by hour of day, exploratory)", ""]
+    rows = []
+    for hour in LOW_SUN_HOURS:
+        found = (
+            splits.filter(
+                (pl.col("split") == "hour_of_day")
+                & (pl.col("group") == str(hour))
+                & (pl.col("treatment") == F6_ARM)
+                & (pl.col("reference") == "f0")
+            )
+            if not splits.is_empty()
+            else splits
+        )
+        if found.height:
+            row = found.row(0, named=True)
+            rows.append(
+                [
+                    f"{hour:02d}",
+                    points(row["difference"], signed=True),
+                    interval(row["lower_95"], row["upper_95"]),
+                ]
+            )
+    if not rows:
+        return [*lines, "No hour-of-day split."]
+    return [
+        *lines,
+        table(rows=rows, header=["hour (UTC)", "F6 minus F0 (points)", "95% interval"]),
+        "",
+        "A positive difference means the full set is worse than the minimal set at that hour.",
+    ]
+
+
+def post_hoc_verdict_rows(*, contrasts: pl.DataFrame) -> list[dict[str, object]]:
+    """Read the post hoc contrasts by the plan's verdict formula, for information.
+
+    Args:
+        contrasts: The contrast table.
+
+    Returns:
+        One row per post hoc contrast with the verdict at each setting, combined, against its
+        control (if it has one), and after the control. `None` values mark a missing fit.
+    """
+    rows: list[dict[str, object]] = []
+    for contrast in POST_HOC_CONTRASTS:
+        by_setting = {
+            setting: one_row(
+                contrasts=contrasts,
+                family="post_hoc",
+                treatment=contrast.treatment,
+                reference=contrast.reference,
+                setting=setting,
+            )
+            for setting in (PRIMARY_SETTING, SENSITIVITY_SETTING)
+        }
+        if by_setting[PRIMARY_SETTING] is None:
+            continue
+        combined = settings_verdict(
+            contrasts=contrasts,
+            family="post_hoc",
+            treatment=contrast.treatment,
+            reference=contrast.reference,
+        )
+        versus_control = (
+            None
+            if contrast.control is None
+            else settings_verdict(
+                contrasts=contrasts,
+                family="post_hoc_control",
+                treatment=contrast.treatment,
+                reference=contrast.control,
+            )
+        )
+        rows.append(
+            {
+                "label": contrast.label,
+                "treatment": contrast.treatment,
+                "reference": contrast.reference,
+                "control": contrast.control,
+                "primary": by_setting[PRIMARY_SETTING]["verdict_adjusted"],  # ty: ignore[not-subscriptable]
+                "sensitivity": None
+                if by_setting[SENSITIVITY_SETTING] is None
+                else by_setting[SENSITIVITY_SETTING]["verdict_adjusted"],  # ty: ignore[not-subscriptable]
+                "combined": combined,
+                "versus_control": versus_control,
+                "final": combined
+                if versus_control is None
+                else gain_after_control(versus_reference=combined, versus_control=versus_control),
+            }
+        )
+    return rows
+
+
+def production_verdict(*, contrasts: pl.DataFrame) -> VerdictType | None:
+    """Return the combined verdict of AIFS Single added to the ensemble mean, or `None`.
+
+    Args:
+        contrasts: The contrast table.
+
+    Returns:
+        The verdict of `e_a` minus `e0` from `combine_verdicts` over the two settings, or `None` if
+        the `ens` view was not fitted.
+    """
+    if not any(row["label"] == "E-A" for row in post_hoc_verdict_rows(contrasts=contrasts)):
+        return None
+    return settings_verdict(
+        contrasts=contrasts, family="post_hoc", treatment=E_A_ARM, reference=E0_ARM
+    )
+
+
+def render_post_hoc_production(*, fits: Fits, contrasts: pl.DataFrame) -> list[str]:
+    """Render the production-relevant second-forecast contrast, which is post hoc and exploratory.
+
+    Args:
+        fits: Every fit.
+        contrasts: The contrast table.
+
+    Returns:
+        The section's lines, or a line saying the analysis is not yet fitted.
+    """
+    lines = [
+        "## Production-relevant second-forecast contrast (post hoc, exploratory)",
+        "",
+        (
+            "P4 and P5 add a second forecast to a single deterministic 9 km point forecast "
+            "(Open-Meteo's IFS run). This section adds it to the IFS ensemble mean, which is what "
+            "the production service reads. The contrasts were added after the first scientific "
+            "review, so they are post hoc and exploratory. Their verdicts below apply the plan's "
+            "formula for information only."
+        ),
+        "",
+    ]
+    verdict_rows = post_hoc_verdict_rows(contrasts=contrasts)
+    if not verdict_rows:
+        return [*lines, f"{POST_HOC_NOT_FITTED}: {', '.join(fits.missing_post_hoc)}.", ""]
+    lines += [
+        render_contrasts(contrasts=contrasts, families=["post_hoc", "post_hoc_control"]),
+        "### Verdicts by the plan's formula (post hoc, for information)",
+        "",
+        table(
+            rows=[
+                [
+                    str(row["label"]),
+                    f"{row['treatment']} minus {row['reference']}",
+                    str(row["primary"]),
+                    str(row["sensitivity"]),
+                    str(row["combined"]),
+                    "n/a"
+                    if row["control"] is None
+                    else f"{row['treatment']} minus {row['control']}: {row['versus_control']}",
+                    f"**{row['final']}**",
+                ]
+                for row in verdict_rows
+            ],
+            header=[
+                "contrast",
+                "arms",
+                "main setting (99%)",
+                "second setting (99%)",
+                "both settings",
+                "against the control",
+                "final verdict after the control",
+            ],
+        ),
+        "",
+        "### The ERA5 study's P4 beside them (99.5% interval, the ERA5 study's own level)",
+        "",
+        render_era5_p4(contrasts=contrasts),
+        "",
+        "### Lead-day values (95% intervals, post hoc, exploratory)",
+        "",
+    ]
+    rows = []
+    for contrast in POST_HOC_CONTRASTS:
+        for day in BLEND_LEAD_DAYS:
+            for setting in (PRIMARY_SETTING, SENSITIVITY_SETTING):
+                row = one_row(
+                    contrasts=contrasts,
+                    family="post_hoc",
+                    treatment=contrast.treatment,
+                    reference=contrast.reference,
+                    setting=setting,
+                    scope=f"lead day {day}",
+                )
+                if row is not None:
+                    rows.append(
+                        [
+                            contrast.label,
+                            str(day),
+                            setting,
+                            points(row["difference"], signed=True),  # ty: ignore[invalid-argument-type]
+                            interval(row["lower_95"], row["upper_95"]),  # ty: ignore[invalid-argument-type]
+                        ]
+                    )
+    lines.append(
+        table(
+            rows=rows,
+            header=["contrast", "lead day", "setting", "difference (points)", "95% interval"],
+        )
+    )
+    return lines
+
+
+def render_by_fold(*, fits: Fits, contrasts: pl.DataFrame) -> list[str]:
+    """Render P4 and P5 by blend fold, and pooled and by lead day without the winter fold.
+
+    Args:
+        fits: Every fit.
+        contrasts: The contrast table.
+
+    Returns:
+        The section's lines. The values are at the main setting; they are exploratory.
+    """
+    lines = [
+        "## P4 and P5 by blend fold and without the winter fold (exploratory)",
+        "",
+    ]
+    blend = fits.get(view="blend", target="pv", lead_days=BLEND_LEAD_DAYS)
+    if not blend:
+        return [*lines, "No blend fits."]
+    primary = {
+        day: losses.filter(pl.col("setting") == PRIMARY_SETTING) for day, losses in blend.items()
+    }
+    all_rows = pl.concat(primary.values())
+    folds = winter_folds(losses=all_rows)
+    months = (
+        all_rows.group_by("fold")
+        .agg(first=pl.col("month").min(), last=pl.col("month").max())
+        .sort("fold")
+    )
+    lines += [
+        (
+            "Each fold holds a block of whole months. The folds that hold a December, January, or "
+            f"February month are {', '.join(str(f) for f in folds)}; the models that score those "
+            "months train on no winter month of the other folds. Main setting throughout."
+        ),
+        "",
+        table(
+            rows=[
+                [str(row["fold"]), row["first"], row["last"]]
+                for row in months.iter_rows(named=True)
+            ],
+            header=["fold", "first month", "last month"],
+        ),
+        "",
+    ]
+    blend_planned = [planned for planned in PLANNED_CONTRASTS if planned.view == "blend"]
+    rows = []
+    for planned in blend_planned:
+        for day, losses in primary.items():
+            by_fold = mean_paired_difference_by(
+                losses=losses,
+                treatment=planned.treatment,
+                reference=planned.reference,
+                metric=METRIC,
+                by="fold",
+            )
+            rows.extend(
+                [
+                    planned.label,
+                    str(day),
+                    str(row["fold"]),
+                    points(row["difference"], signed=True),
+                    f"{row['rows'] // len(SEEDS):,}",
+                ]
+                for row in by_fold.iter_rows(named=True)
+            )
+    lines += [
+        "### By fold",
+        "",
+        table(
+            rows=rows,
+            header=["contrast", "lead day", "fold", "difference (points)", "rows (per seed)"],
+        ),
+        "",
+        "### Without the winter fold",
+        "",
+    ]
+    rows = []
+    for planned in blend_planned:
+        by_day = lead_day_mean_differences(fits=fits, planned=planned)
+        for scope, label in [
+            *((f"lead day {day} without winter fold", str(day)) for day in BLEND_LEAD_DAYS),
+            ("pooled 1-3 without winter fold", "pooled 1-3"),
+        ]:
+            without = one_row(
+                contrasts=contrasts,
+                family="blend_no_winter",
+                treatment=planned.treatment,
+                reference=planned.reference,
+                setting=PRIMARY_SETTING,
+                scope=scope,
+            )
+            if label == "pooled 1-3":
+                with_all = pooled_difference(
+                    contrasts=contrasts,
+                    family="planned",
+                    treatment=planned.treatment,
+                    reference=planned.reference,
+                )
+            else:
+                with_all = by_day.get(int(label), (None, 0))[0]
+            rows.append(
+                [
+                    planned.label,
+                    label,
+                    points(with_all, signed=True),
+                    "n/a" if without is None else points(without["difference"], signed=True),  # ty: ignore[invalid-argument-type]
+                    "n/a"
+                    if without is None
+                    else interval(without["lower_95"], without["upper_95"]),  # ty: ignore[invalid-argument-type]
+                ]
+            )
+    lines.append(
+        table(
+            rows=rows,
+            header=[
+                "contrast",
+                "lead day",
+                "all folds (points)",
+                "without the winter fold (points)",
+                "95% interval without the winter fold",
+            ],
+        )
+    )
+    return lines
+
+
+def render_raw_errors(*, fits: Fits) -> list[str]:
+    """Render the forecasts' raw radiation errors against CAMS irradiance, and F0 on both fits.
+
+    Args:
+        fits: Every fit.
+
+    Returns:
+        The section's lines. The raw errors need `dataset_blend_ens.parquet`.
+    """
+    lines = ["## The reference's own error against CAMS irradiance (post hoc)", ""]
+    if fits.blend_ens is None:
+        return [
+            *lines,
+            (
+                f"{POST_HOC_NOT_FITTED}: dataset_blend_ens.parquet is absent; run the build with "
+                "`--ens-only`."
+            ),
+        ]
+    lines += [
+        (
+            "Raw mean absolute error in W m-2 of each forecast's radiation against CAMS "
+            "irradiance at the valid hour, on the blend rows where all three forecasts are "
+            "present."
+        ),
+        "",
+    ]
+    errors: dict[int, dict[str, float]] = {}
+    counts: dict[int, int] = {}
+    for day in BLEND_LEAD_DAYS:
+        frame = fits.blend_ens.filter(pl.col("lead_day") == day)
+        errors[day] = mean_absolute_error_on_common_rows(
+            frame=frame,
+            forecast_columns=list(RAW_RADIATION_COLUMNS),
+            truth_column=CAMS_IRRADIANCE_COLUMN,
+        )
+        counts[day] = frame.select(
+            pl.all_horizontal(
+                pl.col(name).is_not_null() & ~pl.col(name).is_nan().fill_null(value=False)
+                for name in (*RAW_RADIATION_COLUMNS, CAMS_IRRADIANCE_COLUMN)
+            ).sum()
+        ).item()
+    first, last = BLEND_LEAD_DAYS[0], BLEND_LEAD_DAYS[-1]
+    lines += [
+        table(
+            rows=[
+                [
+                    str(day),
+                    f"{counts[day]:,}",
+                    *(f"{errors[day][name]:.1f}" for name in RAW_RADIATION_COLUMNS),
+                ]
+                for day in BLEND_LEAD_DAYS
+            ]
+            + [
+                [
+                    f"rise, lead day {first} to {last} (%)",
+                    "",
+                    *(
+                        f"{percentage_rise(first=errors[first][name], last=errors[last][name]):.1f}"
+                        for name in RAW_RADIATION_COLUMNS
+                    ),
+                ]
+            ],
+            header=[
+                "lead day",
+                "rows",
+                *(f"{label} (W m-2)" for label in RAW_RADIATION_COLUMNS.values()),
+            ],
+        ),
+        "",
+        "### F0 on the ladder fit and on the blend refit, on the same rows (main setting)",
+        "",
+    ]
+    rows = []
+    for day in BLEND_LEAD_DAYS:
+        ladder = fits.losses.get(("ladder", "pv", day))
+        blend = fits.losses.get(("blend", "pv", day))
+        if ladder is None or blend is None:
+            continue
+        blend_f0 = blend.filter((pl.col("arm") == "f0") & (pl.col("setting") == PRIMARY_SETTING))
+        ladder_f0 = ladder.filter(
+            (pl.col("arm") == "f0") & (pl.col("setting") == PRIMARY_SETTING)
+        ).join(blend_f0.select("site", "time").unique(), on=["site", "time"], how="semi")
+        ladder_error = float(ladder_f0[METRIC].mean())  # ty: ignore[invalid-argument-type]
+        blend_error = float(blend_f0[METRIC].mean())  # ty: ignore[invalid-argument-type]
+        rows.append(
+            [
+                str(day),
+                f"{blend_f0.height // len(SEEDS):,}",
+                points(ladder_error),
+                points(blend_error),
+                points(blend_error - ladder_error, signed=True),
+            ]
+        )
+    lines.append(
+        table(
+            rows=rows,
+            header=[
+                "lead day",
+                "rows (per seed)",
+                "ladder F0 (% of capacity)",
+                "blend refit of F0 (% of capacity)",
+                "blend minus ladder (points)",
+            ],
+        )
+    )
+    return lines
 
 
 def render_arms(*, fits: Fits) -> list[str]:
@@ -1730,7 +2596,8 @@ def render_settings(
     lines.append(
         f"- Exploratory intervals computed: {exploratory.height + split_intervals} "
         f"({exploratory.height} contrast intervals, one per contrast, scope, and setting, and "
-        f"{split_intervals} split intervals), all at 95%. About 1 in 20 with no real effect "
+        f"{split_intervals} split intervals), all with 95% intervals; the pooled post hoc "
+        "production-relevant contrasts also carry 99% intervals. About 1 in 20 with no real effect "
         "behind it reaches statistical significance at the 5% level, the intervals share "
         "months so that spurious results cluster, and the report applies no correction."
     )
@@ -1808,7 +2675,13 @@ def render_farms(*, farms: pl.DataFrame) -> str:
 
 
 def render_decisions(
-    *, verdicts: pl.DataFrame, evidence: pl.DataFrame, third: ThirdDecision, needs_second: bool
+    *,
+    verdicts: pl.DataFrame,
+    evidence: pl.DataFrame,
+    contrasts: pl.DataFrame,
+    third: ThirdDecision,
+    needs_second: bool,
+    production: VerdictType | None,
 ) -> list[str]:
     """Render the three decisions."""
     uppers = third.era5_p4_uppers
@@ -1824,6 +2697,10 @@ def render_decisions(
         "",
         *render_priority(evidence=evidence),
         "",
+        *render_drop_one_rule(evidence=evidence),
+        "",
+        *render_against_production(contrasts=contrasts),
+        "",
         "### Whether the production forecast needs a second IFS feed",
         "",
         (
@@ -1833,6 +2710,11 @@ def render_decisions(
             "exploratory. Boundary-layer height, the third variable the open-data feed lacks, "
             "sits in a group with carried variables, so no drop-one run isolates it and the "
             "rule cannot test it."
+        ),
+        (
+            "- The cloud layers' drop-one raise and the smallest effect are printed under the "
+            "drop-one rule above. F2 minus FP, printed above, is the contrast closest to the "
+            "production feed. The production feed's long-wave radiation was not tested."
         ),
         "",
         "### Variables or another forecast",
@@ -1854,6 +2736,18 @@ def render_decisions(
             "the smallest effect at both settings; otherwise `not_separated`."
         ),
         "",
+        (
+            "**Scope of the third decision.** P5 adds the second forecast to a single 9 km point "
+            "forecast (Open-Meteo's IFS run), and the ERA5 study's P4 adds MARS-only variables to "
+            "a reanalysis. Neither is the gain the production service would see, because it reads "
+            "the IFS ensemble mean. The production-relevant contrast is the post hoc `e_a` minus "
+            "`e0` (AIFS Single added to the ensemble mean). The outcome above keeps its "
+            "pre-registered formula. "
+            + production_scope_sentence(verdict=production)
+            + " The smallest effect is "
+            f"{points(SMALLEST_EFFECT['pv'])} points."
+        ),
+        "",
         "### Planned verdicts, both settings combined",
         "",
         render_planned_verdicts(verdicts=verdicts),
@@ -1870,6 +2764,7 @@ def render_report(
     evidence: pl.DataFrame,
     third: ThirdDecision,
     needs_second: bool,
+    production: VerdictType | None,
     splits: pl.DataFrame,
     farms: pl.DataFrame,
     widths: Sequence[Mapping[str, object]],
@@ -1891,12 +2786,23 @@ def render_report(
         *day_lines,
         "",
         *render_decisions(
-            verdicts=verdicts, evidence=evidence, third=third, needs_second=needs_second
+            verdicts=verdicts,
+            evidence=evidence,
+            contrasts=contrasts,
+            third=third,
+            needs_second=needs_second,
+            production=production,
         ),
         "",
         "## Planned contrasts (planned)",
         "",
         render_contrasts(contrasts=contrasts, families=["planned", "planned_control"]),
+        *render_post_hoc_production(fits=fits, contrasts=contrasts),
+        "",
+        *render_by_fold(fits=fits, contrasts=contrasts),
+        "",
+        *render_raw_errors(fits=fits),
+        "",
         "## Controls",
         "",
         *render_controls(contrasts=contrasts),
@@ -1930,6 +2836,8 @@ def render_report(
         "## Contrasts by cloud regime, season, and hour of day (exploratory)",
         "",
         render_splits(splits=splits),
+        *render_low_sun(splits=splits),
+        "",
         "## Per-farm errors",
         "",
         render_farms(farms=farms),
@@ -1961,6 +2869,26 @@ def write_width_preview() -> int:
     return 0
 
 
+def report_refit_needed() -> int:
+    """Print which post hoc fits and frames are missing, with the commands that make them.
+
+    Returns:
+        The process exit code, always 0, because missing post hoc fits are not an error.
+    """
+    fits = Fits()
+    missing = list(fits.missing_post_hoc)
+    if fits.blend_ens is None:
+        missing.append(ens_dataset_path().name)
+    if not missing:
+        print("every post hoc fit and frame exists")
+        return 0
+    print(f"{POST_HOC_NOT_FITTED}: {', '.join(missing)}")
+    print("build:  ifs_ladder_build_dataset.py --ens-only")
+    print("fit:    ifs_ladder_fit.py --view ens --lead-days 1 2 3")
+    print("fit:    ifs_ladder_fit.py --view extra_sensitivity --lead-days 1 2 3")
+    return 0
+
+
 def main() -> int:
     """Score the saved fits and write the report and tables."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1969,8 +2897,16 @@ def main() -> int:
         action="store_true",
         help="Read only the ERA5 losses and write width_preview.md, before any IFS fit exists.",
     )
-    if parser.parse_args().width_preview_only:
+    parser.add_argument(
+        "--refit-needed",
+        action="store_true",
+        help="Print the post hoc fits and frames that are missing, then exit without a report.",
+    )
+    arguments = parser.parse_args()
+    if arguments.width_preview_only:
         return write_width_preview()
+    if arguments.refit_needed:
+        return report_refit_needed()
     paths = report_paths()
     refuse_to_overwrite(paths=list(paths))
     fits = Fits()
@@ -1978,13 +2914,19 @@ def main() -> int:
         msg = "no fit has saved losses; run ifs_ladder_fit.py first"
         raise FileNotFoundError(msg)
 
-    contrast_rows = [*planned_rows(fits=fits), *exploratory_rows(fits=fits), *era5_p4_rows()]
+    contrast_rows = [
+        *planned_rows(fits=fits),
+        *exploratory_rows(fits=fits),
+        *post_hoc_rows(fits=fits),
+        *era5_p4_rows(),
+    ]
     contrasts = pl.DataFrame(contrast_rows, infer_schema_length=None)
     era5_p4 = contrasts.filter(pl.col("family") == "era5_p4")
     verdicts = planned_verdict_table(contrasts=contrasts)
     evidence = group_evidence(contrasts=contrasts, verdicts=verdicts)
     third = third_decision(verdicts=verdicts, era5_p4=era5_p4)
     needs_second = second_feed(evidence=evidence, verdicts=verdicts)
+    production = production_verdict(contrasts=contrasts)
     board = leaderboard_rows(fits=fits)
     farms = per_farm_rows(fits=fits)
     splits = split_rows(fits=fits)
@@ -2023,6 +2965,7 @@ def main() -> int:
             evidence=evidence,
             third=third,
             needs_second=needs_second,
+            production=production,
             splits=splits,
             farms=farms,
             widths=widths,

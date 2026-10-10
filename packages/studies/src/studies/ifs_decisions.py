@@ -15,6 +15,10 @@ columns.
 `stack_lead_days` keeps only the (farm, hour) rows that every lead day holds, gives each lead day's
 rows a `site` key of their own, and lets one month resample serve all of them. Each lead day then
 holds the same rows, and the pooled difference is the equal-weight mean of the lead days.
+
+**Post hoc helpers.** After the first scientific review, the report added analyses that the plan did
+not pre-register: the second forecast added to the ensemble mean, the drop-one rule applied at both
+settings, and the raw radiation errors. Their pure parts are at the end of this module.
 """
 
 from collections.abc import Mapping, Sequence
@@ -302,3 +306,211 @@ def stack_lead_days(*, losses_by_lead_day: Mapping[int, pl.DataFrame]) -> pl.Dat
             )
         )
     return pl.concat(parts)
+
+
+def drop_one_gain_at_settings(
+    *, raises: Sequence[float], control_differences: Sequence[float]
+) -> bool:
+    """Apply the drop-one rule at every setting that was fitted: the group counts only if all agree.
+
+    Args:
+        raises: The error added by removing the group from the full set, at each setting fitted.
+        control_differences: The negative control's difference from its base arm at the same
+            settings, in the same order.
+
+    Returns:
+        Whether there is at least one setting and `drop_one_matters` holds at every one of them.
+
+    Raises:
+        ValueError: If the two sequences differ in length.
+    """
+    if len(raises) != len(control_differences):
+        msg = f"{len(raises)} raises but {len(control_differences)} control differences"
+        raise ValueError(msg)
+    return len(raises) > 0 and all(
+        drop_one_matters(raise_in_error=raised, control_difference=control)
+        for raised, control in zip(raises, control_differences, strict=True)
+    )
+
+
+def drop_one_margin(*, raise_in_error: float, control_difference: float) -> float:
+    """Return by how much a group passes the drop-one rule, negative if it fails.
+
+    Args:
+        raise_in_error: The error of the full set without the group minus the full set's error.
+        control_difference: The negative control's difference from its base arm. A control that
+            lowered the error counts as a difference of zero.
+
+    Returns:
+        `raise_in_error` minus the larger of `control_difference` and zero.
+    """
+    return raise_in_error - max(control_difference, 0.0)
+
+
+UNRESOLVED_AT_SMALLEST_EFFECT: Final[str] = "unresolved at the smallest effect"
+"""The label of a `no gain shown` group whose planned interval is wholly on the gain side."""
+
+
+def display_class(
+    *, evidence: EvidenceClassType, gain_lower: float | None, smallest_effect: float
+) -> str:
+    """Return the label the report prints for an evidence class.
+
+    A group in the `no gain shown` class whose planned interval lies wholly on the gain side but
+    does not reach the smallest effect is not shown to have no gain: the study could not tell.
+
+    Args:
+        evidence: The group's evidence class.
+        gain_lower: The lower bound of the group's planned gain interval, positive for a gain, or
+            `None` if the group has no planned interval.
+        smallest_effect: The smallest improvement worth acting on, a positive number.
+
+    Returns:
+        `UNRESOLVED_AT_SMALLEST_EFFECT` if `evidence` is `no gain shown` and `gain_lower` is above
+        zero and not above `smallest_effect`, and `evidence` otherwise.
+    """
+    if (
+        evidence == "no gain shown"
+        and gain_lower is not None
+        and 0.0 < gain_lower <= smallest_effect
+    ):
+        return UNRESOLVED_AT_SMALLEST_EFFECT
+    return evidence
+
+
+def production_scope_sentence(*, verdict: VerdictType | None) -> str:
+    """Return the sentence that says whether the routes are separated for the production service.
+
+    Args:
+        verdict: The combined verdict of the second forecast added to the ensemble mean the
+            production service reads, or `None` if that contrast was not fitted.
+
+    Returns:
+        A sentence that follows mechanically from the verdict.
+    """
+    if verdict is None:
+        return "The production-relevant contrast is not yet fitted, so the routes cannot be read."
+    if verdict == "gain":
+        return (
+            "A second forecast added to the ensemble mean is a gain at both settings by the "
+            "pre-registered formula, so for the production service the evidence separates the "
+            "routes in favour of a second forecast."
+        )
+    if verdict == "no gain":
+        return (
+            "A second forecast added to the ensemble mean is no gain at both settings by the "
+            "pre-registered formula: a gain as large as the smallest effect is ruled out, so for "
+            "the production service the evidence does not separate the routes in favour of a "
+            "second forecast."
+        )
+    return (
+        "A second forecast added to the ensemble mean is unresolved by the pre-registered "
+        "formula: its interval holds gains both larger and smaller than the smallest effect, so "
+        "the routes are not separated for the production service."
+    )
+
+
+def half_width_allows_no_gain(*, half_width: float, smallest_effect: float) -> bool:
+    """Say whether an interval around no real effect could return the verdict `no gain`.
+
+    A contrast with no real effect has an interval centred on zero, and `contrast_verdict` returns
+    `no gain` only if the lower bound is above minus the smallest effect.
+
+    Args:
+        half_width: Half the interval's width.
+        smallest_effect: The smallest improvement worth acting on, a positive number.
+
+    Returns:
+        Whether `half_width` is below `smallest_effect`.
+    """
+    return contrast_verdict(
+        lower=-half_width, upper=half_width, smallest_effect=smallest_effect
+    ) == ("no gain")
+
+
+def mean_absolute_error_on_common_rows(
+    *, frame: pl.DataFrame, forecast_columns: Sequence[str], truth_column: str
+) -> dict[str, float]:
+    """Return each forecast column's mean absolute error against a truth column, on shared rows.
+
+    Args:
+        frame: Rows carrying the forecast columns and the truth column.
+        forecast_columns: The forecast columns to score.
+        truth_column: The column the forecasts are scored against.
+
+    Returns:
+        For each forecast column, the mean of its absolute difference from the truth column over
+        the rows where every forecast column and the truth are present (not null, not NaN).
+    """
+    needed = [*forecast_columns, truth_column]
+    present = frame.filter(
+        pl.all_horizontal(
+            pl.col(name).is_not_null() & ~pl.col(name).is_nan().fill_null(value=False)
+            for name in needed
+        )
+    )
+    return {
+        name: float((present[name] - present[truth_column]).abs().mean())  # ty: ignore[invalid-argument-type]
+        for name in forecast_columns
+    }
+
+
+def percentage_rise(*, first: float, last: float) -> float:
+    """Return how much larger `last` is than `first`, as a percentage of `first`."""
+    return (last - first) / first * 100.0
+
+
+def mean_paired_difference_by(
+    *, losses: pl.DataFrame, treatment: str, reference: str, metric: str, by: str
+) -> pl.DataFrame:
+    """Return the treatment-minus-reference mean difference within each value of a column.
+
+    Args:
+        losses: Per-row losses holding both arms, carrying `site`, `time`, `seed`, `arm`, `metric`,
+            and `by`.
+        treatment: The arm whose metric is compared.
+        reference: The arm it is compared against.
+        metric: The loss column to difference.
+        by: The column to group by, such as `fold`.
+
+    Returns:
+        One row per value of `by`, sorted, with `difference` (the mean over rows and seeds) and
+        `rows` (the number of (farm, hour, seed) rows).
+    """
+    paired = (
+        losses.filter(pl.col("arm") == reference)
+        .select("site", "time", "seed", by, reference=pl.col(metric))
+        .join(
+            losses.filter(pl.col("arm") == treatment).select(
+                "site", "time", "seed", treatment=pl.col(metric)
+            ),
+            on=["site", "time", "seed"],
+            how="inner",
+        )
+    )
+    return (
+        paired.group_by(by)
+        .agg(difference=(pl.col("treatment") - pl.col("reference")).mean(), rows=pl.len())
+        .sort(by)
+    )
+
+
+def merge_extra_arms(*, main: pl.DataFrame, extra: pl.DataFrame) -> pl.DataFrame:
+    """Add the losses of arms fitted later to a fit's losses.
+
+    Args:
+        main: A fit's losses, carrying `arm` and `setting`.
+        extra: Losses of further (arm, setting) fits on the same rows.
+
+    Returns:
+        The two stacked, with `main`'s columns.
+
+    Raises:
+        ValueError: If `extra` holds an (arm, setting) that `main` already holds.
+    """
+    key = ["arm", "setting"]
+    clash = main.select(key).unique().join(extra.select(key).unique(), on=key, how="inner")
+    if not clash.is_empty():
+        msg = f"the extra losses repeat fits already in the main losses: {clash.rows()}"
+        raise ValueError(msg)
+    return pl.concat([main, extra.select(main.columns)], how="vertical_relaxed")
