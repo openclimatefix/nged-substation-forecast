@@ -47,13 +47,22 @@ from typing import Final, Literal
 import numpy as np
 import polars as pl
 from contracts.config_schemas import load_cv_config
-from studies.baselines import (
-    MIN_OBSERVED_CLEAR_SKY_SHARE,
-    hourly_clear_sky,
-    hourly_grid,
-    issue_time,
-    same_clock_hour_window,
+from lag_arm_columns import (
+    DAILY_FEATURE_COLUMNS,
+    SATELLITE_LAG_DAYS,
+    LagInputs,
+    analogue_ensemble,
+    clear_sky_table,
+    clipping_share,
+    daily_features,
+    issue_morning,
+    lag_context,
+    lookup_daily,
+    satellite_ratios,
+    transfer_function,
+    window_anchor_lines,
 )
+from studies.baselines import issue_time, same_clock_hour_window
 from studies.commissioning import drop_commissioning_ramp
 from studies.cross_validation import cut_eras
 from studies.export_cap import with_export_cap
@@ -156,16 +165,34 @@ RESIDUAL_MEAN_TEMPLATES: Final[tuple[str, ...]] = (
     "resid_mean_30d_fold{fold}",
 )
 RATIO_TEMPLATE: Final[str] = "energy_ratio_7d_fold{fold}"
-"""The columns `fit_lag_arms.py` derives from the stage-1 models, one per scored fold."""
+CLOCK_RATIO_TEMPLATE: Final[str] = "energy_ratio_clock30_fold{fold}"
+"""The columns `fit_lag_arms.py` derives from the stage-1 models, one per scored fold. R1s and R2
+read the ratios; neither is a feature of a fitted arm."""
+
+IM_COLUMNS: Final[tuple[str, ...]] = ("im_energy", "im_ratio", "im_hours")
+CK_COLUMNS: Final[tuple[str, ...]] = ("ck_expanding_p995", "ck_max_60d", "ck_clear_near_share")
+TF_COLUMNS: Final[tuple[str, ...]] = ("tf_ratio", "tf_scaled_forecast")
+DT_COLUMNS: Final[tuple[str, ...]] = ("dt_centroid_shift_30d", "dt_shoulder_share_30d")
+W7_COLUMNS: Final[tuple[str, ...]] = ("week_min", "week_max", "week_mean")
+Q30_COLUMNS: Final[tuple[str, ...]] = ("q30_p90", "q30_median")
+RP_COLUMNS: Final[tuple[str, ...]] = ("rp_7d", "rp_1d")
+"""Column groups several arms share."""
 
 EXTRA_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
     "B0": (),
     "L1": ("lag_d1",),
-    "L7": tuple(f"lag_d{day}" for day in range(1, 8)),
+    "IM": IM_COLUMNS,
     "L2": ("lag_d1", "lag_nwp_ghi", "lag_nwp_temp"),
-    "W7": ("week_min", "week_max", "week_mean"),
-    "Q30": ("q30_p90", "q30_median", "peak_slope_30d"),
-    "DS": ("day_peak", "day_energy", "day_csi"),
+    "CTX7": (
+        *(f"lag_d{day}" for day in range(1, 8)),
+        *(f"lag_ghi_d{day}" for day in range(1, 8)),
+    ),
+    "W7": W7_COLUMNS,
+    "Q30": Q30_COLUMNS,
+    "CK": CK_COLUMNS,
+    "TF": TF_COLUMNS,
+    "AN": ("an_mean", "an_csi", "an_spread"),
+    "PC": ("pc_power_to_cams_7d", "pc_cams_to_forecast_30d"),
     "S2": (
         STAGE1_TARGET_TEMPLATE,
         STAGE1_LAG_TEMPLATE,
@@ -173,26 +200,30 @@ EXTRA_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
         RESIDUAL_LAG_TEMPLATE,
     ),
     "S3": RESIDUAL_MEAN_TEMPLATES,
-    "FL": ("fleet_lag_mean",),
+    "RP": RP_COLUMNS,
     "T1": ("days_since_start",),
     "KS": (
         "lag_d1",
-        "week_min",
-        "week_max",
-        "week_mean",
-        "q30_p90",
-        "q30_median",
-        "peak_slope_30d",
+        *IM_COLUMNS,
+        *W7_COLUMNS,
+        *Q30_COLUMNS,
+        *TF_COLUMNS,
         *RESIDUAL_MEAN_TEMPLATES,
-        "fleet_lag_mean",
+        *RP_COLUMNS,
     ),
     "N1": ("null_lag_8_to_28",),
     "N2": ("null_lag_random",),
+    "G-ID": ("plant_code",),
+    "G-FP": (*TF_COLUMNS, *CK_COLUMNS, *DT_COLUMNS),
 }
-"""Each fitted arm's columns beyond B0's seven. A `{fold}` is filled with the scored fold."""
+"""Each fitted arm's columns beyond B0's seven. A `{fold}` is filled with the scored fold. The two
+arms named `G-` are fitted only as one model across the plants."""
 
-SWEEP_ARMS: Final[tuple[str, ...]] = tuple(EXTRA_COLUMNS)
-"""Every fitted arm of the lead-day 1 sweep."""
+GLOBAL_ONLY_ARMS: Final[tuple[str, ...]] = ("G-ID", "G-FP")
+"""Arms fitted only in the global scope; they stay out of the per-plant shortlist rule."""
+
+SWEEP_ARMS: Final[tuple[str, ...]] = tuple(a for a in EXTRA_COLUMNS if a not in GLOBAL_ONLY_ARMS)
+"""Every fitted arm of the lead-day 1 per-plant sweep."""
 
 LONGER_LEAD_ARMS: Final[tuple[str, ...]] = ("B0", "L1", "W7", "Q30", "T1", "N2")
 """The arms fitted at every other lead-day."""
@@ -200,23 +231,48 @@ LONGER_LEAD_ARMS: Final[tuple[str, ...]] = ("B0", "L1", "W7", "Q30", "T1", "N2")
 REPLICATE_ARMS: Final[tuple[str, ...]] = ("B0", "L1")
 """The arms fitted with IFS HRES, as an exploratory replicate."""
 
+ARM_LABELS: Final[dict[str, str]] = {"T1": "T1 (interpolation bound)"}
+"""How a table or chart names an arm whose bare name would mislead. T1 gives trees the date, and
+month-block folds interleave, so its gain is what interpolating between months buys, never drift
+a live forecast could use."""
+
 POWER_COLUMN_PREFIXES: Final[tuple[str, ...]] = (
     "power_mw",
     "cap_mw",
     "lag_d",
     "week_",
     "q30_",
-    "peak_slope",
-    "day_peak",
-    "day_energy",
-    "day_csi",
-    "fleet_lag",
+    "im_energy",
+    "im_ratio",
+    "ck_expanding",
+    "ck_max",
+    "tf_ratio",
+    "tf_scaled",
+    "an_mean",
+    "an_spread",
+    "pc_power",
     "null_lag",
     "stage1_",
     "resid_",
 )
-"""Name prefixes of the columns in megawatts: the global model divides them
-by capacity. `energy_ratio_7d` is a ratio, and is left alone."""
+"""Name prefixes of the columns in megawatts (or megawatts per unit of irradiance): the global model
+divides them by capacity. The ratios, shares, counts and irradiances are left alone."""
+
+WINDOW_FIRST_DAY: Final[dict[str, int]] = {
+    **{f"lag_d{day}": day for day in range(1, 8)},
+    **{f"lag_ghi_d{day}": day for day in range(1, 8)},
+    "lag_nwp_ghi": 1,
+    **dict.fromkeys(W7_COLUMNS, 1),
+    **dict.fromkeys(Q30_COLUMNS, 1),
+    **dict.fromkeys(TF_COLUMNS, 1),
+    "an_mean": 1,
+    "pc_power_to_cams_7d": SATELLITE_LAG_DAYS,
+    "pc_cams_to_forecast_30d": SATELLITE_LAG_DAYS,
+    "null_lag_8_to_28": 8,
+}
+"""The nearest day (counted from the latest whole day) of each same-clock-hour window. The anchor
+assertions check each one. N2's random day is deliberately unanchored, because a true null reads
+any day of the record."""
 
 REQUIRED_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
     "weather": ("nwp_ghi", "nwp_temp"),
@@ -377,83 +433,6 @@ def target_date(*, lead_day: int) -> pl.Expr:
     return (pl.col("time") - pl.duration(minutes=30)).dt.date() - pl.duration(days=lead_day + 1)
 
 
-def daily_table(*, hourly: pl.DataFrame) -> pl.DataFrame:
-    """Summarise each plant's days: the peak, the energy, the clear-sky index and the 30-day slope.
-
-    A day is valid only if its observed hours hold at least `MIN_OBSERVED_CLEAR_SKY_SHARE` of its
-    clear-sky energy, the rule `baselines.clear_sky_index` applies to its 24-hour window.
-
-    Args:
-        hourly: The lag source, with `site`, `time` and `power_mw`.
-
-    Returns:
-        One row per `(site, date)` with `day_peak`, `day_energy` (megawatt-hours over the observed
-        hours), `day_csi` (megawatts per W m⁻² of clear-sky irradiance) and `peak_slope_30d`
-        (megawatts per day), each null where the day is invalid.
-    """
-    sites = pv_sites()
-    span = hourly.select(
-        first=pl.col("time").min() - pl.duration(days=1),
-        last=pl.col("time").max() + pl.duration(days=1),
-    ).row(0, named=True)
-    clear_sky = hourly_clear_sky(sites=sites, first=span["first"], last=span["last"])
-    grid = hourly_grid(hourly=hourly).join(clear_sky, on=["site", "time"], how="inner")
-    daily = (
-        grid.with_columns(date=(pl.col("time") - pl.duration(minutes=30)).dt.date())
-        .group_by("site", "date")
-        .agg(
-            peak=pl.col("power_mw").max(),
-            energy=pl.col("power_mw").sum(),
-            observed_clear_sky=pl.col("clear_sky_w_m2")
-            .filter(pl.col("power_mw").is_not_null())
-            .sum(),
-            clear_sky=pl.col("clear_sky_w_m2").sum(),
-        )
-        .with_columns(
-            valid=(pl.col("clear_sky") > 0)
-            & (pl.col("observed_clear_sky") >= MIN_OBSERVED_CLEAR_SKY_SHARE * pl.col("clear_sky"))
-        )
-        .with_columns(
-            day_peak=pl.when("valid").then(pl.col("peak")),
-            day_energy=pl.when("valid").then(pl.col("energy")),
-            day_csi=pl.when("valid").then(pl.col("energy") / pl.col("observed_clear_sky")),
-        )
-        .sort("site", "date")
-    )
-    return daily.select("site", "date", "day_peak", "day_energy", "day_csi").join(
-        _peak_slopes(daily=daily), on=["site", "date"], how="left"
-    )
-
-
-def _peak_slopes(*, daily: pl.DataFrame) -> pl.DataFrame:
-    """Return the least-squares slope of the daily peak over the 30 days ending at each date.
-
-    Args:
-        daily: `daily_table`'s intermediate frame, with `site`, `date` and `day_peak`.
-
-    Returns:
-        `site`, `date` and `peak_slope_30d`, null with fewer than `MIN_SLOPE_DAYS` valid peaks.
-    """
-    parts = []
-    for site, rows in daily.group_by("site", maintain_order=True):
-        grid = rows.select(
-            date=pl.date_range(pl.col("date").min(), pl.col("date").max(), interval="1d")
-        ).join(rows.select("date", "day_peak"), on="date", how="left")
-        peaks = grid["day_peak"].to_numpy()
-        slopes = np.full(len(peaks), np.nan)
-        for end in range(len(peaks)):
-            window = peaks[max(0, end - MONTH_DAYS + 1) : end + 1]
-            index = np.flatnonzero(~np.isnan(window))
-            if len(index) >= MIN_SLOPE_DAYS:
-                slopes[end] = np.polyfit(index, window[index], deg=1)[0]
-        parts.append(
-            grid.select("date").with_columns(
-                site=pl.lit(site[0]), peak_slope_30d=pl.Series(slopes).fill_nan(None)
-            )
-        )
-    return pl.concat(parts)
-
-
 def _random_hours(
     *, rows: pl.DataFrame, hourly: pl.DataFrame, lead_day: int, rng: np.random.Generator
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -515,105 +494,120 @@ def _random_hours(
     return n1, n2
 
 
-def _fleet_lag_mean(*, rows: pl.DataFrame, hourly: pl.DataFrame, lead_day: int) -> pl.Series:
-    """Return the mean of the other plants' lag at the same hour, over whichever are present.
+def _same_hour_columns(
+    *, rows: pl.DataFrame, hourly: pl.DataFrame, lead_day: int, needed: set[str]
+) -> dict[str, pl.Series]:
+    """Build the lags, weekly statistics and 30-day percentiles that some arm needs.
 
     Args:
-        rows: The rows, with `site` and `time`.
+        rows: Rows with `site` and `time`.
         hourly: The lag source.
         lead_day: The forecast's lead-day.
+        needed: Every column the arms need.
 
     Returns:
-        One value per row, null where no other plant has the lag.
+        The `lag_d<k>`, `week_*` and `q30_*` columns in `needed`.
     """
-    sites = hourly["site"].unique().sort()
-    everywhere = pl.DataFrame({"site": sites}).join(rows.select("time").unique(), how="cross")
-    lags = everywhere.with_columns(
-        lag=same_clock_hour_window(
-            keys=everywhere,
-            hourly=hourly,
-            day=lead_day,
-            first_days_back=1,
-            last_days_back=1,
-            statistic="mean",
-            min_count=1,
-        )
-    )
-    totals = lags.group_by("time").agg(
-        total=pl.col("lag").sum(), count=pl.col("lag").is_not_null().sum()
-    )
-    own = rows.select("site", "time").join(
-        lags, on=["site", "time"], how="left", maintain_order="left"
-    )
-    joined = own.join(totals, on="time", how="left", maintain_order="left")
-    others = pl.col("count") - pl.col("lag").is_not_null().cast(pl.UInt32)
-    return joined.select(
-        fleet_lag_mean=pl.when(others > 0).then(
-            (pl.col("total") - pl.col("lag").fill_null(0.0)) / others
-        )
-    )["fleet_lag_mean"]
+    columns: dict[str, pl.Series] = {}
+    specs = [
+        *((f"lag_d{day}", "mean", day, day, 1) for day in range(1, 8)),
+        *((f"week_{name}", name, 1, WEEK_DAYS, WEEK_MIN_DAYS) for name in ("min", "max", "mean")),
+        *((f"q30_{name}", name, 1, MONTH_DAYS, MONTH_MIN_DAYS) for name in ("p90", "median")),
+    ]
+    for column, statistic, first, last, minimum in specs:
+        if column in needed:
+            columns[column] = same_clock_hour_window(
+                keys=rows,
+                hourly=hourly,
+                day=lead_day,
+                first_days_back=first,
+                last_days_back=last,
+                statistic=statistic,  # ty: ignore[invalid-argument-type]
+                min_count=minimum,
+            )
+    return columns
 
 
 def lag_columns(
     *,
     rows: pl.DataFrame,
-    hourly: pl.DataFrame,
-    daily: pl.DataFrame,
+    inputs: LagInputs,
     weather: pl.DataFrame,
+    weather_lead0: pl.DataFrame | None,
     lead_day: int,
     arms: Sequence[str],
-) -> pl.DataFrame:
+) -> tuple[pl.DataFrame, pl.Series | None]:
     """Add every column the named arms need beyond B0's.
 
     Args:
         rows: The rows, with `site`, `time` and the B0 columns.
-        hourly: The lag source.
-        daily: `daily_table`'s result.
-        weather: `weather_table`'s result at the lead-day, for L2's lag-hour weather.
+        inputs: The lead-independent inputs: the lag source, clear-sky irradiance, CAMS and the
+            daily features.
+        weather: `weather_table`'s result at the lead-day, for the lag-hour weather.
+        weather_lead0: `weather_table`'s result at lead-day 0, for IM's morning irradiance.
         lead_day: The forecast's lead-day.
         arms: The arms to build columns for.
 
     Returns:
-        `rows` with the columns of `EXTRA_COLUMNS` that do not hold a `{fold}`, for those arms.
+        `rows` with the columns of `EXTRA_COLUMNS` that do not hold a `{fold}`, for those arms, and
+        each row's latest issue-morning hour read, or `None` if no arm needs IM.
     """
     needed = {c for arm in arms for c in EXTRA_COLUMNS[arm] if "{fold}" not in c}
-    window = {"hourly": hourly, "day": lead_day}
+    hourly = inputs.hourly
     columns: dict[str, pl.Series] = {}
-    for day in range(1, 8):
-        if f"lag_d{day}" in needed:
-            columns[f"lag_d{day}"] = same_clock_hour_window(
-                keys=rows,
-                first_days_back=day,
-                last_days_back=day,
-                statistic="mean",
-                min_count=1,
-                **window,
-            )
-    for name in ("min", "max", "mean"):
-        if f"week_{name}" in needed:
-            columns[f"week_{name}"] = same_clock_hour_window(
-                keys=rows,
-                first_days_back=1,
-                last_days_back=WEEK_DAYS,
-                statistic=name,
-                min_count=WEEK_MIN_DAYS,
-                **window,
-            )
-    for name in ("p90", "median"):
-        if f"q30_{name}" in needed:
-            columns[f"q30_{name}"] = same_clock_hour_window(
-                keys=rows,
-                first_days_back=1,
-                last_days_back=MONTH_DAYS,
-                statistic=name,
-                min_count=MONTH_MIN_DAYS,
-                **window,
-            )
-    if "fleet_lag_mean" in needed:
-        columns["fleet_lag_mean"] = _fleet_lag_mean(rows=rows, hourly=hourly, lead_day=lead_day)
+    if "lag_ghi_d1" in needed:
+        columns |= lag_context(
+            rows=rows, hourly=hourly, weather=weather, lead_day=lead_day
+        ).to_dict()
+    columns |= {
+        name: series
+        for name, series in _same_hour_columns(
+            rows=rows, hourly=hourly, lead_day=lead_day, needed=needed
+        ).items()
+        if name not in columns
+    }
+    morning_latest = None
+    if "im_energy" in needed:
+        if weather_lead0 is None:
+            msg = "IM needs the lead-day 0 weather"
+            raise ValueError(msg)
+        morning, morning_latest = issue_morning(
+            rows=rows, hourly=hourly, weather_lead0=weather_lead0, lead_day=lead_day
+        )
+        columns |= morning.to_dict()
+    if "tf_ratio" in needed:
+        columns |= transfer_function(
+            rows=rows, hourly=hourly, weather=weather, lead_day=lead_day
+        ).to_dict()
+    if "an_mean" in needed:
+        columns |= analogue_ensemble(
+            rows=rows, hourly=hourly, weather=weather, clear_sky=inputs.clear_sky, lead_day=lead_day
+        ).to_dict()
+    if "pc_power_to_cams_7d" in needed:
+        columns |= satellite_ratios(
+            rows=rows, hourly=hourly, weather=weather, cams=inputs.cams, lead_day=lead_day
+        ).to_dict()
+    daily_needed = [c for c in DAILY_FEATURE_COLUMNS if c in needed]
+    if daily_needed:
+        columns |= lookup_daily(
+            rows=rows, daily=inputs.daily, lead_day=lead_day, columns=daily_needed
+        ).to_dict()
+    if "ck_clear_near_share" in needed:
+        columns["ck_clear_near_share"] = clipping_share(
+            rows=rows,
+            hourly=hourly,
+            weather=weather,
+            clear_sky=inputs.clear_sky,
+            daily=inputs.daily,
+            lead_day=lead_day,
+        )
     if "days_since_start" in needed:
         columns["days_since_start"] = rows.select(
             (pl.col("time") - pl.lit(DRIFT_START)).dt.total_days().cast(pl.Int32)
+        ).to_series()
+    if "plant_code" in needed:
+        columns["plant_code"] = rows.select(
+            pl.col("site").str.to_integer(base=36, strict=False).cast(pl.Int32)
         ).to_series()
     out = rows.with_columns(**columns)
     if "lag_nwp_ghi" in needed:
@@ -628,20 +622,6 @@ def lag_columns(
             .join(lag_weather, on=["site", "lag_time"], how="left", maintain_order="left")
             .drop("lag_time")
         )
-    daily_needed = [
-        c for c in ("day_peak", "day_energy", "day_csi", "peak_slope_30d") if c in needed
-    ]
-    if daily_needed:
-        out = (
-            out.with_columns(asof_date=target_date(lead_day=lead_day))
-            .join(
-                daily.select("site", pl.col("date").alias("asof_date"), *daily_needed),
-                on=["site", "asof_date"],
-                how="left",
-                maintain_order="left",
-            )
-            .drop("asof_date")
-        )
     if "null_lag_random" in needed or "null_lag_8_to_28" in needed:
         n1, n2 = _random_hours(
             rows=rows,
@@ -654,7 +634,7 @@ def lag_columns(
             "null_lag_random": pl.Series(n2).fill_nan(None),
         }
         out = out.with_columns(**{name: drawn[name] for name in drawn if name in needed})
-    return out
+    return out, morning_latest
 
 
 def assert_lag_arithmetic(*, frame: pl.DataFrame, lead_day: int, raw: pl.DataFrame) -> list[str]:
@@ -744,8 +724,8 @@ def build_frame(
     lead_day: int,
     arms: Sequence[str],
     shared: pl.DataFrame,
-    hourly: pl.DataFrame,
-    daily: pl.DataFrame,
+    inputs: LagInputs,
+    weather_lead0: pl.DataFrame | None,
     shift: float = 0.0,
 ) -> tuple[pl.DataFrame, list[str]]:
     """Build one lead-day's frame: the shared rows with the arms' columns and the row filter.
@@ -755,8 +735,9 @@ def build_frame(
         lead_day: The lead-day.
         arms: The arms the frame serves.
         shared: `shared_rows()`'s result.
-        hourly: The lag source, already shifted for the positive control if `shift` is not 0.
-        daily: `daily_table`'s result for `hourly`.
+        inputs: The lag source (already shifted for the positive control if `shift` is not 0) and
+            the inputs built from it.
+        weather_lead0: The ENS mean's lead-day 0 weather, for IM, or `None`.
         shift: The positive control's fraction of power lost, scaling the target to match `hourly`.
 
     Returns:
@@ -774,8 +755,13 @@ def build_frame(
             .otherwise(pl.col(TARGET))
         )
         rows = rows.with_columns(**{TARGET: shifted.cast(pl.Float64)})
-    built = lag_columns(
-        rows=rows, hourly=hourly, daily=daily, weather=weather, lead_day=lead_day, arms=arms
+    built, morning_latest = lag_columns(
+        rows=rows,
+        inputs=inputs,
+        weather=weather,
+        weather_lead0=weather_lead0,
+        lead_day=lead_day,
+        arms=arms,
     )
     present = [
         (name, [c for c in columns if c in built.columns])
@@ -789,6 +775,15 @@ def build_frame(
             f"`studies.power.scan_power` cannot read their lags: {after_cutoff}"
         ),
     ]
+    needed = {c for arm in arms for c in EXTRA_COLUMNS[arm]}
+    anchors = window_anchor_lines(
+        rows=built,
+        lead_day=lead_day,
+        windows={c: first for c, first in WINDOW_FIRST_DAY.items() if c in needed},
+        daily_columns=[c for c in (*DAILY_FEATURE_COLUMNS, "ck_clear_near_share") if c in needed],
+        morning_latest=morning_latest,
+    )
+    lines += anchors
     for name, columns in present:
         count = built.filter(pl.any_horizontal(pl.col(c).is_null() for c in columns)).height
         lines.append(f"- rows lacking {name} (`{', '.join(columns)}`): {count}")
@@ -810,6 +805,26 @@ def build_frame(
     ]
     columns = [*FRAME_KEY_COLUMNS, *B0_COLUMNS, *arm_columns, *references]
     return kept.select(list(dict.fromkeys(columns))), lines
+
+
+def lag_inputs(*, hourly: pl.DataFrame) -> LagInputs:
+    """Build the lead-independent inputs from a lag source.
+
+    Args:
+        hourly: The lag source, which a positive control has already shifted.
+
+    Returns:
+        The lag source, clear-sky irradiance, CAMS irradiance, and the daily features.
+    """
+    sites = pv_sites()
+    clear_sky = clear_sky_table(hourly=hourly, sites=sites)
+    cams = pl.read_parquet(
+        NFC_DIR / "solar_forecast_inputs.parquet", columns=["site", "time", "ghi_cams"]
+    )
+    daily = daily_features(
+        hourly=hourly, clear_sky=clear_sky, capacity=sites.select("site", "effective_capacity_mw")
+    )
+    return LagInputs(hourly=hourly, clear_sky=clear_sky, cams=cams, daily=daily)
 
 
 def stage1_hours(
@@ -910,7 +925,8 @@ def main() -> int:
 
     shared = shared_rows()
     hourly = lag_source_hourly()
-    daily = daily_table(hourly=hourly)
+    inputs = lag_inputs(hourly=hourly)
+    weather_lead0 = weather_table(product="ens_mean", lead_day=0) if product == "ens_mean" else None
     raw = raw_hourly_power()
     report = [f"## Frames built for the weather product `{product}`", ""]
     report += [f"Shared rows: {shared.height} (the published count {PUBLISHED_ROW_COUNT}).", ""]
@@ -921,7 +937,12 @@ def main() -> int:
         else:
             arms = SWEEP_ARMS if lead_day == FULL_SWEEP_LEAD_DAY else LONGER_LEAD_ARMS
         frame, lines = build_frame(
-            product=product, lead_day=lead_day, arms=arms, shared=shared, hourly=hourly, daily=daily
+            product=product,
+            lead_day=lead_day,
+            arms=arms,
+            shared=shared,
+            inputs=inputs,
+            weather_lead0=weather_lead0,
         )
         assertion_lines = assert_lag_arithmetic(frame=frame, lead_day=lead_day, raw=raw)
         paths[f"day{lead_day}"].parent.mkdir(parents=True, exist_ok=True)
@@ -950,8 +971,8 @@ def main() -> int:
                     lead_day=lead_day,
                     arms=("B0", "L1"),
                     shared=shared,
-                    hourly=shifted_hourly,
-                    daily=daily,
+                    inputs=lag_inputs(hourly=shifted_hourly),
+                    weather_lead0=weather_lead0,
                     shift=shift,
                 )
                 control.write_parquet(paths[f"control{round(shift * 100):02d}"])
