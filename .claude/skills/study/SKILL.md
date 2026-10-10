@@ -347,25 +347,28 @@ scientist would write, and the figures tell the whole story.** The maintainer as
 on 2026-10-10 for every study. Readers are short of time, so the page works at three depths.
 
 - **In about a minute, without scrolling:** a few sentences of take-home message, then the first
-  figure carrying the study's main headline result. The take-home message is usually the one
-  for the Flexpectation project. A study of a general question, such as which weather variables
-  help a solar power forecast, gives a general take-home message about solar power forecasting.
+  figure carrying the study's main result. The take-home message is usually the take-home
+  message for the Flexpectation project. A study of a general question, such as which weather
+  variables help a solar power forecast, gives a general take-home message about solar power
+  forecasting.
 - **In a few minutes:** concise bullets with the other main take-home messages, then the figures
   and their bolded leads, skimmed in order.
 - **In full:** the prose that supports the figures and fills the gaps they cannot express.
 
-**The rest of the page tells the story from the start, as figures.** The reader is very busy and
-very sceptical, and wants to see from the figures alone that the data are sound and that each
-technique works.
+**After the headline figure, the rest of the page tells the story from the start, as figures.**
+The reader is very busy and very sceptical, and wants to see from the figures alone that the data
+are sound and that each technique works.
 
-1. **First, simple plots of what the data look like**, pointing out any issues in them, such as
+1. **Start with simple plots of what the data look like.** Point out any issues in them, such as
    gaps, steps, or a variable that behaves differently from its neighbours.
-2. **Then the techniques, each proved by a figure.** Show how a known-answer case is built (for
-   example, which real series were added together to make a synthetic aggregate), show each
-   processing step's output, and draw the recovered quantity beside the truth. Show the controls
-   in the same figures, so the reader sees that the technique can fail and does not.
-3. **Then the more complex techniques and the more interesting results**, built on the earlier
-   figures. Apply the method to real data with no answer key only after the known-answer proof.
+2. **Next, explain the techniques, and prove each one with a figure.** Show how a known-answer
+   case is built (for example, which real series were added together to make a synthetic
+   aggregate), show each processing step's output, and draw the recovered quantity beside the
+   truth. Show the controls in the same figures, so the reader sees that the technique can fail
+   and does not.
+3. **Finish with the more complex techniques and the more interesting results**, built on the
+   earlier figures. Apply the method to real data with no answer key only after the known-answer
+   proof.
 
 Plan the page as that sequence of figures first, then write the few sentences each figure needs.
 The figures are mostly time series, with scatter plots, distributions, and other data graphics
@@ -380,8 +383,9 @@ reading any text. Each chart, with its title, subtitle, axis labels, and legend,
 the story without the prose around it.
 
 - **A headline chart opens every page**, directly under the bottom line and before the disclaimer,
-  showing the headline result with its 95% intervals. Every section whose claim rests on a number
-  gets a chart too.
+  showing the headline result with its 95% intervals. It is Figure 1 and previews the answer; the
+  figures that prove how the study got there follow it in the story order above. Every section
+  whose claim rests on a number gets a chart too.
 - **Every figure stands alone, so that someone could screenshot it and share it on Slack.** The
   title, subtitle, axis titles, and legend give everything needed to read the figure: what is
   plotted and in which unit, which direction is better, what each colour or line means, the scope,
@@ -443,11 +447,11 @@ Every study page follows the structure of an academic paper, in this order:
 2. **Summary.** A **bottom line** of a few sentences directly under the title, in plain words: a
    bold sentence stating the answer to the study's main question, then one or two sentences on
    what the answer means for the Flexpectation project (or, for a study of a general question, for
-   solar power or wind forecasting), and on what would change the answer or what the study did not
-   test. The bottom line and the first figure fit on one screen. **The headline figure follows the
-   bottom line at once, so that it is visible above the fold, without scrolling, when a reader
-   lands on the page, and it carries the study's main headline result.** Where the study ranks
-   products, the headline figure is the leaderboard or the paired contrasts. The
+   solar power or wind forecasting). One more sentence says what would change the answer or what
+   the study did not test. The bottom line and the first figure fit on one screen. **The headline
+   figure follows the bottom line at once, so that it is visible above the fold, without
+   scrolling, when a reader lands on the page, and it carries the study's main result.** Where the
+   study ranks products, the headline figure is the leaderboard or the paired contrasts. The
    question-and-answer bullets described below come after the figure, each concise, followed by
    scoped take-home bullets, one per use of the data. The Summary bullets are the only place a
    recommendation appears without its evidence.
