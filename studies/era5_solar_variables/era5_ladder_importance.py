@@ -35,6 +35,8 @@ from era5_ladder_arms import (
     NEGATIVE_CONTROL_SEED,
     PRIMARY_SETTING,
     RESULTS_DIR,
+    SHUFFLED_ARM,
+    SHUFFLED_SUFFIX,
     TARGET_COLUMNS,
     TARGETS,
     TargetType,
@@ -60,12 +62,6 @@ from studies.guards import refuse_to_overwrite
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("era5_ladder_importance")
-
-SHUFFLED_SUFFIX: Final[str] = "_noise"
-"""What the shuffle appends to a column's name. It differs from the negative control's suffix."""
-
-SHUFFLED_ARM: Final[str] = "g9_with_shuffled"
-"""The arm of `g9` and a shuffled copy of every `g3` to `g9` column."""
 
 IMPORTANCE_ARMS: Final[tuple[str, ...]] = ("g0", "g2", "g9", SHUFFLED_ARM)
 """The arms refitted for importance."""

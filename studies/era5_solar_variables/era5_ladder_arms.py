@@ -328,3 +328,13 @@ def aerosol_arm_features() -> dict[str, tuple[str, ...]]:
     """
     base = rung_features(rung="g9")
     return {AEROSOL_REFERENCE: base, AEROSOL_RUNG: (*base, *AEROSOL_COLUMNS)}
+
+
+SHUFFLED_SUFFIX: Final[str] = "_noise"
+"""What the importance refit appends to a column's name for its shuffled copy.
+
+It differs from the negative control's suffix.
+"""
+
+SHUFFLED_ARM: Final[str] = "g9_with_shuffled"
+"""The importance arm of `g9` and a shuffled copy of every `g3` to `g9` column."""

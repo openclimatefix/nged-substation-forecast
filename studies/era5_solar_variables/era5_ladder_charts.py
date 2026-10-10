@@ -2,8 +2,9 @@
 
 One-off throwaway script for the study planned in
 <https://github.com/openclimatefix/nged-substation-forecast/pull/1097>. It reads the tables that
-`era5_ladder_report.py` wrote (`leaderboard`, `contrasts`, `splits`, and `worst_days`, each ending
-in the variant and the highest rung), the frame `era5_ladder_build_dataset.py` wrote, and, for the
+`era5_ladder_report.py` wrote (`leaderboard`, `contrasts`, `splits`, `probabilistic`, and
+`aerosol_conditions`, each ending in the variant and the highest rung), the importance shares that
+`era5_ladder_importance.py` wrote, the frame `era5_ladder_build_dataset.py` wrote, and, for the
 figure that shows the models working, the saved per-row losses. It refits nothing. It writes one SVG
 per figure into `docs/studies/assets/`, named `era5_solar_variables_<name>.svg`.
 
@@ -14,7 +15,7 @@ first rungs while the later variables are still downloading.
 capacity, no coordinate appears, and no calendar date appears on an axis. Figure 2 and figure 4
 draw public weather series on three days chosen on one farm, and draw no farm's output, so that no
 farm's output can be matched to a date through those series. Figure 6 draws every farm's output on
-days chosen separately for each farm, which are never the days of figures 2 and 5, and draws no
+days chosen separately for each farm, which are never the days of figures 2 and 4, and draws no
 weather series. The month and year of each chosen day are printed to the log for the page's text,
 and the day of the month never is.
 
@@ -46,6 +47,8 @@ from era5_ladder_arms import (
     DROP_PREFIX,
     MARS_FREE_ARM,
     PRIMARY_SETTING,
+    SHUFFLED_ARM,
+    SHUFFLED_SUFFIX,
     SIGNED_ERROR,
     SMALLEST_EFFECT,
     TARGETS,
@@ -62,6 +65,8 @@ from studies.era5_ladder import (
     AEROSOL_COLUMNS,
     CLEAR_SKY_INDEX_THRESHOLDS,
     DERIVED_BY_RUNG,
+    MIN_AEROSOL_DAYS,
+    MIN_AEROSOL_MONTHS,
     RUNG_ADDITIONS,
     RUNGS,
     SEASONS,
@@ -358,7 +363,7 @@ def independent_colours(*, chart: alt.VConcatChart) -> alt.VConcatChart:
     return chart.resolve_scale(color="independent")
 
 
-def figure_1_headline(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin:
+def figure_headline(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin:
     """Draw the planned contrasts on both targets, at the adjusted level and at 95%.
 
     Args:
@@ -416,7 +421,10 @@ def figure_1_headline(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMix
                 "planned contrasts."
             ),
             "Dashed rules: no difference, and the smallest improvement worth acting on",
-            "(0.1 percentage points of capacity, or 0.01 clearness index).",
+            (
+                f"({SMALLEST_EFFECT['pv'] * 100:g} percentage points of capacity, or "
+                f"{SMALLEST_EFFECT['cams']:g} clearness index)."
+            ),
             "Each row is the error with the first variable set minus the error with the second.",
             "P4: G9 minus G9 without the MARS-only variables. Error: mean absolute error.",
             *SHORT_ARM_KEY_LINES,
@@ -428,9 +436,7 @@ def figure_1_headline(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMix
     )
 
 
-def figure_2_leaderboard(
-    *, board: pl.DataFrame, target: TargetType, scope: str
-) -> alt.TopLevelMixin:
+def figure_leaderboard(*, board: pl.DataFrame, target: TargetType, scope: str) -> alt.TopLevelMixin:
     """Draw every arm's mean absolute error and correlation, best first.
 
     Args:
@@ -476,7 +482,7 @@ def figure_2_leaderboard(
             ),
         ],
         number=7 if target == "pv" else "7b",
-        title=f"Error and correlation of every arm for {TARGET_NAMES[target]}",
+        title=f"Error and correlation of every variable set for {TARGET_NAMES[target]}",
         subtitle=[
             scope,
             f"Dot: estimate at the {SETTINGS_PHRASE}. Line: 95% interval.",
@@ -692,12 +698,6 @@ COLUMN_WORDS: Final[dict[str, str]] = {
 }
 """What each column is called on the importance figure, with its ERA5 short name in brackets."""
 
-SHUFFLED_SUFFIX: Final[str] = "_noise"
-"""What `era5_ladder_importance.py` appends to a shuffled copy's column name."""
-
-SHUFFLED_ARM: Final[str] = "g9_with_shuffled"
-"""The importance arm that carries shuffled copies."""
-
 TOP_COLUMNS: Final[int] = 20
 """How many columns the first importance panel shows."""
 
@@ -718,9 +718,7 @@ def column_group(*, column: str) -> str:
     return SUN_AND_CALENDAR
 
 
-def figure_12_importance(
-    *, shares: pl.DataFrame, target: TargetType, scope: str
-) -> alt.TopLevelMixin:
+def figure_importance(*, shares: pl.DataFrame, target: TargetType, scope: str) -> alt.TopLevelMixin:
     """Draw how much of XGBoost's total gain each column, group, and model used, for one target.
 
     Args:
@@ -758,14 +756,14 @@ def figure_12_importance(
         .head(TOP_COLUMNS)
         .with_columns(label=pl.col("label").replace(COLUMN_WORDS))
     )
-    # The noise line is the largest shuffled copy's share in one refit of one farm, averaged.
+    # The noise line is the largest shuffled copy's mean share, as the report computes it.
     noise_line = float(
         in_target.filter(
             (pl.col("arm") == SHUFFLED_ARM) & pl.col("column").str.ends_with(SHUFFLED_SUFFIX)
         )
-        .group_by("site", "fold", "seed")
-        .agg(largest=pl.col("share").max())["largest"]
-        .mean()
+        .group_by("column")
+        .agg(share=pl.col("share").mean())["share"]
+        .max()
         * 100.0  # ty: ignore[unsupported-operator]
     )
     by_group = refit_means(
@@ -890,7 +888,7 @@ def _day_facets(*, chart: alt.Chart, days: pl.DataFrame) -> alt.FacetChart:
     )
 
 
-def figure_3_days(
+def figure_days(
     *, dataset: pl.DataFrame, days: pl.DataFrame, scope: str
 ) -> alt.TopLevelMixin | None:
     """Draw the public weather variables for the three chosen days, one panel per group.
@@ -974,7 +972,7 @@ def _cover_label_expression() -> str:
     return f"{cases} : datum.value"
 
 
-def figure_4_cloud_against_clearness(
+def figure_cloud_against_clearness(
     *, dataset: pl.DataFrame, scope: str
 ) -> alt.TopLevelMixin | None:
     """Draw CAMS clearness index against each ERA5 cloud cover, as binned means with a spread band.
@@ -1041,7 +1039,7 @@ def figure_4_cloud_against_clearness(
     )
 
 
-def figure_5_where_ssrd_misses(
+def figure_where_ssrd_misses(
     *, dataset: pl.DataFrame, days: pl.DataFrame, scope: str
 ) -> alt.TopLevelMixin | None:
     """Draw how far ERA5's `ssrd` is from CAMS global irradiance, over time and by each variable.
@@ -1130,7 +1128,7 @@ def figure_5_where_ssrd_misses(
     )
 
 
-def figure_6_cloud_water(*, dataset: pl.DataFrame, scope: str) -> alt.TopLevelMixin | None:
+def figure_cloud_water(*, dataset: pl.DataFrame, scope: str) -> alt.TopLevelMixin | None:
     """Draw clearness index against total cloud water, for hours of low, medium, and high low-cloud.
 
     Args:
@@ -1257,7 +1255,7 @@ def predictions_for_days(
     )
 
 
-def figure_7_models_work(
+def figure_models_work(
     *,
     dataset: pl.DataFrame,
     losses: pl.DataFrame,
@@ -1270,7 +1268,7 @@ def figure_7_models_work(
     Args:
         dataset: The kept rows.
         losses: The output target's losses.
-        days: Each farm's chosen days, which exclude the days of figures 2 and 5.
+        days: Each farm's chosen days, which exclude the days of figures 2 and 4.
         splits: The report's split table, for each farm's error.
         scope: The line naming the farms, hours, and span.
 
@@ -1358,7 +1356,7 @@ HOUR_STEP_AFTER: Final[int] = 9
 """The UTC hour after which ERA5's cloud fields come from the next analysis window."""
 
 
-def figure_11_hour_of_day(*, splits: pl.DataFrame, scope: str) -> alt.TopLevelMixin | None:
+def figure_hour_of_day(*, splits: pl.DataFrame, scope: str) -> alt.TopLevelMixin | None:
     """Draw how much each variable group lowers the error at each UTC hour of the day.
 
     Args:
@@ -1484,7 +1482,7 @@ CONDITION_LABELS: Final[dict[str, str]] = {
 """The words for each aerosol condition."""
 
 
-def figure_13_probabilistic(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMixin | None:
+def figure_probabilistic(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMixin | None:
     """Draw the exploratory probabilistic contrasts: one panel per target and measure.
 
     Args:
@@ -1554,7 +1552,7 @@ def figure_13_probabilistic(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMi
     )
 
 
-def figure_13b_reliability(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMixin | None:
+def figure_reliability(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMixin | None:
     """Draw the share of outcomes at or below each quantile, per arm, against the nominal level.
 
     Args:
@@ -1614,7 +1612,7 @@ def figure_13b_reliability(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMix
     )
 
 
-def figure_13c_coverage_and_width(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMixin | None:
+def figure_coverage_and_width(*, rows: pl.DataFrame, scope: str) -> alt.TopLevelMixin | None:
     """Draw each arm's interval coverage against its mean width, with the constant-width reference.
 
     A quantile model helps with uncertainty only if it reaches the same coverage in a narrower
@@ -1668,7 +1666,7 @@ def figure_13c_coverage_and_width(*, rows: pl.DataFrame, scope: str) -> alt.TopL
                 base.mark_point(filled=True, size=80, aria=False).encode(  # ty: ignore[unresolved-attribute]
                     x=alt.X("width:Q"),
                     y=alt.Y("coverage:Q"),
-                    color=alt.Color("arm:N", title="Arm"),
+                    color=alt.Color("arm:N", title="Variable set"),
                 ),
             ).properties(width=PLOT_WIDTH_PX, height=220, title=_title(PANEL_TITLES[target]))
         )
@@ -1692,9 +1690,7 @@ def figure_13c_coverage_and_width(*, rows: pl.DataFrame, scope: str) -> alt.TopL
     )
 
 
-def figure_14_aerosol_conditions(
-    *, conditions: pl.DataFrame, scope: str
-) -> alt.TopLevelMixin | None:
+def figure_aerosol_conditions(*, conditions: pl.DataFrame, scope: str) -> alt.TopLevelMixin | None:
     """Draw G10 minus G9 in each aerosol condition, with the event counts in the labels.
 
     Args:
@@ -1751,8 +1747,14 @@ def figure_14_aerosol_conditions(
             scope,
             "Dot: estimate. Line: 95% interval from resampling whole months. Main XGBoost tuning",
             "setting. Dashed rules: no difference, and (on the error panels) the smallest",
-            "improvement worth acting on (0.1 percentage points). Labels give distinct days (d)",
-            "and months (mo). A row is assessed only with at least 20 days in 12 months.",
+            (
+                f"improvement worth acting on ({SMALLEST_EFFECT['pv'] * 100:g} percentage points)."
+                " Labels give distinct days (d)"
+            ),
+            (
+                f"and months (mo). A row is assessed only with at least {MIN_AEROSOL_DAYS} days "
+                f"in {MIN_AEROSOL_MONTHS} months."
+            ),
             "Aerosol: optical depth from CAMS's EAC4 reanalysis (a CAMS global atmosphere record).",
             "Clear: ERA5 total cloud cover below 0.2. Dusty: dust optical depth in the top 5% of",
             "hours. Clean: total aerosol optical depth below its median. CRPS scores the whole",
@@ -1773,14 +1775,14 @@ def draw_uncertainty_and_aerosol_figures(
     if paths.probabilistic.exists():
         probabilistic = pl.read_parquet(paths.probabilistic)
         for name, chart in (
-            ("probabilistic", figure_13_probabilistic(rows=probabilistic, scope=scope)),
-            ("reliability", figure_13b_reliability(rows=probabilistic, scope=scope)),
-            ("coverage_and_width", figure_13c_coverage_and_width(rows=probabilistic, scope=scope)),
+            ("probabilistic", figure_probabilistic(rows=probabilistic, scope=scope)),
+            ("reliability", figure_reliability(rows=probabilistic, scope=scope)),
+            ("coverage_and_width", figure_coverage_and_width(rows=probabilistic, scope=scope)),
         ):
             if chart is not None:
                 save(chart=chart, name=name)
     if paths.aerosol_conditions.exists():
-        aerosol_chart = figure_14_aerosol_conditions(
+        aerosol_chart = figure_aerosol_conditions(
             conditions=pl.read_parquet(paths.aerosol_conditions), scope=aerosol_scope
         )
         if aerosol_chart is not None:
@@ -1823,33 +1825,33 @@ def main() -> int:
     )
 
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
-    save(chart=figure_1_headline(contrasts=contrasts, scope=scope), name="headline")
+    save(chart=figure_headline(contrasts=contrasts, scope=scope), name="headline")
     for target in TARGETS:
         save(
-            chart=figure_2_leaderboard(board=board, target=target, scope=scope),
+            chart=figure_leaderboard(board=board, target=target, scope=scope),
             name=f"leaderboard_{target}",
         )
     for name, chart in (
         (
             "days",
-            figure_3_days(
+            figure_days(
                 dataset=dataset,
                 days=weather_days,
                 scope=scope.replace("Six NGED solar farms", "One NGED solar farm"),
             ),
         ),
-        ("cloud_against_clearness", figure_4_cloud_against_clearness(dataset=dataset, scope=scope)),
+        ("cloud_against_clearness", figure_cloud_against_clearness(dataset=dataset, scope=scope)),
         (
             "where_ssrd_misses",
-            figure_5_where_ssrd_misses(dataset=dataset, days=weather_days, scope=scope),
+            figure_where_ssrd_misses(dataset=dataset, days=weather_days, scope=scope),
         ),
-        ("cloud_water", figure_6_cloud_water(dataset=dataset, scope=scope)),
+        ("cloud_water", figure_cloud_water(dataset=dataset, scope=scope)),
     ):
         if chart is not None:
             save(chart=chart, name=name)
     if not splits.is_empty():
         save(
-            chart=figure_7_models_work(
+            chart=figure_models_work(
                 dataset=dataset, losses=pv_losses, days=farm_days, splits=splits, scope=scope
             ),
             name="models_work",
@@ -1911,7 +1913,7 @@ def main() -> int:
         shares = pl.read_parquet(importance_file)
         for target in TARGETS:
             save(
-                chart=figure_12_importance(shares=shares, target=target, scope=scope),
+                chart=figure_importance(shares=shares, target=target, scope=scope),
                 name=f"importance_{target}",
             )
     else:
@@ -1923,9 +1925,9 @@ def main() -> int:
         f"to {aerosol_rows['time'].max().strftime('%B %Y')}",  # ty: ignore[unresolved-attribute]
     )
     draw_uncertainty_and_aerosol_figures(paths=paths, scope=scope, aerosol_scope=aerosol_scope)
-    figure_11 = figure_11_hour_of_day(splits=splits, scope=scope)
-    if figure_11 is not None:
-        save(chart=figure_11, name="hour_of_day")
+    hour_chart = figure_hour_of_day(splits=splits, scope=scope)
+    if hour_chart is not None:
+        save(chart=hour_chart, name="hour_of_day")
     return 0
 
 

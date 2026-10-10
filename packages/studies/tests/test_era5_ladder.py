@@ -452,3 +452,91 @@ def test_the_aerosol_rule_needs_enough_events_and_both_settings_to_agree(
         aerosol_trial_recommendation(uppers=uppers, smallest_effect=0.001, days=days, months=months)
         == expected
     )
+
+
+def test_arms_that_differ_only_in_seed_fail_the_pairing_guard():
+    losses = _losses(rows_by_arm={"g0": [1, 2], "g9": [1, 2]}).with_columns(
+        seed=pl.when(pl.col("arm") == "g9").then(1).otherwise(0)
+    )
+
+    with pytest.raises(ValueError, match="hold different rows"):
+        raise_unless_same_rows(losses=losses, arms=["g0", "g9"])
+
+
+def test_arms_that_differ_only_in_site_fail_the_pairing_guard():
+    losses = _losses(rows_by_arm={"g0": [1, 2], "g9": [1, 2]}).with_columns(
+        site=pl.when(pl.col("arm") == "g9").then(pl.lit("B")).otherwise(pl.lit("A"))
+    )
+
+    with pytest.raises(ValueError, match="hold different rows"):
+        raise_unless_same_rows(losses=losses, arms=["g0", "g9"])
+
+
+def _twenty_clear_hours() -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "site": ["A"] * 20,
+            "time": [START + timedelta(hours=hour) for hour in range(20)],
+            "tcc": [0.1] * 20,
+            "aod550": [0.01 * (hour + 1) for hour in range(20)],
+            "duaod550": [0.001 * (hour + 1) for hour in range(20)],
+        }
+    )
+
+
+def test_aerosol_quantiles_interpolate_between_rows():
+    flags = aerosol_condition_flags(frame=_twenty_clear_hours())
+
+    # 0.95 of 19 gaps is 18.05, so the dust threshold sits just above hour 18's value.
+    assert flags.filter(pl.col("dusty"))["time"].dt.hour().to_list() == [19]
+    # 0.5 of 19 gaps is 9.5, so the clean threshold sits between hours 9 and 10.
+    assert flags.filter(pl.col("clear_and_clean"))["time"].dt.hour().to_list() == list(range(10))
+
+
+def test_aerosol_conditions_refuse_a_missing_total_optical_depth():
+    frame = _twenty_clear_hours().with_columns(
+        aod550=pl.when(pl.col("time").dt.hour() == 3).then(None).otherwise(pl.col("aod550"))
+    )
+
+    with pytest.raises(ValueError, match="non-null"):
+        aerosol_condition_flags(frame=frame)
+
+
+def _arm_rows(*, arm: str, hours: list[int], seed: int = 0) -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "arm": [arm] * len(hours),
+            "site": ["A"] * len(hours),
+            "time": [START + timedelta(hours=hour) for hour in hours],
+            "seed": [seed] * len(hours),
+        }
+    )
+
+
+def test_arms_scored_at_different_seeds_fail_the_pairing_guard():
+    losses = pl.concat(
+        [_arm_rows(arm="g0", hours=[1, 2], seed=0), _arm_rows(arm="g9", hours=[1, 2], seed=1)]
+    )
+
+    with pytest.raises(ValueError, match="hold different rows"):
+        raise_unless_same_rows(losses=losses, arms=["g0", "g9"])
+
+
+def test_arms_with_as_many_rows_but_different_hours_fail_the_pairing_guard():
+    losses = pl.concat([_arm_rows(arm="g0", hours=[1, 2]), _arm_rows(arm="g9", hours=[1, 3])])
+
+    with pytest.raises(ValueError, match=r"1 .* only in the first and 1 only in the second"):
+        raise_unless_same_rows(losses=losses, arms=["g0", "g9"])
+
+
+def test_the_pairing_guard_checks_every_arm_not_only_the_second():
+    losses = pl.concat(
+        [
+            _arm_rows(arm="g0", hours=[1, 2]),
+            _arm_rows(arm="g5", hours=[1, 2]),
+            _arm_rows(arm="g9", hours=[1]),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="'g0' and 'g9'"):
+        raise_unless_same_rows(losses=losses, arms=["g0", "g5", "g9"])

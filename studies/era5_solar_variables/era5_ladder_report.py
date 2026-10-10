@@ -2,8 +2,9 @@
 
 One-off throwaway script for the study planned in
 <https://github.com/openclimatefix/nged-substation-forecast/pull/1097>. It reads the per-row losses
-that `era5_ladder_fit.py` saved and refits nothing. It writes `report.md` and four tables
-(`leaderboard.parquet`, `contrasts.parquet`, `splits.parquet`, `worst_days.parquet`) into
+that `era5_ladder_fit.py` saved and refits nothing. It writes `report.md` and up to six
+tables (`leaderboard`, `contrasts`, `splits`, `worst_days`, `aerosol_conditions`, and
+`probabilistic`, each a parquet file) into
 `data/studies/per_study/era5_solar_variables/results/`, each name ending in the variant and the
 highest rung, so a report on a partial build, the full build, and the snow variant never overwrite
 one another. The chart script reads the tables. Every number on the page comes from `report.md`, and
@@ -56,6 +57,8 @@ from era5_ladder_arms import (
     PRIMARY_SETTING,
     QUANTILE_ARMS,
     SENSITIVITY_SETTING,
+    SHUFFLED_ARM,
+    SHUFFLED_SUFFIX,
     SIGNED_ERROR,
     SMALLEST_EFFECT,
     TARGET_COLUMNS,
@@ -1091,7 +1094,9 @@ def render_probabilistic(*, rows: pl.DataFrame) -> str:
             for row in subset.filter(pl.col("kind") != "contrast").iter_rows(named=True)
         }
         arms = sorted({key[1] for key in values}, key=_arm_order)
+        mean_width = {arm: values[("arm", arm, None, "width_80")]["value"] for arm in arms}
         matched_width = {arm: values[reference_key(arm=arm, matched=True)]["value"] for arm in arms}
+        matched_ratio = {arm: matched_width[arm] / mean_width[arm] for arm in arms}
         parts += [f"### {target} target: scores by arm", ""]
         parts.append(
             table(
@@ -1102,6 +1107,7 @@ def render_probabilistic(*, rows: pl.DataFrame) -> str:
                     "mean width",
                     "width of one constant interval holding 80% of the arm's errors",
                     "width of one constant interval holding the arm's own coverage",
+                    "that constant width over the quantile fit's mean width",
                 ],
                 rows=[
                     [
@@ -1112,11 +1118,21 @@ def render_probabilistic(*, rows: pl.DataFrame) -> str:
                         ),
                         f"{values[reference_key(arm=arm)]['value'] * unit['width_80']:.3f}",
                         f"{matched_width[arm] * unit['width_80']:.3f}",
+                        f"{matched_ratio[arm]:.3f}",
                     ]
                     for arm in arms
                 ],
             )
         )
+        if "g0" in mean_width and "g9" in mean_width:
+            narrowing = mean_width["g9"] / mean_width["g0"] - 1.0
+            parts += [
+                "",
+                (
+                    f"The full set's mean interval width is {narrowing * PERCENTAGE_POINTS:+.1f}% "
+                    "of the minimal set's."
+                ),
+            ]
         parts += ["", f"### {target} target: contrasts (exploratory, 95% intervals)", ""]
         parts.append(
             table(
@@ -1346,9 +1362,10 @@ def render_importance(*, through_rung: RungType, variant: str) -> str:
     """Render the full arm's XGBoost importance and the shuffled-copy noise line, per target.
 
     The share is each column's gain as a fraction of the model's total gain, averaged over farms,
-    folds, and seeds. The importance of an XGBoost model is descriptive and not a test: correlated
-    columns split the credit among themselves. The noise line is the largest share that any shuffled
-    copy of a variable takes in the arm that holds both a variable and its shuffled copy.
+    folds, and seeds, in the refit that holds the full set and a shuffled copy of its columns. The
+    importance of an XGBoost model is descriptive and not a test: correlated columns split the
+    credit among themselves. The noise line is the largest share that any shuffled copy of a
+    variable takes.
 
     Args:
         through_rung: The highest rung of the build.
@@ -1364,7 +1381,11 @@ def render_importance(*, through_rung: RungType, variant: str) -> str:
     parts: list[str] = []
     for target in TARGETS:
         full = (
-            shares.filter((pl.col("target") == target) & (pl.col("arm") == "g9"))
+            shares.filter(
+                (pl.col("target") == target)
+                & (pl.col("arm") == SHUFFLED_ARM)
+                & ~pl.col("column").str.ends_with(SHUFFLED_SUFFIX)
+            )
             .group_by("column")
             .agg(share=pl.col("share").mean())
             .sort("share", descending=True)
@@ -1372,8 +1393,8 @@ def render_importance(*, through_rung: RungType, variant: str) -> str:
         noise = (
             shares.filter(
                 (pl.col("target") == target)
-                & (pl.col("arm") == "g9_with_shuffled")
-                & pl.col("column").str.ends_with("_noise")
+                & (pl.col("arm") == SHUFFLED_ARM)
+                & pl.col("column").str.ends_with(SHUFFLED_SUFFIX)
             )
             .group_by("column")
             .agg(share=pl.col("share").mean())

@@ -694,3 +694,40 @@ def test_a_difference_interval_at_a_level_uses_the_default_resamples_unless_told
 
     assert default == explicit
     assert fewer != default
+
+
+def _losses_frame() -> pl.DataFrame:
+    generator = np.random.default_rng(3)
+    rows = [
+        {
+            "arm": arm,
+            "site": "A",
+            "time": datetime(2025, month, day, tzinfo=UTC),
+            "seed": seed,
+            "month": f"2025-{month:02d}",
+            "loss": float(generator.normal()),
+        }
+        for seed in (1, 2)
+        for month in range(1, 13)
+        for day in range(1, 6)
+        for arm in ("T", "R")
+    ]
+    return pl.DataFrame(rows)
+
+
+def test_more_resamples_than_the_default_are_drawn_when_asked():
+    losses = _losses_frame()
+
+    default = bootstrap_difference_at_level(
+        losses=losses, treatment="T", reference="R", metric="loss", level=99.5
+    )
+    more = bootstrap_difference_at_level(
+        losses=losses,
+        treatment="T",
+        reference="R",
+        metric="loss",
+        level=99.5,
+        n_resamples=2 * N_BOOTSTRAP_RESAMPLES,
+    )
+
+    assert more != default

@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from studies.bootstrap import N_BOOTSTRAP_RESAMPLES
+from studies.bootstrap import BOOTSTRAP_SEED, N_BOOTSTRAP_RESAMPLES
 from studies.correlation import pooled_correlation_interval
 
 MONTHS = np.repeat(np.array([f"2025-{month:02d}" for month in range(1, 13)]), 20)
@@ -95,4 +95,45 @@ def test_the_same_inputs_give_the_same_interval():
     second = pooled_correlation_interval(actual=actual, prediction=prediction, months=MONTHS)
 
     assert first == second
-    assert N_BOOTSTRAP_RESAMPLES == 2000
+
+
+def test_each_resample_draws_a_seed_so_a_noisy_seed_widens_the_interval():
+    actual, _ = _noisy_pair()
+    perfect = 2.0 * actual + 1.0
+    noisy = actual + np.random.default_rng(3).normal(scale=2.0, size=actual.shape[0])
+
+    result = pooled_correlation_interval(
+        actual=actual, prediction=np.stack([perfect, noisy]), months=MONTHS
+    )
+
+    assert result["upper"] == pytest.approx(1.0)
+    assert result["lower"] < 0.9
+
+
+def test_the_interval_matches_a_direct_resample_of_a_seed_then_whole_months():
+    actual, prediction = _noisy_pair()
+
+    result = pooled_correlation_interval(
+        actual=actual, prediction=prediction, months=MONTHS, level=90.0
+    )
+
+    unique_months, month_index = np.unique(MONTHS, return_inverse=True)
+    generator = np.random.default_rng(BOOTSTRAP_SEED)
+    resampled = []
+    for _ in range(N_BOOTSTRAP_RESAMPLES):
+        seed = generator.integers(0, prediction.shape[0])
+        drawn = generator.integers(0, len(unique_months), size=len(unique_months))
+        rows = np.concatenate([np.flatnonzero(month_index == month) for month in drawn])
+        resampled.append(np.corrcoef(actual[rows], prediction[seed, rows])[0, 1])
+    assert result["lower"] == pytest.approx(np.percentile(resampled, 5.0))
+    assert result["upper"] == pytest.approx(np.percentile(resampled, 95.0))
+
+
+def test_every_seed_is_drawn_in_the_resamples():
+    actual, _ = _noisy_pair()
+    prediction = np.stack([actual, -actual])
+
+    result = pooled_correlation_interval(actual=actual, prediction=prediction, months=MONTHS)
+
+    assert result["lower"] == pytest.approx(-1.0)
+    assert result["upper"] == pytest.approx(1.0)
