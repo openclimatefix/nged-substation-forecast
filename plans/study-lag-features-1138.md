@@ -90,8 +90,9 @@ asked, in the plan review, to challenge this recommendation.
 IFS HRES global horizontal irradiance (`shortwave_radiation`), `direct_radiation`, 2 m temperature,
 and total cloud cover at the target hour and the run's lead, plus the sun's zenith and azimuth,
 extraterrestrial horizontal irradiance, hour of day, day of year, and an IFS-cycle era code (IFS
-Cycle 49r1, 12 November 2024, and Cycle 50r1, 12 May 2026; folds are cut inside each era in the
-way the matched-lead page describes, and the page reports a run with the era code only). Radiation
+Cycle 49r1, 12 November 2024, and Cycle 50r1, 12 May 2026; Open-Meteo labels runs before
+2024-11-12 as Cycle 49r1 hindcasts, which is a source change, so that date is an era boundary
+whatever the labels say). Radiation
 is clipped at zero (`clip_radiation`). The exact column list is fixed in the plan's file-by-file
 section below and printed into the report (the "arm can silently lose a column" rule).
 
@@ -139,8 +140,12 @@ lagged-weather columns. Both predictions of every training row are out-of-inner-
 
 ### Folds, leakage and purging
 
-Month-block folds, five per era (`assign_folds(by=("site", "era"))`, `cut_eras`,
-`search_fold_offsets`). **Purge:** a training row is dropped if any of its lag inputs (up to 8 days
+Month-block folds cut inside each era with `cut_eras`, rotated with `search_fold_offsets`, and
+checked with `raise_on_uncovered_months`, because plain `assign_folds` leaves whole calendar months
+out of a fold's training rows once eras are cut (the sibling IFS plan found July and August absent
+from one fold's training data). The part-months straddling the two era boundaries (2024-11 and
+2026-05) are dropped. The era after 2026-05 is too short for folds, so those rows are dropped.
+The fold of a target hour is the same at every lead day, and the script asserts it. **Purge:** a training row is dropped if any of its lag inputs (up to 8 days
 back) fall inside a test month, because that row would let the test month's observed power enter
 training as a feature. Every arm is purged identically, so all arms share the same training rows,
 and all arms are scored on the same test rows (a row needs the lag, so rows with an unobserved
@@ -171,13 +176,22 @@ reads.
 - **P2:** L2 minus L1 (does lagged weather add to the lag?).
 - **P3:** S2 minus the better of L1 and L2, chosen by the primary-setting point estimate, with the
   choice written to the report before the contrast is computed (does the two-step design help?).
-- **P4:** W7 minus L1 (do weekly statistics add to a single lag?).
-- **P5:** L1 minus N1 (is any gain more than the lag column count produces from noise?).
-- **Global-vs-per-plant:** the claim that lags help the global XGBoost model more than the per-plant
-  one is judged by the difference of P1 between the two scopes (planned).
+- **P4:** L1 minus N1 (is any gain more than the lag column count produces from noise?).
+- **P5:** the claim that lags help the global XGBoost model more than the per-plant one, judged by
+  the difference of P1 between the two scopes.
+
+Five planned contrasts, so no multiple-comparison correction is made and the page says so (six
+would need a Bonferroni 99.17% interval). **Decision rule, fixed before any result:** a lag "helps"
+if, at both hyperparameter settings, the 95% interval of the error difference lies wholly below
+zero and the point estimate is at least 0.2 percentage points of capacity (the smallest effect
+worth acting on; a smaller gain is reported as statistically detectable but not worth the
+complexity). Every planned gain is also read against N1's own difference from B0, which the report
+prints, because a wider arm keeps a small edge (about 0.4% of error on synthetic data) even at
+`colsample_bytree=1`.
 
 A verdict needs the primary and sensitivity settings to agree. Every other number is exploratory
-and labelled so (day-0 and day-2 reads of the contrasts, the unseen-plant fit, the seasonal split
+and labelled so (W7 minus L1, since the issue asks about weekly statistics but the arm is not one of the
+five; day-0 and day-2 reads of the contrasts, the unseen-plant fit, the seasonal split
 into summer and winter, importances, any analysis added after the first run is post hoc).
 
 ### Charts (the story, as figures)
@@ -292,9 +306,17 @@ the docs-link checker (the CI steps the skill's set omits).
    UTC with later observed power. Recommendation: keep 00 UTC for this study, and say so.
 2. **Sample:** 6 plants, 2.5 years, two grid cells. Recommendation: no new PV data; the results are
    read with month-resampled intervals, and a null is bounded rather than called "no effect".
-3. **IFS archive:** four run days are unavailable and three runs are incomplete; target hours on
-   those days are dropped for every arm.
-4. **GPU:** XGBoost fits on the GPU if `nvidia-smi` shows one, one device per planned contrast, and
+3. **IFS archive:** 8 run days are missing (2025-08-05 to 09, 2026-06-11, 2026-06-23, 2026-09-19);
+   radiation is null at lead 0 and exactly -1 W m-2 appears at leads 73 to 90 h (clipped to zero).
+   Target hours on missing days, and rows whose lag hour is absent or was dropped as an outage, a
+   commissioning-ramp hour or an export-cap hour, are dropped for every arm, B0 included. The
+   weather columns come from the 20-variable product
+   `data/studies/downloads/NWP/ECMWF-IFS-SINGLE-RUNS-SOLAR/`, which allows cloud-layer columns.
+   Leads here stay at or below 72 h, so interpolated hourly values beyond 90 h do not enter.
+4. **Compute slot and checkpoints:** fits need a slot from the Study MAIN COORDINATOR, and the fit
+   script checkpoints after every few arm-settings (as `era5_ladder_fit.py` does) because a reboot
+   is planned.
+4b. **GPU:** XGBoost fits on the GPU if `nvidia-smi` shows one, one device per planned contrast, and
    one refit of an arm on both devices gives the noise floor.
 5. **Cost:** about 6 arms x 2 scopes x 2 settings x 3 seeds x 3 lead days x folds, with S2 about
    4x; a rough estimate is a few hundred GPU-minutes. No money is spent; no data is ordered.
