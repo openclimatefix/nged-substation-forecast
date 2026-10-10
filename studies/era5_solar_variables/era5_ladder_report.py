@@ -69,15 +69,18 @@ from era5_ladder_arms import (
 )
 from studies.bootstrap import (
     MIN_MONTHS_FOR_INTERVAL,
+    BootstrapInterval,
     bootstrap_absolute,
     bootstrap_difference,
     bootstrap_difference_at_level,
 )
 from studies.correlation import pooled_correlation_interval
 from studies.era5_ladder import (
+    AEROSOL_CONDITIONS,
     CLEAR_SKY_INDEX_THRESHOLDS,
     RUNGS,
     RungType,
+    aerosol_condition_flags,
     mars_fetch_recommendation,
     raise_unless_same_rows,
     season_of_month,
@@ -861,6 +864,149 @@ def render_mars_decision(*, contrasts: pl.DataFrame) -> list[str]:
     ]
 
 
+def aerosol_condition_rows(
+    *, losses: pl.DataFrame, dataset: pl.DataFrame, target: TargetType, setting: str
+) -> pl.DataFrame:
+    """Compare the aerosol rung with its reference inside each pre-specified aerosol condition.
+
+    The conditions come from `aerosol_condition_flags`. Each condition reports its event counts
+    and, for the aerosol rung minus the reference, the mean absolute error with a month-resampled
+    interval, the 95th percentile and the maximum of the farm-day mean absolute error, and the mean
+    signed error as a share of capacity. A condition spanning fewer than `MIN_MONTHS_FOR_INTERVAL`
+    months gets no interval.
+
+    Args:
+        losses: Per-row losses of the aerosol view.
+        dataset: The kept rows, with `tcc`, `aod550`, and `duaod550`.
+        target: The target.
+        setting: The hyperparameter setting to analyse.
+
+    Returns:
+        One row per (condition, measure), with `treatment`, `reference`, the two arms' values, the
+        difference, the interval bounds where one exists, and the event counts.
+    """
+    covered = dataset.filter(
+        pl.all_horizontal(pl.col(name).is_not_null() for name in ("tcc", "aod550", "duaod550"))
+    )
+    flags = aerosol_condition_flags(frame=covered)
+    scored = (
+        losses.filter(
+            (pl.col("setting") == setting) & pl.col("arm").is_in([AEROSOL_RUNG, AEROSOL_REFERENCE])
+        )
+        .join(flags, on=["site", "time"])
+        .with_columns(
+            signed_share=pl.col("signed_error_capped_mw") / pl.col("effective_capacity_mw"),
+            day=pl.col("time").dt.date(),
+        )
+    )
+    rows: list[dict[str, object]] = []
+    for condition in AEROSOL_CONDITIONS:
+        subset = scored.filter(pl.col(condition))
+        one_arm = subset.filter(pl.col("arm") == AEROSOL_RUNG)
+        counts = {
+            "hours": one_arm.select(pl.struct("site", "time").n_unique()).item(),
+            "farm_days": one_arm.select(pl.struct("site", "day").n_unique()).item(),
+            "days": one_arm["day"].n_unique(),
+            "months": one_arm["month"].n_unique(),
+        }
+        if subset.is_empty():
+            continue
+        daily = (
+            subset.group_by("arm", "site", "day")
+            .agg(error=pl.col(METRIC).mean())
+            .group_by("arm")
+            .agg(
+                p95=pl.col("error").quantile(0.95, interpolation="linear"),
+                worst=pl.col("error").max(),
+            )
+        )
+        by_arm = {
+            arm: {
+                "mean_absolute_error": subset.filter(pl.col("arm") == arm)[METRIC].mean(),
+                "signed_error": subset.filter(pl.col("arm") == arm)["signed_share"].mean(),
+                "farm_day_p95": daily.filter(pl.col("arm") == arm)["p95"].item(),
+                "farm_day_worst": daily.filter(pl.col("arm") == arm)["worst"].item(),
+            }
+            for arm in (AEROSOL_RUNG, AEROSOL_REFERENCE)
+        }
+        interval: BootstrapInterval | None = None
+        if counts["months"] >= MIN_MONTHS_FOR_INTERVAL:
+            interval = bootstrap_difference(
+                losses=subset, treatment=AEROSOL_RUNG, reference=AEROSOL_REFERENCE, metric=METRIC
+            )
+        for measure in by_arm[AEROSOL_RUNG]:
+            treated = float(by_arm[AEROSOL_RUNG][measure])  # ty: ignore[invalid-argument-type]
+            reference = float(by_arm[AEROSOL_REFERENCE][measure])  # ty: ignore[invalid-argument-type]
+            rows.append(
+                {
+                    "target": target,
+                    "setting": setting,
+                    "condition": condition,
+                    "measure": measure,
+                    "treatment": AEROSOL_RUNG,
+                    "reference": AEROSOL_REFERENCE,
+                    "treatment_value": treated,
+                    "reference_value": reference,
+                    "difference": treated - reference,
+                    "lower_95": interval["lower_95"]
+                    if interval is not None and measure == "mean_absolute_error"
+                    else None,
+                    "upper_95": interval["upper_95"]
+                    if interval is not None and measure == "mean_absolute_error"
+                    else None,
+                    **counts,
+                }
+            )
+    return pl.DataFrame(rows, infer_schema_length=None)
+
+
+def render_aerosol_conditions(*, conditions: pl.DataFrame) -> str:
+    """Render the aerosol-condition table, with the event counts that let a reader discount it."""
+    if conditions.is_empty():
+        return "No aerosol-condition rows."
+    body = []
+    for row in conditions.iter_rows(named=True):
+        factor = scale(target=row["target"])
+        interval = (
+            interval_text(lower=row["lower_95"], upper=row["upper_95"], factor=factor)
+            if row["lower_95"] is not None
+            else "no interval"
+        )
+        body.append(
+            [
+                row["target"],
+                row["setting"],
+                row["condition"],
+                row["measure"],
+                f"{row['reference_value'] * factor:.{PRINT_DECIMALS}f}",
+                f"{row['treatment_value'] * factor:.{PRINT_DECIMALS}f}",
+                f"{row['difference'] * factor:+.{PRINT_DECIMALS}f}",
+                interval,
+                f"{row['hours']:,}",
+                f"{row['farm_days']:,}",
+                f"{row['days']:,}",
+                f"{row['months']:,}",
+            ]
+        )
+    return table(
+        rows=body,
+        header=[
+            "target",
+            "setting",
+            "condition",
+            "measure",
+            "g9 on aerosol rows",
+            "g10",
+            "g10 minus g9",
+            "95% interval (mean absolute error only)",
+            "hours",
+            "farm-days",
+            "days",
+            "months",
+        ],
+    )
+
+
 def render_report(
     *,
     variant: str,
@@ -871,6 +1017,7 @@ def render_report(
     arms_json: dict[TargetType, dict[str, object]],
     build_notes: str,
     worst: pl.DataFrame,
+    aerosol_conditions: pl.DataFrame,
 ) -> str:
     """Assemble the report text."""
     parts = [
@@ -958,6 +1105,18 @@ def render_report(
             "",
             render_worst_days(worst=worst),
         ]
+    if not aerosol_conditions.is_empty():
+        parts += [
+            "",
+            "## Aerosol in unusual conditions (exploratory, pre-specified)",
+            "",
+            (
+                "Values are scaled as in the other tables; a negative difference is a gain. The "
+                "signed error is prediction minus measurement."
+            ),
+            "",
+            render_aerosol_conditions(conditions=aerosol_conditions),
+        ]
     return "\n".join(parts) + "\n"
 
 
@@ -978,6 +1137,7 @@ def main() -> int:
     contrast_frames: list[pl.DataFrame] = []
     split_frames: list[pl.DataFrame] = []
     worst_frames: list[pl.DataFrame] = []
+    condition_frames: list[pl.DataFrame] = []
     arms_json: dict[TargetType, dict[str, object]] = {}
     for target in TARGETS:
         key = FitKey(variant=variant, through_rung=through_rung, target=target, view="ladder")
@@ -1008,6 +1168,13 @@ def main() -> int:
         if results_path(key=aerosol_key).exists():
             aerosol_losses = read_losses(key=aerosol_key)
             contrast_frames.append(all_contrasts(losses=aerosol_losses, target=target))
+            condition_frames.extend(
+                aerosol_condition_rows(
+                    losses=aerosol_losses, dataset=dataset, target=target, setting=setting
+                )
+                for setting in (PRIMARY_SETTING, SENSITIVITY_SETTING)
+                if setting in aerosol_losses["setting"].unique().to_list()
+            )
     contrasts = pl.concat(contrast_frames, how="diagonal")
     verdicts = planned_verdicts(contrasts=contrasts)
     leaderboard_table = pl.concat(list(boards.values()), how="diagonal")
@@ -1018,6 +1185,11 @@ def main() -> int:
     worst = pl.concat(worst_frames, how="diagonal") if worst_frames else pl.DataFrame()
     if not worst.is_empty():
         worst.write_parquet(paths.worst_days)
+    aerosol_conditions = (
+        pl.concat(condition_frames, how="diagonal") if condition_frames else pl.DataFrame()
+    )
+    if not aerosol_conditions.is_empty():
+        aerosol_conditions.write_parquet(paths.aerosol_conditions)
     report = render_report(
         variant=variant,
         through_rung=through_rung,
@@ -1027,6 +1199,7 @@ def main() -> int:
         arms_json=arms_json,
         build_notes=checks_path(through_rung=through_rung, variant=variant).read_text(),
         worst=worst,
+        aerosol_conditions=aerosol_conditions,
     )
     paths.report.write_text(report)
     _LOG.info("wrote %s", paths.report)

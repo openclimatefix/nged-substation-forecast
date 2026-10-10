@@ -7,6 +7,7 @@ from studies.blending import PERMUTED_SUFFIX
 from studies.era5_ladder import (
     ACCUMULATED_VARIABLES,
     AEROSOL_COLUMNS,
+    AEROSOL_CONDITIONS,
     CLEAR_SKY_INDEX_THRESHOLDS,
     INSTANTANEOUS_VARIABLES,
     MARS_ONLY_VARIABLES,
@@ -15,6 +16,7 @@ from studies.era5_ladder import (
     RUNGS,
     SHARED_FEATURES,
     accumulation_to_hourly_rate,
+    aerosol_condition_flags,
     aerosol_hour_ending_mean,
     drop_one_group_features,
     gain_shares,
@@ -392,3 +394,39 @@ def test_a_model_that_made_no_split_has_no_share_in_any_column():
 def test_gain_for_a_column_the_model_was_not_shown_raises():
     with pytest.raises(ValueError, match="not shown"):
         gain_shares(total_gain={"a": 1.0, "f3": 2.0}, features=["a", "b"])
+
+
+def _aerosol_frame() -> pl.DataFrame:
+    count = 21
+    start = datetime(2024, 6, 1, tzinfo=UTC)
+    return pl.DataFrame(
+        {
+            "site": ["A"] * count,
+            "time": [start + timedelta(hours=hour) for hour in range(count)],
+            "tcc": [0.1 if hour % 2 == 0 else 0.9 for hour in range(count)],
+            "aod550": [0.01 * (hour + 1) for hour in range(count)],
+            "duaod550": [0.001 * (hour + 1) for hour in range(count)],
+        }
+    )
+
+
+def test_each_aerosol_condition_applies_its_own_thresholds():
+    flags = aerosol_condition_flags(frame=_aerosol_frame())
+
+    assert flags.columns == ["site", "time", *AEROSOL_CONDITIONS]
+    # Hour index h has dust 0.001 (h + 1), so the 95th percentile of 21 hours is hour 19's value.
+    assert flags.filter(pl.col("dusty"))["time"].dt.hour().to_list() == [19, 20]
+    # Of those, only hour 20 is clear (even hours have tcc 0.1).
+    assert flags.filter(pl.col("clear_and_dusty"))["time"].dt.hour().to_list() == [20]
+    # The median of aod550 is hour 10's value, so clean means hours 0 to 9, and clear means even.
+    assert flags.filter(pl.col("clear_and_clean"))["time"].dt.hour().to_list() == [0, 2, 4, 6, 8]
+    assert flags["clear"].sum() == 11
+
+
+def test_aerosol_conditions_refuse_rows_with_a_missing_input():
+    frame = _aerosol_frame().with_columns(
+        tcc=pl.when(pl.col("time").dt.hour() == 3).then(None).otherwise(pl.col("tcc"))
+    )
+
+    with pytest.raises(ValueError, match="non-null"):
+        aerosol_condition_flags(frame=frame)

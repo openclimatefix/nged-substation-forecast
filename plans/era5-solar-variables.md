@@ -106,6 +106,61 @@ label of an hour ending at H. The aerosol join interpolates linearly in time to 
 H, takes the mean of the two, and reads the EAC4 cell nearest each farm. The aerosol download is
 about 4 MB in total.
 
+## Aerosol in unusual conditions: cloud-free skies and Saharan dust
+
+**A yearly mean error can hide the days that matter most to a trader, so G10 gets its own
+conditional analysis.** One badly forecast day can cost an energy trader more than the year's gains.
+Saharan dust is the clearest case: on a cloud-free day with a dust plume overhead, irradiance is
+lower than a clear-sky forecast expects, and the error is large and one-signed. Such days are a few
+percent of hours, so their effect on a yearly mean is small. The analysis below is pre-specified,
+which means its conditions, metrics, and reading rule are fixed here before any G10 result exists.
+It is not one of the ten planned contrasts, so the page labels every number in it exploratory, with
+95% intervals and no correction for multiple comparisons. The page states the number of conditions
+(four), so a reader can discount.
+
+**Four conditions, defined from variables the forecast would also have.** All use the G10 rows
+(daylight hours that EAC4 covers) and both targets, with PV primary.
+
+- **Clear:** ERA5 `tcc` below 0.2, the primary regime threshold used elsewhere in the study.
+- **Clear and dusty:** clear, and `duaod550` at or above its 95th percentile over the G10 rows
+  (pooled over the six farms, which share two to four EAC4 cells).
+- **Dusty, any sky:** `duaod550` at or above its 95th percentile, whatever the cloud.
+- **Clear and clean:** clear, and `aod550` below its median over the G10 rows. This is the
+  reference, where aerosol should add nothing, so a gain here would point at an artefact of the
+  extra columns, not at aerosol.
+
+**The contrast is G10 minus G9 on the aerosol rows, in each condition, and four numbers describe
+each condition.** Treatment minus reference, so negative is a gain.
+
+- **Mean absolute error**, the study's metric, with a month-resampled 95% interval.
+- **The 95th percentile of the farm-day mean absolute error**, which measures how bad the bad days
+  are.
+- **The worst farm-day mean absolute error.**
+- **The mean signed error** (prediction minus measurement), which shows whether dust makes the model
+  over-forecast.
+
+**The page counts the events before it reads any number.** For each condition the page prints the
+hours, the farm-days, the calendar months with at least one hour (months are the resampling unit),
+and the distinct days on which any farm met it, without dates on a farm's axis. The 95th percentile
+of `duaod550` is by construction 5% of hours, but dust arrives in episodes, so the number of
+independent events can be a handful. A condition that spans fewer than 6 calendar months
+(`MIN_MONTHS_FOR_INTERVAL`) gets its mean and signed error but no interval, and the page says that
+G10 cannot be assessed there. A condition with an interval wholly below zero is described as "a gain
+in these conditions", never as a production recommendation, because EAC4 is a reanalysis and a
+production forecast would receive CAMS forecast aerosol.
+
+**Reading rule, fixed now.** G10 is worth a production trial of a day-1 to day-3 CAMS aerosol
+feature only if, on the PV target at both hyperparameter settings, the clear-and-dusty interval for
+mean absolute error lies wholly below minus the smallest effect (0.1 percentage points of capacity)
+and the clear-and-clean reference does not. Anything else is reported as not shown. The other
+metrics inform the discussion and do not decide.
+
+**Two limits the page states.** EAC4 is a reanalysis, so it knows the dust plume's actual position;
+a CAMS forecast issued the day before places the plume less well, so the gain here is an upper bound
+on what the forecast would give. And the CAMS-irradiance target contains CAMS aerosol by
+construction (see Targets), so a gain on the CAMS target in dusty conditions is expected and says
+little about PV.
+
 ## Targets
 
 1. **PV target:** hourly mean output of each of the six NGED solar farms, as a percentage of the
@@ -308,6 +363,8 @@ findings, Introduction, Data and methods, Results, and Limitations. The Summary'
 3. Is fetching the 12 MARS-only IFS variables worth it (planned contrast P4 and its decision rule)?
 4. Does the answer on ERA5 carry over to IFS forecasts, and what would a matched-lead follow-up
    need?
+5. Does CAMS aerosol help under cloud-free skies and Saharan dust, where a yearly mean error can
+   hide a costly bad day (the pre-specified conditional analysis)?
 
 ## Figures, in page order
 
@@ -344,6 +401,8 @@ text), has `aria=False` on its marks, and shows the weather series without the f
     mean. Both thresholds are fixed before any result. Exploratory.
 9. **Seasons.** The same differences by season (winter, spring, summer, autumn), and for the
    clear-sky, broken-cloud, and overcast regimes within each season. Exploratory.
+    - **Aerosol in unusual conditions.** G10 minus G9 on the aerosol rows in the four conditions of
+      the aerosol section, with the four metrics and the event counts. Exploratory, pre-specified.
 10. **Drop-one-group.** Error added when each group is removed from G9.
 11. **Hour of day and snow.** Error by hour of day for G0 against G9, and the worst 20 days for G0
     with what G9 changed on them, anonymised by farm label.

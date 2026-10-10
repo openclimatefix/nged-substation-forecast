@@ -437,6 +437,54 @@ def sky_regime_from_cloud_cover(*, cloud_cover: pl.Expr) -> pl.Expr:
     )
 
 
+AEROSOL_CONDITIONS: Final[tuple[str, ...]] = (
+    "clear",
+    "clear_and_dusty",
+    "dusty",
+    "clear_and_clean",
+)
+"""The pre-specified conditions in which the aerosol rung is assessed on its own."""
+
+DUST_QUANTILE: Final[float] = 0.95
+"""Hours at or above this quantile of dust optical depth count as dusty."""
+
+CLEAN_QUANTILE: Final[float] = 0.5
+"""Hours below this quantile of total aerosol optical depth count as clean."""
+
+
+def aerosol_condition_flags(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Flag each hour with the pre-specified aerosol conditions.
+
+    The dust and clean thresholds are quantiles over the rows given, so pass exactly the rows the
+    aerosol rung is scored on.
+
+    Args:
+        frame: Rows with `site`, `time`, `tcc`, `aod550`, and `duaod550`, none of them null.
+
+    Returns:
+        `site`, `time`, and one Boolean column per name in `AEROSOL_CONDITIONS`.
+
+    Raises:
+        ValueError: If a needed column is null on any row.
+    """
+    needed = ["tcc", "aod550", "duaod550"]
+    if frame.select(pl.any_horizontal(pl.col(name).is_null() for name in needed)).to_series().any():
+        msg = f"{needed} must be non-null on every row, or the quantiles cover different rows"
+        raise ValueError(msg)
+    dust_threshold = frame["duaod550"].quantile(DUST_QUANTILE, interpolation="linear")
+    clean_threshold = frame["aod550"].quantile(CLEAN_QUANTILE, interpolation="linear")
+    clear = sky_regime_from_cloud_cover(cloud_cover=pl.col("tcc")) == "clear"
+    dusty = pl.col("duaod550") >= dust_threshold
+    return frame.select(
+        "site",
+        "time",
+        clear=clear,
+        clear_and_dusty=clear & dusty,
+        dusty=dusty,
+        clear_and_clean=clear & (pl.col("aod550") < clean_threshold),
+    )
+
+
 def season_of_month(*, month_number: pl.Expr) -> pl.Expr:
     """Return the meteorological season of a calendar month number.
 

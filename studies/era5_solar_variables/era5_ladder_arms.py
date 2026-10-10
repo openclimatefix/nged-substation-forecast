@@ -215,6 +215,7 @@ class ReportPaths(NamedTuple):
         contrasts: Every contrast with its intervals.
         splits: The regime, season, farm, and hour-of-day splits.
         worst_days: The minimal arm's worst farm-days.
+        aerosol_conditions: The aerosol rung against its reference inside each aerosol condition.
     """
 
     report: Path
@@ -222,6 +223,7 @@ class ReportPaths(NamedTuple):
     contrasts: Path
     splits: Path
     worst_days: Path
+    aerosol_conditions: Path
 
 
 def report_paths(*, variant: str, through_rung: RungType) -> ReportPaths:
@@ -235,6 +237,9 @@ def report_paths(*, variant: str, through_rung: RungType) -> ReportPaths:
         splits=report_path(name="splits.parquet", variant=variant, through_rung=through_rung),
         worst_days=report_path(
             name="worst_days.parquet", variant=variant, through_rung=through_rung
+        ),
+        aerosol_conditions=report_path(
+            name="aerosol_conditions.parquet", variant=variant, through_rung=through_rung
         ),
     )
 
