@@ -427,10 +427,17 @@ so.
 
 ## Page structure
 
-The page follows the study skill's order: title, then a Summary that opens with a one-paragraph
-bottom line, then one bolded question-and-answer bullet per question, then a closing bullet on what
-the data and methods can and cannot support, then the headline figure, then the AI disclaimer, Key
-findings, Introduction, Data and methods, Results, and Limitations. The Summary's questions are:
+**The page is figure-led, and the first figure sits above the fold.** The maintainer asked for this
+on
+2026-10-10. The page opens with the title, a bottom line of at most two sentences, and the headline
+figure, so a reader landing on the page sees the figure without scrolling. The Summary's
+question-and-answer bullets follow the figure, each bullet at most two sentences and each pointing
+at the figure that answers it. The AI disclaimer, Key findings, Introduction, Data and methods,
+Results, and Limitations follow. Prose stays at the minimum the figures need: every figure has a
+bolded one-sentence lead and a caption with the interval method, and a section has no paragraph
+that a figure already tells. The study skill's order puts the bottom line and bullets before the
+headline figure, and this page departs from that order for the maintainer's instruction. The
+Summary's questions are:
 
 1. Do ERA5 variables beyond `ssrd`, `t2m`, and sun position help predict solar farm output, and by
    how much?
