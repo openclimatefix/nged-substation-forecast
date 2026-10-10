@@ -921,7 +921,7 @@ def detection_figure(*, number: int) -> alt.VConcatChart:
     )
     panel = alt.layer(points, rule).properties(width=PLOT_WIDTH_PX, height=150)  # ty: ignore[invalid-argument-type]
     return figure(
-        panels=[panel],  # ty: ignore[invalid-argument-type]
+        panels=[panel],
         number=number,
         title=(
             "Fitted solar explains none of an aggregate's changes without solar, and most of "
@@ -1002,7 +1002,7 @@ def parameter_error_figure(*, number: int) -> alt.VConcatChart:
         )
         panels.append(alt.layer(zero, points).properties(width=PLOT_WIDTH_PX - 20, height=125))
     return figure(
-        panels=panels,  # ty: ignore[invalid-argument-type]
+        panels=panels,
         number=number,
         title=(
             "Beside wind and gas the plant's tilt, azimuth, DC:AC ratio, and capacity come back "

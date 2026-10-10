@@ -478,6 +478,7 @@ NWP_PRODUCT_NAMES: Final[tuple[str, ...]] = (
     "ECMWF-AIFS",
     "ECMWF-AIFS-ENS",
     "ECMWF-IFS-SINGLE-RUNS",
+    "ECMWF-IFS-SINGLE-RUNS-SOLAR",
     "GEFS",
     "GFS",
     "OPEN-METEO-ENSEMBLE-MEANS",
@@ -496,6 +497,7 @@ merged. `UKV-CEDA`, `-part2` and `-part3` hold the 00, 06, 12, and 18 UTC runs t
 REANALYSIS_PRODUCT_NAMES: Final[tuple[str, ...]] = (
     "CAMS",
     "CAMS_public_points",
+    "CAMS_EAC4_AOD",
     "CERRA",
     "ERA5",
     "ERA5-WIND-2019-2023",
@@ -596,6 +598,11 @@ def site_points_dir_for(*, product: str) -> Path:
 ERA5_PRODUCT_DIR: Final[Path] = product_dir_for(product="ERA5")
 """ERA5, fetched from Open-Meteo's mirror and from the Copernicus Climate Data Store."""
 
+ERA5_SOLAR_VARIABLES_DIR: Final[Path] = ERA5_PRODUCT_DIR / "solar_variables"
+"""The ERA5 cloud, water, humidity, snow and other fields that might explain the sunlight reaching a
+panel, over the same 20 cells and hours as `ERA5_PRODUCT_DIR / "beam_diffuse"`: one parquet per
+variable."""
+
 ERA5_SITE_POINTS_DIR: Final[Path] = site_points_dir_for(product="ERA5")
 """ERA5's per-site frames: the irradiance and the wind at each site's coordinates."""
 
@@ -607,6 +614,9 @@ CAMS_PRODUCT_DIR: Final[Path] = product_dir_for(product="CAMS")
 
 CAMS_PUBLIC_POINTS_DIR: Final[Path] = product_dir_for(product="CAMS_public_points")
 """The CAMS irradiance at public points: the single-site solar BMUs and a coarse GB grid."""
+
+CAMS_EAC4_AOD_PRODUCT_DIR: Final[Path] = product_dir_for(product="CAMS_EAC4_AOD")
+"""The CAMS global reanalysis (EAC4) aerosol optical depth at 550 nm, 3-hourly, over a box."""
 
 CAMS_SITE_POINTS_DIR: Final[Path] = site_points_dir_for(product="CAMS")
 """The CAMS irradiance at each site's coordinates."""
@@ -640,6 +650,11 @@ ECMWF_IFS_HRES_PRODUCT_DIR: Final[Path] = product_dir_for(product="ECMWF-IFS-HRE
 
 ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR: Final[Path] = product_dir_for(product="ECMWF-IFS-SINGLE-RUNS")
 """Open-Meteo's Single Runs archive of ECMWF's high-resolution forecast."""
+
+ECMWF_IFS_SINGLE_RUNS_SOLAR_PRODUCT_DIR: Final[Path] = product_dir_for(
+    product="ECMWF-IFS-SINGLE-RUNS-SOLAR"
+)
+"""Open-Meteo's Single Runs archive of ECMWF's high-resolution forecast: the solar variables."""
 
 ECMWF_AIFS_PRODUCT_DIR: Final[Path] = product_dir_for(product="ECMWF-AIFS")
 """ECMWF's AIFS Single forecast."""
@@ -694,6 +709,15 @@ STUDY_DATA_DIR: Final[Path] = study_dir_for(study="beam_diffuse_split")
 
 STUDY_INPUTS_DIR: Final[Path] = STUDY_DATA_DIR / "inputs"
 """The joined `beam_diffuse_dataset_<source>.parquet` frames that `build_dataset.py` writes."""
+
+ERA5_LADDER_DIR: Final[Path] = study_dir_for(study="era5_solar_variables")
+"""The ERA5 variable ladder study's folder."""
+
+ERA5_LADDER_INPUTS_DIR: Final[Path] = ERA5_LADDER_DIR / "inputs"
+"""The joined hourly frames and their checks that `era5_ladder_build_dataset.py` writes."""
+
+ERA5_LADDER_RESULTS_DIR: Final[Path] = ERA5_LADDER_DIR / "results"
+"""The ladder study's out-of-fold losses, report, and interval tables."""
 
 ENS_FORECAST_HORIZONS_DIR: Final[Path] = study_dir_for(study="ens_forecast_horizons")
 """The ENS forecast-horizons study's results. Its member extract is in `ENS_PRODUCT_DIR`."""

@@ -399,6 +399,48 @@ def crps(*, actual: np.ndarray, quantiles: np.ndarray) -> np.ndarray:
     return 2.0 * QUANTILE_LEVEL_SPACING * pinball.sum(axis=1)
 
 
+PROBABILISTIC_COLUMNS: Final[tuple[str, ...]] = (
+    "crps_floored_fraction_of_capacity",
+    "covered_80",
+    "width_80_fraction_of_capacity",
+    *(f"below_q{round(level * 100)}" for level in QUANTILE_LEVELS),
+)
+"""The per-row columns `probabilistic_scores` writes, null where no quantile model was fitted."""
+
+
+def probabilistic_scores(
+    *, actual: np.ndarray, quantiles: np.ndarray, cap_mw: pl.Series, capacity_mw: np.ndarray
+) -> dict[str, np.ndarray]:
+    """Score the quantiles after sorting them, holding them to the export cap, and flooring at 0.
+
+    The repair is the same for every arm. Neither output nor the clearness index is negative, so a
+    negative quantile is raised to 0.
+
+    Args:
+        actual: Observed target, shape (n_rows,).
+        quantiles: Predicted quantiles, shape (n_rows, n_levels), in the order of `QUANTILE_LEVELS`.
+        cap_mw: The export cap in force on each row, null where there is none.
+        capacity_mw: Each row's capacity, which divides every score.
+
+    Returns:
+        One array per name in `PROBABILISTIC_COLUMNS`. The `below_q` columns hold 1.0 where the
+        outcome is at or below that level's quantile, which averages to the level's reliability.
+    """
+    repaired = np.maximum(clamp_to_cap(prediction=np.sort(quantiles, axis=1), cap_mw=cap_mw), 0.0)
+    levels = list(QUANTILE_LEVELS)
+    lower = repaired[:, levels.index(0.1)]
+    upper = repaired[:, levels.index(0.9)]
+
+    scores: dict[str, np.ndarray] = {
+        "crps_floored_fraction_of_capacity": crps(actual=actual, quantiles=repaired) / capacity_mw,
+        "covered_80": ((actual >= lower) & (actual <= upper)).astype(np.float64),
+        "width_80_fraction_of_capacity": (upper - lower) / capacity_mw,
+    }
+    for index, level in enumerate(levels):
+        scores[f"below_q{round(level * 100)}"] = (actual <= repaired[:, index]).astype(np.float64)
+    return scores
+
+
 def booster_parameters(
     *, hyper_parameters: HyperParameters, seed: int, device: DeviceType = "cpu"
 ) -> dict[str, object]:
@@ -782,9 +824,23 @@ def _losses(
         if quantiles is not None
         else pl.lit(None, dtype=pl.Float64)
     )
+    probabilistic = (
+        {
+            name: pl.Series(name, values, dtype=pl.Float64)
+            for name, values in probabilistic_scores(
+                actual=actual,
+                quantiles=quantiles,
+                cap_mw=test["cap_mw"],
+                capacity_mw=test["effective_capacity_mw"].cast(pl.Float64).to_numpy(),
+            ).items()
+        }
+        if quantiles is not None
+        else {name: pl.lit(None, dtype=pl.Float64).alias(name) for name in PROBABILISTIC_COLUMNS}
+    )
     return (
         test.select("site", "time", "month", "fold", "effective_capacity_mw", "constrained")
         .cast({"effective_capacity_mw": pl.Float64})
+        .with_columns(**probabilistic)
         .with_columns(
             seed=pl.lit(seed, dtype=pl.Int32),
             absolute_error_mw=pl.Series(np.abs(actual - point), dtype=pl.Float64),
