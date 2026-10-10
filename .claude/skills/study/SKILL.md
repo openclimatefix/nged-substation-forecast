@@ -122,8 +122,9 @@ review goes on the page only after a committed script prints it into the report.
    fixed.
 6. **Finish the charts and the page** (sections below).
 7. **Diff review**, with the `implement-issue` skill.
-8. **End with a `prose-review` of the page, one rule per pass, alongside persona and evidence
-   reviews** (see "Reviews").
+8. **End with a first-stumble review and then a `prose-review` of the page, one rule per pass,
+   alongside persona and evidence reviews** (see "Reviews"). The text inside the figures gets the
+   same two reviews before the figures are first rendered (see "Review the text of every figure").
 9. **Merge, if the three conditions at the top of this skill hold,** after checking the PR's body
    and commit messages for closing keywords (see "GitHub hygiene").
 
@@ -394,6 +395,15 @@ the story without the prose around it.
   names: write "our solar power forecast" in the forecast's colour and "CAMS irradiance" in the
   colour of the CAMS line, so the eye finds the matching text at once. Use a legend where the
   series are too many for text, and never leave a colour unexplained.
+- **Review the text of every figure before the figure is first rendered.** The text inside a
+  figure is prose that readers see first and may see alone: the title, the subtitle lines, the
+  axis titles, the legend entries, the coloured key phrases, the annotations, and the captions.
+  Collect the figure text from the chart script into one file, with each figure's number and what it
+  plots. Then run the two reviews the page gets, in order: a first-stumble reader (a fresh Opus
+  reviewer who sees only that text and says where it cannot tell what a figure plots, in which
+  unit, which direction is better, or what a colour means), and a `prose-review` sweep of the text,
+  one rule per pass. Fix the chart script, and only then render. The reviewer then checks the
+  renders for truncated labels and overlaps, which the text review cannot see.
 - **Where a study ranks products, Figure 1 is a leaderboard.** The leaderboard shows each
   product's own mean absolute error on the rows every product shares, sorted best first, with its
   95% interval, "smaller is better" in the axis text, and the unit. The paired contrasts follow
@@ -592,12 +602,18 @@ approximate one, which the lineage files showed was backwards. A finding can als
 wrong fix: a reviewer proposed deleting a test that asserted the wrong thing, where rewriting its
 fixture kept the coverage. Record each rejected finding and its reason in the PR.
 
-**Every study ends with a `prose-review` of its page, sweeping one rule per pass.** Run the review
-after the last science review and the diff review, so no later fix brings back prose the sweep has
-checked. A reviewer asked to check every rule at once reports the loudest fault in each paragraph
-and misses the quieter ones. The `prose-review` skill sets the order of the passes, how to split a
-long page across sub-agents, and how to triage the findings. Review the new prose in the READMEs and
-docstrings in the same sweep.
+**All the prose of a study is reviewed twice, first by a first-stumble reader and then by a
+`prose-review` that sweeps one rule per pass.** This covers the page, the READMEs, the docstrings,
+and the text inside the figures. The first-stumble reader (the `prose-review` skill's Pass E) is a
+fresh Opus reviewer who sees only the text, reads from the top, and reports the first sentence it
+cannot follow and the earlier sentence that would have been needed. The sweep follows, after the
+stumbles are fixed, because fixing a stumble moves sentences. The figure text is reviewed before
+the figures are first rendered, as the Charts section says. The page and the other prose are
+reviewed after the last science review and the diff review, so no later fix brings back prose the
+sweep has checked. A reviewer asked to check every rule at once reports the loudest fault in each
+paragraph and misses the quieter ones. The `prose-review` skill sets the order of the passes, how
+to split a long page across sub-agents, and how to triage the findings. Sweep the figure text
+again if a later fix changes it.
 
 **Alongside the prose review, review the page from several personas, starting with the people who
 built each product the page compares.** A prose review checks how the page reads, not whether its
