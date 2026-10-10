@@ -28,11 +28,14 @@ and a rerun skips the ones already saved, so a reboot costs one arm-setting. The
 `losses_<product>.parquet` is written once, when everything is done, and the script refuses to
 overwrite it.
 
-**Device.** `--device cpu` (the default) or `cuda`; `--max-workers` sets how many plants fit at
-once, each on `THREADS_PER_FIT` cores.
+**Device.** `--device cuda` (the default) or `cpu`; `--max-workers` (default 4) sets how many plants
+fit at once, each on `THREADS_PER_FIT` cores. A run writes `checkpoints/run_manifest.json` with its
+device, and a resume on another device raises, because one device must serve each planned contrast.
 
-**Smoke test.** `--smoke` fits B0 and S2 on 150 rows per plant from folds 0 and 1, with 20 boosting
-rounds, to check the plumbing. It is not a result.
+**Smoke test.** `--smoke` fits B0 and S2, one global model, one leave-one-plant-out model, the
+interval model and the importance refit on 150 rows per plant from folds 0 and 1, with 20 boosting
+rounds, to check the plumbing. It writes `checkpoints_smoke/` and `losses_<product>_smoke.parquet`,
+and is not a result.
 
 Run it with `uv run python studies/lag_features/fit_lag_arms.py`.
 """
@@ -43,11 +46,13 @@ import hashlib
 import json
 import logging
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Final, NamedTuple
 
 import numpy as np
 import polars as pl
+import xgboost as xgb
 from build_lag_frame import (
     B0_COLUMNS,
     CLOCK_RATIO_TEMPLATE,
@@ -71,21 +76,26 @@ from build_lag_frame import (
     TARGET,
     WEATHER_PRODUCTS,
     WeatherProduct,
+    assert_before_cutoff,
     extra_columns_of,
+    final_test_cutoff,
     output_paths,
     shared_rows,
     target_date,
     weather_table,
+    write_parquet_atomic,
 )
 from studies.arm_runner import Job, run_all
 from studies.baselines import same_clock_hour_window
 from studies.cross_validation import (
     N_FOLDS,
     PRIMARY_HYPER_PARAMETERS,
+    QUANTILE_LEVELS,
     SEEDS,
     SENSITIVITY_HYPER_PARAMETERS,
     DeviceType,
     HyperParameters,
+    booster_parameters,
     calendar_month_coverage,
     clamp_to_cap,
     cut_eras,
@@ -95,6 +105,7 @@ from studies.cross_validation import (
     score_prediction,
 )
 from studies.guards import refuse_to_overwrite
+from studies.sources import NFC_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fit_lag_arms")
@@ -125,6 +136,10 @@ SHORTLIST_CANDIDATES: Final[tuple[str, ...]] = (
 absolute error over `SCREENING_MONTHS`. The excluded arms are B0, L1, L2, S2, N1 and N2 (phase 2
 carries those regardless), T1 (an interpolation bound), the references and post-model corrections
 (none is fitted), and the global-only arms. Phase 2 carries X."""
+
+CPU_REPRODUCTION_WORKERS: Final[int] = 2
+"""The CPU leg of the reproduction check fits on at most this many workers, to leave the machine
+usable."""
 
 WIDE_X_COLUMNS: Final[int] = 3
 """If X adds more columns than this, N2-k is fitted with as many random lags as X adds."""
@@ -246,8 +261,12 @@ def stage1_predictions(
     parts = []
     for _site, rows in hours.group_by("site", maintain_order=True):
         trainable = rows.filter(
-            pl.col("fold").is_not_null() & ~pl.col("constrained") & pl.col(TARGET).is_not_null()
+            pl.col("fold").is_not_null()
+            & ~pl.col("constrained")
+            & pl.col(TARGET).is_not_null()
+            & (pl.col("time") < final_test_cutoff())
         )
+        assert_before_cutoff(frame=trainable, name="the stage-1 training rows")
         predictions: dict[frozenset[int], np.ndarray] = {}
         for first in range(N_FOLDS):
             for second in range(first, N_FOLDS):
@@ -424,71 +443,23 @@ def checkpoint_path(*, context: Context, scope: str, setting: str, arm: str) -> 
     return context.checkpoint_dir / f"{scope}__{setting}__{arm}.parquet"
 
 
-def fit_arm(
-    *,
-    context: Context,
-    dataset: pl.DataFrame,
-    scope: str,
-    lead_day: int,
-    arm: str,
-    setting: str,
-    quantiles: bool,
-    pooled: bool = False,
-    lopo: bool = False,
+def _annotated(
+    *, losses: pl.DataFrame, dataset: pl.DataFrame, scope: str, lead_day: int, quantiles: bool
 ) -> pl.DataFrame:
-    """Fit one arm at one setting, or read it back if a checkpoint holds it.
+    """Add the actual power, the prediction, the scope and the capacity-normalised CRPS.
 
     Args:
-        context: The run's context.
-        dataset: The site-sorted frame, with `fold`, `month`, `cap_mw`, `constrained` and capacity.
-        scope: A label for the frame: `lead<N>`, `global`, or `control_s<percent>`.
-        lead_day: The lead-day of the frame.
-        arm: The arm.
-        setting: `primary` or `sensitivity`.
-        quantiles: Whether to fit the quantile models too.
-        pooled: Whether `dataset` is one pooled model's frame (fitted as a single `site_rows`).
-        lopo: Whether to fit the pooled frame leaving each plant out in turn (exploratory).
+        losses: Per-row losses of one arm and setting, with `arm`, `setting` and `signed_error_mw`.
+        dataset: The frame the losses were fitted on, for the actual power.
+        scope: The scope label.
+        lead_day: The lead-day.
+        quantiles: Whether the losses carry quantile scores.
 
     Returns:
-        The arm's per-row losses with `arm`, `setting`, `scope`, `lead_day`, `with_quantiles`,
-        `actual` and `prediction` (in the target's own units) and
+        The losses with `actual`, `prediction`, `scope`, `lead_day`, `with_quantiles` and
         `crps_capped_fraction_of_capacity`.
     """
-    path = checkpoint_path(context=context, scope=scope, setting=setting, arm=arm)
-    kind_path = path.with_suffix(".quantile.parquet" if quantiles else ".parquet")
-    if kind_path.exists():
-        return pl.read_parquet(kind_path)
-    hyper_parameters = settings_for(context=context)[setting]
-    features = features_of(arm=arm)
-    if lopo:
-        annotated = leave_one_plant_out(
-            context=context, dataset=dataset, arm=arm, hyper_parameters=hyper_parameters
-        ).with_columns(
-            arm=pl.lit(arm),
-            setting=pl.lit(setting),
-            scope=pl.lit(scope),
-            lead_day=pl.lit(lead_day, dtype=pl.Int32),
-            with_quantiles=pl.lit(value=False),
-        )
-        partial = kind_path.with_suffix(".partial")
-        annotated.write_parquet(partial)
-        partial.replace(kind_path)
-        return annotated
-    if pooled:
-        losses = out_of_fold_losses(
-            site_rows=dataset,
-            features=features,
-            target=TARGET,
-            hyper_parameters=hyper_parameters,
-            with_quantiles=quantiles,
-            device=context.device,
-        ).with_columns(arm=pl.lit(arm), setting=pl.lit(setting), target=pl.lit(TARGET))
-    else:
-        job: Job = (arm, setting, TARGET, features, hyper_parameters, quantiles)
-        losses = run_all(
-            dataset=dataset, jobs=[job], max_workers=context.max_workers, device=context.device
-        )
-    annotated = (
+    return (
         losses.join(
             dataset.select("site", "time", actual=pl.col(TARGET)), on=["site", "time"], how="left"
         )
@@ -502,11 +473,89 @@ def fit_arm(
         )
         .cast({"actual": pl.Float64})
     )
-    partial = kind_path.with_suffix(".partial")
-    annotated.write_parquet(partial)
-    partial.replace(kind_path)
-    _LOG.info("saved %s", kind_path.name)
-    return annotated
+
+
+def fit_arms(
+    *,
+    context: Context,
+    dataset: pl.DataFrame,
+    scope: str,
+    lead_day: int,
+    arms: Sequence[str],
+    setting: str,
+    quantiles: bool,
+    pooled: bool = False,
+    lopo: bool = False,
+) -> list[pl.DataFrame]:
+    """Fit several arms at one setting in one batch, or read back any a checkpoint holds.
+
+    The per-plant jobs of every arm still to fit share one `run_all` call, so the workers stay busy
+    across arms. Each arm is checkpointed on its own.
+
+    Args:
+        context: The run's context.
+        dataset: The site-sorted frame, with `fold`, `month`, `cap_mw`, `constrained` and capacity.
+        scope: A label for the frame: `lead<N>`, `global`, `lopo` or `control_s<percent>`.
+        lead_day: The lead-day of the frame.
+        arms: The arms.
+        setting: `primary` or `sensitivity`.
+        quantiles: Whether to fit the quantile models too.
+        pooled: Whether `dataset` is one pooled model's frame (fitted as a single `site_rows`).
+        lopo: Whether to fit the pooled frame leaving each plant out in turn (exploratory).
+
+    Returns:
+        One frame per arm, in the order of `arms`: its per-row losses with `arm`, `setting`,
+        `scope`, `lead_day`, `with_quantiles`, `actual` and `prediction` (in the target's own
+        units) and `crps_capped_fraction_of_capacity`.
+    """
+    assert_before_cutoff(frame=dataset, name=f"the {scope} frame's rows")
+    suffix = ".quantile.parquet" if quantiles else ".parquet"
+    paths = {
+        arm: checkpoint_path(context=context, scope=scope, setting=setting, arm=arm).with_suffix(
+            suffix
+        )
+        for arm in arms
+    }
+    missing = [arm for arm in arms if not paths[arm].exists()]
+    hyper_parameters = settings_for(context=context)[setting]
+    fitted: dict[str, pl.DataFrame] = {}
+    if missing and not (pooled or lopo):
+        jobs: list[Job] = [
+            (arm, setting, TARGET, features_of(arm=arm), hyper_parameters, quantiles)
+            for arm in missing
+        ]
+        stacked = run_all(
+            dataset=dataset, jobs=jobs, max_workers=context.max_workers, device=context.device
+        )
+        fitted = {arm: stacked.filter(pl.col("arm") == arm) for arm in missing}
+    for arm in missing if (pooled or lopo) else []:
+        if lopo:
+            fitted[arm] = leave_one_plant_out(
+                context=context, dataset=dataset, arm=arm, hyper_parameters=hyper_parameters
+            ).with_columns(arm=pl.lit(arm), setting=pl.lit(setting))
+        else:
+            fitted[arm] = out_of_fold_losses(
+                site_rows=dataset,
+                features=features_of(arm=arm),
+                target=TARGET,
+                hyper_parameters=hyper_parameters,
+                with_quantiles=quantiles,
+                device=context.device,
+            ).with_columns(arm=pl.lit(arm), setting=pl.lit(setting), target=pl.lit(TARGET))
+    for arm, losses in fitted.items():
+        if lopo:
+            annotated = losses.with_columns(
+                scope=pl.lit(scope),
+                lead_day=pl.lit(lead_day, dtype=pl.Int32),
+                with_quantiles=pl.lit(value=False),
+            )
+        else:
+            annotated = _annotated(
+                losses=losses, dataset=dataset, scope=scope, lead_day=lead_day, quantiles=quantiles
+            )
+        write_parquet_atomic(frame=annotated, path=paths[arm])
+        _LOG.info("saved %s", paths[arm].name)
+    return [pl.read_parquet(paths[arm]) for arm in arms]
 
 
 def leave_one_plant_out(
@@ -569,20 +618,22 @@ def leave_one_plant_out(
 
 
 INTERVAL_ARMS: Final[tuple[str, ...]] = ("B0", "L1")
-"""The arms whose 10% and 90% quantile predictions are saved, to measure coverage and width."""
+"""The arms whose nine quantile predictions are saved, to measure coverage and width (and, for
+B0, to score R4 and R5 on the continuous ranked probability score)."""
 
 INTERVAL_SEED: Final[int] = 0
 """The one seed the saved quantile predictions come from; coverage and width are descriptive."""
 
-LOWER_LEVEL_INDEX: Final[int] = 0
-UPPER_LEVEL_INDEX: Final[int] = 8
-"""The positions of the 0.1 and 0.9 levels in `studies.cross_validation.QUANTILE_LEVELS`."""
+QUANTILE_COLUMNS: Final[tuple[str, ...]] = tuple(
+    f"q{index}" for index in range(len(QUANTILE_LEVELS))
+)
+"""The saved columns, one per level of `QUANTILE_LEVELS`, sorted within each row."""
 
 
 def _plant_intervals(
     *, rows: pl.DataFrame, arm: str, hyper_parameters: HyperParameters, device: DeviceType
 ) -> pl.DataFrame:
-    """Predict one plant's 10% and 90% quantiles out of fold, with `INTERVAL_SEED`.
+    """Predict one plant's nine quantiles out of fold, with `INTERVAL_SEED`.
 
     Args:
         rows: One plant's rows.
@@ -591,8 +642,10 @@ def _plant_intervals(
         device: XGBoost's device.
 
     Returns:
-        `site`, `time`, `month`, the actual power, the two quantiles held to the export cap, and
-        the columns that classify the forecast sky, all as fractions of the plant's capacity.
+        `site`, `time`, `month`, `fold`, the forecast irradiance and clear-sky irradiance that
+        classify the sky, the actual power, CK's ceiling (null where the frame lacks it), and the
+        nine quantiles sorted within each row and held to the export cap, all as fractions of the
+        plant's capacity.
     """
     parts = []
     for fold in sorted(rows["fold"].unique().to_list()):
@@ -611,20 +664,30 @@ def _plant_intervals(
         if quantiles is None:
             msg = "quantile models were requested but not returned"
             raise ValueError(msg)
-        capped = clamp_to_cap(prediction=quantiles, cap_mw=test["cap_mw"])
+        capped = np.sort(
+            clamp_to_cap(prediction=np.sort(quantiles, axis=1), cap_mw=test["cap_mw"]), axis=1
+        )
         capacity = test["effective_capacity_mw"].cast(pl.Float64)
+        ceiling = (
+            test["ck_expanding_p995"].cast(pl.Float64) / capacity
+            if "ck_expanding_p995" in test.columns
+            else pl.Series([None] * test.height, dtype=pl.Float64)
+        )
         parts.append(
-            test.select("site", "time", "month", "nwp_ghi", "clear_sky_w_m2").with_columns(
+            test.select("site", "time", "month", "fold", "nwp_ghi", "clear_sky_w_m2").with_columns(
                 actual=test[TARGET].cast(pl.Float64) / capacity,
-                lower=pl.Series(capped[:, LOWER_LEVEL_INDEX]) / capacity,
-                upper=pl.Series(capped[:, UPPER_LEVEL_INDEX]) / capacity,
+                ceiling=ceiling,
+                **{
+                    name: pl.Series(capped[:, index]) / capacity
+                    for index, name in enumerate(QUANTILE_COLUMNS)
+                },
             )
         )
     return pl.concat(parts)
 
 
 def fit_intervals(*, context: Context, dataset: pl.DataFrame, arm: str) -> pl.DataFrame:
-    """Return an arm's out-of-fold 10% and 90% quantile predictions, or read back a checkpoint.
+    """Return an arm's out-of-fold quantile predictions, or read back a checkpoint.
 
     Args:
         context: The run's context.
@@ -652,7 +715,143 @@ def fit_intervals(*, context: Context, dataset: pl.DataFrame, arm: str) -> pl.Da
             )
         )
     result = pl.concat(parts).with_columns(arm=pl.lit(arm))
-    result.write_parquet(path)
+    write_parquet_atomic(frame=result, path=path)
+    return result
+
+
+IMPORTANCE_ARMS: Final[tuple[str, ...]] = ("B0", "L1", "L2", "S2", "X")
+"""The arms whose boosters' gains are saved; `X` stands for the shortlist rule's arm."""
+
+IMPORTANCE_SEED: Final[int] = 0
+"""The one seed of the importance-only refit."""
+
+FEATURE_GROUPS: Final[tuple[tuple[str, str], ...]] = (
+    ("hour_of_day", "calendar"),
+    ("day_of_year", "calendar"),
+    ("era_code", "calendar"),
+    ("solar_", "sun position"),
+    ("nwp_", "forecast weather"),
+    ("lag_nwp", "lag-hour forecast weather"),
+    ("lag_ghi", "lag-hour forecast weather"),
+    ("lag_d", "lagged power"),
+    ("null_lag", "random lags (controls)"),
+    ("stage1_", "stage-1 predictions and residuals"),
+    ("resid_", "stage-1 predictions and residuals"),
+    ("week_", "windowed power statistics"),
+    ("q30_", "windowed power statistics"),
+    ("im_", "issue morning"),
+    ("tf_", "transfer function"),
+    ("ck_", "clipping ceiling"),
+    ("an_", "analogue ensemble"),
+    ("pc_", "satellite ratios"),
+    ("rp_", "relative plant energy"),
+    ("dt_", "diurnal shape"),
+    ("days_since", "date"),
+    ("plant_code", "plant code"),
+)
+"""Name prefixes mapped to feature groups, tried in order; the importance figure sums by group."""
+
+
+def feature_group(*, column: str) -> str:
+    """Return the feature group of a column.
+
+    Args:
+        column: A feature column name, with any `{fold}` already filled.
+
+    Returns:
+        The group of the first matching prefix.
+
+    Raises:
+        ValueError: If no prefix matches, so a new column cannot silently fall outside every group.
+    """
+    for prefix, group in FEATURE_GROUPS:
+        if column.startswith(prefix):
+            return group
+    msg = f"column {column!r} belongs to no feature group"
+    raise ValueError(msg)
+
+
+def _plant_importance(
+    *, rows: pl.DataFrame, arm: str, hyper_parameters: HyperParameters, device: DeviceType
+) -> pl.DataFrame:
+    """Refit one plant's point model per fold and return each column's share of total gain.
+
+    Args:
+        rows: One plant's rows.
+        arm: The arm.
+        hyper_parameters: The setting to fit at.
+        device: XGBoost's device.
+
+    Returns:
+        `site`, `fold`, `column`, `group` and `share`: the shares sum to 1 within a (site, fold)
+        model, and a column the booster never split on has share 0.
+    """
+    records = []
+    for fold in sorted(rows["fold"].unique().to_list()):
+        train = rows.filter((pl.col("fold") != fold) & ~pl.col("constrained"))
+        features = [name.format(fold=fold) for name in features_of(arm=arm)]
+        matrix = xgb.DMatrix(train.select(features).to_numpy(), label=train[TARGET].to_numpy())
+        booster = xgb.train(
+            {
+                **booster_parameters(
+                    hyper_parameters=hyper_parameters, seed=IMPORTANCE_SEED, device=device
+                ),
+                "objective": "reg:absoluteerror",
+            },
+            matrix,
+            num_boost_round=hyper_parameters["num_boost_round"],
+        )
+        gains = booster.get_score(importance_type="total_gain")
+        values = np.asarray([gains.get(f"f{index}", 0.0) for index in range(len(features))])
+        total = values.sum()
+        shares = values / total if total > 0 else values
+        records += [
+            {
+                "site": rows["site"][0],
+                "fold": fold,
+                "column": column,
+                "group": feature_group(column=column),
+                "share": float(share),
+            }
+            for column, share in zip(features, shares, strict=True)
+        ]
+    return pl.DataFrame(records)
+
+
+def fit_importance(*, context: Context, dataset: pl.DataFrame, arm: str) -> pl.DataFrame:
+    """Return an arm's per-model gain shares from a separate refit, or read back a checkpoint.
+
+    Importance is descriptive: gain is measured on the training rows and splits credit between
+    correlated columns by whichever the greedy search picks first. The refit adds no column to any
+    arm and enters no planned contrast.
+
+    Args:
+        context: The run's context.
+        dataset: The lead-day 1 frame.
+        arm: The arm.
+
+    Returns:
+        `_plant_importance`' result for every plant, labelled with the arm.
+    """
+    path = context.checkpoint_dir / f"importance__{arm}.parquet"
+    if path.exists():
+        return pl.read_parquet(path)
+    hyper_parameters = settings_for(context=context)["primary"]
+    sites = sorted(dataset["site"].unique().to_list())
+    with concurrent.futures.ThreadPoolExecutor(max_workers=context.max_workers) as pool:
+        parts = list(
+            pool.map(
+                lambda site: _plant_importance(
+                    rows=dataset.filter(pl.col("site") == site),
+                    arm=arm,
+                    hyper_parameters=hyper_parameters,
+                    device=context.device,
+                ),
+                sites,
+            )
+        )
+    result = pl.concat(parts).with_columns(arm=pl.lit(arm))
+    write_parquet_atomic(frame=result, path=path)
     return result
 
 
@@ -673,16 +872,25 @@ def phase1_table(*, losses: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def shortlist(*, losses: pl.DataFrame) -> str:
+def shortlist(*, losses: pl.DataFrame, global_scope: bool = False) -> str:
     """Apply the shortlist rule.
 
     Args:
         losses: The lead-day 1 sweep's primary-setting losses.
+        global_scope: Whether to choose the arm for the global model, which skips every arm whose
+            columns carry a `{fold}` placeholder (S3 and KS). A stage-1 column is built from
+            models that withheld the scored fold at one plant, and pooling the plants would let
+            another plant's rows in the scored months train the model.
 
     Returns:
-        X: the arm with the lowest phase-1 mean absolute error, other than `SHORTLIST_CANDIDATES`.
+        X: the arm among `SHORTLIST_CANDIDATES` with the lowest phase-1 mean absolute error.
     """
-    candidates = phase1_table(losses=losses).filter(pl.col("arm").is_in(SHORTLIST_CANDIDATES))
+    eligible = [
+        arm
+        for arm in SHORTLIST_CANDIDATES
+        if not (global_scope and any("{fold}" in c for c in extra_columns_of(arm=arm)))
+    ]
+    candidates = phase1_table(losses=losses).filter(pl.col("arm").is_in(eligible))
     return str(candidates["arm"][0])
 
 
@@ -742,10 +950,20 @@ class Fit(NamedTuple):
     lopo: bool = False
 
 
+BATCH_ARMS: Final[int] = 4
+"""How many arms share one `run_all` call: 4 arms is 24 plant fits on 4 workers, and a reboot loses
+at most one batch."""
+
+
+def _batch_key(*, fit: Fit) -> tuple[object, ...]:
+    """Return everything about a fit except its arm, which decides what can share a batch."""
+    return (*fit[:3], *fit[4:])
+
+
 def fit_all(
     *, context: Context, frames: dict[str, pl.DataFrame], fits: list[Fit]
 ) -> list[pl.DataFrame]:
-    """Run each fit in order, reading back any a checkpoint holds.
+    """Run the fits in order, batching neighbouring per-plant fits of up to `BATCH_ARMS` arms.
 
     Args:
         context: The run's context.
@@ -755,20 +973,32 @@ def fit_all(
     Returns:
         The results, in the order of `fits`.
     """
-    return [
-        fit_arm(
+    results: list[pl.DataFrame] = []
+    index = 0
+    while index < len(fits):
+        first = fits[index]
+        batch = [first]
+        batchable = not (first.pooled or first.lopo)
+        while (
+            batchable
+            and index + len(batch) < len(fits)
+            and len(batch) < BATCH_ARMS
+            and _batch_key(fit=fits[index + len(batch)]) == _batch_key(fit=first)
+        ):
+            batch.append(fits[index + len(batch)])
+        results += fit_arms(
             context=context,
-            dataset=frames[fit.frame_key],
-            scope=fit.scope,
-            lead_day=fit.lead_day,
-            arm=fit.arm,
-            setting=fit.setting,
-            quantiles=fit.quantiles,
-            pooled=fit.pooled,
-            lopo=fit.lopo,
+            dataset=frames[first.frame_key],
+            scope=first.scope,
+            lead_day=first.lead_day,
+            arms=[fit.arm for fit in batch],
+            setting=first.setting,
+            quantiles=first.quantiles,
+            pooled=first.pooled,
+            lopo=first.lopo,
         )
-        for fit in fits
-    ]
+        index += len(batch)
+    return results
 
 
 def sweep_fits(*, context: Context) -> list[Fit]:
@@ -782,7 +1012,7 @@ def sweep_fits(*, context: Context) -> list[Fit]:
     """
     quantile_arms = ("S2",) if context.smoke else SWEEP_QUANTILE_ARMS
     arms = SMOKE_ARMS if context.smoke else SWEEP_ARMS
-    return [
+    fits = [
         Fit(
             "lead1",
             f"lead{FULL_SWEEP_LEAD_DAY}",
@@ -793,16 +1023,19 @@ def sweep_fits(*, context: Context) -> list[Fit]:
         )
         for arm in arms
     ]
+    return sorted(fits, key=lambda fit: fit.quantiles)
 
 
-def phase2_fits(*, chosen: str) -> list[Fit]:
+def phase2_fits(*, chosen: str, chosen_global: str) -> list[Fit]:
     """Return phase 2's fits at lead-day 1: sensitivity, quantile, global and control fits.
 
     Args:
         chosen: The shortlist rule's X.
+        chosen_global: X for the global scope, which skips arms with `{fold}` columns.
 
     Returns:
-        The fits, with `X` replaced by `chosen` wherever an arm list names it.
+        The fits, with `X` replaced by `chosen` wherever an arm list names it, and in the global
+        scope by `chosen_global`.
     """
     lead, scope = FULL_SWEEP_LEAD_DAY, f"lead{FULL_SWEEP_LEAD_DAY}"
 
@@ -814,10 +1047,13 @@ def phase2_fits(*, chosen: str) -> list[Fit]:
         for arm in named(QUANTILE_PRIMARY_ARMS)
         if arm not in SWEEP_QUANTILE_ARMS
     ]
-    fits += [
-        Fit("lead1", scope, lead, arm, "sensitivity", arm in QUANTILE_SENSITIVITY_ARMS)
-        for arm in named(PHASE2_POINT_ARMS)
-    ]
+    fits += sorted(
+        (
+            Fit("lead1", scope, lead, arm, "sensitivity", arm in QUANTILE_SENSITIVITY_ARMS)
+            for arm in named(PHASE2_POINT_ARMS)
+        ),
+        key=lambda fit: fit.quantiles,
+    )
     width = len(extra_columns_of(arm=chosen))
     if width > WIDE_X_COLUMNS:
         fits += [
@@ -827,7 +1063,7 @@ def phase2_fits(*, chosen: str) -> list[Fit]:
     fits += [
         Fit("global", "global", lead, arm, setting, arm in GLOBAL_QUANTILE_ARMS, pooled=True)
         for setting in ("primary", "sensitivity")
-        for arm in named(GLOBAL_ARMS)
+        for arm in [chosen_global if arm == "X" else arm for arm in GLOBAL_ARMS]
     ]
     fits += [
         Fit("global", "global", lead, arm, "primary", quantiles=False, pooled=True)
@@ -901,9 +1137,12 @@ def lead1_dataset(*, context: Context, root: Path, product: WeatherProduct) -> p
             hyper_parameters=settings_for(context=context)["primary"],
             device=context.device,
         )
-        predictions.write_parquet(context.checkpoint_dir / "stage1_predictions.parquet")
-        stage1_columns(frame=frame, hours=hours, predictions=predictions).write_parquet(
-            derived_path
+        write_parquet_atomic(
+            frame=predictions, path=context.checkpoint_dir / "stage1_predictions.parquet"
+        )
+        write_parquet_atomic(
+            frame=stage1_columns(frame=frame, hours=hours, predictions=predictions),
+            path=derived_path,
         )
     dataset = frame.join(
         pl.read_parquet(derived_path), on=["site", "time"], how="left", maintain_order="left"
@@ -950,7 +1189,9 @@ def run_ens_mean(*, context: Context, root: Path, product: WeatherProduct) -> li
             Fit("global", "global", lead, "G-FP", "primary", False, True),
             Fit("global", "lopo", lead, "G-FP", "primary", False, lopo=True),
         ]
-        fit_intervals(context=context, dataset=frames["lead1"], arm="B0")
+        for arm in ("B0", "S2"):
+            fit_intervals(context=context, dataset=frames["lead1"], arm=arm)
+            fit_importance(context=context, dataset=frames["lead1"], arm=arm)
         return fit_all(
             context=context, frames=frames, fits=sweep_fits(context=context) + smoke_global
         )
@@ -958,7 +1199,12 @@ def run_ens_mean(*, context: Context, root: Path, product: WeatherProduct) -> li
     results = fit_all(context=context, frames=frames, fits=sweep_fits(context=context))
     sweep = pl.concat(results, how="vertical_relaxed")
     chosen = shortlist(losses=sweep)
-    _write_shortlist(directory=context.checkpoint_dir, sweep=sweep, chosen=chosen)
+    chosen_global = shortlist(losses=sweep, global_scope=True)
+    _write_shortlist(
+        directory=context.checkpoint_dir, sweep=sweep, chosen=chosen, chosen_global=chosen_global
+    )
+    for arm in INTERVAL_ARMS:
+        fit_intervals(context=context, dataset=dataset, arm=arm)
 
     other_leads = tuple(lead for lead in ENS_MEAN_LEAD_DAYS if lead != FULL_SWEEP_LEAD_DAY)
     frames |= read_lead_frames(root=root, product=product, lead_days=other_leads)
@@ -967,10 +1213,13 @@ def run_ens_mean(*, context: Context, root: Path, product: WeatherProduct) -> li
     for shift in POSITIVE_CONTROL_SHIFTS:
         percent = f"{round(shift * 100):02d}"
         frames[f"control{percent}"] = pl.read_parquet(paths[f"control{percent}"])
-    fits = phase2_fits(chosen=chosen) + longer_lead_fits(
+    fits = phase2_fits(chosen=chosen, chosen_global=chosen_global) + longer_lead_fits(
         lead_days=other_leads, arms=LONGER_LEAD_ARMS
     )
-    return results + fit_all(context=context, frames=frames, fits=fits)
+    results += fit_all(context=context, frames=frames, fits=fits)
+    for arm in IMPORTANCE_ARMS:
+        fit_importance(context=context, dataset=dataset, arm=chosen if arm == "X" else arm)
+    return results
 
 
 def run_ifs_single(*, context: Context, root: Path, product: WeatherProduct) -> list[pl.DataFrame]:
@@ -989,20 +1238,23 @@ def run_ifs_single(*, context: Context, root: Path, product: WeatherProduct) -> 
     return fit_all(context=context, frames=frames, fits=fits)
 
 
-def _write_shortlist(*, directory: Path, sweep: pl.DataFrame, chosen: str) -> None:
+def _write_shortlist(
+    *, directory: Path, sweep: pl.DataFrame, chosen: str, chosen_global: str
+) -> None:
     """Print the phase-1 ranking and the shortlist rule's X, and save them beside the checkpoints.
 
     Args:
         directory: The checkpoint directory.
         sweep: The sweep's primary-setting losses.
         chosen: X.
+        chosen_global: X for the global scope, which skips arms with `{fold}` columns.
     """
     table = phase1_table(losses=sweep)
     (directory / "shortlist.json").write_text(
-        json.dumps({"x": chosen, "phase1": table.to_dicts()}, indent=2)
+        json.dumps({"x": chosen, "x_global": chosen_global, "phase1": table.to_dicts()}, indent=2)
     )
     _LOG.info("phase 1 ranking:\n%s", table)
-    _LOG.info("the shortlist rule's X is %s", chosen)
+    _LOG.info("the shortlist rule's X is %s (%s for the global scope)", chosen, chosen_global)
 
 
 def combine(*, results: list[pl.DataFrame]) -> pl.DataFrame:
@@ -1040,7 +1292,36 @@ def loss_checksum(*, losses: pl.DataFrame) -> str:
         The SHA-256 hex digest of the sorted per-row loss values' bytes.
     """
     ordered = losses.sort("site", "time", "seed")
-    return hashlib.sha256(ordered[METRIC].cast(pl.Float64).to_numpy().tobytes()).hexdigest()
+    return hashlib.sha256(ordered[METRIC].cast(pl.Float32).to_numpy().tobytes()).hexdigest()
+
+
+def published_checksum() -> str | None:
+    """Return the per-row loss checksum of the matched-lead study's saved ENS-mean day-1 fit.
+
+    Returns:
+        The checksum of `solar_losses.parquet`'s `ens_mean_day1` primary-setting rows, or `None` if
+        the file is not on disk.
+    """
+    path = NFC_DIR / "solar_losses.parquet"
+    if not path.exists():
+        return None
+    saved = pl.read_parquet(path).filter(
+        (pl.col("arm") == "ens_mean_day1") & (pl.col("setting") == "primary")
+    )
+    return loss_checksum(losses=saved)
+
+
+def workers_for(*, device: str, max_workers: int) -> int:
+    """Return how many plants the reproduction check's fit on a device runs at once.
+
+    Args:
+        device: `cpu` or `cuda`.
+        max_workers: The run's `--max-workers`.
+
+    Returns:
+        `max_workers`, capped at `CPU_REPRODUCTION_WORKERS` on the CPU.
+    """
+    return min(max_workers, CPU_REPRODUCTION_WORKERS) if device == "cpu" else max_workers
 
 
 def reproduction_check(
@@ -1048,7 +1329,8 @@ def reproduction_check(
 ) -> int:
     """Refit the ENS-mean B0 at lead-day 1 on the shared rows and compare it with the published run.
 
-    The CPU refit must give `REPRODUCTION_MAE_PERCENT` (and `expected_checksum`, if given). If
+    The CPU refit must give `REPRODUCTION_MAE_PERCENT` (and the per-row loss checksum of the
+    matched-lead study's saved losses, or `expected_checksum` if given). If
     `device` is `cuda`, a GPU refit is reported beside it, so the device difference can be set
     against the published solar device range.
 
@@ -1056,7 +1338,7 @@ def reproduction_check(
         root: The output root, where `reproduction_check.md` is written.
         device: The device of the second refit; `cpu` runs the CPU refit alone.
         max_workers: How many plants fit at once.
-        expected_checksum: The published per-row loss checksum, or `None` to print it only.
+        expected_checksum: A checksum to assert instead of the saved losses, or None to read those.
 
     Returns:
         0 on success.
@@ -1078,8 +1360,21 @@ def reproduction_check(
     job: Job = ("B0", "primary", TARGET, features_of(arm="B0"), PRIMARY_HYPER_PARAMETERS, False)
     lines = ["# Reproduction check: ENS-mean B0 at lead-day 1 on the shared rows", ""]
     means = {}
+    checksum_to_match = expected_checksum or published_checksum()
+    lines.append(
+        f"- published per-row loss checksum: `{checksum_to_match}`"
+        if checksum_to_match
+        else "- no saved matched-lead losses on disk, so only the mean is asserted."
+    )
     for fitted_on in dict.fromkeys(("cpu", device)):
-        losses = run_all(dataset=frame, jobs=[job], max_workers=max_workers, device=fitted_on)
+        losses = run_all(
+            dataset=frame,
+            jobs=[job],
+            max_workers=min(max_workers, CPU_REPRODUCTION_WORKERS)
+            if fitted_on == "cpu"
+            else max_workers,
+            device=fitted_on,
+        )
         means[fitted_on] = float(losses.select(pl.col(METRIC).mean()).item()) * 100
         checksum = loss_checksum(losses=losses)
         lines.append(
@@ -1093,14 +1388,36 @@ def reproduction_check(
                     f"not the published {REPRODUCTION_MAE_PERCENT}%"
                 )
                 raise ValueError(msg)
-            if expected_checksum is not None and checksum != expected_checksum:
-                msg = f"CPU refit's per-row loss checksum {checksum} is not {expected_checksum}"
+            if checksum_to_match is not None and checksum != checksum_to_match:
+                msg = f"CPU refit's per-row loss checksum {checksum} is not {checksum_to_match}"
                 raise ValueError(msg)
     if "cuda" in means:
         lines.append(f"- GPU minus CPU: {means['cuda'] - means['cpu']:+.3f} points.")
     report.write_text("\n".join(lines) + "\n")
     sys.stdout.write("\n".join(lines) + "\n")
     return 0
+
+
+def check_manifest(*, directory: Path, device: str, smoke: bool) -> None:
+    """Write the run manifest, or raise if a resumed run's device or mode differs from it.
+
+    Args:
+        directory: The checkpoint directory.
+        device: The run's device.
+        smoke: Whether the run is a smoke test.
+
+    Raises:
+        ValueError: If the checkpoints came from another device or mode.
+    """
+    path = directory / "run_manifest.json"
+    current = {"device": device, "smoke": smoke}
+    if path.exists():
+        saved = json.loads(path.read_text())
+        if saved != current:
+            msg = f"{directory} holds a run with {saved}, not {current}: use a new --output-root"
+            raise ValueError(msg)
+        return
+    path.write_text(json.dumps(current))
 
 
 def main() -> int:
@@ -1127,10 +1444,12 @@ def main() -> int:
             expected_checksum=arguments.expected_checksum,
         )
     directory = arguments.output_root / product
-    final = directory / f"losses_{product}.parquet"
+    suffix = "_smoke" if arguments.smoke else ""
+    final = directory / f"losses_{product}{suffix}.parquet"
     refuse_to_overwrite(paths=[final])
-    checkpoints = directory / "checkpoints"
+    checkpoints = directory / f"checkpoints{suffix}"
     checkpoints.mkdir(parents=True, exist_ok=True)
+    check_manifest(directory=checkpoints, device=arguments.device, smoke=arguments.smoke)
     context = Context(
         checkpoint_dir=checkpoints,
         device=arguments.device,
@@ -1139,7 +1458,7 @@ def main() -> int:
     )
     runner = run_ens_mean if product == "ens_mean" else run_ifs_single
     losses = combine(results=runner(context=context, root=arguments.output_root, product=product))
-    losses.write_parquet(final)
+    write_parquet_atomic(frame=losses, path=final)
     _LOG.info("wrote %s (%d rows)", final, losses.height)
     return 0
 

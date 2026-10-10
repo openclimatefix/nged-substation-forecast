@@ -1047,6 +1047,19 @@ def leak_probe(
     ]
 
 
+def write_parquet_atomic(*, frame: pl.DataFrame, path: Path) -> None:
+    """Write a parquet file through a `.partial` sibling, so a crash never leaves a half-file.
+
+    Args:
+        frame: The frame to write.
+        path: The destination.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    partial = path.with_name(path.name + ".partial")
+    frame.write_parquet(partial)
+    partial.replace(path)
+
+
 def assert_before_cutoff(*, frame: pl.DataFrame, name: str) -> None:
     """Raise if any row is at or after the final-test cut-off.
 
@@ -1198,7 +1211,7 @@ def main() -> int:
                 lead_day=lead_day,
             )
         paths[f"day{lead_day}"].parent.mkdir(parents=True, exist_ok=True)
-        frame.write_parquet(paths[f"day{lead_day}"])
+        write_parquet_atomic(frame=frame, path=paths[f"day{lead_day}"])
         report += [
             f"### Lead-day {lead_day}",
             "",
@@ -1213,8 +1226,9 @@ def main() -> int:
         _LOG.info("lead-day %d: %d rows", lead_day, frame.height)
 
         if product == "ens_mean" and lead_day == FULL_SWEEP_LEAD_DAY:
-            stage1_hours(product=product, shared=shared, hourly=hourly).write_parquet(
-                paths["stage1"]
+            write_parquet_atomic(
+                frame=stage1_hours(product=product, shared=shared, hourly=hourly),
+                path=paths["stage1"],
             )
             for shift in POSITIVE_CONTROL_SHIFTS:
                 shifted_hourly = lag_source_hourly(shift=shift)
@@ -1227,7 +1241,7 @@ def main() -> int:
                     weather_lead0=weather_lead0,
                     shift=shift,
                 )
-                control.write_parquet(paths[f"control{round(shift * 100):02d}"])
+                write_parquet_atomic(frame=control, path=paths[f"control{round(shift * 100):02d}"])
                 report += [
                     (
                         f"### Positive control, {shift:.0%} of power lost in a random half of the "
