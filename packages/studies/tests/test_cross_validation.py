@@ -25,6 +25,7 @@ from studies.cross_validation import (
     fit_one_fold,
     fit_one_fold_scoring_many,
     out_of_fold_losses,
+    probabilistic_scores,
     raise_on_uncovered_months,
     rotate_folds,
     search_fold_offsets,
@@ -1012,3 +1013,127 @@ def test_every_week_fold_is_scored_when_there_are_more_than_five(monkeypatch: py
 
     assert sorted(losses["fold"].unique().to_list()) == list(range(8))
     assert losses.height == site_rows.height * len(SEEDS)
+
+
+def test_probabilistic_scores_repair_the_quantiles_before_scoring():
+    # One row, capacity 2. The quantiles cross, one is negative, and one exceeds the cap of 1.5.
+    quantiles = np.array([[0.9, -0.5, 0.2, 0.3, 0.4, 0.5, 0.6, 2.0, 0.1]])
+
+    scores = probabilistic_scores(
+        actual=np.array([0.35]),
+        quantiles=quantiles,
+        cap_mw=pl.Series([1.5]),
+        capacity_mw=np.array([2.0]),
+    )
+
+    # Sorted and repaired: 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.9, 1.5 for levels 0.1 to 0.9, so the
+    # 10-90 interval is [0, 1.5].
+    assert scores["width_80_fraction_of_capacity"] == pytest.approx([0.75])
+    assert scores["covered_80"] == pytest.approx([1.0])
+    assert scores["below_q40"] == pytest.approx([0.0])
+    assert scores["below_q50"] == pytest.approx([1.0])
+    assert scores["crps_floored_fraction_of_capacity"] == pytest.approx(
+        crps(
+            actual=np.array([0.35]),
+            quantiles=np.array([[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.9, 1.5]]),
+        )
+        / 2.0
+    )
+
+
+def test_probabilistic_scores_divide_by_each_rows_own_capacity():
+    quantiles = np.tile(np.linspace(0.1, 0.9, 9), (2, 1))
+
+    scores = probabilistic_scores(
+        actual=np.array([0.5, 0.5]),
+        quantiles=quantiles,
+        cap_mw=pl.Series([None, None], dtype=pl.Float64),
+        capacity_mw=np.array([1.0, 4.0]),
+    )
+
+    assert scores["width_80_fraction_of_capacity"] == pytest.approx([0.8, 0.2])
+
+
+def test_losses_hold_the_same_columns_with_and_without_a_quantile_model():
+    test = pl.DataFrame(
+        {
+            "site": ["A", "A"],
+            "time": [datetime(2025, 1, 1, tzinfo=UTC), datetime(2025, 1, 2, tzinfo=UTC)],
+            "month": ["2025-01", "2025-01"],
+            "fold": [0, 0],
+            "effective_capacity_mw": [2.0, 2.0],
+            "constrained": [False, False],
+            "cap_mw": [None, None],
+        },
+        schema_overrides={"cap_mw": pl.Float64},
+    )
+    actual = np.array([0.5, 0.6])
+    point = np.array([0.4, 0.7])
+
+    without = cross_validation._losses(
+        test=test, actual=actual, point=point, quantiles=None, seed=0
+    )
+    with_quantiles = cross_validation._losses(
+        test=test,
+        actual=actual,
+        point=point,
+        quantiles=np.tile(np.linspace(0.1, 0.9, 9), (2, 1)),
+        seed=0,
+    )
+
+    assert without.columns == with_quantiles.columns
+    assert without.schema == with_quantiles.schema
+    assert without["covered_80"].null_count() == 2
+    assert with_quantiles["covered_80"].null_count() == 0
+
+
+START = datetime(2024, 6, 1, tzinfo=UTC)
+
+EXACT_QUANTILES = np.array([[0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]])
+"""Quantiles that are exact in binary, so an outcome can equal one of them exactly."""
+
+
+def test_an_outcome_on_the_interval_edge_or_on_a_quantile_counts_as_inside_and_below():
+    quantiles = np.repeat(EXACT_QUANTILES, 3, axis=0)
+
+    scores = probabilistic_scores(
+        actual=np.array([0.0, 2.0, 1.0]),
+        quantiles=quantiles,
+        cap_mw=pl.Series([None, None, None], dtype=pl.Float64),
+        capacity_mw=np.array([1.0, 1.0, 1.0]),
+    )
+
+    assert scores["covered_80"].tolist() == [1.0, 1.0, 1.0]
+    assert scores["below_q10"].tolist() == [1.0, 0.0, 0.0]
+    assert scores["below_q90"].tolist() == [1.0, 1.0, 1.0]
+    assert scores["below_q50"].tolist() == [1.0, 0.0, 1.0]
+
+
+def test_losses_carry_the_scores_of_the_capped_quantiles_over_each_rows_capacity():
+    test = pl.DataFrame(
+        {
+            "site": ["A", "A"],
+            "time": [START, START + timedelta(hours=1)],
+            "month": ["2024-06", "2024-06"],
+            "fold": [0, 0],
+            "effective_capacity_mw": [2.0, 4.0],
+            "constrained": [True, False],
+            "cap_mw": [1.0, None],
+        },
+        schema_overrides={"cap_mw": pl.Float64},
+    )
+    actual = np.array([1.6, 0.6])
+    point = np.array([0.1, 1.9])
+    quantiles = np.repeat(EXACT_QUANTILES, 2, axis=0)
+
+    losses = cross_validation._losses(
+        test=test, actual=actual, point=point, quantiles=quantiles, seed=0
+    )
+
+    expected = probabilistic_scores(
+        actual=actual, quantiles=quantiles, cap_mw=test["cap_mw"], capacity_mw=np.array([2.0, 4.0])
+    )
+    for name, values in expected.items():
+        assert losses[name].to_list() == pytest.approx(values.tolist()), name
+    # Row 0 is held to its 1 MW cap, so its 10-90 width is 1 MW over 2 MW of capacity.
+    assert losses["width_80_fraction_of_capacity"].to_list() == pytest.approx([0.5, 0.5])

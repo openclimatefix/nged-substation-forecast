@@ -109,6 +109,7 @@ nav:
           - "Do CERRA and NORA3 describe past wind better than ERA5?": studies/past-weather/reanalysis-wind.md
           - "Does blending CERRA's wind heights beat one height?": studies/past-weather/cerra-wind-levels.md
           - "Does CERRA's wind direction add to its wind speed?": studies/past-weather/cerra-wind-direction.md
+          - "Which ERA5 variables help predict solar farm output?": studies/past-weather/era5-solar-variables.md
           - "Does blending weather products beat the best single weather product?": studies/past-weather/blending.md
           - "Does CEDA's UKV or ERA5 describe past wind and temperature better?": studies/past-weather/ukv-ceda-vs-era5.md
           - "Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?": studies/past-weather/ukv-ceda-vs-openmeteo.md

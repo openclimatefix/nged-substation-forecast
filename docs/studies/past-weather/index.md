@@ -30,10 +30,21 @@ history, historical features, and disaggregation, and each reads one weather pro
   reanalysis, so the page says nothing about forecast skill.
 - [Does CERRA's wind direction add to its wind speed?](cerra-wind-direction.md) — at three wind
   farms, an XGBoost model given CERRA's wind direction as well as its speed has about 5% lower error
-  than one given the speed alone, at 100 m and at 10 m, and the two heights do equally well. Direction
-  at all five heights adds no more than about 0.005 points beyond direction at 100 m, but the study's
-  check of its own sensitivity to veer was weak. CERRA is a reanalysis, so the page says nothing about
+  than one given the speed alone, at 100 m and at 10 m, and the two heights do equally well.
+  Direction
+  at all five heights adds no more than about 0.005 points beyond direction at 100 m, but the
+  study's
+  check of its own sensitivity to veer was weak. CERRA is a reanalysis, so the page says nothing
+  about
   forecast skill.
+- [Which ERA5 variables help predict solar farm output?](era5-solar-variables.md) — at six solar
+  farms, an XGBoost model given ERA5's total and layered cloud cover as well as its solar radiation
+  has about 6% lower error, and one given every ERA5 variable has about 12% lower error. The cloud
+  groups are largely interchangeable with the other variables, so the credit split depends on the
+  order in which variables are added. ERA5 is a reanalysis, and part of the gain may come from
+  cloud fields that saw later observations than its solar radiation, so the page does not say that
+  a forecast would gain as much. Whether fetching the 12 variables that only ECMWF's MARS archive
+  serves is worth it is unresolved.
 - [Does blending weather products beat the best single weather product?](blending.md) — at the six
   solar farms and three wind farms, an XGBoost model given several weather products at once beats an
   XGBoost model given the best single product with its neighbouring hours, by 0.13 points of
@@ -52,8 +63,10 @@ history, historical features, and disaggregation, and each reads one weather pro
   ERA5's, so the planned rule gives UKV, but the advantage falls from 0.250 K at lead 0 to 0.035 K
   at lead 5. At six solar farms the choice of temperature moves power error by no more than 0.009
   points (95% interval, whole row set).
-- [Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?](ukv-ceda-vs-openmeteo.md)
-  — at the nine metered farms over 23 months, the two archives agree closely at the start of each run
+- [Do CEDA's and Open-Meteo's archives of UKV give the same power
+  forecasts?](ukv-ceda-vs-openmeteo.md)
+  — at the nine metered farms over 23 months, the two archives agree closely at the start of each
+  run
   (a mean absolute temperature difference of 0.098 K, and Open-Meteo's wind speed about 3% lower).
   An XGBoost model of wind power trained on CEDA's archive loses 0.441 points of capacity [+0.286,
   +0.600] when given Open-Meteo's wind, a level bias that rescaling the speed mostly removes. CEDA's
