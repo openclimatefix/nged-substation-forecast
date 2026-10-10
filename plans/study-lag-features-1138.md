@@ -91,8 +91,9 @@ regions are untested.
   temperature at its own lead.
 - **Origin convention:** the existing one (`baselines.issue_time`): runs are issued at 09:00 UTC on
   the run's own day for every lead-day from 1. Lead-day 1, the day-ahead lead the live service uses,
-  is the headline. Lead-day 0 is not run: its early hours are not a forecast anyone could have
-  used. **The weather product is the ENS mean** (`ens_mean_day<N>_ghi` and `_temp`), the live
+  is the headline. Lead-day 0 is run in the longer-lead sweep only, issued at the run's init time (00 UTC)
+  with a 24 h lag, and every figure showing it is labelled as not usable for its early hours in a
+  live service, because the 00 UTC run is published later. **The weather product is the ENS mean** (`ens_mean_day<N>_ghi` and `_temp`), the live
   service's input and the more accurate of the two products available (8.79 against 9.76 points at
   day 1). IFS HRES (`ifs_single_day<N>_*`, days 1 and 2 only) is an exploratory replicate of B0 and
   L1.
@@ -169,7 +170,7 @@ regardless). Phase 2 carries X.
   months by construction. The two IFS grid cells partly identify the plant, which the page says.
   Both settings, three seeds; quantiles for B0 and L1.
 - **Longer leads, to day 14 (exploratory):** NGED want forecasts to at least day 10 and perhaps day
-  14. B0, L1, W7, Q30, T1, and N2 are fitted at lead-days 2, 3, 5, 7, 10, and 14 (the days for
+  14. B0, L1, W7, Q30, T1, and N2 are fitted at lead-days 0, 1, 2, 3, 5, 7, 10, and 14 (day 1 is also the full sweep; these are the days for
   which the ENS mean's irradiance and temperature columns exist on the shared rows), point model,
   primary setting, three seeds. The lag of a lead-day-`N` target is still `24 (N + 1)` hours, and
   every window or percentile is anchored at the issue day, not the target day, so at day 14 the
@@ -217,8 +218,8 @@ its 99% interval lies wholly below zero and its point estimate is at least 2% of
 value of that metric (about 0.2 points for mean absolute error, the smallest effect worth acting
 on, and about five times the 0.4% bias of a wider arm); a smaller gain is reported as detectable but
 not worth the complexity. Every other number is exploratory and labelled so: the sweep, S2 minus L1,
-N1 and N2 comparisons, lead-days 2 to 14, global against per-plant, coverage and sharpness (descriptive),
-the IFS HRES replicate of B0 and L1, lead-days 2 to 14, and any analysis added after the first run (post hoc).
+N1 and N2 comparisons, lead-days 0 and 2 to 14, global against per-plant, coverage and sharpness (descriptive),
+the IFS HRES replicate of B0 and L1, lead-days 0 and 2 to 14, and any analysis added after the first run (post hoc).
 
 ### Charts (the story, as figures)
 
@@ -256,10 +257,10 @@ though another job already held it at 99% utilisation, so that comparison is con
 | Quantile models, primary: B0, L1, X, N2 | 360 | about 40 min |
 | Quantile models, sensitivity: B0, L1 | 180 | about 30 min |
 | Global scope: B0, L1, X, both settings; quantiles for B0 and L1 | 90 | about 16 min |
-| Longer leads: 6 arms x 6 lead-days x 6 plants x 5 folds x 3 seeds | 3,240 | about 40 min |
+| Longer leads: 6 arms x 7 extra lead-days (0, 2, 3, 5, 7, 10, 14) x 6 plants x 5 folds x 3 seeds | 3,780 | about 45 min |
 | Stage-1 models, positive control, IFS HRES replicate | about 800 | about 12 min |
 
-**Total: about 2.9 h of single-fit time, so about 30 to 40 min of wall time with 6 fits running at
+**Total: about 3 h of single-fit time, so about 30 to 40 min of wall time with 6 fits running at
 once on an idle machine, and about 1.5 h while the machine is as busy as it is now (load average
 6).** The benchmark is repeated on the idle machine before any fit, and these numbers are then
 revised.
