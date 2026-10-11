@@ -26,6 +26,7 @@ from typing import Any, Final
 
 import numpy as np
 import polars as pl
+from build_capacity_inputs import ORIENTATION_END
 from capacity_paths import (
     DERATED_PLAN_PATH,
     LAG_FOLLOWUPS2_LOSSES_PATH,
@@ -41,10 +42,29 @@ from capacity_paths import (
 )
 from capacity_scores import scale_for
 from scipy import stats
+from studies.baselines import MIN_OBSERVED_CLEAR_SKY_SHARE
 from studies.bootstrap import bootstrap_difference
-from studies.capacity_estimators import ESTIMATOR_FAMILY, scale_for_rows
+from studies.capacity_estimators import (
+    ESTIMATOR_FAMILY,
+    FLOOR_SHARE_OF_STATIC,
+    HM_LEVELS,
+    ISSUE_LAG_DAYS,
+    MIN_VALID_DAYS_OF_HISTORY,
+    REFERENCE_END,
+    REFERENCE_START,
+    scale_for_rows,
+)
 from studies.capacity_explain import CRITERIA, rubric_table
-from studies.capacity_recovery import expected_factor
+from studies.capacity_posthoc import HYSTERESIS_DROP, HYSTERESIS_PERSIST_DAYS
+from studies.capacity_recovery import (
+    FALLBACK_SHARE_GATE,
+    FALSE_MOVEMENT_GATE,
+    FALSE_MOVEMENT_THRESHOLD,
+    FALSE_MOVEMENT_TRAILING_DAYS,
+    FOOTPRINT_AFTER_DAYS,
+    FOOTPRINT_BEFORE_DAYS,
+    expected_factor,
+)
 from studies.capacity_scaling import (
     MIN_ORACLE_GAIN_POINTS,
     SCORED_COLUMN,
@@ -1034,6 +1054,39 @@ EXAMPLE_DAYS_BEFORE: Final[int] = 30
 """How many days before the planted step the example figure starts."""
 
 
+def constants(*, report: Report) -> None:
+    """Print the estimator and scoring constants that the page quotes."""
+    report.heading("Constants the page quotes")
+    report.text(
+        f"- the scale for a target day reads whole days up to {ISSUE_LAG_DAYS} days earlier"
+    )
+    report.text(
+        f"- a day is valid when its observed hours hold at least "
+        f"{MIN_OBSERVED_CLEAR_SKY_SHARE:.0%} of its clear-sky energy; an estimator falls back to "
+        f"the static power with fewer than "
+        f"{MIN_VALID_DAYS_OF_HISTORY} valid days of history; the scale is floored at "
+        f"{FLOOR_SHARE_OF_STATIC:.0%} of the static power"
+    )
+    report.text(f"- calibration year: {REFERENCE_START} to {REFERENCE_END}")
+    report.text(f"- plant orientations fitted on data before {ORIENTATION_END:%Y-%m-%d}")
+    report.text(f"- HM levels: {', '.join(f'{level:g}' for level in HM_LEVELS)}")
+    report.text(
+        f"- HYST: follows a deseasonalised drop of more than {HYSTERESIS_DROP:.0%} that lasts "
+        f"{HYSTERESIS_PERSIST_DAYS} days, and releases after {HYSTERESIS_PERSIST_DAYS} "
+        f"recovered days"
+    )
+    report.text(
+        f"- planted events: footprint of {FOOTPRINT_BEFORE_DAYS} days before and "
+        f"{FOOTPRINT_AFTER_DAYS} days after the planted month"
+    )
+    report.text(
+        f"- false movement: a day moves when its estimate is more than "
+        f"{FALSE_MOVEMENT_THRESHOLD:.0%} from the median of the previous "
+        f"{FALSE_MOVEMENT_TRAILING_DAYS} days; gate at {FALSE_MOVEMENT_GATE:.0%}; fallback-share "
+        f"gate at {FALLBACK_SHARE_GATE:.0%}; decision threshold {THRESHOLD_SHARE:.0%} of B0's error"
+    )
+
+
 def design_facts(*, root: Path, report: Report) -> None:
     """Print the counts the page quotes about the rows, the plants, and the planted losses."""
     events = load_events(root=root)
@@ -1192,6 +1245,7 @@ def main() -> int:
     if not no_pick:
         stage_b(root=root, selection=selection, report=report)
     explainability(root=root, report=report)
+    constants(report=report)
     design_facts(root=root, report=report)
     example_event(root=root, report=report)
     kf_seasonal_shape(root=root, report=report)
