@@ -118,15 +118,15 @@ ARM_COLOURS: Final[dict[str, str]] = {
 """One colour per arm of the by-lead figure. Climatology is grey, which is not a data colour."""
 
 ARM_KEY: Final[dict[str, str]] = {
-    "B0": "the baseline with no lag",
+    "B0": "the XGBoost baseline with no lagged power",
     "L1": (
         "B0 plus the power at the same hour on the latest whole day before the forecast was "
         "issued (two days before the target day for a day-ahead forecast)"
     ),
     "L2": "L1 plus that hour's weather forecast",
     "S2": ("a two-step forecast that adds a first-stage forecast and its residual at the lag hour"),
-    "W7": "the minimum, maximum, and mean of the same hour over the last 7 whole days",
-    "Q30": "the 30-day 90th percentile and median of the same hour",
+    "W7": "the minimum, maximum, and mean of power at the same hour over the last 7 whole days",
+    "Q30": "the 30-day 90th percentile and median of power at the same hour",
     "CTX7": "seven separate daily lags and their weather forecasts",
     "AN": (
         "the analogue ensemble: the mean, the forecast clear-sky index and the spread of the "
@@ -135,8 +135,8 @@ ARM_KEY: Final[dict[str, str]] = {
     ),
     "TF": "the 30-day ratio of power to forecast irradiance (the transfer ratio)",
     "PC": (
-        "the 7-day ratio of power to CAMS satellite irradiance, and the 30-day ratio of CAMS to "
-        "forecast irradiance"
+        "the 7-day ratio of power to the satellite irradiance of the Copernicus Atmosphere "
+        "Monitoring Service (CAMS), and the 30-day ratio of CAMS to forecast irradiance"
     ),
     "CK": "the plant's clipping ceiling",
     "RP": "the plant's recent energy relative to the other plants",
@@ -208,8 +208,8 @@ SHARED_TERMS: Final[dict[str, str]] = {
 """One sentence per shared term, so that a figure defining a term uses the shared wording."""
 
 
-_CAMS_EXPANDED: Final[list[bool]] = []
-"""Becomes non-empty once an arm key has spelled out CAMS, so only the first figure with PC does."""
+ARM_NICKNAMES: Final[dict[str, str]] = {"PC": "the satellite ratio", "W7": "the weekly statistics"}
+"""A plain name a title uses for an arm, which every arm key gives beside the code."""
 
 
 def forecasts_statement(*, runs: str, rows: str | None = None) -> str:
@@ -244,15 +244,8 @@ def arm_key(*arms: str) -> str:
     """
     entries = []
     for arm in arms:
-        meaning = ARM_KEY[arm]
-        if arm == "PC" and not _CAMS_EXPANDED:
-            meaning = (
-                "the 7-day ratio of power to the satellite irradiance of the Copernicus "
-                "Atmosphere Monitoring Service (CAMS), and the 30-day ratio of CAMS to forecast "
-                "irradiance"
-            )
-            _CAMS_EXPANDED.append(True)
-        entries.append(f"{arm}: {meaning}.")
+        nickname = f" ({ARM_NICKNAMES[arm]})" if arm in ARM_NICKNAMES else ""
+        entries.append(f"{arm}{nickname}: {ARM_KEY[arm]}.")
     return "Arms. " + " ".join(entries)
 
 
@@ -1882,27 +1875,30 @@ def derated_figure(*, tables3: Path, text: FigureText) -> alt.VConcatChart:
     )
     claim(holds=n_low == 3, what="the plant has three low-output months")
     title = (
-        f"Removing one plant's {NUMBER_WORDS[n_low]} low-output months from its training removes "
-        "the satellite ratio's and weekly statistics' gains"
+        f"Dropping one plant's {NUMBER_WORDS[n_low]} low-output months from training removes "
+        "PC's and W7's gains"
     )
     pc, w7, tf, q30 = (by_arm[a] for a in ("PC", "W7", "TF", "Q30"))
     subtitle = [
         (
-            "Top: one plant's mean output as a share of the mean of the other five plants' "
-            "output, on the hours at which all six plants are scored, by month. Dashed line: "
-            "80%. Orange: the months below it. Black: the month in which B0's error is largest "
-            "among the 8 unselected months."
+            "Top: one plant's mean capacity-normalised output as a share of the other five "
+            "plants' mean capacity-normalised output, on the hours at which all six plants are "
+            "scored, by month. Dashed line: 0.8, the plant at 80% of the others' output. "
+            "Orange: the months below the dashed line. Black: the month in which B0's error is "
+            "largest among the 8 months not used to screen the arms (the 8 unselected months)."
         ),
         (
             "Bottom: each arm's mean absolute error minus B0's on the 8 unselected months, over "
             "all six plants, in percentage points of capacity. Dot: estimate. Line: 95% interval "
-            "from resampling months and a seed. Blue: all months in training. Purple: the "
-            "orange months removed from that one plant's training only."
+            "from resampling months and the three training seeds. Blue: all months in training. "
+            "Purple: the orange months removed from that one plant's training, for each arm and "
+            "for B0 alike; the months are still scored."
         ),
         (
-            "Gain over B0 with all months in training, then with the low-output months removed, "
-            f"in points: PC {pc['all_training'] * PERCENTAGE_POINTS:+.2f} to "
-            f"{pc['derated_removed'] * PERCENTAGE_POINTS:+.2f}, W7 "
+            "Error minus B0's, with all months in training then with the low-output months "
+            "removed, in points (negative beats B0): PC "
+            f"{pc['all_training'] * PERCENTAGE_POINTS:+.2f} "
+            f"to {pc['derated_removed'] * PERCENTAGE_POINTS:+.2f}, W7 "
             f"{w7['all_training'] * PERCENTAGE_POINTS:+.2f} to "
             f"{w7['derated_removed'] * PERCENTAGE_POINTS:+.2f}, TF "
             f"{tf['all_training'] * PERCENTAGE_POINTS:+.2f} to "
@@ -1914,22 +1910,22 @@ def derated_figure(*, tables3: Path, text: FigureText) -> alt.VConcatChart:
     footnote = [
         (
             "The plant and the months were chosen after the first run, from the whole record, "
-            "including scored months. The refit tests whether low-output training months explain "
-            "the dominant plant-month's error. It does not estimate a gain a live forecast would "
-            f"see. {n_missing} months have no hour at which all six plants are scored, so the "
-            "top panel leaves them out."
+            "including the 8 unselected months this figure scores. The refit tests whether "
+            "low-output training months explain B0's error in the black month. It does not "
+            "estimate a gain a live forecast would see. The top panel leaves out the "
+            f"{n_missing} months that have no hour at which all six plants are scored."
         ),
-        (
-            "Lead-day 1 is the forecast for the day after the day it is issued. Fits are per "
-            f"plant at the primary setting ({PRIMARY_SETTING}), with three training runs "
-            "(seeds)."
-        ),
+        forecasts_statement(runs="three training runs (fitting seeds)"),
+        (f"XGBoost models are fitted per plant at the primary setting ({PRIMARY_SETTING})."),
         POST_HOC,
         arm_key("B0", "PC", "W7", "TF", "Q30"),
     ]
     text.add(
         figure_id="11",
-        plots="One plant's output relative to the others; gains with its low months removed",
+        plots=(
+            "One plant's output relative to the other five plants; arm gains with that plant's "
+            "low months removed"
+        ),
         lines=[
             title,
             *subtitle,
@@ -2253,7 +2249,9 @@ def importance_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | N
 
 # --- The post hoc follow-ups ----------------------------------------------------------------------
 
-POST_HOC: Final[str] = "All rows are post hoc: written after the first run's results were known."
+POST_HOC: Final[str] = (
+    "Every estimate in this figure is post hoc: written after the first run's results were known."
+)
 
 POST_HOC_ROWS: Final[str] = (
     "G-ID, G-FP, G-L1, LOPO G-FP, and LOPO G-L1 are exploratory (the first run). G-ID+TF, "
