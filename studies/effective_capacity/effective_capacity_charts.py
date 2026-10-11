@@ -106,10 +106,10 @@ FAMILY_NAMES: Final[dict[str, str]] = {
 FAMILY_COLOURS: Final[dict[str, str]] = {
     "reference": ocf.BLACK_1,
     "simple formula": ocf.DATA_BLUE,
-    "hidden Markov": ocf.DATA_PURPLE,
+    "hidden Markov": ocf.BRAND_ORANGE,
     "convex programme": ocf.DATA_GREEN,
     "differentiable physics": ocf.DATA_SKY,
-    "post hoc": ocf.BRAND_ORANGE,
+    "post hoc": ocf.DATA_PURPLE,
 }
 """The colour of each family, from the main data colours OCF's brand guidelines allow."""
 
@@ -502,8 +502,8 @@ def headline_figure(*, report: ReportText, text: FigureText) -> alt.VConcatChart
     labels = [
         "KF pick, primary setting",
         "KF pick, second setting",
-        "No-fit bound, primary setting",
-        "No-fit bound, second setting",
+        "Capacity-only ref., primary",
+        "Capacity-only ref., second",
         "HYST, primary setting",
         "HYST, second setting",
         *[f"{name}, primary setting" for name in ordered],
@@ -551,8 +551,8 @@ def headline_figure(*, report: ReportText, text: FigureText) -> alt.VConcatChart
         ).group(1)  # ty: ignore[unresolved-attribute]
     )
     title = (
-        "A capacity estimate that updates daily raised day-ahead solar error at 6 plants, "
-        "and one that holds the static value until a drop lasts did not"
+        "No capacity estimate lowered day-ahead solar error detectably at 6 plants, and the "
+        "Kalman filter raised it at the primary setting"
     )
     subtitle = [
         (
@@ -567,16 +567,19 @@ def headline_figure(*, report: ReportText, text: FigureText) -> alt.VConcatChart
             "designed after the results. Hollow triangle: the second XGBoost setting."
         ),
         (
-            "KF pick: the Kalman filter, which the plan's selection rule chose. No-fit bound: B0's "
-            "forecast multiplied by each plant-month's output relative to its neighbours. HYST "
-            f"holds the static capacity until a drop lasts {hold_days} days. Estimators below "
-            f"HYST ran at the primary setting only. {off_scale_text}"
+            "B0: baseline, dividing by the static capacity. KF pick: the Kalman filter, which the "
+            "plan's rule chose. Capacity-only ref.: B0's forecast times each plant-month's output "
+            "relative to its neighbours, with no fit. HYST: hold at static until a drop lasts "
+            f"{hold_days} days. HM: hidden Markov. PR: performance ratio. CX2: convex, direct and "
+            "alternating current. NR: neighbour ratio. DSKF: deseasonalised Kalman filter. DP1: "
+            "differentiable physics. Rows below HYST ran at the primary setting only. "
+            f"{off_scale_text}"
         ),
     ]
     text.add(
         number=1,
-        plots="Change in day-ahead error against B0, 12 rows, KF pick and no-fit bound and HYST "
-        "at two settings",
+        plots="Change in day-ahead error against B0, 12 rows: KF pick, capacity-only ref., HYST, "
+        "and six other estimators",
         lines=[
             title,
             *subtitle,
@@ -734,7 +737,9 @@ def recovery_figure(*, report: ReportText, text: FigureText) -> alt.VConcatChart
             "high": [None] * table.height,
             "colour_key": table["family_name"],
             "hollow": [False] * table.height,
-            "shape": ["circle"] * table.height,
+            "shape": [
+                "diamond" if name == "post hoc" else "circle" for name in table["family_name"]
+            ],
             "text": texts,
         },
         schema_overrides={"low": pl.Float64, "high": pl.Float64},
@@ -759,7 +764,8 @@ def recovery_figure(*, report: ReportText, text: FigureText) -> alt.VConcatChart
         (
             "Each dot: an estimator's mean gap, over planted steps, ramps, and intermittent "
             "losses at every plant in 10 random draws, between the capacity share it recovered "
-            "and the share left after the loss. Smaller is better."
+            "and the share left after the loss, in points (a gap of 0.02 in the share is 2 "
+            "points). Smaller is better."
         ),
         (
             "The text at the right gives the mean days an estimator took to cross halfway to a "
@@ -803,7 +809,9 @@ def false_movement_figure(*, report: ReportText, text: FigureText) -> alt.VConca
             "high": [None] * table.height,
             "colour_key": table["family_name"],
             "hollow": [False] * table.height,
-            "shape": ["circle"] * table.height,
+            "shape": [
+                "diamond" if name == "post hoc" else "circle" for name in table["family_name"]
+            ],
             "text": [f"{value:.1f}%" for value in table["false_movement"]],
         },
         schema_overrides={"low": pl.Float64, "high": pl.Float64},
@@ -917,8 +925,8 @@ def seasonal_figure(*, root: Path, text: FigureText) -> alt.VConcatChart:
             "median level."
         ),
         (
-            "A plant whose capacity did not change would draw a flat line at 1. Plants are not "
-            "labelled."
+            "A plant whose capacity did not change would draw a flat line at 1. Every plant is "
+            "lowest in December, and January is also low. Plants are not labelled."
         ),
     ]
     text.add(
@@ -1146,7 +1154,14 @@ def control_figure(*, report: ReportText, text: FigureText) -> alt.VConcatChart:
         plots="Positive control: oracle, KF pick on planted data, KF pick on real data, vs B0",
         lines=[title, *subtitle, x_title, *labels, "same as B0"],
     )
-    return render_caption(panels=[panel], number=8, title=title, subtitle=subtitle)
+    key = key_row(
+        entries=[
+            ("Oracle", ocf.DATA_GREEN, "circle", True),
+            ("KF, planted", ocf.BRAND_ORANGE, "circle", True),
+            ("KF, real data", ocf.BRAND_ORANGE, "triangle-up", False),
+        ]
+    )
+    return render_caption(panels=[key, panel], number=8, title=title, subtitle=subtitle)
 
 
 def hyst_activity_figure(*, report: ReportText, text: FigureText) -> alt.VConcatChart:
@@ -1188,12 +1203,24 @@ def hyst_activity_figure(*, report: ReportText, text: FigureText) -> alt.VConcat
         prefix="- over all scored days",
     )
     share_all = float(re.search(r"on ([\d.]+)% of plant-days", overall).group(1))  # ty: ignore[unresolved-attribute]
+    kept = table.select("label", "share", "month")
+    gap = pl.DataFrame(
+        {"label": ["Jan 2026 (no data)"], "share": [None], "month": ["2026-01"]},
+        schema_overrides={"share": pl.Float64},
+    )
+    table = pl.concat([kept, gap]).sort("month")
     order = table["label"].to_list()
+    zeros = table.filter(pl.col("share") == 0).with_columns(note=pl.lit("none"))
     bars = (
         alt.Chart(table)
         .mark_bar(color=ocf.DATA_PURPLE, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("label:N", sort=order, title=None, axis=alt.Axis(labelAngle=-60, labelLimit=0)),
+            x=alt.X(
+                "label:N",
+                sort=order,
+                title=None,
+                axis=alt.Axis(labelAngle=-60, labelLimit=0, labelFontSize=12),
+            ),
             y=alt.Y(
                 "share:Q",
                 title="Plant-days off the static capacity (%)",
@@ -1202,11 +1229,16 @@ def hyst_activity_figure(*, report: ReportText, text: FigureText) -> alt.VConcat
             ),
         )
     )
-    panel = bars.properties(width=CONTENT_WIDTH_PX - 90, height=190)
-    quiet_months = int((table["share"] == 0).sum())
+    none = (
+        alt.Chart(zeros)
+        .mark_text(baseline="bottom", dy=-3, fontSize=11, color=ocf.BLACK_1, aria=False)
+        .encode(x=alt.X("label:N", sort=order), y=alt.value(190), text="note:N")  # ty: ignore[unresolved-attribute]
+    )
+    panel = (bars + none).properties(width=CONTENT_WIDTH_PX - 90, height=190)
+    quiet_months = int((kept["share"] == 0).sum())
     title = (
         f"HYST left the static capacity on {share_all:.0f}% of plant-days, and on none in "
-        f"{quiet_months} of the {table.height} months"
+        f"{quiet_months} of the {kept.height} months"
     )
     subtitle = [
         (
@@ -1286,11 +1318,14 @@ def explainability_figure(*, report: ReportText, text: FigureText) -> alt.VConca
     )
     words = (
         alt.Chart(long)
-        .mark_text(fontSize=10, color=ocf.BLACK_1, aria=False)
+        .mark_text(fontSize=10, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("criterion:N", sort=list(criteria.values())),
             y=alt.Y("estimator:N", sort=order),
             text="grade:N",
+            color=alt.condition(
+                alt.datum.grade == "yes", alt.value(ocf.WHITE), alt.value(ocf.BLACK_1)
+            ),
         )
     )
     scores = (
@@ -1327,8 +1362,8 @@ def explainability_figure(*, report: ReportText, text: FigureText) -> alt.VConca
     )
     subtitle = [
         (
-            "Each estimator is graded yes, partly, or no on five criteria by reading its code and "
-            "outputs, before any result existed. The score is the number of yes grades plus half "
+            "Each estimator is graded yes, partly, or no on five criteria by reading its code, "
+            "before any result existed. The score is the number of yes grades plus half "
             "the number of partly grades."
         ),
         (
@@ -1430,7 +1465,13 @@ def hindsight_figure(*, report: ReportText, text: FigureText) -> alt.VConcatChar
         "without two plant-months",
         lines=[title, *subtitle, x_title, *labels, "no difference"],
     )
-    return render_caption(panels=[panel], number=11, title=title, subtitle=subtitle)
+    key = key_row(
+        entries=[
+            ("Against B0", ocf.BRAND_ORANGE, "circle", True),
+            ("Hindsight minus causal", ocf.DATA_BLUE, "circle", True),
+        ]
+    )
+    return render_caption(panels=[key, panel], number=11, title=title, subtitle=subtitle)
 
 
 def build_figures(*, root: Path, text: FigureText) -> dict[int, alt.VConcatChart]:
