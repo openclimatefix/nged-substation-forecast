@@ -39,7 +39,12 @@ from studies.checkpointed_fits import (
     fit_in_groups,
     run_stamp,
 )
-from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SEEDS, DeviceType
+from studies.cross_validation import (
+    PRIMARY_HYPER_PARAMETERS,
+    SEEDS,
+    SENSITIVITY_HYPER_PARAMETERS,
+    DeviceType,
+)
 from studies.guards import refuse_to_overwrite
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -55,6 +60,17 @@ def main() -> int:
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
     parser.add_argument("--max-workers", type=int, default=4)
     parser.add_argument("--estimators", nargs="+", default=list(ARM_ORDER))
+    parser.add_argument(
+        "--suffix",
+        default="",
+        help="Write `*_posthoc_<suffix>` files and checkpoints, leaving the first run's alone.",
+    )
+    parser.add_argument(
+        "--sensitivity", action="store_true", help="Also fit the sensitivity setting."
+    )
+    parser.add_argument(
+        "--quantiles", action="store_true", help="Fit the primary setting's quantile models."
+    )
     arguments = parser.parse_args()
     root = claim_root(smoke=False)
     device: DeviceType = choose_device(requested=arguments.device)
@@ -66,40 +82,47 @@ def main() -> int:
         scales[f"posthoc_causal__{name}"] = scale_for(
             root=root, estimator=name, params=params, file_id=ORIGINAL
         ).scale_mw
-    np.savez_compressed(root / "scales_stage_b_posthoc.npz", **scales)  # ty: ignore[invalid-argument-type]
+    tag = f"_{arguments.suffix}" if arguments.suffix else ""
+    np.savez_compressed(root / f"scales_stage_b_posthoc{tag}.npz", **scales)  # ty: ignore[invalid-argument-type]
     stamp = run_stamp(
         dataset_path=LAG_FRAME_PATH,
         arms={
             **{arm: list(B0_COLUMNS) for arm in scales},
-            "scales": [sha256_of(path=root / "scales_stage_b_posthoc.npz")],
+            "scales": [sha256_of(path=root / f"scales_stage_b_posthoc{tag}.npz")],
             "code": [fingerprint(root=root, modules=ALL_MODULES)],
         },
         device=device,
     )
-    checkpoint_root = root / "checkpoints_posthoc"
+    checkpoint_root = root / f"checkpoints_posthoc{tag}"
     claim_checkpoint_dir(checkpoint_dir=checkpoint_root, stamp=stamp)
-    final = root / "losses_stage_b_posthoc.parquet"
+    final = root / f"losses_stage_b_posthoc{tag}.parquet"
     refuse_to_overwrite(paths=[final])
     results: list[pl.DataFrame] = []
     for arm, scale in scales.items():
         arm_data = arm_frame(frame=frame, record=record, scale=scale, factor=None)
-        losses = fit_in_groups(
-            dataset=arm_data,
-            jobs=[(arm, "primary", "power_mw", B0_COLUMNS, PRIMARY_HYPER_PARAMETERS, False)],
-            checkpoint_dir=checkpoint_root / f"{arm}__primary",
-            max_workers=arguments.max_workers,
-            device=device,
-        )
-        fractions = losses.with_columns(
-            crps_capped_fraction_of_capacity=pl.col("crps_capped_mw")
-            / pl.col("effective_capacity_mw")
-        )
-        annotated = drop_scaled_loss_columns(losses=fractions).join(
-            arm_data.select("site", "time", "capacity_scale_mw", actual_scaled=pl.col("power_mw")),
-            on=["site", "time"],
-        )
-        assert_arm_covers_frame(losses=annotated, frame=arm_data, seeds=SEEDS)
-        results.append(annotated)
+        settings = [("primary", PRIMARY_HYPER_PARAMETERS, arguments.quantiles)]
+        if arguments.sensitivity:
+            settings.append(("sensitivity", SENSITIVITY_HYPER_PARAMETERS, False))
+        for setting, hyper_parameters, quantiles in settings:
+            losses = fit_in_groups(
+                dataset=arm_data,
+                jobs=[(arm, setting, "power_mw", B0_COLUMNS, hyper_parameters, quantiles)],
+                checkpoint_dir=checkpoint_root / f"{arm}__{setting}",
+                max_workers=arguments.max_workers,
+                device=device,
+            )
+            fractions = losses.with_columns(
+                crps_capped_fraction_of_capacity=pl.col("crps_capped_mw")
+                / pl.col("effective_capacity_mw")
+            )
+            annotated = drop_scaled_loss_columns(losses=fractions).join(
+                arm_data.select(
+                    "site", "time", "capacity_scale_mw", actual_scaled=pl.col("power_mw")
+                ),
+                on=["site", "time"],
+            )
+            assert_arm_covers_frame(losses=annotated, frame=arm_data, seeds=SEEDS)
+            results.append(annotated)
         _LOG.info("fitted %s", arm)
     pl.concat(results, how="diagonal_relaxed").write_parquet(final)
     _LOG.info("wrote %s", final)

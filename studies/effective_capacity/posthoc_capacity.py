@@ -114,6 +114,7 @@ def stage_a(*, root: Path) -> None:
     """
     events = load_events(root=root)
     rows: list[dict[str, object]] = []
+    event_tables: list[pl.DataFrame] = []
     for estimator in (*POSTHOC_ESTIMATORS, *COMPARISON):
         params = (
             {} if estimator in POSTHOC_ESTIMATORS else load_tuned(root=root, estimator=estimator)
@@ -123,6 +124,7 @@ def stage_a(*, root: Path) -> None:
             for i in range(1, len(events.draws))
         ]
         errors = np.array([draw_primary_metric(scores=t) for t in tables])
+        event_tables += [t.with_columns(estimator=pl.lit(estimator)) for t in tables]
         original = scale_for(root=root, estimator=estimator, params=params, file_id=ORIGINAL)
         fallback = np.mean(
             [
@@ -151,6 +153,7 @@ def stage_a(*, root: Path) -> None:
             }
         )
     table = pl.DataFrame(rows)
+    pl.concat(event_tables).write_parquet(root / "tables" / "posthoc_stage_a_events.parquet")
     path = root / "tables" / "posthoc_stage_a.parquet"
     table.write_parquet(path)
     with pl.Config(tbl_cols=-1, tbl_rows=-1, tbl_width_chars=200):

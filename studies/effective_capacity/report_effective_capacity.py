@@ -849,6 +849,95 @@ def posthoc(*, root: Path, report: Report, context: PostHocContext) -> None:  # 
         stage_a_table = pl.read_parquet(root / "tables" / "posthoc_stage_a.parquet")
         report.heading(f"{POSTHOC_LABEL}: Stage A recovery and false movement", level=3)
         report.table(stage_a_table)
+        hyst_section(root=root, report=report, context=context)
+
+
+def hyst_section(*, root: Path, report: Report, context: PostHocContext) -> None:
+    """Print the POST HOC detail on HYST, the arm designed after the main results."""
+    path = root / "losses_stage_b_posthoc_hyst.parquet"
+    if not path.exists():
+        return
+    hyst = pl.read_parquet(path)
+    keep, b0 = context.keep, context.b0
+    arm = "posthoc_causal__HYST"
+    report.heading(f"{POSTHOC_LABEL}: HYST, designed after the main results", level=3)
+    for setting in ("primary", "sensitivity"):
+        part = hyst.filter(pl.col("setting") == setting).select(*keep)
+        result = difference(losses=pl.concat([b0[setting], part]), treatment=arm, reference="B0")
+        report.text(f"- {setting}, HYST minus B0: {_interval_text(result=result)}")
+    chosen = hyst.filter(pl.col("setting") == "primary").select(*keep)
+    both = _paired_rows(losses=pl.concat([b0["primary"], chosen]), treatment=arm, reference="B0")
+    low = both.filter(context.low_mask)
+    rest = both.filter(~context.low_mask)
+    report.text(
+        f"- primary, row weighted: {_mean(low['diff']) * POINTS:.3f} points on the three "
+        f"low-output plant-months, {_mean(rest['diff']) * POINTS:.3f} points on every other row"
+    )
+    is_winter = pl.col("month").str.slice(5, 2).is_in(list(WINTER_MONTHS))
+    pair = pl.concat([b0["primary"], chosen])
+    for label, part in (
+        ("December to February", pair.filter(is_winter)),
+        ("the other months", pair.filter(~is_winter)),
+    ):
+        result = difference(losses=part, treatment=arm, reference="B0")
+        report.text(f"- primary, {label}: {_interval_text(result=result)}")
+    months = sorted(context.events.scored_months)
+    for label, subset in (("first 9 months", months[:9]), ("last 9 months", months[9:])):
+        result = difference(
+            losses=pair.filter(pl.col("month").is_in(subset)), treatment=arm, reference="B0"
+        )
+        report.text(
+            f"- primary, {label} ({subset[0]} to {subset[-1]}): {_interval_text(result=result)}"
+        )
+    # How often HYST moves.
+    scale = np.load(root / "scales_stage_b_posthoc_hyst.npz")[arm]
+    record = context.record
+    months_of_day = record.dates.astype("datetime64[M]").astype(str)
+    static = record.static_p99_mw[:, None]
+    moved = np.abs(scale / static - 1.0) > 1e-9
+    rows = []
+    for month in months:
+        mask = months_of_day == month
+        rows.append(
+            {
+                "month": month,
+                "share_of_plant_days_off_static": float(moved[:, mask].mean()),
+                "plants_off_static_on_some_day": int(moved[:, mask].any(axis=1).sum()),
+                "mean_scale_over_static": float((scale[:, mask] / static).mean()),
+            }
+        )
+    scored = np.isin(months_of_day, months)
+    report.table(pl.DataFrame(rows))
+    report.text(
+        f"- over all scored days: HYST left the static power on "
+        f"{float(moved[:, scored].mean()):.1%} of plant-days; its mean scale is "
+        f"{float((scale[:, scored] / static).mean()):.3f} of the static power"
+    )
+    # CRPS.
+    crps = hyst.filter(
+        (pl.col("setting") == "primary") & pl.col("crps_capped_fraction_of_capacity").is_not_null()
+    )
+    if crps.height:
+        baseline = published_b0(setting="primary")
+        report.text(
+            "- CRPS (fraction of capacity, primary, quantile models): HYST "
+            f"{_mean(crps['crps_capped_fraction_of_capacity']) * POINTS:.3f} points, B0 "
+            f"{_mean(baseline['crps_capped_fraction_of_capacity']) * POINTS:.3f} points"
+        )
+    else:
+        report.text("- CRPS: skipped")
+    # Stage A by shape.
+    events_path = root / "tables" / "posthoc_stage_a_events.parquet"
+    if events_path.exists():
+        shapes = (
+            pl.read_parquet(events_path)
+            .filter(pl.col("estimator").is_in(["HYST", "DSKF", "KF", "S0"]))
+            .group_by("estimator", "shape")
+            .agg(error=pl.col("error").mean(), delay=pl.col("delay").mean(), events=pl.len())
+            .sort("estimator", "shape")
+        )
+        report.text("Stage A recovery by event shape (selection draws), HYST with DSKF, KF, S0:")
+        report.table(shapes)
 
 
 def _scale_changes(*, scale: np.ndarray, plant: int, first: int, day: int) -> float:
