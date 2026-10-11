@@ -224,6 +224,8 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     for record_id in ("original", *NEW_DRAWS):
         collect(arm="tools_llm", version="v1", record_id=record_id, samples=SAMPLES)
         collect(arm="raw_llm", version="v1", record_id=record_id, samples=1)
+    for record_id in OLD_DRAWS:
+        collect(arm="tools_llm", version="v1", record_id=record_id, samples=1)
     for record_id in ROUND2_CONTROL_RECORDS:
         collect(arm="tools_llm", version="v2", record_id=record_id, samples=1)
     for record_id in CONTROL_RECORDS:

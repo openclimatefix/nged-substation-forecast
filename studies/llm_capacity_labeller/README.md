@@ -22,8 +22,9 @@ with a stub model, and is not a result.** `labeller_paths.claim_root` marks each
 | `probe_claude_cli.py` | The 2-call probe of `claude -p`. `--summarise` prints the saved results with no call. |
 | `run_labeller.py` | `--phase estimate` estimates the cost from the built prompts. `--phase hindsight` and `--phase causal` make the calls, cached by the hash of the prompt, resumable, and logged under `data/`. |
 | `score_labeller.py` | Reads the cached answers, applies the hard checks, and writes the planned contrasts, the controls, the event scores, and the capacity series the charts draw. Makes no call. |
+| `build_round2_inputs.py`, `run_round2.py`, `score_round2.py` | **Round 2, post hoc.** Two new draws (seeds 11443 and 11444) and a non-adjacent positive control; the calls of the local-scan tools and the softer prompt, with the guard counting round 1's log and allowing US$6 more; the post hoc contrasts, the controls, and the model's quoted reasons for no change. |
 | `fit_forecast_arms.py` | GPU. The exploratory forecast-level check on the lag study's rows. |
-| `llm_capacity_labeller_charts.py` | Draws each estimator's capacity over a plant's daily maximum power in four figures of seven panels. |
+| `llm_capacity_labeller_charts.py` | Draws each estimator's capacity over a plant's daily maximum power in four figures of seven panels; `--round 2` draws round 2's four figures of eight panels. |
 | `report_llm_capacity_labeller.py` | Prints every table the page quotes into `report.md`. |
 
 ## Run order

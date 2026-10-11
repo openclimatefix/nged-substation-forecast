@@ -432,3 +432,9 @@ the exploratory forecast fits (3 seeds, 5 folds, primary setting only).
   strict cut uses its own static power and carries no plant fit (the physics model's output still
   rests on fits made from the whole record); and check 3 divides each series by its own median so a
   correct constant offset passes.
+- **Round 2 (post hoc, maintainer decision after round 1):** round 1 ran as planned and stays the
+  planned result (0 of 32 hits, a failed positive control, C1 to C3 untested). Round 2 adds a local
+  scan as a seventh evidence table, softens the prompt for a loss that lasts a month, asks for a note
+  on why there is no change, and is judged on two new draws (seeds 11443 and 11444) with a positive
+  control that has no two steps at a plant in adjacent months. Round 1's model arm is re-run on
+  those draws so the versions are paired. Spend: US$3.93 for 156 calls, US$6.97 in all.
