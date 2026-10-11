@@ -319,7 +319,9 @@ def _stack(*, panels: Sequence[alt.Chart], text: FigureText) -> alt.VConcatChart
     caption = alt.TitleParams(
         wrapped(text=f"Figure {text.number}: {text.title}", width=TITLE_CHARACTERS),
         subtitle=[
-            line for sentence in text.subtitle for line in wrapped(text=sentence, width=SUBTITLE_CHARACTERS)
+            line
+            for sentence in text.subtitle
+            for line in wrapped(text=sentence, width=SUBTITLE_CHARACTERS)
         ],
         anchor="start",
         offset=14,
@@ -382,9 +384,9 @@ def _members(
 ) -> tuple[pl.DataFrame, float]:
     """Read one run's members for one series, as a fraction of capacity, within the shown days."""
     capacity = float(
-        context.scores[arm].filter(pl.col("time_series_id") == series_id)[
-            "effective_capacity_mw"
-        ][0]
+        context.scores[arm].filter(pl.col("time_series_id") == series_id)["effective_capacity_mw"][
+            0
+        ]
     )
     path = _arm_dir(fold=context.fold, arm=arm, seed=context.seed) / "forecasts"
     stamp = init_time.strftime("%Y-%m-%d")  # type: ignore[attr-defined]
@@ -394,8 +396,7 @@ def _members(
     )
     return (
         members.with_columns(
-            days=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_seconds()
-            / 86400,
+            days=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_seconds() / 86400,
             power=pl.col("power_fcst") / capacity,
         ).filter(pl.col("days") < SHOWN_DAYS),
         capacity,
@@ -428,9 +429,11 @@ def band_figure(*, context: Context) -> tuple[FigureText, alt.VConcatChart]:
         name = series_label(context=context, series_id=series_id, series_type=series_type)
         week = first_week(scores=context.scores[CLEANED], series_id=series_id)
         scored = factors.filter(pl.col("time_series_id") == series_id)["power_fcst_init_time"]
-        by_run = week.filter(pl.col("power_fcst_init_time").is_in(scored.implode())).group_by(
-            "power_fcst_init_time"
-        ).agg(mean_actual=(pl.col("actual") / pl.col("effective_capacity_mw")).mean())
+        by_run = (
+            week.filter(pl.col("power_fcst_init_time").is_in(scored.implode()))
+            .group_by("power_fcst_init_time")
+            .agg(mean_actual=(pl.col("actual") / pl.col("effective_capacity_mw")).mean())
+        )
         init_time = choose_runs(actual_by_run=by_run)["median"]
         factor = float(
             factors.filter(
@@ -504,8 +507,7 @@ def band_figure(*, context: Context) -> tuple[FigureText, alt.VConcatChart]:
             )
         )
         panels.append(
-            alt.layer(shade, line)
-            .properties(
+            alt.layer(shade, line).properties(
                 title=alt.TitleParams(title, anchor="start", fontSize=12),
                 width=PLOT_WIDTH_PX,
                 height=PANEL_HEIGHT_PX,
@@ -521,9 +523,12 @@ def band_figure(*, context: Context) -> tuple[FigureText, alt.VConcatChart]:
             "calibration, which rescales each series' members about their mean using only past "
             "outcomes. The ensemble mean, and so the mean absolute error, is unchanged.",
             "A well-calibrated band holds the actual power 80% of the time. "
-            + RUN_SCOPE_SENTENCE.replace("chosen by the actual power alone", "the run with the "
-                                         "median mean actual power in its first 7 days, chosen "
-                                         "by the actual power alone"),
+            + RUN_SCOPE_SENTENCE.replace(
+                "chosen by the actual power alone",
+                "the run with the "
+                "median mean actual power in its first 7 days, chosen "
+                "by the actual power alone",
+            ),
         ],
         panel_titles=panel_titles,
         legend=[ACTUAL, RAW_BAND_LABEL, CALIBRATED_BAND_LABEL],
@@ -548,7 +553,10 @@ def lead_day_figure(*, context: Context) -> tuple[FigureText, alt.VConcatChart]:
             .join(context.types, on="time_series_id")
             .filter(pl.col("lead_hours") < LEAD_DAY_LIMIT_HOURS)
             .group_by("time_series_type", (pl.col("lead_hours") // 24 + 1).alias("day"))
-            .agg(error=pl.col("abs_error_norm").mean() * PERCENT, series=pl.col("time_series_id").n_unique())
+            .agg(
+                error=pl.col("abs_error_norm").mean() * PERCENT,
+                series=pl.col("time_series_id").n_unique(),
+            )
             .with_columns(line=pl.lit(ARM_LABELS[arm]))
         )
     data = pl.concat(frames)
@@ -573,9 +581,7 @@ def lead_day_figure(*, context: Context) -> tuple[FigureText, alt.VConcatChart]:
                         grid=False,
                     ),
                 ),
-                y=alt.Y(
-                    "error:Q", title=LEAD_Y_TITLE, scale=alt.Scale(zero=True)
-                ),
+                y=alt.Y("error:Q", title=LEAD_Y_TITLE, scale=alt.Scale(zero=True)),
                 color=alt.Color(
                     "line:N",
                     title=None,

@@ -1223,7 +1223,10 @@ def _changed_series(*, context: Context) -> pl.DataFrame:
             frames[arm] = (
                 pl.read_parquet(path)
                 .group_by("time_series_id")
-                .agg(crps=pl.col("crps_norm").mean(), mae=pl.col("abs_error_norm").cast(pl.Float64).mean())
+                .agg(
+                    crps=pl.col("crps_norm").mean(),
+                    mae=pl.col("abs_error_norm").cast(pl.Float64).mean(),
+                )
             )
         else:
             joined = frames[CHOSEN_RULE_ARM].join(
