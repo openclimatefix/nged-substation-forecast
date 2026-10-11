@@ -30,7 +30,6 @@ from studies.power import scan_power
 N_TREES: Final[int] = 500
 LEARNING_RATE: Final[float] = 0.05
 MAX_DEPTH: Final[int] = 6
-MIN_CHILD_WEIGHT: Final[int] = 1
 SUBSAMPLE: Final[float] = 0.8
 """The production hyperparameters, except `colsample_bytree`, which each arm sets."""
 
@@ -130,7 +129,7 @@ def _parameters(*, arm: arm_definitions.Arm, device: str, seed: int) -> dict[str
     return {
         "eta": LEARNING_RATE,
         "max_depth": MAX_DEPTH,
-        "min_child_weight": MIN_CHILD_WEIGHT,
+        "min_child_weight": arm.min_child_weight,
         "subsample": SUBSAMPLE,
         "colsample_bytree": arm.colsample_bytree,
         "device": device,
@@ -199,9 +198,48 @@ def _fit_series(
     )
 
 
+def _fit_boosters(
+    *,
+    training: pl.DataFrame,
+    arm: arm_definitions.Arm,
+    window: inputs.FoldWindow,
+    device: str,
+    seed: int,
+) -> dict[int, tuple[xgb.Booster, list[str], float]]:
+    """Fit one booster per series, or one per series type when the arm pools.
+
+    Returns:
+        For each series, its booster, its feature columns, and the factor that converts the
+        booster's output to megawatts (1 per series; the series' training capacity when pooled).
+    """
+    boosters: dict[int, tuple[xgb.Booster, list[str], float]] = {}
+    if not arm.pooled_by_type:
+        for (series_id,), group in training.group_by("time_series_id"):
+            columns = list(arm.columns(group["time_series_type"][0]))
+            booster = _fit_series(
+                group=group, columns=columns, arm=arm, window=window, device=device, seed=seed
+            )
+            boosters[int(series_id)] = (booster, columns, 1.0)
+        return boosters
+    capacity = cleaning_rules.training_capacity(
+        power=training.select("time_series_id", pl.col("power"))
+    )
+    scaled = training.join(capacity, on="time_series_id").filter(pl.col("capacity") > 0)
+    scaled = scaled.with_columns(power=pl.col("power") / pl.col("capacity"))
+    scales = dict(zip(capacity["time_series_id"], capacity["capacity"], strict=True))
+    for (series_type,), group in scaled.group_by("time_series_type"):
+        columns = list(arm.columns(str(series_type)))
+        booster = _fit_series(
+            group=group, columns=columns, arm=arm, window=window, device=device, seed=seed
+        )
+        for series_id in group["time_series_id"].unique():
+            boosters[int(series_id)] = (booster, columns, float(scales[series_id]))
+    return boosters
+
+
 def _predict_and_score(
     *,
-    boosters: dict[int, tuple[xgb.Booster, list[str]]],
+    boosters: dict[int, tuple[xgb.Booster, list[str], float]],
     out_dir: Path,
     fold_id: str,
     types: pl.DataFrame,
@@ -215,7 +253,7 @@ def _predict_and_score(
         frame = pl.read_parquet(path).join(types, on="time_series_id")
         pieces = []
         for (series_id,), series_rows in frame.group_by("time_series_id"):
-            booster, columns = boosters[int(series_id)]
+            booster, columns, scale = boosters[int(series_id)]
             matrix = xgb.DMatrix(feature_matrix(frame=series_rows, columns=columns))
             pieces.append(
                 series_rows.select(
@@ -224,7 +262,9 @@ def _predict_and_score(
                     "nwp_init_time",
                     "valid_time",
                     "ensemble_member",
-                ).with_columns(power_fcst=pl.Series(booster.predict(matrix), dtype=pl.Float32))
+                ).with_columns(
+                    power_fcst=pl.Series(booster.predict(matrix) * scale, dtype=pl.Float32)
+                )
             )
         forecasts = pl.concat(pieces)
         if forecasts.height != frame.height:
@@ -258,14 +298,7 @@ def fit_arm(*, arm: arm_definitions.Arm, fold_id: str, device: str, seed: int) -
     )
 
     training, counts = _training_rows(arm=arm, window=window, types=types)
-    boosters: dict[int, tuple[xgb.Booster, list[str]]] = {}
-    for (series_id,), group in training.group_by("time_series_id"):
-        series_type = group["time_series_type"][0]
-        columns = list(arm.columns(series_type))
-        booster = _fit_series(
-            group=group, columns=columns, arm=arm, window=window, device=device, seed=seed
-        )
-        boosters[int(series_id)] = (booster, columns)
+    boosters = _fit_boosters(training=training, arm=arm, window=window, device=device, seed=seed)
     if set(boosters) != set(series_ids):
         msg = f"{arm.name}: trained {len(boosters)} of {len(series_ids)} series"
         raise ValueError(msg)

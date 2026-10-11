@@ -150,6 +150,9 @@ class Arm:
         early_stopping: Choose the number of trees on the last six training weeks, then refit on
             every training row with that number.
         colsample_bytree: Column subsampling per tree. Production uses 0.8; every contrast uses 1.0.
+        min_child_weight: XGBoost's `min_child_weight`; production uses 1.
+        pooled_by_type: Whether one booster per series type is fitted on every series of that type,
+            with each series' power divided by its training capacity, instead of one per series.
         extra_cleaning: Further cleaning rules applied together with `cleaning`.
     """
 
@@ -163,6 +166,8 @@ class Arm:
     recency_half_life_days: float | None = None
     early_stopping: bool = False
     colsample_bytree: float = 1.0
+    min_child_weight: int = 1
+    pooled_by_type: bool = False
 
 
 CHOSEN_CLEANING: Final[CleaningRule] = "new_meter_settling"
@@ -296,6 +301,20 @@ FEATURE_ARMS: Final[tuple[Arm, ...]] = (
 
 TRAINING_ARMS: Final[tuple[Arm, ...]] = (
     Arm(
+        name="d1_min_child_weight_20",
+        cleaning=CHOSEN_CLEANING,
+        family="training",
+        description="min_child_weight 20, as in the earlier studies' boosters.",
+        min_child_weight=20,
+    ),
+    Arm(
+        name="d2_pooled_by_type",
+        cleaning=CHOSEN_CLEANING,
+        family="training",
+        description="One booster per series type on capacity-normalised power (lag study design).",
+        pooled_by_type=True,
+    ),
+    Arm(
         name="c2_early_stopping",
         cleaning=CHOSEN_CLEANING,
         family="training",
@@ -368,6 +387,8 @@ def combine(*, name: str, parts: tuple[Arm, ...], description: str) -> Arm:
             (p.recency_half_life_days for p in reversed(parts) if p.recency_half_life_days), None
         ),
         early_stopping=any(p.early_stopping for p in parts),
+        min_child_weight=max(p.min_child_weight for p in parts),
+        pooled_by_type=any(p.pooled_by_type for p in parts),
     )
 
 
