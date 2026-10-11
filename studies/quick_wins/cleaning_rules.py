@@ -207,9 +207,9 @@ def commissioning_ramp(*, power: pl.DataFrame, types: pl.DataFrame) -> pl.DataFr
         if not isinstance(settled, float) or settled <= 0:
             continue
         rolling = group.with_columns(
-            smooth=pl.col("ratio").rolling_median(
-                window_size=RAMP_ROLLING_DAYS, min_samples=RAMP_ROLLING_DAYS
-            )
+            smooth=pl.col("ratio")
+            .rolling_median(window_size=RAMP_ROLLING_DAYS, min_samples=RAMP_ROLLING_DAYS)
+            .fill_null(strategy="backward")
         )
         reached = rolling.filter(pl.col("smooth") >= RAMP_SETTLED_FRACTION * settled)
         if reached.height == 0:

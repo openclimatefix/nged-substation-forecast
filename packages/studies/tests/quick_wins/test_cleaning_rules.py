@@ -136,7 +136,7 @@ def test_rules_other_than_the_first_months_ignore_readings_before_the_training_w
 
 
 def test_the_ramp_rule_runs_through_rows_to_drop_with_the_frame_the_fit_script_builds():
-    """`rows_to_drop` accepts `time_series_id` and `time_series_type` columns, as `fit_arms` builds."""
+    """`rows_to_drop` accepts the `time_series_type` frame `fit_arms` builds."""
     days = 200
     peers = [_series(series_id=pid, values=[10.0] * 48 * days) for pid in (2, 3)]
     ramp = _series(series_id=1, values=[2.0] * 48 * 70 + [10.0] * 48 * (days - 70))
