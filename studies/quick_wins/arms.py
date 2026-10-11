@@ -10,7 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Final
 
-import inputs
+import quick_wins_inputs as inputs
 from cleaning_rules import CleaningRule
 
 GENERATOR_TYPES: Final[frozenset[str]] = frozenset({"PV", "Wind"})

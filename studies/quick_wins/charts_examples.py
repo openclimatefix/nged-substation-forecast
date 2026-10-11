@@ -20,15 +20,16 @@ never against a calendar date.
 import argparse
 import re
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Final
 
 import altair as alt
-import inputs
 import plotting.ocf_theme as ocf
 import polars as pl
+import quick_wins_inputs as inputs
 from contracts.settings import Settings
 from studies.anonymise import (
     WIND_LABEL_PERMUTATION_SEED,
@@ -232,7 +233,7 @@ def first_week(*, scores: pl.DataFrame, series_id: int) -> pl.DataFrame:
     )
 
 
-def choose_runs(*, actual_by_run: pl.DataFrame) -> dict[str, object]:
+def choose_runs(*, actual_by_run: pl.DataFrame) -> dict[str, datetime]:
     """Return the initialisation time of the highest, median, and lowest mean-actual run.
 
     Args:
@@ -247,7 +248,7 @@ def choose_runs(*, actual_by_run: pl.DataFrame) -> dict[str, object]:
 
 
 def _line_data(
-    *, context: Context, series_id: int, init_time: object, arms: Sequence[str]
+    *, context: Context, series_id: int, init_time: datetime, arms: Sequence[str]
 ) -> pl.DataFrame:
     """Long-form rows (days, percent of capacity, line name) of the actual power and each arm."""
     frames = []
@@ -273,21 +274,21 @@ def _line_data(
     return pl.concat(frames).sort("line", "days")
 
 
-def _colour_scale(*, entries: dict[str, str]) -> alt.Scale:
+def _colour_scale(*, entries: Mapping[str, str]) -> alt.Scale:
     return alt.Scale(domain=list(entries), range=list(entries.values()))
 
 
 def _x_axis(*, title: str | None) -> alt.Axis:
-    return alt.Axis(values=list(range(SHOWN_DAYS + 1)), title=title, grid=False)
+    return alt.Axis(values=list(range(SHOWN_DAYS + 1)), title=title, grid=False, format="d")
 
 
 def _line_panel(*, data: pl.DataFrame, arms: Sequence[str], title: str, last: bool) -> alt.Chart:
     colours = {ACTUAL: ocf.BLACK_1, **{ARM_LABELS[arm]: ARM_COLOURS[arm] for arm in arms}}
     widths = {ACTUAL: 2.4, **{ARM_LABELS[arm]: 1.4 for arm in arms}}
     return (
-        alt.Chart(data.to_pandas(), title=alt.TitleParams(title, anchor="start", fontSize=12))
-        .mark_line(aria=False, clip=True, interpolate="monotone")
-        .encode(
+        alt.Chart(data, title=alt.TitleParams(title, anchor="start", fontSize=12))
+        .mark_line(aria=False, clip=True)
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "days:Q",
                 axis=_x_axis(title=X_TITLE if last else None),
@@ -355,9 +356,11 @@ def example_figure(
         number=number,
         title=title,
         subtitle=[
-            f"Black line: actual power of {name}. Coloured lines: each forecast's ensemble mean "
-            "(the average of the 51 ensemble members), as a percentage of the series' effective "
-            "capacity. Zero is no power.",
+            (
+                f"Black line: actual power of {name}. Coloured lines: each forecast's ensemble "
+                "mean (the average of the 51 ensemble members), as a percentage of the series' "
+                "effective capacity. Zero is no power."
+            ),
             RUN_SCOPE_SENTENCE,
             "Panels run from the run with the highest mean actual power (top) to the lowest "
             "(bottom). " + SERIES_RULE_SENTENCE,
@@ -380,7 +383,7 @@ def example_figure(
 
 
 def _members(
-    *, context: Context, arm: str, series_id: int, init_time: object
+    *, context: Context, arm: str, series_id: int, init_time: datetime
 ) -> tuple[pl.DataFrame, float]:
     """Read one run's members for one series, as a fraction of capacity, within the shown days."""
     capacity = float(
@@ -389,7 +392,7 @@ def _members(
         ]
     )
     path = _arm_dir(fold=context.fold, arm=arm, seed=context.seed) / "forecasts"
-    stamp = init_time.strftime("%Y-%m-%d")  # type: ignore[attr-defined]
+    stamp = init_time.strftime("%Y-%m-%d")
     members = pl.read_parquet(path / f"init={stamp}.parquet").filter(
         pl.col("time_series_id") == series_id,
         pl.col("power_fcst_init_time") == init_time,
@@ -479,9 +482,9 @@ def band_figure(*, context: Context) -> tuple[FigureText, alt.VConcatChart]:
         }
         bands = pl.concat([raw, calibrated])
         shade = (
-            alt.Chart(bands.to_pandas())
+            alt.Chart(bands)
             .mark_area(aria=False, opacity=0.4, clip=True)
-            .encode(
+            .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X(
                     "days:Q",
                     scale=alt.Scale(domain=[0, SHOWN_DAYS], nice=False),
@@ -498,9 +501,9 @@ def band_figure(*, context: Context) -> tuple[FigureText, alt.VConcatChart]:
             )
         )
         line = (
-            alt.Chart(actual.to_pandas())
+            alt.Chart(actual)
             .mark_line(aria=False, clip=True, strokeWidth=2.2)
-            .encode(
+            .encode(  # ty: ignore[unresolved-attribute]
                 x="days:Q",
                 y="percent:Q",
                 color=alt.Color("line:N", scale=_colour_scale(entries=entries), legend=None),
@@ -517,17 +520,19 @@ def band_figure(*, context: Context) -> tuple[FigureText, alt.VConcatChart]:
         number=11,
         title="The raw ensemble band is too narrow, and rescaling the spread widens it",
         subtitle=[
-            "Black line: actual power as a percentage of effective capacity. Blue shade: the band "
-            "holding the middle 80% of the 51 ensemble members (10% to 90%) of the cleaned "
-            "production forecast. Purple shade: the same band after the post hoc B1 spread "
-            "calibration, which rescales each series' members about their mean using only past "
-            "outcomes. The ensemble mean, and so the mean absolute error, is unchanged.",
-            "A well-calibrated band holds the actual power 80% of the time. "
-            + RUN_SCOPE_SENTENCE.replace(
-                "chosen by the actual power alone",
-                "the run with the "
-                "median mean actual power in its first 7 days, chosen "
-                "by the actual power alone",
+            (
+                "Black line: actual power as a percentage of effective capacity. Blue shade: the "
+                "band holding the middle 80% of the 51 ensemble members (10% to 90%) of the "
+                "cleaned production forecast. Purple shade: the same band after the post hoc B1 "
+                "spread calibration, which rescales each series' members about their mean using "
+                "only past outcomes. The ensemble mean, and so the mean absolute error, is "
+                "unchanged."
+            ),
+            (
+                "A well-calibrated band holds the actual power 80% of the time. Each panel shows "
+                "one forecast run from the weekly runs of the validation year (July 2025 to June "
+                "2026): the run with the median mean actual power in its first 7 days among the "
+                "runs the calibration scored, chosen by the actual power alone."
             ),
         ],
         panel_titles=panel_titles,
@@ -546,9 +551,8 @@ def lead_day_figure(*, context: Context) -> tuple[FigureText, alt.VConcatChart]:
         ("Disaggregated Demand", "Disaggregated Demand series"),
         ("Raw Flow", "Raw Flow series"),
     ]
-    frames = []
-    for arm in arms:
-        frames.append(
+    frames = [
+        (
             context.scores[arm]
             .join(context.types, on="time_series_id")
             .filter(pl.col("lead_hours") < LEAD_DAY_LIMIT_HOURS)
@@ -559,6 +563,8 @@ def lead_day_figure(*, context: Context) -> tuple[FigureText, alt.VConcatChart]:
             )
             .with_columns(line=pl.lit(ARM_LABELS[arm]))
         )
+        for arm in arms
+    ]
     data = pl.concat(frames)
     entries = {ARM_LABELS[arm]: ARM_COLOURS[arm] for arm in arms}
     panel_titles, panels = [], []
@@ -567,11 +573,11 @@ def lead_day_figure(*, context: Context) -> tuple[FigureText, alt.VConcatChart]:
         panel_titles.append(f"Mean over the {count} {plural}")
         panels.append(
             alt.Chart(
-                data.filter(pl.col("time_series_type") == series_type).to_pandas(),
+                data.filter(pl.col("time_series_type") == series_type),
                 title=alt.TitleParams(panel_titles[-1], anchor="start", fontSize=12),
             )
             .mark_line(aria=False, point=True, strokeWidth=1.8)
-            .encode(
+            .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X(
                     "day:Q",
                     scale=alt.Scale(domain=[0.5, 11.5], nice=False),
@@ -591,16 +597,28 @@ def lead_day_figure(*, context: Context) -> tuple[FigureText, alt.VConcatChart]:
             )
             .properties(width=PLOT_WIDTH_PX, height=PANEL_HEIGHT_PX - 20)
         )
+    wide = data.pivot(on="line", index=["time_series_type", "day"], values="error")
+    assert (wide[ARM_LABELS[BEST_ROUND_2]] < wide[ARM_LABELS[PRODUCTION]]).all(), (
+        "figure 12's title says the best round 2 arm is lower at every lead day"
+    )
     text = FigureText(
         number=12,
-        title="Forecast error grows with lead time for every series type",
+        title=(
+            "The best round 2 arm has a lower error than production at every lead day, for all "
+            "four series types"
+        ),
         subtitle=[
-            "Mean absolute error of the ensemble mean (the average of the 51 ensemble members) "
-            "as a percentage of effective capacity; smaller is better, zero is a perfect "
-            "forecast. Each point averages every half-hourly forecast of the type's series, over "
-            "all 53 weekly runs of the validation year (July 2025 to June 2026).",
-            "Day 1 is the first 24 hours after a run's initialisation time. Leads of 11 days and "
-            "more are left out. The best round 2 arm was chosen after seeing round 1 (post hoc).",
+            (
+                "Mean absolute error of the ensemble mean (the average of the 51 ensemble "
+                "members) as a percentage of effective capacity; smaller is better, zero is a "
+                "perfect forecast. Each point averages every half-hourly forecast of the type's "
+                "series, over all 53 weekly runs of the validation year (July 2025 to June 2026)."
+            ),
+            (
+                "Day 1 is the first 24 hours after a run's initialisation time. Leads of 11 days "
+                "and more are left out. The best round 2 arm was chosen after seeing round 1 "
+                "(post hoc)."
+            ),
         ],
         panel_titles=panel_titles,
         x_title=LEAD_X_TITLE,
@@ -612,38 +630,55 @@ def lead_day_figure(*, context: Context) -> tuple[FigureText, alt.VConcatChart]:
 
 
 LEAD_X_TITLE: Final[str] = "Lead day (day 1 is the first 24 hours after the run's initialisation)"
-LEAD_Y_TITLE: Final[str] = "Mean absolute error (% of capacity; smaller is better)"
+LEAD_Y_TITLE: Final[str] = "Mean abs. error (% of capacity)"
 
 
-def build_figures(*, context: Context, wanted: set[int]) -> dict[int, tuple[FigureText, object]]:
+def build_figures(
+    *, context: Context, wanted: set[int]
+) -> dict[int, tuple[FigureText, alt.VConcatChart]]:
     """Build every wanted figure whose arms have all been scored."""
     best = BEST_ROUND_2 in context.scores
-    specs: dict[int, dict] = {
-        7: dict(
-            series_type="PV",
-            arms=[PRODUCTION, CLEANED, BEST_ROUND_2],
-            title="Forecasts of a PV farm follow the daily solar cycle but miss the cloudy days",
+    demand_arms = [PRODUCTION, "c4_absolute_error", "d3_pooled_with_site_id", BEST_ROUND_2]
+    specs: dict[int, tuple[str, list[str], str]] = {
+        7: (
+            "PV",
+            [PRODUCTION, CLEANED, BEST_ROUND_2],
+            (
+                "Forecasts of a PV farm follow the daily solar cycle but often miss the height of "
+                "each day's peak"
+            ),
         ),
-        8: dict(
-            series_type="Wind",
-            arms=[PRODUCTION, "a3w_lean_wind_only", BEST_ROUND_2],
-            title="Forecasts of a wind farm follow the actual power's slow swings only roughly",
+        8: (
+            "Wind",
+            [PRODUCTION, "a3w_lean_wind_only", BEST_ROUND_2],
+            (
+                "Forecasts of a wind farm follow the broad swings in power but miss its fast "
+                "changes and highest peaks"
+            ),
         ),
-        9: dict(
-            series_type="Disaggregated Demand",
-            arms=[PRODUCTION, "c4_absolute_error", "d3_pooled_with_site_id", BEST_ROUND_2],
-            title="Forecasts of a demand series follow its daily pattern closely",
+        9: (
+            "Disaggregated Demand",
+            demand_arms,
+            (
+                "Forecasts of a demand series follow its daily pattern but can sit well above or "
+                "below its level"
+            ),
         ),
-        10: dict(
-            series_type="Raw Flow",
-            arms=[PRODUCTION, "c4_absolute_error", "d3_pooled_with_site_id", BEST_ROUND_2],
-            title="Forecasts of a Raw Flow series follow its daily pattern closely",
+        10: (
+            "Raw Flow",
+            demand_arms,
+            (
+                "Forecasts of a Raw Flow series follow its daily swing but miss longer departures "
+                "from it"
+            ),
         ),
     }
-    built: dict[int, tuple[FigureText, object]] = {}
-    for number, spec in specs.items():
-        if number in wanted and best and all(arm in context.scores for arm in spec["arms"]):
-            built[number] = example_figure(context=context, number=number, **spec)
+    built: dict[int, tuple[FigureText, alt.VConcatChart]] = {}
+    for number, (series_type, arms, title) in specs.items():
+        if number in wanted and best and all(arm in context.scores for arm in arms):
+            built[number] = example_figure(
+                context=context, number=number, series_type=series_type, arms=arms, title=title
+            )
     if 11 in wanted:
         built[11] = band_figure(context=context)
     if 12 in wanted and best:
@@ -651,10 +686,10 @@ def build_figures(*, context: Context, wanted: set[int]) -> dict[int, tuple[Figu
     return built
 
 
-def save(*, chart: object, number: int) -> Path:
+def save(*, chart: alt.TopLevelMixin, number: int) -> Path:
     """Write a figure to SVG, optimise it with svgo, and write a PNG beside it for checking."""
     path = ASSETS_DIR / f"quick_wins_figure_{number}.svg"
-    chart.save(path)  # type: ignore[attr-defined]
+    chart.save(path)
     subprocess.run(
         ["npx", "svgo@4", "--multipass", "--precision=1", "--final-newline", str(path)],
         check=True,
@@ -671,8 +706,6 @@ def main() -> None:
     parser.add_argument("--figures", type=int, nargs="+", default=list(range(7, 13)))
     parser.add_argument("--png-dir", type=Path, default=None, help="also write PNG renders here")
     args = parser.parse_args()
-    ocf_theme_enabled = alt.theme.get()
-    assert ocf_theme_enabled is not None
     context = load_context(fold=args.fold, seed=args.seed)
     built = build_figures(context=context, wanted=set(args.figures))
     write_text_sections(texts=[text for text, _ in built.values()])
@@ -680,7 +713,7 @@ def main() -> None:
         print(save(chart=chart, number=number))
         if args.png_dir is not None:
             args.png_dir.mkdir(parents=True, exist_ok=True)
-            chart.save(args.png_dir / f"quick_wins_figure_{number}.png", scale_factor=2)  # type: ignore[attr-defined]
+            chart.save(args.png_dir / f"quick_wins_figure_{number}.png", scale_factor=2)
 
 
 if __name__ == "__main__":

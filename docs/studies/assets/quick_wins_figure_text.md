@@ -10,7 +10,7 @@ Subtitle lines:
 - Each dot is an arm's mean score over 31 series (solar, wind, demand, battery, and biofuel) and 53 weekly ECMWF ensemble (ENS) forecast runs, scored from July 2025 to June 2026; seed 0. Each score is a share of the series' own effective capacity.
 - Each line is the 95% interval from resampling whole months. Month-to-month swings are shared by all arms, so overlapping intervals can hide a real gap (see Figure 2).
 - Every arm is trained on one XGBoost model per series from the same weather; arms differ only in the one change in the label.
-- Round 2 labels list the ideas combined: abs. loss is the absolute-error loss, stopping is early stopping, lead is the forecast lead-time column, wind is the lean wind-farm columns, and pooled is one model per series type with a site identifier.
+- Round 2 labels list the ideas combined: abs. loss is the absolute-error loss, stop is early stopping, lead is the forecast lead-time column, wind is the lean wind-farm columns, and pooled is one model per series type with a site identifier.
 
 Panel titles:
 - CRPS of each arm, best first (scores the whole ensemble)
@@ -28,7 +28,7 @@ Legend entries:
 - Round 1: columns shown
 - Round 1: training
 - Round 2: combinations
-- Spread calibration: uncalibrated (blue)
+- Spread calibration: uncalibrated (black)
 - Spread calibration: calibrated (green)
 
 Annotations:
@@ -42,12 +42,11 @@ Annotations:
 
 Plots: Paired differences in CRPS and MAE (percentage points of capacity) between each round 1 arm and production with cleaning, with 95% month-resampled intervals.
 
-Title: Figure 2: 7 of 12 round 1 ideas lower CRPS reliably; the best, per type, with site identifier, lowers it by 0.8 points of capacity
+Title: Figure 2: 7 of 12 round 1 ideas lower CRPS reliably; the largest, "Per type, with site identifier", lowers it by 0.8 points of capacity
 
 Subtitle lines:
 - Each dot is the paired difference between an arm and production with cleaning in mean score, over 31 series and 53 weekly ECMWF ensemble (ENS) forecast runs, scored from July 2025 to June 2026; seed 0. Zero means no change.
 - Each line is the 95% interval from resampling whole months with the same months drawn for both arms. A line that excludes zero is a reliable difference.
-- (post hoc) marks an arm or rule chosen after seeing earlier results; a bold (planned) row was written into the study plan beforehand.
 
 Panel titles:
 - CRPS: scores the whole ensemble
@@ -64,13 +63,14 @@ Legend entries:
 Annotations:
 - same as production with cleaning
 - ← better than production with cleaning
+- Added by the figure template: Planned: one of the comparisons written into the study plan before any result existed. Every other row is exploratory or, where marked, post hoc.
 - Row labels ending (planned) are in bold; rows ending (post hoc) were chosen later.
 
 ## Figure 3
 
 Plots: Paired difference in CRPS (percentage points of capacity) from production with cleaning, for the main ideas and the best round 2 arm, one panel per series type.
 
-Title: Figure 3: The gains come mostly from wind farms: abs. loss, stopping, lead, wind, pooled lowers their CRPS by 3.6 points of capacity
+Title: Figure 3: The largest gains are in wind farms: abs. loss, stop, lead, wind, pooled lowers their CRPS by 3.6 points of capacity
 
 Subtitle lines:
 - Each dot is the paired difference in mean CRPS between an arm and production with cleaning, within one type of series, over 53 weekly ECMWF ensemble (ENS) forecast runs, scored from July 2025 to June 2026; seed 0. Zero means no change.
@@ -95,7 +95,7 @@ Legend entries:
 Annotations:
 - same as production with cleaning
 - ← better than production with cleaning
-- Round 2 labels list the ideas combined: abs. loss is the absolute-error loss, stopping is early stopping, lead is the forecast lead-time column, wind is the lean wind-farm columns, and pooled is one model per series type with a site identifier.
+- Round 2 labels list the ideas combined: abs. loss is the absolute-error loss, stop is early stopping, lead is the forecast lead-time column, wind is the lean wind-farm columns, and pooled is one model per series type with a site identifier.
 
 ## Figure 4
 
@@ -106,9 +106,9 @@ Title: Figure 4: Combining ideas lowers CRPS by up to 1.4 points of capacity, at
 Subtitle lines:
 - Each dot is the paired difference between an arm and production with cleaning in mean score, over 31 series and 53 weekly ECMWF ensemble (ENS) forecast runs, scored from July 2025 to June 2026; seed 0. Zero means no change.
 - Each line is the 95% interval from resampling whole months. Days 0 to 2 are forecasts up to 72 hours after the run starts; days 3 to 10 are 72 to 264 hours.
-- Every arm here was assembled after seeing the round 1 results, so every row is post hoc. The first row, absolute-error loss, is the best round 1 arm; each later row adds ideas.
+- The first row, absolute-error loss, is the best round 1 arm; each later row adds ideas.
 - The horizontal axis has the same range as Figure 2.
-- Round 2 labels list the ideas combined: abs. loss is the absolute-error loss, stopping is early stopping, lead is the forecast lead-time column, wind is the lean wind-farm columns, and pooled is one model per series type with a site identifier.
+- Round 2 labels list the ideas combined: abs. loss is the absolute-error loss, stop is early stopping, lead is the forecast lead-time column, wind is the lean wind-farm columns, and pooled is one model per series type with a site identifier.
 
 Panel titles:
 - CRPS: scores the whole ensemble
@@ -137,7 +137,6 @@ Subtitle lines:
 - Each dot is the paired difference between a cleaning rule and production, which uses the minimal cleaning already in the stored power table, over 31 series and 53 weekly ECMWF ensemble (ENS) forecast runs, scored from July 2025 to June 2026; seed 0. Rules change only the training data. Zero means no change.
 - Each line is the 95% interval from resampling whole months. Dropping the first 6 months of each series was also tried but removes a whole series, so it was not scored.
 - The chosen rule, drop new-meter settling, removes the 6 weeks after a demand meter first reads live. It was written after seeing the results of the other rules.
-- (post hoc) marks an arm or rule chosen after seeing earlier results; a bold (planned) row was written into the study plan beforehand.
 
 Panel titles:
 - CRPS: scores the whole ensemble
@@ -156,6 +155,7 @@ Legend entries:
 Annotations:
 - same as production
 - ← better than production
+- Added by the figure template: Planned: one of the comparisons written into the study plan before any result existed. Every other row is exploratory or, where marked, post hoc.
 - Demand 13 (2,722 half-hours removed)
 - Demand 16 (2,025 half-hours removed)
 
@@ -172,7 +172,7 @@ Subtitle lines:
 
 Panel titles:
 - a. 10% to 90% band coverage, Production with cleaning
-- a. 10% to 90% band coverage, Abs. loss, stopping, lead, wind, pooled
+- a. 10% to 90% band coverage, Abs. loss, stop, lead, wind, pooled
 - b. Change in CRPS from calibrating, by series type
 
 Axis titles:
@@ -180,12 +180,166 @@ Axis titles:
 - Change in CRPS from calibrating the spread (percentage points of capacity; more negative means better than uncalibrated)
 
 Legend entries:
-- Before calibration (blue)
+- Before calibration (black)
 - After calibration (green)
 - Production with cleaning
-- Abs. loss, stopping, lead, wind, pooled
+- Abs. loss, stop, lead, wind, pooled
 
 Annotations:
 - Dashed line: 80% band coverage if the ensemble were well spread
 - same as uncalibrated
 - ← better than uncalibrated
+
+## Figure 7
+
+Title: Figure 7: Forecasts of a PV farm follow the daily solar cycle but often miss the height of each day's peak
+
+Subtitle:
+- Black line: actual power of PV farm A. Coloured lines: each forecast's ensemble mean (the average of the 51 ensemble members), as a percentage of the series' effective capacity. Zero is no power.
+- Each panel shows one forecast run from the weekly runs of the validation year (July 2025 to June 2026), chosen by the actual power alone and not by forecast error.
+- Panels run from the run with the highest mean actual power (top) to the lowest (bottom). The series is the lower-middle one of its type when ranked by the cleaned production forecast's mean normalised CRPS (continuous ranked probability score) over the 53 weekly runs.
+
+Panel titles:
+- PV farm A: Run with the highest daily energy in its first 7 days
+- PV farm A: Run with the median daily energy in its first 7 days
+- PV farm A: Run with the lowest daily energy in its first 7 days
+
+X axis title: Days since the run's initialisation time (day 1 is the first 24 hours)
+Y axis title: Power (% of effective capacity)
+
+Legend entries:
+- Actual power
+- Production as stored
+- Production, cleaned training data
+- Best round 2 arm (post hoc)
+
+Other text:
+- Models were trained on one random seed (seed 0).
+
+## Figure 8
+
+Title: Figure 8: Forecasts of a wind farm follow the broad swings in power but miss its fast changes and highest peaks
+
+Subtitle:
+- Black line: actual power of Wind farm W3. Coloured lines: each forecast's ensemble mean (the average of the 51 ensemble members), as a percentage of the series' effective capacity. Zero is no power.
+- Each panel shows one forecast run from the weekly runs of the validation year (July 2025 to June 2026), chosen by the actual power alone and not by forecast error.
+- Panels run from the run with the highest mean actual power (top) to the lowest (bottom). The series is the lower-middle one of its type when ranked by the cleaned production forecast's mean normalised CRPS (continuous ranked probability score) over the 53 weekly runs.
+
+Panel titles:
+- Wind farm W3: Run with the highest mean actual power in its first 7 days
+- Wind farm W3: Run with the median mean actual power in its first 7 days
+- Wind farm W3: Run with the lowest mean actual power in its first 7 days
+
+X axis title: Days since the run's initialisation time (day 1 is the first 24 hours)
+Y axis title: Power (% of effective capacity)
+
+Legend entries:
+- Actual power
+- Production as stored
+- A3w: lean wind columns (post hoc)
+- Best round 2 arm (post hoc)
+
+Other text:
+- Models were trained on one random seed (seed 0).
+
+## Figure 9
+
+Title: Figure 9: Forecasts of a demand series follow its daily pattern but can sit well above or below its level
+
+Subtitle:
+- Black line: actual power of Demand 1. Coloured lines: each forecast's ensemble mean (the average of the 51 ensemble members), as a percentage of the series' effective capacity. Zero is no power.
+- Each panel shows one forecast run from the weekly runs of the validation year (July 2025 to June 2026), chosen by the actual power alone and not by forecast error.
+- Panels run from the run with the highest mean actual power (top) to the lowest (bottom). The series is the lower-middle one of its type when ranked by the cleaned production forecast's mean normalised CRPS (continuous ranked probability score) over the 53 weekly runs.
+
+Panel titles:
+- Demand 1: Run with the highest mean actual power in its first 7 days
+- Demand 1: Run with the median mean actual power in its first 7 days
+- Demand 1: Run with the lowest mean actual power in its first 7 days
+
+X axis title: Days since the run's initialisation time (day 1 is the first 24 hours)
+Y axis title: Power (% of effective capacity)
+
+Legend entries:
+- Actual power
+- Production as stored
+- C4: absolute-error loss
+- D3: pooled with site identifier (post hoc)
+- Best round 2 arm (post hoc)
+
+Other text:
+- Models were trained on one random seed (seed 0).
+
+## Figure 10
+
+Title: Figure 10: Forecasts of a Raw Flow series follow its daily swing but miss longer departures from it
+
+Subtitle:
+- Black line: actual power of Raw Flow 1. Coloured lines: each forecast's ensemble mean (the average of the 51 ensemble members), as a percentage of the series' effective capacity. Zero is no power.
+- Each panel shows one forecast run from the weekly runs of the validation year (July 2025 to June 2026), chosen by the actual power alone and not by forecast error.
+- Panels run from the run with the highest mean actual power (top) to the lowest (bottom). The series is the lower-middle one of its type when ranked by the cleaned production forecast's mean normalised CRPS (continuous ranked probability score) over the 53 weekly runs.
+
+Panel titles:
+- Raw Flow 1: Run with the highest mean actual power in its first 7 days
+- Raw Flow 1: Run with the median mean actual power in its first 7 days
+- Raw Flow 1: Run with the lowest mean actual power in its first 7 days
+
+X axis title: Days since the run's initialisation time (day 1 is the first 24 hours)
+Y axis title: Power (% of effective capacity)
+
+Legend entries:
+- Actual power
+- Production as stored
+- C4: absolute-error loss
+- D3: pooled with site identifier (post hoc)
+- Best round 2 arm (post hoc)
+
+Other text:
+- Models were trained on one random seed (seed 0).
+
+## Figure 11
+
+Title: Figure 11: The raw ensemble band is too narrow, and rescaling the spread widens it
+
+Subtitle:
+- Black line: actual power as a percentage of effective capacity. Blue shade: the band holding the middle 80% of the 51 ensemble members (10% to 90%) of the cleaned production forecast. Purple shade: the same band after the post hoc B1 spread calibration, which rescales each series' members about their mean using only past outcomes. The ensemble mean, and so the mean absolute error, is unchanged.
+- A well-calibrated band holds the actual power 80% of the time. Each panel shows one forecast run from the weekly runs of the validation year (July 2025 to June 2026): the run with the median mean actual power in its first 7 days among the runs the calibration scored, chosen by the actual power alone.
+
+Panel titles:
+- PV farm A: median run (by daily energy); this series' spread was multiplied by 8.0
+- Wind farm W3: median run (by mean actual power); this series' spread was multiplied by 8.0
+
+X axis title: Days since the run's initialisation time (day 1 is the first 24 hours)
+Y axis title: Power (% of effective capacity)
+
+Legend entries:
+- Actual power
+- 10% to 90% member band, production (cleaned)
+- 10% to 90% member band after spread calibration (post hoc)
+
+Other text:
+- PV, all runs after the first 8: share of actual values inside the band 16% before and 70% after calibration (nominal 80%).
+- Wind, all runs after the first 8: share of actual values inside the band 16% before and 65% after calibration (nominal 80%).
+
+## Figure 12
+
+Title: Figure 12: The best round 2 arm has a lower error than production at every lead day, for all four series types
+
+Subtitle:
+- Mean absolute error of the ensemble mean (the average of the 51 ensemble members) as a percentage of effective capacity; smaller is better, zero is a perfect forecast. Each point averages every half-hourly forecast of the type's series, over all 53 weekly runs of the validation year (July 2025 to June 2026).
+- Day 1 is the first 24 hours after a run's initialisation time. Leads of 11 days and more are left out. The best round 2 arm was chosen after seeing round 1 (post hoc).
+
+Panel titles:
+- Mean over the 6 PV farms
+- Mean over the 3 Wind farms
+- Mean over the 16 Disaggregated Demand series
+- Mean over the 4 Raw Flow series
+
+X axis title: Lead day (day 1 is the first 24 hours after the run's initialisation)
+Y axis title: Mean abs. error (% of capacity)
+
+Legend entries:
+- Production as stored
+- Best round 2 arm (post hoc)
+
+Other text:
+- Models were trained on one random seed (seed 0).

@@ -18,9 +18,9 @@ from pathlib import Path
 from typing import Final
 
 import extra_features
-import inputs
 import patito as pt
 import polars as pl
+import quick_wins_inputs as inputs
 from contracts.power_schemas import TimeSeriesMetadata
 from contracts.settings import Settings
 from ml_core.features._parsed_features import ParsedFeatures

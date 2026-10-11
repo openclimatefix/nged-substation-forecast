@@ -15,9 +15,9 @@ from typing import Final
 
 import arms as arm_definitions
 import fit_arms
-import inputs
 import month_bootstrap
 import polars as pl
+import quick_wins_inputs as inputs
 from contracts.settings import Settings
 from per_run_scores import LEAD_BAND_ORDER
 from report_tables import markdown_table

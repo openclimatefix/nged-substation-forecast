@@ -18,9 +18,9 @@ from typing import Final
 import arms as arm_definitions
 import build_frames
 import cleaning_rules
-import inputs
 import numpy as np
 import polars as pl
+import quick_wins_inputs as inputs
 import xgboost as xgb
 from contracts.settings import Settings
 from nged_data.storage import scan_cleaned_power

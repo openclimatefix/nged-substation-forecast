@@ -15,9 +15,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Final
 
-import inputs
 import mlflow
 import polars as pl
+import quick_wins_inputs as inputs
 from contracts.settings import Settings
 from per_run_scores import (
     LEAD_BAND_ORDER,

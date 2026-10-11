@@ -19,13 +19,13 @@ from contracts.typing_utils import typeddict_to_dict
 from contracts.weather_schemas import Nwp
 from ml_core.cv_helpers import date_to_utc_datetime
 from nged_data.storage import scan_cleaned_power
-from studies.sources import REPO_DATA_DIR
+from studies.sources import PER_STUDY_DIR
 from xgboost_forecaster.forecaster import XGBoostConfig
 
 FOLD_A: Final[str] = "mid_2025_to_mid_2026"
 """The leaderboard fold, and the fold every round of the study selects on."""
 
-OUTPUT_ROOT: Final[Path] = REPO_DATA_DIR / "studies" / "per_study" / "quick_wins"
+OUTPUT_ROOT: Final[Path] = PER_STUDY_DIR / "quick_wins"
 """Where the study writes every table and prediction file."""
 
 SAMPLE_STRIDE_DAYS: Final[int] = 7

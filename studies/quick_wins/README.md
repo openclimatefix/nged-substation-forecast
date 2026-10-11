@@ -14,7 +14,7 @@ skips any arm whose scores already exist.
 
 | Script | What it does |
 |---|---|
-| `inputs.py` | The folds, the 31 series, effective capacity, the production configuration, and a copy of the production feature loader (studies may not import the Dagster `src/` tree). |
+| `quick_wins_inputs.py` | The folds, the 31 series, effective capacity, the production configuration, and a copy of the production feature loader (studies may not import the Dagster `src/` tree). |
 | `build_frames.py` | Builds and caches the training frame (control member) and one validation frame per sampled run (all members) for a fold. |
 | `fit_production_arm.py`, `report_production_arm.py` | Refit production with the production code path on CPU or GPU and score it against the stored `xgboost_baseline`, `manual_heuristic` and `climatology` on the sampled runs. This is the reproduction gate. |
 | `cleaning_rules.py`, `extra_features.py`, `arms.py` | Round 0 cleaning rules, the extra feature columns, and the definition of every arm. |

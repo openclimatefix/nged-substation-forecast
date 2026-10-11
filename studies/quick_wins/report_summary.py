@@ -12,9 +12,9 @@ from pathlib import Path
 from typing import Final
 
 import arms as arm_definitions
-import inputs
 import month_bootstrap
 import polars as pl
+import quick_wins_inputs as inputs
 from contracts.settings import Settings
 from per_run_scores import normalised_by_capacity
 from report_tables import markdown_table

@@ -1,3 +1,4 @@
+# ruff: noqa: E501, PLR0915
 """Draw Figures 1 to 6 of the quick-wins study: the leaderboard, the contrasts, and calibration.
 
 Every number is read from the report tables written by `report_quick_wins.py` and from the
@@ -18,15 +19,16 @@ import re
 import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Final
 
 import altair as alt
 import arms as arm_definitions
-import inputs
 import month_bootstrap
 import plotting.ocf_theme as ocf
 import polars as pl
+import quick_wins_inputs as inputs
 from contracts.settings import PROJECT_ROOT, Settings
 
 from studies import charts
@@ -104,11 +106,11 @@ ARM_LABELS: Final[dict[str, str]] = {
     "d1_min_child_weight_20": "Minimum child weight 20",
     "d2_pooled_by_type": "One model per series type",
     "d3_pooled_with_site_id": "Per type, with site identifier",
-    "r2_c4_c2": "Abs. loss, stopping",
+    "r2_c4_c2": "Abs. loss, stop",
     "r2_c4_c1": "Abs. loss, lead time",
-    "r2_c4_c2_c1": "Abs. loss, stopping, lead time",
-    "r2_c4_c2_c1_a3w": "Abs. loss, stopping, lead, wind",
-    "r2_c4_c2_c1_a3w_d3": "Abs. loss, stopping, lead, wind, pooled",
+    "r2_c4_c2_c1": "Abs. loss, stop, lead time",
+    "r2_c4_c2_c1_a3w": "Abs. loss, stop, lead, wind",
+    "r2_c4_c2_c1_a3w_d3": "Abs. loss, stop, lead, wind, pooled",
     "r2_c4_c1_a3w_d3": "Abs. loss, lead, wind, pooled",
 }
 """A short label for every arm, at most 40 characters so a row label stays on one line."""
@@ -119,7 +121,7 @@ ARM_FAMILIES: Final[dict[str, str]] = {
 """The kind of each arm: reference, cleaning, features, training, or combination."""
 
 ROUND2_LEGEND: Final[str] = (
-    "Round 2 labels list the ideas combined: abs. loss is the absolute-error loss, stopping is "
+    "Round 2 labels list the ideas combined: abs. loss is the absolute-error loss, stop is "
     "early stopping, lead is the forecast lead-time column, wind is the lean wind-farm columns, "
     "and pooled is one model per series type with a site identifier."
 )
@@ -332,8 +334,8 @@ def _read_calibration(*, fold: str, seeds: list[int]) -> tuple[pl.DataFrame | No
     return None, None
 
 
-def _month_year(*, moment: object) -> str:
-    return moment.strftime("%B %Y")  # type: ignore[attr-defined]
+def _month_year(*, moment: datetime) -> str:
+    return moment.strftime("%B %Y")
 
 
 def _scope(*, fold: str) -> str:
@@ -408,6 +410,8 @@ def build_context(*, fold: str, seeds: list[int]) -> Context:
     ).sort("value")
     if not round2.is_empty():
         best_round2 = round2["arm"][0]
+    if calibration is not None:
+        calibration = calibration.filter(pl.col("arm").is_in(["production_cleaned", best_round2]))
     if calibration is not None and calibration_seed is not None:
         first = calibration["arm"][0]
         raw = pl.read_parquet(
@@ -501,7 +505,19 @@ def _contrast_rows(
                 "planned": mark_planned and arm in PLANNED_ARMS,
             }
         )
-    return pl.DataFrame(rows)
+    return pl.DataFrame(
+        rows,
+        schema={
+            "arm": pl.String,
+            "label": pl.String,
+            "family": pl.String,
+            "difference": pl.Float64,
+            "lower_95": pl.Float64,
+            "upper_95": pl.Float64,
+            "condition": pl.String,
+            "planned": pl.Boolean,
+        },
+    )
 
 
 def _domain(*, frames: Sequence[pl.DataFrame]) -> tuple[float, float]:
@@ -567,7 +583,8 @@ def _dot_panel(
     width: int = charts.PLOT_WIDTH_PX,
     tick_values: Sequence[float] | None = None,
     x_format: str = ".1~f",
-) -> alt.LayerChart:
+    key_title: str | None = None,
+) -> alt.LayerChart | alt.VConcatChart:
     """Draw one dot per row, with an interval where the row has one, coloured by `key`.
 
     Args:
@@ -583,7 +600,9 @@ def _dot_panel(
         row_step_px: The row height.
         width: The plot width.
         tick_values: Axis ticks, or the round ticks of the domain.
-        x_tick_format: Format of the tick labels.
+        x_format: Format of the tick labels.
+        key_title: Where given, colours are drawn literally (outside the figure's shared colour
+            scale) and a key with this title sits above the panel; `legend_title` is then ignored.
     """
     labels = list(dict.fromkeys(rows["label"].to_list()))
     data = rows.with_columns(pl.col("value").round(3))
@@ -596,14 +615,26 @@ def _dot_panel(
         format=x_format,
     )
     title_lines = charts.wrapped(text=x_title, width=78)
-    colour = alt.Color(
-        "key:N",
-        scale=alt.Scale(domain=list(colours), range=list(colours.values())),
-        legend=(
-            alt.Legend(title=legend_title, symbolType="circle", symbolOpacity=1, columns=3)
-            if legend_title
-            else None
-        ),
+    if key_title is not None:
+        data = data.with_columns(colour=pl.col("key").replace_strict(colours))
+    colour = (
+        alt.Color("colour:N", scale=None, legend=None)
+        if key_title is not None
+        else alt.Color(
+            "key:N",
+            scale=alt.Scale(domain=list(colours), range=list(colours.values())),
+            legend=(
+                alt.Legend(
+                    title=legend_title,
+                    symbolType="circle",
+                    symbolOpacity=1,
+                    columns=2,
+                    labelLimit=300,
+                )
+                if legend_title
+                else None
+            ),
+        )
     )
     y = alt.Y(
         "label:N",
@@ -662,7 +693,7 @@ def _dot_panel(
         layers.append(
             alt.Chart(anchor)
             .mark_text(
-                align=align,
+                align=align,  # ty: ignore[invalid-argument-type]
                 dx=4 if align == "left" else -4,
                 baseline="bottom",
                 dy=-4 - 13 * level,
@@ -670,18 +701,28 @@ def _dot_panel(
             )
             .encode(x="x:Q", y=alt.value(0), text=alt.value(text))  # ty: ignore[unresolved-attribute]
         )
-    return alt.LayerChart(
+    panel = alt.LayerChart(
         layer=layers,
         width=width,
         height=alt.Step(row_step_px / offsets),
         title=alt.TitleParams(
-            panel_title,
+            charts.wrapped(text=panel_title, width=85),
             anchor="start",
             frame="group",
             fontSize=charts._PANEL_TITLE_PX,
             offset=13 * (len(reference_frames) + 1) if reference_frames else 5,
         ),
     )
+    if key_title is None:
+        return panel
+    key = charts._key(
+        title=key_title,
+        labels=list(colours),
+        shapes=["circle"] * len(colours),
+        filled=[True] * len(colours),
+        colours=list(colours.values()),
+    )
+    return alt.vconcat(key, panel, spacing=8)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -702,7 +743,7 @@ def figure_1(*, context: Context) -> Figure:
             "value",
             "lower_95",
             "upper_95",
-            pl.col("arm").replace_strict(ARM_FAMILIES).alias("key"),
+            pl.col("arm").replace_strict(ARM_FAMILIES).replace_strict(FAMILY_LABELS).alias("key"),
         )
 
     crps_rows, mae_rows = shape(crps), shape(mae)
@@ -776,7 +817,7 @@ def figure_1(*, context: Context) -> Figure:
         ROUND2_LEGEND,
     ]
     legend = [FAMILY_LABELS[f] for f in FAMILY_ORDER]
-    legend += ["Spread calibration: uncalibrated (blue)", "Spread calibration: calibrated (green)"]
+    legend += ["Spread calibration: uncalibrated (black)", "Spread calibration: calibrated (green)"]
     text = FigureText(
         number=1,
         plots=(
@@ -800,14 +841,18 @@ def figure_1(*, context: Context) -> Figure:
     )
 
     def draw() -> alt.TopLevelMixin:
-        colours = {family: FAMILY_COLOURS[family] for family in FAMILY_ORDER}
+        colours = {
+            **{FAMILY_LABELS[family]: FAMILY_COLOURS[family] for family in FAMILY_ORDER},
+            "Uncalibrated": ocf.BLACK_1,
+            "Calibrated": ocf.DATA_GREEN,
+        }
         top = _dot_panel(
             rows=crps_rows,
             x_domain=crps_domain,
             x_title=x_crps,
             panel_title=panel_crps,
             colours=colours,
-            legend_title="Kind of arm",
+            legend_title="Kind of arm, then calibration",
             rules=rules("crps", stored["value"]),
             row_step_px=ROW_STEP_PX,
         )
@@ -835,12 +880,9 @@ def figure_1(*, context: Context) -> Figure:
                     x_domain=cal_domain,
                     x_title=cal_x,
                     panel_title=cal_panel,
-                    colours={
-                        "Uncalibrated": ocf.DATA_BLUE,
-                        "Calibrated": ocf.DATA_GREEN,
-                    },
-                    legend_title="Spread calibration",
-                    row_step_px=ROW_STEP_PX,
+                    colours=colours,
+                    legend_title=None,
+                    row_step_px=34,
                 )
             )
         return charts.figure(
@@ -888,16 +930,16 @@ def _round1_and_round2_domain(*, context: Context) -> tuple[float, float]:
                 context=context, arms=ROUND1_ARMS, reference="production_cleaned", metric=metric
             )
         )
-        for band in BANDS:
-            frames.append(
-                _contrast_rows(
-                    context=context,
-                    arms=ROUND2_LADDER,
-                    reference="production_cleaned",
-                    metric=metric,
-                    band=band,
-                )
+        frames.extend(
+            _contrast_rows(
+                context=context,
+                arms=ROUND2_LADDER,
+                reference="production_cleaned",
+                metric=metric,
+                band=band,
             )
+            for band in BANDS
+        )
     return _domain(frames=[f for f in frames if not f.is_empty()])
 
 
@@ -919,7 +961,7 @@ def figure_2(*, context: Context) -> Figure:
     n_better = crps.filter(pl.col("upper_95") < 0).height
     title = (
         f"{n_better} of {crps.height} round 1 ideas lower CRPS reliably; "
-        f"the best, {ARM_LABELS[best['arm']].lower()}, lowers it by {-best['difference']:.1f} "
+        f'the largest, "{ARM_LABELS[best["arm"]]}", lowers it by {-best["difference"]:.1f} '
         "points of capacity"
     )
     subtitle = [
@@ -932,7 +974,6 @@ def figure_2(*, context: Context) -> Figure:
             "Each line is the 95% interval from resampling whole months with the same months drawn "
             "for both arms. A line that excludes zero is a reliable difference."
         ),
-        POST_HOC_LINE,
     ]
     x_crps = CONTRAST_X.format(metric="CRPS")
     x_mae = CONTRAST_X.format(metric="MAE")
@@ -959,6 +1000,7 @@ def figure_2(*, context: Context) -> Figure:
         annotations=[
             ZERO_LABEL,
             f"← {BETTER_LABEL}",
+            f"Added by the figure template: {charts.POST_HOC_PLANNING_NOTE}",
             "Row labels ending (planned) are in bold; rows ending (post hoc) were chosen later.",
         ],
     )
@@ -986,7 +1028,7 @@ def figure_2(*, context: Context) -> Figure:
             panels=panels,
             number=2,
             title=title,
-            subtitle=subtitle[:-1],
+            subtitle=subtitle,
             figure_planning="mixed",
             post_hoc=True,
         )
@@ -1036,10 +1078,7 @@ def figure_4(*, context: Context) -> Figure:
             "Each line is the 95% interval from resampling whole months. Days 0 to 2 are forecasts "
             "up to 72 hours after the run starts; days 3 to 10 are 72 to 264 hours."
         ),
-        (
-            "Every arm here was assembled after seeing the round 1 results, so every row is post hoc. "
-            "The first row, absolute-error loss, is the best round 1 arm; each later row adds ideas."
-        ),
+        ("The first row, absolute-error loss, is the best round 1 arm; each later row adds ideas."),
         "The horizontal axis has the same range as Figure 2.",
         ROUND2_LEGEND,
     ]
@@ -1128,7 +1167,7 @@ def figure_3(*, context: Context) -> Figure:
     biggest = max(blocks, key=lambda t: -min(blocks[t]["difference"]))
     best_arm = blocks[biggest].sort("difference").row(0, named=True)
     title = (
-        f"The gains come mostly from {TYPE_LABELS[biggest].lower()}: "
+        f"The largest gains are in {TYPE_LABELS[biggest].lower()}: "
         f"{ARM_LABELS[best_arm['arm']].lower()} lowers their CRPS by "
         f"{-best_arm['difference']:.1f} points of capacity"
     )
@@ -1171,7 +1210,7 @@ def figure_3(*, context: Context) -> Figure:
     def draw() -> alt.TopLevelMixin:
         panels = []
         kinds_all = [_kind_of(arm) for arm in arms]
-        for index, (series_type, rows) in enumerate(blocks.items()):
+        for index, rows in enumerate(blocks.values()):
             kinds = [_kind_of(arm) for arm in rows["arm"]]
             panels.append(
                 charts.interval_panel(
@@ -1272,10 +1311,12 @@ def _rows_removed(*, context: Context) -> dict[int, int]:
     return dict(zip(counted["time_series_id"], counted["len"], strict=True))
 
 
-def figure_5(*, context: Context) -> Figure:
+def figure_5(*, context: Context) -> Figure | None:
     """Round 0 cleaning: contrasts against production, then the per-series change."""
     arms = [arm for arm in CLEANING_ARMS if arm in set(context.contrasts["arm"].to_list())]
     crps = _contrast_rows(context=context, arms=arms, reference="production", metric="crps")
+    if crps.is_empty():
+        return None
     mae = _contrast_rows(context=context, arms=arms, reference="production", metric="mae")
     kinds = ["Cleaning"] * len(arms)
     changed_all = _changed_series(context=context)
@@ -1329,7 +1370,6 @@ def figure_5(*, context: Context) -> Figure:
             "The chosen rule, drop new-meter settling, removes the 6 weeks after a demand meter first "
             "reads live. It was written after seeing the results of the other rules."
         ),
-        POST_HOC_LINE,
     ]
     text = FigureText(
         number=5,
@@ -1351,13 +1391,19 @@ def figure_5(*, context: Context) -> Figure:
             x_series + " (smaller is better)",
         ],
         legend=["Change in CRPS (blue)", "Change in MAE (orange)"],
-        annotations=[zero, f"← {better}", *rows_label.values()],
+        annotations=[
+            zero,
+            f"← {better}",
+            f"Added by the figure template: {charts.POST_HOC_PLANNING_NOTE}",
+            *rows_label.values(),
+        ],
     )
 
     def draw() -> alt.TopLevelMixin:
         panels: list[charts.Panel] = []
-        for index, (rows, x_title, panel_title) in enumerate(
-            ((crps, x_crps, panel_crps), (mae, x_mae, panel_mae))
+        for rows, x_title, panel_title in (
+            (crps, x_crps, panel_crps),
+            (mae, x_mae, panel_mae),
         ):
             panels.append(
                 charts.interval_panel(
@@ -1395,7 +1441,8 @@ def figure_5(*, context: Context) -> Figure:
                     x_title=x_series + " (smaller is better)",
                     panel_title=panel_series,
                     colours={"Change in CRPS": ocf.DATA_BLUE, "Change in MAE": ocf.BRAND_ORANGE},
-                    legend_title="Metric",
+                    legend_title=None,
+                    key_title="Metric",
                     zero_rule="same as production",
                     row_step_px=44,
                 )
@@ -1404,7 +1451,7 @@ def figure_5(*, context: Context) -> Figure:
             panels=panels,
             number=5,
             title=title,
-            subtitle=subtitle[:-1],
+            subtitle=subtitle,
             figure_planning="mixed",
             post_hoc=True,
         )
@@ -1474,7 +1521,7 @@ def figure_6(*, context: Context) -> Figure | None:
                 x_title=x_b, better_label=better, better_direction="negative"
             ),
         ],
-        legend=["Before calibration (blue)", "After calibration (green)", *arm_titles.values()],
+        legend=["Before calibration (black)", "After calibration (green)", *arm_titles.values()],
         annotations=[
             "Dashed line: 80% band coverage if the ensemble were well spread",
             zero,
@@ -1507,14 +1554,15 @@ def figure_6(*, context: Context) -> Figure | None:
             panels.append(
                 _dot_panel(
                     rows=pl.DataFrame(rows),
-                    x_domain=(0.0, 100.0),
+                    x_domain=(-4.0, 100.0),
                     x_title=x_a,
                     panel_title=panel_a[index],
                     colours={
-                        "Before calibration": ocf.DATA_BLUE,
+                        "Before calibration": ocf.BLACK_1,
                         "After calibration": ocf.DATA_GREEN,
                     },
-                    legend_title="Ensemble spread" if index == 0 else None,
+                    legend_title=None,
+                    key_title="Ensemble spread",
                     rules=[(80.0, "80% if well spread", "left")],
                     row_step_px=34,
                     tick_values=[0, 20, 40, 60, 80, 100],
@@ -1522,7 +1570,7 @@ def figure_6(*, context: Context) -> Figure | None:
                 )
             )
         rows_b = []
-        for arm_index, arm in enumerate(arms):
+        for arm in arms:
             for group in groups:
                 row = calibration.filter((pl.col("arm") == arm) & (pl.col("group") == group)).row(
                     0, named=True
