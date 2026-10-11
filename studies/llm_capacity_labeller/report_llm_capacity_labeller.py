@@ -190,6 +190,11 @@ def round3_sections(*, root: Path) -> list[str]:
             "noise_floor.parquet",
         ),
         (
+            "Candidate coverage: planted losses with a candidate or scan episode at the start",
+            tables,
+            "candidate_coverage_all.parquet",
+        ),
+        (
             "Round 1 candidate coverage: events with a candidate near the start and the end",
             root / "tables_round2",
             "candidate_coverage.parquet",

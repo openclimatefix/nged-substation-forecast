@@ -178,8 +178,8 @@ a
 - [Can a language model label a solar plant's capacity changes?](forecasts/llm-capacity-labeller.md)
   — with six deterministic evidence tools, Claude Sonnet 5.5 found 0 of 32 planted one-month losses
   and the 30% positive control failed its gate, so the planned contrasts are untested. In post hoc
-  rounds it marked 6% to 12% of new small losses (2 of 68 after the hard checks in round 2), but 23
-  of 24 answers on a 60% loss lasting 90 days, where a fixed rule marked 1 of 12.
+  rounds with an amended check, it hit 18 of 129 one-month losses (14%) and every one of 12 losses
+  of 60% lasting 90 days, against 13 of 129 and 1 of 12 for a fixed rule.
 - [Which IFS forecast variables, or which second forecast, help a solar power
   forecast?](forecasts/ifs-solar-variables.md) — at the 6 solar farms, no planned step of adding
   extra variables from ECMWF's 9 km IFS forecast lowers the error at lead days 1 to 3 by a resolved

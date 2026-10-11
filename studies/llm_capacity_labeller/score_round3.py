@@ -67,6 +67,9 @@ ROUND1_DRAWS: Final[tuple[RecordIdType, ...]] = ("draw01", "draw02")
 ROUND2_DRAWS: Final[tuple[RecordIdType, ...]] = ("draw03", "draw04")
 ROUND3_DRAWS: Final[tuple[RecordIdType, ...]] = ("draw05", "draw06")
 EASY_RECORDS: Final[tuple[RecordIdType, ...]] = ("easy01", "easy02")
+ROUND4_DRAWS: Final[tuple[RecordIdType, ...]] = tuple(f"draw{n:02d}" for n in range(7, 15))  # ty: ignore[invalid-assignment]
+GRID_30_90: Final[tuple[RecordIdType, ...]] = ("grid01", "grid02")
+GRID_60_30: Final[tuple[RecordIdType, ...]] = ("grid03", "grid04")
 """The records each round is scored on."""
 
 SCAN_NOISE_WORDS: Final[tuple[str, ...]] = ("seasonal", "weather", "artefact", "artifact", "noise")
@@ -128,6 +131,17 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     ) -> dict[int, Answer] | None:
         """Return every plant's answer of an arm (`tools_only_v1`, `tools_llm_v2`, ...)."""
         name, _, version = arm.rpartition("_")
+        if name == "static":
+            return {
+                p: Answer(
+                    plant=context.sites[p],
+                    first_day=first_day,
+                    last_day=last_day,
+                    no_change=True,
+                    knots=(),
+                )
+                for p in range(plants)
+            }
         if name == "tools_only":
             rule = tools_only_answer if version == "v1" else tools_only_v2_answer
             return {
@@ -199,8 +213,9 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     ) -> dict[str, object]:
         hits = int(table["hit"].sum())
         lower, upper = wilson_interval(successes=hits, trials=table.height)
-        any_hit = table.group_by("record", "event").agg(h=pl.col("hit").any())["h"].sum()
+        any_hit = int(table.group_by("record", "event").agg(h=pl.col("hit").any())["h"].sum())
         events = table.select("record", "event").unique().height
+        event_lower, event_upper = wilson_interval(successes=any_hit, trials=events)
         return {
             "round": round_name,
             "label": label,
@@ -212,7 +227,10 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             "wilson_95_lower": lower,
             "wilson_95_upper": upper,
             "events": events,
-            "events_with_a_hit": int(any_hit),
+            "events_with_a_hit": any_hit,
+            "event_hit_rate": any_hit / events,
+            "event_wilson_95_lower": event_lower,
+            "event_wilson_95_upper": event_upper,
             "capacity_error_points": float(table["capacity_error"].mean()),  # ty: ignore[invalid-argument-type]
         }
 
@@ -222,6 +240,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             "planned",
             ROUND1_DRAWS,
             [
+                ("static_v1", 1, ("none",)),
                 ("tools_only_v1", 1, ("none",)),
                 ("tools_llm_v1", 2, ("none", "original")),
                 ("raw_llm_v1", 1, ("none",)),
@@ -232,6 +251,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             "post hoc",
             ROUND2_DRAWS,
             [
+                ("static_v1", 1, ("none",)),
                 ("tools_only_v1", 1, ("none",)),
                 ("tools_only_v2", 1, ("none",)),
                 ("tools_llm_v1", 2, ("none", "original")),
@@ -244,6 +264,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             "post hoc",
             ROUND3_DRAWS,
             [
+                ("static_v1", 1, ("none",)),
                 ("tools_only_v1", 1, ("none",)),
                 ("tools_only_v2", 1, ("none",)),
                 ("tools_llm_v2", 2, ("none", "original", "amended")),
@@ -253,7 +274,64 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             "easy case",
             "post hoc",
             EASY_RECORDS,
-            [("tools_only_v2", 1, ("none",)), ("tools_llm_v2", 2, ("none", "original", "amended"))],
+            [
+                ("static_v1", 1, ("none",)),
+                ("tools_only_v2", 1, ("none",)),
+                ("tools_llm_v2", 2, ("none", "original", "amended")),
+            ],
+        ),
+    ]
+    full = tuple(
+        r
+        for r in ROUND4_DRAWS
+        if all(
+            book(arm="tools_llm_v2", record_id=r, sample=k, check="none") is not None
+            for k in range(2)
+        )
+    )
+    model_checks = ("none", "original", "amended")
+    last_draw = full[-1][-2:] if full else "06"
+    specs += [
+        (
+            f"draws 07 to {last_draw}",
+            "post hoc",
+            full,
+            [
+                ("static_v1", 1, ("none",)),
+                ("tools_only_v2", 1, ("none",)),
+                ("tools_llm_v2", 2, model_checks),
+            ],
+        ),
+        (
+            f"draws 05 to {last_draw} pooled",
+            "post hoc, round 3 pre-registered",
+            (*ROUND3_DRAWS, *full),
+            [
+                ("static_v1", 1, ("none",)),
+                ("tools_only_v1", 1, ("none",)),
+                ("tools_only_v2", 1, ("none",)),
+                ("tools_llm_v2", 2, model_checks),
+            ],
+        ),
+        (
+            "grid 30% for 90 days",
+            "post hoc",
+            GRID_30_90,
+            [
+                ("static_v1", 1, ("none",)),
+                ("tools_only_v2", 1, ("none",)),
+                ("tools_llm_v2", 2, model_checks),
+            ],
+        ),
+        (
+            "grid 60% for 30 days",
+            "post hoc",
+            GRID_60_30,
+            [
+                ("static_v1", 1, ("none",)),
+                ("tools_only_v2", 1, ("none",)),
+                ("tools_llm_v2", 2, model_checks),
+            ],
         ),
     ]
     rows = []
@@ -278,6 +356,45 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             ]
         ).write_parquet(out / "event_scores.parquet")
 
+    # Candidate coverage: how many planted losses the tools list near the start.
+    coverage_rows = []
+    for name, records in (
+        ("draws 01 and 02 (round 1)", ROUND1_DRAWS),
+        ("draws 03 and 04 (round 2)", ROUND2_DRAWS),
+        (f"draws 05 to {last_draw}", (*ROUND3_DRAWS, *full)),
+        ("easy case (60% for 90 days)", EASY_RECORDS),
+        ("grid 30% for 90 days", GRID_30_90),
+        ("grid 60% for 30 days", GRID_60_30),
+    ):
+        total = changepoint = scan = either = 0
+        for record_id in records:
+            for event in events_of(root=root, record_id=record_id):
+                found = context.hindsight_case(
+                    record_id=record_id, plant=event.plant, kind="tools"
+                ).evidence
+                near_change = any(
+                    c.direction == "down" and abs(c.day_index - event.first_day) <= 14
+                    for c in found.changepoints
+                )
+                near_scan = any(
+                    e.direction == "down" and abs(e.first_day - event.first_day) <= 14
+                    for e in found.local_episodes
+                )
+                total += 1
+                changepoint += near_change
+                scan += near_scan
+                either += near_change or near_scan
+        coverage_rows.append(
+            {
+                "records": name,
+                "events": total,
+                "down_changepoint_candidate_within_14_days_of_start": changepoint,
+                "down_local_scan_episode_starting_within_14_days": scan,
+                "either": either,
+            }
+        )
+    pl.DataFrame(coverage_rows).write_parquet(out / "candidate_coverage_all.parquet")
+
     # Placebo: null-record answers scored against each draw's event dates.
     placebo_rows, band_rows = [], []
     for arm, checks in (
@@ -294,6 +411,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                 ("round 1 dates", ROUND1_DRAWS),
                 ("round 2 dates", ROUND2_DRAWS),
                 ("round 3 dates", ROUND3_DRAWS),
+                (f"draws 05 to {last_draw} dates", (*ROUND3_DRAWS, *full)),
             ):
                 parts = [
                     placebo_hits(
@@ -317,8 +435,16 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                         "wilson_95_upper": upper,
                     }
                 )
-                if round_name == "round 2 dates":
-                    real = tables.get(("round 2", arm, check if check != "amended" else "amended"))
+                if round_name in ("round 2 dates", f"draws 05 to {last_draw} dates"):
+                    real = tables.get(
+                        (
+                            "round 2"
+                            if round_name == "round 2 dates"
+                            else f"draws 05 to {last_draw} pooled",
+                            arm,
+                            check,
+                        )
+                    )
                     for band in ("under 15%", "15% to 25%", "25% and over"):
                         mask = pl.Series([size_band(size=s) == band for s in table["size"]])
                         real_band = (
@@ -332,6 +458,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                             {
                                 "arm": arm,
                                 "check": check,
+                                "event_dates_of": round_name,
                                 "size_band": band,
                                 "events": int(mask.sum()),
                                 "placebo_hit_rate": _mean_hit(frame=table.filter(mask)),
@@ -355,7 +482,13 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             ("v2 tools+LLM minus v1 tools+LLM", "tools_llm_v2", 2, "tools_llm_v1", 2),
             ("v2 tools+LLM minus v2 tools only", "tools_llm_v2", 2, "tools_only_v2", 1),
             ("v1 tools+LLM minus v1 tools only", "tools_llm_v1", 2, "tools_only_v1", 1),
-            ("v2 tools+LLM minus LLM on raw summaries", "tools_llm_v2", 2, "raw_llm_v1", 1),
+            (
+                "v2 tools+LLM minus LLM on raw summaries (confounded: raw arm kept the v1 prompt)",
+                "tools_llm_v2",
+                2,
+                "raw_llm_v1",
+                1,
+            ),
         ]
         for after in (0, 1):
             for name, left, left_n, right, right_n in pairs:
@@ -403,25 +536,48 @@ def main() -> int:  # noqa: PLR0912, PLR0915
         wide = per.pivot(
             on="arm", index=["draw", "plant", "shape", "size"], values="e"
         ).drop_nulls()
+        month_of = {
+            (record_id, event.plant, event.shape, event.size): str(
+                dates[event.first_day].astype("datetime64[M]")
+            )
+            for record_id in ROUND1_DRAWS
+            for event in events_of(root=root, record_id=record_id)
+        }
+        wide_months = np.array(
+            [
+                month_of[(d, p, sh, sz)]
+                for d, p, sh, sz in zip(
+                    wide["draw"], wide["plant"], wide["shape"], wide["size"], strict=True
+                )
+            ]
+        )
         for left, right in (("tools_llm", "tools_only"), ("tools_llm", "raw_llm")):
             diff = (wide[left] - wide[right]).to_numpy() * 100.0
             sd = float(diff.std(ddof=1))
-            robust.append(
-                {
-                    "label": "planned (round 1)",
-                    "contrast": f"{left} minus {right}",
-                    "after_original_checks": False,
-                    "resampled": "n/a",
-                    "events": len(diff),
-                    "mean_points": float(diff.mean()),
-                    "lower": None,
-                    "upper": None,
-                    "sd_of_one_event_points": sd,
-                    "events_needed_for_minus_1_point": events_needed(
-                        sd_points=sd, effect_points=1.0
-                    ),
-                }
-            )
+            for resampled, clusters in (("events", None), ("calendar months", wide_months)):
+                mean, lower, upper = events_bootstrap_interval(
+                    differences=diff.reshape(-1, 1),
+                    confidence=CONTRAST_CONFIDENCE,
+                    seed=TUNING_SEED,
+                    clusters=clusters,
+                )
+                robust.append(
+                    {
+                        "label": "planned (round 1; the plan's resampling of (event, sample) "
+                        "pairs gave the intervals on the page's table)",
+                        "contrast": f"{left} minus {right}",
+                        "after_original_checks": False,
+                        "resampled": resampled,
+                        "events": len(diff),
+                        "mean_points": mean,
+                        "lower": lower,
+                        "upper": upper,
+                        "sd_of_one_event_points": sd,
+                        "events_needed_for_minus_1_point": events_needed(
+                            sd_points=sd, effect_points=1.0
+                        ),
+                    }
+                )
     pl.DataFrame(
         robust,
         schema={
@@ -488,7 +644,9 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     ).write_parquet(out / "round3_contrast.parquet")
     floor = []
     for version in ("v1", "v2"):
-        for records in (ROUND2_DRAWS, ROUND3_DRAWS):
+        for records in (ROUND2_DRAWS, ROUND3_DRAWS, full):
+            if not records:
+                continue
             first = book(arm=f"tools_llm_{version}", record_id="original", sample=0, check="none")
             second = book(arm=f"tools_llm_{version}", record_id="original", sample=1, check="none")
             if first is None or second is None:
@@ -521,12 +679,30 @@ def main() -> int:  # noqa: PLR0912, PLR0915
         notes = pl.read_parquet(notes_path)["note"].to_list()
         cites = [n for n in notes if ("local-scan" in n.lower() or "local scan" in n.lower())]
         noise = [n for n in cites if any(w in n.lower() for w in SCAN_NOISE_WORDS)]
+        draw_notes = [
+            n
+            for n, r in zip(
+                pl.read_parquet(notes_path)["note"].to_list(),
+                pl.read_parquet(notes_path)["record"].to_list(),
+                strict=True,
+            )
+            if r in ROUND2_DRAWS
+        ]
+        draw_cites = [
+            n for n in draw_notes if "local-scan" in n.lower() or "local scan" in n.lower()
+        ]
+        draw_noise = [n for n in draw_cites if any(w in n.lower() for w in SCAN_NOISE_WORDS)]
         write_json_atomic(
             path=out / "notes_tally.json",
             payload={
                 "notes": len(notes),
                 "naming_the_local_scan": len(cites),
                 "naming_the_scan_and_a_noise_word": len(noise),
+                "draws_03_and_04_only": {
+                    "notes": len(draw_notes),
+                    "naming_the_local_scan": len(draw_cites),
+                    "naming_the_scan_and_a_noise_word": len(draw_noise),
+                },
                 "rule": "a note names the scan ('local-scan' or 'local scan') and one of "
                 + ", ".join(SCAN_NOISE_WORDS),
             },
