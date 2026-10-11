@@ -194,7 +194,7 @@ def panel_chart(
             .mark_text(color=ocf.BLACK_1, fontSize=11, aria=False)
             .encode(x="x:Q", y="y:Q", text="t:N")  # ty: ignore[unresolved-attribute]
         )
-    return alt.layer(*layers).properties(
+    return alt.layer(*layers).properties(  # ty: ignore[invalid-return-type]
         width=width,
         height=PANEL_HEIGHT_PX,
         title=alt.TitleParams(title, anchor="start", fontSize=12),

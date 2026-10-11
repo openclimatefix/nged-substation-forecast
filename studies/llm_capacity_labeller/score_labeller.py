@@ -137,7 +137,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     root = claim_root(smoke=arguments.smoke)
     context = LabellerContext(root=root)
     plants = len(context.sites)
-    model: LabellerModel = CachedOnlyModel(model_id="stub" if arguments.smoke else MODEL_ID)  # ty: ignore[invalid-assignment]
+    model: LabellerModel = CachedOnlyModel(model_id="stub" if arguments.smoke else MODEL_ID)
     store = CallStore(directory=calls_dir(root=root), log_path=log_path(root=root))
     guard = BudgetGuard()
 
@@ -276,10 +276,10 @@ def main() -> int:  # noqa: PLR0912, PLR0915
         baseline = errors.get(("tools_only", "fresh", 0, after))
         raw = errors.get(("raw_llm", "fresh", 0, after))
         if baseline is not None and all(v is not None for v in tools_errors.values()):
-            matrix = np.stack([tools_errors[s] - baseline for s in range(TOOLS_SAMPLES)], axis=1)  # ty: ignore[unsupported-operator]
+            matrix = np.stack([tools_errors[s] - baseline for s in range(TOOLS_SAMPLES)], axis=1)
             contrasts.append(("C1 tools+LLM minus tools only", after, matrix))
         if raw is not None and all(v is not None for v in tools_errors.values()):
-            matrix = np.stack([tools_errors[s] - raw for s in range(TOOLS_SAMPLES)], axis=1)  # ty: ignore[unsupported-operator]
+            matrix = np.stack([tools_errors[s] - raw for s in range(TOOLS_SAMPLES)], axis=1)
             contrasts.append(("C2 tools+LLM minus LLM on raw summaries", after, matrix))
     rows = []
     for name, after, matrix in contrasts:
@@ -406,7 +406,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                     "control": "positive (30% steps)",
                     "arm": arm,
                     "events": table.height,
-                    "hit_rate": float(table["hit"].mean()),
+                    "hit_rate": float(table["hit"].cast(pl.Float64).mean()),  # ty: ignore[invalid-argument-type]
                     "false_alarms": false_alarms_per_plant(scores=table),
                 }
             )
@@ -512,7 +512,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             "calls_with_knots": pl.Int64,
         },
     ).write_parquet(tables_dir(root=root) / "causal.parquet")
-    np.savez_compressed(tables_dir(root=root) / "capacity_series.npz", **series)
+    np.savez_compressed(tables_dir(root=root) / "capacity_series.npz", **series)  # ty: ignore[invalid-argument-type]
 
     # Real data: agreement with the model's hindsight labels, and the real low months.
     agreement, low_rows = [], []

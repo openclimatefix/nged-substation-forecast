@@ -175,6 +175,11 @@ a
   estimator exists to repair. The Kalman filter recovered a planted capacity loss best of 13
   estimators but chased the December low in its own level, and a post hoc rule that holds the static
   capacity until a drop lasts 7 days did not raise the error.
+- [Can a language model label a solar plant's capacity changes?](forecasts/llm-capacity-labeller.md)
+  — with the physics model's winter bias divided out, only the hold-at-static detector stayed within
+  the 10% false-movement gate, and it did no better than holding the static power on 32 planted
+  losses. The runs that give a language model six deterministic evidence tools are set up but not
+  yet made.
 - [Which IFS forecast variables, or which second forecast, help a solar power
   forecast?](forecasts/ifs-solar-variables.md) — at the 6 solar farms, no planned step of adding
   extra variables from ECMWF's 9 km IFS forecast lowers the error at lead days 1 to 3 by a resolved

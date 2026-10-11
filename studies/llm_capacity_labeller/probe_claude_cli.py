@@ -50,8 +50,10 @@ def run_calls() -> None:
     PROBE_DIR.mkdir(parents=True, exist_ok=True)
     chart = alt.Chart(pl.DataFrame({"x": [1, 2, 3, 4], "y": [1, 3, 2, 5]})).mark_line()
     png = vlc.vegalite_to_png(
-        chart.encode(x="x:Q", y="y:Q").properties(width=200, height=100).to_dict(),
-        scale=1,  # ty: ignore[unresolved-attribute]
+        chart.encode(x="x:Q", y="y:Q")  # ty: ignore[unresolved-attribute]
+        .properties(width=200, height=100)
+        .to_dict(),
+        scale=1,
     )
     image_prompt = Prompt(
         system="You read charts. Answer briefly.",

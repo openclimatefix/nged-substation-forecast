@@ -25,7 +25,7 @@ FIRST = date(2023, 6, 1)
 
 def _knots(*points: tuple[int, float]) -> list[Knot]:
     return [
-        Knot(day=FIRST + timedelta(days=day), capacity_mw=level, cause="degradation", evidence=())  # ty: ignore[invalid-argument-type]
+        Knot(day=FIRST + timedelta(days=day), capacity_mw=level, cause="degradation", evidence=())
         for day, level in points
     ]
 

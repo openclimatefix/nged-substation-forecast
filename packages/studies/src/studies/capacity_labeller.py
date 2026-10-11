@@ -627,14 +627,14 @@ def ratio_chart_spec(*, evidence: Evidence) -> dict[str, object]:
     layers = [
         alt.Chart(alt.Data(values=points))
         .mark_point(size=6, opacity=0.5, color="#555555")
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=x,
             y=alt.Y(
                 "ratio:Q",
                 scale=alt.Scale(domain=list(CHART_RATIO_DOMAIN)),
                 title="corrected clear-sky ratio",
             ),
-        )  # ty: ignore[unresolved-attribute]
+        )
     ]
     if rules:
         layers.append(

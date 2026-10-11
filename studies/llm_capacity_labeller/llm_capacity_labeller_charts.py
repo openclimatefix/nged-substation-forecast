@@ -112,7 +112,7 @@ def main() -> int:
         if event is None:
             _LOG.warning("no planted %s loss to draw", shape)
             continue
-        record = record_for(root=root, record_id=record_id)  # ty: ignore[invalid-argument-type]
+        record = record_for(root=root, record_id=record_id)
         figure = estimate_figure(
             record=record,
             plant=event.plant,

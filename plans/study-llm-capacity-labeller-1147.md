@@ -258,8 +258,10 @@ it is, unchanged.
 | `packages/studies/src/studies/capacity_sanity.py` | the four checks, per-knot rejection (hindsight) and the static-P99 fallback (causal) |
 | `packages/studies/src/studies/capacity_seasonal.py` | the seasonal reference and the HYST2, HM2, CX2S wrappers |
 | `packages/studies/src/studies/labeller_scoring.py` | hits, false alarms, date and size error, event bootstrap |
-| `studies/llm_capacity_labeller/labeller_paths.py` | paths, seeds, `load_record` and `claim_root` equivalents, the fingerprint helpers, and `CONTROL_SIZE` (small copies, source stated, not imports from the other study folder) |
-| `studies/llm_capacity_labeller/` scripts | `build_draws.py`, `estimate_part1.py`, `build_case_files.py`, `run_labeller.py` (calls, cache, log, budget guard), `score_labeller.py`, `fit_forecast_arms.py`, `report_llm_capacity_labeller.py`, `llm_capacity_labeller_charts.py`, `README.md` |
+| `packages/studies/src/studies/capacity_llm.py` | the `LabellerModel` interface, `ClaudeCliModel` and the stub, the budget guard, the call store and log (under `data/`) |
+| `packages/studies/src/studies/capacity_estimate_charts.py` | the figure of each estimator's capacity over a plant's daily maximum power: seven panels on one vertical range, loss windows shaded, no calendar date |
+| `studies/llm_capacity_labeller/labeller_paths.py`, `labeller_jobs.py` | paths, seeds, loaders, stamps, `CONTROL_SIZE` (a small copy, source stated), and the list of calls with the way each prompt is built |
+| `studies/llm_capacity_labeller/` scripts | `build_labeller_inputs.py`, `estimate_part1.py`, `probe_claude_cli.py`, `run_labeller.py` (estimate, causal probe, calls, guard), `score_labeller.py`, `fit_forecast_arms.py`, `llm_capacity_labeller_charts.py`, `report_llm_capacity_labeller.py`, `README.md` |
 
 **Tests** (under `packages/studies/tests/`, run with `--run-studies`; each fails on the bug named):
 
@@ -281,6 +283,10 @@ it is, unchanged.
   a 20% step against a 5% changepoint, an estimate that adds a spurious step (variance rises), and a
   degradation knot inside a cap run; plus the fallback records the failing check.
 - **Budget guard:** the runner raises before the 151st call and before 2.0 million input tokens.
+- **Estimator figure:** seven panels, one shared vertical range, shading only for the plant's own
+  overlapping losses, a note on a panel with no estimate, no calendar date anywhere in the spec, and
+  no accessibility text on any mark (the stage list's chart script draws it from the stub pipeline
+  too, so the layout is checked before any real run).
 - **Boundaries:** `test_study_boundaries.py` passes.
 - **Mutation pass** on `capacity_evidence.py`, `capacity_sanity.py`, and `labeller_scoring.py`.
 
@@ -399,3 +405,22 @@ the exploratory forecast fits (3 seeds, 5 folds, primary setting only).
 - (15) Check 3 window, tie rule, empty-list note: accepted.
 - (16) Log under `data/`, tested, never committed: accepted.
 - (17) Notation: accepted; the 0.16M and 1.3 x DC wording are gone.
+
+## Implementation notes (where the build differs from the plan above)
+
+- **Answer schema:** frozen dataclasses with explicit validation (`AnswerError`) replace the Pydantic
+  model, because `pydantic` is not a direct dependency of `packages/studies` and adding it would end
+  the autonomous-merge condition.
+- **Commissioning ramp:** the record is built after `studies.commissioning.drop_commissioning_ramp`,
+  so a ramp shows as a gap at the record's start, and the clear-sky tool has no separate ramp mask.
+- **Raw-summary arm:** weekly totals (measured and modelled megawatt-hours, gap and stuck days), not
+  daily rows, because a daily table would cost about 35,000 tokens.
+- **Changepoints:** the CUSUM scan and the two-segment fit are the same statistic, so the code runs
+  one binary segmentation with permutation p-values.
+- **Tokens:** numeric tables cost 1.44 characters per token in the probe, and a built hindsight case
+  file is about 11,400 tokens including the two charts. The re-estimated budget is US$12.87 (see
+  `run_labeller.py --phase estimate`), most of it the assumed 4,000 output tokens a call.
+- **Estimator figure (added requirement):** `llm_capacity_labeller_charts.py` draws four figures (a
+  planted step, a planted ramp, a quiet stretch, and a real low-output month) of seven panels each:
+  static power, HYST2, HM2, CX2S, the tools-only rule, the model's hindsight labels, and the model's
+  causal estimate.

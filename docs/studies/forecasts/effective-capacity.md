@@ -527,6 +527,14 @@ better normalisation, which is the trap seen here.
   rows with a loss that an estimator repairs is unknown, and a record with more such rows would give
   the contrast more power than this one had.
 
+### A follow-up that asks a language model to label capacity changes
+
+**A second study tests whether a language model that reads deterministic evidence tools can label
+capacity changes without the trade-off between recovery and false movement seen here.** It divides
+out the winter bias of the physics model before any estimator reads the ratio, so that HYST and its
+neighbours are compared on equal terms. See [the follow-up
+study](llm-capacity-labeller.md).
+
 ## Limitations
 
 - **Sample:** 18 scored months at 6 plants in one trial area, and 3 low-output plant-months from one

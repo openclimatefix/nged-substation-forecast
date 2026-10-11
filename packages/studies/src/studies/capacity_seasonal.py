@@ -21,7 +21,7 @@ designs the study compares.
 
 import warnings
 from collections.abc import Mapping
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Final
 
 import numpy as np
@@ -138,6 +138,7 @@ def own_profile_term(*, residual: np.ndarray, dates: np.ndarray) -> np.ndarray:
     return out
 
 
+@dataclass(frozen=True)
 class SeasonalReference:
     """The log reference of every plant and day, and the pieces it is made of.
 
@@ -147,17 +148,9 @@ class SeasonalReference:
         own: The own-profile term, shape (plants, days), NaN where undefined.
     """
 
-    def __init__(self, *, centre: np.ndarray, shared: np.ndarray, own: np.ndarray) -> None:
-        """Hold the pieces.
-
-        Args:
-            centre: The centring constants.
-            shared: The shared term.
-            own: The own-profile term.
-        """
-        self.centre = centre
-        self.shared = shared
-        self.own = own
+    centre: np.ndarray
+    shared: np.ndarray
+    own: np.ndarray
 
     @property
     def log_reference(self) -> np.ndarray:
