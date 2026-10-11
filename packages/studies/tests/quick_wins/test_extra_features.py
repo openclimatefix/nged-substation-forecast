@@ -93,21 +93,21 @@ def test_clear_sky_index_is_null_at_night_and_a_ratio_by_day():
     out = add_extra_features(frame=frame, metadata=_metadata(latitude=53.0, longitude=0.0))
     assert out["clear_sky_index"][0] is None
     assert out["cos_zenith"][1] > 0.85
-    expected = 400.0 / (
-        1098.0 * out["cos_zenith"][1] * pl.Series([-0.057 / out["cos_zenith"][1]]).exp()[0]
+    assert out["clear_sky_ghi_window_mean"][1] > 700.0
+    assert out["clear_sky_index"][1] == pytest.approx(
+        400.0 / out["clear_sky_ghi_window_mean"][1], rel=1e-6
     )
-    assert out["clear_sky_index"][1] == pytest.approx(expected, rel=1e-6)
 
 
-def test_heating_degree_hours_floor_at_zero_and_count_below_the_base():
+def test_heating_degrees_c_floor_at_zero_and_count_below_the_base():
     """5 C is 10.5 degrees below the 15.5 C base; 20 C is above it."""
     cold = _frame(times=[datetime(2025, 1, 10, 12, tzinfo=UTC)], ghi=0.0, temperature=5.0, speed=1)
     warm = _frame(times=[datetime(2025, 7, 10, 12, tzinfo=UTC)], ghi=0.0, temperature=20.0, speed=1)
     metadata = _metadata(latitude=53.0, longitude=0.0)
-    assert add_extra_features(frame=cold, metadata=metadata)["heating_degree_hours"][0] == (
+    assert add_extra_features(frame=cold, metadata=metadata)["heating_degrees_c"][0] == (
         pytest.approx(10.5)
     )
-    assert add_extra_features(frame=warm, metadata=metadata)["heating_degree_hours"][0] == 0.0
+    assert add_extra_features(frame=warm, metadata=metadata)["heating_degrees_c"][0] == 0.0
 
 
 def test_holiday_columns_use_the_local_date_and_the_nearest_holiday_gap():
@@ -126,7 +126,7 @@ def test_holiday_columns_use_the_local_date_and_the_nearest_holiday_gap():
 
 
 def test_late_evening_utc_in_summer_belongs_to_the_next_local_day_for_calendar_columns():
-    """23:30 UTC on 4 April 2025 is 00:30 on 5 April in London (daylight saving), not a holiday."""
+    """23:30 UTC on 20 April 2025 is 00:30 on Easter Monday, 21 April, in London."""
     out = add_extra_features(
         frame=_frame(
             times=[datetime(2025, 4, 20, 23, 30, tzinfo=UTC)], ghi=0, temperature=10, speed=1
@@ -136,3 +136,37 @@ def test_late_evening_utc_in_summer_belongs_to_the_next_local_day_for_calendar_c
     assert out["is_bank_holiday"][0] == 1  # 00:30 on Easter Monday, 21 April, in London
     assert out["half_hour_of_day"][0] == 1
     assert out["day_of_year"][0] == 111
+
+
+def test_a_null_wind_speed_gives_a_null_power_proxy_not_zero():
+    """A missing speed must reach the model as missing, not as 'no power'."""
+    out = pl.DataFrame({"v": [None, 8.0]}, schema={"v": pl.Float64}).select(
+        out=wind_power_proxy(speed=pl.col("v"))
+    )["out"]
+    assert out[0] is None
+    assert out[1] is not None
+
+
+def test_a_northerly_blows_towards_the_south_and_a_null_radiation_gives_a_null_index():
+    """From 0 degrees: u = 0, v = -speed. A null irradiance by day gives a null index."""
+    frame = _frame(
+        times=[datetime(2025, 6, 21, 12, 0, tzinfo=UTC)], ghi=300.0, temperature=20.0, speed=10.0
+    ).with_columns(
+        wind_direction_100m=pl.lit(0.0),
+        downward_short_wave_radiation_flux_surface=pl.lit(None, dtype=pl.Float64),
+    )
+    out = add_extra_features(frame=frame, metadata=_metadata(latitude=53.0, longitude=0.0))
+    assert out["wind_u_100m"][0] == pytest.approx(0.0, abs=1e-6)
+    assert out["wind_v_100m"][0] == pytest.approx(-10.0, abs=1e-6)
+    assert out["clear_sky_index"][0] is None
+
+
+def test_repeated_valid_times_keep_their_rows_and_order():
+    """Five ensemble members at one valid time stay five rows, in order, with equal sun columns."""
+    time = datetime(2025, 6, 21, 12, 0, tzinfo=UTC)
+    frame = _frame(times=[time] * 5, ghi=500.0, temperature=10.0, speed=5.0).with_columns(
+        ensemble_member=pl.Series(range(5), dtype=pl.Int8)
+    )
+    out = add_extra_features(frame=frame, metadata=_metadata(latitude=53.0, longitude=0.0))
+    assert out["ensemble_member"].to_list() == [0, 1, 2, 3, 4]
+    assert out["cos_zenith"].n_unique() == 1

@@ -95,6 +95,29 @@ def _engineer(
     return with_extra.cast(dict.fromkeys(float_columns, pl.Float32))
 
 
+def _check_rows(*, frame: pl.DataFrame, init_time: datetime, fold_id: str) -> None:
+    """Raise if a validation frame has duplicate keys or a different height than the refit."""
+    if frame.height == 0:
+        msg = f"the run initialised at {init_time} produced no rows"
+        raise ValueError(msg)
+    keys = ["time_series_id", "nwp_init_time", "valid_time", "ensemble_member"]
+    if frame.select(keys).is_duplicated().any():
+        msg = f"the run initialised at {init_time} has duplicate keys"
+        raise ValueError(msg)
+    refit = (
+        inputs.OUTPUT_ROOT
+        / "production_arm"
+        / "colsample0.8_seed0"
+        / "forecasts"
+        / f"init={init_time:%Y-%m-%d}.parquet"
+    )
+    if fold_id == inputs.FOLD_A and refit.exists():
+        expected = pl.scan_parquet(refit).select(pl.len()).collect().item()
+        if frame.height != expected:
+            msg = f"{init_time}: frame has {frame.height:,} rows, the refit predicted {expected:,}"
+            raise ValueError(msg)
+
+
 def main() -> None:
     """Build the training frame and one validation frame per sampled run, skipping finished ones."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -103,6 +126,8 @@ def main() -> None:
 
     settings = Settings()
     window = inputs.window_for(fold_id=args.fold)
+    # The same 31 series on both folds, on purpose: only the leaderboard fold has an eligibility
+    # table, and fold B is a robustness check of the same series, not a second population.
     series_ids = inputs.eligible_series_ids(settings=settings, fold_id=inputs.FOLD_A)
     metadata = inputs.series_metadata(settings=settings, time_series_ids=series_ids)
     out_dir = frames_dir(fold_id=window.fold_id)
@@ -140,9 +165,7 @@ def main() -> None:
             init_time_start=init_time,
             init_time_end=init_time,
         )
-        if frame.height == 0:
-            msg = f"the run initialised at {init_time} produced no rows"
-            raise ValueError(msg)
+        _check_rows(frame=frame, init_time=init_time, fold_id=window.fold_id)
         frame.write_parquet(path.with_suffix(".tmp"))
         path.with_suffix(".tmp").rename(path)
         print(f"{init_time:%Y-%m-%d}: {frame.height:,} rows in {time.monotonic() - started:.0f} s")

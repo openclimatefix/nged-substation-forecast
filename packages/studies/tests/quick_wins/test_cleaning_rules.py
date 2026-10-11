@@ -84,8 +84,8 @@ def test_commissioning_ramp_drops_days_until_output_reaches_the_peers_level():
     )
     dropped = commissioning_ramp(power=pl.concat([ramp, *peers]), types=types)
     assert set(dropped["time_series_id"].to_list()) == {1}
-    last_dropped_day = dropped["time"].max()
-    assert last_dropped_day is not None
+    last_dropped_day = dropped.select(pl.col("time").max()).item()
+    assert isinstance(last_dropped_day, datetime)
     # The 14-day rolling median crosses 90% a week into the settled period, so the cut falls
     # between day 70 and day 77.
     assert START + timedelta(days=69) < last_dropped_day <= START + timedelta(days=78)

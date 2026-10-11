@@ -1,10 +1,16 @@
 """Features the production feature engineer does not build, computed from its output.
 
-Every function takes the engineered frame and adds columns that depend only on that row's own
+`add_extra_features` takes the engineered frame and adds columns that depend only on that row's own
 valid time, location, and forecast weather, so no column reads data from after the forecast's
 initialisation time. The columns are the ones a quick-win arm tries: solar geometry and the
-clear-sky index for PV, wind components and a power-curve proxy for wind, degree-hours for demand,
-and bank-holiday and ordinal calendar columns.
+clear-sky index for PV, wind components and a power-curve proxy for wind, degrees below the heating
+base for demand, and bank-holiday and ordinal calendar columns.
+
+**The clear-sky index is an approximate proxy.** The engineer linearly interpolates ECMWF's
+period-ending radiation means, which cover 3 or 6 hours, onto the half-hour grid. The denominator is
+therefore the Haurwitz clear-sky irradiance averaged over a 3-hour window centred on the half-hour,
+which matches the smoothing of the numerator only roughly. The index is biased by time of day
+near sunrise and sunset, and is null when the sun is below `MIN_COS_ZENITH_FOR_INDEX`.
 
 The bank holidays are those of England and Wales for 2024 to 2026, typed in because the `holidays`
 package is not a dependency. They cover the whole training and validation period of every fold.
@@ -17,10 +23,8 @@ import numpy as np
 import patito as pt
 import polars as pl
 from contracts.power_schemas import TimeSeriesMetadata
+from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE
 from studies.solar import cos_zenith, zenith
-
-LOCAL_TIMEZONE: Final[str] = "Europe/London"
-"""The timezone behaviour follows, as in the production feature engineer."""
 
 BANK_HOLIDAYS: Final[tuple[date, ...]] = (
     date(2024, 1, 1),
@@ -62,18 +66,22 @@ HEATING_BASE_C: Final[float] = 15.5
 MIN_COS_ZENITH_FOR_INDEX: Final[float] = 0.1
 """Below this sun height the clear-sky index is null, since the ratio blows up there."""
 
+CLEAR_SKY_WINDOW_OFFSETS_MINUTES: Final[tuple[int, ...]] = (-90, -60, -30, 0, 30, 60, 90)
+"""Offsets around the half-hour's midpoint at which Haurwitz clear-sky irradiance is averaged."""
+
 MAX_CLEAR_SKY_INDEX: Final[float] = 1.5
 """Upper clip of the clear-sky index, which cloud enhancement lifts a little above 1."""
 
 EXTRA_FEATURE_NAMES: Final[tuple[str, ...]] = (
     "cos_zenith",
+    "clear_sky_ghi_window_mean",
     "clear_sky_index",
     "wind_u_100m",
     "wind_v_100m",
     "wind_u_10m",
     "wind_v_10m",
     "wind_power_proxy",
-    "heating_degree_hours",
+    "heating_degrees_c",
     "is_bank_holiday",
     "days_to_nearest_bank_holiday",
     "half_hour_of_day",
@@ -110,7 +118,9 @@ def wind_power_proxy(*, speed: pl.Expr) -> pl.Expr:
     """
     cube = (speed**3 - WIND_CUT_IN_M_S**3) / (WIND_RATED_M_S**3 - WIND_CUT_IN_M_S**3)
     return (
-        pl.when(speed < WIND_CUT_IN_M_S)
+        pl.when(speed.is_null())
+        .then(None)
+        .when(speed < WIND_CUT_IN_M_S)
         .then(0.0)
         .when(speed < WIND_RATED_M_S)
         .then(cube)
@@ -120,12 +130,13 @@ def wind_power_proxy(*, speed: pl.Expr) -> pl.Expr:
     )
 
 
-def _cos_zenith_by_series_and_time(
+def _sun_by_series_and_time(
     *, frame: pl.DataFrame, metadata: pt.DataFrame[TimeSeriesMetadata]
 ) -> pl.DataFrame:
-    """Compute cos(zenith) once per distinct (series, valid time), at the midpoint of the half-hour.
+    """Compute cos(zenith) and the windowed clear-sky irradiance, once per (series, valid time).
 
     A valid time is the end of its half-hour, so the sun that matters sits 15 minutes earlier.
+    The clear-sky window is `CLEAR_SKY_WINDOW_OFFSETS_MINUTES` around that instant.
     """
     parts = []
     locations = metadata.select("time_series_id", "latitude", "longitude").iter_rows()
@@ -133,15 +144,31 @@ def _cos_zenith_by_series_and_time(
         stamps = frame.filter(pl.col("time_series_id") == series_id)["valid_time"].unique().sort()
         if stamps.len() == 0:
             continue
-        angle = zenith(
-            stamps=stamps.dt.offset_by("-15m"), latitude=float(latitude), longitude=float(longitude)
+        centre = stamps.dt.offset_by("-15m")
+        cos_by_offset = [
+            cos_zenith(
+                zenith_deg=zenith(
+                    stamps=centre.dt.offset_by(f"{offset}m"),
+                    latitude=float(latitude),
+                    longitude=float(longitude),
+                )
+            )
+            for offset in CLEAR_SKY_WINDOW_OFFSETS_MINUTES
+        ]
+        window_mean = np.mean(
+            [
+                1098.0 * c * np.exp(-0.057 / np.where(c > 0, c, 1.0)) * (c > 0)
+                for c in cos_by_offset
+            ],
+            axis=0,
         )
         parts.append(
             pl.DataFrame(
                 {
                     "time_series_id": np.full(stamps.len(), series_id, dtype=np.int32),
                     "valid_time": stamps,
-                    "cos_zenith": cos_zenith(zenith_deg=angle),
+                    "cos_zenith": cos_by_offset[len(cos_by_offset) // 2],
+                    "clear_sky_ghi_window_mean": window_mean,
                 }
             )
         )
@@ -162,16 +189,16 @@ def add_extra_features(
     Returns:
         The frame with the extra columns appended, in `EXTRA_FEATURE_NAMES` order.
     """
-    local = pl.col("valid_time").dt.convert_time_zone(LOCAL_TIMEZONE)
+    local = pl.col("valid_time").dt.convert_time_zone(DEFAULT_LOCAL_TIMEZONE)
     holiday_dates = pl.Series("holiday", list(BANK_HOLIDAYS), dtype=pl.Date)
     holiday_ordinals = holiday_dates.dt.epoch("d").to_list()
 
     with_sun = frame.join(
-        _cos_zenith_by_series_and_time(frame=frame, metadata=metadata),
+        _sun_by_series_and_time(frame=frame, metadata=metadata),
         on=["time_series_id", "valid_time"],
         how="left",
     )
-    clear_sky = haurwitz_clear_sky_ghi(cos_zenith_values=pl.col("cos_zenith"))
+    clear_sky = pl.col("clear_sky_ghi_window_mean")
     local_ordinal = local.dt.date().dt.epoch("d").cast(pl.Int32)
     nearest_gap = pl.min_horizontal(
         *[(local_ordinal - int(holiday)).abs() for holiday in holiday_ordinals]
@@ -189,7 +216,7 @@ def add_extra_features(
         wind_u_10m=-pl.col("wind_speed_10m") * pl.col("wind_direction_10m").radians().sin(),
         wind_v_10m=-pl.col("wind_speed_10m") * pl.col("wind_direction_10m").radians().cos(),
         wind_power_proxy=wind_power_proxy(speed=pl.col("wind_speed_100m")),
-        heating_degree_hours=(HEATING_BASE_C - pl.col("temperature_2m")).clip(lower_bound=0.0),
+        heating_degrees_c=(HEATING_BASE_C - pl.col("temperature_2m")).clip(lower_bound=0.0),
         is_bank_holiday=local.dt.date().is_in(holiday_dates.implode()).cast(pl.Int8),
         days_to_nearest_bank_holiday=nearest_gap,
         half_hour_of_day=(local.dt.hour() * 2 + local.dt.minute() // 30).cast(pl.Int16),
