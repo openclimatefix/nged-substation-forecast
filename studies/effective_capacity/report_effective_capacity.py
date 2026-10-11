@@ -33,6 +33,7 @@ from capacity_paths import (
     LAG_LOSSES_PATH,
     OUTPUT_RATIOS_PATH,
     claim_root,
+    draw_id,
     load_events,
     load_tuned,
     record_for,
@@ -1026,6 +1027,151 @@ def explainability(*, root: Path, report: Report) -> None:
     )
 
 
+EXAMPLE_STEP_SIZE: Final[float] = 0.30
+"""The planted step the example figure draws is the selection draw's step closest to this size."""
+
+EXAMPLE_DAYS_BEFORE: Final[int] = 30
+"""How many days before the planted step the example figure starts."""
+
+
+def design_facts(*, root: Path, report: Report) -> None:
+    """Print the counts the page quotes about the rows, the plants, and the planted losses."""
+    events = load_events(root=root)
+    frame = pl.read_parquet(LAG_FRAME_PATH)
+    plant_months = (
+        frame.with_columns(month=pl.col("time").dt.strftime("%Y-%m"))
+        .select("site", "month")
+        .unique()
+        .height
+    )
+    record = record_for(root=root, record_id="original")
+    report.heading("Design facts")
+    report.text(f"- lead-day-1 daylight hours scored: {frame.height}")
+    report.text(f"- plants: {len(record.sites)}; scored months: {len(events.scored_months)}")
+    report.text(f"- plant-months with rows: {plant_months}")
+    per_draw = [len(draw) for draw in events.draws]
+    report.text(
+        f"- planted events per draw: {min(per_draw)} to {max(per_draw)} (a step, a ramp, and an "
+        f"intermittent loss at each plant, except that the plant with a commissioning ramp has "
+        f"room for fewer); selection draws: {len(events.draws) - 1}; tuning draws: 1"
+    )
+    sizes = np.array([event.size for draw in events.draws for event in draw])
+    report.text(
+        f"- planted loss sizes: {sizes.min():.0%} to {sizes.max():.0%} of power "
+        f"(uniform), {len(sizes)} events over {len(events.draws)} draws"
+    )
+    report.text(f"- record: {len(record.dates)} days")
+
+
+def example_event(*, root: Path, report: Report) -> None:
+    """Print and save one planted step, and every estimator's scale ratio across it.
+
+    The step is chosen by a stated rule: among the selection draws' steps, the one whose size is
+    closest to `EXAMPLE_STEP_SIZE`. Days are counted from the step's first day and no plant label
+    or calendar date is written.
+    """
+    events = load_events(root=root)
+    days = len(record_for(root=root, record_id="original").dates)
+    candidates = [
+        (abs(event.size - EXAMPLE_STEP_SIZE), index, event)
+        for index, draw in enumerate(events.draws)
+        if index > 0
+        for event in draw
+        if event.shape == "step"
+    ]
+    _, draw_index, event = min(candidates, key=lambda item: (item[0], item[1]))
+    first, last = event.first_day - EXAMPLE_DAYS_BEFORE, event.scored_days[1]
+    truth = expected_factor(event=event, days=days)[first:last]
+    rows = []
+    for estimator in (*ESTIMATOR_FAMILY, "HYST"):
+        params = {} if estimator == "HYST" else load_tuned(root=root, estimator=estimator)
+        planted = scale_for(
+            root=root, estimator=estimator, params=params, file_id=draw_id(index=draw_index)
+        )
+        original = scale_for(root=root, estimator=estimator, params=params, file_id="original")
+        ratio = (
+            planted.scale_mw[event.plant, first:last] / original.scale_mw[event.plant, first:last]
+        )
+        rows += [
+            {
+                "estimator": estimator,
+                "day": int(day - event.first_day),
+                "ratio": float(value),
+                "planted_factor": float(factor),
+            }
+            for day, value, factor in zip(range(first, last), ratio, truth, strict=True)
+        ]
+    table = pl.DataFrame(rows)
+    path = root / "tables" / "example_event.parquet"
+    refuse_to_overwrite(paths=[path])
+    table.write_parquet(path)
+    report.heading("Example planted step (the figure of one planted step)")
+    report.text(
+        f"- rule: the selection draw's step closest to {EXAMPLE_STEP_SIZE:.0%}; this one is a "
+        f"{event.size:.1%} loss lasting {event.month_days} days, from draw {draw_index}; days "
+        f"are counted from its first day, and its plant is not named"
+    )
+    report.text(f"- file: {path.name}, {table.height} rows")
+
+
+def kf_seasonal_shape(*, root: Path, report: Report) -> None:
+    """Print how the raw Kalman filter level varies through the calendar year, plant by plant.
+
+    A plant's level in a calendar month is the mean, over every day of that calendar month in the
+    record, of the filter's issue-time scale on days that did not fall back to the static power,
+    over the plant's median scale on the same days. Plants are numbered, not labelled.
+    """
+    record = record_for(root=root, record_id="original")
+    scale = scale_for(
+        root=root, estimator="KF", params=load_tuned(root=root, estimator="KF"), file_id="original"
+    )
+    calendar_month = (record.dates.astype("datetime64[M]").astype(int) % 12) + 1
+    rows = []
+    for plant in range(len(record.sites)):
+        usable = (scale.fallback_reason[plant] == 0) & np.isfinite(scale.scale_mw[plant])
+        median = float(np.median(scale.scale_mw[plant][usable]))
+        for month in range(1, 13):
+            mask = usable & (calendar_month == month)
+            rows.append(
+                {
+                    "plant": plant,
+                    "calendar_month": month,
+                    "level_over_median": float(scale.scale_mw[plant][mask].mean() / median),
+                    "days": int(mask.sum()),
+                }
+            )
+    table = pl.DataFrame(rows)
+    path = root / "tables" / "kf_seasonal_shape.parquet"
+    refuse_to_overwrite(paths=[path])
+    table.write_parquet(path)
+    report.heading("Seasonal shape of the raw Kalman filter level")
+    report.text(
+        "Each plant's mean level in a calendar month over its median level, on days that did not "
+        "fall back to the static power. Across plants, plant labels withheld."
+    )
+    by_month = (
+        table.group_by("calendar_month")
+        .agg(
+            lowest=pl.col("level_over_median").min(),
+            median=pl.col("level_over_median").median(),
+            highest=pl.col("level_over_median").max(),
+        )
+        .sort("calendar_month")
+    )
+    report.table(by_month)
+    december = by_month.filter(pl.col("calendar_month") == 12).row(0, named=True)
+    deepest = by_month.sort("median").row(0, named=True)
+    report.text(
+        f"- December: {december['lowest']:.2f} to {december['highest']:.2f} of each plant's median "
+        f"(median across plants {december['median']:.2f})"
+    )
+    report.text(
+        f"- the lowest calendar month by the median across plants is month "
+        f"{deepest['calendar_month']} at {deepest['median']:.2f}"
+    )
+    report.text(f"- the file: {path.name}")
+
+
 def main() -> int:
     """Write `report.md`."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1046,6 +1192,9 @@ def main() -> int:
     if not no_pick:
         stage_b(root=root, selection=selection, report=report)
     explainability(root=root, report=report)
+    design_facts(root=root, report=report)
+    example_event(root=root, report=report)
+    kf_seasonal_shape(root=root, report=report)
     path.write_text("\n".join(report.lines) + "\n")
     _LOG.info("wrote %s", path)
     return 0
