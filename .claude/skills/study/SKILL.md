@@ -128,6 +128,9 @@ review goes on the page only after a committed script prints it into the report.
 9. **Merge, if the three conditions at the top of this skill hold,** after checking the PR's body
    and commit messages for closing keywords (see "GitHub hygiene").
 
+The final report to the maintainer repeats the page's proposed follow-up in one line, with its rough
+cost, so the maintainer can start it or decline it.
+
 Never publish a study with fewer than two scientific-validity reviews. If the process is shortened
 anywhere, for example one plan review instead of two, say so in the PR body and in the final report,
 with the reason.
@@ -532,15 +535,26 @@ Every study page follows the structure of an academic paper, in this order:
 8. **Discussion: what to use.** A recommendation for each use of the data, limited to what the
    evidence supports, with what would change each one. The Discussion does not repeat the Summary's
    bullets.
-9. **Limitations.** What the numbers depend on: the region, the period, the per-generator
+9. **Proposed follow-up study.** Most studies, though not all, end with a short section proposing
+   the next study, which builds on what this study learned. The section states what this study
+   learned that the follow-up would use, the question the follow-up would ask, a very rough cost
+   (the order of magnitude of the maintainer's time, agent time, downloads, compute, and money, for
+   example "about a day of agent time, 20 GB of download, no spend"), and why the follow-up might
+   be worth doing, including the case against doing it. The proposal is a suggestion for the
+   maintainer and commits the project to nothing (see the `CLAUDE.md` rule against committing the
+   project to work it has not agreed to). Leave the section out when the study closes its question
+   and a follow-up would not change a decision, and say so in the final report. Label the cost
+   estimates as rough, and take any number in them from a committed script or a stated
+   assumption.
+10. **Limitations.** What the numbers depend on: the region, the period, the per-generator
    recalibration, the capacity table, the sample size, the statistics, and every other scope a
    reader might over-read, such as equal leads.
-10. **Scope.** What the study does not cover: the products, variables, leads, regions, and uses it
+11. **Scope.** What the study does not cover: the products, variables, leads, regions, and uses it
     says nothing about.
-11. **Data and code availability.** Which inputs are public and where they come from, which are
+12. **Data and code availability.** Which inputs are public and where they come from, which are
     private and why, the commit of the code, and the XGBoost version and settings. No generator's
     name, identifier, or coordinates appears in this section.
-12. **Reproducing the figures.** The commands, in order.
+13. **Reproducing the figures.** The commands, in order.
 
 **Put a new study page where its question belongs.** A study of how well a weather product describes
 hours that have already passed goes under Studies > Past weather, and a study that scores forecasts
