@@ -153,6 +153,7 @@ class Arm:
         min_child_weight: XGBoost's `min_child_weight`; production uses 1.
         pooled_by_type: Whether one booster per series type is fitted on every series of that type,
             with each series' power divided by its training capacity, instead of one per series.
+        pooled_site_id: Whether a pooled booster is also shown the series identifier as a number.
         extra_cleaning: Further cleaning rules applied together with `cleaning`.
     """
 
@@ -168,6 +169,7 @@ class Arm:
     colsample_bytree: float = 1.0
     min_child_weight: int = 1
     pooled_by_type: bool = False
+    pooled_site_id: bool = False
 
 
 CHOSEN_CLEANING: Final[CleaningRule] = "new_meter_settling"
@@ -315,6 +317,14 @@ TRAINING_ARMS: Final[tuple[Arm, ...]] = (
         pooled_by_type=True,
     ),
     Arm(
+        name="d3_pooled_with_site_id",
+        cleaning=CHOSEN_CLEANING,
+        family="training",
+        description="d2 with the series identifier as a column, so a booster can tell sites apart.",
+        pooled_by_type=True,
+        pooled_site_id=True,
+    ),
+    Arm(
         name="c2_early_stopping",
         cleaning=CHOSEN_CLEANING,
         family="training",
@@ -389,15 +399,27 @@ def combine(*, name: str, parts: tuple[Arm, ...], description: str) -> Arm:
         early_stopping=any(p.early_stopping for p in parts),
         min_child_weight=max(p.min_child_weight for p in parts),
         pooled_by_type=any(p.pooled_by_type for p in parts),
+        pooled_site_id=any(p.pooled_site_id for p in parts),
     )
 
 
 _A3W = next(a for a in FEATURE_ARMS if a.name == "a3w_lean_wind_only")
+_D3 = next(a for a in TRAINING_ARMS if a.name == "d3_pooled_with_site_id")
 _C1 = next(a for a in FEATURE_ARMS if a.name == "c1_lead_time")
 _C2 = next(a for a in TRAINING_ARMS if a.name == "c2_early_stopping")
 _C4 = next(a for a in TRAINING_ARMS if a.name == "c4_absolute_error")
 
 ROUND2_ARMS: Final[tuple[Arm, ...]] = (
+    combine(
+        name="r2_c4_c2_c1_a3w_d3",
+        parts=(_C4, _C2, _C1, _A3W, _D3),
+        description="The best ladder step plus one pooled booster per type with a site identifier.",
+    ),
+    combine(
+        name="r2_c4_c1_a3w_d3",
+        parts=(_C4, _C1, _A3W, _D3),
+        description="As the previous arm, without early stopping.",
+    ),
     combine(
         name="r2_c4_c2_c1_a3w",
         parts=(_C4, _C2, _C1, _A3W),

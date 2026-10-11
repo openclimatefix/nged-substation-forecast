@@ -58,6 +58,19 @@ def feature_matrix(*, frame: pl.DataFrame, columns: list[str]) -> pl.DataFrame:
     )
 
 
+def pooled_inputs(*, frame: pl.DataFrame, scale: float, arm: arm_definitions.Arm) -> pl.DataFrame:
+    """Put one series' rows on the pooled booster's scale.
+
+    The power lags are divided by the series' capacity, like the target, and the series identifier
+    is added when the arm asks for it.
+    """
+    lags = [c for c in frame.columns if c in arm_definitions.LAG_COLUMNS]
+    frame = frame.with_columns(pl.col(c) / scale for c in lags)
+    if arm.pooled_site_id:
+        frame = frame.with_columns(site_id=pl.col("time_series_id").cast(pl.Float32))
+    return frame
+
+
 def arm_dir(*, fold_id: str, arm: arm_definitions.Arm, seed: int) -> Path:
     """Return the directory holding one arm's forecasts and scores."""
     return inputs.OUTPUT_ROOT / "arms" / fold_id / f"{arm.name}_seed{seed}"
@@ -225,10 +238,15 @@ def _fit_boosters(
         power=training.select("time_series_id", pl.col("power"))
     )
     scaled = training.join(capacity, on="time_series_id").filter(pl.col("capacity") > 0)
-    scaled = scaled.with_columns(power=pl.col("power") / pl.col("capacity"))
+    scaled = pl.concat(
+        pooled_inputs(frame=part, scale=float(part["capacity"][0]), arm=arm).with_columns(
+            power=pl.col("power") / pl.col("capacity")
+        )
+        for part in scaled.partition_by("time_series_id")
+    )
     scales = dict(zip(capacity["time_series_id"], capacity["capacity"], strict=True))
     for (series_type,), group in scaled.group_by("time_series_type"):
-        columns = list(arm.columns(str(series_type)))
+        columns = [*arm.columns(str(series_type)), *(["site_id"] if arm.pooled_site_id else [])]
         booster = _fit_series(
             group=group, columns=columns, arm=arm, window=window, device=device, seed=seed
         )
@@ -245,6 +263,7 @@ def _predict_and_score(
     types: pl.DataFrame,
     actuals: pl.DataFrame,
     capacity: pl.DataFrame,
+    arm: arm_definitions.Arm,
 ) -> pl.DataFrame:
     """Predict every ensemble member of each cached run, write the forecasts, and score them."""
     (out_dir / "forecasts").mkdir(parents=True, exist_ok=True)
@@ -254,7 +273,12 @@ def _predict_and_score(
         pieces = []
         for (series_id,), series_rows in frame.group_by("time_series_id"):
             booster, columns, scale = boosters[int(series_id)]
-            matrix = xgb.DMatrix(feature_matrix(frame=series_rows, columns=columns))
+            shown = (
+                pooled_inputs(frame=series_rows, scale=scale, arm=arm)
+                if arm.pooled_by_type
+                else series_rows
+            )
+            matrix = xgb.DMatrix(feature_matrix(frame=shown, columns=columns))
             pieces.append(
                 series_rows.select(
                     "time_series_id",
@@ -311,6 +335,7 @@ def fit_arm(*, arm: arm_definitions.Arm, fold_id: str, device: str, seed: int) -
         types=types,
         actuals=actuals,
         capacity=capacity,
+        arm=arm,
     )
     counts.write_parquet(out_dir / "train_rows.parquet")
     scores.write_parquet(scores_path.with_suffix(".tmp"))
