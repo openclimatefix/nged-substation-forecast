@@ -15,7 +15,7 @@ look most promising.
 
 ## Planned solution
 
-**Stage A runs 9 capacity estimators on synthetic planted losses, with no forecast in the loop, and
+**Stage A runs 10 capacity estimators on synthetic planted losses, with no forecast in the loop, and
 answers "which technique?" from how well each estimator recovers the planted loss.** Stage B
 normalises the lag study's baseline XGBoost forecaster by the one causal estimator a fixed rule
 picks from Stage A, and answers "is it worth it?" with a single planned contrast against that
@@ -62,9 +62,9 @@ have run; next is the `study` skill's full sequence, including the mutation pass
 
 ## Literature
 
-**The project's [energy-forecasting review](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/#3-estimating-the-effective-capacity-of-metered-generators) names the published methods, and each estimator here corresponds to one.** CX1 and CX2 are the linear-programme counterpart of the quadratic optimisation of [Viotti et al. (2026)](https://doi.org/10.1002/we.70136), who fit a capacity time series against a capacity factor simulated from weather and a power curve. DP1 follows the differentiable-physics route of [Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421) (capacity as a fitted bound with uncertainty) and [Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) (a physical model fitted to metered power). KF is a sequential Bayesian update like the one the honourable-mention team used in [Authen et al. (2026)](https://doi.org/10.5617/nmi.13106). PR divides power by irradiance as [RdTools](https://doi.org/10.5281/zenodo.1210316) does. CSQ is a quantile of clear-sky-normalised output, the idea behind [Meyers et al. (2020)](https://doi.org/10.1109/JPHOTOV.2019.2957646). R30 is the rolling relative of the running maximum of [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079). NR and HM have no published precedent that the review found.
+**The project's [energy-forecasting review](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/#3-estimating-the-effective-capacity-of-metered-generators) names the published methods, and each estimator here corresponds to one.** CX1 and CX2 are the linear-programme counterpart of the quadratic optimisation of [Viotti et al. (2026)](https://doi.org/10.1002/we.70136), who fit a capacity time series against a capacity factor simulated from weather and a power curve. DP1 follows the differentiable-physics route of [Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421) (capacity as a fitted bound with uncertainty) and [Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) (a physical model fitted to metered power). KF is a sequential Bayesian update like the one the honourable-mention team used in [Authen et al. (2026)](https://doi.org/10.5617/nmi.13106). PR divides power by irradiance as [RdTools](https://doi.org/10.5281/zenodo.1210316) does. CSQ is a quantile of clear-sky-normalised output, the idea behind [Meyers et al. (2020)](https://doi.org/10.1109/JPHOTOV.2019.2957646). EM is the running maximum that [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) use and that [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) quote their figures against, so Stage A can be compared with theirs. R30 is its rolling relative. NR and HM have no published precedent that the review found.
 
-**Four published methods are not tested.** The running maximum itself is the reference that Viotti et al. quote their numbers against, and a ratchet cannot follow a loss downwards. The Solar Data Tools pipeline and StatisticalClearSky would add dependencies to `uv.lock` (departure 4). Joint estimation with the forecast ([Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421)) needs a different forecaster, and this study keeps the lag study's. Per-park power curves ([Authen et al. (2026)](https://doi.org/10.5617/nmi.13106)) are for wind.
+**Three published methods are not tested.** The Solar Data Tools pipeline and StatisticalClearSky would add dependencies to `uv.lock` (departure 4). Joint estimation with the forecast ([Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421)) needs a different forecaster, and this study keeps the lag study's. Per-park power curves ([Authen et al. (2026)](https://doi.org/10.5617/nmi.13106)) are for wind.
 
 **Departures from the review's recommendation, and results our controls respect.**
 
@@ -152,6 +152,7 @@ of 1e-4 points.
 
 | Family | Code | Estimator |
 |---|---|---|
+| Cheap | EM | running maximum of the hourly power readable at issue time, the published reference of [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) and [Viotti et al. (2026)](https://doi.org/10.1002/we.70136); it never falls, so it cannot follow a loss |
 | Cheap | R30 | rolling 30-day P99 of hourly power (the roadmap's "simple rolling p99") |
 | Cheap | CSQ | rolling 30-day 90th percentile of clear-sky-normalised output |
 | Cheap | NR | the plant's 7-day energy ratio to the daily mean of the other 5 plants, times the static P99 |
@@ -444,7 +445,7 @@ model.** The final page's "Groundwork for version 2" paragraph can draw on these
 
 ## Review triage
 
-Review 1 (simplicity), all accepted: recovery answers "which technique?"; 9 estimators; quantiles
+Review 1 (simplicity), all accepted: recovery answers "which technique?"; 9 estimators (the expanding maximum EM was added later as the published reference); quantiles
 exploratory; constant-scale assertion for NC1; smaller positive control; forward-backward smoother;
 P1 alone decides; scoring with no code change; variants and prose cut; compute fixed.
 

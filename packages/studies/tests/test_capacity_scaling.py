@@ -15,6 +15,7 @@ from studies.capacity_scaling import (
     drop_scaled_loss_columns,
     multiplied_forecast_scores,
     oracle_scale,
+    recovery_share,
     scaled_frame,
 )
 from studies.cross_validation import (
@@ -297,3 +298,10 @@ def test_the_oracle_scale_is_the_true_factor_times_each_plants_static_power() ->
     factor = np.array([[1.0, 0.7], [0.9, 1.0]])
     scale = oracle_scale(static_p99_mw=np.array([5.0, 8.0]), factor=factor)
     assert scale.tolist() == [[5.0, 3.5], [7.2, 8.0]]
+
+
+def test_the_recovery_share_is_not_computed_when_the_oracle_gains_almost_nothing() -> None:
+    assert recovery_share(planted_gain=0.9, real_gain=0.1, oracle_gain=1.0) == pytest.approx(0.8)
+    assert recovery_share(planted_gain=0.9, real_gain=0.1, oracle_gain=0.09) is None
+    assert recovery_share(planted_gain=0.9, real_gain=0.1, oracle_gain=-0.5) is None
+    assert recovery_share(planted_gain=0.2, real_gain=0.1, oracle_gain=0.1) == pytest.approx(1.0)

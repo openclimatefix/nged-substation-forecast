@@ -309,6 +309,28 @@ def assert_refit_reproduces(*, refit: pl.DataFrame, published: pl.DataFrame) -> 
         raise ValueError(msg)
 
 
+MIN_ORACLE_GAIN_POINTS: float = 0.1
+"""Below this oracle gain over the baseline, in points of capacity, the recovery share is not
+computed: dividing by a gain this small makes the share meaningless."""
+
+
+def recovery_share(*, planted_gain: float, real_gain: float, oracle_gain: float) -> float | None:
+    """Return the share of the oracle's gain that the selected estimator recovers.
+
+    Args:
+        planted_gain: The selected estimator's gain over the baseline on planted data, in points.
+        real_gain: Its gain over the baseline on real data, in points.
+        oracle_gain: The oracle's gain over the baseline on planted data, in points.
+
+    Returns:
+        (planted gain minus real gain) over the oracle's gain, or `None` ("not computed") when
+        the oracle's gain is below `MIN_ORACLE_GAIN_POINTS`.
+    """
+    if oracle_gain < MIN_ORACLE_GAIN_POINTS:
+        return None
+    return (planted_gain - real_gain) / oracle_gain
+
+
 def oracle_scale(*, static_p99_mw: np.ndarray, factor: np.ndarray) -> np.ndarray:
     """Return the oracle scale of the positive control: the true factor times the static power.
 

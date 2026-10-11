@@ -47,7 +47,12 @@ from studies.capacity_explain import (
     fitted_physical_quantities,
     rubric_table,
 )
-from studies.capacity_scaling import SCORED_COLUMN, multiplied_forecast_scores
+from studies.capacity_scaling import (
+    MIN_ORACLE_GAIN_POINTS,
+    SCORED_COLUMN,
+    multiplied_forecast_scores,
+    recovery_share,
+)
 from studies.guards import refuse_to_overwrite
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -405,8 +410,15 @@ def stage_b(*, root: Path, selection: dict[str, Any], report: Report) -> None:  
     report.text(f"- selected minus B0 on real data: {real:.3f} points")
     passed = oracle["boot_upper"] < 0
     report.text(f"- the oracle's interval lies wholly below zero (instrument can detect): {passed}")
-    if oracle["difference"] != 0:
-        share = (chosen["difference"] - real) / oracle["difference"]
+    share = recovery_share(
+        planted_gain=-chosen["difference"], real_gain=-real, oracle_gain=-oracle["difference"]
+    )
+    if share is None:
+        report.text(
+            f"- recovery share: not computed, because the oracle's gain is below "
+            f"{MIN_ORACLE_GAIN_POINTS} points"
+        )
+    else:
         report.text(
             f"- recovery share (selected planted gain minus real gain, over oracle gain): "
             f"{share:.3f}"

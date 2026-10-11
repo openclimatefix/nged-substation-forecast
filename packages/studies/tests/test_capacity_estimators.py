@@ -19,6 +19,7 @@ from studies.capacity_estimators import (
     RawEstimate,
     assert_scale_ignores_the_issue_day_onward,
     calibrate,
+    estimate_em,
     estimate_kf,
     hindsight_reference_estimates,
     issue_time_estimates,
@@ -89,7 +90,7 @@ def test_each_estimator_recovers_a_planted_loss_within_its_tolerance_and_delay(
     assert np.abs(quiet[420:445] / quiet[380:399].mean() - 1.0).max() < 0.2
 
 
-@pytest.mark.parametrize("name", sorted(ALLOWED_DELAY_DAYS))
+@pytest.mark.parametrize("name", sorted([*ALLOWED_DELAY_DAYS, "EM"]))
 def test_an_estimate_for_day_d_ignores_every_input_after_day_d(name: str) -> None:
     record = synthetic_record(seed=3)
     day = 600  # 2025-01-22, after the reference year ends on 2024-11-30
@@ -352,7 +353,7 @@ def test_a_record_with_mismatched_arrays_is_refused_and_reversing_twice_restores
     twice = record.reversed().reversed()
     assert np.array_equal(twice.power_mw, record.power_mw)
     assert np.array_equal(twice.dates, record.dates)
-    assert set(CHEAP_ESTIMATORS) == set(ALLOWED_DELAY_DAYS)
+    assert set(CHEAP_ESTIMATORS) == {*ALLOWED_DELAY_DAYS, "EM"}
     name: EstimatorNameType = "NR"
     assert run_cheap_estimator(name=name, record=record).level.shape == (3, 30)
 
@@ -362,3 +363,18 @@ def test_a_longer_lag_reads_an_older_estimate() -> None:
     raw = run_cheap_estimator(name="NR", record=record)
     three = issue_time_estimates(record=record, raw=raw, reference=None, lag_days=3).scale_mw
     assert three[0, 500] == pytest.approx(raw.level[0, 497])
+
+
+def test_the_expanding_maximum_never_falls_and_ignores_a_loss() -> None:
+    factor = np.ones((3, DAYS))
+    factor[1, 400:460] = 0.7
+    record = synthetic_record(capacity_factor=factor, seed=18)
+    level = estimate_em(record=record, plant=1, params={}).level
+    valid = valid_days(record=record)[1]
+    assert (np.diff(level[valid.argmax() :]) >= 0).all()
+    assert level[459] == level[399]
+    assert level[300] == pytest.approx(np.max(record.power_mw[1, :301][valid[:301]]))
+    # With the same fallback and floor as every estimator, the scale cannot follow the loss down.
+    raw = run_cheap_estimator(name="EM", record=record)
+    scale = issue_time_estimates(record=record, raw=raw, reference=None).scale_mw[1]
+    assert scale[460] >= scale[400]

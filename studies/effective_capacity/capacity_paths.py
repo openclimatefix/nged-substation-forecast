@@ -261,6 +261,7 @@ def load_events(*, root: Path) -> Events:
 
 
 TUNING_GRIDS: Final[dict[str, list[dict[str, float]]]] = {
+    "EM": [{}],
     "R30": [{}],
     "CSQ": [{}],
     "NR": [{}],

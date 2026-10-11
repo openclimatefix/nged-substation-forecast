@@ -68,10 +68,11 @@ LOW_SUN_CLEAR_SKY_W_M2: Final[float] = 50.0
 FamilyType = Literal["cheap", "wacky", "convex", "pytorch"]
 """The four families of capacity estimator the study compares."""
 
-EstimatorNameType = Literal["R30", "CSQ", "NR", "PR", "KF", "HM", "CX1", "CX2", "DP1"]
-"""The nine estimators."""
+EstimatorNameType = Literal["EM", "R30", "CSQ", "NR", "PR", "KF", "HM", "CX1", "CX2", "DP1"]
+"""The ten estimators."""
 
 ESTIMATOR_FAMILY: Final[Mapping[str, FamilyType]] = {
+    "EM": "cheap",
     "R30": "cheap",
     "CSQ": "cheap",
     "NR": "cheap",
@@ -291,6 +292,35 @@ def _daily_shape_ratio(*, record: CapacityRecord, plant: int, valid: np.ndarray)
         usable=usable,
         minimum=MIN_SHAPE_SUM,
     )
+
+
+def estimate_em(
+    *, record: CapacityRecord, plant: int, params: Mapping[str, float]
+) -> PlantEstimate:
+    """Return the running maximum of the plant's hourly power over every valid day so far.
+
+    This is the published reference that the running-maximum normalisation of Dantas and Browell and
+    the cumulative-maximum baseline of Viotti et al. both use. It never falls, so it cannot follow a
+    loss downwards; it is in the study to put Stage A on the same footing as those papers.
+
+    Args:
+        record: The record.
+        plant: The plant's index.
+        params: Unused; EM has no setting.
+
+    Returns:
+        The running maximum in megawatts, null before the first valid day.
+    """
+    del params
+    valid = valid_days(record=record)[plant]
+    daily_max = np.where(
+        valid,
+        np.nanmax(
+            np.where(np.isfinite(record.power_mw[plant]), record.power_mw[plant], -np.inf), axis=1
+        ),
+        np.nan,
+    )
+    return PlantEstimate(level=np.fmax.accumulate(daily_max), sd=None)
 
 
 def estimate_r30(
@@ -552,6 +582,7 @@ def estimate_hm(
 CheapEstimatorFunction = Callable[..., PlantEstimate]
 
 CHEAP_ESTIMATORS: Final[Mapping[str, CheapEstimatorFunction]] = {
+    "EM": estimate_em,
     "R30": estimate_r30,
     "CSQ": estimate_csq,
     "NR": estimate_nr,
@@ -562,6 +593,7 @@ CHEAP_ESTIMATORS: Final[Mapping[str, CheapEstimatorFunction]] = {
 """The estimators of this module, by name."""
 
 DEFAULT_PARAMS: Final[Mapping[str, Mapping[str, float]]] = {
+    "EM": {},
     "R30": {},
     "CSQ": {},
     "NR": {},

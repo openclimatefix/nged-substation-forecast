@@ -35,6 +35,13 @@ CRITERIA: Final[tuple[tuple[str, str], ...]] = (
 """The rubric's five criteria: a key and the question the grader answers."""
 
 RUBRIC: Final[Mapping[str, Mapping[str, GradeType]]] = {
+    "EM": {
+        "one_sentence": "yes",
+        "physical_units": "partly",
+        "attributable": "no",
+        "spread": "no",
+        "differentiable": "no",
+    },
     "R30": {
         "one_sentence": "yes",
         "physical_units": "partly",
@@ -102,6 +109,7 @@ RUBRIC: Final[Mapping[str, Mapping[str, GradeType]]] = {
 """Each estimator's grades, from reading its code. The reasons are in the table below."""
 
 RUBRIC_REASONS: Final[Mapping[str, str]] = {
+    "EM": "reports the highest power seen so far; it can only rise, so a loss is invisible",
     "R30": "reports the 30-day 99th percentile of output; no model of the cause",
     "CSQ": "reports a quantile of output per unit of clear-sky irradiance; no model of the cause",
     "NR": "removes shared weather by comparing with the other plants, so a loss is not the weather",
@@ -203,6 +211,7 @@ def explanation_sentence(
     """
     change = 100 * (scale_mw / earlier_scale_mw - 1.0)
     basis = {
+        "EM": "the highest hourly power it has ever recorded",
         "R30": "the 99th percentile of its last 30 days of hourly power",
         "CSQ": "the 90th percentile of its last 30 days of output per unit of clear-sky irradiance",
         "NR": "its last 7 days of energy compared with the other plants' over the same days",
