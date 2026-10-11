@@ -1,94 +1,102 @@
-# A capacity estimate that updated daily raised day-ahead solar error at 6 plants, and one that held the static capacity until a drop lasted did not
+# No estimate of a solar plant's capacity lowered day-ahead forecast error detectably at 6 plants, and a daily Kalman filter raised it
 
-**At 6 solar plants over 18 months, no estimate of a plant's available capacity lowered the
-day-ahead error of an XGBoost forecast by a statistically significant amount at both hyperparameter
-settings, and the Kalman filter that the study plan's rule selected raised the error by 0.255 points
-of capacity [0.004, 0.563], against a baseline error of 8.93.** For Flexpectation (this project),
-the rule that the plan fixed before any result existed therefore says that a capacity estimator is
-not worth building for the day-ahead forecast. That verdict is underpowered, because only 3 of the
-106 plant-months are the low-output kind of loss that an estimator exists to repair, and the
-narrowest interval of any contrast here spans about 0.2 points. A post hoc estimator that holds each
-plant's static capacity until a drop of more than 10% lasts 7 days did not raise the error (−0.081
-points [−0.216, +0.015]), and is the one technique that this study suggests testing on more plants.
-A record in which low-output plant-months were more than about 6.5% of the rows would change the
-verdict for the Kalman filter.
+**Bottom line.** We tested replacing the one fixed number that a solar forecast divides each plant's
+power by (the plant's *static capacity*, its 99th-percentile output) with a *capacity estimate*, an
+estimate updated every day of how much power the plant can produce. **At 6 solar plants over 18
+months, no capacity estimate lowered the day-ahead error detectably, and the Kalman filter that the
+study plan's rule selected raised it by 0.255 points of capacity (percentage points of the static
+capacity) [+0.004, +0.563], against a baseline error of 8.93 points, at the primary XGBoost setting,
+and not detectably at the second setting.** For Flexpectation (this project), the plan's rule
+therefore says that a capacity estimator is not worth building for the day-ahead forecast, but the
+record cannot tell whether a better estimator would pay, because only 3 of 106 plant-months are the
+low-output kind of loss that an estimator exists to repair (one plant producing about 70% of its
+neighbours' output for a month). The next step this study suggests is to test a hold-at-static
+detector (HYST, designed after the results) on more plants.
 
-![Figure 1: A capacity estimate that updates daily raised day-ahead solar error at 6 plants, and one
-that holds the static value until a drop lasts did not. Twelve rows, each the change in error
-against the baseline B0, with a 95% interval.](../assets/effective_capacity_figure_1.svg)
+![Figure 1: No capacity estimate lowered day-ahead solar error detectably at 6 plants, and the
+Kalman filter raised it at the primary setting. Twelve rows of the change in error against the
+baseline B0, with 95% intervals; the off-scale CX1 is in the figure's note. KF: Kalman filter. HYST:
+hold at static. HM: hidden Markov. PR: performance ratio. CX2: convex programme. NR: neighbour
+ratio. DSKF: deseasonalised Kalman filter. DP1: differentiable
+physics.](../assets/effective_capacity_figure_1.svg)
 
-**Terms used on this page.**
+**How the study works.** Stage A plants known losses (steps, ramps, and intermittent losses of 5% to
+40% of power) in real power and asks each estimator to find them, which is the *recovery test*, with
+no forecast in the loop. *False movement* is the share of days on which an estimator's capacity
+moves more than 5% in plant-months in which nothing should have changed. Stage B divides the
+lag-features study's baseline forecast, B0, by the estimator that the plan's fixed rule selects, and
+compares forecast errors. The rule requires a candidate to pass a false-movement gate, and when no
+candidate does, it picks the best recoverer and calls the pick an *ungated pick*.
 
-- **Points:** percentage points of a plant's capacity, where capacity means the plant's *static
-  capacity*, its 99th-percentile metered output over its whole history, and not its nameplate
-  rating. A difference is an arm's error minus the baseline's, so a negative difference means a
-  lower error.
-- **Static capacity:** the fixed number that the baseline divides every plant's power by.
-- **Capacity estimator, or estimator:** a method that estimates, each day, how much of the static
-  capacity a plant can produce, from power and weather up to 2 days before the forecast's target
-  day. The table in "Introduction" lists the estimators.
-- **Arm:** one XGBoost model configuration with its own estimator. The baseline arm, B0, divides by
-  the static capacity and is the baseline of the [lag-features
-  study](lag-features.md#data-and-methods). Every other arm trains on power divided by an
-  estimator's capacity, multiplies its forecast back, and is scored in megawatts against the static
-  capacity.
-- **Planted loss:** a synthetic loss, multiplied into real power in a month chosen at random. A
-  planted loss is a step, a ramp, or an intermittent loss.
-- **Planned, exploratory, post hoc:** a planned contrast was written into the study plan before any
-  result existed, and the plan's rule uses only planned contrasts. Every other number is
-  exploratory. A post hoc number was designed after the first results were seen and is therefore a
-  hypothesis.
-- **Interval:** the range of changes in error that the data are consistent with, allowing for
-  month-to-month weather. A figure's 95% interval is a t-interval over the 18 scored months unless
-  its subtitle says that it resamples whole months. An interval that includes zero means no
-  detectable change.
-- **Second setting:** the second XGBoost hyperparameter setting of the lag-features study. The
-  second setting shows whether a result belongs to the inputs or to the setting.
-- **Oracle:** an arm told the true size of a planted loss, which shows what knowing the loss exactly
-  gains an XGBoost model.
-- **Low-output plant-months:** the 3 plant-months in which one plant produced between 0.67 and 0.71
-  of its neighbours' output.
-
-**Is a capacity estimator worth implementing for the day-ahead forecast?** Not shown, and
-underpowered. The plan's rule reads the selected Kalman filter's +0.255 points [+0.004, +0.563]
-against B0, with a threshold of 0.179, as "not worth building" (Figure 1). Only 3 of 106
-plant-months are low-output ones, and the Kalman filter would need them to be 6.5% of the rows to
-beat B0 overall ([Figure
+**Is a capacity estimator worth implementing for the day-ahead forecast?** Not worth building by the
+plan's rule, and not shown either way for a better estimator. The selected Kalman filter changed the
+error by +0.255 points [+0.004, +0.563] at the primary setting and +0.259 points [−0.022, +0.599] at
+the second, so both intervals exclude a gain of the plan's 0.179-point threshold. The Kalman
+filter's setting is the most agile one tried (its process standard deviation 0.08 sat at the edge of
+the tuning grid, and a stiffer filter never reached Stage B). The 3 low-output plant-months are 1.9%
+of the rows. The Kalman filter would beat B0 overall only above 6.5% of rows, and would reach the
+threshold only at about 9.7%, if the 5.180-point gain from one plant carried over ([Figure
 7](#the-kalman-filter-cut-error-by-about-5-points-in-3-low-plant-months-and-added-04-points-elsewhere)).
 
-**Which techniques look most promising?** For forecast error, only HYST, which was designed after
-the main results (post hoc): −0.081 points [−0.216, +0.015], and −0.113 points [−0.260, +0.004] at
-the second setting (Figure 1). For recovering a planted loss, the Kalman filter had the smallest
-error (1.86 points against 5.02 for doing nothing), then CX1, CX2, PR, and NR (2.04 to 2.39). DP1,
-the most explainable estimator, recovered 4.03 points ([Figure
+**Which techniques look most promising?** For forecast error, HYST had the lowest point estimate of
+the 9 post hoc arms, −0.081 points [−0.216, +0.015] at the primary setting and −0.113 points
+[−0.260, +0.004] at the second, and HM (+0.004 [−0.223, +0.320]), PR (+0.093 [−0.088, +0.268]), and
+CX2 (+0.175 [−0.024, +0.330]) were also indistinguishable from B0 (Figure 1). For recovering a
+planted loss, the Kalman filter had the smallest error (1.86 points against 5.02 for doing nothing),
+then CX1, CX2, PR, and NR (2.04 to 2.39). DP1, the most explainable estimator, recovered 4.03 points
+([Figure
 3](#most-estimators-recovered-a-planted-loss-better-than-doing-nothing-and-the-kalman-filter-did-so-best),
 [Figure
 10](#dp1-and-kf-score-highest-for-explainability-and-the-running-maximum-and-the-quantile-formulas-lowest)).
 
-**Why did the estimator that recovered a planted loss best raise forecast error?** The Kalman
-filter's raw level has a seasonal shape that the recovery test cancels. The Kalman filter's December
-level is 0.72 to 0.88 of each plant's median ([Figure
-5](#the-kalman-filters-raw-capacity-level-is-lowest-in-december-at-every-plant)), and it raised
-error by +0.841 points [+0.032, +1.604] from December to February while lowering it by 5.180 points
-in the 3 low plant-months ([Figure
-6](#the-kalman-filter-raised-error-in-december-to-february-and-hyst-did-not), [Figure
-7](#the-kalman-filter-cut-error-by-about-5-points-in-3-low-plant-months-and-added-04-points-elsewhere)).
+**A possible reason that the best recoverer raised forecast error, not isolated:** the Kalman
+filter's raw level has a seasonal shape, 0.72 to 0.88 of each plant's median in December, which the
+recovery test cancels ([Figure
+5](#the-kalman-filters-raw-capacity-level-is-lowest-in-december-at-every-plant)). It raised error by
++0.841 points [+0.032, +1.604] from December to February and lowered it by 5.180 points in the 3 low
+plant-months ([Figure 6](#the-kalman-filter-raised-error-in-december-to-february-and-hyst-did-not)).
+The explanation is untested: DSKF removes the shape and still raised error by +0.290 points, and
+dropping the day-of-year column from B0 lowered its error by 0.117 points, more than HYST's gain.
 
-**Did any estimator stay still when nothing changed?** Only HYST and the two references did. The 9
-candidates of the plan moved on 31.5% to 80.5% of days in plant-months whose output matched the
-neighbouring plants', against the plan's gate of 10%, and HYST moved on 2.6% ([Figure
+**Did any estimator stay still when nothing changed?** Only HYST (2.6% of days) and the two
+references (S0 and EM, which cannot follow a loss). The 9 candidates moved on 31.5% to 80.5% of days
+against the plan's 10% gate, and none passes even a 30% gate, so the ungated pick is not fragile
+([Figure
 4](#on-plant-months-whose-output-matched-the-neighbouring-plants-only-hyst-and-the-references-stayed-still)).
 
 **Can the study detect a loss at all?** Yes. When a 30% step was planted in 17 plant-months, the
-oracle lowered the error by 1.467 points [−2.084, −0.854], and the Kalman filter recovered 0.89 of
-that gain ([Figure
+oracle (told the true loss) lowered the error by 1.467 points [−2.084, −0.854], and the Kalman
+filter recovered 0.89 of that gain ([Figure
 8](#when-30-steps-were-planted-in-17-plant-months-the-kalman-filter-recovered-most-of-the-oracles-gain)).
 
 **What can these data support?** These data support the absence of a forecast gain from the daily
 Kalman filter at these 6 plants, and a hypothesis that holding the static capacity until a drop
-lasts does no harm and helps in low-output months. The data do not support a claim about wind,
-domestic solar, more than 18 months, hundreds of plants, or a plant that loses capacity in a way
-that its neighbours do not share.
+lasts does no harm. The data do not support a claim about wind, domestic solar, more than 18 months,
+hundreds of plants, or a plant that loses capacity in a way that its neighbours do not share.
+
+**Terms used on this page.**
+
+- **Points:** percentage points of a plant's static capacity. A difference is an arm's error minus
+  the baseline's, so negative means a lower error. In the recovery test, a gap of 0.02 in the share
+  of power left is 2 points.
+- **Arm:** one XGBoost model configuration with its own estimator. The baseline arm, B0, divides by
+  the static capacity ([lag-features study](lag-features.md#data-and-methods)). Every other arm
+  trains on power divided by an estimator's capacity, multiplies its forecast back, and is scored in
+  megawatts against the static capacity.
+- **Hyperparameter setting:** a choice of XGBoost depth, learning rate, and number of rounds. The
+  primary setting and the second, shallower setting with more rounds come from the lag-features
+  study, and a result that holds at both belongs to the inputs and not to the setting.
+- **Planted loss:** a synthetic loss, multiplied into real power in a month chosen at random.
+- **Planned, exploratory, post hoc:** a planned contrast was written into the study plan before any
+  result existed. Every other number is exploratory. A post hoc number was designed after the first
+  results were seen and is therefore a hypothesis.
+- **Interval:** the range of changes in error that the data are consistent with, allowing for
+  month-to-month weather. A 95% interval is a t-interval over the 18 scored months unless its
+  subtitle says that it resamples whole months.
+- **Oracle:** an arm told the true size of a planted loss.
+- **Low-output plant-months:** the 3 plant-months in which one plant produced between 0.67 and 0.71
+  of its neighbours' output, below a neighbour ratio of 0.8. The ratio file lists 16 of the 18
+  scored months for that plant, so the count of 3 rests on that threshold and those months.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
@@ -98,18 +106,10 @@ that its neighbours do not share.
 
 ## Key findings
 
-- **Recovery of a planted loss and forecast error disagreed.** The Kalman filter recovered a planted
-  loss best (1.86 points) and raised forecast error by 0.255 points, whereas HYST recovered it worse
-  (4.38 points) and did not raise forecast error ([Figure
-  3](#most-estimators-recovered-a-planted-loss-better-than-doing-nothing-and-the-kalman-filter-did-so-best),
-  Figure 1).
-- **The plan's rule selected the Kalman filter because no candidate passed the false-movement
-  gate.** The 9 candidates moved on 31.5% to 80.5% of days against a gate of 10% ([Figure
-  4](#on-plant-months-whose-output-matched-the-neighbouring-plants-only-hyst-and-the-references-stayed-still)).
-- **The convex estimators did not beat the Kalman filter.** CX1 recovered a planted loss 0.177
-  points worse than the Kalman filter [0.092, 0.262] (planned contrast E1) and raised forecast error
-  by 3.222 points [+2.380, +4.238] (post hoc), and DP1 recovered a loss 1.992 points worse than CX1
-  [1.745, 2.240] (planned contrast E2) ([Figure
+- **The convex estimators did not beat the Kalman filter at recovery.** CX1 recovered a planted loss
+  0.177 points worse than the Kalman filter [0.092, 0.262] (planned contrast E1) and raised forecast
+  error by 3.222 points [+2.380, +4.238] (post hoc), and DP1 recovered a loss 1.992 points worse
+  than CX1 [1.745, 2.240] (planned contrast E2) ([Figure
   3](#most-estimators-recovered-a-planted-loss-better-than-doing-nothing-and-the-kalman-filter-did-so-best)).
 - **HYST detects most planted steps, slowly.** HYST detected 37 of 53 planted steps with a mean
   delay of 8.4 days, and missed 7 of the 44 steps that fell where its seasonal profile exists
@@ -120,8 +120,8 @@ that its neighbours do not share.
   plant-months ([Figure
   11](#the-hindsight-kalman-filter-did-not-beat-the-causal-one-and-the-gap-shrank-from-042-to-003-points-without-two-plant-months)).
 - **DP1 is the candidate to build on if version 2 of Flexpectation is a differentiable-physics
-  model.** DP1 scored highest for explainability and is the only estimator differentiable end to
-  end, and it trails on recovery ([Figure
+  model.** DP1 scored highest for explainability and is the only estimator graded yes for
+  differentiability, and it trails on recovery ([Figure
   10](#dp1-and-kf-score-highest-for-explainability-and-the-running-maximum-and-the-quantile-formulas-lowest),
   [Groundwork for version 2](#groundwork-for-version-2)).
 
@@ -150,11 +150,11 @@ uncertainty, and of [Gijón et al. (2025)](https://arxiv.org/abs/2502.07344), wh
 model to metered power. KF is a sequential Bayesian update, as the honourable-mention team used in
 [Authen et al. (2026)](https://doi.org/10.5617/nmi.13106). PR divides power by modelled output
 driven by satellite irradiance, as [RdTools](https://doi.org/10.5281/zenodo.1210316) does. CSQ takes
-a quantile of output over clear-sky output, the idea behind [Meyers et al.
-(2020)](https://doi.org/10.1109/JPHOTOV.2019.2957646). EM is the running maximum that [Dantas and
-Browell (2026)](https://doi.org/10.1002/we.70079) use and that Viotti et al. quote their figures
-against. The review found no published precedent for NR or HM, and DSKF and HYST were designed after
-the main results.
+a quantile of output over clear-sky output (the output under a cloudless sky), the idea behind
+[Meyers et al. (2020)](https://doi.org/10.1109/JPHOTOV.2019.2957646). EM is the running maximum that
+[Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) use and that Viotti et al. quote their
+figures against. The review found no published precedent for NR or HM, and DSKF and HYST were
+designed after the main results.
 
 **Three published methods are not tested.** The Solar Data Tools pipeline and StatisticalClearSky
 would add dependencies to the repository's lock file. Joint estimation with the forecast (Pierrot
@@ -170,8 +170,8 @@ and Pinson) needs a different forecaster from the lag-features study's. Per-park
 | NR | simple formula | the plant's 7-day output over the other plants', times the static capacity |
 | PR | simple formula | the 7-day ratio of power to physics-model output driven by satellite irradiance, over its value in a calibration year |
 | KF | simple formula | a Kalman filter on the daily log ratio of power to physics-model output driven by satellite irradiance |
-| HM | hidden Markov | a hidden Markov model over four discrete capacity levels: 1, 0.9, 0.75, and 0.5 of the static capacity |
-| CX1 | convex programme | a fused-lasso fit of one daily capacity trace |
+| HM | hidden Markov | a hidden Markov model (a model that switches between a few discrete states) over four discrete capacity levels: 1, 0.9, 0.75, and 0.5 of the static capacity |
+| CX1 | convex programme | a fused-lasso fit (a fit that penalises day-to-day changes) of one daily capacity trace |
 | CX2 | convex programme | separate direct-current and alternating-current traces, a clipping classifier, and a hinge for curtailment |
 | DP1 | differentiable physics | a PyTorch model with a piecewise-constant weekly direct-current capacity and a posterior |
 | DSKF | post hoc | KF divided by a cross-plant day-of-year profile built only from earlier calendar years |
@@ -182,12 +182,12 @@ and Pinson) needs a different forecaster from the lag-features study's. Per-park
 **The rows and the forecaster are the lag-features study's.** The study scores 29,445 lead-day-1
 daylight hours at 6 plants over 18 months, which is 106 plant-months. The forecaster is the lag
 study's baseline B0: seven columns (hour of day, day of year, an era code, the sun's elevation and
-azimuth, and the ECMWF ensemble mean's irradiance and temperature), the absolute-error objective,
-three fitting seeds, and five folds of whole months. The [lag-features
-study](lag-features.md#data-and-methods) describes the rows, the folds, and both hyperparameter
-settings. Every arm has the same seven columns. Before any other fit, the script checks that
-dividing B0's inputs by one constant reproduces B0, and that a refit of B0 reproduces the lag
-study's B0 losses bit for bit. Each check raises on a mismatch.
+azimuth, and the ensemble mean's irradiance from the European Centre for Medium-Range Weather
+Forecasts (ECMWF) and temperature), the absolute-error objective, three fitting seeds, and five
+folds of whole months. The [lag-features study](lag-features.md#data-and-methods) describes the
+rows, the folds, and both hyperparameter settings. Every arm has the same seven columns. Before any
+other fit, the script checks that dividing B0's inputs by one constant reproduces B0, and that a
+refit of B0 reproduces the lag study's B0 losses bit for bit. Each check raises on a mismatch.
 
 **Every estimate is causal.** The capacity used for a forecast for day T reads whole days up to day
 T−2, which is what a forecast issued at 09:00 UTC on day T−1 can read. An estimator falls back to
@@ -228,9 +228,14 @@ and labels the pick an ungated pick. Two planned estimator-level contrasts, E1 (
 estimator minus the best of the simple formulas and the hidden Markov model) and E2 (DP1 minus the
 best convex estimator), use a 97.5% t-interval over the 10 selection draws. Each estimator's
 settings were chosen on the tuning draw only. The tuning grids of KF, HM, CX1, and CX2 were widened
-after a first pass, because the winners sat at a grid edge. DP1's grid gained a data weight and
-larger total-variation penalties after a first pass left DP1 worse than doing nothing. Both changes
-used the tuning draw only.
+after a first pass, because the winners sat at a grid edge. DP1's grid gained a data weight and the
+total-variation weights 0.5, 1, and 2 (a total-variation penalty discourages jumps in the weekly
+capacity) after a first pass left DP1 worse than doing nothing. Both changes used the tuning draw
+only. After the widening, KF's process standard deviation (0.08), HM's stay probability (0.8), and
+the fused weight of CX1 and CX2 (0.3) still sat at the edge of their grids, so the Kalman filter
+verdict is for the most agile setting tried, and a stiffer filter (process standard deviation 0.02)
+never reached Stage B. DP1's estimator uses windows with at least 20 valid days, and the other
+estimators fall back below 30.
 
 **Stage B asks "is it worth it?" with one planned contrast.** P1 (planned) is the selected arm minus
 B0, pooled over the 6 plants, at both XGBoost settings. The plan's rule uses a threshold of 2% of
@@ -240,8 +245,9 @@ worth building if, at both settings, the interval lies wholly above the negative
 other outcome is unresolved, and so is any outcome in which the negative control's interval lies
 wholly below zero. The negative control, NC2, gives each plant's scale the wrong months. The
 positive control plants a 30% step in the power that the forecasts train on and are scored against,
-in up to 3 months at every plant, and compares B0, an oracle, and the selected estimator. A no-fit
-bound multiplies B0's forecast by each plant-month's output relative to its neighbours.
+in up to 3 months at every plant, and compares B0, an oracle, and the selected estimator. A
+capacity-only reference multiplies B0's forecast by each plant-month's output relative to its
+neighbours.
 
 **What the significance test covers.** An interval is a t-interval over the 18 scored months, with
 every month counting once. The test covers month-to-month weather and not differences between
@@ -275,10 +281,10 @@ days, HYST after 8.4 days, DP1 after 9.7 days, CSQ after 18.2 days, and R30 afte
 HM jumps between its four levels and settles near the planted share and not at it.
 
 **HYST holds the static capacity until a drop has lasted 7 days, follows it, and releases after 7
-recovered days.** HYST detected 37 of the 53 planted steps in the selection draws (0.70) and missed
-16. Nine of the 16 fell where DSKF has no seasonal profile (29 of the 163 events), because the
-    profile is built only from earlier calendar years. The 7 steps that HYST missed although a
-    profile existed were 5%, 7%, 8%, 9%, 11%, 13%, and 25%. KF detected all 53 steps, and DSKF 44.
+recovered days.** HYST detected 37 of the 53 planted steps in the selection draws (0.70) and
+missed 16. Nine of the 16 fell where DSKF has no seasonal profile (29 of the 163 events), because
+the profile is built only from earlier calendar years. The 7 steps that HYST missed although a
+profile existed were 5%, 7%, 8%, 9%, 11%, 13%, and 25%. KF detected all 53 steps, and DSKF 44.
 
 ### Most estimators recovered a planted loss better than doing nothing, and the Kalman filter did so best
 
@@ -295,10 +301,11 @@ covered the planted factor on 0.93 to 0.98 of days, and DP1's on 0.81 to 0.82.
 **The planned contrasts do not support the roadmap's prediction that a convex estimator wins.** CX1
 recovered a planted loss 0.177 points worse than KF [0.092, 0.262] (E1), and DP1 recovered 1.992
 points worse than CX1 [1.745, 2.240] (E2). Each is a 97.5% t-interval over the 10 selection draws,
-conditional on these 6 plants and this record, and each reads "loses". DP1 works, after its grid was
-widened, and trails the convex and filter estimators. Reading the satellite irradiance one day older
-raised the recovery error of KF from 1.86 to 2.24 points, of CX2 from 2.22 to 2.56, and of PR from
-2.37 to 2.73.
+conditional on these 6 plants and this record, and each reads "loses". DP1 recovered less error than
+doing nothing, after its grid was widened, but trails the convex and filter estimators: its 90%
+interval covered the planted factor on 0.81 of days, and it took 9.7 days to detect a step. Reading
+the satellite irradiance one day older raised the recovery error of KF from 1.86 to 2.24 points, of
+CX2 from 2.22 to 2.56, and of PR from 2.37 to 2.73.
 
 ### On plant-months whose output matched the neighbouring plants', only HYST and the references stayed still
 
@@ -318,17 +325,20 @@ The windows favour NR, and NR still moved on 52.2% of days.
 lines and their median by calendar month.](../assets/effective_capacity_figure_5.svg)
 
 **The Kalman filter's level falls to between 0.72 and 0.88 of each plant's median in December, with
-a median of 0.77 across plants.** January is the next lowest month (median 0.88). The shape appears
-at all 6 plants, so it does not come from the capacity of any one plant. The filter divides power by
-the output of a physics model driven by satellite irradiance, and the study did not isolate which
-part of that ratio carries the shape.
+a median of 0.77 across plants.** January is the next lowest month (median 0.88, with one plant at
+0.77). The shape appears at all 6 plants, so it does not come from the capacity of any one plant.
+The filter divides power by the output of a physics model driven by satellite irradiance, and the
+study did not isolate which part of that ratio carries the shape.
 
-**The planted-loss ratio cancels the shape, so Stage A's tuning rewarded agility.** The capacity
-reported with a loss and the capacity reported without it carry the same seasonal factor, so a
-filter that chased winter was not penalised for chasing it. The false-movement check and the
-forecast contrast can see the shape, and the tuned filter sat at the agile edge of its grid. DSKF
-removes the shape with a profile from earlier years, and still moved on 56.8% of days and raised
-forecast error by +0.290 points [+0.083, +0.520].
+**A possible reason, not isolated: the planted-loss ratio cancels the shape, so Stage A's tuning
+rewarded agility.** The capacity reported with a loss and the capacity reported without it carry the
+same seasonal factor, so a filter that chased winter was not penalised for chasing it. The
+false-movement check and the forecast contrast can see the shape, and the tuned filter sat at the
+agile edge of its grid. The explanation is untested. DSKF removes the shape with a profile from
+earlier years, and still moved on 56.8% of days and raised forecast error by +0.290 points [+0.083,
++0.520]. Dropping the day-of-year column lowered B0's error by 0.117 points, more than HYST's 0.081,
+and the Kalman filter without that column was 0.326 points above B0 without it, so the day-of-year
+column also carries part of any seasonal story.
 
 ### The Kalman filter raised error in December to February, and HYST did not
 
@@ -350,18 +360,19 @@ intervals.](../assets/effective_capacity_figure_7.svg)
 **In the 3 low plant-months the Kalman filter lowered the error by 5.180 points, and on every other
 row it raised the error by 0.361 points (post hoc, weighted by rows).** HYST lowered the error by
 3.550 points in the 3 low plant-months and changed it by −0.014 points elsewhere. The Kalman filter
-would beat B0 overall only if more than 6.5% of rows were low-output plant-months, against 1.9% of
-rows here (2.8% of plant-months). One plant supplies all 3 low plant-months, so the study cannot
-resample them, and 5.180 points is a description and not an estimate with an interval. In the 3 low
-months the Kalman filter's mean scale was 0.65, 0.71, and 0.88 of its level in other months, against
-the neighbours' ratios of 0.68, 0.67, and 0.71.
+would beat B0 overall only if more than 6.5% of rows were low-output plant-months, and would reach
+the plan's threshold only at about 9.7%, if the 5.180 points carried over from one plant, against
+1.9% of rows here (2.8% of plant-months). One plant supplies all 3 low plant-months, so the study
+cannot resample them, and 5.180 points is a description and not an estimate with an interval. In the
+3 low months the Kalman filter's mean scale was 0.65, 0.71, and 0.88 of its level in other months,
+against the neighbours' ratios of 0.68, 0.67, and 0.71.
 
-**The record cannot return "worth building" for any estimator.** The no-fit bound, which multiplies
-B0's forecast by each plant-month's output relative to its neighbours, changed the error by −0.022
-points [−0.145, +0.067] at the primary setting and by −0.036 points [−0.185, +0.068] at the second.
-Both point estimates are well above the −0.179 that the plan requires, so an estimator that did as
-well as this bound could reach only "not worth building" or "unresolved". The plan's rule reads the
-bound as "not worth building" too.
+**Two claims need separating.** First, a gain of 0.179 points or more is excluded for the selected
+Kalman filter at both settings, because both t-intervals lie above −0.179. Second, the record cannot
+tell whether a better estimator would pay. The capacity-only reference, which multiplies B0's
+forecast by each plant-month's output relative to its neighbours, changed the error by −0.022 points
+[−0.145, +0.067] at the primary setting and by −0.036 points [−0.185, +0.068] at the second, and
+HYST's −0.081 beat it, so the reference is a yardstick and not a bound.
 
 ### When 30% steps were planted in 17 plant-months, the Kalman filter recovered most of the oracle's gain
 
@@ -384,10 +395,11 @@ bar chart of the share of plant-days off the static capacity in each scored
 month.](../assets/effective_capacity_figure_9.svg)
 
 **HYST left the static capacity on 13.2% of plant-days, and its mean capacity was 0.982 of the
-static capacity (post hoc).** HYST's monthly share ranged from 0.0% to 26.9%. The CRPS of its
-quantile forecast was 6.051 points against 6.147 for B0, whereas the Kalman filter's was 6.305. Over
-the first 9 scored months HYST changed the error by −0.045 points [−0.218, +0.143], and over the
-last 9 months by −0.130 points [−0.335, +0.010].
+static capacity (post hoc).** HYST's monthly share ranged from 0.0% to 26.9%. The CRPS (continuous
+ranked probability score, an error score for a whole forecast distribution) of its quantile forecast
+was 6.051 points against 6.147 for B0, whereas the Kalman filter's was 6.305. Over the first 9
+scored months HYST changed the error by −0.045 points [−0.218, +0.143], and over the last 9 months
+by −0.130 points [−0.335, +0.010].
 
 ### DP1 and KF score highest for explainability, and the running maximum and the quantile formulas lowest
 
@@ -396,7 +408,7 @@ formulas lowest. A matrix of 11 estimators by 5 criteria, graded yes, partly, or
 no.](../assets/effective_capacity_figure_10.svg)
 
 **DP1 scored 4.5 of 5, KF 4.0, CX2 3.5, and HM 3.0, and EM, R30, and CSQ scored 1.5.** The grades
-come from reading each estimator's code and outputs, and were fixed before any result existed.
+come from reading each estimator's code, and were committed before the estimates existed.
 "[Explainability](#explainability)" gives the criteria and the reasons. Twenty days into the 17
 planted events of the tuning draw, the planted change had a median of −0.1812 of capacity. KF's
 median estimated change was −0.1859 (lowest −0.3882, highest −0.0663), HM's −0.1868, CX2's −0.2121,
@@ -433,27 +445,29 @@ recovery scoring cancels the seasonal shape that the forecast contrast and the f
 can see. Whether a time-varying capacity table is worth building as a fault signal rests on Stage A,
 and the forecast contrast does not decide it.
 
-**HYST is the estimator to test next, as a hypothesis and not a recommendation.** HYST is the only
-estimator that did not raise forecast error, it lowered the error in the 3 low plant-months by 3.550
-points, and it moved on 2.6% of days. HYST was designed after the results, so its small gain carries
-a winner's curse. HYST misses small losses, cannot act until a seasonal profile exists, and had a
-CRPS of 6.051 points against 6.147 for B0. A fair test would fix HYST's settings first and use more
-plants.
+**HYST is the estimator this study suggests testing next, as a hypothesis and not a
+recommendation.** HYST had the lowest point estimate of the 9 post hoc arms (HM, PR, and CX2 were
+also indistinguishable from B0), it lowered the error in the 3 low plant-months by 3.550 points, and
+it moved on 2.6% of days. HYST was designed after the results, so its small gain carries a winner's
+curse (the best of several options tried looks better than it is), and its favourable looks were all
+chosen after seeing the results: the second setting, the CRPS, the December-to-February split, the
+low-month split, and the first-9 and last-9-month split. HYST misses small losses, cannot act until
+a seasonal profile exists, and had a CRPS of 6.051 points against 6.147 for B0. A fair test would
+fix HYST's settings first and use more plants.
 
 ### Explainability
 
-**The study graded each estimator on five yes, partly, or no criteria before any result existed,
-because the capacity estimator has to be explainable.** The criteria are that an operator can be
-told in one sentence why the capacity fell on a given day, that the fitted quantities are physical
-quantities with units, that a change can be attributed to a cause (soiling, a lost string,
-curtailment, or bias), that the estimator returns a spread, and that the estimator can be
-differentiated through for joint fitting. A yes scores 1 and a partly 0.5, and the rubric took no
-part in the selection rule.
+**The study graded each estimator on five yes, partly, or no criteria from its code, before the
+estimates existed, because the capacity estimator has to be explainable.** The criteria are that an
+operator can be told in one sentence why the capacity fell on a given day, that the fitted
+quantities are physical quantities with units, that a change can be attributed to a cause (soiling,
+a lost string, curtailment, or bias), that the estimator returns a spread, and that the estimator
+can be differentiated through for joint fitting. A yes scores 1 and a partly 0.5, and the rubric
+took no part in the selection rule.
 
 - **DP1 (4.5):** its tilt, azimuth, and both capacities are physical, and it returns a posterior.
-  The loss handles curtailment without naming it. The fitted tilts of the 6 plants run from 13.1° to
-  26.7°, and the azimuths from 161.0° to 179.6°, which KF and DP1 both take from one orientation
-  fit.
+  The loss handles curtailment without naming it. The fitted tilts run from 13.1° to 26.7° and the
+  azimuths from 161.0° to 179.6°, across the plants, taken from one orientation fit.
 - **KF (4.0):** an availability factor with a standard deviation. A random walk cannot separate
   causes.
 - **CX2 (3.5):** separate direct-current and alternating-current traces tell a lost string from a
@@ -474,11 +488,13 @@ learned jointly. Its output is a weekly direct-current capacity trace with a nor
 mean and a standard deviation per week, which a larger differentiable-physics model could take as
 input.
 
-**The physics chain from irradiance to power, the soft clip, the pinball reconstruction loss, the
-Kullback-Leibler term, and the total-variation penalty are differentiable in PyTorch now.** The Erbs
-split of irradiance and the solar position come from `pvlib` in NumPy, so gradients stop at the
-irradiance. The orientation fit is a separate SciPy fit. The refit schedule is a loop of independent
-weekly windows and not one joint fit, so DP1's estimate can be up to 7 days stale.
+**The physics chain from irradiance to power, the soft clip, the pinball (quantile) reconstruction
+loss, the Kullback-Leibler term (which keeps the posterior near its prior), and the total-variation
+penalty are differentiable in PyTorch now.** The Erbs split of irradiance (a formula that separates
+global irradiance into beam and diffuse parts) and the solar position come from `pvlib` in NumPy, so
+gradients stop at the irradiance. The orientation fit is a separate SciPy fit. The refit schedule is
+a loop of independent weekly windows and not one joint fit, so DP1's estimate can be up to 7 days
+stale.
 
 **Joint fitting needs three changes.** The physics inputs have to become tensors, which means
 porting the Erbs split and the plane-of-array chain. One objective has to cover the whole record. A
@@ -486,29 +502,29 @@ prior has to tie the weekly capacity across plants in the same weather.
 
 ### How the findings would inform a similar study for wind power
 
-**A wind study should expect the same trap at a larger scale, because wind capacity changes more
-often through availability and curtailment.** [Viotti et al.
-(2026)](https://doi.org/10.1002/we.70136) find that the variant that recovers wind capacity best is
-not the variant that forecasts best, and this study found the same split for solar. The lessons here
-point to six steps.
+**The lessons of this study suggest what a wind study could check first, and each suggestion beyond
+the sourced points is speculation.** [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) find
+that the variant that recovers wind capacity best is not the variant that forecasts best, and this
+study found the same split for solar. They also report a day-ahead error 2.0% below that of a
+running-maximum normalisation for a Swedish bidding zone, and that at 5-minute resolution the
+running maximum is already a robust estimate of one farm's capacity (see the
+[review](../../background/energy-forecasting-review.md#3-estimating-the-effective-capacity-of-metered-generators)).
+Viotti et al. note that a forecast gain may reflect corrected seasonal wind-speed biases and not
+better normalisation, which is the trap seen here.
 
-- **Check false movement on normal periods before tuning.** A physics-model ratio has its own
-  seasonal, air-density, and wake biases, and a planted-loss ratio cancels them, as it cancelled the
-  Kalman filter's December shape here.
+- **Check false movement on normal periods before tuning (speculation).** A ratio to a physics-model
+  output can carry its own seasonal bias, and a planted-loss ratio cancels such a bias, as it
+  cancelled the Kalman filter's December shape here.
 - **Tune for stability and not only for agility.** Tuning on recovery chose the filter's most agile
-  setting.
-- **Try a hold-at-static detector first.** HYST was the only estimator that stayed still, and its
-  rule needs no power curve.
-- **Plant losses, build positive controls, and use curtailment labels.** The positive control showed
-  that this instrument can detect a loss. A wind study would add NGED's active network management
-  labels where they exist, as a noisy label.
-- **Expect more low-output episodes, and so more power.** A wind farm's availability changes more
-  often than a solar plant's, so a larger share of rows may be the kind of loss that an estimator
-  repairs, and the forecast contrast could then have the power that this one lacked.
-- **Use the published wind results as the benchmark.** Viotti et al. report a day-ahead error 2.0%
-  below that of a running-maximum normalisation for a Swedish bidding zone, and that at 5-minute
-  resolution the running maximum is already a robust estimate of one farm's capacity (see the
-  [review](../../background/energy-forecasting-review.md#3-estimating-the-effective-capacity-of-metered-generators)).
+  setting here.
+- **Test a hold-at-static detector as one candidate (speculation).** HYST thresholds a ratio to a
+  physics-model output, which for wind is a power curve, and its gain here carries a winner's curse.
+- **Plant losses, build positive controls, and consider curtailment labels.** The positive control
+  showed that this instrument can detect a loss. NGED's active network management (ANM) log records
+  curtailment for its generators and is a noisy label.
+- **Check the power of the forecast contrast (speculation).** Whether wind has a larger share of
+  rows with a loss that an estimator repairs is unknown, and a record with more such rows would give
+  the contrast more power than this one had.
 
 ## Limitations
 
@@ -523,8 +539,13 @@ point to six steps.
 - **Seasonal profile:** DSKF and HYST need a profile from earlier calendar years. Where none exists
   (29 of 163 planted events, near the start of the record), HYST holds the static capacity, so its
   recovery error is worse than it would be on a longer record.
-- **Tuning on recovery:** KF, HM, CX1, and CX2 sat at their grid edges on the tuning draw, because
-  recovery rewards agility, and the selection phase's false-movement gate penalises that agility.
+- **Tuning on recovery:** KF, HM, CX1, and CX2 sat at their grid edges on the tuning draw and after
+  the grids were widened, because recovery rewards agility, and the selection phase's false-movement
+  gate penalises that agility. The Kalman filter verdict is for the most agile setting tried.
+- **Gate sensitivity:** no candidate passes even a 30% false-movement gate (HM, the closest, moved
+  on 31.5% of days), so the ungated pick is not fragile.
+- **Low-output count:** the 3 of 106 plant-months rest on a neighbour-ratio threshold of 0.8, and
+  the ratio file lists 16 of the 18 scored months for that plant.
 - **Satellite latency:** the backtest reads satellite irradiance through day T−2, a day fresher than
   the service could before February 2026. Reading it a day older raised the recovery error of KF,
   CX2, and PR (see [Figure
@@ -536,9 +557,8 @@ point to six steps.
 - **Cleaning:** the rule that drops runs of 24 or more zero hours reads later hours, so the
   estimators see a slightly cleaner history than a live service. Hours where the export cap binds
   are removed, as in the lag-features study. At the one plant with a log of active network
-  management cap changes, which is not the low-output plant, the Kalman filter dipped more than 5%
-  below its estimate that knows the cap on 38.4% of days after capped days, against 0.3% on other
-  days.
+  management (ANM) cap changes, the Kalman filter dipped more than 5% below its estimate that knows
+  the cap on 38.4% of days after capped days, against 0.3% on other days.
 - **Fallbacks:** on the scored days an estimator fell back to the static capacity on 0.0% to 5.8% of
   plant-days (5.8% for NR), and on up to 29.3% of the days at one plant (also NR).
 - **Hindsight:** the hindsight estimate is a reference and not an upper bound, because CX1, CX2, and
