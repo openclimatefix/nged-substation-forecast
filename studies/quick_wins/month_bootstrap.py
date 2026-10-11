@@ -147,7 +147,7 @@ def level_interval(*, table: MonthlyTable) -> Interval:
 
 
 def difference_interval(*, arm: MonthlyTable, reference: MonthlyTable) -> Interval:
-    """Interval `arm - reference` with one shared month draw, so a negative value favours the arm."""
+    """Interval `arm - reference` with one shared month draw; negative favours the arm."""
     _check_same_rows(tables=(arm, reference))
     weights = _month_draws(n_months=len(arm.months))
     resampled = _level(totals=arm.totals, counts=arm.counts, weights=weights) - _level(
