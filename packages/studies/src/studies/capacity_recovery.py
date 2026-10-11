@@ -1,0 +1,784 @@
+"""Plant losses in a record and score how well an estimator recovers them, for issue #1143.
+
+**Stage A of the study plants known capacity losses in the measured power and asks each estimator
+to find them.** A loss is a step, a ramp, or an intermittent loss with its own size, and every draw
+plants three events (one of each shape) at every plant. This module draws the events, applies them
+to a `CapacityRecord`, scores an estimator's recovery, gates out estimators that move without a
+planted loss, and picks the estimator by a rule fixed before any forecast is fitted.
+
+**Footprints keep the events apart.** An event's footprint is the 30 days before its month (the
+longest estimator look-back), the month, and the 60 days after. Two events at one plant never share
+footprint days. An event's month never falls inside another plant's footprint, so a
+neighbour-based estimator never reads a neighbour that is itself deflated. No footprint touches the
+reference year that calibrates the estimators.
+"""
+
+import json
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
+from typing import Final, Literal, NamedTuple
+
+import numpy as np
+import polars as pl
+from scipy import stats
+
+from studies.capacity_estimators import (
+    ESTIMATOR_FAMILY,
+    REFERENCE_END,
+    REFERENCE_START,
+    CapacityRecord,
+    EstimatorNameType,
+    FamilyType,
+    IssueScale,
+    valid_days,
+)
+from studies.guards import refuse_to_overwrite
+
+EventShapeType = Literal["step", "ramp", "intermittent"]
+"""The three shapes of planted loss."""
+
+EVENT_SHAPES: Final[tuple[EventShapeType, ...]] = ("step", "ramp", "intermittent")
+"""Each draw plants one event of each shape at every plant."""
+
+SIZE_RANGE: Final[tuple[float, float]] = (0.05, 0.40)
+"""Each event's size, the share of power lost, is drawn uniformly from here."""
+
+FOOTPRINT_BEFORE_DAYS: Final[int] = 30
+FOOTPRINT_AFTER_DAYS: Final[int] = 60
+"""The days before an event's month and after it that its footprint covers."""
+
+MIN_VALID_SHARE: Final[float] = 0.7
+"""A footprint needs at least this share of valid days at its plant."""
+
+MIN_HISTORY_DAYS: Final[int] = 60
+"""An event starts at least this many days after its plant's first valid day."""
+
+MAX_PLACEMENT_ATTEMPTS: Final[int] = 400
+"""How many random months to try for one event before the draw raises."""
+
+FALSE_MOVEMENT_THRESHOLD: Final[float] = 0.05
+"""A day moves falsely when the estimate is more than this share from its trailing median."""
+
+FALSE_MOVEMENT_TRAILING_DAYS: Final[int] = 90
+"""The trailing median covers this many days before the day."""
+
+FALSE_MOVEMENT_GATE: Final[float] = 0.10
+"""An estimator whose share of falsely moving days exceeds this is out of the selection."""
+
+INTERVAL_Z_90: Final[float] = 1.6449
+"""The standard normal quantile of a two-sided 90% interval."""
+
+CONTRAST_CONFIDENCE: Final[float] = 0.975
+"""The coverage of each of the two estimator-level contrasts' intervals (Bonferroni over two)."""
+
+
+@dataclass(frozen=True)
+class PlantedEvent:
+    """One planted loss.
+
+    Attributes:
+        plant: The plant's index in the record.
+        shape: `step`, `ramp`, or `intermittent`.
+        size: The share of power lost, at the deepest point.
+        first_day: The index of the first day of the event's calendar month.
+        month_days: The number of days in that month.
+        hit_days: For an intermittent loss, the days of the month (from 0) that lose power.
+    """
+
+    plant: int
+    shape: EventShapeType
+    size: float
+    first_day: int
+    month_days: int
+    hit_days: tuple[int, ...] = ()
+
+    @property
+    def footprint(self) -> tuple[int, int]:
+        """The first day (inclusive) and last day (exclusive) the event's footprint covers."""
+        return (
+            self.first_day - FOOTPRINT_BEFORE_DAYS,
+            self.first_day + self.month_days + FOOTPRINT_AFTER_DAYS,
+        )
+
+    @property
+    def scored_days(self) -> tuple[int, int]:
+        """The first day (inclusive) and last day (exclusive) of the days scored: month and after."""
+        return self.first_day, self.first_day + self.month_days + FOOTPRINT_AFTER_DAYS
+
+
+def event_factor(*, event: PlantedEvent, days: int) -> np.ndarray:
+    """Return the share of power left on each day because of one event.
+
+    Args:
+        event: The event.
+        days: The number of days in the record.
+
+    Returns:
+        1 outside the event's month. Inside it, a step is `1 - size`, a ramp falls linearly from 1
+        on the first day to `1 - size` on the last, and an intermittent loss is `1 - size` on its
+        hit days and 1 on the others.
+    """
+    factor = np.ones(days)
+    month = slice(event.first_day, event.first_day + event.month_days)
+    if event.shape == "step":
+        factor[month] = 1.0 - event.size
+    elif event.shape == "ramp":
+        factor[month] = 1.0 - event.size * np.arange(event.month_days) / max(event.month_days - 1, 1)
+    else:
+        hit = np.asarray(event.hit_days, dtype=int) + event.first_day
+        factor[hit] = 1.0 - event.size
+    return factor
+
+
+def expected_factor(*, event: PlantedEvent, days: int) -> np.ndarray:
+    """Return the factor an estimator can be expected to find on each day.
+
+    An intermittent loss is scored against its month's mean, `1 - size / 2`, because no daily
+    estimate can know which days were hit. A step and a ramp are scored against their daily factor.
+
+    Args:
+        event: The event.
+        days: The number of days in the record.
+
+    Returns:
+        One value per day.
+    """
+    factor = event_factor(event=event, days=days)
+    if event.shape == "intermittent":
+        factor[event.first_day : event.first_day + event.month_days] = 1.0 - event.size / 2.0
+    return factor
+
+
+def factor_matrix(*, events: Sequence[PlantedEvent], plants: int, days: int) -> np.ndarray:
+    """Return the share of power left at every plant on every day.
+
+    Args:
+        events: The planted events.
+        plants: The number of plants.
+        days: The number of days.
+
+    Returns:
+        An array of shape (plants, days).
+    """
+    factor = np.ones((plants, days))
+    for event in events:
+        factor[event.plant] *= event_factor(event=event, days=days)
+    return factor
+
+
+def plant_losses(*, record: CapacityRecord, events: Sequence[PlantedEvent]) -> CapacityRecord:
+    """Plant the events in the measured power, leaving every other input alone.
+
+    The loss multiplies all of a day's power, so it is a proportional loss of direct-current and
+    alternating-current capacity together.
+
+    Args:
+        record: The record.
+        events: The events.
+
+    Returns:
+        The record with the planted power.
+    """
+    factor = factor_matrix(events=events, plants=len(record.sites), days=len(record.dates))
+    return record.with_power(power_mw=record.power_mw * factor[:, :, None])
+
+
+def calendar_month_spans(*, record: CapacityRecord) -> dict[str, tuple[int, int]]:
+    """Return the first day index and length of every whole calendar month in the record.
+
+    Args:
+        record: The record.
+
+    Returns:
+        A mapping from the `%Y-%m` label to (first day index, number of days). A month the record
+        starts or ends part-way through is left out.
+    """
+    months = record.dates.astype("datetime64[M]")
+    spans: dict[str, tuple[int, int]] = {}
+    for month in np.unique(months):
+        indices = np.flatnonzero(months == month)
+        first_of_month = month.astype("datetime64[D]")
+        length = int(((month + np.timedelta64(1, "M")).astype("datetime64[D]") - first_of_month).astype(int))
+        if record.dates[indices[0]] == first_of_month and len(indices) == length:
+            spans[str(month)] = (int(indices[0]), length)
+    return spans
+
+
+def _footprints_clash(*, first: PlantedEvent, second: PlantedEvent) -> bool:
+    """Say whether two events break the footprint rules.
+
+    Args:
+        first: One event.
+        second: Another.
+
+    Returns:
+        True if they share a plant and their footprints overlap, or they are at different plants and
+        either one's month overlaps the other's footprint.
+    """
+    def overlap(a: tuple[int, int], b: tuple[int, int]) -> bool:
+        return a[0] < b[1] and b[0] < a[1]
+
+    month_first = (first.first_day, first.first_day + first.month_days)
+    month_second = (second.first_day, second.first_day + second.month_days)
+    if first.plant == second.plant:
+        return overlap(first.footprint, second.footprint)
+    return overlap(month_first, second.footprint) or overlap(month_second, first.footprint)
+
+
+def draw_events(
+    *,
+    record: CapacityRecord,
+    seed: int,
+    reserved: Sequence[PlantedEvent] = (),
+    earliest_first_day: Mapping[int, int] | None = None,
+    shapes: Sequence[EventShapeType] = EVENT_SHAPES,
+) -> list[PlantedEvent]:
+    """Draw one event of each shape at every plant, obeying the footprint rules.
+
+    Args:
+        record: The record.
+        seed: The generator's seed; one draw of the study has one seed.
+        reserved: Events that already exist (the real low months, as steps) and so block their
+            footprints, though they are not returned.
+        earliest_first_day: For a plant, the earliest day index an event's month may start, such
+            as the day its commissioning ramp ends plus `MIN_HISTORY_DAYS`.
+        shapes: The shapes to plant at each plant.
+
+    Returns:
+        The events, in plant order then shape order.
+
+    Raises:
+        ValueError: If an event cannot be placed in `MAX_PLACEMENT_ATTEMPTS` random tries.
+    """
+    rng = np.random.default_rng(seed)
+    days = len(record.dates)
+    valid = valid_days(record=record)
+    months = list(calendar_month_spans(record=record).values())
+    reference = (
+        (record.dates >= np.datetime64(REFERENCE_START)) & (record.dates < np.datetime64(REFERENCE_END))
+    )
+    placed: list[PlantedEvent] = []
+    for plant in range(len(record.sites)):
+        first_valid = int(np.argmax(valid[plant])) if valid[plant].any() else days
+        lowest = max(first_valid + MIN_HISTORY_DAYS, (earliest_first_day or {}).get(plant, 0))
+        for shape in rng.permutation(np.array(shapes, dtype=object)):
+            for _ in range(MAX_PLACEMENT_ATTEMPTS):
+                first_day, month_days = months[int(rng.integers(len(months)))]
+                size = float(rng.uniform(*SIZE_RANGE))
+                hit = ()
+                if shape == "intermittent":
+                    hit = tuple(sorted(rng.permutation(month_days)[: month_days // 2].tolist()))
+                candidate = PlantedEvent(plant, shape, size, first_day, month_days, hit)
+                start, stop = candidate.footprint
+                if first_day < lowest or start < 0 or stop > days:
+                    continue
+                if reference[start:stop].any():
+                    continue
+                if valid[plant, start:stop].mean() < MIN_VALID_SHARE:
+                    continue
+                if any(_footprints_clash(first=candidate, second=other) for other in (*placed, *reserved)):
+                    continue
+                placed.append(candidate)
+                break
+            else:
+                msg = f"cannot place a {shape} event at plant {record.sites[plant]} for seed {seed}"
+                raise ValueError(msg)
+    return placed
+
+
+def draw_control_steps(
+    *,
+    record: CapacityRecord,
+    months_per_plant: int,
+    size: float,
+    scored_months: Sequence[str],
+    barred: Mapping[int, Sequence[str]],
+    seed: int,
+) -> list[PlantedEvent]:
+    """Plant a step of one size in a few scored months at every plant, in distinct months.
+
+    Every plant gets `months_per_plant` months and no month is used twice, so the neighbours of a
+    planted plant are never themselves planted.
+
+    Args:
+        record: The record.
+        months_per_plant: How many months to plant at each plant.
+        size: The share of power lost.
+        scored_months: The `%Y-%m` labels the frames score, which are the candidates.
+        barred: For a plant index, the months it may not be planted in (its own real low months).
+        seed: The generator's seed.
+
+    Returns:
+        The step events.
+
+    Raises:
+        ValueError: If the months cannot be shared out: fewer scored months than plant-months, or no
+            assignment avoids every barred month.
+    """
+    plants = len(record.sites)
+    if len(scored_months) < plants * months_per_plant:
+        msg = f"{len(scored_months)} scored months cannot hold {plants * months_per_plant} steps"
+        raise ValueError(msg)
+    spans = calendar_month_spans(record=record)
+    rng = np.random.default_rng(seed)
+    for _ in range(MAX_PLACEMENT_ATTEMPTS):
+        order = rng.permutation(list(scored_months))[: plants * months_per_plant]
+        assignment = {p: list(order[p * months_per_plant : (p + 1) * months_per_plant]) for p in range(plants)}
+        if all(month not in barred.get(p, ()) for p, chosen in assignment.items() for month in chosen):
+            return [
+                PlantedEvent(plant, "step", size, spans[month][0], spans[month][1])
+                for plant, chosen in assignment.items()
+                for month in sorted(chosen)
+            ]
+    msg = "no assignment of months avoids the barred months"
+    raise ValueError(msg)
+
+
+def event_ratios(
+    *, events: Sequence[PlantedEvent], planted: IssueScale, original: IssueScale
+) -> list[np.ndarray]:
+    """Return, for each event, the planted scale over the original scale on its scored days.
+
+    Args:
+        events: The events.
+        planted: The scale from the record with the losses planted.
+        original: The scale from the record without them.
+
+    Returns:
+        One array per event, covering `event.scored_days`.
+    """
+    ratios = []
+    for event in events:
+        start, stop = event.scored_days
+        ratios.append(
+            planted.scale_mw[event.plant, start:stop] / original.scale_mw[event.plant, start:stop]
+        )
+    return ratios
+
+
+def relative_capacity_error(*, event: PlantedEvent, ratio: np.ndarray, days: int) -> float:
+    """Return the mean absolute gap between the scale ratio and the expected factor.
+
+    Args:
+        event: The event.
+        ratio: The planted scale over the original scale on the event's scored days.
+        days: The number of days in the record.
+
+    Returns:
+        The mean over the scored days of `|ratio - expected factor|`.
+    """
+    start, stop = event.scored_days
+    return float(np.mean(np.abs(ratio - expected_factor(event=event, days=days)[start:stop])))
+
+
+def detection_delay(*, event: PlantedEvent, ratio: np.ndarray) -> float:
+    """Return the days from a step's start until the scale ratio first reaches halfway.
+
+    Args:
+        event: The event, which should be a step.
+        ratio: The planted scale over the original scale on the event's scored days.
+
+    Returns:
+        The delay in days, or NaN if the ratio never reaches `1 - size / 2` in the scored days.
+    """
+    reached = np.flatnonzero(ratio <= 1.0 - event.size / 2.0)
+    return float(reached[0]) if len(reached) else float("nan")
+
+
+def interval_coverage(
+    *, event: PlantedEvent, ratio: np.ndarray, relative_sd: np.ndarray, days: int
+) -> float:
+    """Return the share of scored days whose 90% interval covers the expected factor.
+
+    Args:
+        event: The event.
+        ratio: The planted scale over the original scale on the event's scored days.
+        relative_sd: The planted scale's relative standard deviation on the same days.
+        days: The number of days in the record.
+
+    Returns:
+        The share over the days with a finite standard deviation, or NaN if there are none.
+    """
+    start, stop = event.scored_days
+    expected = expected_factor(event=event, days=days)[start:stop]
+    usable = np.isfinite(relative_sd)
+    if not usable.any():
+        return float("nan")
+    half_width = INTERVAL_Z_90 * relative_sd * ratio
+    covered = np.abs(ratio - expected) <= half_width
+    return float(covered[usable].mean())
+
+
+def score_events(
+    *,
+    events: Sequence[PlantedEvent],
+    planted: IssueScale,
+    original: IssueScale,
+    days: int,
+) -> pl.DataFrame:
+    """Score every event of one draw for one estimator.
+
+    Args:
+        events: The draw's events.
+        planted: The scale from the record with the losses planted.
+        original: The scale from the record without them.
+        days: The number of days in the record.
+
+    Returns:
+        One row per event with `plant`, `shape`, `size`, `error`, `delay` (steps only, else null),
+        and `coverage` (null for an estimator without a standard deviation).
+    """
+    rows = []
+    for event, ratio in zip(
+        events, event_ratios(events=events, planted=planted, original=original), strict=True
+    ):
+        start, stop = event.scored_days
+        rows.append(
+            {
+                "plant": event.plant,
+                "shape": event.shape,
+                "size": event.size,
+                "error": relative_capacity_error(event=event, ratio=ratio, days=days),
+                "delay": detection_delay(event=event, ratio=ratio) if event.shape == "step" else None,
+                "coverage": interval_coverage(
+                    event=event,
+                    ratio=ratio,
+                    relative_sd=planted.relative_sd[event.plant, start:stop],
+                    days=days,
+                ),
+            }
+        )
+    return pl.DataFrame(
+        rows,
+        schema={
+            "plant": pl.Int64,
+            "shape": pl.String,
+            "size": pl.Float64,
+            "error": pl.Float64,
+            "delay": pl.Float64,
+            "coverage": pl.Float64,
+        },
+    ).with_columns(pl.col("delay").fill_nan(None), pl.col("coverage").fill_nan(None))
+
+
+def draw_primary_metric(*, scores: pl.DataFrame) -> float:
+    """Return a draw's primary metric: the mean relative capacity error over all its events.
+
+    Args:
+        scores: `score_events`' result for the draw.
+
+    Returns:
+        The mean of `error`, which weighs every event and every plant alike.
+    """
+    return float(scores["error"].mean())
+
+
+def false_movement_windows(
+    *,
+    ratios: pl.DataFrame,
+    record: CapacityRecord,
+    per_plant: int,
+    seed: int,
+    lower: float = 0.95,
+    upper: float = 1.05,
+) -> list[tuple[int, int, int]]:
+    """Choose the plant-months on which the real-data estimate should not move.
+
+    Args:
+        ratios: Rows with `site`, `month` (`%Y-%m`), and `ratio`, each plant-month's output over its
+            neighbours'.
+        record: The record, for the site order and the month spans.
+        per_plant: The most months to choose at each plant.
+        seed: The generator's seed.
+        lower: The lowest ratio of a quiet month.
+        upper: The highest ratio of a quiet month.
+
+    Returns:
+        (plant, first day, number of days) triples, in plant order.
+    """
+    spans = calendar_month_spans(record=record)
+    rng = np.random.default_rng(seed)
+    windows: list[tuple[int, int, int]] = []
+    for plant, site in enumerate(record.sites):
+        quiet = ratios.filter(
+            (pl.col("site") == site) & pl.col("ratio").is_between(lower, upper)
+        )["month"].to_list()
+        quiet = [month for month in quiet if month in spans]
+        chosen = rng.permutation(quiet)[:per_plant] if quiet else []
+        windows += [(plant, *spans[str(month)]) for month in sorted(chosen)]
+    return windows
+
+
+def false_movement_days(*, windows: Sequence[tuple[int, int, int]]) -> list[np.ndarray]:
+    """Return the estimate days the false-movement metric needs, per window.
+
+    A target day `T` reads the estimate for day `T - 2` and compares it with the median of the 90
+    target days before, so a window starting on `first` needs estimates from `first - 92`.
+
+    Args:
+        windows: `false_movement_windows`' result.
+
+    Returns:
+        One array of day indices per window, ending two days before the window's last day.
+    """
+    return [
+        np.arange(first - FALSE_MOVEMENT_TRAILING_DAYS - 2, first + length - 2)
+        for _, first, length in windows
+    ]
+
+
+def false_movement_share(
+    *, windows: Sequence[tuple[int, int, int]], original: IssueScale
+) -> float:
+    """Return the share of window days on which the estimate moves falsely.
+
+    A day moves falsely when the estimate for it is more than `FALSE_MOVEMENT_THRESHOLD` away from
+    the median of the estimates for the `FALSE_MOVEMENT_TRAILING_DAYS` target days before.
+
+    Args:
+        windows: `false_movement_windows`' result.
+        original: The estimator's scale on the original record.
+
+    Returns:
+        The share over all window days. Days whose trailing window holds a fallback value count as
+        not moving falsely only when the estimate equals the fallback; a fallback is part of the
+        series like any other value.
+    """
+    moved, total = 0, 0
+    for plant, first, length in windows:
+        series = original.scale_mw[plant]
+        for day in range(first, first + length):
+            trailing = np.median(series[day - FALSE_MOVEMENT_TRAILING_DAYS : day])
+            moved += int(abs(series[day] / trailing - 1.0) > FALSE_MOVEMENT_THRESHOLD)
+            total += 1
+    return moved / total
+
+
+class SelectionInputs(NamedTuple):
+    """What the selection rule reads, for every estimator that was run."""
+
+    tuning_error: Mapping[str, float]
+    selection_errors: Mapping[str, np.ndarray]
+    false_movement: Mapping[str, float]
+
+
+@dataclass(frozen=True)
+class Contrast:
+    """A difference in the primary metric between two representatives, with its interval."""
+
+    name: str
+    treatment: str
+    reference: str
+    difference: float
+    lower: float
+    upper: float
+    verdict: str
+
+
+@dataclass(frozen=True)
+class Selection:
+    """The result of the selection rule.
+
+    Attributes:
+        selected: The estimator the forecast contrast uses.
+        exploratory: True if no estimator passed the false-movement gate.
+        survivors: The estimators that passed the gate.
+        shortlist: The best surviving estimator of each family, selected one included.
+        representatives: Each family group's representative, chosen on the tuning draw.
+        contrasts: E1 and E2, or an empty list where a representative is missing.
+        missing: A note for each contrast that cannot be computed.
+    """
+
+    selected: str
+    exploratory: bool
+    survivors: tuple[str, ...]
+    shortlist: tuple[str, ...]
+    representatives: Mapping[str, str]
+    contrasts: tuple[Contrast, ...]
+    missing: tuple[str, ...]
+
+
+def t_interval(*, differences: np.ndarray, confidence: float) -> tuple[float, float, float]:
+    """Return the mean of paired differences and a two-sided t-interval.
+
+    Args:
+        differences: One difference per draw.
+        confidence: The interval's coverage, such as 0.975.
+
+    Returns:
+        The mean, the lower bound, and the upper bound.
+    """
+    n = len(differences)
+    mean = float(np.mean(differences))
+    half_width = float(stats.t.ppf(0.5 + confidence / 2.0, df=n - 1) * np.std(differences, ddof=1) / np.sqrt(n))
+    return mean, mean - half_width, mean + half_width
+
+
+def verdict_of(*, lower: float, upper: float) -> str:
+    """Name an interval's verdict on a difference where a lower error is better.
+
+    Args:
+        lower: The interval's lower bound.
+        upper: The interval's upper bound.
+
+    Returns:
+        `beats` if the interval lies wholly below zero, `loses` if wholly above, and `no detectable
+        difference` otherwise.
+    """
+    if upper < 0:
+        return "beats"
+    if lower > 0:
+        return "loses"
+    return "no detectable difference"
+
+
+def _contrast(
+    *, name: str, treatment: str, reference: str, errors: Mapping[str, np.ndarray]
+) -> Contrast:
+    """Build one estimator-level contrast from the selection draws' errors."""
+    mean, lower, upper = t_interval(
+        differences=errors[treatment] - errors[reference], confidence=CONTRAST_CONFIDENCE
+    )
+    return Contrast(
+        name=name,
+        treatment=treatment,
+        reference=reference,
+        difference=mean,
+        lower=lower,
+        upper=upper,
+        verdict=verdict_of(lower=lower, upper=upper),
+    )
+
+
+def choose_estimators(*, inputs: SelectionInputs) -> Selection:
+    """Apply the selection rule.
+
+    **The false-movement gate comes first.** An estimator whose share of falsely moving days is
+    above `FALSE_MOVEMENT_GATE` is out. Each family's representative is then its lowest-error
+    survivor on the tuning draw, so neither contrast is scored on the draw that chose it. The
+    selected estimator is the survivor with the lowest mean primary metric over the selection draws.
+    The shortlist holds the best survivor of each family by the same mean. If nothing passes the
+    gate, the lowest-error estimator is selected and the selection is marked exploratory.
+
+    E1 is the convex representative minus the representative of the cheap and wacky families. E2 is
+    the neural-network estimator minus the convex representative.
+
+    Args:
+        inputs: The tuning-draw errors, the selection draws' errors, and the false-movement shares.
+
+    Returns:
+        The selection.
+
+    Raises:
+        ValueError: If `inputs` hold no estimator.
+    """
+    names = sorted(inputs.selection_errors)
+    if not names:
+        msg = "no estimator was run"
+        raise ValueError(msg)
+    mean_error = {name: float(np.mean(inputs.selection_errors[name])) for name in names}
+    survivors = [name for name in names if inputs.false_movement[name] <= FALSE_MOVEMENT_GATE]
+    exploratory = not survivors
+    pool = names if exploratory else survivors
+    selected = min(pool, key=lambda name: mean_error[name])
+    families: dict[FamilyType, list[str]] = {}
+    for name in survivors:
+        families.setdefault(ESTIMATOR_FAMILY[name], []).append(name)  # type: ignore[index]
+    shortlist = tuple(
+        min(members, key=lambda name: mean_error[name]) for members in families.values()
+    )
+    if exploratory:
+        shortlist = (selected,)
+
+    def representative(group: Sequence[str]) -> str | None:
+        members = [name for name in survivors if name in group]
+        return min(members, key=lambda name: inputs.tuning_error[name]) if members else None
+
+    cheap_and_wacky = [n for n in names if ESTIMATOR_FAMILY[n] in ("cheap", "wacky")]  # type: ignore[index]
+    convex = [n for n in names if ESTIMATOR_FAMILY[n] == "convex"]  # type: ignore[index]
+    pytorch = [n for n in names if ESTIMATOR_FAMILY[n] == "pytorch"]  # type: ignore[index]
+    reps = {
+        "cheap_and_wacky": representative(cheap_and_wacky),
+        "convex": representative(convex),
+        "pytorch": representative(pytorch),
+    }
+    contrasts: list[Contrast] = []
+    missing: list[str] = []
+    if reps["convex"] and reps["cheap_and_wacky"]:
+        contrasts.append(
+            _contrast(
+                name="E1",
+                treatment=reps["convex"],
+                reference=reps["cheap_and_wacky"],
+                errors=inputs.selection_errors,
+            )
+        )
+    else:
+        missing.append("E1: no convex or no cheap-or-wacky estimator passed the gate")
+    if reps["pytorch"] and reps["convex"]:
+        contrasts.append(
+            _contrast(
+                name="E2",
+                treatment=reps["pytorch"],
+                reference=reps["convex"],
+                errors=inputs.selection_errors,
+            )
+        )
+    else:
+        missing.append("E2: no neural-network or no convex estimator passed the gate")
+    return Selection(
+        selected=selected,
+        exploratory=exploratory,
+        survivors=tuple(survivors),
+        shortlist=shortlist,
+        representatives={k: v for k, v in reps.items() if v is not None},
+        contrasts=tuple(contrasts),
+        missing=tuple(missing),
+    )
+
+
+def write_selection(*, path: Path, selection: Selection, inputs: SelectionInputs) -> None:
+    """Write `selection.json`, refusing to overwrite an existing file.
+
+    Args:
+        path: The file to write.
+        selection: `choose_estimators`' result.
+        inputs: The inputs it was chosen from, which the file records.
+
+    Raises:
+        FileExistsError: If `path` exists (from `refuse_to_overwrite`).
+    """
+    refuse_to_overwrite(paths=[path])
+    payload = {
+        "selected": selection.selected,
+        "exploratory": selection.exploratory,
+        "survivors": list(selection.survivors),
+        "shortlist": list(selection.shortlist),
+        "representatives": dict(selection.representatives),
+        "contrasts": [vars(contrast) for contrast in selection.contrasts],
+        "contrasts_not_computed": list(selection.missing),
+        "false_movement_gate": FALSE_MOVEMENT_GATE,
+        "tuning_error": dict(inputs.tuning_error),
+        "mean_selection_error": {k: float(np.mean(v)) for k, v in inputs.selection_errors.items()},
+        "selection_errors": {k: v.tolist() for k, v in inputs.selection_errors.items()},
+        "false_movement": dict(inputs.false_movement),
+    }
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    temporary.rename(path)
+
+
+def month_label(*, record: CapacityRecord, day: int) -> str:
+    """Return the `%Y-%m` label of a day index.
+
+    Args:
+        record: The record.
+        day: The day index.
+
+    Returns:
+        The label.
+    """
+    stamp: date = record.dates[day].astype("datetime64[D]").astype(object)
+    return f"{stamp.year:04d}-{stamp.month:02d}"
