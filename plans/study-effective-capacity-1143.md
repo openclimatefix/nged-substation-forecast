@@ -237,6 +237,14 @@ that pass's winners sat at a grid edge: KF process_sd gained 0.04 and 0.08, HM s
 gained 0.9 and 0.8, and CX1 and CX2 fused_weight gained 1 and 0.3. The widening used the tuning
 draw only.
 
+**DP1's grid was also widened after the first tuning pass, which left DP1 worse than doing nothing.**
+The pinball loss is a sum of errors in fractions of the static power, not a log-likelihood, so
+against the wide prior the data barely constrained each week. DP1 gained a `data_weight` that
+multiplies the pinball loss, and the total-variation weights 0.5, 1, and 2. The tuning draw alone
+chose among the 8 settings. After the selection phase, the false-movement gate's sensitivity at
+5%, 10%, 15%, 20%, and 30% and E1 and E2 without any gate are reported as post hoc, descriptive
+results beside the pre-registered ones.
+
 **Each estimator is tuned on the tuning draw only, never on a forecast error, and the selection
 rule is fixed now:** after the gates, the lowest primary metric over the 10 selection draws, averaged
 over all events and all 6 plants. The best surviving estimator of each other family joins the
