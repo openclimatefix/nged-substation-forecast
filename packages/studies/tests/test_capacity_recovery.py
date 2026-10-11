@@ -36,8 +36,10 @@ from studies.capacity_recovery import (
     false_movement_days,
     false_movement_share,
     false_movement_windows,
+    gate_sensitivity,
     interval_coverage,
     plant_losses,
+    posthoc_contrasts,
     relative_capacity_error,
     score_events,
     t_interval,
@@ -524,3 +526,30 @@ def test_a_plant_with_little_valid_data_may_get_fewer_events_but_never_none(
     events = draw_events(record=sparse, seed=1, may_have_fewer=[2])
     assert 1 <= sum(e.plant == 2 for e in events) < 3
     assert sum(e.plant == 0 for e in events) == 3
+
+
+def test_the_post_hoc_gate_table_lists_who_passes_at_each_threshold() -> None:
+    errors = dict(
+        zip(ALL_ESTIMATORS, [0.12, 0.11, 0.05, 0.06, 0.07, 0.09, 0.04, 0.03, 0.02], strict=True)
+    )
+    movement = dict.fromkeys(ALL_ESTIMATORS, 0.5)
+    movement["KF"], movement["HM"], movement["CX1"] = 0.04, 0.12, 0.28
+    table = gate_sensitivity(inputs=_inputs(errors=errors, movement=movement))
+    assert table[0.05] == ("KF",)
+    assert table[0.10] == ("KF",)
+    assert table[0.15] == ("HM", "KF")
+    assert table[0.20] == ("HM", "KF")
+    assert table[0.30] == ("CX1", "HM", "KF")
+
+
+def test_the_post_hoc_contrasts_need_no_gate_and_compare_the_neural_network_to_convex() -> None:
+    errors = dict(
+        zip(ALL_ESTIMATORS, [0.12, 0.11, 0.05, 0.06, 0.07, 0.09, 0.04, 0.03, 0.02], strict=True)
+    )
+    errors["DP1"] = 0.15
+    inputs = _inputs(errors=errors, movement=dict.fromkeys(ALL_ESTIMATORS, 0.5))
+    e1, e2 = posthoc_contrasts(inputs=inputs)
+    assert (e1.name, e1.treatment, e1.reference) == ("E1_posthoc", "CX2", "NR")
+    assert (e2.name, e2.treatment, e2.reference) == ("E2_posthoc", "DP1", "CX2")
+    assert e2.verdict == "loses"
+    assert choose_estimators(inputs=inputs).selected == "CX2"

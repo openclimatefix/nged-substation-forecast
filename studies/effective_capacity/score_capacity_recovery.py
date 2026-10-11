@@ -18,6 +18,7 @@ Run it with `uv run python studies/effective_capacity/score_capacity_recovery.py
 """
 
 import argparse
+import json
 import logging
 import sys
 from pathlib import Path
@@ -33,13 +34,14 @@ from capacity_paths import (
     claim_root,
     draw_id,
     fingerprint,
+    inputs_dir,
     load_events,
     load_tuned,
     setting_name,
     tuned_path,
     write_json_atomic,
 )
-from capacity_scores import original_file_id, scale_for
+from capacity_scores import cached_record, load_raw, original_file_id, scale_for
 from studies.capacity_estimators import ESTIMATOR_FAMILY, ISSUE_LAG_DAYS
 from studies.capacity_recovery import (
     SelectionInputs,
@@ -132,6 +134,61 @@ def tune(*, root: Path, estimators: list[str]) -> None:
         _LOG.info("%s: chose %s of %s", estimator, setting_name(params=best), errors)
 
 
+FITTED_ESTIMATORS: Final[tuple[str, ...]] = ("KF", "DP1")
+"""The estimators whose fitted physical quantities the explainability report prints."""
+
+
+def fitted_quantities(
+    *, root: Path, estimator: str, params: dict[str, float]
+) -> list[dict[str, object]]:
+    """Return one row per plant of an estimator's fitted physical quantities, with units.
+
+    The tilt, azimuth, and alternating-current limit are the plant's orientation fit, which KF and
+    DP1 both take as given. The capacity series is on the original record: for DP1 the weekly
+    direct-current capacity in megawatts, and for KF the effective capacity (the calibrated scale)
+    in megawatts. The summary is over the days on which the estimate exists.
+
+    Args:
+        root: The output root.
+        estimator: The estimator.
+        params: Its tuned settings.
+
+    Returns:
+        Nothing for an estimator that does not report fitted quantities.
+    """
+    if estimator not in FITTED_ESTIMATORS:
+        return []
+    orientation = json.loads((inputs_dir(root=root) / "orientation.json").read_text())
+    record = cached_record(root=root, record_id=ORIGINAL)
+    if estimator == "DP1":
+        raw = load_raw(root=root, estimator=estimator, params=params, file_id=ORIGINAL)
+        series = raw.level * record.static_p99_mw[:, None]
+        name = "weekly direct-current capacity (MW)"
+    else:
+        series = scale_for(root=root, estimator=estimator, params=params, file_id=ORIGINAL).scale_mw
+        name = "effective capacity (MW)"
+    rows = []
+    for plant, site in enumerate(record.sites):
+        fitted = orientation[site]
+        values = series[plant][np.isfinite(series[plant])]
+        rows.append(
+            {
+                "estimator": estimator,
+                "plant": site,
+                "tilt_deg": fitted["tilt_deg"],
+                "azimuth_deg": fitted["azimuth_deg"],
+                "ac_limit_mw": fitted["ac_capacity_mw"],
+                "fitted_dc_capacity_mw": fitted["dc_capacity_mw"],
+                "series": name,
+                "series_min_mw": float(values.min()),
+                "series_median_mw": float(np.median(values)),
+                "series_max_mw": float(values.max()),
+                "series_days": len(values),
+            }
+        )
+    return rows
+
+
 def select(*, root: Path) -> None:
     """Score the tuned settings on the selection draws and choose the estimator.
 
@@ -149,6 +206,7 @@ def select(*, root: Path) -> None:
     fallback: dict[str, float] = {}
     event_tables: list[pl.DataFrame] = []
     summary_rows: list[dict[str, object]] = []
+    fitted_rows: list[dict[str, object]] = []
     for estimator in estimators:
         params = load_tuned(root=root, estimator=estimator)
         tuning_error[estimator] = draw_primary_metric(
@@ -184,6 +242,14 @@ def select(*, root: Path) -> None:
             "false_movement": movement[estimator],
             "fallback_share_on_event_days": fallback[estimator],
         }
+        steps = pl.concat(tables).filter(pl.col("shape") == "step")
+        row["steps_detected_share"] = float(np.mean(steps["delay"].is_not_null().to_numpy()))
+        row["mean_step_detection_delay_days"] = (
+            steps["delay"].drop_nulls().mean()
+            if steps["delay"].null_count() < steps.height
+            else None
+        )
+        fitted_rows += fitted_quantities(root=root, estimator=estimator, params=params)
         if estimator in SATELLITE_SENSITIVITY:
             sensitivity = [
                 draw_primary_metric(
@@ -212,6 +278,10 @@ def select(*, root: Path) -> None:
     tables_dir.mkdir(exist_ok=True)
     pl.concat(event_tables).write_parquet(tables_dir / "stage_a_events.parquet")
     pl.DataFrame(summary_rows).write_parquet(tables_dir / "stage_a_summary.parquet")
+    pl.DataFrame(fitted_rows).write_parquet(tables_dir / "fitted_quantities.parquet")
+    with pl.Config(tbl_cols=-1, tbl_rows=-1, tbl_width_chars=250, fmt_str_lengths=80):
+        print(pl.DataFrame(summary_rows))
+        print(pl.DataFrame(fitted_rows))
     write_selection(path=outputs[0], selection=selection, inputs=inputs)
     _LOG.info(
         "selected %s (status %s); shortlist %s",

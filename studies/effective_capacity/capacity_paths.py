@@ -318,6 +318,8 @@ def load_events(*, root: Path) -> Events:
     return Events(payload=json.loads(path.read_text()))
 
 
+# The DP1 grid gained total_variation_weight 0.5, 1, and 2 and the data_weight axis after the first
+# tuning pass, which left DP1 worse than doing nothing; that too used the tuning draw only.
 # The KF, HM, CX1, and CX2 grids were widened after the first tuning pass, because that pass's
 # winners sat at an edge of the grid (the largest KF process_sd, the smallest HM stay_probability,
 # and the smallest CX1 and CX2 fused_weight). The widening used the tuning draw only, so it leaks
@@ -343,12 +345,22 @@ TUNING_GRIDS: Final[dict[str, list[dict[str, float]]]] = {
         {
             "quantile": 0.7,
             "total_variation_weight": weight,
+            "data_weight": data_weight,
             "learning_rate": 0.05,
             "samples": 4.0,
             "first_steps": 300.0,
             "later_steps": 80.0,
         }
-        for weight in (5.0, 20.0)
+        for weight, data_weight in (
+            (0.5, 1.0),
+            (1.0, 1.0),
+            (2.0, 1.0),
+            (5.0, 1.0),
+            (20.0, 1.0),
+            (5.0, 20.0),
+            (20.0, 20.0),
+            (100.0, 20.0),
+        )
     ],
 }
 """Each estimator's settings. The tuning draw alone chooses among them, never a forecast error."""

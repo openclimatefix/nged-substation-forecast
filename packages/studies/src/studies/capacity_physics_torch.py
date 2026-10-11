@@ -7,7 +7,9 @@ the satellite-driven physics model, softly clipped at the alternating-current li
 pinball loss on the reconstruction, which makes the trace follow the upper envelope of the data so
 that curtailment does not drag it down, plus the Kullback-Leibler divergence of a mean-field normal
 posterior over each week's logarithmic capacity from a wide normal prior, plus a total-variation
-penalty on the weekly means.
+penalty on the weekly means. The `data_weight` multiplies the pinball loss, which is a sum of
+errors in fractions of the static power rather than a log-likelihood, so a weight above 1 lets the
+data outweigh the wide prior; the tuning draw chooses it.
 
 **Every refit reads the latest 63 days (nine weeks), and the estimate is the last week's capacity.**
 The refits happen every seventh day and warm-start from the previous refit's posterior, so the
@@ -49,6 +51,7 @@ CLIP_SHARPNESS: Final[float] = 50.0
 DP1_DEFAULT_PARAMS: Final[Mapping[str, float]] = {
     "quantile": 0.7,
     "total_variation_weight": 10.0,
+    "data_weight": 1.0,
     "learning_rate": 0.05,
     "samples": 4.0,
     "first_steps": 300.0,
@@ -147,7 +150,8 @@ def _fit_window(
         end_day: The window's last day.
         posterior: The warm start: the weekly means and the raw standard deviations, each of shape
             (batch, `WEEKS`).
-        params: `quantile`, `total_variation_weight`, `learning_rate`, and `samples`.
+        params: `quantile`, `total_variation_weight`, `data_weight`, `learning_rate`, and
+            `samples`.
         steps: The number of Adam steps.
         generator: The random generator for the reparameterisation noise, drawn once per plant
             and shared across records.
@@ -181,7 +185,7 @@ def _fit_window(
         predicted = soft_clip(power=dc[None] * per_day[..., None] * shape[None], limit=limit[None])
         residual = power[None] - predicted
         pinball = torch.where(residual >= 0, quantile * residual, (quantile - 1.0) * residual)
-        reconstruction = (pinball * mask[None]).sum(dim=(2, 3)).mean(dim=0)
+        reconstruction = params["data_weight"] * (pinball * mask[None]).sum(dim=(2, 3)).mean(dim=0)
         divergence = (
             (sd**2 + mean**2) / (2 * PRIOR_SD**2) - torch.log(sd) + np.log(PRIOR_SD) - 0.5
         ).sum(dim=1)

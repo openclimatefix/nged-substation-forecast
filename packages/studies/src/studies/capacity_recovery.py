@@ -938,6 +938,88 @@ def choose_estimators(*, inputs: SelectionInputs) -> Selection:
     )
 
 
+POSTHOC_GATE_THRESHOLDS: Final[tuple[float, ...]] = (0.05, 0.10, 0.15, 0.20, 0.30)
+"""The false-movement thresholds the post hoc sensitivity table tries."""
+
+
+def gate_sensitivity(
+    *, inputs: SelectionInputs, thresholds: Sequence[float] = POSTHOC_GATE_THRESHOLDS
+) -> dict[float, tuple[str, ...]]:
+    """Return the candidates that pass every gate at each false-movement threshold.
+
+    **This is a post hoc, descriptive table, not part of the selection rule.** A candidate passes
+    at a threshold if it beats S0, stays within the fallback gate, and its false-movement share is
+    at most the threshold.
+
+    Args:
+        inputs: The selection inputs.
+        thresholds: The false-movement thresholds to try.
+
+    Returns:
+        The passing candidates, sorted, for each threshold.
+    """
+    s0 = float(np.mean(inputs.selection_errors["S0"]))
+    candidates = [
+        name for name in sorted(inputs.selection_errors) if name not in REFERENCE_ESTIMATORS
+    ]
+    return {
+        threshold: tuple(
+            name
+            for name in candidates
+            if float(np.mean(inputs.selection_errors[name])) < s0
+            and inputs.fallback_share[name] <= FALLBACK_SHARE_GATE
+            and inputs.false_movement[name] <= threshold
+        )
+        for threshold in thresholds
+    }
+
+
+def posthoc_contrasts(*, inputs: SelectionInputs) -> tuple[Contrast, ...]:
+    """Return E1 and E2 without any gate, as a post hoc analysis.
+
+    **The representatives are the lowest tuning-draw error of each family group among all
+    candidates, whether or not they beat S0 or pass a gate.** The neural-network representative
+    is DP1. The contrasts are labelled `E1_posthoc` and `E2_posthoc`.
+
+    Args:
+        inputs: The selection inputs.
+
+    Returns:
+        The contrasts whose two representatives exist.
+    """
+    candidates = [name for name in inputs.selection_errors if name not in REFERENCE_ESTIMATORS]
+
+    def lowest(families: tuple[str, ...]) -> str | None:
+        members = [name for name in candidates if ESTIMATOR_FAMILY[name] in families]
+        return min(members, key=lambda name: inputs.tuning_error[name]) if members else None
+
+    cheap_and_wacky, convex, pytorch = (
+        lowest(("cheap", "wacky")),
+        lowest(("convex",)),
+        lowest(("pytorch",)),
+    )
+    contrasts: list[Contrast] = []
+    if convex and cheap_and_wacky:
+        contrasts.append(
+            _contrast(
+                name="E1_posthoc",
+                treatment=convex,
+                reference=cheap_and_wacky,
+                errors=inputs.selection_errors,
+            )
+        )
+    if pytorch and convex:
+        contrasts.append(
+            _contrast(
+                name="E2_posthoc",
+                treatment=pytorch,
+                reference=convex,
+                errors=inputs.selection_errors,
+            )
+        )
+    return tuple(contrasts)
+
+
 def write_selection(*, path: Path, selection: Selection, inputs: SelectionInputs) -> None:
     """Write `selection.json`, refusing to overwrite an existing file.
 
@@ -966,6 +1048,11 @@ def write_selection(*, path: Path, selection: Selection, inputs: SelectionInputs
         "mean_selection_error": {k: float(np.mean(v)) for k, v in inputs.selection_errors.items()},
         "selection_errors": {k: v.tolist() for k, v in inputs.selection_errors.items()},
         "false_movement": dict(inputs.false_movement),
+        "posthoc_gate_sensitivity": {
+            str(threshold): list(passing)
+            for threshold, passing in gate_sensitivity(inputs=inputs).items()
+        },
+        "posthoc_contrasts": [vars(contrast) for contrast in posthoc_contrasts(inputs=inputs)],
     }
     temporary = path.with_name(path.name + ".tmp")
     temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")

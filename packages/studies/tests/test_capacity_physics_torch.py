@@ -95,3 +95,20 @@ def test_identical_records_in_one_batch_get_identical_estimates() -> None:
     assert first.sd is not None
     assert second.sd is not None
     assert np.allclose(first.sd, second.sd, rtol=1e-9, equal_nan=True)
+
+
+def test_a_larger_data_weight_lets_the_data_narrow_the_posterior() -> None:
+    record = synthetic_record(days=DAYS, seed=4)
+    sizes = _sizes(3)
+    sds = []
+    for weight in (1.0, 30.0):
+        estimate = run_dp1(
+            records=[record],
+            dc_prior=sizes / record.static_p99_mw,
+            ac_limit=np.full(3, 10.0),
+            params={**FAST, "data_weight": weight},
+            dtype=torch.float64,
+        )[0]
+        assert estimate.sd is not None
+        sds.append(float(np.nanmean(estimate.sd[:, 100:] / estimate.level[:, 100:])))
+    assert sds[1] < sds[0]
