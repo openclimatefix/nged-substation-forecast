@@ -26,7 +26,6 @@ import sys
 from pathlib import Path
 from typing import Final
 
-import polars as pl
 from build_lag_frame import (
     LAG_FEATURES_DIR,
     arms_columns_table,
@@ -136,19 +135,6 @@ def main() -> int:
     report_path.write_text("\n".join(report) + "\n")
     sys.stdout.write("\n".join(report) + "\n")
     return 0
-
-
-def rows_of(*, root: Path, name: str) -> pl.DataFrame:
-    """Read one round-2 frame's keys, for a row-set check.
-
-    Args:
-        root: The output root.
-        name: The frame's name.
-
-    Returns:
-        `site` and `time`.
-    """
-    return pl.read_parquet(frame_path(root=root, name=name), columns=["site", "time"])
 
 
 if __name__ == "__main__":

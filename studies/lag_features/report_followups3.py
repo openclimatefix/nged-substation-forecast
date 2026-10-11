@@ -72,9 +72,6 @@ T_LEVEL: Final[float] = 95.0
 THRESHOLD_SHARE: Final[float] = 0.02
 """The decision threshold, as a share of the reference arm's own metric."""
 
-EXCLUDED_ROWS: Final[str] = "without the largest-error plant-month of the 8 unselected months"
-"""How the rows without the dominant plant-month are named in a table."""
-
 REVIEWED_ARMS: Final[tuple[str, ...]] = ("PC", "W7", "TF", "Q30", "AN")
 """The arms the t-interval table covers."""
 

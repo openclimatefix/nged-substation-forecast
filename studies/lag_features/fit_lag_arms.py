@@ -18,7 +18,7 @@ One-off throwaway script for the study in
    plan names, the global model for `GLOBAL_ARMS`, and the positive controls.
 5. The longer leads: `LONGER_LEAD_ARMS` at the other lead-days, point model, primary setting.
 
-For `--weather-product ifs_single`, only B0 and L1 at lead-days 1 and 2 (an exploratory replicate).
+IFS HRES is not fitted here: `fit_followups2.py` fits B0 and L1 on its frames.
 
 **The decision rules, written into the plan before any fit.** The plan's wording is kept in the
 constants' docstrings below, and nothing here changes it.
@@ -61,7 +61,6 @@ from build_lag_frame import (
     ENS_MEAN_LEAD_DAYS,
     FULL_SWEEP_LEAD_DAY,
     GLOBAL_ONLY_ARMS,
-    IFS_LEAD_DAYS,
     LAG_FEATURES_DIR,
     LONGER_LEAD_ARMS,
     NWP_ERA_FOLD_OFFSETS,
@@ -69,7 +68,6 @@ from build_lag_frame import (
     POSITIVE_CONTROL_SHIFTS,
     POWER_COLUMN_PREFIXES,
     RATIO_TEMPLATE,
-    REPLICATE_ARMS,
     RESIDUAL_LAG_TEMPLATE,
     RESIDUAL_MEAN_TEMPLATES,
     STAGE1_LAG_TEMPLATE,
@@ -1286,24 +1284,6 @@ def run_ens_mean(*, context: Context, root: Path, product: WeatherProduct) -> li
     return results
 
 
-def run_ifs_single(*, context: Context, root: Path, product: WeatherProduct) -> list[pl.DataFrame]:
-    """Fit B0 and L1 with IFS HRES at lead-days 1 and 2, point model, primary setting.
-
-    Args:
-        context: The run's context.
-        root: The output root.
-        product: The weather product (`ifs_single`).
-
-    Returns:
-        The results, in the order fitted.
-    """
-    frames = read_lead_frames(
-        root=root, product=product, lead_days=IFS_LEAD_DAYS, smoke=context.smoke
-    )
-    fits = longer_lead_fits(lead_days=IFS_LEAD_DAYS, arms=REPLICATE_ARMS)
-    return fit_all(context=context, frames=frames, fits=fits)
-
-
 def _write_shortlist(
     *, directory: Path, sweep: pl.DataFrame, chosen: str, chosen_global: str
 ) -> None:
@@ -1405,16 +1385,11 @@ def input_fingerprint(*, root: Path, product: WeatherProduct) -> dict[str, str]:
         product: The weather product.
 
     Returns:
-        The digest of each lead-day frame (every lead-day of the ENS mean, or lead-days 1 and 2
-        for IFS HRES), and for the ENS mean the stage-1 hours and the positive-control frames, by
+        The digest of each lead-day frame, the stage-1 hours and the positive-control frames, by
         file name.
     """
-    if product == "ens_mean":
-        paths = output_paths(root=root, product=product, lead_days=ENS_MEAN_LEAD_DAYS)
-        files = [paths[key] for key in paths if key != "report"]
-    else:
-        paths = output_paths(root=root, product=product, lead_days=IFS_LEAD_DAYS)
-        files = [paths[f"day{day}"] for day in IFS_LEAD_DAYS]
+    paths = output_paths(root=root, product=product, lead_days=ENS_MEAN_LEAD_DAYS)
+    files = [paths[key] for key in paths if key != "report"]
     return {file.name: hashlib.sha256(file.read_bytes()).hexdigest() for file in sorted(files)}
 
 
@@ -1479,6 +1454,8 @@ def main() -> int:
     )
     arguments = parser.parse_args()
     product: WeatherProduct = arguments.weather_product
+    if product != "ens_mean":
+        raise SystemExit("IFS HRES is fitted by fit_followups2.py")
     if arguments.reproduction_check:
         return reproduction_check(
             root=arguments.output_root,
@@ -1503,8 +1480,9 @@ def main() -> int:
         max_workers=arguments.max_workers,
         smoke=arguments.smoke,
     )
-    runner = run_ens_mean if product == "ens_mean" else run_ifs_single
-    losses = combine(results=runner(context=context, root=arguments.output_root, product=product))
+    losses = combine(
+        results=run_ens_mean(context=context, root=arguments.output_root, product=product)
+    )
     write_parquet_atomic(frame=losses, path=final)
     _LOG.info("wrote %s (%d rows)", final, losses.height)
     return 0

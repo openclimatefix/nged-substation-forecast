@@ -623,7 +623,9 @@ def test_a_window_that_could_read_the_issue_day_or_is_empty_is_refused(
     ("statistic", "expected"),
     [("mean", 932.0), ("median", 912.0), ("min", 812.0), ("max", 1072.0), ("p90", 1040.0)],
 )
-def test_each_statistic_is_what_it_names_on_asymmetric_days(statistic: str, expected: float):
+def test_each_statistic_is_what_it_names_on_asymmetric_days(
+    statistic: WindowStatistic, expected: float
+):
     target = DAY + timedelta(days=WINDOW_TARGET_DAY_INDEX, hours=12)
 
     window = same_clock_hour_window(
@@ -632,7 +634,7 @@ def test_each_statistic_is_what_it_names_on_asymmetric_days(statistic: str, expe
         day=1,
         first_days_back=1,
         last_days_back=3,
-        statistic=statistic,  # ty: ignore[invalid-argument-type]
+        statistic=statistic,
         min_count=1,
     )
 

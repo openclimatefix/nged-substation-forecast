@@ -27,7 +27,7 @@ def test_the_derated_frame_marks_only_the_plant_s_derated_months_as_not_for_trai
         {
             "site": ["A", "A", "A", "B"],
             "month": ["2025-03", "2025-04", "2026-04", "2025-03"],
-            "constrained": [False, False, True, False],
+            "constrained": [False, True, True, False],
         }
     )
     plan = {"site": "A", "months": ["2025-03", "2026-04"]}
@@ -35,7 +35,8 @@ def test_the_derated_frame_marks_only_the_plant_s_derated_months_as_not_for_trai
     result = fit_followups3.derated_frame(frame=frame, plan=plan)
 
     assert result["site"].to_list() == ["A", "A", "A"]
-    assert result["constrained"].to_list() == [True, False, True]
+    # 2025-04 was already constrained, and stays so; a derated month is marked too.
+    assert result["constrained"].to_list() == [True, True, True]
 
 
 def test_output_ratios_normalise_by_each_plant_s_own_capacity_and_use_only_full_hours():
@@ -70,7 +71,7 @@ def test_output_ratios_normalise_by_each_plant_s_own_capacity_and_use_only_full_
 
     assert ratios["hours"].to_list() == [2]
     assert abs(ratios["ratio"][0] - 0.5) < 1e-12
-    # The alternative ratio counts the plant's third hour too, with no other plant scored there.
+    # The alternative ratio skips the third hour too, at which fewer than three plants are scored.
     assert ratios["n_alt"].to_list() == [2]
 
 

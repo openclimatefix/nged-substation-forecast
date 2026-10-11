@@ -2,15 +2,16 @@
 
 Study for [issue #1138](https://github.com/openclimatefix/nged-substation-forecast/issues/1138).
 The question is whether an XGBoost solar power forecast improves when it is also shown lagged power.
-The design is in `plans/study-lag-features-1138.md` (deleted on merge) and, once published, on its
-page under `docs/studies/`.
+The pre-registered plan is `plans/study-lag-features-1138.md` in git history, and the design and
+results are on the study's page under `docs/studies/`.
 
 ## The scripts
 
-**Run the four scripts in this order, once per weather product.** Each script takes
-`--weather-product ens_mean` (the default and the primary product) or `ifs_single` (an exploratory
-replicate of B0 and L1), and `--output-root` (default `data/studies/per_study/lag_features/`). Every
-output path carries the product name, and no script overwrites a finished output.
+**Run the scripts in this order.** Each script takes `--output-root` (default
+`data/studies/per_study/lag_features/`), and no script overwrites a finished output.
+`build_lag_frame.py` takes `--weather-product ens_mean` (the default) or `ifs_single`, which builds
+the frames `fit_followups2.py` fits, and `--lead-days N [N ...]` to build only those lead-days.
+`fit_lag_arms.py` and `report_lag_features.py` cover the ENS mean only.
 
 | Script | What it does |
 |---|---|
@@ -18,21 +19,17 @@ output path carries the product name, and no script overwrites a finished output
 | `lag_arm_columns.py` | Imported by the builder: the columns of IM, TF, AN, PC, CK, RP and DT, and the anchor assertions. |
 | `fit_lag_arms.py` | Fits stage 1, every arm, the shortlist rule, phase 2, the global and leave-one-plant-out fits, the positive controls and the longer leads, with checkpoints. |
 | `report_lag_features.py` | Prints every table the page quotes into `report_<product>.md` and saves `tables_<product>/*.parquet`. |
-| `lag_features_charts.py` | Draws the figures from those tables, and writes `figure_text_<product>.txt` for the text reviews first (`--text-only`). Each title states a finding taken from the saved tables, and the script raises if a table no longer supports it. The figures are numbered 1 to 19 in the order the page tells the story. Figures 8, 10, 14, and 18 are the post hoc follow-ups, drawn by `--followups`. A full render writes svgo-optimised SVGs to `docs/studies/assets/lag_features_figure_<n>.svg`. |
+| `lag_features_charts.py` | Draws the figures. Every figure reads all three rounds' tables, so render last (see the closing section). It writes `figure_text_<product>.txt` for the text reviews first (`--text-only`). Each title states a finding taken from the saved tables, and the script raises if a table no longer supports it. The figures are numbered 1 to 19 in the order the page tells the story. Figures 8, 10, 14, and 18 are the post hoc follow-ups, drawn by `--followups`. A full render writes svgo-optimised SVGs to `docs/studies/assets/lag_features_figure_<n>.svg`. |
 
 ## Commands that run the study end to end
 
 ```bash
 uv run python studies/lag_features/build_lag_frame.py
+# The IFS HRES frames, which `fit_followups2.py` fits (round 2):
+uv run python studies/lag_features/build_lag_frame.py --weather-product ifs_single
 uv run python studies/lag_features/fit_lag_arms.py --reproduction-check --device cuda --max-workers 4
 uv run python studies/lag_features/fit_lag_arms.py --device cuda --max-workers 4
 uv run python studies/lag_features/report_lag_features.py
-uv run python studies/lag_features/lag_features_charts.py --text-only
-uv run python studies/lag_features/lag_features_charts.py
-# The exploratory replicate with IFS HRES:
-uv run python studies/lag_features/build_lag_frame.py --weather-product ifs_single
-uv run python studies/lag_features/fit_lag_arms.py --weather-product ifs_single --device cuda --max-workers 4
-uv run python studies/lag_features/report_lag_features.py --weather-product ifs_single
 ```
 
 The fit script needs a compute slot. `--smoke` runs the real path on 20 seeded random rows of each
@@ -52,8 +49,6 @@ uv run python studies/lag_features/followup_frames.py
 uv run python studies/lag_features/fit_followups.py --dry-run
 uv run python studies/lag_features/fit_followups.py --device cuda --max-workers 4
 uv run python studies/lag_features/report_followups.py
-uv run python studies/lag_features/lag_features_charts.py --followups --text-only
-uv run python studies/lag_features/lag_features_charts.py --followups
 ```
 
 `--smoke` on `fit_followups.py`, `report_followups.py` and `lag_features_charts.py --followups` runs
@@ -99,7 +94,7 @@ run `build_lag_frame.py`, `followup_frames.py` and `fit_lag_arms.py --smoke` and
 `report_lag_features.py --smoke` into a scratch `--output-root`. A missing file raises with that
 instruction.
 
-**Choices the brief did not settle.**
+**Choices the first science review did not settle.**
 
 - **R1s** needs no fit and is not scored on the controls, in the plan or here.
 - **The climatology column** is a `{fold}` column: for a scored fold, a training row reads the
@@ -131,9 +126,8 @@ checkpoints and manifest, so no earlier output is written.
 ```bash
 # No fit, no GPU: reads only saved files and takes about three minutes.
 uv run python studies/lag_features/report_followups2.py
-# Already built; skip when the frames exist:
+# Already built; skip when the frames exist (the IFS HRES frames come from the first block):
 uv run python studies/lag_features/followup2_frames.py
-uv run python studies/lag_features/build_lag_frame.py --weather-product ifs_single
 # The fit blocks (1,080 fits):
 uv run python studies/lag_features/fit_followups2.py --dry-run
 uv run python studies/lag_features/fit_followups2.py --device cuda --max-workers 4
@@ -141,10 +135,6 @@ uv run python studies/lag_features/fit_followups2.py --device cuda --max-workers
 # report so it fills the fit sections and verifies the manifest:
 uv run python studies/lag_features/report_followups2.py
 ```
-
-`render_figures` refuses to overwrite, so re-rendering any figure needs the old raw SVGs (under
-`figures_ens_mean/` and `followups/figures_followups_ens_mean/`) and the published
-`docs/studies/assets/lag_features_figure_<n>.svg` moved to `superseded/` first.
 
 | Script | What it does |
 |---|---|
@@ -156,8 +146,8 @@ uv run python studies/lag_features/report_followups2.py
 hindsight monthly rescaling on the 8 unselected months and on all 18, the plant-month that
 dominates, the screening months' paired contrasts, the equivalence of each planned contrast against
 the 2% threshold, climatology from earlier years only, the fingerprint figure's extra rows, and the
-numbers the review asked for. The IFS HRES frames come from the existing `ifs_single` build
-option. The PC step-control fits use their own frames, because round 1's step frames lack PC's
+numbers the review asked for. The IFS HRES frames come from `build_lag_frame.py --weather-product
+ifs_single`. The PC step-control fits use their own frames, because round 1's step frames lack PC's
 columns.
 
 ## Round 3: the third science review's follow-ups
@@ -177,8 +167,24 @@ uv run python studies/lag_features/report_followups3.py
 | Script | What it does |
 |---|---|
 | `followup3_plan.py` | Names the plant with the largest B0 error in one of the 8 unselected months, and its derated months (output below 80% of the other plants', on the hours all six are scored), without naming either in code. |
-| `fit_followups3.py` | B0, PC, W7, TF, and Q30 refitted on that plant with its derated months removed from training only (75 fits, by marking the rows `constrained`), and L1, Q30, AN, and N2-2 refitted without `day_of_year` (360 fits). No new column is built, so the first run's anchors and leak probe stand. |
+| `fit_followups3.py` | 450 fits: B0, PC, W7, TF, and Q30 refitted on that plant with its derated months removed from training only (75 fits, by marking the rows `constrained`); a control, B0 on that plant with nothing removed (15 fits), that reproduces the first run's B0; and L1, Q30, AN, and N2-2 refitted without `day_of_year` (360 fits). No new column is built, so the first run's anchors and leak probe stand. |
 | `report_followups3.py` | The output-ratio audit, the width-matched null contrasts, the month-cluster t-intervals, PC, W7, and TF against B0 without day of year, the same-rows comparison at lead-day 14, the cleaning rules that look at later hours, the equivalence table with t-intervals, and the two fit blocks. |
+
+## Render the figures last, after all three rounds' reports
+
+Every figure reads tables from the first run and from rounds 1 to 3, so render only when all
+reports exist. Write the text first for the text reviews, then render.
+
+```bash
+uv run python studies/lag_features/lag_features_charts.py --text-only
+uv run python studies/lag_features/lag_features_charts.py --followups --text-only
+uv run python studies/lag_features/lag_features_charts.py
+uv run python studies/lag_features/lag_features_charts.py --followups
+```
+
+`render_figures` refuses to overwrite, so re-rendering any figure needs the old raw SVGs (under
+`figures_ens_mean/` and `followups/figures_followups_ens_mean/`) and the published
+`docs/studies/assets/lag_features_figure_<n>.svg` moved to `superseded/` first.
 
 ## Choices the plan did not settle
 

@@ -2,8 +2,9 @@
 
 One-off throwaway script for the study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/1138>. The question is whether
-an XGBoost solar power forecast improves when it is also shown lagged power. `docs/studies/` holds
-the design and the results once published, and `plans/study-lag-features-1138.md` holds the plan.
+an XGBoost solar power forecast improves when it is also shown lagged power.
+`docs/studies/forecasts/lag-features.md` holds the design and the results, and the plan is
+`plans/study-lag-features-1138.md` in git history.
 
 **Rows.** `shared_rows()` rebuilds the matched-lead study's shared row set from
 `original/solar_forecast_inputs.parquet` (the same requirements, the same era-aware folds), because
@@ -63,7 +64,7 @@ from lag_arm_columns import (
     transfer_function,
     window_anchor_lines,
 )
-from studies.baselines import issue_time, same_clock_hour_window
+from studies.baselines import WindowStatistic, issue_time, same_clock_hour_window
 from studies.commissioning import drop_commissioning_ramp
 from studies.cross_validation import cut_eras
 from studies.export_cap import with_export_cap
@@ -324,9 +325,6 @@ REQUIRED_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
 other arm's columns may be null, which XGBoost routes natively, and no row is dropped for them. B0's
 calendar and sun columns are non-null on every shared row, which `build_frame` checks."""
 
-LAG_SOURCE_START_DAYS: Final[int] = 30
-"""How many days before the first row the lag source is read from, for the 30-day windows."""
-
 WEEK_DAYS: Final[int] = 7
 WEEK_MIN_DAYS: Final[int] = 5
 """The weekly statistics' window, and the fewest of its days that must hold the hour."""
@@ -381,9 +379,6 @@ FRAME_KEY_COLUMNS: Final[tuple[str, ...]] = (
     "clear_sky_w_m2",
 )
 """The columns every frame carries besides the arms' features."""
-
-MIN_SLOPE_DAYS: Final[int] = 15
-"""The fewest days with a valid peak that the slope of the daily peak is fitted to."""
 
 
 def shared_rows() -> pl.DataFrame:
@@ -669,7 +664,7 @@ def _same_hour_columns(
         The `lag_d<k>`, `week_*` and `q30_*` columns in `needed`.
     """
     columns: dict[str, pl.Series] = {}
-    specs = [
+    specs: list[tuple[str, WindowStatistic, int, int, int]] = [
         *((f"lag_d{day}", "mean", day, day, 1) for day in range(1, 8)),
         *((f"week_{name}", name, 1, WEEK_DAYS, WEEK_MIN_DAYS) for name in ("min", "max", "mean")),
         *((f"q30_{name}", name, 1, MONTH_DAYS, MONTH_MIN_DAYS) for name in ("p90", "median")),
@@ -682,7 +677,7 @@ def _same_hour_columns(
                 day=lead_day,
                 first_days_back=first,
                 last_days_back=last,
-                statistic=statistic,  # ty: ignore[invalid-argument-type]
+                statistic=statistic,
                 min_count=minimum,
             )
     return columns

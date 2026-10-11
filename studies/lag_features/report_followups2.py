@@ -118,6 +118,10 @@ class Aligned:
         values: Each series' values, shape (n_seeds, n_rows).
     """
 
+    site: np.ndarray
+    month: np.ndarray
+    values: dict[str, np.ndarray]
+
     def __init__(self, *, frame: pl.DataFrame, names: list[str]) -> None:
         """Align a wide frame (one column per series) into arrays, dropping rows with a null.
 
@@ -135,9 +139,9 @@ class Aligned:
         if not all(part.select("site", "time").equals(keys) for part in per_seed[1:]):
             msg = "the seeds do not all hold the same rows"
             raise ValueError(msg)
-        self.site: np.ndarray = per_seed[0]["site"].to_numpy()
-        self.month: np.ndarray = per_seed[0]["month"].to_numpy()
-        self.values: dict[str, np.ndarray] = {
+        self.site = per_seed[0]["site"].to_numpy()
+        self.month = per_seed[0]["month"].to_numpy()
+        self.values = {
             name: np.stack([part[name].to_numpy() for part in per_seed]) for name in names
         }
 

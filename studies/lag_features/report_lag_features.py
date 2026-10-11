@@ -43,7 +43,6 @@ from build_lag_frame import (
     ENS_MEAN_LEAD_DAYS,
     FULL_SWEEP_LEAD_DAY,
     GLOBAL_ONLY_ARMS,
-    IFS_LEAD_DAYS,
     LAG_FEATURES_DIR,
     POSITIVE_CONTROL_SHIFTS,
     RATIO_TEMPLATE,
@@ -153,9 +152,6 @@ at a tight relative tolerance."""
 R5_WINDOW_DAYS: Final[int] = 30
 R5_MIN_EVENTS: Final[int] = 10
 """R5 reads the stage-1 residuals of the last 30 whole days, and needs at least 10."""
-
-SEED_ORDER: Final[tuple[int, ...]] = SEEDS
-
 
 MONTH_LABELS: Final[dict[str, str]] = {
     "all": "all months",
@@ -1623,15 +1619,11 @@ def report_text(*, root: Path, product: WeatherProduct, tables: Path, smoke: boo
     paths = output_paths(root=root, product=product, lead_days=())
     lines = [f"# Lag features: report for the weather product `{product}`", ""]
     lines += ["## Build report", "", paths["report"].read_text()]
-    if product == "ens_mean":
-        lines += ens_mean_sections(
-            root=root, product=product, tables=tables, losses=losses, smoke=smoke
-        )
-        lead_days = ENS_MEAN_LEAD_DAYS
-    else:
-        lead_days = IFS_LEAD_DAYS
+    lines += ens_mean_sections(
+        root=root, product=product, tables=tables, losses=losses, smoke=smoke
+    )
     longer, longer_table = longer_lead_table(
-        losses=losses, root=root, product=product, lead_days=lead_days, smoke=smoke
+        losses=losses, root=root, product=product, lead_days=ENS_MEAN_LEAD_DAYS, smoke=smoke
     )
     _save_table(frame=longer_table, tables=tables, name="by_lead")
     lines += ["## Error and gain over B0 by lead-day (exploratory)", "", *longer]
@@ -1646,6 +1638,10 @@ def main() -> int:
     parser.add_argument("--smoke", action="store_true", help="Report a `--smoke` fit's output.")
     arguments = parser.parse_args()
     product: WeatherProduct = arguments.weather_product
+    if product != "ens_mean":
+        raise SystemExit(
+            "The report covers the ENS mean; IFS HRES is reported by report_followups2.py"
+        )
     suffix = run_suffix(smoke=arguments.smoke)
     directory = arguments.output_root / product
     path = directory / f"report_{product}{suffix}.md"

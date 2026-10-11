@@ -19,7 +19,7 @@ because a 00 UTC run is published after its first hours have passed.
 The figures, numbered in the order the page tells the story (figures 8, 10, 14 and 18 are the post
 hoc follow-ups, drawn by `--followups`):
 
-1. The planned contrasts with their 99% intervals (the headline).
+1. The planned contrasts with their 99% confidence intervals (the headline).
 2. The data: forecast irradiance against measured power, and the lag against the target.
 3. How each lag column is built for one example day.
 4. The stage-1 folds that two-step arms withhold.
@@ -97,12 +97,6 @@ is not usable for its early hours in a live service."""
 HOUR_TICKS: Final[list[int]] = [0, 6, 12, 18, 24]
 """An hour-of-day axis is ticked at these hours and clipped to the hours with daylight."""
 
-HOURS_PER_DAY: Final[int] = 24
-"""Converts an hour of the day into a fraction of a day on a week's axis."""
-
-WEEK_RULES: Final[tuple[str, ...]] = ("sunniest", "most variable", "cloudiest")
-"""The rules that pick the three weeks drawn, stated in the figure text and never chosen by eye."""
-
 PANEL_HEIGHT_PX: Final[int] = 200
 """A single panel's height."""
 
@@ -130,13 +124,16 @@ ARM_KEY: Final[dict[str, str]] = {
     "CTX7": "seven separate daily lags and their weather forecasts",
     "AN": (
         "the analogue ensemble: the mean, the forecast clear-sky index and the spread of the "
-        "power (rescaled by clear-sky irradiance) on the 5 of the last 30 days whose forecast "
-        "clear-sky index was closest to the target's"
+        "power (rescaled by the Haurwitz clear-sky model's irradiance) on the 5 of the last 30 "
+        "days "
+        "whose forecast clear-sky index was closest to the target's"
     ),
     "TF": "the 30-day ratio of power to forecast irradiance (the transfer ratio)",
     "PC": (
         "the 7-day ratio of power to the satellite irradiance of the Copernicus Atmosphere "
-        "Monitoring Service (CAMS), and the 30-day ratio of CAMS to forecast irradiance"
+        "Monitoring Service (CAMS; all-sky global horizontal irradiance, hourly, from Meteosat "
+        "Second "
+        "Generation), and the 30-day ratio of CAMS to forecast irradiance"
     ),
     "CK": "the plant's clipping ceiling",
     "RP": "the plant's recent energy relative to the other plants",
@@ -208,6 +205,16 @@ SHARED_TERMS: Final[dict[str, str]] = {
 """One sentence per shared term, so that a figure defining a term uses the shared wording."""
 
 
+TITLE_NAMES: Final[dict[str, str]] = {
+    "PC": "the satellite ratio",
+    "W7": "the weekly statistics",
+    "AN": "the analogue ensemble",
+    "TF": "the transfer ratio",
+    "Q30": "the 30-day percentiles",
+    "L1": "one day's lag",
+}
+"""A plain name a title uses for an arm, so that no title carries an arm code."""
+
 ARM_NICKNAMES: Final[dict[str, str]] = {"PC": "the satellite ratio", "W7": "the weekly statistics"}
 """A plain name a title uses for an arm, which every arm key gives beside the code."""
 
@@ -234,7 +241,7 @@ def arm_key(*arms: str) -> str:
     """Return the one-line arm key of the arms a figure shows.
 
     Args:
-        arms: The arm codes the figure shows, in the order to list them.
+        *arms: The arm codes the figure shows, in the order to list them.
 
     Returns:
         A line of the form `Arms. B0: the baseline with no lag. L1: ...`.
@@ -449,7 +456,7 @@ def _intervals_chart(
 
 
 def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
-    """Figure 1: the five planned contrasts with their 99% intervals.
+    """Figure 1: the five planned contrasts with their 99% confidence intervals.
 
     Args:
         tables: The report's tables directory.
@@ -483,13 +490,27 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         threshold=THRESHOLD_SHARE * pl.col("reference_value") * PERCENTAGE_POINTS
     )
     span = float(rows["upper"].max()) - float(rows["lower"].min())  # ty: ignore[invalid-argument-type]
+    excluded: list[str] = [
+        str(contrast)
+        for (contrast,), part in rows.group_by("contrast", maintain_order=True)
+        if bool(((part["lower"] > -part["threshold"]) & (part["upper"] < part["threshold"])).all())
+    ]
+    claim(
+        holds=excluded == ["P1", "P3", "P4", "P5"],
+        what="the 99% confidence intervals of P1, P3, P4, and P5 lie between the ticks",
+    )
     verdicts = (
         rows.group_by("label", maintain_order=True)
         .agg(
-            verdict=pl.col("combined_verdict").first().fill_null("not both settings"),
+            contrast=pl.col("contrast").first(),
             x=pl.max_horizontal(pl.col("upper").max(), pl.col("threshold").max()),
         )
-        .with_columns(x=pl.col("x") + 0.02 * span)
+        .with_columns(
+            x=pl.col("x") + 0.02 * span,
+            verdict=pl.when(pl.col("contrast").is_in(excluded))
+            .then(pl.lit("no detectable change; a 2% gain ruled out"))
+            .otherwise(pl.lit("no detectable change; a 2% gain not ruled out")),
+        )
     )
     thresholds = (
         rows.filter(pl.col("setting") == "primary")
@@ -503,16 +524,7 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         .mark_tick(color=ocf.BLACK_1, thickness=1.5, size=26, aria=False)
         .encode(y=alt.Y("label:N", sort=None), x="x:Q")  # ty: ignore[unresolved-attribute]
     )
-    excluded: list[str] = [
-        str(contrast)
-        for (contrast,), part in rows.group_by("contrast", maintain_order=True)
-        if bool(((part["lower"] > -part["threshold"]) & (part["upper"] < part["threshold"])).all())
-    ]
-    claim(
-        holds=excluded == ["P1", "P3", "P4", "P5"],
-        what="the 99% intervals of P1, P3, P4, and P5 lie between the ticks at both settings",
-    )
-    domain = [float(rows["lower"].min()) - 0.05 * span, float(rows["upper"].max()) + 0.55 * span]  # ty: ignore[invalid-argument-type]
+    domain = [float(rows["lower"].min()) - 0.05 * span, float(rows["upper"].max()) + 1.3 * span]  # ty: ignore[invalid-argument-type]
     excluded_text = f"{', '.join(excluded[:-1])}, and {excluded[-1]}"
     x_title = (
         "Change in error, treatment minus reference (percentage points of capacity; "
@@ -520,7 +532,7 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     )
     claim(
         holds=bool(((rows["lower"] < 0) & (rows["upper"] > 0)).all()),
-        what="every planned contrast's 99% interval includes zero",
+        what="every planned contrast's 99% confidence interval includes zero",
     )
     title = "No planned contrast found lagged power changing day-ahead error significantly"
     subtitle = [
@@ -534,15 +546,14 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
             "P4: L1 minus B0 on CRPS. P5: L1 minus B0 in one XGBoost model shared by all plants."
         ),
         (
-            "Dot: estimate at each hyperparameter setting. Line: 99% interval from resampling "
+            "Dot: estimate at each hyperparameter setting. Line: 99% confidence interval from "
+            "resampling "
             "whole months. Zero: no change. Ticks: the 2% decision threshold, minus and "
             "plus 2% of the reference arm's own error."
         ),
         (
-            "The words at the right of a row give the verdict from both settings. "
-            "'unresolved' is the planned rule's verdict: no gain shown. "
-            f"The 99% intervals of {excluded_text} lie wholly between the ticks at both "
-            "settings (a post hoc reading)."
+            "The words at the right of a row say whether the 99% confidence intervals at both "
+            "settings rule out a 2% gain."
         ),
     ]
     footnote = [
@@ -553,6 +564,13 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
             "treatment arm minus a reference arm. Each row names its reference arm's own error. "
             "CRPS is the continuous ranked probability score, approximated from nine quantiles "
             "(0.1 to 0.9)."
+        ),
+        (
+            "The planned rule labels each contrast 'unresolved' when its interval includes zero; "
+            "the rule has no outcome for 'any gain is smaller than the threshold', so the ruling "
+            f"out is a post hoc reading. {excluded_text} are 99% confidence intervals wholly "
+            "between the ticks at both settings; the threshold is 2% of the reference arm's own "
+            "error."
         ),
         SHARED_TERMS["setting"],
         arm_key("B0", "L1", "L2", "S2", "AN"),
@@ -757,7 +775,10 @@ def control_figure(*, tables: Path, followup_tables: Path, text: FigureText) -> 
         what="L1 is not distinguishable from the random-lag controls",
     )
     ten = oracle.sort("shift").row(-1, named=True)
-    claim(holds=float(ten["upper"]) < 0, what="the oracle's 99% interval is below zero at 10%")
+    claim(
+        holds=float(ten["upper"]) < 0,
+        what="the oracle's 99% confidence interval is below zero at 10%",
+    )
     oracle_gain, oracle_shift = abs(float(ten["difference"])), float(ten["shift"])
     labels = [f"{shift:.0%}" for shift in sorted(control["shift"].to_list())]
     shifts = f"{', '.join(labels[:-1])}, or {labels[-1]}"
@@ -780,7 +801,8 @@ def control_figure(*, tables: Path, followup_tables: Path, text: FigureText) -> 
     ]
     footnote = [
         (
-            "Dot: estimate. Line: interval from resampling whole months. Zero: no change. "
+            "Dot: estimate. Line: confidence interval from resampling whole months. Zero: no "
+            "change. "
             "Months being scored are the months the fitted forecasts are tested on."
         ),
         "All rows are exploratory.",
@@ -1022,7 +1044,7 @@ def sweep_figure(
             domain=[SCREEN_BETTER, SCREEN_UNRESOLVED, SCREEN_WORSE],
             range=[ocf.DATA_GREEN, NO_FIT_COLOUR, ocf.BRAND_ORANGE],
         ),
-        legend=alt.Legend(title="95% interval", titleLimit=0, labelLimit=0),
+        legend=alt.Legend(title="95% confidence interval", titleLimit=0, labelLimit=0),
     )
     y = alt.Y("label:N", sort=order, title=None, axis=alt.Axis(labelLimit=0))
     base = alt.Chart(plotted)
@@ -1071,8 +1093,8 @@ def sweep_figure(
     picked = str(json.loads(shortlist.read_text())["x"])
     claim(holds=best["arm"] == picked, what="the arm that beat B0 is the one the screen picked")
     title = (
-        f"The screen picked {best['arm']} on these months, so its "
-        f"{abs(best['difference']):.2f}-point gain over B0 is biased upward"
+        f"The screen picked {TITLE_NAMES[best['arm']]} on these months, so its "
+        f"{abs(best['difference']):.2f}-point gain is biased upward"
     )
     without = contrasts.filter((pl.col("arm") == best["arm"]) & (pl.col("rows") != "all rows")).row(
         0, named=True
@@ -1087,12 +1109,13 @@ def sweep_figure(
         (
             "Each fitted arm's mean absolute error minus B0's over the first 10 of the 18 scored "
             "months, in percentage points of capacity; negative beats B0. Dot: estimate. Line: "
-            "95% interval of the paired difference from resampling whole months and a seed. "
+            "95% confidence interval of the paired difference from resampling whole months and a "
+            "seed. "
             f"Only {best['arm']} clearly beat B0, and {worse.height} arms clearly lost to it."
         ),
         (
-            "A screen, not a test: it picks an arm for the later months. Green: the interval is "
-            "below zero. Orange: above zero. Grey: it includes zero."
+            "A screen, not a test: it picks an arm for the later months. Green: the confidence "
+            "interval is below zero. Orange: above zero. Grey: it includes zero."
         ),
         (
             "Bottom: R4 and R5 on CRPS, the continuous ranked probability score, which compares "
@@ -1104,7 +1127,7 @@ def sweep_figure(
         (
             "Without the plant-month with the largest B0 error (one plant in one month), "
             f"{best['arm']}'s difference is {without['difference']:+.2f} points, 95% "
-            f"interval [{without['lower']:+.2f}, {without['upper']:+.2f}]."
+            f"confidence interval [{without['lower']:+.2f}, {without['upper']:+.2f}]."
         ),
         (
             f"The no-fit arms are not paired with B0. Their mean absolute errors, against B0's "
@@ -1134,7 +1157,7 @@ def sweep_figure(
             *footnote,
             diff_title,
             crps_title,
-            "95% interval: green, grey, orange",
+            "95% confidence interval: green, grey, orange",
         ],
     )
     return figure(panels=panels, number=9, title=title, subtitle=subtitle, footnote=footnote)
@@ -1274,13 +1297,14 @@ def by_lead_figure(*, tables: Path, tables2: Path, text: FigureText) -> alt.VCon
         what="the random-day null also gains at the longest lead",
     )
     title = (
-        f"At lead-day {longest}, B0's error is {abs(last['difference']):.1f} points above the "
-        "earlier-years climatology's, and a random-day lag gains too"
+        f"At lead-day {longest} the baseline is {abs(last['difference']):.1f} points worse than "
+        "climatology from earlier years, and a random-day lag gains too"
     )
     subtitle = [
         (
             "Top: each arm's mean absolute error minus B0's at the same lead-day, in percentage "
-            "points of capacity; below zero beats B0. Line: 95% interval from resampling whole "
+            "points of capacity; below zero beats B0. Line: 95% confidence interval from "
+            "resampling whole "
             "months."
         ),
         (
@@ -1288,7 +1312,7 @@ def by_lead_figure(*, tables: Path, tables2: Path, text: FigureText) -> alt.VCon
             "points of capacity; smaller is better. The earlier-years climatology is drawn at "
             f"lead-days 1, 7, 10, and 14 only, on the {last['n_rows']} rows (at lead-day "
             f"{longest}) where it exists; its difference to B0 at lead-day {longest} is "
-            f"{last['difference']:+.2f} points, 95% interval "
+            f"{last['difference']:+.2f} points, 95% confidence interval "
             f"[{last['lower'] * PERCENTAGE_POINTS:+.2f}, {last['upper']:+.2f}]."
         ),
         (
@@ -1364,7 +1388,7 @@ def coverage_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | Non
         .encode(  # ty: ignore[unresolved-attribute]
             x=sky,
             xOffset="arm:N",
-            y=alt.Y("coverage:Q", title="Share inside the 10% to 90% interval"),
+            y=alt.Y("coverage:Q", title="Share inside the 10%-90% forecast band"),
             color=colours,
         )
     ).properties(width=CONTENT_WIDTH_PX - 52, height=160)
@@ -1379,14 +1403,14 @@ def coverage_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | Non
         .encode(  # ty: ignore[unresolved-attribute]
             x=sky,
             xOffset="arm:N",
-            y=alt.Y("width:Q", title="Mean interval width (percentage points of capacity)"),
+            y=alt.Y("width:Q", title="Mean forecast band width (percentage points of capacity)"),
             color=colours,
         )
     ).properties(width=CONTENT_WIDTH_PX - 52, height=160)
     overall = coverage.filter(pl.col("sky") == "all")
     claim(
         holds=bool((overall["coverage"] < NOMINAL_COVERAGE).all()),
-        what="the interval holds less than its nominal share of hours",
+        what="the forecast band holds less than its nominal share of hours",
     )
     claim(
         holds=float(overall["coverage"].max() - overall["coverage"].min()) < 0.02,  # ty: ignore[unsupported-operator]
@@ -1394,14 +1418,14 @@ def coverage_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | Non
     )
     typical = float(overall["coverage"].mean())  # ty: ignore[invalid-argument-type]
     title = (
-        f"The 10% to 90% interval holds about {typical:.0%} of hours rather than "
+        f"The 10%-90% forecast band holds about {typical:.0%} of hours rather than "
         f"{NOMINAL_COVERAGE:.0%}, with and without the lag"
     )
     subtitle = [
         (
-            "Top: the share of hours whose measured power falls between the forecast's 10% and "
-            "90% quantiles (dashed line: the nominal 80%). Bottom: the mean distance between "
-            "those quantiles, in percentage points of capacity."
+            "Top: the share of hours whose measured power falls inside the forecast band, the "
+            "range between the forecast's 10% and 90% quantiles (dashed line: the nominal 80%). "
+            "Bottom: the mean width of the forecast band, in percentage points of capacity."
         ),
         (
             "Forecast sky is the weather forecast's clear-sky index: its irradiance relative to "
@@ -1415,13 +1439,13 @@ def coverage_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | Non
     ]
     text.add(
         figure_id="17",
-        plots="Coverage and width of the 10% to 90% interval for B0 and L1",
+        plots="Coverage and width of the 10%-90% forecast band for B0 and L1",
         lines=[
             title,
             *subtitle,
             *footnote,
-            "Share inside the 10% to 90% interval",
-            "Mean interval width (percentage points of capacity)",
+            "Share inside the 10%-90% forecast band",
+            "Mean forecast band width (percentage points of capacity)",
             "B0 (no lag) or L1 (one lag)",
         ],
     )
@@ -1708,7 +1732,7 @@ def by_plant_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
             ),
         )
     )
-    title = "Each arm's error at each plant, and its gain over B0 there"
+    title = "Each arm's error at each plant, and its gain over the baseline there"
     subtitle = [
         (
             "Cell text: mean absolute error at lead-day 1, % of capacity, smaller is better, all "
@@ -1876,7 +1900,7 @@ def derated_figure(*, tables3: Path, text: FigureText) -> alt.VConcatChart:
     claim(holds=n_low == 3, what="the plant has three low-output months")
     title = (
         f"Dropping one plant's {NUMBER_WORDS[n_low]} low-output months from training removes "
-        "PC's and W7's gains"
+        "the satellite ratio's and weekly statistics' gains"
     )
     pc, w7, tf, q30 = (by_arm[a] for a in ("PC", "W7", "TF", "Q30"))
     subtitle = [
@@ -1889,7 +1913,8 @@ def derated_figure(*, tables3: Path, text: FigureText) -> alt.VConcatChart:
         ),
         (
             "Bottom: each arm's mean absolute error minus B0's on the 8 unselected months, over "
-            "all six plants, in percentage points of capacity. Dot: estimate. Line: 95% interval "
+            "all six plants, in percentage points of capacity. Dot: estimate. Line: 95% "
+            "confidence interval "
             "from resampling months and the three training seeds. Blue: all months in training. "
             "Purple: the orange months removed from that one plant's training, for each arm and "
             "for B0 alike; the months are still scored."
@@ -1979,7 +2004,7 @@ def monthly_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         )
         .properties(width=CONTENT_WIDTH_PX - 57, height=220)
     )
-    title = "Month by month, the paired difference from B0 at the day-ahead lead"
+    title = "Month by month, the paired difference from the baseline at the day-ahead lead"
     subtitle = [
         (
             "Each bar: the mean over plants, training runs (seeds), and hours of one arm's mean "
@@ -2124,7 +2149,7 @@ def fingerprint_figure(*, tables2: Path, text: FigureText) -> alt.VConcatChart:
     unseen = pair[("LOPO G-FP", "LOPO G-FPnoCK")]
     claim(
         holds=float(unseen["lower"]) > 0,
-        what="the clipping ceiling's 95% interval is above zero for unseen plants",
+        what="the clipping ceiling's 95% confidence interval is above zero for unseen plants",
     )
     claim(
         holds=all(float(pair[(t, "G-B0")]["difference"]) < 0 for t in ("G-ID", "G-ID+TF", "G-FP")),
@@ -2138,7 +2163,8 @@ def fingerprint_figure(*, tables2: Path, text: FigureText) -> alt.VConcatChart:
         (
             "Change in error of a shared XGBoost model given plant information, compared with "
             "the same model given none (G-B0), in percentage points of capacity; more negative "
-            "is better. Dot: estimate. Line: 95% interval from resampling whole months and a seed."
+            "is better. Dot: estimate. Line: 95% confidence interval from resampling whole months "
+            "and a seed."
         ),
         (
             "Each row label gives the two models' mean absolute errors (% of capacity). Orange: "
@@ -2320,21 +2346,27 @@ def followup_controls_figure(*, tables2: Path, text: FigureText) -> alt.VConcatC
     )
     steps = controls.filter(pl.col("kind") == "step")
     resolved = int((steps["lower"] > 0).sum())
+    name = TITLE_NAMES[best]
     title = (
-        f"{best} recovers {shares[best]:.0%} of a planted 10% power loss in the month-level "
-        f"control; one day's lag recovers {shares['L1']:.0%}"
+        f"{name[0].upper()}{name[1:]} recovers {shares[best]:.0%} of a planted 10% power loss "
+        f"across all plants; one day's lag recovers {shares['L1']:.0%}"
     )
+    step_oracle = sorted(
+        {abs(float(v)) * PERCENTAGE_POINTS for v in steps["oracle_difference"].to_list()}
+    )
+    step_oracle_text = " and ".join(f"{v:.3f}" for v in step_oracle)
     subtitle = [
         (
             "Each dot is one arm in one control at one shift size: its error gain over B0, "
             "net of its gain on the unshifted data, divided by the oracle's gain (0: none, 1: all "
             "of it). The oracle is B0 given the true shift factor; its gain is what knowing the "
-            "shift exactly gains a tree model. Line: 95% interval from resampling whole months "
+            "shift exactly gains a tree model. Line: 95% confidence interval from resampling "
+            "whole months "
             "and a seed."
         ),
         (
             "Dashed lines: no gain (0) and the oracle's gain (1). A pair is shown only where the "
-            "oracle's own 99% interval excludes zero. "
+            "oracle's own 99% confidence interval excludes zero. "
             f"In the plant-steps control, {resolved} of {steps.height} shares have an interval "
             "wholly above zero."
         ),
@@ -2344,9 +2376,13 @@ def followup_controls_figure(*, tables2: Path, text: FigureText) -> alt.VConcatC
             "A control is a planted-loss test: the forecasts are re-fitted on a synthetic "
             "target in which measured power is cut by the shift (5% or 10%). In the month-level "
             "control, the cut applies in 9 of the 18 scored months and a random half of the "
-            "others, and it shifts all plants in the same months. In the plant-steps control, "
-            "each plant's power is cut for a random 4 to 12 weeks. An arm's standing gain on the "
-            "unshifted data is subtracted so that it is not counted as recovery."
+            "others. In the plant-steps control, each plant's power is cut for a random 4 to 12 "
+            "weeks. An arm's standing gain on the unshifted data is subtracted so that it is not "
+            "counted as recovery. The month-level control cuts every plant in the same months, so "
+            "it cannot tell an input that tracks one plant's level from one that tracks a change "
+            "shared by every plant. The per-plant control's oracle gains are statistically "
+            f"detectable but small ({step_oracle_text} points), so its shares have wide "
+            "intervals."
         ),
         POST_HOC,
         arm_key("B0", *order),
@@ -2458,17 +2494,22 @@ def followup_long_leads_figure(*, tables: Path, text: FigureText) -> alt.VConcat
         cl = by_lead_diff[(lead, "CL")]
         claim(
             holds=cl["lower"] <= 0 <= cl["upper"],
-            what="the 95% interval of CL, climatology as a column, includes zero",
+            what="the 95% confidence interval of CL, climatology as a column, includes zero",
         )
-    title = "Blending B0 with climatology lowers long-lead error more than any lag arm shown does"
+    title = (
+        "Blending the baseline with climatology lowers long-lead error more than any lag arm "
+        "shown does"
+    )
     subtitle = [
         (
             "Top: arms that use climatology. Bottom: lag arms. Error minus B0's in percentage "
-            "points of capacity; negative beats B0. Line: 95% interval from resampling whole "
+            "points of capacity; negative beats B0. Line: 95% confidence interval from resampling "
+            "whole "
             "months. Zero is B0."
         ),
         (
-            "Adding climatology as a column (CL) leaves the 95% interval across zero at every "
+            "Adding climatology as a column (CL) leaves the 95% confidence interval across zero "
+            "at every "
             "lead-day shown, so CL does not clearly beat B0."
         ),
         (
@@ -2591,26 +2632,32 @@ def followup_unselected_figure(
         "Most of PC's and W7's gain on these months comes from one plant in one month; without "
         f"it the 8-month gains are PC {without['PC']['difference'] * PERCENTAGE_POINTS:+.3f}, "
         f"W7 {without['W7']['difference'] * PERCENTAGE_POINTS:+.3f}, TF "
-        f"{without['TF']['difference'] * PERCENTAGE_POINTS:+.3f} (95% intervals include zero)."
+        f"{without['TF']['difference'] * PERCENTAGE_POINTS:+.3f} (95% confidence intervals "
+        f"include zero)."
     )
     title = (
-        "On the 8 months not used for screening, PC, W7, and TF gained most over B0, but AN did not"
+        "On the 8 unscreened months, three level-tracking inputs gained most; "
+        "the analogue ensemble did not"
     )
     subtitle = [
         (
             "Mean absolute error minus B0's at lead-day 1, per-plant fits, in percentage points "
-            "of capacity; negative beats B0. Dot: estimate. Line: 95% interval from resampling "
+            "of capacity; negative beats B0. Dot: estimate. Line: 95% confidence interval from "
+            "resampling "
             "whole months. Zero is B0."
         ),
         (
-            "Black rows use all 8 months; blue and orange rows split them by era. An era of "
-            "fewer than 6 months has a wide interval."
+            "Black rows use all 8 months; blue and orange rows split them by era. An era of 3 "
+            "or 5 months gives a percentile interval that is unreliable and can be too narrow; "
+            "read the era rows as point estimates."
         ),
     ]
     footnote = [
         (
-            f"{SHARED_TERMS['era']} The study has no 2026-01, so the later era starts at "
-            "2026-02. Lead-day 1 is the forecast for the day after the day it is issued. "
+            "An era is one of the three blocks of months the matched-lead study cuts its folds "
+            "in (boundaries at 2025-10 and 2026-02). Neither boundary marks a change to the "
+            "ensemble forecast. The study has no 2026-01, so the later era starts at 2026-02. "
+            "Lead-day 1 is the forecast for the day after the day it is issued. "
             f"The primary hyperparameter setting is {PRIMARY_SETTING}."
         ),
         (
@@ -2618,6 +2665,10 @@ def followup_unselected_figure(
             "sample."
         ),
         concentration,
+        (
+            "These three arms were picked on the same 8 months they are scored on, so their "
+            "gains here are biased upward, as AN's was."
+        ),
         POST_HOC,
         arm_key("B0", *overall["arm"].to_list()),
     ]
@@ -2682,8 +2733,8 @@ def followup_hit_rate_figure(*, tables: Path, text: FigureText) -> alt.VConcatCh
         what="both tails' quantiles hit away from their levels, on the over-confident side",
     )
     title = (
-        f"B0 and L1 are too narrow: too many hours fall outside their {low:.0%} and "
-        f"{high:.0%} quantiles"
+        "The baseline's and the lag's forecast bands are too narrow: too many hours fall "
+        f"outside their {low:.0%} and {high:.0%} quantiles"
     )
     subtitle = [
         (
