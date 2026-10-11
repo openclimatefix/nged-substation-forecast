@@ -79,6 +79,48 @@ def per_type_physics(series_type: str) -> tuple[str, ...]:
     return (*base, *DEMAND_PHYSICS_COLUMNS)
 
 
+PV_IRRELEVANT_COLUMNS: Final[frozenset[str]] = frozenset(
+    {
+        "wind_direction_100m",
+        "wind_direction_10m",
+        "wind_speed_100m",
+        "wind_speed_10m",
+        "windchill",
+        "geopotential_height_500hpa",
+        "pressure_reduced_to_mean_sea_level",
+        "pressure_surface",
+    }
+)
+"""Production columns with no direct physical route to solar output."""
+
+WIND_IRRELEVANT_COLUMNS: Final[frozenset[str]] = frozenset(
+    {
+        "downward_short_wave_radiation_flux_surface",
+        "dew_point_temperature_2m",
+        "categorical_precipitation_type_surface",
+        "local_time_of_year_sin",
+        "local_time_of_year_cos",
+    }
+)
+"""Production columns with no direct physical route to wind output."""
+
+
+def lean_generators(series_type: str) -> tuple[str, ...]:
+    """Keep the lags but cut the weekday columns and the weather columns a generator ignores."""
+    if series_type == "PV":
+        drop = WEEKDAY_COLUMNS | PV_IRRELEVANT_COLUMNS
+    elif series_type == "Wind":
+        drop = WEEKDAY_COLUMNS | WIND_IRRELEVANT_COLUMNS
+    else:
+        return PRODUCTION_COLUMNS
+    return tuple(c for c in PRODUCTION_COLUMNS if c not in drop)
+
+
+def lean_wind_only(series_type: str) -> tuple[str, ...]:
+    """`lean_generators` for wind farms; every other series, PV included, keeps production's."""
+    return lean_generators(series_type) if series_type == "Wind" else PRODUCTION_COLUMNS
+
+
 def with_lead_time(series_type: str) -> tuple[str, ...]:
     """Show every series the production columns and the forecast lead time."""
     return (*PRODUCTION_COLUMNS, "nwp_lead_time_hours")
@@ -223,6 +265,20 @@ FEATURE_ARMS: Final[tuple[Arm, ...]] = (
         columns=per_type_physics,
     ),
     Arm(
+        name="a3_lean_generators",
+        cleaning=CHOSEN_CLEANING,
+        family="features",
+        description="PV and wind keep their lags but lose weekday and irrelevant weather columns.",
+        columns=lean_generators,
+    ),
+    Arm(
+        name="a3w_lean_wind_only",
+        cleaning=CHOSEN_CLEANING,
+        family="features",
+        description="Only wind farms lose the weekday and irrelevant weather columns (post hoc).",
+        columns=lean_wind_only,
+    ),
+    Arm(
         name="c1_lead_time",
         cleaning=CHOSEN_CLEANING,
         family="features",
@@ -315,11 +371,17 @@ def combine(*, name: str, parts: tuple[Arm, ...], description: str) -> Arm:
     )
 
 
+_A3W = next(a for a in FEATURE_ARMS if a.name == "a3w_lean_wind_only")
 _C1 = next(a for a in FEATURE_ARMS if a.name == "c1_lead_time")
 _C2 = next(a for a in TRAINING_ARMS if a.name == "c2_early_stopping")
 _C4 = next(a for a in TRAINING_ARMS if a.name == "c4_absolute_error")
 
 ROUND2_ARMS: Final[tuple[Arm, ...]] = (
+    combine(
+        name="r2_c4_c2_c1_a3w",
+        parts=(_C4, _C2, _C1, _A3W),
+        description="The best ladder step plus lean wind-farm columns (post hoc).",
+    ),
     combine(
         name="r2_c4_c2",
         parts=(_C4, _C2),
